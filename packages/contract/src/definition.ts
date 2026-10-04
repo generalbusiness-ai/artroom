@@ -16,6 +16,7 @@ export interface DeclaredDefinition {
   acts: Record<string, ActType>;         // at most 48
   receives: Record<string, ReceiveType>; // at most 24
   timed: Record<string, TimedRule>;      // the timed rules, by name (section 5.2)
+  rules: Record<string, string>;         // the expressions a `rule` guard names, in the profile's language (section 6.5)
 }
 
 /**

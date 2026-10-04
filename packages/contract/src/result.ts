@@ -26,7 +26,9 @@ export type RefusalReason =
   | "guard-failed"
   | "slot-full"         // a party list would pass its `max`
   | "type-full"         // an opening would pass the type's `max` of live items
-  | "send-unresolved";  // a send's target or item resolves to nothing
+  | "send-unresolved"   // a send's target or item resolves to nothing
+  | "unknown-message"   // a delivered request names no handler of the definition for a scope of that kind
+  | "bad-input";        // a diagnosis, outcome or checkpoint that does not follow from the scope's state
 
 /** Why an input was not judged. A retry is judged again (sections 4.2, 5.2, 5.3 and 6.5). */
 export type UnavailableReason = "dependency-unavailable" | "busy" | "clock-behind" | "scope-provisional" | "guard-incomplete" | "unavailable";

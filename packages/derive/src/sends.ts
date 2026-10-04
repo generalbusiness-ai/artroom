@@ -12,9 +12,11 @@ import { isLocalId, isScopeRef } from "./values.ts";
 
 /**
  * `cause` is the seed cause of any scope this input creates (section 7.2):
- * for an act, its intent digest.
+ * an act's intent digest, a delivery's delivery cause digest, or a genesis's
+ * own seed digest. `first` is the ordinal of the first written send: 1 in a
+ * child's genesis, whose result is at ordinal 0.
  */
-export function deriveSends(j: Judging, forms: readonly SendForm[], working: ReadonlyMap<string, Item>, cause: Digest): Derived<{ sends: Send[] }> {
+export function deriveSends(j: Judging, forms: readonly SendForm[], working: ReadonlyMap<string, Item>, cause: Digest, first = 0): Derived<{ sends: Send[] }> {
   const on = working.get("on") ?? null;
   const onType = on ? j.definition.declared.items[on.type]! : null;
   const slotType = (slot: string): FieldType | null => (onType?.refs[slot]?.to ?? onType?.values[slot]?.of ?? null);
@@ -51,8 +53,9 @@ export function deriveSends(j: Judging, forms: readonly SendForm[], working: Rea
   const sends: Send[] = [];
   const relations = new Set<string>();
   let creations = 0;
-  for (const [n, form] of forms.entries()) {
-    const refuse = (what: string) => ({ ok: false, reason: "send-unresolved", detail: `sends.${n}: ${what}` }) as const;
+  for (const [i, form] of forms.entries()) {
+    const n = first + i;
+    const refuse = (what: string) => ({ ok: false, reason: "send-unresolved", detail: `sends.${i}: ${what}` }) as const;
     if ("create" in form) {
       // Section 7.2: the seed names this scope as creator, the input's cause, and which creation of that input this is.
       const seed: Seed = { v: 1, kind: form.create.kind, definition: form.create.definition, creator: j.scope.at, cause, ordinal: creations++ };
@@ -68,7 +71,7 @@ export function deriveSends(j: Judging, forms: readonly SendForm[], working: Rea
       if (!isLocalId(item)) return refuse("the item is not a local item");
       // Section 6.4: the key is the target by its scope ID, the item by its local ID, and the name as written.
       const key = JSON.stringify([to.scope, item, form.relate.name]);
-      if (relations.has(key)) return { ok: false, reason: "duplicate-relation", detail: `sends.${n}` };
+      if (relations.has(key)) return { ok: false, reason: "duplicate-relation", detail: `sends.${i}` };
       relations.add(key);
       sends.push({ n, to, message: { class: "request", type: "relate", body: { name: form.relate.name, item: local(item), state: form.relate.state, detail: fields(form.relate.detail) } } });
     } else {

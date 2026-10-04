@@ -1,19 +1,21 @@
 /**
  * One fixture set for every test of derivation, and for the packages that
- * build on it: a key set, two small definitions, and a scope in memory that
+ * build on it: a key set, four small definitions, and a scope in memory that
  * judges, seals and folds the way a runtime's commit does.
  *
  * `lane` is an issue-like lane: an intent, commitments, holds that end by
  * time, reports that take a commitment's attribution, and links to other
  * lanes. `small` is one item type with an act for each refusal and each guard
- * family. The names are made up.
+ * family. `desk` is a small directory that creates `ticket` lanes, by an act
+ * and by a handler; a ticket links to another ticket, asks its desk for a
+ * new one, and has one act under a rule. The names are made up.
  */
 
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { ActType, Bounds, DeclaredDefinition, Digest, Entry, FieldValue, Grant, Guard, Intent, KeyId, MemberId, MemberRef, ScopeKind, ScopeRef, Seed, SignedIntent, Timestamp } from "@generalbusiness/artroom-contract";
-import { entryHash, keyIdOfSecret, newIncarnation, scopeIdOf, signIntent } from "@generalbusiness/artroom-bytes";
-import { MemoryState, applyEntry, clockOf, entryOf, judgeAct, judgeTimed, nextDue, timeMs, timeOf, validateDefinition } from "../src/index.ts";
-import type { ActJudgment, Draft, JudgeContext, Presented, TimedJudgment, ValidDefinition, Validation } from "../src/index.ts";
+import type { ActType, Bounds, DeclaredDefinition, Digest, Entry, FactRef, FieldValue, Grant, Guard, Input, Intent, KeyId, MemberId, MemberRef, ScopeKind, ScopeRef, Seed, Send, SignedIntent, Timestamp } from "@generalbusiness/artroom-contract";
+import { entryHash, intentDigest, keyIdOfSecret, newIncarnation, scopeIdOf, signIntent } from "@generalbusiness/artroom-bytes";
+import { MemoryState, applyEntry, clockOf, entryOf, judgeAct, judgeDelivery, judgeGenesis, judgeTimed, nextDue, timeMs, timeOf, validateDefinition } from "../src/index.ts";
+import type { ActJudgment, Creation, Delivered, DeliveryContext, Draft, JudgeContext, Judgment, Presented, Source, TimedJudgment, ValidDefinition, Validation } from "../src/index.ts";
 
 export const d = (c: string): Digest => `sha256:${c.repeat(64)}`;
 export const T0 = "2026-10-04T12:00:00Z";
@@ -131,6 +133,7 @@ export const lane: DeclaredDefinition = {
   timed: {
     "hold-end": { on: "hold", states: ["held"], deadline: "until", effects: [{ state: "ended" }, { hold: { do: "end" } }], attention: [{ notify: { slot: "holder", of: "on", when: "after", reason: "hold ended" } }] },
   },
+  rules: {},
 };
 
 // ---------------------------------------------------------------- the small definition
@@ -190,6 +193,7 @@ export const small: DeclaredDefinition = {
   },
   receives: {},
   timed: {},
+  rules: {},
 };
 
 export function valid(v: Validation): ValidDefinition {
@@ -198,6 +202,111 @@ export function valid(v: Validation): ValidDefinition {
 }
 export const laneDefinition = valid(validateDefinition(lane, PROPOSED_BOUNDS));
 export const smallDefinition = valid(validateDefinition(small, PROPOSED_BOUNDS));
+
+// ---------------------------------------------------------------- a parent and its child
+
+/**
+ * A ticket: the lane a desk creates. Its genesis refuses the title "refuse",
+ * and sends its creator an index row.
+ * `link` and `unlink` send the two updates of one relationship key; the
+ * handler for `relate:closes` writes the update's state on the intent that
+ * the detail names. `ask` tells the desk to make another ticket. `approve`
+ * is under a rule: its signer is not the requester.
+ */
+export const ticket: DeclaredDefinition = {
+  format: "artroom-definition-1",
+  profile: { name: "restricted", version: 1 },
+  capabilities: [],
+  genesis: "file",
+  items: {
+    intent: {
+      many: false, max: 1, states: { open: { final: false }, closed: { final: true } }, initial: "open",
+      parties: { requester: { fixed: true, required: true, list: false, author: false } }, refs: {}, values: { title: { ...slot, of: text }, linked: { ...slot, of: text } },
+    },
+    link: {
+      many: true, max: 3, states: { set: { final: false }, removed: { final: true } }, initial: "set", parties: {},
+      refs: { target: { fixed: true, required: true, to: { type: "scope", kind: "lane" } }, me: { fixed: true, required: true, to: { type: "item", of: "link" } } }, values: {},
+    },
+    request: {
+      many: true, max: 4, states: { asked: { final: false }, answered: { final: true }, failed: { final: true } }, initial: "asked", parties: {},
+      refs: { desk: { fixed: true, required: true, to: { type: "scope", kind: "directory" } } }, values: {},
+    },
+  },
+  acts: {
+    file: act({
+      step: "open", on: "intent", grant: "file", fields: { title: { ...text, required: true }, opener: { type: "member", required: true } },
+      guards: [{ differs: { a: { field: "title" }, b: { const: "refuse" } } }],
+      effects: [{ party: { slot: "requester", from: { field: "opener" } } }, { value: { slot: "title", from: { field: "title" } } }],
+      sends: [{ index: { fields: { title: { field: "title" } } } }],
+    }),
+    link: act({
+      step: "open", on: "link", grant: "link", fields: { target: { type: "scope", kind: "lane", required: true }, about: { type: "int", min: 0, max: 1000, required: true } },
+      effects: [{ ref: { slot: "target", from: { field: "target" } } }, { ref: { slot: "me", from: "self" } }],
+      sends: [{ relate: { to: { field: "target" }, name: "closes", item: "self", state: "set", detail: { about: { field: "about" } }, result: {} } }],
+    }),
+    unlink: act({
+      step: "transition", on: "link", grant: "link", guards: [{ state: ["set"] }], effects: [{ state: "removed" }],
+      sends: [{ relate: { to: { slot: "target" }, name: "closes", item: { slot: "me" }, state: "removed", detail: { about: { const: 0 } }, result: {} } }],
+    }),
+    ask: act({
+      step: "open", on: "request", grant: "ask", fields: { desk: { type: "scope", kind: "directory", required: true } },
+      effects: [{ ref: { slot: "desk", from: { field: "desk" } } }],
+      sends: [{ tell: { to: "desk", message: "spawn", fields: { opener: { signer: true }, title: { const: "same" } }, result: { applied: [{ state: "answered" }], undelivered: [{ state: "failed" }] } } }],
+    }),
+    approve: act({ step: "transition", on: "intent", grant: "approve", guards: [{ state: ["open"] }, { rule: "two-eyes" }], effects: [{ state: "closed" }] }),
+  },
+  receives: {
+    closes: {
+      message: "relate:closes", from: { kind: "lane" }, also: { intent: { item: "intent", by: "about" } }, guards: [],
+      effects: [{ of: "also.intent", value: { slot: "linked", from: { field: "state" } } }], sends: [], attention: [],
+    },
+  },
+  timed: {},
+  rules: { "two-eyes": "signer.member != subjects.on.parties.requester.member" },
+};
+export const ticketDefinition = valid(validateDefinition(ticket, PROPOSED_BOUNDS));
+
+const makeTicket = { kind: "lane", definition: ticketDefinition.digest } as const;
+
+/**
+ * A desk: a directory. `open-issue` creates a ticket, and each clause of the
+ * creation moves the issue. The handler for `spawn` creates a ticket for a
+ * lane that asks. The handler for `echo` sends two updates that resolve to
+ * one relationship key when its two fields name one item.
+ */
+export const desk: DeclaredDefinition = {
+  format: "artroom-definition-1",
+  profile: { name: "restricted", version: 1 },
+  capabilities: [],
+  genesis: "found",
+  items: {
+    repo: { many: false, max: 1, states: { open: { final: false } }, initial: "open", parties: {}, refs: {}, values: { source: { fixed: true, required: true, of: text } } },
+    issue: {
+      many: true, max: 8, states: { asked: { final: false }, created: { final: false }, refused: { final: true }, conflicted: { final: true } }, initial: "asked",
+      parties: {}, refs: {}, values: { title: { ...slot, of: text } },
+    },
+  },
+  acts: {
+    found: act({ step: "open", on: "repo", grant: "found", fields: { source: { ...text, required: true } }, effects: [{ value: { slot: "source", from: { field: "source" } } }] }),
+    "open-issue": act({
+      step: "open", on: "issue", grant: "open-issue", fields: { title: { ...text, required: true } }, effects: [{ value: { slot: "title", from: { field: "title" } } }],
+      sends: [{ create: { ...makeTicket, fields: { opener: { signer: true }, title: { field: "title" } }, result: { applied: [{ state: "created" }], refused: [{ state: "refused" }], conflict: [{ state: "conflicted" }] } } }],
+    }),
+  },
+  receives: {
+    spawn: {
+      message: "spawn", from: { kind: "lane" }, also: {}, guards: [], effects: [], attention: [],
+      sends: [{ create: { ...makeTicket, fields: { opener: { field: "opener" }, title: { field: "title" } }, result: {} } }],
+    },
+    echo: {
+      message: "echo", from: { kind: "lane" }, also: {}, guards: [], effects: [], attention: [],
+      sends: (["a", "b"] as const).map((item) => ({ relate: { to: { field: "peer" }, name: "mirrors", item: { field: item }, state: "set", detail: {}, result: {} } })),
+    },
+  },
+  timed: {},
+  rules: {},
+};
+export const deskDefinition = valid(validateDefinition(desk, PROPOSED_BOUNDS));
 
 // ---------------------------------------------------------------- a scope in memory
 
@@ -210,51 +319,34 @@ export type Over = Partial<Pick<Intent, "on" | "expected" | "fields" | "idempote
 export type Context = Partial<Omit<JudgeContext, "clock">> & { reading?: Timestamp };
 
 /**
- * A lane created by a directory and confirmed: its genesis opened item 0 for
- * `opener` (entry 0) and its creator's confirmation made it active (entry 1),
- * both at T0. It then does what a commit does: judge at one reading, seal,
- * hash, fold.
+ * One scope's history and state in memory. It does what a commit does: judge
+ * at one reading, seal, hash, fold. `under` is the name a reader of this
+ * scope gives its definition.
  */
-export class Scope {
+export class Ledger {
   readonly state = new MemoryState();
   readonly entries: { entry: Entry; hash: Digest }[] = [];
-  readonly at: ScopeRef;
   /** The reading of the next commit. */
   now: Timestamp = T0;
   bounds: Bounds = PROPOSED_BOUNDS;
   #keys = 0;
 
-  constructor(readonly definition: ValidDefinition, opener: MemberRef = keys.rita.member, confirmed = true) {
-    const declared = definition.declared;
-    const type = declared.acts[declared.genesis]!.on!;
-    const seed: Seed = { v: 1, kind: "lane", definition: definition.digest, creator: directory, cause: d("c"), ordinal: 0 };
-    this.at = { scope: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(9)), kind: "lane" };
-    const source = { at: directory, seq: 17, hash: d("7") };
-    const message = { class: "request", type: "create", body: { fields: { opener } } } as const;
-    const slot = Object.keys(declared.items[type]!.parties)[0]!;
-    this.#fold({
-      v: 1, at: this.at, seq: 0, prev: null, time: T0, clamped: false, epoch: 0,
-      input: { type: "genesis", seed, inc: this.at.inc, founding: null, source, n: 0, message, decision: "applied" }, uses: [], prepared: [],
-      effects: [{ effect: "open", item: 0, type, state: declared.items[type]!.initial }, { effect: "party", item: 0, slot, member: opener }],
-      sends: [{ n: 0, to: directory, message: { class: "result", of: { from: source, n: 0 }, outcome: "applied" } }],
-    });
-    if (confirmed) {
-      const genesis = { at: this.at, seq: 0, hash: this.head.hash };
-      this.#fold({
-        v: 1, at: this.at, seq: 1, prev: this.head.hash, time: T0, clamped: false, epoch: 0,
-        input: { type: "delivery", from: { at: directory, seq: 18, hash: d("8") }, n: 0, message: { class: "control", type: "confirm", genesis } },
-        uses: [], prepared: [], effects: [{ effect: "activate" }], sends: [],
-      });
-    }
-  }
+  constructor(readonly definition: ValidDefinition, readonly under = "ticket") {}
 
+  get at() { return this.state.scope()!.at; }
   get head() { return this.state.scope()!.head; }
+  get last() { return this.entries.at(-1)!.entry; }
   item(id: number) { return this.state.item(id)!; }
-  #fold(entry: Entry): Entry {
+  /** The fact of a sealed entry: a view beside it. */
+  fact(seq: number): FactRef { return { at: this.at, seq, hash: this.entries[seq]!.hash }; }
+  fold(entry: Entry): Entry {
     const hash = entryHash(entry);
     applyEntry(this.state, this.definition, entry, hash);
     this.entries.push({ entry, hash });
     return entry;
+  }
+  seal(draft: Draft, reading: Timestamp = this.now): Entry {
+    return this.fold(entryOf(this.state, draft, clockOf(this.state, reading)));
   }
 
   /** An intent to this scope, with a new idempotency key, admissible for a minute from `now`. */
@@ -275,9 +367,6 @@ export class Scope {
   judge(signed: SignedIntent, over: Context = {}): ActJudgment {
     return judgeAct(this.state, this.definition, signed, this.context(over));
   }
-  seal(draft: Draft, reading: Timestamp = this.now): Entry {
-    return this.#fold(entryOf(this.state, draft, clockOf(this.state, reading)));
-  }
   /** Judge, and write the entry if the judgment is to write. */
   submit(signed: SignedIntent, over: Context = {}): ActJudgment {
     const judgment = this.judge(signed, over);
@@ -291,7 +380,7 @@ export class Scope {
   did(who: Actor, kind: string, over: Over = {}): Entry {
     const judgment = this.act(who, kind, over);
     if (judgment.result !== "write") throw new Error(`${kind} was not written: ${JSON.stringify(judgment)}`);
-    return this.entries.at(-1)!.entry;
+    return this.last;
   }
   /** The drain of section 5.2, step 3, at `now`: each due transition as its own entry. */
   drain(): TimedJudgment[] {
@@ -304,16 +393,114 @@ export class Scope {
     }
     return done;
   }
-  /** Every entry folded again into a new state, as a verifier does. */
-  replay(): MemoryState {
+  /** The first `count` entries, or all, folded again into a new state, as a verifier does. */
+  replay(count = this.entries.length): MemoryState {
     const fresh = new MemoryState();
-    for (const { entry, hash } of this.entries) applyEntry(fresh, this.definition, entry, hash);
+    for (const { entry, hash } of this.entries.slice(0, count)) applyEntry(fresh, this.definition, entry, hash);
     return fresh;
   }
 }
 
+/**
+ * A lane created by a directory and confirmed, with both entries made by
+ * hand: its genesis opened item 0 for `opener` (entry 0) and its creator's
+ * confirmation made it active (entry 1), both at T0. `ordinal` tells two
+ * such lanes apart.
+ */
+export class Scope extends Ledger {
+  constructor(definition: ValidDefinition, opener: MemberRef = keys.rita.member, confirmed = true, ordinal = 0) {
+    super(definition);
+    const declared = definition.declared;
+    const type = declared.acts[declared.genesis]!.on!;
+    const seed: Seed = { v: 1, kind: "lane", definition: definition.digest, creator: directory, cause: d("c"), ordinal };
+    const at: ScopeRef = { scope: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(9 + ordinal)), kind: "lane" };
+    const source = { at: directory, seq: 17, hash: d("7") };
+    const message = { class: "request", type: "create", body: { fields: { opener } } } as const;
+    const slot = Object.keys(declared.items[type]!.parties)[0]!;
+    this.fold({
+      v: 1, at, seq: 0, prev: null, time: T0, clamped: false, epoch: 0,
+      input: { type: "genesis", seed, inc: at.inc, founding: null, source, n: 0, message, decision: "applied" }, uses: [], prepared: [],
+      effects: [{ effect: "open", item: 0, type, state: declared.items[type]!.initial }, { effect: "party", item: 0, slot, member: opener }],
+      sends: [{ n: 0, to: directory, message: { class: "result", of: { from: source, n: 0 }, outcome: "applied" } }],
+    });
+    if (confirmed) {
+      this.fold({
+        v: 1, at, seq: 1, prev: this.head.hash, time: T0, clamped: false, epoch: 0,
+        input: { type: "delivery", from: { at: directory, seq: 18, hash: d("8") }, n: 0, message: { class: "control", type: "confirm", genesis: this.fact(0) } },
+        uses: [], prepared: [], effects: [{ effect: "activate" }], sends: [],
+      });
+    }
+  }
+}
+
+// ---------------------------------------------------------------- entries passed between scopes
+
+/** A directory founded by rita's signed intent (section 7.1): its genesis is judged, sealed and folded. */
+export function founded(): Ledger {
+  const ledger = new Ledger(deskDefinition, "desk");
+  const founding = signIntent({ v: 1, to: null, actor: keys.rita.key, kind: "found", on: null, expected: {}, fields: { source: "a repository" }, idempotencyKey: "found", notAfter: t(60) }, keys.rita.secret);
+  const seed: Seed = { v: 1, kind: "directory", definition: deskDefinition.digest, creator: null, cause: intentDigest(founding.intent), ordinal: 0 };
+  const context = { clock: clockOf(ledger.state, T0), bounds: PROPOSED_BOUNDS, facts: [], prepared: [], source: null };
+  const judgment = judgeGenesis(ledger.state, deskDefinition, { name: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(1)), seed, founding }, context);
+  if (judgment.result !== "write") throw new Error(`the directory was not founded: ${JSON.stringify(judgment)}`);
+  ledger.seal(judgment.draft);
+  return ledger;
+}
+
+/** Send `n` of entry `seq` of `from`, as it arrives, and the source entry as the receiver reads it. */
+export function sent(from: Ledger, seq: number, n = 0): { delivered: Delivered; source: Source } {
+  const { entry } = from.entries[seq]!;
+  const send = entry.sends.find((s) => s.n === n)!;
+  return { delivered: { to: send.to, from: from.fact(seq), n, message: send.message }, source: { entry, under: from.under } };
+}
+
+/** What a test changes in a delivery: the envelope, or the source entry that is read. */
+export type Arrival = Partial<Delivered> & { source?: Source | null };
+
+/** The context of a delivery to `to`: the source entry, and for a result this scope's own entry that sent the request. */
+export function arriving(to: Ledger, delivered: Delivered, source: Source | null): DeliveryContext {
+  const of = delivered.message.class === "result" ? delivered.message.of : null;
+  return { clock: clockOf(to.state, to.now), bounds: to.bounds, facts: [], prepared: [], source, origin: of ? (to.entries[of.from.seq]?.entry ?? null) : null };
+}
+
+/** Judge the delivery of that send to `to`. Nothing is written. */
+export function judged(to: Ledger, from: Ledger, seq: number, n = 0, over: Arrival = {}): Judgment {
+  const { delivered, source } = sent(from, seq, n);
+  const { source: read = source, ...envelope } = over;
+  const arrival = { ...delivered, ...envelope };
+  return judgeDelivery(to.state, to.definition, arrival, arriving(to, arrival, read));
+}
+
+/** Judge it, and write the entry if the judgment is to write. */
+export function deliver(to: Ledger, from: Ledger, seq: number, n = 0): Judgment {
+  const judgment = judged(to, from, seq, n);
+  if (judgment.result === "write") to.seal(judgment.draft);
+  return judgment;
+}
+
+/** The creation that send `n` of entry `seq` of `from` asks for, as it reaches the object its seed names. `mint` makes the incarnation. */
+export function creation(from: Ledger, seq: number, n = 0, mint = 20): { asked: Creation; source: Source } {
+  const { delivered, source } = sent(from, seq, n);
+  const seed = delivered.to as Seed;
+  return { asked: { name: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(mint)), to: seed, from: delivered.from, n, message: delivered.message as Creation["message"] }, source };
+}
+
+/** A new store that receives that creation: the child's genesis is judged and, if it is to be written, sealed. */
+export function born(from: Ledger, seq: number, n = 0, mint = 20): { child: Ledger; judgment: Judgment } {
+  const child = new Ledger(ticketDefinition);
+  const { asked, source } = creation(from, seq, n, mint);
+  const judgment = judgeGenesis(child.state, ticketDefinition, asked, { clock: clockOf(child.state, T0), bounds: PROPOSED_BOUNDS, facts: [], prepared: [], source });
+  if (judgment.result === "write") child.seal(judgment.draft);
+  return { child, judgment };
+}
+
+/** An entry made by hand, as a source that some scope might return: it has a hash, and nothing judged it. */
+export function forged(at: ScopeRef, seq: number, input: Input, sends: readonly Send[]): Source {
+  return { entry: { v: 1, at, seq, prev: d("0"), time: T0, clamped: false, epoch: 0, input, uses: [], prepared: [], effects: [], sends }, under: "ticket" };
+}
+
 /** Short forms for a transition's `on` with its expected revision, and for fields. */
-export const on = (scope: Scope, id: number, also: Record<string, number> = {}): Over => ({
+export const on = (scope: Ledger, id: number, also: Record<string, number> = {}): Over => ({
   on: id, expected: { on: scope.item(id).revision, ...Object.fromEntries(Object.entries(also).map(([name, other]) => [name, scope.item(other).revision])) },
 });
 export const fields = (f: Record<string, FieldValue>): Over => ({ fields: f });

@@ -1,6 +1,6 @@
 /**
  * The fold: how one sealed entry changes the state (scope contract, sections
- * 4.1, 4.2, 6.3 and 7.2 to 7.4). `applyEntry` is the only code that changes
+ * 4.1 to 4.3, 6.3 and 7.2 to 7.4). `applyEntry` is the only code that changes
  * state. The runtime runs it against storage inside the commit and a
  * verifier runs it in memory, so the two cannot drift.
  *
@@ -81,6 +81,8 @@ export function applyEntry(writer: StateWriter, definition: ValidDefinition, ent
   }
   // Section 7.2: a child is provisional until its creator confirms it; a refused genesis is terminal. A directory has no creator to confirm it.
   let status: Status = scope?.status ?? (input.type === "genesis" && input.decision === "refused" ? "refused" : input.type === "genesis" && input.seed.creator === null ? "active" : "provisional");
+  // Section 7.2: every send of a provisional genesis but its result, at ordinal 0, is a duty that is held until the confirmation.
+  let held: readonly number[] = scope?.held ?? (status === "provisional" ? entry.sends.filter((s) => s.n !== 0).map((s) => s.n) : []);
   const signer = signerOf(entry);
 
   // Effects, in the order recorded. `before` holds each touched item as it was, or null for the one this entry opens.
@@ -110,7 +112,15 @@ export function applyEntry(writer: StateWriter, definition: ValidDefinition, ent
         break;
       case "activate":
         status = "active";
+        held = [];
         break;
+      case "operation": {
+        // Section 4.3: attempts are numbered from 1, each opened by an entry before it is sent.
+        const operation = writer.operation(effect.operation) ?? { id: effect.operation, attempts: [] };
+        if (effect.attempt !== operation.attempts.length + 1) throw new FoldError(`entry ${entry.seq} opens attempt ${effect.attempt} of ${effect.operation} out of order`);
+        writer.putOperation({ ...operation, attempts: [...operation.attempts, { attempt: effect.attempt, opened: entry.seq, outcome: null }] });
+        break;
+      }
       case "index": case "attention":
         break; // Rows and notices that no guard of this scope reads.
     }
@@ -133,16 +143,21 @@ export function applyEntry(writer: StateWriter, definition: ValidDefinition, ent
   }
 
   // Bookkeeping that the input implies.
-  if (input.type === "act") {
+  if (input.type === "genesis") {
+    // Section 7.2: a repeat of the creation request is answered from the genesis, as a repeat of any delivery is from its entry.
+    if (input.source && input.n !== null) writer.putDecided(input.source, input.n, entry.seq);
+  } else if (input.type === "act") {
     // Section 4.2: the record of accepted keys is an index over the history.
     writer.putAccepted(input.signed.intent.actor, input.signed.intent.idempotencyKey, { seq: entry.seq, intent: intentDigest(input.signed.intent) });
   } else if (input.type === "delivery") {
-    writer.putDecided(input.from.at, input.from.seq, input.n, entry.seq);
+    // Section 7.3: the owner entry this delivery consumed is recorded, and is never consumed again.
+    writer.putDecided(input.from, input.n, entry.seq);
     if ("clause" in input) {
       const of = input.message.of;
       const request = writer.request(of.from.seq, of.n);
       if (!request) throw new FoldError(`entry ${entry.seq} records a result of a request this scope did not send`);
-      writer.putRequest({ ...request, result: { seq: entry.seq, clause: input.clause } });
+      // A request has one result. A conflict is a second incarnation's answer to a creation: it is recorded and replaces nothing.
+      if (request.result === null) writer.putRequest({ ...request, result: { seq: entry.seq, clause: input.clause } });
       // Section 7.2: the first applied result of a creation is the incarnation this scope holds for that seed.
       if (input.clause === "applied" && !("scope" in request.to)) writer.putCreation(seedDigest(request.to), { inc: input.from.at.inc, seq: entry.seq });
     }
@@ -150,12 +165,18 @@ export function applyEntry(writer: StateWriter, definition: ValidDefinition, ent
     const request = writer.request(input.of.seq, input.of.n);
     if (!request) throw new FoldError(`entry ${entry.seq} diagnoses a request this scope did not send`);
     writer.putRequest({ ...request, diagnosis: { seq: entry.seq, finding: input.finding } });
+  } else if (input.type === "outcome") {
+    // Section 4.3: an outcome settles its own attempt and no other.
+    const operation = writer.operation(input.operation);
+    if (!operation?.attempts.some((a) => a.attempt === input.attempt)) throw new FoldError(`entry ${entry.seq} records an outcome of an attempt that no entry opened`);
+    writer.putOperation({ ...operation, attempts: operation.attempts.map((a) => (a.attempt === input.attempt ? { ...a, outcome: { seq: entry.seq, result: input.result } } : a)) });
   }
 
   // Section 7.4: only a request has a result, so only a request is outstanding.
   for (const send of entry.sends) {
-    if (send.message.class === "request") writer.putRequest({ seq: entry.seq, n: send.n, type: send.message.type, to: send.to, result: null, diagnosis: null });
+    if (send.message.class === "request") writer.putRequest({ seq: entry.seq, n: send.n, hash, type: send.message.type, to: send.to, result: null, diagnosis: null });
   }
 
-  writer.setScope({ at: entry.at, creator: scope ? scope.creator : input.type === "genesis" ? input.seed.creator : null, status, head: { seq: entry.seq, hash }, time: entry.time });
+  const genesis = scope?.genesis ?? { hash, source: input.type === "genesis" ? input.source : null, n: input.type === "genesis" ? input.n : null };
+  writer.setScope({ at: entry.at, creator: scope ? scope.creator : input.type === "genesis" ? input.seed.creator : null, status, head: { seq: entry.seq, hash }, time: entry.time, genesis, held });
 }

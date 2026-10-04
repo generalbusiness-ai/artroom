@@ -181,6 +181,8 @@ describe("idempotency (section 4.2)", () => {
     const first = s.head;
 
     expect(s.submit(signed)).toEqual({ result: "accepted-before", seq: first.seq });
+    // The key is consumed for the life of the scope: the exact retry returns the first entry also after its notAfter.
+    expect(s.submit(signed, { reading: t(3600) })).toEqual({ result: "accepted-before", seq: first.seq });
     // The key stays with the first intent: another intent under it never takes effect, even one that would be refused.
     for (const kind of ["offer", "close"]) expect(s.submit(s.intent(rita, kind, { ...over, notAfter: t(30) }))).toEqual({ result: "mismatch", reason: "idempotency-mismatch" });
     expect(s.head).toEqual(first);

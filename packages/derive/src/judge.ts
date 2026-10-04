@@ -5,32 +5,29 @@
  * inside the commit's transaction; a verifier calls the same judge over the
  * folded state and compares what it derives with what the entry records.
  *
- * This file holds the judges of an act and of a timed transition. Genesis,
- * deliveries, diagnoses, outcomes and checkpoints are judged by functions of
- * the same shape: they build a `Judging`, derive with `judgeGuard`,
- * `deriveEffects` and `deriveSends`, and return a `Draft`.
+ * This file holds the judges of an act and of a timed transition, and what
+ * every judge returns. `genesis.ts`, `delivery.ts` and `settle.ts` hold the
+ * others. Each builds a `Judging`, derives with `judgeGuard`, `deriveEffects`
+ * and `deriveSends`, and returns a `Draft`.
  */
 
-import type { Bounds, Digest, Effect, Entry, FactRef, FactUse, FieldType, FieldValue, Grant, Head, Input, Intent, MismatchReason, Prepared, RefusalReason, Send, SignedIntent, UnavailableReason } from "@generalbusiness/artroom-contract";
-import { canonicalBytes, digestBytes, entryHash, intentDigest, verifySignedIntent } from "@generalbusiness/artroom-bytes";
+import type { Effect, Entry, FactUse, Grant, Head, Input, MismatchReason, Prepared, RefusalReason, RoutingRefusal, ScopeRef, Send, SignedIntent, UnavailableReason } from "@generalbusiness/artroom-contract";
+import { intentDigest, scopeIdOf, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import { deriveEffects } from "./effects.ts";
-import { judgeGuard, type Fetched, type Judging } from "./guards.ts";
+import { isIntent, readFacts, readFields, type Reading } from "./frame.ts";
+import { judgeGuard, type Judging } from "./guards.ts";
 import { deriveSends } from "./sends.ts";
 import type { Item, StateView } from "./state.ts";
 import { nextDue, type Due } from "./timed.ts";
 import { timeMs, type Clock } from "./time.ts";
 import type { ValidDefinition } from "./validate.ts";
-import { byteOrder, isLocalId, isObject, isScopeRef, isValue, same } from "./values.ts";
+import { isScopeRef, same } from "./values.ts";
 
 /** A grant as presented, with the authority port's verdict on whether it is current (section 5.1, held authority). */
 export interface Presented { grant: Grant; current: boolean }
 
-export interface JudgeContext {
-  clock: Clock;                         // the one reading of this commit (section 5.3); see `clockOf`
+export interface JudgeContext extends Reading {
   grants: readonly Presented[];
-  facts: readonly Fetched[];            // fetched before the turn; each entry's bytes already checked against its hash
-  prepared: readonly Prepared[];        // the rule results of preparation (section 5.2, step 5)
-  bounds: Bounds;
 }
 
 /** What a judged input writes. `seq`, `prev` and `time` are allocated when it is sealed; see `entryOf`. */
@@ -59,17 +56,18 @@ export type TimedJudgment =
   | { result: "dropped"; failed: "held" | "reached" | "next" }   // which of the three checks of step 6.3 failed
   | { result: "unavailable"; reason: "clock-behind" };
 
-/** The shape of section 2.1. A valid signature over some other shape is not an intent. */
-function isIntent(v: unknown): v is Intent {
-  return isObject(v) && Object.keys(v).length === 9 && v["v"] === 1 && (v["to"] === null || isScopeRef(v["to"])) && typeof v["actor"] === "string" && typeof v["kind"] === "string"
-    && (v["on"] === null || isLocalId(v["on"])) && isObject(v["expected"]) && Object.values(v["expected"]).every(isLocalId) && isObject(v["fields"])
-    && typeof v["idempotencyKey"] === "string" && timeMs(v["notAfter"]) !== null;
-}
-
-/** Each value in a field with the type it must have: the field itself, or each element of a list. */
-function leaves(type: FieldType, value: FieldValue): [FieldType, FieldValue][] {
-  return type.type === "list" ? (value as readonly FieldValue[]).flatMap((v) => leaves(type.of, v)) : [[type, value]];
-}
+/**
+ * What the judge of a genesis, a delivery, a diagnosis, an outcome or a
+ * checkpoint answers. Only `write` records anything.
+ */
+export type Judgment =
+  | { result: "write"; draft: Draft }
+  | { result: "source-unverified"; detail: string }               // a source check failed (sections 7.2 and 7.4)
+  | { result: "unavailable"; reason: UnavailableReason }          // not decided; offered again. For a delivery, transport answers "retry"
+  | { result: "repeat"; seq: number }                             // already recorded, by that entry; nothing is added
+  | { result: "due"; next: Due }                                  // section 5.2, step 6.3: the drain runs first
+  | { result: "routing"; reason: RoutingRefusal }                 // a delivery addressed to another scope or incarnation (section 7.4)
+  | { result: "refused"; reason: RefusalReason; detail: string }; // not an input this scope can ever write
 
 export function judgeAct(view: StateView, definition: ValidDefinition, signed: SignedIntent, context: JudgeContext): ActJudgment {
   const scope = view.scope();
@@ -82,17 +80,20 @@ export function judgeAct(view: StateView, definition: ValidDefinition, signed: S
   if (!verifySignedIntent(signed) || !isIntent(signed.intent)) return refused("bad-intent", "not a signed intent");
   const intent = signed.intent;
 
-  // Addressing and lifetime (sections 2.1 and 4.2). An intent stops being admissible at its `notAfter`.
+  // Addressing (section 2.1).
   if (!intent.to || !same(intent.to, scope.at)) return refused("misaddressed", "to");
+
+  // Section 4.2: the key belongs to the first sealed intent of this actor, for the life of the scope. So the exact retry
+  // of an accepted intent is answered with its entry at any time, also after its `notAfter`.
+  const digest = intentDigest(intent);
+  const earlier = view.accepted(intent.actor, intent.idempotencyKey);
+  if (earlier) return earlier.intent === digest ? { result: "accepted-before", seq: earlier.seq } : { result: "mismatch", reason: "idempotency-mismatch" };
+
+  // Lifetime (sections 2.1 and 4.2). An intent stops being admissible at its `notAfter`.
   const asOf = timeMs(clock.asOf)!;
   const notAfter = timeMs(intent.notAfter)!;
   if (asOf >= notAfter) return refused("expired", "notAfter");
   if (notAfter - asOf > bounds.intentLifetimeSeconds * 1000) return refused("bad-intent", "notAfter is further ahead than an intent may live");
-
-  // Section 4.2: the key belongs to the first sealed intent of this actor, for the life of the scope.
-  const digest = intentDigest(intent);
-  const earlier = view.accepted(intent.actor, intent.idempotencyKey);
-  if (earlier) return earlier.intent === digest ? { result: "accepted-before", seq: earlier.seq } : { result: "mismatch", reason: "idempotency-mismatch" };
 
   // Section 5.2, step 6.3: an input that is not timed never passes a due transition.
   const next = nextDue(view, definition, clock.asOf);
@@ -105,31 +106,13 @@ export function judgeAct(view: StateView, definition: ValidDefinition, signed: S
   const act = Object.hasOwn(declared.acts, intent.kind) ? declared.acts[intent.kind] : undefined;
   if (!act || intent.kind === declared.genesis) return refused("unknown-act", intent.kind);
 
-  // Section 6.2: each field is required or optional, an optional field may have a default, and an unknown field is refused.
-  const fields: Record<string, FieldValue> = {};
-  for (const name of Object.keys(intent.fields)) if (!Object.hasOwn(act.fields, name)) return refused("bad-field", `${name} is not a field of ${intent.kind}`);
-  for (const [name, type] of Object.entries(act.fields)) {
-    const value = Object.hasOwn(intent.fields, name) ? intent.fields[name] : type.default;
-    if (value === undefined && type.required) return refused("bad-field", `${name} is required`);
-    if (value === undefined) continue;
-    if (!isValue(type, value, bounds)) return refused("bad-field", `${name} is not a value of its type`);
-    fields[name] = value;
-  }
-  // What the fields name: local items, which must exist, and foreign facts, which must have been fetched.
-  const facts = new Map<Digest, Fetched>();
-  const uses: FactUse[] = [];
-  for (const name of Object.keys(fields).sort(byteOrder)) {
-    for (const [type, value] of leaves(act.fields[name]!, fields[name]!)) {
-      if (type.type === "item" && view.item(value as number)?.type !== type.of) return refused("no-item", `${name} names no ${type.of}`);
-      if (type.type !== "fact" || facts.has((value as FactRef).hash)) continue;
-      const ref = value as FactRef;
-      const fetched = context.facts.find((f) => f.fact.hash === ref.hash);
-      // Section 5.2, step 1: a foreign entry that was not fetched, or is not the entry the reference names, is a dependency that is not available.
-      if (!fetched || fetched.entry.seq !== ref.seq || !same(fetched.entry.at, ref.at) || entryHash(fetched.entry) !== ref.hash) return { result: "unavailable", reason: "dependency-unavailable" };
-      facts.set(ref.hash, fetched);
-      uses.push({ fact: ref, content: digestBytes(canonicalBytes(fetched.entry)) });
-    }
-  }
+  const read = readFields(act.fields, intent.fields, bounds);
+  if (!read.ok) return refused("bad-field", read.detail);
+  const fields = read.fields;
+  const named = readFacts(view, act.fields, fields, context.facts);
+  if (named.result === "no-item") return refused("no-item", named.detail);
+  if (named.result === "unavailable") return { result: "unavailable", reason: "dependency-unavailable" };
+  const { facts, uses } = named;
   if (uses.length > bounds.usesPerEntry) return refused("bad-field", `more than ${bounds.usesPerEntry} foreign entries`);
 
   // Section 6.4: `on` and each `also` name are resolved to local items before any guard or effect.
@@ -170,15 +153,13 @@ export function judgeAct(view: StateView, definition: ValidDefinition, signed: S
   if (!presented) return refused("unauthorized", `no current grant of ${act.grant} to this key in this scope`);
   const signer = { member: presented.grant.subject, principal: presented.grant.principal };
 
-  const j: Judging = { view, definition, bounds, clock, scope, self: scope.head.seq + 1, kind: intent.kind, fields, fieldTypes: act.fields, subjects, signer, facts, prepared: context.prepared };
+  const j: Judging = { view, definition, bounds, clock, scope, self: scope.head.seq + 1, kind: intent.kind, fields, fieldTypes: act.fields, subjects, signer, facts, prepared: context.prepared, used: [], asked: context.asked };
 
   for (const [i, guard] of act.guards.entries()) {
     const result = judgeGuard(j, guard);
     if (result === "fail") return refused("guard-failed", `guards.${i}`);
     if (result !== "pass") return { result: "unavailable", reason: result };
   }
-  const prepared = act.guards.flatMap((g) => ("rule" in g ? context.prepared.filter((p) => p.rule === g.rule).slice(0, 1) : []));
-
   const effects = deriveEffects(j, act.effects, act.attention, act.step === "open" ? act.on : null);
   if (!effects.ok) return refused(effects.reason, effects.detail);
   const sends = deriveSends(j, act.sends, effects.working, digest);
@@ -193,7 +174,7 @@ export function judgeAct(view: StateView, definition: ValidDefinition, signed: S
 
   // Section 5.3: every act judges its `notAfter` and its grant's expiry on the commit clock, so no act is written while the clock is behind.
   if (clock.behind) return { result: "unavailable", reason: "clock-behind" };
-  return { result: "write", draft: { input: { type: "act", signed, authority: [presented.grant] }, uses, prepared, effects: effects.effects, sends: sends.sends, judgesTime: true } };
+  return { result: "write", draft: { input: { type: "act", signed, authority: [presented.grant] }, uses, prepared: j.used, effects: effects.effects, sends: sends.sends, judgesTime: true } };
 }
 
 /**
@@ -214,7 +195,7 @@ export function judgeTimed(view: StateView, definition: ValidDefinition, selecte
   const next = nextDue(view, definition, clock.reading);
   if (next?.item !== selected.item || next.rule !== selected.rule) return { result: "dropped", failed: "next" };
 
-  const j: Judging = { view, definition, bounds, clock, scope, self: scope.head.seq + 1, kind: selected.rule, fields: {}, fieldTypes: {}, subjects: new Map([["on", item]]), signer: null, facts: new Map(), prepared: [] };
+  const j: Judging = { view, definition, bounds, clock, scope, self: scope.head.seq + 1, kind: selected.rule, fields: {}, fieldTypes: {}, subjects: new Map([["on", item]]), signer: null, facts: new Map(), prepared: [], used: [] };
   const effects = deriveEffects(j, rule.effects, rule.attention, null);
   // The validator admits no timed rule whose effects can be refused: they change a live item of the rule's own type.
   if (!effects.ok) throw new Error(`timed rule ${selected.rule} cannot apply: ${effects.reason}`);
@@ -224,15 +205,18 @@ export function judgeTimed(view: StateView, definition: ValidDefinition, selecte
 /**
  * The entry a draft becomes at this head and this reading (section 5.3): the
  * reading is its time, or, when the clock is behind, the previous entry's
- * time with `clamped: true`. Its hash is computed afterwards, over these
+ * time with `clamped: true`. A genesis draft becomes entry 0 of the scope its
+ * seed and incarnation name. The hash is computed afterwards, over these
  * bytes.
  */
 export function entryOf(view: StateView, draft: Draft, clock: Clock): Entry {
   const scope = view.scope();
-  if (!scope) throw new Error("a scope's first entry is its genesis");
+  const input = draft.input;
+  if ((scope === null) !== (input.type === "genesis")) throw new Error("a scope's first entry is its genesis, and it has one");
   if (clock.behind && draft.judgesTime) throw new Error("an entry that judges time is not written while the clock is behind");
+  const at: ScopeRef = scope?.at ?? (input.type === "genesis" ? { scope: scopeIdOf(input.seed), inc: input.inc, kind: input.seed.kind } : null as never);
   return {
-    v: 1, at: scope.at, seq: scope.head.seq + 1, prev: scope.head.hash, time: clock.asOf, clamped: clock.behind, epoch: 0,
-    input: draft.input, uses: draft.uses, prepared: draft.prepared, effects: draft.effects, sends: draft.sends,
+    v: 1, at, seq: scope ? scope.head.seq + 1 : 0, prev: scope ? scope.head.hash : null, time: clock.asOf, clamped: clock.behind, epoch: 0,
+    input, uses: draft.uses, prepared: draft.prepared, effects: draft.effects, sends: draft.sends,
   };
 }

@@ -2,12 +2,11 @@ import { describe, expect, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { DeclaredDefinition } from "@generalbusiness/artroom-contract";
 import { definitionDigest } from "@generalbusiness/artroom-bytes";
-import { validateDefinition, type ProblemCode, type Profile } from "../src/index.ts";
-import { lane, laneDefinition, small, smallDefinition } from "./fixtures.ts";
+import { validateDefinition, type ProblemCode } from "../src/index.ts";
+import { desk, lane, laneDefinition, small, smallDefinition, ticket } from "./fixtures.ts";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Change = (d: any) => void;
-const withRule: Record<string, Profile> = { "restricted@1": { rules: ["two-eyes"] } };
 const overdue = { on: "note", states: ["draft"], deadline: "due", effects: [{ state: "kept" }], attention: [] };
 const clone = <T>(v: T): T => structuredClone(v);
 
@@ -15,11 +14,14 @@ const clone = <T>(v: T): T => structuredClone(v);
  * Each row is one definition: a fixture with one change. `null` passes; a
  * code is the only kind of problem the validator reports for it.
  */
-const rows: readonly (readonly [string, DeclaredDefinition, Change, ProblemCode | null, Record<string, Profile>?])[] = [
+const rows: readonly (readonly [string, DeclaredDefinition, Change, ProblemCode | null])[] = [
   ["the lane passes", lane, () => {}, null],
   ["the small definition passes", small, () => {}, null],
-  ["a rule guard the profile declares passes", small, (d) => d.acts.keep.guards.push({ rule: "two-eyes" }), null, withRule],
-  ["a rule guard the profile does not declare", small, (d) => d.acts.keep.guards.push({ rule: "two-eyes" }), "rule"],
+  ["the desk passes", desk, () => {}, null],
+  ["the ticket passes, with a rule guard that names a rule it declares", ticket, () => {}, null],
+  ["a rule guard that names no declared rule", ticket, (d) => { d.rules = {}; }, "rule"],
+  ["two handlers for one message from one kind of scope", desk, (d) => { d.receives.again = clone(d.receives.spawn); }, "handler"],
+  ["a tell under a name the platform keeps for a relate", ticket, (d) => { d.acts.ask.sends[0].tell.message = "relate:closes"; }, "handler"],
   ["a time value set by a genesis, with no timed rule on its type, passes", small, (d) => d.acts.start.effects.push({ value: { slot: "due", from: { time: { plusSeconds: 60 } } } }), null],
 
   // Section 6.4, the table of X1 and X2.
@@ -67,10 +69,10 @@ const rows: readonly (readonly [string, DeclaredDefinition, Change, ProblemCode 
 ];
 
 describe("the definition validator", () => {
-  for (const [name, base, change, code, profiles] of rows) test(name, () => {
+  for (const [name, base, change, code] of rows) test(name, () => {
     const definition = clone(base);
     change(definition);
-    const result = validateDefinition(definition, PROPOSED_BOUNDS, profiles);
+    const result = validateDefinition(definition, PROPOSED_BOUNDS);
     expect(result.ok ? null : [...new Set(result.problems.map((p) => p.code))]).toEqual(code === null ? null : [code]);
     // A problem says where it is.
     if (!result.ok) for (const p of result.problems) expect(p.path + p.message).not.toBe("");

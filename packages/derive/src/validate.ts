@@ -27,6 +27,7 @@ export type ProblemCode =
   | "genesis-timed"      // the genesis act opens a timed item type or has a `hold` effect (section 6.4)
   | "timed"              // a timed rule that is not about its own live item, or that would stay due
   | "hold"               // the hold capability used without what it needs (section 6.8)
+  | "handler"            // two handlers for one message from one kind of scope, or a name the platform keeps
   | "capability" | "profile" | "rule";
 
 export interface Problem { code: ProblemCode; path: string; message: string }
@@ -45,11 +46,19 @@ export interface ValidDefinition {
 
 export type Validation = { ok: true; definition: ValidDefinition } | { ok: false; problems: readonly Problem[] };
 
-/** The rule names an evaluator profile declares, by `name@version` (section 6.5, the `rule` guard). */
-export interface Profile { rules: readonly string[] }
+/**
+ * An evaluator profile, by `name@version` (section 6.1). `admit` says why the
+ * profile does not admit a rule's text, or null. It is synchronous. The
+ * evaluator's own entry point, `@generalbusiness/artroom-derive/rule`, exports
+ * the table that checks each rule; this one checks names and shapes only, so
+ * that the judges never load the engine.
+ */
+export interface Profile { admit?: (source: string) => string | null }
 
-/** The profiles this package knows. `restricted@1` declares no rule until its evaluator is reviewed. */
-export const PROFILES: Readonly<Record<string, Profile>> = { "restricted@1": { rules: [] } };
+export const PROFILES: Readonly<Record<string, Profile>> = { "restricted@1": {} };
+
+/** The message names a `tell` may not use: the platform runs a handler of that name for a `relate` or an advisory. */
+export const keptMessage = (name: string): boolean => name.startsWith("relate:") || name === "index" || name === "notify";
 
 type Rec = Record<string, unknown>;
 interface Slot { kind: "party" | "ref" | "value"; fixed: boolean; required: boolean; list: boolean; type: FieldType; hasDefault: boolean }
@@ -135,13 +144,21 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
     return all.filter((n): n is string => typeof n === "string");
   };
 
-  const top = rec(input, "", ["format", "profile", "capabilities", "genesis", "items", "acts", "receives", "timed"]);
+  const top = rec(input, "", ["format", "profile", "capabilities", "genesis", "items", "acts", "receives", "timed", "rules"]);
   if (!top) return { ok: false, problems };
   if (top["format"] !== "artroom-definition-1") bad("shape", "format", "must be artroom-definition-1");
 
   const profile = rec(top["profile"], "profile", ["name", "version"]);
-  const rules = (profile && profiles[`${String(profile["name"])}@${String(profile["version"])}`]) || null;
-  if (profile && !rules) bad("profile", "profile", "is not a profile this runtime implements");
+  const evaluator = (profile && profiles[`${String(profile["name"])}@${String(profile["version"])}`]) || null;
+  if (profile && !evaluator) bad("profile", "profile", "is not a profile this runtime implements");
+  // Section 6.5: a rule is a named expression in the profile's language.
+  const rules = new Set<string>();
+  for (const [name, source] of entries(top["rules"], "rules", null)) {
+    const text = str(source, at("rules", name));
+    const refusal = text === null ? null : (evaluator?.admit?.(text) ?? null);
+    if (refusal !== null) bad("rule", at("rules", name), refusal);
+    rules.add(name);
+  }
 
   let holds = false;
   list(top["capabilities"], "capabilities", 2).forEach((c, i) => {
@@ -362,7 +379,7 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
         break;
       }
       case "rule":
-        if (typeof x !== "string" || !rules?.rules.includes(x)) bad("rule", p, "names no rule of the definition's profile");
+        if (typeof x !== "string" || !rules.has(x)) bad("rule", p, "names no rule the definition declares");
         break;
     }
     if ("ifPresent" in o && (bool(o["ifPresent"], at(path, "ifPresent")) === null || !namesField)) bad("shape", at(path, "ifPresent"), "is for a guard that names a field");
@@ -514,7 +531,7 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
         const r = rec(x, p, ["to", "message", "fields", "result"]);
         if (!r) return;
         if (source({ slot: r["to"] }, at(p, "to"), ctx)?.type !== "scope") bad("name", at(p, "to"), "names no slot of the primary item that holds a scope");
-        str(r["message"], at(p, "message"));
+        if (str(r["message"], at(p, "message")) !== null && keptMessage(r["message"] as string)) bad("handler", at(p, "message"), "is a name the platform keeps for a relate or an advisory");
         sources(r["fields"], at(p, "fields"), ctx);
         clauses(r["result"], at(p, "result"), ctx, false);
       } else if (k === "relate") {
@@ -617,12 +634,17 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
     }
   }
 
+  const handled = new Set<string>();
   for (const [name, v] of entries(top["receives"], "receives", bounds.receives)) {
     const path = at("receives", name);
     const o = rec(v, path, ["message", "from", "also", "guards", "effects", "sends", "attention"]);
     if (!o) continue;
     str(o["message"], at(path, "message"));
     const from = rec(o["from"], at(path, "from"), ["kind"], ["under"]);
+    // One message from one kind of scope runs one handler, so the handler an entry ran is found again from the entry alone.
+    const key = canonicalize([String(o["message"]), String(from?.["kind"])]);
+    if (handled.has(key)) bad("handler", path, "another handler receives this message from this kind of scope");
+    handled.add(key);
     if (from && (!SCOPE_KINDS.includes(from["kind"] as never) || ("under" in from && str(from["under"], at(path, "from")) === null))) bad("shape", at(path, "from"), "is a scope kind, and a definition name");
     // A handler has no signer and opens no item; its message fields are not declared, so a field name is not resolved.
     const ctx: Ctx = { on: null, also: also(o["also"], at(path, "also"), null), nascent: false, fields: null, signer: false, timed: false, live: new Set() };

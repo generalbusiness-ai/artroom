@@ -121,6 +121,7 @@ const definition: DeclaredDefinition = {
   },
   receives: {},
   timed: {},
+  rules: {},
 };
 
 const tag: DomainTag = DOMAINS.entry;

@@ -76,7 +76,8 @@ export interface Send { n: number; to: ScopeRef | Seed; message: Message }
 /**
  * One derived change. The contract does not spell this union out; it is the
  * smallest set the effect forms of section 6.6 and the platform's own entries
- * can produce. `item` is always a local ID: the `seq` of the entry that
+ * can produce, with the record that an attempt of an outside operation was
+ * opened, which an outcome needs (section 4.3). `item` is always a local ID: the `seq` of the entry that
  * opened the item.
  */
 export type Effect =
@@ -89,6 +90,7 @@ export type Effect =
   | { effect: "hold"; item: number; change: "open" | "renew" | "end"; epoch: number }   // section 6.8
   | { effect: "relation"; owner: ScopeRef; item: number; name: string; state: string; revision: number }   // the owner's item; section 7.3
   | { effect: "activate" }                                                              // section 7.2
+  | { effect: "operation"; operation: OperationId; attempt: number }                    // opens an operation's next numbered attempt; section 4.3
   | { effect: "index"; from: FactRef; fields: Record<string, FieldValue> }              // a projection row in the directory
   | { effect: "attention"; item: number; members: readonly MemberRef[]; reason: string };
 

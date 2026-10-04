@@ -16,13 +16,19 @@ import { same } from "./values.ts";
 /** A foreign entry fetched before the turn, and the name of the definition its scope pins (section 6.2, the `fact` field). */
 export interface Fetched { fact: FactRef; entry: Entry; under: string }
 
+/**
+ * One `rule` guard as preparation evaluates it (section 5.2, step 5):
+ * the rule, its expression, and the input of section 6.5 with its digest.
+ */
+export interface RuleInput { rule: string; source: string; input: unknown; digest: Digest }
+
 /** Everything the guards, effects and sends of one input read. Built once by a judge, inside the commit. */
 export interface Judging {
   view: StateView;
   definition: ValidDefinition;
   bounds: Bounds;
   clock: Clock;
-  scope: ScopeState;
+  scope: Pick<ScopeState, "at" | "creator">;           // a genesis is judged before its scope has a state
   self: number;                                        // the `seq` of the entry being written (section 6.4)
   kind: string;
   fields: Readonly<Record<string, FieldValue>>;        // with defaults; an absent optional field has no key
@@ -31,6 +37,8 @@ export interface Judging {
   signer: Signer | null;
   facts: ReadonlyMap<Digest, Fetched>;                 // the fetched facts the fields name, in the order of `uses`
   prepared: readonly Prepared[];
+  used: Prepared[];                                    // the prepared results the guards read, for the entry
+  asked?: RuleInput[] | undefined;                     // set by `prepareRules` only: collect each rule's input and judge nothing on it
 }
 
 /** Passed, failed, or not judged, with the reason for the Unavailable answer (section 4.2). */
@@ -92,12 +100,16 @@ function range(j: Judging, form: "some" | "none" | "count", r: Range & { min?: n
   }
 }
 
-/** What a `rule` reads, exactly (section 6.5): no clock and no other item. Preparation digests the same value. */
-export function ruleInputDigest(j: Judging): Digest {
-  return digestBytes(canonicalBytes({
+/**
+ * What a `rule` reads, exactly (section 6.5): the subjects' records, the
+ * kind and fields, the signer's member, and the content of each fetched
+ * fact. No clock and no other item.
+ */
+export function ruleInput(j: Judging): unknown {
+  return {
     kind: j.kind, fields: j.fields, signer: j.signer?.member ?? null,
     subjects: Object.fromEntries(j.subjects), facts: [...j.facts.values()].map((f) => f.entry),
-  }));
+  };
 }
 
 /** The fields a guard names, for `ifPresent`. */
@@ -150,7 +162,16 @@ export function judgeGuard(j: Judging, g: Guard): GuardResult {
     const now = timeMs(j.clock.reading)!;
     return ok(deadline !== null && ("before" in g ? now < deadline : now > deadline));
   }
+  const input = ruleInput(j);
+  const digest = digestBytes(canonicalBytes(input));
+  if (j.asked) {
+    // Preparation: the result is not known yet, so the guard is passed over and the guards after it are met.
+    if (!j.asked.some((a) => a.rule === g.rule && a.digest === digest)) j.asked.push({ rule: g.rule, source: j.definition.declared.rules[g.rule]!, input, digest });
+    return "pass";
+  }
   // Section 5.2, step 6.4: a rule's result from preparation is reused only when it was prepared over these inputs.
-  const prepared = j.prepared.find((p) => p.rule === g.rule);
-  return prepared && prepared.input === ruleInputDigest(j) ? ok(prepared.result) : "unavailable";
+  const prepared = j.prepared.find((p) => p.rule === g.rule && p.input === digest);
+  if (!prepared) return "unavailable";
+  if (!j.used.includes(prepared)) j.used.push(prepared);
+  return ok(prepared.result);
 }
