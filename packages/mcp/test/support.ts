@@ -10,6 +10,9 @@ export type Url = `https://${string}`;
 export async function roomWithMcp(): Promise<{ room: FakeRoom; url: Url; reads: Record<string, number> }> {
   const room = await FakeRoom.create();
   const url = (await room.start()) as Url;
+  // A workspace is ready at the first read after it was asked for, with no second poll of the fake room. A test about
+  // a pending workspace sets its own delay.
+  room.workspaceDelay = 0;
   const reads: Record<string, number> = {};
   // The room as a service binding, counting the reads made through it.
   const service = {

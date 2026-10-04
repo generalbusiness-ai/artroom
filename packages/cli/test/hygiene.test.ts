@@ -13,6 +13,8 @@
  * end the comment and add settings (checker report f593d8f7). Each must have
  * its canonical form: checked when a claim's lane is selected, when a lane
  * is chosen, before the destination is touched, and at the boundary.
+ *
+ * Git here is real: these tests are about what git reads from the files.
  */
 
 import { existsSync, readFileSync } from "node:fs";
@@ -68,12 +70,12 @@ describe("checkGrant", () => {
     expect(() => checkGrant("https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net:8443/git/ns/repo.git", "art_v2_x_AbC-09")).not.toThrow();
   });
 
-  test.each(BAD_REMOTES)("refuses a remote with %s", (_why, remote) => {
-    expect(() => checkGrant(remote as string, GOOD_TOKEN)).toThrow(/not a plain https:\/\/ URL/);
+  test("refuses every remote that is not a plain https URL in normal form", () => {
+    for (const [why, remote] of BAD_REMOTES) expect(() => checkGrant(remote as string, GOOD_TOKEN), `a remote with ${why}`).toThrow(/not a plain https:\/\/ URL/);
   });
 
-  test.each(BAD_TOKENS)("refuses a token with %s", (_why, token) => {
-    expect(() => checkGrant(GOOD_REMOTE, token as string)).toThrow(/characters a token cannot have/);
+  test("refuses every token with a character a token cannot have", () => {
+    for (const [why, token] of BAD_TOKENS) expect(() => checkGrant(GOOD_REMOTE, token as string), `a token with ${why}`).toThrow(/characters a token cannot have/);
   });
 
   test("the refusal does not repeat the token", () => {
@@ -113,39 +115,30 @@ describe("checkMarker", () => {
     expect(() => checkMarker(LANE, 1, "AZaz09_-")).not.toThrow();
     expect(() => checkMarker("act_9007199254740991_ffffffff", 0, "a".repeat(64))).not.toThrow();
   });
-  test.each(BAD_LANES)("refuses a lane with %s", (_why, lane) => {
-    expect(() => checkMarker(lane, 1, "i1")).toThrow(/not a lane ID/);
-  });
-  test.each(BAD_LEASES)("refuses a lease that is %s", (_why, lease) => {
-    expect(() => checkMarker(LANE, lease, "i1")).toThrow(/lease that is not a whole number/);
-  });
-  test.each(BAD_INSTALLS)("refuses an installation ID with %s", (_why, install) => {
-    expect(() => checkMarker(LANE, 1, install)).toThrow(/not an idempotency key/);
+  test("refuses a lane, a lease or an installation ID that is not in its canonical form", () => {
+    for (const [why, lane] of BAD_LANES) expect(() => checkMarker(lane, 1, "i1"), `a lane with ${why}`).toThrow(/not a lane ID/);
+    for (const [why, lease] of BAD_LEASES) expect(() => checkMarker(LANE, lease, "i1"), `a lease that is ${why}`).toThrow(/lease that is not a whole number/);
+    for (const [why, install] of BAD_INSTALLS) expect(() => checkMarker(LANE, 1, install), `an installation ID with ${why}`).toThrow(/not an idempotency key/);
   });
 });
 
 describe("configureWorkspace refuses at its own boundary", () => {
-  test.each([
-    ["lane", `${LANE}${MARK_INJECT}`, 1, "i1"],
-    ["lease", LANE, `1${MARK_INJECT}`, "i1"],
-    ["installation ID", LANE, 1, `i1${MARK_INJECT}`],
-  ])("an injecting %s in the mark adds no git setting, remote or credential file", (_which, lane, lease, install) => {
+  test("an injecting remote, token, lane, lease or installation ID adds no git setting, remote or credential file", () => {
     const dir = repo();
-    expect(() => configureWorkspace(dir, GOOD_REMOTE, GOOD_TOKEN, lane as string, lease as number, install as string)).toThrow();
+    const injecting: readonly [string, string, string, unknown, unknown, unknown][] = [
+      ["remote", `https://artifacts.example/x.git${INJECT}`, GOOD_TOKEN, LANE, 1, "i1"],
+      ["token", GOOD_REMOTE, `${GOOD_TOKEN}\n[core]\n\tsshCommand = touch pwned`, LANE, 1, "i1"],
+      ["lane", GOOD_REMOTE, GOOD_TOKEN, `${LANE}${MARK_INJECT}`, 1, "i1"],
+      ["lease", GOOD_REMOTE, GOOD_TOKEN, LANE, `1${MARK_INJECT}`, "i1"],
+      ["installation ID", GOOD_REMOTE, GOOD_TOKEN, LANE, 1, `i1${MARK_INJECT}`],
+    ];
+    for (const [which, remote, token, lane, lease, install] of injecting) {
+      expect(() => configureWorkspace(dir, remote, token, lane as string, lease as number, install as string), which).toThrow();
+      expect(existsSync(join(dir, ".git", "artroom", "credentials")), which).toBe(false);
+    }
+    // Nothing a refused call wrote could be undone by a later one, so the repository is read once, after all five.
     expect(() => git(dir, "config", "--get", "core.sshCommand")).toThrow();
     expect(git(dir, "remote")).toBe("");
-    expect(existsSync(join(dir, ".git", "artroom", "credentials"))).toBe(false);
-  });
-
-  test.each([
-    ["remote", `https://artifacts.example/x.git${INJECT}`, GOOD_TOKEN],
-    ["token", GOOD_REMOTE, `${GOOD_TOKEN}\n[core]\n\tsshCommand = touch pwned`],
-  ])("an injecting %s adds no git setting, remote or credential file", (_which, remote, token) => {
-    const dir = repo();
-    expect(() => configureWorkspace(dir, remote, token, "act_3_0a1b2c3d", 1, "install-1")).toThrow();
-    expect(() => git(dir, "config", "--get", "core.sshCommand")).toThrow();
-    expect(git(dir, "remote")).toBe("");
-    expect(existsSync(join(dir, ".git", "artroom", "credentials"))).toBe(false);
   });
 
   test("every character the patterns admit, in every field, reads back through git as the whole file: one mark and exactly one setting", () => {

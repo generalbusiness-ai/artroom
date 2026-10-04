@@ -8,7 +8,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { connect, generateSigner, isArtroomError, isRefusal, join } from "@generalbusiness/artroom-client";
 import type { Claim, HttpRoom, Proposal, Redeemed } from "@generalbusiness/artroom-contract";
-import { listedTools } from "../src/index.ts";
 import { agent, keyed, roomWithMcp, rpc, type FakeRoom, type Url } from "./support.ts";
 
 let room: FakeRoom;
@@ -39,17 +38,6 @@ describe("the endpoint", () => {
     const wrong = await rpc(a.mcp, "brr_not-a-token", "tools/list");
     expect(wrong.status).toBe(401);
     expect(wrong.body.error.message).toMatch(/new MCP invitation/);
-  });
-
-  test("lists the agent's tools with the descriptors' schemas", async () => {
-    const a = await agent(room, url);
-    const list = await rpc(a.mcp, a.bearer, "tools/list");
-    expect(list.status).toBe(200);
-    // An agent gets the builder toolset (R-API-14), each tool exactly as its descriptor gives it. The room's
-    // document is `v1`, so the generic `act` is not listed.
-    const builder = ["claim", "workspace", "propose", "note", "land", "renew", "release", "attention", "explain", "lane", "proposal", "operation", "acts"];
-    expect(list.body.result.tools.map((t: { name: string }) => t.name)).toEqual(builder);
-    expect(list.body.result.tools).toEqual(listedTools().filter((t) => builder.includes(t.name)));
   });
 });
 
@@ -141,7 +129,7 @@ describe("the loop over MCP", () => {
     expect(theirs).toMatchObject({ refused: true, rule: "not-holder" });
     room.workspaceDelay = 1_000_000;
     const c = (await call(a, "claim", { goal: "g2", scope: ["lib/**"] })).body.result.structuredContent as Claim;
-    const pending = (await call(a, "workspace", { lane: c.lane, lease: 1, waitMs: 50 })).body.result.structuredContent;
+    const pending = (await call(a, "workspace", { lane: c.lane, lease: 1, waitMs: 20 })).body.result.structuredContent;
     expect(pending.op.state).toBe("pending");
     expect(pending.grant).toBeNull();
   });
@@ -188,14 +176,19 @@ describe("the client's bearer handle acts through the MCP route (R-CRED-3)", () 
     expect(isArtroomError(thrown) && thrown.code).toBe("forbidden");
   });
 
-  test("a retried bearer act with the same idempotency key happens once (R-IDEM-6)", async () => {
+  test("a bearer act sent again with the same idempotency key, after its answer was lost, happens once (R-IDEM-6)", async () => {
     const a = await agent(room, url);
-    const api = await connect({ url }, room.id, { kind: "bearer", token: a.bearer });
+    // One attempt for each call: the handle's own retries, and the waits between them, are the client package's subject.
+    const api = await connect({ url }, room.id, { kind: "bearer", token: a.bearer }, { retries: 0 });
     room.faults.push({ route: "POST /mcp", kind: "drop" });
+    const lost = await api.claim({ goal: "g", scope: ["src/**"] }, { idempotencyKey: "agent-claim-1" }).catch((e: unknown) => e);
+    expect(isArtroomError(lost) && lost.maybeRecorded).toBe(true);
+    const claims = () => room.entries.filter((e) => e.entry.type === "act" && e.entry.act.envelope.kind === "claim");
+    expect(claims()).toHaveLength(1);
     const claim = await api.claim({ goal: "g", scope: ["src/**"] }, { idempotencyKey: "agent-claim-1" });
     expect(isRefusal(claim)).toBe(false);
-    const claims = room.entries.filter((e) => e.entry.type === "act" && e.entry.act.envelope.kind === "claim");
-    expect(claims).toHaveLength(1);
-    expect(room.requests.filter((r) => r.route === "/mcp")).toHaveLength(2); // the dropped call and its retry
+    expect((claim as Claim).seq).toBe(claims()[0]!.seq);
+    expect(claims()).toHaveLength(1);
+    expect(room.requests.filter((r) => r.route === "/mcp")).toHaveLength(2); // the dropped call and the one sent again
   });
 });

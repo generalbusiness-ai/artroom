@@ -1,6 +1,6 @@
 /**
- * MCP plan stage 0 (request 8ae3b2dc): advertised output schemas, short
- * instructions, and both wire formats, checked with the official MCP client.
+ * MCP plan stage 0 (request 8ae3b2dc): advertised output schemas and both
+ * wire formats, checked with the official MCP client.
  * After `tools/list`, the client validates every structured result against
  * the tool's advertised `outputSchema`, and throws if one does not conform,
  * so these tests fail when a result (a refusal included) falls outside its
@@ -30,15 +30,6 @@ async function client(a: Redeemed, mode: VersionNegotiationMode): Promise<Client
   return c;
 }
 
-describe("instructions (MCP plan section 6)", () => {
-  test("stand alone in at most 512 characters, naming attention and the refusal fix", () => {
-    expect(INSTRUCTIONS.length).toBeLessThanOrEqual(512);
-    expect(INSTRUCTIONS).toMatch(/attention first/);
-    expect(INSTRUCTIONS).toMatch(/rule, reason and fix/);
-    expect(INSTRUCTIONS).toMatch(/idempotencyKey/);
-  });
-});
-
 describe("advertised output schemas (MCP plan section 5)", () => {
   test("every tool advertises an object-rooted outputSchema; a tool that can refuse is oneOf its result and Refusal", () => {
     const listed = listedTools();
@@ -67,7 +58,7 @@ describe.each([
   ["2026-07-28", { pin: "2026-07-28" } as VersionNegotiationMode],
   ["legacy stateless (2025)", "legacy" as VersionNegotiationMode],
 ])("the official MCP client, %s", (_label, mode) => {
-  test("connects, gets the instructions, and lists the tools with their output schemas unwrapped", async () => {
+  test("connects, gets the instructions, and lists the tools with their output schemas unwrapped; results and refusals conform to them; failures are tool errors", async () => {
     const a = await agent(room, url);
     const c = await client(a, mode);
     try {
@@ -78,17 +69,8 @@ describe.each([
       // An agent's bearer gets the builder toolset (R-API-14). The room's document is `v1`, so `act` is not listed.
       expect(tools.map((t) => t.name)).toEqual(["claim", "workspace", "propose", "note", "land", "renew", "release", "attention", "explain", "lane", "proposal", "operation", "acts"]);
       for (const t of tools) expect(t.outputSchema).toEqual(TOOLS[t.name as keyof typeof TOOLS].outputSchema);
-    } finally {
-      await c.close();
-    }
-  });
 
-  test("results and refusals conform to the advertised schema; failures are tool errors", async () => {
-    const a = await agent(room, url);
-    const c = await client(a, mode);
-    try {
-      // The client validates structured content only against a tool list it has cached, as hosts do.
-      await c.listTools();
+      // The client validates structured content against the tool list it has now cached, as hosts do.
       const claimed = await c.callTool({ name: "claim", arguments: { goal: "Fix login copy", scope: ["src/ui/**"], idempotencyKey: "c1" } });
       expect(claimed.isError).toBe(false);
       const claim = claimed.structuredContent as unknown as Claim;

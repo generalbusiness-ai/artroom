@@ -16,6 +16,7 @@
 
 import { rmSync } from "node:fs";
 import { dirname } from "node:path";
+import type { Readable, Writable } from "node:stream";
 import { parseArgs, type ParseArgsConfig } from "node:util";
 import {
   agentsMd,
@@ -85,6 +86,14 @@ export interface Io {
   readonly fetch?: typeof fetch;
   /** For tests: called after each durable local step, by name. Throwing here simulates an interruption. */
   readonly step?: (name: string) => void;
+  /**
+   * For tests: how many times the client sends a request again within one
+   * run after a retryable failure (`ClientOptions.retries`). Default: the
+   * client's own, with its waits between attempts.
+   */
+  readonly retries?: number;
+  /** For tests: the streams `artroom mcp` serves on. Default: this process's stdin and stdout. */
+  readonly stdio?: { readonly stdin: Readable; readonly stdout: Writable };
 }
 
 export const EXIT = { ok: 0, failed: 1, usage: 2, refused: 3 } as const;
@@ -210,6 +219,7 @@ function roomOf(ctx: Ctx): { config: Config; id: RoomId; room: RoomConfig } {
 function clientOptions(ctx: Ctx): ClientOptions {
   return {
     ...(ctx.io.fetch ? { fetch: ctx.io.fetch } : {}),
+    ...(ctx.io.retries !== undefined ? { retries: ctx.io.retries } : {}),
     ...(ctx.values["verbose"] === true ? { log: (l: string) => ctx.io.err(`  ${l}`) } : {}),
   };
 }
@@ -1218,7 +1228,7 @@ const COMMANDS: Record<string, Command> = {
   mcp: {
     options: { toolset: { type: "string" } },
     async run(ctx) {
-      const { callerFromRoster, serveArtroomStdio, toolsetOf } = await import("@generalbusiness/artroom-mcp/stdio");
+      const { StdioServerTransport, callerFromRoster, serveArtroomStdio, toolsetOf } = await import("@generalbusiness/artroom-mcp/stdio");
       // `--toolset` is the stdio form of the MCP URL's `?toolset=`: builder, reviewer, observer or all. An unknown name
       // is bad-request, before anything is asked of the room.
       const toolset = toolsetOf(str(ctx.values, "toolset"));
@@ -1230,8 +1240,9 @@ const COMMANDS: Record<string, Command> = {
       const who = room.custody === "room" ? session : { key: room.key }; // GM:cli-caller
       const caller = async () => callerFromRoster(await api.members(), who);
       const asked = toolset !== undefined ? { toolset } : {}; // GM:cli-toolset
-      const handle = serveArtroomStdio(api, { caller, ...asked });
-      await new Promise<void>((resolve) => process.stdin.once("end", resolve));
+      const streams = ctx.io.stdio;
+      const handle = serveArtroomStdio(api, { caller, ...asked }, streams ? { transport: new StdioServerTransport(streams.stdin, streams.stdout) } : {});
+      await new Promise<void>((resolve) => (streams?.stdin ?? process.stdin).once("end", resolve));
       await handle.close();
       return EXIT.ok;
     },

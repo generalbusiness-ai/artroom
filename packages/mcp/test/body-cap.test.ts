@@ -4,11 +4,15 @@
  * sent without `Content-Length` is cut off at the cap rather than read
  * whole; a declared length over the cap is refused before any read; and an
  * unauthenticated request is refused before its body is read at all.
+ *
+ * The cap is web-standard stream code, the same in Node as in the Workers
+ * runtime, so it is tested here. The handler inside workerd, with the real
+ * Room behind it, is tested in packages/room (test/workerd/mcp.test.ts).
  */
 
 import { expect, test } from "vitest";
 import type { RoomApi } from "@generalbusiness/artroom-contract";
-import { createMcpFetch } from "../../src/worker.ts";
+import { createMcpFetch } from "../src/worker.ts";
 
 const MiB = 1024 * 1024;
 const room = {} as unknown as RoomApi;
@@ -37,7 +41,9 @@ function post(bearer: string, body: BodyInit, headers: Record<string, string> = 
       method: "POST",
       headers: { host: "localhost", "content-type": "application/json", accept: "application/json, text/event-stream", authorization: `Bearer ${bearer}`, "mcp-protocol-version": "2025-06-18", ...headers },
       body,
-    }),
+      // Node asks for this where the body is a stream; the Workers runtime does not need it.
+      duplex: "half",
+    } as RequestInit),
     {},
   );
 }
