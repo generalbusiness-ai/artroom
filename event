@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at scripts/control.mjs","body":{"commit":"08c6a0fac5d1f71e8ba2d68719d7f9ba76ec127b","path":"scripts/control.mjs"}}
+{"kind":"artifact","text":"Merge published the current artifact at scripts/gate.sh","body":{"commit":"08c6a0fac5d1f71e8ba2d68719d7f9ba76ec127b","path":"scripts/gate.sh"}}
