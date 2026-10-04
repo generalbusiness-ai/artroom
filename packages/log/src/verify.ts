@@ -208,11 +208,14 @@ export interface VerifyReport {
   /**
    * What this run checked. `full`: everything this verifier checks.
    * `integrity`: the caller turned replay off (`replayDecisions: false`,
-   * `--no-replay`). The run checked the log's hashes, seals, order,
-   * publication history and each act's authority, and nothing that needs a
-   * policy evaluation: no decision was replayed, no required call derived,
-   * no input rebuilt, no Git witness read, and no carry judgement or land
-   * input checked. A log that passes in this mode may fail in `full`.
+   * `--no-replay`). No policy was evaluated: no decision was replayed, no
+   * required call derived, no input rebuilt, and no carry judgement or land
+   * input checked. The checks that need no policy evaluation still ran:
+   * decoding, hashes, seals, order, publication history, each act's
+   * authority, and the guard that refuses a land evaluation while the
+   * admin-approval obligation is open, for which Git objects are read where
+   * present. `cannotProve` says what that guard does and does not show. A
+   * log that passes in this mode may fail in `full`.
    */
   readonly mode: "full" | "integrity";
 }
@@ -288,7 +291,8 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
           "Carry judgements are accounted for in part (R-CARRY-13). Verify replays each check-carried judgement that is recorded, and a carry that is not recorded meets no obligation. It detects a second judgement of the same check, a carry that skipped a newer passing check, and a land evaluation made while a blocking obligation was open. It does not derive the whole list of judgements the room owed. So it cannot show that a judgement which did not carry is missing when no later judgement carried; that a whole carry pass is missing, as for an advisory obligation; that the recorded judgements are all of them, in the room's order, with the inputs and the evaluation budget the room used; or that an extra judgement belongs to no pass. The log does not record when the room started or ended a pass, waited, was cancelled, prepared a landing again, or skipped carrying for a recovery landing.",
         ]
       : [
-          "Policy was not replayed in this run, because the caller turned replay off. No policy decision was evaluated again, no required call was derived, no rule input was rebuilt, no Git object was read to witness a version, and no carry judgement or land input was checked. A log with a wrong decision, a missing or extra call, a substituted context, a second judgement of one check, or a land evaluation with an obligation open passes this run. Run without --no-replay to make those checks.",
+          "Policy was not replayed in this run, because the caller turned replay off. No policy decision was evaluated again. The calls the room had to make, their inputs and their evaluation budget were not checked. No carry judgement was replayed or accounted for, and no land input was rebuilt. A log with a wrong decision, a missing or extra call, a substituted context, or a second judgement of one check passes this run. Run without --no-replay to make those checks.",
+          "Checks that need no policy evaluation still ran in this run, and a log can fail them. Besides decoding, hashes, seals, order, publication history and each act's authority, one guard on landings ran: under a v2 document, a land evaluation is refused while the admin-approval obligation is open on its integration. That obligation is derived from the policy document and the version's changed paths, which this run read from Git objects where they were present and otherwise took from the retained context. The guard reads approvals as the log records them. It is not a replay of the land input. Obligations that rules open are known only by replay, so this run did not see them: a land evaluation recorded with one of those open passes this run. This run compared no recorded context with Git objects, so it claims no Git witness.",
         ]),
     "What a verified prefix means: every check this run makes passed for the entries it names. It does not mean that every duty of the room was done, that publication is complete, or that each transition of the room's state was derived again.",
   ];

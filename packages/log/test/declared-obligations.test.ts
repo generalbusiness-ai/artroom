@@ -505,6 +505,26 @@ describe("check-carried events are judged (R-CARRY-6 to R-CARRY-14)", () => {
       expect(said).not.toContain(claim);
       expect(full.cannotProve.join("\n")).toContain(claim);
     }
+    // It does not deny the checks that still ran, and it says what the one kept guard on landings sees.
+    for (const denial of ["no Git object was read", "a land evaluation with an obligation open passes this run"]) expect(said).not.toContain(denial);
+    expect(said).toContain("a land evaluation is refused while the admin-approval obligation is open");
+    expect(said).toContain("read from Git objects where they were present");
+    expect(said).toContain("Obligations that rules open are known only by replay");
+  });
+
+  test("with replay off the guard on landings still runs, as the report says: a land evaluation with admin approval open is refused, and one with a rule's obligation open passes", async () => {
+    // Admin approval is derived from the document and the changed paths, with no policy evaluation.
+    const admin = prefix(CARRY, S.t6twoAdmins);
+    await evaluatedAt(admin, S.t6twoAdmins + 1, S.t6land, { obligations: (o) => o.map((x) => ({ ...x, met: true })), policy: idOf(admin, S.activated3) });
+    const kept = await verify(admin, { replayDecisions: false });
+    expect(kept).toMatchObject({ ok: false, mode: "integrity", carryAccounting: "none", verifiedThrough: S.t6twoAdmins });
+    expect(kept.failures[0]).toMatchObject({ reason: "guard-failed", seq: S.t6twoAdmins + 1 });
+    expect(kept.failures[0]!.detail).toMatch(/the obligation obl_admin-approval is not met/);
+    // An obligation a rule opens is known only by replay: the same forgery passes with replay off, and fails with it on.
+    const rule = prefix(CARRY, S.t5revoked);
+    await evaluatedAt(rule, S.t5revoked + 1, S.t5land, { obligations: (o) => o.map((x) => ({ ...x, met: true })), policy: idOf(rule, S.activated3) });
+    expect(await verify(rule, { replayDecisions: false })).toMatchObject({ ok: true, mode: "integrity", failures: [] });
+    expect((await expectFailure(rule, "guard-failed", S.t5revoked + 1)).detail).toMatch(/the obligation obl_tests is not met/);
   });
 
   test("decision-extra: a judgement no landing of that version owes: one naming another version's landing, one for a failing check, and one for an obligation the version does not have", async () => {

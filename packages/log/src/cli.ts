@@ -33,7 +33,7 @@ try {
   else {
     const full = report.mode === "full";
     console.log(report.ok ? `Verified${full ? "" : ", integrity only"}. Every check this run makes passed; what it cannot prove is listed below.` : "Verification failed.");
-    console.log(full ? "Mode: full." : "Mode: integrity only (--no-replay). Policy decisions, required calls, Git witnesses, carry judgements and land inputs were not checked.");
+    console.log(full ? "Mode: full." : "Mode: integrity only (--no-replay). Policy was not replayed: decisions, required calls, carry judgements and land inputs were not checked. The checks that still ran are named below.");
     console.log(`Room: ${report.room ?? "unknown"}`);
     console.log(`Log commit: ${report.head ?? "none"} (${report.commits} commits)`);
     console.log(`Published through entry ${report.publishedThrough}; verified through entry ${report.verifiedThrough}${report.last ? ` (${report.last.id})` : ""}.`);
