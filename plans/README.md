@@ -3137,16 +3137,30 @@ The request: cut Artroom's test overhead at least ten times. Remove every test t
 
 ### The result
 
-Measured with [scripts/measure-tests.sh](../scripts/measure-tests.sh): each step alone, under `/usr/bin/time`; elapsed seconds; CPU seconds (user and system) summed over every process the step started; and the summed test-file time from vitest's reports. One 18-core machine, shared with other sessions: the one-minute load was 5 to 18 during the baseline and 6 to 18 during the after run. `node_modules` was already installed both times.
+Four figures are kept apart, because they answer different questions:
 
-| The complete gate | Elapsed | CPU | Summed test-file time | Tests run |
-|---|---|---|---|---|
-| Before, at `a1990c94`: `npm ci`, typecheck, each suite | 410.4 s | 830.1 s | 787 s | 4,339 |
-| After, at `641ebb43`, measured the same way, step by step | 40.7 s | 87.0 s | 37 s | 2,000 |
-| After, as the gate now runs it: install, typecheck, one test command | 33.8 s | 79.1 s | | 2,000 |
-| After, as the gate runs when the lock file has not changed: no install | 29.1 s | 69.2 s | | 2,000 |
+- **Elapsed**: how long a person waits.
+- **CPU**: user and system seconds, summed over every process a step started.
+- **Worker time**: vitest's own totals of import and test time over all test files, plus the git runner's duration. This is what the test workers spent, whether or not they ran side by side. The ui package's vitest prints shares, not seconds, so its part is its summed test-file time (2.7 s before, 0.9 s after).
+- **Summed test-file time**: the test durations in vitest's reports. It leaves out imports and setup.
 
-That is 10.1 times less elapsed time and 9.5 times less CPU by the same step-by-step method, 12.2 and 10.5 times as the gate is now run, and 13.7 and 11.6 times against the baseline without its install. The tests alone went from 391.6 s and 791.4 CPU seconds to 29.8 s and 63.7: 13.2 and 12.4 times. The summed test-file time fell 21 times.
+The steps were timed with [scripts/measure-tests.sh](../scripts/measure-tests.sh), each one alone under `/usr/bin/time`, one after another. One 18-core machine, shared with other sessions: the one-minute load was 5 to 18 during the baseline and 6 to 18 during the after run. `node_modules` was already installed both times.
+
+| The complete gate | Elapsed | CPU | Worker time | Summed test-file time | Tests run |
+|---|---|---|---|---|---|
+| Before, at `a1990c94`: the sum of 17 steps (`npm ci`, typecheck, each suite) | 410.4 s | 830.1 s | 990.8 s | 787 s | 4,339 |
+| After, at `641ebb43`: the sum of the same steps, 16 now | 40.7 s | 87.0 s | 51.4 s | 37 s | 2,000 |
+| After, at `a31d84ba`: one whole gate, observed (`npm run gate -- --ci`) | 33.9 s | 78.0 s | 49.1 s | | 2,000 |
+| After, at `a31d84ba`: one whole gate with no install, observed (`npm run gate`) | 29.3 s | 70.6 s | | | 2,000 |
+
+By the same method on both sides, the sum of steps, the gate costs 10.1 times less elapsed time, 9.5 times less CPU, 19.3 times less worker time and 21 times less summed test-file time. One whole gate as it is now run is 12.1 times less elapsed and 10.6 times less CPU than the baseline sum. The tests alone went from 391.6 s and 791.4 CPU seconds to 29.8 s and 63.7: 13.2 and 12.4 times.
+
+What these comparisons are, and are not:
+
+- **The baseline is a sum of steps, not one observed run.** The old gate was `npm ci`, the typecheck and `npm test --workspaces`, which ran these same suites one after another, so the sum is close to what a person waited. No single uninterrupted baseline gate was timed.
+- **The like-for-like row is the second.** It is also a sum of steps, each started with a warm file cache from the step before.
+- **The last two rows are single observed runs** of the gate command, under `/usr/bin/time`. They include the one-process root run, which the baseline could not have. The fourth was taken during the edit cycle below, with a one-minute load of 19.
+- **CPU is the weakest ratio**, 9.5 by the sum of steps and 10.6 for the observed gate. The typecheck and the install are unchanged (about 23 CPU seconds together) and are now more than a quarter of the gate.
 
 By step, elapsed seconds, CPU seconds and tests run:
 
@@ -3171,16 +3185,31 @@ By step, elapsed seconds, CPU seconds and tests run:
 | `npm run typecheck` | 6.5 | 14.2 | | 6.2 | 13.4 | | 1.0 | 1.1 |
 | `npm ci` | 12.2 | 24.5 | | 4.6 | 9.9 | | | |
 
-`npm ci` is the same command both times; its two figures differ only by the machine's load and cache, and it is left out of the ratios that say so.
+`npm ci` is the same command both times; its two figures differ only by the machine's load and cache.
+
+The Room's workerd step was timed again at `a31d84ba`, after a review correction removed a workaround from its harness (see "Review corrections" below): 6.1 s and 6.5 s elapsed, 19.3 and 20.1 CPU seconds, against 5.9 and 6.1 s, 18.4 and 18.5, with the workaround.
 
 **One edit, taken to review.** The same edit both ways: a change to the two guards of the refusal-text bound in `packages/room/src/declared.ts`.
 
 | | Elapsed | CPU |
 |---|---|---|
-| Before, as stage 2 was run: the gate at the code head, one mutant per guard with the root typecheck and five test sets each, the gate again at the report head | 925.7 s | 2,092 s |
-| After: the affected tests (`npm run test:changed`, 12 files), one control per guard (`scripts/control.mjs`, one test file each), the gate once | 44.3 s | 100.4 s |
+| Before, as stage 2 was run: put together from measured parts | 925.7 s | 2,092 s |
+| After, measured at `a31d84ba` | 41.3 s | 98.0 s |
 
-That is 21 times less. It understates what stage 2 really cost: over one day its review loop ran 1,799 mutant runs, 24 hours of runner time, and six root gates, and the inventory was still not complete when the run was stopped.
+That is 22 times less elapsed time and 21 times less CPU.
+
+The before figure is a reconstruction, not one continuous run. Its parts were each measured: one mutant per guard under the old runner, with the root typecheck and five test sets for each (104.9 s, 432.0 CPU seconds for the two), and the baseline gate counted twice (410.4 s, 830.1 CPU seconds each), because the old practice ran the gate at the code head and again at the report head.
+
+The after figure is the sum of four commands, run one after another with the edit in place. The one-minute load was 19.
+
+| Command | Result | Elapsed | CPU |
+|---|---|---|---|
+| `npm run test:changed` | root run: 12 files, 457 tests passed; git and ui not affected | 9.3 s | 24.1 s |
+| `node scripts/control.mjs packages/room/src/declared.ts 'return clipBytes(text, WORDING_FILLED_BYTES);' 'return text;' --expect 'refusal wording' -- packages/room --config vitest.node.config.ts test/node/declared-equivalence.test.ts` | distinguishes: 14 pass before; the named test fails by its assertion | 1.4 s | 1.7 s |
+| the same, with `'if (bytes > max) break;'` changed to `'if (bytes > max + 1) break;'` | distinguishes, by the same test | 1.4 s | 1.7 s |
+| `npm run gate` | passed: 2,000 tests | 29.3 s | 70.6 s |
+
+The comparison understates what stage 2 really cost: over one day its review loop ran 1,799 mutant runs, 24 hours of runner time, and six root gates, and the inventory was still not complete when the run was stopped.
 
 ### Where the time was, and what changed
 
@@ -3208,6 +3237,10 @@ About 260 kept witnesses were checked by breaking the source by hand, one change
 
 [docs/testing.md](../docs/testing.md) is the guidance, and `AGENTS.md` points to it. In short: name the invariant; test it at the cheapest boundary that can show it; run `npm run test:changed` while working; run `npm run gate` once at the head sent for review; show that a new witness distinguishes with `scripts/control.mjs`, one change at a time. There is no mutation sweep.
 
+- **`npm run test:changed`** covers the three test runners. The root vitest run picks the test files that import a changed file. The git and ui packages each run whole when a changed file is in the package or in a package it depends on. Its last lines say which ran.
+- **`scripts/control.mjs`** runs the tests unchanged first, which must pass, then with the one change. It answers "distinguishes" only when a test failed by an assertion. A run that did not start, did not compile, timed out or failed only by a thrown error is "inconclusive", with its own exit code, and is not evidence.
+- **`npm run gate`** checks whitespace, typechecks every workspace and runs every test. The UI build (`vite build`) and the browser suite (`npm run e2e` in `packages/ui`, one file) were not part of the gate before this work and are not part of it now. Neither was changed, and neither is in any figure above.
+
 ### Earlier demands that this request replaces
 
 The request says to reconcile the earlier blanket demands and record them as superseded, not as met.
@@ -3229,7 +3262,7 @@ None changes behaviour: `ClientOptions.backoff` (client); `Io.retries`, `Io.stdi
 ### Found on the way
 
 - **A minor defect, not fixed here:** `judgeBearer` in the Room does not check the grantor key's revocation as the read path does. After a room-held key is retired, a bearer's exact retry still returns the original record, while reads answer `unauthenticated`. Nothing is recorded. It has its own request, `5d41ea36`.
-- **A tool defect, worked around in the Room's test harness:** `@cloudflare/vitest-pool-workers` 0.22.0 nests one more proxy on its wrapper for each Durable Object a file constructs, so a room cost 9 ms at first and 64 ms after 450 rooms.
+- **A tool defect, not worked around:** `@cloudflare/vitest-pool-workers` 0.22.0 nests one more proxy on its wrapper class for each Durable Object an isolate constructs, so a room cost 9 ms at first and 64 ms after 450 rooms in one isolate. With four workers no isolate makes that many, and the cost is under half a second for the suite.
 - **Tests that did not test:** the client's watch close-during-backoff test and session-token redaction test passed with the source broken; both are repaired. The mint-site scan missed a computed key under a type assertion; fixed in the test. One existing Room test (R-ADM-6) failed now and then under load because it slept 20 ms; it now waits for the policy call.
 
 ### What this does not show
@@ -3241,6 +3274,20 @@ None changes behaviour: `ClientOptions.backoff` (client); `Io.retries`, `Io.stdi
 - **The lanes are not reviewed.** A green gate here says the composed head passes its reduced suite. It does not approve stage 2, 3 or 5 or the MCP core.
 - **The browser suite** (`packages/ui/e2e`) is outside the gate, as before, and was not changed.
 
+### Review corrections
+
+The checker read the work before it was sent for review and recorded preliminary findings (`259df8d7`, at `0608e2e8`). Each is corrected at `a31d84ba`:
+
+| Finding | Correction |
+|---|---|
+| The Room's test harness replaced the global `Proxy` to flatten the pool's nested wrappers, matching by the handler's source text. The checker showed an ordinary nested proxy whose result this changes | The workaround is removed. It saved under half a second. The harness now changes nothing in the runtime |
+| `npm run test:changed` ran only the root vitest run, which leaves out git and ui | It now runs all three runners, and says which ran ([scripts/test-changed.mjs](../scripts/test-changed.mjs)) |
+| `scripts/control.mjs` counted a run that never started, or failed to load, as a distinguishing control | It needs a passing run first, and separates "distinguishes", "survives" and "inconclusive". Tried on twelve cases, among them a missing directory, a missing configuration, a change that does not compile, a thrown error and a test file that does not exist: each is inconclusive |
+| The 33.8 s gate figure was a sum of separately measured parts, and the edit-cycle "before" was a reconstruction, neither labelled | The table now separates sums of steps from observed runs, and the edit cycle states its parts |
+| CPU and summed test-file time do not show worker time | Worker time is its own column |
+| The map's known gaps still called the whole `v2` suite a criterion | The line now says the demand is superseded, and what gap remains |
+| The measurement script ended with "done" whatever happened | It names failed steps and fails |
+
 ### Gates
 
-Run at `0608e2e8`, with `npm run gate`: whitespace exit 0 (`git diff --check` against the base on main); typecheck exit 0, every workspace; test exit 0, 2,000 tests passed (1,515 in the root vitest run, with 69 more skipped where the witness set loads a file and runs only its chosen tests; 308 in git; 177 in ui); `git status` empty. The same gate with `--ci`, which also runs `npm ci`, passed at `525e2cbd`. After the measured head `641ebb43` the source and tests changed in two places only: the gate gained its whitespace step, and one blank line left the end of a log test file. The head for review adds only this section and [test-invariants.md](test-invariants.md) to `0608e2e8`. The gate was run again at that head, and the review request states the result.
+Run at `a31d84ba`, with `npm run gate -- --ci`: install exit 0; whitespace exit 0 (`git diff --check` against the base on main); typecheck exit 0, every workspace; test exit 0, 2,000 tests passed (1,515 in the root vitest run, with 69 more skipped where the witness set loads a file and runs only its chosen tests; 308 in git; 177 in ui); `git status` empty. The head for review adds only this section to `a31d84ba`. The gate was run again at that head, and the review request states the result.
