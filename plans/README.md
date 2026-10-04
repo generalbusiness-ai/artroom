@@ -2054,6 +2054,15 @@ A third finding came from the review of this head's parent `c38c23ce`, and is re
 
 | `b2043423` (P2): the plain-data check read a getter once and the copy read it again | A getter could answer plain text to the check and a class instance to the copy, which was then signed and sent as a plain object | The check and the copy are one pass. Each property is read once, through its descriptor, and what is read is what is copied. A getter is refused and never called | the same table test, rows "a getter" and "a nested getter"; it also asserts the getter was not called |
 
+Two more came from the review of `736f4953` (changes requested, `0b33e8cc`), and are repaired:
+
+| Finding | What was wrong | Repair | Witness |
+|---|---|---|---|
+| Item 1 (P2): two new acts started together both passed the bound of 64 | The bound was checked before the first await and the place taken after the answer | A call takes its place before its first await and gives it up when it ends. The bound counts acts unanswered and acts under way | `packages/client/test/prepared.test.ts`: "two new acts started together cannot both take the last place ..." |
+| Item 2 (P2): a failed read of the room's acts unmounted the form that owned an unresolved act | When the acts could be read again the form was fresh: the uncertainty and the same-act retry were gone, and a new act could be sent first | The Acts screen owns the unresolved act and its status. While the acts cannot be read the page says so, sends no new act, and still offers "Ask again, the same act" and "Leave it" | `packages/ui/test/acts-screen.test.tsx`: "an unresolved act outlasts a failed read of the room's acts ..." |
+
+Item 3 of that review, the authenticated UI entry, is a scope question that is with the planner (request `a49b78ab`): the browser has no credential today, and the work packages that give it one are `18815307` and `cfbde32f`.
+
 One consequence of the first repair: a bearer session now refuses input that is not plain data too. Before, only a key handle did, at signing; a bearer would have sent it as JSON.
 
 Each repair has one control with `scripts/control.mjs` that distinguishes.

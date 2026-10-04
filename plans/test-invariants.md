@@ -46,7 +46,7 @@ Files are in `packages/client/test/`.
 | Canonical bytes and signatures are fixed vectors, and a declared envelope's binding is inside the signed bytes. | R-SIG-1 to 3, R-ID-4, R-ID-10, R-DECL-16 | `signing.test.ts`; `workerd/signing.test.ts` |
 | A prepared act is the handle's own frozen copy. | R-IDEM-2, review 43e8fe3b | `prepared.test.ts`: "a prepared act is the handle's own copy" |
 | A target or body that is not plain data is `bad-request` before anything is signed or sent; a getter is refused and not called. | R-SIG-6, reviews 61b68774, b2043423 | `prepared.test.ts`: "a target or body that is not plain data" |
-| A retry sends what was first built, also after the vocabulary changed. A handle drops no unanswered act: at 64 it refuses a new one. | R-IDEM-1, R-IDEM-2, R-DECL-16, review 6bf8d38a | `prepared.test.ts`: "a retry sends what was first built" |
+| A retry sends what was first built, also after the vocabulary changed. A handle drops no unanswered act: at 64, counting acts under way, it refuses a new one. | R-IDEM-1, R-IDEM-2, R-DECL-16, reviews 6bf8d38a, 0b33e8cc | `prepared.test.ts`: "a retry sends what was first built" |
 | A lost or cut-off answer is retried with the same bytes, a bounded number of times, with backoff. | R-IDEM-1 to 3, R-IDEM-6 | `room.test.ts`: "idempotent retries" |
 | Refusals are values and failures are `ArtroomError`s. | R-API-1, R-ID-3 | `room.test.ts`: "refusals are values" |
 | A watch resumes from its cursor, stops once when its credential is refused, and never reconnects after it is closed. | R-API-6 to 8, R-CRED-7 | `room.test.ts`: "resumable cursors" |
@@ -463,6 +463,7 @@ Files are in `packages/ui/test/`. The browser suite `packages/ui/e2e` is not in 
 | Invariant | Rule | Witness |
 |---|---|---|
 | A stale meaning is never sent without the person confirming. | R-DECL-16 | `acts-screen.test.tsx`: "a meaning that changed behind the form" |
+| An act whose outcome is unknown outlasts a failed read of the room's acts: no new act is sent, and asking again settles the same act once. | R-IDEM-2, review 0b33e8cc | `acts-screen.test.tsx`: "an unresolved act outlasts a failed read" |
 | A lost answer is shown as unresolved, and asking again sends the same act with the same key. | R-IDEM-2, review fb27de86 | `acts-screen.test.tsx`: "an answer that was lost" |
 | A form is built from the declaration, and the declared limits are checked before anything is sent. | R-DECL-12 | `acts-screen.test.tsx`: "the form is built"; `acts-fields.test.ts` |
 | The page's catalogue never goes back behind an activation it confirmed. | R-DECL-23 | `live-catalogue.test.ts` |

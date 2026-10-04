@@ -168,8 +168,9 @@ needs a valid token (R-CRED-10). The CLI uses both for its journal.
 A handle also keeps each named act that got no answer, and sends the same
 bytes when you repeat the call with the same idempotency key, even if the
 room's vocabulary changed in between. It keeps at most 64 and drops none:
-with 64 unanswered, a new named act is refused `rate-limited` before it is
-signed or sent. Repeat one of the unanswered acts, so that it is answered,
+with 64 unanswered or under way, a new named act is refused `rate-limited`
+before it is signed or sent. Acts started together are counted before
+either waits, so they cannot both take the last place. Repeat one of the unanswered acts, so that it is answered,
 and then make the new one.
 
 ## Choices this package makes

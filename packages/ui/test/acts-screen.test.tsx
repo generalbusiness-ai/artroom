@@ -483,6 +483,37 @@ describe("an answer that was lost is not a rejection (R-IDEM-2; review fb27de86,
     expect(room.sent.map((s) => (s.body as { title: string }).title)).toEqual(["Local", "Local"]);
   });
 
+  test("an unresolved act outlasts a failed read of the room's acts: the page says the acts cannot be read, still sends no new act, and asking again settles the same act once", async () => {
+    const { room, adapter } = await opened();
+    loseAnswers(room, 1, true);
+    fireEvent.submit(form());
+    await screen.findByRole("alert");
+    // The next read of the room's acts fails. The page says so, and still says the act's outcome is unknown.
+    const acts = room.acts.bind(room);
+    room.acts = async () => {
+      throw lost();
+    };
+    expect(await adapter.readCatalogue()).toBeNull();
+    await waitFor(() => expect(document.querySelector("[data-acts='unavailable']")).not.toBeNull());
+    expect(unresolved()).not.toBeNull();
+    // The identical catalogue is read again on the same open page.
+    room.acts = acts;
+    expect(await adapter.readCatalogue()).toEqual(await acts());
+    await waitFor(() => expect(document.querySelector("[data-acts='unavailable']")).toBeNull());
+    expect(unresolved()!.querySelector("code")!.textContent).toBe(room.keys[0]);
+    // No new act can go: there is no Send button, and submitting the form sends nothing.
+    expect(screen.queryByRole("button", { name: "Send “Start a song”" })).toBeNull();
+    fireEvent.submit(form());
+    await settled();
+    expect(room.sent).toHaveLength(1);
+    again();
+    await waitFor(() => expect(document.querySelector("[data-recorded]")).not.toBeNull());
+    expect(room.sent).toHaveLength(2);
+    expect(room.sent[1]).toEqual(room.sent[0]);
+    expect(room.keys).toEqual([room.keys[0], room.keys[0]]);
+    await waitFor(() => expect(actsIn(adapter)).toHaveLength(1));
+  });
+
   test("asking again after the meaning changed is answered binding-stale: the form shows the new meaning and sends nothing by itself", async () => {
     const { room } = await opened();
     loseAnswers(room, 1, false);

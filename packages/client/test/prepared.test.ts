@@ -210,6 +210,27 @@ describe("a retry sends what was first built, whatever the room's document is no
     expect(posts()).toBeGreaterThan(sent);
   });
 
+  test("two new acts started together cannot both take the last place: with 63 unanswered, one is sent and one is refused before it is signed, and 64 are held", async () => {
+    const alice = await joinAs(room, "@alice");
+    const api = alice.api as HttpRoomClient;
+    room.faults.push({ route: "POST /acts", kind: "drop", times: 64 * 4 });
+    for (let i = 0; i < 63; i++) await caught(api.claim({ goal: "g", scope: [`src/b${i}/**`] }, { idempotencyKey: `held-${i}` }));
+    const prepared: string[] = [];
+    const together = await Promise.allSettled(
+      ["pair-a", "pair-b"].map((key) => api.claim({ goal: "g", scope: [`src/${key}/**`] }, { idempotencyKey: key, onPrepared: (p) => void prepared.push(p.idempotencyKey) })),
+    );
+    const errors = together.map((r) => (r.status === "rejected" ? (r.reason as { code?: string; maybeRecorded?: boolean }) : null));
+    // One reached the room and lost its answer; the other was refused with nothing signed.
+    expect(errors.map((e) => e?.code).sort()).toEqual(["rate-limited", "unavailable"]);
+    expect(errors.find((e) => e?.code === "unavailable")?.maybeRecorded).toBe(true);
+    expect(prepared).toHaveLength(1);
+    const claims = room.entries.filter((e) => e.entry.type === "act" && e.entry.act.envelope.kind === "claim");
+    expect(claims).toHaveLength(64);
+    // The handle is full: a third new act is refused, and the oldest is still repeated to its first record.
+    expect((await caught(api.claim({ goal: "g", scope: ["src/z/**"] }, { idempotencyKey: "one-more" }))).code).toBe("rate-limited");
+    expect(((await api.claim({ goal: "g", scope: ["src/b0/**"] }, { idempotencyKey: "held-0" })) as Claim).seq).toBe(claims[0]!.seq);
+  });
+
   test("an act prepared for another room is refused before it is sent", async () => {
     const alice = await joinAs(room, "@alice");
     let prepared: PreparedAct | undefined;
