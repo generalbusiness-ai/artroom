@@ -483,6 +483,15 @@ Files are in `packages/ui/test/`. The browser suite `packages/ui/e2e` is not in 
 - Four rounds of review findings on the catalogue invariant (27 tests) became `live-catalogue.test.ts` (18).
 - Tables of 14, 5 and 4 cases became one test each.
 
+## Release
+
+The scripts are in `scripts/`. The consumer fixture is `release/consumer/`.
+
+| Invariant | Rule | Witness |
+|---|---|---|
+| The six released packages can be built and packed as their manifests claim: one nonzero version, exact dependencies between them, a command with no runtime dependency, and every export and bin naming a source file the build covers. | request 7e82100b | `scripts/release-manifest.test.mjs` (in the gate) |
+| The packed tarballs install outside the repository, every claimed Node subpath loads, a consumer typechecks under NodeNext and bundler resolution, both commands run, the command installs alone, and every export, type and bin in a tarball is a file in it. | request 7e82100b | `scripts/check-release.mjs` (`npm run release:check`; outside the gate, because it installs from the network) |
+
 ## The 36 repaired defects of declared acts stage 2
 
 One witness for each defect that review found in stage 2 (request `fd6f00b6`), by the number review gave it. A witness is a title in `packages/room/test/workerd/declared-fd6f00b6.test.ts`, unless another file is named.

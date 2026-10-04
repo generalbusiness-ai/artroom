@@ -4,6 +4,20 @@ The `artroom` command lets people and agents work in an Artroom with plain
 git. Run it with `npx @generalbusiness/artroom-cli`, or install it to get
 `artroom`.
 
+## Install
+
+The command is released as a tarball that holds one bundled file. It needs
+Node 22.18 or later and no other package:
+
+```sh
+npm install ./generalbusiness-artroom-cli-<version>.tgz
+npx artroom --help
+```
+
+It is not in a registry. [docs/release.md](../../docs/release.md) says how a release is made and checked.
+Until it is, `npx @generalbusiness/artroom-cli` works only where the tarball
+is installed.
+
 ## Join
 
 You get an invitation link from a room admin. It looks like

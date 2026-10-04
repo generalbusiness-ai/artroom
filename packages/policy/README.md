@@ -19,6 +19,20 @@ moved the shapes this package needs into the contract: `PathOwners`,
 `PolicyProfile` and `ProfileStamp`, and `PolicyLane.purpose`. This package
 defines no shadow copies of them. Protocol section 26 lists the changes.
 
+## Install
+
+The package is released as a tarball of built JavaScript and declarations.
+Install it in one command with the contract's tarball, which it depends on:
+
+```sh
+npm install --save-exact ./generalbusiness-artroom-contract-<version>.tgz \
+  ./generalbusiness-artroom-policy-<version>.tgz
+```
+
+It is not in a registry. [docs/release.md](../../docs/release.md) says how a release is made and checked.
+The exports are `.`, `./helpers`, `./pack` and `./declared`. All run in
+Node 22 or later, browsers and Workers.
+
 ## Run the tests
 
 From the repository root, after `npm install`:

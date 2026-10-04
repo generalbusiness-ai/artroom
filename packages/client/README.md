@@ -7,6 +7,20 @@ same code works on both.
 It uses only Web APIs (`fetch`, WebCrypto, `WebSocket`), so it runs in
 Workers, Node 22 or later, and current browsers.
 
+## Install
+
+The package is released as a tarball of built JavaScript and declarations.
+Install it in one command with the two Artroom packages it depends on:
+
+```sh
+npm install --save-exact ./generalbusiness-artroom-contract-<version>.tgz \
+  ./generalbusiness-artroom-policy-<version>.tgz ./generalbusiness-artroom-client-<version>.tgz
+```
+
+It is not in a registry. [docs/release.md](../../docs/release.md) says how a release is made and checked.
+A TypeScript project without Node's types needs `"ESNext.Disposable"` in
+`lib`.
+
 ## Connect and act
 
 ```ts

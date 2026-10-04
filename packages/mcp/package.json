@@ -1,6 +1,6 @@
 {
   "name": "@generalbusiness/artroom-mcp",
-  "version": "0.0.0",
+  "version": "0.1.0-dev.1",
   "description": "Artroom's MCP server: the contract's sixteen tools, as a stateless Workers handler and as a local stdio server.",
   "license": "Apache-2.0",
   "type": "module",
@@ -12,11 +12,12 @@
   "scripts": {
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json",
     "test": "vitest run --config vitest.config.ts",
-    "test:node": "vitest run --config vitest.config.ts"
+    "test:node": "vitest run --config vitest.config.ts",
+    "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@generalbusiness/artroom-client": "0.0.0",
-    "@generalbusiness/artroom-contract": "0.0.0",
+    "@generalbusiness/artroom-client": "0.1.0-dev.1",
+    "@generalbusiness/artroom-contract": "0.1.0-dev.1",
     "@modelcontextprotocol/server": "2.0.0",
     "agents": "0.24.0",
     "zod": "4.4.3"
@@ -25,5 +26,11 @@
     "@modelcontextprotocol/client": "2.0.0",
     "@types/node": "22.20.4",
     "vitest": "4.1.11"
-  }
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "files": [
+    "dist"
+  ]
 }

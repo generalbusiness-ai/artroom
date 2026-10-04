@@ -1,6 +1,6 @@
 {
   "name": "@generalbusiness/artroom-contract",
-  "version": "0.0.0",
+  "version": "0.1.0-dev.1",
   "description": "Artroom's shared contract: types, the signed envelope, and type guards. No runtime beyond guards and the frozen legacy vocabulary.",
   "license": "Apache-2.0",
   "type": "module",
@@ -12,6 +12,13 @@
     "./checker": "./src/checker.ts"
   },
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json"
-  }
+    "typecheck": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.build.json"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "files": [
+    "dist"
+  ]
 }

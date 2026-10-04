@@ -13,6 +13,16 @@ lane L of Artroom. It has two parts:
   It fetches `refs/artroom/log` and checks everything that can be checked
   offline (R-LOG-10).
 
+## Install
+
+The package is released as a tarball of built JavaScript and declarations.
+Install it in one command with the tarballs of `contract` and `policy`,
+which it depends on. It is not in a registry. [docs/release.md](../../docs/release.md) says how a release is made and checked.
+
+The exports are `.` (Web APIs only: Node 22 or later and Workers) and
+`./git-cli` (Node only: it runs `git`). The package also installs the
+command `artroom-verify <remote>`, which needs Node and git.
+
 ## Run it
 
 ```sh

@@ -1,0 +1,10 @@
+{
+  "name": "artroom-release-consumer",
+  "private": true,
+  "description": "An application outside the Artroom repository. scripts/check-release.mjs copies it to a fresh directory and installs the packed release into it.",
+  "type": "module",
+  "devDependencies": {
+    "@types/node": "22.20.4",
+    "typescript": "7.0.2"
+  }
+}
