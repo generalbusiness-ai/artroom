@@ -477,6 +477,8 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
   const fold = new Fold();
   let operator: KeyId | null = null;
   const idem = new Map<string, Seq>();
+  /** The accepted acts that ran the step `check` under the vocabulary in force at their own seq (R-DECL-18): `check` itself under the legacy vocabulary. */
+  const checkActs = new Set<Seq>();
   const notified = new Set<string>();
   type Lacking = { readonly unsupported: VerifyUnsupported; readonly detail: string };
   /**
@@ -878,6 +880,25 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
    * `prepared` event or its Git commit, and its filtered snapshot from a
    * `prepared` event; without them they are the retained context's.
    */
+  /**
+   * The earlier passing checks a carry pass for this operation could see and has no judgement for: checks of the
+   * obligation and its checker on the thread, on another integration, admitted before the operation's land act
+   * (the room's `carryChecks` lists them after it), newest first. `after` leaves out a check and all older ones.
+   * See notes/2026-10-03-carry-accounting.md.
+   */
+  const unjudged = (op: { readonly act: ActId }, lane: LaneId, generation: number, integration: Sha, obligation: ObligationId, checker: string, policy: PolicyVersion, after: Seq): ActId[] => {
+    const started = Number(/^act_(0|[1-9][0-9]*)_/.exec(op.act)?.[1] ?? Number.NaN);
+    const out: { readonly act: ActId; readonly seq: number }[] = [];
+    for (let g = 1; g <= generation; g++)
+      for (const e of fold.evidenceOn(lane, g)) {
+        const b = e.body as CheckBody;
+        if (e.kind !== "check" || !b.ok || b.obligation !== obligation || b.check !== checker) continue;
+        if (!(e.seq > after && e.seq < started) || e.canonical === undefined || e.canonical === integration) continue;
+        if (!fold.checkJudged.has(`${carryKey(lane, generation, integration, obligation)}/${e.act}/${policy}`)) out.push({ act: e.act, seq: e.seq });
+      }
+    return out.sort((a, b) => b.seq - a.seq).map((e) => e.act);
+  };
+
   const checkCarry = async (seq: Seq, ev: Extract<SystemEvent, { readonly type: "check-carried" }>, judgedKey: string): Promise<{ readonly ok: true } | Failed> => {
     const extra = (detail: string): Failed => ({ ok: false, reason: "decision-extra", detail: `no carry judgement is owed for ${ev.act}: ${detail}` });
     const op = fold.landOps.get(ev.op);
@@ -933,6 +954,13 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
     const left = closed(session);
     if (left) return left;
     if (expected && !same(expected, ev.outcome)) return { ok: false, reason: "carried-outcome-mismatch", detail: `check-carried for ${ev.act}: recorded ${canonicalize(ev.outcome)}, rebuilt ${canonicalize(expected)}` }; // V:carried-outcome
+    if (ev.outcome.carried) {
+      // The pass that carried this check went newest first and sealed each judgement before the next: every newer
+      // check it could see was judged before this one.
+      const skipped = unjudged(op, ev.lane, ev.generation, ev.integration, ev.obligation, spec.check, ev.policy, row.seq);
+      if (skipped.length)
+        return { ok: false, reason: "decision-missing", detail: `check-carried for ${ev.act}: the newer passing check ${skipped[0]} of ${ev.obligation} has no carry judgement for ${ev.integration} under ${ev.policy}, and the room judges newest first` }; // V:carried-newest-first
+    }
     return { ok: true };
   };
 
@@ -1125,14 +1153,24 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
             break;
           }
           await resolve(i, v, ev.decisions);
+          // The obligations count for the integration the landing built (R-OBL-3); the reviews are the version's.
+          const evidence = landEvidence(judgingAt(activePolicy!), v, ev.integration);
+          // R-LAND-4: the room evaluates the land rules only once no blocking obligation is open on the integration.
+          // A carry that the log does not show leaves its obligation open here, whatever the land input says.
+          const open = evidence.obligations.find((o) => !o.met && !evidence.unwitnessed.includes(o.id));
+          if (open) {
+            const spec = specsOf(v).find((x) => x.id === open.id);
+            const owed = spec?.kind === "check" ? unjudged(op, op.lane, op.generation, ev.integration, open.id, spec.check, activePolicy!, -1) : [];
+            if (owed.length) bad("decision-missing", `land-evaluated for ${ev.op}: ${open.id} is open on ${ev.integration}, and the earlier passing check ${owed[0]} has no carry judgement for it under ${activePolicy}`); // V:land-carry-owed
+            else bad("guard-failed", `land-evaluated for ${ev.op}: the obligation ${open.id} is not met on ${ev.integration}, and the room evaluates a landing only when every blocking obligation is met`); // V:land-open-obligation
+            break;
+          }
           if (opts.replayDecisions !== false) {
             const opened = openSession(i, ev.decisions, activePolicy!, true);
             if (!opened.ok) {
               bad(opened.failure.reason, opened.failure.detail);
               break;
             }
-            // The obligations count for the integration the landing built (R-OBL-3); the reviews are the version's.
-            const evidence = landEvidence(judgingAt(activePolicy!), v, ev.integration);
             if (evidence.unwitnessed.length || evidence.maybeReviews.length)
               limit(i, `the log does not say whether ${evidence.unwitnessed.join(", ") || "a carried verdict"} counts for ${ev.integration}: a check on a filtered snapshot with no prepared event, or a verdict whose carry is undecided without Git objects; that part of the land input is the retained context's`);
             const w: World = { fold, roster, declared: true };
@@ -1148,7 +1186,7 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
         // R-CARRY-13: `act` is an earlier accepted check of the same lane and obligation.
         const m = /^act_(0|[1-9][0-9]*)_([0-9a-f]{8})$/.exec(ev.act);
         const check = m ? entries[Number(m[1])] : undefined;
-        if (!m || !check || check.seq >= i || check.hash.slice(7, 15) !== m[2] || check.entry.type !== "act" || check.entry.act.envelope.kind !== "check") {
+        if (!m || !check || check.seq >= i || check.hash.slice(7, 15) !== m[2] || check.entry.type !== "act" || !checkActs.has(check.seq)) {
           bad("carried-unknown", `check-carried names ${ev.act}, which is not an earlier accepted check`);
           break;
         }
@@ -1307,6 +1345,12 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
       bad("authority-mismatch", `recorded ${canonicalize(body.receipt.authority)}, replayed ${canonicalize(judged.authority)}`);
       break;
     }
+    // R-DECL-21, R-ADMIN-5: the room accepts a recover op only from an active admin's own key. Any other signer its
+    // role table lets through is refused `admin-required`, and that refusal is recorded.
+    if (body.type === "act" && (env.kind as string) === "recover" && !(judged.authority.via === "member" && judged.authority.role === "admin")) {
+      bad("admin-required", `an accepted recover op is signed by ${judged.authority.member ?? judged.authority.key}, who is not an admin signing with an own key`); // V:recover-admin
+      break;
+    }
     if (body.type === "act" && judged.authority.via === "recovery" && !body.receipt.flags.includes("recovery-key")) {
       bad("flag-missing", "a recovery-key act lacks the recovery-key flag");
       break;
@@ -1319,6 +1363,7 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
     idem.set(key, i);
     const steps = stepsOf(env, vocab);
     if (body.type === "act" && (vocab.kind === "legacy" ? env.kind === "check" : steps.includes("check"))) {
+      checkActs.add(i); // V:check-step
       // R-OBL-3: an accepted check names its checker's configuration digest in the active version.
       const { check, config, integration, input, landOp } = env.body as CheckBody;
       const expected = activePolicy === null ? undefined : policyByVersion.get(activePolicy)!.checkers.get(check);

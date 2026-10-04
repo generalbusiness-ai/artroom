@@ -116,9 +116,14 @@ act the journal kept. Finishing reads nothing to prepare the act again.
 
 The journal finds a saved act by its idempotency key, not by its kind. If
 you run `artroom act` with that key and name another kind, the saved act is
-what is finished: its saved bytes go back unchanged, and no act of the kind
-you named is made. The receipt names the saved act, and a line on the error
-stream says so: "This idempotency key belongs to a saved start-song act."
+what is finished, and no act of the kind you named is made. The receipt
+names the saved act, and a line on the error stream says so and says what
+the run did. If the saved act had no answer yet, its saved bytes go back
+unchanged: "This idempotency key belongs to a saved start-song act. That
+act was sent again as it was saved; no start-tune act was made." If the
+journal already held its answer, nothing is sent: "That act had already
+been answered, and this is its result. Nothing was sent, and no start-tune
+act was made."
 If the room refuses the saved act, the refusal is explained for the saved
 kind and the binding it was prepared under.
 

@@ -42,7 +42,7 @@ async function rejection(p: Promise<unknown>): Promise<unknown> {
   } catch (e) {
     return e;
   }
-  throw new Error("expected a rejection");
+  return expect.fail("expected a rejection");
 }
 
 describe("cancel ends the subscription", () => {

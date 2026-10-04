@@ -151,20 +151,42 @@ function frozen<T>(value: T): T {
 }
 
 /**
+ * Throws unless `value` is plain data all the way down: null, a boolean, a
+ * string, a number, an array, or an object whose prototype is
+ * `Object.prototype` or null. This is the rule the signing profile has for
+ * objects (R-SIG-3), asked before the copy is made: a structured clone
+ * would turn a class instance into a plain object, and what was sent would
+ * not be what the caller passed. An `undefined` property is allowed, and
+ * is omitted when signed.
+ */
+function assertPlain(value: unknown): void {
+  if (value === null || value === undefined) return;
+  const type = typeof value;
+  if (type === "boolean" || type === "string" || type === "number") return;
+  if (type !== "object") throw new TypeError(`a ${type} is not plain data`);
+  if (!Array.isArray(value)) {
+    const proto = Object.getPrototypeOf(value);
+    if (proto !== Object.prototype && proto !== null) throw new TypeError("not a plain object"); // G5:intent-plain-object
+  }
+  for (const inner of Object.values(value as object)) assertPlain(inner);
+}
+
+/**
  * The handle's own copy of an act's target and body, deeply frozen. A
  * prepared act must stay the bytes that were signed, or for a bearer the
  * call that was made, whatever the caller does afterwards with the objects
  * it passed in: the envelope and the prepared act hold these copies, never
- * the caller's objects (R-IDEM-2).
+ * the caller's objects (R-IDEM-2). A target or body that is not plain data
+ * is `bad-request`, as it was when the caller's own objects were signed.
  */
 function ownedIntent<T, B>(target: T, body: B): { readonly target: T; readonly body: B } {
-  let copy: { target: T; body: B };
   try {
-    copy = { target: structuredClone(target), body: structuredClone(body) };
+    assertPlain(target);
+    assertPlain(body);
+    return frozen({ target: structuredClone(target), body: structuredClone(body) }); // G5:intent-frozen
   } catch {
     throw artroomError("bad-request", "An act's target and body must be plain data: the handle keeps them, to send the act again unchanged."); // G5:intent-plain
   }
-  return frozen(copy); // G5:intent-frozen
 }
 
 /** `ActOptions`, plus a hook to persist the prepared act before it is first sent. */

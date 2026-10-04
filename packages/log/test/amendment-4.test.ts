@@ -16,7 +16,7 @@
 
 import { afterEach, describe, expect, test, vi } from "vitest";
 import type { CheckerConfig, Checkpoint, Decision, LogEntry, MemberId, PolicyDocument, RepoPath, Sha } from "@generalbusiness/artroom-contract";
-import { evaluateNotify, policy, rule } from "@generalbusiness/artroom-policy";
+import { evaluateNotify, policy, requireReview, rule } from "@generalbusiness/artroom-policy";
 import * as ref from "../../contract/examples/log-layout.ts";
 import { canonicalize, utf8 } from "../src/canonical.ts";
 import { digestBytes, sha256Hex } from "../src/crypto.ts";
@@ -537,17 +537,18 @@ function refsInParts(retained: readonly Retained[], loads: { n: number } = { n: 
   });
 }
 
-/** The demo policy, with one more rule whose text makes the document over `bytes` long. */
+/** The demo policy, with a require rule for src/**, and one more rule whose text makes the document over `bytes` long. */
 function bigPolicy(bytes: number): PolicyDocument {
   return policy(
     rule({ id: "narrow-claims", on: "claim", refuse: '"**" in act.body.scope', fix: "Claim only the paths you will change.", reason: "A claim on ** covers the whole repository." }),
     rule({ id: "holder-sees-claims", kind: "notify", on: ["claim"], to: ["holder"], why: "You claimed this lane." }),
+    requireReview({ paths: "src/**", from: "@alice" }),
     rule({ id: "padding", on: "note", refuse: "false", fix: "x".repeat(bytes) }),
   );
 }
 
-/** A `notified` event for `lane`, with the context of a real notify evaluation whose act body is `body`. */
-async function notified(sim: RoomSim, lane: string, body: unknown): Promise<LogEntry> {
+/** A `notified` event for `lane` to `to`, with the context of a real notify evaluation whose act body is `body`. */
+async function notified(sim: RoomSim, lane: string, body: unknown, to: readonly MemberId[] = ["@alice" as MemberId]): Promise<LogEntry> {
   const r = await evaluateNotify(
     sim.policy,
     {
@@ -561,7 +562,7 @@ async function notified(sim: RoomSim, lane: string, body: unknown): Promise<LogE
   );
   for (const e of r.evaluations) sim.retained.push(retain("input", e.context));
   const decisions: Decision[] = r.evaluations.map((e) => e.decision);
-  return sim.system({ type: "notified", entry: lane as never, decisions, to: ["@alice" as MemberId] });
+  return sim.system({ type: "notified", entry: lane as never, decisions, to });
 }
 
 /** An entry sealed by the room whose line is exactly `bytes` long. */
@@ -788,6 +789,28 @@ describe("acceptance cases (30.7): entries and files over B", () => {
     }),
   );
 
+  test(
+    "Large notification: a notified event whose line is over B is sealed with every recipient, published in parts as a chunked entry, and verified; every recipient is read back",
+    at({ objectBound: 4096 }, async () => {
+      const { sim, lane } = await room();
+      const to = Array.from({ length: 120 }, (_, i) => `@member-${String(i).padStart(6, "0")}-platform-engineering-team` as MemberId);
+      const e = await notified(sim, lane, {}, to);
+      expect(lineOf(e)).toBeGreaterThan(B);
+      const git = new MemoryGit();
+      git.objectLimit = B;
+      const opts = proportional();
+      const p = new LogPublisher(git, opts);
+      const r = await p.publish(partsSource(sim.entries, B).source, sim.checkpoint(L2(0)), sim.retained);
+      expect(p.stats.peakBatchBytes).toBeLessThanOrEqual(opts.maxTransfer.bytes); // never the whole line
+      const { files } = await walk(git, r.commit);
+      const chunks = [...files].filter(([path]) => path.startsWith(`${ROOT}/entries/${twelve(e.seq)}.jsonl/`));
+      expect(chunks.map(([, d]) => d.length)).toEqual([B, lineOf(e) - B]);
+      await verifies(git, sim.entries.length - 1);
+      const published = (await readPublishedEntries(git, r.commit))[e.seq]!;
+      expect(published.entry).toMatchObject({ type: "system", event: { type: "notified", to } });
+    }),
+  );
+
   test("an EntryLine must be the entry it stands for: its end names its seq and hash, and its length never changes", async () => {
     const { sim, lane } = await room();
     note(sim, lane, 10);
@@ -811,7 +834,7 @@ describe("acceptance cases (30.7): entries and files over B", () => {
   });
 
   test(
-    "Retained prefix, large activation and determinism: retained files whose digests share their first two hex characters, past the directory limit, and a replay context and a policy document of more than 2 B. inputs/ splits by the first group and again by the next, no tree lists more than the limit, each large file is three chunks, verify finds and checks each by its digest and replays the decisions made under the large policy; two publishers and a restarted one make the same commit; a file in the wrong shard directory is fan-out; a changed chunk of a retained file is chunk-mismatch",
+    "Retained prefix, large activation and determinism: retained files whose digests share their first two hex characters, past the directory limit, and a replay context and a policy document of more than 2 B. inputs/ splits by the first group and again by the next, no tree lists more than the limit, each large file is three chunks, verify finds and checks each by its digest and replays the decisions made under the large policy, those of its obligations-recomputed events among them; two publishers and a restarted one make the same commit; a file in the wrong shard directory is fan-out; a changed chunk of a retained file is chunk-mismatch",
     at({ objectBound: 4096, directoryEntries: 6 }, async () => {
       const { sim, lane } = await room();
       // Seven replay contexts whose digests all start with "ab": more than one directory lists.
@@ -826,10 +849,12 @@ describe("acceptance cases (30.7): entries and files over B", () => {
       const checkers: Record<string, CheckerConfig> = {};
       for (let i = 0; i < 6; i++) checkers[`checker-${i}`] = { format: "artroom-checker-v1", volatile: false, timeoutSeconds: 60 + i };
       sim.activate(big, checkers); // a policy document over 2 B, and more checker configurations than one directory lists
+      const recomputed = [await sim.recomputed(lane, ["src/a.ts"]), await sim.recomputed(lane, ["src/b.ts"])]; // obligations recomputed under it
       await sim.claim(keys.alice, alice, ["docs/**"]); // decided under it
       const sizes = new Map(sim.retained.map((r) => [`${sha256Hex(utf8(r.body))}.json`, utf8(r.body).length]));
       expect([...sizes.values()].filter((n) => n > 2 * B)).toHaveLength(2);
 
+      const policyName = `${sha256Hex(utf8(canonicalize(big)))}.json`;
       const cp = sim.checkpoint(L2(0));
       const git = new MemoryGit();
       git.objectLimit = B;
@@ -859,7 +884,14 @@ describe("acceptance cases (30.7): entries and files over B", () => {
         expect(chunks.map((k) => [k.slice(-12), files.get(k)!.length]), name).toEqual([["000000000000", B], ["000000000001", B], ["000000000002", size - 2 * B]]);
       }
       const report = await verifies(git, sim.entries.length - 1);
-      expect(report.decisionsReplayed).toBeGreaterThan(0);
+      // Every recorded decision is replayed: the two obligations-recomputed events name the chunked policy and carry decisions.
+      const decisionsOf = (e: LogEntry) => (e.entry.type !== "system" ? e.entry.receipt.decisions : "decisions" in e.entry.event ? e.entry.event.decisions : []);
+      for (const e of recomputed) {
+        expect(e.entry).toMatchObject({ type: "system", event: { type: "obligations-recomputed", policy: sim.policy.version } });
+        expect(decisionsOf(e).length).toBeGreaterThan(0);
+      }
+      expect(sizes.get(policyName)).toBeGreaterThan(2 * B);
+      expect(report.decisionsReplayed).toBe(sim.entries.reduce((n, e) => n + decisionsOf(e).length, 0));
 
       // A file moved to a sibling shard directory that exists: fan-out, though its bytes and name are right.
       const moved = copyOf(git);
@@ -873,7 +905,6 @@ describe("acceptance cases (30.7): entries and files over B", () => {
       expect((await verifyLog(moved)).failures.map((x) => x.reason)).toEqual(["fan-out"]);
 
       // Bad chunk: a changed chunk of the large policy document.
-      const policyName = `${sha256Hex(utf8(canonicalize(big)))}.json`;
       const chunk = paths.find((k) => k.includes("/policies/") && k.includes(`${policyName}/`) && k.endsWith("/000000000002"))!;
       await rewrite(git, r.commit, (f) => {
         const d = f.get(chunk)!.slice();

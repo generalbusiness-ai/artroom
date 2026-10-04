@@ -19,9 +19,9 @@
 
 import { describe, expect, test } from "vitest";
 import type { Decision, Envelope, LogEntry, PolicyDocument, PolicyDocumentV2, ReplayContext, Sha } from "@generalbusiness/artroom-contract";
-import { bindingOf, CODE_REVIEW_ACTS, evaluateRefuse, evaluateRequire, actMeter, ownersFor, policy, validatePolicyV2, type InputOf } from "@generalbusiness/artroom-policy";
+import { bindingOf, carry, CODE_REVIEW_ACTS, evaluateRefuse, evaluateRequire, actMeter, ownersFor, policy, requireCheck, validatePolicyV2, type InputOf } from "@generalbusiness/artroom-policy";
 import { canonicalize, parseStrict, utf8 } from "../src/canonical.ts";
-import { digestJson, sha256Hex, unb64url } from "../src/crypto.ts";
+import { digestJson, sha256Hex, sign, unb64url } from "../src/crypto.ts";
 import { Malformed, decodeEntry } from "../src/decode.ts";
 import { retain } from "../src/entries.ts";
 import { MemoryGit } from "../src/git.ts";
@@ -657,6 +657,83 @@ describe("condition 3: the legacy recovery sequence", () => {
     const claim = actAt(log, 3).act.envelope as Envelope;
     expect(kindProblem(claim, LEGACY)).toBeNull();
     expect(kindProblem(claim, v2)).toMatchObject({ reason: "binding-stale" });
+  });
+});
+
+// ============================================ recover by a signer who is no admin
+
+describe("a recover op is judged by the role table of the legacy act it stands for (R-DECL-21, R-GEN-5)", () => {
+  /** Append a recover open signed by `signer`, recorded as `type` with the authority the room would record. */
+  function recoverOpen(signer: typeof bob, member: string, role: string, type: "act" | "refusal"): { log: Log; seq: number } {
+    const log = open(CHECK);
+    const seq = log.entries.length;
+    const envelope = { v: 1, room: actAt(log, 9).act.envelope.room, actor: signer.key, kind: "recover", target: null, body: { op: "open", goal: "Repair the policy", scope: [".artroom/**"] }, idempotencyKey: `recover-${seq}` };
+    const authority = { via: "member", member, role, key: signer.key };
+    const receipt =
+      type === "refusal"
+        ? { outcome: "refused", authority, decisions: [], refusal: { refused: true, rule: "admin-required", reason: "Only an active admin's own key may open a configuration-recovery lane.", fix: "Ask an admin to claim it." } }
+        : { outcome: "accepted", authority, decisions: [], effects: [], flags: ["config-recovery"] };
+    insert(log, seq, { type, act: { envelope, sig: sign(signer.seed, "artroom-envelope-v1", envelope) }, receipt } as unknown as LogEntry["entry"]);
+    return { log, seq };
+  }
+
+  test("a member's recover open stands for claim, which a member may sign: its recorded admin-required refusal verifies", async () => {
+    const { log, seq } = recoverOpen(bob, "@bob", "member", "refusal");
+    const r = await verify(log);
+    expect(r.failures).toEqual([]);
+    expect(r).toMatchObject({ ok: true, verifiedThrough: seq });
+  });
+
+  test("a checker may not sign claim, so the room never recorded a checker's recover open: a forged one is role-forbids; and a member's, recorded as accepted, is admin-required", async () => {
+    const checker = recoverOpen(carol, "@carol", "checker", "refusal");
+    await expectFailure(checker.log, "role-forbids", checker.seq);
+    const accepted = recoverOpen(bob, "@bob", "member", "act");
+    await expectFailure(accepted.log, "admin-required", accepted.seq);
+  });
+});
+
+// ================================================== a check act of another name
+
+describe("a check-carried event names an earlier act that ran the check step, whatever its kind is called (R-DECL-18, R-CARRY-13)", () => {
+  /** A check on a version, a land act, and the check carried onto the landing's integration: a new commit with the same tree. */
+  async function carried(act: string): Promise<{ log: Log; version: number; event: number }> {
+    const RUNNER = `sha256:${"c".repeat(64)}`;
+    const config = { format: "artroom-checker-v2", act, volatile: false, timeoutSeconds: 600, runner: RUNNER } as const;
+    const { check, ...others } = CODE_REVIEW_ACTS;
+    const base = policy(requireCheck("test", { paths: "src/**", by: "@carol", id: "tests" }), carry({ allow: [{ id: "checks-carry", evidence: "check", allow: "true" }] }));
+    const doc = { ...base, format: "artroom-policy-v2", steps: "artroom-steps-v1", acts: { ...others, [act]: check } } as unknown as PolicyDocumentV2;
+    expect(validatePolicyV2(doc, { checkers: { test: config } })).toMatchObject({ ok: true });
+    const room = new DeclaredRoom();
+    await room.activate(doc, { test: config as never });
+    await room.join("@bob", "member", bob);
+    await room.join("@carol", "checker", carol);
+    const claim = await room.act({ signer: bob, kind: "claim", target: null, body: { goal: "The app", scope: ["src/**"] } });
+    const head = room.change({ "src/app.ts": "export const x = 6;\n" });
+    const version = await room.act({ signer: bob, kind: "propose", target: { lane: claim.id }, body: { lease: 1, expectedGeneration: 0, head, summary: "Six" } });
+    const checked = await room.act({
+      signer: carol,
+      kind: act,
+      target: { lane: claim.id, generation: 1 },
+      body: { obligation: "obl_tests", check: "test", integration: head, input: { kind: "tree", tree: room.treeOf(head) }, config: digestJson(config), runner: RUNNER, volatile: false, ok: true, detail: "Passed." },
+    });
+    expect(checked.refused).toBe(false);
+    const land = await room.act({ signer: bob, kind: "land", target: { lane: claim.id, generation: 1 }, body: { lease: 1, head } });
+    const op = (land.entry.entry as unknown as { receipt: { effects: { type: string; op?: string }[] } }).receipt.effects.find((x) => x.type === "land-op")!.op!;
+    const integration = room.recommit(head);
+    await room.carryChecks(op as never, integration, { tree: room.treeOf(integration) });
+    const log = open(room.fixture("a check carried onto a landing's integration"));
+    const event = log.entries.length - 1;
+    expect(log.entries[event]!.entry).toMatchObject({ type: "system", event: { type: "check-carried", act: checked.id, outcome: { carried: true } } });
+    return { log, version: version.entry.seq, event };
+  }
+
+  test.each(["attest", "check"])("the check act declared as %s: the carried check verifies; the same event naming the version act, which ran no check step, is carried-unknown", async (act) => {
+    const { log, version, event } = await carried(act);
+    const r = await verify(log);
+    expect(r.failures).toEqual([]);
+    expect(r).toMatchObject({ ok: true, verifiedThrough: event });
+    withEvent(log, event, (ev) => ({ ...ev, act: idOf(log, version) }));
+    await expectFailure(log, "carried-unknown", event);
   });
 });
 

@@ -2943,6 +2943,54 @@ Status: implemented, pending review. Gitseq request `fd6f00b6` (planner to build
 
 The Room now admits acts from its active document's vocabulary. Under a `v1` document that is the legacy vocabulary, on the code path it had. Under a `v2` document it is the document's declarations. The code-review declarations ship as data, and a room adopts them only by activating a `v2` document (R-DECL-1); a room with no policy file still gets the R-POL-7 default, which is `v1`.
 
+### State at the integration head (written after the rest of this section)
+
+Stage 2 is now reviewed on `request/test-overhead`, the one integration branch for stages 2, 3 and 5 and the MCP core (assert `dae9a1f3`). The branch `request/decl-stage2` stays at `35797f84` and receives no more commits. Read this subsection first. Below it, "The two runs", "Mutation table" and the test names in "Conditions" describe a test layout that request `ecbc722a` replaced; the rest stands.
+
+**Source.** Stage 2 changed 21 source files and `docs/protocol.md`. Sixteen are byte-identical on the integration branch to `35797f84`:
+
+- `packages/room/src/`: `admission.ts`, `authority.ts`, `core.ts`, `declared.ts`, `jobs.ts`, `ports.ts`, `roster.ts`, `schema.ts`, `store.ts`;
+- `packages/policy/src/`: `acts.ts`, `validate.ts`, `vocabulary.ts`;
+- `packages/checkers/src/`: `checker.ts`, `job.ts`;
+- `packages/contract/src/`: `errors.ts`, `roster.ts`.
+
+Five carry later edits by stage 5 and the MCP core, reviewed under those requests: `packages/room/src/model.ts`, `reads.ts` and `requests.ts`, `packages/contract/src/lanes.ts`, and `packages/policy/src/index.ts`. The two `packages/log` lists this section says stage 3 owns are delivered by stage 3 on the same branch, so `artroom verify` reads a `v2` room's log here, and the Room test that publishes and verifies a `v2` session runs.
+
+**Conditions.**
+
+| Condition of request `fd6f00b6` | State |
+|---|---|
+| (1) one source of kinds; dispatch by step; wording; the two new refusals; exact retry | Delivered. Witnesses in the map |
+| (2) the lease rule, with storage, renewal and restart | Delivered. "the lease rule" |
+| (3) the whole suite under both vocabularies, every conversion listed | Superseded by `ecbc722a`: the declared witness set (32 tests under `v2`) and the direct tests of what `v2` changes. Not claimed as met |
+| (4) a mutation of each declaration field and each new guard | Superseded by `ecbc722a`, not met. The run stopped at 199 of 594 mutants and is kept as partial. Each repaired defect keeps one witness |
+| (5) row writes | The local comparison is a test ("the same session ..."). The live measurement is its own request, `92ddf4cc`, still owed |
+| (6) migration 4 from every stored version | Delivered, from versions 1, 2 and 3 |
+| (7) gates, report, one exact head | The gate of [docs/testing.md](../docs/testing.md), once, at the head sent |
+
+**Acceptance cases of section 33.5, stage 2.** Each witness is a test in [packages/room/test/workerd/declared-fd6f00b6.test.ts](../packages/room/test/workerd/declared-fd6f00b6.test.ts), named by the start of its title, unless another file is given.
+
+| Case | Witness |
+|---|---|
+| Same-shape change | "a change of an act's targets or of its scope source ..." |
+| Hold change: lease length; scope source | "an act signed before its meaning changed ..."; "a change of an act's targets or of its scope source ..." |
+| Unrelated update | "an act signed before its meaning changed ..." |
+| Exact retry | the same test, and "across a change of shape ..." |
+| Grants: signed before a change of its kind | "a grant is judged when it is admitted ...", its last part |
+| Grants: a map expanded before a kind was added | `declared-stage5-a5d64b35.test.ts`: "the client expands a grant before it is signed ..." |
+| Grants: exact retry of an admitted grant | "a grant covers a declared kind only by its map ..." |
+| Grants: an invitation redeemed after a change | "a session's map is judged when its invitation is admitted ..." |
+| Grants from before declared acts: `*`; limited to `review` and `check` | "a grant never gains a kind across a change of vocabulary ..." |
+| Take-over with a new scope, both parts | "take-over with a new scope ..." |
+| Retired opening kind | "a retired opening kind ..." |
+| Legacy suite; code-review suite | Superseded: see condition (3) |
+
+Seven of these parts were missing or weakened after the test reduction and are restored (see the known gaps of the Room in [test-invariants.md](test-invariants.md)).
+
+**Defects found in review.** Review found 36 defects in stage 2 before this branch. Each is repaired and has one witness, listed by number in [test-invariants.md](test-invariants.md), "The 36 repaired defects of declared acts stage 2".
+
+**Still owed, outside this review.** A `v1` document too large for one stored row, and a storage failure while preparing a landing (`6d4b227c`). A bearer session's exact retry after its grantor's key is retired (`5d41ea36`). The full check-job lifecycle of R-DECL-18, which stage 4 owns (`48c021ea`, assert `fcbdf07e`). The live row-write measurement (`92ddf4cc`).
+
 ### What packages/log keeps, and why
 
 Condition 1 names five hard-coded kind lists. Three are replaced here: `room/src/schema.ts`, `room/src/roster.ts` and `policy/src/validate.ts` now read the legacy kinds from the frozen description `ARTROOM_LEGACY_V1`, through `packages/policy/src/vocabulary.ts`. The other two, `log/src/decode.ts` and `log/src/roster.ts`, are delivered by stage 3 (request `1e8fee4b`), which owns all of `packages/log` under assert `869d9aad`. An earlier commit on this branch swapped those two lists for imports; commit `2cd97b88` removed that, and this head's `packages/log` is byte-identical to main's.
@@ -3243,6 +3291,39 @@ Status: implemented, pending review. Gitseq request `1e8fee4b` (planner to build
 
 This branch changes `packages/log` and this file, and nothing else.
 
+### State at the integration head (written after the rest of this section)
+
+Stage 3 is now reviewed on `request/test-overhead`, the integration branch (assert `dae9a1f3`), where it is composed with stage 2. The branch `request/decl-stage3` stays at `5449d19c`. Read this subsection first. Below it, "Mutation table" and the test names describe a layout that request `ecbc722a` replaced; "Prerequisite and composition" is done: the head contains stage 2, and the Room test that publishes and verifies a `v2` session runs.
+
+**Not complete.** Condition 2 asks verify to detect omitted, extra and substituted evaluation calls. For carry judgments it now does so in part. Complete accounting needs the Room to record each carry pass, which is a contract amendment. The design is [notes/2026-10-03-carry-accounting.md](../notes/2026-10-03-carry-accounting.md). The planner has said it stays owed under this request.
+
+**Repaired since `5449d19c`**, each from a checker finding:
+
+| Finding | What was wrong | Repair | Witness in `packages/log/test` |
+|---|---|---|---|
+| `c666e41e` (3): a recorded recover refusal failed replay | Verify judged `recover` by the legacy role table's entry for `recover`, which only an admin has. The Room judges it by the legacy act the op stands for, so a member's `recover` with op `open` is recorded as an `admin-required` refusal | `roster.ts` judges the op's legacy act. `verify.ts` accepts a `recover` act only from an admin's own key | `declared-stage3.test.ts`: "a recover op is judged by the role table ..." |
+| `c666e41e` (4): a check kind of another name could not be carried | Verify looked for the literal kind `check` | It records each accepted act that ran the check step under the vocabulary at its own seq | `declared-stage3.test.ts`: "a check-carried event names an earlier act ..." |
+| `8d5fe5c2`: a whole carry event removed, with the land input changed to match, verified | Verify replayed the events it was given and did not ask what was missing | Rule 1: at `land-evaluated`, every blocking obligation is met in the fold, else `decision-missing` naming the check that was owed a judgment, or `guard-failed` naming the obligation. Rule 2: at a carry, every newer passing check the pass could see already has its judgment, else `decision-missing` | `declared-obligations.test.ts`: "a reservation rests only on what the log shows ...", with the checker's two forged logs |
+
+**A change to the Room, from the same review.** The checker and the planner saw in the source (`060828bb`) that the Room builds a land input, awaits the rules, and then seals `land-evaluated`. An act admitted during that wait comes before the event in the log, so the event could record an input that the log at its position no longer gives. The same held for `check-carried`. This was reproduced: with the checker's key revoked during a carry evaluation, the Room sealed "carried" after the revocation. Now `packages/room/src/core.ts` reads the facts again in the sealing transaction. If they moved, it seals nothing and judges again. Witnesses in `packages/room/test/workerd/acts.test.ts`: "a land evaluation is sealed only for the state at its own place in the log ...", and "a carry judgment is sealed only on the facts at its own place in the log ...". `core.ts` is a stage 2 file, so this delta is also for the stage 2 reviewer.
+
+**Two more repairs in the Room, from the review of that delta** (changes requested, `a7688a71`). Both were found by the checker with a failing run:
+
+| Finding | What was wrong | Repair | Witness in `acts.test.ts` |
+|---|---|---|---|
+| `7dabf862` (P1) | A kept land evaluation was looked up by operation and input digest alone. After an activation that changed only a land rule, the input was the same, the old passing answer was used, and the landing could reserve under a policy that blocks it. This was in the Room before stage 2's first approval | The kept evaluation records the policy version that made it, and is used only under that version. A row kept before this names none and is never used | "a kept land evaluation is used only under the policy version that made it ..." |
+| `29551590` (P1) | A held carry judgment was sealed after a recomputation had removed its obligation. Verify, reading the version's obligations at that position, failed the honest `v2` log with `decision-extra` | In the sealing transaction the Room reads the version's obligations again. If another policy version is active, or the obligation or its checker is no longer the version's, the pass ends and seals nothing more | "a carry pass ends when its obligation is gone ..."; "an activation that overtakes a carry pass ..." |
+
+The first two of those tests also run under the `v2` declarations in the declared witness set, where the published log is verified. Three controls distinguish: the policy match of the kept evaluation; the end of the pass, in the legacy run and under `v2`. Stage 2's approval `25bede37` was withdrawn by the checker (`290b3e87`) because the first defect was already present at that head.
+
+I then read the rest of the Room's landing code for the same pattern, a read, an await and a seal. The recomputation of obligations runs in the Room's one queue with admission (`RoomCore.serial`), so no act is admitted between its reads and its seal. Readiness and the carry pass do not run in that queue, which is why they need the fences. After its awaits, readiness uses the policy it read at the start to list obligations and owe jobs; a guard that started it again under a newer version changed no outcome in a test, because the carry pass ends first and the engine prepares the operation again, so it was not added.
+
+**The log's test simulator** sealed `land-evaluated` with an obligation open, which the Room never does. It now waits as the Room does, and two fixtures were regenerated (`declared-carry.json`, `declared-snapshot.json`). Real Room logs were unaffected: the Room and CLI suites, which verify logs the Room wrote, pass unchanged.
+
+**Controls**, each one change with `scripts/control.mjs`, each "distinguishes": the recover role lookup; the check-step lookup; the admin-only acceptance of `recover`; Rule 1 as a whole; Rule 1's owed-carry branch; Rule 2; the land fence; the carry fence; the policy match of a kept land evaluation; the end of a carry pass.
+
+**Still open in this request.** Complete carry accounting, above. The acceptance case "legacy recovery replay" asks that a verifier changed to judge the `v1`-era entries under the `v2` declarations fails; the test shows this for the judging function, not for a whole verify run, as it did before the test reduction.
+
 ### Prerequisite and composition (assert 869d9aad)
 
 - **Stage 3 owns all of `packages/log`** (point 1). Stage 2's condition 1 named two fixed lists there, in `decode.ts` and `roster.ts`. They are delivered here: both files now read the legacy vocabulary's kinds, role table, delegable kinds and roster ops from its one frozen description, the contract's `ARTROOM_LEGACY_V1`. Stage 2's branch no longer touches `packages/log`.
@@ -3472,6 +3553,47 @@ Per package, root `npm test` (node, then workerd where a package has both): chec
 The contract, `docs/protocol.md`, and the policy, room, git, client, MCP, CLI, checkers and UI packages are unchanged. No existing test is edited: every file this branch changes under `packages/log/test` is new. `LICENSE`, `NOTICE` and `AGENTS.md` are untouched.
 
 ## Declared acts stage 5 (request a5d64b35)
+
+### State at the integration head (written after the rest of this section)
+
+Stage 5 is now reviewed on `request/test-overhead`, the integration branch (assert `dae9a1f3`), where it is composed with stage 2 (approved at `4ec48aa1`, review `25bede37`), stage 3 and the MCP core. The branches `request/decl-stage5` and `request/decl-stage5-ui` stay at `db73dddc` and `5dc0d044`. Read this subsection first. It replaces the status paragraph and the four "must change before review" points below, which described a provisional head.
+
+**What changed since those four points were written.**
+
+- *"It is provisional."* No longer. The head contains stage 2 as reviewed, and the gate of [docs/testing.md](../docs/testing.md) runs at it. It is not composed on main, because main does not have stage 2 yet: the four lanes land together from this branch.
+- *"Its mutation evidence does not meet the standard."* That standard is superseded by request `ecbc722a` (review `b1738122`), not met. The guard counts in "The state of the evidence" are lists of where to look, not work owed. The mutation table below is history.
+- *"The repairs are tested against stand-in rooms."* Still true of most of them, and stated as a limit below.
+- *"The whole-head gates are owed."* Run at the head sent; the review request gives the result.
+
+**Conditions of the request.**
+
+| Condition | State |
+|---|---|
+| (1) every stage 5 surface: the declarations read, the generic signed act, the MCP `act` and `acts` tools, CLI submission and discovery, a UI that prepares and submits an application act | Delivered. The UI page is not wired to a live room (see limits) |
+| (2) signed meaning preserved: no silent rebind, exact retries, grant maps expanded before signing | Delivered. Witnesses in the map, under Client and Room |
+| (3) an act the client binary does not know, over HTTPS and MCP, and the listed refusals | Delivered. The stage 5 acceptance cases of the protocol (section 33.10) each have a witness; an audit of them against the test code found one part missing after the test reduction, since restored |
+| (4) stage ownership and the read-route seam | "Edits to files other stages own", below, stands |
+| (5) named red mutations; gates; one exact head | The mutation part is superseded by `ecbc722a`. Gates and one head: as above |
+
+**Findings.** Reviewers recorded twenty findings on this lane. Eighteen were repaired and confirmed by a reviewer before this branch; each has a section under "Since `b7b9d8df`". Two were open and are repaired at this head:
+
+| Finding | What was wrong | Repair | Witness |
+|---|---|---|---|
+| `61b68774`, `11c564ce`: the client's refusal of input that is not plain data changed | The client copied a target or body before checking it. A class instance was copied into a plain object and sent. A nested `Uint8Array` threw a raw `TypeError` | The value is checked before the copy, by the rule the signer's canonical form uses, and every failure is `bad-request`. Nothing is signed, copied or sent | `packages/client/test/prepared.test.ts`: "a target or body that is not plain data ...", a table of twelve values |
+| `4872a4a1`: a finishing run always said the saved act "was sent again" | When the journal already held the answer, nothing was sent | The message now says which happened: "That act was sent again as it was saved", or "That act had already been answered, and this is its result. Nothing was sent" | `packages/cli/test/declared.test.ts`: "a saved act whose answer the journal already holds ..." |
+
+One consequence of the first repair: a bearer session now refuses input that is not plain data too. Before, only a key handle did, at signing; a bearer would have sent it as JSON.
+
+Each repair has one control with `scripts/control.mjs` that distinguishes.
+
+**Limits, restated.**
+
+- Most repairs since `b7b9d8df` are shown against the client's stand-in room and the UI's memory room. The real Room is exercised by `packages/room/test/workerd/declared-stage5-a5d64b35.test.ts` (the declarations read, bindings, named methods, grants, the MCP `act` tool, old records), and four cases that were also shown against a real Room before the test reduction are now shown only against the stand-in (listed in the Room's known gaps in [test-invariants.md](test-invariants.md)).
+- The UI has never run against a real Room with a `v2` document, and the Acts page is not wired to a live room. It has no `because` input and no `recover` or platform kinds. The review screens keep the review application's words.
+- The browser suite (`npm run e2e` in `packages/ui`) is outside the gate and was last run at `c74f3696`.
+- `recover` has no client surface. The checker service still signs `v: 1`; stage 4 changes that.
+
+**Below, stale.** "For the planner or hugh", points 9 and 10, say stage 2 has moved and the MCP core lacks later commits; this head composes all of them. The UI's "Not done" list says a lost answer is not retried from the form; it is, since `f606dd89`. The quoted CLI message under `bdc35c53` is the "sent again" wording only.
 
 Status: implemented, provisional, not for review. Gitseq request `a5d64b35` (planner to builder), stage 5 of 7 in section 8.5 of [notes/2026-10-02-declared-acts.md](../notes/2026-10-02-declared-acts.md), with the planner's acceptance clarification `fa120186` and timing amendment `41a5a2b4`. Branch `request/decl-stage5`. Nothing was pushed or deployed, and no Cloudflare credential was used. No reviewer has approved any head of this branch.
 
@@ -4432,6 +4554,41 @@ Not run at the present head: root `npm ci`, root `npm test`, the Room suites, an
 
 ## MCP core runtime (request 9ca1d290)
 
+### State at the integration head (written last)
+
+The MCP core is now reviewed on `request/test-overhead`, the integration branch (assert `dae9a1f3`), composed with stage 2 (approved at `4ec48aa1`, review `25bede37`), stage 3 and stage 5. The branch `request/mcp-core-runtime` stays at `729fb330`. Read this subsection first, then "State at `8b46e825`", which is still right about what was built and repaired. This subsection replaces that note's "Stopped, and owed" list and the provisional status below it.
+
+**What changed since `8b46e825`.**
+
+- The head contains stage 2 as reviewed and stage 5 as sent for review, and the gate of [docs/testing.md](../docs/testing.md) runs at it. It is not composed on main: the four lanes land together from this branch.
+- The mutation run (39 of 76) and the guard audit are superseded by request `ecbc722a` (review `b1738122`), not met and not owed. The mutation table below is history.
+- The test reduction merged this lane's tests. `packages/cli/test/mcp-core-9ca1d290.test.ts` and `packages/mcp/test/workerd/worker.test.ts` are gone; their invariants are in `packages/cli/test` and `packages/mcp/test/mcp-core-9ca1d290.test.ts`, and the Room's MCP route is in `packages/room/test/workerd/worker.test.ts`. [test-invariants.md](test-invariants.md) names the witnesses, under MCP, CLI and Room.
+
+**Conditions of the request.**
+
+| Condition | State |
+|---|---|
+| (1) R-API-9, 13, 14, 15 and the section 34.2 edits: fourteen named tools, `act` and `acts`, the four reads | Delivered |
+| (2) titles, output schemas, fixed annotations, the length bounds | Delivered |
+| (3) toolsets and discovery | Delivered, with the planner's decisions of `3d8a74a9` |
+| (4) `idempotencyKey` required for every act tool; lost-result retries | Delivered |
+| (5) `waitMs` on four tools; waiting holds nothing | Delivered, with the stream repair below |
+| (6) stage 5's behaviour kept | Kept; stage 5's own review is `f7a3c7fb` |
+| (7) composition, artifacts, one head, review | This head. The planner republishes the contract artifacts (`a9788a59`, `ee3d9036`) at the reviewed head; that is the planner's to do |
+
+**Findings.** Two, both repaired before this branch, and neither yet confirmed by a reviewer:
+
+| Finding | Repair | Witness in `packages/mcp/test/mcp-core-9ca1d290.test.ts` |
+|---|---|---|
+| Checker `48765af0` (P2): an attention wait cancelled a native stream while its own reader held the lock, so the source was never cancelled | The wait cancels a native stream through its reader and releases the lock (`dbcf3a7f`, `8b46e825`) | "a native stream, a page that already has items ..."; "a native stream, the wait runs out ..."; "a native stream, an item arrives ..."; "the client's decoded stream, in the same three cases ..."; "a source whose cancel fails does not fail the tool ..." |
+| Checker `18438fd0` (caveat): the stdio revocation test did not ask the same server for a second list | It now does, with the command line's own callback and no fallback (`dbcf3a7f`) | "over stdio the caller is read again for each list: after the delegation is revoked, the next list on the same server is an error and shows no tool" |
+
+The same caveat noted that a credential saved before the delegation ID was kept uses its key's latest delegation that is not revoked. That is unchanged, and is written in R-API-14 and the MCP README.
+
+**Limits, restated.** No test runs the real `artroom mcp` binary against the real Room, or an expired bearer over stdio. The Room method `caller(token)` is a seam outside `RoomWire`; the planner accepted the seam in `3d8a74a9` without certifying the roster inference behind it.
+
+**Below, stale.** "For the planner or hugh", points 1 to 4, were answered by `3d8a74a9`; point 5 is the republishing above. The condition table's "Part met" for condition 7 names main's notes and a review not yet started.
+
 ### State at `8b46e825` (written after the section below)
 
 The rest of this section describes `b359e278` and is no longer current. It is kept until the head for review exists. This note says what changed since, and what was stopped.
@@ -4864,6 +5021,24 @@ The checker then reviewed `15680192` and asked for changes (`3965e230`, with the
 | A new file with a name git quotes was not matched to its package, and vitest could not read it | Names are read from git with `-z`. Such a name runs the whole root vitest run; git and ui are still chosen by where the file is, and now match it |
 | The worker figure was a subtotal of printed phases, presented as worker time | It is named a subtotal. A single-worker run of every suite at both heads is added as a serial comparison, not as worker time. The amendment `da68c9a9` then set the target on elapsed time and CPU, and the result is stated against it |
 | The edit cycle's edit is comment text; its faults are the controls | Stated |
+
+### After the approval: acceptance cases restored
+
+The checker approved this work at `f6212850` (review `b1738122`). While preparing stage 2 for its own review I then compared every acceptance case of the protocol (sections 23, 29.6, 30.7 and 33.5) with the test code, which the reduction had not done case by case. The reduction had removed or weakened the witnesses of fifteen parts of those cases. All were present before it. This is a defect of the approved head, and the approval does not cover its repair.
+
+Each part is restored, in the smallest form that shows it, in the head that carries this subsection. The parts and their files are listed under the Room's known gaps in [test-invariants.md](test-invariants.md). In short: seven parts of stage 2 in the Room's declared-acts tests; two validator rows in policy; one generic-check case of stage 5; two log layout cases; two checker isolation cases; one client subscription case.
+
+| Since `f6212850` | |
+|---|---|
+| Source | unchanged |
+| Tests | 2,000 became 2,006. Thirteen files in the packages' test directories changed; no file was added |
+| Test helpers | `expectRefusal`, `expectOk` and four like them now fail with `expect.fail`, so a failed result check is an assertion and the control helper can count it |
+| Guidance | [docs/testing.md](../docs/testing.md) says that an acceptance case is an invariant, and that its witness is removed only with its replacement named |
+| The gate, one observed run with no install | 28.4 s elapsed, 67.8 CPU seconds; it was 29.3 s and 70.6 before, so the cost did not move beyond the run-to-run spread |
+
+Controls run on the restored witnesses, each by `scripts/control.mjs` with one change: the take-over overlap check in the Room (distinguishes); the three-step target rule in the policy validator (distinguishes); the recomputed-decision replay and the chunked-entry bound in the log (both distinguish); the checker gateway's repository check (distinguishes). The token checks of the two checker cases rest on the test's stand-in for Artifacts and on `packages/git`, and have no control in the checkers' source.
+
+Some cases are still shown at a lower level than before the reduction, such as by the evaluator and not also through a Room. Those are kept as they are and listed in the same known gaps, so that a reviewer can judge them.
 
 ### Gates
 

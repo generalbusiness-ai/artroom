@@ -45,6 +45,7 @@ Files are in `packages/client/test/`.
 |---|---|---|
 | Canonical bytes and signatures are fixed vectors, and a declared envelope's binding is inside the signed bytes. | R-SIG-1 to 3, R-ID-4, R-ID-10, R-DECL-16 | `signing.test.ts`; `workerd/signing.test.ts` |
 | A prepared act is the handle's own frozen copy. | R-IDEM-2, review 43e8fe3b | `prepared.test.ts`: "a prepared act is the handle's own copy" |
+| A target or body that is not plain data is `bad-request` before anything is signed, copied or sent. | R-SIG-6, review 61b68774 | `prepared.test.ts`: "a target or body that is not plain data" |
 | A retry sends what was first built, also after the vocabulary changed. | R-IDEM-1, R-IDEM-2, R-DECL-16 | `prepared.test.ts`: "a retry sends what was first built" |
 | A lost or cut-off answer is retried with the same bytes, a bounded number of times, with backoff. | R-IDEM-1 to 3, R-IDEM-6 | `room.test.ts`: "idempotent retries" |
 | Refusals are values and failures are `ArtroomError`s. | R-API-1, R-ID-3 | `room.test.ts`: "refusals are values" |
@@ -98,6 +99,9 @@ Files are in `packages/log/test/`. Only `golden.test.ts` also runs in workerd.
 | A `v1` log verifies as it did. | R-DECL-1 | `declared-stage3.test.ts`: "the legacy rule:"; "condition 3:" |
 | A steps version or profile the verifier lacks stops verification as a limit, not as a failure. | R-DECL-14, R-DECL-22 | `declared-stage3.test.ts`: "condition 1: the steps version" |
 | The calls admission had to make are derived, and a missing, extra or differing one is named. | R-DECL-20, R-DECL-25, R-ADM-1 | `declared-stage3.test.ts`: "condition 2:" |
+| A `recover` op is judged by the role table of the legacy act it stands for, and is accepted only from an admin's own key. | R-DECL-21, R-GEN-5, R-ADMIN-5 | `declared-stage3.test.ts`: "a recover op is judged by the role table" |
+| A `check-carried` event names an earlier act that ran the check step, whatever the kind is called. | R-DECL-18, R-CARRY-13 | `declared-stage3.test.ts`: "a check-carried event names an earlier act" |
+| A reservation rests only on what the log shows: no blocking obligation is open at `land-evaluated`, and no newer check was skipped on the way to a carry. | R-LAND-4, R-CARRY-13, notes/2026-10-03-carry-accounting.md | `declared-obligations.test.ts`: "a reservation rests only on what the log shows" |
 | A scope fixed by a template is not carried by the act, and a declared field is present only as the body's own field. | R-DECL-7, R-DECL-12 | `declared-stage3.test.ts`: "a thread whose scope is fixed"; "a declared field is present only" |
 | Each obligation, review, reviewer and carry rule gives what the Room's rules give. | R-OBL-1 to 7, R-POL-5 to 7, R-CARRY-1 to 15 | `declared-obligations.test.ts`: "honest logs verify" |
 | A forged context and a carry call left out or added are each named, and a `check-carried` judgement is accepted only when owed. | R-CARRY-1 to 14 | `declared-obligations.test.ts`: "a recorded context that differs"; "carry calls are derived"; "check-carried events are judged" |
@@ -114,6 +118,8 @@ Files are in `packages/log/test/`. Only `golden.test.ts` also runs in workerd.
 
 ### Known gaps
 
+- Verify cannot yet show that a carry judgment which did not carry is missing when nothing later carried. That needs the Room to record each carry pass: [notes/2026-10-03-carry-accounting.md](../notes/2026-10-03-carry-accounting.md). It stays owed under stage 3's condition 2.
+- The log's test simulator now waits like the Room: it seals `land-evaluated` only when no blocking obligation is open. Six facts that the fixture used to show in honest reservation inputs are now shown by a forged `land-evaluated` event that verify refuses. One is not recovered: a land input that lists an objection as `basis: "here"` after it replaced a carried approval.
 - A review count compared as `> 0`, not as the required count, changes nothing in the fixtures, whose counts are all 1.
 - Section 30.7 gives its acceptance cases sizes. Only the entry of 8 MiB + 1 and the directory limit of 4,096 are tested at real size.
 
@@ -222,6 +228,9 @@ The workerd files share isolates (`vitest.workers.config.ts`), so a test must no
 | A compromised reviewer's approval stops counting. | R-REV-1 to 3 | `obligations.cases.ts`: "R-REV revocation and evidence" |
 | A verdict carries to the next generation until a dependency changes. | R-CARRY-1, 2, 5, 11 | `obligations.cases.ts`: "Carrying through the policy port" |
 | A check binds the preview's integration, the active configuration and the tree, and only the named checker may sign it. | R-OBL-3, R-LAND-1 | `obligations.cases.ts`: "R-OBL-3 checks" |
+| A `land-evaluated` or `check-carried` event is sealed only if the facts it was judged on still hold at the seal; otherwise it is judged again. | R-LAND-4, R-CARRY-13, notes/2026-10-03-carry-accounting.md | `acts.test.ts`: "a land evaluation is sealed only for the state"; "a carry judgment is sealed only on the facts" |
+| A kept land evaluation is used only under the policy version that made it. | R-LAND-4, R-LAND-5, review 7dabf862 | `acts.test.ts`: "a kept land evaluation is used only under the policy version" (also under `v2`) |
+| A carry pass ends once another policy version is active or its obligation is no longer the version's; nothing more is sealed. | R-CARRY-13, R-LAND-5, review 29551590 | `acts.test.ts`: "a carry pass ends when its obligation is gone" (also under `v2`); "an activation that overtakes a carry pass" |
 | Every check carry judgement is a sealed event, counts only under the policy version that judged it, and needs a pinned runner. | R-CARRY-13, R-CARRY-14, R-LAND-7, R-EXEC-10 | `acts.test.ts`: "R-CARRY-13"; `review-a711f7b6.cases.ts`: "1. a stored check carry"; "4. check carry needs" |
 | A scoped check binds the snapshot commit recorded for its own integration, and carries only when main moved outside its inputs. | R-OBL-3, R-CARRY-6 to 10 | `review-a711f7b6.cases.ts`: "4d."; `review-95323c2b.cases.ts`; `phase2b.cases.ts`: "policy activation and recompute" |
 | An advisory obligation never blocks a landing. | R-OBL-7, R-REV-3 | `acts.test.ts`: "R-OBL-7" |
@@ -260,7 +269,8 @@ The workerd files share isolates (`vitest.workers.config.ts`), so a test must no
 |---|---|---|
 | Vocabulary: a room has one, its active document's, and becomes `v2` only by landing a `v2` document. | R-DECL-1, R-DECL-15, R-ADM-1 | `declared-fd6f00b6.test.ts`: "one vocabulary per document" |
 | `who.roles` decides who may sign a declared kind, and `recover` is for an active admin's own key only. | R-DECL-11, R-DECL-21, R-ADMIN-5 | `declared-fd6f00b6.test.ts`: "who may sign"; "recover, the platform kind" |
-| Step 4a: an undeclared kind and a wrong binding are refused unrecorded, and an exact retry gets its receipt across any change. | R-DECL-16, R-IDEM-2, R-SIG-4 | `declared-fd6f00b6.test.ts`: "step 4a" |
+| Step 4a: an undeclared kind and a wrong binding are refused unrecorded, and an exact retry gets its receipt across any change. A change of an act's targets, scope source or lease length makes an earlier signature stale, and no landing starts. | R-DECL-16, R-IDEM-2, R-SIG-4 | `declared-fd6f00b6.test.ts`: "step 4a" |
+| A take-over may bring a new scope: the scope and the lease generation move, and an overlap with an exclusive held thread is refused. | R-DECL-7, R-DECL-9 | `declared-fd6f00b6.test.ts`: "take-over with a new scope" |
 | A grant is a signed map from kind to binding, and never gains a kind across a change of vocabulary. | R-DECL-17, R-ADM-5 | `declared-fd6f00b6.test.ts`: "grants carry the bindings" |
 | A room-custody session is judged when its invitation is admitted and again when it is redeemed. | R-DECL-17, R-CRED-3, R-CRED-10, R-IDEM-2 | `declared-fd6f00b6.test.ts`: "room-custody sessions" |
 | Threads: an act acts only on thread kinds its declaration names, by the step it names, and a thread keeps the lease it recorded. | R-DECL-5, 6, 8, 9, 21, 23; R-EVAL-3 | `declared-fd6f00b6.test.ts`: "threads have kinds"; "what policy sees"; "the lease rule" |
@@ -270,7 +280,7 @@ The workerd files share isolates (`vitest.workers.config.ts`), so a test must no
 | Records: an old record is read under the declarations of its own seq, and a thread is named by its opening act. | R-DECL-23, R-API-3 | `declared-stage5-a5d64b35.test.ts`: "old records are read"; "a thread's kind" |
 | Check jobs: a job names the kind and binding to sign, as in force when it is sent. | R-DECL-18, R-EXEC-8, R-OBL-3 | `declared-fd6f00b6.test.ts`: "check jobs in a v2 room"; `declared-stage5-a5d64b35.test.ts`: "a declared check step" |
 | A document the room cannot run or store never activates, and the active document is parsed once per version. | R-DECL-24, R-DECL-26 | `declared-fd6f00b6.test.ts`: "a document the room cannot store or run"; "the active document" |
-| Migration 4 adds its six columns once, and the declared path writes no more rows per act than the legacy path. | R-DECL-6, R-LOG-10, request fd6f00b6 | `declared-fd6f00b6.test.ts`: "migration 4"; "the same session" |
+| Migration 4 adds its six columns once, from each stored version, and the declared path writes no more rows per act than the legacy path. | R-DECL-6, R-LOG-10, request fd6f00b6 | `declared-fd6f00b6.test.ts`: "migration 4"; "the same session" |
 | The code-review declarations judge envelopes, targets, bodies, roles and grants as the legacy vocabulary does, message for message. | R-DECL-4, 5, 11, 12, 17 | `node/declared-equivalence.test.ts`; `node/declared-steps-a5d64b35.test.ts` |
 | The real Worker and the client agree on the declarations read, bindings, named methods, grants and the MCP `act` tool. | R-DECL-16, R-DECL-17, R-API-9, R-CRED-10 | `declared-stage5-a5d64b35.test.ts` |
 
@@ -323,7 +333,7 @@ No other test runs a second time under `v2`: not founding, secret scanning, log 
 
 ### Removed or replaced
 
-- The declared run of the whole workerd suite: 540 test runs became 32 tests and one test of the run itself.
+- The declared run of the whole workerd suite: 540 test runs became 32 tests and one test of the run itself. Two more were added with the repairs of reviews `7dabf862` and `29551590`.
 - 115 per-condition guard tests and 51 audit tests, merged with the 53 of `declared-fd6f00b6.test.ts` into 38, one witness per invariant. Dropped with no replacement: states that acts cannot reach, and the policy cache's size of four.
 - 133 Node tests, one per field of each step and recover op, became one loop of 116 cases in `node/declared-equivalence.test.ts`.
 - `declared-stage5-a5d64b35.test.ts`: 38 became 9. The rest repeated what `packages/client` and `packages/mcp` test against their doubles.
@@ -336,6 +346,19 @@ No other test runs a second time under `v2`: not founding, secret scanning, log 
 
 ### Known gaps
 
+- Request `ecbc722a` first removed or weakened the witnesses of some acceptance cases of the protocol. An audit of every acceptance table (sections 23, 29.6, 30.7 and 33.5) against the test code found them after the reduction was approved, and each is restored:
+  - section 33.5, stage 2, in `declared-fd6f00b6.test.ts`: the same-shape change; the hold change by scope source; a real grant signed before its kind changed; the `v1`-era grant limited to `review` and `check`; the take-over with a new scope, both parts; migration 4 from stored versions 1 and 2;
+  - section 33.5, stage 1, in `packages/policy/test/declared-acts.test.ts`: "a third step", and the refusal half of the historical opening kind;
+  - section 33.5, stage 5, in `declared-stage5-a5d64b35.test.ts`: a generic check under a binding its grant does not name;
+  - section 30.7, in `packages/log/test/amendment-4.test.ts`: the large notification, and the recomputed obligations of the large activation;
+  - section 29.6, in `packages/checkers/test`: concurrent jobs in both directions, and the earlier job's token after a configuration change;
+  - section 23, in `packages/client/test/room.test.ts`: the `Room` handle yields the same updates.
+- The lesson is in [docs/testing.md](../docs/testing.md): an acceptance case is an invariant, and its witness is removed only with its replacement named.
+- Some acceptance cases are still witnessed, but at a lower level than before the reduction. They are kept that way, and named here so that a reader can judge:
+  - three carry-plan cases of section 23 (the room default `src/lib/**`, `package-lock.json`, `.artroom/policy.json`) are shown by the evaluator in `packages/policy/test/carry.test.ts`, no longer also through a Room;
+  - four stage 5 cases are shown against the client's and the MCP server's stand-in room, no longer also against a real Room: named methods where `claim` differs, a grantor's role that lost the kind over MCP, every kind refused on the generic MCP path in a `v1` room, and the MCP `act` tool naming the thread;
+  - the retained-file placement of section 30.7 is asserted by literal paths for seven files, no longer by the reference layout for every file;
+  - a bearer workspace called directly on `RoomWire`, the sequential canonical-name alias, and the client-side bearer receipt after revocation have one witness each where they had two.
 - Only one `v2` session's log is published and verified in the Room. `v2` logs with checks, revocations and carried verdicts are verified only in `packages/log`.
 - The room's whole suite no longer runs under the `v2` declarations. That demand is superseded, not owed: section 33.6 of the protocol now states the witness set above as the criterion. The gap that remains is a fault that shows only when some other legacy test runs under `v2`.
 - No test fixes what a bearer act answers after its grantor's room-held key is revoked as `retired`: the MCP route answers `unauthenticated`, while `RoomWire.bearerAct` still answers an exact retry.
@@ -355,13 +378,13 @@ Files are in `packages/checkers/test/`. Only `git.test.ts` and `sandbox.test.ts`
 | Each job's check goes to the job's own room, and a room's refusal is the answer. | R-EXEC-8 | `handle.test.ts`: "one service serves many rooms"; "a room's refusal" |
 | No container runs two jobs, each runner has one owner, and a runner failure is `unavailable`, never a failed check. | R-EXEC-1, R-EXEC-3, review c46a4491 | `handle.test.ts`: "G1:"; "G2:"; `sandbox.test.ts` |
 | The service reads only its own copy of the job, the reviewer's check is advisory, and output over the limit is `payload-too-large`. | R-OBL-2, R-OBL-7, R-EXEC-5 | `handle.test.ts`: "G3:"; "G4:" |
-| The checkout is the exact integration with no history, and a scoped job reads only its own snapshot, by any route. | R-EXEC-4, 6, 7; R-CARRY-9, 16 | `git.test.ts`: "checkout fetches"; "a scoped job reads only" |
+| The checkout is the exact integration with no history, and a scoped job reads only its own snapshot, by any route. | R-EXEC-4, 6, 7; R-CARRY-9, 16 | `git.test.ts`: "checkout fetches"; "a scoped job reads only"; "concurrent jobs, different snapshots" |
 | The snapshot commit ID the Room derives is the commit the publisher writes. | R-CARRY-15 | `git.test.ts`: "the Room's snapshot commit ID" |
 | The real tools run the project's tests in the checkout, and the reviewer reads the change against the job's base. | R-EXEC-10 | `git.test.ts`: "tests checker:"; "LLM reviewer:" |
 
 ### Removed or replaced
 
-48 tests became 35.
+48 tests became 36.
 
 - `declared-guards-f.test.ts` (3 tests, 11 cases), written so each type guard had a red test. Two rows of the `job.test.ts` table hold the rule.
 - Real npm, real git and real processes for what are decisions over the runner and container interfaces. Those run on an in-memory container. One real `npm ci` and `npm test` stay.
@@ -416,6 +439,7 @@ Files are in `packages/cli/test/`.
 | A release removes exactly the credential of the lease it released. | reviews 80d3710c, f7c79158, 17013617 | `workspace.test.ts`: "a release is bound" |
 | The destination lock names its holder, and whatever is in the way is named and never removed. | reviews 4758945b, 7040317d | `lock.test.ts` |
 | `artroom act` signs under the binding the user gave, and a receipt is in the words of the act's own seq. | R-DECL-16, R-DECL-23, R-IDEM-2 | `declared.test.ts` |
+| A run that finishes a saved act says what it did: sent it again, or found its answer already kept and sent nothing. | R-IDEM-2, review 4872a4a1 | `declared.test.ts`: "a saved act whose answer the journal already holds" |
 | Nothing the room sends can add a git setting or a shell word. | request 55be0661 | `hygiene.test.ts` |
 
 ### Removed or replaced

@@ -26,7 +26,7 @@ const withAsk = (ask: ActDeclaration = ASK) => v2((a) => void (a["ask"] = ask));
 /** A change of the meaning of `ask`: its binding changes. */
 const SHORTER: ActDeclaration = { ...ASK, body: { text: { type: "text", max: 50 } } };
 const refusedAs = (out: unknown, rule: string): Refusal => {
-  if (!isRefusal(out)) throw new Error(`expected a ${rule} refusal, got ${JSON.stringify(out).slice(0, 200)}`);
+  if (!isRefusal(out)) return expect.fail(`expected a ${rule} refusal, got ${JSON.stringify(out).slice(0, 200)}`);
   expect(out.rule).toBe(rule);
   return out;
 };
@@ -37,7 +37,7 @@ const thrown = async (p: Promise<unknown>) => {
     if (isArtroomError(e)) return e;
     throw e;
   }
-  throw new Error("expected a thrown ArtroomError");
+  return expect.fail("expected a thrown ArtroomError");
 };
 const log = async (r: TestRoom): Promise<LogEntry[]> => [...(await r.admin.read({ q: "log", req: { limit: 500 } })).acts];
 const activations = async (r: TestRoom) => (await log(r)).filter((e) => e.entry.type === "system" && e.entry.event.type === "policy-activated").map((e) => e.seq);
@@ -213,7 +213,7 @@ describe("the generic act over the MCP endpoint (R-CRED-10 and R-API-9 as fa1201
 });
 
 describe("a declared check step under another name (fa120186: judge the check primitive, not the word check)", () => {
-  it("a bearer whose grant names verify meets the obligation through act; one without it does not; the proposer cannot check its own version; the job, integration and input binding still decide", async () => {
+  it("a bearer whose grant names verify meets the obligation through act; one without it, or with a stale binding, does not; the proposer cannot check its own version; the job, integration and input binding still decide", async () => {
     const unit = { format: "artroom-checker-v2", act: "verify", volatile: false, timeoutSeconds: 60 };
     const doc = v2(
       (a) => {
@@ -240,6 +240,8 @@ describe("a declared check step under another name (fa120186: judge the check pr
     const args = { kind: "verify", target: { lane: claim.lane, generation: 1 }, body, binding: verify, idempotencyKey: "v-1" };
     expect((await mcpTool(r, dev.bearer, "act", { ...args, idempotencyKey: "own-1" })).structuredContent).toMatchObject({ refused: true, rule: "not-authorized-checker" });
     expect((await mcpTool(r, other.bearer, "act", args)).structuredContent).toMatchObject({ rule: "delegation-invalid" });
+    // A binding the grant does not name for verify: the grant covers the kind only under the binding it was signed with.
+    expect((await mcpTool(r, ci.bearer, "act", { ...args, binding: `sha256:${"9".repeat(64)}`, idempotencyKey: "v-0" })).structuredContent).toMatchObject({ rule: "delegation-invalid" });
     expect((await mcpTool(r, ci.bearer, "act", { ...args, body: { ...body, integration: "1".repeat(40) }, idempotencyKey: "v-2" })).structuredContent).toMatchObject({ rule: "check-binding" });
     expect(await state()).toBe("open");
     expect((await mcpTool(r, ci.bearer, "act", args)).structuredContent).toMatchObject({ kind: "verify", ok: true, by: { via: "delegation", member: "@ci" } });

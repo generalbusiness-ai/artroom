@@ -129,14 +129,34 @@ describe("a prepared act is the handle's own copy of what the caller intended (R
     expect(posts("/acts")).toBe(sent);
   });
 
-  test("a target or body that is not plain data is bad-request before anything is signed or sent", async () => {
+  test("a target or body that is not plain data is bad-request before anything is signed or sent, and is never sent as a copy of another shape", async () => {
     const { api, claim, binding } = await ready();
+    class Question {
+      text = "x";
+    }
     const sent = room.requests.length;
     let hooked = false;
     const onPrepared = () => void (hooked = true);
-    await expect(api.act("ask", { act: claim.id }, { text: (() => "x") as never }, { binding, onPrepared })).rejects.toMatchObject({ name: "ArtroomError", code: "bad-request" });
-    await expect(api.act("ask", { act: claim.id, extra: Symbol("s") } as never, { text: "x" }, { binding, onPrepared })).rejects.toMatchObject({ name: "ArtroomError", code: "bad-request" });
-    await expect(api.claim({ goal: "g", scope: [(() => "src/**") as never] }, { onPrepared })).rejects.toMatchObject({ name: "ArtroomError", code: "bad-request" });
+    const target = { act: claim.id };
+    // Each value in a body, at the top level or nested. A structured clone alone would send a class instance as
+    // a plain object, a Date, Map or Set as itself, and a typed array until it failed to freeze.
+    const bodies: readonly (readonly [string, unknown])[] = [
+      ["a function", { text: () => "x" }],
+      ["a class instance", new Question()],
+      ["a nested class instance", { text: "x", more: [new Question()] }],
+      ["a nested Uint8Array that is not empty", { text: "x", more: { bytes: new Uint8Array([1, 2]) } }],
+      ["a nested ArrayBuffer", { text: "x", more: new ArrayBuffer(2) }],
+      ["a Date", { text: "x", when: new Date(0) }],
+      ["a Map", { text: "x", more: new Map([["a", 1]]) }],
+      ["a Set", { text: "x", more: new Set([1]) }],
+    ];
+    const got: (readonly [string, unknown])[] = [];
+    for (const [name, body] of bodies) got.push([name, await api.act("ask", target, body as never, { binding, onPrepared }).then(() => "sent", (e: unknown) => e)]);
+    got.push(["a symbol in the target", await api.act("ask", { act: claim.id, extra: Symbol("s") } as never, { text: "x" }, { binding, onPrepared }).then(() => "sent", (e: unknown) => e)]);
+    got.push(["a class instance as the target", await api.act("ask", Object.assign(new Question(), target) as never, { text: "x" }, { binding, onPrepared }).then(() => "sent", (e: unknown) => e)]);
+    got.push(["a function in a named act", await api.claim({ goal: "g", scope: [(() => "src/**") as never] }, { onPrepared }).then(() => "sent", (e: unknown) => e)]);
+    got.push(["a class instance in a named act", await api.claim({ goal: "g", scope: [new Question() as never] }, { onPrepared }).then(() => "sent", (e: unknown) => e)]);
+    expect(got.map(([name, e]) => [name, (e as { name?: string }).name, (e as { code?: string }).code])).toEqual(got.map(([name]) => [name, "ArtroomError", "bad-request"]));
     expect(hooked).toBe(false);
     expect(room.requests.length).toBe(sent);
   });

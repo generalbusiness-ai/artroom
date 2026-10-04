@@ -190,6 +190,24 @@ describe("step 4a: kind-undeclared and binding-stale, unrecorded (R-DECL-16)", (
     expectRefusal(await call(r.stub.submit(await signed(r, r.admin, "claim", null, claimBody(), { ikey: keyOf(accepted) }))), "idempotency-mismatch");
   });
 
+  it("a change of an act's targets or of its scope source makes an act signed before it binding-stale, and no landing starts (section 33.5: same-shape change, hold change)", async () => {
+    const r = await declaredRoom();
+    const c = await ok<Claim>(r, r.admin, "claim", null, claimBody());
+    const head = pushChange(r, c.lane, { "src/app.ts": "v2" });
+    const propose = await signed(r, r.admin, "propose", { lane: c.lane }, { lease: 1, expectedGeneration: 0, head, summary: "s" });
+    await activate(r, v2((a) => void ((a["propose"] as { targets: unknown }).targets = { thread: ["version", "land"] })));
+    const stale = expectRefusal(await call(r.stub.submit(propose)), "binding-stale");
+    expect(stale.current?.binding).toBe(await bindingIn(r, "propose"));
+    expect(stale.current?.binding).not.toBe((propose.envelope as unknown as { binding: string }).binding);
+    // The act was not admitted under its new meaning: there is no version and no landing.
+    expect(await inDO(r, (room) => room.core.landing.activeViews().length)).toBe(0);
+    expect(await inDO(r, (room) => room.core.sql.all("SELECT COUNT(*) AS n FROM generations")[0]!["n"])).toBe(0);
+    // The scope source is part of the meaning of an opening act, as the lease length is.
+    const claim = await signed(r, r.admin, "claim", null, claimBody("docs/**"));
+    await activate(r, v2((a) => void ((a["claim"] as { hold: unknown }).hold = { scope: ["src/**"], workspace: true })));
+    expectRefusal(await call(r.stub.submit(claim)), "binding-stale");
+  });
+
   it("across a change of shape: an exact retry gets its receipt after its declaration lost the target it used, and after the room returned to v1; an act signed before the change is binding-stale; nothing else is answered", async () => {
     const r = await declaredRoom();
     const c = await ok<Claim>(r, r.admin, "claim", null, claimBody());
@@ -257,6 +275,12 @@ describe("grants carry the bindings their grantor signed (R-DECL-17)", () => {
     expect(await headSeq(r)).toBe(seq);
     const granted = expectOk(await grant(bob, { claim: await b("claim"), note: await b("note") }, ["renew"]));
     expect(await delegationOf(r, granted.id)).toMatchObject({ kinds: ["renew"], acts: { claim: await b("claim"), note: await b("note") } });
+    // A grant signed under the binding in force, and submitted after an activation changed that kind (section 33.5).
+    const early = await signed(r, bob, "roster", null, delegateOp(newKeyPair().key, { claim: await b("claim") }), { binding: null });
+    await activate(r, v2(shorterLease));
+    const after = await headSeq(r);
+    expect(expectRefusal(await call(r.stub.submit(early)), "binding-stale").current?.binding).toBe(await b("claim"));
+    expect(await headSeq(r)).toBe(after);
   });
 
   it("a grant covers a declared kind only by its map, under the binding it names, while the kind may be delegated and its grantor may sign it: each is judged at every use", async () => {
@@ -298,14 +322,17 @@ describe("grants carry the bindings their grantor signed (R-DECL-17)", () => {
     const k1 = newKeyPair();
     const k2 = newKeyPair();
     const star = await bob.ok<RosterRecord>("roster", null, { op: "delegate", to: k1.key, kinds: "*", lanes: "*", expiresAt: iso(clock.now + day) });
-    const narrow = await bob.ok<RosterRecord>("roster", null, { op: "delegate", to: k2.key, kinds: ["claim", "note"], lanes: "*", expiresAt: iso(clock.now + day) });
+    const narrow = await r.admin.ok<RosterRecord>("roster", null, { op: "delegate", to: k2.key, kinds: ["review", "check"], lanes: "*", expiresAt: iso(clock.now + day) });
     const c = await bob.ok<Claim>("claim", null, claimBody());
     await activate(r, v2());
     const d1 = new Client(r, k1, star.id);
     expect(await delegationOf(r, star.id)).not.toHaveProperty("acts");
     expect(expectRefusal(await act(r, d1, "claim", null, claimBody("docs/**")), "delegation-invalid").reason).toContain("was granted before this room declared its acts");
     expectOk(await act(r, d1, "renew", { lane: c.lane }, { lease: 1 }, { binding: null }));
-    expectRefusal(await act(r, new Client(r, k2, narrow.id), "renew", { lane: c.lane }, { lease: 1 }, { binding: null }), "delegation-invalid");
+    // A v1-era grant limited to review and check covers nothing under v2: not its own kinds, and not renew.
+    const d2 = new Client(r, k2, narrow.id);
+    expectRefusal(await act(r, d2, "review", { lane: c.lane, generation: 1 }, { head: "a".repeat(40), verdict: "approve", scope: ["src/**"], text: "ok" }), "delegation-invalid");
+    expectRefusal(await act(r, d2, "renew", { lane: c.lane }, { lease: 1 }, { binding: null }), "delegation-invalid");
     // A grant made under v2, with a map and renew, after the room returns to v1.
     const k3 = newKeyPair();
     const mapped = await ok<RosterRecord>(r, bob, "roster", null, delegateOp(k3.key, { claim: (await bindingIn(r, "claim"))!, release: (await bindingIn(r, "release"))! }, ["renew"]), { binding: null });
@@ -524,6 +551,18 @@ describe("threads have kinds, and an act acts only on the kinds its declaration 
     const roster = String(await inDO(r, (x) => x.core.sql.all("SELECT id FROM entries WHERE lane IS NULL AND seq > 0 ORDER BY seq LIMIT 1")[0]!["id"]));
     expectRefusal(await act(r, r.admin, "recover", { act: roster }, { op: "note", text: "x" }, { binding: null }), "wrong-thread");
     expectOk(await act(r, r.admin, "renew", { lane: rec.lane }, { lease: 1 }, { binding: null }));
+  });
+
+  it("take-over with a new scope: a released claim taken over with a different scope moves its scope and its lease generation; a scope that overlaps an exclusive held thread is scope-overlap (R-DECL-7, R-DECL-9)", async () => {
+    const r = await declaredRoom(v2(() => {}, policy(lanesPart("exclusive"))));
+    const bob = await addMember(r, "@bob", "member");
+    const a = await ok<Claim>(r, r.admin, "claim", null, claimBody());
+    await ok<Claim>(r, r.admin, "claim", null, { goal: "docs", scope: ["docs/**"] });
+    await ok(r, r.admin, "release", { lane: a.lane }, { lease: 1 });
+    const t = await ok<Claim>(r, bob, "claim", { lane: a.lane }, { scope: ["lib/**"], expectedGeneration: 0 });
+    expect(t).toMatchObject({ scope: ["lib/**"], lease: { holder: "@bob", generation: 3 }, effect: { type: "taken-over" } });
+    await ok(r, bob, "release", { lane: a.lane }, { lease: 3 });
+    expectRefusal(await act(r, r.admin, "claim", { lane: a.lane }, { scope: ["docs/x.md"], expectedGeneration: 0 }), "scope-overlap");
   });
 
   it("a retired opening kind: its held thread with an open version is still reviewed and released by acts that name it; a new act of it is kind-undeclared; a document may name it in threads only where it opened a thread", async () => {
@@ -1199,15 +1238,15 @@ describe("the same session under the legacy vocabulary and under the code-review
 });
 
 describe("migration 4: thread kind, binding, lease and conflict mode; grant maps; the invitation's vocabulary", () => {
-  it("a room stored at version 3, reopened: the six columns are added, every thread gets its kind, binding and lease stay null, and reopening again changes nothing", async () => {
+  it.each([1, 2, 3])("a room stored at version %i, reopened: the six columns are added, every thread gets its kind, binding and lease stay null, and reopening again changes nothing", async (from) => {
     const r = await makeRoom();
     const c = await r.admin.ok<Claim>("claim", null, claimBody());
     await r.admin.ok("roster", null, { op: "delegate", to: newKeyPair().key, kinds: ["renew"], lanes: "*", expiresAt: iso(clock.now + day) });
     const room = await revertLane(r);
     await inDO(r, (x) => {
-      // The store as version 3 had it: without the six columns.
+      // The store as that version had it: without the six columns.
       for (const [table, column] of [["lanes", "kind"], ["lanes", "binding"], ["lanes", "lease_ms"], ["lanes", "conflict"], ["delegations", "acts"], ["invitations", "declared"]]) x.core.sql.all(`ALTER TABLE ${table} DROP COLUMN ${column}`);
-      x.core.sql.all("UPDATE schema_version SET v = 3 WHERE id = 1");
+      x.core.sql.all("UPDATE schema_version SET v = ? WHERE id = 1", from);
     });
     const read = (x: TestRoom) =>
       inDO(x, (y) => ({

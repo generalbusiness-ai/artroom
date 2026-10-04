@@ -90,6 +90,21 @@ const ROSTER_OPS = { admin: ARTROOM_LEGACY_V1.rosterOps.admin as readonly string
 const NOT_RECOVERY_OPS: readonly RosterOp["op"][] = ["join", "delegate", "undelegate"];
 
 /**
+ * The legacy act each `recover` op stands for (R-DECL-21), for the role
+ * table of R-GEN-5, as the Room's authority step reads it. Own properties
+ * only: an op is looked up as text, never through the prototype.
+ */
+const RECOVER_LEGACY: Readonly<Record<string, EnvelopeKind | undefined>> = Object.assign(Object.create(null) as Record<string, EnvelopeKind>, {
+  open: "claim",
+  take: "claim",
+  version: "propose",
+  approve: "review",
+  land: "land",
+  release: "release",
+  note: "note",
+});
+
+/**
  * R-GEN-5 and R-GEN-4: may this role sign this kind (and roster op)? An
  * admin signs every kind: the legacy table lists all of them for it, and
  * `recover` is an admin's (R-DECL-21). With no op, `roster` asks only
@@ -258,6 +273,13 @@ export class RosterReplay {
           if (bad) return no(bad.reason, `the invitation's session: ${bad.detail}`); // V:invite-session
         }
       }
+    } else if (who.declared !== null && (env.kind as string) === "recover") {
+      // R-DECL-21: exactly as a legacy configuration-recovery lane. A role that could not sign the legacy act the op
+      // stands for was refused here, unrecorded. Any other signer who is no admin was refused `admin-required`
+      // later, and that refusal is recorded; verify judges it where it reads the receipt.
+      const op = (env.body as { op?: unknown } | null)?.op;
+      const legacy = typeof op === "string" ? RECOVER_LEGACY[op] : undefined;
+      if (legacy !== undefined && !roleMaySign(m.role, legacy)) return no("role-forbids", `the role ${m.role} may not sign recover ${String(op)}`); // V:recover-role
     } else if (!who.maySign(m.role, env.kind)) return no("role-forbids", `the role ${m.role} may not sign ${env.kind}`); // V:who-roles
     return { ok: true, authority: { via: "member", member: k.member, role: m.role, key: actor } };
   }

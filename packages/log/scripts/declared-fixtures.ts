@@ -42,6 +42,11 @@
  * - declared-snapshot: a scoped checker: a `prepared` event that records
  *   the snapshot commit for a landing's integration, a check on that
  *   commit, and the same on a second thread with no `prepared` event.
+ *
+ * `room.land` seals a `land-evaluated` event only when no blocking
+ * obligation is open on the landing's integration, as the Room does. A call
+ * below that is made while one is open seals nothing; its comment says so.
+ * The tests show what the fold holds open there with an event they forge.
  */
 
 import { writeFileSync } from "node:fs";
@@ -338,9 +343,9 @@ const DOC_B = valid({
   await room.drainNotify();
   const i2 = room.recommit(h2); // the landing's integration: another commit, the same tree
   await room.carryChecks(opOf(land1), i2, { tree: room.treeOf(i2) }); // tests carries (tree-identical); build is volatile and does not
-  await room.land(opOf(land1), true); // land-evaluated: tests met by the carry, build open on this integration
+  await room.land(opOf(land1), true); // nothing sealed: tests is met by the carry, build is open on this integration
   await room.act(check(room, "build", build, t1.id, 2, i2, true, opOf(land1)));
-  await room.land(opOf(land1), true); // land-evaluated: every blocking obligation met
+  await room.land(opOf(land1), true); // land-evaluated: every blocking obligation met; the advisory lint is open
 
   // Thread 2: a verdict that does not carry, an objection that is not carried either, then an approval.
   const t2 = await room.act({ signer: bob, kind: "claim", target: null, body: { goal: "The library", scope: ["lib/**"] } });
@@ -392,18 +397,18 @@ const DOC_B = valid({
   await room.act(check(room, "build", build, t4.id, 1, s1, false)); // a failing check meets nothing
   const land4 = await room.act(land(t4.id, 1, s1));
   await room.drainNotify();
-  await room.land(opOf(land4), true);
+  await room.land(opOf(land4), true); // nothing sealed: build is open
   await room.activate(c3, later);
   await room.recompute(); // thread 1's and thread 4's open versions
-  await room.land(opOf(land1), true); // thread 1 under the new policy: its check carry was judged under the old one; its build check names the old configuration
-  await room.carryChecks(opOf(land1), i2, { tree: room.treeOf(i2) }); // judged again under the new policy
-  await room.land(opOf(land1), true);
-  await room.land(opOf(land4), true); // thread 4: dave no longer qualifies for lib-review, so his verdict is not listed
+  await room.land(opOf(land1), true); // nothing sealed. Thread 1 under the new policy: its check carry was judged under the old one; its build check names the old configuration
+  await room.carryChecks(opOf(land1), i2, { tree: room.treeOf(i2) }); // judged again under the new policy: tests carries again
+  await room.land(opOf(land1), true); // nothing sealed: build and audit are open
+  await room.land(opOf(land4), true); // nothing sealed. Thread 4: dave no longer qualifies for lib-review
   await room.act(review(erin, t4.id, 1, s1, "approve", ["lib/**"]));
   await room.drainNotify(); // reviewers: alice and erin, not dave
   await room.act(review(alice, t1.id, 2, h2, "object", ["src/**"])); // her verdict here replaces her carried one
   await room.drainNotify();
-  await room.land(opOf(land1), true); // objection-open blocks
+  await room.land(opOf(land1), true); // nothing sealed: src-review is open again
 
   // Thread 5: a check whose key is revoked as compromised stops counting.
   const t5 = await room.act({ signer: bob, kind: "claim", target: null, body: { goal: "The app again", scope: ["src/**"] } });
@@ -413,11 +418,11 @@ const DOC_B = valid({
   await room.act(review(alice, t5.id, 1, x1, "approve", ["src/**"]));
   await room.drainNotify();
   await room.act(check(room, "test", test, t5.id, 1, x1));
-  const land5 = await room.act(land(t5.id, 1, x1)); // tests met, build open
+  const land5 = await room.act(land(t5.id, 1, x1)); // tests met, build and audit open
   await room.drainNotify();
-  await room.land(opOf(land5), true);
+  await room.land(opOf(land5), true); // nothing sealed
   await room.act({ signer: alice, kind: "roster", target: null, body: { op: "revoke-key", key: carol.key, reason: "compromised" } });
-  await room.land(opOf(land5), true); // tests is open again
+  await room.land(opOf(land5), true); // nothing sealed: tests is open again
 
   // Thread 6: a sole admin's flagged self-approval counts only while the room has one active admin.
   const t6 = await room.act({ signer: alice, kind: "claim", target: null, body: { goal: "Tell admins about landings", scope: [".artroom/**"] } });
@@ -428,9 +433,9 @@ const DOC_B = valid({
   await room.drainNotify();
   const land6 = await room.act(land(t6.id, 1, p1, alice));
   await room.drainNotify();
-  await room.land(opOf(land6), true); // obl_admin-approval met
+  await room.land(opOf(land6), true); // land-evaluated: obl_admin-approval met
   await room.act({ signer: alice, kind: "roster", target: null, body: { op: "set-role", member: "@dave", role: "admin" } });
-  await room.land(opOf(land6), true); // two active admins: the self-approval no longer counts
+  await room.land(opOf(land6), true); // nothing sealed. Two active admins: the self-approval no longer counts
 
   // A policy whose require rule cannot be evaluated: each open version is blocked, keeps its obligations, and its
   // carried verdicts are still judged.
@@ -506,21 +511,23 @@ const DOC_B = valid({
     await room.land(opOf(land), true);
   };
   await scoped("Prepared", "export const x = 10;\n", snapshot("a"), true); // 6 claim, 7 propose, 8 land, 9 prepared, 10 check, 11 land-evaluated
-  await scoped("Not prepared", "export const x = 11;\n", snapshot("b"), false); // 12 claim, 13 propose, 14 land, 15 check, 16 land-evaluated
+  // With no prepared event the simulator cannot say the check counts for the landing's integration: tests stays open
+  // in it, and no land-evaluated event is sealed.
+  await scoped("Not prepared", "export const x = 11;\n", snapshot("b"), false); // 12 claim, 13 propose, 14 land, 15 check
   // A third thread: a check on a first version that needs it, then a second version that does not: no check is owed,
   // carried or judged for it.
-  const third = await room.act({ signer: bob, kind: "claim", target: null, body: { goal: "Then only notes", scope: ["src/**", "docs/**"] } }); // 17
+  const third = await room.act({ signer: bob, kind: "claim", target: null, body: { goal: "Then only notes", scope: ["src/**", "docs/**"] } }); // 16
   const first = room.change({ "src/app.ts": "export const x = 12;\n" });
-  await room.act({ signer: bob, kind: "propose", target: { lane: third.id }, body: { lease: 1, expectedGeneration: 0, head: first, summary: "Twelve" } }); // 18
+  await room.act({ signer: bob, kind: "propose", target: { lane: third.id }, body: { lease: 1, expectedGeneration: 0, head: first, summary: "Twelve" } }); // 17
   await room.act({
     signer: carol,
     kind: "check",
     target: { lane: third.id, generation: 1 },
     body: { obligation: "obl_tests", check: "test", integration: first, input: { kind: "tree", tree: room.treeOf(first) }, config: digestJson(config), runner: RUNNER, volatile: false, ok: true, detail: "Passed." },
-  }); // 19
+  }); // 18
   const notes = room.change({ "docs/notes.md": "# notes\n" });
-  await room.act({ signer: bob, kind: "propose", target: { lane: third.id }, body: { lease: 1, expectedGeneration: 1, head: notes, summary: "Only notes" } }); // 20: no obligation
-  const land3 = await room.act({ signer: bob, kind: "land", target: { lane: third.id, generation: 2 }, body: { lease: 1, head: notes } }); // 21
-  await room.land(opOf(land3), true); // 22 land-evaluated
+  await room.act({ signer: bob, kind: "propose", target: { lane: third.id }, body: { lease: 1, expectedGeneration: 1, head: notes, summary: "Only notes" } }); // 19: no obligation
+  const land3 = await room.act({ signer: bob, kind: "land", target: { lane: third.id, generation: 2 }, body: { lease: 1, head: notes } }); // 20
+  await room.land(opOf(land3), true); // 21 land-evaluated
   write("declared-snapshot", room.fixture("A scoped checker: a prepared event records the snapshot commit for a landing's integration, a check runs on that commit, and the landing's land input counts it; then the same on a second thread with no prepared event."));
 }

@@ -477,7 +477,7 @@ export class Fixture extends CanonicalModel {
 /**
  * The canonical repository in memory, for the landing engine's tests: the
  * same commits as `Fixture`, and a publisher that answers as `GitPublisher`
- * does over real git. `test/landing-git.test.ts` runs one script through
+ * does over real git. `test/git-publisher.test.ts` runs one script through
  * both and compares every answer, the integration commit included.
  *
  * It merges by whole files: a path changed on both sides is a conflict.

@@ -28,7 +28,7 @@ import { CODE_REVIEW_ACTS } from "@generalbusiness/artroom-policy/declared";
 import { explainText, refusalText } from "../src/format.ts";
 import { FieldError, meaningChanges, missing, parseValue } from "../src/declared.ts";
 import { invitationLink } from "../src/link.ts";
-import { useHarness } from "./harness.ts";
+import { crashAt, useHarness } from "./harness.ts";
 
 const { h, cli, login, acts: recorded } = useHarness();
 
@@ -665,6 +665,7 @@ describe("a saved act finished under another kind's name (reproduced at c74f3696
   const acts = (songMax = 80) => ({ ...CODE_REVIEW_ACTS, "start-song": OPENING("Start a song", songMax), "start-tune": OPENING("Begin a different tune") });
   const ofKind = recorded;
   const TOLD = "This idempotency key belongs to a saved start-song act. That act was sent again as it was saved; no start-tune act was made.";
+  const TOLD_ANSWERED = "This idempotency key belongs to a saved start-song act. That act had already been answered, and this is its result. Nothing was sent, and no start-tune act was made.";
 
   /** A member logged in, a room that declares both kinds, and a command line for each. */
   async function ready() {
@@ -702,7 +703,7 @@ describe("a saved act finished under another kind's name (reproduced at c74f3696
       expect(lines[0]).toMatch(new RegExp(`^Done: Start a song \\(start-song\\), recorded as act_${seq}_[0-9a-f]{8}\\.$`));
       expect(lines[1]).toMatch(THREAD("Start a song: Footprints"));
       expect(finished.out).not.toContain("tune");
-      expect(finished.err.split("\n")).toContain(TOLD);
+      expect(finished.err.split("\n").filter((l) => l.includes("saved start-song act"))).toEqual([TOLD]);
       // The saved bytes went back unchanged: two sends, one act, one thread, and no act of the kind typed.
       expect(sent).toHaveLength(2);
       expect(new Set(sent).size).toBe(1);
@@ -710,6 +711,25 @@ describe("a saved act finished under another kind's name (reproduced at c74f3696
       expect(ofKind("start-song")).toHaveLength(1);
       expect(ofKind("start-tune")).toHaveLength(0);
       expect(h.room.lanes.size).toBe(1);
+    });
+
+    test("a saved act whose answer the journal already holds is finished without a send, and the run is told that nothing was sent", async () => {
+      const r = await ready();
+      const sent: string[] = [];
+      // The first run stops after it saved the room's answer, before its local steps.
+      const first = await cli(r.home, r.args("start-song", r.song, "Footprints"), h.tmp, { ...crashAt("act-answered"), fetch: counting(sent) });
+      expect(first.code).not.toBe(0);
+      expect(sent).toHaveLength(1);
+      const finished = await cli(r.home, r.args("start-tune", r.tune, "So What"), h.tmp, { fetch: counting(sent) });
+      expect(finished.code).toBe(0);
+      expect(finished.out.split("\n")[0]).toMatch(/^Done: Start a song \(start-song\), recorded as act_\d+_[0-9a-f]{8}\.$/);
+      const told = finished.err.split("\n").filter((l) => l.includes("saved start-song act"));
+      expect(told).toEqual([TOLD_ANSWERED]);
+      expect(finished.err).not.toContain("sent again");
+      // No POST to /acts by the finishing run.
+      expect(sent).toHaveLength(1);
+      expect(ofKind("start-song")).toHaveLength(1);
+      expect(ofKind("start-tune")).toHaveLength(0);
     });
 
     test("when the words cannot be read, the receipt names the saved act's kind, not the kind typed, and the run is still told", async () => {

@@ -856,6 +856,9 @@ export class DeclaredRoom {
     const l = this.lanes.get(o.lane)!;
     const g = this.generations.get(`${o.lane}/${o.generation}`)!;
     const integration = o.integration ?? g.head;
+    // The Room evaluates the land rules only once no blocking obligation is open on the integration (core.ts
+    // `readiness`): until then the landing waits, and nothing is sealed.
+    if (l.purpose !== "config-recovery" && this.landInput(l, g, o.authority, "reservation", integration).obligations.some((x) => !x.met)) return;
     if (l.purpose !== "config-recovery" && this.policy.doc.rules.some((r) => r.kind === "land")) {
       const input = this.landInput(l, g, o.authority, "reservation", integration);
       const r = await evaluateLand(this.active(), input, { budget: actMeter() });

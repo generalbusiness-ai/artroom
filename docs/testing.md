@@ -21,6 +21,11 @@ A test does not earn its place when it:
 - exists so that a count is met: one per field, one per condition, one per
   line.
 
+Each acceptance case of [docs/protocol.md](protocol.md) (sections 23,
+29.6, 30.7 and 33.5) is an invariant with a named expected result. Before you remove or
+merge a test, check the cases it witnessed, and name the test that
+witnesses each one afterwards.
+
 Before you add a test, name the invariant in one sentence. If
 [plans/test-invariants.md](../plans/test-invariants.md) already has a
 witness for it, strengthen that witness instead of adding another.
@@ -124,6 +129,10 @@ runs them again and restores the file. It gives one of three results:
 | distinguishes | 0 | a test failed by an assertion with the change applied |
 | survives | 1 | every test still passed: they do not see this fault |
 | inconclusive | 2 | nothing was shown: the tests did not start, did not pass before the change, did not load or compile with it, ran fewer tests than before, had any timeout, or failed only by a thrown error |
+
+A helper that checks a result, such as `expectRefusal`, fails with
+`expect.fail`, not with a thrown `Error`, so that a test which fails there
+has failed by an assertion.
 
 Only the first is evidence. With `--expect`, the test you name must be one
 of those that failed by an assertion, or the result is inconclusive. The

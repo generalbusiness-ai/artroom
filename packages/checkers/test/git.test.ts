@@ -6,7 +6,7 @@
 //
 // One canonical repository is built once for the file and only read. Each
 // test writes to its own job directory or snapshot repository.
-import { afterAll, beforeAll, test } from "vitest";
+import { afterAll, beforeAll, onTestFinished, test } from "vitest";
 import assert from "node:assert/strict";
 import { chmodSync, existsSync, symlinkSync } from "node:fs";
 import { join } from "node:path";
@@ -19,7 +19,7 @@ import { checkout, git } from "../src/runner.ts";
 import { runnerProvider } from "../src/sandbox.ts";
 import { generateKey, importSigner } from "../src/signing.ts";
 import { Ledger } from "./ledger.ts";
-import { Fleet, ProcessContainer, modelImage } from "./containers.ts";
+import { Fleet, ProcessContainer, modelImage, type ModelImage } from "./containers.ts";
 import { Fixture, LocalRunner, PROJECT, sh, type Commit, type Snap } from "./fixture.ts";
 import { NS, expectations, job } from "./support.ts";
 
@@ -62,50 +62,90 @@ test("checkout fetches the exact integration with no history, and confirms HEAD 
 
 // ------------------------------------------------------------------ filtered snapshots (R-CARRY-9, R-CARRY-15, R-CARRY-16, R-EXEC-7)
 
-test("a scoped job reads only its own snapshot: a file left out cannot be read by any route, nor can an older, wider snapshot's commit or blob by known ID (review bdcc7cc9 P2; R-CARRY-9, R-CARRY-16, R-EXEC-7)", async () => {
-  // The reviewer's reproduction: an older src/** snapshot, then a current src/add.js snapshot, for the same checker.
-  const older = await wide();
-  const current = await f.snapshot(main.sha, ["src/add.js"]);
-  assert.notEqual(older.name, current.name, "each snapshot commit has its own repository");
-  const blob = (path: string) => sh(f.canonical, "rev-parse", `${main.sha}:${path}`) as Sha;
-  const secret = blob("src/secret.txt");
-  assert.equal(sh(older.store, "cat-file", "-t", secret), "blob", "the older snapshot holds the file");
+/** The current snapshot after the checker's inputs were narrowed to one file. Made once. */
+let narrowed: Promise<Snap> | undefined;
+const narrow = () => (narrowed ??= f.snapshot(main.sha, ["src/add.js"]));
+const blob = (c: Commit, path: string) => sh(f.canonical, "rev-parse", `${c.sha}:${path}`) as Sha;
+const refs = (snap: Snap) => `/git/${NS}/${snap.name}.git/info/refs`;
 
-  // The current job in a new runner, as the service runs it: provider, RunnerHost, gateway and checkout.
-  const image = modelImage(f.root);
-  const fleet = new Fleet(() => new ProcessContainer({ dir: f.root, image, repos: (name) => (f.artifacts.has(name) ? f.artifacts.local(name) : null) }));
-  const j = await f.snapshotJob(current);
+let image: ModelImage | undefined;
+/**
+ * Issue a filtered job for `snap` and check it out in a new runner, as the
+ * service runs it: provider, RunnerHost, gateway and checkout. The runner
+ * stays open until the test ends. Its git reaches every repository of the
+ * fake Artifacts, so a fetch fails only because the object is not there.
+ */
+async function open(snap: Snap) {
+  image ??= modelImage(f.root);
+  const fleet = new Fleet(() => new ProcessContainer({ dir: f.root, image: image!, repos: (name) => (f.artifacts.has(name) ? f.artifacts.local(name) : null) }));
+  const j = await f.snapshotJob(snap);
   const bound = checkJob(j, expectations());
   assert.ok(!isRefusal(bound), JSON.stringify(bound));
   const session = await runnerProvider({ fresh: () => fleet.make().host, registry: [] }).open(bound);
-  try {
-    const co = await checkout(session.runner, j, session);
-    assert.ok(co.ok, !co.ok ? co.detail : "");
-    const ws = co.ws;
-    const run = async (...args: string[]) => git(session.runner, ws, args);
-    const fetch = async (id: string) => (await run("fetch", "--no-tags", "--no-write-fetch-head", j.readUrl, id)).exitCode;
-    assert.equal(ws.head, current.commit);
-    assert.deepEqual(ws.files!.map(([p]) => p), ["package-lock.json", "package.json", "src/add.js", "test/add.test.js"]);
-    // 1. Not in the working tree.
-    const box = fleet.boxes[0]!.c;
-    assert.equal(existsSync(join(box.root!, "work", j.id, "src/src/add.js")), true);
-    assert.equal(existsSync(join(box.root!, "work", j.id, "src/src/secret.txt")), false);
-    // 2. Not in the object database, and there is no history to dig in: one root commit.
-    assert.notEqual((await run("cat-file", "-e", secret)).exitCode, 0);
-    assert.equal((await run("rev-list", "--all", "--count")).stdout.trim(), "1");
-    // 3. No remote is configured, and the one repository the job can reach advertises only its snapshot.
-    assert.equal((await run("remote")).stdout.trim(), "");
-    assert.equal((await run("ls-remote", j.readUrl)).stdout.trim(), `${current.commit}\trefs/artroom/snapshot`);
-    // 4. Not fetchable by ID. Control: the server does serve an object it holds by its ID.
-    assert.equal(await fetch(blob("src/add.js")), 0, "the job's repository serves its own blob by ID");
-    assert.notEqual(await fetch(secret), 0, "the file left out");
-    assert.notEqual(await fetch(older.commit), 0, "the older snapshot's commit");
-    // 5. Its gateway reaches its own repository only.
-    assert.equal(await Fleet.ask(box, `/git/${NS}/${current.name}.git/info/refs`), 200);
-    assert.equal(await Fleet.ask(box, `/git/${NS}/${older.name}.git/info/refs`), 403);
-    assert.equal(await Fleet.ask(box, `/git/${NS}/canon.git/info/refs`), 403);
-  } finally {
-    await session.close();
+  onTestFinished(() => session.close());
+  const co = await checkout(session.runner, j, session);
+  assert.ok(co.ok, !co.ok ? co.detail : "");
+  const ws = co.ws;
+  const run = (...args: string[]) => git(session.runner, ws, args);
+  const fetch = async (id: string) => (await run("fetch", "--no-tags", "--no-write-fetch-head", j.readUrl, id)).exitCode;
+  return { j, token: bound.token, box: fleet.boxes[0]!.c, ws, run, fetch };
+}
+
+test("a scoped job reads only its own snapshot: a file left out cannot be read by any route, nor can an older, wider snapshot's commit or blob by known ID; after a configuration change neither job's token reads the other's repository (review bdcc7cc9 P2; R-CARRY-9, R-CARRY-16, R-EXEC-7)", async () => {
+  // The reviewer's reproduction, as input snapshots: an older src/** snapshot with its job, then the snapshot of a
+  // checker whose inputs are narrowed to src/add.js, with the next job. No proposal is run here; the two snapshots
+  // model the state before and after such a change.
+  const older = await wide();
+  const earlier = checkJob(await f.snapshotJob(older), expectations());
+  assert.ok(!isRefusal(earlier), JSON.stringify(earlier));
+  const current = await narrow();
+  assert.notEqual(older.name, current.name, "each snapshot commit has its own repository");
+  const secret = blob(main, "src/secret.txt");
+  assert.equal(sh(older.store, "cat-file", "-t", secret), "blob", "the older snapshot holds the file");
+
+  const { j, token, box, ws, run, fetch } = await open(current);
+  assert.equal(ws.head, current.commit);
+  assert.deepEqual(ws.files!.map(([p]) => p), ["package-lock.json", "package.json", "src/add.js", "test/add.test.js"]);
+  // 1. Not in the working tree.
+  assert.equal(existsSync(join(box.root!, "work", j.id, "src/src/add.js")), true);
+  assert.equal(existsSync(join(box.root!, "work", j.id, "src/src/secret.txt")), false);
+  // 2. Not in the object database, and there is no history to dig in: one root commit.
+  assert.notEqual((await run("cat-file", "-e", secret)).exitCode, 0);
+  assert.equal((await run("rev-list", "--all", "--count")).stdout.trim(), "1");
+  // 3. No remote is configured, and the one repository the job can reach advertises only its snapshot.
+  assert.equal((await run("remote")).stdout.trim(), "");
+  assert.equal((await run("ls-remote", j.readUrl)).stdout.trim(), `${current.commit}\trefs/artroom/snapshot`);
+  // 4. Not fetchable by ID. Control: the server does serve an object it holds by its ID.
+  assert.equal(await fetch(blob(main, "src/add.js")), 0, "the job's repository serves its own blob by ID");
+  assert.notEqual(await fetch(secret), 0, "the file left out");
+  assert.notEqual(await fetch(older.commit), 0, "the older snapshot's commit");
+  // 5. Its gateway reaches its own repository only.
+  assert.equal(await Fleet.ask(box, refs(current)), 200);
+  assert.equal(await Fleet.ask(box, refs(older)), 403);
+  assert.equal(await Fleet.ask(box, `/git/${NS}/canon.git/info/refs`), 403);
+  // 6. Artifacts accepts each job's token for its own repository only.
+  assert.equal(f.artifacts.authorize(current.name, earlier.token), false, "the earlier job's token cannot read the new snapshot");
+  assert.equal(f.artifacts.authorize(older.name, token), false, "the new job's token cannot read the older snapshot");
+  assert.deepEqual([f.artifacts.authorize(older.name, earlier.token), f.artifacts.authorize(current.name, token)], [true, true], "control: each reads its own");
+});
+
+test("concurrent jobs, different snapshots: with both runners open, neither fetches the other's commit or blobs, by ID or by ref, and neither token reads the other's repository (R-CARRY-16)", async () => {
+  // Two snapshots of different commits, each with a file the other lacks.
+  const s2 = await narrow();
+  const s3 = await f.snapshot(second.sha, ["src/second.js"]);
+  const [a, b] = await Promise.all([open(s2), open(s3)]);
+  assert.ok(a.box.running && b.box.running, "both are open at once");
+  for (const [mine, own, theirs, file] of [
+    [a, s2, s3, blob(second, "src/second.js")],
+    [b, s3, s2, blob(main, "src/add.js")],
+  ] as const) {
+    assert.equal(sh(theirs.store, "cat-file", "-t", file), "blob", "control: the other snapshot holds the file");
+    assert.notEqual(await mine.fetch(theirs.commit), 0, "the other snapshot's commit");
+    assert.notEqual(await mine.fetch(file), 0, "the other snapshot's blob");
+    assert.equal(await mine.fetch(own.commit), 0, "control: its own commit, by ID");
+    assert.equal((await mine.run("ls-remote", mine.j.readUrl)).stdout.trim(), `${own.commit}\trefs/artroom/snapshot`, "by ref, only its own");
+    assert.deepEqual([await Fleet.ask(mine.box, refs(own)), await Fleet.ask(mine.box, refs(theirs))], [200, 403], "its gateway reaches its own repository only");
+    assert.deepEqual([f.artifacts.authorize(own.name, mine.token), f.artifacts.authorize(theirs.name, mine.token)], [true, false], "its token reads its own repository only");
   }
 });
 

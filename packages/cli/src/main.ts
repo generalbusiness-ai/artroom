@@ -441,9 +441,9 @@ function applyLocal(ctx: Ctx, id: RoomId, key: string, local: LocalIntent, out: 
  *   current state, so a retired key still gets its receipt (R-IDEM-2). An
  *   unsigned bearer act needs its token judged first (R-CRED-10).
  * - `answered`: nothing is sent; the local steps run again from the kept
- *   answer.
+ *   answer, and `kept` is true in what is returned.
  */
-async function journaled<T>(ctx: Ctx, spec: ActSpec<T>): Promise<{ out: Result<T>; extra: string[]; prepared?: PreparedAct }> {
+async function journaled<T>(ctx: Ctx, spec: ActSpec<T>): Promise<{ out: Result<T>; extra: string[]; prepared?: PreparedAct; kept?: boolean }> {
   const { id, room } = roomOf(ctx);
   const key = str(ctx.values, "idempotency-key") ?? commandKey();
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(key)) throw new UsageError("An idempotency key is 1 to 64 characters from A-Z, a-z, 0-9, '_' and '-'.");
@@ -453,6 +453,8 @@ async function journaled<T>(ctx: Ctx, spec: ActSpec<T>): Promise<{ out: Result<T
     throw new UsageError(`The idempotency key ${key} belongs to an unfinished artroom ${entry.command}. Repeat that command with it.`);
   }
   let out: Result<T>;
+  // True when the journal already held the answer, so this run sends nothing.
+  const kept = entry?.state === "answered";
   if (entry?.state === "answered") out = entry.result as Result<T>;
   else {
     if (entry === undefined) {
@@ -498,7 +500,7 @@ async function journaled<T>(ctx: Ctx, spec: ActSpec<T>): Promise<{ out: Result<T
   ctx.store.finish(id, "act", key);
   ctx.act = undefined;
   // The act as it was prepared, and so as it was sent: what the journal kept, whichever run prepared it.
-  return { out, extra, prepared: entry!.prepared };
+  return { out, extra, prepared: entry!.prepared, kept };
 }
 
 /**
@@ -1136,7 +1138,7 @@ const COMMANDS: Record<string, Command> = {
       }
       const because = list(ctx.values, "because").map(parseReason);
       let reader: HttpRoomClient | undefined;
-      const { out, prepared } = await journaled<DeclaredRecord>(ctx, {
+      const { out, prepared, kept } = await journaled<DeclaredRecord>(ctx, {
         command: "act",
         async start(api, room, opts) {
           reader = api;
@@ -1191,9 +1193,14 @@ const COMMANDS: Record<string, Command> = {
       });
       // A run that finishes an act from the journal finishes the act that was saved, whatever kind this command line
       // names: the saved bytes go back unchanged (R-IDEM-2). So the act is named from what was saved and recorded,
-      // never from this run's arguments, and a run that named another kind is told which act it finished.
+      // never from this run's arguments, and a run that named another kind is told which act it finished. It is told
+      // what this run did: the saved act went to the room again, or its answer was already in the journal and nothing
+      // was sent.
       const saved = prepared?.kind ?? kind; // G5:cli-saved-kind
-      if (saved !== kind) ctx.io.err(`This idempotency key belongs to a saved ${saved} act. That act was sent again as it was saved; no ${kind} act was made.`); // G5:cli-saved-kind-told
+      if (saved !== kind) {
+        const did = kept === true ? `That act had already been answered, and this is its result. Nothing was sent, and no ${kind} act was made.` : `That act was sent again as it was saved; no ${kind} act was made.`; // G5:cli-saved-kind-state
+        ctx.io.err(`This idempotency key belongs to a saved ${saved} act. ${did}`); // G5:cli-saved-kind-told
+      }
       if (isRefusal(out)) {
         const code = refused(ctx, out);
         if (!ctx.json && out.rule === "binding-stale") for (const l of await staleText(ctx, reader, saved, prepared?.binding ?? given)) ctx.io.err(l);

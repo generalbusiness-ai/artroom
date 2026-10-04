@@ -5,6 +5,7 @@
  * Artifacts adapter) over fake remotes (`src/memory/artifacts.ts`).
  */
 
+import { expect } from "vitest";
 import { env } from "cloudflare:workers";
 import { runInDurableObject } from "cloudflare:test";
 import { entriesAfter } from "../../src/log.ts";
@@ -58,9 +59,13 @@ export function advance(ms: number): void {
 /** The policy port with fault injection: a runtime failure is a thrown `policy-runtime` (R-EVAL-5). */
 export interface FaultyPolicy extends PolicyPort {
   failures: { notify: number; refuse: number; require: number };
-  calls: { notify: number; refuse: number };
+  calls: { notify: number; refuse: number; reservation: number; carry: number };
   /** While set, `refuse` waits for it: a test holds an admission inside policy evaluation. */
   gate: Promise<void> | null;
+  /** While set, `land` at stage reservation waits for it: a test holds a landing inside its rule evaluation. */
+  landGate: Promise<void> | null;
+  /** While set, `carry` waits for it: a test holds a carry judgment inside its rule evaluation. */
+  carryGate: Promise<void> | null;
   /** A port that ignores the lane purpose: only the Room's own platform rules then protect recovery lanes. */
   ignorePurpose: boolean;
   /** Called with each refuse input before evaluation; a test may throw from it (a runtime failure). */
@@ -74,8 +79,10 @@ function faultyPolicy(): FaultyPolicy {
   const p: FaultyPolicy = {
     ...real,
     failures: { notify: 0, refuse: 0, require: 0 },
-    calls: { notify: 0, refuse: 0 },
+    calls: { notify: 0, refuse: 0, reservation: 0, carry: 0 },
     gate: null,
+    landGate: null,
+    carryGate: null,
     ignorePurpose: false,
     refuseHook: null,
     refuse: async (policy, input, opts) => {
@@ -97,7 +104,18 @@ function faultyPolicy(): FaultyPolicy {
       }
       return real.require(...a);
     },
-    land: async (policy, input, opts) => realLand(policy, p.ignorePurpose ? { ...input, lane: { ...input.lane, purpose: "ordinary" } } : input, opts),
+    carry: async (...a) => {
+      p.calls.carry++;
+      if (p.carryGate) await p.carryGate;
+      return real.carry(...a);
+    },
+    land: async (policy, input, opts) => {
+      if (input.stage === "reservation") {
+        p.calls.reservation++;
+        if (p.landGate) await p.landGate;
+      }
+      return realLand(policy, p.ignorePurpose ? { ...input, lane: { ...input.lane, purpose: "ordinary" } } : input, opts);
+    },
     notify: async (...a) => {
       p.calls.notify++;
       if (p.failures.notify > 0) {
@@ -318,7 +336,7 @@ export async function call<T>(p: Promise<unknown>): Promise<T> {
 /** The thrown failure of a call, or a test failure if it succeeded. */
 export async function failure(p: Promise<unknown>): Promise<{ code: string; message: string; retryable: boolean }> {
   const w = (await p) as Wire<unknown>;
-  if ("ok" in w) throw new Error(`expected a failure, got ${JSON.stringify(w.ok).slice(0, 300)}`);
+  if ("ok" in w) return expect.fail(`expected a failure, got ${JSON.stringify(w.ok).slice(0, 300)}`);
   return w.error;
 }
 
@@ -366,7 +384,7 @@ export class Client {
   /** Submit and expect acceptance. */
   async ok<T extends ActRecord = ActRecord>(kind: EnvelopeKind, target: unknown, body: unknown, idempotencyKey?: string): Promise<T> {
     const r = await this.act<T>(kind, target, body, idempotencyKey);
-    if (isRefusal(r)) throw new Error(`refused: ${r.rule}: ${r.reason}`);
+    if (isRefusal(r)) return expect.fail(`refused: ${r.rule}: ${r.reason}`);
     return r;
   }
 
@@ -535,14 +553,16 @@ export function runtimeFailure(): Error {
   return Object.assign(new Error("injected engine fault"), { name: "ArtroomError", code: "policy-runtime", retryable: true, maybeRecorded: false });
 }
 
+// These two fail by an assertion, not by a thrown error: a test that fails here has checked a result, and
+// scripts/control.mjs counts only a failed assertion as a test that distinguishes.
 export function expectRefusal(r: unknown, rule: string): Refusal {
-  if (!isRefusal(r)) throw new Error(`expected refusal ${rule}, got ${JSON.stringify(r).slice(0, 400)}`);
-  if (r.rule !== rule) throw new Error(`expected refusal ${rule}, got ${r.rule}: ${r.reason}`);
+  if (!isRefusal(r)) return expect.fail(`expected refusal ${rule}, got ${JSON.stringify(r).slice(0, 400)}`);
+  if (r.rule !== rule) return expect.fail(`expected refusal ${rule}, got ${r.rule}: ${r.reason}`);
   return r;
 }
 
 export function expectOk<T>(r: T | Refusal): T {
-  if (isRefusal(r)) throw new Error(`unexpected refusal ${r.rule}: ${r.reason}`);
+  if (isRefusal(r)) return expect.fail(`unexpected refusal ${r.rule}: ${r.reason}`);
   return r;
 }
 
