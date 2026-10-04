@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:d67642ef4e9558badc8546b62537be87974f79c8","text":"Merge retired a covered predecessor; the successor is at package-lock.json."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:d94391191995cd52e3fc6ee9ea78ac7c499362e0","text":"Merge retired a covered predecessor; the successor is at release/third-party/licenses/content-type-1.0.5.txt."}
