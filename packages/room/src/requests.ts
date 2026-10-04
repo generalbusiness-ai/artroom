@@ -459,24 +459,31 @@ async function redeemRoom(core: RoomCore, invitationId: InvitationId, secretText
 
 // ------------------------------------------------------------ bearer acts (R-CRED-3 step 4)
 
-/** An act for an MCP agent: signed by the bearer's session key, naming its delegation. */
 /**
- * Judge a bearer token (R-CRED-10): an unknown or expired token, or a
- * revoked delegation or session key, is `unauthenticated` and nothing is
- * recorded. So after revocation even a retry of an earlier act is refused:
- * there is no envelope to replay.
+ * Judge a bearer token for an act or a request (R-CRED-10), exactly as a
+ * read judges it (`authenticateHash`): an unknown or expired token, a
+ * revoked session key, a revoked or expired delegation, a revoked grantor
+ * key, or a member who is not active, is `unauthenticated`, and nothing is
+ * recorded. So once the session has ended, even an exact retry of an
+ * earlier act is refused here: the room signs nothing for it, so there is
+ * no envelope to replay. An envelope that was signed and kept by someone
+ * can still be submitted, and gets its record (R-IDEM-2).
  */
 function judgeBearer(core: RoomCore, bearer: unknown): { readonly key: KeyId; readonly delegation: DelegationId; readonly seed: Uint8Array } {
   const fail = () => artroomError("unauthenticated", "The bearer token is not valid.");
   if (typeof bearer !== "string") throw fail();
-  const row = one(core.sql, "SELECT * FROM bearers WHERE hash = ?", tokenHash(bearer));
-  if (!row || num(row, "expires_ms")! <= core.now()) throw fail();
+  const hash = tokenHash(bearer);
+  const row = one(core.sql, "SELECT key, delegation FROM bearers WHERE hash = ?", hash);
+  if (!row) throw fail();
+  try {
+    authenticateHash(core, hash); // one judgment for reads, acts and requests
+  } catch {
+    throw fail();
+  }
   const key = str(row, "key") as KeyId;
-  const d = delegation(core.sql, str(row, "delegation")!);
-  if (!d || d.revoked !== undefined || d.expiresMs <= core.now() || revocationOf(core.sql, key)) throw fail();
   const seed = core.heldSeed(key);
   if (!seed) throw fail();
-  return { key, delegation: d.id, seed };
+  return { key, delegation: str(row, "delegation") as DelegationId, seed };
 }
 
 /**

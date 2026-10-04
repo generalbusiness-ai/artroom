@@ -319,6 +319,7 @@ No other test runs a second time under `v2`: not founding, secret scanning, log 
 | A WebSocket's token is judged before the upgrade, and the socket is closed when its key is revoked. | R-API-8, R-API-12, R-LOG-11 | `worker.test.ts`: "R-API-8, R-API-12: live updates" |
 | A bearer's acts are the room's, signed under its delegation, and listing a tool is not permission. | R-CRED-3, R-CRED-10, R-API-9, R-API-13 to 15 | `worker.test.ts`: "bearer acts and the MCP route" |
 | The Room gives its MCP endpoint the caller's role now and the grant as signed. | R-API-14 | `worker.test.ts`: "the Room gives its MCP endpoint" |
+| A bearer session ends with its grantor: a revoked grantor key or a member who is not active ends acts, requests and exact retries as it ends reads, while a kept signed envelope still gets its record. | R-CRED-10, R-IDEM-2, request 5d41ea36 | `worker.test.ts`: "a bearer session ends with its grantor" |
 
 ### Alarms, idle cost and diagnoses
 

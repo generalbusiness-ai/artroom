@@ -3294,6 +3294,20 @@ The declared run's skips are the tests that found their own rooms (stage 2's, st
 4. **Section 23's "MCP descriptors" row** holds only in a `v2` room: choice 14.
 5. **The planner's artifacts.** The planner republishes them at the final head. That head does not exist yet: it needs stage 5 reviewed and landed, then this branch composed on main.
 
+## Bearer sessions end with their grantor (request 5d41ea36)
+
+Status: implemented, pending review. Gitseq request `5d41ea36` (builder's own, found while reducing the Room's tests), on `request/test-overhead`. The MCP core's review (`bc0d7f6b`) asked for it to be completed.
+
+**The rule (condition 1).** The room judges a token the same way for a read, an act and a request. A session ends when its token is unknown or expired, its session key is revoked, its delegation is revoked or expired, the key of the delegation's grantor is revoked for any reason, or its member is no longer active. After that, an exact retry of an act the session made earlier is `unauthenticated`: the room signs nothing for the session, so there is no envelope to replay. A signed envelope that someone kept is not a session matter: submitted as its own bytes, it gets its record (R-IDEM-2). A change of the member's role, or of what the delegation's kinds mean, does not end the session; it is judged when a new act is admitted. R-CRED-10 in [docs/protocol.md](../docs/protocol.md) now says this. That sentence is contract text, so it is for the planner to accept.
+
+**What was wrong.** `judgeBearer` in `packages/room/src/requests.ts` checked the token, the delegation and the session key. It did not check the grantor's key or the member's state, which the read path (`authenticateHash`) checks. After a member's room-held key was retired, the session's reads answered `unauthenticated` while `bearerAct` still returned the original record for an exact retry. Nothing new could be recorded.
+
+**The change.** `judgeBearer` calls `authenticateHash`: one judgment. No other source changed.
+
+**Witness.** `packages/room/test/workerd/worker.test.ts`, against a real Room: "a bearer session ends with its grantor ...". The grantor's key is revoked as `retired`, so that the delegation itself stays unrevoked and only the grantor's revocation can end the session; a `compromised` revocation revokes the delegation too and would hide the omission. Then the MCP list, an exact retry and a workspace request are all `unauthenticated`, nothing is recorded, and the first act's signed envelope, taken from the log and submitted, returns the first record. A second session whose member is removed gets the same answer.
+
+**Control.** One, with `scripts/control.mjs`: the old three checks in place of the one judgment. The test fails by its assertion ("expected a failure, got" the first record). Distinguishes.
+
 ## Test overhead (request ecbc722a)
 
 Status: implemented, pending review. Gitseq request `ecbc722a` (planner to builder, relaying the project owner's new highest priority), promise `1c6bf45c`. Branch `request/test-overhead`. Nothing was pushed or deployed.
