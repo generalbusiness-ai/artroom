@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:e85e70f75bcbdc1ae2cac9319dc65e15a465683d","text":"Merge retired a covered predecessor; the successor is at packages/cli/test/harness.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:e8e599af66e21f8cefea25ee1011296413ea5177","text":"Merge retired a covered predecessor; the successor is at packages/mcp/vitest.config.ts."}
