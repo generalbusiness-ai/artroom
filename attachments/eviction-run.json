@@ -1,0 +1,17 @@
+{
+  "command": [
+    "node",
+    "/Users/hughpyle/play/artroom/node_modules/vitest/vitest.mjs",
+    "run",
+    "--config",
+    "probe.config.ts",
+    "--reporter=verbose",
+    "--reporter=json",
+    "--outputFile=/tmp/artroom-checker-stage5-c38-eviction-st4tv4kb/vitest.json"
+  ],
+  "cwd": "/tmp/artroom-checker-stage5-c38-eviction-st4tv4kb/fixture",
+  "exit_code": 1,
+  "elapsed_seconds": 0.39690303802490234,
+  "probe_sha256": "e6101b8452d02dee21880b946039c8325c0c36e027ad5651cac5a1a434b1d87a",
+  "config_sha256": "4f33cce840fb6680af674b600e501c415a7e7fa2557e7cf1706c3ef139f3bda9"
+}

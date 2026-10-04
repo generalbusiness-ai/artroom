@@ -1,0 +1,1022 @@
+{
+  "head": "c38c23ce3760f041d75678cf6c5d4c109c62e5da",
+  "fidelity": "exact client against its unchanged FakeRoom HTTPS seam; no real Room or provider",
+  "losses": [
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-0: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-1: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-2: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-3: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-4: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-5: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-6: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-7: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-8: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-9: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-10: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-11: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-12: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-13: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-14: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-15: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-16: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-17: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-18: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-19: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-20: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-21: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-22: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-23: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-24: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-25: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-26: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-27: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-28: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-29: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-30: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-31: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-32: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-33: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-34: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-35: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-36: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-37: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-38: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-39: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-40: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-41: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-42: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-43: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-44: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-45: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-46: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-47: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-48: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-49: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-50: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-51: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-52: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-53: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-54: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-55: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-56: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-57: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-58: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-59: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-60: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-61: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-62: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-63: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key evict-64: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    }
+  ],
+  "acceptedClaimsBefore": 65,
+  "stale": {
+    "refused": true,
+    "rule": "binding-stale",
+    "reason": "The act was prepared for note as undefined; the active declaration's binding is sha256:e8267ab3e4e983a115378f04d2169cc1dbdb5c3774a76469e3e5da2c65049f5c, in policy version act_68_0ca3d593.",
+    "fix": "Read the active declaration. Sign the act again under its binding only if that meaning is still what you intend.",
+    "current": {
+      "binding": "sha256:e8267ab3e4e983a115378f04d2169cc1dbdb5c3774a76469e3e5da2c65049f5c",
+      "policy": "act_68_0ca3d593"
+    }
+  },
+  "retained": {
+    "saved": {
+      "kind": "claim",
+      "target": null,
+      "body": {
+        "goal": "goal-1",
+        "scope": [
+          "src/task_1/**"
+        ]
+      },
+      "idempotencyKey": "evict-1",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_0de86b504b824453e78b758a274092aa",
+          "actor": "key_kU0cvChjR2QVwRxrGP-t4uW9kiKQlzj5Pxrg05g69eo",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "goal-1",
+            "scope": [
+              "src/task_1/**"
+            ]
+          },
+          "idempotencyKey": "evict-1"
+        },
+        "sig": "PUQ4IRILKkuI3TVid0PgWN6qI767z50NAJ7g_Ne0xNIBU7u1HsDZOayZl7X6iKKkQk0YnCG6yuAb17q6d6m5Dw"
+      }
+    },
+    "preparedOnRetry": {
+      "kind": "claim",
+      "target": null,
+      "body": {
+        "goal": "goal-1",
+        "scope": [
+          "src/task_1/**"
+        ]
+      },
+      "idempotencyKey": "evict-1",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_0de86b504b824453e78b758a274092aa",
+          "actor": "key_kU0cvChjR2QVwRxrGP-t4uW9kiKQlzj5Pxrg05g69eo",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "goal-1",
+            "scope": [
+              "src/task_1/**"
+            ]
+          },
+          "idempotencyKey": "evict-1"
+        },
+        "sig": "PUQ4IRILKkuI3TVid0PgWN6qI767z50NAJ7g_Ne0xNIBU7u1HsDZOayZl7X6iKKkQk0YnCG6yuAb17q6d6m5Dw"
+      }
+    },
+    "savedCanonical": "{\"body\":{\"goal\":\"goal-1\",\"scope\":[\"src/task_1/**\"]},\"idempotencyKey\":\"evict-1\",\"kind\":\"claim\",\"signed\":{\"envelope\":{\"actor\":\"key_kU0cvChjR2QVwRxrGP-t4uW9kiKQlzj5Pxrg05g69eo\",\"body\":{\"goal\":\"goal-1\",\"scope\":[\"src/task_1/**\"]},\"idempotencyKey\":\"evict-1\",\"kind\":\"claim\",\"room\":\"room_0de86b504b824453e78b758a274092aa\",\"target\":null,\"v\":1},\"sig\":\"PUQ4IRILKkuI3TVid0PgWN6qI767z50NAJ7g_Ne0xNIBU7u1HsDZOayZl7X6iKKkQk0YnCG6yuAb17q6d6m5Dw\"},\"target\":null}",
+    "retryCanonical": "{\"body\":{\"goal\":\"goal-1\",\"scope\":[\"src/task_1/**\"]},\"idempotencyKey\":\"evict-1\",\"kind\":\"claim\",\"signed\":{\"envelope\":{\"actor\":\"key_kU0cvChjR2QVwRxrGP-t4uW9kiKQlzj5Pxrg05g69eo\",\"body\":{\"goal\":\"goal-1\",\"scope\":[\"src/task_1/**\"]},\"idempotencyKey\":\"evict-1\",\"kind\":\"claim\",\"room\":\"room_0de86b504b824453e78b758a274092aa\",\"target\":null,\"v\":1},\"sig\":\"PUQ4IRILKkuI3TVid0PgWN6qI767z50NAJ7g_Ne0xNIBU7u1HsDZOayZl7X6iKKkQk0YnCG6yuAb17q6d6m5Dw\"},\"target\":null}",
+    "result": {
+      "id": "act_4_50607e32",
+      "seq": 4,
+      "kind": "claim",
+      "by": {
+        "via": "member",
+        "member": "@alice",
+        "role": "member",
+        "key": "key_kU0cvChjR2QVwRxrGP-t4uW9kiKQlzj5Pxrg05g69eo"
+      },
+      "at": "2026-10-04T04:45:19.531Z",
+      "flags": [],
+      "lane": "act_4_50607e32",
+      "purpose": "ordinary",
+      "goal": "goal-1",
+      "scope": [
+        "src/task_1/**"
+      ],
+      "lease": {
+        "holder": "@alice",
+        "generation": 1,
+        "expiresAt": "2026-10-04T05:00:19.531Z"
+      },
+      "overlaps": [
+        {
+          "lane": "act_3_f65b89fc",
+          "holder": "@alice",
+          "mine": "src/task_1/**",
+          "theirs": "src/task_0/**",
+          "certain": false
+        }
+      ],
+      "effect": {
+        "type": "opened",
+        "purpose": "ordinary",
+        "lease": {
+          "holder": "@alice",
+          "generation": 1,
+          "expiresAt": "2026-10-04T05:00:19.531Z"
+        }
+      }
+    }
+  },
+  "oldest": {
+    "saved": {
+      "kind": "claim",
+      "target": null,
+      "body": {
+        "goal": "goal-0",
+        "scope": [
+          "src/task_0/**"
+        ]
+      },
+      "idempotencyKey": "evict-0",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_0de86b504b824453e78b758a274092aa",
+          "actor": "key_kU0cvChjR2QVwRxrGP-t4uW9kiKQlzj5Pxrg05g69eo",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "goal-0",
+            "scope": [
+              "src/task_0/**"
+            ]
+          },
+          "idempotencyKey": "evict-0"
+        },
+        "sig": "wHDpvtu4PNsErZUP0qsiBDrVoXmftc-4Vhaj6sMfPtxWnMtkTh03iuAmry0Z-9kK_PO1WyjjzkC9vZdnHzM3DA"
+      }
+    },
+    "preparedOnRetry": {
+      "kind": "claim",
+      "target": null,
+      "body": {
+        "goal": "goal-0",
+        "scope": [
+          "src/task_0/**"
+        ]
+      },
+      "idempotencyKey": "evict-0",
+      "signed": {
+        "envelope": {
+          "v": 2,
+          "room": "room_0de86b504b824453e78b758a274092aa",
+          "actor": "key_kU0cvChjR2QVwRxrGP-t4uW9kiKQlzj5Pxrg05g69eo",
+          "kind": "claim",
+          "binding": "sha256:7dae8fd33493267c2046a293a6e2499d3bdc0e710e41633789494227a1b68cc4",
+          "target": null,
+          "body": {
+            "goal": "goal-0",
+            "scope": [
+              "src/task_0/**"
+            ]
+          },
+          "idempotencyKey": "evict-0"
+        },
+        "sig": "U6GGj_MS4U4-37HKQ_D55FJg4OjYZcctCXjc7rJi3Gi_s3hcEiulEd6g4TnHfrkjfXYUMeVpxnjO_f5mRfxFBQ"
+      }
+    },
+    "savedCanonical": "{\"body\":{\"goal\":\"goal-0\",\"scope\":[\"src/task_0/**\"]},\"idempotencyKey\":\"evict-0\",\"kind\":\"claim\",\"signed\":{\"envelope\":{\"actor\":\"key_kU0cvChjR2QVwRxrGP-t4uW9kiKQlzj5Pxrg05g69eo\",\"body\":{\"goal\":\"goal-0\",\"scope\":[\"src/task_0/**\"]},\"idempotencyKey\":\"evict-0\",\"kind\":\"claim\",\"room\":\"room_0de86b504b824453e78b758a274092aa\",\"target\":null,\"v\":1},\"sig\":\"wHDpvtu4PNsErZUP0qsiBDrVoXmftc-4Vhaj6sMfPtxWnMtkTh03iuAmry0Z-9kK_PO1WyjjzkC9vZdnHzM3DA\"},\"target\":null}",
+    "retryCanonical": "{\"body\":{\"goal\":\"goal-0\",\"scope\":[\"src/task_0/**\"]},\"idempotencyKey\":\"evict-0\",\"kind\":\"claim\",\"signed\":{\"envelope\":{\"actor\":\"key_kU0cvChjR2QVwRxrGP-t4uW9kiKQlzj5Pxrg05g69eo\",\"binding\":\"sha256:7dae8fd33493267c2046a293a6e2499d3bdc0e710e41633789494227a1b68cc4\",\"body\":{\"goal\":\"goal-0\",\"scope\":[\"src/task_0/**\"]},\"idempotencyKey\":\"evict-0\",\"kind\":\"claim\",\"room\":\"room_0de86b504b824453e78b758a274092aa\",\"target\":null,\"v\":2},\"sig\":\"U6GGj_MS4U4-37HKQ_D55FJg4OjYZcctCXjc7rJi3Gi_s3hcEiulEd6g4TnHfrkjfXYUMeVpxnjO_f5mRfxFBQ\"},\"target\":null}",
+    "result": {
+      "refused": true,
+      "rule": "idempotency-mismatch",
+      "reason": "The idempotency key was used for a different act, act_3_f65b89fc."
+    },
+    "exactExternalReplay": {
+      "id": "act_3_f65b89fc",
+      "seq": 3,
+      "kind": "claim",
+      "by": {
+        "via": "member",
+        "member": "@alice",
+        "role": "member",
+        "key": "key_kU0cvChjR2QVwRxrGP-t4uW9kiKQlzj5Pxrg05g69eo"
+      },
+      "at": "2026-10-04T04:45:19.528Z",
+      "flags": [],
+      "lane": "act_3_f65b89fc",
+      "purpose": "ordinary",
+      "goal": "goal-0",
+      "scope": [
+        "src/task_0/**"
+      ],
+      "lease": {
+        "holder": "@alice",
+        "generation": 1,
+        "expiresAt": "2026-10-04T05:00:19.528Z"
+      },
+      "overlaps": [],
+      "effect": {
+        "type": "opened",
+        "purpose": "ordinary",
+        "lease": {
+          "holder": "@alice",
+          "generation": 1,
+          "expiresAt": "2026-10-04T05:00:19.528Z"
+        }
+      }
+    }
+  },
+  "claimCountAfter": 65,
+  "actPosts": [
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 409
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 409
+    },
+    {
+      "method": "POST",
+      "route": "/acts",
+      "status": 200
+    }
+  ]
+}
