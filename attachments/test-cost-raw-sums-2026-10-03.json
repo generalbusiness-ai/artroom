@@ -1,0 +1,28 @@
+{
+  "before_head": "a1990c9433f9d8e403d58657bdf88c2e36c58b42",
+  "after_head": "641ebb43fa1c5544b6de943d042f4dc91a33fc2b",
+  "before": {
+    "steps": 17,
+    "elapsed_seconds": 410.39,
+    "cpu_seconds": 830.12,
+    "nonzero": []
+  },
+  "after_package_steps": {
+    "steps": 16,
+    "elapsed_seconds": 40.67,
+    "cpu_seconds": 86.98,
+    "nonzero": []
+  },
+  "after_actual_gate": {
+    "steps": 3,
+    "elapsed_seconds": 33.77,
+    "cpu_seconds": 79.12,
+    "nonzero": []
+  },
+  "after_gate_no_install": {
+    "steps": 2,
+    "elapsed_seconds": 29.13,
+    "cpu_seconds": 69.23,
+    "nonzero": []
+  }
+}
