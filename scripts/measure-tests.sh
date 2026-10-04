@@ -11,7 +11,10 @@
 # request ecbc722a was taken (that baseline's step list is this script at
 # commit ebbde3a0). The last step, `root-test`, is the one command the gate
 # runs. State the machine, the load and whether node_modules was already
-# installed with any figure you quote.
+# installed with any figure you quote. The steps run one after another, so a
+# sum of their times is a sum of separate runs, each with a warm file cache
+# from the one before. For the elapsed time of one whole gate, time
+# `npm run gate` itself.
 O=${1:?usage: scripts/measure-tests.sh <output directory>}
 W=$(cd "$(dirname "$0")/.." && pwd)
 mkdir -p "$O"; O=$(cd "$O" && pwd); : > "$O/steps.tsv"
@@ -45,3 +48,12 @@ step ui packages/ui npx vitest run $(V ui)
 step root-test . npm test
 uptime >> "$O/machine.txt"
 echo done > "$O/done"
+# `done` says the collection finished, not that the steps passed. A step that
+# failed is named here and makes this script fail: its time is not a cost of
+# a passing gate.
+failed=$(awk -F'\t' '$2 != 0 {print $1 " (exit " $2 ")"}' "$O/steps.tsv")
+if [ -n "$failed" ]; then
+  echo "steps that failed:"; echo "$failed"
+  exit 1
+fi
+echo "all $(wc -l < "$O/steps.tsv" | tr -d ' ') steps passed; figures in $O/steps.tsv"

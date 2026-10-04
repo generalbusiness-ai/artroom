@@ -337,7 +337,7 @@ No other test runs a second time under `v2`: not founding, secret scanning, log 
 ### Known gaps
 
 - Only one `v2` session's log is published and verified in the Room. `v2` logs with checks, revocations and carried verdicts are verified only in `packages/log`.
-- The protocol's stage 2 criterion (section 33.6) was the room's whole suite under the `v2` declarations. The gate runs the witness set above.
+- The room's whole suite no longer runs under the `v2` declarations. That demand is superseded, not owed: section 33.6 of the protocol now states the witness set above as the criterion. The gap that remains is a fault that shows only when some other legacy test runs under `v2`.
 - No test fixes what a bearer act answers after its grantor's room-held key is revoked as `retired`: the MCP route answers `unauthenticated`, while `RoomWire.bearerAct` still answers an exact retry.
 
 ## Checkers

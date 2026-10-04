@@ -57,12 +57,23 @@ restart is shown against the thing that really retries, orders or restarts.
 Run the tests of what you changed, not the repository.
 
 ```
-npm run test:changed                 # tests that import what you changed and have not committed
-npm run test:changed -- origin/main  # the same, for everything your branch changed
+npm run test:changed                 # what you changed and have not committed
+npm run test:changed -- origin/main  # everything that differs from origin/main
 npx vitest run --project room-workerd declared-fd6f00b6   # one project, files whose name matches
 npm test --workspace packages/git    # the git package (Node's test runner)
 npm test --workspace packages/ui     # the ui package (its own vitest)
 ```
+
+`npm run test:changed` covers all three test runners
+([scripts/test-changed.mjs](../scripts/test-changed.mjs)). The root vitest
+run picks the test files that import a changed file, in every package but
+git and ui. Those two have their own runners. Each runs whole, in a few
+seconds, when a changed file is in the package or in a workspace package it
+depends on. The last lines say which of the three ran, and why one did not.
+
+The selection follows imports. A test that reads a file without importing
+it, such as a fixture or a document, is not selected when only that file
+changes. The gate runs everything.
 
 ## Before a review
 
@@ -76,8 +87,9 @@ It installs only if `package-lock.json` changed since the last install,
 typechecks every workspace, and runs every test: one vitest process for
 the repository (`vitest.config.ts` at the root, one project per package
 and runtime), then the git and ui packages. It prints the head, the tree
-and each step's elapsed and CPU time. On an 18-core machine it takes about
-30 seconds. `npm run gate -- --ci` reinstalls first.
+and each step's elapsed and CPU time. It also fails on a whitespace error
+in what the branch changed. On an 18-core machine it takes about 30
+seconds. `npm run gate -- --ci` reinstalls first.
 
 The Room's tests run against real Durable Objects. One group of them,
 `packages/room/test/workerd/declared-run.test.ts`, runs chosen tests of
@@ -90,15 +102,26 @@ source and tests are unchanged, and give the two tree hashes.
 ## Showing that a test distinguishes
 
 When you add or change a guard, show its witness fails without it. Break
-the one line by hand and run the one test file:
+the one line and run the one test file:
 
 ```
-node scripts/control.mjs <source file> '<old text>' '<new text>' -- <package dir> <vitest args>
+node scripts/control.mjs <source file> '<old text>' '<new text>' [--expect '<part of the test name>'] -- <package dir> <test args>
 ```
 
-It applies the change, runs the tests, restores the file, and tells you
-whether they failed. Read the failure: it should be the assertion you
-expect, not a crash, a timeout or a compile error.
+It runs the tests unchanged, which must pass. Then it applies the change,
+runs them again and restores the file. It gives one of three results:
+
+| Result | Exit | Meaning |
+|---|---|---|
+| distinguishes | 0 | a test failed by an assertion with the change applied |
+| survives | 1 | every test still passed: they do not see this fault |
+| inconclusive | 2 | nothing was shown: the tests did not start, did not pass before the change, did not load or compile with it, timed out, or failed only by a thrown error |
+
+Only the first is evidence. With `--expect`, the test you name must be one
+of those that failed by an assertion, or the result is inconclusive. The
+helper prints each failed test and the first line of its failure. Read
+them: the assertion should be the one that states the invariant. The
+helper cannot judge that for you.
 
 There is no mutation sweep. Do not write one mutant per field or per
 condition, and do not run whole suites per mutant. One or two honest
@@ -124,6 +147,20 @@ head under review. Do not rebuild a per-field or per-guard inventory.
 `scripts/measure-tests.sh <output directory>` times each step
 of the gate alone: elapsed seconds, and CPU seconds summed over every
 process the step started. It also keeps each step's vitest report, from
-which the summed test-file time comes. State the machine, the load and the
-cache state with any figure. The current figures are in
-[plans/README.md](../plans/README.md).
+which the summed test-file time comes. It fails if a step fails. A sum of
+its steps is a sum of separate runs, not the time of one gate: for that,
+time `npm run gate` itself, which also prints each of its steps.
+
+Keep four figures apart, because they answer different questions:
+
+- **elapsed**: how long a person waits;
+- **CPU**: user and system seconds over every process, which is what the
+  machine spent;
+- **worker time**: vitest's own totals of import and test time over all
+  test files, with the git runner's duration, which is what the test
+  workers spent whether or not they ran side by side;
+- **summed test-file time**: the test durations in vitest's reports, which
+  leaves out imports and setup.
+
+State the machine, the load and the cache state with any figure. The
+current figures are in [plans/README.md](../plans/README.md).
