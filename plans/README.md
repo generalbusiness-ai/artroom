@@ -3137,29 +3137,40 @@ The request: cut Artroom's test overhead at least ten times. Remove every test t
 
 ### The result
 
-Four figures are kept apart, because they answer different questions:
+Five figures are kept apart, because they answer different questions:
 
 - **Elapsed**: how long a person waits.
 - **CPU**: user and system seconds, summed over every process a step started.
-- **Worker time**: vitest's own totals of import and test time over all test files, plus the git runner's duration. This is what the test workers spent, whether or not they ran side by side. The ui package's vitest prints shares, not seconds, so its part is its summed test-file time (2.7 s before, 0.9 s after).
+- **Single-worker suite time**: the elapsed time of each suite's command when it is given one worker and runs one file at a time. This is the nearest observation of what the test workers cost when nothing runs side by side. It is the whole command, so it includes the runner's own start and, in workerd, the pool and the runtime. It is not an observed worker lifetime, and it is not how the gate normally runs.
+- **Printed worker subtotal**: vitest's own totals of import, test, setup and environment time over all test files in the normal parallel run, plus the git runner's duration. It leaves out the rest of a worker's life, and parallel load inflates it. The ui package's vitest prints shares, not seconds, so its part is its summed test-file time (2.7 s before, 0.9 s after).
 - **Summed test-file time**: the test durations in vitest's reports. It leaves out imports and setup.
 
 The steps were timed with [scripts/measure-tests.sh](../scripts/measure-tests.sh), each one alone under `/usr/bin/time`, one after another. One 18-core machine, shared with other sessions: the one-minute load was 5 to 18 during the baseline and 6 to 18 during the after run. `node_modules` was already installed both times.
 
-| The complete gate | Elapsed | CPU | Worker time | Summed test-file time | Tests run |
+| The complete gate | Elapsed | CPU | Printed worker subtotal | Summed test-file time | Tests run |
 |---|---|---|---|---|---|
 | Before, at `a1990c94`: the sum of 17 steps (`npm ci`, typecheck, each suite) | 410.4 s | 830.1 s | 990.8 s | 787 s | 4,339 |
 | After, at `641ebb43`: the sum of the same steps, 16 now | 40.7 s | 87.0 s | 51.4 s | 37 s | 2,000 |
 | After, at `a31d84ba`: one whole gate, observed (`npm run gate -- --ci`) | 33.9 s | 78.0 s | 49.1 s | | 2,000 |
 | After, at `a31d84ba`: one whole gate with no install, observed (`npm run gate`) | 29.3 s | 70.6 s | | | 2,000 |
 
-By the same method on both sides, the sum of steps, the gate costs 10.1 times less elapsed time, 9.5 times less CPU, 19.3 times less worker time and 21 times less summed test-file time. One whole gate as it is now run is 12.1 times less elapsed and 10.6 times less CPU than the baseline sum. The tests alone went from 391.6 s and 791.4 CPU seconds to 29.8 s and 63.7: 13.2 and 12.4 times.
+By the same method on both sides, the sum of steps, the gate costs 10.1 times less elapsed time and 9.5 times less CPU. The printed worker subtotal is 19.3 times less and the summed test-file time 21 times less. One whole gate as it is now run is 12.1 times less elapsed and 10.6 times less CPU than the baseline sum. The tests alone went from 391.6 s and 791.4 CPU seconds to 29.8 s and 63.7: 13.2 and 12.4 times.
+
+**Worker time, observed with one worker.** `scripts/measure-tests.sh <dir> --serial` ran every suite with one worker, one file at a time, at both heads. The one-minute load was 3 to 17 during the baseline run and 3 during the after run.
+
+| Every suite, one worker each | Sum of the suites' elapsed time | CPU |
+|---|---|---|
+| Before, at `a1990c94`, 15 suites | 742.2 s | 760.6 s |
+| After, at `64a379c2`, 14 suites | 59.7 s | 63.1 s |
+
+That is 12.4 times less. The largest parts before were the log package in workerd (299.2 s) and in Node (115.1 s), the git package (71.2 s), the Room's two workerd runs (68.0 s and 60.8 s) and the CLI (51.5 s). The largest part after is the Room's workerd run, 26.6 s: with one worker, one isolate makes every room, and the pool's nested proxies (see "Found on the way") cost most there. With the gate's four workers the same run takes 6 s.
 
 What these comparisons are, and are not:
 
 - **The baseline is a sum of steps, not one observed run.** The old gate was `npm ci`, the typecheck and `npm test --workspaces`, which ran these same suites one after another, so the sum is close to what a person waited. No single uninterrupted baseline gate was timed.
 - **The like-for-like row is the second.** It is also a sum of steps, each started with a warm file cache from the step before.
 - **The last two rows are single observed runs** of the gate command, under `/usr/bin/time`. They include the one-process root run, which the baseline could not have. The fourth was taken during the edit cycle below, with a one-minute load of 19.
+- **Worker time is shown two ways, and neither is a measured worker lifetime.** The single-worker figure is the elapsed time of whole commands in a configuration the gate does not use. The printed subtotal comes from the normal run but covers only the phases vitest prints. Aggregate elapsed time across the gate's normal workers was not measured; the request's criterion is met only as far as these two figures show.
 - **CPU is the weakest ratio**, 9.5 by the sum of steps and 10.6 for the observed gate. The typecheck and the install are unchanged (about 23 CPU seconds together) and are now more than a quarter of the gate.
 
 By step, elapsed seconds, CPU seconds and tests run:
@@ -3189,7 +3200,7 @@ By step, elapsed seconds, CPU seconds and tests run:
 
 The Room's workerd step was timed again at `a31d84ba`, after a review correction removed a workaround from its harness (see "Review corrections" below): 6.1 s and 6.5 s elapsed, 19.3 and 20.1 CPU seconds, against 5.9 and 6.1 s, 18.4 and 18.5, with the workaround.
 
-**One edit, taken to review.** The same edit both ways: a change to the two guards of the refusal-text bound in `packages/room/src/declared.ts`.
+**One edit, taken to review.** The same place both ways: the two guards of the refusal-text bound in `packages/room/src/declared.ts`. In the after run the edit itself changes only the comment beside each guard, so that the affected tests are selected and pass. The faults are the two controls that follow, each of which breaks one guard and restores it.
 
 | | Elapsed | CPU |
 |---|---|---|
@@ -3208,6 +3219,8 @@ The after figure is the sum of four commands, run one after another with the edi
 | `node scripts/control.mjs packages/room/src/declared.ts 'return clipBytes(text, WORDING_FILLED_BYTES);' 'return text;' --expect 'refusal wording' -- packages/room --config vitest.node.config.ts test/node/declared-equivalence.test.ts` | distinguishes: 14 pass before; the named test fails by its assertion | 1.4 s | 1.7 s |
 | the same, with `'if (bytes > max) break;'` changed to `'if (bytes > max + 1) break;'` | distinguishes, by the same test | 1.4 s | 1.7 s |
 | `npm run gate` | passed: 2,000 tests | 29.3 s | 70.6 s |
+
+Worker time for the edit cycle is known only in part. After, with one worker: the affected tests took 28.8 s (`npx vitest run --changed --maxWorkers=1 --no-file-parallelism`, the same 12 files), the two controls 1.4 s each, and the gate's suites 59.7 s: 91.3 s. Before, the two gates' suites alone are 1,484 s with one worker. The two mutants' test sets were not run with one worker, so the before figure is a lower bound and the ratio, 16 times, is "at least". No aggregate elapsed time across normal workers was measured for the edit cycle either.
 
 The comparison understates what stage 2 really cost: over one day its review loop ran 1,799 mutant runs, 24 hours of runner time, and six root gates, and the inventory was still not complete when the run was stopped.
 
@@ -3288,6 +3301,17 @@ The checker read the work before it was sent for review and recorded preliminary
 | The map's known gaps still called the whole `v2` suite a criterion | The line now says the demand is superseded, and what gap remains |
 | The measurement script ended with "done" whatever happened | It names failed steps and fails |
 
+The checker then reviewed `15680192` and asked for changes (`3965e230`, with the checks in `0d7ccc8f`). Each is corrected at `64a379c2`:
+
+| Finding | Correction |
+|---|---|
+| `scripts/control.mjs` answered "survives" when every test was skipped after the change | A run with fewer tests than the passing run before it is inconclusive |
+| It answered "distinguishes" when one test failed by an assertion and another timed out | Any timeout makes the run inconclusive. The assertion is still printed, as partial evidence |
+| `npm run test:changed` selected no root test for a change to the lock file or a root `tsconfig`, and reported the root run as passed | A root file now runs every test of all three runners |
+| A new file with a name git quotes was not matched to its package, and vitest could not read it | Names are read from git with `-z`. Such a name runs the whole root suite, and its package is matched |
+| The worker figure was a subtotal of printed phases, presented as worker time | It is named a subtotal. A single-worker run of every suite at both heads is added, with its limits. What was not measured is stated |
+| The edit cycle's edit is comment text; its faults are the controls | Stated |
+
 ### Gates
 
-Run at `a31d84ba`, with `npm run gate -- --ci`: install exit 0; whitespace exit 0 (`git diff --check` against the base on main); typecheck exit 0, every workspace; test exit 0, 2,000 tests passed (1,515 in the root vitest run, with 69 more skipped where the witness set loads a file and runs only its chosen tests; 308 in git; 177 in ui); `git status` empty. The head for review adds only this section to `a31d84ba`. The gate was run again at that head, and the review request states the result.
+Run with `npm run gate -- --ci` at `a31d84ba`: install exit 0; whitespace exit 0 (`git diff --check` against the base on main); typecheck exit 0, every workspace; test exit 0, 2,000 tests passed (1,515 in the root vitest run, with 69 more skipped where the witness set loads a file and runs only its chosen tests; 308 in git; 177 in ui); `git status` empty. After `a31d84ba` the source and tests are unchanged; `64a379c2` changes three scripts and the guidance. The head for review adds only this section to `64a379c2`. The gate was run again at that head, and the review request states the result.
