@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:1144f308dd99a94fedf103248b753d4ed2abb3d4","text":"Merge retired a covered predecessor with no successor at its old path."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:118835f1efda885677228c064185909dde8a4d21","text":"Merge retired a covered predecessor; the successor is at packages/room/test/node/schema.cases.ts."}
