@@ -151,24 +151,35 @@ function frozen<T>(value: T): T {
 }
 
 /**
- * Throws unless `value` is plain data all the way down: null, a boolean, a
- * string, a number, an array, or an object whose prototype is
- * `Object.prototype` or null. This is the rule the signing profile has for
- * objects (R-SIG-3), asked before the copy is made: a structured clone
- * would turn a class instance into a plain object, and what was sent would
- * not be what the caller passed. An `undefined` property is allowed, and
- * is omitted when signed.
+ * A copy of `value`, made while checking that it is plain data all the way
+ * down: null, a boolean, a string, a number, an array, or an object whose
+ * prototype is `Object.prototype` or null, with data properties only. This
+ * is the rule the signing profile has for objects (R-SIG-3).
+ *
+ * Each property is read once, through its descriptor, and what is read is
+ * what is copied. So the copy cannot differ from what was checked: a getter
+ * is refused, not called, and a class instance is refused, not turned into
+ * a plain object as a structured clone would. An `undefined` property is
+ * allowed, and is omitted when signed.
  */
-function assertPlain(value: unknown): void {
-  if (value === null || value === undefined) return;
+function plainCopy(value: unknown): unknown {
+  if (value === null || value === undefined) return value;
   const type = typeof value;
-  if (type === "boolean" || type === "string" || type === "number") return;
+  if (type === "boolean" || type === "string" || type === "number") return value;
   if (type !== "object") throw new TypeError(`a ${type} is not plain data`);
-  if (!Array.isArray(value)) {
-    const proto = Object.getPrototypeOf(value);
-    if (proto !== Object.prototype && proto !== null) throw new TypeError("not a plain object"); // G5:intent-plain-object
-  }
-  for (const inner of Object.values(value as object)) assertPlain(inner);
+  const read = (key: string): unknown => {
+    const d = Object.getOwnPropertyDescriptor(value, key);
+    if (d === undefined) return undefined;
+    if (!("value" in d)) throw new TypeError("a property with a getter is not plain data"); // G5:intent-plain-accessor
+    return plainCopy(d.value);
+  };
+  if (Array.isArray(value)) return Array.from({ length: value.length }, (_, i) => read(String(i)));
+  const proto = Object.getPrototypeOf(value);
+  if (proto !== Object.prototype && proto !== null) throw new TypeError("not a plain object"); // G5:intent-plain-object
+  const out: Record<string, unknown> = {};
+  // Defined, not assigned: a key named `__proto__` is a property of the copy like any other.
+  for (const key of Object.keys(value)) Object.defineProperty(out, key, { value: read(key), enumerable: true, writable: true, configurable: true });
+  return out;
 }
 
 /**
@@ -181,9 +192,7 @@ function assertPlain(value: unknown): void {
  */
 function ownedIntent<T, B>(target: T, body: B): { readonly target: T; readonly body: B } {
   try {
-    assertPlain(target);
-    assertPlain(body);
-    return frozen({ target: structuredClone(target), body: structuredClone(body) }); // G5:intent-frozen
+    return frozen({ target: plainCopy(target) as T, body: plainCopy(body) as B }); // G5:intent-frozen
   } catch {
     throw artroomError("bad-request", "An act's target and body must be plain data: the handle keeps them, to send the act again unchanged."); // G5:intent-plain
   }
@@ -201,6 +210,9 @@ export interface ClientGenericActOptions extends GenericActOptions {
 
 /** The seven code-review kinds the named methods sign. `renew` and `roster` are platform kinds and stay `v: 1`. */
 const NAMED_DECLARED: ReadonlySet<string> = new Set(["claim", "propose", "note", "review", "check", "land", "release"]);
+
+/** How many named acts with no answer a handle keeps for exact retry (R-IDEM-2). */
+const UNANSWERED_MAX = 64;
 
 /** The shared core of every handle. */
 abstract class RoomCore {
@@ -229,6 +241,11 @@ abstract class RoomCore {
    * sent again, as first built, also when the room's vocabulary changed in
    * between (R-IDEM-2, R-DECL-16). Building the act again under the
    * vocabulary now in force would be a different act under the same key.
+   *
+   * None is ever dropped. A handle that holds `UNANSWERED_MAX` of them
+   * refuses a new named act before it is signed or sent, until one is
+   * answered: forgetting an act the room may have recorded would turn its
+   * repeat into another act.
    */
   readonly #unanswered = new Map<string, PreparedAct>();
 
@@ -368,6 +385,8 @@ abstract class RoomCore {
     const idempotencyKey = checkIdempotencyKey(opts?.idempotencyKey ?? newIdempotencyKey());
     const { target, body } = ownedIntent(givenTarget, givenBody); // G5:named-owned
     const kept = this.#unanswered.get(idempotencyKey);
+    if (kept === undefined && this.#unanswered.size >= UNANSWERED_MAX)
+      throw artroomError("rate-limited", `This handle has ${UNANSWERED_MAX} acts with no answer yet. Repeat one of them with its idempotency key, so that it is answered, before making another act.`); // G5:named-unanswered-full
     let prepared: PreparedAct;
     if (kept !== undefined && kept.kind === kind && canonicalize(kept.target) === canonicalize(target) && canonicalize(kept.body) === canonicalize(body)) {
       prepared = kept; // G5:named-retry-kept
@@ -394,7 +413,6 @@ abstract class RoomCore {
         this.#unanswered.delete(idempotencyKey);
       } else {
         // No answer: the room may have recorded it. A repeat with this key sends these bytes.
-        if (this.#unanswered.size >= 64 && !this.#unanswered.has(idempotencyKey)) this.#unanswered.delete(this.#unanswered.keys().next().value!);
         this.#unanswered.set(idempotencyKey, prepared); // G5:named-retry-keep
       }
       throw e;

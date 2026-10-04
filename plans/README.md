@@ -3295,6 +3295,8 @@ This branch changes `packages/log` and this file, and nothing else.
 
 Stage 3 is now reviewed on `request/test-overhead`, the integration branch (assert `dae9a1f3`), where it is composed with stage 2. The branch `request/decl-stage3` stays at `5449d19c`. Read this subsection first. Below it, "Mutation table" and the test names describe a layout that request `ecbc722a` replaced; "Prerequisite and composition" is done: the head contains stage 2, and the Room test that publishes and verifies a `v2` session runs.
 
+**Where each part is reviewed.** `packages/log` and the two notes are reviewed under this request. The changes to `packages/room/src/core.ts` described below are stage 2's source and are reviewed under stage 2 (request `fd6f00b6`, review request `5612131b` at `39430e23`). Each lane has its review request at a head of its own on this branch; the source of `packages/log` has not changed since `26872bac`.
+
 **Not complete.** Condition 2 asks verify to detect omitted, extra and substituted evaluation calls. For carry judgments it now does so in part. Complete accounting needs the Room to record each carry pass, which is a contract amendment. The design is [notes/2026-10-03-carry-accounting.md](../notes/2026-10-03-carry-accounting.md). The planner has said it stays owed under this request.
 
 **Repaired since `5449d19c`**, each from a checker finding:
@@ -3575,12 +3577,20 @@ Stage 5 is now reviewed on `request/test-overhead`, the integration branch (asse
 | (4) stage ownership and the read-route seam | "Edits to files other stages own", below, stands |
 | (5) named red mutations; gates; one exact head | The mutation part is superseded by `ecbc722a`. Gates and one head: as above |
 
-**Findings.** Reviewers recorded twenty findings on this lane. Eighteen were repaired and confirmed by a reviewer before this branch; each has a section under "Since `b7b9d8df`". Two were open and are repaired at this head:
+**Findings.** Reviewers recorded twenty findings on this lane before this branch. Eighteen were repaired and confirmed by a reviewer then; each has a section under "Since `b7b9d8df`". Two were open and are repaired on this branch:
 
 | Finding | What was wrong | Repair | Witness |
 |---|---|---|---|
-| `61b68774`, `11c564ce`: the client's refusal of input that is not plain data changed | The client copied a target or body before checking it. A class instance was copied into a plain object and sent. A nested `Uint8Array` threw a raw `TypeError` | The value is checked before the copy, by the rule the signer's canonical form uses, and every failure is `bad-request`. Nothing is signed, copied or sent | `packages/client/test/prepared.test.ts`: "a target or body that is not plain data ...", a table of twelve values |
+| `61b68774`, `11c564ce`: the client's refusal of input that is not plain data changed | The client copied a target or body before checking it. A class instance was copied into a plain object and sent. A nested `Uint8Array` threw a raw `TypeError` | The value is checked as it is copied, by the rule the signer's canonical form uses, and every failure is `bad-request`. Nothing is signed or sent (see `b2043423` below for the one-pass copy) | `packages/client/test/prepared.test.ts`: "a target or body that is not plain data ...", a table of fourteen values |
 | `4872a4a1`: a finishing run always said the saved act "was sent again" | When the journal already held the answer, nothing was sent | The message now says which happened: "That act was sent again as it was saved", or "That act had already been answered, and this is its result. Nothing was sent" | `packages/cli/test/declared.test.ts`: "a saved act whose answer the journal already holds ..." |
+
+A third finding came from the review of this head's parent `c38c23ce`, and is repaired here:
+
+| Finding | What was wrong | Repair | Witness |
+|---|---|---|---|
+| `6bf8d38a` (P2): the client dropped the oldest unanswered named act when a 65th had no answer | A later repeat of the dropped key was built again under the vocabulary then in force: another act under the same key, refused `idempotency-mismatch` | A handle drops none. With 64 unanswered, a new named act is refused `rate-limited` before it is signed or sent, until one is answered | `packages/client/test/prepared.test.ts`: "a handle that holds 64 acts with no answer ..." |
+
+| `b2043423` (P2): the plain-data check read a getter once and the copy read it again | A getter could answer plain text to the check and a class instance to the copy, which was then signed and sent as a plain object | The check and the copy are one pass. Each property is read once, through its descriptor, and what is read is what is copied. A getter is refused and never called | the same table test, rows "a getter" and "a nested getter"; it also asserts the getter was not called |
 
 One consequence of the first repair: a bearer session now refuses input that is not plain data too. Before, only a key handle did, at signing; a bearer would have sent it as JSON.
 
@@ -4823,6 +4833,22 @@ The declared run's skips are the tests that found their own rooms (stage 2's, st
 3. **Section 34.2's CLI line** says no source change is required. One was: choice 2.
 4. **Section 23's "MCP descriptors" row** holds only in a `v2` room: choice 14.
 5. **The planner's artifacts.** The planner republishes them at the final head. That head does not exist yet: it needs stage 5 reviewed and landed, then this branch composed on main.
+
+## Bearer sessions end with their grantor (request 5d41ea36)
+
+Status: implemented, pending review. Gitseq request `5d41ea36` (builder's own, found while reducing the Room's tests), on `request/test-overhead`. The MCP core's review (`bc0d7f6b`) asked for it to be completed.
+
+**The rule (condition 1).** The room judges a token the same way for a read, an act and a request. A session ends when its token is unknown or expired, its session key is revoked, its delegation is revoked or expired, the key of the delegation's grantor is revoked for any reason, or its member is no longer active. After that, an exact retry of an act the session made earlier is `unauthenticated`: the room signs nothing for the session, so there is no envelope to replay. A signed envelope that someone kept is not a session matter: submitted as its own bytes, it gets its record (R-IDEM-2). A change of the member's role, or of what the delegation's kinds mean, does not end the session; it is judged when a new act is admitted. R-CRED-10 in [docs/protocol.md](../docs/protocol.md) now says this. That sentence is contract text, so it is for the planner to accept.
+
+**What was wrong.** `judgeBearer` in `packages/room/src/requests.ts` checked the token, the delegation and the session key. It did not check the grantor's key or the member's state, which the read path (`authenticateHash`) checks. After a member's room-held key was retired, the session's reads answered `unauthenticated` while `bearerAct` still returned the original record for an exact retry. Nothing new could be recorded.
+
+**The change.** `judgeBearer` calls `authenticateHash`: one judgment. No other source changed.
+
+**One existing test changed.** `review-aabda1ed.cases.ts`, "response-loss recovery ...", made a new act with a stranded session after its member key was retired, and expected the refusal `delegation-invalid` from admission. The session has ended by then, so the answer is now `unauthenticated`, before anything is signed. The test says so.
+
+**Witness.** `packages/room/test/workerd/worker.test.ts`, against a real Room: "a bearer session ends with its grantor ...". The grantor's key is revoked as `retired`, so that the delegation itself stays unrevoked and only the grantor's revocation can end the session; a `compromised` revocation revokes the delegation too and would hide the omission. Then the MCP list, an exact retry and a workspace request are all `unauthenticated`, nothing is recorded, and the first act's signed envelope, taken from the log and submitted, returns the first record. A second session whose member is removed gets the same answer.
+
+**Control.** One, with `scripts/control.mjs`: the old three checks in place of the one judgment. The test fails by its assertion ("expected a failure, got" the first record). Distinguishes.
 
 ## Test overhead (request ecbc722a)
 

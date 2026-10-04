@@ -138,6 +138,9 @@ describe("a prepared act is the handle's own copy of what the caller intended (R
     let hooked = false;
     const onPrepared = () => void (hooked = true);
     const target = { act: claim.id };
+    let reads = 0;
+    const turning = (later: () => unknown) =>
+      Object.defineProperty({}, "text", { enumerable: true, get: () => (reads++ === 0 ? "x" : later()) });
     // Each value in a body, at the top level or nested. A structured clone alone would send a class instance as
     // a plain object, a Date, Map or Set as itself, and a typed array until it failed to freeze.
     const bodies: readonly (readonly [string, unknown])[] = [
@@ -149,6 +152,9 @@ describe("a prepared act is the handle's own copy of what the caller intended (R
       ["a Date", { text: "x", when: new Date(0) }],
       ["a Map", { text: "x", more: new Map([["a", 1]]) }],
       ["a Set", { text: "x", more: new Set([1]) }],
+      // A getter that answers plain text when it is first read, and a class instance after that: it is not called.
+      ["a getter", turning(() => new Question())],
+      ["a nested getter", { text: "x", more: [turning(() => new Question())] }],
     ];
     const got: (readonly [string, unknown])[] = [];
     for (const [name, body] of bodies) got.push([name, await api.act("ask", target, body as never, { binding, onPrepared }).then(() => "sent", (e: unknown) => e)]);
@@ -159,6 +165,7 @@ describe("a prepared act is the handle's own copy of what the caller intended (R
     expect(got.map(([name, e]) => [name, (e as { name?: string }).name, (e as { code?: string }).code])).toEqual(got.map(([name]) => [name, "ArtroomError", "bad-request"]));
     expect(hooked).toBe(false);
     expect(room.requests.length).toBe(sent);
+    expect(reads).toBe(0);
   });
 });
 
@@ -176,6 +183,31 @@ describe("a retry sends what was first built, whatever the room's document is no
     expect(claims[0]!.entry.type === "act" && claims[0]!.entry.act).toEqual(prepared!.signed);
     expect(claims).toHaveLength(1);
     expect(isRefusal(again) ? again.rule : again.seq).toBe(claims[0]!.seq);
+  });
+
+  test("a handle that holds 64 acts with no answer refuses a new one before it is signed or sent, and forgets none: the oldest is still repeated as first built after the vocabulary changed", async () => {
+    const alice = await joinAs(room, "@alice");
+    const api = alice.api as HttpRoomClient;
+    // 64 claims that the room records, each with every reply lost.
+    room.faults.push({ route: "POST /acts", kind: "drop", times: 64 * 4 });
+    for (let i = 0; i < 64; i++) expect((await caught(api.claim({ goal: "g", scope: [`src/a${i}/**`] }, { idempotencyKey: `held-${i}` }))).maybeRecorded).toBe(true);
+    const claims = () => room.entries.filter((e) => e.entry.type === "act" && e.entry.act.envelope.kind === "claim");
+    expect(claims()).toHaveLength(64);
+    const posts = () => room.requests.filter((r) => r.method === "POST" && r.route === "/acts").length;
+    const before = posts();
+    let prepared = false;
+    const full = await caught(api.claim({ goal: "g", scope: ["src/z/**"] }, { idempotencyKey: "one-more", onPrepared: () => void (prepared = true) }));
+    expect(full).toMatchObject({ code: "rate-limited", retryable: true });
+    expect([prepared, posts()]).toEqual([false, before]);
+    // The room moves to a v2 document. The oldest act is repeated: the bytes first signed, v: 1, and its first record.
+    await room.activate(withAsk());
+    const first = (await api.claim({ goal: "g", scope: ["src/a0/**"] }, { idempotencyKey: "held-0" })) as Claim;
+    expect(first.seq).toBe(claims()[0]!.seq);
+    expect(claims()).toHaveLength(64);
+    // One was answered, so there is room for one more: the new act now reaches the room.
+    const sent = posts();
+    await api.claim({ goal: "g", scope: ["src/z/**"] }, { idempotencyKey: "one-more" });
+    expect(posts()).toBeGreaterThan(sent);
   });
 
   test("an act prepared for another room is refused before it is sent", async () => {

@@ -139,7 +139,8 @@ describe("P1.1: a room-custody redemption is all or nothing (R-CRED-9, R-CRED-3,
     expect(fresh.member).toBe("@agent");
     expect(fresh.key).not.toBe(lost.key);
     await r.admin.ok("roster", null, { op: "revoke-key", key: lost.key, reason: "retired" });
-    expectRefusal(await call(r.stub.bearerAct(lost.bearer, { kind: "claim", target: null, body: { goal: "g", scope: ["src/**"] }, idempotencyKey: "lost-1" })), "delegation-invalid");
+    // The stranded session ended with its grantor's key: its token is judged as a read judges it (R-CRED-10).
+    expect((await failure(r.stub.bearerAct(lost.bearer, { kind: "claim", target: null, body: { goal: "g", scope: ["src/**"] }, idempotencyKey: "lost-1" }))).code).toBe("unauthenticated");
     expectOk(await call(r.stub.bearerAct(fresh.bearer, { kind: "claim", target: null, body: { goal: "g", scope: ["src/**"] }, idempotencyKey: "fresh-1" })));
   });
 

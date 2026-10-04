@@ -45,8 +45,8 @@ Files are in `packages/client/test/`.
 |---|---|---|
 | Canonical bytes and signatures are fixed vectors, and a declared envelope's binding is inside the signed bytes. | R-SIG-1 to 3, R-ID-4, R-ID-10, R-DECL-16 | `signing.test.ts`; `workerd/signing.test.ts` |
 | A prepared act is the handle's own frozen copy. | R-IDEM-2, review 43e8fe3b | `prepared.test.ts`: "a prepared act is the handle's own copy" |
-| A target or body that is not plain data is `bad-request` before anything is signed, copied or sent. | R-SIG-6, review 61b68774 | `prepared.test.ts`: "a target or body that is not plain data" |
-| A retry sends what was first built, also after the vocabulary changed. | R-IDEM-1, R-IDEM-2, R-DECL-16 | `prepared.test.ts`: "a retry sends what was first built" |
+| A target or body that is not plain data is `bad-request` before anything is signed or sent; a getter is refused and not called. | R-SIG-6, reviews 61b68774, b2043423 | `prepared.test.ts`: "a target or body that is not plain data" |
+| A retry sends what was first built, also after the vocabulary changed. A handle drops no unanswered act: at 64 it refuses a new one. | R-IDEM-1, R-IDEM-2, R-DECL-16, review 6bf8d38a | `prepared.test.ts`: "a retry sends what was first built" |
 | A lost or cut-off answer is retried with the same bytes, a bounded number of times, with backoff. | R-IDEM-1 to 3, R-IDEM-6 | `room.test.ts`: "idempotent retries" |
 | Refusals are values and failures are `ArtroomError`s. | R-API-1, R-ID-3 | `room.test.ts`: "refusals are values" |
 | A watch resumes from its cursor, stops once when its credential is refused, and never reconnects after it is closed. | R-API-6 to 8, R-CRED-7 | `room.test.ts`: "resumable cursors" |
@@ -319,6 +319,7 @@ No other test runs a second time under `v2`: not founding, secret scanning, log 
 | A WebSocket's token is judged before the upgrade, and the socket is closed when its key is revoked. | R-API-8, R-API-12, R-LOG-11 | `worker.test.ts`: "R-API-8, R-API-12: live updates" |
 | A bearer's acts are the room's, signed under its delegation, and listing a tool is not permission. | R-CRED-3, R-CRED-10, R-API-9, R-API-13 to 15 | `worker.test.ts`: "bearer acts and the MCP route" |
 | The Room gives its MCP endpoint the caller's role now and the grant as signed. | R-API-14 | `worker.test.ts`: "the Room gives its MCP endpoint" |
+| A bearer session ends with its grantor: a revoked grantor key or a member who is not active ends acts, requests and exact retries as it ends reads, while a kept signed envelope still gets its record. | R-CRED-10, R-IDEM-2, request 5d41ea36 | `worker.test.ts`: "a bearer session ends with its grantor" |
 
 ### Alarms, idle cost and diagnoses
 
@@ -361,7 +362,6 @@ No other test runs a second time under `v2`: not founding, secret scanning, log 
   - a bearer workspace called directly on `RoomWire`, the sequential canonical-name alias, and the client-side bearer receipt after revocation have one witness each where they had two.
 - Only one `v2` session's log is published and verified in the Room. `v2` logs with checks, revocations and carried verdicts are verified only in `packages/log`.
 - The room's whole suite no longer runs under the `v2` declarations. That demand is superseded, not owed: section 33.6 of the protocol now states the witness set above as the criterion. The gap that remains is a fault that shows only when some other legacy test runs under `v2`.
-- No test fixes what a bearer act answers after its grantor's room-held key is revoked as `retired`: the MCP route answers `unauthenticated`, while `RoomWire.bearerAct` still answers an exact retry.
 
 ## Checkers
 

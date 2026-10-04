@@ -1089,6 +1089,33 @@ describe("routes, reads, live updates and the MCP endpoint", () => {
       expect(await call<Claim>(room.stub.submit(kept))).toEqual(original);
     });
 
+    it("a bearer session ends with its grantor (R-CRED-10; request 5d41ea36): once the member's room-held key is retired, or the member is removed, an exact retry and a request are unauthenticated as the session's reads are, and nothing is recorded; the signed envelope, kept, still gets its record", async () => {
+      const { room } = await mcp();
+      const b = await roomBearer(room, ["claim", "note"], "@held");
+      using wire = await wireFor(room);
+      const act = { kind: "claim", target: null, body: { goal: "agent", scope: [`${own()}/**`] }, idempotencyKey: "before-the-end" };
+      const first = (await wire.bearerAct(b.bearer, act)) as Claim;
+      // The member's own key, which the room holds: the grantor of the session's delegation. Retired, not compromised,
+      // so the delegation itself is not revoked and only the grantor's revocation can end the session.
+      const grantor = (await room.admin.read({ q: "members" })).delegations.find((d) => d.id === b.delegation)!.grantor;
+      await room.admin.ok("roster", null, { op: "revoke-key", key: grantor, reason: "retired" });
+      expect((await room.admin.read({ q: "members" })).delegations.find((d) => d.id === b.delegation)).not.toHaveProperty("revoked");
+      const before = await headSeq(room);
+      expect((await rpc(`${room.id}/mcp`, b.bearer, "tools/list")).status).toBe(401);
+      expect((await failure(room.stub.bearerAct(b.bearer, act))).code).toBe("unauthenticated");
+      expect((await failure(room.stub.bearerRequest(b.bearer, { kind: "workspace", lane: first.lane, lease: 1 }))).code).toBe("unauthenticated");
+      expect(await headSeq(room)).toBe(before);
+      // The envelope the room signed for the first act is in the log. Submitted as kept bytes, it settles (R-IDEM-2).
+      const kept = (await logOf(room.id)).find((e) => e.seq === first.seq)!.entry as unknown as { act: SignedEnvelope };
+      expect(await call<Claim>(room.stub.submit(kept.act))).toEqual(first);
+      // A member who is no longer active: the same, for another session.
+      const c = await roomBearer(room, ["claim", "note"], "@gone");
+      const act2 = { kind: "claim", target: null, body: { goal: "agent", scope: [`${own()}/**`] }, idempotencyKey: "before-removal" };
+      await wire.bearerAct(c.bearer, act2);
+      await room.admin.ok("roster", null, { op: "remove", member: "@gone" });
+      expect((await failure(room.stub.bearerAct(c.bearer, act2))).code).toBe("unauthenticated");
+    });
+
     it("a bearer claims, opens its workspace, proposes and lands through the MCP tools; a call with no idempotency key records nothing, and a retry with the same key gives the original record and one effect (R-API-9)", async () => {
       const { room, agent } = await mcp();
       const area = own();

@@ -641,8 +641,17 @@ recorded for it (R-CRED-3).
   over HTTPS use the token as `Authorization: Bearer` (R-API-3), or as a
   WebSocket subprotocol (R-API-12).
 - **Judging the token.** The room finds the session by the token's hash.
-  An unknown or expired token, or a revoked delegation or session key,
-  throws `ArtroomError` `unauthenticated`, and nothing is recorded.
+  An unknown or expired token, a revoked session key, a revoked or expired
+  delegation, a revoked key of the delegation's grantor, or a member who
+  is not active, throws `ArtroomError` `unauthenticated`, and nothing is
+  recorded. The room judges a token the same way for a read, an act and a
+  request. So a session that has ended gets no result even for an exact
+  retry of an act it made before: the room signs nothing for it, and there
+  is no envelope to replay. A signed envelope that someone kept is another
+  matter: submitted as its own bytes, it gets its record (R-IDEM-2). A
+  change of the member's role, or of what the delegation's kinds mean,
+  does not end the session; it is judged when a new act is admitted
+  (request `5d41ea36`).
 - **Signing.** For `bearerAct`, the caller gives only `kind`, `target`,
   `body` and `idempotencyKey` (`BearerAct`). The room sets `v`, its own room
   ID, `actor` (the session key) and `delegation` (the session's), signs the
