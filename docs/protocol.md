@@ -4320,9 +4320,10 @@ list of what it cannot prove. The report also names what the run checked:
 `carryAccounting` is `none`, and the report makes no statement that a
 decision, a call, a Git witness or a carry judgment was checked. It still
 makes the checks that need no policy evaluation: decoding, hashes, seals,
-order, publication history, each act's authority, and the refusal of a
-land evaluation while the admin-approval obligation is open, for which it
-reads Git objects where they are present. The report names those checks
+order, publication history, each act's authority, a check's configuration
+and prepared input, what each check-carried event names, and the refusal
+of a land evaluation while the admin-approval obligation is open, for
+which it reads Git objects where they are present. The report names those checks
 and says what they do not show: an obligation that a rule opens is known
 only by replay. The list for a full run names: a missing judgment that did not carry when
 no later one carried; a missing whole pass; the order, inputs and budget

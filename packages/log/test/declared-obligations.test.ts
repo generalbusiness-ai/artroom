@@ -38,9 +38,10 @@ import { describe, expect, test } from "vitest";
 import type { LogEntry, PolicyDocumentV2, PolicyVersion, ReplayContext, Sha, SystemEvent } from "@generalbusiness/artroom-contract";
 import { CODE_REVIEW_ACTS, carry, policy, replay, requireCheck, requireReview } from "@generalbusiness/artroom-policy";
 import { digestJson } from "../src/crypto.ts";
-import { type VerifyReason } from "../src/verify.ts";
+import type { GitReader } from "../src/git.ts";
+import { verifyLog, type VerifyReason } from "../src/verify.ts";
 import { DeclaredRoom, pair, type Fixture } from "./support/declared-room.ts";
-import { actAt, contextOf, decisionsAt, forgeCall, insert, keep, open, policyOf, reseal, setDecisions, verify, type Log } from "./support/fixtures.ts";
+import { actAt, contextOf, decisionsAt, forgeCall, insert, keep, open, policyOf, publish, reseal, setDecisions, verify, type Log } from "./support/fixtures.ts";
 import { keys } from "./support/room-sim.ts";
 import carryJson from "./fixtures/declared-carry.json";
 import plainJson from "./fixtures/declared-carry-plain.json";
@@ -506,10 +507,19 @@ describe("check-carried events are judged (R-CARRY-6 to R-CARRY-14)", () => {
       expect(full.cannotProve.join("\n")).toContain(claim);
     }
     // It does not deny the checks that still ran, and it says what the one kept guard on landings sees.
-    for (const denial of ["no Git object was read", "a land evaluation with an obligation open passes this run"]) expect(said).not.toContain(denial);
+    for (const denial of ["no Git object was read", "passes this run"]) expect(said).not.toContain(denial);
     expect(said).toContain("a land evaluation is refused while the admin-approval obligation is open");
-    expect(said).toContain("read from Git objects where they were present");
+    expect(said).toContain("this run read Git objects where they were present");
     expect(said).toContain("Obligations that rules open are known only by replay");
+    expect(said).toContain("each check-carried event names an earlier accepted check");
+    // The run did read Git objects for the version's witness, as it says: here, the objects of both proposal heads.
+    const read: string[] = [];
+    const git = await publish(forged);
+    const watched: GitReader = { readRef: (ref) => git.readRef(ref), readObject: (sha) => (read.push(sha), git.readObject(sha)) };
+    expect(await verifyLog(watched, { replayDecisions: false })).toMatchObject({ ok: true, mode: "integrity" });
+    const heads = forged.entries.flatMap((e) => (e.entry.type === "act" && e.entry.act.envelope.kind === "propose" ? [(e.entry.act.envelope.body as { head: string }).head] : []));
+    expect(heads.length).toBeGreaterThan(0);
+    for (const head of heads) expect(read).toContain(head);
   });
 
   test("with replay off the guard on landings still runs, as the report says: a land evaluation with admin approval open is refused, and one with a rule's obligation open passes", async () => {

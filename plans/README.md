@@ -3429,9 +3429,24 @@ Witness: `packages/log/test/cli.node.test.ts`, "the report says, for a program a
 
 Controls: the decoder's check; the mode and its statements. Each distinguishes.
 
+**One repair from the review of `f2582a68`** (changes requested, `7df5edb5`; the planner's note `plans/016-2026-10-04-verification-mode-clarification.md` gives the wording rule). The integrity run's description denied work the run still does. It said no Git object was read to witness a version, and that a land evaluation with an obligation open passes. Both were wrong:
+
+- With replay off, verify still reads Git objects for a version's changed paths.
+- It still refuses a land evaluation while the admin-approval obligation is open. That obligation is known without replay, from the receipt that opened it or from the document and the changed paths. Obligations that rules open are known only by replay, so the integrity run does not see those.
+- It still checks that a check names its checker's configuration and, where a prepared event exists, an integration and input the event names; and that each check-carried event names an earlier accepted check of the same lane and obligation and an activated policy, with an outcome of the right shape.
+
+No check was added or removed. The report now says this. The integrity run's statement has two entries. The first says what was not done: no decision evaluated, no call, input or budget checked, no carry judgment replayed or accounted for, no land input rebuilt; and the run "does not detect" the forgeries that need those. The second names the checks that still ran, says the landing guard is not a replay of the land input and sees only the admin-approval obligation, and says the run compared no recorded context with Git objects and so claims no Git witness. The categorical "passes this run" is gone. The command's mode line, the `mode` field's description, the log package's README and R-DECL-25 say the same. `mode` and `carryAccounting` are unchanged.
+
+Witnesses in `packages/log/test/declared-obligations.test.ts`:
+
+- "with replay off the report says so ...", extended: the report has neither denial, names the kept checks, and a reader that records each object read shows the run read the objects of the proposal heads.
+- "with replay off the guard on landings still runs, as the report says ...": a forged land evaluation with admin approval open is refused `guard-failed` with replay off; the same forgery for an obligation a rule opens passes with replay off and is refused with replay on.
+
+No source control was run for this repair: it changes text, and the two tests show behaviour that was already there. Before the change the first test fails on the two denials.
+
 **The argument that needs its own review.** [notes/2026-10-03-carry-accounting.md](../notes/2026-10-03-carry-accounting.md), "What an omission can do" (2026-10-03), argues that a removed judgment which did not carry cannot admit a landing that should not be admitted. That is an argument from the source, not something a test shows, and stage 2's approval does not establish it. The verifier's output does not rely on it and does not repeat it: it says only what verify checks and what it does not.
 
-**Still owed, in full, under `1e8fee4b` / `3af8ebc7`.** Complete carry accounting: every pass and every judgment the Room owed, missing, extra and substituted, with all ten acceptance cases of the carry-pass amendment and the planner's points A to F. The amendment is not adopted: draft 2 was returned with changes (`794e6f86`), and its revision is owed. The Room's side, with the `prepared` event, is stage 4's (`48c021ea`). Stage 6 keeps the derivation of lane, lease and landing transitions.
+**Still owed, in full, under `1e8fee4b` / `3af8ebc7`.** Complete carry accounting: every pass and every judgment the Room owed, missing, extra and substituted, with all ten acceptance cases of the carry-pass amendment and the planner's points A to F. The planner accepted draft 3 of the amendment as amended by `plans/015-2026-10-04-carry-pass-draft3-decision.md` (report `7634a884`, ratified `6693d748`); that complete copy governs when it is built. The Room's side, with the `prepared` event, is stage 4's (`48c021ea`). Stage 6 keeps the derivation of lane, lease and landing transitions.
 
 **Gates.** The review request gives the gate's result at the head sent.
 
