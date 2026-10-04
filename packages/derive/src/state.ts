@@ -40,7 +40,8 @@ export interface Item {
   /**
    * The history attribution needs (section 6.7): every member ever in one of
    * its `author` slots, every holder of a hold whose `under` names it, and
-   * the principal of each who signed under one.
+   * the principal of each who signed under one: when put in the slot, or
+   * later, when changing this item or a hold under it.
    */
   readonly attributed: readonly MemberRef[];
   readonly epoch?: number;                 // a hold item only (section 6.8)
@@ -78,7 +79,7 @@ export interface Decided { from: Pick<ScopeRef, "scope" | "inc">; seq: number; h
 export interface AttemptState { attempt: number; opened: number; outcome: { seq: number; result: "confirmed" | "refused" | "unknown" } | null }
 export interface Operation { id: OperationId; attempts: readonly AttemptState[] }
 
-/** Items in ascending ID order. `more`: the page stopped at its limit and further items may follow. */
+/** Items in ascending ID order. `more`: the page stopped at its limit and at least one further item follows. */
 export interface Page { items: readonly Item[]; more: boolean }
 
 /**
@@ -110,7 +111,17 @@ export interface StateView {
   item(id: number): Item | null;
   /** The exact number of items of that type in that state, live or retained final (section 6.5). */
   count(type: string, state: string): number;
-  /** At most `limit` items of that type in those states with an ID above `after`. */
+  /**
+   * At most `limit` items of that type in those states with an ID above
+   * `after`, lowest ID first. `after` is the cursor: the ID of the last item
+   * of the page before, or null for the first page. An item's ID never
+   * changes, so the cursor stays good across writes.
+   *
+   * Section 6.5: the index is ordered by type, state and ID. An
+   * implementation reads this page from that index, so the page costs the
+   * items it returns and not the items the scope retains. Retained final
+   * items are not bounded and nothing is evicted.
+   */
   page(type: string, states: readonly string[], after: number | null, limit: number): Page;
   relation(owner: ScopeRef, name: string, item: number): Relation | null;
   accepted(actor: KeyId, idempotencyKey: string): Accepted | null;
@@ -148,10 +159,28 @@ function keyOrder(a: Key, b: Key): number {
   return a.length - b.length;
 }
 
+/** The index in an ascending list of the first ID above `after`. */
+function firstAbove(ids: readonly number[], after: number): number {
+  let [low, high] = [0, ids.length];
+  while (low < high) {
+    const mid = (low + high) >>> 1;
+    if (ids[mid]! <= after) low = mid + 1;
+    else high = mid;
+  }
+  return low;
+}
+
 /** The state in memory, for a verifier and for tests. */
 export class MemoryState implements StateWriter {
   #scope: ScopeState | null = null;
   readonly #items = new Map<number, Item>();
+  /**
+   * The index of section 6.5: for each type and state, the IDs of its items
+   * in ascending order. `putItem` keeps it. A new item has the highest ID,
+   * so it is appended; an item that changes state is found and placed by
+   * binary search.
+   */
+  readonly #index = new Map<string, number[]>();
   readonly #counts = new Map<string, readonly [string, string, number]>();
   readonly #relations = new Map<string, Relation>();
   readonly #accepted = new Map<string, readonly [KeyId, string, Accepted]>();
@@ -164,8 +193,18 @@ export class MemoryState implements StateWriter {
   item(id: number) { return this.#items.get(id) ?? null; }
   count(type: string, state: string) { return this.#counts.get(key(type, state))?.[2] ?? 0; }
   page(type: string, states: readonly string[], after: number | null, limit: number): Page {
-    const all = [...this.#items.values()].filter((i) => i.type === type && states.includes(i.state) && (after === null || i.id > after)).sort((a, b) => a.id - b.id);
-    return { items: all.slice(0, limit), more: all.length > limit };
+    // One position in each listed state's bucket, from the cursor; then a merge by ID. No other item is read.
+    const buckets = [...new Set(states)].map((state) => {
+      const ids = this.#index.get(key(type, state)) ?? [];
+      return { ids, at: after === null ? 0 : firstAbove(ids, after) };
+    });
+    const items: Item[] = [];
+    for (;;) {
+      let next: (typeof buckets)[number] | null = null;
+      for (const b of buckets) if (b.at < b.ids.length && (next === null || b.ids[b.at]! < next.ids[next.at]!)) next = b;
+      if (next === null || items.length >= limit) return { items, more: next !== null };
+      items.push(this.#items.get(next.ids[next.at++]!)!);
+    }
   }
   relation(owner: ScopeRef, name: string, item: number) { return this.#relations.get(key(owner.scope, owner.inc, name, item)) ?? null; }
   accepted(actor: KeyId, idempotencyKey: string) { return this.#accepted.get(key(actor, idempotencyKey))?.[2] ?? null; }
@@ -175,7 +214,19 @@ export class MemoryState implements StateWriter {
   operation(id: OperationId) { return this.#operations.get(id) ?? null; }
 
   setScope(scope: ScopeState) { this.#scope = scope; }
-  putItem(item: Item) { this.#items.set(item.id, item); }
+  putItem(item: Item) {
+    const was = this.#items.get(item.id);
+    this.#items.set(item.id, item);
+    if (was?.type === item.type && was.state === item.state) return;
+    if (was) {
+      const ids = this.#index.get(key(was.type, was.state))!;
+      ids.splice(firstAbove(ids, item.id - 1), 1);
+    }
+    const at = key(item.type, item.state);
+    const ids = this.#index.get(at) ?? [];
+    this.#index.set(at, ids);
+    ids.splice(firstAbove(ids, item.id), 0, item.id);
+  }
   addCount(type: string, state: string, by: number) { this.#counts.set(key(type, state), [type, state, this.count(type, state) + by]); }
   putRelation(r: Relation) { this.#relations.set(key(r.owner.scope, r.owner.inc, r.name, r.item), r); }
   putAccepted(actor: KeyId, idempotencyKey: string, accepted: Accepted) { this.#accepted.set(key(actor, idempotencyKey), [actor, idempotencyKey, accepted]); }

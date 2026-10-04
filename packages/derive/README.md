@@ -25,7 +25,7 @@ The package has two entry points:
 | Module | Holds |
 |---|---|
 | `validate` | `validateDefinition(definition, bounds, profiles?)`: a `ValidDefinition` with its digest, timed types, hold types and the slots each range guard's `where` reads; or a list of problems. `PROFILES`, `Profile`, `keptMessage`. |
-| `state` | `StateView` and `StateWriter`; the records of an item, a relationship copy, a sent request, a consumed delivery, a held creation and an outside operation; `MemoryState`; `StateSnapshot` and `stateDigest`, the digest a checkpoint carries. |
+| `state` | `StateView` and `StateWriter`; the records of an item, a relationship copy, a sent request, a consumed delivery, a held creation and an outside operation; `MemoryState`; `StateSnapshot` and `stateDigest`, the digest a checkpoint carries. `StateView.page` is the one paged read: by type and states, in ID order, with the last ID as its cursor. An implementation reads it from an index ordered by type, state and ID, as `MemoryState` does, so a page costs the items it returns. |
 | `fold` | `applyEntry(writer, definition, entry, hash)`, the only code that changes state. `changeItem` and `newItem`, which the judges use on their working copy. `FoldError`. |
 | `judge` | `judgeAct`, `judgeTimed`, and `entryOf`, which makes a draft the entry at a head and a reading, or entry 0 for a genesis. The answer types `ActJudgment`, `TimedJudgment` and `Judgment`. |
 | `genesis` | `judgeGenesis(view, definition, asked, context)` for a `Founding` (a directory) or a `Creation` (a child). |
@@ -36,7 +36,7 @@ The package has two entry points:
 | `guards`, `effects`, `sends` | `judgeGuard`, `deriveEffects`, `deriveSends`, the `Judging` value they read, and `ruleInput`. |
 | `timed` | `nextDue(view, definition, asOf)`: the next due transition in the contract's order. |
 | `time` | `clockOf(view, reading)`: one commit's reading, whether it is behind, and the time at which a transition is due. `timeMs`, `timeOf`. |
-| `attribution` | `attribution(item, signer)`. |
+| `attribution` | `historyOf(item, changed, definition, signer)`: an item's attribution history with what the entry's changed holds add. `attribution(history, signer)`: that history, then the signer and the signer's principal. |
 | `values` | `isValue` for each field type, `same`, `byteOrder`, and the reference shapes. |
 
 ## How a commit uses it

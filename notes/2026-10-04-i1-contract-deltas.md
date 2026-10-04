@@ -6,6 +6,10 @@ design review. Entries 1 to 43 came with the act and timed judges. Entries
 outcome and a checkpoint, and with the rule evaluator. The scope and replay contract, revision 7, is "the contract".
 Section numbers are its own.
 
+Section 11 lists eight repairs made after the first static review of this
+source (report `d3930ee8`). Entries 2, 29, 31, 39 and 40 are corrected in
+place where a repair made them untrue.
+
 Each entry is a place where the contract was silent or needed a concrete
 form, what was implemented, and why. Nothing here is adopted by being
 implemented. An entry stays open until the contract's owner accepts it,
@@ -16,7 +20,7 @@ changes it or removes it.
 | # | Where the contract is silent | Implemented | Why |
 |---|---|---|---|
 | 1 | Section 5.2 names timed rules, and the `timed` input names a rule, but `DeclaredDefinition` has no member that declares one. | `timed: Record<string, TimedRule>`. A rule names an item type (`on`), the live states in which it applies, the value slot of type `time` that holds the deadline, its effects and its attention. | The drain, the `timed` input and `genesis-timed` all need a declared rule to read. |
-| 2 | Section 6.8 says a hold ending changes the hold item only. No rule says what a timed rule's effects may name. | A timed rule's effects may change only its own item. It has no signer and no fields. | Section 6.8, applied to every timed rule. |
+| 2 | Section 6.8 says a hold ending changes the hold item only. No rule says what a timed rule's effects may name. | A timed rule's effects may change only its own item. It has no signer and no fields. Its effects are total: the validator refuses, as `timed-partial`, an `add` to a party list and an `attribute`, which a full list would refuse in the commit (repair 5). | Section 6.8, applied to every timed rule. A due transition that could be refused would stay due and block the drain. |
 | 3 | Nothing says a timed rule must stop being due. | The validator requires a `state` effect that takes the item out of the rule's states. A rule cannot instead clear or move its deadline: the grammar has no form that empties a value slot. | Otherwise the transition is due again as soon as it is applied, and the drain never ends. |
 | 4 | Section 6.8 gives the hold capability no shape. | As far as I1 needs: a definition that lists `hold@1` may use the `hold` effect. The hold type is any type that a `hold: open` effect targets. It has a party slot named `holder` that holds one member, and may have a reference slot named `under` that names a local item. Its end time is an ordinary `time` value slot, set by the opening act, under a timed rule whose effects include `hold: end`. The validator requires that rule for every hold type, and requires the opening act to set its deadline slot. Opening sets the epoch to 1. An end raises it. A renewal raises it when the holder after the entry's effects differs from the holder before them. `extent` is checked to name a field or slot and is not recorded. | The task's stated form. The two slot names are a convention this step had to choose. Tokens, workspaces and export are the authority note's. |
 | 5 | Section 6.4 says `self` is not expanded in a message, and gives it no form on the wire. | `{ "self": true }` (`SelfMark`). It is not a value of any field type. | The receiver must be able to tell it from every field value. |
@@ -61,9 +65,9 @@ section 4 below.
 |---|---|---|---|
 | 27 | What a slot operand means in a range guard's `where`. | A slot of each item the range covers. A field, the signer and a constant are read from the act. The validator derives, for each such guard, the slots an index must cover. | Section 6.5: "`where` is a list of `equals` over its slots". |
 | 28 | `every`: whether `list` is a field or a slot, and an absent list. | A field of that name when the act has one; otherwise a slot of the subject. An absent field fails unless the guard carries `ifPresent`. A listed ID with no item fails. | The form has one name for both. |
-| 29 | `fact`: what `where` reads, what `under` names, and the content digest of a use. | In a `where`, operand `a` is a field of the foreign intent and `b` is read in this act. The foreign entry's effects cannot be reached: that is G1. `under` is compared with a name the fetcher supplies beside the entry; the contract does not say how a definition is named. `uses` lists each fetched fact the fields name, by field name in byte order, with the SHA-256 of the entry's canonical bytes as `content`. A fact that was not fetched is `dependency-unavailable`. | The smallest reading of section 6.5 that the grammar can express. |
+| 29 | `fact`: what `where` reads, what `under` names, and the content digest of a use. | In a `where`, operand `a` is a field of the foreign intent and `b` is read in this act. The foreign entry's effects cannot be reached: that is G1. `under` is compared with a name the fetcher supplies beside the entry; the contract does not say how a definition is named. `uses` lists each fetched fact the fields name, by field name in byte order, with the SHA-256 of the entry's canonical bytes as `content`. Every reference is checked whole against the fetched entry, by scope, incarnation, position and hash, before a fact is listed once (repair 4). A fact that was not fetched, or a reference that the fetched entry does not match, is `dependency-unavailable`. | The smallest reading of section 6.5 that the grammar can express. |
 | 30 | `rule`: where rules are declared, and the digest of a rule's input. | Replaced by entries 44 and 74 to 78: the definition declares its rules, and the evaluator is reviewed and in place. | The first version of this entry deferred the evaluator. |
-| 31 | "A final state has no transition out of it" as a static rule. | A `state` effect on an existing subject needs a `state` guard on that subject that lists no final state. An opening may carry a `state` effect only when the initial state is not final. A result clause cannot be checked before it runs, so the same rule is checked when effects are derived: a `state` effect on an item in a final state is refused `final`. A transition whose primary item is in a final state is refused `final`. | The validator cannot otherwise know the subject's state. |
+| 31 | "A final state has no transition out of it" as a static rule. | A `state` effect on an existing subject needs a `state` guard on that subject that lists no final state. An opening may carry a `state` effect only when the initial state is not final. When effects are derived, an effect of any kind on a subject that was in a final state before the entry is refused `final`, and the fold takes no entry with such an effect (repair 6). So a result clause on such an item changes nothing. A transition whose primary item is in a final state is refused `final`. | The validator cannot otherwise know the subject's state. |
 | 32 | A fixed slot, statically. | Only an effect of the opening act, on the item it opens, may set a fixed slot. A result clause and a timed rule may not. | Section 6.3. |
 | 33 | "Two effects set the same slot". | Any two effects of one list that name one slot of one subject, whatever they do to it, including two list changes and an `attribute`. Each result clause is its own list. | The strict reading. |
 | 34 | Party lists. | A list slot takes `add` or `remove` of one member, or `from: null` to empty it. Adding a member already present, or removing one not present, records no effect. A list past its `max` is refused `slot-full`. | An effect record states a change. |
@@ -76,8 +80,8 @@ section 4 below.
 
 | # | Where the contract is silent | Implemented | Why |
 |---|---|---|---|
-| 39 | How attribution's history is kept (section 6.7). | Each item record holds the members ever put in one of its `author` slots, in order. A member made the holder of a hold joins the history of the hold, and of the item the hold's `under` names. That item's revision does not rise for it. The `attribute` effect takes that history, then the signer and the signer's principal, in order of first appearance. | A verifier derives the same list from the same fold, with no scan of retained holds. |
-| 40 | When a principal is counted. | When the member put in the slot is the signer of that entry, the grant's principal joins with it. A member whom another signer puts in a slot brings no principal, because no grant of theirs was judged. | "Each of those who acted under another member's authority" needs a judged grant. |
+| 39 | How attribution's history is kept (section 6.7). | Each item record holds the members ever put in one of its `author` slots, in order. A member made the holder of a hold joins the history of the hold, and of the item the hold's `under` names. That item's revision does not rise for it. The `attribute` effect takes that history as it stands after the effects written before it in the same entry, with the history of each hold under the item that the entry has changed (repair 7); then the signer and the signer's principal, in order of first appearance. | A verifier derives the same list from the same fold, with no scan of retained holds. |
+| 40 | When a principal is counted. | When the member put in the slot is the signer of that entry, the grant's principal joins with it. A member whom another signer puts in a slot brings no principal then, because no grant of theirs was judged. Later, when a member of an item's history signs an entry that changes the item, or a hold under it, the principal of the grant judged for that entry joins the history (repair 7). | "Each of those who acted under another member's authority" needs a judged grant. |
 | 41 | A directory's status at genesis. | The fold makes a scope with no creator active at its genesis. A child is provisional until an `activate` effect; a refused genesis is terminal. | A seam for the next step. The founding rule is the authority note's. |
 | 42 | Handlers. | `ReceiveType` has no form that opens an item, so a handler opens none, and `hold: open` in one is refused. Its message fields are not declared, so the validator does not resolve a field name in a handler. | Section 4.1 allows a handler one item; section 6.4 gives it no way to open it. |
 | 43 | Capabilities this runtime does not implement. | `git-read`, and any profile other than `restricted@1`, are refused by the validator. | Section 6.1: a runtime that does not implement a version admits nothing to that scope. |
@@ -141,3 +145,43 @@ section 4 below.
 | 76 | The result of a rule that does not evaluate. | A rule holds only when its expression gives `true`. Any other value, and any deterministic refusal of the profile, is false. A fault of the engine prepares nothing. | A rule is a Boolean guard, and the same expression and input always end the same way. |
 | 77 | The profile `restricted@1`. | The restricted JSONata evaluator of the earlier model, on the pinned engine, with its budgets unchanged and no budget shared between two rules. The package's README has the review. A rule input over 256 KiB makes the rule false. | A prepared result is identified by the rule and its input digest alone. |
 | 78 | What an entry's `prepared` holds. | Exactly the results its guards read, in the order read. | Section 4.1: "each rule evaluated". |
+
+## 11. Repairs after the first static review (d3930ee8)
+
+An independent static review of this source at `c05e89cf`, report
+`d3930ee8`, found eight defects in supported forms. Each is repaired, with
+one test that failed before its repair. Revision 8 of the contract, at
+`a549aac6`, states the rule behind each. Revision 8 is filed for review and
+is not adopted, so only these eight rules are implemented from it, and
+none of its other new forms.
+
+| # | Rule (revision 8) | What changed | Witness |
+|---|---|---|---|
+| 1 | Each operand is validated by itself (section 6.5). | The validator checks both operands of an `equals` or a `differs`, and of each `where` of a `fact` guard, before it combines them. A bare `null` is not an operand. | Validator row: `{ equals: { a: { field }, b: null } }` is refused `shape`. |
+| 2 | A slot never holds a value outside its type (section 6.6). | A copy from a declared field or a slot needs a source that is assignable to the slot: the same type, with the text `max`, integer range, enum values, reference kind, and list `max` and elements inside the slot's. The validator refuses another type as `name` and a wider bound as `bound`. A handler's undeclared field is still checked against the slot in the commit and refused `bad-field`. No rule was added for comparing two values. | Validator row: a text field of 200 bytes copied into a slot of 4 is refused `bound`. |
+| 3 | A copy preserves its source (section 6.6). | A `ref` effect with a slot source reads the slot of that name, of whatever kind, and the validator checks that slot's type against the destination as in repair 2. Before, it read reference slots only and copied `null` from a value slot. | A reference copied from a value slot is the reference that slot holds. |
+| 4 | A fact reference is verified whole (section 6.5). | Every fact reference of every field is checked against the fetched entry, by scope, incarnation, position and hash, before anything is deduplicated. Two references that both pass are equal, so `uses` and the guards' map hold that fact once. | A second field with a verified hash and another scope and position leaves the act not judged; two equal references give one use. |
+| 5 | A timed rule's effects are total (section 6.4). | The validator refuses, as `timed-partial`, a timed rule with an `add` to a party list or an `attribute`. No other effect that a timed rule may write can be refused in its commit, and the rule must still take its item out of its states. So a selected transition that passes its three checks is written, and its item is not due again under that rule. `judgeTimed` passes over nothing: a refusal there is a fault and throws. | Validator row: a timed rule that adds the holder to a list with `max` 1 is refused `timed-partial`. |
+| 6 | No effect changes an item that was final before the entry (section 6.6). | Effect derivation refuses `final` for an effect of any kind on a subject that was final before the entry, read from the state before the entry and not from the working copy. An entry that takes a live item to a final state keeps its other effects on that item. The fold refuses an entry with an effect on such an item. A final item may still be named in `also` and read. | An edit with a value effect on a kept `also` note is refused `final`; the same edit without that effect is written. |
+| 7 | Attribution within an entry, and a principal on later authority (section 6.7). | An `attribute` effect reads the subject's history with the history of each hold under it as the entry's earlier effects left it. The fold uses the same function after the entry. When a member of an item's history signs an entry that changes the item, or a hold under it, the principal of that entry's grant joins the history. | A report that hands its hold to another member lists that member; a note's owner who edits under a grant that names a principal brings that principal. |
+| 8 | The index is ordered (section 6.5). | `MemoryState` keeps, for each type and state, the item IDs in ascending order, and `putItem` maintains them. `page` reads from the cursor in each listed state and merges by ID; `more` is exact. `StateView.page` is unchanged, and its comment states the cursor and the cost an implementation owes. No bound on retained items was added and nothing is evicted. | A page of two live notes among 38 retained final ones reads no final note, and pages stay in ID order while a note changes state. |
+
+Decisions made in these repairs, for review:
+
+- **Repair 4.** Revision 8 refuses a reference that does not match its
+  entry with a new reason, `fact-mismatch`. That reason is a new form and
+  is not implemented. Such a reference is answered
+  `dependency-unavailable`, as a single mismatched reference already was.
+- **Repair 5.** Revision 8 also lets `hold: end` alone take an item out of
+  a rule's states, and names capability effects that are not total.
+  Neither is implemented: a `state` effect is still required, and `hold`
+  is the only capability.
+- **Repair 6.** Every written effect on a subject that was final is
+  refused, also one that would record no change, such as an `add` of a
+  member already in the list.
+- **Repair 7.** The history is still kept with each entry and not derived
+  from retained history. Revision 8 allows either when both rules hold.
+- **Repair 8.** The search for the next due transition still reads one
+  page of live items for each timed rule. A type's `max` bounds that
+  page. Revision 8's separate index of live timed items in due order is
+  not implemented.

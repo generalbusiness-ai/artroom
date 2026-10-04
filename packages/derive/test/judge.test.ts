@@ -3,14 +3,14 @@ import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { Effect, MemberRef, RefusalReason } from "@generalbusiness/artroom-contract";
 import { canonicalBytes, digestBytes, intentDigest } from "@generalbusiness/artroom-bytes";
 import type { ActJudgment } from "../src/index.ts";
-import { Scope, d, fields, grantOf, keys, laneDefinition, on, otherLane, smallDefinition, t, type Actor } from "./fixtures.ts";
+import { Scope, d, fields, grantOf, keys, lane, laneDefinition, on, otherLane, small, smallDefinition, t, variant, type Actor } from "./fixtures.ts";
 
 const { rita, una, vic, paul, sam } = keys;
 const names = (list: unknown) => (list as readonly MemberRef[]).map((m) => m.member);
 
 /** A lane with commitment 2, accepted, performed by una. */
-function laneWithCommitment(): Scope {
-  const s = new Scope(laneDefinition);
+function laneWithCommitment(definition = laneDefinition): Scope {
+  const s = new Scope(definition);
   s.did(rita, "offer", { fields: { intent: 0 }, expected: { intent: 1 } });
   s.did(rita, "assign", { ...on(s, 2), ...fields({ performer: una.member }) });
   return s;
@@ -133,6 +133,31 @@ describe("a refused act", () => {
   });
 });
 
+describe("effects (section 6.6)", () => {
+  test("a reference copied from a slot is the value that slot holds, whatever kind of slot it is", () => {
+    // `backup` is a value slot that holds a scope reference by default; `peer` is a reference slot of the same type.
+    const s = new Scope(variant(small, (def) => {
+      def.items.note.values.backup = { fixed: false, required: false, of: { type: "scope", kind: "lane" }, default: otherLane };
+      def.acts.restore = { ...def.acts.keep, effects: [{ ref: { slot: "peer", from: { slot: "backup" } } }] };
+    }));
+    expect(s.did(rita, "restore", on(s, 0)).effects).toEqual([{ effect: "ref", item: 0, slot: "peer", to: otherLane }]);
+  });
+
+  test("no effect changes an item that was final before the entry; a final item may still be named and read", () => {
+    // Note 0 is kept, which is final. An edit of a live note names it as `other`.
+    const edit = (definition = smallDefinition) => {
+      const s = new Scope(definition);
+      s.did(rita, "keep", on(s, 0));
+      const note = s.did(rita, "write", fields({ owner: rita.member, due: t(30) })).seq;
+      return [s.act(rita, "edit", { ...on(s, note, { other: 0 }), fields: { text: "b", other: 0 } }), s.item(0).revision, s.item(0).values["text"]];
+    };
+    expect(edit()).toMatchObject([{ result: "write" }, 2, null]);
+    // The same edit, with a value effect on `other`: its expected revision is right and no state effect names it.
+    const writesOther = variant(small, (def) => def.acts.edit.effects.push({ of: "also.other", value: { slot: "text", from: { field: "text" } } }));
+    expect(edit(writesOther)).toMatchObject([{ result: "refused", reason: "final" }, 2, null]);
+  });
+});
+
 describe("range guards (section 6.5)", () => {
   // Kept notes, in ID order, with texts a, a, b, c. They are retained final items; `max` does not bound them.
   const s = new Scope(smallDefinition);
@@ -219,6 +244,30 @@ describe("attribution (sections 6.7 and 10.2)", () => {
   });
 });
 
+describe("attribution within an entry, and under later authority (section 6.7)", () => {
+  test("a holder set by an earlier effect of the entry is in the attribution; so is the principal of an attributed member's later grant", () => {
+    // A report that first hands the hold under its commitment to the member in `to`, renews it, and then takes the attribution.
+    const s = laneWithCommitment(variant(lane, (def) => {
+      const report = def.acts.report;
+      report.also = { ...report.also, hold: { item: "hold", by: "hold" } };
+      report.fields = { ...report.fields, hold: { type: "item", of: "hold", required: true }, to: { type: "member", required: true } };
+      report.effects.splice(2, 0, { of: "also.hold", party: { slot: "holder", from: { field: "to" } } }, { of: "also.hold", hold: { do: "renew" } });
+    }));
+    const hold = s.did(una, "take-hold", under(s, 2)).seq;
+    const report = s.did(una, "report", { fields: { commitment: 2, hold, to: vic.member }, expected: { commitment: s.item(2).revision, hold: 1 } });
+    // vic holds from this entry on, so vic is not outside the report's authors. Another signer set vic, so vic brings no principal.
+    expect(names(s.item(report.seq).parties["authors"])).toEqual(["@una", "@paul", "@vic"]);
+
+    // rita opens a note with una as owner: no grant of una's was judged. Later una edits it under a grant that names paul.
+    const n = new Scope(smallDefinition);
+    const note = n.did(rita, "write", fields({ owner: una.member, due: t(30) })).seq;
+    expect(names(n.item(note).attributed)).toEqual(["@una"]);
+    n.did(una, "edit", { ...on(n, note, { other: 0 }), fields: { text: "b", other: 0 } });
+    expect(names(n.item(note).attributed)).toEqual(["@una", "@paul"]);
+    expect(n.replay().snapshot()).toBe(n.state.snapshot());
+  });
+});
+
 describe("a foreign fact (sections 5.1 and 6.5)", () => {
   test("a fact guard is judged on the fetched entry only, and the entry it read is recorded in `uses`", () => {
     const l = laneWithCommitment();
@@ -240,6 +289,19 @@ describe("a foreign fact (sections 5.1 and 6.5)", () => {
     expect(written.uses).toEqual([{ fact: proof, content: digestBytes(canonicalBytes(entry)) }]);
     // An effect may take a member from a field of the fetched fact.
     expect(names(s.item(0).parties["readers"])).toEqual(["@una"]);
+  });
+
+  test("each fact reference is verified whole: one that shares a verified hash and names another scope and position is not taken for it", () => {
+    const l = laneWithCommitment();
+    const { entry, hash } = l.entries.at(-1)!;
+    const proof = { at: l.at, seq: entry.seq, hash };
+    // `cite` with a second fact field, later in byte order than `proof`.
+    const s = new Scope(variant(small, (def) => { def.acts.cite.fields.second = { type: "fact", kind: "assign", under: "lane", required: false }; }));
+    const cite = (second: typeof proof) => s.act(una, "cite", { ...on(s, 0), ...fields({ proof, second }) }, { facts: [{ fact: proof, entry, under: "lane" }] });
+    expect(cite({ at: otherLane, seq: 99, hash })).toEqual({ result: "unavailable", reason: "dependency-unavailable" });
+    // Two references that both pass are one reference: the entry is used once.
+    expect(cite(proof).result).toBe("write");
+    expect(s.last.uses.map((u) => u.fact)).toEqual([proof]);
   });
 });
 

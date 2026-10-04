@@ -11,7 +11,7 @@
 
 import type { Digest, Effect, Entry, ItemType, MemberRef } from "@generalbusiness/artroom-contract";
 import { intentDigest, seedDigest } from "@generalbusiness/artroom-bytes";
-import { withMembers, withPrincipal, type Signer } from "./attribution.ts";
+import { UNDER, historyOf, withActing, withMembers, withPrincipal, type Signer } from "./attribution.ts";
 import type { Item, Party, StateWriter, Status } from "./state.ts";
 import { same } from "./values.ts";
 import type { ValidDefinition } from "./validate.ts";
@@ -26,8 +26,6 @@ export type ItemEffect = Extract<Effect, { effect: "state" | "party" | "ref" | "
 
 /** The slot of a hold type whose member is the holder (section 6.8). */
 export const HOLDER = "holder";
-/** The reference slot of a hold type that names the item the hold is under (section 6.7). */
-export const UNDER = "under";
 
 /** Section 6.3: a new item is in its initial state, each slot takes its default or is empty, and its revision is 1. */
 export function newItem(effect: Extract<Effect, { effect: "open" }>, type: ItemType, opened: Digest | null): Item {
@@ -49,9 +47,17 @@ export function signerOf(entry: Entry): Signer | null {
  * One effect on one item. The judges use it on their working copy and the
  * fold on the state, so both see the same item afterwards. A member put in an
  * `author` slot, or made the holder of a hold, joins the item's attribution
- * history, with the signer's principal when that member is the signer.
+ * history, with the signer's principal when that member is the signer. And
+ * whenever a member of that history signs an entry that changes the item,
+ * the principal of the grant judged for that entry joins it (section 6.7).
  */
 export function changeItem(item: Item, effect: ItemEffect, definition: ValidDefinition, signer: Signer | null): Item {
+  const changed = changeSlots(item, effect, definition, signer);
+  const attributed = withActing(changed.attributed, signer);
+  return attributed === changed.attributed ? changed : { ...changed, attributed };
+}
+
+function changeSlots(item: Item, effect: ItemEffect, definition: ValidDefinition, signer: Signer | null): Item {
   const type = definition.declared.items[item.type]!;
   const attributes = (slot: string) => type.parties[slot]?.author === true || (slot === HOLDER && definition.holdTypes.includes(item.type));
   const noted = (slot: string, member: MemberRef) => (attributes(slot) ? withMembers(item.attributed, withPrincipal(member, signer)) : item.attributed);
@@ -91,7 +97,11 @@ export function applyEntry(writer: StateWriter, definition: ValidDefinition, ent
   const touch = (id: number): Item => {
     const held = now.get(id) ?? writer.item(id);
     if (!held) throw new FoldError(`entry ${entry.seq} has an effect on item ${id}, which does not exist`);
-    if (!before.has(id)) before.set(id, held);
+    if (!before.has(id)) {
+      // Section 6.6: no effect changes an item that was final before the entry.
+      if (definition.declared.items[held.type]?.states[held.state]?.final) throw new FoldError(`entry ${entry.seq} has an effect on item ${id}, which was ${held.state} before it`);
+      before.set(id, held);
+    }
     return held;
   };
   for (const effect of entry.effects) {
@@ -135,11 +145,14 @@ export function applyEntry(writer: StateWriter, definition: ValidDefinition, ent
       writer.addCount(item.type, item.state, 1);
     }
   }
-  // Section 6.7: every holder of a hold is in the attribution of the item the hold is under. That item is read, not changed: its revision stays.
+  // Section 6.7: every holder of a hold is in the attribution of the item the hold is under, and so is the principal of a member of
+  // that attribution who changed the hold. That item is read, not changed: its revision stays.
   for (const hold of now.values()) {
     const under = definition.holdTypes.includes(hold.type) ? hold.refs[UNDER] : null;
     const target = typeof under === "number" && under !== hold.id ? writer.item(under) : null;
-    if (target) writer.putItem({ ...target, attributed: withMembers(target.attributed, hold.attributed) });
+    if (!target) continue;
+    const attributed = historyOf(target, [hold], definition, signer);
+    if (attributed !== target.attributed) writer.putItem({ ...target, attributed });
   }
 
   // Bookkeeping that the input implies.

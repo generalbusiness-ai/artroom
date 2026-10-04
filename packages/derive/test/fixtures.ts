@@ -200,6 +200,13 @@ export function valid(v: Validation): ValidDefinition {
   if (!v.ok) throw new Error(`the fixture definition is refused: ${JSON.stringify(v.problems)}`);
   return v.definition;
 }
+/** A fixture definition with one change, validated. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function variant(base: DeclaredDefinition, change: (definition: any) => void): ValidDefinition {
+  const definition = structuredClone(base);
+  change(definition);
+  return valid(validateDefinition(definition, PROPOSED_BOUNDS));
+}
 export const laneDefinition = valid(validateDefinition(lane, PROPOSED_BOUNDS));
 export const smallDefinition = valid(validateDefinition(small, PROPOSED_BOUNDS));
 

@@ -7,7 +7,7 @@
  */
 
 import type { Effect, EffectForm, FactRef, FieldValue, MemberRef, Notify, RefusalReason } from "@generalbusiness/artroom-contract";
-import { attribution } from "./attribution.ts";
+import { attribution, historyOf } from "./attribution.ts";
 import { HOLDER, changeItem, newItem, type ItemEffect } from "./fold.ts";
 import { members, slotOf, type Judging } from "./guards.ts";
 import type { Item } from "./state.ts";
@@ -52,12 +52,14 @@ export function deriveEffects(j: Judging, forms: readonly EffectForm[], attentio
     const item = working.get(subject)!;
     const type = items[item.type]!;
     const id = item.id;
+    // Section 6.6: no effect of any kind changes an item that was final before the entry, however the entry orders its effects.
+    // An entry that takes a live item to a final state may carry its other effects on that item.
+    const was = j.subjects.get(subject);
+    if (was && type.states[was.state]?.final) return refuse("final", `effects.${i}: item ${id} is ${was.state}`);
     /** A list may take one more member. */
     const room = (slot: string) => members(working.get(subject)!.parties[slot]).length < Math.min(type.parties[slot]?.max ?? j.bounds.listElements, j.bounds.listElements);
 
     if ("state" in form) {
-      // Section 6.3: an item in a final state refuses every transition.
-      if (type.states[item.state]?.final) return refuse("final", `effects.${i}: item ${id} is ${item.state}`);
       apply(subject, { effect: "state", item: id, state: form.state });
     } else if ("party" in form) {
       const { slot, from, list } = form.party;
@@ -86,7 +88,8 @@ export function deriveEffects(j: Judging, forms: readonly EffectForm[], attentio
       // Section 6.4: inside a scope, `self` is a local reference to the entry being written, and so to the item it opens.
       const field = from !== null && from !== "self" && "field" in from ? fieldFor(from.field, (v) => isValue(type.refs[slot]!.to, v, j.bounds)) : null;
       if (field && !field.ok) return field;
-      const to: FieldValue | null = from === null ? null : from === "self" ? j.self : field ? field.value : "slot" in from ? (item.refs[from.slot] ?? null) : null;
+      // Section 6.6: a copy preserves its source. A slot source is the slot of that name, of whatever kind.
+      const to: FieldValue | null = from === null ? null : from === "self" ? j.self : field ? field.value : "slot" in from ? slotOf(item, from.slot) : null;
       apply(subject, { effect: "ref", item: id, slot, to });
     } else if ("value" in form) {
       const { slot, from } = form.value;
@@ -96,9 +99,10 @@ export function deriveEffects(j: Judging, forms: readonly EffectForm[], attentio
       const value: FieldValue | null = field ? field.value : "const" in from ? from.const : "time" in from ? timeOf(timeMs(j.clock.reading)! + from.time.plusSeconds * 1000) : null;
       apply(subject, { effect: "value", item: id, slot, value });
     } else if ("attribute" in form) {
-      // Section 6.7: the attribution of the named subject, not of the item that receives it.
+      // Section 6.7: the attribution of the named subject, not of the item that receives it, as it stands after the effects
+      // written before this one: a member whom an earlier effect of this entry made the holder of a hold under the subject is in it.
       const { slot } = form.attribute;
-      for (const member of attribution(working.get(form.attribute.of)!, j.signer)) {
+      for (const member of attribution(historyOf(working.get(form.attribute.of)!, working.values(), j.definition, j.signer), j.signer)) {
         if (members(working.get(subject)!.parties[slot]).some((m) => same(m, member))) continue;
         if (!room(slot)) return refuse("slot-full", `effects.${i}: ${slot}`);
         apply(subject, { effect: "list", item: id, slot, change: "add", member });

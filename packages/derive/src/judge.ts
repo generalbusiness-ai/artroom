@@ -197,7 +197,10 @@ export function judgeTimed(view: StateView, definition: ValidDefinition, selecte
 
   const j: Judging = { view, definition, bounds, clock, scope, self: scope.head.seq + 1, kind: selected.rule, fields: {}, fieldTypes: {}, subjects: new Map([["on", item]]), signer: null, facts: new Map(), prepared: [], used: [] };
   const effects = deriveEffects(j, rule.effects, rule.attention, null);
-  // The validator admits no timed rule whose effects can be refused: they change a live item of the rule's own type.
+  // Section 6.4: a timed rule's effects are total. The validator refuses, as `timed-partial`, a rule with an effect that could be
+  // refused here, and requires one that takes the item out of the rule's states. So a selection that passes its three checks is
+  // written, and its item is not due again under this rule: the drain makes progress. A refusal here is a fault of the validator,
+  // and is never answered by passing over the due item.
   if (!effects.ok) throw new Error(`timed rule ${selected.rule} cannot apply: ${effects.reason}`);
   return { result: "write", draft: { input: { type: "timed", item: selected.item, rule: selected.rule, due: selected.due }, uses: [], prepared: [], effects: effects.effects, sends: [], judgesTime: true } };
 }

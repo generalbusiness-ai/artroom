@@ -37,6 +37,7 @@ const rows: readonly (readonly [string, DeclaredDefinition, Change, ProblemCode 
   ["an opening sets no value in a required slot", small, (d) => d.acts.write.effects.shift(), "required-unset"],
   ["a guard reads the state of the item its act opens", small, (d) => d.acts.write.guards.push({ state: ["draft"] }), "nascent-guard"],
   ["a guard reads a slot of the item its act opens", small, (d) => d.acts.write.guards.push({ equals: { a: { slot: "owner" }, b: { signer: true } } }), "nascent-guard"],
+  ["an equality whose second operand is not an operand, after a first that is valid", small, (d) => d.acts.write.guards.push({ equals: { a: { field: "owner" }, b: null } }), "shape"],
   ["a later act sets a fixed slot", small, (d) => d.acts.edit.effects.push({ party: { slot: "owner", from: { signer: true } } }), "fixed"],
   ["a state effect with no guard that its subject is live", small, (d) => { d.acts.keep.guards = []; }, "final"],
   ["a state effect whose guard admits a final state", small, (d) => d.acts.keep.guards[0].state.push("kept"), "final"],
@@ -48,12 +49,17 @@ const rows: readonly (readonly [string, DeclaredDefinition, Change, ProblemCode 
   ["an also entry is named by an item field of another type", lane, (d) => { d.acts.offer.also.intent.item = "commitment"; }, "name"],
   ["more guards than one act may have", small, (d) => { d.acts.edit.guards = Array.from({ length: PROPOSED_BOUNDS.guards + 1 }, () => ({ state: ["draft"] })); }, "bound"],
   ["a text field larger than a text may be", small, (d) => { d.items.note.values.text.of.max = PROPOSED_BOUNDS.textBytes + 1; }, "bound"],
+  ["a field copied into a slot that holds less: a text of 200 bytes into a slot of 4", small, (d) => { d.items.note.values.text.of.max = 4; }, "bound"],
   ["more states than a type may have", small, (d) => { for (let i = 0; i < PROPOSED_BOUNDS.states; i++) d.items.note.states[`s${i}`] = { final: false }; }, "bound"],
 
   // Timed rules and the hold capability, as the deltas note records them.
   ["a hold with no timed rule that ends it", lane, (d) => { d.timed = {}; }, "hold"],
   ["a hold effect in a definition that does not list hold@1", lane, (d) => { d.capabilities = []; }, "capability"],
   ["a timed rule that leaves its item due", lane, (d) => { d.timed["hold-end"].effects = [{ hold: { do: "end" } }]; }, "timed"],
+  ["a timed rule with an effect its commit could refuse: an add to a party list that may be full", lane, (d) => {
+    d.items.hold.parties.past = { fixed: false, required: false, list: true, max: 1, author: false };
+    d.timed["hold-end"].effects.push({ party: { slot: "past", from: { slot: "holder" }, list: "add" } });
+  }, "timed-partial"],
   ["a timed rule over a final state", lane, (d) => d.timed["hold-end"].states.push("ended"), "timed"],
   ["a profile this runtime does not implement", small, (d) => { d.profile.version = 2; }, "profile"],
   ["a capability this runtime does not implement", small, (d) => d.capabilities.push({ name: "git-read", version: 1 }), "capability"],

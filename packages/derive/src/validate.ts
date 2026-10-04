@@ -26,6 +26,7 @@ export type ProblemCode =
   | "genesis"            // the genesis act is missing or is not an `open` act
   | "genesis-timed"      // the genesis act opens a timed item type or has a `hold` effect (section 6.4)
   | "timed"              // a timed rule that is not about its own live item, or that would stay due
+  | "timed-partial"      // a timed rule with an effect that its commit could refuse (section 6.4)
   | "hold"               // the hold capability used without what it needs (section 6.8)
   | "handler"            // two handlers for one message from one kind of scope, or a name the platform keeps
   | "capability" | "profile" | "rule";
@@ -80,9 +81,24 @@ const FIELD_SHAPES: Readonly<Record<string, readonly string[]>> = {
   text: ["max"], int: ["min", "max"], bool: [], time: [], enum: ["of"], member: [], item: ["of"], fact: ["kind", "under"], scope: ["kind"], digest: [], commit: [], tree: [], list: ["of", "max"],
 };
 
-const sameType = (a: FieldType, b: FieldType): boolean =>
-  a.type === b.type && (a.type !== "item" || a.of === (b as typeof a).of) && (a.type !== "scope" || a.kind === (b as typeof a).kind) && (a.type !== "enum" || canonicalize(a.of) === canonicalize((b as typeof a).of))
-  && (a.type !== "fact" || (a.kind === (b as typeof a).kind && a.under === (b as typeof a).under)) && (a.type !== "list" || sameType(a.of, (b as typeof a).of));
+/**
+ * Section 6.6: every value of `from` is a value of `to`. The two are the same
+ * type, and the bounds of `from` are inside those of `to`: a text's `max`, an
+ * integer's range, an enum's values, a reference's kind, a list's `max` and
+ * its elements. A copy needs this; a comparison does not.
+ */
+function assignable(from: FieldType, to: FieldType): boolean {
+  switch (from.type) {
+    case "text": return to.type === "text" && from.max <= to.max;
+    case "int": return to.type === "int" && from.min >= to.min && from.max <= to.max;
+    case "enum": return to.type === "enum" && from.of.every((v) => to.of.includes(v));
+    case "item": return to.type === "item" && from.of === to.of;
+    case "scope": return to.type === "scope" && from.kind === to.kind;
+    case "fact": return to.type === "fact" && from.kind === to.kind && from.under === to.under;
+    case "list": return to.type === "list" && from.max <= to.max && assignable(from.of, to.of);
+    default: return from.type === to.type;
+  }
+}
 const onSubject = (of: unknown) => of === undefined || of === "on";
 /** The slot of the primary item that a written effect sets to a value, if any. */
 const setsSlot = (e: unknown): unknown => {
@@ -275,6 +291,11 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
     return k;
   };
   const fieldOf = (v: unknown, ctx: Ctx): FieldType | null => (isObject(v) && typeof v["field"] === "string" ? (ctx.fields?.get(v["field"]) ?? null) : null);
+  /** Section 6.6: a slot never holds a value outside its type, so a copy needs a source whose every value the slot can hold. */
+  const copy = (from: FieldType | null | undefined, to: FieldType, path: string, what: string): void => {
+    if (from?.type !== to.type) bad("name", path, `names no ${what} of the slot's type`);
+    else if (!assignable(from, to)) bad("bound", path, `the ${what} admits a value outside the slot's type`);
+  };
 
   // ------------------------------------------------------------ guards (section 6.5)
 
@@ -298,7 +319,9 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
     const pair = (e: unknown, ep: string, a: (v: unknown, path: string) => string | null) => {
       const r = rec(e, ep, ["a", "b"]);
       if (!r) return;
-      if (a(r["a"], at(ep, "a")) === "field" || operand(r["b"], at(ep, "b"), ctx, item) === "field") namesField = true;
+      // Section 6.5: each operand is validated by itself. A valid first operand excuses nothing about the second.
+      const forms = [a(r["a"], at(ep, "a")), operand(r["b"], at(ep, "b"), ctx, item)];
+      if (forms.includes("field")) namesField = true;
     };
     switch (k) {
       case "state": {
@@ -416,6 +439,7 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
         if (!r || !sl) return null;
         const from = r["from"];
         if ("list" in r && (!sl.list || from === null || (r["list"] !== "add" && r["list"] !== "remove"))) bad("shape", at(p, "list"), "is add or remove, of a member, on a list slot");
+        if (ctx.timed && r["list"] === "add") bad("timed-partial", p, "a timed rule adds to no party list: a full list would refuse the transition");
         if (!("list" in r) && sl.list && from !== null) bad("shape", p, "a list slot takes add or remove, or null to empty it");
         if (isObject(from) && "fact" in from) {
           if (rec(from, at(p, "from"), ["fact", "field"]) && (fieldOf({ field: from["fact"] }, ctx)?.type !== "fact" || typeof from["field"] !== "string")) bad("name", at(p, "from"), "names no field of type fact");
@@ -435,11 +459,12 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
         const from = r["from"];
         if (from === "self") {
           // Section 6.4: `self` is a local reference to the entry being written, and so to the item it opens.
-          if (!ctx.nascent || later || !ctx.on || !sameType(sl.type, { type: "item", of: ctx.on.name })) bad("name", at(p, "from"), "self is the item this entry opens, in a slot that refers to an item of that type");
+          if (!ctx.nascent || later || !ctx.on || !assignable({ type: "item", of: ctx.on.name }, sl.type)) bad("name", at(p, "from"), "self is the item this entry opens, in a slot that refers to an item of that type");
         } else if (from !== null) {
           const fk = form(from, at(p, "from"), ["field", "slot"]);
-          const type = fk?.[0] === "slot" ? (typeof fk[1] === "string" ? s.slots.get(fk[1])?.type : undefined) : fieldOf(from, ctx);
-          if (fk && (fk[0] === "slot" || ctx.fields) && !(type && sameType(type, sl.type))) bad("name", at(p, "from"), "names no field or slot of the slot's type");
+          // A slot source is any slot of the subject, of whatever kind: the effect reads the slot of that name.
+          if (fk?.[0] === "slot") copy(typeof fk[1] === "string" ? s.slots.get(fk[1])?.type : undefined, sl.type, at(p, "from"), "slot");
+          else if (fk && ctx.fields) copy(fieldOf(from, ctx), sl.type, at(p, "from"), "field");
         }
         return `slot ${String(r["slot"])} of ${sk}`;
       }
@@ -448,10 +473,7 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
         const sl = r && slot(r["slot"], "value");
         if (!r || !sl) return null;
         const fk = form(r["from"], at(p, "from"), ["field", "const", "time"]);
-        if (fk?.[0] === "field" && ctx.fields) {
-          const type = fieldOf(r["from"], ctx);
-          if (!(type && sameType(type, sl.type))) bad("name", at(p, "from"), "names no field of the slot's type");
-        }
+        if (fk?.[0] === "field" && ctx.fields) copy(fieldOf(r["from"], ctx), sl.type, at(p, "from"), "field");
         if (fk?.[0] === "const" && !isValue(sl.type, fk[1], bounds)) bad("shape", at(p, "from"), "is not a value of the slot's type");
         if (fk?.[0] === "time") {
           const t = rec(fk[1], at(p, "from"), ["plusSeconds"]);
@@ -465,6 +487,7 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
         const sl = r && slot(r["slot"], "party");
         if (!r || !sl) return null;
         if (!sl.list) bad("name", p, "attribution fills a party list");
+        if (ctx.timed) bad("timed-partial", p, "a timed rule takes no attribution: a full list would refuse the transition");
         subject(r["of"], at(p, "of"), ctx, false);
         return `slot ${String(r["slot"])} of ${sk}`;
       }
@@ -668,6 +691,8 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
     const deadline = typeof o["deadline"] === "string" ? t.slots.get(o["deadline"]) : undefined;
     if (!(deadline?.kind === "value" && deadline.type.type === "time")) bad("name", at(path, "deadline"), "names no value slot of type time");
     const ctx: Ctx = { on: t, also: new Map(), nascent: false, fields: new Map(), signer: false, timed: true, live: new Set(["on"]) };
+    // Section 6.4: a timed rule's effects are total. With no field, no signer and no other subject, what is left that a commit
+    // could refuse is an effect that needs room in a party list, and `effect` refuses each as `timed-partial`.
     effects(o["effects"], at(path, "effects"), ctx, false);
     // Otherwise the transition would be due again as soon as it was applied, and the drain would never end.
     if (!(Array.isArray(o["effects"]) && o["effects"].some((e) => isObject(e) && typeof e["state"] === "string" && !states.includes(e["state"])))) bad("timed", at(path, "effects"), "a timed rule takes its item out of the rule's states");

@@ -60,18 +60,29 @@ export const useOf = (fact: FactRef, entry: Entry): FactUse => ({ fact, content:
 /** True when `entry` is the entry that `fact` names. */
 export const isEntryOf = (entry: Entry, fact: FactRef): boolean => entry.seq === fact.seq && same(entry.at, fact.at) && entryHash(entry) === fact.hash;
 
-/** What the fields name: local items, which must exist, and foreign facts, which must have been fetched. In the byte order of the field names. */
+/**
+ * What the fields name: local items, which must exist, and foreign facts,
+ * which must have been fetched. In the byte order of the field names.
+ *
+ * Section 6.5: a fact reference is verified whole. Every reference is checked
+ * against the fetched entry, by scope, incarnation, position and hash, before
+ * anything is deduplicated. So a later reference with the hash of a verified
+ * one and another scope or position is not taken for it, and two references
+ * that both pass are one reference: the map by hash and the list of uses
+ * then hold that fact once.
+ */
 export function readFacts(view: StateView, types: ActType["fields"], fields: Readonly<Record<string, FieldValue>>, available: readonly Fetched[]): Facts {
   const facts = new Map<Digest, Fetched>();
   const uses: FactUse[] = [];
   for (const name of Object.keys(fields).sort(byteOrder)) {
     for (const [type, value] of leaves(types[name]!, fields[name]!)) {
       if (type.type === "item" && view.item(value as number)?.type !== type.of) return { result: "no-item", detail: `${name} names no ${type.of}` };
-      if (type.type !== "fact" || facts.has((value as FactRef).hash)) continue;
+      if (type.type !== "fact") continue;
       const ref = value as FactRef;
       const fetched = available.find((f) => f.fact.hash === ref.hash);
       // Section 5.2, step 1: a foreign entry that was not fetched, or is not the entry the reference names, is a dependency that is not available.
       if (!fetched || !isEntryOf(fetched.entry, ref)) return { result: "unavailable" };
+      if (facts.has(ref.hash)) continue;
       facts.set(ref.hash, fetched);
       uses.push(useOf(ref, fetched.entry));
     }
