@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:749f7311b780fdffb8325e3632208a0bdbae7b22","text":"Merge retired a covered predecessor; the successor is at packages/room/test/workerd/log-tokens.test.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:7540ff431f052ce1ee70de51ec46b8696b72d926","text":"Merge retired a covered predecessor; the successor is at packages/client/package.json."}
