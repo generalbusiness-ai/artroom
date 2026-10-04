@@ -258,4 +258,3 @@ describe("review b618eca1: staged publication", () => {
     expect(git.objects.has(sha)).toBe(true);
   });
 });
-
