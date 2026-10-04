@@ -73,8 +73,11 @@ depends on. The last lines say which of the three ran, and why one did not.
 
 A change to a root file (`package.json`, the lock file, a root
 `tsconfig`, the root `vitest.config.ts`) runs every test of all three.
-So does a changed file whose name git would quote, such as a name with a
-space or a letter outside ASCII, because vitest cannot read that name.
+
+A changed file whose name git would quote, such as a name with a space or
+a letter outside ASCII, runs the whole root vitest run, because vitest
+cannot read that name. The git and ui packages are still chosen by where
+the file is.
 
 The selection follows imports. A test that reads a file without importing
 it, such as a fixture or a document, is not selected when only that file
@@ -156,18 +159,27 @@ which the summed test-file time comes. It fails if a step fails. A sum of
 its steps is a sum of separate runs, not the time of one gate: for that,
 time `npm run gate` itself, which also prints each of its steps.
 
-Keep four figures apart, because they answer different questions:
+The cost of the tests is judged by two figures, for the whole gate and for
+one edit taken to review (request `ecbc722a`, as amended by `da68c9a9`):
 
-- **elapsed**: how long a person waits;
-- **CPU**: user and system seconds over every process, which is what the
-  machine spent;
-- **worker time**: what the test workers spent, whether or not they ran
-  side by side. Observe it: `scripts/measure-tests.sh <dir> --serial` runs
-  each suite with one worker, so a step's elapsed time is its worker's
-  time. Vitest's printed totals of import and test time are only a
-  subtotal of it;
-- **summed test-file time**: the test durations in vitest's reports, which
-  leaves out imports and setup.
+- **elapsed**: how long the pipeline takes, which is how long a person
+  waits;
+- **CPU**: user and system seconds over every process the pipeline
+  started, which is what the machine spent.
+
+Other figures help to find where the time is. Say what each one is:
+
+- **summed test-file time**: the test durations in vitest's reports. It
+  leaves out imports and setup;
+- **printed phase totals**: vitest's import and test totals over all test
+  files. Parallel load inflates them;
+- **single-worker suite time**: `scripts/measure-tests.sh <dir> --serial`
+  runs each suite with one worker. Its figure is the elapsed time of the
+  whole command in a configuration the gate does not use. Do not call it
+  worker time.
+
+A sum of separately timed steps is a sum; say so, and do not present it as
+one observed run.
 
 State the machine, the load and the cache state with any figure. The
 current figures are in [plans/README.md](../plans/README.md).

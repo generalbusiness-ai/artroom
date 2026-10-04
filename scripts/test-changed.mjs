@@ -10,8 +10,9 @@
 // those two runs whole when a changed file is in the package or in a
 // workspace package it depends on; whole, because that takes a few seconds
 // and needs no import graph. A change to a root file such as package.json or
-// the lock file runs every test of all three, and so does a changed file
-// name that vitest cannot read from git. The last lines say what ran and what was not affected.
+// the lock file runs every test of all three. A changed file whose name
+// vitest cannot read from git runs the whole root run; git and ui are still
+// chosen by where the file is. The last lines say what ran and what was not affected.
 import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";

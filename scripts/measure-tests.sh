@@ -18,9 +18,10 @@
 #
 # With --serial as the second argument, each suite runs with one worker and
 # one file at a time, and the install, the typecheck and `root-test` are left
-# out. A step's elapsed time is then the time its one worker took, with the
-# runner's own start and end: the worker time of the suite, observed and not
-# added up from a report.
+# out. A step's figure is then the elapsed time of the whole suite command
+# with one worker: a serial comparison. It includes the runner's start and,
+# in workerd, the pool and the runtime. It is not a worker's lifetime and not
+# how the gate runs.
 O=${1:?usage: scripts/measure-tests.sh <output directory> [--serial]}
 SERIAL=""; [ "${2:-}" = "--serial" ] && SERIAL="--maxWorkers=1 --no-file-parallelism"
 W=$(cd "$(dirname "$0")/.." && pwd)
