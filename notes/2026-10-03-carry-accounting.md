@@ -149,18 +149,29 @@ what each event names and from where verify reads each fact.
 
 | Fact | `land-evaluated` | `check-carried` |
 |---|---|---|
-| The policy version | Not named in the event. Verify uses the version active at the event's position. Fenced: the event is sealed only under the version that was evaluated | Named in the event. Verify reads the document, the checker configuration, the pinned runner and the owners from the named version, wherever the event is. Pinned by name: an activation during the evaluation does not stop the seal, and the carry then does not count under the new version (R-CARRY-13) |
+| The policy version | Not named in the event. Verify uses the version active at the event's position. Fenced: the event is sealed only under the version that was evaluated. A kept evaluation is used again only under the version that made it | Named in the event. Verify reads the document, the checker configuration, the pinned runner and the owners from the named version, wherever the event is, and accepts an event that names an earlier version. The Room does not rely on that: a pass ends, sealing nothing more, once another version is active, because the operation is prepared again under it (R-LAND-5) |
+| Whether the obligation is still the version's | The obligations are part of the land input: fenced | Read again at the seal. After a recomputation has changed or removed the obligation, or its checker, the pass ends. Verify judges the event against the version's obligations as the log gives them at the event's position, and would call it extra |
 | The lane and generation | Named through the operation. Their head and changed paths do not change. The obligations' states and the reviews are part of the land input, so they are fenced with it | Named in the event. Pinned by name. A newer generation does not stop the seal; the judgment is of the generation it names |
 | The integration, its tree and snapshot | Named. A commit does not change | Named. A commit does not change |
 | Whether the evidence is revoked or retired | Part of the land input: fenced | Read at the event's position by verify: fenced |
 | The acting member's role and teams | The initiator's, part of the land input: fenced | The checker's, read at the event's position by verify: fenced |
-| Whether the obligation is still open | Fenced, as part of the land input | Not fenced. A judgment of an obligation that a direct check met meanwhile is extra history, and verify accepts it |
+| Whether the obligation is still open | Fenced, as part of the land input | Not fenced. A judgment of an obligation that a direct check met meanwhile is more history, and verify accepts it |
 | Whether the check was already judged | | Checked again at the seal, as before |
 
 A sealed `land-evaluated` event is then what verify takes it to be: an
 evaluation of the state at its own position, with no blocking obligation
 open. It is still not a reservation; `land-reserved` is. The engine's own
 fence on the final answer is unchanged.
+
+The checker then found two more places by the same reasoning, each with a
+failing run (`7dabf862`, `29551590`). A kept land evaluation was looked up
+by operation and input alone, so after an activation that changed only a
+rule, the old passing answer was used again and the landing could reserve.
+And a held carry judgment was sealed after a recomputation had removed its
+obligation, which made an honest `v2` log fail verify. Both are repaired as
+the table says. The first was in the Room before this note; the second is
+the gap between "the facts that were judged" and "whether the judgment is
+still owed".
 
 One test in the Room holds a land evaluation open, admits a revocation that
 reopens an obligation, lets the evaluation finish, and shows that no

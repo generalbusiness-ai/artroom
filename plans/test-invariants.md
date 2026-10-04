@@ -229,6 +229,8 @@ The workerd files share isolates (`vitest.workers.config.ts`), so a test must no
 | A verdict carries to the next generation until a dependency changes. | R-CARRY-1, 2, 5, 11 | `obligations.cases.ts`: "Carrying through the policy port" |
 | A check binds the preview's integration, the active configuration and the tree, and only the named checker may sign it. | R-OBL-3, R-LAND-1 | `obligations.cases.ts`: "R-OBL-3 checks" |
 | A `land-evaluated` or `check-carried` event is sealed only if the facts it was judged on still hold at the seal; otherwise it is judged again. | R-LAND-4, R-CARRY-13, notes/2026-10-03-carry-accounting.md | `acts.test.ts`: "a land evaluation is sealed only for the state"; "a carry judgment is sealed only on the facts" |
+| A kept land evaluation is used only under the policy version that made it. | R-LAND-4, R-LAND-5, review 7dabf862 | `acts.test.ts`: "a kept land evaluation is used only under the policy version" (also under `v2`) |
+| A carry pass ends once another policy version is active or its obligation is no longer the version's; nothing more is sealed. | R-CARRY-13, R-LAND-5, review 29551590 | `acts.test.ts`: "a carry pass ends when its obligation is gone" (also under `v2`); "an activation that overtakes a carry pass" |
 | Every check carry judgement is a sealed event, counts only under the policy version that judged it, and needs a pinned runner. | R-CARRY-13, R-CARRY-14, R-LAND-7, R-EXEC-10 | `acts.test.ts`: "R-CARRY-13"; `review-a711f7b6.cases.ts`: "1. a stored check carry"; "4. check carry needs" |
 | A scoped check binds the snapshot commit recorded for its own integration, and carries only when main moved outside its inputs. | R-OBL-3, R-CARRY-6 to 10 | `review-a711f7b6.cases.ts`: "4d."; `review-95323c2b.cases.ts`; `phase2b.cases.ts`: "policy activation and recompute" |
 | An advisory obligation never blocks a landing. | R-OBL-7, R-REV-3 | `acts.test.ts`: "R-OBL-7" |
@@ -331,7 +333,7 @@ No other test runs a second time under `v2`: not founding, secret scanning, log 
 
 ### Removed or replaced
 
-- The declared run of the whole workerd suite: 540 test runs became 32 tests and one test of the run itself.
+- The declared run of the whole workerd suite: 540 test runs became 32 tests and one test of the run itself. Two more were added with the repairs of reviews `7dabf862` and `29551590`.
 - 115 per-condition guard tests and 51 audit tests, merged with the 53 of `declared-fd6f00b6.test.ts` into 38, one witness per invariant. Dropped with no replacement: states that acts cannot reach, and the policy cache's size of four.
 - 133 Node tests, one per field of each step and recover op, became one loop of 116 cases in `node/declared-equivalence.test.ts`.
 - `declared-stage5-a5d64b35.test.ts`: 38 became 9. The rest repeated what `packages/client` and `packages/mcp` test against their doubles.

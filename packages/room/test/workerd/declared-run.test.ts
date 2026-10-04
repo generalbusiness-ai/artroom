@@ -38,9 +38,9 @@ interface Witness {
 const WITNESSES: readonly Witness[] = [
   {
     file: "acts.test.ts",
-    only: /R-LANE|R-PROP-1, R-PROP-2|R-ADMIN|R-LAND-7: reservation|policy activation during preparation|builds the same bytes at reservation/,
+    only: /R-LANE|R-PROP-1, R-PROP-2|R-ADMIN|R-LAND-7: reservation|policy activation during preparation|builds the same bytes at reservation|a carry pass ends when its obligation is gone|a kept land evaluation is used only under the policy version/,
     shows:
-      "the steps open, take and release, renewal and expiry, and a version with its pin, reached through the declared kinds claim, release and propose (conversion 1); the steps review and land with the landing engine, reservation, an activation while a landing is prepared, and configuration recovery through recover (conversion 2)",
+      "the steps open, take and release, renewal and expiry, and a version with its pin, reached through the declared kinds claim, release and propose (conversion 1); the steps review and land with the landing engine, reservation, an activation while a landing is prepared, a land evaluation and a carry pass across an activation, with the v2 log verified, and configuration recovery through recover (conversion 2)",
     load: () => import("./acts.test.ts"),
   },
   {

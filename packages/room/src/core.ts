@@ -1286,12 +1286,20 @@ export class RoomCore {
     policy: ActivePolicyFull,
     still: () => boolean,
   ): Promise<{ refusal: Refusal | null; retained: RetainedLandInput | null } | null> {
-    const kept = json<{ refusal: Refusal | null; retained: RetainedLandInput | null }>(one(this.sql, "SELECT body FROM land_evals WHERE op = ? AND digest = ?", op, digest), "body");
+    // A kept evaluation is used only under the policy version that made it: the same input under another version is
+    // another question, and is evaluated again. A row kept before the version was recorded names none, so it is
+    // never used.
+    type Kept = { refusal: Refusal | null; retained: RetainedLandInput | null; policy?: PolicyVersion };
+    const keptNow = (): Kept | null => {
+      const k = json<Kept>(one(this.sql, "SELECT body FROM land_evals WHERE op = ? AND digest = ?", op, digest), "body");
+      return k && k.policy === policy.version ? k : null;
+    };
+    const kept = keptNow();
     if (kept) return kept;
     const r = await this.ports.policy.land(policy, input, { budget: this.ports.policy.actBudget() });
     let moved = false;
     this.sql.transaction(() => {
-      if (one(this.sql, "SELECT 1 AS x FROM land_evals WHERE op = ? AND digest = ?", op, digest)) return;
+      if (keptNow()) return;
       if (!still()) {
         moved = true;
         return;
@@ -1299,15 +1307,15 @@ export class RoomCore {
       this.retainEvaluations(r.evaluations);
       this.sealSystem({ type: "land-evaluated", op, integration, landInput: r.retained?.digest ?? digest, decisions: r.evaluations.map((e) => e.decision) });
       this.sql.all(
-        "INSERT INTO land_evals (op, digest, body) VALUES (?, ?, ?) ON CONFLICT (op, digest) DO NOTHING",
+        "INSERT INTO land_evals (op, digest, body) VALUES (?, ?, ?) ON CONFLICT (op, digest) DO UPDATE SET body = excluded.body",
         op,
         digest,
-        JSON.stringify({ refusal: r.refusal, decisions: r.evaluations.map((e) => e.decision), retained: r.retained }),
+        JSON.stringify({ refusal: r.refusal, decisions: r.evaluations.map((e) => e.decision), retained: r.retained, policy: policy.version }),
       );
     });
     if (moved) return null;
     this.committed();
-    return json<{ refusal: Refusal | null; retained: RetainedLandInput | null }>(one(this.sql, "SELECT body FROM land_evals WHERE op = ? AND digest = ?", op, digest), "body")!;
+    return keptNow()!;
   }
 
   /**
@@ -1389,8 +1397,18 @@ export class RoomCore {
           : { carried: null, notCarried: { act: ev.act, code: "runner-changed" as const, text: "No runner environment is pinned" }, evaluations: [] };
         const carried = res.carried;
         let moved = false;
+        let ended = false;
         this.sql.transaction(() => {
           if (judged(ev.act)) return;
+          // The pass was for one policy version and for the obligations the version had under it. After an
+          // activation, or once a recomputation has changed or removed this obligation, a judgment of it is owed
+          // by no one, and a reader of the log would find it extra: the pass ends, and the operation is prepared
+          // again under the version now active (R-LAND-5).
+          const spec2 = generationRow(this.sql, op.lane, op.generation)?.obligations.find((x) => x.id === spec.id);
+          if (this.activePolicy().version !== policy.version || !spec2 || spec2.kind !== "check" || spec2.check !== spec.check) {
+            ended = true;
+            return;
+          }
           if (runner && digestJson(read()) !== digestJson(on)) {
             moved = true;
             return;
@@ -1434,6 +1452,7 @@ export class RoomCore {
         });
         // The facts moved during the evaluation: nothing was sealed, and this check is judged again on the facts as
         // they are now.
+        if (ended) return;
         if (moved) {
           n--;
           continue;
