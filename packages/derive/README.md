@@ -1,8 +1,9 @@
 # @generalbusiness/artroom-derive
 
 Derivation for an Artroom scope: the definition validator, the state that
-entries fold into, the fold, and the judges. Everything is a pure,
-synchronous function. Nothing reads a clock, storage or a random source.
+entries fold into, the fold, and the judges. Everything in the main entry is
+a pure, synchronous function. Nothing reads a clock, storage or a random
+source.
 
 The scope runtime calls these inside one storage transaction. A verifier
 calls the same functions over a state it folds in memory. So what the
@@ -12,15 +13,27 @@ The scope and replay contract is the authority. Comments cite its sections.
 Where the contract was silent, `notes/2026-10-04-i1-contract-deltas.md`
 records what was implemented.
 
-## What it exports
+The package has two entry points:
+
+- `@generalbusiness/artroom-derive`: everything below but the evaluator.
+- `@generalbusiness/artroom-derive/rule`: the evaluator of `rule` guards. It
+  is asynchronous and loads the JSONata engine, so it runs in preparation,
+  before the commit, and the judges never import it.
+
+## What the main entry exports
 
 | Module | Holds |
 |---|---|
-| `validate` | `validateDefinition(definition, bounds, profiles?)`: a `ValidDefinition` with its digest, timed types, hold types and the slots each range guard's `where` reads; or a list of problems. `PROFILES`. |
-| `state` | `StateView` and `StateWriter`, the item record, and `MemoryState` with `snapshot()`. |
+| `validate` | `validateDefinition(definition, bounds, profiles?)`: a `ValidDefinition` with its digest, timed types, hold types and the slots each range guard's `where` reads; or a list of problems. `PROFILES`, `Profile`, `keptMessage`. |
+| `state` | `StateView` and `StateWriter`; the records of an item, a relationship copy, a sent request, a consumed delivery, a held creation and an outside operation; `MemoryState`; `StateSnapshot` and `stateDigest`, the digest a checkpoint carries. |
 | `fold` | `applyEntry(writer, definition, entry, hash)`, the only code that changes state. `changeItem` and `newItem`, which the judges use on their working copy. `FoldError`. |
-| `judge` | `judgeAct`, `judgeTimed`, and `entryOf`, which makes a draft the entry at a head and a reading. |
-| `guards`, `effects`, `sends` | `judgeGuard`, `deriveEffects`, `deriveSends`, and the `Judging` value they read. |
+| `judge` | `judgeAct`, `judgeTimed`, and `entryOf`, which makes a draft the entry at a head and a reading, or entry 0 for a genesis. The answer types `ActJudgment`, `TimedJudgment` and `Judgment`. |
+| `genesis` | `judgeGenesis(view, definition, asked, context)` for a `Founding` (a directory) or a `Creation` (a child). |
+| `delivery` | `judgeDelivery(view, definition, delivered, context)` for a request, a result, a control and an advisory. `Delivered`, `Source`, `DeliveryContext`, `sentBy`. |
+| `settle` | `judgeDiagnosis`, `judgeOutcome`, `judgeCheckpoint`, and `checkpointOf(view)`. |
+| `rules` | `prepareRules(view, definition, judged)`: for each `rule` guard an input would meet, the rule, its expression, its input and the input's digest. |
+| `frame` | What the judges share: `Reading`, `readFields`, `readFacts`, `bound` (the handler a message runs), `runHandler`, `runClause`, `derive`. |
+| `guards`, `effects`, `sends` | `judgeGuard`, `deriveEffects`, `deriveSends`, the `Judging` value they read, and `ruleInput`. |
 | `timed` | `nextDue(view, definition, asOf)`: the next due transition in the contract's order. |
 | `time` | `clockOf(view, reading)`: one commit's reading, whether it is behind, and the time at which a transition is due. `timeMs`, `timeOf`. |
 | `attribution` | `attribution(item, signer)`. |
@@ -29,18 +42,110 @@ records what was implemented.
 ## How a commit uses it
 
 1. Read the clock once: `clockOf(view, reading)`.
-2. `judgeAct(view, definition, signedIntent, context)`. The answer is one of:
-   write this draft; refused, with a reason and the head judged at;
-   unavailable; mismatch; accepted before, with the first entry's `seq`; or
-   a transition is due, in which case nothing is written and the drain runs.
+2. Call the judge of the input: `judgeAct`, `judgeGenesis`, `judgeDelivery`,
+   `judgeDiagnosis`, `judgeOutcome` or `judgeCheckpoint`. Every judge takes
+   the state, the definition, the input, and a context with that one
+   reading, the bounds and the retained inputs it needs.
 3. For a draft: `entryOf(view, draft, clock)`, hash the entry, then
    `applyEntry(writer, definition, entry, hash)`.
+
+A judge answers one of these. Only the first records anything.
+
+| Answer | Means |
+|---|---|
+| `write` | Write this draft: the input with its decision, `uses`, `prepared`, `effects`, `sends`, and whether it judges time. |
+| `source-unverified` | A source check of a genesis or a delivery failed. |
+| `unavailable` | Not judged, with a reason. It is offered again. An entry that judges time is `clock-behind` while the clock is behind. |
+| `repeat` (`accepted-before` for an act) | Already recorded, by the entry of that `seq`. |
+| `due` | A transition is due. Nothing is written and the drain runs first. |
+| `routing` | A delivery addressed to another scope or incarnation. |
+| `refused` | An act that is refused, with the head it was judged at; or an input the scope can never write. |
+| `mismatch` | An act whose key is on another sealed intent. |
 
 The drain selects with `nextDue` and commits with `judgeTimed`, which
 writes only when the selection passes its three checks.
 
-The judges of a genesis, a delivery, a diagnosis, an outcome and a checkpoint
-are the next step. The fold already applies their entries.
+What the caller supplies for each input:
+
+| Input | Beside the clock and bounds |
+|---|---|
+| An act | The presented grants with the authority port's verdict; each fetched foreign entry its fields name; the prepared rule results. |
+| A genesis | The scope's own name and a new incarnation. For a child, the source entry: the creator's entry that holds the `create` send. |
+| A delivery | The send's address, source fact, ordinal and message; the source entry as read from the source scope. For a result, this scope's own entry that sent the request. |
+| A diagnosis | The request by `seq` and ordinal, the attempt log, and this scope's own entry that sent the request. |
+| An outcome, a checkpoint | Nothing more. `checkpointOf(view)` builds the checkpoint a scope may write. |
+
+A provisional child's state names, in `ScopeState.held`, the ordinals of
+its genesis entry's sends that are sealed and must not be dispatched. The
+entry that records the confirmation empties the list.
+
+## Rules
+
+A definition declares its rule expressions in `rules`, by name. A `rule`
+guard names one.
+
+1. Preparation, over the snapshot: `prepareRules(view, definition, judged)`
+   judges the input as a commit would, passes over each rule guard, and
+   returns what each rule reads. That is exactly the input of the
+   contract's section 6.5: the subjects' records, the kind and fields, the
+   signer's member, and each fetched fact.
+2. `evaluateRules(asked)`, from the `rule` entry point, returns one
+   `Prepared` record for each: the rule, the digest of its input, and the
+   result. A rule holds only when its expression gives `true`.
+3. The judge takes the records in its context. A rule guard reuses one only
+   when its digest is the digest of what the rule reads in the commit.
+   Otherwise the answer is `unavailable`. The entry records each result its
+   guards read.
+
+`RULE_PROFILES`, from the `rule` entry point, is a profile table for
+`validateDefinition` that also checks each rule's text against the profile.
+
+## Review of the earlier evaluator
+
+The rule evaluator is the restricted JSONata evaluator of the earlier
+model (`parked/policy/src`), reviewed for its new role and copied into
+`src/rule/`. It passed. The review asked four questions.
+
+| Question | What was found | Outcome |
+|---|---|---|
+| Can an expression read a clock? | Every function call must name one of 16 listed functions: `abs`, `ceil`, `floor`, `round`, `count`, `sum`, `min`, `max`, `length`, `exists`, `not`, `lookup`, `append`, `merge`, `contains`, `substring`. `$now`, `$millis`, `$random` and `$eval` are not listed, so the admission check refuses them before anything is evaluated. The engine takes a timestamp when it starts; no admitted expression can observe it. | Passes. A test pins the refusals. |
+| Can it read anything beyond its input? | The host passes no bindings. An expression may read the context, the root and the variables it binds itself. The parent operator, wildcards, descendants, lambdas, partial application, function chaining, regular expressions, sorting and transforms are node types outside the allowlist. The keys `__proto__`, `constructor` and `prototype` are refused in the expression and in the input. | Passes. A definition whose slot or field has one of those three names cannot be read by a rule: the rule is then false. |
+| Is its work bounded? | Before evaluation: the expression is at most 64 KiB, and its syntax tree at most 4,096 nodes and 64 levels. During evaluation: at most 100,000 steps, 64 active levels, 16,384 items in a sequence, 1 MiB in one intermediate value and 16 MiB inspected in all. The input is at most 256 KiB and 32 levels. The steps are counted by two hooks of the engine, which are internal to it. | Passes, on the pinned engine. The engine's own timeout is not used. The fingerprint below covers the hooks, because it includes step counts. |
+| Is it deterministic? | Numbers are safe integers; a fraction or an overflow is refused. Strings are well formed. The input is copied through canonical JSON, so object keys have one order. Every refusal has a stable code. | Passes. |
+
+Changes made in the copy:
+
+- **No budget is shared between rules.** The earlier model charged all the
+  rules of one act to one budget and recorded where each started. Here a
+  prepared result is identified by the rule and the digest of its input
+  alone, so each rule is evaluated by itself, with the budgets above.
+- **Results.** The earlier model recorded an evaluation error as a refusal
+  with a code. Here a rule is a Boolean guard: any deterministic refusal of
+  the profile makes the rule false. A fault of the engine prepares nothing,
+  and the input is answered `unavailable`.
+- **The engine check.** The earlier code compared the installed package's
+  version text and a fingerprint of 13 probes: their results, step counts
+  and inspected bytes. The copy keeps the fingerprint, with the same value,
+  and computes it with this repository's SHA-256. It drops the comparison
+  of the version text, which needed a JSON import. The exact version is
+  pinned in `package.json` and the lock file. The check detects drift. It
+  is not a boundary against someone who can change the installed code.
+- **Vocabulary.** The profile is `restricted@1`. The errors are
+  `RuleEvalError` and `RuleRuntimeFailure`.
+
+The earlier package's own test corpus was not run again, because parked
+source is not built or tested. The fingerprint is unchanged, which shows
+that the engine, the budgets and the hooks behave as they did when that
+corpus last passed. Three tests of this package pin the points above.
+
+Not copied: `context.ts`, the replay context of the earlier decision
+record; `inputs.ts`, a helper for the earlier policy document; and
+`integrity.ts`, whose digests the bytes package replaces.
+
+Two limits follow from the profile and are not yet settled by the
+contract. A rule's input is at most 256 KiB, and an input may name more
+fetched facts than that holds; such a rule is false. Evaluation is
+asynchronous, so a rule can never be evaluated inside the commit.
 
 ## How to test
 
@@ -49,6 +154,7 @@ npm test --workspace @generalbusiness/artroom-derive
 npm run typecheck --workspace @generalbusiness/artroom-derive
 ```
 
-`test/fixtures.ts` holds the one fixture set: a key set, two small
-definitions, and a scope in memory that judges, seals and folds as a commit
-does. It is not exported from the package's entry.
+`test/fixtures.ts` holds the one fixture set: a key set, four small
+definitions, a scope in memory that judges, seals and folds as a commit
+does, and helpers that pass the entries of one scope to another. It is not
+exported from the package's entry.

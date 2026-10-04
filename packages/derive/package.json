@@ -1,12 +1,13 @@
 {
   "name": "@generalbusiness/artroom-derive",
   "version": "0.1.0-dev.1",
-  "description": "Artroom's derivation: the definition validator, the fold of entries into state, and the judges. Pure functions shared by the scope runtime and the verifier.",
+  "description": "Artroom's derivation: the definition validator, the fold of entries into state, the judges, and the rule evaluator. Pure functions shared by the scope runtime and the verifier.",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./rule": "./src/rule/index.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json",
@@ -14,7 +15,8 @@
   },
   "dependencies": {
     "@generalbusiness/artroom-bytes": "0.1.0-dev.1",
-    "@generalbusiness/artroom-contract": "0.1.0-dev.1"
+    "@generalbusiness/artroom-contract": "0.1.0-dev.1",
+    "jsonata": "2.2.2"
   },
   "devDependencies": {
     "@types/node": "26.6.3",
