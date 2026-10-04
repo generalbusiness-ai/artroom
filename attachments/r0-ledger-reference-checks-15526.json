@@ -1,0 +1,2520 @@
+{
+  "head": "a3d0ce4c5337c98bf1e9f507813d3b8605c03894",
+  "snapshot_depth": 15526,
+  "rows": [
+    {
+      "item": "Test overhead",
+      "request": "ecbc722a2bd96b8cd5778f78be36d5895dc40d42",
+      "requester": "planner",
+      "performer": "builder",
+      "state": "awaiting-landing",
+      "promise": "1c6bf45cec20f310b5f3e5871281ff676709814c"
+    },
+    {
+      "item": "Acts stage 2",
+      "request": "fd6f00b612d68c035cbdbc3f27ebe3c21500f079",
+      "requester": "planner",
+      "performer": "builder",
+      "state": "awaiting-landing",
+      "promise": "c96e88fc3ce2d8b910de4c38d66c9030a0a8b8c7"
+    },
+    {
+      "item": "Acts stage 3",
+      "request": "1e8fee4bfcb6e057bbf352faba2b5719cd39f9c7",
+      "requester": "planner",
+      "performer": "builder",
+      "state": "awaiting-review",
+      "promise": "3af8ebc70ec973a6c298698fd6131598fb6ae9cb"
+    },
+    {
+      "item": "Acts stage 4",
+      "request": "48c021ea67470bc59bdf48f8d6a1408cbc06025a",
+      "requester": "planner",
+      "performer": "builder",
+      "state": "promised",
+      "promise": "8d497ff552b4ee60b9857b402010ce7cdbf100ca"
+    },
+    {
+      "item": "Acts stage 5",
+      "request": "a5d64b35e87c97560ff354578d9560bd1261aacb",
+      "requester": "planner",
+      "performer": "builder",
+      "state": "awaiting-landing",
+      "promise": "d5378da5583d3bc16c0c19094c1d4c8716aceb2b"
+    },
+    {
+      "item": "MCP runtime",
+      "request": "9ca1d290b7f01fe713b46668e2d4ab949d289787",
+      "requester": "planner",
+      "performer": "builder",
+      "state": "awaiting-review",
+      "promise": "bac4bb0e7dc0c788949e82ce18c1445cbadcd8b0"
+    },
+    {
+      "item": "Bearer retry",
+      "request": "5d41ea36aa0047fbd9e285e3276188e0f3b9131b",
+      "requester": "builder",
+      "performer": "builder",
+      "state": "awaiting-landing",
+      "promise": "9c75aae2fbdac4fd0fba800aa3a21eeba10f9bf8"
+    },
+    {
+      "item": "Verifier release",
+      "request": "42342e35a7660b466b3f623309702461e8f44f6f",
+      "requester": "planner",
+      "performer": "builder",
+      "state": "awaiting-review",
+      "promise": "4e66accc560de6f8ca320ee24593cb0df4f63448"
+    },
+    {
+      "item": "First Jam packages",
+      "request": "7e82100b785d9734a6d68ec452bd43952240668d",
+      "requester": "planner",
+      "performer": "builder",
+      "state": "awaiting-landing",
+      "promise": "1eb5788cf9e31cdf7f74a3ba1512482d83791ac6"
+    },
+    {
+      "item": "Jam readiness",
+      "request": "b4ef9b7adaabcd7f7a89582146c2bcbe7bfe4f81",
+      "requester": "planner",
+      "performer": "builder",
+      "state": "promised",
+      "promise": "8c87c35cef24c556b164486579c162cbcd910f78"
+    },
+    {
+      "item": "Snapshot repositories",
+      "request": "ee2296d557ed7686b049febe7cdb5869d86f2c44",
+      "requester": "planner",
+      "performer": "builder",
+      "state": "promised",
+      "promise": "7921a96c8384048496c5beb72a8a33259f6f9476"
+    },
+    {
+      "item": "Oversized policy; storage failure",
+      "request": "6d4b227cc00a8b0585307b5b7fce0235011f9363",
+      "requester": "builder",
+      "performer": "none",
+      "state": "open",
+      "promise": null
+    },
+    {
+      "item": "Row-write measurement",
+      "request": "92ddf4cc0a0a6d9e704b3e1defba70dd315d28b6",
+      "requester": "planner",
+      "performer": "builder",
+      "state": "stale",
+      "promise": "d83daac19ac94bb99e60fed8ad9cc83104785b19"
+    },
+    {
+      "item": "Alarm backoff and retention",
+      "request": "b70595d020ea7c2e613f4b85664a52031bd803d5",
+      "requester": "planner",
+      "performer": "builder",
+      "state": "stale",
+      "promise": "7d15247be33d1af4998436b62c7d424aaa579f97"
+    },
+    {
+      "item": "Check-job retry and budgets",
+      "request": "ea7716c0186e160a476305b95de02a991183138f",
+      "requester": "planner",
+      "performer": "builder",
+      "state": "stale",
+      "promise": "bed04c12ac00f33c10a661e3446e543e55ed6c82"
+    },
+    {
+      "item": "Container sizing",
+      "request": "d687ef51e0c5a5700650b3abaf05cb3fcccc23f9",
+      "requester": "planner",
+      "performer": "builder",
+      "state": "stale",
+      "promise": "c63c987499581b9dbddab012f95b89cb8dd47ac2"
+    },
+    {
+      "item": "One signing module",
+      "request": "9625391917dfed9e8c32550ae060e62ef5f2aebf",
+      "requester": "planner",
+      "performer": "none",
+      "state": "stale",
+      "promise": null
+    },
+    {
+      "item": "One glob, admin set, snapshot commit",
+      "request": "705cd75c4d6aafcae12e0dc987a4d0cdc99af2e7",
+      "requester": "planner",
+      "performer": "none",
+      "state": "stale",
+      "promise": null
+    },
+    {
+      "item": "One duty ledger",
+      "request": "3b761aba16cefbe3960745015a27789501d91cb1",
+      "requester": "planner",
+      "performer": "none",
+      "state": "stale",
+      "promise": null
+    },
+    {
+      "item": "Entry points and manifests",
+      "request": "c7440a7d2526a693e3dada04151807710175921b",
+      "requester": "planner",
+      "performer": "none",
+      "state": "stale",
+      "promise": null
+    },
+    {
+      "item": "One fake, one adapter",
+      "request": "6003499251ff0b223a71af0528a6e42f29f4512f",
+      "requester": "planner",
+      "performer": "none",
+      "state": "stale",
+      "promise": null
+    },
+    {
+      "item": "Structural refactors",
+      "request": "478e024f7641c7b59cc96c39a39dd51f78fe9778",
+      "requester": "planner",
+      "performer": "none",
+      "state": "stale",
+      "promise": null
+    },
+    {
+      "item": "Documentation hygiene",
+      "request": "166e80e355e07ac4abac012c0c85280a1c5d1c52",
+      "requester": "planner",
+      "performer": "none",
+      "state": "stale",
+      "promise": null
+    },
+    {
+      "item": "Publication loop and orphan room",
+      "request": "14edad4cdc1ebd79a392e0c912b09ca4c07cab6e",
+      "requester": "planner",
+      "performer": "none",
+      "state": "stale",
+      "promise": null
+    },
+    {
+      "item": "Small security items",
+      "request": "972e302398681e958d5089712ce0b6cb5f45d0f7",
+      "requester": "planner",
+      "performer": "none",
+      "state": "stale",
+      "promise": null
+    },
+    {
+      "item": "Gate public founding",
+      "request": "214ddbfe8323f4d17b30803ad060dd08faa0aa0d",
+      "requester": "planner",
+      "performer": "none",
+      "state": "stale",
+      "promise": null
+    },
+    {
+      "item": "Agent production runtime",
+      "request": "fa6d295a1f3df7d708ea71e3cddc28930a9520f5",
+      "requester": "planner",
+      "performer": "none",
+      "state": "stale",
+      "promise": null
+    },
+    {
+      "item": "N1 proposal reads",
+      "request": "53016b8e7ebc4ee50322fc85ce5e9f7a9d4d0dfa",
+      "requester": "planner",
+      "performer": "builder",
+      "state": "awaiting-review",
+      "promise": "4ba647c2e18d9cfcbce10f1d08cfcbcf764aecd2"
+    },
+    {
+      "item": "N2 lifecycle",
+      "request": "9c43c17327cc26c2e5e54cd27fea197d26e803a5",
+      "requester": "planner",
+      "performer": "builder",
+      "state": "awaiting-review",
+      "promise": "6f1481eb166ee4c0649d86e08df074f72ba87241"
+    },
+    {
+      "item": "N3 starter",
+      "request": "f3299ab4b2bf553f2a221a353a7cb75f04cbd5c6",
+      "requester": "planner",
+      "performer": "builder",
+      "state": "awaiting-review",
+      "promise": "779cf3a62b080b9e34e0f4568e9489fa0ec4e753"
+    },
+    {
+      "item": "N4 act guidance",
+      "request": "5fee04f47e18a42024bbf642572045255b89c0a5",
+      "requester": "planner",
+      "performer": "builder",
+      "state": "awaiting-review",
+      "promise": "bc53003980790ca4e65e51018051bae2194f4514"
+    },
+    {
+      "item": "N5 installation",
+      "request": "f1af7cfdb6029863e2bd7e545ef526737f5648ea",
+      "requester": "planner",
+      "performer": "builder",
+      "state": "awaiting-review",
+      "promise": "a18f373c74eab924d1fa8db030cf908dde2a8da8"
+    },
+    {
+      "item": "N6 manual",
+      "request": "db2fd1468ed09aecd51bbec3a89a45cb373b91a2",
+      "requester": "planner",
+      "performer": "none",
+      "state": "open",
+      "promise": null
+    },
+    {
+      "item": "N7 absent attention",
+      "request": "64e9d131567e647c8c33394aa7cd817274eea175",
+      "requester": "planner",
+      "performer": "builder",
+      "state": "promised",
+      "promise": "a70c6a52a598d0a144e08aef1eda47d552949f12"
+    },
+    {
+      "item": "Notes reconciliation",
+      "request": "50d7806ac4c7da8ea6683180ba65a7b43c547e73",
+      "requester": "planner",
+      "performer": "builder",
+      "state": "awaiting-review",
+      "promise": "14926009c7eac68badd2a5b1035d8ccbca6887e3"
+    },
+    {
+      "item": "First jam-room note",
+      "request": "f4a626c8e939ce8a30b377a1e156c9bea05d56bf",
+      "requester": "planner",
+      "performer": "builder",
+      "state": "awaiting-review",
+      "promise": "18c400e06f62d7b1fae50cb5d9090b6255a796de"
+    },
+    {
+      "item": "C1 hosted coding authority",
+      "request": "b538c5eace50a1de82a8bdf8a8f19764548af15e",
+      "requester": "planner",
+      "performer": "none",
+      "state": "open",
+      "promise": null
+    },
+    {
+      "item": "C2 recovery spike",
+      "request": "6cdaf20fa260d6d6c6b30e83f585883a51b964f4",
+      "requester": "planner",
+      "performer": "none",
+      "state": "open",
+      "promise": null
+    },
+    {
+      "item": "C3 hosted runtime",
+      "request": "13dfc613e8e3d9a1aed5f7492272fbf8c580d727",
+      "requester": "planner",
+      "performer": "none",
+      "state": "open",
+      "promise": null
+    },
+    {
+      "item": "C4 browser identity and import",
+      "request": "18815307e6c306d63766230ed7eb7ddbf94d1f21",
+      "requester": "planner",
+      "performer": "none",
+      "state": "open",
+      "promise": null
+    },
+    {
+      "item": "C5 browser journey",
+      "request": "cfbde32f20618231aed598f63f3898cc188d0ffd",
+      "requester": "planner",
+      "performer": "none",
+      "state": "open",
+      "promise": null
+    },
+    {
+      "item": "C6 acceptance and guides",
+      "request": "d89fc17fb60a7c8a3591e23193596c981781b26c",
+      "requester": "planner",
+      "performer": "none",
+      "state": "open",
+      "promise": null
+    },
+    {
+      "item": "Checker authority per job",
+      "request": "f12cef6bae7bf4c3813241df0624199568f14ddf",
+      "requester": "planner",
+      "performer": "none",
+      "state": "open",
+      "promise": null
+    },
+    {
+      "item": "Bootstrap with a policy",
+      "request": "a13a0bf504520e1b77367fbbe68aee8c74e66fb6",
+      "requester": "planner",
+      "performer": "none",
+      "state": "open",
+      "promise": null
+    },
+    {
+      "item": "Show cleanup duties",
+      "request": "8d249233901a901d9a57ceac999b26e4a8f68cf2",
+      "requester": "planner",
+      "performer": "none",
+      "state": "open",
+      "promise": null
+    },
+    {
+      "item": "Firm authority note",
+      "request": "d50ce26d79a10b55c1e2880870030e9bd6e5acdd",
+      "requester": "planner",
+      "performer": "none",
+      "state": "open",
+      "promise": null
+    },
+    {
+      "item": "Firm authority implementation",
+      "request": "1ebda91724f6d4fbeb5ce1a1e766cb50594e9812",
+      "requester": "planner",
+      "performer": "none",
+      "state": "open",
+      "promise": null
+    },
+    {
+      "item": "R0",
+      "request": "30c06d808a9a95314016ac8e64c36338066d824d",
+      "requester": "planner",
+      "performer": "builder",
+      "state": "promised",
+      "promise": "cbbf86120e5cec8c1a9189e175f4d63367dd526f"
+    },
+    {
+      "item": "R1",
+      "request": "c69b573d910a2ead7874a8651d022530dc58be85",
+      "requester": "planner",
+      "performer": "builder",
+      "state": "promised",
+      "promise": "8d614272a21db84b700f8c9002ad7191fb3ed7df"
+    },
+    {
+      "item": "R2",
+      "request": "fe47970e29a3dd30ceb84133d1b7d64e05b1504a",
+      "requester": "planner",
+      "performer": "builder",
+      "state": "promised",
+      "promise": "8da8b218e8fd95d923c5687af2b2e37b05f191f5"
+    },
+    {
+      "item": "R3",
+      "request": "f2d23e6fededcbeceba50574fbd2a9f2200588c7",
+      "requester": "planner",
+      "performer": "builder",
+      "state": "promised",
+      "promise": "8661af6be60114d0863265a7c54d7c12d2b63382"
+    },
+    {
+      "item": "R4",
+      "request": "b18554a6eae02f4a4d35740543047ce4803bed30",
+      "requester": "planner",
+      "performer": "builder",
+      "state": "promised",
+      "promise": "f3c5d607e430a4722719c5521c7215dc2c38a3e3"
+    },
+    {
+      "item": "Composable design, from Hugh",
+      "request": "5c716a5c35bfdbdcef89e1e4fbe82df4aab0b8fd",
+      "requester": "planner",
+      "performer": "planner",
+      "state": "promised",
+      "promise": "efc0d86cc329025353f8e2dd21957b0f60ce68d8"
+    },
+    {
+      "item": "MCP core contract",
+      "request": "a9788a594d327df7e6a09add00b97fc0f9259169",
+      "requester": "planner",
+      "performer": "planner",
+      "state": "awaiting-review",
+      "promise": "ee3d9036e9807f935e315059d5bba95a773b01ab"
+    },
+    {
+      "item": "MCP plan",
+      "request": "489a992e0412ea4c83fdef3ecc16fcd1c472a791",
+      "requester": "planner",
+      "performer": "planner",
+      "state": "awaiting-review",
+      "promise": "932ce20e20468fc5503249686dd09151548e818d"
+    },
+    {
+      "item": "Wake and schedule",
+      "request": "24711ceb99c3939c0217eb7e0cac7d2b2d21cde9",
+      "requester": "planner",
+      "performer": "planner",
+      "state": "awaiting-review",
+      "promise": "19a020afb0b90cc69f98ff1f90eb27854ef331a3"
+    },
+    {
+      "item": "Collections",
+      "request": "34cf52b3dad76053ef17c10ee792ab8b81b740d0",
+      "requester": "planner",
+      "performer": "planner",
+      "state": "awaiting-review",
+      "promise": "6430ffd49f700c75594c4feb4ccb89561a5908bd"
+    },
+    {
+      "item": "jj comparison",
+      "request": "966aeaad47d450f70a6c0712bd5300091ea6875e",
+      "requester": "planner",
+      "performer": "planner",
+      "state": "awaiting-review",
+      "promise": "bfb563fe704b11ac19a48b9c0a924376bec05dc7"
+    },
+    {
+      "item": "Future-direction section",
+      "request": "da2737b2ad309bb8d70464f55ea4e025d8c226fd",
+      "requester": "planner",
+      "performer": "none",
+      "state": "open",
+      "promise": null
+    },
+    {
+      "item": "Joint review of plans 017 and 018",
+      "request": "edaad58f57cde6befd3c4442480e6a30b4e30a60",
+      "requester": "planner",
+      "performer": "none",
+      "state": "open",
+      "promise": null
+    },
+    {
+      "item": "Verifier release at `d691e6e9`",
+      "request": "a23cfe01368878719b3a1a73a12fda85c99246ba",
+      "requester": "builder",
+      "performer": "checker",
+      "state": "promised",
+      "promise": "f6dd71f4807598abd6ce884b2eae865612fa6a4e"
+    },
+    {
+      "item": "Stage 2 at `4ec48aa1`",
+      "request": "a25ee2a97142cfce14ee9dc3c3e5b7c0cb6c25cc",
+      "requester": "builder",
+      "performer": "checker",
+      "state": "promised",
+      "promise": "c8bfd0d7bbdc83ced5655a86a92d448a1363958b"
+    },
+    {
+      "item": "MCP runtime at `50216bb1`",
+      "request": "90adf4a7f3068acd8c93b57d1ac4ba163d5f4ca6",
+      "requester": "builder",
+      "performer": "checker",
+      "state": "reported",
+      "promise": "453d5961a35b37c53621b078f35e4fdf1dc708c3"
+    },
+    {
+      "item": "Stage 3 at `947fb909`",
+      "request": "1c911ea7a73b5de6b1d9e746bc88036305d07cd4",
+      "requester": "builder",
+      "performer": "checker",
+      "state": "reported",
+      "promise": "37595d2d6596396df6afe3d657ccd52fdd340bc9"
+    },
+    {
+      "item": "N3 design",
+      "request": "cdcdabb5bf9d83e6a66d660cf7a136898d97c798",
+      "requester": "builder",
+      "performer": "none",
+      "state": "open",
+      "promise": null
+    },
+    {
+      "item": "N5 design",
+      "request": "17f1411d20e7998d0d1cc754b6eb7c9b6a53a538",
+      "requester": "builder",
+      "performer": "none",
+      "state": "open",
+      "promise": null
+    },
+    {
+      "item": "N4 design",
+      "request": "408f4c0ea808d272631f56ca4de7e98b37dcb0ee",
+      "requester": "builder",
+      "performer": "none",
+      "state": "open",
+      "promise": null
+    },
+    {
+      "item": "N1 design",
+      "request": "ad2c9cd353f77ae75580bf03fcd4c1376b20ae54",
+      "requester": "builder",
+      "performer": "none",
+      "state": "open",
+      "promise": null
+    },
+    {
+      "item": "N2 design",
+      "request": "82191a0bea708a703335ef5dec6c2f1ce68cfe05",
+      "requester": "builder",
+      "performer": "none",
+      "state": "open",
+      "promise": null
+    },
+    {
+      "item": "Notes reconciliation",
+      "request": "8d3d138e01e5cc41c433ff044ae18b3f3e8cefbb",
+      "requester": "builder",
+      "performer": "none",
+      "state": "open",
+      "promise": null
+    }
+  ],
+  "projection_checks": [
+    {
+      "item": "Test overhead",
+      "id": "ecbc722a2bd96b8cd5778f78be36d5895dc40d42",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "awaiting-landing",
+      "promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:1c6bf45cec20f310b5f3e5871281ff676709814c",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "performer": "feb90d36627c7f4466ef9473c4fa0bbaf91699d16b93d832a37629988dfba6de",
+      "depth": 15526
+    },
+    {
+      "item": "Acts stage 2",
+      "id": "fd6f00b612d68c035cbdbc3f27ebe3c21500f079",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "awaiting-landing",
+      "promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:c96e88fc3ce2d8b910de4c38d66c9030a0a8b8c7",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "performer": "feb90d36627c7f4466ef9473c4fa0bbaf91699d16b93d832a37629988dfba6de",
+      "depth": 15526
+    },
+    {
+      "item": "Acts stage 3",
+      "id": "1e8fee4bfcb6e057bbf352faba2b5719cd39f9c7",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "awaiting-review",
+      "promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:3af8ebc70ec973a6c298698fd6131598fb6ae9cb",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "performer": "feb90d36627c7f4466ef9473c4fa0bbaf91699d16b93d832a37629988dfba6de",
+      "depth": 15526
+    },
+    {
+      "item": "Acts stage 4",
+      "id": "48c021ea67470bc59bdf48f8d6a1408cbc06025a",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "promised",
+      "promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:8d497ff552b4ee60b9857b402010ce7cdbf100ca",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "performer": "feb90d36627c7f4466ef9473c4fa0bbaf91699d16b93d832a37629988dfba6de",
+      "depth": 15526
+    },
+    {
+      "item": "Acts stage 5",
+      "id": "a5d64b35e87c97560ff354578d9560bd1261aacb",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "awaiting-landing",
+      "promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:d5378da5583d3bc16c0c19094c1d4c8716aceb2b",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "performer": "feb90d36627c7f4466ef9473c4fa0bbaf91699d16b93d832a37629988dfba6de",
+      "depth": 15526
+    },
+    {
+      "item": "MCP runtime",
+      "id": "9ca1d290b7f01fe713b46668e2d4ab949d289787",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "awaiting-review",
+      "promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:bac4bb0e7dc0c788949e82ce18c1445cbadcd8b0",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "performer": "feb90d36627c7f4466ef9473c4fa0bbaf91699d16b93d832a37629988dfba6de",
+      "depth": 15526
+    },
+    {
+      "item": "Bearer retry",
+      "id": "5d41ea36aa0047fbd9e285e3276188e0f3b9131b",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "awaiting-landing",
+      "promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:9c75aae2fbdac4fd0fba800aa3a21eeba10f9bf8",
+      "requester": "feb90d36627c7f4466ef9473c4fa0bbaf91699d16b93d832a37629988dfba6de",
+      "performer": "feb90d36627c7f4466ef9473c4fa0bbaf91699d16b93d832a37629988dfba6de",
+      "depth": 15526
+    },
+    {
+      "item": "Verifier release",
+      "id": "42342e35a7660b466b3f623309702461e8f44f6f",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "awaiting-review",
+      "promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:4e66accc560de6f8ca320ee24593cb0df4f63448",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "performer": "feb90d36627c7f4466ef9473c4fa0bbaf91699d16b93d832a37629988dfba6de",
+      "depth": 15526
+    },
+    {
+      "item": "First Jam packages",
+      "id": "7e82100b785d9734a6d68ec452bd43952240668d",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "awaiting-landing",
+      "promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:1eb5788cf9e31cdf7f74a3ba1512482d83791ac6",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "performer": "feb90d36627c7f4466ef9473c4fa0bbaf91699d16b93d832a37629988dfba6de",
+      "depth": 15526
+    },
+    {
+      "item": "Jam readiness",
+      "id": "b4ef9b7adaabcd7f7a89582146c2bcbe7bfe4f81",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "promised",
+      "promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:8c87c35cef24c556b164486579c162cbcd910f78",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "performer": "feb90d36627c7f4466ef9473c4fa0bbaf91699d16b93d832a37629988dfba6de",
+      "depth": 15526
+    },
+    {
+      "item": "Snapshot repositories",
+      "id": "ee2296d557ed7686b049febe7cdb5869d86f2c44",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "promised",
+      "promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:7921a96c8384048496c5beb72a8a33259f6f9476",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "performer": "feb90d36627c7f4466ef9473c4fa0bbaf91699d16b93d832a37629988dfba6de",
+      "depth": 15526
+    },
+    {
+      "item": "Oversized policy; storage failure",
+      "id": "6d4b227cc00a8b0585307b5b7fce0235011f9363",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "open",
+      "requester": "feb90d36627c7f4466ef9473c4fa0bbaf91699d16b93d832a37629988dfba6de",
+      "depth": 15526
+    },
+    {
+      "item": "Row-write measurement",
+      "id": "92ddf4cc0a0a6d9e704b3e1defba70dd315d28b6",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "stale",
+      "promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:d83daac19ac94bb99e60fed8ad9cc83104785b19",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "performer": "feb90d36627c7f4466ef9473c4fa0bbaf91699d16b93d832a37629988dfba6de",
+      "depth": 15526
+    },
+    {
+      "item": "Alarm backoff and retention",
+      "id": "b70595d020ea7c2e613f4b85664a52031bd803d5",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "stale",
+      "promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:7d15247be33d1af4998436b62c7d424aaa579f97",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "performer": "feb90d36627c7f4466ef9473c4fa0bbaf91699d16b93d832a37629988dfba6de",
+      "depth": 15526
+    },
+    {
+      "item": "Check-job retry and budgets",
+      "id": "ea7716c0186e160a476305b95de02a991183138f",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "stale",
+      "promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:bed04c12ac00f33c10a661e3446e543e55ed6c82",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "performer": "feb90d36627c7f4466ef9473c4fa0bbaf91699d16b93d832a37629988dfba6de",
+      "depth": 15526
+    },
+    {
+      "item": "Container sizing",
+      "id": "d687ef51e0c5a5700650b3abaf05cb3fcccc23f9",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "stale",
+      "promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:c63c987499581b9dbddab012f95b89cb8dd47ac2",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "performer": "feb90d36627c7f4466ef9473c4fa0bbaf91699d16b93d832a37629988dfba6de",
+      "depth": 15526
+    },
+    {
+      "item": "One signing module",
+      "id": "9625391917dfed9e8c32550ae060e62ef5f2aebf",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "stale",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "depth": 15526
+    },
+    {
+      "item": "One glob, admin set, snapshot commit",
+      "id": "705cd75c4d6aafcae12e0dc987a4d0cdc99af2e7",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "stale",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "depth": 15526
+    },
+    {
+      "item": "One duty ledger",
+      "id": "3b761aba16cefbe3960745015a27789501d91cb1",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "stale",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "depth": 15526
+    },
+    {
+      "item": "Entry points and manifests",
+      "id": "c7440a7d2526a693e3dada04151807710175921b",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "stale",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "depth": 15526
+    },
+    {
+      "item": "One fake, one adapter",
+      "id": "6003499251ff0b223a71af0528a6e42f29f4512f",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "stale",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "depth": 15526
+    },
+    {
+      "item": "Structural refactors",
+      "id": "478e024f7641c7b59cc96c39a39dd51f78fe9778",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "stale",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "depth": 15526
+    },
+    {
+      "item": "Documentation hygiene",
+      "id": "166e80e355e07ac4abac012c0c85280a1c5d1c52",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "stale",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "depth": 15526
+    },
+    {
+      "item": "Publication loop and orphan room",
+      "id": "14edad4cdc1ebd79a392e0c912b09ca4c07cab6e",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "stale",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "depth": 15526
+    },
+    {
+      "item": "Small security items",
+      "id": "972e302398681e958d5089712ce0b6cb5f45d0f7",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "stale",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "depth": 15526
+    },
+    {
+      "item": "Gate public founding",
+      "id": "214ddbfe8323f4d17b30803ad060dd08faa0aa0d",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "stale",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "depth": 15526
+    },
+    {
+      "item": "Agent production runtime",
+      "id": "fa6d295a1f3df7d708ea71e3cddc28930a9520f5",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "stale",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "depth": 15526
+    },
+    {
+      "item": "N1 proposal reads",
+      "id": "53016b8e7ebc4ee50322fc85ce5e9f7a9d4d0dfa",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "awaiting-review",
+      "promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:4ba647c2e18d9cfcbce10f1d08cfcbcf764aecd2",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "performer": "feb90d36627c7f4466ef9473c4fa0bbaf91699d16b93d832a37629988dfba6de",
+      "depth": 15526
+    },
+    {
+      "item": "N2 lifecycle",
+      "id": "9c43c17327cc26c2e5e54cd27fea197d26e803a5",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "awaiting-review",
+      "promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:6f1481eb166ee4c0649d86e08df074f72ba87241",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "performer": "feb90d36627c7f4466ef9473c4fa0bbaf91699d16b93d832a37629988dfba6de",
+      "depth": 15526
+    },
+    {
+      "item": "N3 starter",
+      "id": "f3299ab4b2bf553f2a221a353a7cb75f04cbd5c6",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "awaiting-review",
+      "promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:779cf3a62b080b9e34e0f4568e9489fa0ec4e753",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "performer": "feb90d36627c7f4466ef9473c4fa0bbaf91699d16b93d832a37629988dfba6de",
+      "depth": 15526
+    },
+    {
+      "item": "N4 act guidance",
+      "id": "5fee04f47e18a42024bbf642572045255b89c0a5",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "awaiting-review",
+      "promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:bc53003980790ca4e65e51018051bae2194f4514",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "performer": "feb90d36627c7f4466ef9473c4fa0bbaf91699d16b93d832a37629988dfba6de",
+      "depth": 15526
+    },
+    {
+      "item": "N5 installation",
+      "id": "f1af7cfdb6029863e2bd7e545ef526737f5648ea",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "awaiting-review",
+      "promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:a18f373c74eab924d1fa8db030cf908dde2a8da8",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "performer": "feb90d36627c7f4466ef9473c4fa0bbaf91699d16b93d832a37629988dfba6de",
+      "depth": 15526
+    },
+    {
+      "item": "N6 manual",
+      "id": "db2fd1468ed09aecd51bbec3a89a45cb373b91a2",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "open",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "depth": 15526
+    },
+    {
+      "item": "N7 absent attention",
+      "id": "64e9d131567e647c8c33394aa7cd817274eea175",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "promised",
+      "promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:a70c6a52a598d0a144e08aef1eda47d552949f12",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "performer": "feb90d36627c7f4466ef9473c4fa0bbaf91699d16b93d832a37629988dfba6de",
+      "depth": 15526
+    },
+    {
+      "item": "Notes reconciliation",
+      "id": "50d7806ac4c7da8ea6683180ba65a7b43c547e73",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "awaiting-review",
+      "promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:14926009c7eac68badd2a5b1035d8ccbca6887e3",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "performer": "feb90d36627c7f4466ef9473c4fa0bbaf91699d16b93d832a37629988dfba6de",
+      "depth": 15526
+    },
+    {
+      "item": "First jam-room note",
+      "id": "f4a626c8e939ce8a30b377a1e156c9bea05d56bf",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "awaiting-review",
+      "promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:18c400e06f62d7b1fae50cb5d9090b6255a796de",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "performer": "feb90d36627c7f4466ef9473c4fa0bbaf91699d16b93d832a37629988dfba6de",
+      "depth": 15526
+    },
+    {
+      "item": "C1 hosted coding authority",
+      "id": "b538c5eace50a1de82a8bdf8a8f19764548af15e",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "open",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "depth": 15526
+    },
+    {
+      "item": "C2 recovery spike",
+      "id": "6cdaf20fa260d6d6c6b30e83f585883a51b964f4",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "open",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "depth": 15526
+    },
+    {
+      "item": "C3 hosted runtime",
+      "id": "13dfc613e8e3d9a1aed5f7492272fbf8c580d727",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "open",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "depth": 15526
+    },
+    {
+      "item": "C4 browser identity and import",
+      "id": "18815307e6c306d63766230ed7eb7ddbf94d1f21",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "open",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "depth": 15526
+    },
+    {
+      "item": "C5 browser journey",
+      "id": "cfbde32f20618231aed598f63f3898cc188d0ffd",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "open",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "depth": 15526
+    },
+    {
+      "item": "C6 acceptance and guides",
+      "id": "d89fc17fb60a7c8a3591e23193596c981781b26c",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "open",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "depth": 15526
+    },
+    {
+      "item": "Checker authority per job",
+      "id": "f12cef6bae7bf4c3813241df0624199568f14ddf",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "open",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "depth": 15526
+    },
+    {
+      "item": "Bootstrap with a policy",
+      "id": "a13a0bf504520e1b77367fbbe68aee8c74e66fb6",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "open",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "depth": 15526
+    },
+    {
+      "item": "Show cleanup duties",
+      "id": "8d249233901a901d9a57ceac999b26e4a8f68cf2",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "open",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "depth": 15526
+    },
+    {
+      "item": "Firm authority note",
+      "id": "d50ce26d79a10b55c1e2880870030e9bd6e5acdd",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "open",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "depth": 15526
+    },
+    {
+      "item": "Firm authority implementation",
+      "id": "1ebda91724f6d4fbeb5ce1a1e766cb50594e9812",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "open",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "depth": 15526
+    },
+    {
+      "item": "R0",
+      "id": "30c06d808a9a95314016ac8e64c36338066d824d",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "promised",
+      "promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:cbbf86120e5cec8c1a9189e175f4d63367dd526f",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "performer": "feb90d36627c7f4466ef9473c4fa0bbaf91699d16b93d832a37629988dfba6de",
+      "depth": 15526
+    },
+    {
+      "item": "R1",
+      "id": "c69b573d910a2ead7874a8651d022530dc58be85",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "promised",
+      "promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:8d614272a21db84b700f8c9002ad7191fb3ed7df",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "performer": "feb90d36627c7f4466ef9473c4fa0bbaf91699d16b93d832a37629988dfba6de",
+      "depth": 15526
+    },
+    {
+      "item": "R2",
+      "id": "fe47970e29a3dd30ceb84133d1b7d64e05b1504a",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "promised",
+      "promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:8da8b218e8fd95d923c5687af2b2e37b05f191f5",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "performer": "feb90d36627c7f4466ef9473c4fa0bbaf91699d16b93d832a37629988dfba6de",
+      "depth": 15526
+    },
+    {
+      "item": "R3",
+      "id": "f2d23e6fededcbeceba50574fbd2a9f2200588c7",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "promised",
+      "promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:8661af6be60114d0863265a7c54d7c12d2b63382",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "performer": "feb90d36627c7f4466ef9473c4fa0bbaf91699d16b93d832a37629988dfba6de",
+      "depth": 15526
+    },
+    {
+      "item": "R4",
+      "id": "b18554a6eae02f4a4d35740543047ce4803bed30",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "promised",
+      "promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:f3c5d607e430a4722719c5521c7215dc2c38a3e3",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "performer": "feb90d36627c7f4466ef9473c4fa0bbaf91699d16b93d832a37629988dfba6de",
+      "depth": 15526
+    },
+    {
+      "item": "Composable design, from Hugh",
+      "id": "5c716a5c35bfdbdcef89e1e4fbe82df4aab0b8fd",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "promised",
+      "promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:efc0d86cc329025353f8e2dd21957b0f60ce68d8",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "performer": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "depth": 15526
+    },
+    {
+      "item": "MCP core contract",
+      "id": "a9788a594d327df7e6a09add00b97fc0f9259169",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "awaiting-review",
+      "promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:ee3d9036e9807f935e315059d5bba95a773b01ab",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "performer": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "depth": 15526
+    },
+    {
+      "item": "MCP plan",
+      "id": "489a992e0412ea4c83fdef3ecc16fcd1c472a791",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "awaiting-review",
+      "promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:932ce20e20468fc5503249686dd09151548e818d",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "performer": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "depth": 15526
+    },
+    {
+      "item": "Wake and schedule",
+      "id": "24711ceb99c3939c0217eb7e0cac7d2b2d21cde9",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "awaiting-review",
+      "promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:19a020afb0b90cc69f98ff1f90eb27854ef331a3",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "performer": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "depth": 15526
+    },
+    {
+      "item": "Collections",
+      "id": "34cf52b3dad76053ef17c10ee792ab8b81b740d0",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "awaiting-review",
+      "promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:6430ffd49f700c75594c4feb4ccb89561a5908bd",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "performer": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "depth": 15526
+    },
+    {
+      "item": "jj comparison",
+      "id": "966aeaad47d450f70a6c0712bd5300091ea6875e",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "awaiting-review",
+      "promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:bfb563fe704b11ac19a48b9c0a924376bec05dc7",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "performer": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "depth": 15526
+    },
+    {
+      "item": "Future-direction section",
+      "id": "da2737b2ad309bb8d70464f55ea4e025d8c226fd",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "open",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "depth": 15526
+    },
+    {
+      "item": "Joint review of plans 017 and 018",
+      "id": "edaad58f57cde6befd3c4442480e6a30b4e30a60",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "open",
+      "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+      "depth": 15526
+    },
+    {
+      "item": "Verifier release at `d691e6e9`",
+      "id": "a23cfe01368878719b3a1a73a12fda85c99246ba",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "promised",
+      "promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:f6dd71f4807598abd6ce884b2eae865612fa6a4e",
+      "requester": "feb90d36627c7f4466ef9473c4fa0bbaf91699d16b93d832a37629988dfba6de",
+      "performer": "4817b532e7a1a118634cb7947b05f7d5d16f726c9d30ea22ff7eaf7db3634e80",
+      "depth": 15526
+    },
+    {
+      "item": "Stage 2 at `4ec48aa1`",
+      "id": "a25ee2a97142cfce14ee9dc3c3e5b7c0cb6c25cc",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "promised",
+      "promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:c8bfd0d7bbdc83ced5655a86a92d448a1363958b",
+      "requester": "feb90d36627c7f4466ef9473c4fa0bbaf91699d16b93d832a37629988dfba6de",
+      "performer": "4817b532e7a1a118634cb7947b05f7d5d16f726c9d30ea22ff7eaf7db3634e80",
+      "depth": 15526
+    },
+    {
+      "item": "MCP runtime at `50216bb1`",
+      "id": "90adf4a7f3068acd8c93b57d1ac4ba163d5f4ca6",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "reported",
+      "promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:453d5961a35b37c53621b078f35e4fdf1dc708c3",
+      "requester": "feb90d36627c7f4466ef9473c4fa0bbaf91699d16b93d832a37629988dfba6de",
+      "performer": "4817b532e7a1a118634cb7947b05f7d5d16f726c9d30ea22ff7eaf7db3634e80",
+      "depth": 15526
+    },
+    {
+      "item": "Stage 3 at `947fb909`",
+      "id": "1c911ea7a73b5de6b1d9e746bc88036305d07cd4",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "reported",
+      "promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:37595d2d6596396df6afe3d657ccd52fdd340bc9",
+      "requester": "feb90d36627c7f4466ef9473c4fa0bbaf91699d16b93d832a37629988dfba6de",
+      "performer": "4817b532e7a1a118634cb7947b05f7d5d16f726c9d30ea22ff7eaf7db3634e80",
+      "depth": 15526
+    },
+    {
+      "item": "N3 design",
+      "id": "cdcdabb5bf9d83e6a66d660cf7a136898d97c798",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "open",
+      "requester": "feb90d36627c7f4466ef9473c4fa0bbaf91699d16b93d832a37629988dfba6de",
+      "depth": 15526
+    },
+    {
+      "item": "N5 design",
+      "id": "17f1411d20e7998d0d1cc754b6eb7c9b6a53a538",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "open",
+      "requester": "feb90d36627c7f4466ef9473c4fa0bbaf91699d16b93d832a37629988dfba6de",
+      "depth": 15526
+    },
+    {
+      "item": "N4 design",
+      "id": "408f4c0ea808d272631f56ca4de7e98b37dcb0ee",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "open",
+      "requester": "feb90d36627c7f4466ef9473c4fa0bbaf91699d16b93d832a37629988dfba6de",
+      "depth": 15526
+    },
+    {
+      "item": "N1 design",
+      "id": "ad2c9cd353f77ae75580bf03fcd4c1376b20ae54",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "open",
+      "requester": "feb90d36627c7f4466ef9473c4fa0bbaf91699d16b93d832a37629988dfba6de",
+      "depth": 15526
+    },
+    {
+      "item": "N2 design",
+      "id": "82191a0bea708a703335ef5dec6c2f1ce68cfe05",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "open",
+      "requester": "feb90d36627c7f4466ef9473c4fa0bbaf91699d16b93d832a37629988dfba6de",
+      "depth": 15526
+    },
+    {
+      "item": "Notes reconciliation",
+      "id": "8d3d138e01e5cc41c433ff044ae18b3f3e8cefbb",
+      "isError": false,
+      "kind": "request",
+      "decision": "effective",
+      "status": "open",
+      "requester": "feb90d36627c7f4466ef9473c4fa0bbaf91699d16b93d832a37629988dfba6de",
+      "depth": 15526
+    }
+  ],
+  "comparisons": [
+    {
+      "item": "Test overhead",
+      "request": "ecbc722a2bd96b8cd5778f78be36d5895dc40d42",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "awaiting-landing",
+      "currentState": "awaiting-landing"
+    },
+    {
+      "item": "Acts stage 2",
+      "request": "fd6f00b612d68c035cbdbc3f27ebe3c21500f079",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "awaiting-landing",
+      "currentState": "awaiting-landing"
+    },
+    {
+      "item": "Acts stage 3",
+      "request": "1e8fee4bfcb6e057bbf352faba2b5719cd39f9c7",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "awaiting-review",
+      "currentState": "awaiting-review"
+    },
+    {
+      "item": "Acts stage 4",
+      "request": "48c021ea67470bc59bdf48f8d6a1408cbc06025a",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "promised",
+      "currentState": "promised"
+    },
+    {
+      "item": "Acts stage 5",
+      "request": "a5d64b35e87c97560ff354578d9560bd1261aacb",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "awaiting-landing",
+      "currentState": "awaiting-landing"
+    },
+    {
+      "item": "MCP runtime",
+      "request": "9ca1d290b7f01fe713b46668e2d4ab949d289787",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "awaiting-review",
+      "currentState": "awaiting-review"
+    },
+    {
+      "item": "Bearer retry",
+      "request": "5d41ea36aa0047fbd9e285e3276188e0f3b9131b",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "awaiting-landing",
+      "currentState": "awaiting-landing"
+    },
+    {
+      "item": "Verifier release",
+      "request": "42342e35a7660b466b3f623309702461e8f44f6f",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "awaiting-review",
+      "currentState": "awaiting-review"
+    },
+    {
+      "item": "First Jam packages",
+      "request": "7e82100b785d9734a6d68ec452bd43952240668d",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "awaiting-landing",
+      "currentState": "awaiting-landing"
+    },
+    {
+      "item": "Jam readiness",
+      "request": "b4ef9b7adaabcd7f7a89582146c2bcbe7bfe4f81",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "promised",
+      "currentState": "promised"
+    },
+    {
+      "item": "Snapshot repositories",
+      "request": "ee2296d557ed7686b049febe7cdb5869d86f2c44",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "promised",
+      "currentState": "promised"
+    },
+    {
+      "item": "Oversized policy; storage failure",
+      "request": "6d4b227cc00a8b0585307b5b7fce0235011f9363",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "open",
+      "currentState": "open"
+    },
+    {
+      "item": "Row-write measurement",
+      "request": "92ddf4cc0a0a6d9e704b3e1defba70dd315d28b6",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "stale",
+      "currentState": "stale"
+    },
+    {
+      "item": "Alarm backoff and retention",
+      "request": "b70595d020ea7c2e613f4b85664a52031bd803d5",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "stale",
+      "currentState": "stale"
+    },
+    {
+      "item": "Check-job retry and budgets",
+      "request": "ea7716c0186e160a476305b95de02a991183138f",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "stale",
+      "currentState": "stale"
+    },
+    {
+      "item": "Container sizing",
+      "request": "d687ef51e0c5a5700650b3abaf05cb3fcccc23f9",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "stale",
+      "currentState": "stale"
+    },
+    {
+      "item": "One signing module",
+      "request": "9625391917dfed9e8c32550ae060e62ef5f2aebf",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "stale",
+      "currentState": "stale"
+    },
+    {
+      "item": "One glob, admin set, snapshot commit",
+      "request": "705cd75c4d6aafcae12e0dc987a4d0cdc99af2e7",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "stale",
+      "currentState": "stale"
+    },
+    {
+      "item": "One duty ledger",
+      "request": "3b761aba16cefbe3960745015a27789501d91cb1",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "stale",
+      "currentState": "stale"
+    },
+    {
+      "item": "Entry points and manifests",
+      "request": "c7440a7d2526a693e3dada04151807710175921b",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "stale",
+      "currentState": "stale"
+    },
+    {
+      "item": "One fake, one adapter",
+      "request": "6003499251ff0b223a71af0528a6e42f29f4512f",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "stale",
+      "currentState": "stale"
+    },
+    {
+      "item": "Structural refactors",
+      "request": "478e024f7641c7b59cc96c39a39dd51f78fe9778",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "stale",
+      "currentState": "stale"
+    },
+    {
+      "item": "Documentation hygiene",
+      "request": "166e80e355e07ac4abac012c0c85280a1c5d1c52",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "stale",
+      "currentState": "stale"
+    },
+    {
+      "item": "Publication loop and orphan room",
+      "request": "14edad4cdc1ebd79a392e0c912b09ca4c07cab6e",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "stale",
+      "currentState": "stale"
+    },
+    {
+      "item": "Small security items",
+      "request": "972e302398681e958d5089712ce0b6cb5f45d0f7",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "stale",
+      "currentState": "stale"
+    },
+    {
+      "item": "Gate public founding",
+      "request": "214ddbfe8323f4d17b30803ad060dd08faa0aa0d",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "stale",
+      "currentState": "stale"
+    },
+    {
+      "item": "Agent production runtime",
+      "request": "fa6d295a1f3df7d708ea71e3cddc28930a9520f5",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "stale",
+      "currentState": "stale"
+    },
+    {
+      "item": "N1 proposal reads",
+      "request": "53016b8e7ebc4ee50322fc85ce5e9f7a9d4d0dfa",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "awaiting-review",
+      "currentState": "awaiting-review"
+    },
+    {
+      "item": "N2 lifecycle",
+      "request": "9c43c17327cc26c2e5e54cd27fea197d26e803a5",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "awaiting-review",
+      "currentState": "awaiting-review"
+    },
+    {
+      "item": "N3 starter",
+      "request": "f3299ab4b2bf553f2a221a353a7cb75f04cbd5c6",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "awaiting-review",
+      "currentState": "awaiting-review"
+    },
+    {
+      "item": "N4 act guidance",
+      "request": "5fee04f47e18a42024bbf642572045255b89c0a5",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "awaiting-review",
+      "currentState": "awaiting-review"
+    },
+    {
+      "item": "N5 installation",
+      "request": "f1af7cfdb6029863e2bd7e545ef526737f5648ea",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "awaiting-review",
+      "currentState": "awaiting-review"
+    },
+    {
+      "item": "N6 manual",
+      "request": "db2fd1468ed09aecd51bbec3a89a45cb373b91a2",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "open",
+      "currentState": "open"
+    },
+    {
+      "item": "N7 absent attention",
+      "request": "64e9d131567e647c8c33394aa7cd817274eea175",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "promised",
+      "currentState": "promised"
+    },
+    {
+      "item": "Notes reconciliation",
+      "request": "50d7806ac4c7da8ea6683180ba65a7b43c547e73",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "awaiting-review",
+      "currentState": "awaiting-review"
+    },
+    {
+      "item": "First jam-room note",
+      "request": "f4a626c8e939ce8a30b377a1e156c9bea05d56bf",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "awaiting-review",
+      "currentState": "awaiting-review"
+    },
+    {
+      "item": "C1 hosted coding authority",
+      "request": "b538c5eace50a1de82a8bdf8a8f19764548af15e",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "open",
+      "currentState": "open"
+    },
+    {
+      "item": "C2 recovery spike",
+      "request": "6cdaf20fa260d6d6c6b30e83f585883a51b964f4",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "open",
+      "currentState": "open"
+    },
+    {
+      "item": "C3 hosted runtime",
+      "request": "13dfc613e8e3d9a1aed5f7492272fbf8c580d727",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "open",
+      "currentState": "open"
+    },
+    {
+      "item": "C4 browser identity and import",
+      "request": "18815307e6c306d63766230ed7eb7ddbf94d1f21",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "open",
+      "currentState": "open"
+    },
+    {
+      "item": "C5 browser journey",
+      "request": "cfbde32f20618231aed598f63f3898cc188d0ffd",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "open",
+      "currentState": "open"
+    },
+    {
+      "item": "C6 acceptance and guides",
+      "request": "d89fc17fb60a7c8a3591e23193596c981781b26c",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "open",
+      "currentState": "open"
+    },
+    {
+      "item": "Checker authority per job",
+      "request": "f12cef6bae7bf4c3813241df0624199568f14ddf",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "open",
+      "currentState": "open"
+    },
+    {
+      "item": "Bootstrap with a policy",
+      "request": "a13a0bf504520e1b77367fbbe68aee8c74e66fb6",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "open",
+      "currentState": "open"
+    },
+    {
+      "item": "Show cleanup duties",
+      "request": "8d249233901a901d9a57ceac999b26e4a8f68cf2",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "open",
+      "currentState": "open"
+    },
+    {
+      "item": "Firm authority note",
+      "request": "d50ce26d79a10b55c1e2880870030e9bd6e5acdd",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "open",
+      "currentState": "open"
+    },
+    {
+      "item": "Firm authority implementation",
+      "request": "1ebda91724f6d4fbeb5ce1a1e766cb50594e9812",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "open",
+      "currentState": "open"
+    },
+    {
+      "item": "R0",
+      "request": "30c06d808a9a95314016ac8e64c36338066d824d",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "promised",
+      "currentState": "promised"
+    },
+    {
+      "item": "R1",
+      "request": "c69b573d910a2ead7874a8651d022530dc58be85",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "promised",
+      "currentState": "promised"
+    },
+    {
+      "item": "R2",
+      "request": "fe47970e29a3dd30ceb84133d1b7d64e05b1504a",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "promised",
+      "currentState": "promised"
+    },
+    {
+      "item": "R3",
+      "request": "f2d23e6fededcbeceba50574fbd2a9f2200588c7",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "promised",
+      "currentState": "promised"
+    },
+    {
+      "item": "R4",
+      "request": "b18554a6eae02f4a4d35740543047ce4803bed30",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "promised",
+      "currentState": "promised"
+    },
+    {
+      "item": "Composable design, from Hugh",
+      "request": "5c716a5c35bfdbdcef89e1e4fbe82df4aab0b8fd",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "promised",
+      "currentState": "promised"
+    },
+    {
+      "item": "MCP core contract",
+      "request": "a9788a594d327df7e6a09add00b97fc0f9259169",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "awaiting-review",
+      "currentState": "awaiting-review"
+    },
+    {
+      "item": "MCP plan",
+      "request": "489a992e0412ea4c83fdef3ecc16fcd1c472a791",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "awaiting-review",
+      "currentState": "awaiting-review"
+    },
+    {
+      "item": "Wake and schedule",
+      "request": "24711ceb99c3939c0217eb7e0cac7d2b2d21cde9",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "awaiting-review",
+      "currentState": "awaiting-review"
+    },
+    {
+      "item": "Collections",
+      "request": "34cf52b3dad76053ef17c10ee792ab8b81b740d0",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "awaiting-review",
+      "currentState": "awaiting-review"
+    },
+    {
+      "item": "jj comparison",
+      "request": "966aeaad47d450f70a6c0712bd5300091ea6875e",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "awaiting-review",
+      "currentState": "awaiting-review"
+    },
+    {
+      "item": "Future-direction section",
+      "request": "da2737b2ad309bb8d70464f55ea4e025d8c226fd",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "open",
+      "currentState": "open"
+    },
+    {
+      "item": "Joint review of plans 017 and 018",
+      "request": "edaad58f57cde6befd3c4442480e6a30b4e30a60",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "open",
+      "currentState": "open"
+    },
+    {
+      "item": "Verifier release at `d691e6e9`",
+      "request": "a23cfe01368878719b3a1a73a12fda85c99246ba",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "promised",
+      "currentState": "promised"
+    },
+    {
+      "item": "Stage 2 at `4ec48aa1`",
+      "request": "a25ee2a97142cfce14ee9dc3c3e5b7c0cb6c25cc",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "promised",
+      "currentState": "promised"
+    },
+    {
+      "item": "MCP runtime at `50216bb1`",
+      "request": "90adf4a7f3068acd8c93b57d1ac4ba163d5f4ca6",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "reported",
+      "currentState": "reported"
+    },
+    {
+      "item": "Stage 3 at `947fb909`",
+      "request": "1c911ea7a73b5de6b1d9e746bc88036305d07cd4",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "reported",
+      "currentState": "reported"
+    },
+    {
+      "item": "N3 design",
+      "request": "cdcdabb5bf9d83e6a66d660cf7a136898d97c798",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "open",
+      "currentState": "open"
+    },
+    {
+      "item": "N5 design",
+      "request": "17f1411d20e7998d0d1cc754b6eb7c9b6a53a538",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "open",
+      "currentState": "open"
+    },
+    {
+      "item": "N4 design",
+      "request": "408f4c0ea808d272631f56ca4de7e98b37dcb0ee",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "open",
+      "currentState": "open"
+    },
+    {
+      "item": "N1 design",
+      "request": "ad2c9cd353f77ae75580bf03fcd4c1376b20ae54",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "open",
+      "currentState": "open"
+    },
+    {
+      "item": "N2 design",
+      "request": "82191a0bea708a703335ef5dec6c2f1ce68cfe05",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "open",
+      "currentState": "open"
+    },
+    {
+      "item": "Notes reconciliation",
+      "request": "8d3d138e01e5cc41c433ff044ae18b3f3e8cefbb",
+      "requesterMatches": true,
+      "performerMatches": true,
+      "promiseMatches": true,
+      "datedState": "open",
+      "currentState": "open"
+    }
+  ],
+  "raw_promise_checks": [
+    {
+      "item": "Test overhead",
+      "request": "ecbc722a2bd96b8cd5778f78be36d5895dc40d42",
+      "promise": "1c6bf45cec20f310b5f3e5871281ff676709814c",
+      "promiseKindCorrect": true,
+      "promiseDirectlyRestsOnRequest": true
+    },
+    {
+      "item": "Acts stage 2",
+      "request": "fd6f00b612d68c035cbdbc3f27ebe3c21500f079",
+      "promise": "c96e88fc3ce2d8b910de4c38d66c9030a0a8b8c7",
+      "promiseKindCorrect": true,
+      "promiseDirectlyRestsOnRequest": true
+    },
+    {
+      "item": "Acts stage 3",
+      "request": "1e8fee4bfcb6e057bbf352faba2b5719cd39f9c7",
+      "promise": "3af8ebc70ec973a6c298698fd6131598fb6ae9cb",
+      "promiseKindCorrect": true,
+      "promiseDirectlyRestsOnRequest": true
+    },
+    {
+      "item": "Acts stage 4",
+      "request": "48c021ea67470bc59bdf48f8d6a1408cbc06025a",
+      "promise": "8d497ff552b4ee60b9857b402010ce7cdbf100ca",
+      "promiseKindCorrect": true,
+      "promiseDirectlyRestsOnRequest": true
+    },
+    {
+      "item": "Acts stage 5",
+      "request": "a5d64b35e87c97560ff354578d9560bd1261aacb",
+      "promise": "d5378da5583d3bc16c0c19094c1d4c8716aceb2b",
+      "promiseKindCorrect": true,
+      "promiseDirectlyRestsOnRequest": true
+    },
+    {
+      "item": "MCP runtime",
+      "request": "9ca1d290b7f01fe713b46668e2d4ab949d289787",
+      "promise": "bac4bb0e7dc0c788949e82ce18c1445cbadcd8b0",
+      "promiseKindCorrect": true,
+      "promiseDirectlyRestsOnRequest": true
+    },
+    {
+      "item": "Bearer retry",
+      "request": "5d41ea36aa0047fbd9e285e3276188e0f3b9131b",
+      "promise": "9c75aae2fbdac4fd0fba800aa3a21eeba10f9bf8",
+      "promiseKindCorrect": true,
+      "promiseDirectlyRestsOnRequest": true
+    },
+    {
+      "item": "Verifier release",
+      "request": "42342e35a7660b466b3f623309702461e8f44f6f",
+      "promise": "4e66accc560de6f8ca320ee24593cb0df4f63448",
+      "promiseKindCorrect": true,
+      "promiseDirectlyRestsOnRequest": true
+    },
+    {
+      "item": "First Jam packages",
+      "request": "7e82100b785d9734a6d68ec452bd43952240668d",
+      "promise": "1eb5788cf9e31cdf7f74a3ba1512482d83791ac6",
+      "promiseKindCorrect": true,
+      "promiseDirectlyRestsOnRequest": true
+    },
+    {
+      "item": "Jam readiness",
+      "request": "b4ef9b7adaabcd7f7a89582146c2bcbe7bfe4f81",
+      "promise": "8c87c35cef24c556b164486579c162cbcd910f78",
+      "promiseKindCorrect": true,
+      "promiseDirectlyRestsOnRequest": true
+    },
+    {
+      "item": "Snapshot repositories",
+      "request": "ee2296d557ed7686b049febe7cdb5869d86f2c44",
+      "promise": "7921a96c8384048496c5beb72a8a33259f6f9476",
+      "promiseKindCorrect": true,
+      "promiseDirectlyRestsOnRequest": true
+    },
+    {
+      "item": "Oversized policy; storage failure",
+      "request": "6d4b227cc00a8b0585307b5b7fce0235011f9363",
+      "promise": null,
+      "promiseKindCorrect": null,
+      "promiseDirectlyRestsOnRequest": null
+    },
+    {
+      "item": "Row-write measurement",
+      "request": "92ddf4cc0a0a6d9e704b3e1defba70dd315d28b6",
+      "promise": "d83daac19ac94bb99e60fed8ad9cc83104785b19",
+      "promiseKindCorrect": true,
+      "promiseDirectlyRestsOnRequest": true
+    },
+    {
+      "item": "Alarm backoff and retention",
+      "request": "b70595d020ea7c2e613f4b85664a52031bd803d5",
+      "promise": "7d15247be33d1af4998436b62c7d424aaa579f97",
+      "promiseKindCorrect": true,
+      "promiseDirectlyRestsOnRequest": true
+    },
+    {
+      "item": "Check-job retry and budgets",
+      "request": "ea7716c0186e160a476305b95de02a991183138f",
+      "promise": "bed04c12ac00f33c10a661e3446e543e55ed6c82",
+      "promiseKindCorrect": true,
+      "promiseDirectlyRestsOnRequest": true
+    },
+    {
+      "item": "Container sizing",
+      "request": "d687ef51e0c5a5700650b3abaf05cb3fcccc23f9",
+      "promise": "c63c987499581b9dbddab012f95b89cb8dd47ac2",
+      "promiseKindCorrect": true,
+      "promiseDirectlyRestsOnRequest": true
+    },
+    {
+      "item": "One signing module",
+      "request": "9625391917dfed9e8c32550ae060e62ef5f2aebf",
+      "promise": null,
+      "promiseKindCorrect": null,
+      "promiseDirectlyRestsOnRequest": null
+    },
+    {
+      "item": "One glob, admin set, snapshot commit",
+      "request": "705cd75c4d6aafcae12e0dc987a4d0cdc99af2e7",
+      "promise": null,
+      "promiseKindCorrect": null,
+      "promiseDirectlyRestsOnRequest": null
+    },
+    {
+      "item": "One duty ledger",
+      "request": "3b761aba16cefbe3960745015a27789501d91cb1",
+      "promise": null,
+      "promiseKindCorrect": null,
+      "promiseDirectlyRestsOnRequest": null
+    },
+    {
+      "item": "Entry points and manifests",
+      "request": "c7440a7d2526a693e3dada04151807710175921b",
+      "promise": null,
+      "promiseKindCorrect": null,
+      "promiseDirectlyRestsOnRequest": null
+    },
+    {
+      "item": "One fake, one adapter",
+      "request": "6003499251ff0b223a71af0528a6e42f29f4512f",
+      "promise": null,
+      "promiseKindCorrect": null,
+      "promiseDirectlyRestsOnRequest": null
+    },
+    {
+      "item": "Structural refactors",
+      "request": "478e024f7641c7b59cc96c39a39dd51f78fe9778",
+      "promise": null,
+      "promiseKindCorrect": null,
+      "promiseDirectlyRestsOnRequest": null
+    },
+    {
+      "item": "Documentation hygiene",
+      "request": "166e80e355e07ac4abac012c0c85280a1c5d1c52",
+      "promise": null,
+      "promiseKindCorrect": null,
+      "promiseDirectlyRestsOnRequest": null
+    },
+    {
+      "item": "Publication loop and orphan room",
+      "request": "14edad4cdc1ebd79a392e0c912b09ca4c07cab6e",
+      "promise": null,
+      "promiseKindCorrect": null,
+      "promiseDirectlyRestsOnRequest": null
+    },
+    {
+      "item": "Small security items",
+      "request": "972e302398681e958d5089712ce0b6cb5f45d0f7",
+      "promise": null,
+      "promiseKindCorrect": null,
+      "promiseDirectlyRestsOnRequest": null
+    },
+    {
+      "item": "Gate public founding",
+      "request": "214ddbfe8323f4d17b30803ad060dd08faa0aa0d",
+      "promise": null,
+      "promiseKindCorrect": null,
+      "promiseDirectlyRestsOnRequest": null
+    },
+    {
+      "item": "Agent production runtime",
+      "request": "fa6d295a1f3df7d708ea71e3cddc28930a9520f5",
+      "promise": null,
+      "promiseKindCorrect": null,
+      "promiseDirectlyRestsOnRequest": null
+    },
+    {
+      "item": "N1 proposal reads",
+      "request": "53016b8e7ebc4ee50322fc85ce5e9f7a9d4d0dfa",
+      "promise": "4ba647c2e18d9cfcbce10f1d08cfcbcf764aecd2",
+      "promiseKindCorrect": true,
+      "promiseDirectlyRestsOnRequest": true
+    },
+    {
+      "item": "N2 lifecycle",
+      "request": "9c43c17327cc26c2e5e54cd27fea197d26e803a5",
+      "promise": "6f1481eb166ee4c0649d86e08df074f72ba87241",
+      "promiseKindCorrect": true,
+      "promiseDirectlyRestsOnRequest": true
+    },
+    {
+      "item": "N3 starter",
+      "request": "f3299ab4b2bf553f2a221a353a7cb75f04cbd5c6",
+      "promise": "779cf3a62b080b9e34e0f4568e9489fa0ec4e753",
+      "promiseKindCorrect": true,
+      "promiseDirectlyRestsOnRequest": true
+    },
+    {
+      "item": "N4 act guidance",
+      "request": "5fee04f47e18a42024bbf642572045255b89c0a5",
+      "promise": "bc53003980790ca4e65e51018051bae2194f4514",
+      "promiseKindCorrect": true,
+      "promiseDirectlyRestsOnRequest": true
+    },
+    {
+      "item": "N5 installation",
+      "request": "f1af7cfdb6029863e2bd7e545ef526737f5648ea",
+      "promise": "a18f373c74eab924d1fa8db030cf908dde2a8da8",
+      "promiseKindCorrect": true,
+      "promiseDirectlyRestsOnRequest": true
+    },
+    {
+      "item": "N6 manual",
+      "request": "db2fd1468ed09aecd51bbec3a89a45cb373b91a2",
+      "promise": null,
+      "promiseKindCorrect": null,
+      "promiseDirectlyRestsOnRequest": null
+    },
+    {
+      "item": "N7 absent attention",
+      "request": "64e9d131567e647c8c33394aa7cd817274eea175",
+      "promise": "a70c6a52a598d0a144e08aef1eda47d552949f12",
+      "promiseKindCorrect": true,
+      "promiseDirectlyRestsOnRequest": true
+    },
+    {
+      "item": "Notes reconciliation",
+      "request": "50d7806ac4c7da8ea6683180ba65a7b43c547e73",
+      "promise": "14926009c7eac68badd2a5b1035d8ccbca6887e3",
+      "promiseKindCorrect": true,
+      "promiseDirectlyRestsOnRequest": true
+    },
+    {
+      "item": "First jam-room note",
+      "request": "f4a626c8e939ce8a30b377a1e156c9bea05d56bf",
+      "promise": "18c400e06f62d7b1fae50cb5d9090b6255a796de",
+      "promiseKindCorrect": true,
+      "promiseDirectlyRestsOnRequest": true
+    },
+    {
+      "item": "C1 hosted coding authority",
+      "request": "b538c5eace50a1de82a8bdf8a8f19764548af15e",
+      "promise": null,
+      "promiseKindCorrect": null,
+      "promiseDirectlyRestsOnRequest": null
+    },
+    {
+      "item": "C2 recovery spike",
+      "request": "6cdaf20fa260d6d6c6b30e83f585883a51b964f4",
+      "promise": null,
+      "promiseKindCorrect": null,
+      "promiseDirectlyRestsOnRequest": null
+    },
+    {
+      "item": "C3 hosted runtime",
+      "request": "13dfc613e8e3d9a1aed5f7492272fbf8c580d727",
+      "promise": null,
+      "promiseKindCorrect": null,
+      "promiseDirectlyRestsOnRequest": null
+    },
+    {
+      "item": "C4 browser identity and import",
+      "request": "18815307e6c306d63766230ed7eb7ddbf94d1f21",
+      "promise": null,
+      "promiseKindCorrect": null,
+      "promiseDirectlyRestsOnRequest": null
+    },
+    {
+      "item": "C5 browser journey",
+      "request": "cfbde32f20618231aed598f63f3898cc188d0ffd",
+      "promise": null,
+      "promiseKindCorrect": null,
+      "promiseDirectlyRestsOnRequest": null
+    },
+    {
+      "item": "C6 acceptance and guides",
+      "request": "d89fc17fb60a7c8a3591e23193596c981781b26c",
+      "promise": null,
+      "promiseKindCorrect": null,
+      "promiseDirectlyRestsOnRequest": null
+    },
+    {
+      "item": "Checker authority per job",
+      "request": "f12cef6bae7bf4c3813241df0624199568f14ddf",
+      "promise": null,
+      "promiseKindCorrect": null,
+      "promiseDirectlyRestsOnRequest": null
+    },
+    {
+      "item": "Bootstrap with a policy",
+      "request": "a13a0bf504520e1b77367fbbe68aee8c74e66fb6",
+      "promise": null,
+      "promiseKindCorrect": null,
+      "promiseDirectlyRestsOnRequest": null
+    },
+    {
+      "item": "Show cleanup duties",
+      "request": "8d249233901a901d9a57ceac999b26e4a8f68cf2",
+      "promise": null,
+      "promiseKindCorrect": null,
+      "promiseDirectlyRestsOnRequest": null
+    },
+    {
+      "item": "Firm authority note",
+      "request": "d50ce26d79a10b55c1e2880870030e9bd6e5acdd",
+      "promise": null,
+      "promiseKindCorrect": null,
+      "promiseDirectlyRestsOnRequest": null
+    },
+    {
+      "item": "Firm authority implementation",
+      "request": "1ebda91724f6d4fbeb5ce1a1e766cb50594e9812",
+      "promise": null,
+      "promiseKindCorrect": null,
+      "promiseDirectlyRestsOnRequest": null
+    },
+    {
+      "item": "R0",
+      "request": "30c06d808a9a95314016ac8e64c36338066d824d",
+      "promise": "cbbf86120e5cec8c1a9189e175f4d63367dd526f",
+      "promiseKindCorrect": true,
+      "promiseDirectlyRestsOnRequest": true
+    },
+    {
+      "item": "R1",
+      "request": "c69b573d910a2ead7874a8651d022530dc58be85",
+      "promise": "8d614272a21db84b700f8c9002ad7191fb3ed7df",
+      "promiseKindCorrect": true,
+      "promiseDirectlyRestsOnRequest": true
+    },
+    {
+      "item": "R2",
+      "request": "fe47970e29a3dd30ceb84133d1b7d64e05b1504a",
+      "promise": "8da8b218e8fd95d923c5687af2b2e37b05f191f5",
+      "promiseKindCorrect": true,
+      "promiseDirectlyRestsOnRequest": true
+    },
+    {
+      "item": "R3",
+      "request": "f2d23e6fededcbeceba50574fbd2a9f2200588c7",
+      "promise": "8661af6be60114d0863265a7c54d7c12d2b63382",
+      "promiseKindCorrect": true,
+      "promiseDirectlyRestsOnRequest": true
+    },
+    {
+      "item": "R4",
+      "request": "b18554a6eae02f4a4d35740543047ce4803bed30",
+      "promise": "f3c5d607e430a4722719c5521c7215dc2c38a3e3",
+      "promiseKindCorrect": true,
+      "promiseDirectlyRestsOnRequest": true
+    },
+    {
+      "item": "Composable design, from Hugh",
+      "request": "5c716a5c35bfdbdcef89e1e4fbe82df4aab0b8fd",
+      "promise": "efc0d86cc329025353f8e2dd21957b0f60ce68d8",
+      "promiseKindCorrect": true,
+      "promiseDirectlyRestsOnRequest": true
+    },
+    {
+      "item": "MCP core contract",
+      "request": "a9788a594d327df7e6a09add00b97fc0f9259169",
+      "promise": "ee3d9036e9807f935e315059d5bba95a773b01ab",
+      "promiseKindCorrect": true,
+      "promiseDirectlyRestsOnRequest": true
+    },
+    {
+      "item": "MCP plan",
+      "request": "489a992e0412ea4c83fdef3ecc16fcd1c472a791",
+      "promise": "932ce20e20468fc5503249686dd09151548e818d",
+      "promiseKindCorrect": true,
+      "promiseDirectlyRestsOnRequest": true
+    },
+    {
+      "item": "Wake and schedule",
+      "request": "24711ceb99c3939c0217eb7e0cac7d2b2d21cde9",
+      "promise": "19a020afb0b90cc69f98ff1f90eb27854ef331a3",
+      "promiseKindCorrect": true,
+      "promiseDirectlyRestsOnRequest": true
+    },
+    {
+      "item": "Collections",
+      "request": "34cf52b3dad76053ef17c10ee792ab8b81b740d0",
+      "promise": "6430ffd49f700c75594c4feb4ccb89561a5908bd",
+      "promiseKindCorrect": true,
+      "promiseDirectlyRestsOnRequest": true
+    },
+    {
+      "item": "jj comparison",
+      "request": "966aeaad47d450f70a6c0712bd5300091ea6875e",
+      "promise": "bfb563fe704b11ac19a48b9c0a924376bec05dc7",
+      "promiseKindCorrect": true,
+      "promiseDirectlyRestsOnRequest": true
+    },
+    {
+      "item": "Future-direction section",
+      "request": "da2737b2ad309bb8d70464f55ea4e025d8c226fd",
+      "promise": null,
+      "promiseKindCorrect": null,
+      "promiseDirectlyRestsOnRequest": null
+    },
+    {
+      "item": "Joint review of plans 017 and 018",
+      "request": "edaad58f57cde6befd3c4442480e6a30b4e30a60",
+      "promise": null,
+      "promiseKindCorrect": null,
+      "promiseDirectlyRestsOnRequest": null
+    },
+    {
+      "item": "Verifier release at `d691e6e9`",
+      "request": "a23cfe01368878719b3a1a73a12fda85c99246ba",
+      "promise": "f6dd71f4807598abd6ce884b2eae865612fa6a4e",
+      "promiseKindCorrect": true,
+      "promiseDirectlyRestsOnRequest": true
+    },
+    {
+      "item": "Stage 2 at `4ec48aa1`",
+      "request": "a25ee2a97142cfce14ee9dc3c3e5b7c0cb6c25cc",
+      "promise": "c8bfd0d7bbdc83ced5655a86a92d448a1363958b",
+      "promiseKindCorrect": true,
+      "promiseDirectlyRestsOnRequest": true
+    },
+    {
+      "item": "MCP runtime at `50216bb1`",
+      "request": "90adf4a7f3068acd8c93b57d1ac4ba163d5f4ca6",
+      "promise": "453d5961a35b37c53621b078f35e4fdf1dc708c3",
+      "promiseKindCorrect": true,
+      "promiseDirectlyRestsOnRequest": true
+    },
+    {
+      "item": "Stage 3 at `947fb909`",
+      "request": "1c911ea7a73b5de6b1d9e746bc88036305d07cd4",
+      "promise": "37595d2d6596396df6afe3d657ccd52fdd340bc9",
+      "promiseKindCorrect": true,
+      "promiseDirectlyRestsOnRequest": true
+    },
+    {
+      "item": "N3 design",
+      "request": "cdcdabb5bf9d83e6a66d660cf7a136898d97c798",
+      "promise": null,
+      "promiseKindCorrect": null,
+      "promiseDirectlyRestsOnRequest": null
+    },
+    {
+      "item": "N5 design",
+      "request": "17f1411d20e7998d0d1cc754b6eb7c9b6a53a538",
+      "promise": null,
+      "promiseKindCorrect": null,
+      "promiseDirectlyRestsOnRequest": null
+    },
+    {
+      "item": "N4 design",
+      "request": "408f4c0ea808d272631f56ca4de7e98b37dcb0ee",
+      "promise": null,
+      "promiseKindCorrect": null,
+      "promiseDirectlyRestsOnRequest": null
+    },
+    {
+      "item": "N1 design",
+      "request": "ad2c9cd353f77ae75580bf03fcd4c1376b20ae54",
+      "promise": null,
+      "promiseKindCorrect": null,
+      "promiseDirectlyRestsOnRequest": null
+    },
+    {
+      "item": "N2 design",
+      "request": "82191a0bea708a703335ef5dec6c2f1ce68cfe05",
+      "promise": null,
+      "promiseKindCorrect": null,
+      "promiseDirectlyRestsOnRequest": null
+    },
+    {
+      "item": "Notes reconciliation",
+      "request": "8d3d138e01e5cc41c433ff044ae18b3f3e8cefbb",
+      "promise": null,
+      "promiseKindCorrect": null,
+      "promiseDirectlyRestsOnRequest": null
+    }
+  ],
+  "approval_subjects": [
+    {
+      "item": "Test overhead",
+      "report": "b1738122e830e3b3aea81d516c607a716b7572ff",
+      "verdict": "approved",
+      "head": "f621285036b0bec4bc156946172440061dce3b81",
+      "request": "ecbc722a2bd96b8cd5778f78be36d5895dc40d42",
+      "bindings": [
+        "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:1c6bf45cec20f310b5f3e5871281ff676709814c"
+      ]
+    },
+    {
+      "item": "Acts stage 2",
+      "report": "9cb05da9bbfad21d0bc21c7f1e3dd2c20be8445f",
+      "verdict": "approved",
+      "head": "39430e23dcbae8e40df551dc53855a669250a79d",
+      "request": "fd6f00b612d68c035cbdbc3f27ebe3c21500f079",
+      "bindings": [
+        "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:c96e88fc3ce2d8b910de4c38d66c9030a0a8b8c7"
+      ]
+    },
+    {
+      "item": "Acts stage 5",
+      "report": "b90f22116fc33830067b6a3abde69ab99ab6c605",
+      "verdict": "approved",
+      "head": "6b877f6ba5e7dec13de4a16fbb6cba755db83b74",
+      "request": "a5d64b35e87c97560ff354578d9560bd1261aacb",
+      "bindings": [
+        "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:d5378da5583d3bc16c0c19094c1d4c8716aceb2b"
+      ]
+    },
+    {
+      "item": "Bearer retry",
+      "report": "65df0958948ba9424363e0cef802977d0a6a03f1",
+      "verdict": "approved",
+      "head": "87cd5804218bcf59cf69a849743d4ccbb8a66cce",
+      "request": "5d41ea36aa0047fbd9e285e3276188e0f3b9131b",
+      "bindings": [
+        "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:9c75aae2fbdac4fd0fba800aa3a21eeba10f9bf8"
+      ]
+    },
+    {
+      "item": "First Jam packages",
+      "report": "81478e2dd22771a7936f89e3e60b6045039d860a",
+      "verdict": "approved",
+      "head": "1e444739086882cec0b8b10b6e468ccad486666f",
+      "request": "7e82100b785d9734a6d68ec452bd43952240668d",
+      "bindings": [
+        "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:1eb5788cf9e31cdf7f74a3ba1512482d83791ac6"
+      ]
+    }
+  ]
+}
