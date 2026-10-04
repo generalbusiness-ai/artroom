@@ -54,7 +54,7 @@ async function landLane(room: TestRoom, host: FakeArtifactsHost, scope: string, 
 /** Test hooks on the Room's engine: its publication tokens, and the revocation timeout. */
 type Hooks = { tokens: { revoke: (id: string) => Promise<boolean> }; revokeTimeoutMs: number };
 const hooks = (r: Room) => r.core.landing as unknown as Hooks;
-type Probe = { calls: number; release: ((v: boolean) => void) | null };
+type Probe = { calls: number; release: ((v: boolean) => void) | null; due: number | null; at: number };
 const probe = (r: Room) => r as unknown as Probe;
 
 const failing = (r: Room) => {
@@ -62,11 +62,18 @@ const failing = (r: Room) => {
     throw new Error("Artifacts unavailable (revoke)");
   };
 };
-/** Every revocation waits until the test answers it. */
+/**
+ * Every revocation waits until the test answers it. Each one also records the engine's next due time while its
+ * attempt is running: read in a microtask, after the engine has noted the pass and before any timer can end it.
+ */
 const pending = (r: Room) => {
   probe(r).calls = 0;
   hooks(r).tokens.revoke = () => {
     probe(r).calls++;
+    queueMicrotask(() => {
+      probe(r).due = r.core.landing.nextDue();
+      probe(r).at = clock.now;
+    });
     return new Promise<boolean>((resolve) => {
       probe(r).release = resolve;
     });
@@ -95,6 +102,9 @@ it("review f060871b: a pending cleanup pass gives the Room a bounded future wake
     setAlarmDelay(null);
     const seen: { delay: number | null; calls: number; owed: number; landingDue: number | null; now: number }[] = [];
     for (let i = 0; i < 5; i++) {
+      // The stored alarm is compared with the real time below. On a busy machine the real time may have passed the
+      // room clock since the test began, so the room clock is brought up to it first.
+      clock.now = Math.max(clock.now, Date.now());
       await runDurableObjectAlarm(stub);
       seen.push(
         await runInDurableObject(stub, async (r: Room, state: DurableObjectState) => {
@@ -133,7 +143,8 @@ it("review f060871b: a pending cleanup pass gives the Room a bounded future wake
       hooks(r).revokeTimeoutMs = 20;
     });
     await runDurableObjectAlarm(stub);
-    const waiting = await runInDurableObject(stub, (r: Room) => ({ due: r.core.landing.nextDue(), now: clock.now, calls: probe(r).calls }));
+    // What the attempt saw while it ran. A read made now could come after the 20 ms timeout on a busy machine.
+    const waiting = await runInDurableObject(stub, (r: Room) => ({ due: probe(r).due, now: probe(r).at, calls: probe(r).calls }));
     expect(waiting.calls).toBe(1);
     expect(waiting.due! - waiting.now).toBeLessThanOrEqual(20);
     await runInDurableObject(stub, (r: Room) => r.core.landing.cleanupDone());
