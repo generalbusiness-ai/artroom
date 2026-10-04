@@ -32,7 +32,7 @@ Your key key_3aX_JVQ25YZPVcT0QsDBUtKRSQw5OS3tjzAocP6s_Dg is in <scratch>/home/ke
 Next: artroom claim <paths> --goal "<what you will do>"
 ```
 
-They claim the paths they will change and gets a lane with a lease, then a git remote and a write token for it:
+They claim the paths they will change and get a lane with a lease, then a git remote and a write token for it:
 
 ```
 $ artroom claim 'src/api/**' --goal "Rate-limit /api/login"
