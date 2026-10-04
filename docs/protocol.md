@@ -4324,8 +4324,9 @@ order, publication history, each act's authority, a check's configuration
 and prepared input, what each check-carried event names, and the refusal
 of a land evaluation while the admin-approval obligation is open, for
 which it reads Git objects where they are present. Where they are, it
-also compares the changed paths of a retained proposal context with them
-and refuses nothing on that comparison. The report names those checks
+also compares the changed paths of a retained proposal context with them,
+one way: it uses Git's list where the context omits a change, and refuses
+nothing. It does not rebuild or compare the complete rule context. The report names those checks
 and says what they do not show: an obligation that a rule opens is known
 only by replay, and a context that differs from the one the Room used is
 not detected. The list for a full run names: a missing judgment that did not carry when
