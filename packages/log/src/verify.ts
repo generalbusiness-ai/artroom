@@ -194,6 +194,16 @@ export interface VerifyReport {
   readonly limits: readonly { readonly reason: VerifyProofLimit; readonly seq: Seq; readonly detail: string }[];
   /** Plain statements of what this verification cannot prove. */
   readonly cannotProve: readonly string[];
+  /**
+   * How far this report accounts for check carry judgments (R-CARRY-13).
+   * `partial`: recorded judgments are replayed, and three omissions are
+   * detected (a duplicate, a newer check skipped on the way to a carry, a
+   * land evaluation with a blocking obligation open); the judgments the
+   * room owed are not derived as a whole. `cannotProve` says what that
+   * leaves out. This verifier answers `partial` for every log: no log yet
+   * records carry passes.
+   */
+  readonly carryAccounting: "partial";
 }
 
 const same = (a: unknown, b: unknown) => canonicalize(a) === canonicalize(b);
@@ -257,7 +267,8 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
     "A version's changed paths are checked against Git objects, from the base its context names to its head, when the objects are present; without them they are the retained context's, reported as git-unwitnessed. That the base is the merge base of main and the head needs main's history, which the log does not carry.",
     "The paths changed since an earlier verdict's head, which decide whether it carries, are read from Git objects. Without them they are the retained carry context's, where one is recorded; where none is, whether the verdict carried is undecided, and so is each land input that depends on it. Each is reported as git-unwitnessed.",
     "Whether the room prepared a check's integration, for a version or landing with no prepared event: rooms seal prepared events from stage 4 (R-DECL-20); verify checks a check against them where they are present. Until then a check on a filtered snapshot does not name the integration it counts for, and a check carry's new tree and snapshot are not in the log: verify takes them from the retained context and reports git-unwitnessed.",
-    "Whether a check-carried judgement was owed: the room judges carrying a check when a landing is prepared, which the log does not time. Verify checks each judgement that is recorded, and a carry that is not recorded meets no obligation.",
+    "Carry judgements are accounted for in part (R-CARRY-13). Verify replays each check-carried judgement that is recorded, and a carry that is not recorded meets no obligation. It detects a second judgement of the same check, a carry that skipped a newer passing check, and a land evaluation made while a blocking obligation was open. It does not derive the whole list of judgements the room owed. So it cannot show that a judgement which did not carry is missing when no later judgement carried; that a whole carry pass is missing, as for an advisory obligation; that the recorded judgements are all of them, in the room's order, with the inputs and the evaluation budget the room used; or that an extra judgement belongs to no pass. The log does not record when the room started or ended a pass, waited, was cancelled, prepared a landing again, or skipped carrying for a recovery landing.",
+    "What a verified prefix means: every check this verifier makes passed for the entries it names. It does not mean that every duty of the room was done, that publication is complete, or that each transition of the room's state was derived again.",
   ];
   const empty = (extra: Partial<VerifyReport> = {}): VerifyReport => ({
     ok: false,
@@ -274,6 +285,7 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
     unsupported: null,
     limits: [],
     cannotProve,
+    carryAccounting: "partial",
     ...extra,
   });
   if (!head) {
@@ -1512,5 +1524,6 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
     unsupported,
     limits,
     cannotProve,
+    carryAccounting: "partial",
   };
 }

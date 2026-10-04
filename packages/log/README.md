@@ -289,7 +289,13 @@ exactly one policy version, chosen by event kind:
 - the number of decisions replayed;
 - each failure, with a named reason;
 - what verification cannot prove (R-LOG-15): acts after the last published
-  entry; lanes, leases, obligations and landings; and the room clock.
+  entry; lanes, leases, obligations and landings; and the room clock;
+- how far check carry judgments are accounted for: `carryAccounting` is
+  `"partial"` in the JSON report, and "Carry accounting: partial." in the
+  text. Verify replays the judgments that are recorded and detects three
+  omissions; it does not derive every judgment the room owed, and the
+  list of what it cannot prove says what that leaves out (protocol
+  R-DECL-25).
 
 When a later commit rewrites history, verify reports it and verifies the
 entries of the last consistent commit.

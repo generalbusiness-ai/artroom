@@ -111,6 +111,16 @@ describe("artroom verify, on a fresh clone", () => {
     expect(JSON.parse(intact.stdout)).toMatchObject({ ok: true, verifiedThrough: 9, failures: [], limits: [] });
   });
 
+  test("the report says, for a program and for a person, that carry judgements are accounted for only in part and what that leaves out", () => {
+    const report = JSON.parse(intact.stdout) as { carryAccounting: string; cannotProve: string[] };
+    expect(report.carryAccounting).toBe("partial");
+    const said = report.cannotProve.join("\n");
+    for (const part of ["a whole carry pass is missing", "did not carry is missing", "in the room's order", "evaluation budget", "extra judgement", "prepared a landing again", "recovery landing", "What a verified prefix means"]) expect(said).toContain(part);
+    // The text output carries the same statements, also when verification fails.
+    expect(tampered.stdout).toContain("Carry accounting: partial.");
+    expect(tampered.stdout).toContain("Cannot prove: Carry judgements are accounted for in part");
+  });
+
   test("a log with a rewritten entry exits 1, and the report names history-rewritten; a room with no pinned heads is still read", () => {
     expect(tampered.status, tampered.stderr).toBe(1);
     expect(tampered.stdout).toMatch(/^Verification failed\./);

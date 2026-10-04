@@ -93,7 +93,7 @@ Files are in `packages/log/test/`. Only `golden.test.ts` also runs in workerd.
 | Recomputed, land and `notified` decisions replay under the policy pinned with their act. | R-LOG-13, section 27 | `amendment-2.test.ts`; `review-ea4a9bd0.test.ts`: "finding 5" |
 | `check-carried` events replay under the version they name. | R-CARRY-13, section 29.8 | `amendment-3.test.ts` |
 | A time that bounds authority is a valid RFC 3339 UTC time, and retained evidence is decoded per contract and digest. | reviews 07d3150e, a454cbaf | `review-07d3150e.test.ts`; `review-a454cbaf.test.ts` |
-| `artroom verify` exits 0, 1 or 2, and fetches the room's pinned heads. | R-LOG-10 | `cli.node.test.ts` |
+| `artroom verify` exits 0, 1 or 2, fetches the room's pinned heads, and says to a program and to a person that carry judgments are accounted for in part. | R-LOG-10, R-DECL-25, request 42342e35 | `cli.node.test.ts` |
 | A declared log is decoded by grammar, and an entry outside it is `malformed` at its seq. | R-SIG-4, R-DECL-2, R-DECL-16 | `declared-stage3.test.ts`: "condition 1: decoding by grammar (R-SIG-4" |
 | Kind, binding, body, target and grants are judged under the document in force at the entry's seq. | R-DECL-1, 4, 5, 10 to 12, 16, 17, 21; R-ADM-5 | `declared-stage3.test.ts`: "condition 1: decoding by grammar, and kind" |
 | A `v1` log verifies as it did, and a verifier that judged its `v1`-era entries by the `v2` declarations would fail it. | R-DECL-1, R-DECL-21, R-DECL-25 | `declared-stage3.test.ts`: "the legacy rule:"; "condition 3:"; `declared-legacy-negative.test.ts` (the whole log, under a verifier with that one fault) |

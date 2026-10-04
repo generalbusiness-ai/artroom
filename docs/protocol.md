@@ -4303,6 +4303,25 @@ not fetched), room-clock timing, and the unrecorded refusals of steps 1 to
 first entry that needs the missing version, and its report says the log
 was verified only up to that seq.
 
+**Carry judgments are accounted for in part** (as delivered; request
+`42342e35`). Verify replays each recorded `check-carried` judgment
+(R-CARRY-13). It reports `decision-extra` for a second judgment of the
+same check on the same integration under the same policy version;
+`decision-missing` at a judgment that carried when a newer passing check
+of that obligation, admitted before the operation's land act, has no
+judgment; and, at a `land-evaluated` event with a blocking obligation
+open in the fold, `decision-missing` naming an earlier passing check that
+has no judgment, or else `guard-failed` naming the obligation. It does
+not derive the whole list of judgments the Room owed. Its report says so
+to a program, as `carryAccounting: "partial"`, and to a person, in the
+list of what it cannot prove: a missing judgment that did not carry when
+no later one carried; a missing whole pass; the order, inputs and budget
+of the judgments; an extra judgment that belongs to no pass; and waiting,
+cancellation, repeated preparation and recovery, which the log does not
+record. Complete accounting stays owed under request `1e8fee4b`. It needs
+the Room to record carry passes, which no rule of this protocol provides
+yet.
+
 **R-DECL-26. Platform bounds on declarations.** A document outside these
 is refused `policy-invalid`.
 

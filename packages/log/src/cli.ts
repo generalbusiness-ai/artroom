@@ -31,7 +31,7 @@ try {
   const report = await verifyLog(git, { ref, replayDecisions: replay });
   if (json) console.log(JSON.stringify(report, null, 2));
   else {
-    console.log(report.ok ? "Verified." : "Verification failed.");
+    console.log(report.ok ? "Verified. Every check this verifier makes passed; what it cannot prove is listed below." : "Verification failed.");
     console.log(`Room: ${report.room ?? "unknown"}`);
     console.log(`Log commit: ${report.head ?? "none"} (${report.commits} commits)`);
     console.log(`Published through entry ${report.publishedThrough}; verified through entry ${report.verifiedThrough}${report.last ? ` (${report.last.id})` : ""}.`);
@@ -41,6 +41,7 @@ try {
     if (report.unsupported)
       console.log(`Not verified from entry ${report.unsupported.seq}: ${report.unsupported.reason}, a limit of this verifier, not a finding against the log. ${report.unsupported.detail}`);
     for (const l of report.limits) console.log(`  ${l.reason} at entry ${l.seq}: ${l.detail}`);
+    console.log(`Carry accounting: ${report.carryAccounting}.`);
     for (const c of report.cannotProve) console.log(`Cannot prove: ${c}`);
   }
   process.exit(report.ok ? 0 : 1);

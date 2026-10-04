@@ -3309,6 +3309,36 @@ The declared run's skips are the tests that found their own rooms (stage 2's, st
 4. **Section 23's "MCP descriptors" row** holds only in a `v2` room: choice 14.
 5. **The planner's artifacts.** The planner republishes them at the final head. That head does not exist yet: it needs stage 5 reviewed and landed, then this branch composed on main.
 
+## Intermediate verifier release (request 42342e35)
+
+Status: implemented, pending review. Gitseq request `42342e35` (planner to builder, replacing `34c87678`), promise `4e66accc`, under the planner's note `plans/013-2026-10-04-first-jam-release.md` (decision `a6824b80`). On `request/test-overhead`.
+
+**What this is.** Main cannot read a `v2` room's log. This delivery is the verifier that the integration branch has, sent for review as a bounded release of its own so that reviewed declared-acts code can reach main. It is not declared acts stage 3. Request `1e8fee4b` and promise `3af8ebc7` stay open and promised, and this section claims none of their conditions as complete.
+
+**What a review of this release assesses.** The delivered verifier, as it is:
+
+| Scope | What is delivered | Where to read |
+|---|---|---|
+| Stage 3 condition 1 | Decoding by grammar; kind, binding, body, target and `who` judged under the document in force at each entry; the legacy rule for `v1`; a steps version or profile the verifier lacks reported as a limit | The stage 3 section, "What was built"; map rows under Log |
+| The delivered part of condition 2 | The calls admission had to make are derived per entry, and their inputs and budget rebuilt from the fold; a missing, extra or differing call is named. For check carries: recorded judgments are replayed; a duplicate, a carry that skipped a newer check, and a land evaluation with a blocking obligation open are refused | The stage 3 section, "State at the integration head"; [notes/2026-10-03-carry-accounting.md](../notes/2026-10-03-carry-accounting.md) |
+| Condition 3's fixtures | The fresh-clone replay with a forged undeclared kind; the old `v1` log; two steps versions; the legacy recovery sequence, with its negative half run over the whole log by a verifier with the wrong vocabulary (`declared-legacy-negative.test.ts`); forged logs with a call removed or a context changed; a forged stale binding | Map rows under Log |
+| Conditions 4 and 5 | As reconciled by request `ecbc722a`: useful witnesses and one-change controls, the gate once at the head, changed paths disclosed. No mutation count | [docs/testing.md](../docs/testing.md) |
+
+**What changed for this release.** The verifier's own output now states the limit of its carry accounting, as the commission asks:
+
+- `VerifyReport.carryAccounting` is `"partial"`, for a program.
+- The list `cannotProve` replaces its one line about carry with two entries. The first says what is done and what is not: recorded judgments are replayed and three omissions are detected, but verify cannot show a missing judgment that did not carry when no later one carried, a missing whole pass, the order, inputs and budget of the judgments, or an extra judgment that belongs to no pass, and the log does not record waiting, cancellation, repeated preparation or what a recovery landing skipped. The second says what a verified prefix means and does not mean.
+- `artroom-verify` prints "Carry accounting: partial." and each of those entries, whether verification passed or failed. Its first line on success is now "Verified. Every check this verifier makes passed; what it cannot prove is listed below."
+- R-DECL-25 in [docs/protocol.md](../docs/protocol.md) and the log package's README say the same.
+
+Witness: `packages/log/test/cli.node.test.ts`, "the report says, for a program and for a person, that carry judgements are accounted for only in part ...".
+
+**The argument that needs its own review.** [notes/2026-10-03-carry-accounting.md](../notes/2026-10-03-carry-accounting.md), "What an omission can do" (2026-10-03), argues that a removed judgment which did not carry cannot admit a landing that should not be admitted. That is an argument from the source, not something a test shows, and stage 2's approval does not establish it. The verifier's output does not rely on it and does not repeat it: it says only what verify checks and what it does not.
+
+**Still owed, in full, under `1e8fee4b` / `3af8ebc7`.** Complete carry accounting: every pass and every judgment the Room owed, missing, extra and substituted, with all ten acceptance cases of the carry-pass amendment and the planner's points A to F. The amendment is not adopted: draft 2 was returned with changes (`794e6f86`), and its revision is owed. The Room's side, with the `prepared` event, is stage 4's (`48c021ea`). Stage 6 keeps the derivation of lane, lease and landing transitions.
+
+**Gates.** The review request gives the gate's result at the head sent.
+
 ## Bearer sessions end with their grantor (request 5d41ea36)
 
 Status: implemented, pending review. Gitseq request `5d41ea36` (builder's own, found while reducing the Room's tests), on `request/test-overhead`. The MCP core's review (`bc0d7f6b`) asked for it to be completed.
