@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:e9e4da5dbad0593cb3f67a96435d81afe4dbe8fb","text":"Merge retired a covered predecessor; the successor is at release/consumer/tsconfig.nodenext.json."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:ef786c9759ed56e9393669494b689ba12a4bf5de","text":"Merge retired a covered predecessor; the successor is at packages/client/tsconfig.build.json."}
