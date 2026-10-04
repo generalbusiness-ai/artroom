@@ -1,0 +1,34 @@
+{
+  "head": "64a379c2f6c89265ff6187a2d6948db3e9c13752",
+  "scriptSHA256": "f4ccd8073ded73d64791b56ce778860ebf3c3036f25d5fdb46018fcf3285da5c",
+  "vitestVersion": "4.1.11",
+  "fixture": "Own temporary repository; exact selector copied unchanged. Actual Vitest witnesses; Git/UI commands private runner stubs test dispatch only. Existing node_modules symlink; no installation or app-suite execution.",
+  "cases": [
+    {
+      "case": "baselineRoot",
+      "exit": 0,
+      "stdout": "\n\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.11 \u001b[39m\u001b[90m/private/tmp/artroom-checker-selector-64a3-iniHlg\u001b[39m\n\n \u001b[32m✓\u001b[39m test/real.test.mjs \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 1\u001b[2mms\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m1 passed\u001b[39m\u001b[22m\u001b[90m (1)\u001b[39m\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m1 passed\u001b[39m\u001b[22m\u001b[90m (1)\u001b[39m\n\u001b[2m   Start at \u001b[22m 22:22:37\n\u001b[2m   Duration \u001b[22m 124ms\u001b[2m (transform 6ms, setup 0ms, import 10ms, tests 1ms, environment 0ms)\u001b[22m\n\n",
+      "stderr": ""
+    },
+    {
+      "case": "lockOnly",
+      "exit": 0,
+      "stdout": "\n\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.11 \u001b[39m\u001b[90m/private/tmp/artroom-checker-selector-64a3-iniHlg\u001b[39m\n\n \u001b[32m✓\u001b[39m test/real.test.mjs \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 1\u001b[2mms\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m1 passed\u001b[39m\u001b[22m\u001b[90m (1)\u001b[39m\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m1 passed\u001b[39m\u001b[22m\u001b[90m (1)\u001b[39m\n\u001b[2m   Start at \u001b[22m 22:22:38\n\u001b[2m   Duration \u001b[22m 111ms\u001b[2m (transform 5ms, setup 0ms, import 9ms, tests 1ms, environment 0ms)\u001b[22m\n\n\n> @generalbusiness/artroom-git@0.0.0 test\n> node -e \"console.log('isolated runner fixture')\"\n\nisolated runner fixture\n\n> @generalbusiness/artroom-ui@0.0.0 test\n> node -e \"console.log('isolated runner fixture')\"\n\nisolated runner fixture\n",
+      "stderr": "\n== root vitest run: every test, because package-lock.json changed\n\n\n== git package: the whole package, because package-lock.json changed\n\n\n== ui package: the whole package, because package-lock.json changed\n\n\nChanged files: 1, compared with HEAD.\n  root vitest run: passed\n  git package: passed\n  ui package: passed\n"
+    },
+    {
+      "case": "tsconfigOnly",
+      "exit": 0,
+      "stdout": "\n\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.11 \u001b[39m\u001b[90m/private/tmp/artroom-checker-selector-64a3-iniHlg\u001b[39m\n\n \u001b[32m✓\u001b[39m test/real.test.mjs \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 1\u001b[2mms\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m1 passed\u001b[39m\u001b[22m\u001b[90m (1)\u001b[39m\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m1 passed\u001b[39m\u001b[22m\u001b[90m (1)\u001b[39m\n\u001b[2m   Start at \u001b[22m 22:22:39\n\u001b[2m   Duration \u001b[22m 111ms\u001b[2m (transform 5ms, setup 0ms, import 9ms, tests 1ms, environment 0ms)\u001b[22m\n\n\n> @generalbusiness/artroom-git@0.0.0 test\n> node -e \"console.log('isolated runner fixture')\"\n\nisolated runner fixture\n\n> @generalbusiness/artroom-ui@0.0.0 test\n> node -e \"console.log('isolated runner fixture')\"\n\nisolated runner fixture\n",
+      "stderr": "\n== root vitest run: every test, because tsconfig.json changed\n\n\n== git package: the whole package, because tsconfig.json changed\n\n\n== ui package: the whole package, because tsconfig.json changed\n\n\nChanged files: 1, compared with HEAD.\n  root vitest run: passed\n  git package: passed\n  ui package: passed\n"
+    },
+    {
+      "case": "untrackedUnicodeUI",
+      "exit": 0,
+      "stdout": "\n\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.11 \u001b[39m\u001b[90m/private/tmp/artroom-checker-selector-64a3-iniHlg\u001b[39m\n\n \u001b[32m✓\u001b[39m test/real.test.mjs \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 1\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m packages/ui/é.test.mjs \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 1\u001b[2mms\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m2 passed\u001b[39m\u001b[22m\u001b[90m (2)\u001b[39m\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m2 passed\u001b[39m\u001b[22m\u001b[90m (2)\u001b[39m\n\u001b[2m   Start at \u001b[22m 22:22:40\n\u001b[2m   Duration \u001b[22m 138ms\u001b[2m (transform 14ms, setup 0ms, import 24ms, tests 2ms, environment 0ms)\u001b[22m\n\n\n> @generalbusiness/artroom-ui@0.0.0 test\n> node -e \"console.log('isolated runner fixture')\"\n\nisolated runner fixture\n",
+      "stderr": "\n== root vitest run: every test, because vitest cannot read the changed name \"packages/ui/é.test.mjs\" from git\n\n\n== ui package: the whole package, because packages/ui/é.test.mjs changed\n\n\nChanged files: 1, compared with HEAD.\n  root vitest run: passed\n  git package: not run: no changed file is in the package or in a package it depends on\n  ui package: passed\n",
+      "quotedGitOutput": "\"packages/ui/\\303\\251.test.mjs\"\n"
+    }
+  ],
+  "restored": true
+}
