@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at release/consumer/package.json","body":{"commit":"4a44231e1c37257ed7c905463529db9fe46af42f","path":"release/consumer/package.json"}}
+{"kind":"artifact","text":"Merge published the current artifact at release/consumer/src/use.ts","body":{"commit":"4a44231e1c37257ed7c905463529db9fe46af42f","path":"release/consumer/src/use.ts"}}
