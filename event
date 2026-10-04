@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:bce79b02b2121bc3064467460c5af33921ea7ee8","text":"Merge retired a covered predecessor with no successor at its old path."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:be63f51fe3f76a2bd162fbe5a8e5b68fb8f8e8a7","text":"Merge retired a covered predecessor; the successor is at package-lock.json."}
