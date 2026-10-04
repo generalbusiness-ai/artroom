@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:d05c5c85cd95875488def75df9ffaad76ebc595c","text":"Republished at 947fb909dba780fc35df3e22e56cd726d2ec6ba1; the successor stands at plans/README.md."}
+{"kind":"artifact","text":"packages/room/src/core.ts at exact 947fb909dba780fc35df3e22e56cd726d2ec6ba1 on request/test-overhead, under promise git:sha1…b6ae9cb on request git:sha1…d39f9c7","body":{"commit":"947fb909dba780fc35df3e22e56cd726d2ec6ba1","path":"packages/room/src/core.ts"}}
