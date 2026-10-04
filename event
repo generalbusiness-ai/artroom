@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:d708c16a41349285b9a436b642d66f21f135196f","text":"Merge retired a covered predecessor with no successor at its old path."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:d74870f655218eda793f2d894e064412ebfd9047","text":"Merge retired a covered predecessor; the successor is at packages/git/test/treediff.test.ts."}
