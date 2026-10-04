@@ -138,7 +138,8 @@ checks that release from outside the repository:
   resolution;
 - `artroom-verify` runs and prints its usage;
 - the CLI tarball installs alone in a second fresh directory, with no other
-  package, and `npx artroom --help` runs.
+  package; the installed package holds `THIRD-PARTY-NOTICES.txt` with the
+  same text; and `npx artroom --help` runs.
 
 The check uses the network only to fetch third-party packages from npm's
 public registry. It contacts no room. It shows that the packages install

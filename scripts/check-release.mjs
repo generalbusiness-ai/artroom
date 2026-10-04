@@ -22,7 +22,8 @@
 //      runs the compiled fixture;
 //   5. `tsc --noEmit` passes under NodeNext and under bundler resolution;
 //   6. `artroom-verify` (the log package's command) runs and prints its usage;
-//   7. in a second fresh directory, the CLI tarball installs alone and
+//   7. in a second fresh directory, the CLI tarball installs alone, the
+//      installed package holds the third-party licence texts, and
 //      `npx artroom --help` runs.
 // It uses the network only for npm's public registry (third-party packages).
 // It contacts no room and no provider. It exits non-zero if any check fails.
@@ -171,6 +172,9 @@ const cliInstall = run("npm", ["install", "--save-exact", "--no-audit", "--no-fu
 if (record("cli alone: npm install of the CLI tarball", cliInstall.code === 0, cliInstall.code === 0 ? alone : lastLines(cliInstall.text))) {
   const names = installed(alone);
   record("cli alone: nothing else is installed", names.length === 1 && names[0] === `node_modules/${cli.name}`, names.join(", "));
+  const notices = join(alone, "node_modules", cli.name, THIRD_PARTY_NOTICES);
+  const sameNotices = existsSync(notices) && readFileSync(notices, "utf8") === thirdPartyNotices(cli.name, release.version);
+  record("cli alone: the installed package has the third-party licence texts", sameNotices, sameNotices ? `node_modules/${cli.name}/${THIRD_PARTY_NOTICES}` : "missing, or not the text built from release/third-party");
   const help = run("npx", ["--no-install", "artroom", "--help"], alone);
   record("cli alone: npx artroom --help", help.code === 0 && /artroom/.test(help.out), `exit ${help.code}: ${help.out.trim().split("\n")[0] ?? ""}`);
   copyFileSync(join(alone, "package-lock.json"), join(releaseDir, "cli-only-package-lock.json"));
