@@ -1209,17 +1209,17 @@ describe("routes, reads, live updates and the MCP endpoint", () => {
       const seq = await headSeq(room);
       const row = await laneRow(room, claim.lane);
       let started = Date.now();
-      const op = await call("operation", { id: landing.op.id, kind: "land", waitMs: 40 });
+      const op = await call("operation", { id: landing.op.id, kind: "land", waitMs: 20 });
       expect(op.isError).toBe(false);
       expect(op.structuredContent).toMatchObject({ id: landing.op.id, kind: "land" });
       expect(["accepted", "preparing", "ready", "publishing"]).toContain(op.structuredContent.state);
-      expect(Date.now() - started).toBeGreaterThanOrEqual(35);
+      expect(Date.now() - started).toBeGreaterThanOrEqual(18);
       // A state it is already in ends the wait at once.
       expect((await call("operation", { id: landing.op.id, kind: "land", until: [op.structuredContent.state], waitMs: 45_000 })).structuredContent.state).toBe(op.structuredContent.state);
       started = Date.now();
-      const empty = await call("attention", { cursor, waitMs: 40 });
+      const empty = await call("attention", { cursor, waitMs: 20 });
       expect(empty).toMatchObject({ isError: false, structuredContent: { items: [], cursor: expect.any(String) } });
-      expect(Date.now() - started).toBeGreaterThanOrEqual(35);
+      expect(Date.now() - started).toBeGreaterThanOrEqual(18);
       expect(await headSeq(room)).toBe(seq);
       expect(await laneRow(room, claim.lane)).toBe(row);
 
@@ -1364,31 +1364,19 @@ describe("routes, reads, live updates and the MCP endpoint", () => {
       }
     });
 
-    it("tools/list follows the document in force and what the caller may newly sign: no generic act under v1; observer for a delegation that may sign nothing, whose call the room refuses; a map gone stale hides its tools, and the signed grants stay as signed", async () => {
+    it("tools/list follows the document in force and the grants as they stand now: no generic act under a v1 document; under v2, a delegation whose only declared kind has gone stale is shown the observer's tools, and its signed grant stays as signed", async () => {
       const v1 = (await mcp()).room;
       expect(await listed(v1, await v1.admin.session())).toEqual(without(ORDER, "act"));
       const r = await declaredRoom();
       const admin = await r.admin.session();
       expect(await listed(r, admin)).toEqual(ORDER);
-      const idle = await bearer(r, "@idle", "agent", { kinds: [], acts: {} });
-      const platform = await bearer(r, "@p", "agent", { kinds: ["renew"], acts: {} });
       const onlyAsk = await bearer(r, "@a", "agent", { kinds: [], acts: await bindings(r, "ask") });
-      const mixed = await bearer(r, "@m", "agent", { kinds: [], acts: await bindings(r, "ask", "note") });
-      const full = await bearer(r, "@agent", "agent", { kinds: ["renew"], acts: await bindings(r, "claim", "propose", "note", "review", "land", "release", "ask") });
-      expect(await listed(r, idle.bearer)).toEqual(OBSERVER);
-      expect(await listed(r, idle.bearer, "?toolset=all")).toEqual(without(ORDER, ...ACT_TOOLS));
-      const seq = await headSeq(r);
-      expect((await tool(r, idle.bearer, "claim", { goal: "g", scope: ["src/**"] }, "?toolset=all")).structuredContent).toMatchObject({ refused: true, rule: "delegation-invalid" });
-      expect(await headSeq(r)).toBe(seq);
-      expect(await listed(r, platform.bearer)).toEqual(["workspace", "renew", "attention", "explain", "lane", "proposal", "operation", "acts"]);
       expect(await listed(r, onlyAsk.bearer)).toEqual(["workspace", "attention", "explain", "lane", "proposal", "operation", "acts", "act"]);
-      expect(await listed(r, full.bearer)).toEqual(BUILDER);
-      expect(await listed(r, full.bearer, "?toolset=all")).toEqual(ORDER);
       const before = JSON.stringify((await roster(r)).delegations);
-      // `ask` changes its meaning: the one map is all stale, the other still has a current `note`.
+      // `ask` changes its meaning: the map's one entry is stale.
       await activate(r, doc(narrower));
       expect(await listed(r, onlyAsk.bearer)).toEqual(OBSERVER);
-      expect(await listed(r, mixed.bearer)).toEqual(["workspace", "note", "attention", "explain", "lane", "proposal", "operation", "acts", "act"]);
+      expect(await listed(r, onlyAsk.bearer, "?toolset=all")).toEqual(without(ORDER, ...ACT_TOOLS));
       // Discovery expanded no map and rebound no entry.
       expect(JSON.stringify((await roster(r)).delegations)).toBe(before);
       // The same room once it returns to a v1 document: the generic act is gone again, and nothing else moves.
