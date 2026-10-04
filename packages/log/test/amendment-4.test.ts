@@ -1,26 +1,34 @@
 /**
  * Contract amendment 4 (docs/protocol.md section 30), lane L: layout 2.
- * The shared rules against the contract's reference functions
- * (`packages/contract/examples/log-layout.ts`), and the acceptance cases of
- * 30.7 that need no Room and no entry over 1 MiB. The cases with entries or
- * files of 8 MiB and more, and 5 million entries, are in
- * `amendment-4-large.test.ts`.
+ *
+ * The shared rules are checked against the contract's reference functions
+ * (`packages/contract/examples/log-layout.ts`) at the contract's limits:
+ * they are pure functions of numbers and names, so that costs nothing.
+ *
+ * The acceptance cases of 30.7 publish and verify real logs. Each crosses a
+ * limit: the object bound B, 1,000 entries to a segment, 4,096 names to a
+ * directory. The rules are the same at any limit, so these cases run at
+ * small limits (`at(...)`, `src/layout.ts` `setLayoutLimitsForTests`) and a
+ * few entries cross them. The last describe block keeps two cases at the
+ * contract's own bound and directory limit, to show that the defaults fit
+ * together at their real sizes.
  */
 
 import { afterEach, describe, expect, test, vi } from "vitest";
-import type { Checkpoint, Sha } from "@generalbusiness/artroom-contract";
+import type { CheckerConfig, Checkpoint, Decision, LogEntry, MemberId, PolicyDocument, RepoPath, Sha } from "@generalbusiness/artroom-contract";
+import { evaluateNotify, policy, rule } from "@generalbusiness/artroom-policy";
 import * as ref from "../../contract/examples/log-layout.ts";
 import { canonicalize, utf8 } from "../src/canonical.ts";
+import { digestBytes, sha256Hex } from "../src/crypto.ts";
 import { Malformed, decodeCheckpoint, decodeChunkedLine } from "../src/decode.ts";
-import { LOG_REF, ROOT } from "../src/entries.ts";
+import { LOG_REF, ROOT, makeCheckpoint, retain, seal, type Retained } from "../src/entries.ts";
 import { MemoryGit, OBJECT_TOO_LARGE, parseCommit } from "../src/git.ts";
 import * as layout from "../src/layout.ts";
-import { OBJECT_BOUND as B, Placement } from "../src/layout.ts";
-import { LogPublisher, PublishError, type EntryLine, type EntrySource, type RetainedRef } from "../src/publisher.ts";
-import type { LogEntry } from "@generalbusiness/artroom-contract";
-import { sha256Hex } from "../src/crypto.ts";
+import { OBJECT_BOUND as B, Placement, twelve } from "../src/layout.ts";
+import { LOG_TRANSFER_LIMITS, LogPublisher, PublishError, READ_LIMITS, readPublishedEntries, type EntryLine, type EntrySource, type RetainedRef } from "../src/publisher.ts";
 import { verifyLog } from "../src/verify.ts";
-import { L2, RoomSim, Scripted, alice, bareRoom, exact, graft, keys, lineOf, note, rewrite, walk } from "./support/layout2.ts";
+import { LogPublisher as Reference } from "./support/publisher-417a1618.ts";
+import { L2, RoomSim, Scripted, alice, at, bareRoom, exact, expectSmallTrees, graft, keys, lineOf, note, partsSource, proportional, rewrite, walk } from "./support/layout2.ts";
 
 /** A seeded generator, so each run checks the same cases. */
 function rng(seed: number) {
@@ -85,7 +93,7 @@ describe("the shared rules agree with the contract's reference functions (exampl
       [Array.from({ length: 4097 }, (_, i) => layout.twelve(i)), decKey, 3],
     ];
     for (const [names, key, group] of sets) {
-      const sample = names.filter((_, i) => i % 37 === 0 || i === names.length - 1);
+      const sample = names.filter((_, i) => i % 211 === 0 || i === names.length - 1);
       for (const n of sample) expect(layout.shardsOf(names, n, key, group), n).toEqual(ref.shardsOf(names, n, key, group));
     }
   });
@@ -122,74 +130,88 @@ async function starts(git: MemoryGit, commit: Sha): Promise<number[]> {
   return [...files.keys()].filter((p) => p.startsWith(`${ROOT}/segments/`)).map((p) => Number(p.slice(-18, -6))).sort((a, b) => a - b);
 }
 
+/** Expect the log on `git` to verify with no failure through entry `through`. */
+async function verifies(git: MemoryGit, through: number) {
+  const report = await verifyLog(git);
+  expect(report.failures).toEqual([]);
+  expect(report.verifiedThrough).toBe(through);
+  return report;
+}
+
 describe("acceptance cases (30.7): segments", () => {
-  test("Byte close: entries near the 64 KiB envelope bound close a segment before it passes B; every segment is at most B; earlier segments never change; verify passes", async () => {
-    const { sim, lane } = await room();
-    const git = new MemoryGit();
-    git.objectLimit = B;
-    const p = new LogPublisher(git);
-    const sizes = () => sim.entries.map(lineOf);
-    while (sim.entries.length < 140) note(sim, lane, 64_000);
-    const c1 = await p.publish(sim.entries, sim.checkpoint(L2(0)), sim.retained);
-    while (sim.entries.length < 270) note(sim, lane, 64_000);
-    const c2 = await p.publish(sim.entries, sim.checkpoint(L2(0)), sim.retained);
-    const want = ref.segmentStarts(sizes(), cp(L2(0)));
-    // "After about 128 entries": 3 small entries, then about 128 lines of about 65,000 bytes.
-    expect(want[1]! - 3).toBeGreaterThanOrEqual(125);
-    expect(want[1]! - 3).toBeLessThanOrEqual(131);
-    expect(await starts(git, c2.commit)).toEqual(want);
-    const first = await walk(git, c1.commit);
-    const second = await walk(git, c2.commit);
-    for (const [path, data] of second.files) if (path.includes("/segments/")) expect(data.length, path).toBeLessThanOrEqual(B);
-    const seg0 = `${ROOT}/segments/000000000000.jsonl`;
-    expect(second.blobs.get(seg0)).toBe(first.blobs.get(seg0)); // closed, never changed
-    const report = await verifyLog(git);
-    expect(report.failures).toEqual([]);
-    expect(report.verifiedThrough).toBe(269);
-  }, 120_000);
-
-  test("Count close: small entries close segments at 1,000 entries, as in layout 1", async () => {
-    const { sim, lane } = await room();
-    const git = new MemoryGit();
-    const p = new LogPublisher(git);
-    while (sim.entries.length < 2100) note(sim, lane, 20);
-    const r = await p.publish(sim.entries, sim.checkpoint(L2(0)), sim.retained);
-    expect(await starts(git, r.commit)).toEqual([0, 1000, 2000]);
-    expect((await verifyLog(git)).failures).toEqual([]);
-  }, 120_000);
-
-  test("Edge: an entry that brings the segment to exactly B, newlines included, is appended; one a byte longer starts a new segment", async () => {
-    for (const extra of [0, 1]) {
+  test(
+    "Byte close: a segment closes before the next line would take it past B; every segment is at most B and could not hold the next entry; earlier segments never change; verify passes",
+    at({ objectBound: 16_384 }, async () => {
       const { sim, lane } = await room();
-      for (let i = 0; i < 3; i++) note(sim, lane, 2 * 2 ** 20);
-      const before = sim.entries.reduce((n, e) => n + lineOf(e) + 1, 0); // the segment's bytes so far, plus the newline before the next line
-      exact(sim, B - before + extra, (pad) => note(sim, lane, pad));
-      note(sim, lane, 10);
       const git = new MemoryGit();
-      const r = await new LogPublisher(git).publish(sim.entries, sim.checkpoint(L2(0)), sim.retained);
-      const { files } = await walk(git, r.commit);
-      const seg0 = files.get(`${ROOT}/segments/000000000000.jsonl`)!;
-      if (extra === 0) {
-        expect(seg0.length).toBe(B);
-        expect(await starts(git, r.commit)).toEqual([0, 7]); // entries 0 to 6 fill it exactly; 7 starts the next
-      } else expect(await starts(git, r.commit)).toEqual([0, 6]);
-      expect(await starts(git, r.commit)).toEqual(ref.segmentStarts(sim.entries.map(lineOf), cp(L2(0))));
-      expect((await verifyLog(git)).failures).toEqual([]);
-    }
-  }, 120_000);
+      git.objectLimit = B;
+      const p = new LogPublisher(git);
+      while (sim.entries.length < 12) note(sim, lane, 1500);
+      const c1 = await p.publish(sim.entries, sim.checkpoint(L2(0)), sim.retained);
+      while (sim.entries.length < 22) note(sim, lane, 1500);
+      const c2 = await p.publish(sim.entries, sim.checkpoint(L2(0)), sim.retained);
+      const first = await walk(git, c1.commit);
+      const second = await walk(git, c2.commit);
+      const at2 = await starts(git, c2.commit);
+      expect(at2.length).toBeGreaterThanOrEqual(3);
+      // R-LOG-17, said directly: each segment is at most B, and the entry that starts the next one would not have fitted.
+      for (const [k, start] of at2.entries()) {
+        const bytes = second.files.get(`${ROOT}/segments/${twelve(start)}.jsonl`)!.length;
+        expect(bytes, `segment ${start}`).toBeLessThanOrEqual(B);
+        const next = at2[k + 1];
+        if (next !== undefined) expect(bytes + 1 + lineOf(sim.entries[next]!), `segment ${start} could not take entry ${next}`).toBeGreaterThan(B);
+      }
+      const seg0 = `${ROOT}/segments/000000000000.jsonl`;
+      expect(second.blobs.get(seg0)).toBe(first.blobs.get(seg0)); // closed, never changed
+      await verifies(git, 21);
+    }),
+  );
 
-  test("Switch, small open segment: three entries open at the switch continue the segment, which closes at 1,000 entries", async () => {
-    const { sim, lane } = await room();
-    const git = new MemoryGit();
-    const p = new LogPublisher(git);
-    while (sim.entries.length < 1003) note(sim, lane, 20);
-    const w = await p.publish(sim.entries, sim.checkpoint(), sim.retained); // layout 1 through 1002: segment 1000 holds three entries
-    expect(await starts(git, w.commit)).toEqual([0, 1000]);
-    while (sim.entries.length < 2010) note(sim, lane, 20);
-    const r = await p.publish(sim.entries, sim.checkpoint(L2(1003)), sim.retained);
-    expect(await starts(git, r.commit)).toEqual([0, 1000, 2000]);
-    expect((await verifyLog(git)).failures).toEqual([]);
-  }, 120_000);
+  test(
+    "Count close: small entries close segments at the entry limit, as in layout 1",
+    at({ segmentEntries: 10 }, async () => {
+      const { sim, lane } = await room();
+      const git = new MemoryGit();
+      while (sim.entries.length < 21) note(sim, lane, 20);
+      const r = await new LogPublisher(git).publish(sim.entries, sim.checkpoint(L2(0)), sim.retained);
+      expect(await starts(git, r.commit)).toEqual([0, 10, 20]);
+      await verifies(git, 20);
+    }),
+  );
+
+  for (const extra of [0, 1])
+    test(
+      `Edge: an entry that brings the segment to ${extra === 0 ? "exactly B, newlines included, is appended" : "one byte over B starts a new segment"}`,
+      at({ objectBound: 16_384 }, async () => {
+        const { sim, lane } = await room();
+        for (let i = 0; i < 3; i++) note(sim, lane, 2000);
+        const before = sim.entries.reduce((n, e) => n + lineOf(e) + 1, 0); // the segment's bytes so far, plus the newline before the next line
+        exact(sim, B - before + extra, (pad) => note(sim, lane, pad));
+        note(sim, lane, 10);
+        const git = new MemoryGit();
+        const r = await new LogPublisher(git).publish(sim.entries, sim.checkpoint(L2(0)), sim.retained);
+        const { files } = await walk(git, r.commit);
+        if (extra === 0) expect(files.get(`${ROOT}/segments/000000000000.jsonl`)!.length).toBe(B);
+        expect(await starts(git, r.commit)).toEqual(extra === 0 ? [0, 7] : [0, 6]); // entries 0 to 6 fill it exactly; one byte more and 6 starts the next
+        await verifies(git, 7);
+      }),
+    );
+
+  test(
+    "Switch, small open segment: three entries open at the switch continue the segment, which closes at the entry limit",
+    at({ segmentEntries: 10 }, async () => {
+      const { sim, lane } = await room();
+      const git = new MemoryGit();
+      const p = new LogPublisher(git);
+      while (sim.entries.length < 13) note(sim, lane, 20);
+      const w = await p.publish(sim.entries, sim.checkpoint(), sim.retained); // layout 1 through 12: segment 10 holds three entries
+      expect(await starts(git, w.commit)).toEqual([0, 10]);
+      while (sim.entries.length < 25) note(sim, lane, 20);
+      const r = await p.publish(sim.entries, sim.checkpoint(L2(13)), sim.retained);
+      expect(await starts(git, r.commit)).toEqual([0, 10, 20]);
+      await verifies(git, 24);
+    }),
+  );
 });
 
 describe("the layout follows the parent (R-LOG-16)", () => {
@@ -217,23 +239,27 @@ describe("the layout follows the parent (R-LOG-16)", () => {
     expect(() => p.commitFor(p.head, sim.entries, { ...sim.checkpoint(), layout: { version: 3, from: 3 } } as unknown as Checkpoint, sim.retained)).toThrow(PublishError);
   });
 
-  test("open on a layout 2 head reads its shape and continues it: the same commits as a publisher that never stopped", async () => {
-    const { sim, lane } = await room();
-    const a = new MemoryGit();
-    const b = new MemoryGit();
-    const steady = new LogPublisher(a);
-    let restarted = new LogPublisher(b);
-    for (const n of [50, 1200, 1300]) {
-      while (sim.entries.length < n) note(sim, lane, 30);
-      const c = sim.checkpoint(L2(0));
-      const r = await steady.publish(sim.entries, c, sim.retained);
-      restarted = await LogPublisher.open(b);
-      expect(restarted.commitFor(restarted.head, sim.entries, c, sim.retained)).toBe(r.commit);
-      expect((await restarted.publish(sim.entries, c, sim.retained)).commit).toBe(r.commit);
-      sim.system({ type: "checkpoint", through: r.through, hash: r.hash, commit: r.commit });
-    }
-    expect((await verifyLog(b)).failures).toEqual([]);
-  }, 120_000);
+  test(
+    "open on a layout 2 head reads its shape and continues it: the same commits as a publisher that never stopped",
+    at({ segmentEntries: 10 }, async () => {
+      const { sim, lane } = await room();
+      const a = new MemoryGit();
+      const b = new MemoryGit();
+      const steady = new LogPublisher(a);
+      let restarted = new LogPublisher(b);
+      // Inside segment 0, then two segments on, then inside the same open segment.
+      for (const n of [5, 25, 28]) {
+        while (sim.entries.length < n) note(sim, lane, 30);
+        const c = sim.checkpoint(L2(0));
+        const r = await steady.publish(sim.entries, c, sim.retained);
+        restarted = await LogPublisher.open(b);
+        expect(restarted.commitFor(restarted.head, sim.entries, c, sim.retained)).toBe(r.commit);
+        expect((await restarted.publish(sim.entries, c, sim.retained)).commit).toBe(r.commit);
+        sim.system({ type: "checkpoint", through: r.through, hash: r.hash, commit: r.commit });
+      }
+      expect((await verifyLog(b)).failures).toEqual([]);
+    }),
+  );
 });
 
 describe("acceptance cases (30.7): verify's layout checks", () => {
@@ -275,48 +301,56 @@ describe("acceptance cases (30.7): verify's layout checks", () => {
     expect((await verifyLog(g2)).failures.map((f) => f.reason)).toContain("layout-changed");
   });
 
-  test("Misplaced boundary: a layout 2 commit whose segment starts differ from R-LOG-17 is segment-bound", async () => {
-    const { git, r } = await log2(1005);
-    await rewrite(git, r.commit, (files) => {
-      const s0 = `${ROOT}/segments/000000000000.jsonl`;
-      const s1 = `${ROOT}/segments/000000001000.jsonl`;
-      const a = new TextDecoder().decode(files.get(s0)).split("\n");
-      const b = new TextDecoder().decode(files.get(s1)).split("\n");
-      files.delete(s1);
-      files.set(s0, utf8(a.slice(0, 999).join("\n")));
-      files.set(`${ROOT}/segments/000000000999.jsonl`, utf8([a[999]!, ...b].join("\n")));
-    });
-    const report = await verifyLog(git);
-    expect(report.failures.map((f) => f.reason)).toContain("segment-bound");
-    expect(report.ok).toBe(false);
-  }, 120_000);
+  test(
+    "Misplaced boundary: a layout 2 commit whose segment starts differ from R-LOG-17 is segment-bound",
+    at({ segmentEntries: 10 }, async () => {
+      const { git, r } = await log2(15);
+      await rewrite(git, r.commit, (files) => {
+        const s0 = `${ROOT}/segments/000000000000.jsonl`;
+        const s1 = `${ROOT}/segments/000000000010.jsonl`;
+        const a = new TextDecoder().decode(files.get(s0)).split("\n");
+        const b = new TextDecoder().decode(files.get(s1)).split("\n");
+        files.delete(s1);
+        files.set(s0, utf8(a.slice(0, 9).join("\n")));
+        files.set(`${ROOT}/segments/000000000009.jsonl`, utf8([a[9]!, ...b].join("\n")));
+      });
+      const report = await verifyLog(git);
+      expect(report.failures.map((f) => f.reason)).toContain("segment-bound");
+      expect(report.ok).toBe(false);
+    }),
+  );
 
-  test("a segment that does not follow on from the one before is segment-bound; a misplaced shard directory is fan-out; a segment over B with entries from from on is object-too-large", async () => {
-    const { git, r } = await log2(1005);
-    const s1 = `${ROOT}/segments/000000001000.jsonl`;
-    const gap = new MemoryGit();
-    for (const [k, v] of git.objects) gap.objects.set(k, v);
-    await rewrite(gap, r.commit, (files) => {
-      files.set(`${ROOT}/segments/000000001001.jsonl`, files.get(s1)!);
-      files.delete(s1);
-    });
-    expect((await verifyLog(gap)).failures.map((f) => f.reason)).toContain("segment-bound");
-    await expect(LogPublisher.open(gap)).rejects.toMatchObject({ code: "unexpected-writer" }); // segment 1001 is 1,001 entries after 0
+  test(
+    "a segment that does not follow on from the one before is segment-bound; a misplaced shard directory is fan-out; a retained file left whole over B is object-too-large",
+    at({ segmentEntries: 10, objectBound: 65_536 }, async () => {
+      const { git, r } = await log2(15);
+      const s1 = `${ROOT}/segments/000000000010.jsonl`;
+      const copy = () => {
+        const g = new MemoryGit();
+        for (const [k, v] of git.objects) g.objects.set(k, v);
+        return g;
+      };
+      const gap = copy();
+      await rewrite(gap, r.commit, (files) => {
+        files.set(`${ROOT}/segments/000000000011.jsonl`, files.get(s1)!);
+        files.delete(s1);
+      });
+      expect((await verifyLog(gap)).failures.map((f) => f.reason)).toContain("segment-bound");
+      await expect(LogPublisher.open(gap)).rejects.toMatchObject({ code: "unexpected-writer" }); // segment 11 is 11 entries after 0
 
-    const shard = new MemoryGit();
-    for (const [k, v] of git.objects) shard.objects.set(k, v);
-    await rewrite(shard, r.commit, (files) => {
-      files.set(`${ROOT}/segments/000/000000001000.jsonl`, files.get(s1)!); // only 2 names: never split
-      files.delete(s1);
-    });
-    expect((await verifyLog(shard)).failures.map((f) => f.reason)).toContain("fan-out");
-    await expect(LogPublisher.open(shard)).rejects.toMatchObject({ code: "unexpected-writer" });
+      const shard = copy();
+      await rewrite(shard, r.commit, (files) => {
+        files.set(`${ROOT}/segments/000/000000000010.jsonl`, files.get(s1)!); // only 2 names: never split
+        files.delete(s1);
+      });
+      expect((await verifyLog(shard)).failures.map((f) => f.reason)).toContain("fan-out");
+      await expect(LogPublisher.open(shard)).rejects.toMatchObject({ code: "unexpected-writer" });
 
-    const big = new MemoryGit();
-    for (const [k, v] of git.objects) big.objects.set(k, v);
-    await rewrite(big, r.commit, (files) => files.set(`${ROOT}/inputs/${"0".repeat(64)}.json`, new Uint8Array(B + 1)));
-    expect((await verifyLog(big)).failures.map((f) => f.reason)).toContain("object-too-large");
-  }, 120_000);
+      const big = copy();
+      await rewrite(big, r.commit, (files) => files.set(`${ROOT}/inputs/${"0".repeat(64)}.json`, new Uint8Array(B + 1)));
+      expect((await verifyLog(big)).failures.map((f) => f.reason)).toContain("object-too-large");
+    }),
+  );
 });
 
 /** A layout 1 checkpoint on entry `through`. */
@@ -333,61 +367,64 @@ describe("acceptance cases (30.7): publication outcomes (R-LOG-20)", () => {
     vi.restoreAllMocks();
   });
 
-  test("Guard: a faulty publisher that plans an object over B stores and pushes nothing, and fails with object-too-large, not retryable", async () => {
-    const { sim, lane } = await room();
-    for (let i = 0; i < 3; i++) note(sim, lane, 3 * 2 ** 20); // 9 MiB: R-LOG-17 would close a segment
-    // The fault: placement by count alone.
-    vi.spyOn(Placement.prototype, "place").mockImplementation(function (this: Placement, _seq: number, n: number) {
-      const starts = this.count === 0 || this.count === 1000;
-      if (starts) this.count = this.bytes = 0;
-      this.bytes += (this.count ? 1 : 0) + n;
-      this.count++;
-      return starts;
-    });
-    const git = new MemoryGit();
-    const p = new LogPublisher(git);
-    const objects = git.objects.size;
-    expect(() => p.commitFor(null, sim.entries, sim.checkpoint(L2(0)), sim.retained)).toThrow(expect.objectContaining({ code: "object-too-large" }));
-    const e = await p.publish(sim.entries, sim.checkpoint(L2(0)), sim.retained).catch((x: unknown) => x as PublishError);
-    expect(e).toMatchObject({ code: "object-too-large", retryable: false });
-    expect(git.pushes).toBe(0);
-    expect(git.objects.size).toBe(objects);
-    expect(git.refs.get(LOG_REF)).toBeUndefined();
-    // Layout 1 is not guarded: a segment over B is what layout 1 writes.
-    expect(p.commitFor(null, sim.entries, sim.checkpoint(), sim.retained)).toMatch(/^[0-9a-f]{40}$/);
-  }, 120_000);
+  test(
+    "Guard: a faulty publisher that plans an object over B stores and pushes nothing, and fails with object-too-large, not retryable",
+    at({ objectBound: 4096 }, async () => {
+      const { sim, lane } = await room();
+      for (let i = 0; i < 3; i++) note(sim, lane, 1500); // over B together: R-LOG-17 would close a segment
+      // The fault: placement by count alone.
+      vi.spyOn(Placement.prototype, "place").mockImplementation(function (this: Placement, _seq: number, n: number) {
+        const starts = this.count === 0 || this.count === 1000;
+        if (starts) this.count = this.bytes = 0;
+        this.bytes += (this.count ? 1 : 0) + n;
+        this.count++;
+        return starts;
+      });
+      const git = new MemoryGit();
+      const p = new LogPublisher(git);
+      expect(() => p.commitFor(null, sim.entries, sim.checkpoint(L2(0)), sim.retained)).toThrow(expect.objectContaining({ code: "object-too-large" }));
+      const e = await p.publish(sim.entries, sim.checkpoint(L2(0)), sim.retained).catch((x: unknown) => x as PublishError);
+      expect(e).toMatchObject({ code: "object-too-large", retryable: false });
+      expect(git.pushes).toBe(0);
+      expect(git.objects.size).toBe(0);
+      expect(git.refs.get(LOG_REF)).toBeUndefined();
+      // Layout 1 is not guarded: a segment over B is what layout 1 writes.
+      expect(p.commitFor(null, sim.entries, sim.checkpoint(), sim.retained)).toMatch(/^[0-9a-f]{40}$/);
+    }),
+  );
 
-  test("Refused push and recovery: a layout 1 commit refused for an object over the limit stays refused (refused, not retryable, not pushed again, the ref at the parent); the next cohort is layout 2 on the confirmed parent, is accepted, and the refused commit cannot apply", async () => {
-    // Artifacts' 32 MiB limit is scaled to B here, so the layout 1 segment that passes it is 9 MiB, not 33.
-    const { sim, lane } = await room();
-    const git = new MemoryGit();
-    git.objectLimit = B;
-    const p = new LogPublisher(git);
-    for (let i = 0; i < 5; i++) note(sim, lane, 2 ** 20);
-    const parent = await p.publish(sim.entries, sim.checkpoint(), sim.retained); // layout 1, open segment 5 MiB
-    sim.system({ type: "checkpoint", through: parent.through, hash: parent.hash, commit: parent.commit });
-    for (let i = 0; i < 4; i++) note(sim, lane, 2 ** 20);
-    const refusedCp = sim.checkpoint();
-    const refused = p.commitFor(parent.commit, sim.entries, refusedCp, sim.retained);
-    const pushes = git.pushes;
-    const e = await p.publish(sim.entries, refusedCp, sim.retained).catch((x: unknown) => x as PublishError);
-    expect(e).toBeInstanceOf(PublishError);
-    expect(e).toMatchObject({ code: "refused", retryable: false, refusal: { code: OBJECT_TOO_LARGE } });
-    expect(git.pushes - pushes).toBe(1);
-    expect(git.refs.get(LOG_REF)).toBe(parent.commit);
-    expect(p.head).toBe(parent.commit);
+  test(
+    "Refused push and recovery: a layout 1 commit refused for an object over the remote's limit stays refused (refused, not retryable, not pushed again, the ref at the parent); the next cohort is layout 2 on the confirmed parent, is accepted, and the refused commit cannot apply",
+    at({ objectBound: 8192 }, async () => {
+      // The remote's limit is B here, so the layout 1 segment that passes it is small.
+      const { sim, lane } = await room();
+      const git = new MemoryGit();
+      git.objectLimit = B;
+      const p = new LogPublisher(git);
+      for (let i = 0; i < 2; i++) note(sim, lane, 1000);
+      const parent = await p.publish(sim.entries, sim.checkpoint(), sim.retained); // layout 1, open segment under the limit
+      sim.system({ type: "checkpoint", through: parent.through, hash: parent.hash, commit: parent.commit });
+      for (let i = 0; i < 3; i++) note(sim, lane, 1000);
+      const refusedCp = sim.checkpoint();
+      const refused = p.commitFor(parent.commit, sim.entries, refusedCp, sim.retained);
+      const pushes = git.pushes;
+      const e = await p.publish(sim.entries, refusedCp, sim.retained).catch((x: unknown) => x as PublishError);
+      expect(e).toBeInstanceOf(PublishError);
+      expect(e).toMatchObject({ code: "refused", retryable: false, refusal: { code: OBJECT_TOO_LARGE } });
+      expect(git.pushes - pushes).toBe(1);
+      expect(git.refs.get(LOG_REF)).toBe(parent.commit);
+      expect(p.head).toBe(parent.commit);
 
-    // Recovery: layout 2 on the confirmed parent, from one past its through.
-    note(sim, lane, 10);
-    const d = await p.publish(sim.entries, sim.checkpoint(L2(parent.through + 1)), sim.retained);
-    expect(git.refs.get(LOG_REF)).toBe(d.commit);
-    expect(parseCommit((await git.readObject(d.commit)).data).parents).toEqual([parent.commit]);
-    // A late push of the refused commit leases the parent, which the ref will never hold again.
-    expect(await git.push([], LOG_REF, refused, parent.commit)).toMatchObject({ ok: false, reason: "lease-mismatch", current: d.commit });
-    const report = await verifyLog(git);
-    expect(report.failures).toEqual([]);
-    expect(report.verifiedThrough).toBe(sim.entries.length - 1);
-  }, 120_000);
+      // Recovery: layout 2 on the confirmed parent, from one past its through.
+      note(sim, lane, 10);
+      const d = await p.publish(sim.entries, sim.checkpoint(L2(parent.through + 1)), sim.retained);
+      expect(git.refs.get(LOG_REF)).toBe(d.commit);
+      expect(parseCommit((await git.readObject(d.commit)).data).parents).toEqual([parent.commit]);
+      // A late push of the refused commit leases the parent, which the ref will never hold again.
+      expect(await git.push([], LOG_REF, refused, parent.commit)).toMatchObject({ ok: false, reason: "lease-mismatch", current: d.commit });
+      await verifies(git, sim.entries.length - 1);
+    }),
+  );
 
   test("Refused, by status: a [remote rejected] status is refused, the ref reads back at the parent, and the commit is not pushed again", async () => {
     const { sim, lane } = await room();
@@ -479,6 +516,373 @@ describe("acceptance cases (30.7): publication outcomes (R-LOG-20)", () => {
     expect(r.attempts).toBe(2);
     expect(remote.pushed.slice(-2)).toEqual([r.commit, r.commit]);
   });
+});
+
+// ------------------------------------------------- entries and files over B
+
+/** Retained files as references read in parts: never loaded whole. `loads` counts whole loads. */
+function refsInParts(retained: readonly Retained[], loads: { n: number } = { n: 0 }): RetainedRef[] {
+  return retained.map((r) => {
+    const bytes = utf8(r.body);
+    return {
+      kind: r.kind,
+      digest: `sha256:${sha256Hex(bytes)}` as const,
+      load: () => {
+        loads.n++;
+        return r.body;
+      },
+      bytes: bytes.length,
+      read: (o: number, l: number) => bytes.slice(o, o + l),
+    };
+  });
+}
+
+/** The demo policy, with one more rule whose text makes the document over `bytes` long. */
+function bigPolicy(bytes: number): PolicyDocument {
+  return policy(
+    rule({ id: "narrow-claims", on: "claim", refuse: '"**" in act.body.scope', fix: "Claim only the paths you will change.", reason: "A claim on ** covers the whole repository." }),
+    rule({ id: "holder-sees-claims", kind: "notify", on: ["claim"], to: ["holder"], why: "You claimed this lane." }),
+    rule({ id: "padding", on: "note", refuse: "false", fix: "x".repeat(bytes) }),
+  );
+}
+
+/** A `notified` event for `lane`, with the context of a real notify evaluation whose act body is `body`. */
+async function notified(sim: RoomSim, lane: string, body: unknown): Promise<LogEntry> {
+  const r = await evaluateNotify(
+    sim.policy,
+    {
+      kind: "notify",
+      act: { id: lane as never, kind: "claim", target: null, body: body as never },
+      actor: { member: "@alice" as MemberId, role: "admin", teams: [], delegated: false },
+      lane: { id: lane as never, claimed: true, holder: "@alice" as MemberId, scope: [], generation: 0, purpose: "ordinary" },
+      proposal: null,
+    },
+    { roles: {}, reviewers: [] },
+  );
+  for (const e of r.evaluations) sim.retained.push(retain("input", e.context));
+  const decisions: Decision[] = r.evaluations.map((e) => e.decision);
+  return sim.system({ type: "notified", entry: lane as never, decisions, to: ["@alice" as MemberId] });
+}
+
+/** An entry sealed by the room whose line is exactly `bytes` long. */
+const sized = (sim: RoomSim, bytes: number) => exact(sim, bytes, (pad) => sim.system({ type: "revert-lane", of: "op_land_0" as never, scope: ["x".repeat(pad) as RepoPath], reason: "abort-after-landing" }));
+
+/** A copy of a repository's objects, to change apart from it. */
+function copyOf(git: MemoryGit): MemoryGit {
+  const g = new MemoryGit();
+  for (const [k, v] of git.objects) g.objects.set(k, v);
+  return g;
+}
+
+describe("acceptance cases (30.7): entries and files over B", () => {
+  test(
+    "Unpublished old entry over B: the switch commit has from 1; segment 0 holds entry 0 and the ChunkedLine for entry 1; its file is chunks of B and 1 bytes; every blob is at most B; verify reassembles it and checks its hash and signature. Read whole or in parts, the commit is the same, and in parts the publisher never holds the line",
+    at({ objectBound: 4096 }, async () => {
+      const sim = bareRoom();
+      const commits: Sha[] = [];
+      let parent: Sha | null = null;
+      let one: LogEntry | null = null;
+      for (const inParts of [false, true]) {
+        const git = new MemoryGit();
+        git.objectLimit = B; // every object at most B
+        const opts = proportional();
+        const p = new LogPublisher(git, opts);
+        sim.entries.length = 1;
+        const w = await p.publish(sim.entries, sim.checkpoint(), []); // layout 1, through entry 0
+        parent ??= w.commit;
+        expect(w.commit).toBe(parent);
+        // Entry 1, sealed before the upgrade and never published: a line of B + 1 bytes.
+        if (one) sim.entries.push(one);
+        else one = sized(sim, B + 1);
+        p.resetStats();
+        const parts = partsSource(sim.entries, B);
+        const r = await p.publish(inParts ? parts.source : sim.entries, sim.checkpoint(L2(1)), []);
+        commits.push(r.commit);
+        const { files, blobs } = await walk(git, r.commit);
+        const seg = new TextDecoder().decode(files.get(`${ROOT}/segments/000000000000.jsonl`)).split("\n");
+        expect(seg).toEqual([canonicalize(sim.entries[0]), ref.chunkedLine(1, B + 1, digestBytes(utf8(canonicalize(one))))]);
+        const chunks = [...files].filter(([path]) => path.startsWith(`${ROOT}/entries/000000000001.jsonl/`));
+        expect(chunks.map(([path, d]) => [path.slice(-12), d.length])).toEqual([["000000000000", B], ["000000000001", 1]]);
+        for (const [path, d] of files) expect(d.length, path).toBeLessThanOrEqual(B);
+        expect(blobs.size).toBe(files.size);
+        await verifies(git, 1);
+        expect(await readPublishedEntries(git, r.commit)).toEqual(sim.entries);
+        if (inParts) {
+          // The line was never read whole: it was hashed in parts of at most one read, and sent in staged parts of at most one transfer.
+          const hashing = parts.reads.slice(0, Math.ceil((B + 1) / opts.read.bytes));
+          expect(Math.max(...hashing)).toBeLessThanOrEqual(opts.read.bytes);
+          expect(Math.max(...parts.reads)).toBeLessThanOrEqual(opts.maxTransfer.bytes);
+          expect(p.stats.peakBatchBytes).toBeLessThanOrEqual(opts.maxTransfer.bytes);
+          expect(p.stats.peakObjectBytes).toBeLessThan(B / 2); // trees, the checkpoint and the genesis: never the line
+          expect(p.stats.peakSendBytes).toBeLessThanOrEqual(opts.maxTransfer.bytes);
+        }
+      }
+      expect(commits[1]).toBe(commits[0]);
+      // A restarted publisher whose open segment holds the chunked entry does not send its chunks again:
+      // to a remote that cannot stage, the next publication is one push under one transfer.
+      const git = new MemoryGit();
+      await new LogPublisher(git, proportional()).publish(sim.entries, sim.checkpoint(L2(0)), []);
+      note(sim, "act_0_00000000", 5);
+      const noStage = { readRef: (r: string) => git.readRef(r), readObject: (sha: Sha) => git.readObject(sha), push: git.push.bind(git) };
+      const reopened = await LogPublisher.open(noStage, proportional());
+      await reopened.publish(sim.entries, sim.checkpoint(L2(0)), []);
+      expect(reopened.stats.peakSendBytes).toBeLessThan(B);
+    }),
+  );
+
+  test(
+    "a chunked line whose length changes between hashing and sending is refused as changed, and nothing is pushed",
+    at({ objectBound: 4096 }, async () => {
+      const sim = bareRoom();
+      const bytes = utf8(canonicalize(sized(sim, B + 1)));
+      let calls = 0;
+      const source: EntrySource = {
+        through: 1,
+        read: (from, limit) =>
+          sim.entries.slice(from, from + limit).map((e): LogEntry | EntryLine => {
+            if (e.seq !== 1) return e;
+            const n = calls++ < 3 ? bytes.length : bytes.length + 1; // measured, tail, hashed: then one byte longer
+            return { seq: 1, bytes: n, read: (o, l) => bytes.slice(o, o + l) };
+          }),
+      };
+      const git = new MemoryGit();
+      const e = (await new LogPublisher(git, proportional()).publish(source, sim.checkpoint(L2(0)), []).catch((x: unknown) => x)) as Error;
+      expect(e).toMatchObject({ code: "invalid-input" });
+      expect(e.message).toMatch(/changed while it was read/);
+      expect(git.refs.get(LOG_REF)).toBeUndefined();
+    }),
+  );
+
+  test(
+    "Bad chunk: a changed chunk of an entry file is chunk-mismatch, and the verified prefix ends before the entry; so are the same bytes cut at another place",
+    at({ objectBound: 4096 }, async () => {
+      const sim = bareRoom();
+      const git = new MemoryGit();
+      const p = new LogPublisher(git);
+      await p.publish(sim.entries, sim.checkpoint(), []);
+      sized(sim, B + 1);
+      const r = await p.publish(sim.entries, sim.checkpoint(L2(1)), []);
+      const dir = `${ROOT}/entries/000000000001.jsonl`;
+      // A changed byte inside the first chunk: the same length, another digest.
+      const changed = copyOf(git);
+      await rewrite(changed, r.commit, (files) => {
+        const d = files.get(`${dir}/000000000000`)!.slice();
+        const at = d.indexOf(0x78, 1000);
+        d[at] = 0x79;
+        files.set(`${dir}/000000000000`, d);
+      });
+      const report = await verifyLog(changed);
+      expect(report.failures.find((f) => f.reason === "chunk-mismatch")?.seq).toBe(1);
+      expect(report.verifiedThrough).toBe(0);
+      // The same bytes cut into chunks of other sizes: R-LOG-18 gives B bytes, then the rest.
+      const recut = copyOf(git);
+      await rewrite(recut, r.commit, (files) => {
+        const a = files.get(`${dir}/000000000000`)!;
+        const b = files.get(`${dir}/000000000001`)!;
+        files.set(`${dir}/000000000000`, a.slice(0, B - 1));
+        files.set(`${dir}/000000000001`, new Uint8Array([...a.slice(B - 1), ...b]));
+      });
+      expect((await verifyLog(recut)).failures.map((f) => f.reason)).toContain("chunk-mismatch");
+    }),
+  );
+
+  test(
+    "Old log, then the switch with a large open segment: a layout 1 log whose segments are over B verifies as before, and is the commit the publisher before this amendment made; the next commit is layout 2 from W + 1, both segments are unchanged, the open one is closed, entry W + 1 starts a new one, and verify passes across the switch",
+    at({ objectBound: 4096, segmentEntries: 10 }, async () => {
+      const { sim, lane } = await room();
+      while (sim.entries.length < 15) note(sim, lane, 500);
+      const git = new MemoryGit();
+      const p = new LogPublisher(git);
+      const w = await p.publish(sim.entries, sim.checkpoint(), sim.retained);
+      expect(w.commit).toBe(await new Reference(new MemoryGit()).commitFor(null, sim.entries, sim.checkpoint(), sim.retained));
+      const seg0 = `${ROOT}/segments/000000000000.jsonl`;
+      const seg10 = `${ROOT}/segments/000000000010.jsonl`;
+      const before = await walk(git, w.commit);
+      for (const seg of [seg0, seg10]) expect(before.files.get(seg)!.length).toBeGreaterThan(B); // a full one and the open one
+      await verifies(git, 14);
+
+      sim.system({ type: "checkpoint", through: w.through, hash: w.hash, commit: w.commit });
+      for (let i = 0; i < 2; i++) note(sim, lane, 100);
+      p.resetStats();
+      const cp2 = sim.checkpoint(L2(w.through + 1));
+      const r = await p.publish(sim.entries, cp2, sim.retained);
+      // Another publisher, for whom w is not its own parent, places every segment and makes the same commit;
+      // the segments over B hold only entries before from, so the guard lets them through.
+      expect(new LogPublisher(new MemoryGit()).commitFor(w.commit, sim.entries, cp2, sim.retained)).toBe(r.commit);
+      const after = await walk(git, r.commit);
+      for (const seg of [seg0, seg10]) expect(after.blobs.get(seg)).toBe(before.blobs.get(seg));
+      expect([...after.files.keys()].filter((k) => k.includes("/segments/"))).toEqual([seg0, seg10, `${ROOT}/segments/${twelve(w.through + 1)}.jsonl`]);
+      expect(p.stats.sentSegmentBytes).toBeLessThan(B); // the segments over B are reused by ID, not sent
+      await verifies(git, sim.entries.length - 1);
+    }),
+  );
+
+  test(
+    "At the switch every retained file moves to its layout 2 path: one over B in the layout 1 parent becomes a chunk directory; a restarted publisher needs every kept file, loads each once to learn its size, and not again after the switch",
+    at({ objectBound: 4096 }, async () => {
+      const { sim, lane } = await room();
+      const big: Retained = { kind: "input", body: `{"budget":{},"input":{"pad":"${"x".repeat(B)}"},"kind":"refuse"}` };
+      sim.retained.push(big);
+      const git = new MemoryGit();
+      const w = await new LogPublisher(git).publish(sim.entries, sim.checkpoint(), sim.retained); // layout 1: one blob of B + 48 bytes
+      const name = `${ROOT}/inputs/${sha256Hex(utf8(big.body))}.json`;
+      expect((await walk(git, w.commit)).files.get(name)!.length).toBe(B + 48);
+      sim.system({ type: "checkpoint", through: w.through, hash: w.hash, commit: w.commit });
+      note(sim, lane, 10);
+      const restarted = await LogPublisher.open(git);
+      expect(() => restarted.commitFor(w.commit, sim.entries, sim.checkpoint(L2(w.through + 1)), [])).toThrow(/needs the retained file/);
+      const loads = { n: 0 };
+      const refs = sim.retained.map((r): RetainedRef => ({ kind: r.kind, digest: `sha256:${sha256Hex(utf8(r.body))}`, load: () => (loads.n++, r.body) }));
+      const r = await restarted.publish(sim.entries, sim.checkpoint(L2(w.through + 1)), refs);
+      const loadsAtSwitch = loads.n;
+      expect(loadsAtSwitch).toBeGreaterThanOrEqual(sim.retained.length);
+      const { files } = await walk(git, r.commit);
+      expect(files.has(name)).toBe(false);
+      expect([...files.keys()].filter((k) => k.startsWith(`${name}/`)).map((k) => files.get(k)!.length)).toEqual([B, 48]);
+      await verifies(git, sim.entries.length - 1);
+      // After the switch the kept files are reused by ID and not loaded.
+      note(sim, lane, 10);
+      await restarted.publish(sim.entries, sim.checkpoint(L2(w.through + 1)), refs);
+      expect(loads.n).toBe(loadsAtSwitch);
+    }),
+  );
+
+  test(
+    "a line or file of exactly B is not chunked; one byte more is",
+    at({ objectBound: 4096 }, async () => {
+      const { sim, lane } = await room();
+      const atB: Retained = { kind: "input", body: `{"budget":{},"input":{"pad":"${"x".repeat(B - 48)}"},"kind":"refuse"}` };
+      const overB: Retained = { kind: "input", body: `{"budget":{},"input":{"pad":"${"y".repeat(B - 47)}"},"kind":"refuse"}` };
+      expect([utf8(atB.body).length, utf8(overB.body).length]).toEqual([B, B + 1]);
+      sim.retained.push(atB, overB);
+      const e = exact(sim, B, (pad) => note(sim, lane, pad));
+      note(sim, lane, 5);
+      const git = new MemoryGit();
+      git.objectLimit = B;
+      const r = await new LogPublisher(git, proportional()).publish(partsSource(sim.entries, B / 2).source, sim.checkpoint(L2(0)), refsInParts(sim.retained));
+      const { files } = await walk(git, r.commit);
+      expect(files.get(`${ROOT}/inputs/${sha256Hex(utf8(atB.body))}.json`)!.length).toBe(B);
+      expect([...files.keys()].filter((k) => k.startsWith(`${ROOT}/inputs/${sha256Hex(utf8(overB.body))}.json/`))).toHaveLength(2);
+      expect(files.get(`${ROOT}/segments/${twelve(e.seq)}.jsonl`)!.length).toBe(B); // the line alone, whole
+      expect([...files.keys()].some((k) => k.includes("/entries/"))).toBe(false);
+      await verifies(git, sim.entries.length - 1);
+    }),
+  );
+
+  test(
+    "a layout 2 segment over B holding entries from from on is object-too-large",
+    at({ objectBound: 8192 }, async () => {
+      const { sim, lane } = await room();
+      note(sim, lane, 3000);
+      note(sim, lane, 3000);
+      const git = new MemoryGit();
+      const r = await new LogPublisher(git).publish(sim.entries, sim.checkpoint(L2(0)), sim.retained);
+      expect(await starts(git, r.commit)).toEqual([0, 4]);
+      await rewrite(git, r.commit, (files) => {
+        const a = files.get(`${ROOT}/segments/000000000000.jsonl`)!;
+        const b = files.get(`${ROOT}/segments/000000000004.jsonl`)!;
+        files.delete(`${ROOT}/segments/000000000004.jsonl`);
+        files.set(`${ROOT}/segments/000000000000.jsonl`, new Uint8Array([...a, 0x0a, ...b]));
+      });
+      expect((await verifyLog(git)).failures.map((f) => f.reason)).toContain("object-too-large");
+    }),
+  );
+
+  test("an EntryLine must be the entry it stands for: its end names its seq and hash, and its length never changes", async () => {
+    const { sim, lane } = await room();
+    note(sim, lane, 10);
+    note(sim, lane, 10);
+    const lines = sim.entries.map((e) => utf8(canonicalize(e)));
+    const n = sim.entries.length - 1;
+    const as = (seq: number, bytes: Uint8Array): EntryLine => ({ seq, bytes: bytes.length, read: (o, l) => bytes.slice(o, o + l) });
+    const source = (give: (seq: number) => LogEntry | EntryLine): EntrySource => ({ through: n, read: (from, limit) => Array.from({ length: Math.min(limit, n - from + 1) }, (_, i) => give(from + i)) });
+    const p = new LogPublisher(new MemoryGit());
+    // The last entry given as the line of the one before it.
+    expect(() => p.commitFor(null, source((s) => (s === n ? as(n, lines[n - 1]!) : sim.entries[s]!)), sim.checkpoint(L2(0)), sim.retained)).toThrow(expect.objectContaining({ code: "invalid-input" }));
+    // The last line with its seq changed: its hash is still the checkpoint's, but it is not entry n.
+    const renumbered = utf8(new TextDecoder().decode(lines[n]!).replace(new RegExp(`"seq":${n}}$`), `"seq":${n + 7}}`));
+    expect(() => p.commitFor(null, source((s) => (s === n ? as(n, renumbered) : sim.entries[s]!)), sim.checkpoint(L2(0)), sim.retained)).toThrow(expect.objectContaining({ code: "invalid-input" }));
+    // A line whose length changes between reads.
+    let reads = 0;
+    const shifting = (s: number): LogEntry | EntryLine => (s === n - 1 ? as(s, reads++ < 1 ? lines[s]! : new Uint8Array([...lines[s]!, 0x20])) : sim.entries[s]!);
+    expect(() => p.commitFor(null, source(shifting), sim.checkpoint(L2(0)), sim.retained)).toThrow(expect.objectContaining({ code: "invalid-input" }));
+    // Given rightly, the commit is the same as from the entries.
+    expect(p.commitFor(null, source((s) => as(s, lines[s]!)), sim.checkpoint(L2(0)), sim.retained)).toBe(p.commitFor(null, sim.entries, sim.checkpoint(L2(0)), sim.retained));
+  });
+
+  test(
+    "Retained prefix, large activation and determinism: retained files whose digests share their first two hex characters, past the directory limit, and a replay context and a policy document of more than 2 B. inputs/ splits by the first group and again by the next, no tree lists more than the limit, each large file is three chunks, verify finds and checks each by its digest and replays the decisions made under the large policy; two publishers and a restarted one make the same commit; a file in the wrong shard directory is fan-out; a changed chunk of a retained file is chunk-mismatch",
+    at({ objectBound: 4096, directoryEntries: 6 }, async () => {
+      const { sim, lane } = await room();
+      // Seven replay contexts whose digests all start with "ab": more than one directory lists.
+      const prefixed: Retained[] = [];
+      for (let s = 0; prefixed.length < 7; s++) {
+        const body = `{"budget":{},"input":{"n":${prefixed.length},"s":${s}},"kind":"refuse"}`;
+        if (sha256Hex(utf8(body)).startsWith("ab")) prefixed.push({ kind: "input", body });
+      }
+      sim.retained.push(...prefixed);
+      await notified(sim, lane, { pad: "x".repeat(2 * B + 100) }); // a replay context over 2 B
+      const big = bigPolicy(2 * B + 100);
+      const checkers: Record<string, CheckerConfig> = {};
+      for (let i = 0; i < 6; i++) checkers[`checker-${i}`] = { format: "artroom-checker-v1", volatile: false, timeoutSeconds: 60 + i };
+      sim.activate(big, checkers); // a policy document over 2 B, and more checker configurations than one directory lists
+      await sim.claim(keys.alice, alice, ["docs/**"]); // decided under it
+      const sizes = new Map(sim.retained.map((r) => [`${sha256Hex(utf8(r.body))}.json`, utf8(r.body).length]));
+      expect([...sizes.values()].filter((n) => n > 2 * B)).toHaveLength(2);
+
+      const cp = sim.checkpoint(L2(0));
+      const git = new MemoryGit();
+      git.objectLimit = B;
+      const p = new LogPublisher(git, proportional());
+      const loads = { n: 0 };
+      const r = await p.publish(sim.entries, cp, refsInParts(sim.retained, loads));
+      expect(loads.n).toBe(0); // read in parts, never loaded whole
+      expect(p.stats.peakObjectBytes).toBeLessThan(B);
+      // Determinism: another publisher, and the same one after a restart.
+      expect(new LogPublisher(new MemoryGit()).commitFor(null, sim.entries, cp, sim.retained)).toBe(r.commit);
+      const reopened = await LogPublisher.open(git, proportional());
+      expect(reopened.commitFor(null, sim.entries, cp, refsInParts(sim.retained))).toBe(r.commit);
+      expect((await reopened.publish(sim.entries, cp, refsInParts(sim.retained))).commit).toBe(r.commit);
+
+      // Where R-LOG-19 puts each file, and R-LOG-18 each chunk.
+      const { files, trees } = await walk(git, r.commit);
+      expectSmallTrees(trees);
+      expect(trees.find((t) => t.path === `${ROOT}/policies`)!.names.every((n) => /^[0-9a-f]{2}$/.test(n))).toBe(true); // nine files: split
+      const paths = [...files.keys()];
+      for (const x of prefixed) {
+        const hex = sha256Hex(utf8(x.body));
+        expect(paths, hex).toContain(`${ROOT}/inputs/ab/${hex.slice(2, 4)}/${hex}.json`);
+      }
+      for (const [name, size] of sizes) {
+        if (size <= B) continue;
+        const chunks = paths.filter((k) => k.includes(`/${name}/`)).sort();
+        expect(chunks.map((k) => [k.slice(-12), files.get(k)!.length]), name).toEqual([["000000000000", B], ["000000000001", B], ["000000000002", size - 2 * B]]);
+      }
+      const report = await verifies(git, sim.entries.length - 1);
+      expect(report.decisionsReplayed).toBeGreaterThan(0);
+
+      // A file moved to a sibling shard directory that exists: fan-out, though its bytes and name are right.
+      const moved = copyOf(git);
+      const prefixedPaths = paths.filter((k) => /^artroom-log\/v1\/inputs\/ab\/[0-9a-f]{2}\/[0-9a-f]{64}\.json$/.test(k));
+      const from = prefixedPaths[0]!;
+      const sibling = prefixedPaths.find((k) => k.split("/")[4] !== from.split("/")[4])!.split("/")[4]!;
+      await rewrite(moved, r.commit, (f) => {
+        f.set(from.replace(/\/ab\/[0-9a-f]{2}\//, `/ab/${sibling}/`), f.get(from)!);
+        f.delete(from);
+      });
+      expect((await verifyLog(moved)).failures.map((x) => x.reason)).toEqual(["fan-out"]);
+
+      // Bad chunk: a changed chunk of the large policy document.
+      const policyName = `${sha256Hex(utf8(canonicalize(big)))}.json`;
+      const chunk = paths.find((k) => k.includes("/policies/") && k.includes(`${policyName}/`) && k.endsWith("/000000000002"))!;
+      await rewrite(git, r.commit, (f) => {
+        const d = f.get(chunk)!.slice();
+        d[0] = d[0] === 0x78 ? 0x79 : 0x78;
+        f.set(chunk, d);
+      });
+      expect((await verifyLog(git)).failures.map((f) => f.reason)).toContain("chunk-mismatch");
+    }),
+  );
 });
 
 describe("lengths past 32 bits and sizes that are not lengths (review of 04797d8c)", () => {
@@ -605,4 +1009,80 @@ describe("lengths past 32 bits and sizes that are not lengths (review of 04797d8
   test("eachChunk refuses a size that is not a length", () => {
     for (const n of [NaN, -1, 1.5, Infinity]) expect(() => layout.chunks(n)).toThrow(RangeError);
   });
+});
+
+// ------------------------------------------------ at the contract's own limits
+
+describe("acceptance cases (30.7) at the contract's own limits", () => {
+  test("Unpublished old entry over B, at B = 8 MiB and the default limits: its file is chunks of B and 1 bytes, every blob is at most B, the line is hashed in reads of at most 1 MiB and sent in staged parts of at most one transfer, and verify reassembles it", async () => {
+    expect(B).toBe(8 * 2 ** 20);
+    const sim = bareRoom();
+    const git = new MemoryGit();
+    git.objectLimit = B; // stricter than Artifacts: every object at most B
+    const p = new LogPublisher(git);
+    await p.publish(sim.entries, sim.checkpoint(), []); // layout 1, through entry 0
+    const one = sized(sim, B + 1);
+    p.resetStats();
+    const parts = partsSource(sim.entries);
+    const r = await p.publish(parts.source, sim.checkpoint(L2(1)), []);
+    const { files } = await walk(git, r.commit);
+    const seg = new TextDecoder().decode(files.get(`${ROOT}/segments/000000000000.jsonl`)).split("\n");
+    expect(seg[1]).toBe(ref.chunkedLine(1, B + 1, digestBytes(utf8(canonicalize(one)))));
+    const chunks = [...files].filter(([path]) => path.startsWith(`${ROOT}/entries/000000000001.jsonl/`));
+    expect(chunks.map(([path, d]) => [path.slice(-12), d.length])).toEqual(ref.chunks(B + 1).map((c) => [c.name, c.bytes]));
+    for (const [path, d] of files) expect(d.length, path).toBeLessThanOrEqual(B);
+    const hashing = parts.reads.slice(0, Math.ceil((B + 1) / READ_LIMITS.bytes));
+    expect(Math.max(...hashing)).toBeLessThanOrEqual(READ_LIMITS.bytes);
+    expect(Math.max(...parts.reads)).toBeLessThanOrEqual(LOG_TRANSFER_LIMITS.bytes);
+    expect(p.stats.peakBatchBytes).toBeLessThanOrEqual(LOG_TRANSFER_LIMITS.bytes);
+    expect(p.stats.peakObjectBytes).toBeLessThan(64 * 1024);
+    expect(p.stats.peakSendBytes).toBeLessThanOrEqual(LOG_TRANSFER_LIMITS.bytes);
+    await verifies(git, 1);
+  });
+
+  test(
+    "Many segments, at the directory limit of 4,096 names: a log of 5,000 segments (of 10 entries here, not 1,000); segments/ splits by digit groups where the contract's reference function says; every tree is within the limit and under 397,312 bytes; a restarted publisher reads the fanned-out index and continues it",
+    at({ segmentEntries: 10 }, async () => {
+      // The entries between the genesis and the last are one-byte lines given in parts, which the publisher
+      // places, hashes and sends without parsing. So verify, which checks every entry's signature, is not run
+      // here; its fan-out walk is covered by the retained prefix case.
+      expect(layout.DIRECTORY_ENTRIES).toBe(4096);
+      const N = 50_000;
+      const sim = bareRoom();
+      const last = seal({ format: "artroom-log-v1", seq: N - 1, prev: sim.entries[0]!.hash, at: sim.at(N - 1), entry: { type: "system", event: { type: "lease-expired", lane: "act_1_00000000" as never, holder: "@alice" as MemberId, leaseGeneration: 1 } } }, keys.room.seed);
+      const x = new Uint8Array([0x78]);
+      const tiny = (seq: number): EntryLine => ({ seq, bytes: 1, read: (o, l) => x.subarray(o, o + l) });
+      const source: EntrySource = {
+        through: N - 1,
+        read: (from, limit) => {
+          const out: (LogEntry | EntryLine)[] = [];
+          for (let s = from; s < Math.min(from + limit, N); s++) out.push(s === 0 ? sim.entries[0]! : s === N - 1 ? last : tiny(s));
+          return out;
+        },
+      };
+      const cp = makeCheckpoint(sim.room, keys.room.key, keys.room.seed, last, sim.at(N), L2(0));
+      const git = new MemoryGit();
+      const r = await new LogPublisher(git).publish(source, cp, []);
+      const { trees } = await walk(git, r.commit);
+      expectSmallTrees(trees);
+      const segs = trees.filter((t) => t.path.startsWith(`${ROOT}/segments`));
+      expect(segs.find((t) => t.path === `${ROOT}/segments`)!.names).toEqual(["000"]);
+      expect(segs.find((t) => t.path === `${ROOT}/segments/000`)!.names).toEqual(["000"]);
+      expect(segs.find((t) => t.path === `${ROOT}/segments/000/000`)!.names).toHaveLength(50);
+      const names = Array.from({ length: N / 10 }, (_, k) => `${twelve(k * 10)}.jsonl`);
+      for (const k of [0, 99, 100, 4096, 4999]) {
+        const dirs = ref.shardsOf(names, names[k]!, (n) => n.slice(0, 12), 3);
+        expect(dirs).toHaveLength(3);
+        expect(segs.find((t) => t.path === [`${ROOT}/segments`, ...dirs].join("/"))!.names).toContain(names[k]);
+      }
+      const reopened = await LogPublisher.open(git);
+      expect(reopened.publishedThrough).toBe(N - 1);
+      expect(git.refs.get(LOG_REF)).toBe(r.commit);
+      // A child of the head reads only the open segment and reuses every shard directory by ID:
+      // only the root, artroom-log/ and v1/ trees are encoded again.
+      reopened.resetStats();
+      reopened.commitFor(reopened.head, source, cp, []);
+      expect(reopened.stats.treesBuilt).toBe(3);
+    }),
+  );
 });

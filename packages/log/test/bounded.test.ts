@@ -4,6 +4,11 @@
  * then ID, then the bytes of each part), reuses the parent's full segments
  * and retained files by ID, and makes exactly the commits the publisher of
  * main 417a1618 made from the same log.
+ *
+ * The bounds are options (`maxTransfer`, `read`), and the tests pass small
+ * ones. Tests that cross a segment boundary run with segments of 10
+ * entries (`at`, `src/layout.ts` `setLayoutLimitsForTests`): the reference
+ * publisher reads the same segment size.
  */
 
 import { describe, expect, test } from "vitest";
@@ -16,6 +21,7 @@ import { LogPublisher, READ_LIMITS, type EntrySource, type RetainedRef } from ".
 import { LogPublisher as Reference } from "./support/publisher-417a1618.ts";
 import { verifyLog } from "../src/verify.ts";
 import { RoomSim, keys, memberAuthority } from "./support/room-sim.ts";
+import { at } from "./support/layout2.ts";
 
 const alice = memberAuthority("@alice", keys.alice.key);
 
@@ -65,22 +71,23 @@ function referenceCommit(parent: Sha | null, entries: readonly LogEntry[], retai
 }
 
 describe("the same commits as 417a1618", () => {
-  test("across segment boundaries, staged and unstaged, from arrays and sources, with restarts: every commitFor and every publish equals the reference", async () => {
+  test("across segment boundaries, staged and unstaged, from arrays and sources, with restarts: every commitFor and every publish equals the reference", at({ segmentEntries: 10 }, async () => {
     const sim = new RoomSim();
     const claim = await sim.claim(keys.alice, alice, ["src/**"]);
     const ref = new Reference(new MemoryGit());
     const arrays = new LogPublisher(new MemoryGit());
     const srcGit = new MemoryGit();
-    let sources = new LogPublisher(srcGit, { maxTransfer: { objects: 100_000, bytes: 4093 }, read: { entries: 7, bytes: 5000 } });
+    const bounds = { maxTransfer: { objects: 100_000, bytes: 4093 }, read: { entries: 3, bytes: 1500 } };
+    let sources = new LogPublisher(srcGit, bounds);
     // Publish when through is, in turn: inside segment 0, its last entry, the first of segment 1,
     // a jump over a whole segment, and the first two of segment 3 (restarting before each).
-    const stops = [37, 999, 1000, 2600, 3000, 3001];
+    const stops = [3, 9, 10, 26, 30, 31];
     for (const [i, stop] of stops.entries()) {
       while (sim.entries.length <= stop) {
-        if (sim.entries.length % 97 === 0) await sim.claim(keys.alice, alice, [`area${sim.entries.length}/**`]);
+        if (sim.entries.length % 7 === 0) await sim.claim(keys.alice, alice, [`area${sim.entries.length}/**`]);
         else note(sim, claim.lane!, (sim.entries.length * 7) % 300);
       }
-      if (i >= 4) sources = await LogPublisher.open(srcGit, { maxTransfer: { objects: 100_000, bytes: 4093 }, read: { entries: 7, bytes: 5000 } });
+      if (i >= 4) sources = await LogPublisher.open(srcGit, bounds);
       sim.entries.length = stop + 1; // the cohort ends exactly at the stop
       const cp = sim.checkpoint();
       const parent = ref.head;
@@ -98,19 +105,19 @@ describe("the same commits as 417a1618", () => {
     expect(sources.stats.largestSegment).toBeGreaterThan(4093);
     const report = await verifyLog(srcGit);
     expect(report.failures).toEqual([]);
-    expect(report).toMatchObject({ ok: true, commits: stops.length, verifiedThrough: 3001 });
-  }, 120_000);
+    expect(report).toMatchObject({ ok: true, commits: stops.length, verifiedThrough: 31 });
+  }));
 
-  test("the reference serialization rebuilt from R-LOG-9's files gives the same commit (the reference is the layout, not only the old code)", async () => {
+  test("the reference serialization rebuilt from R-LOG-9's files gives the same commit (the reference is the layout, not only the old code)", at({ segmentEntries: 10 }, async () => {
     const sim = new RoomSim();
     const claim = await sim.claim(keys.alice, alice, ["src/**"]);
-    while (sim.entries.length < 1203) note(sim, claim.lane!, 50);
+    while (sim.entries.length < 13) note(sim, claim.lane!, 50);
     const cp = sim.checkpoint();
     const p = new LogPublisher(new MemoryGit());
     const files: Record<string, Uint8Array> = {};
     files[`artroom-log/v1/genesis.json`] = utf8(canonicalize((sim.entries[0]!.entry as { event: { genesis: unknown } }).event.genesis));
-    files[segmentPath(0)] = utf8(sim.entries.slice(0, 1000).map((e) => canonicalize(e)).join("\n"));
-    files[segmentPath(1000)] = utf8(sim.entries.slice(1000).map((e) => canonicalize(e)).join("\n"));
+    files[segmentPath(0)] = utf8(sim.entries.slice(0, 10).map((e) => canonicalize(e)).join("\n"));
+    files[segmentPath(10)] = utf8(sim.entries.slice(10).map((e) => canonicalize(e)).join("\n"));
     for (const r of sim.retained) files[`artroom-log/v1/${r.kind === "input" ? "inputs" : "policies"}/${sha256Hex(utf8(r.body))}.json`] = utf8(r.body);
     files[`artroom-log/v1/checkpoint.json`] = utf8(canonicalize(cp));
     const who = `Artroom Room <room@artroom.invalid> ${Math.floor(Date.parse(cp.at) / 1000)} +0000`;
@@ -118,36 +125,37 @@ describe("the same commits as 417a1618", () => {
     const commit = gitObject("commit", encodeCommit({ tree, parents: [], author: who, committer: who, message: `artroom log through ${cp.through}\n\nhash ${cp.hash}\n` }));
     expect(p.commitFor(null, sourceOf(sim.entries).source, cp, refsOf(sim.retained))).toBe(commit.sha);
     expect(referenceCommit(null, sim.entries, sim.retained, new Map(), cp)).toBe(commit.sha);
-  });
+  }));
 });
 
 describe("bounded reads", () => {
-  test("after the first publication, only the last segment is read, in batches within READ_LIMITS; full segments are reused by ID", async () => {
+  test("after the first publication, only the last segment is read, in batches within the read limit; full segments are reused by ID", at({ segmentEntries: 10 }, async () => {
     const sim = new RoomSim();
     const claim = await sim.claim(keys.alice, alice, ["src/**"]);
     const git = new MemoryGit();
-    const p = new LogPublisher(git);
-    while (sim.entries.length < 2500) note(sim, claim.lane!, 20);
+    const read = { entries: 4, bytes: READ_LIMITS.bytes };
+    const p = new LogPublisher(git, { read });
+    while (sim.entries.length < 25) note(sim, claim.lane!, 20);
     await p.publish(sourceOf(sim.entries).source, sim.checkpoint(), refsOf(sim.retained));
-    for (let i = 0; i < 30; i++) note(sim, claim.lane!, 20);
-    for (const publisher of [p, await LogPublisher.open(git)]) {
+    for (let i = 0; i < 4; i++) note(sim, claim.lane!, 20);
+    for (const publisher of [p, await LogPublisher.open(git, { read })]) {
       const { source, reads } = sourceOf(sim.entries);
       const cp = sim.checkpoint();
       const expected = new Reference(new MemoryGit()).commitFor(p.head, sim.entries, cp, sim.retained);
       expect(publisher.commitFor(publisher.head, source, cp, [])).toBe(expected);
-      expect(reads.every((r) => r.limit <= READ_LIMITS.entries)).toBe(true);
-      // The parent's checkpoint names entry 2499; segment 2000 is the last. Entries 0 to 1999 are never read.
+      expect(reads.every((r) => r.limit <= read.entries)).toBe(true);
+      // The parent's checkpoint names entry 24; segment 20 is the last. Entries 0 to 19 are never read.
       const seqs = reads.flatMap((r) => Array.from({ length: r.limit }, (_, i) => r.from + i));
-      expect(Math.min(...seqs)).toBe(2000);
+      expect(Math.min(...seqs)).toBe(20);
     }
-  });
+  }));
 
   test("a publication over one transfer reads each part's lines from where the part starts, and lands the reference commit", async () => {
     const sim = new RoomSim();
     const claim = await sim.claim(keys.alice, alice, ["src/**"]);
-    while (sim.entries.length < 900) note(sim, claim.lane!, 400);
+    while (sim.entries.length < 30) note(sim, claim.lane!, 400);
     const git = new MemoryGit();
-    const p = new LogPublisher(git, { maxTransfer: { objects: 100_000, bytes: 64 * 1024 }, read: { entries: 4, bytes: 1 << 20 } });
+    const p = new LogPublisher(git, { maxTransfer: { objects: 100_000, bytes: 4 * 1024 }, read: { entries: 4, bytes: 1 << 20 } });
     const { source, reads } = sourceOf(sim.entries);
     const cp = sim.checkpoint();
     const r = await p.publish(source, cp, refsOf(sim.retained));
@@ -155,9 +163,9 @@ describe("bounded reads", () => {
     // Three passes over the segment (size, ID, bytes) and one read of the checkpoint's entry; never the whole log at once.
     expect(reads.every((x) => x.limit <= 4)).toBe(true);
     const total = reads.reduce((n, x) => n + x.limit, 0);
-    expect(total).toBeLessThan(sim.entries.length * 3 + 2 + 600); // a part may start inside a line: that line is read twice
-    expect(p.stats.peakSendBytes).toBeLessThanOrEqual(64 * 1024);
-    expect(p.stats.largestSegment).toBeGreaterThan(64 * 1024 * 5);
+    expect(total).toBeLessThan(sim.entries.length * 3 + 2 + 40); // a part may start inside a line: that line is read twice
+    expect(p.stats.peakSendBytes).toBeLessThanOrEqual(4 * 1024);
+    expect(p.stats.largestSegment).toBeGreaterThan(4 * 1024 * 5);
     expect(p.stats.sentSegmentBytes).toBe(p.stats.largestSegment);
     expect(p.stats.peakBatchBytes).toBeLessThan(4 * 2 * 1024);
     expect((await verifyLog(git)).ok).toBe(true);
@@ -188,7 +196,7 @@ describe("guards", () => {
   async function published() {
     const sim = new RoomSim();
     const claim = await sim.claim(keys.alice, alice, ["src/**"]);
-    while (sim.entries.length < 40) note(sim, claim.lane!, 30);
+    while (sim.entries.length < 10) note(sim, claim.lane!, 30);
     const git = new MemoryGit();
     const p = new LogPublisher(git);
     await p.publish(sourceOf(sim.entries).source, sim.checkpoint(), refsOf(sim.retained));
@@ -202,7 +210,7 @@ describe("guards", () => {
     const { sim, git, p } = await published();
     const pushes = git.pushes;
     // Longer on the second read only: the size pass and the bytes sent see the same entry, the ID pass another.
-    const { source } = sourceOf(sim.entries, { swap: (seq, e, n) => (seq === 42 && n === 2 ? longer(e) : e) });
+    const { source } = sourceOf(sim.entries, { swap: (seq, e, n) => (seq === 12 && n === 2 ? longer(e) : e) });
     await expect(p.publish(source, sim.checkpoint(), [])).rejects.toMatchObject({ code: "invalid-input" });
     expect(git.pushes).toBe(pushes);
   });
@@ -211,7 +219,7 @@ describe("guards", () => {
     const { sim, git } = await published();
     const p = await LogPublisher.open(git, { maxTransfer: { objects: 100_000, bytes: 1500 } });
     const pushes = git.pushes;
-    const { source } = sourceOf(sim.entries, { swap: (seq, e, n) => (seq === 41 && n >= 3 ? longer(e) : e) });
+    const { source } = sourceOf(sim.entries, { swap: (seq, e, n) => (seq === 11 && n >= 3 ? longer(e) : e) });
     await expect(p.publish(source, sim.checkpoint(), [])).rejects.toMatchObject({ code: "invalid-input" });
     expect(git.pushes).toBe(pushes);
     expect(git.refs.get(LOG_REF)).toBe(p.head);
@@ -230,7 +238,7 @@ describe("guards", () => {
 
   test("out of order: a source that returns entries out of seq order is invalid-input", async () => {
     const { sim, p } = await published();
-    const { source } = sourceOf(sim.entries, { swap: (seq, e) => (seq === 41 ? sim.entries[42]! : seq === 42 ? sim.entries[41]! : e) });
+    const { source } = sourceOf(sim.entries, { swap: (seq, e) => (seq === 11 ? sim.entries[12]! : seq === 12 ? sim.entries[11]! : e) });
     await expect(p.publish(source, sim.checkpoint(), [])).rejects.toMatchObject({ code: "invalid-input" });
     const short: EntrySource = { through: sim.entries.length - 1, read: (from, limit) => sim.entries.slice(from, from + limit - 1) };
     await expect(p.publish(short, sim.checkpoint(), [])).rejects.toMatchObject({ code: "invalid-input" });
@@ -260,7 +268,7 @@ describe("guards", () => {
     }
     const sim = new RoomSim();
     const claim = await sim.claim(keys.alice, alice, ["src/**"]);
-    while (sim.entries.length < 120) note(sim, claim.lane!, 200);
+    while (sim.entries.length < 30) note(sim, claim.lane!, 200);
     const git = new Lossy();
     const p = new LogPublisher(git, { maxTransfer: { objects: 100_000, bytes: 1999 }, attempts: 100 });
     const cp = sim.checkpoint();
@@ -272,7 +280,7 @@ describe("guards", () => {
   test("every part of a segment is exactly the reference blob's bytes, wherever it starts and ends", async () => {
     const sim = new RoomSim();
     const claim = await sim.claim(keys.alice, alice, ["src/**"]);
-    while (sim.entries.length < 60) note(sim, claim.lane!, (sim.entries.length * 13) % 70);
+    while (sim.entries.length < 12) note(sim, claim.lane!, (sim.entries.length * 13) % 70);
     const blob = utf8(sim.entries.map((e) => canonicalize(e)).join("\n"));
     const sha = gitObject("blob", blob).sha;
     const seen: Uint8Array[] = [];
@@ -285,7 +293,8 @@ describe("guards", () => {
         return super.stage(cohort, want, parts);
       }
     }
-    for (const bytes of [1, 2, 3, 97, 1000, 1001, 4096]) {
+    // Sizes that share no factor with the lines' lengths: a few bytes, under one line, over one line.
+    for (const bytes of [7, 97, 1001]) {
       seen.length = 0;
       const git = new Capture();
       const p = new LogPublisher(git, { maxTransfer: { objects: 100_000, bytes }, read: { entries: 3, bytes: 300 } });
@@ -293,40 +302,42 @@ describe("guards", () => {
       expect(seen.reduce((n, d) => n + d.length, 0)).toBe(blob.length);
       expect(git.objects.get(sha)?.data).toEqual(blob);
     }
-  }, 120_000);
+  });
 
-  test("would-rewrite: when the parent's last segment is full, the entry its checkpoint names is still checked", async () => {
+  test("would-rewrite: when the parent's last segment is full, the entry its checkpoint names is still checked", at({ segmentEntries: 10 }, async () => {
     const sim = new RoomSim();
     const claim = await sim.claim(keys.alice, alice, ["src/**"]);
-    while (sim.entries.length < 1000) note(sim, claim.lane!, 5);
+    while (sim.entries.length < 10) note(sim, claim.lane!, 5);
     const p = new LogPublisher(new MemoryGit());
-    expect((await p.publish(sourceOf(sim.entries).source, sim.checkpoint(), refsOf(sim.retained))).through).toBe(999);
+    expect((await p.publish(sourceOf(sim.entries).source, sim.checkpoint(), refsOf(sim.retained))).through).toBe(9);
     note(sim, claim.lane!, 5);
-    // Segment 0 is reused by ID and not read; entry 999, which the parent's checkpoint names, is, by its hash.
-    const changed999 = sourceOf(sim.entries, { swap: (seq, e) => (seq === 999 ? { ...e, hash: `sha256:${"0".repeat(64)}` as never } : e) }).source;
-    await expect(p.publish(changed999, sim.checkpoint(), [])).rejects.toMatchObject({ code: "would-rewrite" });
-    expect((await p.publish(sourceOf(sim.entries).source, sim.checkpoint(), [])).through).toBe(1000);
-  });
+    // Segment 0 is reused by ID and not read; entry 9, which the parent's checkpoint names, is, by its hash.
+    const changed9 = sourceOf(sim.entries, { swap: (seq, e) => (seq === 9 ? { ...e, hash: `sha256:${"0".repeat(64)}` as never } : e) }).source;
+    await expect(p.publish(changed9, sim.checkpoint(), [])).rejects.toMatchObject({ code: "would-rewrite" });
+    const honest = sourceOf(sim.entries);
+    expect((await p.publish(honest.source, sim.checkpoint(), [])).through).toBe(10);
+    expect(new Set(honest.reads.flatMap((r) => Array.from({ length: r.limit }, (_, i) => r.from + i)).filter((seq) => seq < 10))).toEqual(new Set([9]));
+  }));
 
   test("would-rewrite: a changed published entry in the last segment, a changed entry at the checkpoint, a shorter log", async () => {
     const { sim, p } = await published();
-    const at = (n: number) => sourceOf(sim.entries, { swap: (seq, e) => (seq === n ? changed(e) : e) }).source;
-    await expect(p.publish(at(10), sim.checkpoint(), [])).rejects.toMatchObject({ code: "would-rewrite" });
-    expect(() => p.commitFor(p.head, at(10), sim.checkpoint(), [])).toThrow(/published history is never rewritten/);
-    const hashChanged = sourceOf(sim.entries, { swap: (seq, e) => (seq === 39 ? { ...e, hash: `sha256:${"0".repeat(64)}` as never } : e) }).source;
+    const changedAt = (n: number) => sourceOf(sim.entries, { swap: (seq, e) => (seq === n ? changed(e) : e) }).source;
+    await expect(p.publish(changedAt(3), sim.checkpoint(), [])).rejects.toMatchObject({ code: "would-rewrite" });
+    expect(() => p.commitFor(p.head, changedAt(3), sim.checkpoint(), [])).toThrow(/published history is never rewritten/);
+    const hashChanged = sourceOf(sim.entries, { swap: (seq, e) => (seq === 9 ? { ...e, hash: `sha256:${"0".repeat(64)}` as never } : e) }).source;
     await expect(p.publish(hashChanged, sim.checkpoint(), [])).rejects.toMatchObject({ code: "would-rewrite" });
     const shorter = new RoomSim();
     await expect(p.publish(shorter.entries, shorter.checkpoint(), [])).rejects.toMatchObject({ code: "would-rewrite" });
     // Unchanged, the same log publishes.
-    expect((await p.publish(sourceOf(sim.entries).source, sim.checkpoint(), [])).through).toBe(44);
+    expect((await p.publish(sourceOf(sim.entries).source, sim.checkpoint(), [])).through).toBe(14);
   });
 });
 
 describe("opening from the ref", () => {
-  test("reads the head's trees and checkpoint only: no segment and no retained file", async () => {
+  test("reads the head's trees and checkpoint only: no segment and no retained file", at({ segmentEntries: 10 }, async () => {
     const sim = new RoomSim();
     const claim = await sim.claim(keys.alice, alice, ["src/**"]);
-    while (sim.entries.length < 1500) note(sim, claim.lane!, 10);
+    while (sim.entries.length < 15) note(sim, claim.lane!, 10);
     const git = new MemoryGit();
     const first = new LogPublisher(git);
     const r = await first.publish(sim.entries, sim.checkpoint(), sim.retained);
@@ -339,11 +350,11 @@ describe("opening from the ref", () => {
       },
     });
     const p = await LogPublisher.open(counting);
-    expect(p).toMatchObject({ head: r.commit, publishedThrough: 1499 });
+    expect(p).toMatchObject({ head: r.commit, publishedThrough: 14 });
     const blobs = read.filter((x) => x.type === "blob");
     expect(blobs).toHaveLength(1); // checkpoint.json
     expect(blobs[0]!.size).toBeLessThan(1000);
-  });
+  }));
 
   test("a head that is not a log commit, or whose segments do not match its checkpoint, is unexpected-writer", async () => {
     const git = new MemoryGit();
@@ -374,15 +385,17 @@ describe("opening from the ref", () => {
 });
 
 describe("a large active segment, from a source", () => {
-  test("an active segment over one transfer, with an entry near the 64 KiB envelope bound: bounded batches and parts, the reference commit, verified", async () => {
+  test("an active segment over one transfer, with an entry near the read limit: bounded batches and parts, the reference commit, verified", async () => {
     const sim = new RoomSim();
     const claim = await sim.claim(keys.alice, alice, ["src/**"]);
-    // Notes are at most 16 KiB of text; a claim's reasons carry the envelope to its 64 KiB bound (R-SIG-6).
-    const because = Array.from({ length: 31 }, (_, i) => ({ url: `https://example.com/${i}/${"r".repeat(2000)}` }));
+    const bounds = { maxTransfer: { objects: 100_000, bytes: 8 * 1024 }, read: { entries: 64, bytes: 8 * 1024 } };
+    // A claim whose reasons carry its line close to one read.
+    const because = Array.from({ length: 3 }, (_, i) => ({ url: `https://example.com/${i}/${"r".repeat(2000)}` }));
     sim.accept(sim.envelope(keys.alice, "claim", null, { goal: "A large claim", scope: ["big/**"], because }), alice);
-    const big = canonicalize(sim.last.entry);
-    expect(big.length).toBeGreaterThan(62 * 1024);
-    while (sim.entries.length < 400) note(sim, claim.lane!, 16 * 1024 - 64);
+    const big = utf8(canonicalize(sim.last)).length;
+    expect(big).toBeGreaterThan(6 * 1024);
+    expect(big).toBeLessThan(bounds.read.bytes);
+    while (sim.entries.length < 40) note(sim, claim.lane!, 1024);
     const git = new MemoryGit();
     const pushed: GitObject[][] = [];
     const orig = git.push.bind(git);
@@ -390,34 +403,33 @@ describe("a large active segment, from a source", () => {
       pushed.push([...objects]);
       return orig(objects, ref, next, lease);
     };
-    const p = new LogPublisher(git, { maxTransfer: { objects: 100_000, bytes: 1024 * 1024 } });
+    const p = new LogPublisher(git, bounds);
     const cp = sim.checkpoint();
     const r = await p.publish(sourceOf(sim.entries).source, cp, refsOf(sim.retained));
     expect(r.commit).toBe(new Reference(new MemoryGit()).commitFor(null, sim.entries, cp, sim.retained));
     expect(pushed.at(-1)).toEqual([]);
-    expect(p.stats.largestSegment).toBeGreaterThan(6 * 1024 * 1024);
-    expect(p.stats.peakSendBytes).toBeLessThanOrEqual(1024 * 1024);
-    expect(p.stats.peakBatchBytes).toBeLessThanOrEqual(READ_LIMITS.bytes);
+    expect(p.stats.largestSegment).toBeGreaterThan(6 * bounds.maxTransfer.bytes);
+    expect(p.stats.peakSendBytes).toBeLessThanOrEqual(bounds.maxTransfer.bytes);
+    expect(p.stats.peakBatchBytes).toBeLessThanOrEqual(bounds.read.bytes);
     expect((await verifyLog(git)).ok).toBe(true);
-  }, 120_000);
+  });
 
-  test("an entry near the 2 MB row bound, among small ones, is read alone: no read holds more than the byte limit or one entry", async () => {
+  test("an entry over the read limit, among small ones, is read alone: no read holds more than the byte limit or one entry", async () => {
     const sim = new RoomSim();
     const claim = await sim.claim(keys.alice, alice, ["src/**"]);
-    for (let i = 0; i < 200; i++) note(sim, claim.lane!, 10);
-    const to = Array.from({ length: 31_000 }, (_, i) => `@member${String(i).padStart(6, "0")}${"m".repeat(48)}` as never);
+    const read = { entries: 64, bytes: 4096 };
+    for (let i = 0; i < 20; i++) note(sim, claim.lane!, 10);
+    const to = Array.from({ length: 120 }, (_, i) => `@member${String(i).padStart(6, "0")}${"m".repeat(48)}` as never);
     sim.system({ type: "notified", entry: claim.lane!, decisions: [], to });
     const huge = utf8(canonicalize(sim.last)).length;
-    expect(huge).toBeGreaterThan(1_900_000);
-    expect(huge).toBeLessThan(2_000_000);
-    for (let i = 0; i < 100; i++) note(sim, claim.lane!, 10);
+    expect(huge).toBeGreaterThan(read.bytes);
+    for (let i = 0; i < 10; i++) note(sim, claim.lane!, 10);
     const git = new MemoryGit();
-    const p = new LogPublisher(git);
+    const p = new LogPublisher(git, { read });
     const cp = sim.checkpoint();
     const r = await p.publish(sourceOf(sim.entries).source, cp, refsOf(sim.retained));
     expect(r.commit).toBe(new Reference(new MemoryGit()).commitFor(null, sim.entries, cp, sim.retained));
     expect(p.stats.peakBatchBytes).toBe(huge); // the large entry, read alone
-    expect(p.stats.peakSendBytes).toBeLessThanOrEqual(8 * 1024 * 1024);
     expect((await verifyLog(git)).ok).toBe(true);
-  }, 120_000);
+  });
 });
