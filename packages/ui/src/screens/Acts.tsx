@@ -250,8 +250,14 @@ function ActForm({ held, kind, status, setStatus, available, onBack, onAccept }:
     setStatus({ state: "refused", refusal: r });
   };
 
-  /** The person accepts the new meaning: the form now shows it, and sends under it. */
+  /**
+   * The person accepts the new meaning: the form now shows it, and sends
+   * under it. That is a new act, so it waits like any other new act while
+   * the room's acts cannot be read: the meaning shown may no longer be the
+   * room's.
+   */
   const confirm = (fresh: ActsCatalogue) => {
+    if (!available) return; // G5U:confirm-available
     onAccept(fresh);
     if (!targetsOf(fresh.acts[kind]!.declaration).includes(shape)) {
       setShape(targetsOf(fresh.acts[kind]!.declaration)[0] ?? "none");
@@ -336,7 +342,7 @@ function ActForm({ held, kind, status, setStatus, available, onBack, onAccept }:
           )}
           <p class="small">Check that the new meaning is still what you intend. Nothing is sent until you say so.</p>
           <div class="row">
-            <button class="btn primary" type="button" onClick={() => confirm(status.fresh)}>
+            <button class="btn primary" type="button" disabled={!available} onClick={() => confirm(status.fresh)}>
               Send it with the new meaning
             </button>
             <button class="btn" type="button" onClick={onBack}>

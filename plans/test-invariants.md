@@ -463,7 +463,7 @@ Files are in `packages/ui/test/`. The browser suite `packages/ui/e2e` is not in 
 | Invariant | Rule | Witness |
 |---|---|---|
 | A stale meaning is never sent without the person confirming. | R-DECL-16 | `acts-screen.test.tsx`: "a meaning that changed behind the form" |
-| An act whose outcome is unknown outlasts a failed read of the room's acts: no new act is sent, and asking again settles the same act once. | R-IDEM-2, review 0b33e8cc | `acts-screen.test.tsx`: "an unresolved act outlasts a failed read" |
+| An act whose outcome is unknown outlasts a failed read of the room's acts: no new act is sent, by the form or by confirming a new meaning, and asking again settles the same act once. | R-IDEM-2, reviews 0b33e8cc, 12b1e0a9 | `acts-screen.test.tsx`: "an unresolved act outlasts a failed read"; "confirming the new meaning sends nothing while" |
 | A lost answer is shown as unresolved, and asking again sends the same act with the same key. | R-IDEM-2, review fb27de86 | `acts-screen.test.tsx`: "an answer that was lost" |
 | A form is built from the declaration, and the declared limits are checked before anything is sent. | R-DECL-12 | `acts-screen.test.tsx`: "the form is built"; `acts-fields.test.ts` |
 | The page's catalogue never goes back behind an activation it confirmed. | R-DECL-23 | `live-catalogue.test.ts` |

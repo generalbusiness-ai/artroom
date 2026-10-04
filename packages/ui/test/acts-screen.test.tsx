@@ -291,6 +291,38 @@ describe("a meaning that changed behind the form (binding-stale)", () => {
     expect(room.sent[1]!.body).toEqual(room.sent[0]!.body);
   });
 
+  test("confirming the new meaning sends nothing while the room's acts cannot be read, and sends once they can", async () => {
+    const { room, adapter } = await open();
+    renderAt("#/acts", adapter);
+    await prepare("Start a song");
+    await fillSong();
+    await room.activate({ acts: { ...SETLIST_ACTS, "start-song": { ...SETLIST_ACTS["start-song"]!, body: { ...SETLIST_ACTS["start-song"]!.body, tempo: { type: "int", min: 40, max: 300 } } } } });
+    submit();
+    await waitFor(() => expect(document.querySelector("[data-stale='start-song']")).not.toBeNull());
+    expect(room.sent).toHaveLength(1);
+    // The next read of the room's acts fails: the page says no new act is sent until they can be read.
+    const acts = room.acts.bind(room);
+    room.acts = async () => {
+      throw Object.assign(new Error("The room did not answer."), { name: "ArtroomError", code: "unavailable", retryable: true });
+    };
+    expect(await adapter.readCatalogue()).toBeNull();
+    await waitFor(() => expect(document.querySelector("[data-acts='unavailable']")).not.toBeNull());
+    const button = screen.getByRole("button", { name: "Send it with the new meaning" }) as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+    // A click that reaches the handler all the same, as one could before the page is drawn again, sends nothing.
+    button.disabled = false;
+    fireEvent.click(button);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(room.sent).toHaveLength(1);
+    // The acts can be read again: the same confirmation now sends, once.
+    room.acts = acts;
+    await adapter.readCatalogue();
+    await waitFor(() => expect(document.querySelector("[data-acts='unavailable']")).toBeNull());
+    fireEvent.click(screen.getByRole("button", { name: "Send it with the new meaning" }));
+    await waitFor(() => expect(document.querySelector("[data-recorded]")).not.toBeNull());
+    expect(room.sent).toHaveLength(2);
+  });
+
   test("the person can decline: nothing more is sent and the list returns", async () => {
     const { room, adapter } = await open();
     renderAt("#/acts", adapter);

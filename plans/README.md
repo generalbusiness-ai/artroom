@@ -2033,7 +2033,7 @@ Stage 5 is now reviewed on `request/test-overhead`, the integration branch (asse
 
 | Condition | State |
 |---|---|
-| (1) every stage 5 surface: the declarations read, the generic signed act, the MCP `act` and `acts` tools, CLI submission and discovery, a UI that prepares and submits an application act | Delivered. The UI page is not wired to a live room (see limits) |
+| (1) every stage 5 surface: the declarations read, the generic signed act, the MCP `act` and `acts` tools, CLI submission and discovery, a UI that prepares and submits an application act | Delivered, as amended by `98a292d4`: the UI's generic form and adapter are delivered and tested as components; the authenticated page entry against a live room belongs to `cfbde32f` |
 | (2) signed meaning preserved: no silent rebind, exact retries, grant maps expanded before signing | Delivered. Witnesses in the map, under Client and Room |
 | (3) an act the client binary does not know, over HTTPS and MCP, and the listed refusals | Delivered. The stage 5 acceptance cases of the protocol (section 33.10) each have a witness; an audit of them against the test code found one part missing after the test reduction, since restored |
 | (4) stage ownership and the read-route seam | "Edits to files other stages own", below, stands |
@@ -2063,7 +2063,9 @@ Two more came from the review of `736f4953` (changes requested, `0b33e8cc`), and
 
 A further finding, `2ee996f4` (P2), was recorded during that review and is repaired: a different act sent under a key the handle holds got the room's `idempotency-mismatch`, and the handle then forgot the original act, so that a later repeat of the original was built again and refused. The handle now changes what it keeps under a key only on an outcome of that very act. Witness: `packages/client/test/prepared.test.ts`, "a different act sent under a held key does not replace the act that is kept ...". One control distinguishes.
 
-Item 3 of that review, the authenticated UI entry, is a scope question that is with the planner (request `a49b78ab`): the browser has no credential today, and the work packages that give it one are `18815307` and `cfbde32f`.
+The review of `7931d5e8` (changes requested, `12b1e0a9`) added one: while the room's acts could not be read, "Send it with the new meaning" still sent a new act, under a banner that said none would be sent. The button is now disabled then, and its handler sends nothing. Witness: `packages/ui/test/acts-screen.test.tsx`, "confirming the new meaning sends nothing while the room's acts cannot be read, and sends once they can". Two controls distinguish, one for the button and one for the handler. The form's other routes to a new act were read again: the submit is guarded, and "Ask again, the same act" sends only the kept act.
+
+The authenticated UI entry is no longer in this request. The planner's decision `bdd0ebd5` (scope amendment `98a292d4`) moves the live Acts page entry and its real-browser, real-Room witness to request `cfbde32f`, which depends on `18815307` for the browser's credential. Stage 5 keeps authenticated access by the client, HTTPS, MCP and the command line, the generic typed form and its LiveRoom adapter with their component tests, and every other original condition.
 
 One consequence of the first repair: a bearer session now refuses input that is not plain data too. Before, only a key handle did, at signing; a bearer would have sent it as JSON.
 
