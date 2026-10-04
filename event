@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"packages/cli/src/config.ts at exact 7f65de2c8e62d390679a30952baa711fbb99a284 on request/mcp-core-composed, under promise git:sha1…adcd8b0 on request git:sha1…d289787","body":{"commit":"7f65de2c8e62d390679a30952baa711fbb99a284","path":"packages/cli/src/config.ts"}}
+{"kind":"artifact","text":"packages/cli/src/main.ts at exact 7f65de2c8e62d390679a30952baa711fbb99a284 on request/mcp-core-composed, under promise git:sha1…adcd8b0 on request git:sha1…d289787","body":{"commit":"7f65de2c8e62d390679a30952baa711fbb99a284","path":"packages/cli/src/main.ts"}}
