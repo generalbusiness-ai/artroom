@@ -1,5 +1,5 @@
 #!/bin/bash
-# Measure what the tests cost, step by step: scripts/measure-tests.sh <output directory>
+# Measure what the tests cost, step by step: scripts/measure-tests.sh <output directory> [--serial]
 #
 # Each step is timed alone with /usr/bin/time: elapsed seconds, and CPU
 # seconds (user and system) summed over every process the step started. Each
@@ -15,7 +15,14 @@
 # sum of their times is a sum of separate runs, each with a warm file cache
 # from the one before. For the elapsed time of one whole gate, time
 # `npm run gate` itself.
-O=${1:?usage: scripts/measure-tests.sh <output directory>}
+#
+# With --serial as the second argument, each suite runs with one worker and
+# one file at a time, and the install, the typecheck and `root-test` are left
+# out. A step's elapsed time is then the time its one worker took, with the
+# runner's own start and end: the worker time of the suite, observed and not
+# added up from a report.
+O=${1:?usage: scripts/measure-tests.sh <output directory> [--serial]}
+SERIAL=""; [ "${2:-}" = "--serial" ] && SERIAL="--maxWorkers=1 --no-file-parallelism"
 W=$(cd "$(dirname "$0")/.." && pwd)
 mkdir -p "$O"; O=$(cd "$O" && pwd); : > "$O/steps.tsv"
 cd "$W" || exit 1
@@ -28,9 +35,9 @@ step() { # name dir command...
   ( cd "$W/$dir" && /usr/bin/time -p -o "$O/$name.time" "$@" > "$O/$name.log" 2>&1 ); local code=$?
   printf "%s\t%s\t%s\t%s\t%s\t%s\n" "$name" "$code" "$(awk '/^real/{print $2}' "$O/$name.time")" "$(awk '/^user/{print $2}' "$O/$name.time")" "$(awk '/^sys/{print $2}' "$O/$name.time")" "$l0" >> "$O/steps.tsv"
 }
-V() { echo "--reporter=default --reporter=json --outputFile.json=$O/$1.json"; }
-step ci . npm ci
-step typecheck . npm run typecheck
+V() { echo "--reporter=default --reporter=json --outputFile.json=$O/$1.json $SERIAL"; }
+[ -z "$SERIAL" ] && step ci . npm ci
+[ -z "$SERIAL" ] && step typecheck . npm run typecheck
 step checkers packages/checkers npx vitest run --config vitest.config.ts $(V checkers)
 step cli packages/cli npx vitest run $(V cli)
 step client-node packages/client npx vitest run --config vitest.config.ts $(V client-node)
@@ -45,7 +52,7 @@ step room-node packages/room npx vitest run --config vitest.node.config.ts $(V r
 step room-workerd packages/room npx vitest run --config vitest.workers.config.ts $(V room-workerd)
 step room-declared packages/room npx vitest run --config vitest.declared.config.ts $(V room-declared)
 step ui packages/ui npx vitest run $(V ui)
-step root-test . npm test
+[ -z "$SERIAL" ] && step root-test . npm test
 uptime >> "$O/machine.txt"
 echo done > "$O/done"
 # `done` says the collection finished, not that the steps passed. A step that

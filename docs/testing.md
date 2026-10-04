@@ -71,6 +71,11 @@ git and ui. Those two have their own runners. Each runs whole, in a few
 seconds, when a changed file is in the package or in a workspace package it
 depends on. The last lines say which of the three ran, and why one did not.
 
+A change to a root file (`package.json`, the lock file, a root
+`tsconfig`, the root `vitest.config.ts`) runs every test of all three.
+So does a changed file whose name git would quote, such as a name with a
+space or a letter outside ASCII, because vitest cannot read that name.
+
 The selection follows imports. A test that reads a file without importing
 it, such as a fixture or a document, is not selected when only that file
 changes. The gate runs everything.
@@ -115,7 +120,7 @@ runs them again and restores the file. It gives one of three results:
 |---|---|---|
 | distinguishes | 0 | a test failed by an assertion with the change applied |
 | survives | 1 | every test still passed: they do not see this fault |
-| inconclusive | 2 | nothing was shown: the tests did not start, did not pass before the change, did not load or compile with it, timed out, or failed only by a thrown error |
+| inconclusive | 2 | nothing was shown: the tests did not start, did not pass before the change, did not load or compile with it, ran fewer tests than before, had any timeout, or failed only by a thrown error |
 
 Only the first is evidence. With `--expect`, the test you name must be one
 of those that failed by an assertion, or the result is inconclusive. The
@@ -156,9 +161,11 @@ Keep four figures apart, because they answer different questions:
 - **elapsed**: how long a person waits;
 - **CPU**: user and system seconds over every process, which is what the
   machine spent;
-- **worker time**: vitest's own totals of import and test time over all
-  test files, with the git runner's duration, which is what the test
-  workers spent whether or not they ran side by side;
+- **worker time**: what the test workers spent, whether or not they ran
+  side by side. Observe it: `scripts/measure-tests.sh <dir> --serial` runs
+  each suite with one worker, so a step's elapsed time is its worker's
+  time. Vitest's printed totals of import and test time are only a
+  subtotal of it;
 - **summed test-file time**: the test durations in vitest's reports, which
   leaves out imports and setup.
 

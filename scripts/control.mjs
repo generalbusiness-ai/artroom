@@ -20,8 +20,9 @@
 //   exit 1  survives        every test still passed with the change applied
 //   exit 2  inconclusive    nothing was shown: the tests did not start, did not
 //                           pass before the change, did not load or compile
-//                           with it, timed out, or failed only by a thrown
-//                           error; or the test named by --expect did not fail
+//                           with it, ran fewer tests than before, had any
+//                           timeout, or failed only by a thrown error; or the
+//                           test named by --expect did not fail
 //
 // The failed tests and the first line of each failure are printed. Read them:
 // the assertion should be the one that states the invariant. This is for one
@@ -93,7 +94,11 @@ function readVitest(report) {
     if (f.status === "failed" && !tests.some((t) => t.status === "failed")) unloaded.push(`${f.name}: ${firstLine(f.message)}`);
     for (const t of tests) {
       if (t.status === "passed") passed++;
-      if (t.status === "failed") failed.push({ name: t.fullName, message: firstLine((t.failureMessages ?? [])[0]) });
+      if (t.status === "failed") {
+        // vitest's JSON report gives a timeout no words of its own: its stack begins "Error: STACK_TRACE_ERROR".
+        const text = (t.failureMessages ?? []).join("\n");
+        failed.push({ name: t.fullName, message: /^Error: STACK_TRACE_ERROR\b|\btimed out\b/im.test(text) ? "Test timed out" : firstLine(text) });
+      }
     }
   }
   return { passed, failed, unloaded };
@@ -149,13 +154,21 @@ console.error(`\nWith the change applied: exit ${changed.status}, ${changed.pass
 for (const t of changed.failed) console.error(`  failed: ${t.name}\n          ${t.message}`);
 for (const u of changed.unloaded) console.error(`  not loaded: ${u}`);
 if (changed.unloaded.length > 0) inconclusive("a test file did not load or compile with the change applied. Make the change one that compiles.");
+const ran = changed.passed + changed.failed.length;
+if (ran < base.passed) {
+  inconclusive(`${base.passed} tests ran before the change and ${ran} with it: tests were skipped or did not run, so the two runs cannot be compared.`);
+}
 if (changed.failed.length === 0) {
   if (changed.status !== 0) inconclusive(`the test command exited ${changed.status} though no test failed.`);
   console.error("\nSURVIVES: the tests still pass with the change applied. They do not tell this fault from the required behaviour.");
   process.exit(1);
 }
 const asserted = changed.failed.filter(isAssertion);
-if (asserted.length === 0) inconclusive("the tests failed, but none by an assertion: a thrown error or a timeout does not show that a test checks this behaviour.");
+const timedOut = changed.failed.filter((t) => /timed out/i.test(t.message));
+if (timedOut.length > 0) {
+  inconclusive(`${timedOut.length} test${timedOut.length === 1 ? "" : "s"} timed out with the change applied. A timeout shows nothing, and it puts the other results in doubt.${asserted.length > 0 ? ` ${asserted.length} failed by an assertion, listed above: partial evidence only.` : ""}`);
+}
+if (asserted.length === 0) inconclusive("the tests failed, but none by an assertion: a thrown error does not show that a test checks this behaviour.");
 if (expected !== null && !asserted.some((t) => t.name.includes(expected))) {
   inconclusive(`no test whose name contains "${expected}" failed by an assertion. Other tests failed; they are not the witness you named.`);
 }
