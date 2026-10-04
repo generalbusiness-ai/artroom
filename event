@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:9cb3fab010850238bb42347244a2baaa4ed61687","text":"Merge retired a covered predecessor; the successor is at packages/room/scripts/spike-checker-key.d.mts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:9d637da623cc1b9c48b03189f68f8cc0e3a4c558","text":"Merge retired a covered predecessor with no successor at its old path."}
