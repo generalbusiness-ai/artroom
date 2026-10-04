@@ -138,6 +138,9 @@ describe("a prepared act is the handle's own copy of what the caller intended (R
     let hooked = false;
     const onPrepared = () => void (hooked = true);
     const target = { act: claim.id };
+    let reads = 0;
+    const turning = (later: () => unknown) =>
+      Object.defineProperty({}, "text", { enumerable: true, get: () => (reads++ === 0 ? "x" : later()) });
     // Each value in a body, at the top level or nested. A structured clone alone would send a class instance as
     // a plain object, a Date, Map or Set as itself, and a typed array until it failed to freeze.
     const bodies: readonly (readonly [string, unknown])[] = [
@@ -149,6 +152,9 @@ describe("a prepared act is the handle's own copy of what the caller intended (R
       ["a Date", { text: "x", when: new Date(0) }],
       ["a Map", { text: "x", more: new Map([["a", 1]]) }],
       ["a Set", { text: "x", more: new Set([1]) }],
+      // A getter that answers plain text when it is first read, and a class instance after that: it is not called.
+      ["a getter", turning(() => new Question())],
+      ["a nested getter", { text: "x", more: [turning(() => new Question())] }],
     ];
     const got: (readonly [string, unknown])[] = [];
     for (const [name, body] of bodies) got.push([name, await api.act("ask", target, body as never, { binding, onPrepared }).then(() => "sent", (e: unknown) => e)]);
@@ -159,6 +165,7 @@ describe("a prepared act is the handle's own copy of what the caller intended (R
     expect(got.map(([name, e]) => [name, (e as { name?: string }).name, (e as { code?: string }).code])).toEqual(got.map(([name]) => [name, "ArtroomError", "bad-request"]));
     expect(hooked).toBe(false);
     expect(room.requests.length).toBe(sent);
+    expect(reads).toBe(0);
   });
 });
 

@@ -2041,7 +2041,7 @@ Stage 5 is now reviewed on `request/test-overhead`, the integration branch (asse
 
 | Finding | What was wrong | Repair | Witness |
 |---|---|---|---|
-| `61b68774`, `11c564ce`: the client's refusal of input that is not plain data changed | The client copied a target or body before checking it. A class instance was copied into a plain object and sent. A nested `Uint8Array` threw a raw `TypeError` | The value is checked before the copy, by the rule the signer's canonical form uses, and every failure is `bad-request`. Nothing is signed, copied or sent | `packages/client/test/prepared.test.ts`: "a target or body that is not plain data ...", a table of twelve values |
+| `61b68774`, `11c564ce`: the client's refusal of input that is not plain data changed | The client copied a target or body before checking it. A class instance was copied into a plain object and sent. A nested `Uint8Array` threw a raw `TypeError` | The value is checked as it is copied, by the rule the signer's canonical form uses, and every failure is `bad-request`. Nothing is signed or sent (see `b2043423` below for the one-pass copy) | `packages/client/test/prepared.test.ts`: "a target or body that is not plain data ...", a table of fourteen values |
 | `4872a4a1`: a finishing run always said the saved act "was sent again" | When the journal already held the answer, nothing was sent | The message now says which happened: "That act was sent again as it was saved", or "That act had already been answered, and this is its result. Nothing was sent" | `packages/cli/test/declared.test.ts`: "a saved act whose answer the journal already holds ..." |
 
 A third finding came from the review of this head's parent `c38c23ce`, and is repaired here:
@@ -2049,6 +2049,8 @@ A third finding came from the review of this head's parent `c38c23ce`, and is re
 | Finding | What was wrong | Repair | Witness |
 |---|---|---|---|
 | `6bf8d38a` (P2): the client dropped the oldest unanswered named act when a 65th had no answer | A later repeat of the dropped key was built again under the vocabulary then in force: another act under the same key, refused `idempotency-mismatch` | A handle drops none. With 64 unanswered, a new named act is refused `rate-limited` before it is signed or sent, until one is answered | `packages/client/test/prepared.test.ts`: "a handle that holds 64 acts with no answer ..." |
+
+| `b2043423` (P2): the plain-data check read a getter once and the copy read it again | A getter could answer plain text to the check and a class instance to the copy, which was then signed and sent as a plain object | The check and the copy are one pass. Each property is read once, through its descriptor, and what is read is what is copied. A getter is refused and never called | the same table test, rows "a getter" and "a nested getter"; it also asserts the getter was not called |
 
 One consequence of the first repair: a bearer session now refuses input that is not plain data too. Before, only a key handle did, at signing; a bearer would have sent it as JSON.
 
