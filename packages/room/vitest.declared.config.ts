@@ -5,7 +5,8 @@ import { keyPairFromSeed } from "./src/crypto.ts";
 /** The test operator key: its seed is fixed and known to the tests (test/workerd/support.ts). */
 const operator = keyPairFromSeed(new Uint8Array(32).fill(0x0b)).key;
 
-// workerd run: the Room Durable Object with real SQLite storage.
+// The declared witness set (test/workerd/declared-run.test.ts): chosen tests of other files, run again under the
+// code-review v2 declarations. It loads those files itself, so it runs alone, in its own isolate.
 export default defineConfig({
   plugins: [
     cloudflareTest({
@@ -17,14 +18,7 @@ export default defineConfig({
     }),
   ],
   test: {
-    include: ["test/workerd/**/*.test.ts"],
-    // The declared witness set loads other test files a second time under another vocabulary, so it needs an isolate
-    // of its own: vitest.declared.config.ts runs it.
-    exclude: ["test/workerd/declared-run.test.ts"],
+    include: ["test/workerd/declared-run.test.ts"],
     testTimeout: 60_000,
-    // The files share isolates: loading the Worker is paid once per worker, not once per file. Every room has its
-    // own Durable Object and its own storage, and no test depends on another file's rooms.
-    isolate: false,
-    maxWorkers: 4,
   },
 });

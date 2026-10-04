@@ -313,8 +313,9 @@ describe("the compiler refuses a partial owner map (Node: it is a Node script)",
     const { execFile } = (await load("node:child_process")) as unknown as { execFile(cmd: string, args: string[], opts: object, done: (error: { code?: number } | null, stdout: string, stderr: string) => void): void };
     const proc = (globalThis as unknown as { process: { execPath: string; env: Record<string, string | undefined>; cwd(): string } }).process;
     const { mkdtempSync, mkdirSync, writeFileSync, existsSync, readFileSync, rmSync } = fs;
-    // vitest runs in the package directory.
-    const pkg = proc.cwd();
+    // The package directory, from this file's own place: the tests may be run from the repository root.
+    const { fileURLToPath } = (await load("node:url")) as unknown as { fileURLToPath(url: URL): string };
+    const pkg = fileURLToPath(new URL("..", import.meta.url));
     expect(existsSync(join(pkg, "scripts/compile-policy.ts"))).toBe(true);
     const root = mkdtempSync(join(tmpdir(), "artroom-compile-"));
     try {

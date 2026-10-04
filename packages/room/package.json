@@ -11,9 +11,10 @@
   "scripts": {
     "types": "wrangler types --include-env=false src/worker-runtime.d.ts >/dev/null",
     "typecheck": "npm run types && tsc -p tsconfig.types.json && tsc -p tsconfig.json && tsc -p test/tsconfig.json",
-    "test": "npm run test:node && npm run test:workerd",
+    "test": "npm run test:node && npm run test:workerd && npm run test:declared",
     "test:node": "vitest run --config vitest.node.config.ts",
-    "test:workerd": "vitest run --config vitest.workers.config.ts"
+    "test:workerd": "vitest run --config vitest.workers.config.ts",
+    "test:declared": "vitest run --config vitest.declared.config.ts"
   },
   "dependencies": {
     "@generalbusiness/artroom-client": "*",
