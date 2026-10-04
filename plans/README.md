@@ -3003,6 +3003,41 @@ Not run at the present head: root `npm ci`, root `npm test`, the Room suites, an
 
 ## MCP core runtime (request 9ca1d290)
 
+### State at the integration head (written last)
+
+The MCP core is now reviewed on `request/test-overhead`, the integration branch (assert `dae9a1f3`), composed with stage 2 (approved at `4ec48aa1`, review `25bede37`), stage 3 and stage 5. The branch `request/mcp-core-runtime` stays at `729fb330`. Read this subsection first, then "State at `8b46e825`", which is still right about what was built and repaired. This subsection replaces that note's "Stopped, and owed" list and the provisional status below it.
+
+**What changed since `8b46e825`.**
+
+- The head contains stage 2 as reviewed and stage 5 as sent for review, and the gate of [docs/testing.md](../docs/testing.md) runs at it. It is not composed on main: the four lanes land together from this branch.
+- The mutation run (39 of 76) and the guard audit are superseded by request `ecbc722a` (review `b1738122`), not met and not owed. The mutation table below is history.
+- The test reduction merged this lane's tests. `packages/cli/test/mcp-core-9ca1d290.test.ts` and `packages/mcp/test/workerd/worker.test.ts` are gone; their invariants are in `packages/cli/test` and `packages/mcp/test/mcp-core-9ca1d290.test.ts`, and the Room's MCP route is in `packages/room/test/workerd/worker.test.ts`. [test-invariants.md](test-invariants.md) names the witnesses, under MCP, CLI and Room.
+
+**Conditions of the request.**
+
+| Condition | State |
+|---|---|
+| (1) R-API-9, 13, 14, 15 and the section 34.2 edits: fourteen named tools, `act` and `acts`, the four reads | Delivered |
+| (2) titles, output schemas, fixed annotations, the length bounds | Delivered |
+| (3) toolsets and discovery | Delivered, with the planner's decisions of `3d8a74a9` |
+| (4) `idempotencyKey` required for every act tool; lost-result retries | Delivered |
+| (5) `waitMs` on four tools; waiting holds nothing | Delivered, with the stream repair below |
+| (6) stage 5's behaviour kept | Kept; stage 5's own review is `f7a3c7fb` |
+| (7) composition, artifacts, one head, review | This head. The planner republishes the contract artifacts (`a9788a59`, `ee3d9036`) at the reviewed head; that is the planner's to do |
+
+**Findings.** Two, both repaired before this branch, and neither yet confirmed by a reviewer:
+
+| Finding | Repair | Witness in `packages/mcp/test/mcp-core-9ca1d290.test.ts` |
+|---|---|---|
+| Checker `48765af0` (P2): an attention wait cancelled a native stream while its own reader held the lock, so the source was never cancelled | The wait cancels a native stream through its reader and releases the lock (`dbcf3a7f`, `8b46e825`) | "a native stream, a page that already has items ..."; "a native stream, the wait runs out ..."; "a native stream, an item arrives ..."; "the client's decoded stream, in the same three cases ..."; "a source whose cancel fails does not fail the tool ..." |
+| Checker `18438fd0` (caveat): the stdio revocation test did not ask the same server for a second list | It now does, with the command line's own callback and no fallback (`dbcf3a7f`) | "over stdio the caller is read again for each list: after the delegation is revoked, the next list on the same server is an error and shows no tool" |
+
+The same caveat noted that a credential saved before the delegation ID was kept uses its key's latest delegation that is not revoked. That is unchanged, and is written in R-API-14 and the MCP README.
+
+**Limits, restated.** No test runs the real `artroom mcp` binary against the real Room, or an expired bearer over stdio. The Room method `caller(token)` is a seam outside `RoomWire`; the planner accepted the seam in `3d8a74a9` without certifying the roster inference behind it.
+
+**Below, stale.** "For the planner or hugh", points 1 to 4, were answered by `3d8a74a9`; point 5 is the republishing above. The condition table's "Part met" for condition 7 names main's notes and a review not yet started.
+
 ### State at `8b46e825` (written after the section below)
 
 The rest of this section describes `b359e278` and is no longer current. It is kept until the head for review exists. This note says what changed since, and what was stopped.
