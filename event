@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:f8ed56c659faaff328e0a4514ac3fc839f369d96"}
+{"kind":"artifact","text":"docs/protocol.md at exact 6b877f6ba5e7dec13de4a16fbb6cba755db83b74 on request/test-overhead, under promise git:sha1…6aceb2b on request git:sha1…261aacb","body":{"commit":"6b877f6ba5e7dec13de4a16fbb6cba755db83b74","path":"docs/protocol.md"}}
