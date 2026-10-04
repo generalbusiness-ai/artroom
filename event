@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:8e100d7392391fa6ee0b522fa5cbb8562aa2cf19","text":"Merge retired a covered predecessor; the successor is at packages/git/test/fork-tokens.test.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:8e409da95077a8d1d92c6060d103bad5204ec8eb","text":"Merge retired a covered predecessor; the successor is at vitest.config.ts."}
