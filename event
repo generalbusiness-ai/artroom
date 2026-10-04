@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:4ab1a7b3debbdafecc3e9de501ba352ca1c48bc0","text":"Merge retired a covered predecessor; the successor is at packages/room/test/workerd/pin-delay.cases.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:4b76d828fb7884a402fcd84fe7b18735e8ce0afc","text":"Merge retired a covered predecessor with no successor at its old path."}
