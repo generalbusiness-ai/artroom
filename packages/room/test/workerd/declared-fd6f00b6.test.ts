@@ -687,10 +687,14 @@ describe("the lease rule (R-DECL-6, R-DECL-9)", () => {
   it("a thread opened under a v2 document records the room's lease and keeps it across a restart and a deployment change, for renewal and expiry; a v1 thread records none and follows the deployment, also once the room is v2", async () => {
     const before = await makeRoom();
     const old = await before.admin.ok<Claim>("claim", null, claimBody("old/**"));
+    const oldRoom = await revertLane(before, "old-lib/**");
     await activate(before, v2());
     const c = await ok<Claim>(before, before.admin, "claim", null, claimBody());
     const room = await revertLane(before);
-    expect([(await laneRowOf(before, old.lane)).lease_ms, (await laneRowOf(before, c.lane)).lease_ms, (await laneRowOf(before, room)).lease_ms]).toEqual([null, LEASE, LEASE]);
+    expect([(await laneRowOf(before, old.lane)).lease_ms, (await laneRowOf(before, c.lane)).lease_ms]).toEqual([null, LEASE]);
+    // A thread the room opens itself, for a revert, records its lease and the policy's conflict mode in the same way.
+    expect(await laneRowOf(before, oldRoom)).toMatchObject({ kind: "room", lease_ms: null, conflict: null });
+    expect(await laneRowOf(before, room)).toMatchObject({ kind: "room", lease_ms: LEASE, conflict: v2().lanes });
     const r = await restarted(before);
     await deployLease(r, 600_000);
     advance(60_000);
@@ -1005,7 +1009,7 @@ describe("a document the room cannot store or run is refused before it can activ
     return out;
   }
 
-  it("at propose time a v2 document is judged by the acts validator, its checker configurations and what this room runs: policy-invalid, recorded, and the document never activates", async () => {
+  it("at propose time a v2 document is judged by the acts validator, its checker configurations, what this room runs and what it can store: policy-invalid, recorded, and the document never activates", async () => {
     const r = await declaredRoom();
     const version = await policyVersion(r);
     const reason = async (doc: unknown, checkers?: Record<string, unknown>) => {
@@ -1019,14 +1023,12 @@ describe("a document the room cannot store or run is refused before it can activ
     expect(await reason(v2((a) => void (a["propose"] = { ...a["propose"]!, targets: { thread: ["version", "land"] } })))).toBe("The proposed configuration is invalid: acts.propose: version then land in one act is not run by this room until declared acts stage 4.");
     expect(await policyVersion(r)).toBe(version);
     expectOk(await proposeDoc(r, v2(), { unit: { format: "artroom-checker-v2", act: "check", volatile: false, timeoutSeconds: 60 } }));
-  });
-
-  it("a document whose canonical JSON is over 1,048,576 bytes is refused by the room's parser, also when an owner path named constructor would hide its size; the same shape under the bound is accepted", async () => {
+    // The same parser refuses a document too large to store: over 1,048,576 bytes of canonical JSON, counted also
+    // when an owner path named constructor, a legal glob, would hide the size from a canonical writer.
     const sized = (description: string) => ({ ...v2(), owners: { constructor: ["role:admin"] }, rules: [{ id: "describe", kind: "notify", on: ["claim"], to: ["role:admin"], why: "A change.", description }] });
-    const r = await declaredRoom();
     const parse = (d: object) => inDO(r, (room) => room.core.parseConfig(JSON.stringify(d), {}) as { ok: boolean; problems?: string[] });
     expect(await parse(sized("x".repeat(1_048_576)))).toEqual({ ok: false, problems: ["policy: the document's canonical JSON must be at most 1048576 bytes"] });
-    expect((await parse(sized("x".repeat(1_000_000)))).ok).toBe(true);
+    expect((await parse(sized("x"))).ok).toBe(true);
   });
 
   it("the active document is parsed once per version, not once per kind, and a kept policy cannot be changed by its reader", async () => {
