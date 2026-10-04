@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:c504d17d729608e866cd1f6712f8808c77b726d6","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-04-carry-pass-amendment.md."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:c602b4da2a5e79dc85505ccb2282b1aa618ab6bc","text":"Merge retired a covered predecessor; the successor is at packages/log/src/decode.ts."}
