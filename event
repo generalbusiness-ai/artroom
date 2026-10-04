@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:bc14e58e7ed971001783a84f03c9f02929761b1e","text":"Merge retired a covered predecessor; the successor is at packages/room/test/workerd/vocabulary.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:bce79b02b2121bc3064467460c5af33921ea7ee8","text":"Merge retired a covered predecessor with no successor at its old path."}
