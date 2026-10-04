@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:1d3ce5e2f42b2fd192f2c63c7cd67a448a2e58ee","text":"Merge retired a covered predecessor; the successor is at release/third-party/licenses/json-schema-traverse-1.0.0.txt."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:1fb5fd7d7be20b5d4a2a5f21ea206ce9bcd0cd16","text":"Merge retired a covered predecessor; the successor is at packages/log/package.json."}
