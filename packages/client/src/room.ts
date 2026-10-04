@@ -414,6 +414,10 @@ abstract class RoomCore {
         prepared = { kind, target, body, idempotencyKey, signed: await signEnvelope(envelope, this.identity.signer) };
       }
       await opts?.onPrepared?.(prepared);
+      // The handle keeps one act under a key, and only an outcome of that very act changes what is kept. A different
+      // act sent under a held key, by this call or by one started beside it, gets the room's mismatch; that says
+      // nothing about the kept act, which stays until it has an answer of its own.
+      const keeps = () => this.#unanswered.get(idempotencyKey);
       let out: Result<ActRecord>;
       try {
         out = await this.replay(prepared);
@@ -422,14 +426,14 @@ abstract class RoomCore {
         if (isArtroomError(e) && e.code === "bad-request") {
           this.#vocabulary = undefined; // G5:named-forget-vocabulary
           // The room answers an exact retry of an accepted act before step 1, so it never accepted this one.
-          this.#unanswered.delete(idempotencyKey);
-        } else {
+          if (keeps() === prepared) this.#unanswered.delete(idempotencyKey);
+        } else if (keeps() === undefined) {
           // No answer: the room may have recorded it. A repeat with this key sends these bytes.
           this.#unanswered.set(idempotencyKey, prepared); // G5:named-retry-keep
         }
         throw e;
       }
-      this.#unanswered.delete(idempotencyKey);
+      if (keeps() === prepared) this.#unanswered.delete(idempotencyKey); // G5:named-own
       this.#vocabularyStale(out);
       this.sawRefusal(out);
       return out as Result<T>;

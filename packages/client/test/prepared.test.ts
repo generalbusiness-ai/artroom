@@ -231,6 +231,29 @@ describe("a retry sends what was first built, whatever the room's document is no
     expect(((await api.claim({ goal: "g", scope: ["src/b0/**"] }, { idempotencyKey: "held-0" })) as Claim).seq).toBe(claims[0]!.seq);
   });
 
+  test("a different act sent under a held key does not replace the act that is kept: after its idempotency-mismatch and a change of vocabulary, the original is repeated as first signed and gets its record", async () => {
+    const alice = await joinAs(room, "@alice");
+    const api = alice.api as HttpRoomClient;
+    const input = { goal: "g", scope: ["src/**"] };
+    let first: PreparedAct | undefined;
+    room.faults.push({ route: "POST /acts", kind: "drop", times: 4 });
+    expect((await caught(api.claim(input, { idempotencyKey: "held", onPrepared: (p) => void (first = p) }))).maybeRecorded).toBe(true);
+    // Another act under the same key: the room names the mismatch. That is not an answer for the first act.
+    const other = await api.claim({ goal: "another", scope: ["docs/**"] }, { idempotencyKey: "held" });
+    expect(isRefusal(other) && other.rule).toBe("idempotency-mismatch");
+    // The room moves to v2, and the handle reads the new vocabulary through another named act.
+    await room.activate(withAsk());
+    await api.claim({ goal: "g", scope: ["lib/**"] }, { idempotencyKey: "fresh" });
+    await api.claim({ goal: "g", scope: ["lib/**"] }, { idempotencyKey: "fresh-2" });
+    let again: PreparedAct | undefined;
+    const done = (await api.claim(input, { idempotencyKey: "held", onPrepared: (p) => void (again = p) })) as Claim;
+    expect(again).toBe(first);
+    const claims = room.entries.filter((e) => e.entry.type === "act" && e.entry.act.envelope.kind === "claim" && e.entry.act.envelope.idempotencyKey === "held");
+    expect(claims).toHaveLength(1);
+    expect(done.seq).toBe(claims[0]!.seq);
+    expect(claims[0]!.entry.type === "act" && claims[0]!.entry.act).toEqual(first!.signed);
+  });
+
   test("an act prepared for another room is refused before it is sent", async () => {
     const alice = await joinAs(room, "@alice");
     let prepared: PreparedAct | undefined;
