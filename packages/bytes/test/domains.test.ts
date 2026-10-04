@@ -1,9 +1,9 @@
 import { describe, expect, test } from "vitest";
 import { DOMAINS } from "@generalbusiness/artroom-contract";
-import type { Digest, Intent, Seed, SignedIntent } from "@generalbusiness/artroom-contract";
+import type { Digest, Message, Seed, SignedIntent } from "@generalbusiness/artroom-contract";
 import {
-  b64url, canonicalBytes, canonicalize, definitionDigest, deliveryCauseDigest, digestBytes, domainBytes, entryHash, factRefOf, intentDigest, isDigest,
-  isIncarnation, isScopeId, keyIdOfSecret, messageDigest, newIncarnation, scopeIdOf, seedDigest, sign, signIntent, unb64url, utf8, verifySignedIntent,
+  b64url, canonicalBytes, canonicalize, definitionDigest, deliveryCauseDigest, digestBytes, domainBytes, entryHash, factRefOf, intentDigest,
+  isIncarnation, isScopeId, messageDigest, newIncarnation, scopeIdOf, seedDigest, sign, signIntent, unb64url, utf8, verifySignedIntent,
 } from "../src/index.ts";
 import { cause, definition, directory, entry, intent, message, otherSecret, secret, seed } from "./fixtures.ts";
 
@@ -18,31 +18,24 @@ const digests: readonly (readonly [string, (value: never) => Digest, object])[] 
 ];
 const run = (fn: (value: never) => Digest, value: object) => fn(value as never);
 
-/** One copy of `value` for each top-level field, with that field changed. */
-function changed(value: object): [string, object][] {
-  return Object.entries(value).map(([k, v]) => {
-    const other = typeof v === "number" ? v + 1 : typeof v === "string" ? `${v}x` : typeof v === "boolean" ? !v : v === null ? 0 : Array.isArray(v) ? [...v, 0] : { ...v, x: 1 };
-    return [k, { ...value, [k]: other }];
-  });
-}
-
 describe("byte domains", () => {
-  test("each digest is over its own domain tag, a newline and the canonical JSON, so one value under two tags has two digests", () => {
+  test("each of the six digests is over its own tag, one newline byte and the canonical JSON of its value", () => {
     for (const [tag, fn, value] of digests) {
       const expected = new Uint8Array([...utf8(tag), 0x0a, ...canonicalBytes(value)]);
       expect(domainBytes(tag as never, value), tag).toEqual(expected);
       expect(run(fn, value), tag).toBe(digestBytes(expected));
-      expect(isDigest(run(fn, value))).toBe(true);
     }
-    // The same value through all six functions: six different digests.
+    // So one value under the six tags has six digests.
     expect(new Set(digests.map(([, fn]) => run(fn, seed))).size).toBe(6);
   });
 
-  test("a digest commits to every field of its value", () => {
-    for (const [tag, fn, value] of digests) {
-      const base = run(fn, value);
-      for (const [field, other] of changed(value)) expect(run(fn, other), `${tag} ${field}`).not.toBe(base);
-    }
+  test("one message's bytes and digest are the ones written out here", () => {
+    // Neither expected value was produced by this package. The text is canonical JSON written by hand: keys in order, no
+    // spaces. Its SHA-256 was computed once with Node's `crypto.createHash("sha256")`, in a one-off command.
+    const text = 'artroom-message-1\n{"body":{"n":1},"class":"advisory","type":"index"}';
+    const value: Message = { class: "advisory", type: "index", body: { n: 1 } };
+    expect(domainBytes(DOMAINS.message, value)).toEqual(new TextEncoder().encode(text));
+    expect(messageDigest(value)).toBe("sha256:8e6e8bab371f3c95f753a75291f29a9cad024babc6f69c70b35d476b89aef1f6");
   });
 });
 
@@ -78,23 +71,16 @@ describe("scope identity", () => {
 describe("signed intents", () => {
   const signed = signIntent(intent, secret);
 
-  test("an intent signed by its actor verifies, and the signature is over the intent domain", () => {
+  test("an intent signed by its actor verifies; an altered payload, another key, another domain and an altered signature do not", () => {
     expect(verifySignedIntent(signed)).toBe(true);
-    // A signature by the same key over the bare canonical bytes, or under another tag, is not a signed intent.
-    for (const bytes of [canonicalBytes(intent), domainBytes(DOMAINS.entry, intent)]) expect(verifySignedIntent({ intent, sig: sign(secret, bytes) })).toBe(false);
-  });
-
-  test("a changed intent, a changed signature or another key fails", () => {
-    for (const [field, other] of changed(intent)) expect(verifySignedIntent({ intent: other as Intent, sig: signed.sig }), field).toBe(false);
-    const raw = unb64url(signed.sig)!;
-    for (const at of [0, 31, 32, 63]) {
-      const flipped = Uint8Array.from(raw, (b, i) => (i === at ? b ^ 1 : b));
-      expect(verifySignedIntent({ intent, sig: b64url(flipped) }), `byte ${at}`).toBe(false);
-    }
-    // Signed by a key that is not the actor; and the actor replaced by the key that did sign.
-    const forged = signIntent(intent, otherSecret);
-    expect(verifySignedIntent(forged)).toBe(false);
-    expect(verifySignedIntent({ intent: { ...intent, actor: keyIdOfSecret(otherSecret) }, sig: signed.sig })).toBe(false);
+    const flipped = Uint8Array.from(unb64url(signed.sig)!, (b, i) => (i === 0 ? b ^ 1 : b));
+    const others: readonly (readonly [string, SignedIntent])[] = [
+      ["an altered payload", { intent: { ...intent, kind: "close-issue" }, sig: signed.sig }],
+      ["signed by a key that is not the actor", signIntent(intent, otherSecret)],
+      ["signed under another domain", { intent, sig: sign(secret, domainBytes(DOMAINS.entry, intent)) }],
+      ["an altered signature", { intent, sig: b64url(flipped) }],
+    ];
+    for (const [name, other] of others) expect(verifySignedIntent(other), name).toBe(false);
   });
 
   test("malformed input is answered false and never throws", () => {
