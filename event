@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:79a9a393f7a8b12d3c680080c986ae4814c9e0a0","text":"Merge retired a covered predecessor; the successor is at packages/ui/screenshots/needs-you-phone.png."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:79c02ed3d47bf5a6f45d698695ff70710764030a","text":"Merge retired a covered predecessor; the successor is at packages/mcp/test/stage0.test.ts."}
