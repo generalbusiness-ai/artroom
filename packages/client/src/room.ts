@@ -198,7 +198,12 @@ function ownedIntent<T, B>(target: T, body: B): { readonly target: T; readonly b
   }
 }
 
-/** `ActOptions`, plus a hook to persist the prepared act before it is first sent. */
+/**
+ * `ActOptions`, plus a hook to persist the prepared act before it is first sent.
+ * The act is sent when the hook returns, or when the promise it returns settles.
+ * A hook may make the same call again: it gets the first call's promise. It must
+ * not await that promise, which settles only after the hook has returned.
+ */
 export interface ClientActOptions extends ActOptions {
   readonly onPrepared?: (act: PreparedAct) => void | Promise<void>;
 }
@@ -420,15 +425,20 @@ abstract class RoomCore {
           artroomError("rate-limited", `This handle has ${UNANSWERED_MAX} acts with no answer yet. Repeat one of them with its idempotency key, so that it is answered, before making another act.`), // G5:named-unanswered-full
         );
     }
-    const entry = { intent, run: undefined as unknown as Promise<Result<ActRecord>> };
+    // The promise is made and entered before the act starts. Starting it can run the caller's hook at once, and a
+    // hook that makes the same call again must find the promise there. Such a hook must not await that call.
+    let start!: (outcome: Promise<Result<ActRecord>>) => void;
+    const entry = { intent, run: new Promise<Result<ActRecord>>((resolve) => void (start = resolve)) };
     this.#underWay.set(idempotencyKey, entry); // G5:named-under-way
-    entry.run = (async () => {
-      try {
-        return await this.#sendNamed(kind, owned.target, owned.body, idempotencyKey, kept, opts);
-      } finally {
-        if (this.#underWay.get(idempotencyKey) === entry) this.#underWay.delete(idempotencyKey);
-      }
-    })();
+    start(
+      (async () => {
+        try {
+          return await this.#sendNamed(kind, owned.target, owned.body, idempotencyKey, kept, opts);
+        } finally {
+          if (this.#underWay.get(idempotencyKey) === entry) this.#underWay.delete(idempotencyKey);
+        }
+      })(), // G5:named-publish
+    );
     return entry.run as Promise<Result<T>>;
   }
 

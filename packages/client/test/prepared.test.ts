@@ -300,6 +300,46 @@ describe("a retry sends what was first built, whatever the room's document is no
     expect([hooks, posts() - before]).toEqual([1, 1]);
   });
 
+  test("a hook that makes the same call again, before it returns, gets the first call's promise: a bearer session, on a new key", async () => {
+    // With a bearer nothing is awaited before the hook runs, so the hook runs inside the first call.
+    await room.activate(withAsk());
+    const { invitation, secret } = await room.invite("@agent", { role: "agent", custody: "room", kinds: [], acts: { claim: (await room.bindingOf("claim"))! } });
+    const b = await redeem({ url }, room.id, { invitation, secret });
+    if (isRefusal(b)) throw new Error(b.rule);
+    let posts = 0;
+    const wire = room.wire();
+    const rpc = (await connect({ room: async (): Promise<RoomWire> => ({ ...wire, bearerAct: (tok, act) => (posts++, wire.bearerAct(tok, act)) }) }, room.id, { kind: "bearer", token: b.bearer })) as unknown as HttpRoomClient;
+    const input = { goal: "g", scope: ["src/**"] };
+    const inside: unknown[] = [];
+    let hooks = 0;
+    const first = rpc.claim(input, { idempotencyKey: "again", onPrepared: () => void (hooks++, inside.push(rpc.claim(input, { idempotencyKey: "again" }))) });
+    expect(inside).toHaveLength(1); // G5U:named-publish: the hook has run already, inside the first call
+    expect(inside[0]).toBeInstanceOf(Promise);
+    expect(inside[0]).toBe(first);
+    const claim = (await first) as Claim;
+    expect(await inside[0]).toBe(claim);
+    expect([hooks, posts]).toEqual([1, 1]);
+    // The control: the same call made after the first has returned gets the same promise.
+    const one = rpc.claim(input, { idempotencyKey: "after" });
+    expect(rpc.claim(input, { idempotencyKey: "after" })).toBe(one);
+    await one;
+  });
+
+  test("a hook that makes the same call again, before it returns, gets the first call's promise: a key, on an act the handle kept", async () => {
+    // An act the handle kept is sent again with nothing awaited before the hook.
+    const input = { goal: "g", scope: ["src/**"] };
+    const alice = await joinAs(room, "@alice");
+    const api = alice.api as HttpRoomClient;
+    room.faults.push({ route: "POST /acts", kind: "drop", times: 4 });
+    expect((await caught(api.claim(input, { idempotencyKey: "kept" }))).maybeRecorded).toBe(true);
+    const nested: unknown[] = [];
+    const retry = api.claim(input, { idempotencyKey: "kept", onPrepared: () => void nested.push(api.claim(input, { idempotencyKey: "kept" })) });
+    expect(nested).toHaveLength(1);
+    expect(nested[0]).toBe(retry);
+    expect(await nested[0]).toBe(await retry);
+    expect(room.entries.filter((e) => e.entry.type === "act" && e.entry.act.envelope.idempotencyKey === "kept")).toHaveLength(1);
+  });
+
   test("an act prepared for another room is refused before it is sent", async () => {
     const alice = await joinAs(room, "@alice");
     let prepared: PreparedAct | undefined;
