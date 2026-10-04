@@ -21,8 +21,8 @@ A test does not earn its place when it:
 - exists so that a count is met: one per field, one per condition, one per
   line.
 
-Each acceptance case of [docs/protocol.md](protocol.md) (sections 30.7 and
-33.5) is an invariant with a named expected result. Before you remove or
+Each acceptance case of [docs/protocol.md](protocol.md) (sections 23,
+29.6, 30.7 and 33.5) is an invariant with a named expected result. Before you remove or
 merge a test, check the cases it witnessed, and name the test that
 witnesses each one afterwards.
 

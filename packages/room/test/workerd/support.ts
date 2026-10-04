@@ -59,9 +59,13 @@ export function advance(ms: number): void {
 /** The policy port with fault injection: a runtime failure is a thrown `policy-runtime` (R-EVAL-5). */
 export interface FaultyPolicy extends PolicyPort {
   failures: { notify: number; refuse: number; require: number };
-  calls: { notify: number; refuse: number };
+  calls: { notify: number; refuse: number; reservation: number; carry: number };
   /** While set, `refuse` waits for it: a test holds an admission inside policy evaluation. */
   gate: Promise<void> | null;
+  /** While set, `land` at stage reservation waits for it: a test holds a landing inside its rule evaluation. */
+  landGate: Promise<void> | null;
+  /** While set, `carry` waits for it: a test holds a carry judgment inside its rule evaluation. */
+  carryGate: Promise<void> | null;
   /** A port that ignores the lane purpose: only the Room's own platform rules then protect recovery lanes. */
   ignorePurpose: boolean;
   /** Called with each refuse input before evaluation; a test may throw from it (a runtime failure). */
@@ -75,8 +79,10 @@ function faultyPolicy(): FaultyPolicy {
   const p: FaultyPolicy = {
     ...real,
     failures: { notify: 0, refuse: 0, require: 0 },
-    calls: { notify: 0, refuse: 0 },
+    calls: { notify: 0, refuse: 0, reservation: 0, carry: 0 },
     gate: null,
+    landGate: null,
+    carryGate: null,
     ignorePurpose: false,
     refuseHook: null,
     refuse: async (policy, input, opts) => {
@@ -98,7 +104,18 @@ function faultyPolicy(): FaultyPolicy {
       }
       return real.require(...a);
     },
-    land: async (policy, input, opts) => realLand(policy, p.ignorePurpose ? { ...input, lane: { ...input.lane, purpose: "ordinary" } } : input, opts),
+    carry: async (...a) => {
+      p.calls.carry++;
+      if (p.carryGate) await p.carryGate;
+      return real.carry(...a);
+    },
+    land: async (policy, input, opts) => {
+      if (input.stage === "reservation") {
+        p.calls.reservation++;
+        if (p.landGate) await p.landGate;
+      }
+      return realLand(policy, p.ignorePurpose ? { ...input, lane: { ...input.lane, purpose: "ordinary" } } : input, opts);
+    },
     notify: async (...a) => {
       p.calls.notify++;
       if (p.failures.notify > 0) {

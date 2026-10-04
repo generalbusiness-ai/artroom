@@ -98,6 +98,9 @@ Files are in `packages/log/test/`. Only `golden.test.ts` also runs in workerd.
 | A `v1` log verifies as it did. | R-DECL-1 | `declared-stage3.test.ts`: "the legacy rule:"; "condition 3:" |
 | A steps version or profile the verifier lacks stops verification as a limit, not as a failure. | R-DECL-14, R-DECL-22 | `declared-stage3.test.ts`: "condition 1: the steps version" |
 | The calls admission had to make are derived, and a missing, extra or differing one is named. | R-DECL-20, R-DECL-25, R-ADM-1 | `declared-stage3.test.ts`: "condition 2:" |
+| A `recover` op is judged by the role table of the legacy act it stands for, and is accepted only from an admin's own key. | R-DECL-21, R-GEN-5, R-ADMIN-5 | `declared-stage3.test.ts`: "a recover op is judged by the role table" |
+| A `check-carried` event names an earlier act that ran the check step, whatever the kind is called. | R-DECL-18, R-CARRY-13 | `declared-stage3.test.ts`: "a check-carried event names an earlier act" |
+| A reservation rests only on what the log shows: no blocking obligation is open at `land-evaluated`, and no newer check was skipped on the way to a carry. | R-LAND-4, R-CARRY-13, notes/2026-10-03-carry-accounting.md | `declared-obligations.test.ts`: "a reservation rests only on what the log shows" |
 | A scope fixed by a template is not carried by the act, and a declared field is present only as the body's own field. | R-DECL-7, R-DECL-12 | `declared-stage3.test.ts`: "a thread whose scope is fixed"; "a declared field is present only" |
 | Each obligation, review, reviewer and carry rule gives what the Room's rules give. | R-OBL-1 to 7, R-POL-5 to 7, R-CARRY-1 to 15 | `declared-obligations.test.ts`: "honest logs verify" |
 | A forged context and a carry call left out or added are each named, and a `check-carried` judgement is accepted only when owed. | R-CARRY-1 to 14 | `declared-obligations.test.ts`: "a recorded context that differs"; "carry calls are derived"; "check-carried events are judged" |
@@ -114,6 +117,8 @@ Files are in `packages/log/test/`. Only `golden.test.ts` also runs in workerd.
 
 ### Known gaps
 
+- Verify cannot yet show that a carry judgment which did not carry is missing when nothing later carried. That needs the Room to record each carry pass: [notes/2026-10-03-carry-accounting.md](../notes/2026-10-03-carry-accounting.md). It stays owed under stage 3's condition 2.
+- The log's test simulator now waits like the Room: it seals `land-evaluated` only when no blocking obligation is open. Six facts that the fixture used to show in honest reservation inputs are now shown by a forged `land-evaluated` event that verify refuses. One is not recovered: a land input that lists an objection as `basis: "here"` after it replaced a carried approval.
 - A review count compared as `> 0`, not as the required count, changes nothing in the fixtures, whose counts are all 1.
 - Section 30.7 gives its acceptance cases sizes. Only the entry of 8 MiB + 1 and the directory limit of 4,096 are tested at real size.
 
@@ -222,6 +227,7 @@ The workerd files share isolates (`vitest.workers.config.ts`), so a test must no
 | A compromised reviewer's approval stops counting. | R-REV-1 to 3 | `obligations.cases.ts`: "R-REV revocation and evidence" |
 | A verdict carries to the next generation until a dependency changes. | R-CARRY-1, 2, 5, 11 | `obligations.cases.ts`: "Carrying through the policy port" |
 | A check binds the preview's integration, the active configuration and the tree, and only the named checker may sign it. | R-OBL-3, R-LAND-1 | `obligations.cases.ts`: "R-OBL-3 checks" |
+| A `land-evaluated` or `check-carried` event is sealed only if the facts it was judged on still hold at the seal; otherwise it is judged again. | R-LAND-4, R-CARRY-13, notes/2026-10-03-carry-accounting.md | `acts.test.ts`: "a land evaluation is sealed only for the state"; "a carry judgment is sealed only on the facts" |
 | Every check carry judgement is a sealed event, counts only under the policy version that judged it, and needs a pinned runner. | R-CARRY-13, R-CARRY-14, R-LAND-7, R-EXEC-10 | `acts.test.ts`: "R-CARRY-13"; `review-a711f7b6.cases.ts`: "1. a stored check carry"; "4. check carry needs" |
 | A scoped check binds the snapshot commit recorded for its own integration, and carries only when main moved outside its inputs. | R-OBL-3, R-CARRY-6 to 10 | `review-a711f7b6.cases.ts`: "4d."; `review-95323c2b.cases.ts`; `phase2b.cases.ts`: "policy activation and recompute" |
 | An advisory obligation never blocks a landing. | R-OBL-7, R-REV-3 | `acts.test.ts`: "R-OBL-7" |

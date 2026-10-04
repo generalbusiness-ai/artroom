@@ -793,7 +793,7 @@ describe("acceptance cases (30.7): entries and files over B", () => {
     "Large notification: a notified event whose line is over B is sealed with every recipient, published in parts as a chunked entry, and verified; every recipient is read back",
     at({ objectBound: 4096 }, async () => {
       const { sim, lane } = await room();
-      const to = Array.from({ length: 120 }, (_, i) => `@member-${String(i).padStart(6, "0")}.platform-engineering-team` as MemberId);
+      const to = Array.from({ length: 120 }, (_, i) => `@member-${String(i).padStart(6, "0")}-platform-engineering-team` as MemberId);
       const e = await notified(sim, lane, {}, to);
       expect(lineOf(e)).toBeGreaterThan(B);
       const git = new MemoryGit();

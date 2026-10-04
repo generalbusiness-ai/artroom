@@ -92,8 +92,9 @@ async function open(snap: Snap) {
 }
 
 test("a scoped job reads only its own snapshot: a file left out cannot be read by any route, nor can an older, wider snapshot's commit or blob by known ID; after a configuration change neither job's token reads the other's repository (review bdcc7cc9 P2; R-CARRY-9, R-CARRY-16, R-EXEC-7)", async () => {
-  // The reviewer's reproduction: an older src/** snapshot with its job, then an approved proposal narrows the
-  // checker's inputs, and the next job's snapshot is src/add.js.
+  // The reviewer's reproduction, as input snapshots: an older src/** snapshot with its job, then the snapshot of a
+  // checker whose inputs are narrowed to src/add.js, with the next job. No proposal is run here; the two snapshots
+  // model the state before and after such a change.
   const older = await wide();
   const earlier = checkJob(await f.snapshotJob(older), expectations());
   assert.ok(!isRefusal(earlier), JSON.stringify(earlier));

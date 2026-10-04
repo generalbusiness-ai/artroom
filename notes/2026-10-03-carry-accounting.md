@@ -3,8 +3,10 @@
 Builder, 2026-10-03. For declared acts stage 3 (request `1e8fee4b`),
 condition 2, after the checker's finding `8d5fe5c2` and guidance
 (`carry-guidance-5449.md`), which the planner read in `cc929e30`. Status:
-proposed, for review. It decides what verify does now, and names one change
-to the Room that a later request would make.
+proposed, for review; revised after the checker's and the planner's first
+reading (`060828bb` and the replies). It decides what verify does now, one
+fence the Room gains now, and the shape of the amendment that complete
+accounting needs.
 
 ## The problem
 
@@ -87,9 +89,14 @@ reached step 6, so its steps 3 to 5 ran before it.
 event, every blocking obligation of the version is met in the fold on that
 integration under the active policy: reviews, checks on the integration,
 and carries whose events are present and count. If one is not, the event
-fails `guard-failed`, naming the obligation. This is the Room's steps 4 and
+fails. The failure is `decision-missing`, naming the check, when an earlier
+passing check of that obligation has no carry judgment for the integration:
+the room owed that judgment before it could evaluate the landing. Otherwise
+it is `guard-failed`, naming the obligation. This is the Room's steps 4 and
 5. It rejects both of the checker's forgeries: with the carry removed, the
-obligation is open at the reservation.
+obligation is open at the reservation. An obligation the log cannot decide
+(a check on a filtered snapshot with no `prepared` event) is left to the
+limit verify already reports.
 
 **Rule 2: nothing skipped on the way to a carry.** At a `check-carried`
 event that carried: every earlier passing check of the same obligation and
@@ -109,6 +116,42 @@ same key fails `decision-extra`. Verify does this today.
 Verify's statement of what it cannot prove changes to say exactly what is
 left, below.
 
+## The Room must fence what it seals
+
+Rule 1, and the context comparison verify already makes, both read the fold
+at the event's own position. The Room builds a land input, awaits the
+policy evaluation, and then seals `land-evaluated`. An act admitted during
+that wait, such as a revocation that reopens an obligation, comes before
+the event in the log. The event then records an input that the fold at its
+position no longer gives. Verify would fail that honest log today with
+`context-mismatch`, and with Rule 1 as well. The same is true of a
+`check-carried` event: its facts are read before the policy evaluation and
+only the judged key is checked again at the seal. The checker and the
+planner pointed this out from the source (`060828bb`); no failing run was
+produced.
+
+The decision: an event that records a judgment is sealed only if the facts
+it was judged on still hold at the seal.
+
+- **`land-evaluated`.** In the transaction that seals it, the Room builds
+  the land input again from the state as it is, under the policy now
+  active. If its digest or the policy version differs from what was
+  evaluated, nothing is sealed, and the readiness is worked out again from
+  the start.
+- **`check-carried`.** In the transaction that seals it, the Room builds
+  the carry input and its facts again. If they differ from what was judged,
+  nothing is sealed, and that check is judged again.
+
+A sealed `land-evaluated` event is then what verify takes it to be: an
+evaluation of the state at its own position, with no blocking obligation
+open. It is still not a reservation; `land-reserved` is. The engine's own
+fence on the final answer is unchanged.
+
+One test in the Room holds a land evaluation open, admits a revocation that
+reopens an obligation, lets the evaluation finish, and shows that no
+`land-evaluated` event is sealed for the old input and that the published
+log verifies.
+
 ## What is left, and why it needs the Room
 
 Verify still cannot show that a judgment which did not carry is missing
@@ -121,26 +164,38 @@ Closing that needs the Room to record the pass. Of the two designs in the
 checker's guidance, this note recommends the second, in its smallest form:
 
 - `carryChecks` reads all it needs in one synchronous step: the obligation
-  states, each obligation's candidates, and each candidate's revocation and
-  actor facts. It seals a `carry-started` event that names the operation,
-  the integration, the policy version and the log position of that read.
-- Each `check-carried` event of the pass names that position.
-- The pass seals `carry-ended` with how it ended: complete, or stopped
-  because the tree could not be read.
-- A pass that finds a newer `carry-started` for the same integration and
-  policy when it comes to seal a judgment stops, and seals nothing more.
+  states, each obligation's candidates, the judgments already sealed, and
+  each candidate's revocation and actor facts. It seals a `carry-started`
+  event that names the operation, the attempt, the integration, the policy
+  version and the log position of that read.
+- Each `check-carried` event of the pass names that pass.
+- The pass seals `carry-ended` with how it ended: complete; stopped because
+  the tree could not be read; superseded by a newer pass for the same
+  thread, generation, integration and policy; or cancelled with its
+  operation.
 
 Verify can then derive the exact ordered judgments of each completed pass
 from the fold at the named position, and report `decision-missing` and
 `decision-extra` for whole events. An unfinished pass at the end of a
 published prefix owes nothing yet.
 
+The reviewers added a constraint that this note accepts: a pass marker
+cannot be its own reason to exist. If the whole group of start, judgments
+and end were removed and the log resealed, verify must still see that a
+pass was owed. So the pass has to be required by something the log already
+shows: the `prepared` event of R-DECL-20, which the Room seals when an
+integration is ready and before it issues any job. The rule would be: each
+`prepared` event of a landing is followed by a `carry-started` for that
+operation and integration before any job is owed or any `land-evaluated`
+for it is sealed.
+
 This is a change to the Room's landing lifecycle and to the event grammar
-(R-LOG-5), so it belongs in its own request, with a contract amendment. It
-fits beside R-DECL-20's `prepared` event in stage 4, which already adds a
-lifecycle event at the same point. It is not needed for first use of
-declared acts: Rule 1 already keeps a landing from resting on a carry that
-the log does not show.
+(R-LOG-5). It needs a contract amendment, reviewed before it is built, and
+it depends on the `prepared` event, which stage 4 delivers. The planner
+has said that complete accounting stays owed under stage 3's condition 2
+(`cc929e30`, and the replies to this note). This note does not move it. It
+proposes the order: the three rules and the fence now; the amendment text
+next, for review; the pass events with `prepared`.
 
 ## Tests
 

@@ -793,6 +793,26 @@ describe("landing, policy activation and checks", () => {
       expect(await evaluated(room, l)).toBe("failed");
     });
 
+    it("a land evaluation is sealed only for the state at its own place in the log: a revocation admitted while the rules are evaluated reopens the obligation, and no land-evaluated event is sealed for the input that was true before it", async () => {
+      const { room, alice, bob, lane, head } = await approved(withLandRule("false"));
+      let finish = () => {};
+      room.world.policy.landGate = new Promise<void>((r) => (finish = r));
+      const l = await land(alice, lane, head);
+      // The landing is prepared and its reservation rules are being evaluated, on an input that says the review is met.
+      const working = tick(room);
+      await until(async () => room.world.policy.calls.reservation === 1);
+      const rev = await room.admin.ok<RosterRecord>("roster", null, { op: "revoke-key", key: bob.key, reason: "compromised" });
+      expect(rev.invalidated?.reopened).toEqual([{ lane, generation: 1, obligation: "obl_code-review" }]);
+      room.world.policy.landGate = null;
+      finish();
+      await working;
+      await tick(room);
+      // The evaluation finished after the revocation was sealed. Its input no longer describes the room there.
+      expect(events(await entries(room), "land-evaluated")).toHaveLength(0);
+      expect(room.world.artifacts.main).not.toBe(head);
+      expect((await op(room, l.op.id)).state).not.toBe("landed");
+    });
+
     it("section 23: a rule that passes at both stages: ready with a land input digest, and unchanged state builds the same bytes at reservation and lands", async () => {
       const { room, alice, lane, head } = await approved(withLandRule("false"));
       const l = await land(alice, lane, head);
@@ -1031,6 +1051,37 @@ describe("landing, policy activation and checks", () => {
   }
 
   describe("R-CARRY-13: every check carry judgment is a sealed check-carried event", () => {
+    it("a carry judgment is sealed only on the facts at its own place in the log: the checker's key is revoked while the carry rules are evaluated, and the one sealed event says the check does not carry", async () => {
+      const t = await checkRoom(scoped, [allowChecks("true")]);
+      const { r, doc, alice, bob, ci } = t;
+      snapshotRepos(r, { wrong: false });
+      checkerService(r, ci, () => "refuse");
+      const other = await proposed(r, bob, ["docs/**"], { "docs/guide.md": "more docs" });
+      await land(bob, other.lane, other.head);
+      const mine = await srcChange(r, alice);
+      const l = await land(alice, mine.lane, mine.head);
+      await tick(r);
+      const i1 = (await op(r, l.op.id)).integration!;
+      // Bob's landing moves main; Alice's is prepared again on I2, and the carry of her check is judged. The test
+      // holds that judgment inside its rule evaluation.
+      let finish = () => {};
+      r.world.policy.carryGate = new Promise<void>((done) => (finish = done));
+      const check = await ci.ok<Check>("check", { lane: mine.lane, generation: 1 }, await bodyFor(r, scoped, doc, i1));
+      const working = tick(r, 4);
+      await until(async () => r.world.policy.calls.carry === 1);
+      expect(await carriedEvents(r)).toEqual([]);
+      const rev = await r.admin.ok<RosterRecord>("roster", null, { op: "revoke-key", key: ci.key, reason: "compromised" });
+      expect(rev.invalidated?.evidence).toEqual([check.id]);
+      r.world.policy.carryGate = null;
+      finish();
+      await working;
+      // The judgment made before the revocation was not sealed. The check was judged again, as revoked evidence.
+      const evs = await carriedEvents(r);
+      expect(evs.map((e) => [e.act, e.outcome.carried])).toEqual([[check.id, false]]);
+      expect(evs[0]!.seq).toBeGreaterThan(rev.seq);
+      expect((evs[0]!.outcome as { notCarried: { code: string } }).notCarried.code).toBe("key-compromised");
+    });
+
     it("R-CARRY-13, R-LOG-10 a carry rule refuses the check: a notCarried event with the decision, and a new job for I2; after an activation that allows it, a second event carries it under the new version, and the carry counts with that event; artroom verify replays every decision", async () => {
       let seen: { job: CheckJob }[] = [];
       const { r, l, mine, after, check } = await carryCase(scoped, [allowChecks("false")], ({ r, ci }) => {

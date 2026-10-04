@@ -1751,6 +1751,28 @@ Status: implemented, pending review. Gitseq request `1e8fee4b` (planner to build
 
 This branch changes `packages/log` and this file, and nothing else.
 
+### State at the integration head (written after the rest of this section)
+
+Stage 3 is now reviewed on `request/test-overhead`, the integration branch (assert `dae9a1f3`), where it is composed with stage 2. The branch `request/decl-stage3` stays at `5449d19c`. Read this subsection first. Below it, "Mutation table" and the test names describe a layout that request `ecbc722a` replaced; "Prerequisite and composition" is done: the head contains stage 2, and the Room test that publishes and verifies a `v2` session runs.
+
+**Not complete.** Condition 2 asks verify to detect omitted, extra and substituted evaluation calls. For carry judgments it now does so in part. Complete accounting needs the Room to record each carry pass, which is a contract amendment. The design is [notes/2026-10-03-carry-accounting.md](../notes/2026-10-03-carry-accounting.md). The planner has said it stays owed under this request.
+
+**Repaired since `5449d19c`**, each from a checker finding:
+
+| Finding | What was wrong | Repair | Witness in `packages/log/test` |
+|---|---|---|---|
+| `c666e41e` (3): a recorded recover refusal failed replay | Verify judged `recover` by the legacy role table's entry for `recover`, which only an admin has. The Room judges it by the legacy act the op stands for, so a member's `recover` with op `open` is recorded as an `admin-required` refusal | `roster.ts` judges the op's legacy act. `verify.ts` accepts a `recover` act only from an admin's own key | `declared-stage3.test.ts`: "a recover op is judged by the role table ..." |
+| `c666e41e` (4): a check kind of another name could not be carried | Verify looked for the literal kind `check` | It records each accepted act that ran the check step under the vocabulary at its own seq | `declared-stage3.test.ts`: "a check-carried event names an earlier act ..." |
+| `8d5fe5c2`: a whole carry event removed, with the land input changed to match, verified | Verify replayed the events it was given and did not ask what was missing | Rule 1: at `land-evaluated`, every blocking obligation is met in the fold, else `decision-missing` naming the check that was owed a judgment, or `guard-failed` naming the obligation. Rule 2: at a carry, every newer passing check the pass could see already has its judgment, else `decision-missing` | `declared-obligations.test.ts`: "a reservation rests only on what the log shows ...", with the checker's two forged logs |
+
+**A change to the Room, from the same review.** The checker and the planner saw in the source (`060828bb`) that the Room builds a land input, awaits the rules, and then seals `land-evaluated`. An act admitted during that wait comes before the event in the log, so the event could record an input that the log at its position no longer gives. The same held for `check-carried`. This was reproduced: with the checker's key revoked during a carry evaluation, the Room sealed "carried" after the revocation. Now `packages/room/src/core.ts` reads the facts again in the sealing transaction. If they moved, it seals nothing and judges again. Witnesses in `packages/room/test/workerd/acts.test.ts`: "a land evaluation is sealed only for the state at its own place in the log ...", and "a carry judgment is sealed only on the facts at its own place in the log ...". `core.ts` is a stage 2 file, so this delta is also for the stage 2 reviewer.
+
+**The log's test simulator** sealed `land-evaluated` with an obligation open, which the Room never does. It now waits as the Room does, and two fixtures were regenerated (`declared-carry.json`, `declared-snapshot.json`). Real Room logs were unaffected: the Room and CLI suites, which verify logs the Room wrote, pass unchanged.
+
+**Controls**, each one change with `scripts/control.mjs`, each "distinguishes": the recover role lookup; the check-step lookup; the admin-only acceptance of `recover`; Rule 1 as a whole; Rule 1's owed-carry branch; Rule 2; the land fence; the carry fence.
+
+**Still open in this request.** Complete carry accounting, above. The acceptance case "legacy recovery replay" asks that a verifier changed to judge the `v1`-era entries under the `v2` declarations fails; the test shows this for the judging function, not for a whole verify run, as it did before the test reduction.
+
 ### Prerequisite and composition (assert 869d9aad)
 
 - **Stage 3 owns all of `packages/log`** (point 1). Stage 2's condition 1 named two fixed lists there, in `decode.ts` and `roster.ts`. They are delivered here: both files now read the legacy vocabulary's kinds, role table, delegable kinds and roster ops from its one frozen description, the contract's `ARTROOM_LEGACY_V1`. Stage 2's branch no longer touches `packages/log`.
