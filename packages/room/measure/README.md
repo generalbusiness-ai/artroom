@@ -31,7 +31,7 @@ See "What remains".
 | [rows.mjs](rows.mjs) | The gate: query, attribution, budgets. Run directly, it is the scheduled check. Plain Node, no `npm ci` needed. |
 | [spike-smoke.mjs](spike-smoke.mjs) | Gates its own run when the token is set. `SPIKE_PHASE=rows` is the part 1 driver. |
 | [results/row-costs-2026-10-02.md](results/row-costs-2026-10-02.md) | Part 1: the measured table, its method, the index count for each table, and the findings. |
-| [../src/budgets.ts](../src/budgets.ts) | Part 3: the budgets the cost requests cite, each justified from the table, in its comment. No code reads them, so no test repeats the arithmetic (request ecbc722a removed the one that did). |
+| [../src/budgets.ts](../src/budgets.ts) | Part 3: the budgets the cost requests cite, each justified from the table, in its comment. The room reads only `ALARM`, whose behaviour the workerd tests show; no test repeats the arithmetic of the others (request ecbc722a removed the one that did). |
 | [../test/node/rows.cases.ts](../test/node/rows.cases.ts) | Tests against recorded responses in the shapes Cloudflare returns. No live call. |
 | [../../../.github/workflows/row-writes.yml](../../../.github/workflows/row-writes.yml) | The hourly check. It does nothing until it is turned on. |
 
