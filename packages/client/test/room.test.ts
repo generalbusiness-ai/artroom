@@ -300,10 +300,18 @@ describe("the same handle over a service binding (RPC)", () => {
     expect((await http.api.lane(claim.lane))?.state).toBe("held");
     const stream = await rpc.subscribe();
     const reader = stream.getReader();
-    const pending = reader.read();
+    let pending = reader.read();
+    const renewed = ok(await rpc.renew(claim));
     await rpc.renew(claim);
-    const first = await pending;
-    expect(first.done).toBe(false);
+    // The handle yields the room's own updates, in order: the two acts made since it subscribed.
+    const seqs: number[] = [];
+    while (seqs.length < 2) {
+      const next = await pending;
+      expect(next.done).toBe(false);
+      seqs.push(...next.value!.entries.map((e) => e.seq));
+      if (seqs.length < 2) pending = reader.read();
+    }
+    expect(seqs).toEqual([renewed.seq, renewed.seq + 1]);
     reader.releaseLock();
     await stream.cancel();
     rpc[Symbol.dispose]();

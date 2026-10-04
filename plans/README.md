@@ -1403,6 +1403,54 @@ Status: implemented, pending review. Gitseq request `fd6f00b6` (planner to build
 
 The Room now admits acts from its active document's vocabulary. Under a `v1` document that is the legacy vocabulary, on the code path it had. Under a `v2` document it is the document's declarations. The code-review declarations ship as data, and a room adopts them only by activating a `v2` document (R-DECL-1); a room with no policy file still gets the R-POL-7 default, which is `v1`.
 
+### State at the integration head (written after the rest of this section)
+
+Stage 2 is now reviewed on `request/test-overhead`, the one integration branch for stages 2, 3 and 5 and the MCP core (assert `dae9a1f3`). The branch `request/decl-stage2` stays at `35797f84` and receives no more commits. Read this subsection first. Below it, "The two runs", "Mutation table" and the test names in "Conditions" describe a test layout that request `ecbc722a` replaced; the rest stands.
+
+**Source.** Stage 2 changed 21 source files and `docs/protocol.md`. Sixteen are byte-identical on the integration branch to `35797f84`:
+
+- `packages/room/src/`: `admission.ts`, `authority.ts`, `core.ts`, `declared.ts`, `jobs.ts`, `ports.ts`, `roster.ts`, `schema.ts`, `store.ts`;
+- `packages/policy/src/`: `acts.ts`, `validate.ts`, `vocabulary.ts`;
+- `packages/checkers/src/`: `checker.ts`, `job.ts`;
+- `packages/contract/src/`: `errors.ts`, `roster.ts`.
+
+Five carry later edits by stage 5 and the MCP core, reviewed under those requests: `packages/room/src/model.ts`, `reads.ts` and `requests.ts`, `packages/contract/src/lanes.ts`, and `packages/policy/src/index.ts`. The two `packages/log` lists this section says stage 3 owns are delivered by stage 3 on the same branch, so `artroom verify` reads a `v2` room's log here, and the Room test that publishes and verifies a `v2` session runs.
+
+**Conditions.**
+
+| Condition of request `fd6f00b6` | State |
+|---|---|
+| (1) one source of kinds; dispatch by step; wording; the two new refusals; exact retry | Delivered. Witnesses in the map |
+| (2) the lease rule, with storage, renewal and restart | Delivered. "the lease rule" |
+| (3) the whole suite under both vocabularies, every conversion listed | Superseded by `ecbc722a`: the declared witness set (32 tests under `v2`) and the direct tests of what `v2` changes. Not claimed as met |
+| (4) a mutation of each declaration field and each new guard | Superseded by `ecbc722a`, not met. The run stopped at 199 of 594 mutants and is kept as partial. Each repaired defect keeps one witness |
+| (5) row writes | The local comparison is a test ("the same session ..."). The live measurement is its own request, `92ddf4cc`, still owed |
+| (6) migration 4 from every stored version | Delivered, from versions 1, 2 and 3 |
+| (7) gates, report, one exact head | The gate of [docs/testing.md](../docs/testing.md), once, at the head sent |
+
+**Acceptance cases of section 33.5, stage 2.** Each witness is a test in [packages/room/test/workerd/declared-fd6f00b6.test.ts](../packages/room/test/workerd/declared-fd6f00b6.test.ts), named by the start of its title, unless another file is given.
+
+| Case | Witness |
+|---|---|
+| Same-shape change | "a change of an act's targets or of its scope source ..." |
+| Hold change: lease length; scope source | "an act signed before its meaning changed ..."; "a change of an act's targets or of its scope source ..." |
+| Unrelated update | "an act signed before its meaning changed ..." |
+| Exact retry | the same test, and "across a change of shape ..." |
+| Grants: signed before a change of its kind | "a grant is judged when it is admitted ...", its last part |
+| Grants: a map expanded before a kind was added | `declared-stage5-a5d64b35.test.ts`: "the client expands a grant before it is signed ..." |
+| Grants: exact retry of an admitted grant | "a grant covers a declared kind only by its map ..." |
+| Grants: an invitation redeemed after a change | "a session's map is judged when its invitation is admitted ..." |
+| Grants from before declared acts: `*`; limited to `review` and `check` | "a grant never gains a kind across a change of vocabulary ..." |
+| Take-over with a new scope, both parts | "take-over with a new scope ..." |
+| Retired opening kind | "a retired opening kind ..." |
+| Legacy suite; code-review suite | Superseded: see condition (3) |
+
+Seven of these parts were missing or weakened after the test reduction and are restored (see the known gaps of the Room in [test-invariants.md](test-invariants.md)).
+
+**Defects found in review.** Review found 36 defects in stage 2 before this branch. Each is repaired and has one witness, listed by number in [test-invariants.md](test-invariants.md), "The 36 repaired defects of declared acts stage 2".
+
+**Still owed, outside this review.** A `v1` document too large for one stored row, and a storage failure while preparing a landing (`6d4b227c`). A bearer session's exact retry after its grantor's key is retired (`5d41ea36`). The full check-job lifecycle of R-DECL-18, which stage 4 owns (`48c021ea`, assert `fcbdf07e`). The live row-write measurement (`92ddf4cc`).
+
 ### What packages/log keeps, and why
 
 Condition 1 names five hard-coded kind lists. Three are replaced here: `room/src/schema.ts`, `room/src/roster.ts` and `policy/src/validate.ts` now read the legacy kinds from the frozen description `ARTROOM_LEGACY_V1`, through `packages/policy/src/vocabulary.ts`. The other two, `log/src/decode.ts` and `log/src/roster.ts`, are delivered by stage 3 (request `1e8fee4b`), which owns all of `packages/log` under assert `869d9aad`. An earlier commit on this branch swapped those two lists for imports; commit `2cd97b88` removed that, and this head's `packages/log` is byte-identical to main's.
@@ -3324,6 +3372,24 @@ The checker then reviewed `15680192` and asked for changes (`3965e230`, with the
 | A new file with a name git quotes was not matched to its package, and vitest could not read it | Names are read from git with `-z`. Such a name runs the whole root vitest run; git and ui are still chosen by where the file is, and now match it |
 | The worker figure was a subtotal of printed phases, presented as worker time | It is named a subtotal. A single-worker run of every suite at both heads is added as a serial comparison, not as worker time. The amendment `da68c9a9` then set the target on elapsed time and CPU, and the result is stated against it |
 | The edit cycle's edit is comment text; its faults are the controls | Stated |
+
+### After the approval: acceptance cases restored
+
+The checker approved this work at `f6212850` (review `b1738122`). While preparing stage 2 for its own review I then compared every acceptance case of the protocol (sections 23, 29.6, 30.7 and 33.5) with the test code, which the reduction had not done case by case. The reduction had removed or weakened the witnesses of fifteen parts of those cases. All were present before it. This is a defect of the approved head, and the approval does not cover its repair.
+
+Each part is restored, in the smallest form that shows it, in the head that carries this subsection. The parts and their files are listed under the Room's known gaps in [test-invariants.md](test-invariants.md). In short: seven parts of stage 2 in the Room's declared-acts tests; two validator rows in policy; one generic-check case of stage 5; two log layout cases; two checker isolation cases; one client subscription case.
+
+| Since `f6212850` | |
+|---|---|
+| Source | unchanged |
+| Tests | 2,000 became 2,006. Ten test files changed; no file was added |
+| Test helpers | `expectRefusal`, `expectOk` and four like them now fail with `expect.fail`, so a failed result check is an assertion and the control helper can count it |
+| Guidance | [docs/testing.md](../docs/testing.md) says that an acceptance case is an invariant, and that its witness is removed only with its replacement named |
+| The gate, one observed run with no install | 28.4 s elapsed, 67.7 CPU seconds; it was 29.3 s and 70.6 before, so the cost did not move beyond the run-to-run spread |
+
+Controls run on the restored witnesses, each by `scripts/control.mjs` with one change: the take-over overlap check in the Room (distinguishes); the three-step target rule in the policy validator (distinguishes); the recomputed-decision replay and the chunked-entry bound in the log (both distinguish); the checker gateway's repository check (distinguishes). The token checks of the two checker cases rest on the test's stand-in for Artifacts and on `packages/git`, and have no control in the checkers' source.
+
+Some cases are still shown at a lower level than before the reduction, such as by the evaluator and not also through a Room. Those are kept as they are and listed in the same known gaps, so that a reviewer can judge them.
 
 ### Gates
 

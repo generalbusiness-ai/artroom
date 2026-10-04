@@ -103,7 +103,8 @@ interface FakeToken {
 /**
  * Artifacts, modelled on local bare repositories under `<root>/artifacts`:
  * create (empty, with a write token), get, delete (with its tokens), and
- * tokens of one repository. Each repository serves any object it holds by ID
+ * tokens of one repository, each accepted for that repository only
+ * (`authorize`). Each repository serves any object it holds by ID
  * (`uploadpack.allowAnySHA1InWant`), the most a server could allow, so what
  * a job can read rests only on what its repository holds.
  */
@@ -126,6 +127,11 @@ export class FakeArtifacts implements ArtifactsNamespace {
     const t: FakeToken = { id, plaintext: tok(`${id}${"x".repeat(24)}`), repo, scope, state: "active", expiresAt: Date.now() + ttl * 1000 };
     this.tokens.push(t);
     return t;
+  }
+  /** The server's check: a live token for exactly this repository. */
+  authorize(repo: string, token: string): boolean {
+    const t = this.tokens.find((x) => x.plaintext === token);
+    return !!t && t.state === "active" && t.expiresAt > Date.now() && t.repo === repo && this.has(repo);
   }
   async create(name: string) {
     if (this.has(name)) throw new ArtifactsError("ALREADY_EXISTS", 10409);

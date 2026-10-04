@@ -260,7 +260,8 @@ The workerd files share isolates (`vitest.workers.config.ts`), so a test must no
 |---|---|---|
 | Vocabulary: a room has one, its active document's, and becomes `v2` only by landing a `v2` document. | R-DECL-1, R-DECL-15, R-ADM-1 | `declared-fd6f00b6.test.ts`: "one vocabulary per document" |
 | `who.roles` decides who may sign a declared kind, and `recover` is for an active admin's own key only. | R-DECL-11, R-DECL-21, R-ADMIN-5 | `declared-fd6f00b6.test.ts`: "who may sign"; "recover, the platform kind" |
-| Step 4a: an undeclared kind and a wrong binding are refused unrecorded, and an exact retry gets its receipt across any change. | R-DECL-16, R-IDEM-2, R-SIG-4 | `declared-fd6f00b6.test.ts`: "step 4a" |
+| Step 4a: an undeclared kind and a wrong binding are refused unrecorded, and an exact retry gets its receipt across any change. A change of an act's targets, scope source or lease length makes an earlier signature stale, and no landing starts. | R-DECL-16, R-IDEM-2, R-SIG-4 | `declared-fd6f00b6.test.ts`: "step 4a" |
+| A take-over may bring a new scope: the scope and the lease generation move, and an overlap with an exclusive held thread is refused. | R-DECL-7, R-DECL-9 | `declared-fd6f00b6.test.ts`: "take-over with a new scope" |
 | A grant is a signed map from kind to binding, and never gains a kind across a change of vocabulary. | R-DECL-17, R-ADM-5 | `declared-fd6f00b6.test.ts`: "grants carry the bindings" |
 | A room-custody session is judged when its invitation is admitted and again when it is redeemed. | R-DECL-17, R-CRED-3, R-CRED-10, R-IDEM-2 | `declared-fd6f00b6.test.ts`: "room-custody sessions" |
 | Threads: an act acts only on thread kinds its declaration names, by the step it names, and a thread keeps the lease it recorded. | R-DECL-5, 6, 8, 9, 21, 23; R-EVAL-3 | `declared-fd6f00b6.test.ts`: "threads have kinds"; "what policy sees"; "the lease rule" |
@@ -270,7 +271,7 @@ The workerd files share isolates (`vitest.workers.config.ts`), so a test must no
 | Records: an old record is read under the declarations of its own seq, and a thread is named by its opening act. | R-DECL-23, R-API-3 | `declared-stage5-a5d64b35.test.ts`: "old records are read"; "a thread's kind" |
 | Check jobs: a job names the kind and binding to sign, as in force when it is sent. | R-DECL-18, R-EXEC-8, R-OBL-3 | `declared-fd6f00b6.test.ts`: "check jobs in a v2 room"; `declared-stage5-a5d64b35.test.ts`: "a declared check step" |
 | A document the room cannot run or store never activates, and the active document is parsed once per version. | R-DECL-24, R-DECL-26 | `declared-fd6f00b6.test.ts`: "a document the room cannot store or run"; "the active document" |
-| Migration 4 adds its six columns once, and the declared path writes no more rows per act than the legacy path. | R-DECL-6, R-LOG-10, request fd6f00b6 | `declared-fd6f00b6.test.ts`: "migration 4"; "the same session" |
+| Migration 4 adds its six columns once, from each stored version, and the declared path writes no more rows per act than the legacy path. | R-DECL-6, R-LOG-10, request fd6f00b6 | `declared-fd6f00b6.test.ts`: "migration 4"; "the same session" |
 | The code-review declarations judge envelopes, targets, bodies, roles and grants as the legacy vocabulary does, message for message. | R-DECL-4, 5, 11, 12, 17 | `node/declared-equivalence.test.ts`; `node/declared-steps-a5d64b35.test.ts` |
 | The real Worker and the client agree on the declarations read, bindings, named methods, grants and the MCP `act` tool. | R-DECL-16, R-DECL-17, R-API-9, R-CRED-10 | `declared-stage5-a5d64b35.test.ts` |
 
@@ -336,6 +337,19 @@ No other test runs a second time under `v2`: not founding, secret scanning, log 
 
 ### Known gaps
 
+- Request `ecbc722a` first removed or weakened the witnesses of some acceptance cases of the protocol. An audit of every acceptance table (sections 23, 29.6, 30.7 and 33.5) against the test code found them after the reduction was approved, and each is restored:
+  - section 33.5, stage 2, in `declared-fd6f00b6.test.ts`: the same-shape change; the hold change by scope source; a real grant signed before its kind changed; the `v1`-era grant limited to `review` and `check`; the take-over with a new scope, both parts; migration 4 from stored versions 1 and 2;
+  - section 33.5, stage 1, in `packages/policy/test/declared-acts.test.ts`: "a third step", and the refusal half of the historical opening kind;
+  - section 33.5, stage 5, in `declared-stage5-a5d64b35.test.ts`: a generic check under a binding its grant does not name;
+  - section 30.7, in `packages/log/test/amendment-4.test.ts`: the large notification, and the recomputed obligations of the large activation;
+  - section 29.6, in `packages/checkers/test`: concurrent jobs in both directions, and the earlier job's token after a configuration change;
+  - section 23, in `packages/client/test/room.test.ts`: the `Room` handle yields the same updates.
+- The lesson is in [docs/testing.md](../docs/testing.md): an acceptance case is an invariant, and its witness is removed only with its replacement named.
+- Some acceptance cases are still witnessed, but at a lower level than before the reduction. They are kept that way, and named here so that a reader can judge:
+  - three carry-plan cases of section 23 (the room default `src/lib/**`, `package-lock.json`, `.artroom/policy.json`) are shown by the evaluator in `packages/policy/test/carry.test.ts`, no longer also through a Room;
+  - four stage 5 cases are shown against the client's and the MCP server's stand-in room, no longer also against a real Room: named methods where `claim` differs, a grantor's role that lost the kind over MCP, every kind refused on the generic MCP path in a `v1` room, and the MCP `act` tool naming the thread;
+  - the retained-file placement of section 30.7 is asserted by literal paths for seven files, no longer by the reference layout for every file;
+  - a bearer workspace called directly on `RoomWire`, the sequential canonical-name alias, and the client-side bearer receipt after revocation have one witness each where they had two.
 - Only one `v2` session's log is published and verified in the Room. `v2` logs with checks, revocations and carried verdicts are verified only in `packages/log`.
 - The room's whole suite no longer runs under the `v2` declarations. That demand is superseded, not owed: section 33.6 of the protocol now states the witness set above as the criterion. The gap that remains is a fault that shows only when some other legacy test runs under `v2`.
 - No test fixes what a bearer act answers after its grantor's room-held key is revoked as `retired`: the MCP route answers `unauthenticated`, while `RoomWire.bearerAct` still answers an exact retry.
@@ -355,13 +369,13 @@ Files are in `packages/checkers/test/`. Only `git.test.ts` and `sandbox.test.ts`
 | Each job's check goes to the job's own room, and a room's refusal is the answer. | R-EXEC-8 | `handle.test.ts`: "one service serves many rooms"; "a room's refusal" |
 | No container runs two jobs, each runner has one owner, and a runner failure is `unavailable`, never a failed check. | R-EXEC-1, R-EXEC-3, review c46a4491 | `handle.test.ts`: "G1:"; "G2:"; `sandbox.test.ts` |
 | The service reads only its own copy of the job, the reviewer's check is advisory, and output over the limit is `payload-too-large`. | R-OBL-2, R-OBL-7, R-EXEC-5 | `handle.test.ts`: "G3:"; "G4:" |
-| The checkout is the exact integration with no history, and a scoped job reads only its own snapshot, by any route. | R-EXEC-4, 6, 7; R-CARRY-9, 16 | `git.test.ts`: "checkout fetches"; "a scoped job reads only" |
+| The checkout is the exact integration with no history, and a scoped job reads only its own snapshot, by any route. | R-EXEC-4, 6, 7; R-CARRY-9, 16 | `git.test.ts`: "checkout fetches"; "a scoped job reads only"; "concurrent jobs, different snapshots" |
 | The snapshot commit ID the Room derives is the commit the publisher writes. | R-CARRY-15 | `git.test.ts`: "the Room's snapshot commit ID" |
 | The real tools run the project's tests in the checkout, and the reviewer reads the change against the job's base. | R-EXEC-10 | `git.test.ts`: "tests checker:"; "LLM reviewer:" |
 
 ### Removed or replaced
 
-48 tests became 35.
+48 tests became 36.
 
 - `declared-guards-f.test.ts` (3 tests, 11 cases), written so each type guard had a red test. Two rows of the `job.test.ts` table hold the rule.
 - Real npm, real git and real processes for what are decisions over the runner and container interfaces. Those run on an in-memory container. One real `npm ci` and `npm test` stay.

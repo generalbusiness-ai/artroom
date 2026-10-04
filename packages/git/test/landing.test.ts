@@ -3,7 +3,7 @@
 // (`MemoryCanonical`): the engine's own transactions, retries, restarts and
 // ordering are real, and no test here starts a process. The same engine over
 // real git, and the proof that the memory repository answers as real git
-// does, are in landing-git.test.ts. Test names start with the plan's
+// does, are in git-publisher.test.ts. Test names start with the plan's
 // acceptance case or the rule they show.
 import { test } from "node:test";
 import assert from "node:assert/strict";

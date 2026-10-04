@@ -28,7 +28,7 @@ afterEach(() => {
 
 const sha = (c: string) => c.repeat(40) as Sha;
 const ok = (r: Result<DeclaredRecord>) => {
-  if (isRefusal(r)) throw new Error(`refused: ${r.rule}: ${r.reason}`);
+  if (isRefusal(r)) return expect.fail(`refused: ${r.rule}: ${r.reason}`);
   return r;
 };
 

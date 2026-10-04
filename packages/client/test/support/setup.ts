@@ -1,4 +1,5 @@
 import type { ArtroomError, HttpRoom, MemberId, Refusal, Role, Signer } from "@generalbusiness/artroom-contract";
+import { expect } from "vitest";
 import { connect, generateSigner, isArtroomError, isRefusal, join, type ClientOptions } from "../../src/index.ts";
 import { FakeRoom } from "./fake-room.ts";
 
@@ -38,7 +39,7 @@ export function sha(c: string): string {
 
 /** The value, or an error that names the refusal. */
 export function ok<T>(value: T): Exclude<T, Refusal> {
-  if (isRefusal(value)) throw new Error(`refused: ${value.rule}: ${value.reason}`);
+  if (isRefusal(value)) return expect.fail(`refused: ${value.rule}: ${value.reason}`);
   return value as Exclude<T, Refusal>;
 }
 
@@ -50,7 +51,7 @@ export async function caught(p: Promise<unknown>): Promise<ArtroomError> {
     if (isArtroomError(e)) return e;
     throw e;
   }
-  throw new Error("expected an ArtroomError");
+  return expect.fail("expected an ArtroomError");
 }
 
 /** Waits until `test` holds, looking every 2 ms, for at most `ms`. */

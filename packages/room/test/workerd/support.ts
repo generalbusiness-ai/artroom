@@ -5,6 +5,7 @@
  * Artifacts adapter) over fake remotes (`src/memory/artifacts.ts`).
  */
 
+import { expect } from "vitest";
 import { env } from "cloudflare:workers";
 import { runInDurableObject } from "cloudflare:test";
 import { entriesAfter } from "../../src/log.ts";
@@ -318,7 +319,7 @@ export async function call<T>(p: Promise<unknown>): Promise<T> {
 /** The thrown failure of a call, or a test failure if it succeeded. */
 export async function failure(p: Promise<unknown>): Promise<{ code: string; message: string; retryable: boolean }> {
   const w = (await p) as Wire<unknown>;
-  if ("ok" in w) throw new Error(`expected a failure, got ${JSON.stringify(w.ok).slice(0, 300)}`);
+  if ("ok" in w) return expect.fail(`expected a failure, got ${JSON.stringify(w.ok).slice(0, 300)}`);
   return w.error;
 }
 
@@ -366,7 +367,7 @@ export class Client {
   /** Submit and expect acceptance. */
   async ok<T extends ActRecord = ActRecord>(kind: EnvelopeKind, target: unknown, body: unknown, idempotencyKey?: string): Promise<T> {
     const r = await this.act<T>(kind, target, body, idempotencyKey);
-    if (isRefusal(r)) throw new Error(`refused: ${r.rule}: ${r.reason}`);
+    if (isRefusal(r)) return expect.fail(`refused: ${r.rule}: ${r.reason}`);
     return r;
   }
 
@@ -535,14 +536,16 @@ export function runtimeFailure(): Error {
   return Object.assign(new Error("injected engine fault"), { name: "ArtroomError", code: "policy-runtime", retryable: true, maybeRecorded: false });
 }
 
+// These two fail by an assertion, not by a thrown error: a test that fails here has checked a result, and
+// scripts/control.mjs counts only a failed assertion as a test that distinguishes.
 export function expectRefusal(r: unknown, rule: string): Refusal {
-  if (!isRefusal(r)) throw new Error(`expected refusal ${rule}, got ${JSON.stringify(r).slice(0, 400)}`);
-  if (r.rule !== rule) throw new Error(`expected refusal ${rule}, got ${r.rule}: ${r.reason}`);
+  if (!isRefusal(r)) return expect.fail(`expected refusal ${rule}, got ${JSON.stringify(r).slice(0, 400)}`);
+  if (r.rule !== rule) return expect.fail(`expected refusal ${rule}, got ${r.rule}: ${r.reason}`);
   return r;
 }
 
 export function expectOk<T>(r: T | Refusal): T {
-  if (isRefusal(r)) throw new Error(`unexpected refusal ${r.rule}: ${r.reason}`);
+  if (isRefusal(r)) return expect.fail(`unexpected refusal ${r.rule}: ${r.reason}`);
   return r;
 }
 
