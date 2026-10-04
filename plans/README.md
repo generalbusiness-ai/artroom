@@ -3313,49 +3313,76 @@ The declared run's skips are the tests that found their own rooms (stage 2's, st
 
 ## Installable packed packages (request 7e82100b)
 
-Status: implemented, pending review. Gitseq request `7e82100b` (planner to builder, replacing `64dc6f04`), promise `1eb5788c`, under the planner's note `plans/013-2026-10-04-first-jam-release.md` (decision `b6dd55dc`). On `request/test-overhead`. Nothing was published to a registry, and no provider was contacted.
+Status: implemented, repaired after review `59605d51` (changes requested), pending review again. Gitseq request `7e82100b` (planner to builder, replacing `64dc6f04`), promise `1eb5788c`, under the planner's note `plans/013-2026-10-04-first-jam-release.md` (decision `b6dd55dc`). On `request/test-overhead`. Nothing was published to a registry, and no provider was contacted.
 
 **What this is.** Six packages that a repository outside this one can install: contract, policy, client, mcp, log and the `artroom` command. It is the installability the first jam task needs. The public-package starter and its conformance route stay owed under request `f3299ab4`. Publishing to a public registry is the owner's decision and is not part of this.
 
 **How it works.** [docs/release.md](../docs/release.md) is the instruction. Inside the repository each package's `exports` and `bin` still name TypeScript source, so the tests, the typecheck and the Workers run the source as before; no test or resolution setting changed. npm does not rewrite `exports` or `bin` from `publishConfig` when it packs (tried with npm 11.19.1), so the release script writes the tarball's manifest itself: it builds `src` to `dist` (JavaScript and declarations), copies `dist`, the README, `LICENSE` and `NOTICE` into a staging directory outside the repository, turns each `./src/x.ts` export into its built file and declaration, drops scripts and development dependencies, and packs there. No source file changed.
 
-**The release.** Version `0.1.0-dev.1`, built and packed from source commit `980618d16f78714f755b1a1922c49d50e8f001a2` (tree `3b5960e5515fba0f2553803d68f1759e1ddbd9d9`, clean), with Node 26.10.0 and npm 11.19.1:
+**The release candidate.** Version `0.1.0-dev.1`, built and packed from source commit `1b40b7ec1ca8051900233123f95ac85c8a69fe81` (tree `6c8c82edc031d9b739277981b607dacb42930aaa`, clean), with Node 26.10.0 and npm 11.19.1, in a clean checkout:
 
 ```
 npm ci
-npm run release:pack -- /Users/hughpyle/play/artroom-releases/0.1.0-dev.1
-npm run release:check -- /Users/hughpyle/play/artroom-releases/0.1.0-dev.1
+npm run release:pack -- /Users/hughpyle/play/artroom-releases/candidates/1b40b7ec
+npm run release:check -- /Users/hughpyle/play/artroom-releases/candidates/1b40b7ec
 ```
 
 | Package | Tarball | Bytes | SHA-256 |
 |---|---|---|---|
 | `@generalbusiness/artroom-contract` | `generalbusiness-artroom-contract-0.1.0-dev.1.tgz` | 51,379 | `834e61bad0d625cdbd85b7cc16c8fe17d0abd17c87e86f00671c7ca7e1fe23ef` |
 | `@generalbusiness/artroom-policy` | `generalbusiness-artroom-policy-0.1.0-dev.1.tgz` | 75,663 | `1ae1d1be10fc804c4f9687f4eb2187cd46bf720034de4604cf1b7c49e3feaedb` |
-| `@generalbusiness/artroom-client` | `generalbusiness-artroom-client-0.1.0-dev.1.tgz` | 50,772 | `806422fbd39c42bc66abdfdafabac9109d1af5599605492d1833ed0fe2741d98` |
+| `@generalbusiness/artroom-client` | `generalbusiness-artroom-client-0.1.0-dev.1.tgz` | 51,184 | `98c9183ab73d4f13750da8ea97af3bf5fb7b91202455260e034839edd048d24a` |
 | `@generalbusiness/artroom-mcp` | `generalbusiness-artroom-mcp-0.1.0-dev.1.tgz` | 34,476 | `8a69286e0d285c245b4731318686785e0125b6c01d8e28540eb907673f60b8aa` |
-| `@generalbusiness/artroom-log` | `generalbusiness-artroom-log-0.1.0-dev.1.tgz` | 125,887 | `605c6b188f580a838dd1939f91b86dceadeb6b8b9a579dbe78b0b3badcc18280` |
-| `@generalbusiness/artroom-cli` | `generalbusiness-artroom-cli-0.1.0-dev.1.tgz` | 220,872 | `f569f9292abf572cafa2d8266d6e12bb18e07044c56c1875d96258f6cafeb311` |
+| `@generalbusiness/artroom-log` | `generalbusiness-artroom-log-0.1.0-dev.1.tgz` | 126,796 | `6f27164e7e4939ff6b24e0817d2e1de159938e26eed6f559394301b01d807d5d` |
+| `@generalbusiness/artroom-cli` | `generalbusiness-artroom-cli-0.1.0-dev.1.tgz` | 227,449 | `40084846d1cb32ffedb426c92be54a4e93395d877552c5688173ee7866d64e41` |
 
-Packing the same commit twice gave the same bytes: a trial run from the working tree before the commit, and this run from a clean checkout of the commit, have the same six hashes.
+Packing the same source twice gave the same bytes: a trial run from the working tree, and this run from a clean checkout, have the same six hashes. The contract, policy and MCP tarballs have the bytes they had in the candidate packed from `980618d1`. The client and log tarballs differ because their source changed on the branch since then. The command's tarball differs for that reason and because it now carries the licence texts.
 
-**Where it is.** The directory `/Users/hughpyle/play/artroom-releases/0.1.0-dev.1/` on the development machine holds the six tarballs, `release-manifest.json`, the consumer's lock file (`consumer-package-lock.json`), the lock file of the command installed alone (`cli-only-package-lock.json`) and the check's output (`release-check.log`). The manifest, the two lock files and the log are also attached to the review request in the workroom. The jam repository installs from that directory by file path. This is a local route, chosen because the first jam task runs on this machine; it is not a public release.
+This is a candidate. The release the jam installs is packed again from the commit that lands on main.
 
-**The consumer check** (`npm run release:check`, [scripts/check-release.mjs](../scripts/check-release.mjs)): 53 checks passed, in 11 seconds. It copies [release/consumer](../release/consumer) to a fresh directory outside the repository and:
+**Third-party code in the command (review `59605d51`).** The finding: the command's tarball is one bundled file holding other packages' code, and it carried only Artroom's own `LICENSE` and `NOTICE`. The repair:
+
+- The tarball now holds `THIRD-PARTY-NOTICES.txt`: for each package in the bundle, its name, version, declared licence and the complete text of the licence file that package ships. npm installs it with the command.
+- The bundle holds more than the finding named. The MCP server package's published build already contains a schema validator and its helpers, and the bundle takes them with it. Nine packages are recorded:
+
+| Package | Version | Declared licence | How it is in the bundle |
+|---|---|---|---|
+| `@modelcontextprotocol/core` | 2.0.0 | MIT | bundled directly |
+| `@modelcontextprotocol/server` | 2.0.0 | MIT | bundled directly |
+| `ajv` | 8.18.0 | MIT | embedded in the published build of `@modelcontextprotocol/server` |
+| `ajv-formats` | 3.0.1 | MIT | embedded in the published build of `@modelcontextprotocol/server` |
+| `content-type` | 1.0.5 | MIT | embedded in the published build of `@modelcontextprotocol/server` |
+| `fast-deep-equal` | 3.1.3 | MIT | embedded in the published build of `@modelcontextprotocol/server` |
+| `fast-uri` | 3.1.0 | BSD-3-Clause | embedded in the published build of `@modelcontextprotocol/server` |
+| `json-schema-traverse` | 1.0.0 | MIT | embedded in the published build of `@modelcontextprotocol/server` |
+| `zod` | 4.4.3 | MIT | bundled directly |
+
+- The record is `release/third-party`: `packages.json` and one licence file per package, copied unchanged from the published package at that exact version, with its SHA-256. For the six that are installed here at the recorded version, the installed licence file has the same hash. `ajv` 8.18.0 and `fast-uri` 3.1.0 are installed here at other versions, so their files were fetched from npm's public registry at the embedded versions. No package ships a separate notice file.
+- Nobody lists the bundle's contents by hand. The scripts read them from the bundle: the bundler's comment for each module file, and, where such a file has a source map, the packages and versions the map names. `release:pack` stops if the bundle and the record differ in either direction. `release:check` makes the same comparison on the bundle inside the tarball, compares the notices file in the tarball and in the installed package with the text built from the record, and checks each licence text is in it. The release manifest records the nine with their licence hashes.
+- The command is still self-contained, with no runtime dependency, and the scope is still six packages. The five libraries are compiled, not bundled, so their tarballs hold only Artroom code.
+
+Controls, by hand, each restored afterwards: one byte added to a recorded licence text failed the gate's test ("does not have the recorded SHA-256"); a package removed from the record made the comparison, and `release:check` on a packed tarball, fail by naming it ("the bundle contains fast-uri 3.1.0 (embedded in @modelcontextprotocol/server), which release/third-party/packages.json does not record").
+
+Limits of this repair: the embedded packages are found through the source maps the MCP server package publishes; a bundled package that embedded other code and published no source map would not be found this way. The record says what each package declares and ships. It is not legal advice.
+
+**Where it is.** The directory `/Users/hughpyle/play/artroom-releases/candidates/1b40b7ec/` on the development machine holds the six tarballs, `release-manifest.json`, the consumer's lock file (`consumer-package-lock.json`), the lock file of the command installed alone (`cli-only-package-lock.json`) and the check's output (`release-check.log`). The manifest, the two lock files and the log are also attached to the review request in the workroom. The jam repository installs from that directory by file path. This is a local route, chosen because the first jam task runs on this machine; it is not a public release.
+
+**The consumer check** (`npm run release:check`, [scripts/check-release.mjs](../scripts/check-release.mjs)): 55 checks passed, in 7 seconds. It copies [release/consumer](../release/consumer) to a fresh directory outside the repository and:
 
 - installs the six tarballs with npm, with a saved lock file that names each by file and integrity, no link, and no other Artroom package (239 packages with third-party dependencies, from the public registry);
 - imports each of the 14 library subpaths from plain Node;
 - typechecks the fixture under NodeNext and under bundler resolution, with ordinary settings, and runs it compiled;
 - runs `artroom-verify` to its usage line;
-- installs the command's tarball alone in a second fresh directory, where it is the only package, and runs `npx artroom --help`;
-- checks, for each tarball, its identity against the manifest, that every export, declaration and bin is a file in it, that `LICENSE` and `NOTICE` are there, that it holds only built files, and its version, internal dependencies and `engines`.
+- installs the command's tarball alone in a second fresh directory, where it is the only package, reads the third-party licence texts from the installed package, and runs `npx artroom --help`;
+- checks, for each tarball, its identity against the manifest, that every export, declaration and bin is a file in it, that `LICENSE` and `NOTICE` are there, that the command's tarball has the licence text of every package in its bundle, that it holds only built files, and its version, internal dependencies and `engines`.
 
 This shows the packages install and load. It does not show Room admission: no room was contacted.
 
 **Subpaths.** All 14 load under plain Node; none is for a Worker only. contract, policy and client import no Node or Cloudflare module and also run in a browser and a Worker. `mcp`'s `./stdio` and `log`'s `./git-cli` and its command need Node. `mcp`'s `./worker` is written for a Worker and also loads under Node.
 
-**In the gate.** `scripts/release-manifest.test.mjs`, two tests in under 0.1 s, reads the six manifests and build configurations: one nonzero version, exact dependencies between the six, a command with no runtime dependency, and every export and bin naming a source file the build covers. Four hand-made controls each failed the test they should: a version mismatch, an export naming a missing source file, an Artroom runtime dependency on the command, and a build that leaves out the bin's source. The pack-and-install check is outside the gate because it installs from the network.
+**In the gate.** `scripts/release-manifest.test.mjs`, four tests in about 0.1 s, reads the six manifests, the build configurations and the third-party record: one nonzero version, exact dependencies between the six, a command with no runtime dependency, every export and bin naming a source file the build covers, and recorded licence texts that have their recorded hashes. Four hand-made controls each failed the test they should: a version mismatch, an export naming a missing source file, an Artroom runtime dependency on the command, and a build that leaves out the bin's source. The pack-and-install check is outside the gate because it installs from the network.
 
-**Changed.** The six package manifests (version, exact internal versions, `engines`, `files`, a `build` script for the five libraries; the command's Artroom packages moved to development dependencies, since its bundle holds what it runs); a `tsconfig.build.json` in each library; `packages/ui/package.json`, two lines, so that the workspace still links contract and policy at the new version; `package-lock.json`; the root `package.json` (two release scripts, and the manifest test in `npm test`); `scripts/pack-release.mjs`, `scripts/check-release.mjs`, `scripts/release-lib.mjs`, `scripts/release-manifest.test.mjs`; `scripts/test-changed.mjs` (runs the manifest test when a manifest changed); `release/consumer/`; `docs/release.md`; a short "Installing" section in five READMEs; [docs/testing.md](../docs/testing.md) and [test-invariants.md](test-invariants.md).
+**Changed.** The six package manifests (version, exact internal versions, `engines`, `files`, a `build` script for the five libraries; the command's Artroom packages moved to development dependencies, since its bundle holds what it runs); a `tsconfig.build.json` in each library; `packages/ui/package.json`, two lines, so that the workspace still links contract and policy at the new version; `package-lock.json`; the root `package.json` (two release scripts, and the manifest test in `npm test`); `scripts/pack-release.mjs`, `scripts/check-release.mjs`, `scripts/release-lib.mjs`, `scripts/release-manifest.test.mjs`; `scripts/test-changed.mjs` (runs the manifest test when a manifest changed); `release/consumer/`; `docs/release.md`; a short "Installing" section in five READMEs; [docs/testing.md](../docs/testing.md) and [test-invariants.md](test-invariants.md). For review `59605d51`: `release/third-party/` (the record and nine licence files), `.gitattributes` (the licence files are kept byte for byte), the three release scripts and their test, `scripts/test-changed.mjs` (a change to the record runs the test), `docs/release.md` and one row in `plans/test-invariants.md`.
 
 **Limits.**
 
@@ -3365,7 +3392,7 @@ This shows the packages install and load. It does not show Room admission: no ro
 - The contract package has no README, so its tarball has none.
 - Not tried: `npm ci` in a consumer from the saved lock file, and a global install of the command.
 
-**Gates.** The review request gives the gate's result at the head sent. The packaging source is that of `980618d1`; the head for review adds only this section.
+**Gates.** The review request gives the gate's result at the head sent. The packaging source is that of `1b40b7ec`; the head for review adds only this section. The earlier candidate, packed from `980618d1`, is still at `/Users/hughpyle/play/artroom-releases/0.1.0-dev.1/`; it lacks the licence texts and is not to be installed.
 
 ## Intermediate verifier release (request 42342e35)
 
