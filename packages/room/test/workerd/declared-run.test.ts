@@ -37,16 +37,11 @@ interface Witness {
 
 const WITNESSES: readonly Witness[] = [
   {
-    file: "lanes.test.ts",
-    only: /R-LANE|R-PROP-1, R-PROP-2/,
-    shows: "the steps open, take and release, renewal and expiry, and a version with its pin, reached through the declared kinds claim, release and propose (conversion 1)",
-    load: () => import("./lanes.test.ts"),
-  },
-  {
-    file: "landing.test.ts",
-    only: /R-ADMIN|R-LAND-7: reservation|policy activation during preparation|byte-equal input/,
-    shows: "the steps review and land with the landing engine, reservation, an activation while a landing is prepared, and configuration recovery through recover (conversion 2)",
-    load: () => import("./landing.test.ts"),
+    file: "acts.test.ts",
+    only: /R-LANE|R-PROP-1, R-PROP-2|R-ADMIN|R-LAND-7: reservation|policy activation during preparation|builds the same bytes at reservation/,
+    shows:
+      "the steps open, take and release, renewal and expiry, and a version with its pin, reached through the declared kinds claim, release and propose (conversion 1); the steps review and land with the landing engine, reservation, an activation while a landing is prepared, and configuration recovery through recover (conversion 2)",
+    load: () => import("./acts.test.ts"),
   },
   {
     file: "obligations.cases.ts",
