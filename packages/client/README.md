@@ -188,7 +188,9 @@ either waits, so they cannot both take the last place. A key carries one
 intent at a time: a second call with the same key and the same kind,
 target and body, made while the first is under way, gets the first call's
 outcome; one with another intent is refused `bad-request` and nothing is
-sent. Repeat one of the unanswered acts, so that it is answered,
+sent. This holds from the moment the first call starts, so an `onPrepared`
+hook that makes the same call again gets the first call's promise. The hook
+must not await it: it settles only after the hook has returned. Repeat one of the unanswered acts, so that it is answered,
 and then make the new one.
 
 ## Choices this package makes
