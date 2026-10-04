@@ -61,7 +61,7 @@ function prefix(f: Fixture, through: number): Log {
 }
 
 /** A retained context, as far as the tests below change it. */
-type Shaped = { input: { proposal?: { changed: unknown }; obligations?: unknown } };
+type Shaped = { input: { proposal?: { changed: unknown }; obligations?: unknown; evidence?: unknown } };
 
 /** Verify `log` and expect `reason` at `seq`, with the verified prefix ending just before it. */
 async function expectFailure(log: Log, reason: VerifyReason, seq: number, opts: Parameters<typeof verify>[1] = {}) {
@@ -547,14 +547,17 @@ describe("check-carried events are judged (R-CARRY-6 to R-CARRY-14)", () => {
     { name: "a proposal's changed list is not a list", at: "propose2" as const, change: (c: Shaped): void => { c.input.proposal!.changed = "src/a.ts"; }, says: /context\.input\.proposal\.changed is not an array/ },
     { name: "a renamed path has no from", at: "propose2" as const, change: (c: Shaped): void => { c.input.proposal!.changed = [{ status: "renamed", path: "src/a.ts" }]; }, says: /changed\[0\]\.from is not a string/ },
     { name: "a land input's obligations hold null", at: "land" as const, change: (c: Shaped): void => { c.input.obligations = [null]; }, says: /context\.input\.obligations\[0\] is not an object/ },
-  ])("a retained context that verify reads by shape is malformed when that shape is wrong, in a report and not a throw: $name", async ({ at, change, says }) => {
+    { name: "a carry input has no evidence", at: "propose2" as const, kind: "carry" as const, change: (c: Shaped): void => { c.input.evidence = null; }, says: /context\.input\.evidence is not an object/ },
+    { name: "a carry input's evidence names no act", at: "propose2" as const, kind: "carry" as const, change: (c: Shaped): void => { c.input.evidence = { act: 7 }; }, says: /context\.input\.evidence\.act is not a string/ },
+  ])("a retained context that verify reads by shape is malformed when that shape is wrong, in a report and not a throw: $name", async ({ at, change, says, ...rest }) => {
+    const kind = "kind" in rest ? rest.kind : undefined;
     const seq = S[at];
     // The control: the log cut after this entry verifies, with replay on and off.
     for (const replayDecisions of [true, false]) expect(await verify(prefix(CARRY, seq), { replayDecisions })).toMatchObject({ ok: true, verifiedThrough: seq });
     // The same log, with one recorded context changed in that one place, kept under its own digest and resealed.
     const forged = prefix(CARRY, seq);
     const recorded = decisionsAt(forged, seq);
-    const first = recorded.find((d) => (at === "land" ? d.kind === "land" : (contextOf(forged, d) as unknown as Shaped).input.proposal))!;
+    const first = recorded.find((d) => (kind ? d.kind === kind : at === "land" ? d.kind === "land" : (contextOf(forged, d) as unknown as Shaped).input.proposal))!;
     const context = structuredClone(contextOf(forged, first)) as unknown as Shaped;
     change(context);
     const digest = keep(forged, context);
