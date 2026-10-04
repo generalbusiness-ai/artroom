@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:f35eade5299cb5f9bbd0d8fa2a9fa39f5cd03919","text":"Merge retired a covered predecessor; the successor is at packages/log/test/fixtures/declared-carry.json."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:fb087e75432ea21b25a2b48c084d6588a4b102a2","text":"Merge retired a covered predecessor; the successor is at plans/test-invariants.md."}
