@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:9d637da623cc1b9c48b03189f68f8cc0e3a4c558","text":"Merge retired a covered predecessor with no successor at its old path."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:9e67602543be59355f07d9ddc3d987bc87ef426c","text":"Merge retired a covered predecessor; the successor is at packages/ui/src/room/live/describe.ts."}
