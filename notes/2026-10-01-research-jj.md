@@ -10,7 +10,9 @@ with the reviewed clarification
 identity). The clarification answers changes review `6649bb50` of the
 first version of this note. Corrected passages are rewritten in place.
 The first version stays readable at commit
-`b3050dc6959f3c10d5eb550b28492d40ab81f435`.
+`b3050dc6959f3c10d5eb550b28492d40ab81f435`. The planner answered this
+note's open points in workroom direction `fceb27d0`, and those answers
+are applied here.
 
 This note covers:
 - what each system is for;
@@ -49,8 +51,8 @@ their own limits, and none was rerun. Local evidence is not shared Room
 authority, and it is not proof about a provider.
 
 **History, adopted and proposed.** Section 5 marks each item as a
-recorded decision, as existing work, or as a proposal. The proposed plan
-sentence in section 6 is not yet in the plan.
+recorded decision, as existing work, or as a proposal. The plan now
+carries the reviewed sentence in section 6, as documentation.
 
 ## 1. The short answer
 
@@ -165,7 +167,9 @@ They are not the universal identity of all Artroom work. For a general
 application, the declared kinds and their recorded bindings decide what
 the work means. The clarification takes this general model from
 decisions recorded in the workroom. Unlanded candidates for declared
-acts are not credited here as behaviour of main.
+acts are not credited here as behaviour of main. The plan's older
+account of lanes is kept as the code-review profile and as history,
+beside that recorded general direction.
 
 ## 4. Where they differ, and why
 
@@ -266,10 +270,11 @@ stores. The other is a failed integration in Artroom.
   validity of the Git tree nor R-LAND-4 excludes that data.
 
 **Source: Artroom, `packages/policy/src/pack.ts` at main `e6e67828`.**
-The default policy pack already has a `jj-conflicts` rule
-(`jjConflicts`). On `propose`, it refuses a proposal whose added or
-modified paths, or rename destinations, start with the root conflict
-directory prefixes. It runs before the `outside-claim` check, so the
+The default policy pack already has a rule with the id `jj-conflicts`.
+The function that builds it is `jjConflicts`. Both names are correct.
+On `propose`, the rule refuses a proposal whose added or modified paths,
+or rename destinations, start with the root conflict directory
+prefixes. It runs before the `outside-claim` check, so the
 author sees the real cause. It does not count deletions. This is a
 **changes-only policy decision**. It is not a scan that proves the whole
 head free of jj conflict data. Untouched older content, removals and
@@ -389,11 +394,14 @@ data not delivered.**
   do not map one to one, it says it could not tell whether the edit
   moved. A change ID that appears twice in a generation is shown as
   divergent and not matched. Commits without a header are counted. The
-  display works with mock data.
-- **Wording in `plans/011`.** The clarification describes the same
-  display as showing "mapped and unmapped comment positions, explicit
-  unknown states". The README at main `e6e67828` does not use those
-  terms. This note follows the README.
+  view is labelled author-supplied. The display works with mock data,
+  within the bounds below.
+- **History: wording in `plans/011`.** The frozen clarification says the
+  display shows "mapped and unmapped comment positions, explicit unknown
+  states". The planner corrected this in direction `fceb27d0`: the
+  phrase was inaccurate, and it is not attributed to current source. The
+  frozen bytes of `plans/011` are unchanged and stay as evidence
+  history.
 - **Source: the same README.** Live Room data does not yet provide
   `changeHistory` or the commit and blob reads it needs. Live screens
   therefore show no such history.
@@ -478,9 +486,10 @@ work. It must not imply any of these:
 
 ## 6. A revised sentence for the plan
 
-**Status: proposed. The plan is not changed by this note.**
+**Status: the plan now carries the reviewed wording, as documentation.
+This is not adoption of runtime support for jj.**
 
-Section 3 of the plan, revision 4, says: "jj offers first-class
+Section 3 of the plan, revision 4, said: "jj offers first-class
 conflicts and an operation log." That is accurate but leaves out the
 parts that matter to a judge comparing the two.
 
@@ -491,7 +500,7 @@ review or policy model" as a statement of what jj does natively, not a
 claim that jj cannot take part in an external review system. That
 proposal is withdrawn; it stays readable at `b3050dc6`.
 
-The reviewed clarification proposes this text instead, to replace the
+The reviewed clarification proposed this text instead, to replace the
 plan's comparison sentence when the plan is integrated:
 
 > jj is a local version control client with a Git backend and history
@@ -508,11 +517,18 @@ waiting, always committing, and conflicts being excluded. It does not
 change the general contract for declared acts, and it does not promise
 that every client is compatible.
 
-The plan edit is still owed under request `966aeaad`. Approval of the
-clarification did not edit the plan and does not satisfy that
-obligation. The first version of this note made the same point: it
-proposed the change and did not make it, because the plan was under
-checker's review.
+**History.** The first version of this note proposed a change and did
+not make it, because the plan was under checker's review. Approval of
+the clarification did not edit the plan either.
+
+**Current state (2026-10-04).** Section 3 of
+`notes/2026-10-01-artroom-plan.md` now carries the paragraph above, with
+a dated revision note. The edit was made under request `50d7806a`, on
+the planner's direction `fceb27d0`. It replaces that one paragraph and
+nothing else in the plan. It is documentation. It does not adopt new
+runtime support, and it does not rewrite the plan. The original promise
+`966aeaad` / `bfb563fe` stays separate. Its conditions on review and on
+source reaching main are not closed by this edit.
 
 ## 7. Follow-up work
 
@@ -544,8 +560,9 @@ remains. No duplicate implementation request is needed.
 **Judgement.** If a hosted environment advertises jj continuity, its
 checkpoint must cover more than files and the closure of Git objects. It
 must also cover the actual `.jj` operation, store and view state, and
-the workspace references. Plan 005's quiescent checkpoint, acknowledged
-manifest and epoch fences should apply to every writer. Prepared commits
+the workspace references. Plan 005 is a frozen planning file that is not
+on this branch. Its quiescent checkpoint, acknowledged manifest and
+epoch fences should apply to every writer. Prepared commits
 and the frozen meaning of signed acts should be preserved separately. A
 shell
 exit, a pushed ref or a local working-copy commit does not prove a
@@ -616,8 +633,8 @@ of the day it was read.
 
 Artroom, at main `e6e6782830e0ca8a68f0d11c4d4ece5e4e98c967`, read
 2026-10-04:
-- `packages/policy/src/pack.ts`: the default `jjConflicts` changes-only
-  rule.
+- `packages/policy/src/pack.ts`: the default changes-only rule (function
+  `jjConflicts`, rule id `jj-conflicts`).
 - `packages/git/test/jj-change-id.test.ts`: witnesses for the raw object
   and the header after landing.
 - `packages/git/measure/jj-change-id.mjs`: the measurement driver.
@@ -636,7 +653,10 @@ Artroom, as read on 2026-10-01 (history), at
 
 Workroom decisions. The current declared acts, and the C1 to C6 and N1
 to N7 directions, are recorded workroom decisions and requests. The
-clarification says they are indexed in `plans/README.md`.
+clarification says they are indexed in `plans/README.md`. That index is
+the planner's working copy. The `plans/README.md` on this branch does
+not index them, and plans 005 and 006 are not on this branch. C1 and N1
+keep the incorporation of plans 005 and 006.
 
 ## 9. Revision record and correction map
 
@@ -647,9 +667,11 @@ clarification says they are indexed in `plans/README.md`.
 | Clarification | `plans/011-2026-10-04-jj-clarification.md`, Draft 1: 25,637 bytes, 423 lines, SHA-256 `cd74665c0e516d30edfdc078d18f2410574d8ec2f6a221d383c62ab175e3139b`. Request `63be1105161fb4d0c0c390fbba34c30929781932`, promise `152a3b84ec731df68c058a61b333396f9e2ddcfc`. Primary artifact `9acd28e0` at head `5d0d606e` |
 | Its approval and guidance | Approval `e7cc8c03`, as an evidence-only planning clarification. Guidance `cb4613c9` |
 | This reconciliation | Request `50d7806a`, 2026-10-04 |
+| Planner's direction on the open points | Workroom assert `fceb27d0`, 2026-10-04 |
 
 The clarification file is not on this branch. It lives in the planner's
 copy of `plans/`, and its frozen bytes are the primary artifact above.
+The artifact reference is the canonical identity of that file.
 
 Where each accepted correction group is delivered in this note:
 

@@ -9,6 +9,12 @@ Revised 2026-10-04: reconciled with the reviewed clarification
 `50d7806a`. Section 10 lists, by place, the statements that this
 revision corrects.
 
+Corrected 2026-10-04 under the planner's direction `fceb27d0`: six
+passages that the clarification left at odds with its own corrections,
+and the credit for the pi spike. Section 10 quotes the clarification's
+wording that each correction replaces. The clarification itself stays
+frozen as reviewed history.
+
 **Status of this note.** Read every statement as one of five kinds.
 
 - **Delivered.** Only Artroom's protocol and code on `main`, at the
@@ -131,7 +137,9 @@ requests own. It does not define or change that work.
   in section 5. Replay alone is required; million-cell cost is still
   unmeasured. [Judgement, Untested]
 - **Three control Rooms, three mechanisms.** Identity arrives as a signed
-  object verified against a pinned key. Functionality arrives as a
+  source object that is carried in and then admitted locally as an
+  authorized key, pin or grant. A valid signature alone grants nothing
+  (REQ-5). Functionality arrives as a
   digest, taken by a proposal in the cell. A reporting dimension never
   arrives at all: it is joined at query time. [Judgement]
 - **Ten walk-throughs** (section 4) through dap and Artroom cases show
@@ -145,9 +153,11 @@ requests own. It does not define or change that work.
   hidden from each other, which Artroom cannot express inside one Room
   (G7).
 - **Revocation needs two mechanisms together, not one.** Short-lived
-  mandates bound the damage with no infrastructure. A deployment-level
-  revocation list, consulted at admission and recorded in the receipt,
-  makes the stop fast only with retained completeness and freshness proof.
+  mandates bound stale mandate authority by its remaining lifetime, with
+  no infrastructure. They do not bound a fail-closed outage, and there is
+  no expiry-only fallback. Deployment revocation state, consulted at
+  admission and recorded in the receipt, makes the stop fast only with
+  retained completeness and freshness proof.
   Targeted delivery uses evidence of actual affected activity, rather than
   treating assignments as proof that a key acted. A per-cell
   proposal, the mechanism for everything else, fails the timeliness
@@ -165,16 +175,20 @@ Durable Object that sleeps until something happens, so a firm can hold a
 million open engagements at low idle cost. This scale and cost are an
 engineering hypothesis requiring REQ-41's evidence. [Judgement, Untested]
 The pi-durable note records a bounded local workerd spike
-(`notes/2026-10-01-pi-durable.md`). It used the pinned lane A Room and
-lane E client over fake Artifacts and the publisher sandbox. The Room,
-policy runtime, landing engine and log publisher are real within that
-harness. The workspace and the push are simulated. Resumption is driven
-by the caller, from retained local resume inputs. The workspace token
-path is not exercised. The spike demonstrates prepared-act retry and
-scripted recovery within that harness. It does not demonstrate an
-autonomous production representative, a real coding environment,
-provider publication or the hosted C3 lifecycle. C3 owns production
-runtime and 007/008 its input delivery; C2 owns real repository
+(`notes/2026-10-01-pi-durable.md`). Its setup lists the pinned lane A
+Room, with its policy runtime, landing engine, workspace code and log
+publisher, and the pinned lane E client, over fake Artifacts and the
+publisher sandbox. The Room, client, policy, landing and log logic is
+real within that harness. Listing the Room's workspace code does not make
+a real hosted coding workspace. The prepared fork push was simulated.
+The workspace token path was not exercised. Resumption was driven by the
+caller, from retained local resume inputs. The spike demonstrates
+prepared-act retry and scripted recovery within that harness. It does
+not demonstrate an autonomous production representative, a real coding
+environment, real coding-host persistence, provider publication or the
+hosted C3 lifecycle. The setup list does not support any claim about the
+workspace or token lifecycle. C3 owns production runtime and 007/008 its
+input delivery; C2 owns real repository
 recovery. [Source]
 
 **The coordinates are in genesis.** A Room's genesis never changes
@@ -524,11 +538,15 @@ key, is compromised at 09:00.
 | 6. The audit question afterwards: "where did that key act after 09:00?" | none; an authorized bounded read | the grouping "cells of this firm" | actual published logs/receipts and the acknowledged activity frontier, not just assignment lists | read result with known prefix and any pending discovery/propagation limits | C-5. Each applicable receipt records authority plus the immutable revocation state/proof and its freshness basis |
 
 Findings. Step 2 is the requirement that breaks the per-cell proposal
-mechanism: the firm must be able to stop a key in every cell in minutes
-without a member of each cell signing anything. Step 5 is the requirement
-that breaks a naive push: most cells should pay nothing. Step 3 is why a
-push is still needed for some cells: evidence invalidation is a change to
-the cell's state that only the cell can seal. [Judgement]
+mechanism: affected authority must stop being admitted in every
+applicable cell within the proposed one minute of the deployment service
+accepting the authorized revocation, without a member of each cell
+signing anything. Submission by the firm and acceptance by that service
+are distinct. The one-minute bound is unmeasured. Step 5 is the
+requirement that breaks a naive push: most cells should pay nothing.
+Step 3 is why a push is still needed for some cells: evidence
+invalidation is a change to the cell's state that only the cell can
+seal. [Judgement, Untested]
 
 ### W9. A pack upgrade across the collection
 
@@ -627,9 +645,12 @@ From W8, W5.10, W4.9 and W1.8:
   anything. The firm's own act must suffice. (W8.2)
 - **Replayable.** A cell's log must still say, for every admitted act,
   what the cell relied on, so a replay reaches the same verdict. (C-1)
-- **Audit.** Each cell where the key had acted must seal the revocation
-  and apply R-REV-3's effects, so "where did it act after 09:00" has an
-  answer in the logs. (W8.3, W8.6)
+- **Audit.** Each affected cell must seal an applicable positive
+  revocation and apply the R-REV effects, so "where did it act after
+  09:00" has an answer in the logs. Until an authoritative cell result
+  exists, delivery is shown as pending or unsealed. Central acceptance,
+  targeted delivery or a missing acknowledgement does not prove that
+  every cell has sealed. (W8.3, W8.6)
 - **Remove only.** The mechanism can only take authority away. It can
   never grant, and so can never become a control plane. (C-6)
 - **The ordinary case stays ordinary.** Revoking a family member from two
@@ -990,8 +1011,8 @@ the seven review groups to focused acceptance and existing owners.
   fail-closed unavailability may last indefinitely. Unrelated direct human
   member authority is unaffected. Final admission rechecks local authority
   after any awaited proof acquisition. (section 5, C/D) [Untested]
-- **REQ-36.** The list can only remove authority. No entry on it grants
-  anything. (C-6)
+- **REQ-36.** Deployment revocation state can only remove authority. No
+  entry or proof in it grants anything. (C-6)
 - **REQ-37.** A revocation by a member in one cell (R-REV-3) continues to
   work unchanged. (W5.10)
 
@@ -1114,13 +1135,18 @@ the seven review groups to focused acceptance and existing owners.
   withdrawn `25bede37` remains historical. Whole Stage 3 accounting,
   Stage 5 client/UI and MCP integration retain separate outcomes.
 - `notes/2026-10-01-pi-durable.md` at exact main `e6e67828`: a bounded
-  local workerd spike using the pinned lane A Room and lane E client over
-  fake Artifacts and the publisher sandbox, with simulated workspace/push,
-  retained local resume inputs and caller-driven resumption. The Room,
-  policy runtime, landing engine and log publisher are real within that
-  harness; the workspace token path is not exercised. It does not
-  establish autonomous production dispatch, provider publication or the
-  hosted C3 lifecycle. No runtime was rerun for the clarification or for
+  local workerd spike. Its setup lists the pinned lane A Room, with its
+  policy runtime, landing engine, workspace code and log publisher, and
+  the pinned lane E client, over fake Artifacts and the publisher
+  sandbox. The Room, client, policy, landing and log logic is real within
+  that harness. Listing the Room's workspace code does not make a real
+  hosted coding workspace: the prepared fork push was simulated, the
+  workspace token path was not exercised, and resumption was driven by
+  the caller from retained local resume inputs. The spike does not
+  establish autonomous production dispatch, provider publication, real
+  coding-host persistence or the hosted C3 lifecycle. The setup list
+  does not support any claim about the workspace or token
+  lifecycle. No runtime was rerun for the clarification or for
   this reconciliation.
 - `notes/2026-10-01-jam-room.md`, Revision 3, at
   `d3291cd0b8cd41b58a7643b4b95286bcd1deaf36`. The 2026-10-02 text cited
@@ -1150,7 +1176,8 @@ the seven review groups to focused acceptance and existing owners.
   described as unimplemented/aspirational.
 - Workroom owners: G2 `d50ce26d` and associated `1ebda917`, founding
   `a13a0bf5`, checker-job authority `f12cef6b`, future K2 `da2737b2`,
-  wake source integration `24711ceb` and original discussion `d8e11208`.
+  wake source integration `24711ceb` and assert `d8e11208`, which amends
+  the scope of the firm-authority design request `d50ce26d`.
   Approved 005/006, frozen 007/008 and their adoption records are retained
   planning authorities, with C1–C6 and N1–N7 implementation still distinct.
 
@@ -1219,8 +1246,10 @@ The first table lists the places that changed, outside the requirement
 statements, and quotes the main statements in each. Within a listed
 place, a sentence that is not quoted may also have changed. The second
 table gives the complete original statement of every rewritten
-requirement. Places that neither table lists are unchanged from the
-original, apart from added qualifications, labels and source pins. The
+requirement. The third table lists the corrections made under the
+planner's direction `fceb27d0`, and quotes the clarification's wording
+that each one replaces. Places that no table lists are unchanged from
+the original, apart from added qualifications, labels and source pins. The
 complete original at `5b579511` is the record.
 
 | Where | The 2026-10-02 text said | Why it no longer stands | Corrected in |
@@ -1228,13 +1257,13 @@ complete original at `5b579511` is the record.
 | Summary; section 1 | Self-sufficiency "keeps a million cells cheap". A firm can hold a million open engagements "at near-zero idle cost" | Scale and cost are unmeasured hypotheses | Summary; section 1; REQ-41 |
 | Summary, first point | Everything a cell needs to judge an act "is in its own log before the act" | A revocation proof is retained with the admission receipt that uses it | Summary; C-1; section 5 |
 | Summary, revocation point | The list "makes the stop fast". "A targeted push from the firm's own assignment list handles the cells where evidence must be invalidated" | The stop is fast only with retained completeness and freshness proof. Assignment is discovery, not activity | Summary; section 5, D and B; REQ-32; REQ-33 |
-| Section 1 | "The pi-durable spike shows one such agent claiming, proposing and landing under a member's delegation, and resuming after a crash without acting twice" | The spike is a bounded local harness. Its workspace and push are simulated, its resumption is driven by the caller, and the workspace token path is not exercised | Section 1; W1.5; section 8 |
+| Section 1 | "The pi-durable spike shows one such agent claiming, proposing and landing under a member's delegation, and resuming after a crash without acting twice" | The spike is a bounded local harness. Its fork push is simulated, its resumption is driven by the caller, and its workspace token path is not exercised | Section 1; W1.5; section 8 |
 | Section 2, identity row | Mechanism: "a signed object carried in, verified against a key pinned in the cell's roster". Records: "the pinned key at join; each mandate as presented". Later change: "only by revocation" | A signature alone grants nothing. Keys, pins and grants need local authorized admission. New keys and rosters need local acts | Section 2 table |
 | Section 2, first consequence | The customer's Room "supplies the delegation their agent acts under". The cell treats both contributors "by the same mechanism", so dap's structural-disadvantage criterion is "met by construction" | A delegation in the customer's private Room authorizes nothing in another cell. Equal mechanism is a design boundary, not proof of usable agency | Section 2; W5; REQ-15 to REQ-17 |
 | Section 2, second consequence | A grouping Room's roster "says who may see the roll-up" | The roster is one required permission. The source cells must also authorize fields and audience | Section 2; W10; REQ-23 |
 | Section 3, C-1 | What a cell relies on is "recorded in the cell's own log, by digest or by signed object, before it is used" | The bounded revocation witness is retained with the admission that uses it | C-1; section 5 |
 | Section 3, C-5 | "The same rule as for Cloudflare K2" | The comparison stands, but K2 is future work, and the note now says so. Export also needs the source cell's declared policy | C-5 |
-| Section 3, C-6 | Revocation "can only remove authority, never grant it", with no issuer check stated | These words still stand in C-6 and in REQ-36. The original stated no issuer check. The cell must also verify issuer authority over the exact target and scope | C-6; REQ-30; REQ-36 |
+| Section 3, C-6 | Revocation "can only remove authority, never grant it", with no issuer check stated | These words still stand in C-6, and REQ-36 says the same of deployment revocation state. The original stated no issuer check. The cell must also verify issuer authority over the exact target and scope | C-6; REQ-30; REQ-36 |
 | Section 3, closing test | A relation is a control plane if it puts in the cell anything "that is not a pinned key, a pinned digest or a sealed revocation" | The test omitted carried objects with provenance and local authorization | Section 3; REQ-40 |
 | W1 | "The case Artroom is built for, as it stands today". Step 5 recorded "claim, push, propose" under "signed envelopes". Finding: "the service never writes into the room" | A Git push is not a Room act. The checker does submit a signed check, judged by the cell's own admission. Spike criterion 3 is local, simulated-push evidence | W1 intro, step 5, finding |
 | W2.4 | "if the rule is general, the catalogue gets a request". "The jam note's rule, zero contract amendments, is the same discipline" | The jam note's fixed vocabulary is dated. Hugh allows the acts vocabulary to change during self-hosting | W2.4; W2 finding |
@@ -1261,7 +1290,7 @@ complete original at `5b579511` is the record.
 | Section 5, contract | "one more input to admission for delegated acts", "one more field in the receipt's `Authority`", "one new system entry kind" and "a deployment component beside the registry" | D changes more than one optional receipt field | Section 5, contract changes |
 | Section 5, untested | "The read cost of D at admission in a Durable Object, the propagation time of the list across a deployment, and whether a KV-backed list's propagation (about a minute) or a Durable Object-backed list's strong consistency is the right trade. A spike would measure these." | A store's name proves no bound. The untested list is now wider, and the store figures are not carried as claims | Section 5; section 7 |
 | Section 6, introduction | The original said that "Must" is a requirement, with no qualifier | Every requirement is proposed | Section 6 introduction |
-| Section 6, statements | Thirty requirements had shorter statements | Each gained the conditions from its correction group. No number was removed, merged or reused. REQ-3, 4, 10 to 12, 14, 20, 26, 36, 37 and 39 are unchanged | Section 6; the second table below |
+| Section 6, statements | Thirty requirements had shorter statements, and REQ-36 named "The list" | Each of the thirty gained the conditions from its correction group. REQ-36 now names deployment revocation state (third table). No number was removed, merged or reused. REQ-3, 4, 10 to 12, 14, 20, 26, 37 and 39 are unchanged | Section 6; the second table below |
 | Section 7 | Visibility "is a platform question with a cost on both sides". "The mandate's shape, and whether a team may hold a key" (the team question still stands in section 7). Facts store: "REQ-18 to REQ-24 hold for any of them". The list's backing store: "KV or a Durable Object. REQ-25 is the measure". Cross-Room obligations: "a carry by a member of both" | The open choices are wider: recovery pins, handover, export format, proof encoding, activity feed and standing | Section 7 |
 | Section 8 | Sources pinned by branch name or "at the same head" | Each source now has an exact commit and a stated evidence boundary | Section 8 |
 
@@ -1299,6 +1328,26 @@ section 6.
 | REQ-33 | A targeted push reaches those cells and no others. (W8.3, W8.5) |
 | REQ-34 | A mandate carries an expiry, with the lifetime set by the pack. (section 5, C) |
 | REQ-35 | When the list is unavailable, delegated and mandated acts are refused with a named reason and direct member acts are unaffected. (section 5, C) |
+| REQ-36 | The list can only remove authority. No entry on it grants anything. (C-6) |
 | REQ-38 | A sale with private bids is expressed as one cell per private relationship, and the decision is carried into each with provenance. (W7.3') |
 | REQ-40 | Any proposed control relation that puts something in a cell other than a pinned key, a pinned digest, a carried object with provenance or a sealed revocation is refused at design review with that reason. (section 3) |
 | REQ-41 | Every requirement above that is marked [Untested] gets a spike before it is adopted. (section 5) |
+
+The corrections made under the planner's direction `fceb27d0`
+(2026-10-04) follow. The clarification left each of these passages at
+odds with its own, more specific corrections. The planner directed that
+the operative text be corrected. The middle column quotes the wording of
+`plans/012-2026-10-04-collections-clarification.md` that was replaced,
+so the reviewed text stays visible. That file is frozen and unchanged.
+Apart from these corrections and the added labels, pins and names key,
+sections Summary to 9 carry the clarification's wording.
+
+| Where | The clarification's wording, replaced | Corrected to say | Corrected in |
+|---|---|---|---|
+| Summary, control mechanisms | "Identity arrives as a signed object verified against a pinned key." | A signed source object is carried in and then admitted locally as an authorized key, pin or grant. A valid signature alone grants nothing | Summary; agrees with the section 2 table and REQ-5 |
+| Summary, revocation | "Short-lived mandates bound the damage with no infrastructure. A deployment-level revocation list, consulted at admission and recorded in the receipt, makes the stop fast only with retained completeness and freshness proof." | Mandates bound stale mandate authority by its remaining lifetime. They do not bound a fail-closed outage, and there is no expiry-only fallback. The fast stop is deployment revocation state, not a list | Summary; agrees with section 5, C and D |
+| W8 findings | "the firm must be able to stop a key in every cell in minutes without a member of each cell signing anything." | The proposed bound is one minute, in every applicable cell, from acceptance of the authorized revocation by the deployment service. Submission and acceptance are distinct. The bound is unmeasured | W8 findings; agrees with section 5 and REQ-25 |
+| Section 5, audit requirement | "Each cell where the key had acted must seal the revocation and apply R-REV-3's effects, so "where did it act after 09:00" has an answer in the logs." | Each affected cell seals an applicable positive revocation and applies the R-REV effects. Delivery is shown as pending or unsealed until an authoritative cell result exists. Central acceptance, targeted delivery or a missing acknowledgement proves no sealing | Section 5, "What the walk-throughs require"; agrees with section 5, B |
+| REQ-36 | "The list can only remove authority. No entry on it grants anything." | Deployment revocation state can only remove authority. No entry or proof in it grants anything. Other uses of "list" in the note are unchanged | Section 6 |
+| Section 8, workroom owners | "original discussion `d8e11208`" | `d8e11208` is an assert that amends the scope of the firm-authority design request `d50ce26d` | Section 8; agrees with the opening of the note |
+| Section 1 and section 8, pi spike | "using pinned sources, fake Artifacts, a simulated push and caller-driven resumption." and "with simulated workspace/push, retained local resume inputs and caller-driven resumption." | The spike's setup lists the real Room and its workspace code over fake Artifacts and the publisher sandbox. That is not a real hosted coding workspace. The fork push was simulated, the workspace token path was not exercised, and resumption was driven by the caller | Section 1; section 8 |

@@ -4,10 +4,11 @@
 Revision 3, 2026-10-04: reconciled with the reviewed clarification
 `plans/008-2026-10-03-wake-and-schedule-clarification.md` and the
 attention handoff `plans/007-2026-10-03-attention-runtime-handoff.md`,
-under request `50d7806a`. Answers hugh's question: what is the simple
-version of "trigger this agent when X happens in the room", and how can
-a schedule ("cron") do the same for daily housekeeping and reporting
-work that needs an agent?
+under request `50d7806a`. The same day, the planner's direction
+`fceb27d0` on that revision's open points was applied. Answers hugh's
+question: what is the simple version of "trigger this agent when X
+happens in the room", and how can a schedule ("cron") do the same for
+daily housekeeping and reporting work that needs an agent?
 
 **Kinds of statement.** Facts about Artroom in revisions 1 and 2 come
 from `main` at `8189d66`. Facts added in revision 3 come from `main` at
@@ -20,7 +21,7 @@ for this note. Facts about pi-durable come from its announcement.
 Judgements are marked **Judgement**; claims nobody has tested are
 marked **Untested**.
 
-**Status of each choice.** This note uses five words:
+**Status of each choice.** This note uses six labels:
 
 - **Exists:** present in the source at the named pin.
 - **Adopted:** decided by hugh on 2026-10-01 (decision `154f25d8`,
@@ -30,6 +31,10 @@ marked **Untested**.
   it as planning direction (`6068751a`). It is not a contract, not a
   schema and not an implementation. Its owners still owe the reviewed
   work (section 10).
+- **Direction `fceb27d0`:** the planner's answer of 2026-10-04 to the
+  open points of revision 3 (read at commit `508ac63b`). It is planning
+  direction. It is not a complete independent review, and it is not
+  implemented protocol or runtime.
 - **Planned:** owed by a stage in section 8. Not shipped.
 - **History:** kept as a dated record. It does not limit the scope.
 
@@ -197,6 +202,15 @@ definition activates. There are two classes:
   recorded work lifecycle and the requested result, with or without a
   file scope.
 
+**Direction `fceb27d0`.** The class belongs to the retained activated
+task definition and is validated at activation. It must distinguish an
+informational notice from an action that requests a result. Scope is
+not the discriminator, because action work without a scope exists. The
+exact JSON field or rule encoding stays an explicit choice. Its owner
+is the existing public wake and schedule amendment, with C1
+(`b538c5ea`) and its work-lifecycle dependencies. It is not an orphan
+choice, and it creates no new duplicate task.
+
 A task edit that changes the class is a new activation. The earlier
 work stays owed.
 
@@ -321,6 +335,23 @@ for the missed window, with the earliest missed time and a count
 the actual recording time. The room produces one requested task for
 that summary, subject to coalescing. No due slot is silently dropped.
 
+**Direction `fceb27d0`: a missed window that spans an activation
+switch.** The activation bounds apply to each missed window. Accounting
+is split at the switch:
+
+- Each generation accounts for its own bounded interval. It gets at
+  most one summary and one task for its missed slots, subject to that
+  generation's coalescing.
+- The old and new task meanings are not merged into one request of the
+  current generation.
+- The boundary slot belongs to one generation only. Unfinished
+  evaluation and effects of the old generation recover under their
+  retained meaning. No old-generation slot is created after
+  deactivation.
+
+This clarifies the reviewed generation and window requirements. It does
+not choose a new cron format or storage wire format.
+
 ### Recovery
 
 **Proposed.**
@@ -424,7 +455,7 @@ Where an agent puts its output decides what the room keeps:
 | Output | How | Kept |
 |---|---|---|
 | A finding about one lane, and its reason | A `note` on the lane's act | In the log |
-| A report to keep | A file such as `reports/2026-10-02.md`, landed through a lane | In the repository and the log. Policy can exempt `reports/**` from review for the reporter, as it can for documentation scopes. The reviews that policy requires, the landing and the publication stay separate steps |
+| A report to keep | A file such as `reports/2026-10-02.md`, landed through a lane | In the repository and the log. Policy can exempt `reports/**` from review for the reporter, as it can for documentation scopes. The reviews that policy requires, the landing and the publication stay separate steps. **Direction `fceb27d0`:** reports follow the normal proposal and landing process and the reviews that current policy requires. A genuine policy exemption may yield no required human review. That is not a transport bypass, and it is not a new universal review obligation |
 | A new task | An open item (with D1) addressed to a role. N2 owns the addressed-work lifecycle | In the log, and in the target's queue |
 | Something only people outside the room need | Sent by the agent's own tools. Those tools need their own task authorization and their own recovery for an uncertain effect | Not in the room; the agent should still note that it was sent. A record that a send was attempted is not evidence that it was delivered |
 
@@ -438,7 +469,7 @@ replaces the others.
 |---|---|---|---|---|
 | **Watcher** | **Planned** (stage 1). Not shipped | A laptop, a container, a CI job | `artroom watch --as <member> --exec '<command>'` subscribes to the queue and starts the command for each new item, with the item in `$ARTROOM_ITEM` and a ready prompt in `$ARTROOM_PROMPT`. `--once` drains the queue and exits, for external cron. It keeps the recovery boundary below | CLI only (lane E). No contract change |
 | **Wake address** | **Adopted**, not built (stage 4) | Any server: a Worker, a container platform, a vendor's cloud agent | The member has an optional wake route: an HTTPS URL or a service binding. The room sends a content-free hint that names the room and the member. A cursor, if the hint carries one, is advisory only | Small amendment: one roster field, delivery rules |
-| **pi-durable** | **Adopted**, not built (stage 5) | pi-durable harnesses on Cloudflare Durable Objects, next to the room | A wake route that is a service binding to the harness. The harness submits a message to the agent's conversation with a stable `requestId`, so that a repeated wake resubmits the same input. **Untested:** the announcement says pi-durable deduplicates such a submission; the production receiver still owes that proof (see "What retained input does not prove"). This does not make commands run exactly once | The pi-durable integration design (request `3f23ea89`) and the durable receiver (C3, `13dfc613`) |
+| **pi-durable** | **Adopted**, not built (stage 5) | pi-durable harnesses on Cloudflare Durable Objects, next to the room | A wake route that is a service binding to the harness. The harness submits a message to the agent's conversation with a stable `requestId`, so that a repeated wake resubmits the same input. **Untested:** the announcement says pi-durable deduplicates such a submission; the production receiver still owes that proof (see "What retained input does not prove"). This does not make commands run exactly once | The production durable receiver (C3, `13dfc613`), using `plans/007`. **History:** the pi-durable integration design and spike (request `3f23ea89`) is satisfied and landed (approval `adb239bd`, landing `31da00de`). It is not a production receiver |
 
 **Source: the watcher does not exist yet.** The tree at `8189d66` has
 no `packages/cli` files. The CLI command map on `main` at `e6e67828`
@@ -495,6 +526,13 @@ a gap in an unbuilt design, not an observed production defect.
   things. They are not interchangeable.
 - A wake does not replace the receiver's saved cursor, authorize tools,
   close an attention item or resume a paused task.
+
+**Direction `fceb27d0`.** A cursor in the hint is optional and advisory.
+The room and member identity identify the receiver. The receiver
+resumes from its own retained, typed attention checkpoint. Including a
+cursor in the hint never advances that checkpoint, and never converts a
+conversation or subscription cursor into an attention cursor. The
+concrete payload encoding stays with the existing wake and C1 owner.
 
 ### The durable hosted receiver
 
@@ -757,6 +795,12 @@ public prompts and task history.
   cancelled. A new route can later catch up from the durable queue.
 - Access follows current member and device authority, not possession of
   a route URL.
+- **Direction `fceb27d0`:** "per-member" names the scope of authority
+  and delivery. "Route and secret generation" names its version.
+  Neither settles whether a member has one active route or several.
+  That cardinality stays open, with the existing wake, C1 and private
+  delivery owner. The requirements for immediate retirement or rotation
+  and for current authority stay.
 
 **Prompt injection.** An item's text can come from another member's act
 (a note). The prompt that the planned watcher builds marks that text as
@@ -785,6 +829,15 @@ and retry (section 4).
 One amendment, for checker's review. **Adopted** by decision `154f25d8`
 in three parts. The qualifications are **Proposed**; no schema or
 source change is adopted by this note.
+
+**Direction `fceb27d0`.** The qualified closure, privacy, generation
+and recovery limits of the reviewed and adopted `plans/008` are the
+current planning guidance. Decision `154f25d8` is kept as the
+historical adopted amendment. The planning requirement is distinct from
+the implementation and protocol amendment, which is still owed. Raw
+route endpoints and secrets are not made public merely because an
+earlier roster example used a `wake` field.
+
 1. **Closing by `because`, qualified:** an eligible informational
    notice is acknowledged when its addressee records an admitted act
    citing the notice's entry. The contract names the eligible notice
@@ -816,7 +869,21 @@ owed.
 | 2 | The amendment's item 1 (qualified closing by `because`) | Planner, then lane A |
 | 3 | Schedules (item 2); recorded fired, missed and coalesced outcomes; housekeeping and weekly-report examples in the default templates; application-pack prompts | Planner, then lane A; lane F shows schedules and firings |
 | 4 | Wake addresses (item 3), authentication, delivery status and budgets | Lane A, lane E |
-| 5 | pi-durable wake through its integration and the durable receiver | Request `3f23ea89`; C3 `13dfc613` |
+| 5 | pi-durable wake through the durable receiver | C3 `13dfc613`, using `plans/007`. Revision 2 named request `3f23ea89` (**History**, see below) |
+
+**Owners and stage labels. Direction `fceb27d0`.**
+- The lane letters in the table (lanes A, E, F and M) are historical
+  sequencing labels. Current request identities and the owner table in
+  section 10 track the live work. There is no assumed one-to-one
+  mapping from a lane to a request, and no duplicate commission.
+- Request `3f23ea89` is satisfied and landed design-and-spike work
+  (approval `adb239bd`, landing `31da00de`). It is credited as history,
+  for its bounded source and evidence. It is not an outstanding
+  production receiver implementation. C3 (`13dfc613`) owns the
+  production durable receiver, using `plans/007`. The other wake-stage
+  obligations stay owed; the completed request does not deliver them.
+- The stage numbers here are this note's wake stages. Wake stage 5 is
+  not stage 5 of the declared-acts work.
 
 **Order with other work.** Test-overhead reduction stays first
 (`plans/007`). The acts work needed for the first Jam task
@@ -858,12 +925,17 @@ in US Eastern time:
 | 2026-10-03 | Clarification `plans/008`, Draft 1 | Changes requested by `f965c475`: classify action requests that have no scope |
 | 2026-10-03 | Clarification `plans/008`, Draft 2 (request `45065116`, promise `6a209eaa`) | Approved as planning evidence by `8365e4c4`; adopted as planning direction by `6068751a` |
 | 2026-10-04 | This revision 3, under request `50d7806a` | Source note reconciled. Not yet reviewed |
+| 2026-10-04 | Planner's direction `fceb27d0` on revision 3's open points, read at `508ac63b` | Applied in this note. It resolves editorial questions. It is not a complete independent review, and it closes no original promise |
 
 The approvals of `plans/007` and `plans/008` cover planning evidence
 only. They do not approve a protocol schema, a runtime, a functional
 delivery or first-Jam readiness. The original request `24711ceb` and
 its promise `19a020af` stay owed until this source note passes its own
 review and lands.
+
+**Direction `fceb27d0`.** The status line inside the frozen `plans/007`
+file ("pending independent design review") is history. Its actual
+approval and adoption, in the table above, govern its status.
 
 ## 10. Owners and open choices
 
@@ -878,19 +950,15 @@ delivery to an absent person (`64e9d131`).
 |---|---|
 | Correcting and integrating this source note | Original `24711ceb` and `19a020af`. The clarification was reviewed first; this revision carries it. Completion is not claimed here |
 | Public identity of a schedule, firing and wake; eligible notice kinds; authentication and freshness; safe route references | The wake and schedule amendment, reconciled with C1 and with declared acts. The exact public encoding is open |
-| Whether a hint carries a cursor at all, and its kind | The wake and schedule amendment. If it does, the cursor is advisory |
+| The concrete payload encoding of the hint, including an optional cursor | The existing wake and C1 owner (direction `fceb27d0`). A cursor is optional and advisory |
+| The JSON field or rule that encodes a schedule's class (notice or action request) | The existing public wake and schedule amendment, with C1 and its work-lifecycle dependencies (direction `fceb27d0`). Open |
+| Whether a member has one active wake route or several | The existing wake, C1 and private delivery owner (direction `fceb27d0`). Open |
 | Atomic or keyed recovery of firing, effect and frontier; reproducible cron and zone meaning | The stage 3 schedule owner. A bounded design must name its actual storage and evaluator boundary before implementation review |
 | Durable receiver, and the alarm and input budget | C3, using approved `plans/007`. It must prove real storage and submission recovery under current authority, not a mock wake |
 | Scoped and non-scoped action work; accepted result, reassignment and cancellation | D1 and N2, with the schedule owner. Their separately reviewed lifecycle and authority are preserved. Scope is optional. An acknowledgment does not replace an action result |
 | Watcher and harness instructions | Stage 1 CLI and documentation owners, and N6. Distinguish real command support from examples |
 | Private control of routes and secrets; authority for raw reads | C1 and the stage 4 delivery owner |
 | Notifications to an absent person | N7. An agent's wake configuration gives no consent for delivery to a person |
-
-The clarification says a schedule's request is classified when its
-task definition activates. Neither `plans/008` nor `plans/007` says how
-the class (notice or action request) is expressed, and neither names an
-owner for that choice. `plans/008` leaves public field encodings with
-their existing owners.
 
 The UTC-slot, activation, coalescing and budget rules above are
 planning direction. The exact schema and the provider mechanisms are

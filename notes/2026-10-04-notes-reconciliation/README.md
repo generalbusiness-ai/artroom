@@ -21,9 +21,16 @@ names its clarification by path and identity.
 
 ## How to read the branch
 
-The first commit brings the four notes onto the branch unchanged. The
-second commit holds the reconciliation. So `git diff` between the two
-commits shows exactly what the reconciliation changed in each note.
+The first commit, `8888d8ef`, brings the four notes onto the branch
+unchanged. The second, `508ac63b`, holds the reconciliation. So `git
+diff` between the two shows what the reconciliation changed in each note.
+
+The planner then read the "Drift and open points" of each checklist at
+`508ac63b` and answered them in the workroom, in assert `fceb27d0`
+(2026-10-04). The third commit applies that direction. It is planning
+direction. It is not a review of these files, and it adopts no protocol or
+runtime behaviour. Each checklist marks every open point as answered by
+`fceb27d0`, with what was done, or as still open, with its owner.
 
 ## What each checklist holds
 
@@ -52,9 +59,17 @@ text word for word; the other three are rewritten in place.
   `34cf52b3` / `6430ffd4`). Those keep their own conditions.
 - It adopts nothing. A mechanism that a clarification proposes is still
   only proposed.
-- It does not change `notes/2026-10-01-artroom-plan.md`. The jj
-  clarification proposes new wording for section 3 of that plan. The jj
-  note records the wording as proposed, and [jj.md](jj.md) lists it as an
-  open point.
+- It changes one paragraph of `notes/2026-10-01-artroom-plan.md`: the
+  comparison with jj in section 3, replaced by the reviewed paragraph of
+  the jj clarification, on the planner's direction `fceb27d0`. That is
+  documentation. It adopts no runtime support. Nothing else in the plan is
+  changed.
+- Two corrections go beyond the reviewed clarifications, both on the
+  planner's direction: the jj note describes `packages/ui/README.md` as
+  that file reads on main, where the clarification's phrase was
+  inaccurate; and the collections note corrects six operative passages
+  that the clarification had left in conflict with its own corrections.
+  Section 10 of the collections note quotes the wording each replaced. The
+  clarification files themselves stay as they were reviewed.
 - No external source was read again. Dated statements keep the date on
   which they were read.
