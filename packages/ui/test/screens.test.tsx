@@ -1,12 +1,21 @@
-import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/preact";
-import { afterEach, describe, expect, test } from "vitest";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/preact";
+import { afterEach, describe, expect, test, vi } from "vitest";
+import { App } from "../src/app.tsx";
+import type { Why } from "../src/room/adapter.ts";
+import type { ActId, Proposal, Sha } from "../src/room/contract.ts";
+import { MockRoom } from "../src/room/mock/mock-room.ts";
+import { AppContext } from "../src/ui/context.ts";
+import { WhyDialog } from "../src/ui/WhyDialog.tsx";
 import { DEFAULT_STEP } from "../src/room/mock/scenario.ts";
-import { laneId, renderAt, stepOf } from "./helpers.tsx";
+import { laneId, renderAt, settled, stepOf, waitFor } from "./helpers.tsx";
 
 afterEach(() => {
   cleanup();
+  vi.restoreAllMocks();
   location.hash = "";
 });
+
+const sha = (c: string) => c.repeat(40) as Sha;
 
 describe("Needs you", () => {
   test("each open item says what to do, why it is yours, and offers one action", () => {
@@ -173,5 +182,94 @@ describe("Shell", () => {
     expect(screen.getByText(/No lanes yet/)).toBeTruthy();
     adapter.timeline!.go(1);
     await waitFor(() => expect(document.querySelector("[data-lane='Rate-limit /api/login']")).not.toBeNull());
+  });
+});
+
+describe("note threads stay bound to their recorded head (review 82f2743b, P2.4)", () => {
+  const LANE_GOAL = "Rate-limit /api/login";
+
+  async function openGen(mock: MockRoom, generation: number) {
+    const lane = mock.snapshot().lanes.find((l) => l.goal === LANE_GOAL)!;
+    location.hash = `#/lane/${lane.lane}/${generation}`;
+    render(<App adapter={mock} />);
+    await waitFor(() => expect(document.querySelector("[data-file='src/api/login.ts']")).not.toBeNull());
+    return document.querySelector<HTMLElement>("[data-file='src/api/login.ts']")!;
+  }
+
+  test("with every interdiff known and the file unchanged, the thread is placed on the line and says why", async () => {
+    const file = await openGen(new MockRoom({ step: 22 }), 2);
+    const row = file.querySelector<HTMLElement>("tr.thread")!;
+    expect(row.textContent).toContain("Written on generation 1");
+    expect(row.textContent).toContain("The file is unchanged from that head to this one.");
+  });
+
+  test("with the interdiff unavailable, the thread stays on its own head and the relation is unknown", async () => {
+    const mock = new MockRoom({ step: 22 });
+    vi.spyOn(mock, "changedSince").mockReturnValue(null);
+    const file = await openGen(mock, 2);
+    expect(file.querySelector("tr.thread")).toBeNull();
+    const held = file.querySelector<HTMLElement>("[data-relation='unknown']")!;
+    expect(held.textContent).toContain("On generation 1");
+    expect(held.textContent).toContain("line 15");
+    expect(held.textContent).toContain("is not known here");
+    expect(file.textContent).not.toContain("unchanged from that head");
+  });
+
+  test("a file changed in an earlier generation and unchanged in the latest is not projected", async () => {
+    const mock = new MockRoom({ step: 22 });
+    const snap = mock.snapshot();
+    const lane = snap.lanes.find((l) => l.goal === LANE_GOAL)!;
+    const g2 = snap.proposals.find((p) => p.lane === lane.lane && p.generation === 2)!;
+    const g3: Proposal = { ...g2, generation: 3, head: sha("3"), id: "act_200_aaaaaaaa" };
+    vi.spyOn(mock, "snapshot").mockReturnValue({ ...snap, proposals: [...snap.proposals, g3], lanes: snap.lanes.map((l) => (l.lane === lane.lane ? { ...l, generation: 3 } : l)) });
+    vi.spyOn(mock, "changedSince").mockImplementation((ref) => (ref.generation === 2 ? ["src/api/login.ts"] : ref.generation === 3 ? ["src/lib/authz/check.ts"] : null));
+    vi.spyOn(mock, "diff").mockImplementation((ref) => MockRoom.prototype.diff.call(mock, { ...ref, generation: Math.min(ref.generation, 2) }));
+    const file = await openGen(mock, 3);
+    expect(file.querySelector("tr.thread")).toBeNull();
+    expect(file.querySelector<HTMLElement>("[data-relation='changed']")!.textContent).toContain("This file changed since that head");
+  });
+});
+
+describe("the why dialog shows the explanation of the act it was asked for (review 82f2743b, P2.5)", () => {
+  function setup() {
+    const mock = new MockRoom();
+    const ids = mock.snapshot().feed.slice(0, 2).map((f) => f.id) as [ActId, ActId];
+    const why = (act: ActId, title: string): Why => ({ act, seq: 1, by: "@sam", title, outcome: "accepted", decisions: [], invariants: [], reasons: [], published: false });
+    const state = { adapter: mock, snap: mock.snapshot(), why: () => {} };
+    const view = (id: ActId | null) => (
+      <AppContext.Provider value={state}>
+        <WhyDialog act={id} onClose={() => {}} />
+      </AppContext.Provider>
+    );
+    return { mock, ids, why, view };
+  }
+
+  test("a late answer for an earlier request does not replace the current one", async () => {
+    const { mock, ids, why, view } = setup();
+    let resolveA!: (v: Why) => void;
+    let resolveB!: (v: Why) => void;
+    const pa = new Promise<Why>((r) => (resolveA = r));
+    const pb = new Promise<Why>((r) => (resolveB = r));
+    vi.spyOn(mock, "explain").mockImplementation((id) => (id === ids[0] ? pa : pb));
+    const { rerender } = render(view(ids[0]));
+    rerender(view(null));
+    rerender(view(ids[1]));
+    resolveB(why(ids[1], "Explanation B"));
+    await screen.findByText("Explanation B");
+    resolveA(why(ids[0], "Explanation A"));
+    await settled();
+    expect(screen.queryByText("Explanation A")).toBeNull();
+    expect(screen.getByText("Explanation B")).toBeTruthy();
+  });
+
+  test("a failed explain shows a recoverable error, and trying again works", async () => {
+    const { mock, ids, why, view } = setup();
+    const explain = vi.spyOn(mock, "explain").mockRejectedValueOnce({ name: "ArtroomError", message: "unavailable" }).mockResolvedValueOnce(why(ids[0], "Explanation A"));
+    render(view(ids[0]));
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("The room did not explain this entry: unavailable.");
+    fireEvent.click(within(alert).getByRole("button", { name: "Try again" }));
+    await screen.findByText("Explanation A");
+    expect(explain).toHaveBeenCalledTimes(2);
   });
 });

@@ -57,6 +57,28 @@ npx playwright install chromium         # once
 npm run e2e                             # Playwright, headless: builds, serves, walks the scenario
 ```
 
+The vitest files, by what they protect. The sections below record earlier
+reviews as they were answered; where they name a `test/review-*.test.tsx`
+file, `test/policy-runtime.test.ts` or `test/amendment-3.test.tsx`, the cases
+are now in the files of this table.
+
+| File | What it protects |
+|---|---|
+| `test/screens.test.tsx` | The five screens over the scripted room, note threads bound to their head, and the why dialog (review 82f2743b, P2.4 and P2.5) |
+| `test/acts-screen.test.tsx` | The Acts screen: a form built from a declaration, a stale meaning never sent without the person confirming, and a lost answer shown as unresolved and asked again with the same key (review fb27de86) |
+| `test/acts-fields.test.ts` | Reading typed fields and targets with the declared limits; what changed between two meanings |
+| `test/declared-rendering.test.tsx` | Every record shown under the declarations of its own seq; thread names from the opening act's own declaration (decision c37653e1) |
+| `test/live-catalogue.test.ts` | The page's catalogue never goes back behind an activation it confirmed (reviews fcd7391d, 0fd98c41, 8df737b8 and fb27de86) |
+| `test/live-room.test.tsx` | The live adapter over the contract's reads: no workspace token, partial reads shown as partial (review 82f2743b, P2.6), check-carried events |
+| `test/publication.test.tsx` | What the page says about an unresolved publication and a finished landing (reviews 82f2743b and 88a20f74) |
+| `test/checks.test.tsx` | Advisory checks never shown as blocking; a carried check's reason from its own event (amendment 3, review a4241e41) |
+| `test/change-history.test.tsx` | The per-change history and its interdiff (reviews 125ee638 and f3fff92c) |
+| `test/dry-run.test.ts` | A draft rule's preview agrees with the policy runtime, and is validated first (reviews 82f2743b, P1.1 and 88a20f74, P2) |
+
+The scripted room and the in-memory room in `src/room/mock` are stand-ins.
+The tests use them to drive the page and the live adapter; they do not test
+the stand-ins' own behaviour, which shows nothing about a real Room.
+
 `npm run typecheck` first generates declarations for the policy runtime into
 `.types/` (git-ignored) and checks the UI against them. The runtime's sources
 assume a non-DOM library, and the UI needs the DOM, so the UI checks against

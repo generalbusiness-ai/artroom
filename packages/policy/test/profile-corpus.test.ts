@@ -6,7 +6,11 @@
  * Not ported, because Artroom has no counterpart: fold outcomes and their
  * byte caps (action, state, ineffective reason and message), Lexicon schema
  * cases, Inlay view cases, and the Node dependency-closure check, which
- * test/integrity.test.ts replaces.
+ * test/integrity.test.ts replaces. The corpus's inspected-byte boundary is
+ * replaced by Artroom's own, below, which holds the same bound to the byte.
+ *
+ * This file runs in Node and in workerd: the room evaluates in workerd, and
+ * a recorded decision must replay to the same outcome on either.
  */
 
 import { describe, expect, test } from "vitest";
@@ -83,42 +87,39 @@ describe("atseq corpus: values and queries", () => {
 });
 
 describe("atseq corpus: forbidden programs", () => {
-  for (const source of [
-    "$now()",
-    "$millis()",
-    "$random()",
-    "$shuffle([1,2])",
-    '$eval("1")',
-    "function($x){$x}(1)",
-    "($v_f := $now; $v_f())",
-    "[1..100000000]",
-    "/(a+)+$/",
-    '$pad("a",100000000)',
-    "$map([1],function($x){$x})",
-    '$lookup({},"constructor")()',
-  ])
-    test(`forbidden: ${source}`, () => rejects(() => evaluate(source, {})));
-  test("generated range rejected with stable code", () => rejects(() => evaluate("[1..100000000]", {}), "unsupported_expression"));
-  test("regex rejected with stable code", () => rejects(() => evaluate("/(a+)+$/", {}), "unsupported_expression"));
+  test("each program outside the profile is refused; a generated range and a regex with their stable code", async () => {
+    const forbidden: readonly (readonly [string, string?])[] = [
+      ["$now()"],
+      ["$millis()"],
+      ["$random()"],
+      ["$shuffle([1,2])"],
+      ['$eval("1")'],
+      ["function($x){$x}(1)"],
+      ["($v_f := $now; $v_f())"],
+      ["[1..100000000]", "unsupported_expression"],
+      ["/(a+)+$/", "unsupported_expression"],
+      ['$pad("a",100000000)'],
+      ["$map([1],function($x){$x})"],
+      ['$lookup({},"constructor")()'],
+    ];
+    for (const [source, code] of forbidden) {
+      const thrown = await evaluate(source, {}).then(
+        () => null,
+        (e: unknown) => e as { code?: string },
+      );
+      expect(thrown, `forbidden: ${source}`).not.toBeNull();
+      if (code) expect(thrown!.code, `forbidden: ${source}`).toBe(code);
+    }
+  });
   test("Unicode casing is outside the portable profile", async () => {
     for (const name of ["lowercase", "uppercase"]) await rejects(() => evaluate(`$${name}("İß")`, {}), "unsupported_function");
   });
 });
 
 describe("atseq corpus: budgets", () => {
-  test("deterministic work exhaustion", async () => {
-    const source = "($v_rows := state.rows; $count($v_rows.($v_rows.(1))))";
-    const outcomes: string[] = [];
-    for (let i = 0; i < 2; i++) {
-      try {
-        await evaluate(source, { state: { rows: Array(400).fill(1) } });
-        throw new Error("Budget did not fire");
-      } catch (e) {
-        outcomes.push((e as { code: string }).code);
-      }
-    }
-    expect(outcomes).toEqual(["step_budget", "step_budget"]);
-  });
+  test("work exhaustion has a stable code", () =>
+    // Run once here: both runtimes run this file, and each must give this code.
+    rejects(() => evaluate("($v_rows := state.rows; $count($v_rows.($v_rows.(1))))", { state: { rows: Array(400).fill(1) } }), "step_budget"));
   test("program bytes exact cap", async () => {
     await evaluate("1" + " ".repeat(PROFILE.programBytes - 1), {});
     await rejects(() => evaluate("1" + " ".repeat(PROFILE.programBytes), {}), "source_bytes");
@@ -160,13 +161,6 @@ describe("atseq corpus: budgets", () => {
   test("AST container depth exact boundary", async () => {
     await evaluate("[".repeat(32) + "1" + "]".repeat(32), {});
     await rejects(() => evaluate("[".repeat(33) + "1" + "]".repeat(33), {}), "source_complexity");
-  });
-  test("encoded-byte work budget exact boundary", async () => {
-    // Repeated string scans dominate work, while the returned value stays tiny.
-    const source = "($a:=s; rows.$length($a); p; 1)";
-    const input = { s: "x".repeat(250380), rows: Array(64).fill(1), p: "x".repeat(325) };
-    expect((await evaluate(source, input)).inspectedBytes).toBe(16777216);
-    await rejects(() => evaluate(source, { ...input, p: input.p + "x" }), "inspection_budget");
   });
   test("large repeated intermediate strings exhaust byte budget", () =>
     rejects(

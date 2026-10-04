@@ -5,10 +5,8 @@
  */
 
 import { describe, expect, test } from "vitest";
-import { codeReviewPolicy, defaultPolicy, validatePolicyV2 } from "@generalbusiness/artroom-policy";
 import { declarationChanges, entryMeaning, fieldsOf, own, readBody, readField, readTarget, shapeOfTarget, targetText, targetsOf, typeText, valueText, type ActField } from "../src/room/acts.ts";
 import type { ActDeclaration, RecordMeaning } from "../src/room/contract.ts";
-import { SETLIST_ACTS_2 } from "../src/room/mock/declared-room.ts";
 import { SETLIST_ACTS } from "../src/room/mock/setlist.ts";
 
 const declared = (name: string, field: ActField["field"], required = true): ActField => ({ name, from: "declaration", required, field }) as ActField;
@@ -22,31 +20,20 @@ const value = (f: ActField, raw: string) => {
   return r.value;
 };
 
-describe("a field may be named like an inherited property (R-DECL-12)", () => {
+describe("a field may be named like an inherited property (R-DECL-12; review fb27de86, finding 1)", () => {
   test("its value is the form's own or it is empty: a required one is asked for, an optional one is left out, a given one is sent", () => {
     expect(own({ a: "1" }, "a")).toBe("1");
-    expect(own({ a: "1" }, "hasOwnProperty")).toBeUndefined();
-    expect(own({ a: "1" }, "constructor")).toBeUndefined();
-    const fields = [declared("constructor", { type: "text", max: 20 }), declared("toString", { type: "text", max: 20 }, false), declared("title", { type: "text", max: 20 })];
-    expect(readBody(fields, { title: "X" })).toEqual({ ok: false, problems: { constructor: "constructor is required." } });
-    expect(readBody(fields, { title: "X", constructor: "built" })).toEqual({ ok: true, body: { title: "X", constructor: "built" } });
-    expect(readBody(fields, { title: "X", constructor: "built", toString: "said" })).toEqual({ ok: true, body: { title: "X", constructor: "built", toString: "said" } });
-  });
-});
-
-describe("the setlist application is a valid set of declarations, and none of them is a code-review act", () => {
-  test("both policy versions validate with no problem", () => {
-    for (const acts of [SETLIST_ACTS, SETLIST_ACTS_2]) {
-      const v = validatePolicyV2({ ...codeReviewPolicy(defaultPolicy()), acts }, { historicalOpeningKinds: ["start-song"] });
-      expect(v.ok ? [] : v.problems).toEqual([]);
+    for (const name of ["hasOwnProperty", "constructor", "toString", "valueOf"]) expect(own({ a: "1" }, name), name).toBeUndefined();
+    for (const name of ["constructor", "toString", "valueOf"]) {
+      const required = [declared(name, { type: "text", max: 20 }), declared("title", { type: "text", max: 20 })];
+      const optional = [declared(name, { type: "text", max: 20 }, false), declared("title", { type: "text", max: 20 })];
+      expect(readBody(required, { title: "X" }), name).toEqual({ ok: false, problems: { [name]: `${name} is required.` } });
+      expect(readBody(required, { title: "X", [name]: "own value" }), name).toEqual({ ok: true, body: { title: "X", [name]: "own value" } });
+      // Left out, an optional one is absent from the body: nothing is read from the prototype.
+      const read = readBody(optional, { title: "X" });
+      expect(read, name).toEqual({ ok: true, body: { title: "X" } });
+      expect(read.ok && Object.hasOwn(read.body, name), name).toBe(false);
     }
-  });
-
-  test("it shares no kind with the code-review seven, and uses every declared field type", () => {
-    const seven = ["claim", "propose", "note", "review", "check", "land", "release"];
-    expect(Object.keys(SETLIST_ACTS).filter((k) => seven.includes(k))).toEqual([]);
-    const types = new Set(Object.values(SETLIST_ACTS).flatMap((d) => Object.values(d.body ?? {}).map((f) => f.type)));
-    expect([...types].sort()).toEqual(["act", "bool", "enum", "globs", "int", "member", "segment", "text"]);
   });
 });
 

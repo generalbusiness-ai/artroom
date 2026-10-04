@@ -1,9 +1,9 @@
 /**
- * What readers call a thread that has no goal (docs/protocol.md section
- * 33.10, R-DECL-23; the planner's decision c37653e1): the opening act's
+ * What readers call a record, and a thread that has no goal (docs/protocol.md
+ * section 33.10, R-DECL-23; the planner's decision c37653e1): the act's
  * label at its own seq, then its first text field by name, as that act's
- * own declaration typed its fields at that seq. The helper is the one every
- * reader shares: the client, the CLI, the MCP tool `act` and the UI.
+ * own declaration typed its fields at that seq. The helpers are the ones
+ * every reader shares: the client, the CLI, the MCP tool `act` and the UI.
  */
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { envelopeOf, type ActDeclaration, type ActsCatalogue, type DeclaredRecord, type RecordMeaning } from "@generalbusiness/artroom-contract";
@@ -26,20 +26,14 @@ const SWAPPED: ActDeclaration = { ...SONG, body: { ...SONG.body, key: { type: "t
 const declared = (declaration: ActDeclaration, label = declaration.label) => ({ label, declaration });
 
 describe("titleOf prefers the first text field by name (section 33.10)", () => {
-  test("a text field names the record though an enum field comes first by name", () => {
+  test("the declared type decides, not the type of the value or the order of names: one body under two declarations", () => {
     expect(titleOf(declared(SONG), { key: "c", title: "Footprints", tempo: 96 })).toBe("Start a song: Footprints");
-    // The control: with the declaration not at hand, the same body is named by its first field by name.
-    expect(titleOf({ label: "Start a song" }, { key: "c", title: "Footprints", tempo: 96 })).toBe("Start a song: c");
-  });
-
-  test("the declared type decides, not the type of the value: one body under two declarations", () => {
     const body = { key: "blue", title: "bossa" };
     // Both values are strings. Under SONG `title` is the text field; under SWAPPED `key` is.
     expect(titleOf(declared(SONG), body)).toBe("Start a song: bossa");
     expect(titleOf(declared(SWAPPED), body)).toBe("Start a song: blue");
-    // An enum field and a text field that hold the same string give that string either way.
-    expect(titleOf(declared(SONG), { key: "c", title: "c" })).toBe("Start a song: c");
-    expect(titleOf(declared(SWAPPED), { key: "c", title: "c" })).toBe("Start a song: c");
+    // The control: with the declaration not at hand, the same body is named by its first field by name.
+    expect(titleOf({ label: "Start a song" }, { key: "c", title: "Footprints", tempo: 96 })).toBe("Start a song: c");
   });
 
   test("the order a body was typed in does not matter: the typed body and the canonical record give one title", () => {
@@ -54,28 +48,22 @@ describe("titleOf prefers the first text field by name (section 33.10)", () => {
     expect(titleOf(declared(two), { composer: "Shorter", key: "c", title: "Footprints" })).toBe("Start a song: Shorter");
   });
 
-  test("an optional text field that is absent is passed over: the next text field, or else the first field by name", () => {
+  test("an absent text field is passed over: the next text field, else the first field by name, else the label alone; scope and because never name a record", () => {
     const two: ActDeclaration = { ...SONG, body: { ...SONG.body, composer: { type: "text", max: 80, optional: true } } };
     expect(titleOf(declared(two), { key: "c", title: "Footprints" })).toBe("Start a song: Footprints");
     expect(titleOf(declared(two), { key: "c", tempo: 96 })).toBe("Start a song: c");
     expect(titleOf(declared(two), { tempo: 96 })).toBe("Start a song: 96");
     expect(titleOf(declared(two), { scope: ["songs/**"], because: [] })).toBe("Start a song");
-  });
-
-  test("an act that declares no text field is named by its first field by name, as before", () => {
-    const plain: ActDeclaration = { ...SONG, body: { key: { type: "enum", values: KEYS }, tempo: { type: "int", min: 40, max: 240 } } };
-    expect(titleOf(declared(plain), { tempo: 132, key: "c" })).toBe("Start a song: c");
+    expect(titleOf(declared(SONG), { scope: ["songs/**"], because: [{ act: "act_1_00000000" }], title: "Blue Bossa" })).toBe("Start a song: Blue Bossa");
+    // An act that declares no field at all.
     const none: ActDeclaration = { label: "Start a jam", targets: { none: ["open"] }, who: { roles: ["member"] }, hold: { scope: "body.scope", workspace: true } };
     expect(titleOf(declared(none), { scope: ["jams/**"] })).toBe("Start a jam");
   });
 
-  test("scope and because never name a record, even when nothing else is present, and a text field is read as the body's own", () => {
-    expect(titleOf(declared(SONG), { scope: ["songs/**"], because: [{ act: "act_1_00000000" }], title: "Blue Bossa" })).toBe("Start a song: Blue Bossa");
-    // A field may be named like an inherited property. It is text only if the declaration says so, by its own name.
+  test("a field named like an inherited property is text only if the declaration says so, by its own name", () => {
     const odd: ActDeclaration = { ...SONG, body: { key: { type: "enum", values: KEYS, optional: true }, valueOf: { type: "text" as const, max: 80, optional: true as const } } as NonNullable<ActDeclaration["body"]> };
     expect(titleOf(declared(odd), { key: "c", valueOf: "Nardis" })).toBe("Start a song: Nardis");
     expect(titleOf(declared(SONG), { key: "c", valueOf: "Nardis" })).toBe("Start a song: c");
-    expect(titleOf(declared(SONG), { key: "c" })).toBe("Start a song: c");
   });
 
   test("legacy, platform and unknown kinds, and a caller with only a label, keep the first field by name", () => {
@@ -86,6 +74,16 @@ describe("titleOf prefers the first text field by name (section 33.10)", () => {
     expect(titleOf(platform, { op: "open", goal: "Repair the policy", scope: [".artroom/**"] })).toBe("Recover: Repair the policy");
     expect(titleOf(unknown, { text: "x", count: 3 })).toBe("shout: 3");
     expect(titleOf({ label: "Start a song" }, { title: "Blue Bossa", key: "c" })).toBe("Start a song: c");
+  });
+
+  test("a value is shown as it is: text, yes or no, a number, a list of text, anything else as JSON; a body that is not an object gives the label alone", () => {
+    const ask = { label: "Ask" };
+    expect(titleOf(ask, { swing: true })).toBe("Ask: yes");
+    expect(titleOf(ask, { swing: false })).toBe("Ask: no");
+    expect(titleOf(ask, { tempo: 132 })).toBe("Ask: 132");
+    expect(titleOf(ask, { parts: ["bass", "keys"] })).toBe("Ask: bass, keys");
+    expect(titleOf(ask, { at: { bar: 4 } })).toBe('Ask: {"bar":4}');
+    for (const body of [{}, null, ["a"]]) expect(titleOf(ask, body)).toBe("Ask");
   });
 });
 

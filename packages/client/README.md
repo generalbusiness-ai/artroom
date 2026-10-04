@@ -215,6 +215,31 @@ removed.
 that implements the HTTPS routes and `RoomWire`, and the signing vectors
 inside workerd. Tests name the rules they check.
 
+The fake room is a stand-in. The tests show what the client signs, sends,
+retries, keeps and returns; the Room's own rules are tested in
+`packages/room`. The test files, by what they protect:
+
+| File | What it protects |
+|---|---|
+| `test/signing.test.ts` | Canonical bytes, the signing vectors, and the declared envelope's bytes |
+| `test/room.test.ts` | Refusals as values, retries with the same bytes, waits, sessions, cursors, the watch's reconnect and stop, RPC, and no credential in any output. It holds the client cases of review f47a509c, P1 and P2 |
+| `test/prepared.test.ts` | A prepared act is the handle's own copy, and a retry sends what was first built. It holds review 43e8fe3b's first finding and review f47a509c, P4 |
+| `test/catalogue.test.ts` | `acts()` and `actsAt()`: what the handle keeps never takes a reader back behind an activation it has seen. It holds review 43e8fe3b's second finding |
+| `test/declared.test.ts` | The generic act, the named methods' built-for binding, bearer sessions and grants |
+| `test/titles.test.ts` | What readers call a record and a thread (decision c37653e1) |
+| `test/redeem.test.ts` | Redemption in both custodies, with lost and refused responses |
+| `test/updates.test.ts` | The RPC update decoder's stream lifecycle (review 17013617) |
+| `test/agents-md.test.ts` | The generated AGENTS.md block |
+| `test/contract.types.ts` | No test to run: `npm run typecheck` checks that the client has the contract's declared types |
+
+The tests pass `backoff: () => 1` in `ClientOptions`, so a retry or a
+reconnect waits 1 ms. One test in `test/room.test.ts` checks the waits the
+client chooses without that option.
+
+The sections above and below record earlier reviews as they were answered.
+Where they name `test/review-*.test.ts` files or test titles of this
+package, the cases are now in the files of this table.
+
 ## Review f7c79158
 
 The checker's third review confirmed the earlier fixes and asked for one

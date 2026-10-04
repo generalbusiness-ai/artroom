@@ -5,14 +5,14 @@
  * and never resubmits a stale act on its own.
  */
 
-import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/preact";
+import { cleanup, fireEvent, screen, within } from "@testing-library/preact";
 import { afterEach, describe, expect, test } from "vitest";
 import type { ActDeclaration, ActsCatalogue, HttpRoom, MemberId } from "../src/room/contract.ts";
 import { LiveRoom } from "../src/room/live/live-room.ts";
 import { BAND, SETLIST_ACTS_2, declaredDemo } from "../src/room/mock/declared-room.ts";
 import { MemoryRoom, type MemoryDoc } from "../src/room/mock/memory-room.ts";
 import { SETLIST_ACTS } from "../src/room/mock/setlist.ts";
-import { renderAt } from "./helpers.tsx";
+import { renderAt, settled, waitFor } from "./helpers.tsx";
 
 afterEach(() => {
   cleanup();
@@ -256,7 +256,7 @@ describe("a meaning that changed behind the form (binding-stale)", () => {
     expect(within(stale).getByText("New field: feel (one of straight, swung, latin, required).")).toBeTruthy();
     // The one stale act was sent, with the old binding. Nothing else, however long we wait.
     expect(room.sent.map((s) => s.binding)).toEqual([oldBinding]);
-    await new Promise((r) => setTimeout(r, 30));
+    await settled();
     expect(room.sent).toHaveLength(1);
     expect(document.querySelector("button[type='submit']")).toBeNull();
     // Confirming shows the new meaning's form; its new required field is missing, so nothing is sent yet.
@@ -324,6 +324,177 @@ describe("a meaning that changed behind the form (binding-stale)", () => {
     fireEvent.click(screen.getByRole("button", { name: "See the room's acts" }));
     await waitFor(() => expect([...document.querySelectorAll<HTMLElement>("li[data-act]")].map((a) => a.dataset["act"])).toEqual(["start-song", "add-part", "cue", "sign-off"]));
     expect(screen.getByText("Signal the band")).toBeTruthy();
+  });
+});
+
+// A room, its adapter and a filled-in form, for the cases below.
+type Acts = Readonly<Record<string, ActDeclaration>>;
+
+/** The setlist's acts, with one more text field on `start-song`. */
+const withField = (name: string, optional: boolean): Acts => ({
+  ...SETLIST_ACTS,
+  "start-song": { ...SETLIST_ACTS["start-song"]!, body: { ...SETLIST_ACTS["start-song"]!.body, [name]: { type: "text", max: 80, ...(optional ? { optional: true } : {}) } } },
+});
+
+const song = { scope: "songs/local/**", title: "Local", key: "c", tempo: "120" };
+const sent = { scope: ["songs/local/**"], title: "Local", key: "c", tempo: 120 };
+const actsIn = (a: LiveRoom) => a.snapshot()!.feed.filter((e) => e.type === "act");
+
+/** A room, its adapter, and the `start-song` form filled in. `paused` holds back the room's change notices. */
+async function opened(declared: Acts = SETLIST_ACTS, paused = false) {
+  const room = await MemoryRoom.found("the-band/setlist", BAND, { acts: declared });
+  room.me = "@noor";
+  if (paused) {
+    const watch = room.watch.bind(room);
+    room.watch = (cursor, _onUpdate) => watch(cursor, () => {});
+  }
+  const adapter = new LiveRoom(room as unknown as HttpRoom, "@noor", () => new Date("2026-10-03T10:00:00Z"));
+  opened.adapters.push(adapter);
+  await adapter.start();
+  renderAt("#/acts", adapter);
+  fireEvent.click(screen.getByRole("button", { name: "Prepare “Start a song”" }));
+  await waitFor(() => expect(form()).not.toBeNull());
+  fireEvent.input(screen.getByLabelText(/^scope/), { target: { value: song.scope } });
+  fireEvent.input(screen.getByLabelText(/^title/), { target: { value: song.title } });
+  fireEvent.change(screen.getByLabelText(/^key/), { target: { value: song.key } });
+  fireEvent.input(screen.getByLabelText(/^tempo/), { target: { value: song.tempo } });
+  return { room, adapter };
+}
+opened.adapters = [] as LiveRoom[];
+afterEach(() => {
+  for (const a of opened.adapters.splice(0)) a.stop();
+});
+
+describe("a field named like an inherited property, in the form (R-DECL-12)", () => {
+  test("a required field named toString, left empty, shows its own problem and sends nothing; once filled in, it is sent under its own name (review fb27de86, finding 1)", async () => {
+    const name = "toString";
+    const { room } = await opened(withField(name, false));
+    fireEvent.submit(form());
+    await waitFor(() => expect(document.querySelector(`[data-field='${name}'] [role='alert']`)?.textContent).toBe(`${name} is required.`));
+    // No other field shows a problem, and nothing was sent.
+    expect(document.querySelectorAll("[data-field] [role='alert']")).toHaveLength(1);
+    expect(room.sent).toEqual([]);
+    fireEvent.input(screen.getByLabelText(new RegExp(`^${name}`)), { target: { value: "said" } });
+    fireEvent.submit(form());
+    await waitFor(() => expect(document.querySelector("[data-recorded]")).not.toBeNull());
+    expect(room.sent.map((s) => s.body)).toEqual([{ ...sent, [name]: "said" }]);
+  });
+});
+
+/** The error a transport throws when it cannot say whether the room recorded the act. */
+const lost = () => ({ name: "ArtroomError", code: "timeout", retryable: true, maybeRecorded: true, message: "The room's reply did not arrive." });
+const NOT_TAKEN = "The room did not take the act";
+const unresolved = () => document.querySelector<HTMLElement>("[data-unresolved]");
+const again = () => fireEvent.click(screen.getByRole("button", { name: "Ask again, the same act" }));
+
+/** Make the room lose its next `times` answers. With `recorded`, it admits the act first; without, it does not see it at all. */
+function loseAnswers(room: MemoryRoom, times: number, recorded: boolean) {
+  const act = room.act.bind(room);
+  const count = { lost: 0 };
+  room.act = async (...args) => {
+    if (count.lost < times) {
+      if (recorded) expect("refused" in (await act(...args))).toBe(false);
+      count.lost += 1;
+      throw lost();
+    }
+    return act(...args);
+  };
+  return count;
+}
+
+describe("an answer that was lost is not a rejection (R-IDEM-2; review fb27de86, finding 2)", () => {
+  test("baseline: a failure that says nothing of a record keeps its wording: the room did not take the act", async () => {
+    const { room } = await opened();
+    room.act = async () => {
+      throw { name: "ArtroomError", code: "bad-request", retryable: false, message: "The envelope is malformed." };
+    };
+    fireEvent.submit(form());
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toBe(`${NOT_TAKEN}: The envelope is malformed.`);
+    expect(unresolved()).toBeNull();
+    // The form can still be sent.
+    expect(screen.getByRole("button", { name: "Send “Start a song”" })).not.toBeNull();
+  });
+
+  test("an act the room recorded, whose answer was lost, is shown as unresolved, never as not taken; the page reads the room again, though the room sends it no notice", async () => {
+    const { room, adapter } = await opened(SETLIST_ACTS, true);
+    loseAnswers(room, 1, true);
+    fireEvent.submit(form());
+    const alert = await screen.findByRole("alert");
+    expect(unresolved()).toBe(alert);
+    expect(alert.textContent).toContain("The room's answer did not arrive");
+    expect(alert.textContent).toContain("may have been recorded, or it may not: The room's reply did not arrive.");
+    expect(alert.textContent).not.toContain(NOT_TAKEN);
+    expect(document.querySelector("[data-recorded]")).toBeNull();
+    // The room did record it, and the page's own feed shows it.
+    await waitFor(() => expect(actsIn(adapter)).toHaveLength(1));
+    // The notice names the key the act was sent with, which is one of the room's form.
+    expect(alert.querySelector("code")!.textContent).toBe(room.keys[0]);
+    expect(room.keys[0]).toMatch(/^[A-Za-z0-9_-]{1,64}$/);
+  });
+
+  test("asking again sends exactly the same act with the same key: the room answers with the record it made and records nothing new", async () => {
+    const { room, adapter } = await opened();
+    loseAnswers(room, 1, true);
+    fireEvent.submit(form());
+    await screen.findByRole("alert");
+    again();
+    await waitFor(() => expect(document.querySelector("[data-recorded]")).not.toBeNull());
+    expect(room.sent).toHaveLength(2);
+    expect(room.sent[1]).toEqual(room.sent[0]);
+    expect(room.keys[1]).toBe(room.keys[0]);
+    expect(room.keys[0]).toBeDefined();
+    // One entry, and the notice names it.
+    await waitFor(() => expect(actsIn(adapter)).toHaveLength(1));
+    expect(document.querySelector<HTMLElement>("[data-recorded]")!.dataset["recorded"]).toBe((actsIn(adapter)[0] as { id: string }).id);
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  test("asking again when the room never saw the act records it once", async () => {
+    const { room, adapter } = await opened();
+    const count = loseAnswers(room, 2, false);
+    fireEvent.submit(form());
+    await screen.findByRole("alert");
+    again();
+    // Lost a second time: unresolved again, with the same act kept.
+    await waitFor(() => expect(count.lost).toBe(2));
+    await waitFor(() => expect(unresolved()).not.toBeNull());
+    again();
+    await waitFor(() => expect(document.querySelector("[data-recorded]")).not.toBeNull());
+    await waitFor(() => expect(actsIn(adapter)).toHaveLength(1));
+    expect(room.sent).toHaveLength(1);
+    expect(room.keys).toHaveLength(1);
+  });
+
+  test("while the answer is unresolved the form sends no new act", async () => {
+    const { room } = await opened();
+    loseAnswers(room, 1, true);
+    fireEvent.submit(form());
+    await screen.findByRole("alert");
+    expect(screen.queryByRole("button", { name: "Send “Start a song”" })).toBeNull();
+    // Editing a field and submitting the form by the keyboard sends nothing: the only act that can go is the one kept.
+    fireEvent.input(screen.getByLabelText(/^title/), { target: { value: "Another" } });
+    fireEvent.submit(form());
+    await settled();
+    expect(room.sent).toHaveLength(1);
+    expect(unresolved()).not.toBeNull();
+    again();
+    await waitFor(() => expect(document.querySelector("[data-recorded]")).not.toBeNull());
+    expect(room.sent.map((s) => (s.body as { title: string }).title)).toEqual(["Local", "Local"]);
+  });
+
+  test("asking again after the meaning changed is answered binding-stale: the form shows the new meaning and sends nothing by itself", async () => {
+    const { room } = await opened();
+    loseAnswers(room, 1, false);
+    fireEvent.submit(form());
+    await screen.findByRole("alert");
+    await room.activate({ acts: { ...SETLIST_ACTS, "start-song": { ...SETLIST_ACTS["start-song"]!, body: { ...SETLIST_ACTS["start-song"]!.body, feel: { type: "text", max: 20, optional: true } } } } });
+    again();
+    await waitFor(() => expect(document.querySelector("[data-stale]")).not.toBeNull());
+    expect(unresolved()).toBeNull();
+    // The one act the room saw was the kept one, under the binding the person had read.
+    expect(room.sent).toHaveLength(1);
+    expect(document.querySelector("[data-recorded]")).toBeNull();
   });
 });
 

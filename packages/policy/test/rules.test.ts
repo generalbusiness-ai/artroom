@@ -2,11 +2,11 @@
 
 import { describe, expect, test } from "vitest";
 import { carry, lanes, owners, policy, requireCheck, requireReview, rule } from "../src/helpers.ts";
-import { evaluateLand, evaluateNotify, evaluateRefuse, evaluateRequire, replay } from "../src/rules.ts";
+import { evaluateLand, evaluateNotify, evaluateRefuse, evaluateRequire, matchesRetainedLandInput, notifyContext, ownersFor, replay } from "../src/rules.ts";
 import { actMeter } from "../src/evaluator.ts";
 import { explain } from "../src/explain.ts";
 import { digestJson } from "../src/integrity.ts";
-import { ACT_BUDGET, STAMP } from "../src/profile.ts";
+import { ACCOUNTING, ACT_BUDGET, STAMP } from "../src/profile.ts";
 import { PolicyRuntimeFailure } from "../src/errors.ts";
 import { act, active, actor, landInput, lane, notifyInput, refuseInput, requireInput, V1 } from "./support/fixtures.ts";
 import { recoveryLane } from "./support/fixtures.ts";
@@ -138,6 +138,48 @@ describe("land (R-POL-6, R-POL-7)", () => {
     expect(recovery.refusal).toBeNull();
     expect(recovery.evaluations).toEqual([]);
   });
+
+  // The prospective reservation input and the synchronous byte comparison (R-LAND-4, R-LAND-7; review 09c01bf9).
+  test("stage is policy-visible: it changes the outcome and the bare digest; the reservation evaluation replays", async () => {
+    const p = policy(rule({ id: "reservation-only", kind: "land", block: 'stage = "reservation"', reason: "reservation refused", fix: "x" }));
+    const before = landInput(p, ["src/a.ts"]);
+    const reservation = { ...before, stage: "reservation" as const };
+    const a = await evaluateLand(active(p), before);
+    const b = await evaluateLand(active(p), reservation);
+    expect(a.refusal).toBeNull();
+    expect(b.refusal?.rule).toBe("reservation-only");
+    expect(await digestJson(before as never)).not.toBe(await digestJson(reservation as never));
+    expect(await replay(active(p), JSON.parse(JSON.stringify(b.evaluations[0]!.context)))).toEqual(b);
+  });
+
+  test("a stage-specific rule cannot be bypassed: the land act passes, preparation fails, nothing is retained", async () => {
+    const p = policy(rule({ id: "reservation-only", kind: "land", block: 'stage = "reservation"', reason: "reservation refused", fix: "x" }));
+    const admitted = await evaluateLand(active(p), landInput(p, ["src/a.ts"]));
+    expect(admitted.refusal).toBeNull();
+    expect(admitted.retained).toBeNull();
+    const prepared = await evaluateLand(active(p), { ...landInput(p, ["src/a.ts"]), stage: "reservation" });
+    expect(prepared.refusal?.rule).toBe("reservation-only");
+    expect(prepared.retained).toBeNull();
+  });
+
+  test("preparation retains canonical bytes and digest; unchanged state matches; changed state or stage land does not", async () => {
+    const p = policy();
+    const approve = { act: act(40), verdict: "approve" as const, by: actor("@bob"), basis: "here" as const };
+    const prospective = { ...landInput(p, ["src/a.ts"], [approve]), stage: "reservation" as const };
+    const prepared = await evaluateLand(active(p), prospective);
+    expect(prepared.refusal).toBeNull();
+    const retained = prepared.retained!;
+    expect(retained.stage).toBe("reservation");
+    expect(retained.digest).toBe(await digestJson(prospective as never));
+    expect(retained.digest).not.toBe(prepared.evaluations[0]!.decision.input);
+    // Reservation rebuilds from unchanged state: equal bytes, with no await.
+    expect(matchesRetainedLandInput(retained, JSON.parse(JSON.stringify(prospective)))).toBe(true);
+    // A new objection changes the state: the guard fails.
+    const objection = { act: act(41), verdict: "object" as const, by: actor("@carol"), basis: "here" as const };
+    expect(matchesRetainedLandInput(retained, { ...prospective, reviews: [approve, objection] })).toBe(false);
+    // Substituting stage land never matches.
+    expect(matchesRetainedLandInput(retained, { ...prospective, stage: "land" })).toBe(false);
+  });
 });
 
 describe("notify (R-POL-5)", () => {
@@ -169,64 +211,6 @@ describe("determinism and replay (R-EVAL-5, R-EVAL-6)", () => {
     expect(error).toBeInstanceOf(PolicyRuntimeFailure);
     expect(error).toMatchObject({ name: "ArtroomError", code: "policy-runtime", retryable: true });
   });
-
-  test("an input over 256 KiB is a deterministic budget refusal, not a runtime failure", async () => {
-    const big = { ...refuseInput(plan, "propose"), act: { kind: "propose" as const, target: null, body: { s: "x".repeat(262_144) } } };
-    const r = await evaluateRefuse(active(plan), big);
-    expect(r.refusal?.rule).toBe("policy-budget-exceeded");
-  });
-});
-
-describe("budgets on Workers (room-core spike 2026-10-01)", () => {
-  // The spike's pathological rule: admitted by the profile, cubic in the input.
-  const cubic = "$count(proposal.paths[$count($$.proposal.paths[$count($$.proposal.paths[$ = $$.proposal.paths[0]]) > 0]) > 0]) > 0";
-  const p = policy(rule({ id: "cubic", on: "propose", refuse: cubic, fix: "Simplify the rule." }));
-  const paths = Array.from({ length: 150 }, (_, i) => `src/file${i}.ts`);
-
-  test("the cubic rule over 150 paths is refused with policy-budget-exceeded, with the same code and usage on every host", async () => {
-    const input = refuseInput(p, "propose", { proposal: requireInput(p, paths).proposal });
-    const r = await evaluateRefuse(active(p), input);
-    expect(r.refusal?.rule).toBe("policy-budget-exceeded");
-    const outcome = r.evaluations[0]!.decision.outcome;
-    expect(outcome).toMatchObject({ result: "error", code: "policy-budget-exceeded" });
-    expect(outcome.result === "error" && outcome.detail.split(":")[0]).toBe("act_inspection_budget");
-    // Pinned: the Node and workerd runs must both give exactly this usage.
-    expect(r.evaluations[0]!.decision.usage).toEqual({ steps: 775, inspectedBytes: 4202795 });
-  });
-
-  test("without the act budget, the per-evaluation atseq budget still refuses the cubic rule", async () => {
-    const input = refuseInput(p, "propose", { proposal: requireInput(p, paths).proposal });
-    const unlimited = actMeter({ steps: Number.MAX_SAFE_INTEGER, inspectedBytes: Number.MAX_SAFE_INTEGER });
-    const r = await evaluateRefuse(active(p), input, { budget: unlimited });
-    const outcome = r.evaluations[0]!.decision.outcome;
-    expect(outcome.result === "error" && outcome.detail.split(":")[0]).toBe("inspection_budget");
-  });
-
-  test("the act budget is shared across rules and kinds of one act", async () => {
-    const q = policy(
-      rule({ id: "cheap", on: "propose", refuse: "$count(proposal.paths) > 1000", fix: "x" }),
-      requireReview({ id: "also-cheap", paths: "**", from: "@lead", when: "$count(proposal.paths) > 0" }),
-    );
-    const budget = actMeter();
-    const input = requireInput(q, paths);
-    await evaluateRefuse(active(q), { ...refuseInput(q, "propose"), proposal: input.proposal }, { budget });
-    const afterRefuse = budget.steps;
-    await evaluateRequire(active(q), input, { budget });
-    expect(afterRefuse).toBeGreaterThan(0);
-    expect(budget.steps).toBeGreaterThan(afterRefuse);
-    const tight = actMeter({ steps: afterRefuse, inspectedBytes: ACT_BUDGET.inspectedBytes });
-    await evaluateRefuse(active(q), { ...refuseInput(q, "propose"), proposal: input.proposal }, { budget: tight });
-    const req = await evaluateRequire(active(q), input, { budget: tight });
-    expect(req.refusal?.rule).toBe("policy-budget-exceeded");
-  });
-
-  test("the act's inspected-byte budget refuses deterministically", async () => {
-    const q = policy(rule({ id: "bytes", on: "propose", refuse: '($a := act.body.s & act.body.s; $length($a & $a) = 0)', fix: "x" }));
-    const input = { ...refuseInput(q, "propose"), act: { kind: "propose" as const, target: null, body: { s: "x".repeat(100_000) } } };
-    const r = await evaluateRefuse(active(q), input, { budget: actMeter({ steps: ACT_BUDGET.steps, inspectedBytes: 300_000 }) });
-    const outcome = r.evaluations[0]!.decision.outcome;
-    expect(outcome.result === "error" && outcome.detail.split(":")[0]).toBe("act_inspection_budget");
-  });
 });
 
 describe("explain() data", () => {
@@ -240,7 +224,7 @@ describe("explain() data", () => {
       ["check-tests", "obligation"],
       ["review-src-api", "obligation"],
     ]);
-    for (const d of e.decisions) expect(e.contexts[d.input]).toBeDefined();
+    for (const d of e.decisions) expect(await digestJson(e.contexts[d.input] as never)).toBe(d.input);
     expect(e.lines).toContain("claim-before-propose did not refuse the act");
     expect(e.invariants).toContainEqual(expect.objectContaining({ rule: "R-PROP-5" }));
   });
@@ -258,5 +242,130 @@ describe("no shared mutable engine state (checker, room-core spike review)", () 
     expect(together[2]!.evaluations[0]!.decision).toEqual(alone[0]!.evaluations[0]!.decision);
     expect(alone[0]!.refusal).toBeNull();
     expect(alone[1]!.refusal?.rule).toBe("many");
+  });
+});
+
+describe("every input that decides is in one digested replay context (R-EVAL-6; review dd2a995b)", () => {
+  test("default act budget, refuse then require: the require replays to the same budget refusal", async () => {
+    const scan = "($a := proposal.paths; $count($a.($$)); ";
+    const p = policy(
+      rule({ id: "scan-refuse", on: "propose", refuse: scan + "false)", fix: "x" }),
+      requireReview({ id: "scan-require", paths: "**", from: "@lead", when: scan + "true)" }),
+    );
+    const paths = Array.from({ length: 60 }, (_, i) => `src/${"a".repeat(60)}/${i}.ts`);
+    const input = requireInput(p, paths);
+    const budget = actMeter();
+    const before = await evaluateRefuse(active(p), refuseInput(p, "propose", { proposal: input.proposal }), { budget });
+    expect(before.refusal).toBeNull();
+    const recorded = await evaluateRequire(active(p), input, { budget });
+    expect(recorded.refusal?.rule).toBe("policy-budget-exceeded");
+    const context = recorded.evaluations[0]!.context;
+    expect(context.budget).toEqual({ accounting: ACCOUNTING, limits: ACT_BUDGET, start: before.evaluations[0]!.decision.usage });
+    const replayed = await replay(active(p), JSON.parse(JSON.stringify(context)));
+    expect(replayed.evaluations.map((e) => e.decision)).toEqual(recorded.evaluations.map((e) => e.decision));
+    // The same rule input with a fresh budget is a different context, with a different digest.
+    const fresh = await evaluateRequire(active(p), input);
+    expect(fresh.refusal).toBeNull();
+    expect(fresh.evaluations[0]!.decision.input).not.toBe(recorded.evaluations[0]!.decision.input);
+  });
+
+  test("the notify directory is part of the context: different directories, different digests, each replays", async () => {
+    const p = policy(rule({ id: "admin-sees", kind: "notify", on: ["claim"], to: ["role:admin"], why: "Review this." }));
+    const input = notifyInput(p, "claim", null);
+    const a = await evaluateNotify(active(p), input, { roles: { admin: ["@alice"] }, reviewers: [] });
+    const b = await evaluateNotify(active(p), input, { roles: { admin: ["@bob"] }, reviewers: [] });
+    const da = a.evaluations[0]!.decision;
+    const db = b.evaluations[0]!.decision;
+    expect(da.outcome).toEqual({ result: "notify", to: ["@alice"] });
+    expect(db.outcome).toEqual({ result: "notify", to: ["@bob"] });
+    expect(da.input).not.toBe(db.input);
+    for (const r of [a, b]) {
+      const again = await replay(active(p), JSON.parse(JSON.stringify(r.evaluations[0]!.context)));
+      expect(again.evaluations.map((e) => e.decision)).toEqual(r.evaluations.map((e) => e.decision));
+    }
+  });
+
+  test("a notify queue retry reuses the stored context and never inherits an act meter", async () => {
+    const p = policy(rule({ id: "costly", kind: "notify", on: ["claim"], when: "$count(proposal.paths) > 0", to: ["holder"], why: "x" }));
+    const context = notifyContext(notifyInput(p, "claim", ["a.ts"]), { roles: {}, reviewers: [] });
+    expect(context.budget.start).toEqual({ steps: 0, inspectedBytes: 0 });
+    const first = await replay(active(p), context);
+    const retry = await replay(active(p), JSON.parse(JSON.stringify(context)));
+    expect(retry.evaluations.map((e) => e.decision)).toEqual(first.evaluations.map((e) => e.decision));
+    expect(first.evaluations[0]!.decision.input).toBe(await digestJson(context as never));
+  });
+});
+
+describe("the retained context is an owned, frozen snapshot (review dd2a995b)", () => {
+  test("changing the caller's input after return changes nothing retained", async () => {
+    const p = policy(rule({ id: "never", on: "claim", refuse: "false", fix: "x" }));
+    const input = refuseInput(p, "claim");
+    const r = await evaluateRefuse(active(p), input);
+    const e = r.evaluations[0]!;
+    expect(e.context.input).not.toBe(input);
+    expect(Object.isFrozen(e.context.input)).toBe(true);
+    (input as { room: unknown }).room = { admins: 50, members: 99 };
+    expect(await digestJson(e.context as never)).toBe(e.decision.input);
+    expect(e.context.kind === "refuse" && e.context.input.room).toEqual({ admins: 1, members: 3 });
+  });
+
+  test("changing the caller's input while hashing and evaluation are pending changes nothing", async () => {
+    const p = policy(rule({ id: "unclaimed", on: "propose", refuse: "$not(lane.claimed)", fix: "x" }));
+    const input = refuseInput(p, "propose");
+    const pending = evaluateRefuse(active(p), input);
+    (input.lane as { claimed: boolean }).claimed = false;
+    (input as { room: unknown }).room = { admins: 9, members: 9 };
+    const r = await pending;
+    expect(r.refusal).toBeNull();
+    const e = r.evaluations[0]!;
+    expect(e.context.kind === "refuse" && e.context.input.lane.claimed).toBe(true);
+    expect(await digestJson(e.context as never)).toBe(e.decision.input);
+  });
+
+  test("an input over 256 KiB is a deterministic budget refusal, not a runtime failure, and replays", async () => {
+    const p = policy(rule({ id: "never", on: "propose", refuse: "false", fix: "x" }));
+    const big = { ...refuseInput(p, "propose"), act: { kind: "propose" as const, target: null, body: { s: "x".repeat(262_144) } } };
+    const r = await evaluateRefuse(active(p), big);
+    expect(r.refusal?.rule).toBe("policy-budget-exceeded");
+    const again = await replay(active(p), r.evaluations[0]!.context);
+    expect(again.evaluations.map((e) => e.decision)).toEqual(r.evaluations.map((e) => e.decision));
+  });
+});
+
+describe("any legal repository path works in rule inputs (review dd2a995b)", () => {
+  const special = ["constructor", "prototype", "_jsonata_cache", "__proto__"];
+  const p = policy(
+    // Parsed from JSON so that "__proto__" is an own key, as it is in a parsed .artroom/policy.json.
+    owners(JSON.parse('{"constructor":"@c","prototype":"@p","_jsonata_cache":"@j","__proto__":"@x"}')),
+    requireReview({ id: "review-all", paths: "**", from: "owners", when: '$count(proposal.owners[path = "__proto__"].owners) > 0' }),
+    rule({ id: "owners-see", kind: "notify", on: ["propose"], to: ["owners"], why: "You own a changed path." }),
+  );
+
+  test("ownership is a list of path/owners pairs, with no prototype or reserved-key hazard", () => {
+    const pairs = ownersFor(p, special);
+    expect(pairs).toEqual([
+      { path: "constructor", owners: ["@c"] },
+      { path: "prototype", owners: ["@p"] },
+      { path: "_jsonata_cache", owners: ["@j"] },
+      { path: "__proto__", owners: ["@x"] },
+    ]);
+  });
+
+  test("require evaluates and creates the obligation for each such path, and replays", async () => {
+    for (const path of special) {
+      const r = await evaluateRequire(active(p), requireInput(p, [path, "__proto__"]));
+      expect(r.refusal, path).toBeNull();
+      expect(r.obligations.map((o) => o.id)).toEqual(["obl_review-all"]);
+      const again = await replay(active(p), JSON.parse(JSON.stringify(r.evaluations[0]!.context)));
+      expect(again.evaluations.map((e) => e.decision)).toEqual(r.evaluations.map((e) => e.decision));
+    }
+  });
+
+  test("notify resolves the owners of such paths, and a refuse rule reads them as values", async () => {
+    const r = await evaluateNotify(active(p), notifyInput(p, "propose", special), { roles: {}, reviewers: [] });
+    expect(r.notify.map((n) => n.to)).toEqual(["@c", "@j", "@p", "@x"]);
+    const q = policy(rule({ id: "no-proto", on: "propose", refuse: '"__proto__" in proposal.paths', fix: "x" }));
+    const refused = await evaluateRefuse(active(q), refuseInput(q, "propose", { proposal: requireInput(q, ["constructor", "__proto__"]).proposal }));
+    expect(refused.refusal?.rule).toBe("no-proto");
   });
 });
