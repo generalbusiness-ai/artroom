@@ -1,0 +1,229 @@
+{
+  "serial-baseline-a1990c94": {
+    "head": "a1990c9433f9d8e403d58657bdf88c2e36c58b42",
+    "steps": 15,
+    "all_exit_zero": true,
+    "elapsed_sum": 742.2,
+    "cpu_sum": 691.25,
+    "max_load": 16.83,
+    "rows": [
+      {
+        "step": "checkers",
+        "exit": 0,
+        "elapsed": 36.83,
+        "cpu": 34.03,
+        "load": 3.25
+      },
+      {
+        "step": "cli",
+        "exit": 0,
+        "elapsed": 51.52,
+        "cpu": 15.649999999999999,
+        "load": 16.83
+      },
+      {
+        "step": "client-node",
+        "exit": 0,
+        "elapsed": 12.09,
+        "cpu": 3.59,
+        "load": 11.19
+      },
+      {
+        "step": "client-workerd",
+        "exit": 0,
+        "elapsed": 1.04,
+        "cpu": 1.22,
+        "load": 10.03
+      },
+      {
+        "step": "git",
+        "exit": 0,
+        "elapsed": 71.18,
+        "cpu": 55.93,
+        "load": 9.86
+      },
+      {
+        "step": "log-node",
+        "exit": 0,
+        "elapsed": 115.08,
+        "cpu": 118.96,
+        "load": 4.93
+      },
+      {
+        "step": "log-workerd",
+        "exit": 0,
+        "elapsed": 299.24,
+        "cpu": 302.69,
+        "load": 4.03
+      },
+      {
+        "step": "mcp-node",
+        "exit": 0,
+        "elapsed": 4.48,
+        "cpu": 3.3200000000000003,
+        "load": 2.9
+      },
+      {
+        "step": "mcp-workerd",
+        "exit": 0,
+        "elapsed": 1.76,
+        "cpu": 2.13,
+        "load": 2.9
+      },
+      {
+        "step": "policy-node",
+        "exit": 0,
+        "elapsed": 3.08,
+        "cpu": 3.77,
+        "load": 3.15
+      },
+      {
+        "step": "policy-workerd",
+        "exit": 0,
+        "elapsed": 4.41,
+        "cpu": 5.2299999999999995,
+        "load": 3.15
+      },
+      {
+        "step": "room-node",
+        "exit": 0,
+        "elapsed": 5.26,
+        "cpu": 6.56,
+        "load": 3.22
+      },
+      {
+        "step": "room-workerd",
+        "exit": 0,
+        "elapsed": 68.04,
+        "cpu": 69.21000000000001,
+        "load": 3.2
+      },
+      {
+        "step": "room-declared",
+        "exit": 0,
+        "elapsed": 60.83,
+        "cpu": 61.120000000000005,
+        "load": 3.37
+      },
+      {
+        "step": "ui",
+        "exit": 0,
+        "elapsed": 7.36,
+        "cpu": 7.84,
+        "load": 3.46
+      }
+    ]
+  },
+  "serial-after": {
+    "head": "64a379c2f6c89265ff6187a2d6948db3e9c13752",
+    "steps": 14,
+    "all_exit_zero": true,
+    "elapsed_sum": 59.66,
+    "cpu_sum": 64.82,
+    "max_load": 3.33,
+    "rows": [
+      {
+        "step": "checkers",
+        "exit": 0,
+        "elapsed": 2.19,
+        "cpu": 2.09,
+        "load": 3.19
+      },
+      {
+        "step": "cli",
+        "exit": 0,
+        "elapsed": 2.77,
+        "cpu": 2.81,
+        "load": 3.19
+      },
+      {
+        "step": "client-node",
+        "exit": 0,
+        "elapsed": 1.01,
+        "cpu": 1.03,
+        "load": 3.33
+      },
+      {
+        "step": "client-workerd",
+        "exit": 0,
+        "elapsed": 1,
+        "cpu": 1.16,
+        "load": 3.33
+      },
+      {
+        "step": "git",
+        "exit": 0,
+        "elapsed": 5.02,
+        "cpu": 3.7199999999999998,
+        "load": 3.33
+      },
+      {
+        "step": "log-node",
+        "exit": 0,
+        "elapsed": 9.15,
+        "cpu": 11.5,
+        "load": 3.23
+      },
+      {
+        "step": "log-workerd",
+        "exit": 0,
+        "elapsed": 1.33,
+        "cpu": 1.66,
+        "load": 3.26
+      },
+      {
+        "step": "mcp-node",
+        "exit": 0,
+        "elapsed": 1.43,
+        "cpu": 1.41,
+        "load": 3.26
+      },
+      {
+        "step": "policy-node",
+        "exit": 0,
+        "elapsed": 1.13,
+        "cpu": 1.6099999999999999,
+        "load": 3.32
+      },
+      {
+        "step": "policy-workerd",
+        "exit": 0,
+        "elapsed": 1.85,
+        "cpu": 2.2699999999999996,
+        "load": 3.32
+      },
+      {
+        "step": "room-node",
+        "exit": 0,
+        "elapsed": 1.81,
+        "cpu": 2.32,
+        "load": 3.32
+      },
+      {
+        "step": "room-workerd",
+        "exit": 0,
+        "elapsed": 26.62,
+        "cpu": 27.71,
+        "load": 3.29
+      },
+      {
+        "step": "room-declared",
+        "exit": 0,
+        "elapsed": 2.74,
+        "cpu": 3.3000000000000003,
+        "load": 3.24
+      },
+      {
+        "step": "ui",
+        "exit": 0,
+        "elapsed": 1.61,
+        "cpu": 2.23,
+        "load": 3.14
+      }
+    ]
+  },
+  "ratios": {
+    "elapsed": 12.440496144820651,
+    "cpu": 10.66414686825054
+  }
+}
