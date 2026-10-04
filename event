@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:0eaf4c935e118f1072301f0777688fc79b13997a","text":"Republished at 4ec48aa162413302f066e78790a240f810d24525; the successor stands at packages/room/test/workerd/vocabulary.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:0ca394f87f86fb55b7b80a6841d79ed117e3b70f","text":"Republished at 4ec48aa162413302f066e78790a240f810d24525, which no longer changes packages/room/vitest.workers.declared.config.ts: the pointer is withdrawn with no successor."}
