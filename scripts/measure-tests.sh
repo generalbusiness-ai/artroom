@@ -1,16 +1,29 @@
 #!/bin/bash
-# Measure the cost of the complete gate, step by step: measure.sh <worktree> <outdir>
-# For each step: elapsed seconds, and CPU seconds (user + system) summed over every process the step started.
-W=$1; O=$2; mkdir -p $O; : > $O/steps.tsv
-cd $W || exit 1
-git rev-parse HEAD > $O/head.txt; git status --porcelain | wc -l | tr -d ' ' > $O/status-lines.txt
-{ sysctl -n machdep.cpu.brand_string; sysctl -n hw.ncpu; node --version; uptime; } > $O/machine.txt 2>&1
+# Measure what the tests cost, step by step: scripts/measure-tests.sh <output directory>
+#
+# Each step is timed alone with /usr/bin/time: elapsed seconds, and CPU
+# seconds (user and system) summed over every process the step started. Each
+# vitest step also leaves its JSON report, from which the summed test-file
+# time comes. steps.tsv has one line per step: name, exit code, elapsed,
+# user, sys, and the one-minute load average when the step began.
+#
+# The first group times each package's suite on its own, as the baseline of
+# request ecbc722a was taken (that baseline's step list is this script at
+# commit ebbde3a0). The last step, `root-test`, is the one command the gate
+# runs. State the machine, the load and whether node_modules was already
+# installed with any figure you quote.
+O=${1:?usage: scripts/measure-tests.sh <output directory>}
+W=$(cd "$(dirname "$0")/.." && pwd)
+mkdir -p "$O"; O=$(cd "$O" && pwd); : > "$O/steps.tsv"
+cd "$W" || exit 1
+git rev-parse HEAD > "$O/head.txt"; git status --porcelain | wc -l | tr -d ' ' > "$O/status-lines.txt"
+{ sysctl -n machdep.cpu.brand_string 2>/dev/null || grep -m1 "model name" /proc/cpuinfo; getconf _NPROCESSORS_ONLN; node --version; uptime; } > "$O/machine.txt" 2>&1
+load() { uptime | sed 's/.*load average[s]*: *//' | cut -d' ' -f1 | tr -d ','; }
 step() { # name dir command...
   local name=$1 dir=$2; shift 2
-  local l0=$(sysctl -n vm.loadavg | awk '{print $2}')
-  ( cd $W/$dir && /usr/bin/time -p -o $O/$name.time "$@" > $O/$name.log 2>&1 ); local code=$?
-  local real=$(awk '/^real/{print $2}' $O/$name.time) user=$(awk '/^user/{print $2}' $O/$name.time) sys=$(awk '/^sys/{print $2}' $O/$name.time)
-  printf "%s\t%s\t%s\t%s\t%s\t%s\n" "$name" "$code" "$real" "$user" "$sys" "$l0" >> $O/steps.tsv
+  local l0; l0=$(load)
+  ( cd "$W/$dir" && /usr/bin/time -p -o "$O/$name.time" "$@" > "$O/$name.log" 2>&1 ); local code=$?
+  printf "%s\t%s\t%s\t%s\t%s\t%s\n" "$name" "$code" "$(awk '/^real/{print $2}' "$O/$name.time")" "$(awk '/^user/{print $2}' "$O/$name.time")" "$(awk '/^sys/{print $2}' "$O/$name.time")" "$l0" >> "$O/steps.tsv"
 }
 V() { echo "--reporter=default --reporter=json --outputFile.json=$O/$1.json"; }
 step ci . npm ci
@@ -23,12 +36,12 @@ step git packages/git npm test
 step log-node packages/log npx vitest run --config vitest.config.ts $(V log-node)
 step log-workerd packages/log npx vitest run --config vitest.workers.config.ts $(V log-workerd)
 step mcp-node packages/mcp npx vitest run --config vitest.config.ts $(V mcp-node)
-step mcp-workerd packages/mcp npx vitest run --config vitest.workers.config.ts $(V mcp-workerd)
 step policy-node packages/policy npx vitest run --config vitest.config.ts $(V policy-node)
 step policy-workerd packages/policy npx vitest run --config vitest.workers.config.ts $(V policy-workerd)
 step room-node packages/room npx vitest run --config vitest.node.config.ts $(V room-node)
 step room-workerd packages/room npx vitest run --config vitest.workers.config.ts $(V room-workerd)
-step room-declared packages/room npx vitest run --config vitest.workers.declared.config.ts $(V room-declared)
+step room-declared packages/room npx vitest run --config vitest.declared.config.ts $(V room-declared)
 step ui packages/ui npx vitest run $(V ui)
-uptime >> $O/machine.txt
-echo done > $O/done
+step root-test . npm test
+uptime >> "$O/machine.txt"
+echo done > "$O/done"
