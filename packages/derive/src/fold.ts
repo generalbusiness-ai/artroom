@@ -1,0 +1,161 @@
+/**
+ * The fold: how one sealed entry changes the state (scope contract, sections
+ * 4.1, 4.2, 6.3 and 7.2 to 7.4). `applyEntry` is the only code that changes
+ * state. The runtime runs it against storage inside the commit and a
+ * verifier runs it in memory, so the two cannot drift.
+ *
+ * It applies the entry's recorded effects and the bookkeeping that its input
+ * and sends imply. It judges nothing: whether the effects are the right ones
+ * is the judges' question.
+ */
+
+import type { Digest, Effect, Entry, ItemType, MemberRef } from "@generalbusiness/artroom-contract";
+import { intentDigest, seedDigest } from "@generalbusiness/artroom-bytes";
+import { withMembers, withPrincipal, type Signer } from "./attribution.ts";
+import type { Item, Party, StateWriter, Status } from "./state.ts";
+import { same } from "./values.ts";
+import type { ValidDefinition } from "./validate.ts";
+
+/** An entry that this state cannot take: out of sequence, or with an effect on nothing. */
+export class FoldError extends Error {
+  override readonly name = "FoldError";
+}
+
+/** The effects that change one item. */
+export type ItemEffect = Extract<Effect, { effect: "state" | "party" | "ref" | "value" | "list" | "hold" }>;
+
+/** The slot of a hold type whose member is the holder (section 6.8). */
+export const HOLDER = "holder";
+/** The reference slot of a hold type that names the item the hold is under (section 6.7). */
+export const UNDER = "under";
+
+/** Section 6.3: a new item is in its initial state, each slot takes its default or is empty, and its revision is 1. */
+export function newItem(effect: Extract<Effect, { effect: "open" }>, type: ItemType, opened: Digest | null): Item {
+  const each = <T, V>(slots: Record<string, T>, value: (slot: T) => V) => Object.fromEntries(Object.entries(slots).map(([name, slot]) => [name, value(slot)]));
+  return {
+    id: effect.item, type: effect.type, state: effect.state, revision: 1, opened,
+    parties: each(type.parties, (s): Party => (s.list ? [] : null)), refs: each(type.refs, () => null), values: each(type.values, (s) => s.default ?? null),
+    attributed: [],
+  };
+}
+
+/** The signer of an act entry, as the grant it was judged on states it. The judge records exactly that one grant. */
+export function signerOf(entry: Entry): Signer | null {
+  const grant = entry.input.type === "act" ? entry.input.authority[0] : undefined;
+  return grant ? { member: grant.subject, principal: grant.principal } : null;
+}
+
+/**
+ * One effect on one item. The judges use it on their working copy and the
+ * fold on the state, so both see the same item afterwards. A member put in an
+ * `author` slot, or made the holder of a hold, joins the item's attribution
+ * history, with the signer's principal when that member is the signer.
+ */
+export function changeItem(item: Item, effect: ItemEffect, definition: ValidDefinition, signer: Signer | null): Item {
+  const type = definition.declared.items[item.type]!;
+  const attributes = (slot: string) => type.parties[slot]?.author === true || (slot === HOLDER && definition.holdTypes.includes(item.type));
+  const noted = (slot: string, member: MemberRef) => (attributes(slot) ? withMembers(item.attributed, withPrincipal(member, signer)) : item.attributed);
+  switch (effect.effect) {
+    case "state": return { ...item, state: effect.state };
+    case "party": {
+      const value: Party = effect.member ?? (type.parties[effect.slot]?.list ? [] : null);
+      return { ...item, parties: { ...item.parties, [effect.slot]: value }, attributed: effect.member ? noted(effect.slot, effect.member) : item.attributed };
+    }
+    case "list": {
+      const held = item.parties[effect.slot];
+      const list = Array.isArray(held) ? (held as readonly MemberRef[]) : [];
+      const next = effect.change === "add" ? withMembers(list, [effect.member]) : list.filter((m) => !same(m, effect.member));
+      return { ...item, parties: { ...item.parties, [effect.slot]: next }, attributed: effect.change === "add" ? noted(effect.slot, effect.member) : item.attributed };
+    }
+    case "ref": return { ...item, refs: { ...item.refs, [effect.slot]: effect.to } };
+    case "value": return { ...item, values: { ...item.values, [effect.slot]: effect.value } };
+    case "hold": return { ...item, epoch: effect.epoch };
+  }
+}
+
+export function applyEntry(writer: StateWriter, definition: ValidDefinition, entry: Entry, hash: Digest): void {
+  const scope = writer.scope();
+  const input = entry.input;
+  if (input.type === "genesis" ? scope !== null || entry.seq !== 0 || entry.prev !== null : scope === null || entry.seq !== scope.head.seq + 1 || entry.prev !== scope.head.hash) {
+    throw new FoldError(`entry ${entry.seq} does not follow the head`);
+  }
+  // Section 7.2: a child is provisional until its creator confirms it; a refused genesis is terminal. A directory has no creator to confirm it.
+  let status: Status = scope?.status ?? (input.type === "genesis" && input.decision === "refused" ? "refused" : input.type === "genesis" && input.seed.creator === null ? "active" : "provisional");
+  const signer = signerOf(entry);
+
+  // Effects, in the order recorded. `before` holds each touched item as it was, or null for the one this entry opens.
+  const before = new Map<number, Item | null>();
+  const now = new Map<number, Item>();
+  const touch = (id: number): Item => {
+    const held = now.get(id) ?? writer.item(id);
+    if (!held) throw new FoldError(`entry ${entry.seq} has an effect on item ${id}, which does not exist`);
+    if (!before.has(id)) before.set(id, held);
+    return held;
+  };
+  for (const effect of entry.effects) {
+    switch (effect.effect) {
+      case "open": {
+        const type = definition.declared.items[effect.type];
+        // Section 4.1: an entry opens at most one item, and its ID is the entry's `seq`.
+        if (!type || effect.item !== entry.seq || before.has(effect.item)) throw new FoldError(`entry ${entry.seq} opens an item it cannot`);
+        before.set(effect.item, null);
+        now.set(effect.item, newItem(effect, type, hash));
+        break;
+      }
+      case "state": case "party": case "list": case "ref": case "value": case "hold":
+        now.set(effect.item, changeItem(touch(effect.item), effect, definition, signer));
+        break;
+      case "relation":
+        writer.putRelation({ owner: effect.owner, name: effect.name, item: effect.item, state: effect.state, revision: effect.revision });
+        break;
+      case "activate":
+        status = "active";
+        break;
+      case "index": case "attention":
+        break; // Rows and notices that no guard of this scope reads.
+    }
+  }
+
+  for (const [id, item] of now) {
+    const was = before.get(id) ?? null;
+    // Section 6.3: an existing item that one entry changes rises by one, once, however many effects touch it.
+    writer.putItem(was ? { ...item, revision: was.revision + 1 } : item);
+    if (was?.state !== item.state) {
+      if (was) writer.addCount(was.type, was.state, -1);
+      writer.addCount(item.type, item.state, 1);
+    }
+  }
+  // Section 6.7: every holder of a hold is in the attribution of the item the hold is under. That item is read, not changed: its revision stays.
+  for (const hold of now.values()) {
+    const under = definition.holdTypes.includes(hold.type) ? hold.refs[UNDER] : null;
+    const target = typeof under === "number" && under !== hold.id ? writer.item(under) : null;
+    if (target) writer.putItem({ ...target, attributed: withMembers(target.attributed, hold.attributed) });
+  }
+
+  // Bookkeeping that the input implies.
+  if (input.type === "act") {
+    // Section 4.2: the record of accepted keys is an index over the history.
+    writer.putAccepted(input.signed.intent.actor, input.signed.intent.idempotencyKey, { seq: entry.seq, intent: intentDigest(input.signed.intent) });
+  } else if (input.type === "delivery") {
+    writer.putDecided(input.from.at, input.from.seq, input.n, entry.seq);
+    if ("clause" in input) {
+      const of = input.message.of;
+      const request = writer.request(of.from.seq, of.n);
+      if (!request) throw new FoldError(`entry ${entry.seq} records a result of a request this scope did not send`);
+      writer.putRequest({ ...request, result: { seq: entry.seq, clause: input.clause } });
+      // Section 7.2: the first applied result of a creation is the incarnation this scope holds for that seed.
+      if (input.clause === "applied" && !("scope" in request.to)) writer.putCreation(seedDigest(request.to), { inc: input.from.at.inc, seq: entry.seq });
+    }
+  } else if (input.type === "diagnosis") {
+    const request = writer.request(input.of.seq, input.of.n);
+    if (!request) throw new FoldError(`entry ${entry.seq} diagnoses a request this scope did not send`);
+    writer.putRequest({ ...request, diagnosis: { seq: entry.seq, finding: input.finding } });
+  }
+
+  // Section 7.4: only a request has a result, so only a request is outstanding.
+  for (const send of entry.sends) {
+    if (send.message.class === "request") writer.putRequest({ seq: entry.seq, n: send.n, type: send.message.type, to: send.to, result: null, diagnosis: null });
+  }
+
+  writer.setScope({ at: entry.at, creator: scope ? scope.creator : input.type === "genesis" ? input.seed.creator : null, status, head: { seq: entry.seq, hash }, time: entry.time });
+}

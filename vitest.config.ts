@@ -13,6 +13,7 @@ export default defineConfig({
   test: {
     projects: [
       project("bytes", "bytes", "vitest.config.ts"),
+      project("derive", "derive", "vitest.config.ts"),
     ],
   },
 });
