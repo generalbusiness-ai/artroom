@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:7aad7b46e25907dcc6e2672f6389a521e2df2d40","text":"Merge retired a covered predecessor; the successor is at plans/test-invariants.md."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:7bf7e3444f2f7aceaadfd8015851c90eea73e472","text":"Merge retired a covered predecessor; the successor is at packages/room/test/node/deploy.cases.ts."}
