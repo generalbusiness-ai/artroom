@@ -3382,10 +3382,10 @@ Each part is restored, in the smallest form that shows it, in the head that carr
 | Since `f6212850` | |
 |---|---|
 | Source | unchanged |
-| Tests | 2,000 became 2,006. Ten test files changed; no file was added |
+| Tests | 2,000 became 2,006. Thirteen files in the packages' test directories changed; no file was added |
 | Test helpers | `expectRefusal`, `expectOk` and four like them now fail with `expect.fail`, so a failed result check is an assertion and the control helper can count it |
 | Guidance | [docs/testing.md](../docs/testing.md) says that an acceptance case is an invariant, and that its witness is removed only with its replacement named |
-| The gate, one observed run with no install | 28.4 s elapsed, 67.7 CPU seconds; it was 29.3 s and 70.6 before, so the cost did not move beyond the run-to-run spread |
+| The gate, one observed run with no install | 28.4 s elapsed, 67.8 CPU seconds; it was 29.3 s and 70.6 before, so the cost did not move beyond the run-to-run spread |
 
 Controls run on the restored witnesses, each by `scripts/control.mjs` with one change: the take-over overlap check in the Room (distinguishes); the three-step target rule in the policy validator (distinguishes); the recomputed-decision replay and the chunked-entry bound in the log (both distinguish); the checker gateway's repository check (distinguishes). The token checks of the two checker cases rest on the test's stand-in for Artifacts and on `packages/git`, and have no control in the checkers' source.
 
