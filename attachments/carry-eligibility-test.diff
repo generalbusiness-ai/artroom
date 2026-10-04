@@ -1,0 +1,59 @@
+--- /tmp/artroom-checker-stage3-26872-carry-eligibility-ap8ck5r4/acts.test.ts.exact	2026-10-04 00:13:32
++++ /tmp/artroom-checker-stage3-26872-carry-eligibility-ap8ck5r4/fixture/packages/room/test/workerd/acts.test.ts	2026-10-04 00:19:48
+@@ -22,6 +22,7 @@
+  */
+ 
+ import { describe, expect, it } from "vitest";
++import { runDeclared } from "./vocabulary.ts";
+ import { env, exports } from "cloudflare:workers";
+ import { runDurableObjectAlarm } from "cloudflare:test";
+ import type {
+@@ -1082,6 +1083,48 @@
+       expect((evs[0]!.outcome as { notCarried: { code: string } }).notCarried.code).toBe("key-compromised");
+     });
+ 
++    it("CHECKER PROBE: a held carry remains replayable after activation removes its obligation", async () => {
++      runDeclared();
++      const t = await checkRoom(scoped, [allowChecks("true")]);
++      const { r, doc, alice, bob, ci } = t;
++      snapshotRepos(r, { wrong: false });
++      checkerService(r, ci, () => "refuse");
++      const other = await proposed(r, bob, ["docs/**"], { "docs/guide.md": "more docs" });
++      await land(bob, other.lane, other.head);
++      const mine = await srcChange(r, alice);
++      const l = await land(alice, mine.lane, mine.head);
++      await tick(r);
++      const i1 = (await op(r, l.op.id)).integration!;
++      const prefixPublished = await call<{ through: number }>(r.stub.publishLog());
++      const prefixReport = await verifyLog(r.world.artifacts.canonicalRepo());
++      expect(prefixReport.failures).toEqual([]);
++      expect(prefixReport).toMatchObject({ ok: true, verifiedThrough: prefixPublished.through });
++      let finish = () => {};
++      r.world.policy.carryGate = new Promise<void>((done) => (finish = done));
++      const check = await ci.ok<Check>("check", { lane: mine.lane, generation: 1 }, await bodyFor(r, scoped, doc, i1));
++      const working = tick(r, 4);
++      await until(async () => r.world.policy.calls.carry === 1);
++      expect(await carriedEvents(r)).toEqual([]);
++      await activate(r, (p) => ({ doc: { ...p.doc, rules: p.doc.rules.filter((rule) => rule.kind !== "require") }, checkers: p.checkers }));
++      await inDO(r, (room) => room.core.recompute());
++      const held = await entries(r);
++      const activated = events(held, "policy-activated").at(-1)!;
++      const recomputed = events(held, "obligations-recomputed").filter((e) => e.event.lane === mine.lane).at(-1)!;
++      expect(recomputed.event.obligations).toEqual([]);
++      expect(recomputed.seq).toBeGreaterThan(activated.seq);
++      expect(r.world.policy.carryGate).not.toBeNull();
++      expect(await carriedEvents(r)).toEqual([]);
++      r.world.policy.carryGate = null;
++      finish();
++      await working;
++      const evs = await carriedEvents(r);
++      const published = await call<{ through: number }>(r.stub.publishLog());
++      const report = await verifyLog(r.world.artifacts.canonicalRepo());
++      const observed = { check: check.id, lane: mine.lane, op: l.op.id, prefix: { through: prefixPublished.through, ok: prefixReport.ok, failures: prefixReport.failures }, activation: { seq: activated.seq, policy: activated.id }, recomputation: { seq: recomputed.seq, obligations: recomputed.event.obligations }, events: evs, published, report };
++      expect(report.failures, "CARRY-ELIGIBILITY-PROBE " + JSON.stringify(observed)).toEqual([]);
++      expect(report).toMatchObject({ ok: true, verifiedThrough: published.through });
++    });
++
+     it("R-CARRY-13, R-LOG-10 a carry rule refuses the check: a notCarried event with the decision, and a new job for I2; after an activation that allows it, a second event carries it under the new version, and the carry counts with that event; artroom verify replays every decision", async () => {
+       let seen: { job: CheckJob }[] = [];
+       const { r, l, mine, after, check } = await carryCase(scoped, [allowChecks("false")], ({ r, ci }) => {

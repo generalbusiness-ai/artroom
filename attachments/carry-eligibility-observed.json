@@ -1,0 +1,109 @@
+{
+  "check": "act_16_c08f5e50",
+  "lane": "act_11_bc626305",
+  "op": "op_land_13",
+  "prefix": {
+    "through": 14,
+    "ok": true,
+    "failures": []
+  },
+  "activation": {
+    "seq": 20,
+    "policy": "act_20_abc73aa9"
+  },
+  "recomputation": {
+    "seq": 21,
+    "obligations": []
+  },
+  "events": [
+    {
+      "seq": 22,
+      "id": "act_22_c027f25f",
+      "act": "act_16_c08f5e50",
+      "decisions": [
+        {
+          "input": "sha256:4cfce4b66123277e041e4775a0e2eda27ac9f802c0bd2e67f089c42095cc3d20",
+          "kind": "carry",
+          "outcome": {
+            "evidence": "act_16_c08f5e50",
+            "result": "carry"
+          },
+          "policy": "act_1_e70e44a5",
+          "rule": "checks",
+          "stamp": {
+            "accounting": "artroom-act-budget-v1",
+            "jsonata": "2.2.2",
+            "profile": "artroom-jsonata-v1"
+          },
+          "usage": {
+            "inspectedBytes": 4,
+            "steps": 1
+          }
+        }
+      ],
+      "generation": 1,
+      "integration": "5c48b74aa77d176de6fc74710072e49e49f22e79",
+      "lane": "act_11_bc626305",
+      "obligation": "obl_unit-tests",
+      "op": "op_land_13",
+      "outcome": {
+        "carried": true,
+        "reason": {
+          "code": "snapshot-identical",
+          "config": "sha256:e29be6d7cd849666fd19025801dc752e633a86f7abcbf4a67de5e6ecb2bafdce",
+          "runner": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+          "snapshot": "sha256:6c87eb1452a984256c55311aa8cc94fd64d47573ca5b1145e614e6b0da488681",
+          "text": "carried: the filtered snapshot, checker configuration and runner are unchanged"
+        }
+      },
+      "policy": "act_1_e70e44a5",
+      "type": "check-carried"
+    }
+  ],
+  "published": {
+    "through": 23,
+    "commit": "687ec289f26d6b579fffefe116bffbb259b52fa2"
+  },
+  "report": {
+    "ok": false,
+    "ref": "refs/artroom/log",
+    "head": "687ec289f26d6b579fffefe116bffbb259b52fa2",
+    "room": "room_fff4ac0c8c626ea26cd7c8012ff8c974",
+    "operator": "key_Zr5-Myx6RTMyvZ0Kf32wVfXF7xoGraZtmLOftoEMRzo",
+    "commits": 2,
+    "verifiedThrough": 21,
+    "last": {
+      "id": "act_21_02b056c6",
+      "hash": "sha256:02b056c63c6f365894eb025333bd57b38d69d6a4b9bdf9ef48f6d10bed937975"
+    },
+    "publishedThrough": 23,
+    "decisionsReplayed": 6,
+    "failures": [
+      {
+        "reason": "decision-extra",
+        "seq": 22,
+        "detail": "no carry judgement is owed for act_16_c08f5e50: obl_unit-tests is not a check obligation of the version with a configured checker"
+      }
+    ],
+    "unsupported": null,
+    "limits": [
+      {
+        "reason": "git-unwitnessed",
+        "seq": 17,
+        "detail": "the log does not say whether obl_unit-tests counts for a9246270a2cf8751de483647bbbbb8639e48e90d: a check on a filtered snapshot with no prepared event, or a verdict whose carry is undecided without Git objects; that part of the land input is the retained context's"
+      }
+    ],
+    "cannotProve": [
+      "Whether any act was admitted after the last published entry: unpublished acts cannot be proven to exist or not to exist.",
+      "Lanes, leases, obligations and landings (R-LOG-15): verify checks each act's authority and replays every policy decision, but does not re-derive lane, lease, obligation or landing transitions, or the effects in receipts.",
+      "The room clock: expiry checks use each entry's recorded `at`, which only the room key vouches for.",
+      "Refusals that are never recorded (R-ADM-8): kind-undeclared, binding-stale and the other refusals of admission steps 1 to 6 leave no entry, so verify can neither see nor prove them.",
+      "Under a v1 document, entries are judged by the legacy vocabulary as before declared acts: the decisions present are replayed, but the calls the room had to make are not derived (R-DECL-1).",
+      "Under a v2 document, the required evaluation calls are derived and their inputs rebuilt from the thread, roster, obligation and evidence fold, which takes receipt effects as recorded: lane, lease and landing transitions, the obligations effects, and the platform guards behind a recorded refusal are not re-derived (stage 6).",
+      "A version's changed paths are checked against Git objects, from the base its context names to its head, when the objects are present; without them they are the retained context's, reported as git-unwitnessed. That the base is the merge base of main and the head needs main's history, which the log does not carry.",
+      "The paths changed since an earlier verdict's head, which decide whether it carries, are read from Git objects. Without them they are the retained carry context's, where one is recorded; where none is, whether the verdict carried is undecided, and so is each land input that depends on it. Each is reported as git-unwitnessed.",
+      "Whether the room prepared a check's integration, for a version or landing with no prepared event: rooms seal prepared events from stage 4 (R-DECL-20); verify checks a check against them where they are present. Until then a check on a filtered snapshot does not name the integration it counts for, and a check carry's new tree and snapshot are not in the log: verify takes them from the retained context and reports git-unwitnessed.",
+      "Whether a check-carried judgement was owed: the room judges carrying a check when a landing is prepared, which the log does not time. Verify checks each judgement that is recorded, and a carry that is not recorded meets no obligation."
+    ]
+  }
+}
