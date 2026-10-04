@@ -1,5 +1,7 @@
 # Artroom UI
 
+> **Test file names below may be out of date.** Each section names the tests as they were when it was written. Request `ecbc722a` later merged and removed many test files; [plans/test-invariants.md](../../plans/test-invariants.md) is the current map from each invariant to its test.
+
 The web interface for Artroom: five screens over one data adapter.
 
 | Screen | What it shows |

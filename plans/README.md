@@ -3126,3 +3126,121 @@ The declared run's skips are the tests that found their own rooms (stage 2's, st
 3. **Section 34.2's CLI line** says no source change is required. One was: choice 2.
 4. **Section 23's "MCP descriptors" row** holds only in a `v2` room: choice 14.
 5. **The planner's artifacts.** The planner republishes them at the final head. That head does not exist yet: it needs stage 5 reviewed and landed, then this branch composed on main.
+
+## Test overhead (request ecbc722a)
+
+Status: implemented, pending review. Gitseq request `ecbc722a` (planner to builder, relaying the project owner's new highest priority), promise `1c6bf45c`. Branch `request/test-overhead`. Nothing was pushed or deployed.
+
+The request: cut Artroom's test overhead at least ten times. Remove every test that does not prove a useful invariant, make the expensive useful tests cheap, measure before and after, and stop the exhaustive mutation sweeps.
+
+**What the head is.** The work could not start from main, because the cost was in the lanes under review. So the branch first composes them: declared acts stage 2 (`35797f84`), stage 3 (`5449d19c`), stage 5 (`db73dddc`) and the MCP core runtime (`729fb330`), merged at `a1990c94`. Only this file conflicted. That composed head is the baseline. None of those lanes is reviewed or landed, and this request does not review them: their functional outcomes and their open findings stay owed under their own requests.
+
+### The result
+
+Measured with [scripts/measure-tests.sh](../scripts/measure-tests.sh): each step alone, under `/usr/bin/time`; elapsed seconds; CPU seconds (user and system) summed over every process the step started; and the summed test-file time from vitest's reports. One 18-core machine, shared with other sessions: the one-minute load was 5 to 18 during the baseline and 6 to 18 during the after run. `node_modules` was already installed both times.
+
+| The complete gate | Elapsed | CPU | Summed test-file time | Tests run |
+|---|---|---|---|---|
+| Before, at `a1990c94`: `npm ci`, typecheck, each suite | 410.4 s | 830.1 s | 787 s | 4,339 |
+| After, at `641ebb43`, measured the same way, step by step | 40.7 s | 87.0 s | 37 s | 2,000 |
+| After, as the gate now runs it: install, typecheck, one test command | 33.8 s | 79.1 s | | 2,000 |
+| After, as the gate runs when the lock file has not changed: no install | 29.1 s | 69.2 s | | 2,000 |
+
+That is 10.1 times less elapsed time and 9.5 times less CPU by the same step-by-step method, 12.2 and 10.5 times as the gate is now run, and 13.7 and 11.6 times against the baseline without its install. The tests alone went from 391.6 s and 791.4 CPU seconds to 29.8 s and 63.7: 13.2 and 12.4 times. The summed test-file time fell 21 times.
+
+By step, elapsed seconds, CPU seconds and tests run:
+
+| Step | Before: elapsed | CPU | tests | After: elapsed | CPU | tests | Times less: elapsed | CPU |
+|---|---|---|---|---|---|---|---|---|
+| `checkers` | 36.5 | 33.8 | 48 | 2.6 | 2.2 | 35 | 14.2 | 15.2 |
+| `cli` | 8.8 | 21.8 | 201 | 1.5 | 3.7 | 132 | 5.8 | 6.0 |
+| `client-node` | 6.7 | 4.5 | 144 | 0.8 | 1.3 | 99 | 8.2 | 3.6 |
+| `client-workerd` | 1.0 | 1.2 | 2 | 1.0 | 1.2 | 2 | 1.0 | 1.0 |
+| `git` | 72.3 | 56.5 | 340 | 5.3 | 4.0 | 308 | 13.6 | 13.9 |
+| `log-node` | 32.0 | 137.2 | 369 | 2.1 | 15.2 | 267 | 15.0 | 9.1 |
+| `log-workerd` | 194.2 | 328.1 | 362 | 1.4 | 1.7 | 12 | 140.7 | 191.9 |
+| `mcp-node` | 2.5 | 4.0 | 149 | 1.1 | 1.6 | 103 | 2.2 | 2.5 |
+| `mcp-workerd` | 1.4 | 2.1 | 5 | removed | removed | 0 | | |
+| `policy-node` | 1.0 | 4.7 | 355 | 0.8 | 1.9 | 209 | 1.2 | 2.5 |
+| `policy-workerd` | 2.4 | 5.7 | 353 | 1.5 | 2.4 | 48 | 1.6 | 2.3 |
+| `room-node` | 1.7 | 8.4 | 403 | 1.0 | 2.6 | 165 | 1.7 | 3.3 |
+| `room-workerd` | 15.6 | 90.9 | 819 | 6.3 | 19.7 | 410 | 2.5 | 4.6 |
+| `room-declared` | 13.9 | 80.3 | 540 | 3.0 | 3.5 | 33 | 4.7 | 22.7 |
+| `ui` | 1.6 | 12.2 | 249 | 1.2 | 2.8 | 177 | 1.3 | 4.4 |
+| **all test steps** | **391.6** | **791.4** | **4339** | **29.8** | **63.7** | **2000** | **13.2** | **12.4** |
+| `npm run typecheck` | 6.5 | 14.2 | | 6.2 | 13.4 | | 1.0 | 1.1 |
+| `npm ci` | 12.2 | 24.5 | | 4.6 | 9.9 | | | |
+
+`npm ci` is the same command both times; its two figures differ only by the machine's load and cache, and it is left out of the ratios that say so.
+
+**One edit, taken to review.** The same edit both ways: a change to the two guards of the refusal-text bound in `packages/room/src/declared.ts`.
+
+| | Elapsed | CPU |
+|---|---|---|
+| Before, as stage 2 was run: the gate at the code head, one mutant per guard with the root typecheck and five test sets each, the gate again at the report head | 925.7 s | 2,092 s |
+| After: the affected tests (`npm run test:changed`, 12 files), one control per guard (`scripts/control.mjs`, one test file each), the gate once | 44.3 s | 100.4 s |
+
+That is 21 times less. It understates what stage 2 really cost: over one day its review loop ran 1,799 mutant runs, 24 hours of runner time, and six root gates, and the inventory was still not complete when the run was stopped.
+
+### Where the time was, and what changed
+
+- **The log package was 59 percent of all CPU.** Four test files, each run in Node and again in workerd, built logs at real limits: 20 MiB files, a search over 1.3 million digests, a 64 MiB staging case. The layout rules are now shown at small limits set for the test, with the 8 MiB segment bound and the 4,096-entry directory bound still shown at real size. workerd runs one file, which pins a log's commit IDs for both runtimes.
+- **The git package** started about 4,930 git processes and ran its files one at a time. Test repositories are now written as files, the landing engine runs on a repository in memory that is compared with real git by one script, and waits are bounded at 10 to 40 ms.
+- **The checkers** ran a real `npm ci` and `npm test` 30 times and built a git fixture per test. Those run once; what the service decides, signs and sends is tested against a container in memory, with the provider, gateway and checkout still real.
+- **The Room's suite ran twice**, once as written and once under the `v2` declarations. The second run is now a witness set of 33 tests in one file. The other files share isolates, so the Worker is loaded once per worker and not once per file, and 52 files became 11.
+- **Real waits are gone**: the client's backoff (6 s), the CLI's dropped-reply cases (1.4 s each), a 2 s ledger timeout, lock tests with waits of up to 3 s. Each now uses an injected delay, a gate or the test clock.
+- **Policy** ran its whole suite in two runtimes; workerd now runs the three files that are about the runtime.
+- **One process.** `npm test` at the root is one vitest run with a project per package and runtime, where there were fifteen runs.
+
+### What was removed
+
+2,339 of 4,339 run tests are gone, and 2,000 remain. No test was removed for being slow. The reasons, by group, are in [test-invariants.md](test-invariants.md), with the witness that still protects each invariant. In broad terms:
+
+- **The same thing twice:** the log and policy suites in a second runtime (about 660 tests); the Room's whole suite under a second vocabulary (507).
+- **One test per condition:** the tests written in the last days of stage 2 so that every mutant of every guard had a red test (about 300 in the Room, 146 in policy), merged into the tests of each invariant.
+- **Tests of test code:** the stand-in rooms of the UI and the client, the checkers' room stand-in.
+- **Tests of other programs:** git's and npm's own behaviour.
+- **Review-by-review repeats:** files added one finding at a time that pinned the same rule again; each of the 36 defects repaired in stage 2 keeps one witness.
+
+About 260 kept witnesses were checked by breaking the source by hand, one change at a time, and seeing the named test fail by its assertion. About ten did not distinguish. Two were repaired, one assertion that claimed more than it tested was removed, and the rest are listed in the map as known gaps.
+
+### How to work now
+
+[docs/testing.md](../docs/testing.md) is the guidance, and `AGENTS.md` points to it. In short: name the invariant; test it at the cheapest boundary that can show it; run `npm run test:changed` while working; run `npm run gate` once at the head sent for review; show that a new witness distinguishes with `scripts/control.mjs`, one change at a time. There is no mutation sweep.
+
+### Earlier demands that this request replaces
+
+The request says to reconcile the earlier blanket demands and record them as superseded, not as met.
+
+| Earlier demand | Where | Now |
+|---|---|---|
+| The Room's whole suite passes unchanged against the legacy vocabulary and again against the `v2` declarations, with every converted test listed one by one | stage 2, condition 3; protocol section 33.6 | Superseded. The declared witness set runs 33 chosen tests under `v2` and checks that each of the four conversions was applied. 507 tests no longer run under `v2`. Section 33.6 says so. `plans/declared-stage2-conversions.md` is removed |
+| A mutation of each declaration field and each new guard turns a test red | stage 2, condition 4; taken up for stages 3 and 5 and the MCP core | Superseded, not met. The stage 2 run of 594 mutants was stopped at 199, and its output is kept as partial. The stage 3 and stage 5 audits (502 and 375 guards with no mutant) are kept as lists of where to look, not as work owed. The MCP run stopped at 39 of 76 |
+| Every repaired reviewer finding keeps its test | all lanes | Kept, as one witness per finding |
+| Root gates at the exact head, and again at the report head | all lanes | The gate runs once, at the head sent. A commit that changes only documents carries the tree hashes instead |
+| The live row-write measurement on the provider | request `92ddf4cc` | Unchanged, still owed |
+
+The stage 2, 3, 5 and MCP sections above were written before this request. They name test files, counts and mutation tables that this work merged or removed, and those parts are superseded by this section; [test-invariants.md](test-invariants.md) is the current map.
+
+### Seams added to source
+
+None changes behaviour: `ClientOptions.backoff` (client); `Io.retries`, `Io.stdio` and `gitCommand.run` (CLI); a re-export of `StdioServerTransport` (MCP); `setLayoutLimitsForTests` (log); and the body of `ArtifactsGateway.fetch` moved, unchanged, to `gatewayFetch` (git).
+
+### Found on the way
+
+- **A minor defect, not fixed here:** `judgeBearer` in the Room does not check the grantor key's revocation as the read path does. After a room-held key is retired, a bearer's exact retry still returns the original record, while reads answer `unauthenticated`. Nothing is recorded. It has its own request, `5d41ea36`.
+- **A tool defect, worked around in the Room's test harness:** `@cloudflare/vitest-pool-workers` 0.22.0 nests one more proxy on its wrapper for each Durable Object a file constructs, so a room cost 9 ms at first and 64 ms after 450 rooms.
+- **Tests that did not test:** the client's watch close-during-backoff test and session-token redaction test passed with the source broken; both are repaired. The mint-site scan missed a computed key under a type assertion; fixed in the test. One existing Room test (R-ADM-6) failed now and then under load because it slept 20 ms; it now waits for the policy call.
+
+### What this does not show
+
+- **The figures are from one shared machine.** Elapsed time moved up to twofold from minute to minute with other sessions' load. CPU time is steadier, and the paired runs in each package's notes agree with the table. A quiet machine would give smaller numbers on both sides.
+- **Not every step fell ten times.** The Room's first run is 2.5 times less elapsed and 4.6 times less CPU, the CLI about 6 times, the client, policy, UI and MCP 2 to 4 times. Their floor is the cost of starting a vitest run (0.5 to 1 s each) and, in the Room, real Durable Objects: about 9 ms a room and 2.4 ms an admitted act, 30 ms a test. The gate as a whole passes ten times because the two largest costs fell 14 to 190 times.
+- **The second-vocabulary run is much smaller.** A fault that only shows when some other legacy test runs under `v2` would no longer be caught by the suite. The direct tests of what `v2` changes are the protection.
+- **The removed tests were judged, not proved, redundant.** Each removal has a reason and a surviving witness in the map, and a sample of witnesses was checked by breaking the source. The checker's focused counterexamples are the independent test of that judgement.
+- **The lanes are not reviewed.** A green gate here says the composed head passes its reduced suite. It does not approve stage 2, 3 or 5 or the MCP core.
+- **The browser suite** (`packages/ui/e2e`) is outside the gate, as before, and was not changed.
+
+### Gates
+
+Run at `641ebb43`, with `npm run gate -- --ci`: install exit 0; typecheck exit 0, every workspace; test exit 0, 2,000 tests passed (1,515 in the root vitest run, with 69 more skipped where the witness set loads a file and runs only its chosen tests; 308 in git; 177 in ui); `git diff --check` clean; `git status` empty. The head for review adds only documents to `641ebb43`: this section, [test-invariants.md](test-invariants.md), [docs/testing.md](../docs/testing.md), the pointer in `AGENTS.md`, two notes in `docs/protocol.md`, and notices in four READMEs. The gate was run again at that head, and the review request states the result.

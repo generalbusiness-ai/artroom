@@ -3271,7 +3271,12 @@ Each needs a named failure reason, such as `layout-changed`,
 
 ### 30.7 Acceptance cases
 
-Each is normative.
+Each is normative. The limits these cases name are the layout's real
+ones. The tests show most cases at small limits set for the test
+(`setLayoutLimitsForTests`), since each rule is about where a limit falls
+and not about its size; the 8 MiB segment bound and the 4,096-entry
+directory bound are also shown at their real size
+(request `ecbc722a`).
 
 | Case | Expected result | Rules |
 |---|---|---|
@@ -4437,6 +4442,18 @@ Stage 2's report lists every converted test, one by one, with the
 conversion applied, for review. Each is a listed, reviewable rewrite of a
 fixture's form; none is permission to weaken, remove or loosen an
 assertion. A mutation of each declaration field turns a test red.
+
+As reduced by request `ecbc722a`: the second run of the whole suite is
+replaced by a named witness set, `declared-run.test.ts` in the Room's
+tests, which runs chosen tests of the code-review application under the
+`v2` declarations with the same four conversions, and checks that each
+conversion was applied. The Room dispatches by step, and both vocabularies
+run the same step handlers, so what a `v2` document changes (admission
+steps 1, 4, 4a and 5, grants, sessions, check jobs, recovery and what a
+thread records) has direct tests of its own. The list of every converted
+test and the mutation of each declaration field are no longer kept;
+[plans/test-invariants.md](../plans/test-invariants.md) names the
+witnesses and says what the smaller run does not show.
 
 ### 33.7 Contract types and built-in data
 

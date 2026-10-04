@@ -1,5 +1,7 @@
 # @generalbusiness/artroom-room
 
+> **Test file names below may be out of date.** Each section names the tests as they were when it was written. Request `ecbc722a` later merged and removed many test files; [plans/test-invariants.md](../../plans/test-invariants.md) is the current map from each invariant to its test.
+
 The Room is the part of Artroom that decides. It is a Cloudflare Worker and
 one Durable Object per repository. The Durable Object keeps the repository's
 log in SQLite and is the only sequencer for it: every act gets its place in

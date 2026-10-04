@@ -15,3 +15,6 @@ Use gitseq requests to track all tasks in this project.
 User-facing notes, documentation and other communications prefer plain English,
 per ISO 24495-1, for a technical audience.
 
+Tests: read [docs/testing.md](docs/testing.md). Run the tests of what you change
+while you work, and the gate (`npm run gate`) once before review. Do not run
+mutation sweeps or repeat whole suites.

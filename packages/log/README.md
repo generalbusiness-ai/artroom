@@ -1,5 +1,7 @@
 # @generalbusiness/artroom-log
 
+> **Test file names below may be out of date.** Each section names the tests as they were when it was written. Request `ecbc722a` later merged and removed many test files; [plans/test-invariants.md](../../plans/test-invariants.md) is the current map from each invariant to its test.
+
 This package publishes a room's log to git and verifies it offline. It is
 lane L of Artroom. It has two parts:
 
