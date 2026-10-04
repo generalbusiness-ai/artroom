@@ -1,5 +1,235 @@
 # Credential cleanup handoffs
 
+## Composable lanes and GitHub demonstration
+
+[017: Composable authority scopes, lanes, and the GitHub demo](017-2026-10-04-composable-lanes-and-github-demo.md)
+is architecture Draft 2 dated 2026-10-04 under planning request
+`5c716a5c35bfdbdcef89e1e4fbe82df4aab0b8fd`. Hugh's direction starts
+with composable authority scopes and defines lane as work as it happens:
+issues/goals, discussion, commitments, splitting concerns and recombination
+into an exact proposed and mergeable deployable change. Issues and PRs are
+lane forms. The demo target is an exact-as-reasonable GitHub experience.
+Production rollout is explicitly outside this design. Hugh's clarification
+`d4e07064` establishes the sequence: one compelling complete demo; the
+composable architecture that supports it; explicit retargeting of all other
+Artroom applications and components. No backward compatibility is required.
+Completed and in-flight architecture may be replaced or retired. Planner
+owns the complete retargeting ledger, successor requests, removal tasks,
+independent review and revised sequencing. Demo success alone does not
+complete alignment/removal. Runtime mechanisms remain proposed; this draft
+changes no source implementation. Status: DRAFT 2, planner handoff.
+
+[018: Demo-first task and retargeting ledger](018-2026-10-04-composable-lanes-task-ledger.md)
+records the full revised input, explicit supersession of initial S1–S4,
+five successor design requests R0–R4, decision owners, proposed source and
+removal packages, and an all-component/application category inventory.
+All five now have builder promises: R0 `30c06d80` / `cbbf8612`,
+R1 `c69b573d` / `8d614272`, R2 `fe47970e` / `8da8b218`,
+R3 `f2d23e6f` / `8661af6b`, and R4 `b18554a6` / `f3c5d607`.
+Frozen 018 records its earlier status snapshot. Initial S1's
+promise raced unclaimed replacement; requester withdrawal `0de4b3a0`
+now projects cancelled, and R1 is separately accepted. The other three
+unclaimed requests were guardedly retired/replaced. No source completion
+is claimed by those acts.
+
+Frozen 018 is primary `f7ebb23b`, attachment commit `8df56a19`, 22,650
+bytes, SHA256
+`1ac551d6281f7a09e952d3f9d749e2133ace083f096fd5ed38e0f0de8852bf2b`.
+Local/attachment byte equality, local links and whitespace were verified.
+Joint exact evidence-only review `edaad58f` covers 017 Draft 2 and 018,
+D1–D8/P0–P8/A1–A10, three browser outcomes and the complete removal
+boundary. It is queued with no executing reviewer; the existing native
+checker remains terminal/restricted, with no restart or substitute.
+Planner promise `efc0d86c` continues. Exact source-level inventory and
+formal dispositions for other incompatible promises remain owed.
+
+Builder delivered R0's first draft in `98fee5dc`, at exact head
+`542c3bfff32ee2ab8cd9b6a9f263a695897ae7fa` on `request/demo-contract`.
+Planner read the complete demo contract (945 lines) and all three
+inventories (785, 442 and 293 lines); its four-file design-only diff passed
+the whitespace check. Internal correction `b9eb7419` requests explicit
+coverage of the full workspace, browser and device outcomes; separates
+hold expiry from responsibility; distinguishes refusal before an
+irrevocable effect from reconciliation afterwards; qualifies GitHub parity
+and inbox-only attention; corrects current inventory/tooling/manual scope;
+and requires attributed task closure without calling cancelled delivery
+complete. Source-baseline reuse is proposed, with no automatic release or
+main merge. Runtime design and settlement choices still need their named
+owners. The builder should revise with a correction matrix before filing
+independent review. R1 design may continue. No old task, external duty or
+review invitation was closed by this correction; it is not independent
+approval. The ephemeral heads-up failed because the builder inbox was
+full; the durable correction is effective.
+
+Builder also delivered R1's first scope/replay draft in `4131c1f4`, at
+`8416c414df68f11b2a789ebb686de0bf1895c4d4` on `request/scope-contract`.
+Planner read its full 842-line contract and 420-line admission-read
+inventory; the design-only diff passed the whitespace check. Effective
+internal correction `a670d34d` requests construction without circular
+creation/source hashes; time-dependent revalidation after preparation;
+complete pinned act semantics; recursive source verification with explicit
+trust and replay limits; distinct refusal, retry and settlement behavior;
+retention and capacity for outstanding duties; and complete contribution
+authorship for review. The separate per-scope queue and conservative local
+head validation remain proposed. A corrected exact draft and correction
+matrix are owed before independent review. No protocol or source adoption
+is claimed.
+
+R0 revision 2 arrived in `c2aa096c`, at exact head
+`b02a85a9a86077c2b6457d592a1c6070a0da2623`. Planner read its complete
+1,250-line contract and 21-line correction matrix; the three inventories
+are unchanged from the first reading. Its two-file revision passed the
+whitespace check. Effective internal follow-up `86fc02fd` preserves the
+revised story coverage and requests the remaining commissioning fixes:
+C2 needs an explicit staged retarget, because the original spike depends
+on the reviewed C1 authority contract; checkpoint and deletion witnesses
+must preserve its full acceptance scope; a refused push cannot release a
+slot while an earlier attempt could still write; and the rebuilt task
+ledger needs exact provenance. Planner also proposed cancelling the
+obsolete MCP source amendment's remaining integration, while retaining
+four historical-note deliveries through `50d7806a` with review and landing
+still owed. These are proposed dispositions, not closure acts. A corrected
+exact head is still needed before independent review. No provider probe,
+runtime test, implementation, adoption or task closure followed from this
+reading.
+
+R1 revision 2 arrived in `3ee06d0a`, at exact head
+`8ceb151059977fcf8f01f6ce63d599a68cba126a`. Planner read the complete
+1,244-line contract and 28-line correction matrix; its admission inventory
+is unchanged. The revised note's bytes and reported SHA256 match, and
+the two-file revision passed the whitespace check. Effective internal
+follow-up `ba913350` requests unambiguous identities for multiple items
+opened by one entry; an explicit provisional-child confirmation path;
+terminal delivery responses and supersession; a stated runtime source
+trust boundary; and complete initialization, selectors and report
+attribution. The single namespace and inbox also need to agree with R0.
+These are open foundation decisions for the corrected draft and its
+independent review. R2 and R3 may use it as design input with the gaps
+named; no executable contract or source adoption is claimed.
+
+R0 revision 3 arrived in `15751680`, at exact head
+`a3d0ce4c5337c98bf1e9f507813d3b8605c03894`. Planner read every change
+against the fully read revision 2, the complete 40-line correction matrix
+and new 76-line ledger-source evidence. All three revised files' bytes and
+hashes were checked; the revision passed the whitespace check. Main note:
+118,495 bytes, 1,300 lines, SHA256
+`9b66892b2a865319f96ebf1f4681e7ec6b271253d3970c65b38ab054a1cc1dbf`.
+Effective internal readiness `7e66c453` asks the builder to file all six
+files at that exact head for independent design review. The five latest
+corrections are addressed for that review, including staged C2 delivery,
+full recovery witnesses, uncertain publication, historical dispositions
+and exact task-ledger provenance. R1's foundation fixes remain open.
+Implementation scopes and task dispositions remain proposed.
+
+Checker status `25c25dc3` confirms that the earlier verifier turn failed
+an automated cybersecurity-risk review. Its retained source and bounded
+runtime reports are evidence, with remaining review checks unfinished;
+there is no verdict on `a23cfe01`. Presence and a promise do not imply an
+executing or completed review. No restricted reviewer is restarted,
+replaced or rephrased. The exact design reviews remain pending, while
+permitted planning continues.
+
+R2's first draft is announced in `9166ffc5`, at exact head
+`c2a0987d142cda2fa8ed123878c07cf79ef4bd2a` on `request/lane-forms`.
+Its handoff names the complete browser flow, two-device journey, lane
+forms, dated GitHub comparison and eight proposed grammar gaps. Planner
+has now read all 819 lines of the note and all 533 lines of the evidence,
+recovering truncated spans, and checked their bytes and hashes. The
+design-only diff passed the whitespace check. A bounded check of current
+official GitHub references and the existing Jam timing contract informed
+effective internal correction `5f83a4bf`. Its eight groups cover exact
+report/commitment and selected-input binding; goal and judgment subjects;
+verdict preservation and check recovery; creation, plans and handover;
+source freeze and atomic link edits; deletion and replay; browser recovery
+and enrollment; and Jam semantics, bounds and compact source evidence.
+A corrected exact draft and matrix are owed before independent review.
+No runtime gate, provider probe or source implementation was run.
+
+The builder has filed all six R0 paths at `a3d0ce4c`: primary `674473eb`,
+corrections `7ed9ab4e`, ledger source `862f272c`, source inventory
+`00ddc3cf`, workroom inventory `065f3426` and documents/repositories
+inventory `40d4af78`. Planner inspected each attribution and the complete
+independent review invitation `de653836`, which is open and rests on all
+six exact artifacts. It is queued, with no verdict or adoption claimed.
+Checker planning evidence `eb4632f5` verifies a bounded source census and
+identifies one wording correction: section 9.6 names three measurement
+configurations, so "Four" should read "Three". Builder recorded that
+erratum in `2abe4923`, preserving the filed bytes. Evidence `d26606b3`
+checks all seventy ledger request identities, thirty-eight promise
+bindings and five historical approval subjects, without establishing
+the narrative safety reasons or completing original conditions. Its
+full design review is unperformed. Reconciliation `b491912f` confirms that partial planning
+reading has closed no promises and approved no design. Original review
+and settlement duties remain pending.
+
+R1 revision 3 arrived in `814853a9`, at exact head
+`4b7f77eb3955a9f81a1a502b561f20c86eb7dbc5`. Planner read its complete
+two-file revision against the fully read revision 2. The main note is
+1,407 lines, 81,298 bytes, SHA-256
+`808aafce1b7fc0c8a1d2935acbd25008b036236593b695a3731f238145514c3a`.
+It resolves the item collision, confirmation exception and terminating
+message exchange. Correction `f4ed2dab` asks for four remaining points:
+receiver loss cannot prove an earlier request had no effect; entry and
+replay types must express the new message outcomes; founding-child seed
+causes need distinct replay rules; and effects must check aliases after
+resolving actual local item identities. The R2 grammar extensions remain
+proposed and must follow the current application corrections. Whitespace
+checking passed. No independent verdict or source authorization is implied.
+
+R3's first authority and publication draft arrived in `c2408d90`, at
+exact head `43b68f5a6d1f1a68bcb494062fa2db0e081f7ef9`. Planner read all
+888 lines of its main note and all 723 lines of the source-reading
+evidence. The main note is 56,110 bytes, SHA-256
+`f2f78fb0db14cfdb8f4a99580d97b5916cad533c90b7a9c6ff4035357fc45483`.
+Correction `f6c4d14b` asks for nine groups: complete bounded authority
+proofs; device and direct private-resource controls; separate writable
+workspaces for plural commitments; no inventory-based settlement of
+unknown creates; correlated publication messages and complete source
+eligibility; evidence for every possible dispatch; explicit publication
+and abort-fence assumptions; object staging and receipt ownership; and
+safe founding replacement with complete resource retirement. Both notes'
+whitespace checking passed. No independent verdict, adoption or runtime
+work is claimed.
+
+R2 revision 2 arrived in `3265ebea`, at exact head
+`f146aa2ef1f77775b49ec2f07c47f5879f978e42`. Planner read the full main
+note (1,121 lines), correction matrix (25 lines) and documentation
+evidence (533 lines). The main note is 84,087 bytes, SHA-256
+`77ca6209ee61404d7d5eee83b0d1d9f3356ce3e8ec6396bd20f8338f2665e62d`.
+It improves verdict preservation, check retries, commitment forks and
+redaction coverage. Correction `36115bc5` asks for six remaining groups:
+uncertain send/expiry recovery; exact goal/plan/concern coverage including
+failed creations; parent-result and inherited-input provenance;
+executable job supersession and own-action guards; correlated publication
+progress and frozen eligibility; and precise redaction/presentation
+controls with two bounded documentation qualifications. Whitespace
+checking passed. No independent verdict or runtime work is claimed.
+
+The builder filed R1 revision 4 at exact head
+`665e490bf474d44065ad6618dce4478c76306623`: primary `f47508dc`,
+corrections `bead7549` and admission inventory `76e0cf78`. Planner
+inspected all three attributions and the full independent invitation
+`6d348d8a`. It is queued and has no verdict. The complete revision 4
+delta against the fully read revision 3 is next; filing does not prove
+the requested corrections or authorize implementation.
+
+Checker status `da822d58` records its standing goal as blocked: the last
+known native reviewer failure remains the automated cybersecurity-risk
+rejection, and recent status reads failed at the local transport. The
+pending independent invitations remain open. Planner can continue design
+corrections; no reviewer restart, replacement or rephrasing is authorized.
+
+Direction `d4e07064` governs current commissioning. Older sections below
+record historical approvals, ownership and previous sequencing; they do
+not require legacy support, pre-change replay or completing an obsolete
+architecture. Useful outcomes and test economy are reassessed under the
+new model, and real unknown external duties remain until safely accounted
+for. Removal accompanies replacements; successful demo alone cannot close
+all-component alignment. Source implementation still needs relevant exact
+independent design adoption.
+
+## Original credential cleanup audit
+
 Focused read-only audit under gitseq request `c01205f5d967ccef69319549dd1734b3e108a8b0`, with promise `51ef2bd2a3829800872ccd25f072cbe28dc961f1`. Started at approved main `72d6abde5c6dfa993ac441884e8f966a903b932f`; reconciled to `bd520fb926f8161a722c6f1e23ae4aac29e41a66` after the separately reviewed A7 landing. That landing's tree equals approved head `84e25a78883e03f7accf1a18d66d8866eea94195`. The Git paths below are unchanged; Room founding line references were refreshed.
 
 The improve skill supplied the handoff format. Four verified fixes were selected under the user's standing autonomous checker instruction. Priorities and effort estimates set review order only. They do not cut scope. Source code was not changed by this audit. These plans have not been implemented or approved for landing.
@@ -15,7 +245,1317 @@ Plans 001 and 002 touch the same workspace cleanup function; serialize their edi
 
 Design note for review under request `a2cbd459`, following assert `4e4134b4` as corrected by `b2cdc44a` (acts are declared by each application): [notes/2026-10-02-declared-acts.md](../notes/2026-10-02-declared-acts.md).
 
+## Connected browser coding stories
+
+[005: Durable browser coding across devices](005-2026-10-03-browser-cloud-work.md),
+dated 2026-10-03, is the frozen Draft 2 under planning request `b5f1fb3f`,
+promise `28e63ebc`. It connects durable cloud coding, the complete browser
+journey and same-member device continuity. It reconciles all six groups in
+independent Draft 1 review `25065edf` / guarded verdict `c80ef89e`.
+The exact revision was independently approved for commissioning in
+`fc77cf82` (ratified `412c7bce`), then adopted as product direction
+`0f358e52` (ratified `cfc2d66f`). Its workroom evidence artifact
+`209a5ec9` names commit `a15aed52`, attachment
+`2026-10-03-browser-cloud-work-draft2.md`, SHA256
+`10b9d2650aeb774c0811cce51f213a432d7495fc3dad5899cb0ab1b38de6fecc`.
+The saved note preserves those exact reviewed bytes; its draft label and
+proposed-package table describe that frozen version.
+
+The approval carries one explicit contract choice: raw private reads
+initially require a direct owner/admin device session, with direct-key
+provenance and current role/resource checked by the trusted Room boundary.
+A returned member handle is insufficient. Delegation-issued read sessions
+are denied raw resources by default; signed task controls remain separate.
+
+All six self-contained implementation requests below are addressed to
+builder. They inline the reviewed decisions, dependencies, acceptance and
+bounded validation. Requests are not implementation completion. The
+contract task also owns eventual repository integration of this saved
+planning note and commissioning index through normal source review/landing.
+
+| Work | Request | Dependency order |
+|---|---|---|
+| Authority and lifecycle contract, types and trusted Room boundary | `b538c5eace50a1de82a8bdf8a8f19764548af15e` | Reviewed design; reconcile acts/client and test workflow |
+| Real coding recovery spike | `6cdaf20fa260d6d6c6b30e83f585883a51b964f4` | Relevant reviewed contract decisions |
+| Production durable coding agent | `13dfc613e8e3d9a1aed5f7492272fbf8c580d727` | Contract/boundary and reviewed recovery spike |
+| Browser identity, onboarding and authorized import | `18815307e6c306d63766230ed7eb7ddbf94d1f21` | Contract; reuse lane J and policy bootstrap `a13a0bf5` |
+| Complete browser progress, steering and review | `cfbde32f20618231aed598f63f3898cc188d0ffd` | Live runtime/identity; reuse stage 5 and cleanup `8d249233` |
+| Joint deployed acceptance and user docs | `d89fc17fb60a7c8a3591e23193596c981781b26c` | Integrated journey, policy/cleanup; coordinate existing docs plan |
+
+Test-overhead `ecbc722a` has independent approval; main integration remains
+owed. Builder now resumes acts, builder-identified Jam blockers, and
+Jam/docs in parallel after builder-positive readiness.
+These stories add no first-Jam readiness gate. Initial delegated-agent
+runtime, reusable agent identities, private-source OAuth, browser IDE and
+preview remain later choices; no implementation or shipping is claimed.
+
+## Experience and developer adoption
+
+[006: Experience-to-task map](006-2026-10-03-experience-and-developer-adoption.md)
+is Draft 1 under planning request `2262034d`, promise `4d8de5d7`. It covers
+all ten scenarios in the supplied experience/DX analysis, reuses the six
+connected-story requests, and proposes seven missing packages. Independent
+review `48cb948c` approved commissioning in `a259c26d`, ratified `bf77c8cd`,
+against evidence-only artifact `5b32100a`,
+attachment commit `109501e9`, SHA256
+`7bdca0fd19a8c26613c9e9ea427c6cea1c3296c7fa429ff3ff1561135e03a381`.
+The local plan matches those frozen bytes. Earlier metadata/invitation
+`fcaec9bb` / `00a2d4cc` were retired to correct a final-newline hash.
+The commissioning scope was adopted in `cf116410`, ratified `711f7826`.
+[The companion task ledger](006-2026-10-03-experience-and-developer-adoption-tasks.md)
+records seven effective builder requests and the five explicit full-scope
+review details. Six requests deliver designs before separately commissioned
+implementation; N6 delivers the complete already approved manual beside Jam
+after builder-positive readiness. New protocol/runtime choices remain subject
+to review and adoption. The full documentation scope, test-overhead priority
+and builder-owned Jam start path are retained.
+Planning request `2262034d` is satisfied by report `51a4cfdc`, ratified
+`389dc7ee`; implementation remains queued. The independent checker also
+read all seven effective requests in full and found no handoff correction.
+
+## Attention delivery handoff
+
+[007: Attention delivery for the durable coding runtime](007-2026-10-03-attention-runtime-handoff.md)
+is an independently reviewed planning addendum to wake/schedule request `24711ceb` and runtime C3
+`13dfc613`. It identifies the older wake note's unspecified cursor meaning
+against the Room's exclusive attention position, and separates durable
+input delivery, attention closure and authoritative work outcomes.
+Planning clarification request `03d85a35`, promise `9e8e3081`, tracks the
+addendum. Draft 1 review `40514a0a`, ratified by `12211341`, requested
+visibility catch-up, ingestion ordering and inherited author provenance.
+Frozen Draft 2 evidence `c85631b5` names attachment commit `7f3cb69d`,
+14,606 bytes, SHA256
+`6b0cb9cd9f8079ed0ff21d5b3d13bb3838bfb2c5678f8a930cbf7f40d068ca5d`.
+Successions `3cb8e697` and `d0009274` preserve Draft 1 history and replace
+the first Draft 2 primary's stale review dependency with live provenance.
+The bytes are unchanged. Succession `d8caf1f6` withdraws the stale
+invitation `c2875063` in favor of one live invitation.
+Independent evidence-only approval `78be0cd1` for review `16a23469` is
+operative and was ratified by `3057e53a`; the earlier stale-lineage verdict
+`18a209d0` remains historical. Private runtime handoff `34c5274b` was
+ratified by `bb69d6f3`. Planning completion `07e0fdf7`, ratified by
+`96634818`, closes `03d85a35` only. Public wake cursor, attention closure
+and added read-field choices remain open for their named contract owners;
+runtime implementation and the older wake-note review remain owed.
+Draft 2 addresses source-derived case `b5471b77`: role/team or work-filter
+changes can reveal older queue positions. It proposes bounded fresh scans,
+separate scan progress, re-evaluation of filter skips, deduplicated input
+identities and fences for overlapping ingestion. The frozen draft keeps its
+pre-review status text; this index records the subsequent approval.
+It adds no implementation
+request or Jam gate and preserves the reviewed bytes of 005 and 006.
+The older full wake/schedule note received changes review `2acf4f43`
+under request `e34ac0c1` and checker promise `2723c332`, against exact
+primary `c44e96df` at `337a449d`. Ratification `24a58dd6` accepts that
+review delivery. The six bounded corrections cover delivery guarantees,
+qualified closure, schedule firing/recovery, coalescing, private secrets
+and budgets, and actual watcher availability. The original planning
+request `24711ceb` still owes a reviewed correction and source integration.
+This remains below actual-task acts reviews and adds no Jam gate.
+
+[008: Wake and schedule clarification](008-2026-10-03-wake-and-schedule-clarification.md)
+is frozen Draft 2 under no-Git planning request `45065116`, promise
+`6a209eaa`. Draft 1 review `f965c475`, accepted by `08cf96df`, requested
+one correction: non-scoped housekeeping is action work, and notice
+acknowledgment cannot complete its requested outputs. Current primary
+`3ee468ec` names attachment commit `649b7cd8`, 26,682 bytes, SHA256
+`bb4eedbd29bae8834a903471c144dded1a32f8dc7e440edda32382ecd073facc`.
+The local file matches that attachment. Supersession `5ba48e8d` retires
+Draft 1 primary `552abe62`; the fresh candidate's own-promise bases remain
+live. Independent planning rereview `033f6473`, promise `f45ece69`,
+approved the exact evidence in `8365e4c4`, accepted by `2fec61af`.
+Draft 2 retains firing-linked non-scoped action work, a qualified recorded
+result and its outstanding/coalescing lifecycle without requiring a lane
+or new public acceptance field. Its proposed activation/time, coalescing
+and budget semantics were adopted as planning direction in `6068751a`,
+ratified by `bc9ec5ab`. It preserves
+the adopted scope/defaults/staging and approved 007. Public encoding and
+runtime work remain with existing owners; original `24711ceb` source
+integration remains owed. Planning completion `e87fe126`, ratified by
+`e33176bd`, satisfies `45065116` only. The frozen file retains its
+pre-review status label; this index records operative approval and adoption.
+
+## MCP planning review
+
+Original MCP planning request `489a992e`, promise `932ce20e`, still owes
+independent review and source integration. Current primary `91e3d26a`
+names the complete Revision 3 at `b5add513`,
+`notes/2026-10-01-mcp-plan.md`: 32,581 bytes, 582 lines, SHA256
+`c79336c71296da583a929b497721ddf97380988373b4e8851287f1fcbd004962`.
+Full source-note review `711ded30`, checker promise `099e171b`, returned
+changes `4e542273`, accepted by `5877afdf`. Its seven bounded corrections
+cover general declared-act routing, frozen prepared retry meaning,
+conforming error schemas/explicit credential outputs, OAuth client consent
+and current Room authority, caching boundaries, source/staging/owner status,
+and qualified external client/subscription claims. The dated reconciliation
+remains owed under the existing planning promise, below actual-task
+functional work. It preserves adopted `775acdd3` goals and
+staged scope while reconciling fixed code-room assumptions with declared
+acts, prepared meaning and existing C1/N1/N3/N4/N5/N6 owners. The old
+vendor/client statements remain dated evidence; the current
+[MCP version page](https://modelcontextprotocol.io/docs/2026-07-28/learn/versioning)
+calls 2026-07-28 current, rather than final. The plan's review is distinct
+from the MCP core implementation and adds no runtime suite or Jam gate.
+
+[009: MCP clarification](009-2026-10-03-mcp-clarification.md) is frozen
+Draft 2 under evidence-only request `7fc05f06`, promise `9e739dea`.
+Primary `514c43ba` names attachment commit `b15eca8d`, 35,977 bytes,
+537 lines, SHA256
+`c5bd4fbe66c424e12db24a34baeaa4bad15495adf423412ce1ba8108fc0e7343`.
+The local note matches the frozen attachment. It responds to all seven
+accepted corrections, retaining the complete surface, adopted staging,
+named owners and acceptance. Draft 2 corrects the planner's overbroad
+checker exclusion against adopted `fa120186`: properly bound declared
+check steps may use generic MCP, while legacy bearer check, bearer roster
+and ordinary independent-check qualifications retain their boundaries.
+Supersessions `98a20ce5` and `b07ffaff` retire Draft 1 primary `d89250a8`
+and invitation `24db7e09`; its attachment remains historical.
+The fresh primary rests only on the live own promise and fresh freeze.
+Independent planning review `b2162238`, promise `0809f54b`, approved the
+complete exact Draft 2 in `db41608a`, accepted by `04b94a1d`. The full
+surface, adopted staging and all seven corrections remain. Planning
+guidance `c18af03e` records this accepted revision without granting runtime
+authority. Completion `81faccb0`, accepted by `8266ca84`, satisfies only
+own clarification `7fc05f06`; current inspect confirms that status.
+Original `489a992e` source integration, runtime/schema approval, final
+dual contract/runtime binding and deployment remain separate. The frozen
+note's dated Stage 2 status cannot revive withdrawn approval `25bede37`.
+This clarification adds no implementation lane or first-Jam gate.
+
+MCP core functional verdict `bc0d7f6b` requests changes at `50216bb1`.
+Its original runtime scope remains open. Planner has republished all four
+own `a9788a59` / `ee3d9036` contract artifacts at composed review head
+`048c7411`: primary protocol `baa91897`, transports `7342cd7d`, index
+`52240536` and example `b121df57`. Their exact bytes and SHA256 identities
+were checked; all four also match `947fb909`. This removes the planner's
+missing-artifact blocker at `048c7411`, without source edits or approval.
+Final functional review must explicitly bind both original contract and
+runtime scopes at one final composed head and assess the original result
+and schema conditions. Grantor-revoked bearer request `5d41ea36` now has
+its separate exact-head approval `65df0958`. Real binary-to-Room and
+expired-bearer stdio coverage remain unshown limits, not two additional
+tests prescribed by original `9ca1d290` or verdict `bc0d7f6b`. The complete
+original MCP plan's cold-agent/deployed acceptance keeps its existing
+owners and scope. No new first-Jam gate is added by those coverage limits.
+Later source changes require metadata at that actual review head.
+
+Builder has confirmed the final-publication order: after the `d691e6e9`
+verifier verdict and any required repair, update the MCP report's dated
+state and dependencies, then name that composed head. Planner publishes
+the original four paths there, including
+`packages/contract/examples/demo-loop.ts`; builder then files one full
+contract/runtime invitation at the same head. At `d691e6e9`, only the
+protocol's carry-report paragraph differs from planner publication `9451aa24`;
+the other three contract blobs match. This is publication preparation and
+scope clarification, without new runtime evidence or source approval.
+Planner observation `32f5446d` records the correction and agreed sequence.
+For the final report-only commit, the adopted testing workflow carries
+checks with the tested and delivery tree identities and an explicit
+source/tests-unchanged statement. It does not repeat the full gate for
+documents alone. Any further source repair keeps its relevant checks.
+
+## Other original planning reports
+
+Two original reports still owe independent review and source integration.
+Their reviews follow actual-task functional work, 008 and the full MCP
+plan. The complete exact drafts and current workroom states were refreshed.
+
+| Original work | Current source evidence | Queued review |
+|---|---|---|
+| jj comparison `966aeaad` / promise `bfb563fe` | Primary `e51dc84d`, `notes/2026-10-01-research-jj.md` at `b3050dc6`; 12,816 bytes, SHA256 `8563588cd23c7047eb3572bd61b78b432b87eef85141e467cb08d63b72aa516f` | `a9c34999` |
+| Collections of Rooms `34cf52b3` / promise `6430ffd4` | Primary `5c69660e`, `notes/2026-10-02-collections-of-rooms.md` at `5b579511`; 47,931 bytes, SHA256 `4179cca075e3c9ff2ed83ae7519eea98e23228c71375d7f636f054ea9f65038d` | `106bd3ca` |
+
+The jj review preserves the recorded choice to pursue safe client/header
+handling and per-change history. Existing bounded implementation and
+measurement evidence is credited separately from live product gaps below.
+Changes verdict `6649bb50`, accepted by `fef19f77`, requests four bounded
+corrections: qualify operation-log concurrency separately from working-copy
+and Git-backend locks; distinguish an unresolved landing merge from jj
+conflict data stored in Git objects; pin source identities and qualify
+header/interoperability evidence; reconcile follow-up boundaries with
+declared applications and existing N1/C2 owners. Items 1 and 2 remain
+worth doing, item 3 is not pursued and item 4 remains undecided. The
+original note's corrected review and source integration remain owed.
+
+[011: Dated jj clarification](011-2026-10-04-jj-clarification.md) is frozen
+Draft 1 under evidence-only request `63be1105`, promise `152a3b84`.
+Primary `9acd28e0` names attachment commit `5d0d606e`, 25,637 UTF-8 bytes,
+423 lines, SHA256
+`cd74665c0e516d30edfdc078d18f2410574d8ec2f6a221d383c62ab175e3139b`;
+the local note matches the frozen attachment. Independent planning review
+`bf425045` is queued below functional acts and the carry amendment.
+Checker promise `ad9885e7` and guarded evidence-only approval `e7cc8c03`
+have since completed that review, accepted by `10b794ba`. Accepted
+clarification guidance `cb4613c9` preserves the recorded choices and
+existing owners. Completion `8ddc4745`, accepted by `de44ea91`, satisfies
+only own `63be1105`; current inspect confirms that status. The frozen
+note retains its dated pre-review label and exact bytes.
+It reconciles all four accepted correction groups throughout the complete
+comparison, retaining all four recorded choices and existing owners.
+Pinned jj v0.45.1 sources describe that dated baseline. Main `e6e67828`
+already has header test source, a bounded Artifacts measurement with a
+stand-in Room, the changes-only conflict refusal and a mock per-change UI.
+The new merge commit's header is distinct from the original reachable
+object's header. Live authorized history reads and hosted/device recovery
+remain existing N1/C2/C3/C5/C6 work. Planning approval and original `966aeaad`
+source integration remain separate; no new implementation or Jam gate is
+commissioned by this clarification.
+
+Collections review `106bd3ca` is promised by `10d431c5` at the same
+complete source head. Guarded changes verdict `e1f72af6` was read in full
+and accepted by planner. Seven correction groups retain the full scope:
+fresh replayable authorized revocation and direct-key coverage; targeted
+activity and outage limits; one sale decision and explicit disclosure
+limits; source-authorized reporting/coordinates; preserved work with
+current controls and coherent join/delegation; changing standing/usable
+agency; precise dated source and runtime claims. Original corrected
+planning review and source integration remain owed. These are proposed
+contract/source corrections, not runtime defects or new Jam gates.
+Collections preserves
+the previously delivered user-first draft and
+Hugh's current wording, all ten walkthroughs, four revocation alternatives
+and 41 traceable requirements. Its proposed collection/mandate mechanisms
+remain future design. Neither review adds implementation requests or a
+first-Jam gate; review approval alone cannot prove source incorporation.
+
+[012: Dated collections clarification](012-2026-10-04-collections-clarification.md)
+is frozen Draft 2 under evidence-only `b9877507` / `7184dd20`.
+Primary `ed154082` names attachment commit `2bea2e84`, 89,844 UTF-8 bytes,
+1,105 lines, SHA256
+`7d621bc99d44d8c0b12aa540dc259a814926f0a31f8f1fd816222c3062883cbd`;
+the local note matches the frozen attachment. Independent planning review
+`a694028a` approved complete Draft 2 in `2baa8ef7`, accepted by `f78144e4`.
+The complete original was
+reread, and the revision preserves the model, six constraints, all ten
+walkthroughs, four revocation alternatives and 41 numbered requirements.
+All seven accepted corrections are reconciled throughout, including fresh
+complete authorized retained revocation proof and direct-key recovery,
+actual activity/known discovery/outage frontiers, unique sale decisions and
+private disclosure, source export/query privacy, saved-work versus fresh
+control, changing standing and pinned evidence boundaries. Section 9 maps
+focused acceptance and existing owners; unresolved contract/encoding
+choices remain explicit. No mechanism adoption, source integration,
+runtime implementation or Jam gate is claimed by freezing this note.
+Full Draft 1 review `a3c58958`, accepted by `331d44e8`, reconciled all
+seven substantive groups and retained the complete scope. One P3 corrected
+source attribution: the pi spike uses the actual pinned Room/client with
+real policy, landing and log components over fake repository/publisher
+services, with simulated workspace/push and caller-driven resumption.
+The token path and production C3 remain unproved. Draft 2 changes only
+that passage and its label; the entire delta and byte identity were checked,
+with no runtime rerun. Supersession `cddd0167` retires Draft 1 primary; fresh
+provenance uses only the live own promise/freeze. Provisional freeze
+`0a204ae6` was replaced by `2bea2e84` and retired in `ed0c0155` to avoid
+inheriting old-candidate review staleness. The accepted full Draft 1 review
+is historical assessment evidence carried only across unchanged text.
+Reviewed handoff `b5aab68c` preserves original `34cf52b3` source integration
+and every selected mechanism's bounded evidence duties. Completion
+`09dc707b`, accepted in `5297ec5e`, satisfies only clarification `b9877507`.
+
+## First Jam release decisions
+
+[013: A reviewed first release for Jam](013-2026-10-04-first-jam-release.md),
+dated 2026-10-04, is frozen Draft 1 for builder's integration decision
+`18060abc`, authenticated UI scope decision `a49b78ab` and package
+availability decision `1d4e5b39`. Planner promises are `bc297ae7`,
+`82e04fe2` and `4f56cf10`. Primary `741e4502` names attachment commit
+`e0e80927`, 16,255 UTF-8 bytes, 295 lines, SHA256
+`68612673f6b4c54f569a376aea1a2e0bcbbccbf671be94742980c176ba5d9602`.
+Complete independent planning review `51486c08` approves the frozen text;
+planner accepted it in `8b0b1a76`. Direction `90939141`, ratified in
+`0cdace8f`, adopts the decisions. Fresh requester direction `8021b270`,
+ratified `58a6c383`, preserves their full scope without inheriting retired
+source artifacts as current commissioning bases. Inherited staleness was
+inspected: this is a dated planning assessment, not source approval at
+the later `7931d5e8` or `077bf24a` heads.
+
+Current ordinary decision reports `27049c0e` and `61c0f684` now answer the
+original integration and package requests without stale provenance. Both
+attach the complete 013 text, preserve all original conditions and name
+the fresh commissions below. Builder accepted them in `e654c4cc` and
+`6cb6ef4c`; both original requests are satisfied. They replace retired
+reports `a6824b80` and `b6dd55dc`; attempts to accept those retired reports
+were ineffective. Builder also accepted historical UI report `bdd0ebd5`
+in `7eed990b`, satisfying `a49b78ab` with its stale source qualification
+retained. No refreshed UI decision request is needed. Current scope
+ownership is already recorded below. These are
+planning-record corrections, with no source approval or implementation
+review restart.
+
+Intermediate verifier delivery is commissioned as `42342e35`, now promised
+by builder in `4e66accc`, under that new promise alone; original Stage 3
+`1e8fee4b` / `3af8ebc7` retains complete
+accounting, every original outcome, all ten carry cases and points A–F.
+Actual CLI and machine-readable limits must disclose the incomplete pass
+accounting; the sealed source binding must not claim original Stage 3
+completion. The full carry Draft 2 at `077bf24a` is assessed in
+[014: Carry-pass Draft 2 review](014-2026-10-04-carry-pass-draft2-review.md),
+report `794e6f86` under `baf43319` / `357e0bcd`, accepted in `3034c23d`:
+changes requested in A/C;
+B/D/E/F accepted with precise qualifications. That dated decision retains
+all thirteen cases. Complete Draft 3 at `90b91f31` now has an accepted,
+amended incorporation copy in
+[015: Carry-pass Draft 3 decision](015-2026-10-04-carry-pass-draft3-decision.md).
+Ordinary report `7634a884` answers `ac8b8fd7` / `a7304876` with all A–F,
+all fifteen cases, both open choices and exact owner/order instructions.
+Builder accepted it in `6693d748`; the original ordinary planning request
+is satisfied. The whole contract is adopted
+in `4fa3fe0c`, authorized by `1d2319ba`. Section 35/amendment 8,
+R-CARRY-17–19, is checked unused at the reviewed head. The saved 015
+contains the complete incorporation copy, not a summary. It preserves
+declared-name compatibility, makes attempt/pass allocation the actual
+durable engine fence, resolves current no-tree checks versus forbidden
+land/closed-pass use, discriminates preview owners, and qualifies full,
+integrity, mixed-history and unfinished-prefix reporting. Existing Stage 4
+owns source protocol/types/producer incorporation; original Stage 3 keeps
+full accounting and all other outcomes. Design adoption approves no
+source and adds no first-Jam gate. Selected-mode wording is clarified by
+[016: Verification modes](016-2026-10-04-verification-mode-clarification.md),
+adopted `f8ed56c6` / `03a41871`: disabling policy replay does not disable
+or deny independently retained Git-object consultation or landing guards.
+The complete unchanged 015 and exact replacement paragraph are both
+attached to that record; all fifteen cases and original owners remain.
+
+Fresh scope amendment `04880e7e`, ratified `8464d0e7`, transfers only the actual
+authenticated unknown-act browser entry/witness to existing C5 `cfbde32f`,
+dependent on C4 `18815307`. Its C5 acceptance addendum `0a9a086c`, ratified
+`85236634`, retains the real browser/Room witness and authoritative result.
+Every other Stage 5 condition remains, including capacity, catalog and
+pending-intent ownership, and original-intent retention `2ee996f4`.
+
+Built packed-package delivery `7e82100b`, promised in `1eb5788c`, covers
+contract, policy, client,
+MCP, log and CLI from one reviewed source commit, with exact tarball
+identities and bounded external runtime/type/CLI installation witnesses.
+Public registry publication remains an owner choice. N3's complete
+starter and conformance scope stays owed. Every source delivery still
+needs exact-head independent review, final composition and normal landing.
+N3 builder promise `779cf3a6` has a design draft on
+`request/starter-spec`, first read completely by planner at `82a4ba4d`.
+Planner direction `37934f82` records proposed defaults and planning
+corrections: valid declared targets and authority, consistent development
+key custody, independent review rather than seed-key mechanics, complete
+prepared-intent context, actual Jam acceptance and N5 provisioning.
+The existing public founding protocol avoids making a convenience SDK
+export a prerequisite. The later `fdd98295` delta corrects several act
+shapes and names the candidate's Stage 4 limits; further corrections and
+independent design review/adoption remain owed before implementation.
+N5 promise `a18f373c` has a separate installation/evolution design draft
+at `6e6447f5` on `request/app-installation`. Planner read it completely,
+and the complete starter revision 2 at `7736157b`. Direction `c1b91b4b`
+records proposed installation/update choices and source corrections:
+keep a usable, currently authorized holder exit; qualify continuing lease
+renewal and binding identity; reuse the validator's existing history
+argument; distinguish candidate job metadata from complete Stage 4;
+and retain the separate checker authority/provisioning owners. It also
+clarifies starter recovery-key custody and signing, and removes a newly
+mandatory third acceptance run. These are planning choices and source
+observations, with no runtime witness or new implementation commission.
+Both drafts still need independent design review/adoption and their
+later implementation and acceptance. Neither is an adopted runtime change
+or a first-Jam gate. The temporary publication hold was later lifted in
+`bbc5a412`; normal independent design review remains owed.
+The builder applied N5 direction in `8ee78cca`; planner read that complete
+revised note. The remaining narrow corrections concern per-kind mismatch
+wording, open-ended catalogue intervals and unfinished questions whose
+leases have expired. Expiry is not application acceptance, so retirement
+guidance must retain their documented recovery or name an explicit
+authorized migration. No new migration API or runtime check is requested.
+Planner then read the complete N5 `8ee78cca` to `98c0883f` delta and
+starter `7736157b` to `6c7b42d0` delta. Observation `46ef56c0` records
+their exact current heads and applied follow-ups. The N5 note covers
+unfinished held and unheld work, qualified per-kind mismatch and the
+active catalogue interval. The starter clarifies recovery-key custody,
+one signing call, local page authorization and independent reviewer setup,
+and keeps the additional handed-over acceptance run optional. No further
+correction arose from those deltas. The designs are now filed: N3 at
+`6c7b42d0` under invitation `cdcdabb5`, primary `f3c9cb58`; N5 at
+`98c0883f` under `17f1411d`, primary `8e13237d`. Planner read both
+complete invitations and their non-stale direct artifact bindings. No
+executing reviewer is established; neither design is adopted, and its
+original implementation and acceptance remain owed.
+
+N4 builder promise `bc530039` has a new guidance design at `3973f302`
+on `request/act-guidance`. Planner read its complete note and original
+scope, then checked targeted contract and source boundaries. Direction
+`87440e49` records five proposed defaults and eight design repairs:
+text-only shared client guidance; caller hints from known authorized
+inputs; no new authoritative read now; known refusal, unknown write and
+read/wait timeout kept distinct; ambiguous policy-rule provenance;
+qualified authority and waiting; exact prepared recovery; and a complete
+bounded cold-agent scenario. It removes the proposed mandatory second
+complete cold run and tests that merely mirror a table. Independent
+design review/adoption and later implementation remain owed. This adds no
+Stage 5 closure condition or first-Jam gate.
+Builder applied that direction at `c938f0cb`; planner read the complete
+revised note. Observation `637c1054` gives six narrow recovery
+and evidence corrections. It corrects planner's own reservation wording:
+an actual `reserved` refusal means the caller is not the designated
+member. It distinguishes landing's write and later wait, actual read
+shapes and wait boundaries, transport-specific uncertainty, exact signed
+envelope replay after revocation versus an ended bearer session, and the
+policy that governed an outcome. It also removes an unarranged revocation
+observation and an unsupported promised refusal from the cold recipe.
+These are design corrections; no runtime commission or extra test follows.
+Builder applied all six follow-ups at `ec5e99ef`; planner read the
+complete delta and builder's report. No further correction arose from
+that inspected delta. The design is filed under invitation `408f4c0e`,
+primary `f11ad1f9`, at that exact head. Planner read the complete invitation
+and its direct artifact binding. Publication supplies no executing review,
+adoption or implementation credit.
+The current accepted decision reports are listed above; their historical
+predecessors supply no current source approval.
+The two fresh commissions and two scope records were inspected effective
+and non-stale. Their original `34c87678`, `64dc6f04`, `98a292d4` and
+`c046f97c` predecessors were retired solely to correct stale tracking
+bases; the substantive scopes and dated planning assessment are retained.
+
+Builder readiness `77a2aada` says not yet: reviewed code is not on main or
+deployed, and Jam cannot yet install the application packages. The first
+task can use generic acts and independent reviews without all Stage 4
+primitives or complete carry accounting. Builder will judge again when
+those two concrete blockers are removed, then start Jam and the full
+manual together. This note supplies no new readiness checklist.
+
+Builder source request `50d7806a` commissions comprehensive incorporation
+of the complete reviewed 008, 009, 011 and 012 clarifications into their
+four original repository notes, after test-cost, acts and actual Jam
+blockers. It preserves all original source promises and requires a full
+condition-to-source checklist, independent source review and normal
+landing. It adds no runtime mechanism or first-Jam gate. C1/N1 retain
+005/006 incorporation; the full manual remains separately owned.
+
+Builder promise `14926009` delivered a reconciliation draft at
+`508ac63b` on `request/notes-reconcile`, with the four notes and their
+condition checklists. Planner direction `fceb27d0` answers all four
+checklists' open editorial questions after reading their drift sections,
+relevant frozen passages and cited source. It corrects the jj account of
+parent-relative hunk positions, qualifies the pi harness evidence, and
+aligns collections summaries and audit wording with their detailed
+requirements. It also includes the already-requested narrow comparison
+paragraph in the Artroom plan. Frozen planning artifacts stay unchanged;
+their history and the operative corrections remain explicit. This is
+direction for the next draft, not a complete independent source review
+or approval. The temporary hold on publishing the design package was
+later lifted in `bbc5a412`; independent review remains owed.
+Prose validation uses whitespace and focused source, link and pin checks;
+it requires no runtime suite or spike rerun.
+Builder applied that direction in `b878fee9`, now ten changed artifacts
+including the narrow Artroom-plan paragraph. Planner read that paragraph,
+all five reconciliation files, the complete wake body and focused MCP/jj
+passages. Observation `244e1f43` records independent input/output identity
+checks, all 41 requirement IDs once, eight resolving relative Markdown
+links outside code fences and exact-delta whitespace validity. A broad
+initial link regex also matched four fenced shell patterns; those are
+not links. These checks do not prove semantic completeness. The complete
+other three note bodies and whole delivery still need independent review;
+builder's exact-quotation checks remain producer evidence. Two narrow
+provenance corrections are requested: date the jj checklist's pre-commit
+statements as history and label the unavailable scratch review reports
+accurately. No report recreation or runtime check is requested.
+Builder applied both provenance corrections at `5c5de4fd`; planner read
+the complete three-checklist delta and checked its whitespace. Note bodies
+are unchanged. The N4 table also matches all 43 platform rules and ten
+error codes once each in a corrected static comparison. That establishes
+inventory, not the semantic classification questioned in `87440e49`.
+The ten-path delivery is now filed at `5c5de4fd` under invitation
+`988fdbc4`, primary `06202327`. Planner read the complete invitation and
+all ten non-stale artifact bindings. Observation `415314b0` records
+complete reads of the four reconciled note bodies and all five maps,
+alongside the changed Artroom-plan paragraph. It does not claim a new
+complete read of that plan's unchanged remainder. One narrow jj provenance
+correction remains: attribute the original note's dated latest-release
+claim without newly affirming that it was true on that day. Preserve the
+comparison pin and frozen 011; no new research or runtime check follows.
+Builder applied that correction in `18e2d077`. Planner read the entire
+two-file delta, confirmed whitespace validity and the unchanged frozen
+011 digest, and inspected the replacement invitation `8d3d138e`, primary
+`6806aed3`, with all ten non-stale bindings at that head. Supersession
+`a78ad387` retires `988fdbc4`; it supplies no current review binding.
+No further correction arose from that inspected delta.
+Current direct-basis observation `dadff438` preserves these reads and
+limits. It replaces an observation that inherited the retired invitation's
+staleness; the evidence and substantive scope are unchanged.
+Whole independent review, normal landing and the four original source-note
+promises remain owed. None of the four design invitations establishes an
+executing reviewer or adopts its design.
+
+Builder has promised the existing N1 proposal-read design in `4ba647c2`
+under `53016b8e`. Planner reread its complete scope and confirmed that the
+design/specification and implementing-lane handoff may proceed. Its reader
+matrix, current authority, retention, revision examples and C5/C6 witness
+stay intact. Runtime routes need separate commissioning after exact design
+review and adoption; this adds no Jam gate.
+Builder's first N1 design is `41b304e7`, a complete 631-line note, with
+the two frozen 006 files and a separate provenance note. Planner read the
+note and provenance completely and independently matched both copied
+files. Direction `25b6dccd` records five proposed defaults and six repair
+groups. Serving immutable inputs for client diffs is the proposed route,
+with current member-backed read sessions and explicit new file disclosure.
+The design must fix its empty-base inference: equal base and head also
+occur for unchanged proposals, and unrelated or multiple-base histories
+need qualified comparison identities. It must specify graph ordering and
+parent/root/merge inputs, bounded responses and caches, missing-object and
+cursor semantics, current authorization during awaited reads, and the
+MCP presentation handoff. The source shows redemption throttling, not the
+general read throttling claimed by the draft. These are design corrections,
+not a finding against the pending release or a runtime commission. Original
+N1, C5/C6 and full MCP outcomes remain owed; review/adoption precedes
+implementation.
+
+Planner read revision 2 `b4b06d26` completely: 771 lines, 40,995 bytes.
+Only the note changed; the frozen 006 copies and provenance are unchanged.
+Direction `a1db261a` chooses recording the actual comparison for future
+generations: empty tree or all merge bases. Matching a path/status list
+does not prove the original baseline or its content; older generations
+need qualified displays unless retained facts establish the comparison.
+The revision must also keep head files readable independently of a bounded
+history listing, enforce the encoded response budget (including JSON
+expansion and long path pages), bound blob acquisition, and align returned
+identities with the exact types. Displayed content can inform a human
+review; it cannot itself settle or replace a recorded Room outcome.
+These remain corrections to the exact design and amendment proposal,
+with their producer/consumer compatibility and later A1–A7 handoff.
+No runtime or verifier change is commissioned by this direction.
+
+Revision 3 `31eef8f3` applies those main corrections. Planner read all
+912 lines, 50,359 bytes; only the note changed and its delta passes
+whitespace checking. Direction `8deb5b15` identifies the last adapter
+input gap: complete per-commit changed paths cannot be recovered from
+the proposal's net paths or from known-path file reads. A path changed
+and later restored still belongs to a commit's patch. The exact design
+must supply bounded path discovery, with parent/root identity,
+rename metadata, pagination and visible incompleteness. It must also
+bound returned paths, align the permitted snapshots and legacy history
+set, and remove the remaining absolute claim about multiple bases.
+The existing history acceptance can cover the transient path economically.
+Design review and adoption remain owed; no additional runtime work or
+release gate follows from this read.
+
+Revision 4 `c3fbb91f` adds `commitChanges` for bounded first-parent/root
+path discovery and aligns the exact contract, transport, matrix and
+implementation lanes. Planner read the complete delta against the
+completely read revision 3; the note is now 994 lines, 55,391 bytes,
+and the copied plans and provenance are unchanged. Observation `4ff5915f`
+found no further architectural correction in that delta. It asks only
+that the transient-path example name the selected before/after heads,
+since an intermediate generation can still show that path.
+Builder may publish all four exact source paths and file the normal full
+independent design invitation after that wording fix. Review is queued;
+no executing reviewer, adoption or A1–A7 commission is established.
+
+N1 is now filed at `75260d65`. Planner read its complete two-hunk
+wording delta, the one-note inventory and whitespace result, and the full
+invitation `ad2c9cd3`. Primary `66c9f481` and the other three artifacts
+bind that exact head and promise `4ba647c2`; all four are non-stale.
+Observation `6f2ddd2e` supplies no further correction from that delta
+and preserves the outstanding independent review, adoption and landing.
+It also answers builder's scheduling question: full N2 `9c43c173` next,
+then full N7 `64e9d131`. Accepted terms, actor authority, handover and
+requester closure fit the acts-first priority and define what steering
+means; absent-person delivery follows that design. Both keep their
+original full scope and remain design work, with separate implementation
+after review/adoption. Neither adds a first-Jam gate.
+
+Builder promised N2 in `6f1481eb`, then supplied its first complete draft
+at `6ffab389`: one new note, 662 lines, 40,523 bytes. Planner read it
+completely and recorded direction `098186f8`. The full destination stays
+an enforced lifecycle; a cooperative ledger is a reduced practice that
+may support the first Jam task. The revision must make negotiated terms
+and the basis/race model coherent, and supply the trusted state, party,
+reference and terms guards that the proposed primitives still lack.
+It must keep commitment performer separate from resource holder and
+define how interpretation remains stable across policy versions.
+Room receipts, application projections and authoritative guard outcomes
+need distinct labels and complete-prefix evidence. Existing body `act`
+and `member` fields check format, not existence or relationship; entry
+anchors have a separate existence check. All original lifecycle,
+handover, non-code, attention and publication-boundary scope remains.
+Representative lease/activation controls can accompany the required
+distinct race orders without multiplying the whole table. This is
+design direction, with independent review/adoption and implementation
+still outstanding.
+
+Planner read revision 2 `95eb6a41` completely (798 lines, 49,039 bytes),
+then the complete `f32e612b` delta (812 lines, 49,989 bytes). The draft
+now owns workflow state and transitions in the Room, with real guarded
+outcomes and a distinct reduced practice. Direction `2a78d9f0` asks the
+remaining corrections: pin transition meaning as well as schema,
+retain the current agreement's provenance, make every shown declaration
+expressible, validate party/reference targets, define attention across
+party changes, and align member recovery and complete-prefix reading.
+The enforced reader/agent route must depend on the enforcing Room and
+template; reduced practice remains optional. These are design repairs,
+with full original lifecycle scope retained.
+
+Planner then read the complete revision-3 delta at `82c05a2a` and
+revision-4 delta at `7f49d9e4`; both single-note inventories and whitespace
+pass. Revision 3 applies all five corrections. Observation `f3c9308b`
+asked two final repairs, applied in revision 4: pin opening guards/effects
+and profile, and distinguish same-definition duplicates from eligible
+new-definition replacements. Full invitation `82191a0b` is queued with
+no executing reviewer. The new `d4e07064` direction now reassesses this
+design within composed lanes; useful semantics remain input, while old
+v1 preservation and prior implementation sequencing are not required.
+
+Request `5c716a5c` now has immutable 017 Draft 2 and reconciled 018,
+with five actual R0–R4 successors and a joint review invitation, as
+recorded at the top of this index. Planner read both complete 017
+versions and verified the current exact attachment. The unfinished
+initial 018 and contrary S1–S4 conditions were replaced formally.
+Demo-first composable architecture and full all-component retarget/removal
+now govern, with no backward compatibility. N2's one-performer choice
+remains an application choice, not a universal platform constraint.
+Production rollout is excluded. Independent design adoption, source-level
+dispositions, implementation and removal remain owed.
+
+## Current test-cost priority
+
+The 10× useful-invariant/test-economy goal continues under `d4e07064`.
+The source integration sequence below records the previous model; R0/R4
+now reassess each component/test and R3 accounts for actual external
+duties before any retirement. It is not a requirement to complete an
+obsolete architecture. Historical measurements qualify their exact
+candidate, not the new model's unmeasured validation cost.
+
+Test-overhead request `ecbc722a` is independently approved at exact head
+`f621285036b0bec4bc156946172440061dce3b81`, primary `6b8024ab`, by
+guarded review `b1738122`. Builder accepted that review in `a21d9d7c`.
+Planner accepted the bounded cost scope in `b47f97f5`, ratified by
+`0ce8ba3d`; source integration and inherited functional work remain owed.
+Measurement clarification
+`da68c9a9`, ratified by `67d58f37`, uses comparable elapsed pipeline time
+and aggregate process CPU to assess the 10× target for the complete gate
+and normal edit-to-review cycle. Summed component commands, serial suite
+comparisons and worker phase subtotals must name their actual boundaries.
+Exact internal worker lifetimes are no longer an acceptance requirement.
+The review accepts the useful-invariant audit, heavy-test optimization,
+helper corrections, compact complete gate and contributor workflow.
+The complete pipeline comparison records 12.09× lower elapsed time and
+10.65× lower process CPU. Its baseline is a sum of observed components;
+the normal edit-to-review baseline is reconstructed. Shared load, cache
+conditions and those measurement boundaries limit the comparison; this
+is not a universal 10× guarantee. The supplementary serial comparison
+records 12.44× elapsed and 10.66× CPU reduction.
+
+Builder's integration plan `dae9a1f3` keeps `request/test-overhead` as the
+combined branch for stages 2, 3, 5 and MCP core. Each lane needs its own
+functional approval at an exact head, in that order. An approval can
+carry across a repair only when its source, witnesses and relevant shared
+contract/runtime/helper/test-configuration dependencies are unchanged,
+with the diff and impact stated. A dependency change needs focused review
+of its actual effect. One landing follows when all four approvals hold.
+No main incorporation is claimed here. Whole-carry, original-input
+profile, bearer parity, oversize/storage failure, stage 4 job lifecycle
+and live provider row-write outcomes retain their existing owners.
+
+During Stage 2 preparation, builder found removed/weakened useful
+acceptance witnesses in the approved cost candidate. Commit `4178a97d`
+restores target/hold binding changes, a signed pre-change grant, a narrow
+legacy grant, changed-scope takeover/overlap, stored-version migration,
+and additional policy, log, checker-isolation and client-subscription cases.
+The invariant map names restored witnesses and the remaining lower-level
+substitutions. Test result helpers now fail by assertion. No production
+source changed from `f6212850`. Report correction `4ec48aa1` changes only
+two figures: thirteen files in package test directories, and 67.8 CPU
+seconds. Builder records 2,006 passing tests and one gate without install
+at 28.4 elapsed seconds. These are the builder's recorded results; planner
+has read the concrete delta but has not independently rerun the gate.
+Functional Stage 2 review `a25ee2a9`, checker promise `c8bfd0d7`, is at
+exact `4ec48aa162413302f066e78790a240f810d24525`, primary `3638042e`.
+Historical guarded verdict `25bede37` approved Stage 2 under original
+`fd6f00b6` / `c96e88fc`, naming all 43 artifacts and preserving the
+recorded evidence limits. It uses carried source/witness review and one
+independent focused stale-scope binding control; no repeat gate or fresh
+36-control sweep is claimed. Builder accepted the verdict in `5c7307de`;
+this does not approve the other three functional lanes or establish main
+incorporation.
+The checker has since withdrawn `25bede37`: current inspect records it
+retired following newly found pre-existing policy-cache behavior. It is
+historical evidence, not an operative approval to land Stage 2. The bounded
+test-cost approval remains separate.
+The next candidate owes three nonblocking accuracy corrections: valid
+hyphenated recipient handles, modeled before/after checker snapshot
+wording, and protocol 23/29.6 in the acceptance inventory. Later heads
+require explicit unchanged-dependency carry or review of their delta.
+Earlier planner preflight `a0dd55de` and cost approval `b1738122` do not
+approve that repaired head or its functional outcome. Main integration
+remains owed; the comparisons above remain historical evidence for
+`f6212850`.
+
+Builder's carry-accounting proposal at `37f627e1` adds useful checks
+against an unwitnessed carry admitting a landing and a newer judgment
+being skipped before an older carry. It also proposes a later Room/event
+amendment for remaining whole-event accounting. Original Stage 3
+condition 2 remains owed under `1e8fee4b`; planner has not accepted that
+scope split. Independent review must assess honest overlap, missing-tree,
+policy and filtered-snapshot boundaries. An amendment needs reviewed
+semantics, explicit ownership and original-condition accounting before
+Stage 3 can be described as complete. This adds no first-Jam gate.
+Read-only assessment `060828bb` and the independent checker found the
+same source timing boundary: land input precedes an awaited policy call,
+while its event is sealed before the engine fences the final answer.
+`land-evaluated` therefore is not itself a current-valid reservation.
+The proposed guard needs snapshot/fencing semantics and an honest timing
+witness. Complete pass accounting also needs an independent lifecycle
+anchor, so deleting a whole marker/judgment/end group cannot erase the
+work's obligation. These are planning/source findings, not reproduced
+runtime failures or adopted event encodings.
+
+New candidate `26872bac08efb220d90ee218ac31a4034b90e98e` revises the carry
+note, restores additional verifier guards, fixes the three accuracy
+corrections and changes the Room's evaluation/sealing boundary. Builder
+reports a newly reproduced stale carry after an intervening revocation;
+that is distinct from planner's earlier source-only `060828bb` finding.
+Planner read the complete revised note, review invitation `58623b2a`,
+primary metadata `d05c5c85` and full Room source/two held-evaluation test
+delta. The changed Stage 2 source needs its own focused delta approval
+bound to original `fd6f00b6` / `c96e88fc`; approval at `4ec48aa1` does not
+carry automatically. That invitation named Stage 3's delivered
+portion. Original Stage 3 condition 2 explicitly remains owed, with an
+independently anchored pass amendment proposed next. Neither the partial
+delivery nor builder's reported 2,024-test gate closes that condition.
+Planner also asked the existing reviewers to distinguish facts that may
+stay pinned from current facts that need fencing during activation or
+supersession. That question is source-derived, not a new runtime repro.
+
 ## Evidence and limits
+
+[010: Carry-pass planning review](010-2026-10-04-carry-pass-review.md)
+reviews the complete builder amendment, unchanged from `b008a326` through
+`947fb909`, under replacement evidence-only `49d6d070` / `d95e3e22`.
+Draft 2 requests changes while retaining all ten
+acceptance stories and answering the three open questions. Primary
+`98166e96` names attachment commit `041d6d1a`, 16,286 bytes, 272 lines,
+SHA256 `220806ce3bbba973888dbc8969ddb63b66657a4eeb65de475f3887c0c6fb0c4d`;
+the frozen attachment matches the local review. The key design finding
+is that enabling enforcement at the first pass permits deletion of that
+first/only pass to remove the enabling condition. Other corrections
+define start/current facts, producer fences, legal stop/terminal frontiers,
+public later-job evidence, preview/recovery bounds and existing ownership.
+These are source/design findings, not newly run failures or adoption.
+
+Old delivery `2f9952c3` is recorded but ineffective: review request
+`795d0ad4` omitted `no_git_artifact` and inherited a main-landing
+obligation. Builder retired it in `7a792d51` and issued `49d6d070` with
+`no_git_artifact: true`. Fresh report `85032553` is effective and accepted
+by builder in `4832669c`; only that planning-review request is satisfied.
+The earlier primary is retired by `1c53fa8b`; its
+attachment remains historical. Current `39430e23` producer fences are
+credited as pending-review source; they do not record pass closure or
+establish complete-call accounting. No amendment adoption or source
+approval is claimed. Original Stage 3 condition 2 stays owed; Stage 4 remains
+the prepared-event producer owner. Functional Stage 3 review `58623b2a`
+was promised by `c72697dd` at exact `26872bac`. New Stage 2 delta
+invitation `ec9de335` was followed by supersession `3b397466`, which
+cancelled the Stage 3 invitation and released its promise. Planner asked
+builder to restore a fresh live Stage 3 invitation and verify the Stage 2
+guard's actual `fd6f00b6` / `c96e88fc` binding, or use one properly bound
+combined review. No verdict is claimed for either delta from those
+invitation records. Fresh Stage 3 invitation `1c911ea7` now names exact
+`947fb909`, primary `a4821bf7`, all 37 artifacts and the complete original
+binding. It preserves the outstanding whole-carry outcome. The fresh
+invitation, rather than cancelled `58623b2a`, is current.
+
+Fresh Stage 2 delta invitation `944c5550`, checker promise `aa976cb6`,
+binds original `fd6f00b6` / `c96e88fc` to primary `724f795c` and 46
+artifacts at exact `0138a05c`. Its production source is unchanged from
+`26872bac`; the two added notes explain proposed accounting and pinned
+versus current facts. Two independent held-evaluation controls in
+`d9f83440` distinguish the revocation fences, within their stated scope.
+They do not establish that every mutable dependency is fenced.
+
+Effective guarded verdict `a7688a71` now requests changes against all 46
+artifacts and the full original Stage 2 implementation binding. Planner
+read the complete verdict and the carry-removal probe's exact observation,
+diagnostic test-only diff and result. Withdrawal `290b3e87` retires the
+earlier Stage 2 approval. Builder owes both focused source repairs and
+their note corrections before exact delta review. Neither the reported
+gate nor the two passing revocation controls overrides these findings.
+
+Checker finding `29551590`, read in full, records an actual declared-v2
+held carry after activation/recomputation removes its obligation. The
+published honest log fails `decision-extra` at that stale event. Finding
+`7dabf862`, also read in full, records a cached passing reservation reused
+after a block-only policy activation with unchanged input. Planner read
+the cache, input and activation/reservation source and confirmed the
+missing evaluated-policy identity; no probe was rerun. Both findings
+retain the existing Stage 2/3 scopes and need focused repairs. Legitimate
+historical-policy carry names are separate from current target eligibility.
+
+Fresh Stage 2 invitation `306abff3` binds all 47 artifacts to exact
+`39430e23`, primary `086ae11b`, and the full original `fd6f00b6` /
+`c96e88fc` scope. Checker promised it in `53df705f`. The Room now uses a
+kept land evaluation only under its recorded policy version, including all
+cache reads and replacement of older cache rows. A carry seal also checks
+current policy and obligation eligibility. Builder reports focused v2 and
+legacy witnesses and three distinguishing controls; planner read the
+source delta and has not rerun them. Guarded independent approval
+`9cb05da9`, accepted by builder in `93974c40`, now binds the full Stage 2
+scope at this repaired head. Portable
+evidence `ca9d0668` records three successful actual-Room witnesses, two
+under v2 and the activation case under v1, using workerd/SQLite and real
+policy evaluation with artifact/publisher/checker-service doubles. Old-row
+compatibility is source-reviewed; no provider or repeated broad gate is
+claimed. The approval retains historical policy identities and conservative
+activation restart, with advisory wording corrections. It does not approve
+the assembled branch or other scopes. Old `25bede37` remains withdrawn.
+
+Stage 5 invitation `595fb021` replaces retired `f7a3c7fb` at exact
+`048c7411`, primary `beb2d2bf`, all 111 artifacts; checker promise is
+`f4ebb374`. Repair source retains unresolved named-act bytes and refuses
+a new act at capacity before signing or sending. Full checker findings
+`6bf8d38a`, `b2043423` and `4a138704` were read: eviction lost exact retry;
+an accessor could change value between plain-data validation and cloning;
+and an ordinary failed catalogue refresh unmounted the UI form holding an
+unresolved intent. Only the first has a submitted repair at `048c7411`.
+The latter two and the original live UI entry requirement remain under
+functional review. The UI probe proves ownership loss on one open page,
+not a production Room, signature or browser acceptance result. Recorded
+gates do not replace these focused invariant outcomes.
+
+Focused finding `f7740b54`, read in full, shows the remaining concurrent
+capacity boundary at `048c7411`: with 63 unknown outcomes retained, two
+simultaneous new calls both dispatch and leave 65. Exact prepared bytes,
+literal HTTP bodies and original receipts survive activation, so eviction
+is repaired; capacity must be reserved before the first await. The loaded
+capacity assertion fails while the serial witness passes, over the exact
+client/Ed25519/FakeRoom HTTPS seam. No real Room/provider result or new
+original-byte-loss claim follows. This remains the existing Stage 5 repair
+scope, alongside accessor/UI ownership and live UI entry.
+
+Fresh Stage 3 guarded verdict `6263fdec` requests changes at exact
+`947fb909`, with all 37 artifacts and original `1e8fee4b` / `3af8ebc7`
+binding. The named primary is actually the checker Git test; the report
+artifact is `f7b143bc`. The entire Log subtree is unchanged from `26872bac`,
+so no duplicate verifier run was performed. Complete omission/extra/context
+accounting and the integrated whole-log legacy negative remain owed;
+helper-level vocabulary refusal does not satisfy that latter condition.
+The accepted 010 changes decision does not adopt or build the amendment.
+
+Stage 5 invitation `60900227` replaces `595fb021` at exact `736f4953`,
+primary `06d9af26`, retaining all 111 artifacts and original scope. Its
+guarded changes review `0b33e8cc` supports the getter repair with two
+focused passing witnesses and a distinguishing control. Copy and validation
+use property descriptors in one pass; getters are refused without invocation.
+Concurrent capacity, UI ownership and live UI entry remained outstanding.
+Builder's `7931d5e8` source addresses capacity and catalogue presentation
+ownership. Independent guarded changes review `12b1e0a` assesses all 111
+artifacts under `a5d64b35` / `d5378da5` and supports those repairs with
+focused witnesses and distinguishing controls. Original-intent retention
+and stale-confirmation availability remain corrections. Its local
+client/FakeRoom and UI/MemoryRoom evidence supplies no whole-head or real
+browser/Room approval. The earlier 048 verdict draft
+was not filed: acknowledged planner contract artifact news expanded its
+sealing binding beyond its prepared Stage 5 scope. A fresh invitation
+after publication is the normal metadata remedy; no guard bypass, scope
+reduction or implicit contract approval is used. Future own contract
+publication will precede the fresh final MCP dual-scope invitation.
+
+Additional Stage 5 finding `2ee996f4`, accepted in `31c1a977`, proves that
+a known mismatch for different work under the same key can discard the
+original unanswered act. After activation its retry is re-signed and refused.
+The ordinary settlement control preserves original bytes and its receipt;
+one accepted claim remains in both cases. Planner read the complete probe,
+raw failure and observations, and independently checked 12 source, two
+probe and nine saved evidence identities. This is exact client/FakeRoom
+evidence, not provider or Room execution. The key-based cleanup path remains
+in `7931d5e8`; this repair stays under original Stage 5 condition 2. No
+duplicate effect or authority bypass is claimed.
+
+Builder reports retention repair `30d83d58`; planner read its full client
+and witness delta, but independent approval remains owed. New confirmation
+availability finding `522b0b80`, ratified `27acdc69`, accepts the second
+P2 from `12b1e0a`. A deliberate stale-confirmation click creates a new
+key/binding and accepted MemoryRoom act while declarations are unavailable,
+contradicting the banner. An actual legacy state also dispatches a fresh
+candidate but accepts none. Planner read the complete diagnostic and
+observations and matched nine exact source/fixture and 19 saved evidence
+hashes. One loaded failed-read assertion fails; the final legacy assertion
+was not reached, although all three observations were saved. No automatic
+resend or authority bypass is claimed. Every new-intent route must use the
+same availability guard, preserving cached meaning, unresolved exact retry
+and Leave it. The next exact-head invitation must also correct the source
+release ledger and use fresh scope `04880e7e` / `8464d0e7`; actual live
+entry remains C5 under `0a9a086c` / `85236634`.
+
+Builder's new `9451aa24` candidate adds the confirmation availability
+guard and disabled button, with a bounded unavailable/click/restore
+witness. Planner read all five changed paths from `30d83d58`; no runtime
+approval is claimed. Invitation `ea6d9266`, primary `ced12916`, names all
+111 artifacts at that exact head, replacing `f85ae6f1` with `b99cc10e`.
+Checker promised the complete retained-scope review in `40437194`, using
+the fresh scope records, and reports that normal preparation binds all
+111 solely to original Stage 5. The four own MCP records remain outside
+that scope. Independent guarded verdict `17ce6443` requests changes,
+with the actual recorded binding solely to `d5378da5`. It gives bounded
+repair credit to the already-held intent and confirmation availability
+guards, but a distinct fresh-key race remains. Original A is accepted,
+different B under the same initially unheld key mismatches, both answers
+are lost, and B's unknown-result completion wins retention. After an
+activation and cache refresh, A is rebuilt and refused instead of settling
+its original receipt. The timing control preserves its object, canonical
+and literal wire bytes, and receipt without another signature. One claim
+remains in both runs; no duplicate effect or authority bypass is claimed.
+Planner read the full verdict, diagnostic report, timing probe/config,
+control and saved assertion/observation summaries; 13 exact source
+identities, 29 evidence seals and 713 restored archive files match.
+This actual client/FakeRoom evidence proves the local retry failure,
+not real Room, browser or provider behavior. The correction remains
+original Stage 5 work. Builder's `2ba30aa8` now records the intent owner
+before preparation or signing, shares concurrent same-intent calls and
+refuses a conflicting in-flight intent locally. Planner read its complete
+five-path delta and public caller/hook contract. Independent review remains
+owed. One source-ordering counterexample was sent to builder and checker:
+the bearer path can invoke `onPrepared` synchronously before the owner's
+shared promise is assigned, so a same-intent call from that hook can read
+an undefined outcome promise. This is not a reproduced runtime finding;
+the existing Stage 5 review must assess that boundary. New invitation
+`ef469da0`, primary `eb3eacc8`, names all 111 artifacts at `2ba30aa8`;
+`8c9b2507` retires the older invitation and is not the new request.
+Checker promised the complete 111-artifact review in `c04a6f26`; guarded
+changes-requested verdict `26231a05` now records that re-entry boundary: a
+synchronous bearer hook's same-intent call returns undefined, while the
+outer call admits one claim and a post-return call shares its Promise.
+The actual public HttpRoomClient/McpBearer path reaches a local HTTP
+FakeRoom adapter; no duplicate real Room admission or authority bypass
+is established. Its paired loaded assertion distinguishes synchronous
+publication timing. The entire guarded report retains full Stage 5 scope,
+all 111 artifacts and actual sealed binding solely to `d5378da5`.
+Ordinary conflict/share/capacity fixes have bounded independent positive
+and distinguishing-control evidence; source-identical earlier UI/held-key
+evidence is carried with its original limits. Planner read the complete
+verdict and binding. Planner then read the complete callback report,
+private public-API fixture, actual loaded failure/control observations
+and command status; all 43 saved evidence seals, 16 source identities
+against exact Git, and 727 restored tracked hashes match. This strengthens
+the saved callback appraisal; the full ownership-control and 111-artifact
+appraisal remains the checker's. Planner ran no witness. Initialize the
+shared Promise before
+preparation can re-enter, retaining the synchronous intent reservation
+and existing exact-byte owner/settlement rules. The clean-checkout
+2,042-test gate remains builder-reported evidence. Fresh corrected source
+review is owed. Builder's `6b877f6b` creates and enters a real shared Promise
+before starting the act, then adopts the send/settlement result into it.
+Planner read all five changed paths, including fresh bearer and retained
+key callback controls and the caller contract. This is source assessment,
+not runtime approval. Fresh invitation `dbf4147f`, primary `28dfc5d6`,
+now names all 111 artifacts at `6b877f6b` under original Stage 5. The
+2,048-test gate and two old-order distinguishing controls are builder
+evidence. Checker promised the complete exact-head review in `bb127c66`.
+Complete guarded approval `b90f2211`, accepted by builder in `0ddc47f5`,
+now covers all 111 artifacts solely under original `d5378da5`. Four focused
+callback assertions pass, and restoring only the old publication block
+produces two loaded semantic failures. Fresh bearer evidence measures RPC
+`bearerAct` invocations; the kept-key probe supplies local HTTPS, exact
+original body reuse and zero additional envelope signatures. These are
+bounded fake-Room seams, retaining the separately qualified historical
+real-Room/UI evidence. Planner read the full verdict and actual binding;
+its raw runtime/source/inventory appraisal is the checker's. Nonblocking
+wording corrections remain: a hook must return successfully or fulfill
+before sending, while a throw or rejection stops the send; the shipped
+bearer witness measures an invocation rather than a POST. Normal final
+composition and landing remain owed.
+Builder's `d7dde97f` incorporates those nonblocking corrections. Planner
+read its complete three-path delta: the option comment now specifies
+fulfillment and rejection; the shipped RPC witness calls its counter
+`calls`; the source ledger adds dated approved/open status without
+rewriting its historical evidence. The named-call implementation is
+unchanged. This source assessment adds no new exact-head approval.
+Invitation `ef469da0` is retired by `d86e2a7e`; the earlier changes verdict
+is historical. The earlier
+2,037-test gate is also builder evidence. The source ledger
+still cites historical scope `98a292d4`; the fresh identical transfer is
+operative, and final composition must reconcile those references and
+withdrawn Stage 2 approval prose. Normal prepared binding remains to be
+inspected, without adding implicit MCP approval to a Stage 5 verdict.
+
+Bearer request `5d41ea36`, promised in `9c75aae2`, now has source changes
+at `5aaf22a7` and `87cd5804`. `judgeBearer` uses the read path's
+`authenticateHash`, and R-CRED-10 explicitly ends access for revoked
+grantor keys, expired/revoked grants, inactive members and ended sessions.
+An intact retained signed envelope still has its original R-IDEM-2
+settlement path. Independent guarded approval `65df0958`, accepted by
+builder in `3a65356a`, covers the complete repair at `87cd5804`, with a
+passing actual Room witness, assertion-distinguishing old-judge control
+and the changed recovery case. Local workerd/SQLite uses fake provider
+seams. This approval remains separate from final composition or deployment.
+
+Planner semantic decision `a6e9a14a` accepts that exact R-CRED-10
+paragraph under existing `5d41ea36` condition 1, preserving ended-session
+access refusal, retained signed settlement and current role/kind admission
+checks. This is contract acceptance, separate from source/runtime approval.
+Review `510fbbbf`, checker promise `bc0b176a`, names all six artifacts at
+`87cd5804`. Planner source inventory `e8586693` compares approved Stage 2
+`39430e23` with `4cb7688e`: only the bearer judge changed in Room source;
+the core and policy remain identical. This supports focused evidence reuse,
+not approval of the whole branch. Collections Draft 2 is independently
+approved as recorded above. No final main incorporation is claimed.
+Complete pass accounting still needs the separately reviewed amendment;
+neither repair depends on adoption of that amendment.
+
+Historical Stage 5 invitation `f7a3c7fb` at `c38c23ce` was replaced by
+the later invitations above. MCP core review `bc0d7f6b` requests changes
+under invitation `90adf4a7` at `50216bb1`, all 35 artifacts. Fresh Stage 3
+review `6263fdec` under `1c911ea7` preserves complete accounting and the
+whole-verifier legacy negative. Builder subsequently added that negative
+case at `a10c9bec`; planner checked its source and actual verify wrapper,
+while independent execution/review remains owed. The staged release route
+and live UI ownership transfer in 013 are adopted planning decisions;
+intermediate source delivery `42342e35` and packed release `7e82100b` are
+commissioned on fresh normal bases. Scope amendment `04880e7e` /
+`8464d0e7` and C5 addendum `0a9a086c` / `85236634` record the narrow
+live-entry transfer. Actual source
+review and landing remain owed.
+
+The intermediate verifier is now delivered at exact `391d20cd`, under
+new promise `4e66accc` alone. Invitation `9122c446`, primary `db1ec1fb`,
+has 46 artifacts, all inspected current at that head; its text's count of
+40 is corrected by the builder's chat and checker promise `f5c48aee`.
+The advertised main-to-head path set has those 46 existing files and two
+deleted tests, `packages/log/test/amendment-4-large.test.ts` and
+`packages/log/test/staging.test.ts`. Planner sent that inventory to the
+checker for explicit test-cost evidence carry; no existing path is missing.
+Builder attributes both removals to `ecbc722a`, independently approved in
+`b1738122`, with the Log "Removed or replaced" rows: layout/large-entry
+invariants stay in `amendment-4.test.ts`, and staged transfer at a smaller
+limit stays in `transfer.test.ts`. This is source attribution and qualified
+historical test-cost evidence, not new execution or whole-head approval.
+Planner read the complete commission, invitation, promise and seven-path
+delta from `9451aa24`. Its default CLI output and JSON report partial
+carry accounting and explain that a verified prefix does not prove every
+duty, complete publication or every state transition. This source reading
+is not independent runtime approval. Complete guarded verdict `63af1ce0`
+requests two P2 repairs, with actual sealed binding solely to `4e66accc`
+and all 46 artifacts. Integrity-only replay-off output claims checks it
+skipped; a signed malformed legacy check can throw rather than return a
+structured failure and verified prefix. Checker supplies actual paired
+full/integrity and valid/malformed controls. This is saved synthetic-log
+evidence, not malformed admission by a real Room. The full default
+grammar/call/input/budget and legacy positive/negative assessment retains
+bounded credit; the omission argument does not establish every
+mandatory/advisory/order/pass duty. Planner read the complete verdict;
+the checker's raw-seal appraisal is not claimed as planner reproduction.
+All original Stage 3 outcomes, ten carry families/A–F and Stage 4 producer
+scope remain owed. The 2,038-test gate is historical builder evidence.
+
+Builder delivered both repairs at exact `f2582a68` under invitation
+`53b0e587`, primary `04e7814c`, with 47 artifacts and sole original fresh
+promise `4e66accc`. Checker promised the complete review in `99f5ccef`.
+The new request states full/integrity mode and carryAccounting none when
+replay is off, matching machine/human limits, and decoder validation of
+legacy input/integration before replay. Two distinguishing controls and
+the clean-checkout 2,044-test gate are builder-reported evidence. Complete
+guarded verdict `7df5edb5` independently supports both earlier repairs and
+requests one remaining disclosure P2, bound solely to `4e66accc` with all
+47 artifacts. Passive reads on the signed duplicate fixture observed both
+proposal-head objects in integrity mode; API and CLI output denied those
+reads. This is the checker's saved runtime evidence, not planner execution.
+Planner source inspection confirms `witnessOf` at 651, its version call
+at 1449 before replay 1457, and the land guard at 1195–1201 before replay
+1203. Ordinary policy-defined obligations are absent when replay is off;
+only the fixed admin-approval obligation supports that retained guard.
+The verdict's landing qualification is source-derived, without an executed
+open-land witness. It does not retain full-mode obligation accounting.
+Planner read the complete verdict and its actual scope and proof limits;
+the raw runtime and inventory appraisal remains the checker's.
+
+Builder's `db1c24c6` and `f8d8980a` repair that disclosure. Planner read the
+complete six-path delta: common/API/CLI and protocol/README wording names
+retained checks, distinguishes Git-object consultation from comparing
+recorded context, and limits the landing guard to admin approval. It
+removes categorical claims that every skipped semantic error passes.
+The extended passive-reader assertion and the added admin/rule-obligation
+pair are producer witnesses; planner ran neither. Fresh invitation
+`43172fc4`, primary `b10b2c72`, names all 47 artifacts at exact `f8d8980a`
+under the same sole intermediate commission. Checker promised its complete
+review in `b9b547f1`. The clean-checkout 2,049-test gate is builder evidence;
+independent exact-head verdict and normal landing remain owed. Invitation
+`53b0e587` is retired by `5d9dafca`, so `7df5edb5` is historical rather
+than fresh-head approval. Future adopted contract wording in 016 and all
+fifteen cases remain unchanged.
+Checker subsequently reports a narrower wording P2 on `f8d8980a`:
+`cannotProve` denies comparing any recorded context with Git, but
+`witnessOf` reads retained proposal paths and `missingChanges` compares
+them with Git before the replay gate. Planner read those exact source
+paths: omitted changes select Git's list for the witness. This limited
+comparison is distinct from complete input/context/budget replay and does
+not, with replay off, reject the context mismatch through semantic replay.
+The categorical denial still needs correction. This is source assessment
+and a checker progress notice, not a fresh guarded verdict or runtime
+approval; the normal complete review remains pending.
+Complete normal verdict `925790d7` now requests that same P2, with all
+47 companions and sole `42342e35` / `4e66accc` binding. The finding is
+source-qualified, without a new runtime comparison countercase. Two
+actual unmodified shipped mode/admin-versus-rule assertions pass, carrying
+the earlier repairs with their unchanged-source limits. The admin refusal
+now has this bounded independent runtime credit; no fresh CLI process or
+independent signature revalidation was run in this review. The comparison
+is conditional and one-way: it checks omitted changed paths, without
+proving the retained base, rejecting extra retained changes or rebuilding
+complete semantic contexts. Planner read the full verdict and actual
+binding; its raw identity/runtime/seal appraisal remains the checker's.
+Builder's `8b833fb3` corrects that categorical denial. Planner read its
+complete four-path delta: the common report and protocol now describe the
+omitted-path comparison, selection of Git paths, lack of refusal from
+that comparison, and skipped semantic replay. The existing reporting
+witness is extended; no verifier guard or mode changes. This is source
+assessment of the replacement, without a fresh guarded verdict.
+Builder's later `342d67c3` addresses the complete formal wording request:
+the report and mode documentation condition the comparison on both Git
+objects and retained proposal context, state its one-way omission/Git-list
+selection, and disclaim extra-change rejection, merge-base proof and
+complete semantic-context/budget reconstruction. Planner read the complete
+four-path refinement, including the existing assertion update and report.
+It changes descriptions rather than verifier guards. Fresh normal
+candidate review remains owed under the same intermediate commission.
+Fresh invitation `46ad0357`, primary `eb09af54`, now pins all 47 artifacts
+at `342d67c3`; checker promised the complete review in `4905d528`.
+Invitation `43172fc4` is retired by `1aa18c64`, making `925790d7` the
+historical correction verdict rather than replacement-head approval.
+Planner also raised a source-qualified decoding question within existing
+grammar/report scope: retained input decoding checks outer context shapes,
+while `witnessOf` accepts a changed-path array whose items `missingChanges`
+assumes are objects. A malformed item may throw before replay. Public
+reachability and applicable catches remain to be assessed; no reproduced
+defect, malformed real-Room admission or new acceptance gate is claimed.
+Checker confirmed the narrow source path and the separate legacy quiet
+catch, then assigned one valid/malformed public `verifyLog` pair with
+canonical digest, receipt and fixture resealing. Its two selected wording
+witnesses have completed; final `342d67c3` verdict waits for the new
+question's appraisal. The pair has no result yet, and its eventual
+synthetic offline evidence must retain that admission boundary.
+Builder now reports a public `verifyLog` reproduction in both modes and
+delivers repair `d691e6e9`. Planner read its complete four-path delta:
+the decoder validates proposal base/changed items, optional carry paths,
+and land obligation/review items before those shapes are consumed. Four
+paired cases distinguish the null item that threw from three shapes that
+previously returned context-mismatch and now return malformed. The valid
+controls, hand restoration, 305-log-test result and 2,053-test gate are
+builder evidence pending independent appraisal. This is not a complete
+retained-context schema or malformed real-Room admission proof. Actual
+replacement invitation `a23cfe01`, primary `8b986210`, pins all 47 at
+`d691e6e9`; `e442b1c4` retires `46ad0357` and is not the new request.
+The former `4905d528` review is released, and a fresh normal promise and
+exact-head verdict are owed under the same sole intermediate scope.
+Planner observation `e53f7c64` records the complete replacement read,
+the producer evidence limits and the remaining review and release work.
+Planner correction `56407f10` records stronger execution evidence: the
+checker's actual task reported a failed turn after an automated risk
+flag, while its workroom connection remained leased. That connection
+did not establish an executing review. The same task was continued on
+the delivered repair and existing validation work, with retained
+diagnostic inspection first; native status initially confirmed a new
+active turn. Full original scope and the fresh guarded verdict remain
+owed.
+Fresh checker promise `f6dd71f4` now owns `a23cfe01` at exact `d691e6e9`.
+Planner read the complete promise and initially confirmed execution.
+Checker reports that its retained old child report/manifest records a
+completed full-mode valid/malformed public pair and TypeError at
+`342d67c3`, with synthetic/offline limits. Planner has not read that
+report/manifest or credited an integrity-mode probe. The old binding
+stays cancelled, and current guarded approval remains pending.
+Planner status correction `aabbeaa8` records that the resumed native turn
+has also failed with the automated cybersecurity-risk flag. Its truncated
+last commentary reports shipped validation passing and an additional
+source question; it supplies no complete report or verdict. The named
+child task could not be read because it was not loaded. Preserve existing
+results and uncertain command handles. The rejected probe will not be
+restarted or repeatedly rephrased to bypass the restriction. The review
+promise remains outstanding, with no source approval or extra tests.
+Safe independent planning and notes reconciliation continue.
+Coordination decision `bbc5a412` records the current blocker and lifts
+only the temporary hold on independent design publication. The release
+review still needs a real complete verdict at `d691e6e9`; the resumed
+checker task remains failed after its automated restriction. The review
+package stays intact. Hugh has been asked whether to arrange an independent
+human review, restore access for the existing reviewer, or continue planning
+while it waits. That answer remains pending. No replacement reviewer,
+model switch or retry to bypass the restriction has been initiated.
+Invitation `9122c446` is retired by
+`1455927e`; the prior verdict is historical, not fresh-head approval.
+Packed release `7e82100b` / `1eb5788c` is delivered for review under
+invitation `0bf6e7c`, primary `a8307d37`, all 32 artifacts at exact
+`90d24c4c`. Checker promised the complete independent review in
+`8b56aa78`. The six `0.1.0-dev.1` tarballs were built from clean source
+`980618d1`; the review head adds only the report. Evidence assertion
+`2d1dde24` names the local delivery directory, manifest, both consumer
+lockfiles and the saved 53-check result. Planner read the packaging
+scripts, consumer, manifests/configuration and documentation delta, and
+matched all six local tarball hashes, names, byte counts and matching
+versions; their source tree matches Git. This inventory inspection is
+not an independent install/runtime run or source approval. The saved
+result reports all 14 library subpaths loading, both consumer typechecks
+and commands working, with the CLI installed alone. The 2,040-test gate
+and byte-reproducibility comparison remain builder-reported evidence.
+Complete guarded package verdict `59605d51` requests changes, with actual
+sealed binding solely to `1eb5788c` and all 32 artifacts. Independent cold
+consumers loaded all 14 library subpaths, passed ordinary NodeNext/bundler
+typechecks and fixture/CLI-only help; exact six tar identities and consumer
+isolation retain bounded credit. One P2 remains: the standalone CLI bundles
+third-party implementation but omits supplied copyright/permission notice
+contents. Staging/inventory must include the applicable actual bundled
+notices and check their contents, then repack the corrected candidate.
+Planner read the complete guarded report; the checker's detailed raw
+source/license/consumer appraisal is not claimed as planner reproduction.
+Final matching source/release evidence remains required: both the client
+repair and current verifier changes affect the bundled CLI or log package.
+No registry publication or first-Jam readiness is claimed.
+
+Builder's notice repair is now delivered at `1e444739`, invitation
+`08b8041a`, primary `63bec7f4`, all 43 artifacts under the same `1eb5788c`.
+Checker promised the complete review in `5f0d8d8f`. The six matching-version
+candidate files are at `artroom-releases/candidates/1b40b7ec`, built from
+`1b40b7ec` (source tree `6c8c82ed`); assertion `798318a3` names the manifest,
+both locks, extracted notices and reported 55-check result. Planner matched
+all six local tar hashes/byte counts to their manifest and Git source tree.
+The CLI archive has seven members, including a 36,859-byte notices file,
+SHA256 `bfef5fbb8d71e14e46aacf212a1ee36029346abc0a0e458ae9a12d77bce62f0b`.
+All nine recorded source license hashes match, and their complete normalized
+texts occur in that actual archive. Planner read the staging/content-check
+and bundle/source-map inventory changes, not executed them. Complete
+guarded approval `81478e2d`, accepted by builder in `99d8496b`, now covers
+all 43 artifacts solely under `1eb5788c`, including the actual
+archive/installed notice repair. The
+checker supplies fresh cold-consumer imports, strict NodeNext/Bundler
+typechecks and standalone CLI evidence, plus two focused inventory
+witnesses and loaded hash/missing-record controls. The complete consumer
+actually installs 181 packages; 239 describes non-root lock entries,
+including 58 absent optional platform alternatives. CLI alone installs
+one package. This evidence proves packaging boundaries, not real Room
+admission, live discovery or functional readiness. Embedded dependency
+discovery remains limited to available published source maps. Planner
+read the full verdict and sealed sole-implementation binding; its raw
+consumer/source/license appraisal is the checker's. The 55-check result
+and 2,046-test broad gate remain historical builder evidence. Approval
+does not authorize public registry publication. This candidate predates `6b877f6b`
+and the final verifier disclosure repair; final matching repack remains
+required. Old invitation `0bf6e7c` is retired by `8ef33b74`.
+
+MCP condition 7 retains the four own `a9788a59` / `ee3d9036` contract
+artifacts and explicit dual implementation binding at the final composed
+head. Builder's separate review heads are a workflow choice, not a new
+one-lane-per-head contract. Current source repairs and metadata correction
+remain owed before normal integration can establish completion.
+Original runtime request `9ca1d290` explicitly leaves first-Jam readiness
+to builder and adds no runtime gate for the recorded first task. Accepted
+release decision `27049c0e` requires both MCP scopes to be reviewed in the
+chosen composition, which already contains their source. That source
+review requirement does not enlarge the first task's capability needs.
+
+Planner republished all four own MCP artifacts at `9451aa24` before its
+new Stage 5 invitation: protocol primary `7c1b69ee`, transports `a6925cf3`,
+contract index `f9c46cca` and demo example `1fefbba3`. Each has sole direct
+`ee3d9036` provenance and is inspected current/non-retired. All four source
+paths are byte-identical to `87cd5804`; no source edit or runtime run
+occurred. This satisfies current-head publication, not full MCP review,
+source completion or landing. The later explicit dual-scope review must
+include both complete original commitments and all changed evidence.
+The subsequent `391d20cd` protocol change belongs to the intermediate
+verifier delivery. The four own MCP artifacts will be republished at the
+final composed head for their separate review, after the current Stage 5
+review; these earlier publications do not approve that later protocol
+change.
 
 Parent read every cited production path and test pattern. Read-only synthetic provider controls using actual exported Workspaces/SnapshotRepos classes and in-memory SQLite reproduced incomplete inventory acceptance and unknown-duty closure on foreign provenance. They do not establish live provider behavior. Terminal revocation and founding interruption were verified by source control-flow analysis; their plans require meaningful regression tests, including actual DO recovery for founding. No new whole-repository gates, live inference, deployments, remote deletions or credential creation were run as part of the audit. A7's separate exact-head review ran its own gates and fault controls; those are not claimed as audit repros.
 
