@@ -40,6 +40,7 @@ V() { echo "--reporter=default --reporter=json --outputFile.json=$O/$1.json $SER
 step bytes packages/bytes npx vitest run --config vitest.config.ts $(V bytes)
 step derive packages/derive npx vitest run --config vitest.config.ts $(V derive)
 step platform packages/platform npx vitest run --config vitest.config.ts $(V platform)
+step git packages/git npx vitest run --config vitest.config.ts $(V git)
 step replay packages/replay npx vitest run --config vitest.config.ts $(V replay)
 step client packages/client npx vitest run --config vitest.config.ts $(V client)
 step scope packages/scope npx vitest run --config vitest.config.ts $(V scope)

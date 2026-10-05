@@ -1,0 +1,17 @@
+/**
+ * @generalbusiness/artroom-git
+ *
+ * Everything of Artroom that touches a Git repository or a Git host (I3
+ * plan, section 3.1). It runs in Node and in a container, never in a scope's
+ * commit. The review that each retained part passed is
+ * `notes/2026-10-05-i3-git-review.md`.
+ *
+ * `./node` has the one module that needs Node: `nodeExec`.
+ */
+
+export { GitRefusal, MAX_REF_NAME, ZERO_ID, branchRef, isObjectId, objectId, refName, remoteUrl } from "./names.ts";
+export type { GitReason, ObjectId, Transport } from "./names.ts";
+export { MODES, READ_BOUNDS, Reader, idOf, parseCommit, parseTree } from "./reader.ts";
+export type { Closure, Commit, GitSource, Mode, ObjectType, ReadBounds, RefTarget, StoredObject, TreeEntry } from "./reader.ts";
+export { COMMAND_MS, GitFailure, GitProgram, HARDENING, repositorySource } from "./program.ts";
+export type { Exec, ExecResult, ProgramOptions } from "./program.ts";

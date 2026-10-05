@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "../..",
+    // Node's types: this package runs in Node and in a container. They also declare the Web APIs the gateway uses (Request, Response, Headers, streams).
+    "skipLibCheck": true,
+    "types": ["node"]
+  },
+  "include": ["src"]
+}

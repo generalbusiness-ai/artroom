@@ -24,6 +24,7 @@ export default defineConfig({
       project("bytes", "bytes", "vitest.config.ts"),
       project("derive", "derive", "vitest.config.ts"),
       project("platform", "platform", "vitest.config.ts"),
+      project("git", "git", "vitest.config.ts"),
       project("replay", "replay", "vitest.config.ts"),
       project("client", "client", "vitest.config.ts"),
       project("scope", "scope", "vitest.config.ts", ["../lanes/test/**/*.scope.test.ts"]),
