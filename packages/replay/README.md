@@ -20,7 +20,7 @@ The library runs under Node and under Workers.
 | Module | Holds |
 |---|---|
 | `source` | `HistorySource`: what a verifier reads. `page(scope, from, allow)`: a page of a scope's entries, each as its canonical bytes with the hash the source gives for it. `retained(scope, kind, digest, allow)`: one retained input. `allow` is the most the read may take in, and each result says how many raw bytes it read. `httpSource(service, options?)`: a source over a scope service's read routes. `MemorySource`: a source over histories in memory. `hashOfBytes`. `PAGE_REPLY_BYTES`, `RETAINED_REPLY_BYTES`, `PAGE_ENTRIES`, `READ_SECONDS`. |
-| `verify` | `verify(source, options)`: a `Verification`, which is the report and, in words, what was found. `Options`: the mode, the target scope ID, a known head, anchors, limits, bounds, and `capabilities`: the rules of the capability versions the caller has code for. This package has none of its own. `LIMITS`, `TRUSTS`, `SourceError`. |
+| `verify` | `verify(source, options)`: a `Verification`, which is the report and, in words, what was found. `Options`: the mode, the target scope ID, a known head, anchors, limits, bounds, `capabilities`: the rules of the capability versions the caller has code for; and `platform`: the data and the rules of the platform definitions the caller has code for, by name and version. This package has none of its own. A history under a platform definition is derived with those rules, and the report then lists `platformCode(named)` under `trusts`. `LIMITS`, `TRUSTS`, `SourceError`. |
 | `report` | `Report`, the contract's type, and `render(report, why?)`: the report in plain English. |
 | `cli` | `main(argv, io)`: the command, with no process state. `src/bin.ts` runs it under Node. |
 
@@ -116,7 +116,7 @@ service being checked.
 | `mismatch` | An entry is not what its bytes, its chain, its signature or its replay say; or a reference names another entry, incarnation or kind than its source scope has; or the history does not reach or match the known head. `at` names the entry. |
 | `missing-dependency` | A source history cannot be read, or does not reach the entry a reference names, and no anchor names it. `at` names the entry that used it. |
 | `incomplete` | A retained input is missing or is not the bytes its digest names; or a detached text is gone and no later entry redacts it; or a limit was reached. |
-| `unsupported-definition` | The scope pins a platform definition, or a declaration that does not pass validation under the bounds given, or a declaration that needs a capability version the caller gave no rules for. `at` names the genesis. Also a `preparation` entry or an `outcome` entry: this replay has no rules for either yet, and `at` names that entry. |
+| `unsupported-definition` | The scope pins a platform definition for which the caller gave no data and rules (`platform`), or gave them without a rule for one mark of the data; or a declaration that does not pass validation under the bounds given, or a declaration that needs a capability version the caller gave no rules for. `at` names the genesis. Also a `preparation` entry or an `outcome` entry: this replay has no rules for either yet, and `at` names that entry. |
 
 The check stops at the first finding. The report's coverage lists, for each
 scope, the entries that were checked to their end, with every fact they

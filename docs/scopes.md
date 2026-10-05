@@ -618,7 +618,7 @@ result is one of:
 | `mismatch` | An entry is not what its bytes, its chain, its signature or its replay say. The report names the entry. |
 | `missing-dependency` | A history that an entry used cannot be read, and no anchor names the entry. |
 | `incomplete` | A retained input is missing, or a limit was reached. A detached text that is gone with no tombstone is a missing input. No claim is made beyond the coverage. |
-| `unsupported-definition` | The scope pins a definition this replay has no code for: a platform definition, or a declared one that needs a capability's rules. The package has none of its own. |
+| `unsupported-definition` | The scope pins a definition this replay has no code for: a platform definition whose data and rules the caller did not give, or gave without the rule of one mark; or a declared one that needs a capability's rules. The package has none of its own. With the rules of a platform definition, the report lists `platform-code` under `trusts`, with the name and the version. |
 
 "Consistent" is always for a stated mode, target, coverage and set of
 trusts. It is not "verified". A replay trusts, among other things, the

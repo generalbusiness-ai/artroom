@@ -5,8 +5,8 @@ import type { DeclaredDefinition, Entry, Intent, ScopeRef, Seed } from "@general
 import { definitionDigest, factRefOf, intentDigest, isIncarnation, newIncarnation, scopeIdOf, signIntent } from "@generalbusiness/artroom-bytes";
 import { timeOf, type Delivered } from "@generalbusiness/artroom-derive";
 import { Scope, forged, grantOf, laneDefinition, variant } from "@generalbusiness/artroom-derive/testing";
-import { inbox } from "@generalbusiness/artroom-platform";
-import { httpSource, verify } from "@generalbusiness/artroom-replay";
+import { inbox, platform } from "@generalbusiness/artroom-platform";
+import { httpSource, platformCode, verify } from "@generalbusiness/artroom-replay";
 import { controls, scriptedCapability } from "../src/testing.ts";
 import { Node, founding as foundingIn, net, routed, soon } from "./net.ts";
 import { HOLD, START, at, definition, found, founding, reader, rita, stubOf, una } from "./support.ts";
@@ -147,6 +147,16 @@ describe("founding a directory (sections 2.2, 2.3 and 7.1)", () => {
       expect(await I.stub.deliver(notified)).toEqual(recorded);
       await I.did(rita, "mark-read", { on: 1, expected: { on: 1, inbox: 1 } });
       expect([(await I.item(1))?.state, (await I.entries()).length]).toEqual(["read", 3]);
+
+      // A replay runs the same rules. Given the platform package's data and rules, it derives every entry again, and its report
+      // lists the trust `platform-code` with the name and the version: it shows that these rules derive the same bytes, and not that
+      // they are the ones the runtime ran. Given none, or the data without the rule, it cannot derive under the definition at all:
+      // `unsupported-definition`, at the genesis. The lane's entry is the scripted peer's, so an anchor names it.
+      const replayed = async (code?: (named: string) => ReturnType<typeof platform>) =>
+        (await verify(httpSource("https://scopes.test", { fetch: routed }), { mode: "replay", scope: name, platform: code, anchors: [{ scope: lane.scope, seq: 3, hash: from.hash }] })).report;
+      const [same, none, ruleless] = [await replayed(platform), await replayed(), await replayed((named) => { const supplied = platform(named); return supplied && { ...supplied, rules: {} }; })];
+      expect([same, none, ruleless]).toMatchObject([{ result: "consistent", target: { seq: 2 } }, { result: "unsupported-definition", at: { seq: 0 } }, { result: "unsupported-definition", at: { seq: 0 } }]);
+      expect([same.trusts.includes(platformCode(NAMED)), none.trusts.some((trust) => trust.startsWith("platform-code")), same.coverage]).toEqual([true, false, [{ scope: ref, from: 0, through: 2 }]]);
 
       // The same scope, in a runtime that has lost the rule: test support supplies the data with no rule. Section 6.1, "A mark with
       // no rule: the whole scope": the scope admits nothing, whatever the row. The act that was judged above is now not judged, and
