@@ -400,7 +400,7 @@ and nothing is written. Witness: `derive/test/forms-marks.test.ts`, the row
 which the same rule sets the hash of a ticket that it opens. Controls: the
 guard removed, and the guard without its exception. Both distinguish.
 
-**The sweep for finding 2's family** (`7da1185c0`, `0d132a8c1`; EN3 to EN8).
+**The sweep for finding 2's family** (`7da1185c0`, `da809c8bc`; EN3 to EN8).
 Each static check of the validator on a written effect or send was set
 against what the commit checks of a rule's output. The whole table is in the
 deltas note, entry EN-sweep. Beside finding 2, in the first row, six more
