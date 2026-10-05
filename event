@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:70f7411663654d8392034b7d5957fe5446855b09"}
+{"kind":"assert","text":"Verified effective requesting-planner ratification27728e49 and satisfied originating extent planning request1cc4283f; index3e4c60eb8 now records accepted delivery70f74116. Separate adoption not observed yet. Exact protocol successors and I3/full product evidence remain open. Documentation only, diff --check passed; no tests.","body":{"commit":"3e4c60eb8","no_git_artifact":"true","path":"plans/README.md"}}
