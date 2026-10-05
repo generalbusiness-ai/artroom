@@ -4,7 +4,8 @@ import { definitionDigest } from "@generalbusiness/artroom-bytes";
 import { PROFILES, derivable, runnable, validateDefinition } from "@generalbusiness/artroom-derive";
 import { FIRST_ACTIONS, ROLE_LISTS, RULES, definitions, inbox, membership, platform } from "../src/index.ts";
 
-// The plan's T43, for the one definition that exists: `platform:inbox@1` (authority note, revision 16, section 12.1.6).
+// The plan's T43, for `platform:inbox@1` (authority note, revision 16, section 12.1.6). The package holds six definitions: the two
+// lists at the end of this test name them. T43 for each of the other five is in this file or in the test file of its definition.
 test("the inbox definition validates whole with the platform option, with its marks listed, and is refused without it", () => {
   const checked = validateDefinition(inbox, PROPOSED_BOUNDS, PROFILES, { platform: true });
   if (!checked.ok) throw new Error(`the inbox is refused: ${JSON.stringify(checked.problems)}`);
