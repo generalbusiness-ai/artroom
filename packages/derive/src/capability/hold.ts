@@ -929,12 +929,13 @@ export function holdReserves(view: StateView, definition: ValidDefinition): numb
  * preparation entry and of an outcome entry from the entry's own input, and
  * only this code writes an entry of such a kind (section 6.2; source row
  * I3-13).
- * The steps `retry` and `job-read`, and the creation of a fork with the
- * read of a head, are not built here: with no rules for them, nothing of
- * them is judged or sent.
+ * The step `retry`, and the creation of a fork with the read of a head, are
+ * not built here: with no rules for them, nothing of them is judged or
+ * sent. The step `job-read` is a step of `git-read@1`, and its code is in
+ * `gitread.ts`.
  */
-// I3 merge: step 18 adds the rules of the fork's creation and of the head's read. The step `retry` and the step `job-read` have no
-// code here. The driver's rule that the request of an attempt is sent only when its tokens are `live` is `tokensLive`, above.
+// I3 merge: step 18 adds the rules of the fork's creation and of the head's read. The step `retry` has no code here. The driver's
+// rule that the request of an attempt is sent only when its tokens are `live` is `tokensLive`, above.
 export function holdCapability(options: HoldOptions): Capabilities & Steps & Owners {
   const { tokensPerHold: tokens, rootRetentionSeconds: retention } = options;
   if (!Number.isSafeInteger(tokens) || tokens < TOKENS_FLOOR) throw new Error(`a hold may have at least ${TOKENS_FLOOR} tokens at once`);

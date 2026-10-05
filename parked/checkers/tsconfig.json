@@ -1,5 +1,0 @@
-{
-  "extends": "../../tsconfig.base.json",
-  "compilerOptions": { "rootDir": "..", "lib": ["ES2024", "ESNext.Disposable"], "resolveJsonModule": true, "types": [] },
-  "include": ["src"]
-}

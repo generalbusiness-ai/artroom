@@ -246,7 +246,7 @@ export const HOLD_VERSION: HoldOptions = { tokensPerHold: TOKENS_FLOOR, rootRete
 /**
  * The code of the two capability versions, as one value for the two ports
  * that ask it: the forms and the steps (`capabilities`), and the rules of
- * the operations that `hold@1` owns (`owners`). It is derive's code: pure
+ * the operations that `hold@1` and `git-read@1` own (`owners`). It is derive's code: pure
  * functions that hold no state and read no port.
  */
 export const CAPABILITY_CODE = capabilitiesOf(holdCapability(HOLD_VERSION), gitRead());
@@ -260,8 +260,9 @@ export const CAPABILITY_CODE = capabilitiesOf(holdCapability(HOLD_VERSION), gitR
  * are the platform package's.
  *
  * The capability code is derive's: `hold@1` over its records, with its
- * steps and the rules of its operations, and the guard `ancestry` of
- * `git-read@1`. So a definition that uses those forms is one that this
+ * steps and the rules of its operations, and the guard `ancestry` and the
+ * step `job-read` of `git-read@1`, with a read token's mint and
+ * revocation. So a definition that uses those forms is one that this
  * runtime can pin (section 6.1): the contract's rule is on the code of the
  * forms that a definition uses, and asks for no peer. What a scope under
  * such a definition can then do here is little, and each limit is another
