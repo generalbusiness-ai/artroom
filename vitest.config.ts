@@ -17,6 +17,7 @@ export default defineConfig({
       project("replay", "replay", "vitest.config.ts"),
       project("client", "client", "vitest.config.ts"),
       project("scope", "scope", "vitest.config.ts"),
+      project("lanes", "lanes", "vitest.config.ts"),
     ],
   },
 });
