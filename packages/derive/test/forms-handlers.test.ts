@@ -244,6 +244,10 @@ describe("subjects and handlers (sections 6.4 and 7.3)", () => {
       ["a number of copies on a tell handler", inBoard((d) => { d.receives.post.copies = 2; }), "shape"],
       ["an advisory handler for a message that is no advisory type", inBoard((d) => { d.receives.count.class = "advisory"; }), "name"],
       ["an advisory handler that tells a member", inBoard((d) => { Object.assign(d.receives.count, { class: "advisory", message: "index", attention: [{ notify: { slot: "owner", of: "also.board", when: "after", reason: "counted" } }], also: { board: { item: "board", one: true } } }); }), "advisory-sends"],
+      ["an advisory handler that sets a fact slot from self: its entry has no kind", inBoard((d) => { Object.assign(d.receives.post, { class: "advisory", message: "index" }); d.items.card.refs.postedAt.to.kind = ["index"]; }), "name"],
+      // Section 6.6: the source entry is under the definition that the handler's `from` names.
+      ["the source entry into a fact slot under another name than the sender's definition", inBoard((d) => { d.receives.post.from.under = "ticket"; d.receives.post.effects[1].ref.from = { source: "ref" }; }), "name"],
+      ["the source entry into a fact slot under the sender's definition passes", inBoard((d) => { d.receives.post.from.under = "ticket"; d.receives.post.effects[1].ref.from = { source: "ref" }; d.items.card.refs.postedAt.to.under = "ticket"; }), null],
       ["a field of a message with a default", inBoard((d) => { d.receives.post.fields.about.default = 1; }), "shape"],
       ["a handler that opens no item type", inBoard((d) => { d.receives.post.opens = "page"; }), "name"],
       ["a handler's guard on the item it opens", inBoard((d) => { d.receives.post.guards.push({ state: ["open"] }); }), "nascent-guard"],

@@ -177,7 +177,7 @@ export function receives(d: Defining, v: unknown, top: Rec): void {
     // applied. The item it opens may not exist before the entry, so no guard and no `via` reads it. The kind of its entry is its
     // message's name (section 6.2); the entry of an advisory has none.
     const named = also(d, o["also"], at(path, "also"), fields, null, top);
-    const ctx: Ctx = { ...naming(), on, also: named.types, nascent: on !== null, fields, kind: cls === "advisory" ? null : message, handler: { update: cls === "relate" }, unsettled: named.unsettled };
+    const ctx: Ctx = { ...naming(), on, also: named.types, nascent: on !== null, fields, kind: cls === "advisory" ? null : message, handler: { update: cls === "relate", under: typeof from?.["under"] === "string" ? from["under"] : null }, unsettled: named.unsettled };
     guards(d, o["guards"], at(path, "guards"), ctx);
     effects(d, o["effects"], at(path, "effects"), ctx, false);
     // The entry that decides a request sends the platform's one result.

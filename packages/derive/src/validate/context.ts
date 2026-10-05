@@ -16,13 +16,13 @@ export interface Ctx {
   on: Type | null;
   also: Map<string, Type>;
   nascent: boolean;                       // `on` is opened by this entry
-  fields: Map<string, FieldType> | null;  // null: a handler, whose message fields the contract does not declare
+  fields: Map<string, FieldType> | null;  // the fields an act or a handler declares. Null: none is declared here, and a field operand is not checked by name
   signer: boolean;
   timed: boolean;
   live: Set<string>;                      // subjects under a `state` guard that lists no final state
   // What the operands of section 6.5 may name here, beside the above.
-  kind: string | null;                    // the kind of the entry these forms write: an act's own kind. Null where none is derived yet, as for a handler and a timed rule
-  handler: { update: boolean } | null;    // a handler: it has a sender and a source entry, and a `relate` handler an update
+  kind: string | null;                    // the kind of the entry these forms write (section 6.2). Null: the entry of an advisory, which has none
+  handler: { update: boolean; under: string | null } | null;   // a handler: it has a sender and a source entry, a `relate` handler an update, and `under` is the definition its `from` names, if it names one
   clause: boolean;                        // a result clause: it has a sender and a result
   presented: Map<string, FieldType>;      // an act: the facts presented beside the intent, by name
   elements: Map<string, FieldType | null>;// inside a list form: each element it binds, by its `as` name, with its type when the definition states it

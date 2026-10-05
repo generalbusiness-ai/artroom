@@ -69,7 +69,9 @@ export function effect(d: Defining, v: unknown, path: string, ctx: Ctx, later: b
     if (read.form === "none") bad("shape", fp, "a source that is none is never applied; null empties a slot");
     else if (read.form === "const") { if (!isValue(to, (from as Rec)["const"], bounds)) bad("shape", fp, "is not a value of the slot's type"); }
     else if (read.type !== null) copy(d, read.type, to, fp, "source");
-    // I2 merge: section 6.6 also refuses `{ source: "ref" }` into a slot whose `under` is not the handler's `from.under`. `Ctx.handler` does not hold that name (step 7), so only the commit checks it.
+    // Section 6.6: the source entry is a fact under the definition that the handler's `from.under` names, of a kind that only the
+    // commit knows. So it is no copy into a slot whose `under` is another name. When `from` names none, the commit checks both.
+    else if (read.form === "source" && (from as Rec)["source"] === "ref" && to.type === "fact" && ctx.handler?.under != null && ctx.handler.under !== to.under) bad("name", fp, "the source entry is under the definition that the handler's `from` names, and the slot is under another");
     // Section 6.4: a timed rule's effects are total, so each source is one whose value the validator has shown the slot can hold.
     if (ctx.timed && read.type === null && !(read.form === "const" && k === "value")) bad("timed-partial", fp, "a timed rule copies only what the validator can show the slot holds");
   };
@@ -108,8 +110,8 @@ export function effect(d: Defining, v: unknown, path: string, ctx: Ctx, later: b
       if (from === "self") {
         // Section 6.4: `self` is a local reference to the entry being written, and so to the item it opens.
         const item = ctx.nascent && !later && ctx.on !== null && assignable({ type: "item", of: ctx.on.name }, sl.type);
-        // Section 6.2: it may fill a slot of type `fact` when the slot's kinds include the kind of the entry being written, under this definition's name.
-        // I2 merge: a handler's entry has a kind, its message's name, once `validate/handlers.ts` sets `ctx.kind` for it (step 7). Until then `self` into a fact slot in a handler is refused here.
+        // Section 6.2: it may fill a slot of type `fact` when the slot's kinds include the kind of the entry being written, under this
+        // definition's name: an act's kind, a handler's message, or `timed:` and a rule's key. The entry of an advisory has no kind.
         const fact = !later && ctx.kind !== null && sl.type.type === "fact" && sl.type.kind.includes(ctx.kind) && sl.type.under === d.name;
         if (!item && !fact) bad("name", at(p, "from"), "self is the item this entry opens, in a slot that refers to an item of that type; or this entry, in a slot for a fact of its kind under this definition");
       } else if (from !== null) source(from, at(p, "from"), sl.type);
