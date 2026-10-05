@@ -360,3 +360,104 @@ it and no production port is given it (the reference is written by
 Node projects run as one group before `scope`. `packages/contract/README.md`:
 only `Commitment.cancelBy` is still `unknown`; `observation` and `evidence`
 are listed. `packages/git` and `packages/platform` have no README.
+
+## 11. After review fe34edbe: the repairs
+
+Written 2026-10-05. The reviewer's verdict `fe34edbe`, at `5635689ee`, asked
+for changes: two findings, and two points of reporting. Both findings are
+borne out by the source. The repairs were made with the contract's revision
+16 and the authority note's revision 21 as the adopted designs. Each source
+choice is an entry EN of the deltas note, section 13.
+
+**Finding 1: one answer in hand could hold back every other** (`dfacf6596`,
+EN1). The driver offered the answers in hand oldest first and stopped at the
+first that the scope could not write. A scope answers `unavailable` for a
+busy turn, and also for a cause of one input: an owner with no rule, an
+outcome that would open more than its owner declared, a fault of a rule. An
+answer with such a cause was offered first in every pass, and none behind it
+was ever offered. Now an answer that cannot be written goes to the back of
+the line, as the same input of the same attempt, and the pass goes on to the
+next. The cause is not asked, so no form carries it. **The fairness
+property:** an answer with n others before it is offered within
+floor(n / batch) + 1 passes, because none is ever put before it. **What
+bounds the retries:** nothing bounds their number. No pass asks for a wake-up
+at once on an answer's account. The next is after `drainRetrySeconds` on the
+scope's clock, so an answer that fails again costs one turn in each
+ceil(held / batch) delays, until it is judged or the process ends. Witness:
+`scope/test/operations.test.ts`, "an answer in hand that stays unavailable",
+with a batch of 1: two attempts closed on `unknown`, both late answers in
+hand, the older one's owner at fault. The later answer is written at the
+second pass. The older stays in hand, its operation stays a duty, and it is
+written as it arrived once its owner declares the cleanup. Controls: the old
+stop, and a line that does not turn. Both distinguish. With a batch of 1 the
+two controls fail in the same way.
+
+**Finding 2: a rule could change a fixed slot of an existing item**
+(`493ce09c1`, EN2). A rule's effect on a fixed slot is now a fault of the
+rule unless the item is the one that the entry opens. The input is not judged
+and nothing is written. Witness: `derive/test/forms-marks.test.ts`, the row
+"a fixed slot of an item that existed before the entry", and the entry in
+which the same rule sets the hash of a ticket that it opens. Controls: the
+guard removed, and the guard without its exception. Both distinguish.
+
+**The sweep for finding 2's family** (`7da1185c0`, `da809c8bc`; EN3 to EN8).
+Each static check of the validator on a written effect or send was set
+against what the commit checks of a rule's output. The whole table is in the
+deltas note, entry EN-sweep. Beside finding 2, in the first row, six more
+entries were not checked of a rule's output, and are now:
+
+| What the validator asks of a written form | Of a rule's output, now | Entry |
+|---|---|---|
+| A fixed slot is set only at the opening | A fault | EN2 |
+| Only the hold effect sets a hold's state, holder, epoch and end; a hold is opened by an act | A fault | EN3 |
+| A list change that changes nothing is not recorded | Not recorded | EN4 |
+| The entry that opens an operation opens attempt 1 | A fault. A genesis is not asked (EB12) | EN5 |
+| `self` is the item of a `relate` only in an entry that opens one | A fault | EN6 |
+| A hold ends with the item that it is under | Also when a rule ends an item that is no subject | EN7 |
+| An opening within its type's `max`; at most `sendsPerEntry` sends | Also in an outcome (a fault) and in a result clause (it changes nothing) | EN8 |
+
+Witnesses: two tests of `forms-marks.test.ts`, with one row or one entry for
+each. Nine controls, one for each guard. Each distinguishes. Three places
+stay open and are recorded with their owners: no bound on the effects that an
+outcome's rule derives (R4), no bound of its own on the fields of a rule's
+message (the contract), and no reservation for what a mark in a result clause
+opens (entry EJ6). One reading is left for the contract to confirm: a rule's
+`list` change after a list that a written effect set whole is taken as
+successive. Two things beside the family are recorded and not changed:
+a rule's `create` of a lane is not given the directory, and an opening may
+state any number of attempts.
+
+**The sweep for finding 1's family.** Every loop of `operations.ts` and
+`outbox.ts` that takes a bounded batch was read (the deltas note, the second
+table of EN-sweep). Only the answers in hand were chosen in an order that a
+failing row did not leave. The due attempts, the due sends and the diagnoses
+are chosen by time, and a row that fails is put off past everything that is
+due. The walk goes on by the row it reached. One property is shared and not
+changed: a row, a diagnosis or an answer that fails for its own cause is tried
+again after `drainRetrySeconds` for as long as it fails.
+
+**The two points of reporting.** Section 4 keeps its qualification: that a
+state with no new member has the digest it had rests on the commit messages
+and on unchanged tests, and no stored history was recomputed. This note has no
+other sentence that says "no state digest changes". The deltas note has one,
+at the head of its section 12, and its section 13 now gives it the same
+qualification. The plan's sentence that called revisions 16 and 21 "under
+review" has a dated correction after it.
+
+**Bytes and digests.** No form of an entry, an input or an answer changes.
+Neither lane digest changes. The folded state has no new member. What the
+commit derives from a rule's output changes in the cases above. The one
+delivered rule, `notice-source`, meets none of them. This rests on reading
+that rule and on the unchanged tests: no stored history was derived again.
+
+**The gate.** One run of `npm run gate`, at head `c3c4806e3`, tree
+`65bb1731f6ae175d38fa003ae4097fbaaca6427a`, as printed: install skipped;
+whitespace 0.0 s elapsed; typecheck 2.9 s elapsed and 7.6 s CPU; test 9.0 s
+elapsed and 18.3 s CPU. It printed 340 tests passed in vitest and 5 in Node's
+runner. One observed run, on a shared machine with other sessions active
+(load averages 4.72, 4.16 and 3.74 just before it), with a warm package
+cache. The three tests added are the 3 more than section 7 states. The pins
+test passed in that run, and `node notes/2026-10-05-07-i1-story/run.mjs`
+exits 0. The commit that adds this section changes notes only. The source and
+the tests are unchanged from the gated head: `packages` is the tree
+`8282a39a14dd4cb2d7baa51d314e5ea73f89c4fa` at both.

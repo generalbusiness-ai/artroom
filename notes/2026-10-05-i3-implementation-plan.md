@@ -187,6 +187,15 @@ each in full.
   they are proposals, and nothing is built that only they state. An
   adoption is of a design. It accepts no source: the marks and the
   repairs above are still to be reviewed.
+- **Corrected on 2026-10-05, after the review `fe34edbe` of milestone
+  F.** The contract's revision 16 at `54420b41` and the authority note's
+  revision 21 at `f9ec25e4` are adopted. The sentence above, which calls
+  them under review, was true when it was written and is no longer. The
+  source of milestone F, at `5635689ee` and before, was built on
+  revisions 15 and 20, and takes no credit from the later adoption (the
+  delivery note, section 2, says what of revisions 16 and 21 it does not
+  implement). The repairs after that review were made with revisions 16
+  and 21 as the adopted designs (the deltas note, section 13).
 - **Step 16 waits, and steps 16a to 16c did not.** The rules of the two
   capabilities are built and tested as pure functions, and the judges use
   them when a test gives them the code. Wiring them into the production

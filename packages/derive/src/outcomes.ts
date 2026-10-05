@@ -17,6 +17,7 @@ import type { EffectForm, Mark, PlatformData, Send, SendForm } from "@generalbus
 import { deriveEffects } from "./effects.ts";
 import type { Reading } from "./fields.ts";
 import type { Judging } from "./guards.ts";
+import { overMax } from "./handlers.ts";
 import type { OperationRules, OutcomeDerived, OutcomeInput, Owner, Owners } from "./ledger.ts";
 import { RuleFault, givenTo, outside, ruleAt, run, type OutcomeGives, type PlatformRules, type Rules } from "./marks.ts";
 import { deriveSends } from "./sends.ts";
@@ -87,6 +88,8 @@ function given(mark: Mark, j: Judging, kinds: Readonly<Record<string, Mark>>, gi
   const { effects, sends, opens } = gives;
   if (effects.some((effect) => isObject(effect) && (effect["effect"] === "operation" || effect["effect"] === "attempt"))) throw outside(mark, "an operation among its effects: an outcome states the operations that it opens");
   if (sends.some((request) => isObject(request) && isObject(request["message"]) && request["message"]["type"] === "create")) throw outside(mark, "a creation, for which an outcome entry has no cause");
+  // Section 7.5: the bound on every send of one entry. The validator counts it for a row. An outcome entry has no row, and none of its rule's requests is cut off.
+  if (sends.length > j.bounds.sendsPerEntry) throw outside(mark, "more requests than one entry sends");
   for (const open of opens) {
     const { owner, kind, attempts }: { owner?: unknown; kind?: unknown; attempts?: unknown } = isObject(open) ? open : {};
     if (owner !== j.platform?.named || typeof kind !== "string" || own(kinds, kind) === undefined || typeof attempts !== "number" || !Number.isSafeInteger(attempts) || attempts < 1) throw outside(mark, "an operation that its definition does not own");
@@ -96,7 +99,9 @@ function given(mark: Mark, j: Judging, kinds: Readonly<Record<string, Mark>>, gi
   const joining: Judging = { ...j, platform: { named: j.platform!.named, rules: Object.fromEntries(rules) } };
   const joined = deriveEffects(joining, [{ code: "effects", row: mark.row } as unknown as EffectForm], [], null);
   if (!joined.ok) throw outside(mark, `effects that the entry cannot hold: ${"reason" in joined ? joined.reason : joined.unavailable}`);
-  const requests = deriveSends(joining, sends.map((_, n) => ({ code: `send.${n}`, row: mark.row }) as unknown as SendForm), joined.working, "sha256:" as never);
+  // Section 6.3: `max` bounds the live items of a type, whatever opens the item. An act or a handler is refused `type-full`.
+  if (joined.opened && overMax(j.view, j.definition, joined.opened.type, joined.opened.state) !== null) throw outside(mark, "effects that the entry cannot hold: type-full");
+  const requests = deriveSends(joining, sends.map((_, n) => ({ code: `send.${n}`, row: mark.row }) as unknown as SendForm), joined.working, "sha256:" as never, 0, undefined, joined.opened !== null);
   if (!requests.ok) throw outside(mark, `requests that the entry cannot hold: ${"reason" in requests ? requests.reason : requests.unavailable}`);
   return { effects: joined.effects, sends: requests.sends satisfies Send[], opens };
 }

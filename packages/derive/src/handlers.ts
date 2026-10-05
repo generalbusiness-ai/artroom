@@ -252,7 +252,7 @@ export function derive(j: Judging, forms: Forms, opens: string | null, cause: Di
   // Sections 6.6 and 6.7: a condition, or a range that a source or a send reads, that is not completed leaves the input not judged.
   const effects = deriveEffects(j, forms.effects, forms.attention, opens);
   if (!effects.ok) return "unavailable" in effects ? { result: "unavailable", reason: effects.unavailable } : { result: "refused", reason: effects.reason, detail: effects.detail, prepared: j.used };
-  const sends = deriveSends(j, forms.sends, effects.working, cause, first, directory);
+  const sends = deriveSends(j, forms.sends, effects.working, cause, first, directory, effects.opened !== null);
   if (!sends.ok) return "unavailable" in sends ? { result: "unavailable", reason: sends.unavailable } : { result: "refused", reason: sends.reason, detail: sends.detail, prepared: j.used };
   // Section 6.3: `max` bounds the live items of a type, whatever opens the item: the row, or in platform data a rule.
   const full = effects.opened === null ? null : overMax(j.view, j.definition, effects.opened.type, effects.opened.state);
@@ -429,5 +429,8 @@ export function runClause(view: StateView, definition: ValidDefinition, context:
   const effects = deriveEffects(j, forms, [], null);
   // Section 6.6: a clause's condition that is not completed leaves the result not recorded now. It is offered again.
   if (!effects.ok && "unavailable" in effects) return { result: "unavailable", reason: effects.unavailable };
-  return { result: "ran", effects: effects.ok ? effects.effects : [], uses: [...facts.uses, ...beside.uses.filter((use) => !facts.facts.has(use.fact.hash))], judgesTime: forms.some(timesEffect) || j.ran?.clock === true };
+  // Section 6.3: `max` bounds the live items of a type, whatever opens the item. In platform data a rule of the clause may open
+  // one. Past the bound the clause's effects cannot apply now, and it changes nothing, as above.
+  const applies = effects.ok && (effects.opened === null || overMax(view, definition, effects.opened.type, effects.opened.state) === null);
+  return { result: "ran", effects: applies ? effects.effects : [], uses: [...facts.uses, ...beside.uses.filter((use) => !facts.facts.has(use.fact.hash))], judgesTime: forms.some(timesEffect) || j.ran?.clock === true };
 }

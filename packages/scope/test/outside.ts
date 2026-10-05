@@ -56,9 +56,18 @@ export function outsideOf(name: string): OutsideDouble {
   return made;
 }
 
-/** A made-up owner's rules: a push is decided by a read, selects nothing, and its rule always asks for another attempt. No other kind has rules. */
+/** A made-up owner's rules: a push is decided by a read, selects nothing, and its rule always asks for another attempt. */
 const push: OperationRules = { selects: false, read: true, retries: () => true };
-export const owners: Owners = { rules: (_owner, kind) => (kind === "push" ? push : null) };
 export const pushOf = (attempts: number): Opening => ({ owner: "platform:destination@1", kind: "push", attempts });
-/** An operation of a kind that the made-up owner has no rules for: no runtime of these tests sends it. */
+/**
+ * A made-up kind whose confirmed outcome opens a cleanup, a push of one
+ * attempt. `closure` is what its owner declares for that, and a test sets
+ * it. While it is less than the cleanup reserves, the owner has broken its
+ * own declaration: a confirmed outcome of a mint is not written, whatever
+ * the scope's turn can do for any other outcome.
+ */
+export const mint: OperationRules = { selects: false, read: false, retries: () => false, derives: (_view, _operation, outcome) => ({ effects: [], sends: [], opens: outcome.result === "confirmed" ? [pushOf(1)] : [] }) };
+export const MINT: Opening = { owner: "platform:destination@1", kind: "mint", attempts: 1 };
+export const owners: Owners = { rules: (_owner, kind) => (kind === "push" ? push : kind === "mint" ? mint : null) };
+/** An operation of a kind that the made-up owner has no rules for, as it has for no kind but a push and a mint: no runtime of these tests sends it. */
 export const FENCE: Opening = { owner: "platform:destination@1", kind: "fence", attempts: 1 };

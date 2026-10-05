@@ -137,8 +137,9 @@ export class Operations {
   readonly #wakes: Wakes;
   readonly #bounds: Bounds;
   /**
-   * Answers in hand that the scope could not record yet, by attempt, oldest
-   * first: at most one for each attempt that was sent. Each is the `outcome`
+   * Answers in hand that the scope could not record yet, by attempt, in the
+   * order in which they are offered next (`#replies`): at most one for each
+   * attempt that was sent. Each is the `outcome`
    * input as it was first offered, so it keeps the operation, the attempt
    * and the evidence of its answer. An answer stays here until the scope
    * has judged it: written, a copy, a contradiction, or no answer. It is
@@ -197,9 +198,9 @@ export class Operations {
 
   /**
    * One pass over the attempts that have no outcome and are due, and over
-   * one page of the walk. Rule 7: a pass is bounded, by two batches; with
-   * nothing due it writes nothing and asks for no wake-up; and it opens no
-   * attempt, which only an entry does.
+   * one page of the walk. Rule 7: a pass is bounded, by two batches of rows
+   * and one of answers in hand; with nothing due it writes nothing and asks
+   * for no wake-up; and it opens no attempt, which only an entry does.
    */
   async #pass(): Promise<number> {
     const store = this.#store;
@@ -259,19 +260,36 @@ export class Operations {
   }
 
   /**
-   * The answers in hand that no row of this pass offered: each is offered
-   * to the scope again, oldest first, at most `batch` of them. This is how
-   * a late answer is written after its attempt's row was closed by the
-   * `unknown` entry. It stops at the first that cannot be written yet: what
-   * kept the turn from that one keeps it from the rest. Resolves with the
-   * number that the scope judged.
+   * The answers in hand that no row of this pass offered: each of the first
+   * `batch` of them is offered to the scope again. This is how a late
+   * answer is written after its attempt's row was closed by the `unknown`
+   * entry. Resolves with the number that the scope judged.
+   *
+   * An answer that cannot be written yet stays in hand as it is, the same
+   * input of the same attempt, and goes to the back of the line. The cause
+   * is not asked: a turn that is busy keeps every answer out, and a fault
+   * of one owner, such as an outcome that would open more than the owner
+   * declared, keeps out that owner's answer alone. So the line turns
+   * whatever the cause. An answer with n others before it is offered within
+   * floor(n / batch) + 1 passes, since none is ever put before it: no
+   * answer that stays unavailable holds back another. Its operation keeps
+   * what it reserved, because no entry was written.
+   *
+   * No answer is offered twice in one pass, and no pass asks for a wake-up
+   * at once on an answer's account: `#wake` asks for the next after the
+   * delay of a turn that left work due, on the scope's clock. So an answer
+   * that fails again for its own reason costs one turn in each
+   * ceil(held / batch) delays, until it is judged or the process ends.
    */
   async #replies(offered: ReadonlySet<string>, batch: number): Promise<number> {
     let judged = 0;
     for (const [key, input] of [...this.#held].filter(([key]) => !offered.has(key)).slice(0, batch)) {
-      if ((await this.#record(input)).recorded === "unavailable") break;
-      if (this.#held.get(key) === input) this.#held.delete(key);
-      judged++;
+      const { recorded } = await this.#record(input);
+      // Another answer of that attempt took its place while this one was judged: that one keeps its own place.
+      if (this.#held.get(key) !== input) continue;
+      this.#held.delete(key);
+      if (recorded === "unavailable") this.#held.set(key, input);
+      else judged++;
     }
     return judged;
   }
