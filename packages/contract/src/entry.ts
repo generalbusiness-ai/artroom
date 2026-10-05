@@ -79,9 +79,10 @@ export type Input =
  * capability's step, the one grant judged, the capability and the step. It is
  * a member of `Input`. Derive's `judgePreparation` writes it, and the fold
  * keeps its index. The production ports hold the code of the steps of
- * `hold@1`. No grant is read in production yet, so each request for a step
- * is refused there. A replay has no rules for one yet (I3 deltas, entries
- * E5 and E13).
+ * `hold@1` and `git-read@1`. With only the production defaults no grant is
+ * read, so each request for a step is refused there. A replay derives one
+ * again when its caller gives it the code of the step, and the replay
+ * command gives none (I3 deltas, entries E5, E13 and EU1).
  */
 export interface PreparationInput {
   type: "preparation";
