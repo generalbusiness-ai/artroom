@@ -1,1 +1,1 @@
-{"kind":"promise","text":"I will deliver this two-file change at 840efd9e76e9dc406fdaa4578389c077474a5cb7 and land it after review.","body":{"branch":"request/root-hygiene"}}
+{"kind":"artifact","text":".github/workflows/row-writes.yml at exact 840efd9e76e9dc406fdaa4578389c077474a5cb7 on request/root-hygiene, under promise git:sha1…68c9ca9 on request git:sha1…8bab8ce","body":{"commit":"840efd9e76e9dc406fdaa4578389c077474a5cb7","path":".github/workflows/row-writes.yml"}}
