@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:db181f727579418ca2ea26a2b24953e57231248c","text":"Merge retired a covered predecessor; the successor is at docs/policy-pack.md."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:db302573d388986635d391b6ff84616c525c8495","text":"Merge retired a covered predecessor with no successor at its old path."}
