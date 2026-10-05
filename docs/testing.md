@@ -162,7 +162,7 @@ be run, and nothing about any rule. Without it the platform definitions
 are the platform package's, with their rules, as in production.
 
 A scripted peer, `net.peers` of the same module, is a stand-in for a scope
-of a platform kind that is not delivered, such as a rules scope or a
+of a platform kind that the test does not run, such as a rules scope or a
 destination. The test writes the peer's entry by hand, and nothing judged
 it. A test that uses one says so in the same way. It shows the receiver's
 side of a delivery, and nothing about the peer.

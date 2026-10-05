@@ -269,7 +269,7 @@ export interface Net {
    * The entries of scripted platform peers, by the hash of the fact that
    * names each, with the name of the definition that the peer is said to
    * pin. A scripted peer is a stand-in for a scope of a platform kind that
-   * is not delivered, such as a rules scope or a destination. Its entries
+   * the test does not run, such as a rules scope or a destination. Its entries
    * are written by the test, and nothing judged them. A scope of the
    * namespace reads one as it reads any source entry, so a test that uses
    * one shows the receiver's side of a delivery and nothing about the peer.
