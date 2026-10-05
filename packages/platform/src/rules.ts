@@ -34,6 +34,7 @@
 import type { Rules } from "@generalbusiness/artroom-derive";
 import { inboxRules } from "./inbox.ts";
 import { membershipRules } from "./membership.ts";
+import { rulesScopeRules } from "./rules-scope.ts";
 
 /** The platform definitions that this package holds, by name without the version (section 12.1). `platform:task` is not here: it is IA's. */
 export type PlatformName = "platform:register" | "platform:directory" | "platform:membership" | "platform:rules" | "platform:destination" | "platform:inbox";
@@ -46,6 +47,7 @@ export type RuleTable = { readonly [name in PlatformName]?: Rules };
  * that the authority note's table of marks names. Membership's data holds
  * three more marks, for places that the note's rows state and its table
  * does not list, and no rule is written for them (`membership.ts`). So this
- * table does not make `platform:membership@1` runnable.
+ * table does not make `platform:membership@1` runnable. The three rules of
+ * the rules scope are the whole of its version (`rules-scope.ts`).
  */
-export const RULES: RuleTable = { "platform:inbox": inboxRules, "platform:membership": membershipRules };
+export const RULES: RuleTable = { "platform:inbox": inboxRules, "platform:membership": membershipRules, "platform:rules": rulesScopeRules };

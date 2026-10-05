@@ -15,14 +15,17 @@ import { inbox } from "./inbox.ts";
 import { membership, standingOf } from "./membership.ts";
 import type { Rules, StateView } from "@generalbusiness/artroom-derive";
 import { RULES } from "./rules.ts";
+import { rulesScope } from "./rules-scope.ts";
 
 export { inbox, membership };
 export { MEMBERSHIP, NO_MEMBER, ROLE_LISTS, ROLE_TABLE, actionsIn, standingOf, type Role } from "./membership.ts";
 export { RULES };
+export { rulesScope };
+export { CONFIGURATION_BYTES, CONFIGURATION_DOMAIN, DEFINITION_DOMAIN, RULES_SCOPE, membershipId } from "./rules-scope.ts";
 export type { PlatformName, RuleTable } from "./rules.ts";
 
 /** The platform definitions delivered so far, by name without the version. */
-export const definitions: Readonly<Record<string, PlatformData>> = { "platform:inbox": inbox, "platform:membership": membership };
+export const definitions: Readonly<Record<string, PlatformData>> = { "platform:inbox": inbox, "platform:membership": membership, "platform:rules": rulesScope };
 
 /**
  * One version of a platform definition, as a runtime or a verifier is
