@@ -103,7 +103,7 @@ describe("a history that is not consistent is reported with the right result, at
       change: (w) => rewrite(w.I, 2, (entry) => { entry.input = { ...preparing(w), step: "check" }; }), result: "unsupported-definition", at: ["I", 2], why: /a preparation, and this replay has no rules/ },
     // Section 9.3, point E13: the same for an outcome entry. This verifier has the rules of no owner of an operation (I3 step 22).
     { name: "a well-formed outcome entry in a history, for a verifier with no owner rules: `unsupported-definition`, at that entry",
-      change: (w) => rewrite(w.I, 2, (entry) => { entry.input = { type: "outcome", operation: "1:0", attempt: 1, result: "unknown", evidence: { basis: "none", body: null } }; }), result: "unsupported-definition", at: ["I", 2], why: /an outcome, and this replay has no rules/ },
+      change: (w) => rewrite(w.I, 2, (entry) => { entry.input = { type: "outcome", operation: "1:0", attempt: 1, owner: "hold@1", kind: "mint", result: "unknown", evidence: { basis: "none", body: null } }; }), result: "unsupported-definition", at: ["I", 2], why: /an outcome, and this replay has no rules/ },
     { name: "a preparation entry with no step: its bytes are not an entry",
       change: (w) => rewrite(w.I, 2, (entry) => { entry.input = preparing(w); }), result: "mismatch", at: ["I", 2], why: /bytes are not an entry/ },
     // I.0 used D.4, and D.2, on the way to it, used P.0: the entry named is the one that used the history that cannot be read.

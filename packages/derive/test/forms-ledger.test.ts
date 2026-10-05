@@ -4,6 +4,7 @@ import type { Entry, Evidence, OperationId } from "@generalbusiness/artroom-cont
 import { entryHash } from "@generalbusiness/artroom-bytes";
 import { FoldError, applyEntry, checkpointOf, clockOf, operationId, operationOpening, operationStanding, owed, settleOutcome, tokenPast } from "../src/index.ts";
 import type { Opening, OperationRules, Owners } from "../src/index.ts";
+import { kindOf } from "../src/operand.ts";
 import { Scope, t, ticketDefinition } from "./fixtures.ts";
 
 /**
@@ -41,8 +42,8 @@ type Basis = Evidence["basis"];
 /** In place of a body: the evidence has none. */
 const ABSENT = Symbol("no body");
 /** Offer one outcome, and seal it when it writes. The answer in short: `write`, a refusal's detail, or the entry that a repeat or a conflict names. */
-function answer(s: Scope, operation: OperationId, attempt: number, result: "confirmed" | "refused" | "unknown", basis: Basis = result === "unknown" ? "none" : "own-answer", body: unknown = {}, given: Owners | null = owners) {
-  const j = settleOutcome(s.state, ticketDefinition, { type: "outcome", operation, attempt, result, evidence: (body === ABSENT ? { basis } : { basis, body }) as Evidence }, { clock: clockOf(s.state, s.now), bounds: PROPOSED_BOUNDS, owners: given ?? undefined });
+function answer(s: Scope, operation: OperationId, attempt: number, result: "confirmed" | "refused" | "unknown", basis: Basis = result === "unknown" ? "none" : "own-answer", body: unknown = {}, given: Owners | null = owners, named: { owner?: string; kind?: string } = {}) {
+  const j = settleOutcome(s.state, ticketDefinition, { type: "outcome", operation, attempt, result, evidence: (body === ABSENT ? { basis } : { basis, body }) as Evidence, ...named }, { clock: clockOf(s.state, s.now), bounds: PROPOSED_BOUNDS, owners: given ?? undefined });
   if (j.result === "write") s.seal(j.draft);
   return j.result === "repeat" || j.result === "conflict" ? [j.result, j.seq] : j.result === "refused" ? j.detail : j.result;
 }
@@ -67,7 +68,15 @@ describe("the ledger of outside effects (scope contract, section 4.3; authority 
 
     // A listing is no decisive read for a create (rule 3). Attempt 1 is unknown, and its entry opens attempt 2. Attempt 2 is confirmed, and is selected.
     expect(answer(s, op, 1, "confirmed", "read", { listed: "A" })).toBe("a read is not decisive for that kind of operation");
-    expect([answer(s, op, 1, "unknown"), s.last.effects.length, answer(s, op, 2, "confirmed", "own-answer", { repository: "B" })]).toEqual(["write", 2, "write"]);
+    // Section 4.1, "An outcome states its owner and its kind": the offer chooses neither. One that states another owner or another
+    // kind than the entry that opened the operation is `bad-input`, and nothing is written.
+    const other = "the outcome names another owner or kind than its operation has";
+    expect([answer(s, op, 1, "unknown", "none", {}, owners, { kind: "mint" }), answer(s, op, 1, "unknown", "none", {}, owners, { owner: "git-read@1", kind: "create" }), s.head.seq]).toEqual([other, other, 2]);
+    expect([answer(s, op, 1, "unknown", "none", {}, owners, { owner: "hold@1", kind: "create" }), s.last.effects.length, answer(s, op, 2, "confirmed", "own-answer", { repository: "B" })]).toEqual(["write", 2, "write"]);
+    // The judge set both members from the opening, and the entry's kind is read from them by any reader (section 6.2).
+    expect([s.entries[3]!.entry.input, kindOf(s.entries[3]!.entry), kindOf(s.last)]).toMatchObject([{ type: "outcome", operation: op, attempt: 1, owner: "hold@1", kind: "create", result: "unknown" }, "hold@1:create", "hold@1:create"]);
+    // An entry whose input names another kind than its operation has is no state: a replay stops at it.
+    expect(forged(s, (e) => ({ ...e, input: { ...e.input, kind: "mint" } as Entry["input"] }))).toThrow(FoldError);
     expect([shape(s, op), s.state.operation(op)!.selected, operationStanding(s.state.operation(op)!)]).toEqual([[["unknown"], ["confirmed, selected true"]], 2, "unknown"]);
     // What stays reserved is the late answer of attempt 1, with its closure: nothing more is opened after a selection.
     expect(reserved(s) - free).toBe(7);
@@ -94,6 +103,8 @@ describe("the ledger of outside effects (scope contract, section 4.3; authority 
     expect([
       answer(s, op, 1, "confirmed", "own-answer", { repository: "A" }), answer(s, op, 1, "confirmed", "own-answer", { repository: "C" }), answer(s, op, 1, "refused"), answer(s, op, 2, "unknown"), s.head.seq,
     ]).toEqual([["repeat", late], ["conflict", late], ["conflict", late], ["repeat", 4], late]);
+    // A copy of a recorded answer that names another kind is refused too, and is no repeat.
+    expect(answer(s, op, 1, "confirmed", "own-answer", { repository: "A" }, owners, { kind: "delete" })).toBe(other);
     expect(s.replay().snapshot()).toBe(s.state.snapshot());
   });
 

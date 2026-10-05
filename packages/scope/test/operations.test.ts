@@ -74,7 +74,7 @@ describe("outside operations at a real scope (scope contract, section 4.3; autho
     expect(await s.alarm()).toBe(true);
     const unknown = (await s.sealed(2))[0]!;
     expect([out.attempts, unknown.entry.input, unknown.entry.effects]).toEqual([
-      [`${op}#1`], { type: "outcome", operation: op, attempt: 1, result: "unknown", evidence: { basis: "none", body: null } },
+      [`${op}#1`], { type: "outcome", operation: op, attempt: 1, owner: "platform:destination@1", kind: "push", result: "unknown", evidence: { basis: "none", body: null } },
       [{ effect: "attempt", operation: op, attempt: 1, result: "unknown", selected: null }, { effect: "attempt", operation: op, attempt: 2, result: "opened", selected: null }],
     ]);
 
@@ -155,7 +155,7 @@ describe("outside operations at a real scope (scope contract, section 4.3; autho
     expect([await late(s, out, op, 1, own("c1")), (await s.head()).seq, outcomes(await seen(s, op)), await s.alarmAt()]).toEqual([{ recorded: "unavailable" }, 9, [["unknown at 8"]], retry]);
     // The wake-up's turn writes the other end. The driver then offers the answer it kept: the late answer, of that operation and attempt, with its evidence.
     expect([await s.alarm(), (await s.sealed(11))[0]?.entry.input, (await seen(s, op)).state, out.attempts, await s.alarmAt()]).toEqual([
-      true, { type: "outcome", operation: op, attempt: 1, result: "confirmed", evidence: { basis: "own-answer", body: { commit: "c1" } } }, "settled", [`${op}#1`], null,
+      true, { type: "outcome", operation: op, attempt: 1, owner: "platform:destination@1", kind: "push", result: "confirmed", evidence: { basis: "own-answer", body: { commit: "c1" } } }, "settled", [`${op}#1`], null,
     ]);
     // Nothing is in hand any more: a pass offers nothing, and the same answer again is a copy.
     expect([await surface(s).effect(), await late(s, out, op, 1, own("c1")), (await s.head()).seq]).toEqual([0, { recorded: "repeat", seq: 11 }, 11]);

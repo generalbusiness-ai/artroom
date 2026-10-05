@@ -50,7 +50,7 @@ export function ownersOf(definition: ValidDefinition, platform: PlatformRules | 
         if (rule.clock === true) reading.ran.clock = true;
         return {
           view, definition, bounds: reading.bounds, clock: reading.clock, scope, self: scope.head.seq + 1, kind, fields: {}, fieldTypes: {}, subjects: new Map(), signer: null,
-          facts: new Map(), prepared: [], used: [], own: reading.own, platform, judged: { type: "outcome", operation: outcome.operation, attempt: outcome.attempt, result: outcome.result, evidence: outcome.evidence }, ran: reading.ran,
+          facts: new Map(), prepared: [], used: [], own: reading.own, platform, judged: { type: "outcome", operation: outcome.operation, attempt: outcome.attempt, owner: outcome.owner, kind: outcome.kind, result: outcome.result, evidence: outcome.evidence }, ran: reading.ran,
         };
       };
       const answer = (given: unknown): boolean => {

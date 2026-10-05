@@ -6,10 +6,10 @@
  * is offered again, or is not an input the scope can write.
  */
 
-import type { Attempt, Digest, Entry, Input } from "@generalbusiness/artroom-contract";
+import type { Attempt, Digest, Entry } from "@generalbusiness/artroom-contract";
 import type { Reading } from "./fields.ts";
 import { runClause } from "./handlers.ts";
-import { outcomeOf, recordedOutcome, type Owners } from "./ledger.ts";
+import { namesOwn, outcomeOf, recordedOutcome, type OutcomeOffered, type Owners } from "./ledger.ts";
 import { ownersOf } from "./outcomes.ts";
 import type { Judgment } from "./judge.ts";
 import { unjudged, type PlatformRules } from "./marks.ts";
@@ -90,7 +90,11 @@ export type OutcomeJudgment = Judgment | { result: "conflict"; seq: number };
  * judged. An outcome judges no time, so it may be written clamped (section
  * 5.3).
  */
-export function settleOutcome(view: StateView, definition: ValidDefinition, outcome: Extract<Input, { type: "outcome" }>, context: OutcomeContext): OutcomeJudgment {
+export function settleOutcome(view: StateView, definition: ValidDefinition, outcome: OutcomeOffered, context: OutcomeContext): OutcomeJudgment {
+  // Section 4.1: an outcome that is offered with another owner or kind than its operation has is `bad-input`, also when it would
+  // be a copy of a recorded answer. Nothing is written.
+  const operation = view.operation(outcome.operation);
+  if (operation && !namesOwn(operation, outcome)) return invalid("the outcome names another owner or kind than its operation has");
   const known = recordedOutcome(view, outcome);
   if (known) return known;
   const admit = admitted(view, definition, context);
@@ -105,7 +109,7 @@ export function settleOutcome(view: StateView, definition: ValidDefinition, outc
 }
 
 /** `settleOutcome`, for a caller that only asks whether the outcome writes an entry: a contradiction is an input that the scope never writes. */
-export function judgeOutcome(view: StateView, definition: ValidDefinition, outcome: Extract<Input, { type: "outcome" }>, context: OutcomeContext): Judgment {
+export function judgeOutcome(view: StateView, definition: ValidDefinition, outcome: OutcomeOffered, context: OutcomeContext): Judgment {
   const judged = settleOutcome(view, definition, outcome, context);
   return judged.result === "conflict" ? invalid(`outcome-conflict: entry ${judged.seq} records another answer of that attempt`) : judged;
 }

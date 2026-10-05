@@ -30,6 +30,20 @@ export type Owner = CapabilityName | PlatformDefinition;
 export type OutcomeInput = Extract<Input, { type: "outcome" }>;
 type Result = OutcomeInput["result"];
 
+/**
+ * An outcome as it is offered (section 4.1, "An outcome states its owner and
+ * its kind"). The component that offers it does not choose the operation's
+ * owner or its kind: the judge reads both from the `operation` effect that
+ * opened the operation, which the folded state holds, and sets them in the
+ * input. An offer may state them, as a verifier's does when it derives a
+ * sealed input again. An offer that states other values is `bad-input`.
+ */
+export type OutcomeOffered = Omit<OutcomeInput, "owner" | "kind"> & { owner?: unknown; kind?: unknown };
+
+/** True when the offer states no owner and no kind, or the ones of its operation. */
+export const namesOwn = (operation: Pick<Operation, "owner" | "kind">, outcome: OutcomeOffered): boolean =>
+  (outcome.owner === undefined || outcome.owner === operation.owner) && (outcome.kind === undefined || outcome.kind === operation.kind);
+
 /** Item 1: the operation's ID is the `seq` of the entry that opened it and the record's ordinal there. */
 export const operationId = (seq: number, k: number): OperationId => `${seq}:${k}`;
 
@@ -195,6 +209,8 @@ export function attemptedBy(operation: Operation, effect: Extract<Effect, { effe
   }
   const input = entry.input;
   if (input.type !== "outcome" || input.operation !== operation.id || input.attempt !== effect.attempt || input.result !== effect.result) return "records a result that is not its own outcome";
+  // Section 4.1: the outcome's owner and kind are those of the operation, which the entry that opened it states.
+  if (input.owner !== operation.owner || input.kind !== operation.kind) return "names another owner or kind than its operation has";
   const attempt = operation.attempts.find((a) => a.attempt === effect.attempt);
   if (!attempt) return "records an outcome of an attempt that no entry opened";
   if (attempt.outcomes.length > 1 || decisive(latest(attempt)) || (attempt.outcomes.length === 1 && effect.result === "unknown")) return "records an outcome of an attempt that has its last one";
@@ -217,7 +233,7 @@ export function attemptedBy(operation: Operation, effect: Extract<Effect, { effe
  * An `unknown` is no answer. Offered for an attempt that has any outcome, it
  * writes nothing: it is answered with the attempt's first outcome.
  */
-export function recordedOutcome(view: StateView, outcome: OutcomeInput): { result: "repeat" | "conflict"; seq: number } | null {
+export function recordedOutcome(view: StateView, outcome: OutcomeOffered): { result: "repeat" | "conflict"; seq: number } | null {
   const outcomes = view.operation(outcome.operation)?.attempts.find((a) => a.attempt === outcome.attempt)?.outcomes ?? [];
   if (outcomes.length === 0) return null;
   if (outcome.result === "unknown") return { result: "repeat", seq: outcomes[0]!.seq };
@@ -245,17 +261,20 @@ const invalid = (detail: string): OutcomeDerivation => ({ result: "refused", rea
  * `recordedOutcome` did not answer. The input is the operation, the attempt's
  * number, the result and the evidence. `selected`, the next attempt and
  * what the owner derives are effects, derived here from the state and never
- * supplied (the closing paragraph of section 4.3).
+ * supplied (the closing paragraph of section 4.3). The input's `owner` and
+ * `kind` are the operation's, read from the state, and an offer that states
+ * others is refused (section 4.1).
  *
  * The scope cannot check that an answer came from the outside system. That
  * is trusted, and a replay reports it as trusted: `own-answer` for an
  * attempt's own answer, `host-read` for a read (section 9.5).
  */
-export function outcomeOf(view: StateView, outcome: OutcomeInput, owners: Owners | undefined): OutcomeDerivation {
+export function outcomeOf(view: StateView, outcome: OutcomeOffered, owners: Owners | undefined): OutcomeDerivation {
   const operation = view.operation(outcome.operation);
   const attempt = operation?.attempts.find((a) => a.attempt === outcome.attempt);
   // Item 5, and rule 1: an outcome is of an attempt that an earlier entry opened. No outcome makes an attempt or an operation.
   if (!operation || !attempt) return invalid("no entry opened that attempt of that operation");
+  if (!namesOwn(operation, outcome)) return invalid("the outcome names another owner or kind than its operation has");
   const { result, evidence } = outcome;
   if (!["confirmed", "refused", "unknown"].includes(result)) return invalid("the result is confirmed, refused or unknown");
   // Section 4.1: the evidence of every outcome has a basis and a body, whatever its owner checks. An owner's rule may narrow the
@@ -285,13 +304,15 @@ export function outcomeOf(view: StateView, outcome: OutcomeInput, owners: Owners
 
   // Item 7: `selected` is true when the result is `confirmed`, the slot is empty at this commit and the owner's guard holds. Every
   // other `confirmed` outcome of a selecting operation is recorded as not selected. The order of the outcome entries decides.
-  const selected = rules.selects && result === "confirmed" ? operation.selected === null && (rules.holds?.(view, operation, outcome) ?? true) : null;
+  // What an owner's rule and the entry are given: the input as the judge sets it, with the operation's owner and kind.
+  const input: OutcomeInput = { type: "outcome", operation: operation.id, attempt: attempt.attempt, owner: operation.owner, kind: operation.kind, result, evidence };
+  const selected = rules.selects && result === "confirmed" ? operation.selected === null && (rules.holds?.(view, operation, input) ?? true) : null;
   // Item 2: the outcome entry of attempt n opens attempt n + 1 when its result is `refused` or `unknown`, the owner's retry rule
   // allows another, fewer than the stated number are opened and nothing is selected. Rule 7: none is opened beyond the stated
   // number, and nothing here reads the scope's free room. The room was reserved by the entry that opened the operation.
   const last = attempt.attempt === operation.attempts.length;
   const next = result !== "confirmed" && last && operation.attempts.length < operation.most && operation.selected === null && rules.retries(result, operation);
-  const derived = rules.derives?.(view, operation, outcome, selected) ?? { effects: [], sends: [], opens: [] };
+  const derived = rules.derives?.(view, operation, input, selected) ?? { effects: [], sends: [], opens: [] };
   // Section 17.2, row 5: an outcome entry is never asked whether it fits (section 17.3), so what it opens was reserved with its own
   // operation, as the closure that the owner declares. An owner whose outcome would open more has broken its own declaration:
   // fail closed, and nothing is written.
@@ -303,7 +324,6 @@ export function outcomeOf(view: StateView, outcome: OutcomeInput, owners: Owners
     // Item 7, and rule 2: a cleanup, like a retry, is a new operation with its own identity and its own attempts.
     ...derived.opens.flatMap((open, k) => operationOpening(k, open)),
   ];
-  const input: Input = { type: "outcome", operation: outcome.operation, attempt: outcome.attempt, result, evidence };
   // An outcome judges no time, so it may be written clamped (section 5.3).
   return { result: "write", draft: { input, uses: [], prepared: [], effects, sends: derived.sends, judgesTime: false } };
 }

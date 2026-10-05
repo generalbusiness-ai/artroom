@@ -54,6 +54,7 @@ export type Input =
   | { type: "timed"; item: number; rule: string; due: Timestamp }
   | PreparationInput
   | { type: "outcome"; operation: OperationId; attempt: number;
+      owner: CapabilityName | PlatformDefinition; kind: string;           // of the operation, as the entry that opened it states them (section 4.1, revision 16)
       result: "confirmed" | "refused" | "unknown"; evidence: Evidence }   // section 4.3
   | { type: "checkpoint"; through: number; state: Digest };
 

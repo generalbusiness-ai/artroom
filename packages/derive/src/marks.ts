@@ -16,7 +16,7 @@
  * and nothing in an entry says that a rule ran.
  */
 
-import type { ActType, AlsoMark, Attempt, Bounds, Effect, Evidence, FactRef, FieldType, FieldValue, Grant, GrantMark, Guard, Mark, MemberRef, Message, OperationId, PlatformDefinition, Request, ScopeRef, Seed, SignedIntent, Timestamp } from "@generalbusiness/artroom-contract";
+import type { ActType, AlsoMark, Attempt, Bounds, CapabilityName, Effect, Evidence, FactRef, FieldType, FieldValue, Grant, GrantMark, Guard, Mark, MemberRef, Message, OperationId, PlatformDefinition, Request, ScopeRef, Seed, SignedIntent, Timestamp } from "@generalbusiness/artroom-contract";
 import { isFieldValue, isMemberRef } from "@generalbusiness/artroom-bytes";
 import type { Signer } from "./attribution.ts";
 import type { Own } from "./fields.ts";
@@ -42,7 +42,7 @@ export type JudgedInput =
   | { readonly type: "act"; readonly signed: SignedIntent; readonly grant: Grant | null; readonly presented: Readonly<Record<string, unknown>> }
   | { readonly type: "genesis"; readonly seed: Seed; readonly founding: SignedIntent | null; readonly source: FactRef | null; readonly n: number | null; readonly message: Request | null }
   | { readonly type: "delivery"; readonly from: FactRef; readonly n: number; readonly message: Message }
-  | { readonly type: "outcome"; readonly operation: OperationId; readonly attempt: number; readonly result: "confirmed" | "refused" | "unknown"; readonly evidence: Evidence }
+  | { readonly type: "outcome"; readonly operation: OperationId; readonly attempt: number; readonly owner: CapabilityName | PlatformDefinition; readonly kind: string; readonly result: "confirmed" | "refused" | "unknown"; readonly evidence: Evidence }
   | { readonly type: "diagnosis"; readonly of: { seq: number; n: number }; readonly attempts: readonly Attempt[] };
 
 /**

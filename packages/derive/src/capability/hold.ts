@@ -640,11 +640,11 @@ export function holdReserves(view: StateView, definition: ValidDefinition): numb
  * pins.
  *
  * `implements` answers for each form (section 6.1). The four guards, the
- * four effects and a `carried` part are derived. The kind of a step's
- * entries is not. `kindOf` gives a preparation entry its kind, and gives an
- * outcome entry none: the kind is not in an outcome entry's bytes (I3
- * deltas, entry EH3). A definition that names such a kind names a check
- * entry, which is an outcome entry, so the form stays without code.
+ * four effects and a `carried` part are derived. So is the kind of a step's
+ * entries, for a step that has code here: `kindOf` reads the kind of a
+ * preparation entry and of an outcome entry from the entry's own input, and
+ * only this code writes an entry of such a kind (section 6.2; source row
+ * I3-13).
  * The steps `retry` and `job-read`, and the operations of a fork, are not
  * built here: with no rules for them, nothing of them is judged or sent.
  */
@@ -659,7 +659,8 @@ export function holdCapability(options: HoldOptions, definition: (view: StateVie
   return {
     implements: (form: unknown, step?: string) => (typeof form === "string"
       ? form === HOLD && step !== undefined && own(steps, step) !== undefined
-      : isRecord(form) && form["capability"] === HOLD && (form["form"] === "listed" || form["form"] === "carried" || (form["form"] === "guard" && own(GUARDS, form["name"] as string) !== undefined) || (form["form"] === "effect" && own(EFFECTS, form["name"] as string) !== undefined))),
+      : isRecord(form) && form["capability"] === HOLD && (form["form"] === "listed" || form["form"] === "carried" || (form["form"] === "guard" && own(GUARDS, form["name"] as string) !== undefined) || (form["form"] === "effect" && own(EFFECTS, form["name"] as string) !== undefined)
+        || (form["form"] === "kind" && typeof form["name"] === "string" && form["name"].startsWith(`${HOLD}:`) && own(steps, form["name"].slice(HOLD.length + 1)) !== undefined))),
     guard: (capability, guard, args, given) => {
       const rule = capability === HOLD ? own(GUARDS, guard) : undefined;
       if (!rule) throw new Error(`${capability} has no code for the guard ${guard}`);

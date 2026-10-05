@@ -48,12 +48,13 @@ export function slotOf(item: Item, slot: string): FieldValue | null {
  * kind, exactly"). No act kind and no message name has that form, so only
  * the capability's code writes an entry of such a kind.
  *
- * That table gives the same kind to each outcome entry of the step's
- * operation. An outcome entry holds the operation's ID, and neither the
- * capability nor the step, so that kind is not in its own bytes, and a
- * reader of a fetched entry has nothing else. An outcome entry has no kind
- * here, and a `fact` type that names a check entry does not hold (I3
- * deltas, entry EH3).
+ * An outcome entry has the kind of its operation's owner and kind, written
+ * `hold@1:check`, from the members `owner` and `kind` of its input, whatever
+ * its result (section 6.2, the row made exact in revision 16; section 4.1,
+ * "An outcome states its owner and its kind"). The judge set both from the
+ * `operation` effect that opened the operation, so a reader of one fetched
+ * entry needs no table of the capability. The kind says nothing of the
+ * result: a row that needs a completed check reads the carried record.
  */
 export function kindOf(entry: Entry): string | null {
   const input = entry.input;
@@ -61,6 +62,7 @@ export function kindOf(entry: Entry): string | null {
   if (input.type === "genesis") return input.kind;
   if (input.type === "timed") return `timed:${input.rule}`;
   if (input.type === "preparation") return `${input.capability}:${input.step}`;
+  if (input.type === "outcome") return `${input.owner}:${input.kind}`;
   if (input.type !== "delivery" || input.message.class !== "request" || !("decision" in input)) return null;
   if (input.decision === "refused" && input.reason?.code === "unknown-message") return null;
   const body = input.message.body;

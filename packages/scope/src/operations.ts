@@ -33,9 +33,9 @@
  * commit and from the object's alarm.
  */
 
-import type { Bounds, CapabilityName, DecisiveEvidence, Entry, Evidence, FactRef, Input, OperationId, PlatformDefinition, ScopeRef } from "@generalbusiness/artroom-contract";
+import type { Bounds, CapabilityName, DecisiveEvidence, Entry, Evidence, FactRef, OperationId, PlatformDefinition, ScopeRef } from "@generalbusiness/artroom-contract";
 import { isEvidence, isOperationId } from "@generalbusiness/artroom-bytes";
-import { settleOutcome, timeMs, timeOf, type Owners } from "@generalbusiness/artroom-derive";
+import { settleOutcome, timeMs, timeOf, type OutcomeOffered, type Owners } from "@generalbusiness/artroom-derive";
 import { ownOf, type Scope } from "./core.ts";
 import type { Wakes } from "./outbox.ts";
 import type { Clock, Ports } from "./ports.ts";
@@ -109,7 +109,8 @@ const isAnswer = (answer: unknown): answer is EffectAnswer => {
   return typeof a === "object" && a !== null && (a.result === "confirmed" || a.result === "refused") && isEvidence(a.evidence) && a.evidence.basis !== "none";
 };
 
-type Outcome = Extract<Input, { type: "outcome" }>;
+/** An outcome as the driver offers it: it states no owner and no kind, which the judge sets from the operation (section 4.1). */
+type Outcome = OutcomeOffered;
 
 export class Operations {
   readonly #scope: Scope;

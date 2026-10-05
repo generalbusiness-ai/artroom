@@ -208,7 +208,11 @@ const input = variant("type", {
   // Section 4.1 and 5.5: the signed intent, the one grant judged, the capability and its step. Depth is bounded as for an act.
   preparation: record({ type: any, signed: signedIntent, authority: listOf(grant), capability: capabilityName, step: text }),
   timed: record({ type: any, item: isLocalId, rule: text, due: isTime }),
-  outcome: record({ type: any, operation: isOperationId, attempt: isLocalId, result: among({ confirmed: true, refused: true, unknown: true }), evidence }),
+  // Section 4.1, "An outcome states its owner and its kind": both are always present, and the kind is a text that is not empty.
+  outcome: record({
+    type: any, operation: isOperationId, attempt: isLocalId, owner: (v) => capabilityName(v) || isPlatformDefinition(v), kind: (v) => text(v) && v !== "",
+    result: among({ confirmed: true, refused: true, unknown: true }), evidence,
+  }),
   checkpoint: record({ type: any, through: isLocalId, state: isDigest }),
 } satisfies Record<Input["type"], Check>);
 export const isInput = (v: unknown): v is Input => input(v);
