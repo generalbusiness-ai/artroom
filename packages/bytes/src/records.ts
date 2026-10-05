@@ -22,8 +22,8 @@
  * the judges.
  *
  * What stays opaque, because the contract leaves it to another owner or to
- * the application: the body of a request or an advisory; the evidence of an
- * outcome; a grant's `within`, when it is not one scope, and its `fresh`;
+ * the application: the body of a request or an advisory; the body of the
+ * evidence of an outcome; a grant's `within`, when it is not one scope, and its `fresh`;
  * the value of each field of an intent and of an `index` effect; and
  * whether a slot's value is a value of the type its definition declares.
  * A slot's value is checked as far as `isFieldValue` goes: one of the forms
@@ -31,7 +31,7 @@
  */
 
 import type {
-  Attempt, Dispatched, Duty, Effect, Entry, FactRef, FactUse, FieldValue, Grant, Head, Input, Intent, Item, LogPage, MemberRef, Message, Party, Prepared, Read, ReadRefusal, Receipt, RefusalReason,
+  Attempt, Dispatched, Duty, Effect, Entry, Evidence, FactRef, FactUse, FieldValue, Grant, Head, Input, Intent, Item, LogPage, MemberRef, Message, Party, Prepared, Read, ReadRefusal, Receipt, RefusalReason,
   RetainedInput, ScopeRef, Sealed, Seed, Send, SignedIntent, Status, Summary,
 } from "@generalbusiness/artroom-contract";
 import { MAX_DEPTH, wellFormed } from "./canonical.ts";
@@ -176,6 +176,17 @@ const effect = variant("effect", {
 } satisfies Record<Effect["effect"], Check>);
 export const isEffect = (v: unknown): v is Effect => effect(v);
 
+/**
+ * The evidence of an outcome (sections 4.1 and 4.3, item 4): a basis the
+ * contract names and a body, both its own members, and nothing else. The
+ * body is its owner's to type, so any value is one, and it is never absent.
+ * Which result may have which basis, and what a body means, are the
+ * ledger's and the owner's checks.
+ */
+const BASIS: Record<Evidence["basis"], true> = { "own-answer": true, read: true, none: true };
+const evidence = record({ basis: among(BASIS), body: (v) => v !== undefined });
+export const isEvidence = (v: unknown): v is Evidence => evidence(v);
+
 /** A delivery records what its message's class requires beside it: a request its decision, a result the clause that ran, a control or an advisory nothing more. */
 const delivered = { type: any, from: factRef, n: isLocalId, message };
 const deliveryOf: Record<Message["class"], Check> = {
@@ -197,7 +208,7 @@ const input = variant("type", {
   // Section 4.1 and 5.5: the signed intent, the one grant judged, the capability and its step. Depth is bounded as for an act.
   preparation: record({ type: any, signed: signedIntent, authority: listOf(grant), capability: capabilityName, step: text }),
   timed: record({ type: any, item: isLocalId, rule: text, due: isTime }),
-  outcome: record({ type: any, operation: isOperationId, attempt: isLocalId, result: among({ confirmed: true, refused: true, unknown: true }), evidence: any }),
+  outcome: record({ type: any, operation: isOperationId, attempt: isLocalId, result: among({ confirmed: true, refused: true, unknown: true }), evidence }),
   checkpoint: record({ type: any, through: isLocalId, state: isDigest }),
 } satisfies Record<Input["type"], Check>);
 export const isInput = (v: unknown): v is Input => input(v);

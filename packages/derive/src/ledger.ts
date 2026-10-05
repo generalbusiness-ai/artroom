@@ -20,7 +20,7 @@
  */
 
 import type { CapabilityName, Digest, Effect, Entry, Evidence, Input, OperationId, PlatformDefinition, Send, Timestamp } from "@generalbusiness/artroom-contract";
-import { canonicalBytes, digestBytes } from "@generalbusiness/artroom-bytes";
+import { canonicalBytes, digestBytes, isEvidence } from "@generalbusiness/artroom-bytes";
 import type { Draft } from "./judge.ts";
 import type { AttemptState, Operation, OutcomeState, StateView } from "./state.ts";
 import { timeMs, type Clock } from "./time.ts";
@@ -49,7 +49,7 @@ export interface OperationRules {
   retries(result: "refused" | "unknown", operation: Operation): boolean;
   /** Item 7: the owner's local guard for a selection. Absent: it holds. */
   holds?(view: StateView, operation: Operation, outcome: OutcomeInput): boolean;
-  /** Item 4: the evidence is well formed for this owner. Absent: any body is. */
+  /** Item 4: the evidence is well formed for this owner. Absent: any body is. The ledger has checked that the evidence has a basis and a body. */
   wellFormed?(result: Result, evidence: Evidence): boolean;
   /** What the outcome derives beside the ledger's records. Absent: nothing. */
   derives?(view: StateView, operation: Operation, outcome: OutcomeInput, selected: boolean | null): OutcomeDerived;
@@ -258,9 +258,12 @@ export function outcomeOf(view: StateView, outcome: OutcomeInput, owners: Owners
   if (!operation || !attempt) return invalid("no entry opened that attempt of that operation");
   const { result, evidence } = outcome;
   if (!["confirmed", "refused", "unknown"].includes(result)) return invalid("the result is confirmed, refused or unknown");
+  // Section 4.1: the evidence of every outcome has a basis and a body, whatever its owner checks. An owner's rule may narrow the
+  // body, and none may let it be absent.
+  if (!isEvidence(evidence)) return invalid("the evidence is a basis and a body");
   // Item 4: `unknown` has the basis `none`, and no other result has it.
   const bases: readonly unknown[] = result === "unknown" ? ["none"] : ["own-answer", "read"];
-  if (typeof evidence !== "object" || evidence === null || !bases.includes(evidence.basis)) return invalid(`a ${result} outcome has no such basis`);
+  if (!bases.includes(evidence.basis)) return invalid(`a ${result} outcome has no such basis`);
   try {
     evidenceDigest(evidence);
   } catch {

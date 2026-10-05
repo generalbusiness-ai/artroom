@@ -38,9 +38,11 @@ function open(s: Scope, ...opens: Opening[]): OperationId[] {
 }
 
 type Basis = Evidence["basis"];
+/** In place of a body: the evidence has none. */
+const ABSENT = Symbol("no body");
 /** Offer one outcome, and seal it when it writes. The answer in short: `write`, a refusal's detail, or the entry that a repeat or a conflict names. */
 function answer(s: Scope, operation: OperationId, attempt: number, result: "confirmed" | "refused" | "unknown", basis: Basis = result === "unknown" ? "none" : "own-answer", body: unknown = {}, given: Owners | null = owners) {
-  const j = settleOutcome(s.state, ticketDefinition, { type: "outcome", operation, attempt, result, evidence: { basis, body } }, { clock: clockOf(s.state, s.now), bounds: PROPOSED_BOUNDS, owners: given ?? undefined });
+  const j = settleOutcome(s.state, ticketDefinition, { type: "outcome", operation, attempt, result, evidence: (body === ABSENT ? { basis } : { basis, body }) as Evidence }, { clock: clockOf(s.state, s.now), bounds: PROPOSED_BOUNDS, owners: given ?? undefined });
   if (j.result === "write") s.seal(j.draft);
   return j.result === "repeat" || j.result === "conflict" ? [j.result, j.seq] : j.result === "refused" ? j.detail : j.result;
 }
@@ -110,6 +112,8 @@ describe("the ledger of outside effects (scope contract, section 4.3; authority 
       "only that attempt's own answer follows an unknown outcome", ["repeat", 3], "no entry opened that attempt of that operation", "a confirmed outcome has no such basis", ["repeat", 3],
       "unavailable", head,
     ]);
+    // The mint's own answer with a basis and no body is no evidence, though its made-up owner checks no body (section 4.1).
+    expect([answer(s, mint, 1, "confirmed", "own-answer", ABSENT), s.head.seq]).toEqual(["the evidence is a basis and a body", head]);
     expect([shape(s, push), operationStanding(s.state.operation(push)!), s.state.outstanding()]).toMatchObject([[["unknown"], ["confirmed"]], "unknown", { opened: 0, unknown: 2, unopened: 0 }]);
     // Rule 4 is a judgment about a token whose end time is known, on the commit's reading. It is the only rule that reads a time, and it settles no attempt.
     const clock = (reading: number, behind = false) => ({ reading: t(reading), behind, asOf: t(reading) });

@@ -34,7 +34,7 @@
  */
 
 import type { Bounds, CapabilityName, DecisiveEvidence, Entry, Evidence, FactRef, Input, OperationId, PlatformDefinition, ScopeRef } from "@generalbusiness/artroom-contract";
-import { isOperationId } from "@generalbusiness/artroom-bytes";
+import { isEvidence, isOperationId } from "@generalbusiness/artroom-bytes";
 import { settleOutcome, timeMs, timeOf, type Owners } from "@generalbusiness/artroom-derive";
 import { ownOf, type Scope } from "./core.ts";
 import type { Wakes } from "./outbox.ts";
@@ -103,11 +103,10 @@ export const NO_OUTSIDE: Outside = { accepts: () => false, send: () => Promise.r
 
 const UNKNOWN: Evidence = { basis: "none", body: null };
 const keyOf = (operation: OperationId, attempt: number) => `${operation}#${attempt}`;
-/** An answer as the contract's outcome can hold it. Anything else is no answer. */
+/** An answer as the contract's outcome can hold it: a decisive result, and evidence with a basis and a body (`isEvidence`). Anything else is no answer. */
 const isAnswer = (answer: unknown): answer is EffectAnswer => {
-  const a = answer as Partial<EffectAnswer> | null;
-  return typeof a === "object" && a !== null && (a.result === "confirmed" || a.result === "refused") && typeof a.evidence === "object" && a.evidence !== null
-    && (a.evidence.basis === "own-answer" || a.evidence.basis === "read");
+  const a = answer as { result?: unknown; evidence?: unknown } | null;
+  return typeof a === "object" && a !== null && (a.result === "confirmed" || a.result === "refused") && isEvidence(a.evidence) && a.evidence.basis !== "none";
 };
 
 type Outcome = Extract<Input, { type: "outcome" }>;
