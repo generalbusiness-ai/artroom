@@ -360,7 +360,7 @@ Four more routes serve what is no history:
 
 | Route | Answer | Status |
 |---|---|---|
-| `POST /v1/scopes/:scope/sessions`, body a signed session request `{ request, sig }` | `SessionAnswer`: the token and what it names, or a reason. Marked `cache-control: no-store` | 200; 400 `bad-request`; 403 `unauthorized`; 404 `not-found`; 422 `misaddressed`, `expired`; 503 `sessions-unavailable`, `clock-behind` |
+| `POST /v1/scopes/:scope/sessions`, body a signed session request `{ request, sig }` | `SessionAnswer`: the token and what it names, or a reason. Marked `cache-control: no-store` | 200; 400 `bad-request`; 403 `unauthorized`; 404 `not-found`; 409 `replayed`; 422 `misaddressed`, `expired`; 429 `rate-limited`; 503 `sessions-unavailable`, `clock-behind` |
 | `GET /v1/scopes/:scope/stream` | Lines of JSON, `{ at }`: the scope's head when the stream opens and after each commit | 200; as a read otherwise |
 | `GET /v1/scopes/:scope/incidents?cursor=` | A page of the operator's record of the scope, for an admin's session | as a read |
 | `GET /v1/scopes/:scope/waiting/:list?cursor=` | One page of the list `diagnosed` or `unanswered` of the requests that wait, for an admin's session | as a read |
@@ -379,7 +379,7 @@ section 3.9).
 | Question | Answer |
 |---|---|
 | What it binds | The deployment's name; the membership scope with its incarnation, which is the repository; the member and the device key; the reads of the member's role when it was issued; and an end time at most 600 seconds later, written from membership's clock. |
-| How it is issued | A device signs a session request with its own key, to the membership scope. Membership answers from its head: only an active key of an active member gets one. It writes no entry. |
+| How it is issued | A device signs a session request with its own key, to the membership scope. Membership answers from its head: only an active key of an active member gets one. It writes no entry. A request is answered with a session once: membership notes the key and the request's operation identity, outside its history, until the request's `notAfter`. |
 | How it is verified | By HMAC-SHA-256 under the deployment's session secret, over the exact claim bytes, compared in constant time. Then the deployment's name, then the membership reference: a scope accepts a session only for the membership scope that it records itself. Then the scope's own clock against the end time, at every read and before every send on a stream. |
 | Which clock | Two. Membership's clock wrote the end time, and each reading scope compares it with its own. A scope whose clock reads earlier than its previous entry's time answers `clock-behind` and sends nothing. |
 | After a key is revoked or a member is removed | A session already issued is accepted until its end: at most 600 seconds on membership's clock, plus the difference between the two clocks. No new one is issued. Nothing recalls what was read. |

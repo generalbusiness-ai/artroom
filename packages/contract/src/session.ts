@@ -21,7 +21,9 @@ export const SESSION_DOMAINS = { token: "artroom-session-1", request: "artroom-s
  * incarnation, which is the repository's membership reference; `actor` is
  * the device key that signs; `operation` is an operation identity, a new
  * one for each request; and `notAfter` is at most 15 minutes ahead.
- * Exactly these members.
+ * Exactly these members. A request is answered with a session once: the
+ * same key and operation identity get none again (the scope contract's
+ * section 8.2, row 24). After a lost reply a device signs a new request.
  */
 export interface SessionRequest { v: 1; to: ScopeRef; actor: KeyId; action: "read-session"; operation: string; notAfter: Timestamp }
 export interface SignedSessionRequest { request: SessionRequest; sig: Base64Url }
@@ -43,8 +45,11 @@ export interface SessionClaims { v: 1; deployment: string; membership: ScopeRef;
  * incarnation. `clock-behind`: the scope's clock reads earlier than its
  * previous entry's time. `expired`: the reading is at or past `notAfter`.
  * `unauthorized`: the key is not an active key of an active member.
+ * `replayed`: that key was already given a session for that operation
+ * identity. `rate-limited`: that key has as many requests that have not yet
+ * passed their `notAfter` as one key may have.
  */
-export type SessionRefusal = "sessions-unavailable" | "bad-request" | "not-found" | "misaddressed" | "clock-behind" | "expired" | "unauthorized";
+export type SessionRefusal = "sessions-unavailable" | "bad-request" | "not-found" | "misaddressed" | "clock-behind" | "expired" | "unauthorized" | "replayed" | "rate-limited";
 
 /** Membership's answer to a session request. It is an answer and no entry. `token` is the credential: it is kept in memory and presented in a header. */
 export type SessionAnswer = { ok: true; token: string; session: SessionClaims } | { ok: false; reason: SessionRefusal };

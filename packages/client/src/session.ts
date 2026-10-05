@@ -6,7 +6,9 @@
  *
  * - **Asking.** The device signs a session request with its own key, to the
  *   repository's membership scope with its incarnation, and sends it in a
- *   request's body. The same key that is revoked is refused a new session.
+ *   request's body. A key that is revoked is refused a new session. A
+ *   request is answered with a session once: after a lost reply the device
+ *   signs a new request, with a new operation identity.
  * - **Holding.** The token is kept in memory, in a `Session`. Nothing here
  *   writes it to storage, to a URL, to an error or to a log. `toJSON` and
  *   the text form of a `Session` leave it out.
@@ -53,7 +55,7 @@ export class Session {
   toString(): string { return `Session of ${this.claims.member} until ${this.claims.ends}`; }
 }
 
-const REFUSALS: Record<SessionRefusal, true> = { "sessions-unavailable": true, "bad-request": true, "not-found": true, misaddressed: true, "clock-behind": true, expired: true, unauthorized: true };
+const REFUSALS: Record<SessionRefusal, true> = { "sessions-unavailable": true, "bad-request": true, "not-found": true, misaddressed: true, "clock-behind": true, expired: true, unauthorized: true, replayed: true, "rate-limited": true };
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 
 /** Whether a reply is an answer to a session request, with what that answer must carry. A reply is untrusted until this has passed. */

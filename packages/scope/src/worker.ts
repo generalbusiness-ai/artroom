@@ -183,7 +183,7 @@ const READ_STATUS: Record<ReadRefusal, number> = {
   "not-found": 404, "wrong-incarnation": 409, forbidden: 403, "scope-provisional": 409, "unsupported-definition": 501, "history-unavailable": 503, "too-large": 413, unavailable: 503,
   "sessions-unavailable": 503, "clock-behind": 503,
 };
-const SESSION_STATUS: Record<SessionRefusal, number> = { "sessions-unavailable": 503, "bad-request": 400, "not-found": 404, misaddressed: 422, "clock-behind": 503, expired: 422, unauthorized: 403 };
+const SESSION_STATUS: Record<SessionRefusal, number> = { "sessions-unavailable": 503, "bad-request": 400, "not-found": 404, misaddressed: 422, "clock-behind": 503, expired: 422, unauthorized: 403, replayed: 409, "rate-limited": 429 };
 const read = (result: Read<unknown>): Response => json(result.ok ? 200 : READ_STATUS[result.reason], result);
 
 /**

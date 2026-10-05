@@ -200,6 +200,9 @@ describe("read sessions (authority note, sections 3.9, 3.12 row W6, 5.3 and 5.5;
       // The operator replaces the secret. Every session that the old one made ends at once, and a new request gets a new session.
       platformNet.secret = testSecret();
       expect([await read(M, "", held.reader()), await read(M, "", (await session(M, rita)).reader())]).toEqual([[403, "forbidden"], [200, "ok"]]);
+      // A request is answered with a session once: the same signed bytes, sent again, get none.
+      const once = await signedRequest(M, rita);
+      expect([(await ask(M, once)).ok, await ask(M, once)]).toEqual([true, { ok: false, reason: "replayed" }]);
       // A session request that is signed by another key than it names, or that is to another membership scope, gets no session.
       const [good, away] = [await signedRequest(M, rita), await signedRequest((await office()).M, rita)];
       expect([await ask(M, { ...good, request: { ...good.request, actor: una.key } }), await ask(M, away), await ask(M, await signedRequest(M, rita, 901)), unb64url(good.sig)?.length])

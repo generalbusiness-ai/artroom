@@ -47,6 +47,12 @@
  * takes effect in a session the same way: at the next session. Replacing
  * the secret ends every session at once.
  *
+ * **How one is issued.** A device signs a session request with its own key,
+ * to the membership scope, and membership answers from its head and its own
+ * clock (`issueSession`). The forms of the request and of the claims are in
+ * the contract package's `session.ts`. A request is answered with a session
+ * once, by its key and operation identity.
+ *
  * **A reader with no session** gets `forbidden` from every read, and no
  * stream.
  *
@@ -262,17 +268,19 @@ export function readsOf(actions: readonly string[]): readonly ReadName[] {
  * request's `notAfter`; the standing of the signing key. The end time is
  * membership's reading plus 600 seconds.
  *
- * A request is not single use: no adopted text gives membership a record
- * of the requests it has answered. The same signed bytes are answered
- * again until `notAfter`, each time with a session that ends 600 seconds
- * after that answer (I3 deltas, entry ES2). So a signed request is to be
- * kept as a credential is, in a request body and never in a URL.
+ * **A request is answered with a session once.** The last step notes the
+ * key and the operation identity in `requests`, until the request's
+ * `notAfter`, and a request that is found there gets no session:
+ * `replayed`. So a signed request that someone else captured, after it was
+ * answered, is worth nothing. One that was captured and never answered is
+ * still a credential until its `notAfter`: it travels in a request's body,
+ * never in a URL. With no `requests` given, no session is issued.
  */
 export function issueSession(
-  config: { sessions: Sessions | null; clock: Clock }, state: Pick<StateView, "scope" | "page" | "item">, pinned: { named: unknown } | null, asked: unknown,
+  config: { sessions: Sessions | null; clock: Clock; requests: SessionRequests | null }, state: Pick<StateView, "scope" | "page" | "item">, pinned: { named: unknown } | null, asked: unknown,
 ): SessionAnswer {
   const no = (reason: SessionRefusal): SessionAnswer => ({ ok: false, reason });
-  if (!config.sessions) return no("sessions-unavailable");
+  if (!config.sessions || !config.requests) return no("sessions-unavailable");
   if (!isSessionRequest(asked) || !verifySessionRequest(asked)) return no("bad-request");
   const { to, actor, notAfter } = asked.request;
   const scope = state.scope();
@@ -286,10 +294,50 @@ export function issueSession(
   const standing = standingOf(state, { of: scope.at, key: actor });
   // A revoked key, a key that membership does not hold, a removed member, and an agent whose controller is not active: none is issued a session.
   if (!standing || !("key" in standing) || standing.keyState !== "active" || standing.memberState !== "active" || standing.controllerActive === false) return no("unauthorized");
+  // The last check, and the one write: this key has not been given a session for this operation identity.
+  const noted = config.requests.note(actor, asked.request.operation, reading, ends);
+  if (noted !== "new") return no(noted);
   const session: SessionClaims = {
     v: 1, deployment: config.sessions.deployment, membership: scope.at, member: standing.member, key: actor, reads: readsOf(standing.actions), ends: timeOf(reading + SESSION_SECONDS * 1000),
   };
   return { ok: true, token: mintSession(config.sessions, session), session };
+}
+
+/** The most requests of one key that have been answered and have not passed their `notAfter`. Configuration (I3 deltas, entry ES2). */
+export const REQUESTS_PER_KEY = 64;
+
+/**
+ * The session requests that a membership scope has answered with a session,
+ * each until its `notAfter` (the scope contract's section 8.2, row 24:
+ * "Request nonce unseen", local, with a time bound). It is one table of the
+ * scope's object, outside the history: no entry holds it and no guard reads
+ * it. A row is a key ID, an operation identity and a time. It holds no
+ * token and no signature.
+ *
+ * Only a request that passed every other check writes a row, so a caller
+ * with no active key writes none. One key holds at most `perKey` rows, and
+ * its further requests are `rate-limited` until one passes its `notAfter`:
+ * that limits the key that asked, and no other.
+ */
+export class SessionRequests {
+  readonly #sql: { exec(query: string, ...bindings: (string | number)[]): { toArray(): Record<string, unknown>[] } };
+  readonly #perKey: number;
+
+  constructor(sql: { exec(query: string, ...bindings: (string | number)[]): { toArray(): Record<string, unknown>[] } }, perKey: number = REQUESTS_PER_KEY) {
+    this.#sql = sql;
+    this.#perKey = perKey;
+    sql.exec("CREATE TABLE IF NOT EXISTS session_request (key TEXT NOT NULL, operation TEXT NOT NULL, ends INTEGER NOT NULL, PRIMARY KEY (key, operation)) WITHOUT ROWID").toArray();
+  }
+
+  /** Note one request at `now`, which is before its `ends`. `new`: it was not noted before, and is now. */
+  note(key: string, operation: string, now: number, ends: number): "new" | "replayed" | "rate-limited" {
+    // A request past its `notAfter` is refused `expired` before it reaches here, so its row is no longer needed.
+    this.#sql.exec("DELETE FROM session_request WHERE ends <= ?", now).toArray();
+    if (this.#sql.exec("SELECT 1 AS x FROM session_request WHERE key = ? AND operation = ?", key, operation).toArray().length > 0) return "replayed";
+    if ((this.#sql.exec("SELECT COUNT(*) AS n FROM session_request WHERE key = ?", key).toArray()[0]?.["n"] as number) >= this.#perKey) return "rate-limited";
+    this.#sql.exec("INSERT INTO session_request (key, operation, ends) VALUES (?, ?, ?)", key, operation, ends).toArray();
+    return "new";
+  }
 }
 
 // ---------------------------------------------------------------- streams

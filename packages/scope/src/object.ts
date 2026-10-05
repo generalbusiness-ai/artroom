@@ -42,7 +42,7 @@ import { Operations } from "./operations.ts";
 import { OperatorRecord, sendAgain, type Incident, type Resent } from "./operator.ts";
 import { Dispatcher, Wakes } from "./outbox.ts";
 import { production, type Alarm, type Authority, type Clock, type Delivery, type Ports, type Readers, type Transport } from "./ports.ts";
-import { Streams, issueSession, type Opened, type Sessions, type StreamRefusal } from "./sessions.ts";
+import { SessionRequests, Streams, issueSession, type Opened, type Sessions, type StreamRefusal } from "./sessions.ts";
 import { READ_BOUNDS, Reads, type ReadBounds, type Summary } from "./reads.ts";
 import { SqliteStore } from "./sqlite.ts";
 import type { Duty, OperationStatus, Sealed } from "./store.ts";
@@ -92,6 +92,7 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
   readonly #streams: Streams;
   readonly #limits: JoinLimits;
   readonly #sessions: () => Sessions | null;
+  readonly #requests: SessionRequests;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -137,6 +138,8 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
     this.#streams = new Streams(ports.readers, () => store.scope()?.head ?? null);
     this.#limits = new JoinLimits(wiring.limits);
     this.#sessions = wiring.sessions ?? (() => null);
+    // The session requests that this scope has answered, each until its `notAfter`: one more table that is no part of the store.
+    this.#requests = new SessionRequests({ exec: (query, ...bindings) => ctx.storage.sql.exec(query, ...bindings) });
   }
 
   /**
@@ -215,7 +218,7 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
    * A read session, for a device that asks with a signed request (authority note, section 3.9). Only an active membership scope
    * answers one, from its head and its own clock. It is an answer and no entry: nothing is written.
    */
-  session(asked: unknown): SessionAnswer { return issueSession({ sessions: this.#sessions(), clock: this.#clock }, this.#store, this.#scope.pinned(), asked); }
+  session(asked: unknown): SessionAnswer { return issueSession({ sessions: this.#sessions(), clock: this.#clock, requests: this.#requests }, this.#store, this.#scope.pinned(), asked); }
   /** A stream of this scope's head, for a read session that may read the summary; or why none is opened (`sessions.ts`, `Streams`). */
   stream(reader: unknown): Opened | StreamRefusal { return this.#streams.open(reader); }
   /** The reader of the stream with that ID went away. Its subscription is released at once. */
