@@ -3,8 +3,12 @@ import { defineConfig } from "vitest/config";
 /**
  * Every package's vitest suite as one run (`npm test` at the root): one
  * vitest process instead of one per package and runtime. Each project keeps
- * its package's own config, and they run one after another, so a project's
- * worker settings are its own.
+ * its package's own config. The projects that run in Node are one group and
+ * run at the same time. The `scope` project runs after them, by itself: it
+ * has one worker, and vitest lets projects share a group only when their
+ * worker counts agree. Run one after another, the Node projects took about
+ * half a second longer (5.1 seconds against 4.5 for the whole run; observed,
+ * three runs each, on a shared machine with 18 cores).
  *
  * The lane scenarios on real scopes, `packages/lanes/test/*.scope.test.ts`,
  * run here inside the `scope` project: the same Worker, loaded once. A
@@ -14,19 +18,18 @@ import { defineConfig } from "vitest/config";
  * `packages/lanes/vitest.scope.config.ts` runs them alone, in a Worker of
  * the lanes package's own, with the same classes.
  */
-let order = 0;
-const project = (name: string, dir: string, config: string, more: string[] = []) =>
-  ({ extends: `./packages/${dir}/${config}`, test: { name, root: `./packages/${dir}`, ...(more.length > 0 ? { include: ["test/**/*.test.ts", ...more] } : {}), sequence: { groupOrder: order++ } } });
+const project = (name: string, dir: string, config: string, group: number, more: string[] = []) =>
+  ({ extends: `./packages/${dir}/${config}`, test: { name, root: `./packages/${dir}`, ...(more.length > 0 ? { include: ["test/**/*.test.ts", ...more] } : {}), sequence: { groupOrder: group } } });
 
 export default defineConfig({
   test: {
     projects: [
-      project("bytes", "bytes", "vitest.config.ts"),
-      project("derive", "derive", "vitest.config.ts"),
-      project("replay", "replay", "vitest.config.ts"),
-      project("client", "client", "vitest.config.ts"),
-      project("scope", "scope", "vitest.config.ts", ["../lanes/test/**/*.scope.test.ts"]),
-      project("lanes", "lanes", "vitest.config.ts"),
+      project("bytes", "bytes", "vitest.config.ts", 0),
+      project("derive", "derive", "vitest.config.ts", 0),
+      project("replay", "replay", "vitest.config.ts", 0),
+      project("client", "client", "vitest.config.ts", 0),
+      project("scope", "scope", "vitest.config.ts", 1, ["../lanes/test/**/*.scope.test.ts"]),
+      project("lanes", "lanes", "vitest.config.ts", 0),
     ],
   },
 });
