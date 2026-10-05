@@ -302,17 +302,24 @@ children.
 
 ## What runs today, and what does not
 
-**Under the production wiring, nothing runs.** Both definitions list
-`git-read@1`, and both use forms that need the code of `hold@1` or
-`git-read@1`. The derive package holds that code as pure functions, and no
-production port is given it. The validator
-reads those forms, checks them against the tables in the contract
-package, and lists each in `ValidDefinition.underived`. The production
-runtime then founds and creates no scope under either definition. It
-answers `unsupported-definition`. The verifier answers the same at the
-genesis.
+**Under the production wiring, a lane can be founded, and it then does
+little.** Both definitions list `git-read@1`, and both use forms that need
+the code of `hold@1` or `git-read@1`. The derive package holds that code as
+pure functions, and from I3 step 16 the production ports hold it. The
+validator reads those forms, checks them against the tables in the
+contract package, and lists each in `ValidDefinition.underived`. The
+production runtime has the code of each, so it can pin both definitions.
+A runtime or a verifier that lacks the code answers
+`unsupported-definition`, at the genesis.
 
-That holds for the whole scope, and not only for the rows that use a
+As deployed, a scope under either definition records its genesis and
+nothing more by an act. The production authority reads no grant, so every
+act and every step is refused `unauthorized`. No hold is opened, and so no
+operation. Nothing is sent outside the service, and no reader may read.
+A delivery from another scope is judged by its handler.
+
+The rule of the contract's section 6.1 is of the whole scope, and not only
+of the rows that use a
 capability. The rows that use one are 3 acts and 7 handlers, with one item
 type:
 
@@ -327,13 +334,23 @@ type:
 |---|---|---|
 | Both definitions pass the real validator whole, and are exactly their pinned bytes | `packages/lanes/test/definitions.test.ts` | Real: plain functions, no stand-in |
 | For each family of forms: what the validator accepts and refuses, and what the judges derive | The `forms-*.test.ts` files of `packages/derive/test` | Real derivation, on small made-up definitions and not on the lane rows |
-| The production wiring founds no scope under a definition that needs a capability record | `packages/scope/test/founding.test.ts` | Real: the object as deployed |
+| The production wiring founds a scope under a definition that needs a capability record, and that scope admits no act and no step and sends nothing; a runtime that lacks the code founds none | `packages/scope/test/founding.test.ts` | Real: the object as deployed |
 | What a definition does once a capability has answered | The same test, with `scriptedCapability` of `@generalbusiness/artroom-scope/testing` | A stand-in |
-| What the two pinned definitions do on real scopes: ten scenarios, T1 to T9 | `packages/lanes/test/*.scope.test.ts`, on the one fixture `test/support/graph.ts` | Real scopes, storage, turn and dispatchers, founded and created by the two pinned digests. Stand-ins, each named in the test: the test authority, the scripted capability, scripted peers for the rules scope and the destination, and a made-up directory |
+| What the two pinned definitions do on real scopes: ten scenarios, T1 to T9 | `packages/lanes/test/*.scope.test.ts`, on the one fixture `test/support/graph.ts` | Real scopes, storage, turn and dispatchers, founded and created by the two pinned digests. T3, T4 and T5b run on the capability's code, as the production ports hold it. Stand-ins, each named in the test: the test authority, a Git host (`Host`), the scripted capability where a scenario still uses it, scripted peers for the rules scope and the destination, and a made-up directory |
 
-The ten scenarios found and create scopes under both definitions, which
-the production wiring refuses. They can do so only because the test
-Worker supplies the scripted capability. From the root they run inside
+The ten scenarios found and create scopes under both definitions. A
+scenario chooses the capability code of its namespace. `onCode`, of the
+fixture, runs every scope on the code of `hold@1` and `git-read@1` as the
+production ports hold it, with `Host` for the outside: a stand-in that
+answers each attempt that the code opened, in place of a Git host and of a
+walk of commits. T3, T4 and T5b run so. Their reports and manifests are
+admitted on the lane's own records: an instance, a root that was sealed
+before its ref, a check entry with a retained snapshot, and a pin for the
+one intent. The other scenarios keep the scripted capability, which
+refuses every guard unless a scenario says otherwise. T8 keeps it because
+its bound of 16 entries cannot hold what a hold's workspace reserves.
+
+From the root the scenarios run inside
 the `scope` project's one test Worker. The lanes package keeps a
 configuration of its own, `vitest.scope.config.ts`, that runs them alone.
 The scope package exports its test Worker for that, as
@@ -346,14 +363,20 @@ two capacity scenarios.
 One run of the ten scenarios writes 21 of the 50 act kinds of `issue` and
 12 of the 52 of `change`, and runs 2 of 7 and 2 of 4 handlers (counted by
 a script over one run; `notes/2026-10-05-i2-contract-deltas.md`, section
-20, lists them). The other rows are shown only as data, and by the tables
-of forms in `derive`.
+20, lists them). The counts are the same after I3 step 16. Of those rows,
+these now run on the capability's code: `report` of `issue`, and
+`propose-manifest` and the handler `publication` of `change`, with
+`take-hold` and `release-hold` of both, whose entries hold what a
+workspace derives. The run also writes preparation entries of the steps
+`instance`, `stage` and `check`, and outcome entries of the operations
+`stage`, `check`, `mint` and `revoke`. The other rows are shown only as
+data, and by the tables of forms in `derive`.
 
 A manifest may name the `file` entry of an issue lane as its `goal`. That
 entry is the issue's genesis. A genesis records its act kind, and a change
 lane reads the kind from the entry (`docs/scopes.md`, "The kind of an
 entry"). T3 names the `file` entry as the goal of its plan and of its
-manifests, with the scripted capability. A goal of another kind is still
+manifests. A goal of another kind is still
 refused. This follows revision 12 of the scope contract, which is adopted
 (section 24 of the deltas note).
 
@@ -361,10 +384,11 @@ One row cannot do today what the lane forms say, with or without a
 stand-in. The row was not changed.
 
 - `propose-manifest` staged in another lane needs a presented entry of
-  the kind `hold@1:check`. The entry it presents is a check entry, which
-  is an outcome entry, and no reader gives an outcome entry a kind. So no
-  real change lane sends `pin-confirm` or `unpin` to an issue lane yet
-  (entry DK6; I3 deltas, entry EH3).
+  the kind `hold@1:check`. A check entry is an outcome entry, and from the
+  contract's revision 16 it has that kind, from the members `owner` and
+  `kind` of its input. No scenario presents one yet, so no real change
+  lane sends `pin-confirm` or `unpin` to an issue lane (entry DK6; I3
+  deltas, entries EH9 and EL9).
 
 The scripted capability is a stand-in and is named as one wherever it is
 used. It answers each capability guard and effect from a table that the

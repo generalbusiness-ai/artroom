@@ -65,9 +65,10 @@ names no lane: any declared definition works, and a value written
 The handle checks no guard, no grant and no state, and derives no
 judgment. A shape that passes may still be refused: the scope checks every
 field again, with its own bounds on a member's handle and on a list, and
-then judges the act. In this delivery no production scope runs a
-definition that uses a capability record, which both lane definitions do:
-a founding under one is answered `unsupported-definition`.
+then judges the act. The production ports hold the code of the two
+capability versions, so a scope may be founded under a definition that
+uses a capability record, as both lane definitions do. No grant is read
+in production yet, so each act of such a scope is refused `unauthorized`.
 
 ## What a transport returns
 

@@ -1,17 +1,20 @@
 import { expect, test } from "vitest";
 import { textDigest } from "@generalbusiness/artroom-bytes";
-import { answered, capable, graph, http, net, paul, rita, sam, una, vic } from "./support/graph.ts";
+import { answered, graph, http, onCode, paul, rita, sam, una, vic } from "./support/graph.ts";
 
-/** A Git object ID. Nothing reads a repository here. */
+/** A Git object ID. No repository exists here: the Git host is a stand-in. */
 const oid = (c: string) => c.repeat(40);
 
-test("T3, a manifest and its evidence: it is complete only by the plan's recorded facts, a later version in a child changes nothing in it, an author's verdict is refused, and it merges only on the approval and the passed check of its own version (SCRIPTED: the test capability, and a rules peer; no destination exists)", async () => {
-  // Real scopes: a goal, two concern lanes and a change lane, with real fetches between them. STAND-INS: the scripted test capability
-  // answers yes to every staging and ancestry guard of `report` and `propose-manifest`; the rules are one handwritten entry of a
-  // scripted rules peer; and the destination is a reference that no scope answers. So this shows what the lanes decide from recorded
-  // facts. It shows nothing about a staged commit, ancestry, a pin, a real rules scope, or what a destination judges and publishes.
+test("T3, a manifest and its evidence: it is complete only by the plan's recorded facts, a later version in a child changes nothing in it, an author's verdict is refused, and it merges only on the approval and the passed check of its own version (on the capability's code; STAND-IN: the Git host; SCRIPTED: a rules peer; no destination exists)", async () => {
+  // Real scopes: a goal, two concern lanes and a change lane, with real fetches between them, on the code of `hold@1` and
+  // `git-read@1` as the production ports hold it. Every report and every version of the manifest is admitted on the lane's own
+  // records: a root that was sealed before its ref, a check entry, and a pin for that one intent. STAND-INS: `Host` answers each
+  // attempt that the code opened, in place of a Git host and a walk of commits; the rules are one handwritten entry of a scripted
+  // rules peer; and the destination is a reference that no scope answers. So this shows what the lanes decide from recorded facts
+  // and from their own capability records. It shows nothing about a real host, a walk of real commits, a real rules scope, or what
+  // a destination judges and publishes.
   const g = await graph();
-  net.capability = capable;
+  const host = onCode();
   const G = await g.goal();
   // Everything below names the entry that filed the goal as the goal's conditions: the genesis of the issue lane, of the kind `file`.
   // The change lane pins another definition, and reads that kind from the entry (scope contract, sections 4.1 and 6.2).
@@ -26,7 +29,10 @@ test("T3, a manifest and its evidence: it is complete only by the plan's recorde
   const filed = await A.fact(0);
   const ca = (await A.did(rita, "offer", { fields: { offeree: vic.member } })).fact;
   await A.did(vic, "accept", { on: ca.seq, fields: { terms: filed } });
-  const ra = (await A.did(vic, "report", { fields: { commitment: ca.seq, terms: filed, commit: oid("a"), tree: oid("1"), claims: ["it parses"] } })).fact;
+  // A report is staged from the performer's own hold, with an instance: without one the lane stages nothing, and the act is refused.
+  expect(await A.stagedAsks(vic, "report", { fields: { commitment: ca.seq, terms: filed, commit: oid("a"), tree: oid("1") } })).toBe("capability-refused: not-staged");
+  await A.instance(vic, (await A.did(vic, "take-hold", { fields: { commitment: ca.seq } })).fact.seq);
+  const ra = (await A.stagedDid(vic, "report", { fields: { commitment: ca.seq, terms: filed, commit: oid("a"), tree: oid("1"), claims: ["it parses"] } })).fact;
   // A report is judged by the requester of its commitment, and never by its author.
   expect(await A.asks(vic, "accept-report", { on: ra.seq, fields: { commitment: ca.seq, terms: filed } })).toBe("guard-failed");
   const aa = (await A.did(rita, "accept-report", { on: ra.seq, fields: { commitment: ca.seq, terms: filed } })).fact;
@@ -36,7 +42,8 @@ test("T3, a manifest and its evidence: it is complete only by the plan's recorde
   // Concern B is done by una on terms that una proposed and the requester agreed to: changed terms, with their own terms fact.
   const cb = (await B.did(una, "propose-terms", { fields: { conditions: ["it prints", "in colour"] } })).fact;
   await B.did(rita, "agree", { on: cb.seq, fields: { terms: cb } });
-  const rb = (await B.did(una, "report", { fields: { commitment: cb.seq, terms: cb, commit: oid("b"), tree: oid("2") } })).fact;
+  await B.instance(una, (await B.did(una, "take-hold", { fields: { commitment: cb.seq } })).fact.seq);
+  const rb = (await B.stagedDid(una, "report", { fields: { commitment: cb.seq, terms: cb, commit: oid("b"), tree: oid("2") } })).fact;
   const ab = (await B.did(rita, "accept-report", { on: rb.seq, fields: { commitment: cb.seq, terms: cb } })).fact;
 
   // The change lane. una is responsible for the integration and holds; a manifest names exact entries of the other three lanes.
@@ -44,9 +51,11 @@ test("T3, a manifest and its evidence: it is complete only by the plan's recorde
   const offer = (await C.did(rita, "offer", { fields: { offeree: una.member, terms: "Integrate the two concerns." } })).fact;
   await C.did(una, "accept", { on: offer.seq, fields: { terms: offer } });
   const hold = (await C.did(una, "take-hold", { fields: { commitment: offer.seq } })).fact.seq;
+  await C.instance(una, hold, "i-1");
   const version = { hold, instance: "i-1", goal, plan: sealed, base: oid("0"), integration: oid("c"), tree: oid("3"), complete: true } as const;
   const [fromA, fromB] = [{ accepted: aa, report: ra }, { accepted: ab, report: rb }];
-  const proposes = (selected: (typeof fromA)[], decisions: (typeof goal)[]) => C.asks(una, "propose-manifest", { fields: { ...version, selected, decisions } });
+  // Each version is prepared for its own intent: the first staging of the commit, and after it the reuse of the live root.
+  const proposes = (selected: (typeof fromA)[], decisions: (typeof goal)[]) => C.stagedAsks(una, "propose-manifest", { fields: { ...version, selected, decisions } });
   // Completeness is derived from the facts named, in the commit. A required concern with no selection and no decision fails it.
   // So does a selection whose accepted terms are not the concern's own, until the parent has recorded that it accepts them.
   expect([await proposes([fromA], []), await proposes([fromA, fromB], [])]).toEqual(["guard-failed: not-complete", "guard-failed: not-complete"]);
@@ -54,13 +63,16 @@ test("T3, a manifest and its evidence: it is complete only by the plan's recorde
   // A comment is no report: an entry of another kind in the place of the accepted report is refused, whatever it says.
   const claim = (await A.did(vic, "comment", { fields: { body: "It is done, and it passes." } })).fact;
   expect(await proposes([{ accepted: aa, report: claim }, fromB], [decided])).toBe("guard-failed: selection-malformed");
-  const m1 = (await C.did(una, "propose-manifest", { fields: { ...version, selected: [fromA, fromB], decisions: [decided] } })).fact.seq;
+  const m1 = (await C.stagedDid(una, "propose-manifest", { fields: { ...version, selected: [fromA, fromB], decisions: [decided] } })).fact.seq;
+  // One root holds the commit, staged once. Each refused version left a pin that is still `provisional`, and the admitted one is `held`.
+  const records = async (kind: string, state: string) => (await C.state()).recordCount("hold@1", kind, state);
+  expect([await records("root", "live"), await records("pin", "provisional"), await records("pin", "held"), await records("check", "recorded"), host.asked.filter((kind) => kind === "stage").length]).toEqual([1, 3, 1, 4, 3]);
   // Its authors are derived: the integrator, the authors of each selected report, and the member each acts for.
   const manifest = await C.item(m1);
   expect(manifest.parties["authors"]).toMatchObject([{ member: "@paul" }, { member: "@quinn" }, { member: "@una" }, { member: "@vic" }]);
 
   // A later version in a child changes nothing in the manifest: it holds the exact entries it was proposed with.
-  const later = (await B.did(una, "report", { fields: { commitment: cb.seq, terms: cb, commit: oid("e"), tree: oid("5") } })).fact;
+  const later = (await B.stagedDid(una, "report", { fields: { commitment: cb.seq, terms: cb, commit: oid("e"), tree: oid("5") } })).fact;
   await B.did(rita, "accept-report", { on: later.seq, fields: { commitment: cb.seq, terms: cb } });
   expect(await C.item(m1)).toEqual(manifest);
   expect(manifest.values).toMatchObject({ selected: [fromA, fromB], decisions: [decided], complete: true, tree: oid("3") });
@@ -113,7 +125,9 @@ test("T3, a manifest and its evidence: it is complete only by the plan's recorde
 
   // A new version of the same selection, with another tree. The approval and the passed check were of the earlier version:
   // neither counts for this one, and the earlier version can no longer merge.
-  const m2 = (await C.did(una, "propose-manifest", { fields: { ...version, previous: m1, integration: oid("d"), tree: oid("4"), selected: [fromA, fromB], decisions: [decided] } })).fact.seq;
+  const m2 = (await C.stagedDid(una, "propose-manifest", { fields: { ...version, previous: m1, integration: oid("d"), tree: oid("4"), selected: [fromA, fromB], decisions: [decided] } })).fact.seq;
+  // The entry of the new version releases the pin of the version that it supersedes, found by that manifest's item.
+  expect((await C.state()).records("hold@1", "pin", { states: ["released"] }).map((pin) => [pin.values["commit"], pin.values["admitted"], pin.values["by"]])).toEqual([[oid("c"), m1, m2]]);
   expect([await merges(m1), await merges(m2)]).toEqual(["guard-failed: newer-version", "guard-failed: approvals-needed"]);
   await C.did(sam, "review-verdict", { fields: { manifest: m2, verdict: "approve" } });
   expect(await merges(m2)).toBe("guard-failed: required-check-not-passed");
@@ -124,7 +138,7 @@ test("T3, a manifest and its evidence: it is complete only by the plan's recorde
   // route, the act gets past its shape and is refused there.
   const elsewhere = { instance: "i-1", lane: A.at, foreignHold: 7, base: oid("0"), integration: oid("f"), tree: oid("6"), complete: false, previous: m2, selected: [], decisions: [] } as const;
   expect([
-    await C.asks(una, "propose-manifest", { fields: { ...version, previous: m2, goal: sealed, selected: [fromA, fromB], decisions: [decided] } }),
+    await C.stagedAsks(una, "propose-manifest", { fields: { ...version, previous: m2, goal: sealed, selected: [fromA, fromB], decisions: [decided] } }),
     await C.asks(una, "propose-manifest", { fields: elsewhere }),
     answered(await C.over(http, await C.signed(una, "propose-manifest", { fields: elsewhere, presented: { pin: ra } }))),
   ]).toEqual(["guard-failed", "guard-failed: source-shape", "guard-failed"]);

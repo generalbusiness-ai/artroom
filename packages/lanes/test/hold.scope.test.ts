@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import { timeMs } from "@generalbusiness/artroom-derive";
-import { capable, graph, net, rita, soon, una, vic } from "./support/graph.ts";
+import { graph, net, onCode, rita, soon, una, vic } from "./support/graph.ts";
 
 /** A commit and a tree, as a report names them. Nothing reads a repository here. */
 const COMMIT = "c".repeat(40);
@@ -50,11 +50,13 @@ test("T1, responsibility is not a hold: a hold ends by time before the act that 
   expect((await G.item(h3)).state).toBe("held");
 });
 
-test("T4, a handover: the same accepted commitment gets a new performer only when no hold is held and on the same terms fact; the former performer is then refused, and the successor's report carries both in its authors (the report rows run on the SCRIPTED test capability)", async () => {
-  // One real `issue` lane. STAND-IN: `report` asks the capability whether the commit is staged and what its ancestry is, and the
-  // scripted test capability answers yes. So this shows who may report after a handover, and what the report attributes. It shows
-  // nothing about staging, ancestry, a pin, or what a former performer's old credential can still do outside the lane.
+test("T4, a handover: the same accepted commitment gets a new performer only when no hold is held and on the same terms fact; the former performer is then refused, and the successor's report carries both in its authors (on the capability's code; STAND-IN: the Git host)", async () => {
+  // One real `issue` lane, on the code of `hold@1` and `git-read@1` as the production ports hold it: every record, step, guard
+  // and outcome rule below is real. STAND-IN: `Host` answers each attempt that the code opened, in place of a Git host and a walk
+  // of commits. So this shows who may hold, stage and report after a handover, on the lane's own records, and what the report
+  // attributes. It shows nothing about a real host, a fork, a credential outside the lane, or a walk of real commits.
   const g = await graph();
+  const host = onCode();
   const G = await g.goal();
   const terms = await G.fact(0);
   const c = (await G.did(rita, "offer", { fields: { offeree: una.member } })).fact.seq;
@@ -81,12 +83,23 @@ test("T4, a handover: the same accepted commitment gets a new performer only whe
   expect([after.state, after.refs, after.values, after.parties["requester"]]).toEqual(["accepted", before.refs, before.values, before.parties["requester"]]);
   expect([before.parties["performer"], after.parties["performer"], (await G.item(h)).parties["holder"]]).toEqual([una.member, vic.member, una.member]);
 
-  // The former performer may neither hold nor report. The same report by the successor is accepted, so it was the signer that refused.
-  net.capability = capable;
+  // The former performer may neither hold nor report, and the lane stages nothing for una: a report's hold is the one held hold
+  // under its commitment, and it is used only when the signer holds it. The successor has no hold yet, and stages nothing either.
   const report = { fields: { commitment: c, terms, commit: COMMIT, tree: TREE } };
-  expect([await G.asks(una, "take-hold", { fields: { commitment: c } }), await G.asks(una, "report", report)]).toEqual(["guard-failed", "guard-failed"]);
-  const reported = await G.did(vic, "report", report);
+  const stages = async (who: typeof una) => { const asked = await G.prepare((await G.signed(who, "report", report)).signed, "stage"); return asked.answer === "refused" ? `${asked.reason}: ${asked.name}` : asked.answer; };
+  expect([await G.asks(una, "take-hold", { fields: { commitment: c } }), await G.asks(una, "report", report), await stages(una), await stages(vic), await G.asks(vic, "report", report)])
+    .toEqual(["guard-failed", "guard-failed", "capability-refused: not-staged", "capability-refused: not-staged", "capability-refused: not-staged"]);
+  // The successor takes a hold of its own, with an instance. una still stages nothing under it. vic's report is then prepared:
+  // the root is sealed before the ref is created, the read that shows the ref makes it live, and the check entry holds the record.
+  const h2 = (await G.did(vic, "take-hold", { fields: { commitment: c } })).fact.seq;
+  expect([(await G.instance(una, h2)).answer, (await G.instance(vic, h2)).answer, await stages(una), host.asked]).toEqual(["refused", "accepted", "capability-refused: not-staged", []]);
+  const reported = await G.stagedDid(vic, "report", report);
   // Its authors are everyone the commitment was ever performed by, each with the member it acts for, in byte order of handle.
   expect(reported.effects.flatMap((e) => (e.effect === "list" && e.slot === "authors" ? [e.member.member] : []))).toEqual(["@paul", "@quinn", "@una", "@vic"]);
-  expect(reported.effects.at(-2)).toEqual({ effect: "record", capability: "hold@1", kind: "pin", key: [COMMIT], state: "held", values: { commit: COMMIT } });
+  // The report was admitted on the lane's own records: its pin is `held`, on root 1, with the entry that admitted it. The stand-in
+  // was asked for the two mints of the staging's first attempt, the ref, the read, and the revocation of each token.
+  expect(reported.effects.at(-2)).toMatchObject({ effect: "record", capability: "hold@1", kind: "pin", state: "held", values: { root: 1, commit: COMMIT, admitted: reported.fact.seq } });
+  expect([...host.asked].sort()).toEqual(["check", "mint", "mint", "revoke", "revoke", "stage"]);
+  const state = await G.state();
+  expect([state.record("hold@1", "root", [1])?.state, state.recordCount("hold@1", "token", "ended"), state.record("hold@1", "fork", [h2])?.state, state.outstanding().opened]).toEqual(["live", 2, "creating", 2]);
 });

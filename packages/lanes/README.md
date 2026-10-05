@@ -62,15 +62,18 @@ not the ones `pin.mjs` writes. If the validator refuses a row as the lane
 forms state it, do not change the row to pass. Record the refusal and
 return it to the owner of the lane forms.
 
-## What does not run
+## What runs, and what does not
 
 Both definitions use forms that need the code of the capabilities `hold@1`
 and `git-read@1`. The derive package holds that code as pure functions,
-and no production port is given it. The validator lists those forms in `ValidDefinition.underived`, and the test
-asserts the list. Under the production wiring a scope is not founded or
-created under either digest: `unsupported-definition`. The scenarios run
-only because their test Worker supplies a scripted capability, which is a
-stand-in. [docs/lanes.md](../../docs/lanes.md) lists what they show and
+and the production ports hold it. The validator lists those forms in `ValidDefinition.underived`, and the test
+asserts the list, and that the code has each form. So a scope can be
+founded or created under either digest. As deployed it admits no act and
+no step, because the production authority reads no grant yet. A runtime
+that lacks the code answers `unsupported-definition`. The scenarios T3, T4
+and T5b run on the code itself, with a stand-in for the Git host. The
+others use a scripted capability, which is a stand-in.
+[docs/lanes.md](../../docs/lanes.md) lists what they show and
 the rows that cannot run yet.
 
 ## How to test
