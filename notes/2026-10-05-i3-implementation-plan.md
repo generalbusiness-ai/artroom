@@ -11,6 +11,14 @@
 - Economy: the 49 rows are coverage mappings. The "55 to 75 tests" target, the quarter-range stopping rule and the control for every new guard are removed (section 7). The full-path comparison is owed.
 - Section 2 records steps 1 and 2 as built on this branch. The inbox needs one platform rule, P22 (finding E10), so "inbox needs no rule" is corrected.
 
+## Corrected 2026-10-05 after the checker's finding 514b35a9 and its static readings 92fa170a and f55ad7d0
+
+- Texts: the scope contract's revision 15 at `7f1ea903c` and the authority note's revision 20 at `4ef1a5e37` are adopted. Their revisions 16 and 21 are under review, and this plan reads them as proposals only (section 2.1).
+- M1's dependency (finding `514b35a9`). A platform definition with a marked row and no rule for it runs nothing: entry EC4, which is now the contract's rule (its section 6.1). The builder's decision: every pure rule that a definition's version requires is built before a scope is founded under that definition for real. So the pure rules of the rules scope and of the destination move into M1, before step 9c. Steps 8a, 9d, 9e and 9f are new. Steps 7, 9, 9a, 9b, 9c and 10 are restated. Step 23 is now step 9d. Steps 26 to 28 keep the outside ports and the scenarios that need them (sections 8.2, 8.4, 8.5, 8.7 and 9.3). This replaces the last sentence of the Bootstrap point above.
+- One rule cannot be written yet: the register's rule for the outcome of `create-repository`, which waits on the open question EJ1. The founding chain starts at the register. So step 9c, step 10 and M1's acceptance of six founded scopes wait on EJ1 (section 8.2, "What waits, and on what").
+- Section 2.1 records what is built since: the marks, rows I3-1 to I3-11, and the repairs of the five component findings. It lists the questions EJ1 to EJ15 as open, with their owners.
+- Wording: M1's cell "Runs after it" names the acts that M1 delivers (section 9.3).
+
 Written 2026-10-05, before any source change. Branch
 `request/i3-authority-effects`, cut at `50bba45c`. It has since merged main,
 which holds I2's base milestone (landed at `b57e8774`).
@@ -150,6 +158,8 @@ neither.
 | 5, 6, 17 and 21 | Their merge. | `10f9afc13` |
 | 16a to 16c, with the above | Their merge, and the seams that needed no owner's decision: a preparation is judged by the grant guard on the observation read; a preparation entry has its kind; the judges derive a hold's workspace records and decide a bound license request when they are given the code; `prepare` is in `ScopeApi`. | `6681ce18e`, `2962403ff`, `f29ecfb84`, `8aa8b55b7`, `95ba2f5ac`, `4e5ce053e`, `ac68e5017` |
 | 16 | **Waiting.** The production capabilities port is null, and the scripted capability stays. Entries EH6 to EH11 of the deltas note list what an owner must decide first, and EH12 what the step then builds. | `64f06de26`, the list |
+| The marks: rows I3-1 to I3-11 of the contract's section 11.13 | How a platform rule joins its row. The types of platform data, with a mark at seven places. The validator reads the marks. A rule has the kind of its mark's place and is given six things. The judges run a rule at the check of its mark's place. A rule at `grant` that passes records an empty authority. A scope whose every rule is supplied runs every row, and one that lacks a rule runs nothing. The verifier runs the same rules. A grant's `within` is `{ membership }`. The fold holds the highest head for each subject. The inbox's rule `notice-source` (P22) is written, and its data writes no effect on `source`. This is the step that "no step owns", below. It was written before the two revisions were adopted. | `f4ec55017` to `57d79f478`; the deltas EJ1 to EJ15 |
+| The repairs of the checker's five component findings (reports `92fa170a` and `f55ad7d0`) | The driver walks every parked attempt after a restart. A late answer is kept until the scope has judged it. Every outcome's evidence has a basis and a body. A gateway grant has one lifecycle across calls that overlap. The ancestry check is shown by its read's own answer. Three wording points. | `8aaa17973`, `481f440f9`, `293ea8e7d`, `bbff23788`, `c798917aa`, `3d06620be`; the deltas EK1 to EK5 |
 
 Finding E10, recorded in `notes/2026-10-05-i3-contract-deltas.md`: the
 inbox needs one platform rule, P22, for a notice's `source`. The note
@@ -169,6 +179,14 @@ each in full.
   4, in section 6.4, in step 29 and step 30, and in the questions Q2 to
   Q4 and the risks of section 9. The rows that waited on them are not
   reworked here.
+- **The texts, again.** The contract's revision 15 at `7f1ea903c` and
+  the authority note's revision 20 at `4ef1a5e37` are adopted since. They
+  are the designs that this plan now builds. The same reading applies to
+  them, and to the note's revision 19, which revision 20 holds. The
+  contract's revision 16 and the note's revision 21 are under review:
+  they are proposals, and nothing is built that only they state. An
+  adoption is of a design. It accepts no source: the marks and the
+  repairs above are still to be reviewed.
 - **Step 16 waits, and steps 16a to 16c did not.** The rules of the two
   capabilities are built and tested as pure functions, and the judges use
   them when a test gives them the code. Wiring them into the production
@@ -186,13 +204,18 @@ each in full.
   production wiring founds no scope under `platform:inbox@1` until step 11
   writes the rule P22. The witness is now: the production wiring answers
   `unsupported-definition`, and the same definition with a stand-in rule
-  for every marked row is founded.
+  for every marked row is founded. Since the marks were built the rule
+  P22 is written (row I3-5), and the witness is the contract's 18.39: the
+  platform package's definition is founded with its rule, and the same
+  data with no rule is `unsupported-definition`.
 - **No step owns the judges for running a platform rule**, and no adopted
   text says how a rule's result joins its row (entry EC6). Steps 7, 9 to
   9c and 11 each need it. It is a step of its own, before step 7, once
   EC6 is decided: it owns `derive/src/judge.ts` and `handlers.ts`, the
   marked entries in `scope/src/core.ts`, and the same rules in
-  `replay/src/verify.ts`.
+  `replay/src/verify.ts`. **Built since**, as the marks of the table
+  above: the contract's revision 15 and the note's revision 20 decide
+  EC6.
 - **No step owns `scope/src/delivery.ts` for a creation under a platform
   name** (entry EA9). Steps 9 and 9c need it: the directory is created by
   the register, and creates three children. It goes with step 9.
@@ -203,6 +226,31 @@ each in full.
   contract, which has no basis for an outcome by an end time (entry EB4).
   It is witnessed as the pure judgment `tokenPast`, in
   `derive/test/forms-ledger.test.ts`, and settles no attempt.
+
+**The questions EJ1 to EJ15, open, with their owners.** The marks were
+built from two texts that are silent in these places, or differ. The
+deltas note has each in full, with what the source holds meanwhile. None
+is decided by this plan. "The contract" is the scope contract's owner, for
+its revision 15 or a successor. "The note" is the authority note's owner,
+for its revision 20 or a successor.
+
+| # | The question | Owner | What waits on it |
+|---|---|---|---|
+| EJ1 | Where are the clauses of a request that an outcome entry sends, and what is the cause of a scope that it creates? | The contract, with the note | The register's rule for the outcome of `create-repository`, and with it steps 9c and 10 and M1's acceptance (section 8.2). |
+| EJ2 | Is the member `membership` of a creation written by the change that adopts the filter? What does a directory record before its slot `repository.membership` is set? | The builder, at the steps that create scopes; the contract | A replay of an act judged on a filter, until a creation writes the member (step 9). |
+| EJ3 | Does a result clause run a rule again for a name that a mark selects, and on which input and state? | The contract | No row is known to need it. Steps 7 and 9 check their rows against it. |
+| EJ4 | How is the clause of a result found again in a list of sends that holds a mark? | The contract | Nothing while a list with a mark sends each written send once. The directory's `create-lane` fits that, as its row is written. |
+| EJ5 | Where may a mark stand as a type: also in a list's element or a record's member, and with a default? | The contract, to confirm or widen | Nothing. |
+| EJ6 | Do the static counts take in the most that a rule returns (point R1-59)? | The contract, and request `cc570904` | The reservation of a timed rule that holds a mark. No delivered definition has one. |
+| EJ7 | Are `at`, `self` and a diagnosis among the things a rule is given? | The builder, for `observed` and the values beside an intent (step 8a); the contract, to confirm the rest | Every rule that reads an observation or a value: steps 9, 9d and 9f follow step 8a. |
+| EJ8 | In what form does a version state a rule's place, refusals, most and clock? | The note | Nothing: the rule table states them. |
+| EJ9 | Is the kind of the sending scope part of a notice's `source` record? | The note | Nothing: the record has the four members that the note lists. |
+| EJ10 | Should the commit stop a rule that sets a fixed slot after the opening? | The contract | Nothing. |
+| EJ11 | Is an effect of an outcome's rule that a check would refuse a fault? | The contract, to confirm | Nothing: step 9f builds on it as the source holds it. |
+| EJ12 | None: revision 15 states the reason `unsupported-definition` of an act. | Closed | Nothing. |
+| EJ13 | If a rule at `grant` ever passes with a member, where does a later entry read that member? | The contract | Nothing: every rule of revision 20 passes with no member. |
+| EJ14 | The replay still takes each recorded grant as current. | The builder, at steps 14 and 22 | T44. |
+| EJ15 | The subject of an observation of the rules, in the fold and in the port. | The builder, with the read of the rules scope (step 9d) | The directory's `definition-active`, on a real read. |
 
 ## 3. The scope table
 
@@ -590,7 +638,7 @@ head sent for review.
 | Project | Pool | New files |
 |---|---|---|
 | `derive` | Node | `forms-grant`, `forms-prepare`, `forms-ledger`, `forms-ancestry`, `forms-records` |
-| `platform`, new | Node | `definitions.test.ts` |
+| `platform`, new | Node | `definitions.test.ts`; `rules.test.ts`, for T50 |
 | `git`, new | Node, with the `git` program | `reader`, `push`, `gateway` |
 | `checkers`, new | Node | `service`, `runner` |
 | `scope` | workerd | Its own new files, and `../platform/test/**/*.scope.test.ts`, added in the root `vitest.config.ts` as the lanes' scenarios are. One Worker, loaded once. |
@@ -663,6 +711,7 @@ witness that section 13.7 lists as real evidence.
 | T44 | Replay agrees with the runtime on a founded repository, once. A grant is derived again from membership's history at the observed head, and the three mismatch names are reported. | 10; G18; the contract's 9.3 | `platform/test/replay.scope.test.ts` | `npx vitest run --project scope replay` |
 | T45 | The grant guard and the commit guards of an observation, as one table of a pure function. | 3.3 | `derive/test/forms-grant.test.ts` | `npx vitest run --project derive forms-grant` |
 | T46 | The clock table: which inputs judge time, and what a clock that is behind stops. | 3.12, W1 to W14 | `scope/test/authority.test.ts`, second test | As T6 |
+| T50 | Each platform rule as a plain function, once: one table for each definition, from its rows of the note's table of marks and the cases of its section. For the destination: every reason of section 6.5, the three classes of send evidence, and a lost reply that stays unknown. No scope, no port and no host. | 12.1.1 to 12.1.5; 12.1.8; 6.5 | `platform/test/rules.test.ts` | `npx vitest run --project platform rules` |
 
 Tests that the last steps add, when their forms are adopted:
 
@@ -770,26 +819,61 @@ and 6 once step 3 has landed, because they own different modules.
 |---|---|---|---|---|
 | 5 | The grant guard and the commit guards of an observation, as pure functions. | `derive/src/grant.ts` (new) | T45 | Care |
 | 6 | The observation read: before the turn, bounded, counted by run and number, never kept across a restart, at most one per key, a revoked answer kept for the run. | `scope/src/authority.ts` (new), `namespace.ts` | T6, T46 | Care |
-| 7 | Membership: the definition as data, and its rules (P13, P14, P18, P24). Its answer to an observation. | `platform/src/membership.ts`, `membership.rules.ts` | T10, T13 | Care |
+| 7 | Membership: the definition as data, and every rule of its version (P13, P14, P18, P24): rows 14 to 26 and g, h and i of the note's table of marks (section 12.1.8). Its answer to an observation. | `platform/src/membership.ts`, with its rules beside the data, as the package's table of rules has it | T10, T13; T50, membership's table | Care |
 | 8 | The fourth cause, and a genesis by a register's outcome. | `derive/src/genesis.ts` | One row in `derive/test/compose.test.ts` | Care |
-| 9 | The register and the directory: the definitions, and the rules for founding, the three creations as held sends, numbers, `index` and `compromised` (P13 to P17, P20 for the two children). `MemoryHost`. | `platform/src/register.ts`, `register.rules.ts`, `directory.ts`, `directory.rules.ts`; `platform/test/support/host.ts` | T38, and the register's rows of T18 (the claim, the creation, the provisional state). | Care |
-| 9a | The rules scope as data, whole: the definition of `platform:rules@1` with every row of the tables of section 12.1.4 declared, no row reduced. Its genesis: `establish` by the directory's `create`, which opens `rules` with `branch`, `directory` and membership's scope ID, and the other values at their defaults. The rule table has its row for each Code rule of the definition. The behaviours (`publish`, `rules-wanted`, `retire-definition`, the checks) stay in step 23. | `platform/src/rules.ts` (definition and genesis only) | T43, with the rules definition; the rules scope's row of T18: it is created by the directory, and is provisional until the register's `confirm`. | Care |
-| 9b | The destination as data, whole: the definition of `platform:destination@1` with every row of the tables of section 12.1.5 declared, no row reduced. Its genesis: `establish` by the directory's `create`, which opens `branch` as `empty`. The declaration of the operation `first-head`, and the attempt that the `confirm` opens, are declared as data. The behaviours (reservation, compare-and-set, readback, receipts, the first head's push) stay in steps 26 to 28. | `platform/src/destination.ts` (definition and genesis only) | T43, with the destination definition; the destination's row of T18. | Care |
-| 9c | Founding complete and the fixture. The directory's genesis creates membership, rules and destination in that order, each held until the register's `confirm`. The `confirm` makes all of them take effect, and each `applied` result sets its reference in the directory. Before the `confirm` each admits nothing (`scope-provisional`). The `repository` fixture is made from the real scopes of steps 7, 9, 9a and 9b, with the seated founder and a first key. No scripted peer stands for a scope. | `platform/test/support/repository.ts` | T18 whole, including the provisional gating and the order of two `created` answers. From here the `repository` fixture exists, with five scopes. Step 11 adds the sixth, the inbox. | Care |
-| 10 | Remove the earlier founding and registry. | `parked/room/src/founding.ts`, `registry.ts`; `parked/README.md` | The check of active files passes. | Small |
+| 8a | New. The two adopted forms that rules read, which no source holds yet (entry EJ7): `observed` on an act, on a result's delivery and on an outcome (P19; the contract's sections 4.1 and 16.1), and `values` beside an intent, each retained under its digest (P21; section 6.2). A rule is given both. An entry that would lack one that its rule reads is not completed: `dependency-unavailable`. The replay checks each against what the entry retains. An entry with neither has the bytes it had. | `contract/src/entry.ts`, `transport.ts`; `bytes/src/records.ts`; `derive/src/marks.ts`, `judge.ts`, `grant.ts`; `scope/src/core.ts`, `store.ts`; `replay/src/verify.ts` | Rows of `derive/test/forms-marks.test.ts`: a made-up rule reads a retained observation and a retained value, and without either the input is not completed. One row of `replay/test/verify.test.ts`. | Care |
+| 9 | The register and the directory: the definitions as data, whole, and every rule of each version that can be written. After steps 7, 8 and 8a. The register: rows 2 to 6 (`install`, `founding-policy`, `founder-key`, `claim-seed`, `open-create-repository`), and the outcomes of `revoke-credential` and `delete-repository`. **One rule waits on EJ1:** the outcome of `create-repository`, whose selecting outcome sends the `create` of the directory with its clauses. Until it is written the register's version lacks a rule, and no register is founded. The directory: rows 7 to 13, a and d (`open-import`, `next-number`, `definition-active`, `worker-standing`, `reopen-import`, `index-row`, `index-number`, `create-lane`, and the outcome of `import`), with the three creations as held sends and `compromised` as data (P13 to P17, P19, P21, P20 for the two children). `scope/src/delivery.ts` for a creation under a platform name (entry EA9). | `platform/src/register.ts`, `directory.ts`, each with its rules beside the data; `scope/src/delivery.ts` | T50, the register's and the directory's tables. T43: every mark of the directory has its rule, and the register is not runnable, by the name of the one rule that it lacks. T38, on a directory that a scripted register created (a labelled stand-in), until step 9c. | Care |
+| 9a | The rules scope as data, whole: the definition of `platform:rules@1` with every row of the tables of section 12.1.4 declared, no row reduced, and a mark at each of its three places of code. Its genesis: `establish` by the directory's `create`, which opens `rules` with `branch`, `directory` and membership's scope ID, and the other values at their defaults. Its three rules are step 9d's. No scope is created under the definition before step 9d. | `platform/src/rules-scope.ts`, the data (`rules.ts` is the package's table of rules) | T43, with the rules definition: it validates whole, and its three marks are listed. | Care |
+| 9d | New, from step 23. The rules scope's rules, all three, as pure functions: `checkers` (row 27; `not-a-checker`, from the `MemberObservation` of each check's checker in `observed`), `configuration-bytes` (row 28; `configuration-mismatch`, from the value beside the intent) and `definition-bytes` (row 29; from the definition's bytes and its closure beside the intent, with the judge's bounds). With them every row of section 12.1.4 runs: `publish`, `keep-configuration`, `activate`, `retire-definition` and `rules-wanted`. The rules scope's answer to an observation of the rules, and its read (entry EJ15). After steps 8a and 9a. Nothing here touches an outside system. | `platform/src/rules-scope.ts`, the rules; `scope/src/authority.ts`, `derive/src/grant.ts`, for the observation of the rules | T50, the rules scope's table: each rule's pass, each refusal and the case that is not completed. T37, on real scopes with a real membership, under a directory that a scripted register created until step 9c. | Care |
+| 9b | The destination as data, whole: the definition of `platform:destination@1` with every row of the tables of section 12.1.5 declared, no row reduced, a mark at each place of code, and `outcomes` with each operation kind that it owns. The fence of section 6.8 is not adopted (U2; question Q12), so the data names no fence: no operation, and no outcome kind. Its genesis: `establish` by the directory's `create`, which opens `branch` as `empty`. Its rules are steps 9e and 9f. No scope is created under the definition before step 9f. | `platform/src/destination.ts`, the data | T43, with the destination definition: it validates whole, and its marks and outcome kinds are listed. | Care |
+| 9e | New, from step 26. The destination's rules at its acts and handlers, as pure functions: `declare-first-head` (row 30), `open-first-head` (31), `open-judge` (32), `publication-of` and `open-withdrawn` (34), `abort-if-behind` (35, for the hold alone: it reads the reservation entry of the scope's own history with its `observed`), `open-branch-read` (36), `reopen-publish` (37) and `collect-list` (row b; P25). After steps 8a and 9b. | `platform/src/destination.ts`, the rules at acts and handlers | T50, the destination's first table: each rule from its row, and the cases a to e of section 12.1.5, with the mark `withdrawDecided`. | Care |
+| 9f | New, from steps 26 to 28. The destination's rules for its outcome entries (place 7), as pure functions of the state, the outcome, its evidence and what the entry retains: `judge` (row 33; every reason of section 6.5, the reservation and the slot, the `relate`, and attempt 1 of the push with its mint), and the outcomes of `first-head`, of a push, of its mint and its revocation, of the deciding read, of the receipt, and of the read that `adopt-head` opens (row e). The bodies of the evidence are those the Git package and the capability already state (entries EG7 and EF5). Which attempt a read confirms follows entry EG6, and the note's point O11 stays open with its owner. The `relate` of `judge` has no clause in its row, so it is built on entry EJ1 as the source holds it. After steps 8a, 9e and 21. No port, no host and no token is here: an outcome is given to the rule by the test. | `platform/src/destination.ts`, the rules of `outcomes` | T50, the destination's second table: each reason of section 6.5; each of the three classes of send evidence, to the state that section 6.4 maps it to; a lost reply, which stays `unknown` whatever a read shows; the receipt; the first head. The evidence in each row is written by hand, and the table says so. | Care |
+| 9c | **Waits on EJ1.** Founding complete and the fixture. It is built only when every rule of the five versions exists: steps 7, 9, 9d, 9e and 9f, and the register's one rule that waits. The register's selecting outcome creates the directory. The directory's genesis creates membership, rules and destination in that order, each held until the register's `confirm`. The `confirm` makes all of them take effect, and each `applied` result sets its reference in the directory. Before the `confirm` each admits nothing (`scope-provisional`). The `repository` fixture is made from those real scopes, with the seated founder and a first key, and `MemoryHost`, a labelled stand-in, behind the outside port for the creation of the repository. No scripted peer stands for a scope. **Until then, partial preparation, and labelled as that:** the fixture has a directory that a scripted register created, with a real membership, rules scope and destination below it, each under its whole version. It shows the rules of those four definitions and their provisional gating. It shows nothing of a founding, and it is not M1's acceptance. | `platform/test/support/repository.ts`, `host.ts` | T18 whole, including the provisional gating and the order of two `created` answers. From here the `repository` fixture exists, with five scopes. Step 11 adds the sixth, the inbox. Before EJ1 is answered: the rows of T18 for the directory's three children only, on the partial fixture, named as that in the test. | Care |
+| 10 | **Waits with step 9c.** Remove the earlier founding and registry. Their successor is the register's founding, and it is not shown before step 9c is whole. | `parked/room/src/founding.ts`, `registry.ts`; `parked/README.md` | The check of active files passes. | Small |
 | 11 | The inbox on the fixture: membership creates one for a member. The rule P22 for a notice's `source`. | `platform/src/inbox.ts`; `membership.rules.ts`, one send | T40 | Small |
 | 12 | The production wiring of authority and readers for a platform scope. | `scope/src/worker.ts`, `object.ts` | T11 | Care |
 | 13 | Remove the earlier authority, roster and admin code. | `parked/room/src/authority.ts`, `roster.ts`; `parked/contract/src/roster.ts`; `parked/policy/` | The check of active files passes. | Small |
 | 14 | The grant in a replay. | `replay/src/verify.ts`, `source.ts` | T44 | Care |
 | 15 | Read sessions, the serving limits after review of the parked limiter, and the operator's record with its two lists. Remove the earlier requests code. | `scope/src/sessions.ts`, `limits.ts`, `operator.ts`, `reads.ts` (all new but the last); `client/src/session.ts`; `parked/room/src/requests.ts`, `ratelimit.ts` | T15, T39, T41, T42 | Care for sessions. Small for the lists. |
 
-**Milestone M1, authority.** Six scopes can be founded, with real
-definitions for all six: the register, the directory, membership, the
-rules, the destination (steps 9 to 9c) and the inbox (step 11). The
-rules and destination definitions, their genesis and their confirmation
-are in M1. Their check and publication behaviours are in M3 and M4. An act
-at a platform scope is judged on a real observation. A device can join, be
-revoked and be recovered.
+**Milestone M1, authority.** M1 holds the data of all six definitions
+and every pure rule that their versions require: the register (step 9),
+the directory (step 9), membership (step 7), the rules (steps 9a and 9d),
+the destination (steps 9b, 9e and 9f) and the inbox (step 11, and its
+rule, which is built). A pure rule is a function of what the judge gives
+it. None of them needs a host, a runner, a gateway or a provider. What
+tracks C and D keep is the integration with outside systems, and the
+scenarios that need it: the Git host's session and its stand-in behind
+the outside port, the checker's runner, the gateway's upstream, and the
+evidence of a provider. An act at a platform scope is judged on a real
+observation. A device can join, be revoked and be recovered.
+
+**What waits, and on what.** A scope is founded for real only under a
+version whose every rule exists. One rule cannot be written from the
+adopted texts: the register's rule for the outcome of `create-repository`.
+Its selecting outcome sends the `create` of the directory, and that
+request has clauses and a cause. No adopted text says where the clauses
+of a request that an outcome entry sends are written, or what the cause
+of a scope that it creates is (entry EJ1; owner: the scope contract, with
+the authority note). A rule that refuses, or that sends nothing, would
+not be that rule, and none is written in its place. So:
+
+- The register is not founded for real until EJ1 is answered and the rule
+  is written. Every other rule of the register is built in step 9.
+- The founding chain starts at the register, so step 9c, step 10 and
+  M1's acceptance of six really founded scopes wait with it.
+- The directory, membership, the rules scope, the destination and the
+  inbox each have a whole version before that. Each is created for real
+  under it, below a directory that a scripted register created. That
+  register is a stand-in, labelled in each test and in the delivery note.
+  The witnesses of steps 11 to 15 run on that partial fixture until step
+  9c is whole, and then on the real one, as the same tests.
+- No other rule of the six versions waits on a later track. Some wait
+  on a step of M1: every rule that reads an observation or a value
+  follows step 8a. Three rest on a reading that an owner may change, and
+  are built as the source holds it: the `relate` of `judge` (EJ1), a rule's
+  effect that a check would refuse (EJ11), and which attempt a read
+  confirms (O11; entry EG6).
 
 ### 8.3 Track B: the capabilities and Git
 
@@ -819,11 +903,14 @@ if Q3 is answered. If it is not, M2 is filed without it and says so.
 
 ### 8.4 Track C: rules and checks
 
-After M1. It needs step 16a for `job-read`.
+After M1. It needs step 16a for `job-read`. What is left here is the
+integration with a Git host and with the checker's runner, and the
+scenarios that need them. The rules scope has no outside system: its
+rules and its scenario are in M1 (step 9d).
 
 | Step | Delivers | Owns | Witness | Model |
 |---|---|---|---|---|
-| 23 | The rules' behaviour: `publish`, `rules-wanted`, `retire-definition`, and an observation of the rules. The definition and its genesis are step 9a's. | `platform/src/rules.ts`, `rules.rules.ts` | T37 | Small, from the table of 12.1.4 |
+| 23 | Moved to M1 as step 9d, whole. Nothing of it is left in this track. | None | None | None |
 | 24 | The step `job-read`, the read token and the snapshot repository. The snapshot commit, written again. | `derive/src/capability/gitread.ts`; `packages/git/src/snapshot.ts`; the three parked snapshot files | A row of `forms-prepare` | Care |
 | 25 | The checker service: the origin read, the outcome store, one run for a job, the signer, the runner after its review. Remove the earlier jobs and checker code. | `packages/checkers/*`; `parked/checkers/` but its retained paths (`measure/` and `wrangler.spike.jsonc`, section 6.2); `parked/room/src/jobs.ts`; `parked/contract/src/checker.ts` | T34, T35, T36 | Care |
 
@@ -832,16 +919,22 @@ After M1. It needs step 16a for `job-read`.
 ### 8.5 Track D: the destination
 
 After M1, step 4, step 19 and step 21. Steps 26 and 27 are the centre of
-the delivery and are not split across workers.
+the delivery and are not split across workers. The destination's rules
+are in M1 (steps 9e and 9f). What is left here is how an attempt reaches
+the outside, and the scenarios on real scopes that need it. Each scenario
+runs with `MemoryHost` behind the outside port, a labelled stand-in. The
+gateway's real upstream, the real host and provider evidence are the
+host session's.
 
 | Step | Delivers | Owns | Witness | Model |
 |---|---|---|---|---|
-| 26 | The destination's behaviour, on the definition of step 9b: `reserve`, the queue, the operation `judge` with its retained observations and fetched entries, `withdraw` with its mark, and the updates to the lane. | `platform/src/destination.ts`, `destination.rules.ts` | T1, T2, T3, T4, T29 | Care |
-| 27 | Publishing: attempts, the mint and its revocation, the three classes of evidence, the deciding read, the slot, the first head, the receipt, `resend`. Remove the earlier log push. | `platform/src/destination.rules.ts`, the second half; `parked/git/src/publisher/log-push.ts`, `parked/room/src/logremote.ts` | T7, T8, T30, T31, T32 | Care |
-| 28 | A publication that does not publish: the host keeps refusing, a compromised key, another writer, `adopt-head`. The fence of section 6.8 is not built: it is proposed and not adopted (U2). Remove the earlier landing machine. | The same file; `parked/git/src/landing/`; `parked/contract/src/landing.ts`, `guards.ts` | T5, T33 | Care |
+| 26 | The attempt of `judge`, on the rules of steps 9e and 9f: the outside port's reads of the branch's head and of the integration commit's closure, the ten-second observations and the fetched entries that the outcome entry retains. The scenarios of a reservation on real scopes, in both orders of each race. | The outside port for `platform:destination@1`, in `scope/src/worker.ts` and `packages/git/src/host.ts`; `platform/test/reserve.scope.test.ts`, `withdraw.scope.test.ts` | T1, T2, T3, T4, T29 | Care |
+| 27 | Publishing through the port: an attempt's push through the gateway, the mint and its revocation at the host port, the deciding read, the first head's push, the receipt's write. The scenarios with a lost reply. Remove the earlier log push. | The same port; `platform/test/publish.scope.test.ts`, `first-head.scope.test.ts`; `parked/git/src/publisher/log-push.ts`, `parked/room/src/logremote.ts` | T7, T8, T30, T31, T32 | Care |
+| 28 | The scenarios of a publication that does not publish: the host keeps refusing, a compromised key, another writer, `adopt-head`. The fence of section 6.8 is not built: it is proposed and not adopted (U2). Remove the earlier landing machine. | `platform/test/abort.scope.test.ts`; `parked/git/src/landing/`; `parked/contract/src/landing.ts`, `guards.ts` | T5, T33 | Care |
 
 **Milestone M4, publication.** The proof plan's A6 and A7 pass in both
-orders of each race, with a lost push reply settled by a read.
+orders of each race, on real scopes, with a lost push reply settled by a
+read. Their judgments were shown as pure functions in M1 (T50).
 
 ### 8.6 The assembly
 
@@ -858,17 +951,17 @@ orders of each race, with a lost push reply settled by a read.
 |---|---|---|
 | Base | 1, 2, then 3 and 4 | 3 and 4 own different files and run together after 1. |
 | A1 | 5, 6 | After 3. One worker. |
-| A2 | 7, 8, 9, 9a, 9b, 9c | After 3. Beside A1. 7 and 8 are independent; 9 follows both; 9a and 9b follow 9 and are independent; 9c follows them. |
+| A2 | 7, 8, 8a, 9, 9a, 9b, 9d, 9e, 9f, 9c | After 3 and the marks. Beside A1. 7, 8 and 8a are independent; 9 follows all three; 9a and 9b follow 9 and are independent; 9d follows 9a and 8a; 9e follows 9b and 8a; 9f follows 9e and step 21. 9c follows all of them, and waits on EJ1. |
 | B1 | 16a, 16b, 16c | After 4. Three workers. |
 | B2 | 17, 21 | After 1. Two workers. They touch only `packages/git`, in different files. |
-| C | 23 | After 9a. Beside everything. |
+| C | 24, 25 | After M1 and 16a. Step 23 is step 9d, in A2. |
 | D | 26, 27, 28 | One worker, in order. |
 
 Steps 3, 4, 12, 16, 30 and 32 are integration points. Each is one
 worker's, with no other step open on the files it owns.
 
-Counted by hand over the "Model" column of 38 steps: 8 are small, 27
-need care, and 3 are mixed (15, 17 and 32).
+Counted by hand over the "Model" column of 41 steps, with step 23 counted
+as step 9d: 7 are small, 31 need care, and 3 are mixed (15, 17 and 32).
 
 ## 9. Open questions, and risks
 
@@ -955,10 +1048,10 @@ replaces, and can land. None is reported as I3.
 
 | Milestone | Steps | What a reviewer can judge | Removes | Runs after it |
 |---|---|---|---|---|
-| M1 Authority | 1 to 15, with 9a to 9c | Founding of six scopes with real definitions, membership, the observation and the grant guard, sessions, enrolment, revocation and recovery, incidents. V6 and V9; V7's entries; the authority rows of A6. | The earlier founding, registry, authority, roster, admin and requests code. | Every act of a platform scope, on a real grant. |
+| M1 Authority | 1 to 15, with 8a and 9a to 9f | The data and every pure rule of six definitions, each rule against its row. Five scopes created under whole versions. The founding of six from an install, when EJ1 is answered (section 8.2). Membership, the observation and the grant guard, sessions, enrolment, revocation and recovery, incidents. V6 and V9; V7's entries; the authority rows of A6. | The earlier authority, roster, admin and requests code. The earlier founding and registry, when step 9c is whole. | The authority acts of membership: `seat`, `first-key`, `invite-member`, `invite-key`, `join`, `enrol`, `remove-member`, `revoke-key` and `rotate-recovery`, each on a real grant or on its rule at `grant`. The acts of the rules scope and of the directory, as rows with their rules. The founding acts, once EJ1 is answered: `install`, `found`, `establish` and the `confirm`. No check job, no push and no publication runs: those need the outside ports of M3 and M4. |
 | M2 Capabilities | 16a to 22 | Preparation, the records, staging, pins, ancestry, the token ledger, the gateway, the retained Git code after review. O3 and O15; V8's entries. | The scripted capability. The earlier workspaces, mint ledger, publisher and Git reader. | I2's W1. |
-| M3 Checks | 23 to 25 | The rules, the checker service and the runner after review. | The earlier jobs and checker code. | A check from a request to its deciding entry. |
-| M4 Publication | 26 to 28 | The destination: reservation, compare-and-set, readback, receipt, abort. A6 and A7 in both orders, with the lost push reply. | The earlier landing machine and log push. | A merge that a real destination decides, from a test's `reserve`. |
+| M3 Checks | 24 and 25 | The read token and the snapshot repository, the checker service and the runner after review. | The earlier jobs and checker code. | A check from a request to its deciding entry. |
+| M4 Publication | 26 to 28 | The destination's outside port, and its scenarios on real scopes: reservation, compare-and-set, readback, receipt, abort. A6 and A7 in both orders, with the lost push reply. | The earlier landing machine and log push. | A merge that a real destination decides, from a test's `reserve`. |
 | M5 Assembly | 29 to 32 | The adopted forms of revision 13, and the forms that owners adopt in the meantime; the lanes on the real repository; the last removal; the guides; the measured cost. | The scripted peers and the test authority, where the adoption of revision 14 allows. What is left of the parked packages. | I2's W2 and W3. The full I3 is filed here, and accounts for every row of sections 3 and 4. |
 
 M1 and M2 can be built side by side and reviewed in either order. M3 and
