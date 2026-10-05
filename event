@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:c5045dc422416cf8c6d5ef32904c2ce26df81064","text":"Merge retired a covered predecessor; the successor is at packages/cli/src/main.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:cae77c69acf1f9ad9e7c5896f5516cdad38cb71d","text":"Merge retired a covered predecessor; the successor is at packages/room/scripts/deploy-spike.sh."}
