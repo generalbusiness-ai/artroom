@@ -205,6 +205,16 @@ that failed before it.
 | The facts a refused genesis read. | Once the named facts are read, a refused genesis records them in `uses` after the source entry, as an applied one does. A genesis refused before that point, for a field that is not a value of its type, records the source entry only. | A child genesis whose `fact` guard is false: the entry holds the source entry and the named fact. |
 | The facts a later clause read. | A clause with effects reads every fact that the origin entry's fields name. The entry that records it, a delivery of a result or a diagnosis, now records those facts in `uses`, after the source entry and without repeating it. A clause with no effects reads none. | A diagnosis whose `undelivered` clause runs for an origin that names a fact: the diagnosis entry holds that fact. |
 
+One branch of the second row was missed and is repaired after event
+`fb6f8e03`. A genesis whose fields name a foreign fact and then, later in
+the byte order of the field names, a local item is refused `no-item`,
+because no item exists before a genesis. The named fact had been read by
+then, and the written entry recorded the source entry only. The reading of
+the fields now returns the facts it read before the missing item, and the
+refused genesis records them. The order of the checks, the reason and the
+source entry are unchanged. Witness: the same test, with a creation whose
+fields name the fact and then an item.
+
 Not changed: a refused act writes no entry and records nothing. The
 decision, the effects and the sends of every entry are as before.
 

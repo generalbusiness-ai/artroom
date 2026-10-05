@@ -65,7 +65,8 @@ export function factsNamed(types: ActType["fields"], fields: Readonly<Record<str
   return [...named.values()];
 }
 
-export type Facts = { result: "read"; facts: Map<Digest, Fetched>; uses: FactUse[] } | { result: "no-item"; detail: string } | { result: "unavailable" };
+/** `no-item` carries the foreign facts read before the missing item, so an entry that records that refusal records them (section 9.2). */
+export type Facts = { result: "read"; facts: Map<Digest, Fetched>; uses: FactUse[] } | { result: "no-item"; detail: string; uses: FactUse[] } | { result: "unavailable" };
 
 /** What a use records of a foreign entry: the entry by fact, and the digest of its canonical bytes (section 9.2). */
 export const useOf = (fact: FactRef, entry: Entry): FactUse => ({ fact, content: digestBytes(canonicalBytes(entry)) });
@@ -89,7 +90,7 @@ export function readFacts(view: StateView, types: ActType["fields"], fields: Rea
   const uses: FactUse[] = [];
   for (const name of Object.keys(fields).sort(byteOrder)) {
     for (const [type, value] of leaves(types[name]!, fields[name]!)) {
-      if (type.type === "item" && view.item(value as number)?.type !== type.of) return { result: "no-item", detail: `${name} names no ${type.of}` };
+      if (type.type === "item" && view.item(value as number)?.type !== type.of) return { result: "no-item", detail: `${name} names no ${type.of}`, uses };
       if (type.type !== "fact") continue;
       const ref = value as FactRef;
       const fetched = available.find((f) => f.fact.hash === ref.hash);

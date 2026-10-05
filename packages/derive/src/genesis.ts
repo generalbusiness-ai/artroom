@@ -110,8 +110,11 @@ export function judgeGenesis(view: StateView, definition: ValidDefinition, asked
   const read = given ? readFields(act.fields, given, bounds) : null;
   if (!read?.ok) return refuse("bad-field");
   const named = readFacts(view, act.fields, read.fields, source ? [...context.facts, source] : context.facts);
-  if (named.result === "no-item") return refuse("no-item");
   if (named.result === "unavailable") return { result: "unavailable", reason: "dependency-unavailable" };
+  /** The source entry, then each named fact that was read. The source is recorded once. */
+  const uses = [...sourceUse, ...named.uses.filter((u) => u.fact.hash !== source?.fact.hash)];
+  // A field that names a local item names nothing: no item exists before a genesis. The facts read before it are recorded.
+  if (named.result === "no-item") return refuse("no-item", uses);
 
   const j: Judging = {
     view, definition, bounds, clock, scope: { at, creator: seed.creator }, self: 0, kind: definition.declared.genesis, fields: read.fields, fieldTypes: act.fields,
@@ -120,7 +123,6 @@ export function judgeGenesis(view: StateView, definition: ValidDefinition, asked
   // A child's result is at ordinal 0; the sends its act declares follow. Each scope a genesis creates has that genesis's own seed digest as its cause.
   const ran = derive(j, act, act.on, seedDigest(seed), child ? 1 : 0);
   if (ran.result === "unavailable") return ran;
-  const uses = [...sourceUse, ...named.uses.filter((u) => u.fact.hash !== source?.fact.hash)];
   if (ran.result === "refused") return refuse(ran.reason, uses, ran.prepared);
   // No item exists before a genesis, so no transition is due (section 5.2, step 6.3), and no entry precedes it, so the clock is not behind.
   return { result: "write", draft: { input: input("applied"), uses, prepared: ran.prepared, effects: ran.effects, sends: [...result("applied"), ...ran.sends], judgesTime: founding !== null || ran.judgesTime } };

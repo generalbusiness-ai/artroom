@@ -260,7 +260,7 @@ describe("what a written refusal or a later clause records of what it read (sect
     });
   });
 
-  test("a fact guard that is false: the refused genesis records the named fact it read, and a later clause records the facts it reads again", () => {
+  test("a fact guard that is false, or a later field that names no item: the refused genesis records the named fact it read, and a later clause records the facts it reads again", () => {
     // P: a lane's `assign` entry, which names una as performer. The creation passes the reference on; the creator did not read P.
     const l = new Scope(laneDefinition);
     l.did(rita, "offer", { fields: { intent: 0 }, expected: { intent: 1 } });
@@ -277,6 +277,17 @@ describe("what a written refusal or a later clause records of what it read (sect
     // The opener is rita, so the guard is false. The entry holds the source entry and P: the child can derive the refusal again from its own retained bytes.
     expect(judgeGenesis(new MemoryState(), cited, asked, { ...context, facts: [fetched] })).toMatchObject({
       result: "write", draft: { input: { decision: "refused" }, uses: [useOf(asked.from, context.source!.entry), useOf(fetched.fact, entry)], sends: [{ message: { outcome: "refused", reason: "guard-failed" } }] },
+    });
+
+    // The same creation under a definition whose later field names a local item. No item exists before a genesis, so it is refused
+    // `no-item`, after P was read: the entry holds P all the same.
+    const itemised = variant(ticket, (def) => {
+      def.acts.file.fields.proof = proof;
+      def.acts.file.fields.zItem = { type: "item", of: "intent", required: true };
+    });
+    const early = creationUnder(D, itemised, { proof: fetched.fact, zItem: 0 });
+    expect(judgeGenesis(new MemoryState(), itemised, early.asked, { ...early.context, facts: [fetched] })).toMatchObject({
+      result: "write", draft: { input: { decision: "refused" }, uses: [useOf(early.asked.from, early.context.source!.entry), useOf(fetched.fact, entry)], sends: [{ message: { outcome: "refused", reason: "no-item" } }] },
     });
 
     // An `ask` whose fields name P. Its `undelivered` clause runs in a later entry and reads P again; the origin entry recorded P first.
