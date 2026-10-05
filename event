@@ -1,1 +1,1 @@
-{"kind":"promise","text":"I will deliver revision 15 of the scope contract for review.","body":{"branch":"request/scope-contract-r15"}}
+{"kind":"artifact","text":"notes/2026-10-04-scope-and-replay-contract/corrections.md at exact 7f1ea903cfc36be9252f5fd67b386ea67b96e2b8 on request/scope-contract-r15, under promise git:sha1…c3bb49a on request git:sha1…ff737ac","body":{"commit":"7f1ea903cfc36be9252f5fd67b386ea67b96e2b8","path":"notes/2026-10-04-scope-and-replay-contract/corrections.md"}}
