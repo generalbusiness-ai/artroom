@@ -14,6 +14,11 @@ seal an entry inside one storage transaction.
 | `hash` | `sha256`, `digestBytes`, `digestOfHash`, `isDigest`. |
 | `sign` | `keyIdOf`, `keyIdOfSecret`, `publicKeyOf`, `sign`, `verify`. |
 | `domains` | `domainBytes`; `intentDigest`, `signIntent`, `verifySignedIntent`; `seedDigest`, `scopeIdOf`, `newIncarnation`; `entryHash`, `factRefOf`; `messageDigest`, `deliveryCauseDigest`, `definitionDigest`; `isScopeId`, `isIncarnation`. |
+| `ids` | The guard of each other identifier the contract names: `isKeyId`, `isMemberId`, `isOperationId`, `isDutyId`, `isPlatformDefinition`, `isScopeKind` with `SCOPE_KINDS`; and `positionOf`, the one reader of a position's decimal text. No other package tests these forms with a pattern of its own. |
+
+The entry `@generalbusiness/artroom-bytes/web` is the declarations of the
+Web text coders these sources compile against. A package that needs no
+wider library names it in its `tsconfig`.
 
 Every digest and signature is over a domain tag, one newline byte, and the
 canonical JSON of one value. No value contains its own digest. An entry's hash
