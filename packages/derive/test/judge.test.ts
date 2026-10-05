@@ -238,7 +238,8 @@ describe("attribution (sections 6.7 and 10.2)", () => {
     const report = s.did(vic, "report", under(s, 2));
 
     // The attribution is taken of the commitment, not of the new report, which has no history: una is in it.
-    expect(names(s.item(report.seq).parties["authors"])).toEqual(["@una", "@paul", "@vic", "@quinn"]);
+    // The list is in byte order of member identifier, and not in the order in which the members joined the history.
+    expect(names(s.item(report.seq).parties["authors"])).toEqual(["@paul", "@quinn", "@una", "@vic"]);
     // A hold ending changed the hold only: the commitment kept its performer through it.
     expect(s.item(hold.seq)).toMatchObject({ state: "ended", epoch: 2 });
 
@@ -263,7 +264,7 @@ describe("attribution within an entry, and under later authority (section 6.7)",
     const hold = s.did(una, "take-hold", under(s, 2)).seq;
     const report = s.did(una, "report", { fields: { commitment: 2, hold, to: vic.member }, expected: { commitment: s.item(2).revision, hold: 1 } });
     // vic holds from this entry on, so vic is not outside the report's authors. Another signer set vic, so vic brings no principal.
-    expect(names(s.item(report.seq).parties["authors"])).toEqual(["@una", "@paul", "@vic"]);
+    expect(names(s.item(report.seq).parties["authors"])).toEqual(["@paul", "@una", "@vic"]);
 
     // rita opens a note with una as owner: no grant of una's was judged. Later una edits it under a grant that names paul.
     const n = new Scope(smallDefinition);

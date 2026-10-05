@@ -176,7 +176,7 @@ export const small: DeclaredDefinition = {
     cite: act({
       step: "transition", on: "note", grant: "edit", fields: { proof: { type: "fact", kind: ["assign"], under: "lane", required: true } },
       guards: [{ state: ["draft"] }, { fact: { field: "proof", where: [{ equals: { a: { field: "performer" }, b: { signer: true } } }] } }],
-      effects: [{ party: { slot: "readers", from: { fact: "proof", field: "performer" }, list: "add" } }],
+      effects: [{ party: { slot: "readers", from: { field: "proof", part: { field: "performer" } }, list: "add" } }],
     }),
     // Two relate sends that are written differently and resolve to one key: `self`, and a slot that holds the opened item.
     echo: act({

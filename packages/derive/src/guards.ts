@@ -117,20 +117,18 @@ function namesAbsent(j: Judging, g: Guard): boolean {
 /**
  * The guards of one written list, by the three results of section 6.5: false
  * when one is false on a completed evaluation; otherwise not completed when
- * one is not; otherwise true. `at`: the guard that decided it, which is the
- * failed guard of a refusal; -1 when the list holds.
+ * one is not; otherwise true. `at`: the failed guard, whose `reason` names a
+ * refusal; -1 when no guard is false.
  */
 // I2 merge: the guards of an act and of a handler are a list of this kind. `judgeAct` and `derive` still stop at the first guard that is not completed.
 export function judgeGuards(j: Judging, guards: readonly Guard[], of: Subject = "on"): { result: GuardResult; at: number } {
   let at = -1;
-  let open = -1;
   const result = all(guards.map((g, i) => () => {
     const r = judgeGuard(j, g, of);
     if (r === "fail") at = i;
-    else if (r !== "pass" && open < 0) open = i;
     return r;
   }));
-  return { result, at: result === "fail" ? at : result === "pass" ? -1 : open };
+  return { result, at };
 }
 
 /** One guard. `of`: the subject of the guard that holds it, which a nested guard takes unless it names its own. */

@@ -212,12 +212,9 @@ export type Source = Operand | null;
 /** An effect, a send or an attention form with `if` is applied only when every guard holds; with `unless`, only when not every guard holds. */
 export interface Condition { if?: readonly Guard[]; unless?: readonly Guard[] }
 
-/** Landed form. A party slot's member from a field of the intent of a fetched fact. The adopted form is a field operand with a part. */
-export interface LandedFactSource { fact: string; field: string }
-
 export type EffectForm = { of?: Subject } & Condition & (
   | { state: string }
-  | { party: { slot: string; from: Source | readonly Operand[] | LandedFactSource; list?: "add" | "remove" } }
+  | { party: { slot: string; from: Source | readonly Operand[]; list?: "add" | "remove" } }   // a list of operands sets a list slot whole
   | { ref: { slot: string; from: "self" | Source } }            // `self` is the entry being written (section 6.4)
   | { value: { slot: string; from: Source | { time: { plusSeconds: number } } } }   // the time form is the commit time plus a constant
   | { attribute: { slot: string; of: Subject; with?: readonly AuthorSource[] } }      // section 6.7
