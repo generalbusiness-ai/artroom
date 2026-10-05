@@ -121,6 +121,11 @@ describe("room custody: an MCP bearer token (R-CRED-3, R-SEC-5)", () => {
     expect(JSON.stringify(err)).not.toContain(secret);
   });
 
+  test("the lost-redemption advice names what works: an admin revokes the room-held key with revoke-key (review Info 3)", () => {
+    expect(LOST_REDEMPTION).toContain("revoke-key");
+    expect(LOST_REDEMPTION).not.toMatch(/delegation/);
+  });
+
   test("a gateway error with no room error body may have been recorded: no retry", async () => {
     const { invitation, secret } = await room.invite("@builder", { role: "agent", custody: "room" });
     room.faults.push({ route: "POST /redeem", kind: "status", status: 502 });

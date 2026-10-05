@@ -188,7 +188,7 @@ export async function resubmit(endpoint: Endpoint, room: RoomId, signed: AnySign
 export const LOST_REDEMPTION =
   "The redemption may have succeeded, but its response was lost, and the bearer token cannot be shown again. " +
   "Do not retry this invitation. Ask an admin for a new MCP (room-custody) invitation for the same member, " +
-  "and ask them to revoke the unused delegation.";
+  "and ask them to revoke the key the room made for the lost token, with the roster act `revoke-key`.";
 
 /**
  * Redeem a room-custody invitation for an MCP bearer token (R-CRED-3,

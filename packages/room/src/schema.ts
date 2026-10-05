@@ -275,6 +275,8 @@ function checkTarget(c: Checker, kind: EnvelopeKind, t: unknown, body: unknown):
       return;
     case "roster":
       if (t !== null) c.error(path, "must be null for roster acts");
+      // Every roster op is an object. Admission reads `body.op` before the signature, so the shape is settled here (review L2).
+      if (!isPlainObject(body)) c.error("envelope.body", "must be an object for roster acts");
       return;
     case "propose":
     case "release":
@@ -290,7 +292,6 @@ function checkTarget(c: Checker, kind: EnvelopeKind, t: unknown, body: unknown):
       if (isPlainObject(t) && "act" in t) return entryTarget(c, t, path);
       return lineTarget(c, t, path);
   }
-  void body;
 }
 
 /** Canonical size of the whole envelope (R-SIG-6, R-ADM-1 step 1). */
