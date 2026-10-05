@@ -63,7 +63,7 @@ I2.
 | `room` | 109 | Sources: `authority.ts`, `roster.ts`, `requests.ts`, `founding.ts`, `registry.ts`, `jobs.ts`, `snapshot.ts`, `artifacts.ts`, `logremote.ts`, `policy.ts`, `mcp.ts`, `secrets.ts`, `ratelimit.ts`, `diag.ts`, `errors.ts`, `budgets.ts`, `memory/artifacts.ts`. Node case files for kept sources and for the measurement scripts. `wrangler.jsonc`, `wrangler.spike.jsonc`, `scripts/`, and `measure/` with its 70 files | I3 for membership, the directory, founding and check issue; I5 for the tool endpoint; I4 for `measure/`; E1 for the spike configuration and `scripts/` | `secrets.ts`, `ratelimit.ts`, `diag.ts`, `errors.ts`, `budgets.ts`; `memory/artifacts.ts` as test support | I3 removes the package when the last scope kind is accepted. I5 removes `mcp.ts`. I4 deletes `measure/` with its results. E1 deletes the spike configuration and scripts after settlement. |
 | `log` | 0 | Nothing. I3 removed the directory at its step 17: "What I3 removed", below. | `packages/git` | None left | Done. |
 | `policy` | 10 | `admin.ts`, its test and the test's fixtures; the guide, the manifest and configurations | I3: part of the membership definition | None named | I3 rewrites it and deletes the directory. |
-| `git` | 63 | The whole package | I3 | The publisher (`publisher/client.ts`, `container.ts`, `git-publisher.ts`, `gitops.ts`, `push-outcome.ts`, `ref-fence.ts`); reads and support (`artifacts.ts`, `diff/treediff.ts`, `first-commit.ts`, `snapshot/repos.ts`, `safe-errors.ts`, `sql.ts`, `index.ts`) | I3 rewrites landing, workspaces, fork tokens and the mint ledger, keyed by hold and epoch; retires `publisher/log-push.ts`; I4 deletes `measure/`. |
+| `git` | 57 | The whole package, less six files of `src/publisher/` that I3 removed at its step 21: "What I3 removed", below. `src/publisher/log-push.ts` stays. | I3 | Reads and support (`artifacts.ts`, `diff/treediff.ts`, `first-commit.ts`, `snapshot/repos.ts`, `safe-errors.ts`, `sql.ts`, `index.ts`). The publisher is reviewed and is `packages/git`. | I3 rewrites landing, workspaces, fork tokens and the mint ledger, keyed by hold and epoch; retires `publisher/log-push.ts` at its step 27; I4 deletes `measure/`. |
 | `checkers` | 43 | The whole package | I3. I2 delivered the subject of a check, as data: the `job` item type of the `change` definition. Nothing here was removed for it. | The runner: `sandbox.ts`, `runner.ts`, `container.ts`, `checkers.ts`, `llm.ts`, `worker.ts`, `index.ts` | I3 rewrites `job.ts`, `checker.ts`, `signing.ts` and `snapshot-commit.ts`; I4 deletes `measure/`; E1 the spike configuration. |
 | `mcp` | 24 | The whole package | I5 | The transport: `server.ts`, `stdio.ts`, `worker.ts`, `validate.ts`, `index.ts` | I5 replaces `tools.ts`, `run.ts` and `toolsets.ts` with tools generated from declarations. |
 | `cli` | 22 | The whole package | I5 | `config.ts`, `link.ts`, `format.ts`, and the bundle with its third-party notices | I5 removes the 18 commands and their tests. |
@@ -142,10 +142,16 @@ deletes, moves or reads the body of a path on that list.
 | Step | Removed | Successor | The review, and what did not move | Checked against the retained paths |
 |---|---|---|---|---|
 | 17 | `log/`, whole: `src/git.ts`, `src/gitcli.ts`, `src/web.d.ts`, the guide, the manifest and two build configurations. 7 files. | `packages/git/src/names.ts`, `reader.ts`, `program.ts` | `notes/2026-10-05-i3-git-review.md`, section 2. No file moved as it was. The reader's parsers and its read of an object and a ref were written again against the review. The object writers, the log's push, the transfer in parts, the in-memory repository and `gitcli.ts` have no successor. | `log/` held no `measure/` directory and no other retained path. |
+| 21 | Six files of `git/src/publisher/`: `gitops.ts`, `push-outcome.ts`, `ref-fence.ts`, `client.ts`, `container.ts`, `git-publisher.ts`. | `packages/git/src/gitops.ts`, `push-outcome.ts`, `gateway.ts`, on `program.ts` | `notes/2026-10-05-i3-git-review.md`, sections 3 to 5. No file moved as it was. The one push, the read of a ref, the fetch, the reading of a push's output and the reading of a push's commands were written again against the review. The pin and integration refs, the merge planner, the snapshot commands, the log's staging and push, the Room's client, the container object and the adapter to the landing engine have no successor in this step. The snapshot commands (`listTree`, `writeSnapshot`) are step 24's to write again, from Git history at `5e5583e74`. | `git/src/publisher/log-push.ts` is kept for step 27, as the plan says. `git/measure/` is on the list and is untouched. No other retained path is under `git/src/publisher/`. |
 
 Parked files that imported what a step removed still name it, and are not
-edited: after step 17, some sources and manifests of `room`, `git`,
-`contract` and `ui` name the earlier log package.
+edited. After step 17, some sources and manifests of `room`, `git`,
+`contract` and `ui` name the earlier log package. After step 21,
+`git/src/publisher/log-push.ts`, `git/src/index.ts`, `git/src/landing/` and
+`git/src/safe-errors.ts` import the removed publisher files. Four case
+files of `git/test` test removed sources and have no source now:
+`gitops.test.ts`, `git-publisher.test.ts`, `push-outcome.test.ts` and
+`ref-fence.test.ts`, with `push-samples.json`. They stay until step 31.
 
 ## Outside this directory, and not active either
 
