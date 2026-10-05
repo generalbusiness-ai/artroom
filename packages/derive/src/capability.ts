@@ -46,8 +46,13 @@ export interface Recorded { kind: string; key: readonly FieldValue[]; state: str
  * - `facts` and `source`: the entries in `uses` that the input names, and
  *   for a handler the verified source entry.
  * - `clock`: the one reading of the commit.
+ * - `from`, for an effect: for each argument that the definition writes as
+ *   a slot of an item, with no part, the ID of that item: the subject of
+ *   the slot operand. An argument that is read from anything else has no
+ *   member. The effect `pin-release` finds its pin by it (authority note,
+ *   section 5.7, "Which pin a commit alone releases").
  */
-export type CapabilityGiven = Pick<Judging, "view" | "definition" | "scope" | "self" | "kind" | "fields" | "signer" | "intent" | "facts" | "source" | "own" | "clock">;
+export type CapabilityGiven = Pick<Judging, "view" | "definition" | "scope" | "self" | "kind" | "fields" | "signer" | "intent" | "facts" | "source" | "own" | "clock"> & { from?: Readonly<Record<string, number>> };
 
 /** One form that needs a capability's own code, as the validator lists it (section 6.1): the version, the kind of form and its name. */
 export type CapabilityForm = Pick<Underived, "capability" | "form" | "name">;
@@ -157,7 +162,13 @@ export function capabilityEffect(j: Judging, form: { name: string; do: string; w
   const found = rulesFor(j, form.name, "effect", form.do);
   if (!found) return "unavailable";
   const args = Object.fromEntries(Object.entries(form.with).map(([arg, from]) => [arg, operand(j, from, item)]));
-  return found.rules.effect(found.version, form.do, args, given(j)).map((r) => {
+  // The subject of each argument that is a slot operand: the form's own subject, the item of a range, or the subject it names.
+  const from = Object.fromEntries(Object.entries(form.with).flatMap(([arg, o]): [string, number][] => {
+    if (!("slot" in o) || o.part !== undefined) return [];
+    const of = o.of === undefined ? item : o.of === "each" ? (j.each ?? null) : (j.subjects.get(o.of) ?? null);
+    return of ? [[arg, of.id]] : [];
+  }));
+  return found.rules.effect(found.version, form.do, args, { ...given(j), from }).map((r) => {
     const kind = own(found.declared.records, r.kind);
     if (!kind?.states.includes(r.state)) throw new Error(`${found.version} declares no record ${r.kind} with the state ${r.state}`);
     return { effect: "record", capability: found.version, kind: r.kind, key: r.key, state: r.state, values: r.values };

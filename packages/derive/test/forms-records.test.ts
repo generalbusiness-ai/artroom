@@ -83,6 +83,23 @@ describe("the records of `hold@1` (scope contract, section 6.11; authority note,
     expect([shape(s.outcome("12:0", "unknown")), s.outcome("12:0", "confirmed", found, "read"), shape(s.outcome("12:0", "confirmed", found)), s.record("check", intentDigest(other.intent), 1)?.state]).toEqual([
       ["unknown"], "refused bad-input", ["confirmed", "check recorded"], "recorded",
     ]);
+
+    // Section 5.7, "Which pin a commit alone releases". Two more reports of the one commit are admitted, each on its own pin, so
+    // two pins are `held` on it. The entry that refuses one report releases the pin whose `admitted` is the entry that opened that
+    // report, and never the pin of the other intent.
+    const third = s.intent(una, "report", { expected: { commitment: s.item(s.commitment).revision }, fields: source });
+    const check = s.asked(third, "check") as Entry;
+    s.outcome(`${check.seq}:0`, "confirmed", found);
+    const reports = [other, third].map((signed) => { expect(s.submit(signed, { capabilities: cap }).result).toBe("write"); return s.last.seq; }) as [number, number];
+    const pins = () => [other, third].map((signed) => { const pin = s.record("pin", s.at, intentDigest(signed.intent)) as Record<string, unknown>; return [pin["state"], pin["admitted"], pin["by"]]; });
+    const refuse = (report: number) => { expect(s.act(rita, "refuse-report", { on: report, expected: { on: 1 } }, { capabilities: cap }).result).toBe("write"); return shape(s.last); };
+    expect([pins(), refuse(reports[1]), pins()]).toEqual([
+      [["held", reports[0], null], ["held", reports[1], null]], ["state", "pin released"], [["held", reports[0], null], ["released", reports[1], s.head.seq]],
+    ]);
+    // With no pin that matches, nothing is released, and the entry is written as its row has it. Made by hand: the first pin's
+    // `admitted` is another entry. Its report is refused, and the pin, which is another intent's by its record, stays `held`.
+    s.hand(recordEffects("hold@1", [{ kind: "pin", key: [s.at, intentDigest(other.intent)], state: "held", values: { ...s.state.record("hold@1", "pin", [s.at, intentDigest(other.intent)])!.values, admitted: 11 } }]));
+    expect([refuse(reports[0]), s.item(reports[0]).state, pins()[0], s.replay().snapshot() === s.state.snapshot()]).toEqual([["state"], "refused", ["held", 11, null], true]);
   });
 
   test("a pin in another lane ends in one state in both orders of `pin-confirm` and `unpin`, and a late confirmation restores nothing (T22)", () => {

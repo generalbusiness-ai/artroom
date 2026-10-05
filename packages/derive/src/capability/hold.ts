@@ -340,17 +340,26 @@ function pinHold(args: Readonly<Record<string, unknown>>, given: CapabilityGiven
 /**
  * The effect `pin-release` (section 6.11). With `consumer`, `intent`,
  * `manifest` and `by`: that consumer's pin, `provisional` or `held`, becomes
- * `released`, `unpinned`, with the entry that showed it. With `commit`
- * alone: this scope's own pin that is `held` on that commit. The form names
- * no intent, so it releases only when exactly one such pin exists (I3
- * deltas, entry EF9).
+ * `released`, `unpinned`, with the entry that showed it.
+ *
+ * With `commit` alone (authority note, section 5.7, "Which pin a commit
+ * alone releases", decided in revision 21): the argument is a slot of an
+ * item, and that item was opened by the entry that admitted its act. The
+ * pin that is released is this scope's own pin that is `held`, whose
+ * `commit` is that value and whose `admitted` is that entry: the item's ID.
+ * One entry admits one act, and one act has one pin, so at most one
+ * matches. With none, nothing is released, and the entry is written as its
+ * row has it: an effect has no refusal. An argument that is no slot of an
+ * item names no pin. A pin of another intent is never released: its
+ * `admitted` is another entry.
  */
 function pinRelease(args: Readonly<Record<string, unknown>>, given: CapabilityGiven): readonly Recorded[] {
   if ("consumer" in args) {
     const pin = pinOf(given.view, args["consumer"], args["intent"]);
     return pin && pin.state !== "released" ? [moved(pin, "released", { admitted: pin.values["admitted"] ?? args["manifest"] ?? null, released: "unpinned", by: args["by"] ?? null })] : [];
   }
-  const mine = records(given.view, "pin", ["held"], "commit", args["commit"]).filter((pin) => same(pin.key[0], given.scope.at));
+  const item = own(given.from ?? {}, "commit");
+  const mine = item === undefined ? [] : records(given.view, "pin", ["held"], "commit", args["commit"]).filter((pin) => same(pin.key[0], given.scope.at) && pin.values["admitted"] === item);
   return mine.length === 1 ? [moved(mine[0]!, "released", { released: "unpinned", by: given.self })] : [];
 }
 
