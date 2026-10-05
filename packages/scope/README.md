@@ -196,7 +196,9 @@ that records the confirmation clears the flag. No attempt of it starts.
    reaches an empty store writes the genesis and mints the incarnation.
 4. A first decision and a repeat are both answered `recorded`, with the
    fact of the entry that recorded the message. A scope that cannot decide
-   yet answers `retry`.
+   yet answers `retry`. A repeat reads no foreign entry and no text, so one
+   that can no longer be had does not hide the answer. A repeated founding
+   is answered the same way.
 
 The source entry's bytes are retained with the entry that used them.
 

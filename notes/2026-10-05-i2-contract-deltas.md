@@ -17,15 +17,14 @@ numbered D1, D2 and so on. The plan named D1 to D6 before any source
 changed. Each entry has the date it was written.
 
 Steps 4 to 18 were written by several workers, and each numbered its
-entries with a prefix of its own: DL, DF, DG, DH, DI, DJ, DK, DM and DN.
+entries with a prefix of its own: DL, DF, DG, DH, DI, DJ, DK, DM, DN, DP and DR.
 The prefixes are kept. Sections 7, 8 and 10 say that the builder renumbers
 the entries at the merge. That was not done, because later entries, the
 guides and the source comments cite the entries by these names.
 
-The note holds 175 entries: 26 numbered D, 5 DL, 14 DF, 29 DG, 21 DH, 23
-DI, 25 DJ, 11 DK, 5 DM, 6 DN, 5 DP and 3 DR (DR1, DR2 and DR5; DR3 and DR4 are
-counted where they are written). The count was made by a script over
-the first cell of each table row of this file. Section 23 lists, by owner,
+The note holds 177 entries: 26 numbered D, 5 DL, 14 DF, 29 DG, 21 DH, 23
+DI, 25 DJ, 11 DK, 5 DM, 6 DN, 5 DP and 7 DR. The count was made by a script
+over the first cell of each table row of this file; no entry is counted twice. Section 23 lists, by owner,
 the entries that need an owner's decision. Section 24 was written after
 the base milestone, and is the only section that names a later revision of
 the contract. Section 25 repairs findings of a review of the base milestone.
@@ -56,7 +55,7 @@ the contract. Section 25 repairs findings of a review of the base milestone.
 | 22 | Step 18: the assembly | DN1 to DN6 |
 | 23 | For owners | None: a list by owner |
 | 24 | After the base milestone: the genesis kind | DP1 to DP5 |
-| 25 | I2 review repairs (verdict 1993412c) | DR1 to DR5 |
+| 25 | I2 review repairs (verdict 1993412c) | DR1 to DR7 |
 
 ## 1. The silences the plan named
 
@@ -792,9 +791,11 @@ thrown `TransportError`. Neither is an assertion as the script reads one.
 
 Written 2026-10-05, for the review of the base milestone at `744f2447`,
 whose verdict is event `1993412c`. It found five supported P2 source
-findings. The entries are numbered DR1 to DR5 to match the findings. The first
-table holds DR1, DR2 and DR5, and the second DR3 and DR4. None of the five changes a digest, a pinned
-definition or the bytes of an entry. Each was repaired in its own commit,
+findings. The entries DR1 to DR5 match the findings. DR6 and DR7 repair two
+faults of the same kinds that were found after the verdict: the `self` mark
+read in a field of any type, and the order of a repeated founding. The first
+table holds DR1, DR2, DR5, DR6 and DR7, and the second DR3 and DR4. None of the
+seven changes a digest, a pinned definition or the bytes of an entry. Each was repaired in its own commit,
 and its control was run by hand with `scripts/control.mjs`.
 
 | # | What was wrong | Implemented | Why |
