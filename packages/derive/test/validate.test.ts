@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { DeclaredDefinition } from "@generalbusiness/artroom-contract";
 import { canonicalBytes, definitionDigest } from "@generalbusiness/artroom-bytes";
-import { validateDefinition, type ProblemCode } from "../src/index.ts";
+import { timedGraph, validateDefinition, type ProblemCode } from "../src/index.ts";
 import { Scope, desk, fields, keys, lane, laneDefinition, member, on, small, smallDefinition, t, ticket, valid } from "./fixtures.ts";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -103,6 +103,33 @@ describe("the definition validator", () => {
     expect(laneDefinition.indexes).toEqual([{ path: "acts.take-hold.guards.2.none", type: "hold", slots: ["under"] }]);
     expect(smallDefinition.timedTypes).toEqual([]);
     expect(smallDefinition.indexes.map((i) => [i.type, i.slots])).toEqual(Array(4).fill(["note", ["text"]]));
+  });
+
+  test("timed rules that part and join again: 60 rules over 16 states are read by rules and leads, not by paths; each chain is exact, and one rule back to the start is a cycle", () => {
+    // A type apart from the genesis type, with states s0 to s15. Four rules take it from each state to the next: 4^14 paths from one rule, 60 rules.
+    const stepped = (back: boolean) => {
+      const d = clone(small) as any;
+      d.items.step = { many: true, max: 1, states: Object.fromEntries(Array.from({ length: 16 }, (_, i) => [`s${i}`, { final: i === 15 }])), initial: "s0", parties: {}, refs: {}, values: { due: { fixed: false, required: false, of: { type: "time" } } } };
+      for (let i = 0; i < 15; i++) for (const r of "abcd") d.timed[`s${i}${r}`] = { on: "step", states: [`s${i}`], deadline: "due", effects: [{ state: `s${i + 1}` }], attention: [] };
+      if (back) d.timed.back = { on: "step", states: ["s14"], deadline: "due", effects: [{ state: "s0" }], attention: [] };
+      return d;
+    };
+    const graphOf = (d: any) => timedGraph(Object.entries<any>(d.timed).map(([name, r]) => ({ name, type: r.on, states: r.states, to: r.effects[0].state, deadline: r.deadline })));
+
+    const result = validateDefinition(stepped(false), PROPOSED_BOUNDS);
+    // The reserve of a state is its longest chain: 15 rules from s0, one from s14.
+    expect(result.ok ? result.definition.deadlines : result.problems).toEqual({ step: Object.fromEntries(Array.from({ length: 15 }, (_, i) => [`s${i}`, 15 - i])) });
+    const graph = graphOf(stepped(false));
+    expect([graph.cyclic.size, graph.chain.get("s0a"), graph.chain.get("s7d"), graph.chain.get("s14b"), graph.fromSlot.get("step")?.get("due")]).toEqual([0, 15, 8, 1, 15]);
+    // Each rule is entered once. Each of the 56 rules before s14 leads to the four rules of the next state: 224 leads, each followed once.
+    expect(graph.work).toEqual({ rules: 60, edges: 224 });
+
+    // With a rule from s14 back to s0, each of the other 57 rules leads back to itself. The four rules into the final state lead nowhere, and are not refused.
+    const cyclic = validateDefinition(stepped(true), PROPOSED_BOUNDS);
+    expect(cyclic.ok ? null : [[...new Set(cyclic.problems.map((p) => p.code))], cyclic.problems.length]).toEqual([["reserve-unbounded"], 57]);
+    expect(cyclic.ok ? null : cyclic.problems.map((p) => p.path)).not.toContain("timed.s14a");
+    // One more rule, and eight more leads: four into it and four out of it.
+    expect(graphOf(stepped(true)).work).toEqual({ rules: 61, edges: 232 });
   });
 
   test("a timed rule that copies a party list is counted at every member the list can hold, so the entry of an admitted rule fits the entry size bound", () => {

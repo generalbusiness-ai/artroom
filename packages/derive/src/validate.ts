@@ -714,7 +714,7 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
 
   const timedTypes = new Set<string>(holdTypes);
   /** Each timed rule that was read whole: its type, the states it applies in, and the state it leaves its item in. */
-  const moves: { name: string; type: string; states: readonly string[]; to: string; deadline: string }[] = [];
+  const moves: TimedMove[] = [];
   for (const [name, v] of entries(top["timed"], "timed", null)) {
     const path = at("timed", name);
     const o = rec(v, path, ["on", "states", "deadline", "effects", "attention"]);
@@ -739,17 +739,12 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
     attention(o["attention"], at(path, "attention"), ctx);
   }
 
-  // Section 17.2, a chain of timed rules: rule r leads to rule s when r sets a state that the `states` of s list. A timed entry is
-  // never refused, so the room for every rule of a chain is reserved with the first deadline. When the rules of one type lead to
-  // one another in a cycle no chain is finite, and the drain of such an item need never end.
-  const leads = (r: (typeof moves)[number]) => moves.filter((m) => m.type === r.type && m.states.includes(r.to));
+  // Section 17.2, a chain of timed rules. A timed entry is never refused, so the room for every rule of a chain is reserved with
+  // the first deadline. When the rules of one type lead to one another in a cycle no chain is finite, and the drain of such an
+  // item need never end.
+  const graph = timedGraph(moves);
   for (const rule of moves) {
-    const reached = new Set<string>();
-    for (let next = [rule]; next.length > 0;) {
-      next = next.flatMap(leads).filter((m) => !reached.has(m.name));
-      for (const m of next) reached.add(m.name);
-    }
-    if (reached.has(rule.name)) bad("reserve-unbounded", at("timed", rule.name), "the timed rules of its type lead back to this rule, so no reservation covers what its deadline can start");
+    if (graph.cyclic.has(rule.name)) bad("reserve-unbounded", at("timed", rule.name), "the timed rules of its type lead back to this rule, so no reservation covers what its deadline can start");
   }
 
   for (const name of holdTypes) {
@@ -776,17 +771,16 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
     if (most > bounds.entryBytes) bad("bound", at("timed", name), `its entry could take ${most} bytes; at most ${bounds.entryBytes}`);
   }
   if (problems.length > 0) return { ok: false, problems };
-  // The chains are finite here: a cycle was refused above.
-  const chain = (r: (typeof moves)[number]): number => 1 + Math.max(0, ...leads(r).map(chain));
+  // The chains are finite here: a cycle was refused above. Each rule's chain was computed once, with the cycle check.
   /** The entries a deadline reserves when an item of that type is in that state. */
-  const held = (type: string, state: string): number => Math.max(0, ...moves.filter((m) => m.type === type && m.states.includes(state)).map(chain));
+  const held = (type: string, state: string): number => graph.fromState.get(type)?.get(state) ?? 0;
   const deadlines: Record<string, Record<string, number>> = {};
-  for (const m of moves) for (const state of m.states) (deadlines[m.type] ??= {})[state] = held(m.type, state);
+  for (const [type, states] of graph.fromState) deadlines[type] = Object.fromEntries(states);
   // What one clause can start: for each subject one deadline, by the state the clause sets or by a deadline slot it sets.
   const starts = (set: ClauseSet): number => {
     const bySubject = new Map<string, number>();
     for (const e of set) {
-      const most = e.state !== undefined ? held(e.type, e.state) : Math.max(0, ...moves.filter((m) => m.type === e.type && m.deadline === e.slot).map(chain));
+      const most = e.state !== undefined ? held(e.type, e.state) : (graph.fromSlot.get(e.type)?.get(e.slot!) ?? 0);
       bySubject.set(e.subject, Math.max(bySubject.get(e.subject) ?? 0, most));
     }
     return [...bySubject.values()].reduce((a, b) => a + b, 0);
@@ -797,6 +791,119 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
   } catch {
     return { ok: false, problems: [{ code: "shape", path: "", message: "has no canonical bytes" }] };
   }
+}
+
+// ---------------------------------------------------------------- the graph of timed rules (sections 17.2 and 17.3a)
+
+/** A timed rule as the graph reads it: its type, the states it applies in, the state it leaves its item in, and its deadline slot. */
+export interface TimedMove { name: string; type: string; states: readonly string[]; to: string; deadline: string }
+
+export interface TimedGraph {
+  /** The rules that lead back to themselves. With any, no chain is finite, and the lengths below are not to be used. */
+  readonly cyclic: ReadonlySet<string>;
+  /** For each rule, the rules of its longest chain, itself included. */
+  readonly chain: ReadonlyMap<string, number>;
+  /** By type, then state: the longest chain of a rule that applies in that state. */
+  readonly fromState: ReadonlyMap<string, ReadonlyMap<string, number>>;
+  /** By type, then deadline slot: the longest chain of a rule with that deadline. */
+  readonly fromSlot: ReadonlyMap<string, ReadonlyMap<string, number>>;
+  /** The work done: rules entered, and leads followed from one rule to another. Each is counted once. */
+  readonly work: { readonly rules: number; readonly edges: number };
+}
+
+/**
+ * The graph of the timed rules: rule r leads to rule s when they are of one
+ * type and r sets a state that the `states` of s list.
+ *
+ * One traversal answers both questions asked of it. It enters each rule
+ * once and follows each lead once, so its work is in proportion to the rules
+ * and the leads, and not to the paths, of which a small graph that parts and
+ * joins again has very many. A rule is `cyclic` when it is one of several
+ * rules that reach one another. Otherwise its chain is one more than the
+ * longest chain of a rule it leads to, which is final by the time the rule
+ * is left. The traversal keeps its own stack, so a long chain of rules is
+ * no deeper a call.
+ */
+export function timedGraph(moves: readonly TimedMove[]): TimedGraph {
+  // The rules that apply in each state of each type, in the order declared. A rule that leads to that state leads to each of them.
+  const listed = new Map<string, Map<string, number[]>>();
+  moves.forEach((m, i) => {
+    let states = listed.get(m.type);
+    if (!states) listed.set(m.type, states = new Map());
+    for (const state of m.states) {
+      let rules = states.get(state);
+      if (!rules) states.set(state, rules = []);
+      if (rules.at(-1) !== i) rules.push(i);
+    }
+  });
+  const none: readonly number[] = [];
+  const next = moves.map((m) => listed.get(m.type)?.get(m.to) ?? none);
+
+  // Tarjan's strongly connected components, with a stack of frames in place of recursion.
+  const order = new Array<number>(moves.length).fill(-1);
+  const low = new Array<number>(moves.length).fill(0);
+  const open = new Array<boolean>(moves.length).fill(false);
+  const chain = new Array<number>(moves.length).fill(0);
+  const cyclic = new Set<string>();
+  const path: number[] = [];
+  let rules = 0;
+  let edges = 0;
+  for (let root = 0; root < moves.length; root++) {
+    if (order[root] !== -1) continue;
+    /** One rule being read: the next lead to follow, the longest chain among the rules it leads to, and whether it leads to itself. */
+    const frames: { rule: number; lead: number; most: number; self: boolean }[] = [];
+    const enter = (rule: number): void => {
+      order[rule] = low[rule] = rules++;
+      open[rule] = true;
+      path.push(rule);
+      frames.push({ rule, lead: 0, most: 0, self: false });
+    };
+    enter(root);
+    while (frames.length > 0) {
+      const frame = frames.at(-1)!;
+      const v = frame.rule;
+      const leads = next[v]!;
+      if (frame.lead < leads.length) {
+        const w = leads[frame.lead++]!;
+        edges++;
+        if (order[w] === -1) enter(w);
+        else if (open[w]) { low[v] = Math.min(low[v]!, order[w]!); frame.self ||= w === v; }
+        else frame.most = Math.max(frame.most, chain[w]!);
+        continue;
+      }
+      frames.pop();
+      chain[v] = 1 + frame.most;
+      if (low[v] === order[v]) {
+        // Every rule from here to the top of the path reaches every other. One rule alone is a cycle only if it leads to itself.
+        const alone = path.at(-1) === v && !frame.self;
+        for (;;) {
+          const w = path.pop()!;
+          open[w] = false;
+          if (!alone) cyclic.add(moves[w]!.name);
+          if (w === v) break;
+        }
+      }
+      const parent = frames.at(-1);
+      if (parent) {
+        low[parent.rule] = Math.min(low[parent.rule]!, low[v]!);
+        parent.most = Math.max(parent.most, chain[v]!);
+      }
+    }
+  }
+
+  const fromState = new Map<string, Map<string, number>>();
+  for (const [type, states] of listed) {
+    const most = new Map<string, number>();
+    for (const [state, at] of states) most.set(state, Math.max(...at.map((i) => chain[i]!)));
+    fromState.set(type, most);
+  }
+  const fromSlot = new Map<string, Map<string, number>>();
+  moves.forEach((m, i) => {
+    let slots = fromSlot.get(m.type);
+    if (!slots) fromSlot.set(m.type, slots = new Map());
+    slots.set(m.deadline, Math.max(slots.get(m.deadline) ?? 0, chain[i]!));
+  });
+  return { cyclic, chain: new Map(moves.map((m, i) => [m.name, chain[i]!])), fromState, fromSlot, work: { rules, edges } };
 }
 
 // ---------------------------------------------------------------- the size of a timed entry (sections 5.2 and 7.5)
