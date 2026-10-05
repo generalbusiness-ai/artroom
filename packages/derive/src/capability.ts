@@ -16,7 +16,7 @@
  */
 
 import { CAPABILITIES } from "@generalbusiness/artroom-contract";
-import type { Capability, CapabilityArg, CapabilityName, DeclaredDefinition, Effect, FieldValue, Guard, Operand, UnavailableReason } from "@generalbusiness/artroom-contract";
+import type { Capability, CapabilityArg, CapabilityName, DeclaredDefinition, Effect, FieldValue, Guard, Operand, ScopeRef, UnavailableReason } from "@generalbusiness/artroom-contract";
 import type { GuardResult, Judging } from "./guards.ts";
 import type { Underived } from "./validate/capability.ts";
 import { bindEach, covered } from "./lists.ts";
@@ -78,6 +78,17 @@ export interface Capabilities {
    * and an entry holds the item form only.
    */
   workspace?(view: StateView, definition: ValidDefinition, self: number, k: number, holds: readonly HoldEffect[], working: (id: number) => Item | null): readonly Effect[];
+  /**
+   * Whether a request is bound to a pending record that reserved an entry
+   * for it (section 6.11, "Reserved requests"; authority note, section 4.2,
+   * "A reserved license decision"). `from` is the envelope's source scope,
+   * as verified, and `fields` the message's own fields, read by themselves.
+   * The answer is the one record that the deciding entry holds when it
+   * refuses the request. Null: the request is not bound, and its deciding
+   * entry is new work. Absent: these rules have no such code, and no
+   * request is bound.
+   */
+  bound?(capability: CapabilityName, view: StateView, at: ScopeRef, from: ScopeRef, fields: unknown): Recorded | null;
 }
 
 const given = ({ view, definition, scope, self, kind, fields, signer, intent, facts, source, own, clock }: Judging): CapabilityGiven => ({ view, definition, scope, self, kind, fields, signer, intent, facts, source, own, clock });

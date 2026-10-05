@@ -47,6 +47,15 @@ export const staging: ValidDefinition = variant(lane, (def: any) => {
     step: "open", on: "export", grant: "export", also: { hold: { item: "hold", by: "hold" } }, fields: { hold: { type: "item", of: "hold", required: true } },
     guards: [{ of: "also.hold", state: ["ended"] }], effects: [{ ref: { slot: "hold", from: { field: "hold" } } }], sends: [], attention: [],
   };
+  // The license request of a task scope, with the capability's guard and effect as `issue` writes them, argument for argument.
+  const license = { export: { item: "also.export" }, from: { sender: true }, checkpoint: { field: "checkpoint" }, hold: { item: "also.target" }, instance: { field: "instance" } };
+  def.receives["export-license"] = {
+    message: "export-license", class: "tell", from: { kind: "task" }, opens: null,
+    fields: { export: { type: "item", of: "export", required: true }, k: { type: "int", min: 1, max: 3, required: true }, checkpoint: { type: "digest", required: true }, hold: { type: "item", of: "hold", required: true }, instance: { type: "text", max: 128, required: true } },
+    also: { export: { item: "export", by: "export" }, target: { item: "hold", by: "hold" } },
+    guards: [{ capability: { name: "hold", guard: "license", with: license } }],
+    effects: [{ capability: { name: "hold", do: "license", with: { ...license, k: { field: "k" } } } }], sends: [], attention: [],
+  };
 });
 
 /** The snapshots of staged refs that the fixture's scopes retain, by digest: what a scope's store keeps for the guard `ancestry`. */

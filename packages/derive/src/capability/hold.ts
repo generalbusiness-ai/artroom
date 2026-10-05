@@ -674,6 +674,10 @@ export function holdCapability(options: HoldOptions, definition: (view: StateVie
       return rule(given);
     },
     workspace: workspaceEffects,
+    bound: (capability, view, at, from, fields) => {
+      const found = capability === HOLD ? boundLicense(view, at, from, fields) : null;
+      return found && licenseRefused(found);
+    },
     rules: (owner, kind) => (owner === HOLD ? (own(rules, kind) ?? null) : null),
     reserves: holdReserves,
   };

@@ -1,9 +1,9 @@
 import { describe, expect, test } from "vitest";
 import type { Entry, FactRef, ScopeRef } from "@generalbusiness/artroom-contract";
-import { intentDigest } from "@generalbusiness/artroom-bytes";
-import { boundLicense, hasWorkspace, licenseRefused, preparationStatus, recordEffects } from "../src/index.ts";
+import { factRefOf, intentDigest } from "@generalbusiness/artroom-bytes";
+import { boundLicense, hasWorkspace, judgeDelivery, preparationStatus, recordEffects } from "../src/index.ts";
 import type { Fetched } from "../src/index.ts";
-import { d, keys, laneDefinition, otherLane, t, variant, lane } from "./fixtures.ts";
+import { arriving, d, decided, forged, keys, laneDefinition, otherLane, t, variant, lane } from "./fixtures.ts";
 import { C, Staging, cap, clean, staging } from "./fixtures-hold.ts";
 
 const { rita, una, vic } = keys;
@@ -158,13 +158,24 @@ describe("the records of `hold@1` (scope contract, section 6.11; authority note,
     const bound = (fields: object, from: unknown = task) => { const b = boundLicense(s.state, s.at, from, fields); return b && b.k; };
     const whole = { export: s.fact(exported), k: 2, instance: 7 };
     expect([bound(whole), bound(whole, otherLane), bound({ ...whole, k: 1 }), bound({ ...whole, k: 4 }), bound({ ...whole, k: "2" }), bound({ k: 2 })]).toEqual([2, null, null, null, null, null]);
-    // The refusal of the bound request is one record: `decided` is 2, and the pin's state, target and `k` do not change. It uses the
-    // entry that the pin reserved for number 2, so what is used and reserved is the same after it. The number is then decided:
-    // the same number again is not bound, and is new work.
+    // The judge of a delivery decides a license request of the task scope, with the capability's code. Request 2 is bound, and it is
+    // ill-typed in another field. Its refusal is a settling entry with one effect, the record whose `decided` is 2: the pin's
+    // state, target and `k` do not change. It uses the entry that the pin reserved for number 2, so what is used and reserved is the
+    // same after it. The number is then decided: the same number again is not bound. Its refusal is new work, with no effect.
+    const asks = (fields: object) => {
+      const send = { n: 0, to: s.at, message: { class: "request", type: "tell", body: { message: "export-license", fields } } } as const;
+      const source = { ...forged(task, 20 + s.head.seq, { type: "checkpoint", through: 0, state: d("0") }, [send]), under: "platform:task" };
+      const arrival = { ...send, from: factRefOf(source.entry) };
+      const judged = judgeDelivery(s.state, s.definition, arrival, { ...arriving(s, arrival, source), capabilities: cap });
+      if (judged.result !== "write") throw new Error(`not decided: ${JSON.stringify(judged)}`);
+      s.seal(judged.draft);
+      return [...decided(s), judged.draft.settles, shape(s.last)];
+    };
     const before = [s.head.seq + s.reserved(), s.reserved()];
-    s.hand(recordEffects("hold@1", [licenseRefused(boundLicense(s.state, s.at, task, whole)!)]));
-    expect([s.record("receiver-pin", exported), s.head.seq + s.reserved(), s.reserved(), bound(whole), bound({ ...whole, k: 3 })]).toEqual([
+    expect([asks(whole), s.record("receiver-pin", exported), s.head.seq + s.reserved(), s.reserved(), bound(whole), bound({ ...whole, k: 3 }), asks(whole)]).toEqual([
+      ["refused", "bad-field", true, ["receiver-pin standing"]],
       { state: "standing", checkpoint: d("9"), hold: target, instance: "i2", holder: una.member, task, k: 1, decided: 2, by: null }, before[0], before[1]! - 1, null, 3,
+      ["refused", "bad-field", false, []],
     ]);
 
     // `export-settled`: the final entry of the task scope, made by hand, whose own effects set the release to its final state.

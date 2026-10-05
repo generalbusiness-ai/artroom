@@ -4,11 +4,13 @@
  * advisory.
  */
 
-import type { Advisory, Control, Effect, Entry, FactRef, FactUse, Message, Prepared, Reason, Request, Result, RoutingRefusal, ScopeRef, Seed, Send } from "@generalbusiness/artroom-contract";
+import type { Advisory, CapabilityName, Control, Effect, Entry, FactRef, FactUse, Message, Prepared, Reason, Request, Result, RoutingRefusal, ScopeRef, Seed, Send } from "@generalbusiness/artroom-contract";
 import { deliveryCauseDigest, messageDigest, scopeIdOf, seedDigest } from "@generalbusiness/artroom-bytes";
+import { declaredBy, type Recorded } from "./capability.ts";
 import { isEntryOf, updateOf, useOf, type Reading } from "./fields.ts";
 import { bound, runClause, runHandler, type Clause, type Handled, type Sent } from "./handlers.ts";
 import type { Judgment } from "./judge.ts";
+import { recordEffects } from "./prepare.ts";
 import type { ScopeState, StateView } from "./state.ts";
 import { nextDue } from "./timed.ts";
 import type { ValidDefinition } from "./validate/index.ts";
@@ -133,13 +135,19 @@ export function judgeDelivery(view: StateView, definition: ValidDefinition, deli
   };
   const b = bound(definition, message, from);
   if (!b) return decide("refused", { code: "bad-field" });
+  // Authority note, section 4.2, "A reserved license decision": the first decision of a bound request uses the entry that a standing
+  // pin reserved for its number, whatever it decides. So its deciding entry is a settling entry. When it refuses, for any reason, the
+  // entry holds one effect: the record whose `decided` is the request's number. A request that is not bound is as it was: new work.
+  const reserved = message.type === "tell" ? reservedFor(view, definition, context, scope.at, from.at, b.kind, message.body) : null;
+  const refuse = (reason: Reason, prepared: readonly Prepared[] = [], read: readonly FactUse[] = []): Judgment =>
+    decide("refused", reason, reserved ? recordEffects(reserved.capability, [reserved.refused]) : [], [], prepared, false, read, reserved !== null);
   // Section 4.2: a request that names no handler of the definition, for a scope of the sender's kind and definition, is decided
   // `refused`. That holds for a relationship update too: a scope keeps a copy only for a relationship it declares a handler for.
   // An entry so decided has no kind (section 6.2): no handler of this definition received it.
   const handler = b.handler && under(b.handler, context.source) ? b.handler : null;
-  if (!handler) return decide("refused", { code: "unknown-message" });
+  if (!handler) return refuse({ code: "unknown-message" });
   const given = b.fields;
-  if (!given) return decide("refused", { code: "bad-field" });
+  if (!given) return refuse({ code: "bad-field" });
 
   const platform: Effect[] = [];
   let first = false;
@@ -162,12 +170,31 @@ export function judgeDelivery(view: StateView, definition: ValidDefinition, deli
   if (ran.result === "unavailable") return ran;
   // A refusal, among them `duplicate-relation` for a handler whose sends hold two for one key: no effect and no send but the result.
   // The deciding entry records each rule result a guard read before the refusal, and each foreign entry the fields named (section 9.2).
-  if (ran.result === "refused") return decide("refused", reasonOf(ran), [], [], ran.prepared, false, ran.uses);
+  if (ran.result === "refused") return refuse(reasonOf(ran), ran.prepared, ran.uses);
   // Section 7.3: copies are bounded. The first update for a key beyond the number its handler states is refused, like an opening
   // past a type's `max`. An update for a key that is already held is never refused for that reason.
-  if (first && view.copies(b.kind, from.at.kind) >= (handler.copies ?? 0)) return decide("refused", { code: "type-full" }, [], [], ran.prepared, false, ran.uses);
+  if (first && view.copies(b.kind, from.at.kind) >= (handler.copies ?? 0)) return refuse({ code: "type-full" }, ran.prepared, ran.uses);
   // A refusal takes nothing out of a pending state, so it is new work (section 17.3). An applied update or message may settle.
-  return decide("applied", undefined, [...platform, ...ran.effects], ran.sends, ran.prepared, ran.judgesTime, ran.uses, ran.settles || settlesCopy);
+  return decide("applied", undefined, [...platform, ...ran.effects], ran.sends, ran.prepared, ran.judgesTime, ran.uses, ran.settles || settlesCopy || reserved !== null);
+}
+
+/**
+ * The pending record that reserved an entry for this `tell`, as the listed
+ * capability that declares such requests answers (section 6.11, "Reserved
+ * requests"): the capability, and the one record of a refusal. Null: no
+ * listed capability declares a request of that message, the rules have no
+ * code for the binding, or the request is not bound.
+ */
+function reservedFor(view: StateView, definition: ValidDefinition, context: DeliveryContext, at: ScopeRef, from: ScopeRef, message: string, body: unknown): { capability: CapabilityName; refused: Recorded } | null {
+  const rules = context.capabilities;
+  if (!rules?.bound || !isObject(body)) return null;
+  for (const listed of definition.declared.capabilities) {
+    const capability: CapabilityName = `${listed.name}@${listed.version}`;
+    if (!declaredBy(capability)?.reserved.some((r) => r.request.class === "tell" && r.request.message === message)) continue;
+    const refused = rules.bound(capability, view, at, from, body["fields"]);
+    if (refused) return { capability, refused };
+  }
+  return null;
 }
 
 /** The reason an entry records for a refusal: the code, and the name when the failed guard declares one (section 4.2). */
