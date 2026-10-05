@@ -28,8 +28,7 @@ export type ProblemCode =
   | "genesis-timed"      // the genesis act opens a timed item type or has a `hold` effect (section 6.4)
   | "timed"              // a timed rule that is not about its own live item, or that would stay due
   | "timed-partial"      // a timed rule with an effect that its commit could refuse (section 6.4)
-  | "timed-cycle"        // timed rules of one type that could apply to one item again with no act between (section 9.2)
-  | "clause-timed"       // a result clause that moves an item into a state a timed rule names (section 9.2)
+  | "reserve-unbounded"  // what a duty can start is not finite: timed rules of one type that lead to one another in a cycle (section 17.2)
   | "hold"               // the hold capability used without what it needs (section 6.8)
   | "handler"            // two handlers for one message from one kind of scope, or a name the platform keeps
   | "capability" | "profile" | "rule";
@@ -46,6 +45,20 @@ export interface ValidDefinition {
   readonly timedTypes: readonly string[];   // section 5.2
   readonly holdTypes: readonly string[];    // section 6.8: the types a `hold: open` effect targets
   readonly indexes: readonly RangeIndex[];
+  /**
+   * Section 17.2, a chain of timed rules: for each timed item type and each
+   * live state a timed rule applies in, the entries a deadline held in that
+   * state reserves: one for each rule of the longest chain that starts there.
+   */
+  readonly deadlines: Readonly<Record<string, Readonly<Record<string, number>>>>;
+  /**
+   * Section 17.2, a request's clauses: the entries a request reserves for
+   * what the clause of its result or diagnosis can start. The largest, over
+   * every request send of the definition and its clauses `applied`,
+   * `refused`, `superseded` and `undelivered`, of the chains of the
+   * deadlines that clause can create.
+   */
+  readonly clauseEntries: number;
 }
 
 export type Validation = { ok: true; definition: ValidDefinition } | { ok: false; problems: readonly Problem[] };
@@ -413,8 +426,10 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
 
   // ------------------------------------------------------------ effects (section 6.6)
 
-  /** Each state effect of a result clause: where it is written, the item type, and the state it sets. Checked once the timed rules are read. */
-  const clauseStates: { path: string; type: string; state: string }[] = [];
+  /** What one result clause can change that a timed rule reads: for each effect, the subject, its item type, and the state or the value slot it sets. */
+  type ClauseSet = { subject: string; type: string; state?: string; slot?: string }[];
+  const clauseSets: ClauseSet[] = [];
+  let clause: ClauseSet | null = null;
 
   /** One effect. `later`: it runs in a later entry, as a result clause does. Returns what it sets, for the conflict check. */
   const effect = (v: unknown, path: string, ctx: Ctx, later: boolean): string | null => {
@@ -438,7 +453,7 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
         if (typeof x !== "string" || !s.states.has(x)) return bad("name", p, `names no state of ${s.name}`);
         // Section 6.3: an item in a final state refuses every transition. A later clause is checked when it runs.
         if (nascent ? s.states.get(s.initial) : !later && !ctx.live.has(sk)) bad("final", p, "a state effect needs a `state` guard on its subject that lists no final state");
-        if (later) clauseStates.push({ path: p, type: s.name, state: x });
+        clause?.push({ subject: sk, type: s.name, state: x });
         return `the state of ${sk}`;
       case "party": {
         const r = rec(x, p, ["slot", "from"], ["list"]);
@@ -493,6 +508,7 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
           if (ctx.timed) bad("timed-partial", p, "a timed rule sets no time from the commit clock");
           if (sl.type.type !== "time") bad("name", p, "the commit time goes in a slot of type time");
         }
+        clause?.push({ subject: sk, type: s.name, slot: String(r["slot"]) });
         return `slot ${String(r["slot"])} of ${sk}`;
       }
       case "attribute": {
@@ -545,7 +561,13 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
   const sources = (v: unknown, path: string, ctx: Ctx) => { for (const [name, s] of entries(v, path, bounds.listElements)) source(s, at(path, name), ctx); };
   const clauses = (v: unknown, path: string, ctx: Ctx, conflict: boolean) => {
     const r = rec(v, path, [], ["applied", "refused", "superseded", "undelivered", ...(conflict ? ["conflict"] : [])]);
-    for (const [name, e] of Object.entries(r ?? {})) effects(e, at(path, name), ctx, true);
+    for (const [name, e] of Object.entries(r ?? {})) {
+      // Section 17.2: a `conflict` is not reserved. Its entry is new work, and what its clause starts is counted when it is admitted.
+      clause = name === "conflict" ? null : [];
+      effects(e, at(path, name), ctx, true);
+      if (clause) clauseSets.push(clause);
+      clause = null;
+    }
   };
 
   const sends = (v: unknown, path: string, ctx: Ctx): void => {
@@ -692,7 +714,7 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
 
   const timedTypes = new Set<string>(holdTypes);
   /** Each timed rule that was read whole: its type, the states it applies in, and the state it leaves its item in. */
-  const moves: { name: string; type: string; states: readonly string[]; to: string }[] = [];
+  const moves: { name: string; type: string; states: readonly string[]; to: string; deadline: string }[] = [];
   for (const [name, v] of entries(top["timed"], "timed", null)) {
     const path = at("timed", name);
     const o = rec(v, path, ["on", "states", "deadline", "effects", "attention"]);
@@ -713,26 +735,21 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
     // Otherwise the transition would be due again as soon as it was applied, and the drain would never end.
     const to = Array.isArray(o["effects"]) ? o["effects"].find((e) => isObject(e) && typeof e["state"] === "string" && !states.includes(e["state"])) : undefined;
     if (!isObject(to)) bad("timed", at(path, "effects"), "a timed rule takes its item out of the rule's states");
-    else moves.push({ name, type: t.name, states, to: to["state"] as string });
+    else moves.push({ name, type: t.name, states, to: to["state"] as string, deadline: String(o["deadline"]) });
     attention(o["attention"], at(path, "attention"), ctx);
   }
 
-  // Section 9.2: an admitted duty always has an entry to settle in. The count of those entries gives a live item of a timed type one
-  // entry for each timed rule on its type, and is asked only of an entry that admits duties. So no entry that is not asked may start
-  // a timed duty again. Two kinds of entry could. A timed entry, when the rules of one type lead back to a rule that has applied:
-  // then each rule could apply more than once with no act between. And the entry of a result or a diagnosis, when its clause moves
-  // an item into a state a timed rule names. A clause has effects only, so it starts no send.
+  // Section 17.2, a chain of timed rules: rule r leads to rule s when r sets a state that the `states` of s list. A timed entry is
+  // never refused, so the room for every rule of a chain is reserved with the first deadline. When the rules of one type lead to
+  // one another in a cycle no chain is finite, and the drain of such an item need never end.
+  const leads = (r: (typeof moves)[number]) => moves.filter((m) => m.type === r.type && m.states.includes(r.to));
   for (const rule of moves) {
     const reached = new Set<string>();
     for (let next = [rule]; next.length > 0;) {
-      const after = next.flatMap((r) => moves.filter((m) => m.type === r.type && m.states.includes(r.to) && !reached.has(m.name)));
-      for (const m of after) reached.add(m.name);
-      next = after;
+      next = next.flatMap(leads).filter((m) => !reached.has(m.name));
+      for (const m of next) reached.add(m.name);
     }
-    if (reached.has(rule.name)) bad("timed-cycle", at("timed", rule.name), "after this rule, the timed rules of its type could apply it again with no act between");
-  }
-  for (const c of clauseStates) {
-    if (moves.some((m) => m.type === c.type && m.states.includes(c.state))) bad("clause-timed", c.path, `a result clause moves no item into a state a timed rule names: ${c.state}`);
+    if (reached.has(rule.name)) bad("reserve-unbounded", at("timed", rule.name), "the timed rules of its type lead back to this rule, so no reservation covers what its deadline can start");
   }
 
   for (const name of holdTypes) {
@@ -759,8 +776,24 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
     if (most > bounds.entryBytes) bad("bound", at("timed", name), `its entry could take ${most} bytes; at most ${bounds.entryBytes}`);
   }
   if (problems.length > 0) return { ok: false, problems };
+  // The chains are finite here: a cycle was refused above.
+  const chain = (r: (typeof moves)[number]): number => 1 + Math.max(0, ...leads(r).map(chain));
+  /** The entries a deadline reserves when an item of that type is in that state. */
+  const held = (type: string, state: string): number => Math.max(0, ...moves.filter((m) => m.type === type && m.states.includes(state)).map(chain));
+  const deadlines: Record<string, Record<string, number>> = {};
+  for (const m of moves) for (const state of m.states) (deadlines[m.type] ??= {})[state] = held(m.type, state);
+  // What one clause can start: for each subject one deadline, by the state the clause sets or by a deadline slot it sets.
+  const starts = (set: ClauseSet): number => {
+    const bySubject = new Map<string, number>();
+    for (const e of set) {
+      const most = e.state !== undefined ? held(e.type, e.state) : Math.max(0, ...moves.filter((m) => m.type === e.type && m.deadline === e.slot).map(chain));
+      bySubject.set(e.subject, Math.max(bySubject.get(e.subject) ?? 0, most));
+    }
+    return [...bySubject.values()].reduce((a, b) => a + b, 0);
+  };
+  const clauseEntries = Math.max(0, ...clauseSets.map(starts));
   try {
-    return { ok: true, definition: { declared, digest: definitionDigest(declared), timedTypes: [...timedTypes].sort(), holdTypes: [...holdTypes].sort(), indexes } };
+    return { ok: true, definition: { declared, digest: definitionDigest(declared), timedTypes: [...timedTypes].sort(), holdTypes: [...holdTypes].sort(), indexes, deadlines, clauseEntries } };
   } catch {
     return { ok: false, problems: [{ code: "shape", path: "", message: "has no canonical bytes" }] };
   }

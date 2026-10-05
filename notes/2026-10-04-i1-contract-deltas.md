@@ -24,9 +24,10 @@ rule evaluator. Section 17, "Composition and transport", has entries 96 to
 136, both from step 5.
 Section 21 is three corrections after the static report `a8a34b4d`,
 entries 137 to 139.
-Section 22 is two capacity seams closed ahead of the contract's decision
-(event `cc570904`), entries 140 to 142; section 15's table and limits are
-corrected in place.
+Section 22 is the two capacity seams of event `cc570904`, entries 140 to
+142, closed as the contract's candidate revision 10 decides them; that
+revision is not adopted yet. Section 15's table and limits are corrected in
+place.
 
 Each entry is a place where the contract was silent or needed a concrete
 form, what was implemented, and why. Nothing here is adopted by being
@@ -306,15 +307,15 @@ nothing that transport keeps outside the history.
 
 | A duty that is counted | Entries |
 |---|---|
-| A live item of a timed item type | One for each timed rule on that type, in whatever live state the item is and whether or not its deadline is set. |
-| A request this scope sent, with no result and no `undelivered` diagnosis | Two before any diagnosis: a `delivery-unavailable` diagnosis may be followed by a late result. One after that diagnosis. |
+| A live item in a state a timed rule applies in | One for each rule of the longest chain of timed rules from that state, whether or not its deadline is set (corrected by entry 142; first written as one for each timed rule on the type, in whatever live state). |
+| A request this scope sent, with no result and no `undelivered` diagnosis | Two before any diagnosis: a `delivery-unavailable` diagnosis may be followed by a late result. One after that diagnosis. And, since entry 141, the entries of what its clause can start. |
 | A provisional scope | One: the confirmation. |
 | An opened attempt of an outside operation | Two before any outcome: `unknown` may be followed by the same attempt's outcome. One after `unknown`. |
-| A checkpoint | One, always. Corrected by entry 140: a checkpoint is written into free room, and this entry is used only by the scope's last entry. |
+| The closing checkpoint | One, except while the head entry is a checkpoint and nothing else is pending (entry 140). |
 
 Entries that are checked, because they admit duties or are new work: a
 genesis, an act, a delivery of a request, a delivery of an advisory and,
-since entry 140, a checkpoint.
+since section 22, a checkpoint and a `conflict` result.
 Entries that are not checked, because their duty was counted when it was
 admitted: a timed entry, a delivery of a result or of a control, a
 diagnosis and an outcome. Those are refused only at `scopeEntries` itself,
@@ -339,12 +340,11 @@ What the count does not cover. The code guarantees nothing for these:
   receivers of those sends will need is theirs to count. A result's clause
   that sends a confirmation admits no entry here.
 - **A second result.** A `conflict`, the answer of a second incarnation to
-  a creation, is an entry that no count foresaw.
-- **Chains of timed rules.** A timed rule that moves its item into the
-  states of another timed rule is counted once for each rule. Since entry
-  142 the validator refuses timed rules of one type that lead back to one
-  another, so no rule applies twice without an act between and the count
-  holds.
+  a creation, is an entry that no count foresaw. Since entry 141 it is new
+  work: at capacity it is not recorded and transport answers `retry`.
+- **Chains of timed rules.** Since entry 142 a deadline reserves one entry
+  for each rule of its chain, and timed rules that lead to one another in a
+  cycle are refused `reserve-unbounded`.
 - **Cost.** The count reads one number for each state of each timed type,
   one aggregate over the requests with no result, and the operations, which
   no form opens yet. Requests diagnosed `undelivered` stay among the rows
@@ -509,21 +509,20 @@ repository; export of sealed segments; replay of a platform definition.
 | 138 | The size of a request body (entry 111). The route read the whole body as text and compared its length in UTF-16 units with the limit. | The budget is 1 MiB of raw bytes, counted while the body is read. A body that declares more in `Content-Length` is not read. One that sends more is cancelled at the chunk that passes the budget. Bytes that are not UTF-8 are no JSON. Each is answered 400 `bad-request`, as before, and no operation is called. | A body of three-byte characters passed at nearly three times the limit, and any oversized body was held whole before it was refused. Witness, in the route test: a founding padded with 400,000 three-byte characters is 400, and is accepted without the padding; a body with no end is cancelled after 1 MiB and one chunk. |
 | 139 | A path that is not percent-encoded UTF-8, such as `/v1/scopes/%`. Decoding it threw before any response. | 400 `bad-request`, before any operation. | A request must get a stable answer. Witness: the same route test. |
 
-## 22. Two capacity seams, implemented ahead of the contract's decision
+## 22. Two capacity seams, as the contract's candidate revision 10 decides them
 
 Event `cc570904` names two places where the count of section 15 did not
-keep its own promise. Both are closed here in source. Neither is adopted:
-the contract's owner decides the checkpoint policy and whether these
-refusals stay. Each entry says what a different decision would change.
+keep its own promise. The scope contract's candidate revision 10 (`f52573e7`,
+sections 17.2, 17.3a and 17.4) decides both, and the source follows it.
+That revision is not adopted yet: if it changes, these entries change with
+it. The count is still of entries only (section 15, "Bytes").
 
-| # | Where the contract is silent | Implemented, ahead of the decision | Why |
+| # | The contract's candidate rule | Implemented | Where the source stops short, and the witness |
 |---|---|---|---|
-| 140 | **For review.** The checkpoint that is counted (section 9.2). `owed` always counted one checkpoint, and `fits` took one off for every checkpoint written. So a checkpoint written while duties were open used the entry kept for a checkpoint, the count went on saying one was kept, and after the duties settled there could be no entry for a closing checkpoint: with six entries, a founding, a hold, a checkpoint and the hold's end leave none. | One policy. One entry is kept for a checkpoint at all times. A checkpoint is new work, asked like an act: it is written when the entries written and owed, the kept one among them, fit the budget, and the kept entry stays kept. The kept entry is used once, by the scope's last entry: a checkpoint that fills the budget when nothing else is owed. Any other checkpoint that does not fit is answered `unavailable` and nothing is written. | No checkpoint takes the room of a duty, and a scope whose duties have settled can always write its closing checkpoint. Witness, in the scope's turn test with 12 entries: a checkpoint asked while two ends are owed and no room is free is `unavailable`; after both ends the closing checkpoint is entry 11; a second is `unavailable`. With 3 entries: two checkpoints, the second the last entry. A decision that the kept entry may be spent earlier would bring back the first formula. |
-| 141 | **For review.** A duty started by an entry that is not asked. The count gives a live item of a timed type one entry for each timed rule, and is asked only of entries that admit duties. A result clause could move an item back into a state a timed rule names: after a `delivery-unavailable` diagnosis and a late result, the rule applied again in an entry nothing had counted. | The validator refuses the definition, as `clause-timed`: no state effect of a result clause, in any of `applied`, `refused`, `superseded`, `undelivered` and `conflict`, may set a state that a timed rule on that item's type names in its `states`. A clause has effects only, so it starts no send. A clause may still set a deadline slot, set other slots, and move its item to any other state. | Chosen over counting the follow-on entries with each open request, because it can be made exact: what a clause can start is read from the definition alone. Counting would need, for each open request, the clause its result will run, and a `conflict` clause may run any number of times. Witness: three validator rows on the fixture ticket and desk, one each for `applied`, `undelivered` and `conflict`, and a control row that passes. What is lost: a definition in which a result starts a timer on the same item; it can do so with an act, or on a handler's side. |
-| 142 | The same seam, from a timed entry. Section 15 disclosed that timed rules forming a cycle are not bounded. | The validator refuses them, as `timed-cycle`: for each timed rule, the rules of the same type whose `states` hold the state it sets, and those after them, must not include the rule itself. | With entry 141, no entry that is not asked starts a timed duty again, so a timed rule applies to an item at most once between two entries that are asked, which is what one entry for each rule assumes. A cycle of rules with deadlines already passed would also never let a drain end. Witness: one validator row. |
+| 140 | The closing checkpoint (section 17.2, row 8). One entry is reserved, once for the scope, from the genesis on, except while the head entry is a checkpoint and no other duty is pending. A checkpoint written with no other duty pending is the closing checkpoint and uses the reservation. A checkpoint beside a pending duty, or on a head that is a checkpoint, is new work. The next entry that is not a checkpoint arms the reservation again. | `owed(view, definition, head)` leaves the checkpoint out exactly in that case, read from the head entry's input and the other duties; no flag is kept. `fits` asks every checkpoint: one beside a pending duty needs a free entry, and the closing one fits because its entry was reserved. A checkpoint that does not fit is answered `unavailable`. Before, the count owed one checkpoint at every head and let every checkpoint into that entry. | Witnesses, in the scope's turn test: the fourth witness of section 17.4 with 6 entries (a checkpoint beside the pending hold is not written; after the hold's end the closing checkpoint is entry 5) and with 7 (it is written into the free entry, and the closing checkpoint is entry 6); and with 3 entries, a remark after a closing checkpoint is refused `scope-full` while a second checkpoint is written. The size of a checkpoint entry in bytes is not reserved. |
+| 141 | A request's clauses (section 17.2, row 1). A request reserves its 2 entries and the largest, over its clauses `applied`, `refused`, `superseded` and `undelivered`, of the closures of the duties the clause can create: a deadline, when an effect can set a state a timed rule lists, or that rule's deadline slot. Each request reserves it for itself. A `conflict` is not reserved: it is new work. | The validator derives `clauseEntries`: for each clause, one deadline for each subject, at the chain of the state it sets or of the rule whose deadline slot it sets; the largest over the clauses. Each open request reserves it beside its entries, before and after a `delivery-unavailable` diagnosis. A delivery of a `conflict` result is asked like new work, and at capacity transport answers `retry`. | **For review.** `clauseEntries` is one number for the definition: the largest over every request send, not the amount of each request's own send. The folded state does not hold which send form a request came from. So a request may reserve more than its own closure, never less. Duties of rows 3 and 6 do not exist in this source, so a clause creates deadlines only. Witness, in derive's composition test: the fifth witness of section 17.4, on the fixture ticket: the act reserves 8 and is asked for 11 entries with the two this fixture starts with; the rows after it are 7, 5, 4, 3, 2, 1 and 0 reserved, and written and reserved are 11 in every row. |
+| 142 | A chain of timed rules (sections 17.2, row 2, and 17.3a). Rule r leads to rule s when r can set a state that the `states` of s list. A deadline reserves one entry for each rule of its longest chain. Rules of one type that lead to one another in a cycle are refused `reserve-unbounded`. | The validator derives `deadlines`: for each timed type and each live state a timed rule applies in, the longest chain from that state. `owed` counts that for each item in that state. A cycle is refused `reserve-unbounded`. An item in a live state that no timed rule lists reserves nothing; the act, handler or clause that puts it under a rule is counted then. | The static rule of section 17.3a, the type's `max` times its longest chain plus one, is not used: the count is by duty, in the commit, and is never more than that sum. `reserve-unbounded` has this one case here: no form of this source has `settles`, and every retained input has a bound. Witnesses: the table of section 17.3a on the fixture ticket (a chain of 2 reserves 2, and both timed entries are written from it); one validator row for the cycle. |
 
-What stays open. A `conflict` result is still an entry that no count
-foresaw: each further incarnation that answers a creation writes one. It
-starts no timed duty now, but it uses an entry. Bytes, sends that are not
-requests, and the duties of other scopes are as section 15 lists them.
-
+What stays open. The count is of entries only: items, records, pending
+requests and bytes are not counted. Sends that are not requests, and the
+duties of other scopes, are as section 15 lists them.

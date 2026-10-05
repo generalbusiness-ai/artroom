@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { Attempt, Input, Result, ScopeRef, Seed, Send } from "@generalbusiness/artroom-contract";
 import { deliveryCauseDigest, factRefOf, intentDigest, messageDigest, scopeIdOf, seedDigest } from "@generalbusiness/artroom-bytes";
-import { MemoryState, checkpointOf, clockOf, judgeCheckpoint, judgeDelivery, judgeDiagnosis, judgeGenesis, judgeOutcome, prepareRules, stateDigest, useOf } from "../src/index.ts";
+import { MemoryState, checkpointOf, clockOf, fits, judgeCheckpoint, judgeDelivery, judgeDiagnosis, judgeGenesis, judgeOutcome, owed, prepareRules, stateDigest, useOf } from "../src/index.ts";
 import type { Creation, DeliveryContext, Judged, Source, ValidDefinition } from "../src/index.ts";
 import { Ledger, Scope, arriving, born, creation, d, deliver, deskDefinition, fields, forged, founded, judged, keys, laneDefinition, on, sent, t, ticket, ticketDefinition, variant } from "./fixtures.ts";
 
@@ -385,3 +385,61 @@ describe("outcomes and checkpoints (sections 4.3 and 9.2)", () => {
     expect([stateDigest(s.replay(3).all()), stateDigest(s.state.all()) === at.state]).toEqual([at.state, false]);
   });
 });
+
+describe("room to settle (section 17.2 of the contract's candidate revision 10)", () => {
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  /** The ticket, with a request that a timed rule pauses at its `until`, which `ask` sets from a field. */
+  const pausing = (d: any) => {
+    d.items.request.states.paused = { final: false };
+    d.items.request.values.until = { fixed: false, required: false, of: { type: "time" } };
+    d.timed.pause = { on: "request", states: ["asked"], deadline: "until", effects: [{ state: "paused" }], attention: [] };
+    d.acts.ask.fields.until = { type: "time", required: true };
+    d.acts.ask.effects.push({ value: { slot: "until", from: { field: "until" } } });
+  };
+  /** The entries written, and the entries reserved at that head. */
+  const row = (s: Ledger) => [s.entries.length, owed(s.state, s.definition, s.last.input)];
+
+  test("a late result sets a timer again (the fifth witness of section 17.4): each request reserves its two entries and the deadline its clause can create, and every row is within the budget the act was admitted in", () => {
+    // X12: `ask` sends two requests, and the `applied` clause of each sets `asked` again. The deadline has passed, so `asked` is due at once.
+    const x12 = variant(ticket, (d) => {
+      pausing(d);
+      d.acts.ask.sends[0].tell.result = { applied: [{ state: "asked" }] };
+      d.acts.ask.sends.push(structuredClone(d.acts.ask.sends[0]));
+    });
+    const D = founded();
+    const S = new Scope(x12);                                  // entries 0 and 1: one more than the contract's table, which has a founding only
+    const ask = S.did(una, "ask", fields({ desk: D.at, until: t(-60) }));
+    // The act: a deadline that reserves 1, two requests that reserve 3 each, and the closing checkpoint. It fits in 11 entries and not in 10.
+    expect([row(S), fits(S.state, x12, { scopeEntries: 11 }, ask.input), fits(S.state, x12, { scopeEntries: 10 }, ask.input)]).toEqual([[3, 8], true, false]);
+    const rows = [];
+    const paused = () => { expect(S.drain().map((j) => j.result)).toEqual(["write"]); rows.push(row(S)); };
+    paused();
+    for (const n of [0, 1]) {
+      const diagnosis = judgeDiagnosis(S.state, x12, { of: { seq: 2, n }, attempts: [{ at: t(0), answer: "retry" }] }, { ...reading(S), origin: ask });
+      if (diagnosis.result === "write") S.seal(diagnosis.draft);
+    }
+    rows.push(row(S));
+    for (const n of [0, 1]) {
+      // The desk decides the request late, and its result runs the clause: the item is `asked` again, and due.
+      deliver(D, S, 2, n);
+      expect(deliver(S, D, D.head.seq, 1).result).toBe("write");
+      rows.push(row(S));
+      paused();
+    }
+    const closing = judgeCheckpoint(S.state, x12, checkpointOf(S.state), reading(S));
+    if (closing.result === "write") S.seal(closing.draft);
+    rows.push(row(S));
+    // Timed; both diagnoses; a result and its timed entry, twice; the closing checkpoint. Written and reserved are 11 in every row.
+    expect(rows).toEqual([[4, 7], [6, 5], [7, 4], [8, 3], [9, 2], [10, 1], [11, 0]]);
+  });
+
+  test("a chain of timed rules (the table of section 17.3a): a deadline reserves one entry for each rule its rule leads to", () => {
+    // Rule A, `asked` to `paused`; rule B, `paused` to `failed`, which is final. Both read one deadline.
+    const x11 = variant(ticket, (d) => { pausing(d); d.timed.lapse = { ...d.timed.pause, states: ["paused"], effects: [{ state: "failed" }] }; });
+    const S = new Scope(x11);
+    S.did(una, "ask", fields({ desk: founded().at, until: t(-60) }));
+    // The chain of 2, the request's 2, and the closing checkpoint. Both timed entries are then written from that reservation.
+    expect([x11.deadlines, row(S), S.drain().length, row(S)]).toEqual([{ request: { asked: 2, paused: 1 } }, [3, 5], 2, [5, 3]]);
+  });
+});
+
