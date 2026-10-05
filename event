@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:4ebca54eed547dd6a0a8f10035244214361e4c25","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-05-i2-delivery.md."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:4f844cd575e83dce99557a542751a6aac8e1572a","text":"Merge retired a covered predecessor; the successor is at packages/derive/test/forms-hold.test.ts."}
