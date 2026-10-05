@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:67d1828a0b6633fca660215a483a7032a51f3051","text":"Merge retired a covered predecessor; the successor is at vitest.config.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:6890813ceead2371f420fef04db92fd5b641ebbb","text":"Merge retired a covered predecessor; the successor is at packages/scope/src/sqlite.ts."}
