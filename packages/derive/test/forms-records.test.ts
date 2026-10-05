@@ -17,13 +17,31 @@ describe("the records of `hold@1` (scope contract, section 6.11; authority note,
     const s = new Staging();
     // The hold's opening derived its fork, with a seed from the destination's head: the commitment has no admitted act yet.
     expect([s.record("fork", s.hold), s.state.operation("5:0")?.kind]).toEqual([{ state: "creating", seed: { commit: null, from: "destination-head", fact: null, under: 2 }, operation: "5:0", id: null, name: null }, "head"]);
-    const source = { commitment: s.commitment, commit: X, hold: s.hold, instance: "i1" };
+    // A report names its commit and its commitment, and no hold: the step finds the one held hold under the commitment.
+    const source = { commitment: s.commitment, commit: X };
     const report = s.intent(una, "report", { expected: { commitment: s.item(s.commitment).revision }, fields: source });
     // A new staging needs the hold's current instance, and the signer's own held hold: a refusal is an answer and no entry.
     const head = s.head;
     expect([s.asked(report, "stage"), s.head]).toEqual(["refused capability-refused not-staged", head]);
     s.prepare(una, "instance", { hold: s.hold, task, instance: "i1" });
-    expect([s.prepare(vic, "stage", source, { kind: "report" }), s.head.seq]).toEqual(["refused capability-refused not-staged", 6]);
+    // Section 5.7, "The signer's own hold, and no other". The hold of a report is found by its commitment, and is used only when
+    // its holder is the signer's member: `vic` signs a report under `una`'s commitment, and stages nothing. Nor does `vic` by
+    // naming `una`'s hold in a manifest's source, in either shape. An intent of neither shape reads nothing.
+    const manifest = { integration: X, hold: s.hold, instance: "i1" };
+    const elsewhere = { to: otherLane, kind: "propose" };
+    const asks = (who: typeof una, fields: object, over: object = { kind: "propose" }) => s.prepare(who, "stage", fields as never, over);
+    expect([
+      asks(vic, source, { kind: "report" }), asks(vic, manifest), asks(vic, { integration: X, lane: s.at, foreignHold: s.hold, instance: "i1" }, elsewhere),
+      asks(una, { ...manifest, instance: "i0" }), asks(una, { integration: X, lane: otherLane, foreignHold: s.hold, instance: "i1" }, elsewhere), asks(una, manifest, elsewhere),
+      asks(una, { commit: X }), asks(una, { ...source, commit: "main" }), s.head.seq,
+    ]).toEqual([...Array<string>(8).fill("refused capability-refused not-staged"), 6]);
+    // The same two shapes from the holder: a manifest of this lane, and one that is proposed in another lane, each with its root.
+    const shapes = new Staging();
+    shapes.prepare(una, "instance", { hold: shapes.hold, task, instance: "i1" });
+    expect([
+      shape(shapes.prepare(una, "stage", manifest, { kind: "propose" })), shape(shapes.prepare(una, "stage", { integration: C("b"), lane: shapes.at, foreignHold: shapes.hold, instance: "i1" }, elsewhere)),
+      shapes.state.record("hold@1", "root", [1])?.values["under"], shapes.state.record("hold@1", "root", [2])?.values["consumer"],
+    ]).toEqual([["root creating", "opens stage x3", "attempt 1 opened"], ["root creating", "opens stage x3", "attempt 1 opened"], shapes.commitment, otherLane]);
 
     // Section 5.5: the preparation entry is the record, and it comes first. It holds the root, the operation and attempt 1, not sent yet.
     expect((s.asked(report, "stage") as Entry).effects).toEqual([
@@ -92,6 +110,13 @@ describe("the records of `hold@1` (scope contract, section 6.11; authority note,
     // Without a workspace the item form is all there is: no fork, and the steps of a workspace are refused by name.
     const plain = new Staging(laneDefinition);
     expect([plain.head.seq, plain.state.recordCount("hold@1", "fork"), plain.prepare(una, "instance", { hold: plain.hold, task, instance: "i1" })]).toEqual([4, 0, "refused capability-refused no-workspace"]);
+    // Section 5.7, "The steps with no act": the intent has the step's own kind and exactly its fields. A field that the table does
+    // not name, a missing one, an instance ID past 128 bytes and the kind of an act each refuse the step `bad-field`.
+    const whole = { hold: plain.hold, task, instance: "i1" };
+    expect([
+      plain.prepare(una, "instance", { ...whole, commit: X }), plain.prepare(una, "instance", { hold: plain.hold, instance: "i1" }), plain.prepare(una, "instance", { ...whole, instance: "i".repeat(129) }),
+      plain.prepare(una, "instance", whole, { kind: "take-hold" }), plain.prepare(una, "token", whole),
+    ]).toEqual(Array(5).fill("refused bad-field"));
 
     const s = new Staging();
     s.prepare(una, "instance", { hold: s.hold, task, instance: "i1" });                 // entry 6

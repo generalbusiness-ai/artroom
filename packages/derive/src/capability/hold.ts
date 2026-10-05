@@ -9,6 +9,8 @@
  *
  * - `hasWorkspace`: the predicate of section 5.7, one function of the
  *   definition.
+ * - `stagedSource`: what the steps `stage` and `check` read of a signed
+ *   intent, by the fields that the lane rows carry.
  * - `holdCapability`: the four guards and the four effects, the steps
  *   `stage`, `check`, `instance` and `token`, the rules of the operations
  *   that those steps open, and what each pending record reserves.
@@ -26,7 +28,7 @@
  */
 
 import type { CapabilityName, Digest, Effect, Evidence, FieldValue, Intent, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
-import { isDigest, isFactRef, isLocalId, isRecord, isScopeRef } from "@generalbusiness/artroom-bytes";
+import { isDigest, isFactRef, isLocalId, isRecord, isScopeRef, utf8 } from "@generalbusiness/artroom-bytes";
 import type { Capabilities, CapabilityGiven, Recorded } from "../capability.ts";
 import { WINDOWS, type Window } from "../grant.ts";
 import { EPOCH, HOLDER, holdStates, type HoldEffect } from "../hold.ts";
@@ -37,7 +39,7 @@ import type { Item, Operation, RecordState, StateView } from "../state.ts";
 import { timeMs, type Clock } from "../time.ts";
 import type { ValidDefinition } from "../validate/index.ts";
 import { own, same } from "../values.ts";
-import { isAncestryCheck } from "./ancestry.ts";
+import { isAncestryCheck, objectIdLength } from "./ancestry.ts";
 
 export const HOLD: CapabilityName = "hold@1";
 
@@ -123,24 +125,103 @@ export function useEnded(view: StateView, definition: ValidDefinition, token: Pi
 
 // ---------------------------------------------------------------- what the steps read of a request
 
-/** What `stage` and `check` read of the signed intent: the commit, the commitment that the source hold is under, and for a new staging the hold and its instance. */
+/** What `stage` and `check` read of the signed intent: the commit, the commitment, and for a new staging the hold and its instance. Null: none is read. */
 export interface StagedSource { commit: string; under: number; hold: number | null; instance: string | null }
 
+type Asking = Pick<StepGiven, "view" | "definition" | "scope" | "intent">;
+
+/** The one hold of this scope that is `held` and whose `under` is that commitment. Null: none, or more than one. */
+function heldUnder(view: StateView, definition: ValidDefinition, commitment: number): Hold | null {
+  const found: Hold[] = [];
+  for (const type of definition.holdTypes) {
+    const declared = own(definition.declared.items, type);
+    if (!declared) continue;
+    // A held hold is live, so the type's `max` bounds how many there are (section 6.3): one page holds them all.
+    const page = view.page(type, [holdStates(declared).held], null, declared.max);
+    if (page.more) return null;
+    for (const item of page.items) if (own(item.refs, UNDER) === commitment) found.push(holdOf(view, definition, item.id)!);
+  }
+  return found.length === 1 ? found[0]! : null;
+}
+
 /**
- * How a step reads its request from the signed intent. The texts give a
- * `source` field with three parts (authority note, section 6.2), and the
- * two pinned lane rows write other fields, so no one reading is stated
- * (I3 deltas, entry EF2). The reader is given, and there is no default. Null:
- * the intent names no such request, and the step is refused.
+ * What the steps `stage` and `check` read of the signed intent (authority
+ * note, section 5.7, "What a step reads of its signed intent", decided in
+ * revision 21). It is a rule of `hold@1`, and it reads names of fields, as
+ * the capability reads the names `holder` and `under` of a hold. The first
+ * row that fits is read, in this order.
+ *
+ * 1. Addressed to this scope, with the field `integration`: a manifest from
+ *    a hold of this lane. The commit is `integration`, the hold the field
+ *    `hold`, the instance the field `instance`, and the commitment the
+ *    hold's `under`.
+ * 2. Addressed to another scope, with the field `integration`: a manifest
+ *    from a hold of this lane, proposed elsewhere. The field `lane` must be
+ *    this scope's reference, with its incarnation. The hold is the field
+ *    `foreignHold`, an item ID of this scope.
+ * 3. Addressed to this scope, with the fields `commit` and `commitment` and
+ *    no field `integration`: a report. The hold is the one hold of this
+ *    scope that is `held` under that commitment, and the instance is that
+ *    hold's `current` one. The hold is found by the commitment and not by
+ *    the signer: `stage` uses it only when its holder is the signer's
+ *    member.
+ * 4. Any other intent: nothing, and the step is refused `not-staged`.
+ *
+ * A field of another type than the row states is no such field: nothing is
+ * read. A commit is an object ID of 40 or 64 lower-case hex characters.
  */
-export interface HoldReads {
-  staged(intent: Intent): StagedSource | null;
-  instance(intent: Intent): { hold: number; task: ScopeRef; instance: string } | null;
-  token(intent: Intent): { hold: number; instance: string } | null;
+export function stagedSource({ view, definition, scope, intent }: Asking): StagedSource | null {
+  const { fields } = intent;
+  const here = isScopeRef(intent.to) && same(intent.to, scope.at);
+  const integration = own(fields, "integration");
+  if (integration !== undefined) {
+    const lane = own(fields, "lane");
+    const named = here ? own(fields, "hold") : isScopeRef(lane) && same(lane, scope.at) ? own(fields, "foreignHold") : undefined;
+    const hold = holdOf(view, definition, named);
+    const instance = own(fields, "instance");
+    return objectIdLength(integration) !== null && hold && hold.under !== null && typeof instance === "string" ? { commit: integration as string, under: hold.under, hold: hold.item.id, instance } : null;
+  }
+  const [commit, commitment] = [own(fields, "commit"), own(fields, "commitment")];
+  if (!here || objectIdLength(commit) === null || !isLocalId(commitment) || !view.item(commitment)) return null;
+  const hold = heldUnder(view, definition, commitment);
+  const instance = hold ? currentInstance(view, hold.item.id) : null;
+  return { commit: commit as string, under: commitment, hold: hold?.item.id ?? null, instance: instance ? (instance.key[1] as string) : null };
+}
+
+/** The most bytes of an instance ID (section 5.7, the intent of the step `instance`). */
+const INSTANCE_BYTES = 128;
+const isInstanceId = (v: unknown): v is string => typeof v === "string" && v !== "" && utf8(v).length <= INSTANCE_BYTES;
+
+/**
+ * The fields of the signed intent that asks for a step with no act (section
+ * 5.7, "The steps with no act"): the steps `instance`, `token` and `retire`.
+ * Its `kind` is the step's kind, `hold@1:instance`, which no act of a
+ * definition may have, so such an intent is never admitted as an act. Its
+ * `to` is the lane that holds the hold: the judge of a preparation has
+ * checked it, because none of these steps is `foreign`. `on` is null and
+ * `expected` is empty. Null: the intent is not of that form, or it has a
+ * field that `names` does not hold, and the step is refused `bad-field`.
+ */
+function ownFields(intent: Intent, step: string, names: readonly string[]): Readonly<Record<string, FieldValue>> | null {
+  const whole = intent.kind === `${HOLD}:${step}` && intent.on === null && Object.keys(intent.expected).length === 0 && Object.keys(intent.fields).every((name) => names.includes(name));
+  return whole ? intent.fields : null;
+}
+
+/** The intent of the step `instance`: `hold`, the hold's item ID; `task`, the task scope's reference with its incarnation; `instance`, the new instance ID, a text of at most 128 bytes. */
+function instanceAsked(intent: Intent): { hold: number; task: ScopeRef; instance: string } | null {
+  const fields = ownFields(intent, "instance", ["hold", "task", "instance"]);
+  const [hold, task, instance] = fields ? [own(fields, "hold"), own(fields, "task"), own(fields, "instance")] : [];
+  return isLocalId(hold) && isScopeRef(task) && isInstanceId(instance) ? { hold, task, instance } : null;
+}
+
+/** The intent of the step `token`: `hold`, the hold's item ID; `instance`, the hold's `current` instance. */
+function tokenAsked(intent: Intent): { hold: number; instance: string } | null {
+  const fields = ownFields(intent, "token", ["hold", "instance"]);
+  const [hold, instance] = fields ? [own(fields, "hold"), own(fields, "instance")] : [];
+  return isLocalId(hold) && isInstanceId(instance) ? { hold, instance } : null;
 }
 
 export interface HoldOptions {
-  reads: HoldReads;
   /**
    * The most tokens of one hold that may be `minting` or `live` at once. The
    * entry that ends a hold changes each of them and opens a revocation for
@@ -156,6 +237,8 @@ export interface HoldOptions {
 
 const refusal = (name: string): StepRefusal => ({ reason: "capability-refused", name });
 const failed = (detail: string): StepRefusal => ({ reason: "guard-failed", detail });
+/** Section 5.7, "The steps with no act": a field that the table does not name, or a missing one. */
+const badField = (detail: string): StepRefusal => ({ reason: "bad-field", detail });
 
 /** The pin of one consumer for one intent (section 6.11): its key is the consumer's scope reference and the intent's digest. */
 const pinOf = (view: StateView, consumer: unknown, intent: unknown): RecordState | null => (isScopeRef(consumer) && isDigest(intent) ? record(view, "pin", [consumer, intent]) : null);
@@ -413,13 +496,14 @@ function openingGrant(definition: ValidDefinition, type: string | undefined): st
   return grants.size === 1 ? [...grants][0]! : null;
 }
 
-function stepGrant(reads: HoldReads, step: string, { view, definition, scope, intent }: Omit<StepGiven, "signer">): { action: string; window: Window } | null {
+function stepGrant(step: string, given: Omit<StepGiven, "signer">): { action: string; window: Window } | null {
+  const { view, definition, scope, intent } = given;
   // The step `check` reuses a root and writes nothing outside: the act's own grant, in its ordinary window (section 6.11; authority
   // note, section 6.2, "A new staging, and the reuse of a completed one"). For an intent that is addressed to another scope the
   // act is not this scope's, and the grant is the one that this scope judges staging on (I3 deltas, entry EF3).
   const act = step === "check" && same(intent.to, scope.at) ? own(definition.declared.acts, intent.kind) : undefined;
   if (act) return { action: act.grant, window: WINDOWS.ordinary };
-  const hold = step === "instance" ? reads.instance(intent)?.hold : step === "token" ? reads.token(intent)?.hold : reads.staged(intent)?.hold;
+  const hold = step === "instance" ? instanceAsked(intent)?.hold : step === "token" ? tokenAsked(intent)?.hold : stagedSource(given)?.hold;
   const action = openingGrant(definition, isLocalId(hold) ? view.item(hold)?.type : undefined);
   return action === null ? null : { action, window: step === "check" ? WINDOWS.ordinary : WINDOWS.once };
 }
@@ -437,11 +521,14 @@ function ownHeld(given: StepGiven, id: number): Hold | null {
  * commitment named, and the instance named is its current one. This scope
  * holds no `live` root for the commit under that commitment. It derives a
  * `root`, `creating`, and the operation `stage`, whose attempts create the
- * ref. A signer with no held hold is refused `not-staged`.
+ * ref. With no such hold, with a hold that another member holds, or with no
+ * `current` instance, the step is refused `not-staged`: so is an intent of
+ * which nothing is read (authority note, section 5.7, "What `stage` then
+ * judges" and "The signer's own hold, and no other").
  */
-function stage(reads: HoldReads, given: StepGiven): StepDerived | { refused: StepRefusal } {
-  const source = reads.staged(given.intent);
-  if (!source) return { refused: failed("the intent names no commit to stage") };
+function stage(given: StepGiven): StepDerived | { refused: StepRefusal } {
+  const source = stagedSource(given);
+  if (!source) return { refused: refusal("not-staged") };
   const hold = source.hold === null ? null : ownHeld(given, source.hold);
   if (!hold || hold.under !== source.under || source.instance === null || record(given.view, "instance", [hold.item.id, source.instance])?.state !== "current") return { refused: refusal("not-staged") };
   if (records(given.view, "root", ["live"], "commit", source.commit).some((root) => root.values["under"] === source.under)) return { refused: failed("a live root holds this commit under this commitment: the step `check` reuses it") };
@@ -461,9 +548,10 @@ function stage(reads: HoldReads, given: StepGiven): StepDerived | { refused: Ste
  * ended. It derives the `provisional` pin, if there is none, and the
  * operation `check`: one read of the canonical repository.
  */
-function check(reads: HoldReads, given: StepGiven): StepDerived | { refused: StepRefusal } {
-  const source = reads.staged(given.intent);
-  if (!source) return { refused: failed("the intent names no commit to check") };
+function check(given: StepGiven): StepDerived | { refused: StepRefusal } {
+  // Section 5.7, "What `check` reads": the commit and the commitment, by the same table. It needs no hold that is `held`.
+  const source = stagedSource(given);
+  if (!source) return { refused: refusal("not-staged") };
   const { view, definition, digest, intent, self } = given;
   const root = [...records(view, "root", ["live"], "commit", source.commit)].filter((r) => r.values["under"] === source.under).sort((a, b) => (b.key[0] as number) - (a.key[0] as number))[0];
   const staged = root ? holdOf(view, definition, root.values["hold"]) : null;
@@ -485,9 +573,9 @@ function workspaceOf(given: StepGiven, id: number): Hold | { refused: StepRefusa
 }
 
 /** The step `instance` (authority note, section 5.7): the `instance` record, `current`, with the task scope and the hold's epoch, and the earlier one, `past`. */
-function instance(reads: HoldReads, given: StepGiven): StepDerived | { refused: StepRefusal } {
-  const asked = reads.instance(given.intent);
-  if (!asked) return { refused: failed("the intent names no hold, task scope and instance") };
+function instance(given: StepGiven): StepDerived | { refused: StepRefusal } {
+  const asked = instanceAsked(given.intent);
+  if (!asked) return { refused: badField("the intent is not the one of the step instance: the hold, the task scope and a new instance ID") };
   const hold = workspaceOf(given, asked.hold);
   if ("refused" in hold) return hold;
   if (record(given.view, "instance", [asked.hold, asked.instance])) return { refused: failed("the instance ID is not new") };
@@ -501,8 +589,8 @@ function instance(reads: HoldReads, given: StepGiven): StepDerived | { refused: 
  * `minting`, and its mint operation with its one attempt.
  */
 function token(options: HoldOptions, given: StepGiven): StepDerived | { refused: StepRefusal } {
-  const asked = options.reads.token(given.intent);
-  if (!asked) return { refused: failed("the intent names no hold and instance") };
+  const asked = tokenAsked(given.intent);
+  if (!asked) return { refused: badField("the intent is not the one of the step token: the hold and its current instance") };
   const hold = workspaceOf(given, asked.hold);
   if ("refused" in hold) return hold;
   if (record(given.view, "instance", [asked.hold, asked.instance])?.state !== "current") return { refused: failed("the instance named is not the hold's current one") };
@@ -654,7 +742,7 @@ export function holdCapability(options: HoldOptions, definition: (view: StateVie
   if (!Number.isSafeInteger(options.tokensPerHold) || options.tokensPerHold < 1) throw new Error("a hold may have at least one token");
   const rules = operationRules(definition);
   const steps: Readonly<Record<string, (given: StepGiven) => StepDerived | { refused: StepRefusal }>> = {
-    stage: (given) => stage(options.reads, given), check: (given) => check(options.reads, given), instance: (given) => instance(options.reads, given), token: (given) => token(options, given),
+    stage, check, instance, token: (given) => token(options, given),
   };
   return {
     implements: (form: unknown, step?: string) => (typeof form === "string"
@@ -671,7 +759,7 @@ export function holdCapability(options: HoldOptions, definition: (view: StateVie
       if (!rule) throw new Error(`${capability} has no code for the effect ${effect}`);
       return rule(args, given);
     },
-    grant: (_capability, step, given) => stepGrant(options.reads, step, given),
+    grant: (_capability, step, given) => stepGrant(step, given),
     derive: (capability, step, given) => {
       const rule = capability === HOLD ? own(steps, step) : undefined;
       if (!rule) throw new Error(`${capability} has no code for the step ${step}`);

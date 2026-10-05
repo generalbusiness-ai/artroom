@@ -78,7 +78,7 @@ describe("the ancestry walk and the guard `ancestry` (authority note, section 6.
     function checked(record: (s: Staging) => AncestryCheck | null) {
       const s = new Staging();
       s.prepare(una, "instance", { hold: s.hold, task: { ...otherLane, kind: "task" }, instance: "i1" });
-      const report = s.intent(una, "report", { expected: { commitment: s.item(s.commitment).revision }, fields: { commitment: s.commitment, commit: X, hold: s.hold, instance: "i1" } });
+      const report = s.intent(una, "report", { expected: { commitment: s.item(s.commitment).revision }, fields: { commitment: s.commitment, commit: X } });
       s.asked(report, "stage");                                                // entry 7
       const before = cap.guard("git-read@1", "ancestry", { commit: X, row: "report" }, s.given({ intent: intentDigest(report.intent) }));
       s.outcome("7:0", "confirmed", {}, "read");                               // entry 8: the root is live

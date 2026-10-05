@@ -81,9 +81,11 @@ export interface StepGiven {
  * How a step's guard refuses (authority note, section 5.7). With a name:
  * `capability-refused`, by the name that the texts give the refusal.
  * Without one: `guard-failed`, for a judgment that the texts state and give
- * no name (I3 deltas, entry EF3).
+ * no name (I3 deltas, entry EF3). `bad-field`: the signed intent of a step
+ * with no act has a field that its table does not name, or lacks one
+ * (authority note, section 5.7, "The steps with no act").
  */
-export type StepRefusal = { reason: "capability-refused"; name: string } | { reason: "guard-failed"; detail: string };
+export type StepRefusal = { reason: "capability-refused"; name: string } | { reason: "guard-failed"; detail: string } | { reason: "bad-field"; detail: string };
 
 /**
  * What a step derives (section 5.5): the capability's records, and the
@@ -218,7 +220,7 @@ export function judgePreparation(view: StateView, definition: ValidDefinition, a
     || (grant.notAfter !== null && asOf >= (timeMs(grant.notAfter) ?? -Infinity))) return refused("unauthorized", `no current grant of ${needs.action} to this key in this scope`);
 
   const derived = steps.derive(capability, step, { ...given, signer: { member: grant.subject, principal: grant.principal } });
-  if ("refused" in derived) return derived.refused.reason === "capability-refused" ? refused("capability-refused", `the step's guard ${derived.refused.name} does not hold`, derived.refused.name) : refused("guard-failed", derived.refused.detail);
+  if ("refused" in derived) return derived.refused.reason === "capability-refused" ? refused("capability-refused", `the step's guard ${derived.refused.name} does not hold`, derived.refused.name) : refused(derived.refused.reason, derived.refused.detail);
 
   // Section 5.3: a preparation judges its `notAfter` and its grant on the commit clock, so none is written while the clock is behind.
   if (clock.behind) return { result: "unavailable", reason: "clock-behind" };
