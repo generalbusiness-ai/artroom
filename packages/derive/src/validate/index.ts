@@ -22,7 +22,7 @@ import { isObject, own } from "../values.ts";
 import { capacityOf } from "./capacity.ts";
 import type { Defining, RangeIndex } from "./context.ts";
 import { acts, receives } from "./handlers.ts";
-import { holdSlots, holdTypesOf } from "./hold.ts";
+import { heldUnderBytes, holdForms, holdTypes } from "./hold.ts";
 import { itemTypes } from "./items.ts";
 import { at, shapes, type Problem } from "./shape.ts";
 import { timedEntryBytes, timedGraph, timedKinds, timedRules } from "./timed.ts";
@@ -116,7 +116,7 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
   const written = isObject(top["acts"]) ? top["acts"] : {};
   const timed = isObject(top["timed"]) ? top["timed"] : {};
   // The hold types are needed before any effect is read: a `hold: open` effect on the primary item of an `open` act.
-  for (const name of holdTypesOf(written)) d.holdTypes.add(name);
+  holdTypes(d, written);
   acts(d, top["acts"], timed);
   receives(d, top["receives"]);
   timedKinds(d, top["acts"], top["receives"]);
@@ -132,7 +132,7 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
     if (graph.cyclic.has(rule.name)) bad("reserve-unbounded", at("timed", rule.name), "the timed rules of its type lead back to this rule, so no reservation covers what its deadline can start");
   }
 
-  holdSlots(d);
+  holdForms(d, top);
 
   // Section 6.4: a genesis opens no timed item.
   const genesis = typeof top["genesis"] === "string" ? own(written, top["genesis"]) : undefined;
@@ -145,7 +145,7 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
   const declared = input as DeclaredDefinition;
   // Section 5.2: a due transition is always written, so its entry must fit whatever its item holds by then.
   for (const [name, rule] of Object.entries(declared.timed)) {
-    const most = timedEntryBytes(name, rule, d.types.get(rule.on)!, bounds);
+    const most = timedEntryBytes(name, rule, d.types.get(rule.on)!, bounds) + heldUnderBytes(declared, d.holdTypes, rule);
     if (most > bounds.entryBytes) bad("bound", at("timed", name), `its entry could take ${most} bytes; at most ${bounds.entryBytes}`);
   }
   if (problems.length > 0) return { ok: false, problems };

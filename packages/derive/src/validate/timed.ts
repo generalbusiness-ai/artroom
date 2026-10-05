@@ -8,6 +8,7 @@ import type { Bounds, TimedRule } from "@generalbusiness/artroom-contract";
 import { isObject } from "../values.ts";
 import { naming, type Ctx, type Defining, type Type } from "./context.ts";
 import { effectBytes, effects } from "./effects.ts";
+import { endedState, holdDoes } from "./hold.ts";
 import { attention, notifyBytes } from "./sends.ts";
 import { at } from "./shape.ts";
 import { ENTRY_BYTES, RECORD_BYTES, memberBytes, mostBytes, stated } from "./sizes.ts";
@@ -68,9 +69,11 @@ export function timedRules(d: Defining, v: unknown, timedTypes: Set<string>): Ti
     // each as `timed-partial`.
     effects(d, o["effects"], at(path, "effects"), ctx, false);
     // Otherwise the transition would be due again as soon as it was applied, and the drain would never end.
-    const to = Array.isArray(o["effects"]) ? o["effects"].find((e) => isObject(e) && typeof e["state"] === "string" && !states.includes(e["state"])) : undefined;
-    if (!isObject(to)) bad("timed", at(path, "effects"), "a timed rule takes its item out of the rule's states");
-    else moves.push({ name, type: t.name, states, to: to["state"] as string, deadline: String(o["deadline"]) });
+    // The item leaves by a `state` effect, or, when it is a hold, by `hold: end`, which sets the hold type's final state (section 6.8).
+    const left = Array.isArray(o["effects"]) ? o["effects"].find((e) => isObject(e) && typeof e["state"] === "string" && !states.includes(e["state"])) : undefined;
+    const to = isObject(left) ? (left["state"] as string) : d.holdTypes.has(t.name) && holdDoes(o["effects"], "end") ? endedState(t) : null;
+    if (to === null) bad("timed", at(path, "effects"), "a timed rule takes its item out of the rule's states");
+    else moves.push({ name, type: t.name, states, to, deadline: String(o["deadline"]) });
     attention(d, o["attention"], at(path, "attention"), ctx);
   }
   return moves;

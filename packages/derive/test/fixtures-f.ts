@@ -1,18 +1,20 @@
 /**
  * Fixtures for the forms of fields and of the hold type (scope contract,
  * sections 6.2 and 6.8). `board` is made up for the tests of fields: a job
- * that a timed rule decides, and a plan whose rows are records.
+ * that a timed rule decides, and a plan whose rows are records. `works` is
+ * the lane of the shared fixtures with the acts that end a commitment and a
+ * hold.
  */
 
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { ActType, DeclaredDefinition } from "@generalbusiness/artroom-contract";
 import { validateDefinition } from "../src/index.ts";
-import { valid } from "./fixtures.ts";
+import { lane, valid } from "./fixtures.ts";
 
 const text = { type: "text", max: 100 } as const;
 const slot = { fixed: false, required: false } as const;
 const fact = (...kind: string[]) => ({ type: "fact", kind, under: "board" }) as const;
-const act = (a: Partial<ActType> & Pick<ActType, "step" | "on" | "grant">): ActType => ({ also: {}, fields: {}, guards: [], effects: [], sends: [], attention: [] , ...a });
+const act = (a: Partial<ActType> & Pick<ActType, "step" | "on" | "grant">): ActType => ({ also: {}, fields: {}, guards: [], effects: [], sends: [], attention: [], ...a });
 
 /** One row of a plan: a job, why it is there, and the entry that asked for it. */
 const row = { type: "record", of: { job: { type: "item", of: "job", required: true }, why: { ...text, required: false }, by: { ...fact("ask"), required: false } } } as const;
@@ -55,3 +57,39 @@ export const board: DeclaredDefinition = {
   rules: {},
 };
 export const boardDefinition = valid(validateDefinition(board, PROPOSED_BOUNDS));
+
+// ---------------------------------------------------------------- the hold type
+
+const held = { state: ["held"] } as const;
+const standing = { of: "also.commitment", state: ["offered", "accepted"] } as const;
+const itsCommitment = { also: { commitment: { item: "commitment", by: "commitment" } }, fields: { commitment: { type: "item", of: "commitment", required: true } } } as const;
+
+/**
+ * The lane, with the ways a commitment and a hold end. `withdraw` takes a
+ * commitment to a final state. `release` ends a hold by its holder, with the
+ * hold effect alone. `abandon` is an act on a hold that withdraws the
+ * commitment the hold is under, and sends the hold's epoch as it is after
+ * the entry. `quit` does the same and ends the hold itself first.
+ * `last-hold` opens a hold under a commitment and withdraws that commitment
+ * in the same entry.
+ */
+export const works: DeclaredDefinition = {
+  ...lane,
+  name: "works",
+  items: { ...lane.items, commitment: { ...lane.items["commitment"]!, states: { ...lane.items["commitment"]!.states, withdrawn: { final: true } } } },
+  acts: {
+    ...lane.acts,
+    withdraw: act({ step: "transition", on: "commitment", grant: "offer", guards: [{ state: ["offered", "accepted"] }, { signer: ["requester"] }], effects: [{ state: "withdrawn" }] }),
+    release: act({ step: "transition", on: "hold", grant: "hold", guards: [held, { signer: ["holder"] }], effects: [{ hold: { do: "end" } }] }),
+    abandon: act({
+      step: "transition", on: "hold", grant: "hold", ...itsCommitment, guards: [held, standing],
+      effects: [{ of: "also.commitment", state: "withdrawn" }], sends: [{ index: { fields: { epoch: { slot: "epoch" } } } }],
+    }),
+    quit: act({ step: "transition", on: "hold", grant: "hold", ...itsCommitment, guards: [held, standing], effects: [{ hold: { do: "end" } }, { of: "also.commitment", state: "withdrawn" }] }),
+    "last-hold": act({
+      step: "open", on: "hold", grant: "hold", ...itsCommitment, guards: [standing],
+      effects: [...lane.acts["take-hold"]!.effects, { of: "also.commitment", state: "withdrawn" }],
+    }),
+  },
+};
+export const worksDefinition = valid(validateDefinition(works, PROPOSED_BOUNDS));

@@ -240,7 +240,7 @@ describe("attribution (sections 6.7 and 10.2)", () => {
     // The attribution is taken of the commitment, not of the new report, which has no history: una is in it.
     expect(names(s.item(report.seq).parties["authors"])).toEqual(["@una", "@paul", "@vic", "@quinn"]);
     // A hold ending changed the hold only: the commitment kept its performer through it.
-    expect(s.item(hold.seq)).toMatchObject({ state: "ended", epoch: 2 });
+    expect(s.item(hold.seq)).toMatchObject({ state: "ended", values: { epoch: 2 } });
 
     // `notIn: [authors]`: an author, a principal of one, and a key that acts for one are all refused; an outsider is not.
     const forPaul: Actor = { ...sam, principal: paul.member };
@@ -252,18 +252,17 @@ describe("attribution (sections 6.7 and 10.2)", () => {
 });
 
 describe("attribution within an entry, and under later authority (section 6.7)", () => {
-  test("a holder set by an earlier effect of the entry is in the attribution; so is the principal of an attributed member's later grant", () => {
-    // A report that first hands the hold under its commitment to the member in `to`, renews it, and then takes the attribution.
+  test("a performer set by an earlier effect of the entry is in the attribution; so is the principal of an attributed member's later grant", () => {
+    // A report that first hands its commitment to the member in `to`, and then takes the attribution. Only a hold effect sets a
+    // holder, and it sets the signer, who is in every attribution. So the member an earlier effect brings in is a performer.
     const s = laneWithCommitment(variant(lane, (def) => {
       const report = def.acts.report;
-      report.also = { ...report.also, hold: { item: "hold", by: "hold" } };
-      report.fields = { ...report.fields, hold: { type: "item", of: "hold", required: true }, to: { type: "member", required: true } };
-      report.effects.splice(2, 0, { of: "also.hold", party: { slot: "holder", from: { field: "to" } } }, { of: "also.hold", hold: { do: "renew" } });
+      report.fields = { ...report.fields, to: { type: "member", required: true } };
+      report.effects.splice(2, 0, { of: "also.commitment", party: { slot: "performer", from: { field: "to" } } });
     }));
-    const hold = s.did(una, "take-hold", under(s, 2)).seq;
-    const report = s.did(una, "report", { fields: { commitment: 2, hold, to: vic.member }, expected: { commitment: s.item(2).revision, hold: 1 } });
-    // vic holds from this entry on, so vic is not outside the report's authors. Another signer set vic, so vic brings no principal.
-    expect(names(s.item(report.seq).parties["authors"])).toEqual(["@una", "@paul", "@vic"]);
+    const report = s.did(una, "report", { fields: { commitment: 2, to: vic.member }, expected: { commitment: s.item(2).revision } });
+    // vic performs from this entry on, so vic is not outside the report's authors. Another signer set vic, so vic brings no principal.
+    expect(names(s.item(report.seq).parties["authors"])).toEqual(["@una", "@vic", "@paul"]);
 
     // rita opens a note with una as owner: no grant of una's was judged. Later una edits it under a grant that names paul.
     const n = new Scope(smallDefinition);

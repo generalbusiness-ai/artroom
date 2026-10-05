@@ -55,7 +55,6 @@ export interface Item {
    * later, when changing this item or a hold under it.
    */
   readonly attributed: readonly MemberRef[];
-  readonly epoch?: number;                 // a hold item only (section 6.8)
 }
 
 /**

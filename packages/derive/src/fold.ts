@@ -12,6 +12,7 @@
 import type { Digest, Effect, Entry, ItemType, MemberRef } from "@generalbusiness/artroom-contract";
 import { intentDigest, seedDigest } from "@generalbusiness/artroom-bytes";
 import { UNDER, historyOf, withActing, withMembers, withPrincipal, type Signer } from "./attribution.ts";
+import { HOLDER, changeHold } from "./hold.ts";
 import type { Item, Party, StateWriter, Status } from "./state.ts";
 import { own, same } from "./values.ts";
 import type { ValidDefinition } from "./validate/index.ts";
@@ -25,7 +26,7 @@ export class FoldError extends Error {
 export type ItemEffect = Extract<Effect, { effect: "state" | "party" | "ref" | "value" | "list" | "hold" }>;
 
 /** The slot of a hold type whose member is the holder (section 6.8). */
-export const HOLDER = "holder";
+export { HOLDER };
 
 /** Section 6.3: a new item is in its initial state, each slot takes its default or is empty, and its revision is 1. */
 export function newItem(effect: Extract<Effect, { effect: "open" }>, type: ItemType, opened: Digest | null): Item {
@@ -76,7 +77,7 @@ function changeSlots(item: Item, effect: ItemEffect, definition: ValidDefinition
     }
     case "ref": return { ...item, refs: { ...item.refs, [effect.slot]: effect.to } };
     case "value": return { ...item, values: { ...item.values, [effect.slot]: effect.value } };
-    case "hold": return { ...item, epoch: effect.epoch };
+    case "hold": return changeHold(item, effect, definition, signer);
   }
 }
 

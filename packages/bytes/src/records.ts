@@ -198,7 +198,6 @@ const sealed = record({ entry, hash: isDigest });
 export const isSealed = (v: unknown): v is Sealed => sealed(v);
 const item = record(
   { id: isLocalId, type: text, state: text, revision: isLocalId, opened: orNull(isDigest), parties: named(party), refs: named(orNull(isFieldValue)), values: named(orNull(isFieldValue)), attributed: listOf(memberRef) },
-  { epoch: isLocalId },
 );
 export const isItem = (v: unknown): v is Item => item(v);
 const summary = record({
