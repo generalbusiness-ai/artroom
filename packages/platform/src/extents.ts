@@ -126,10 +126,17 @@ export const matches = (pattern: string, path: string): boolean => {
  * A symbolic link of a tree that the changed set was computed from, as the
  * caller resolved it. `resolves` is every path within the tree that the
  * link at `path` resolves to: each step of a chain of links, and its end.
- * Null: the link resolves outside the tree, or cannot be resolved. A link
- * whose target differs between two of the trees is two rows.
+ * Null: the link resolves outside the tree, or cannot be resolved.
+ *
+ * `tree` says which tree holds the link: `old`, the tree that the change
+ * starts from; `new`, the tree that it makes; or `both`, for a link that
+ * the change leaves as it is. A link whose target differs between the two
+ * trees is two rows, one `old` and one `new`. A link that the change
+ * removes, or replaces with a regular file, is one `old` row. The member
+ * is what tells the creation of a link from its removal: without it the
+ * planner's rule for a link that leaves the tree cannot be judged.
  */
-export interface TreeLink { path: string; resolves: readonly string[] | null }
+export interface TreeLink { path: string; tree: "old" | "new" | "both"; resolves: readonly string[] | null }
 
 /** What a changed set touches under one rules content. */
 export interface Touched {
@@ -151,25 +158,36 @@ export interface Touched {
  * A changed path is judged at each of these paths:
  *
  * 1. the path itself;
- * 2. every path that a link at it resolves to, in any of the trees. So a
+ * 2. every path that a link at it resolves to, in either tree. So a
  *    link into another extent touches that extent too, and a change of a
  *    link's target is a change in every extent that the old and the new
  *    target fall in;
  * 3. the path of a link, with the rest of the changed path, when the
  *    changed path is what the link resolves to, or is below it. So a change
  *    to the file that `AGENTS.md` is a link to is a change at `AGENTS.md`.
- *    The decision does not state this direction: it is the failing-closed
- *    reading (I3 deltas, entry EV7).
+ *    The planner confirmed this direction on 2026-10-05 (I3 deltas, entry
+ *    EV7).
  *
  * Steps 2 and 3 are taken again from each path that they give, at most
  * once for each link: links below links are followed, and a link that
  * leads up into its own directory ends. A change that still gives new
  * paths then is refused.
  *
- * A link at a judged path that resolves outside the tree, or cannot be
- * resolved, is refused as a change to the `rules` extent. That holds for a
- * link of any of the trees, so also for the change that removes such a
- * link (entry EV7).
+ * A link that resolves outside the tree, or cannot be resolved, is never
+ * followed. What a change does with one decides (the planner's decision of
+ * 2026-10-05 on entry EV7):
+ *
+ * - The new tree holds one at a judged path: the change creates it, or
+ *   gives a link that target. It is refused as a change to the `rules`
+ *   extent.
+ * - Only the old tree holds one at a judged path: the change removes it,
+ *   or replaces it with a regular file or with a link inside the tree. It
+ *   is allowed, and is judged in the `rules` extent, in the extents of the
+ *   link's own path and, for a new link, in those of its target by step 2.
+ *   Rules that name no extent `rules` hold no such change: the path is
+ *   unclassified.
+ * - Both trees hold it and the change is elsewhere: no judged path is the
+ *   link's, so it blocks nothing.
  *
  * An extent with patterns holds a judged path that one of them matches. A
  * path may match several, and then the change touches each. An extent with
@@ -184,13 +202,16 @@ export function classify(extents: readonly Extent[], changed: readonly string[],
   const open = extents.filter((extent) => extent.patterns.length === 0);
   for (const path of [...new Set(changed)].sort(byteOrder)) {
     const judged = new Set([path]);
+    const left = new Set<string>();
     let fresh = [path];
     for (let pass = 0; fresh.length > 0; pass += 1) {
       if (pass > links.length) { refused.add(path); break; }
       const found: string[] = [];
       for (const at of fresh) {
         for (const link of links) {
-          if (link.path === at && link.resolves === null) refused.add(path);
+          // A link that leaves the tree is refused where the new tree holds it. Where only the old tree did, the change is one of the rules extent.
+          if (link.path === at && link.resolves === null && link.tree !== "old") refused.add(path);
+          if (link.path === at && link.resolves === null && link.tree === "old") left.add(path);
           const reached = link.path === at ? (link.resolves ?? []) : [];
           const through = (link.resolves ?? []).filter((to) => at === to || at.startsWith(`${to}/`)).map((to) => link.path + at.slice(to.length));
           for (const other of [...reached, ...through]) if (!judged.has(other)) { judged.add(other); found.push(other); }
@@ -202,6 +223,11 @@ export function classify(extents: readonly Extent[], changed: readonly string[],
       const holding = patterned.filter((extent) => extent.patterns.some((pattern) => matches(pattern, at)));
       if (holding.length === 0 && open.length === 0) unclassified.add(path);
       for (const extent of holding.length > 0 ? holding : open) if (!shown.has(extent.name)) shown.set(extent.name, path);
+    }
+    // The removal or the replacement of a link that left the tree: a change in the `rules` extent, whatever its path matches.
+    if (left.has(path)) {
+      if (!extents.some((extent) => extent.name === RULES_EXTENT)) unclassified.add(path);
+      else if (!shown.has(RULES_EXTENT)) shown.set(RULES_EXTENT, path);
     }
   }
   const touched = extents.filter((extent) => shown.has(extent.name)).map((extent) => ({ extent: extent.name, path: shown.get(extent.name)! }));

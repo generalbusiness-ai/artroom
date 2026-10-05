@@ -108,27 +108,54 @@ test("the single-controller exception holds only when it is declared, membership
 
 test("a symbolic link is judged at its path and at every path that it resolves to; a change of its target is a change in the old and the new target's extents; a link that leaves the tree is refused as a change to the rules extent", () => {
   // A link into another extent: a source path that resolves to a CI definition.
-  expect([names(FIRST, ["docs/ci.yml"]), names(FIRST, ["docs/ci.yml"], [{ path: "docs/ci.yml", resolves: [".github/workflows/ci.yml"] }])]).toEqual([["source"], ["rules", "infrastructure", "source"]]);
+  expect([names(FIRST, ["docs/ci.yml"]), names(FIRST, ["docs/ci.yml"], [{ path: "docs/ci.yml", tree: "new", resolves: [".github/workflows/ci.yml"] }])]).toEqual([["source"], ["rules", "infrastructure", "source"]]);
   // A target change: the old target is an instruction file and the new one is infrastructure. Both rows are given.
-  const moved = [{ path: "docs/notes.md", resolves: ["AGENTS.md"] }, { path: "docs/notes.md", resolves: [".gitignore"] }];
+  const moved: TreeLink[] = [{ path: "docs/notes.md", tree: "old", resolves: ["AGENTS.md"] }, { path: "docs/notes.md", tree: "new", resolves: [".gitignore"] }];
   expect([names(FIRST, ["docs/notes.md"], moved.slice(1)), names(FIRST, ["docs/notes.md"], moved)]).toEqual([["infrastructure", "source"], ["rules", "infrastructure", "source"]]);
   // A link of another path changes nothing here.
   expect(names(FIRST, ["src/app.ts"], moved)).toEqual(["source"]);
 
   // The other direction: `AGENTS.md` is a link, and what it resolves to changes. A directory that a link resolves to carries the paths below it.
-  expect(names(FIRST, ["docs/instructions.md"], [{ path: "AGENTS.md", resolves: ["docs/instructions.md"] }])).toEqual(["rules", "source"]);
-  expect(names(FIRST, ["ci/build.yml"], [{ path: ".github/workflows", resolves: ["ci"] }])).toEqual(["rules", "infrastructure", "source"]);
+  expect(names(FIRST, ["docs/instructions.md"], [{ path: "AGENTS.md", tree: "both", resolves: ["docs/instructions.md"] }])).toEqual(["rules", "source"]);
+  expect(names(FIRST, ["ci/build.yml"], [{ path: ".github/workflows", tree: "both", resolves: ["ci"] }])).toEqual(["rules", "infrastructure", "source"]);
   // A link below a link is followed, and a link that leads up into its own directory ends by a refusal.
-  expect(names(FIRST, ["text/guide.md"], [{ path: "tools/AGENTS.md", resolves: ["text/guide.md"] }, { path: "kit", resolves: ["tools"] }])).toEqual(["rules", "source"]);
-  expect(classify(FIRST, ["a/x"], [{ path: "a/b", resolves: ["a"] }]).refused).toEqual(["a/x"]);
+  expect(names(FIRST, ["text/guide.md"], [{ path: "tools/AGENTS.md", tree: "both", resolves: ["text/guide.md"] }, { path: "kit", tree: "both", resolves: ["tools"] }])).toEqual(["rules", "source"]);
+  expect(classify(FIRST, ["a/x"], [{ path: "a/b", tree: "both", resolves: ["a"] }]).refused).toEqual(["a/x"]);
 
-  // Outside the tree, or not resolvable: refused. No review meets it, and the class is `authority`.
-  const outside = classify(FIRST, ["src/app.ts", "docs/secrets"], [{ path: "docs/secrets", resolves: null }]);
+  // A link that the change creates, outside the tree or not resolvable: refused. No review meets it, and the class is `authority`.
+  const outside = classify(FIRST, ["src/app.ts", "docs/secrets"], [{ path: "docs/secrets", tree: "new", resolves: null }]);
   expect([outside.touched, outside.refused, outside.class]).toEqual([[{ extent: "source", path: "docs/secrets" }], ["docs/secrets"], "authority"]);
   expect(said({ touched: outside, reviews: [ada, ann] })).toEqual([false, ["rules"], { source: [["@ada", "@ann"], []] }]);
   // Where the change also touches the rules extent, that extent is the one that is not met.
-  const both = judgeExtents(asked({ touched: classify(FIRST, ["AGENTS.md", "docs/secrets"], [{ path: "docs/secrets", resolves: null }]), reviews: [ada] }));
+  const both = judgeExtents(asked({ touched: classify(FIRST, ["AGENTS.md", "docs/secrets"], [{ path: "docs/secrets", tree: "new", resolves: null }]), reviews: [ada] }));
   expect([both.met, both.unmet, both.extents[0]!.met, both.extents[0]!.lacks]).toEqual([false, ["rules"], false, []]);
+});
+
+// The planner's decision of 2026-10-05 on a link that leaves the tree or cannot be resolved (I3 deltas, entry EV7). The rows are
+// written by hand: `old` is the tree that the change starts from, `new` the tree that it makes, `both` a link that it leaves alone.
+test("a link that leaves the tree is refused only where the change creates it or gives a link that target; its removal, and its replacement by a file or by a link inside the tree, are allowed and are a change in the rules extent; an unrelated change in a tree that holds one is not blocked, and the link is not followed", () => {
+  const bad = (tree: TreeLink["tree"]): TreeLink => ({ path: "docs/secrets", tree, resolves: null });
+  const judged = (changed: readonly string[], links: readonly TreeLink[]) => { const t = classify(FIRST, changed, links); return [t.touched.map((row) => row.extent), t.refused, t.class]; };
+  // Created: no link was there, and the new tree holds one that leaves the tree. Refused.
+  expect(judged(["docs/secrets"], [bad("new")])).toEqual([["source"], ["docs/secrets"], "authority"]);
+  // Retargeted to outside: the old link resolved inside the tree, and the new one does not. Refused, and the old target is still judged.
+  expect(judged(["docs/secrets"], [{ path: "docs/secrets", tree: "old", resolves: [".gitignore"] }, bad("new")])).toEqual([["infrastructure", "source"], ["docs/secrets"], "authority"]);
+  // Removed: only the old tree held it. Allowed: the rules extent, and the extents of the link's own path.
+  expect(judged(["docs/secrets"], [bad("old")])).toEqual([["rules", "source"], [], "authority"]);
+  // Replaced with a regular file: a file is no link, so its rows are those of a removal, one `old` row, and `classify` cannot tell the
+  // two apart. Here at a path of the infrastructure extent: the rules extent, and the extents of the path.
+  expect(judged([".github/secrets"], [{ path: ".github/secrets", tree: "old", resolves: null }])).toEqual([["rules", "infrastructure"], [], "authority"]);
+  // Replaced with a link inside the tree: the rules extent, the path's extents and those of the new target.
+  expect(judged(["docs/secrets"], [bad("old"), { path: "docs/secrets", tree: "new", resolves: [".gitignore"] }])).toEqual([["rules", "infrastructure", "source"], [], "authority"]);
+  // The reviews that the rules extent asks then meet it: an allowed change is judged, and not refused.
+  const removal = classify(FIRST, ["docs/secrets"], [bad("old")]);
+  expect([said({ touched: removal, reviews: [max] }).slice(0, 2), said({ touched: removal, reviews: [ada, max] }).slice(0, 2)]).toEqual([[false, ["rules"]], [true, []]]);
+  // An unrelated change in a tree that already holds such a link: not blocked, and the link is not followed. Nothing is judged at it.
+  expect(judged(["src/app.ts"], [bad("both")])).toEqual([["source"], [], "content"]);
+  expect(judged(["docs/guide.md"], [bad("both"), { path: "docs/latest", tree: "both", resolves: ["docs/guide.md"] }])).toEqual([["source"], [], "content"]);
+  // Rules that name no extent `rules` hold no removal of such a link: the path is unclassified, and the change is not met.
+  const none = classify(FIRST.slice(1), ["docs/secrets"], [bad("old")]);
+  expect([none.touched.map((row) => row.extent), none.unclassified, none.refused]).toEqual([["source"], ["docs/secrets"], []]);
 });
 
 test("the extents are a repository's own: a second rules content with other patterns classifies the same paths differently, and a path that no extent holds is not met", () => {
