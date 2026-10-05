@@ -63,8 +63,8 @@ A hold is separate from its commitment: `hold-end` and `release-hold` each
 have one effect, which ends the hold, and neither changes a commitment.
 The platform also ends a hold in the entry that takes its commitment to a
 final state. `packages/derive/test/forms-hold.test.ts` shows each of
-these on a test definition. The workspace and the token that a hold will
-stand for are not delivered.
+these on a test definition. The code of `hold@1` derives the records of a
+hold's workspace and tokens. No fork and no token exists at a real host.
 
 **Plan and concern.** In `issue`, a plan is one way to split the goal. A
 concern is one part of a plan. `add-concern` opens a concern and sends a

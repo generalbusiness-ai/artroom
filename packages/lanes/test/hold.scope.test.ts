@@ -10,7 +10,7 @@ const HOLD = 3600;
 
 test("T1, responsibility is not a hold: a hold ends by time before the act that waits, its commitment keeps its performer and its terms, another commitment's hold is untouched, and a withdrawn commitment ends its hold in the same entry", async () => {
   // One real `issue` lane, on the turn and the store. No capability and no peer is used. Not proved: anything a real hold has
-  // outside the lane, such as a fork, a token or the fence of its epoch. Those are the capability's records, which are not delivered.
+  // outside the lane, such as a fork, a token or the fence of its epoch. Those are the capability's records, which this scenario does not use.
   const g = await graph();
   const G = await g.goal();
   const terms = await G.fact(0);
