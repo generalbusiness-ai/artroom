@@ -211,22 +211,24 @@ describe("operands, parts and a local fact (sections 6.2 and 6.5; witness 18.1)"
           flag: { type: "record", of: { self: { type: "bool", required: true } }, required: false },
         },
       });
-      // The link keeps the entry that made it, set from `self`, and its update carries that slot and a fact that the act names.
+      // The link keeps the entry that made it, set from `self`, and its update carries that slot, a fact that the act names, and a fact that it is presented.
       d.items.link.refs.madeAt = { fixed: true, required: true, to: { type: "fact", kind: ["link"], under: "ticket" } };
       d.acts.link.fields.because = { type: "fact", kind: ["file"], under: "ticket", required: true };
       d.acts.link.effects.push({ ref: { slot: "madeAt", from: "self" } });
-      Object.assign(d.acts.link.sends[0].relate.detail, { madeAt: { slot: "madeAt" }, because: { field: "because" } });
-      Object.assign(d.receives.closes.fields, { madeAt: { type: "fact", kind: ["link"], under: "ticket", required: false }, because: { type: "fact", kind: ["file"], under: "ticket", required: false } });
+      d.acts.link.presents = { shown: { kind: ["file"], under: "ticket", required: false } };
+      Object.assign(d.acts.link.sends[0].relate.detail, { madeAt: { slot: "madeAt" }, because: { field: "because" }, shown: { presented: "shown" } });
+      const filed = { type: "fact", kind: ["file"], under: "ticket", required: false };
+      Object.assign(d.receives.closes.fields, { madeAt: { type: "fact", kind: ["link"], under: "ticket", required: false }, because: filed, shown: filed });
       d.receives.closes.guards.push(equals({ field: "madeAt" }, { source: "ref" }, "made at"));
     };
     const definition = variant(ticket, change);
     const P = new Scope(definition);
     const I = new Scope(definition, rita.member, true, 1);
     // P.2 opens link 2 and sends its update, `set`. The source entry is that `link` act, and the owner's item is the entry itself.
-    P.did(rita, "link", fields({ target: I.at, about: 0, because: P.fact(0) }));
+    expect(P.act(rita, "link", fields({ target: I.at, about: 0, because: P.fact(0) }), { presented: { shown: P.fact(0) } }).result).toBe("write");
     // Section 6.4: a local entry reference is not sent as a position. The entry being written is sent as the `self` mark, which the
-    // receiver reads as the envelope's source, and an earlier entry as its fact reference.
-    expect(P.last.sends[0]!.message).toMatchObject({ body: { detail: { madeAt: { self: true }, because: P.fact(0) } } });
+    // receiver reads as the envelope's source, and an earlier entry as its fact reference: one that a field names, and one that is presented.
+    expect(P.last.sends[0]!.message).toMatchObject({ body: { detail: { madeAt: { self: true }, because: P.fact(0), shown: P.fact(0) } } });
     expect(deliver(I, P, 2)).toMatchObject({ result: "write", draft: { input: { decision: "applied" } } });
     const applied = I.head.seq;
     // P.3 removes the link. The handler's first guard fails, so the deciding entry is `refused`, with the code and the guard's name, and so is its result.

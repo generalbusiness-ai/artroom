@@ -85,11 +85,13 @@ export function deriveSends(j: Judging, forms: readonly SendForm[], working: Rea
    * The type of an operand's value, when the definition states it: what tells a
    * local reference, which is not sent as a number, from a number. A part
    * reads inside an entry of some scope, and what it finds there is sent as it
-   * is; the part `ref` is the reference itself.
+   * is; the part `ref` is the reference itself. A presented fact is a fact,
+   * and one of this scope is held as its `seq`, like a fact field.
    */
   const typeOf = (o: Operand, each: Item | null): FieldType | null => {
     if ("item" in o) return { type: "item", of: "" };
-    if (!("field" in o || "slot" in o) || (o.part !== undefined && o.part !== "ref")) return null;
+    if (!("field" in o || "slot" in o || "presented" in o) || (o.part !== undefined && o.part !== "ref")) return null;
+    if ("presented" in o) return { type: "fact", kind: [], under: "" };
     return "field" in o ? (own(j.fieldTypes, o.field) ?? null) : slotType(o.of === undefined ? on : o.of === "each" ? each : working.get(o.of), o.slot);
   };
   /**
