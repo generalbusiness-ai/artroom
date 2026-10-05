@@ -22,7 +22,7 @@ import { kindOf, operand } from "./operand.ts";
 import type { Item } from "./state.ts";
 import { LAST_MS, timeMs, timeOf } from "./time.ts";
 import { unsupported } from "./unsupported.ts";
-import { isFactRef, isLocalId, isMemberRef, isValue, memberFits, own, same } from "./values.ts";
+import { isFactRef, isLocalId, isMemberRef, isObject, isValue, memberFits, own, same } from "./values.ts";
 import { isDigest } from "@generalbusiness/artroom-bytes";
 
 /**
@@ -63,13 +63,26 @@ function stated(j: Judging, o: Operand): boolean {
  * states: this scope's own entry, the source entry of a delivery, or an
  * entry that was fetched for the input. A fact to this scope is held in
  * normal form. An item is a local item of the slot's type, named by its ID,
- * or by the fact of the entry of this scope that opened it.
+ * or by the fact of the entry of this scope that opened it. An element of a
+ * list and a member of a record are each checked by their declared type, to
+ * any depth, as `readFacts` checks the fields of an input.
  */
 function held(j: Judging, type: FieldType, value: unknown): FieldValue | undefined {
   if (type.type === "list") {
     if (!Array.isArray(value) || value.length > Math.min(type.max, j.bounds.listElements)) return undefined;
     const each = value.map((v) => held(j, type.of, v));
     return each.includes(undefined) ? undefined : (each as FieldValue[]);
+  }
+  if (type.type === "record") {
+    // Section 6.2: an unknown member is refused, and a member that is not required may be absent.
+    if (!isObject(value) || Object.keys(value).some((m) => !Object.hasOwn(type.of, m))) return undefined;
+    const members: [string, FieldValue][] = [];
+    for (const [m, of] of Object.entries(type.of)) {
+      const member = Object.hasOwn(value, m) ? held(j, of, value[m]) : undefined;
+      if (member === undefined && (of.required || Object.hasOwn(value, m))) return undefined;
+      if (member !== undefined) members.push([m, member]);
+    }
+    return Object.fromEntries(members);
   }
   if (type.type === "item") {
     const id = isLocalId(value) ? value : isFactRef(value) && isLocalFact(value, j.scope.at) && j.view.item(value.seq)?.opened === value.hash ? value.seq : null;

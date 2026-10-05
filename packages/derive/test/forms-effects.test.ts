@@ -29,7 +29,7 @@ const cards: DeclaredDefinition = {
     card: {
       many: true, max: 8, states: { draft: { final: false }, done: { final: true } }, initial: "draft",
       parties: { owner: { ...one, author: true }, helper: { ...slot, list: false, author: false }, team: { ...slot, list: true, max: 3, author: false } },
-      refs: { parent: { ...slot, to: { type: "item", of: "card" } } }, values: { text: { ...slot, of: text }, size: { ...slot, of: size }, tags: { ...slot, of: { type: "list", of: text, max: 2 } } },
+      refs: { parent: { ...slot, to: { type: "item", of: "card" } } }, values: { text: { ...slot, of: text }, size: { ...slot, of: size }, tags: { ...slot, of: { type: "list", of: text, max: 2 } }, near: { ...slot, of: { type: "record", of: { card: { type: "item", of: "card", required: true } } } } },
     },
     summary: {
       many: true, max: 8, states: { made: { final: false } }, initial: "made",
@@ -117,7 +117,7 @@ describe("effects: sources, conditions and what is not applied (section 6.6)", (
     const edit = (f: Record<string, FieldValue>) => written(s, s.act(rita, "edit", at(s, p, f)));
     expect(edit({ size: 3 })).toEqual([{ effect: "value", item: p, slot: "size", value: 3 }]);
     // No field is given: each source is absent. Before, such an effect emptied its slot.
-    expect([edit({}), s.item(p).values]).toEqual([[], { text: "p", size: 3, tags: null }]);
+    expect([edit({}), s.item(p).values]).toEqual([[], { text: "p", size: 3, tags: null, near: null }]);
     // `clear` is true: the `if` applies and the `unless` with the same guards does not, though its source is present.
     expect(edit({ clear: true, size: 5 })).toEqual([{ effect: "value", item: p, slot: "size", value: null }]);
     expect(edit({ clear: false, size: 5 })).toEqual([{ effect: "value", item: p, slot: "size", value: 5 }]);
@@ -252,6 +252,8 @@ describe("attribution: its sources and its order (section 6.7)", () => {
     const forged = { ...s.fact(q), hash: s.fact(0).hash };
     expect([copy("ref", "parent", q), copy("ref", "parent", s.fact(q)), copy("ref", "parent", forged), copy("ref", "parent", 0), copy("ref", "parent", 99)]).toEqual([[q], [q], "bad-field", "bad-field", "bad-field"]);
     expect([copy("value", "tags", ["a", "b"]), copy("value", "tags", ["a", "b", "c"]), copy("value", "tags", ["a", 7])]).toEqual([[["a", "b"]], "bad-field", "bad-field"]);
+    // A member of a record is checked by its declared type, as the slot itself is: a card by its ID or by that fact, and no other item.
+    expect([{ card: q }, { card: s.fact(q) }, { card: forged }, { card: 0 }, {}, { card: q, more: 1 }].map((sent) => copy("value", "near", sent))).toEqual([[{ card: q }], [{ card: q }], "bad-field", "bad-field", "bad-field", "bad-field"]);
 
     // The guards of one written list: the first is not completed and the second is false, so the list is false, by its second guard.
     expect(judgeGuards(judging(s, "sum", { on: p, "also.parent": p }, { bounds: stopped }), [some, { unset: "owner" }])).toEqual({ result: "fail", at: 1 });
