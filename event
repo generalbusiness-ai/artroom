@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at vitest.config.ts","body":{"commit":"b57e8774bbdee1205b648bfd856904bb37c6d282","path":"vitest.config.ts"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:04d2bbdd423a257c55895edbb338d51e51b117e5","text":"Merge retired a covered predecessor; the successor is at packages/derive/src/effects.ts."}
