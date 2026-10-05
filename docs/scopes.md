@@ -1,8 +1,8 @@
 # Scopes
 
-This guide describes what the scope substrate delivers: the eight packages
-under `packages/` that hold the substrate, the platform definitions and the
-Git code. A ninth package, `lanes`, holds the two lane
+This guide describes what the scope substrate delivers: the nine packages
+under `packages/` that hold the substrate, the platform definitions, the
+Git code and the checker service. A tenth package, `lanes`, holds the two lane
 definitions as data, and [lanes.md](lanes.md) describes it. This guide is
 for a technical reader who has not read the design notes. It says what a scope is, how a change to one takes effect,
 how scopes work together, how a history is checked, and what is not built
@@ -21,13 +21,14 @@ why. Nothing in either note is adopted by being built.
 | `@generalbusiness/artroom-bytes` | Canonical JSON, SHA-256, encodings, Ed25519, the seven byte domains, and the guard of each identifier. | contract |
 | `@generalbusiness/artroom-derive` | The definition validator, the fold, the judges and the rule evaluator. Pure functions. | contract, bytes |
 | `@generalbusiness/artroom-platform` | The platform definitions as data, with the rules that no form can say. Today: six. The inbox is runnable under the package's own rules. The rules scope is runnable, as data and rules. Membership is runnable under the package's own ten rules. The register is not: one rule waits. The directory is not: three marks lack rules. The destination is not: ten marks lack rules. | contract, bytes, derive |
-| `@generalbusiness/artroom-git` | Everything that touches a Git repository or a Git host: the object reader, the commands, the outcome of a push, and the gateway. It is not part of a scope's commit and no other package imports it. | contract, bytes |
+| `@generalbusiness/artroom-git` | Everything that touches a Git repository or a Git host: the object reader, the commands, the outcome of a push, the gateway, the host port with the token driver, and the files and the commit of a snapshot. It is not part of a scope's commit. The checkers package imports it, and two test files of the scope package import its test support by path. | contract, bytes |
+| `@generalbusiness/artroom-checkers` | The pure parts of the checker service: its own read of a job before a run, its record of at most one run for a job, the runner's checkout and gateway rule, and the signer. It has no runner, no storage and no Worker: each is a port with no adapter. | contract, bytes, git |
 | `@generalbusiness/artroom-scope` | The runtime of a scope on a Cloudflare Durable Object with SQLite storage, and the Worker's routes. | contract, bytes, derive, platform |
 | `@generalbusiness/artroom-replay` | An independent check of a history, its report, and the command `artroom-replay`. | contract, bytes, derive |
 | `@generalbusiness/artroom-client` | Building and signing an intent, and a typed handle on one scope. | contract, bytes |
 
 Each package's `README.md` lists its modules. The runtime and the verifier
-share `derive` and nothing else. The client shares neither. None of the eight
+share `derive` and nothing else. The client shares neither. None of the nine
 imports the lanes package.
 
 ## What a scope is
