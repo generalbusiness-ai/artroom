@@ -5,7 +5,7 @@
  */
 
 import type { Entry, FactRef, FactUse, Incarnation, Prepared, Request, Result, ScopeId, ScopeRef, Seed, Send, SignedIntent } from "@generalbusiness/artroom-contract";
-import { deliveryCauseDigest, intentDigest, isDigest, isIncarnation, messageDigest, scopeIdOf, seedDigest, verifySignedIntent } from "@generalbusiness/artroom-bytes";
+import { deliveryCauseDigest, intentDigest, isDigest, isIncarnation, isScopeKind, messageDigest, scopeIdOf, seedDigest, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import { judgeDelivery, sentBy, type DeliveryContext } from "./delivery.ts";
 import { creationFields, derive, isIntent, readFacts, readFields, useOf } from "./frame.ts";
 import type { Fetched, Judging } from "./guards.ts";
@@ -13,7 +13,7 @@ import type { Judgment } from "./judge.ts";
 import type { StateView } from "./state.ts";
 import { timeMs } from "./time.ts";
 import type { ValidDefinition } from "./validate.ts";
-import { SCOPE_KINDS, isFactRef, isLocalId, isObject, isScopeRef, same } from "./values.ts";
+import { isFactRef, isLocalId, isObject, isScopeRef, same } from "./values.ts";
 
 /**
  * What asks for a directory (section 7.1). `name` is the name of the object
@@ -26,7 +26,7 @@ export interface Founding { name: ScopeId; inc: Incarnation; seed: Seed; foundin
 export interface Creation { name: ScopeId; inc: Incarnation; to: Seed; from: FactRef; n: number; message: Request }
 
 function isSeed(v: unknown): v is Seed {
-  return isObject(v) && Object.keys(v).length === 6 && v["v"] === 1 && SCOPE_KINDS.includes(v["kind"] as never) && typeof v["definition"] === "string"
+  return isObject(v) && Object.keys(v).length === 6 && v["v"] === 1 && isScopeKind(v["kind"]) && typeof v["definition"] === "string"
     && (v["creator"] === null || isScopeRef(v["creator"])) && isDigest(v["cause"]) && isLocalId(v["ordinal"]);
 }
 

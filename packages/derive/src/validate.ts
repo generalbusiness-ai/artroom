@@ -9,9 +9,9 @@
  */
 
 import type { Bounds, DeclaredDefinition, Digest, FieldType, TimedRule } from "@generalbusiness/artroom-contract";
-import { canonicalize, definitionDigest, isDigest, utf8 } from "@generalbusiness/artroom-bytes";
+import { canonicalize, definitionDigest, isDigest, isPlatformDefinition, isScopeKind, utf8 } from "@generalbusiness/artroom-bytes";
 import { LAST_MS } from "./time.ts";
-import { SCOPE_KINDS, isObject, isValue } from "./values.ts";
+import { isObject, isValue } from "./values.ts";
 
 export type ProblemCode =
   | "shape"              // not the shape of the form, or a form or field the contract does not define
@@ -228,7 +228,7 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
         str(o["under"], at(path, "under"));
         break;
       case "scope":
-        if (!SCOPE_KINDS.includes(o["kind"] as never)) bad("shape", at(path, "kind"), "is not a scope kind");
+        if (!isScopeKind(o["kind"])) bad("shape", at(path, "kind"), "is not a scope kind");
         break;
       case "list":
         if (nested) bad("shape", path, "a list of lists is not a field type");
@@ -581,8 +581,8 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
       if (k === "create") {
         const r = rec(x, p, ["kind", "definition", "fields", "result"]);
         if (!r) return;
-        if (!SCOPE_KINDS.includes(r["kind"] as never)) bad("shape", at(p, "kind"), "is not a scope kind");
-        if (!isDigest(r["definition"]) && !(typeof r["definition"] === "string" && /^platform:(directory|membership|rules|destination|inbox|task)@(0|[1-9][0-9]*)$/.test(r["definition"]))) bad("shape", at(p, "definition"), "is a definition digest or a platform definition");
+        if (!isScopeKind(r["kind"])) bad("shape", at(p, "kind"), "is not a scope kind");
+        if (!isDigest(r["definition"]) && !isPlatformDefinition(r["definition"])) bad("shape", at(p, "definition"), "is a definition digest or a platform definition");
         sources(r["fields"], at(p, "fields"), ctx);
         clauses(r["result"], at(p, "result"), ctx, true);
       } else if (k === "tell") {
@@ -703,7 +703,7 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
     const key = canonicalize([String(o["message"]), String(from?.["kind"])]);
     if (handled.has(key)) bad("handler", path, "another handler receives this message from this kind of scope");
     handled.add(key);
-    if (from && (!SCOPE_KINDS.includes(from["kind"] as never) || ("under" in from && str(from["under"], at(path, "from")) === null))) bad("shape", at(path, "from"), "is a scope kind, and a definition name");
+    if (from && (!isScopeKind(from["kind"]) || ("under" in from && str(from["under"], at(path, "from")) === null))) bad("shape", at(path, "from"), "is a scope kind, and a definition name");
     // A handler has no signer and opens no item; its message fields are not declared, so a field name is not resolved.
     const ctx: Ctx = { on: null, also: also(o["also"], at(path, "also"), null), nascent: false, fields: null, signer: false, timed: false, live: new Set() };
     list(o["guards"], at(path, "guards"), bounds.guards).forEach((g, i) => guard(g, at(at(path, "guards"), i), ctx));

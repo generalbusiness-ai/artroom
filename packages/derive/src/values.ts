@@ -1,20 +1,21 @@
 /** Values of the field types of section 6.2, as they appear in an intent, a slot and an effect. */
 
-import type { Bounds, FactRef, FieldType, MemberRef, ScopeKind, ScopeRef } from "@generalbusiness/artroom-contract";
-import { canonicalize, isDigest, isIncarnation, isScopeId, utf8, wellFormed } from "@generalbusiness/artroom-bytes";
+import type { Bounds, FactRef, FieldType, MemberRef, ScopeRef } from "@generalbusiness/artroom-contract";
+import { SCOPE_KINDS, canonicalize, isDigest, isIncarnation, isMemberId, isScopeId, isScopeKind, utf8, wellFormed } from "@generalbusiness/artroom-bytes";
 import { timeMs } from "./time.ts";
 
-export const SCOPE_KINDS: readonly ScopeKind[] = ["directory", "membership", "rules", "destination", "inbox", "task", "lane"];
+/** The scope kinds, from the bytes package, which holds the one guard of each identifier. */
+export { SCOPE_KINDS };
 
 export const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 const hasOnly = (v: Record<string, unknown>, keys: readonly string[]) => Object.keys(v).length === keys.length && keys.every((k) => k in v);
 
 export function isScopeRef(v: unknown): v is ScopeRef {
-  return isObject(v) && hasOnly(v, ["scope", "inc", "kind"]) && isScopeId(v["scope"]) && isIncarnation(v["inc"]) && SCOPE_KINDS.includes(v["kind"] as ScopeKind);
+  return isObject(v) && hasOnly(v, ["scope", "inc", "kind"]) && isScopeId(v["scope"]) && isIncarnation(v["inc"]) && isScopeKind(v["kind"]);
 }
 
 export function isMemberRef(v: unknown): v is MemberRef {
-  return isObject(v) && hasOnly(v, ["membership", "member"]) && isScopeRef(v["membership"]) && typeof v["member"] === "string" && /^@./.test(v["member"]) && wellFormed(v["member"]);
+  return isObject(v) && hasOnly(v, ["membership", "member"]) && isScopeRef(v["membership"]) && isMemberId(v["member"]);
 }
 
 /** A member handle within its bound. A slot never holds a longer one, so an entry that lists a slot's members has a known size. */

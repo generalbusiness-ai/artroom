@@ -10,6 +10,7 @@
 
 import { ENTRY_READ_BYTES, HISTORY_PAGE_BYTES, HISTORY_PAGE_ENTRIES, OUTBOX_PAGE_DUTIES, RETAINED_INPUT_BYTES, RETAINED_ITEMS_PAGE } from "@generalbusiness/artroom-contract";
 import type { Cursor, Digest, DutyId, Entry, LogPage, Read, ReadRefusal, RetainedInput, Summary } from "@generalbusiness/artroom-contract";
+import { isDutyId } from "@generalbusiness/artroom-bytes";
 import { byteOrder, type Item, type ScopeState, type ValidDefinition } from "@generalbusiness/artroom-derive";
 import type { Pinned } from "./core.ts";
 import type { ReadName, Readers } from "./ports.ts";
@@ -29,7 +30,8 @@ const no = (reason: ReadRefusal) => ({ ok: false, reason }) as const;
 const position = (cursor: Cursor | undefined, first: number | null): number | null | undefined => (cursor === undefined ? first : /^(0|[1-9][0-9]{0,15})$/.test(cursor) ? Number(cursor) : undefined);
 
 /** A duty ID: the `seq` of an entry and the ordinal of one of its sends. */
-const DUTY = /^(0|[1-9][0-9]{0,15})\.(0|[1-9][0-9]{0,5})$/;
+/** The entry and the ordinal a duty ID names, or null. The form is the bytes package's to judge. */
+const dutyOf = (duty: unknown): [seq: number, n: number] | null => (isDutyId(duty) ? (duty.split(".").map(Number) as [number, number]) : null);
 
 export class Reads {
   readonly #store: Store;
@@ -156,9 +158,9 @@ export class Reads {
   outbox(reader: unknown, cursor?: Cursor): Read<readonly Duty[]> {
     const open = this.#open(reader, "outbox");
     if (!("scope" in open)) return open;
-    const at = cursor === undefined ? null : DUTY.exec(cursor);
+    const at = cursor === undefined ? null : dutyOf(cursor);
     if (cursor !== undefined && !at) return no("not-found");
-    const page = this.#store.duties(at ? { seq: Number(at[1]), n: Number(at[2]) } : null, this.#bounds.outboxDuties);
+    const page = this.#store.duties(at ? { seq: at[0], n: at[1] } : null, this.#bounds.outboxDuties);
     return { ok: true, at: open.scope.head, value: page.duties, complete: !page.more, ...(page.more ? { next: page.duties.at(-1)!.duty } : {}) };
   }
 
@@ -166,8 +168,8 @@ export class Reads {
   duty(reader: unknown, duty: DutyId): Read<Duty> {
     const open = this.#open(reader, "outbox");
     if (!("scope" in open)) return open;
-    const at = typeof duty === "string" ? DUTY.exec(duty) : null;
-    const row = at ? this.#store.duty(Number(at[1]), Number(at[2])) : null;
+    const at = dutyOf(duty);
+    const row = at ? this.#store.duty(at[0], at[1]) : null;
     return row ? { ok: true, at: open.scope.head, value: row, complete: true } : no("not-found");
   }
 }
