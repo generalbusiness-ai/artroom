@@ -7,10 +7,10 @@
  * the answer to a founding, is the contract's, and is exported here again.
  */
 
-import type { Answer, Bounds, DeclaredDefinition, Digest, DutyId, Entry, FactRef, Founded, Grant, PlatformDefinition, Receipt, RefusalReason, ScopeId, Seed, Settlement, SignedIntent, UnavailableReason } from "@generalbusiness/artroom-contract";
-import { canonicalize, definitionDigest, intentDigest, isDigest, isGrant, newIncarnation, parseStrict } from "@generalbusiness/artroom-bytes";
-import { checkpointOf, factsNamed, judgeAct, judgeCheckpoint, judgeGenesis, own, prepareRules, readFields, validateDefinition } from "@generalbusiness/artroom-derive";
-import type { ActJudgment, Clock as Reading, Draft, Fetched, Founding, JudgeContext, Own, ValidDefinition } from "@generalbusiness/artroom-derive";
+import type { ActType, Answer, Beside, Bounds, DeclaredDefinition, Digest, DutyId, Entry, FactRef, Founded, Grant, PlatformDefinition, Receipt, RefusalReason, ScopeId, Seed, Settlement, SignedIntent, UnavailableReason } from "@generalbusiness/artroom-contract";
+import { canonicalize, definitionDigest, intentDigest, isDigest, isGrant, newIncarnation, parseStrict, textDigest, utf8 } from "@generalbusiness/artroom-bytes";
+import { checkpointOf, factsNamed, inputTexts, isObject, judgeAct, judgeCheckpoint, judgeGenesis, own, prepareRules, presentedTypes, readFields, validateDefinition } from "@generalbusiness/artroom-derive";
+import type { ActJudgment, Clock as Reading, Draft, Fetched, Founding, JudgeContext, Own, Texts, ValidDefinition } from "@generalbusiness/artroom-derive";
 import { RULE_PROFILES } from "@generalbusiness/artroom-derive/rule";
 import { namedBy } from "./definitions.ts";
 import type { DefinitionRead, Ports } from "./ports.ts";
@@ -62,6 +62,52 @@ export function retainedFacts(store: Store, entry: Entry): Fetched[] {
     return kept ? [{ fact: use.fact, entry: JSON.parse(kept.bytes) as Entry, under: kept.under ?? "" }] : [];
   });
 }
+
+/**
+ * The detached texts at hand for one input (section 6.2), by the digest of
+ * each, which is computed here: each as the JSON string that is retained,
+ * with the number of UTF-8 bytes of the text.
+ */
+export class Received {
+  readonly #texts = new Map<Digest, { bytes: string; size: number }>();
+
+  /**
+   * The texts that came beside an intent. At most as many are read as
+   * `fields` has detached texts, and none longer than a text may be. A
+   * value that is no text, or has no canonical bytes, is not one.
+   */
+  static beside(texts: unknown, fields: ActType["fields"] | undefined, bounds: Bounds): Received {
+    const received = new Received();
+    const most = Object.values(fields ?? {}).filter((type) => type.type === "text" && type.detached).length;
+    for (const text of Array.isArray(texts) ? texts.slice(0, most) : []) if (typeof text === "string" && text.length <= bounds.textBytes) received.add(text);
+    return received;
+  }
+
+  /** One text. Returns its digest, or null when the text has no canonical bytes. */
+  add(text: string): Digest | null {
+    try {
+      const digest = textDigest(text);
+      this.#texts.set(digest, { bytes: canonicalize(text), size: utf8(text).length });
+      return digest;
+    } catch {
+      return null;
+    }
+  }
+
+  /** What a judge asks: the size of the text under a digest, or undefined when none came. */
+  readonly sizes: Texts = (digest) => this.#texts.get(digest)?.size;
+
+  /** Section 9.2: the bytes of each text that the entry's input names, under its digest, to be retained with the entry. */
+  retain(definition: ValidDefinition, draft: Draft): Retained[] {
+    return inputTexts(definition, draft.input).flatMap((digest): Retained[] => {
+      const text = this.#texts.get(digest);
+      return text ? [{ kind: "text", digest, bytes: text.bytes }] : [];
+    });
+  }
+}
+
+/** What came beside an intent, as a caller over a transport sent it: untrusted, so anything that is not a record is nothing. */
+const besideOf = (beside: unknown): { texts?: unknown; presented?: unknown } => (isObject(beside) ? beside : {});
 
 /** Asked for while rules are found in preparation, where nothing is written. The commit mints the real one. */
 export const NO_INCARNATION = newIncarnation(new Uint8Array(16));
@@ -132,10 +178,14 @@ export class Scope {
    * retained, and a creation under it waits. One that is supplied and is not
    * a valid declaration is refused `unsupported-definition`.
    *
+   * `beside`: the detached texts that the founding intent's fields name
+   * (section 6.2). Each is checked against its digest and retained with the
+   * genesis.
+   *
    * No grant is asked for: who may found a repository is the authority
    * note's (section 7.1).
    */
-  async found(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions: readonly DeclaredDefinition[] = []): Promise<Founded> {
+  async found(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions: readonly DeclaredDefinition[] = [], beside: Beside = {}): Promise<Founded> {
     const refused = (reason: Extract<Founded, { answer: "refused" }>["reason"]): Founded => ({ answer: "refused", reason });
     const name = this.#name;
     if (!name || !isSigned(founding)) return refused("source-unverified");
@@ -179,8 +229,9 @@ export class Scope {
     const facts = named.length > bounds.usesPerEntry ? null : await fetchFacts(resolver, bounds, named);
     if (!facts) return unavailable("dependency-unavailable");
 
+    const texts = Received.beside(besideOf(beside).texts, act.fields, bounds);
     const asked = (inc: Founding["inc"]): Founding => ({ name, inc, seed, founding });
-    const context = (clock: Reading) => ({ clock, bounds, facts, source: null });
+    const context = (clock: Reading) => ({ clock, bounds, facts, source: null, texts: texts.sizes });
     const pinned = (): Pinned => this.pinned() ?? { named: valid.digest, definition: valid };
     const answer = (sealed: Sealed): Founded =>
       (sealed.entry.input.type === "genesis" && sealed.entry.input.decision === "applied" ? { answer: "accepted", receipt: receiptOf(sealed, pinned().named) } : refused("scope-refused"));
@@ -194,7 +245,10 @@ export class Scope {
           case "write":
             // The item the genesis opens is indexed as this definition says, from its first write.
             this.#store.cover(valid.indexes);
-            return { verdict: "write", draft: judged.draft, retain: [{ kind: "definition", digest: valid.digest, bytes }, ...children.retain, ...used(judged.draft, facts)], sealed: answer, unfit: () => refused("bad-field"), full: () => refused("scope-full") };
+            return {
+              verdict: "write", draft: judged.draft, retain: [{ kind: "definition", digest: valid.digest, bytes }, ...children.retain, ...used(judged.draft, facts), ...texts.retain(valid, judged.draft)],
+              sealed: answer, unfit: () => refused("bad-field"), full: () => refused("scope-full"),
+            };
           case "repeat": {
             const kept = this.#store.stored(0)!;
             return said(answer({ entry: JSON.parse(kept.bytes) as Entry, hash: kept.hash }));
@@ -211,11 +265,16 @@ export class Scope {
 
   /**
    * Submit an act (sections 4.2 and 5.2). Step 1 is here: the signature and
-   * the shape, then the foreign entries the fields name. The turn does the
-   * rest. A refusal is a statement about the head it names and writes
-   * nothing.
+   * the shape, then the foreign entries that the fields and the presented
+   * facts name. The turn does the rest. A refusal is a statement about the
+   * head it names and writes nothing.
+   *
+   * `beside`: what travels beside the intent and is not signed (sections 6.2
+   * and 6.4). Each detached text is checked against the digest that a field
+   * names, and is retained with the entry. Each presented fact is fetched
+   * like a fact field, and the entry records it.
    */
-  async submit(signed: SignedIntent, grants: readonly Grant[]): Promise<Answer> {
+  async submit(signed: SignedIntent, grants: readonly Grant[], beside: Beside = {}): Promise<Answer> {
     const pinned = this.pinned();
     const scope = this.#store.scope();
     if (!pinned?.definition || !scope) return unavailable("unavailable");
@@ -232,15 +291,23 @@ export class Scope {
     // judge gives the answer; an intent with a key that is not accepted is new work and meets every check below.
     const known = this.#store.accepted(intent.actor, intent.idempotencyKey) !== null;
     // Section 6.2: a fact that names this scope is a local fact. It is not fetched: the judge reads this scope's own history.
-    const wanted = !known && act && fields?.ok ? factsNamed(act.fields, fields.fields, scope.at) : [];
+    // Section 6.4: a presented fact is fetched before the turn like a fact field. One that the act does not declare is fetched for
+    // nothing: the judge refuses the input.
+    const presented = besideOf(beside).presented;
+    const offered: Readonly<Record<string, unknown>> = isObject(presented) ? presented : {};
+    const presents = presentedTypes(act?.presents);
+    const shown = readFields(presents, offered, bounds);
+    const wanted = !known && act && fields?.ok ? [...factsNamed(act.fields, fields.fields, scope.at), ...(shown.ok ? factsNamed(presents, shown.fields, scope.at) : [])].filter((fact, i, all) => all.findIndex((f) => f.hash === fact.hash) === i) : [];
     if (wanted.length > bounds.usesPerEntry) return { answer: "refused", reason: "bad-field", judgedAt: scope.head };
+    // Section 6.2: the scope receives the bytes of each detached text with the intent, and the judge checks them against the field.
+    const texts = Received.beside(besideOf(beside).texts, act?.fields, bounds);
     const facts = await fetchFacts(resolver, bounds, wanted);
     if (!facts) return unavailable("dependency-unavailable");
 
     // Section 5.1: held authority is read with the clock. The verdict on each grant is asked for on the reading it is used with.
-    const presented = (Array.isArray(grants) ? grants : []).filter(isGrant);
+    const given = (Array.isArray(grants) ? grants : []).filter(isGrant);
     const context = (clock: Reading): Omit<JudgeContext, "prepared"> =>
-      ({ clock, bounds, facts, own: ownOf(this.#store), grants: presented.map((grant) => ({ grant, current: authority.current(grant, scope.at, clock.reading) })) });
+      ({ clock, bounds, facts, own: ownOf(this.#store), texts: texts.sizes, presented: offered, grants: given.map((grant) => ({ grant, current: authority.current(grant, scope.at, clock.reading) })) });
 
     const end = await this.#turns.run<Answer>({
       asks: (view, clock) => prepareRules(view, definition, { act: signed, context: { ...context(clock), prepared: [] } }),
@@ -250,7 +317,7 @@ export class Scope {
           case "write": {
             const head = view.scope()!.head;
             return {
-              verdict: "write", draft: judged.draft, retain: used(judged.draft, facts),
+              verdict: "write", draft: judged.draft, retain: [...used(judged.draft, facts), ...texts.retain(definition, judged.draft)],
               sealed: (sealed) => ({ answer: "accepted", receipt: receiptOf(sealed, named) }),
               // An entry over the size bound, or a grant that is not canonical values, is never written.
               unfit: (why) => ({ answer: "refused", reason: why === "size" ? "bad-field" : "unauthorized", judgedAt: head }),

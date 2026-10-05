@@ -22,7 +22,8 @@ export const memberBytes = (bounds: Bounds): number => SCOPE_BYTES + 64 + 6 * bo
 /** The most canonical bytes a value of that type takes. */
 export function mostBytes(type: FieldType, bounds: Bounds): number {
   switch (type.type) {
-    case "text": return 2 + 6 * type.max;
+    // A detached text is held as its digest.
+    case "text": return type.detached ? 73 : 2 + 6 * type.max;
     case "int": return 20;
     case "bool": return 5;
     case "time": return 26;

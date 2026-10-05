@@ -30,10 +30,15 @@ export const memberFits = (v: MemberRef, bounds: Pick<Bounds, "memberBytes">): b
 /** A Git object ID: SHA-1 or SHA-256, lowercase hex. */
 const isObjectId = (v: unknown) => typeof v === "string" && /^([0-9a-f]{40}|[0-9a-f]{64})$/.test(v);
 
-/** True when `v` is a value of `type`. An `item` is checked as a local ID only; whether it exists is a question for the state. */
+/**
+ * True when `v` is a value of `type`. An `item` is checked as a local ID
+ * only; whether it exists is a question for the state. The value of a
+ * detached text is its digest (section 6.2); whether the text is at hand,
+ * and within the field's `max`, is a question for what came with the input.
+ */
 export function isValue(type: FieldType, v: unknown, bounds: Bounds): boolean {
   switch (type.type) {
-    case "text": return typeof v === "string" && wellFormed(v) && utf8(v).length <= type.max;
+    case "text": return type.detached ? isDigest(v) : typeof v === "string" && wellFormed(v) && utf8(v).length <= type.max;
     case "int": return typeof v === "number" && Number.isSafeInteger(v) && !Object.is(v, -0) && v >= type.min && v <= type.max;
     case "bool": return typeof v === "boolean";
     case "time": return timeMs(v) !== null;

@@ -7,7 +7,7 @@
  */
 
 import type { ActType, Bounds, Digest, Entry, FactRef, FactUse, FieldRecord, FieldType, FieldValue, Prepared, Request, ScopeRef, Sealed } from "@generalbusiness/artroom-contract";
-import { canonicalBytes, digestBytes, entryHash, isIntent } from "@generalbusiness/artroom-bytes";
+import { canonicalBytes, digestBytes, entryHash, isDigest, isIntent } from "@generalbusiness/artroom-bytes";
 import type { Fetched, RuleInput } from "./guards.ts";
 import type { StateView } from "./state.ts";
 import type { Clock } from "./time.ts";
@@ -21,6 +21,15 @@ import { byteOrder, isFactRef, isObject, isValue, own, same } from "./values.ts"
  */
 export type Own = (seq: number) => Sealed | null;
 
+/**
+ * The detached texts at hand for one input, by digest (section 6.2). A
+ * number: the text came with the input, its bytes hash to that digest, and
+ * it has that many UTF-8 bytes. Null: the bytes are not at hand and are not
+ * asked for, as for a text that a tombstone removed since; nothing about
+ * them is checked. Undefined: no text came under that digest.
+ */
+export type Texts = (digest: Digest) => number | null | undefined;
+
 /** What every judge is given: the one reading of the commit, the bounds, and the retained inputs. */
 export interface Reading {
   clock: Clock;                         // the one reading of this commit (section 5.3); see `clockOf`
@@ -29,6 +38,7 @@ export interface Reading {
   prepared: readonly Prepared[];        // the rule results of preparation (section 5.2, step 5)
   asked?: RuleInput[] | undefined;      // set by `prepareRules` only
   own?: Own | undefined;                // this scope's own history. Without it an input that names a local fact is not judged
+  texts?: Texts | undefined;            // the detached texts that came with the input. Without it an input that names one is not judged
 }
 
 /** The shape of section 2.1, which the bytes package guards beside the contract's other fixed records. */
@@ -80,18 +90,38 @@ export function factsNamed(types: ActType["fields"], fields: Readonly<Record<str
 }
 
 /**
+ * The digest of each detached text that the given fields name (section
+ * 6.2), once each, in the byte order of the field names. `given` is as an
+ * intent or a message holds it: a field that is not a digest names none.
+ * The validator lets only a field itself be detached: no element and no
+ * member is.
+ */
+export function textsNamed(types: ActType["fields"], given: Readonly<Record<string, unknown>> | null): Digest[] {
+  const named = new Set<Digest>();
+  for (const name of Object.keys(given ?? {}).sort(byteOrder)) {
+    const [type, value] = [own(types, name), given![name]];
+    if (type?.type === "text" && type.detached && isDigest(value)) named.add(value);
+  }
+  return [...named];
+}
+
+/** The facts an act declares that it is presented, as field types, so that they are read as fact fields are (section 6.4). */
+export const presentedTypes = (presents: ActType["presents"]): ActType["fields"] =>
+  Object.fromEntries(Object.entries(presents ?? {}).map(([name, p]) => [name, { type: "fact", kind: p.kind, under: p.under, required: p.required }]));
+
+/**
  * `fields`: the fields with each local fact in normal form, which is the
- * `seq` of the entry it names. `no-item` and `fact-mismatch` carry the
- * foreign facts read before them, so an entry that records that refusal
- * records them (section 9.2).
+ * `seq` of the entry it names. `no-item`, `fact-mismatch` and `bad-field`
+ * carry the foreign facts read before them, so an entry that records that
+ * refusal records them (section 9.2).
  */
 export type Facts =
   | { result: "read"; fields: Record<string, FieldValue>; facts: Map<Digest, Fetched>; uses: FactUse[] }
-  | { result: "no-item" | "fact-mismatch"; detail: string; uses: FactUse[] }
+  | { result: "no-item" | "fact-mismatch" | "bad-field"; detail: string; uses: FactUse[] }
   | { result: "unavailable" };
 
-/** The scope that judges an input, and its own history: what tells a local fact from a foreign one, and checks it. */
-export interface Local { at: ScopeRef; own?: Own | undefined }
+/** The scope that judges an input, its own history, and the texts that came with the input: what tells a local fact from a foreign one, and checks it. */
+export interface Local { at: ScopeRef; own?: Own | undefined; texts?: Texts | undefined }
 
 /** What a use records of a foreign entry: the entry by fact, and the digest of its canonical bytes (section 9.2). */
 export const useOf = (fact: FactRef, entry: Entry): FactUse => ({ fact, content: digestBytes(canonicalBytes(entry)) });
@@ -101,8 +131,14 @@ export const isEntryOf = (entry: Entry, fact: FactRef): boolean => entry.seq ===
 
 /**
  * What the fields name: local items, which must exist; foreign facts, which
- * must have been fetched; and local facts, which must be this scope's own
- * entries. In the byte order of the field names.
+ * must have been fetched; local facts, which must be this scope's own
+ * entries; and detached texts, which must have come with the input. In the
+ * byte order of the field names.
+ *
+ * Section 6.2, a detached text: the scope receives the bytes with the
+ * input, and checks them against the digest and the field's `max`. A
+ * mismatch is `bad-field`. With no word on the texts, the input is not
+ * judged.
  *
  * Section 6.2, a local fact: the scope checks that its own entry at that
  * `seq` has that hash. If it has not, the input is refused `fact-mismatch`.
@@ -126,6 +162,12 @@ export function readFacts(view: StateView, types: ActType["fields"], fields: Rea
     if (!declared) continue;
     for (const [type, value] of leaves(declared, fields[name]!)) {
       if (type.type === "item" && view.item(value as number)?.type !== type.of) return { result: "no-item", detail: `${name} names no ${type.of}`, uses };
+      if (type.type === "text" && type.detached) {
+        if (!local.texts) return { result: "unavailable" };
+        const size = local.texts(value as Digest);
+        if (size === undefined) return { result: "bad-field", detail: `${name} names a text that did not come with the input, or whose bytes its digest does not name`, uses };
+        if (size !== null && size > type.max) return { result: "bad-field", detail: `${name} names a text of ${size} bytes; at most ${type.max}`, uses };
+      }
       if (type.type !== "fact") continue;
       const ref = value as FactRef;
       if (isLocalFact(ref, local.at)) {

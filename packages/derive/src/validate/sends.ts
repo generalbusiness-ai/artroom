@@ -7,7 +7,7 @@ import { isObject, own } from "../values.ts";
 import { subject, type ClauseSet, type Ctx, type Defining, type Duties, type Type } from "./context.ts";
 import { effects } from "./effects.ts";
 import { guards, range } from "./guards.ts";
-import { operand } from "./operands.ts";
+import { isDetached, operand } from "./operands.ts";
 import { at, type Rec } from "./shape.ts";
 import { RECORD_BYTES, stated } from "./sizes.ts";
 
@@ -29,9 +29,14 @@ function ranged(d: Defining, v: unknown, path: string, ctx: Ctx): { type: Type; 
  * `collect`. A slot with no `of` is a slot of the primary item. Returns the
  * type of its value when the definition states it. Null: it is not a source
  * here, which is reported.
+ *
+ * `lane`: the message goes to a lane. Section 6.2: a send to a scope of
+ * another kind, and an `index` send, read no detached text. A message to a
+ * lane carries the digest, and the receiver reads the bytes from the sender.
  */
-function source(d: Defining, v: unknown, path: string, ctx: Ctx, field: boolean): { type: FieldType | null } | null {
+function source(d: Defining, v: unknown, path: string, ctx: Ctx, field: boolean, lane = false): { type: FieldType | null } | null {
   const { bounds, bad, rec, entries } = d;
+  const redactable = () => bad("redactable-read", path, "reads a detached text, which only a message to a lane carries");
   if (v === "self") return { type: null };
   if (isObject(v) && "collect" in v) {
     const c = field ? rec(v, path, ["collect"]) : bad("shape", path, "a collect is a field of a send");
@@ -42,13 +47,16 @@ function source(d: Defining, v: unknown, path: string, ctx: Ctx, field: boolean)
     if (items && !items.live) bad("bound", at(at(path, "collect"), "items"), "a collect reads live items only: its range lists no final state");
     for (const [name, member] of entries(r["fields"], at(at(path, "collect"), "fields"), bounds.sendFields)) {
       if (items && !(member === "item" || member === "state" || (typeof member === "string" && items.type.slots.has(member)))) bad("name", at(at(at(path, "collect"), "fields"), name), `is item, state or a slot of ${items.type.name}`);
+      if (!lane && items && typeof member === "string" && isDetached(items.type.slots.get(member)?.type)) redactable();
     }
     return { type: null };
   }
-  const read = operand(d, v, path, ctx, () => ctx.on ?? bad("name", path, "there is no primary item whose slot this could be"), false);
+  const read = operand(d, v, path, ctx, () => ctx.on ?? bad("name", path, "there is no primary item whose slot this could be"), false, true);
+  if (read && isDetached(read.type) && !lane) return redactable();
   return read && { type: read.type };
 }
-const sources = (d: Defining, v: unknown, path: string, ctx: Ctx) => { for (const [name, s] of d.entries(v, path, d.bounds.sendFields)) source(d, s, at(path, name), ctx, true); };
+/** The fields of one message. `lane`: the message goes to a lane, so a field may carry a detached text. */
+const sources = (d: Defining, v: unknown, path: string, ctx: Ctx, lane: boolean) => { for (const [name, s] of d.entries(v, path, d.bounds.sendFields)) source(d, s, at(path, name), ctx, true, lane); };
 
 /** True when a result clause list is written with an effect. */
 const hasClause = (result: unknown): boolean => isObject(result) && Object.values(result).some((e) => Array.isArray(e) && e.length > 0);
@@ -113,7 +121,7 @@ export function sends(d: Defining, v: unknown, path: string, ctx: Ctx, top: Rec,
       if (!isScopeKind(r["kind"])) bad("shape", at(p, "kind"), "is not a scope kind");
       // Section 6.6: a definition cannot hold its own digest, so `self` names the creating scope's own pinned definition.
       if (r["definition"] !== "self" && !isDigest(r["definition"]) && !isPlatformDefinition(r["definition"])) bad("shape", at(p, "definition"), "is a definition digest, a platform definition, or self");
-      sources(d, r["fields"], at(p, "fields"), ctx);
+      sources(d, r["fields"], at(p, "fields"), ctx, r["kind"] === "lane");
       requests.push({ most: 1, clauses: clauses(d, r["result"], at(p, "result"), ctx, true) });
       [kind, result] = [[k, r["kind"], r["definition"]], r["result"]];
     } else if (k === "tell") {
@@ -124,7 +132,7 @@ export function sends(d: Defining, v: unknown, path: string, ctx: Ctx, top: Rec,
       if (to && to.type?.type !== "scope") bad("name", at(p, "to"), "names no slot that holds a scope");
       str(r["message"], at(p, "message"));
       condition(d, r, p, ctx);
-      sources(d, r["fields"], at(p, "fields"), ctx);
+      sources(d, r["fields"], at(p, "fields"), ctx, to?.type?.type === "scope" && to.type.kind === "lane");
       requests.push({ most: 1, clauses: clauses(d, r["result"], at(p, "result"), ctx, false) });
       [kind, result, always] = [[k, r["message"]], r["result"], !("if" in r) && alsoRead(r["to"]).length === 0];
     } else if (k === "relate") {
@@ -145,7 +153,7 @@ export function sends(d: Defining, v: unknown, path: string, ctx: Ctx, top: Rec,
       str(r["name"], at(p, "name"));
       str(r["state"], at(p, "state"));
       condition(d, r, p, within);
-      sources(d, r["detail"], at(p, "detail"), within);
+      sources(d, r["detail"], at(p, "detail"), within, to?.type?.type === "scope" && to.type.kind === "lane");
       // Section 6.6: a clause of a fan-out send may read `each`, the item of that send. The entry records the item of each update and
       // nothing else of the range. So `each` is found again, when the result is recorded, only where the update's `item` is `each`.
       requests.push({ most: Number.isFinite(max) ? max : 0, clauses: clauses(d, r["result"], at(p, "result"), each && canonicalize(r["item"]) === canonicalize({ item: "each" }) ? within : ctx, false) });
@@ -158,7 +166,7 @@ export function sends(d: Defining, v: unknown, path: string, ctx: Ctx, top: Rec,
       }
     } else {
       const r = rec(x, p, ["fields"]);
-      if (r) sources(d, r["fields"], at(p, "fields"), ctx);
+      if (r) sources(d, r["fields"], at(p, "fields"), ctx, false);
     }
     most += made;
     if (problems.length !== before) return;

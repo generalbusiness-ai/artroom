@@ -113,6 +113,8 @@ export interface LogPage { scope: ScopeRef; definition: Digest | PlatformDefinit
  * `entry`: a foreign entry of some `uses`, under its content digest, with
  * `under`, the name of the definition its scope pins, as the fetcher
  * recorded it. `rule`: the input of one rule evaluation, under its digest.
+ * `text`: a detached text, as one JSON string, under its digest in the
+ * domain `artroom-text-1`, until a `redact` effect removes it (section 6.6).
  * `bytes` is canonical JSON text.
  */
-export interface RetainedInput { kind: "definition" | "entry" | "rule"; digest: Digest; bytes: string; under?: string }
+export interface RetainedInput { kind: "definition" | "entry" | "rule" | "text"; digest: Digest; bytes: string; under?: string }

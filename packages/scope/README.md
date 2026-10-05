@@ -25,14 +25,14 @@ what a judge drafts, in one storage transaction for each entry.
 |---|---|
 | `store` | `Store`: the storage the core needs. It is derive's `StateView` and `StateWriter`, with `transaction`, `append` (an entry and the row of each send), `retain`, and bounded reads of entries, retained inputs and duties. |
 | `sqlite` | `SqliteStore`, the one implementation, over `Sql`: `exec` and `transaction`, which a Durable Object's `ctx.storage.sql.exec` and `ctx.storage.transactionSync` satisfy. It keeps nothing in memory but the list of indexed slots. |
-| `ports` | `Clock`, `Random`, `Authority`, `Resolver`, `Rules`, `Alarm`, `Definitions`, `Readers`, and `production()`, their defaults. |
+| `ports` | `Clock`, `Random`, `Authority`, `Resolver`, `Rules`, `Alarm`, `Definitions`, `SentTexts`, `Readers`, and `production()`, their defaults. |
 | `definitions` | `creates(declared)`: the digests a declaration names in its `create` sends. `namedBy(root, read, validate, limit)`: the declarations a scope retains for its children. |
 | `turn` | `Turns.run(waiting, founding?)`: section 5.2, steps 3 to 7, and section 5.3. `isSigned` and `fetchFacts`: step 1. `Waiting`, `Verdict`, `End`. |
 | `core` | `Scope`: `found`, `submit`, `settle`, `alarm`, `checkpoint`, `pinned`. `receiptOf`. The answers `Founded` and `Checkpointed`. |
 | `reads` | `Reads`: `summary`, `items`, `history`, `entry`, `outbox`, and `duty`, one send's row. For a verifier: `log`, a history page as stored bytes, and `retained`, one retained input. `ReadBounds` and `READ_BOUNDS`. |
 | `delivery` | `Deliveries.deliver(envelope)`: receiving. It reads the source entry through the resolver, checks it against the fact's hash, and runs derive's delivery judge, or its genesis judge for a `create` that reaches an empty store, in the scope's turn. It answers as transport does: `recorded` with a fact, `retry`, `routing` or `source-unverified`. |
 | `outbox` | `Dispatcher.run()`: sending. One pass at a time over the sends that are due: a durable record before each dispatch and after its answer, a retry delay that doubles, and a `diagnosis` input through the turn when a request is given up. `Wakes`: one alarm for the earliest deadline and the next dispatch. |
-| `namespace` | `namespace(binding)`: the production `Resolver`, `Transport` and `Definitions`, each one RPC call on the object a scope ID names. `routed`: the resolver of a name, which refuses a wrong address before any judgment. `sourced`: the answer to a read of one entry. `declaredBy`: the answer to a read of one retained declaration. |
+| `namespace` | `namespace(binding)`: the production `Resolver`, `Transport`, `Definitions` and `SentTexts`, each one RPC call on the object a scope ID names. `routed`: the resolver of a name, which refuses a wrong address before any judgment. `sourced`: the answer to a read of one entry. `declaredBy`: the answer to a read of one retained declaration. `sentText`: the answer to a read of one detached text that a send of this scope names. |
 | `object` | `ScopeObject`: the Durable Object class. It wires the store, the ports, the core, receiving, the dispatcher and the reads, and exposes them over RPC: `found`, `submit`, `settle`, `checkpoint`, the reads, `deliver`, `source`, `declared` and `dispatch`. Its `alarm()` runs the alarm's turn and then a dispatch pass. With no transport, which is its default, nothing is dispatched. |
 | `worker` (its own entry, `@generalbusiness/artroom-scope/worker`) | `route(request, binding)`: the HTTP routes. `ScopeService`: the same operations over a service binding; it implements the contract's `ScopeApi`, which a client's transport also is. `DeployedScope`: the object class with the namespace as its resolver, its transport and its source of declarations. `api(binding)`: what both call. The default export is the deployed Worker. |
 
@@ -54,6 +54,7 @@ can hold back or make lose an answer. The main entry and `worker.ts` do not impo
 | `Rules` | The results of prepared rule inputs. | Derive's evaluator, `evaluateRules`. |
 | `Alarm` | The next wake time. | In `production()`, nothing. `ScopeObject` supplies the object's own alarm. |
 | `Definitions` | A declaration by digest or platform name, from the scope that retains it. | A platform name is `unsupported-definition`. A digest is unavailable. `DeployedScope` supplies the namespace, which reads a child's declaration from its creator. |
+| `SentTexts` | A detached text that a delivered message names by digest, from the scope that sent the message. | Unavailable: a delivery that names one is not decided. `DeployedScope` supplies the namespace, which reads the text from the sender. |
 | `Readers` | Whether a reader may make a read. | Nobody may: every read is `forbidden`. |
 
 So a deployed scope can be founded and can create children, and then
@@ -184,8 +185,8 @@ the contract's own answer.
 
 | Route | Answer | Status |
 |---|---|---|
-| `POST /v1/scopes`, body `{ founding, definition, definitions? }` | `Founded` | 201 accepted; 422 refused; 503 unavailable |
-| `POST /v1/scopes/:scope/acts`, body `{ signed, grants }` | `Answer` | 200 accepted; 403 refused `unauthorized`; 422 refused otherwise; 409 mismatch; 503 unavailable |
+| `POST /v1/scopes`, body `{ founding, definition, definitions?, texts? }` | `Founded` | 201 accepted; 422 refused; 503 unavailable |
+| `POST /v1/scopes/:scope/acts`, body `{ signed, grants, texts?, presented? }`. `texts`: each detached text that a field of the intent names by digest. `presented`: the facts presented beside the intent, by name | `Answer` | 200 accepted; 403 refused `unauthorized`; 422 refused otherwise; 409 mismatch; 503 unavailable |
 | `POST /v1/scopes/:scope/settle`, body `{ signed }` | `Settlement` | as a read |
 | `GET /v1/scopes/:scope` | The summary | 200; 404 `not-found`; 403 `forbidden`; 409 `wrong-incarnation`, `scope-provisional`; 413 `too-large`; 501 `unsupported-definition`; 503 otherwise |
 | `GET /v1/scopes/:scope/items/:type?cursor=` | A page of retained final items | as above |
@@ -194,7 +195,7 @@ the contract's own answer.
 | `GET /v1/scopes/:scope/outbox?cursor=` | A page of the outbox | as above |
 | `GET /v1/scopes/:scope/outbox/:duty` | The outbox status of one send, by its duty ID | as above |
 | `GET /v1/scopes/:scope/log?cursor=` | A page of the history as stored: each entry's canonical bytes and hash, for a verifier | as above |
-| `GET /v1/scopes/:scope/retained/:kind/:digest` | One retained input: a `definition`, an `entry` or a `rule` input, by digest | as above; 413 past 1 MiB |
+| `GET /v1/scopes/:scope/retained/:kind/:digest` | One retained input: a `definition`, an `entry`, a `rule` input or a detached `text`, by digest. A text that was redacted is `not-found` | as above; 413 past 1 MiB |
 
 A body is at most 1 MiB of bytes, counted while it is read: a larger body
 is cancelled and is not held. A body over that, or one that is not a JSON

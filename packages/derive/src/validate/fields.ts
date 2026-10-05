@@ -24,7 +24,8 @@ const FIELD_SHAPES: Readonly<Record<string, readonly string[]>> = {
  */
 export function assignable(from: FieldType, to: FieldType): boolean {
   switch (from.type) {
-    case "text": return to.type === "text" && from.max <= to.max;
+    // A detached text is held as its digest, and a plain one as its bytes: neither is a value of the other.
+    case "text": return to.type === "text" && from.max <= to.max && (from.detached === true) === (to.detached === true);
     case "int": return to.type === "int" && from.min >= to.min && from.max <= to.max;
     case "enum": return to.type === "enum" && from.of.every((v) => to.of.includes(v));
     case "item": return to.type === "item" && from.of === to.of;
@@ -41,17 +42,29 @@ export function assignable(from: FieldType, to: FieldType): boolean {
   }
 }
 
-/** One field type. `extra`: the members a field or a slot may carry beside its type. Null: it is not one, which is reported. */
-export function fieldType(d: Defining, v: unknown, path: string, extra: readonly string[] = [], nested = false): FieldType | null {
+/**
+ * One field type. `extra`: the members a field or a slot may carry beside
+ * its type. `detachable`: the type is that of a field of an act or of a
+ * message, or of a value slot, which are the places a detached text is held
+ * (section 6.2). Null: it is not one, which is reported.
+ */
+export function fieldType(d: Defining, v: unknown, path: string, extra: readonly string[] = [], nested = false, detachable = false): FieldType | null {
   const { bounds, problems, bad, rec, str, int } = d;
   const before = problems.length;
   const keys = isObject(v) && typeof v["type"] === "string" ? own(FIELD_SHAPES, v["type"]) : undefined;
   if (!keys) return bad("shape", path, "must be a field type");
-  const o = rec(v, path, ["type", ...keys], extra);
+  const o = rec(v, path, ["type", ...keys], (v as Rec)["type"] === "text" ? [...extra, "detached"] : extra);
   if (!o) return null;
   switch (o["type"]) {
     case "text":
       if ((int(o["max"], at(path, "max")) ?? 0) > bounds.textBytes) bad("bound", at(path, "max"), `at most ${bounds.textBytes} bytes`);
+      // Section 6.2: a detached text is held beside the input and named in it by digest. Its bytes are kept under that digest
+      // for the field or the slot that names it, so a value that nothing came with has none: it takes no default.
+      if ("detached" in o) {
+        if (o["detached"] !== true) bad("shape", at(path, "detached"), "is true, or is left out");
+        else if (!detachable) bad("shape", at(path, "detached"), "a detached text is a field of an act or of a message, or a value slot: not an element, a member or a reference");
+        else if ("default" in o) bad("shape", at(path, "default"), "a detached text has no default: no bytes would come with it");
+      }
       break;
     case "int":
       if (!Number.isSafeInteger(o["min"]) || !Number.isSafeInteger(o["max"]) || (o["min"] as number) > (o["max"] as number)) bad("shape", path, "min and max must be integers, min not above max");
@@ -120,7 +133,7 @@ export function declaredFields(d: Defining, v: unknown, path: string): Map<strin
   const fields = new Map<string, FieldType>();
   for (const [f, fv] of entries(v, path, null)) {
     const p = at(path, f);
-    const type = fieldType(d, fv, p, ["required", "default"]);
+    const type = fieldType(d, fv, p, ["required", "default"], false, true);
     if (!type) continue;
     const fo = fv as Rec;
     if (bool(fo["required"], at(p, "required")) === null) continue;

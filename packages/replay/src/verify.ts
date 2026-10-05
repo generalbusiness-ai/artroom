@@ -14,6 +14,11 @@
  * the entry records; and proves each foreign fact the entry used, by replay
  * of the source scope up to that entry or by an anchor the caller supplies.
  *
+ * A detached text is checked against the digest that names it. A text whose
+ * bytes are gone is reported as redacted when a later entry of the same
+ * scope is its tombstone, and is not derived again. With no tombstone the
+ * replay is `incomplete` (section 9.3).
+ *
  * It runs none of the runtime's code. The judges and the fold are the pure
  * functions the runtime also calls; the turn, the store and transport are
  * not here.
@@ -26,9 +31,9 @@
 
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { Bounds, Digest, Entry, FactRef, Head, PlatformDefinition, Report, RetainedInput, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
-import { canonicalize, definitionDigest, digestBytes, isDigest, isEntry, parseStrict, scopeIdOf, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
+import { canonicalize, definitionDigest, digestBytes, isDigest, isEntry, parseStrict, scopeIdOf, textDigest, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import {
-  MemoryState, applyEntry, clockOf, entryOf, isFactRef, isLocalId, isObject, isScopeRef, judgeAct, judgeCheckpoint, judgeDelivery, judgeDiagnosis, judgeGenesis, judgeOutcome, judgeTimed,
+  MemoryState, applyEntry, clockOf, entryOf, inputTexts, isFactRef, isLocalId, isObject, isScopeRef, judgeAct, judgeCheckpoint, judgeDelivery, judgeDiagnosis, judgeGenesis, judgeOutcome, judgeTimed,
   nextDue, timeMs, updateOf, validateDefinition,
 } from "@generalbusiness/artroom-derive";
 import type { ActJudgment, Clock, Fetched, Judgment, TimedJudgment, ValidDefinition } from "@generalbusiness/artroom-derive";
@@ -88,6 +93,7 @@ export const TRUSTS = {
   outcomes: "each outcome's evidence, and that the outside write happened",
   anchors: "each anchor as the caller supplied it, and the definition name retained with each anchored entry",
   bounds: "the bounds: each scope is taken to run under the bounds this replay was given",
+  redacted: "each redacted text: its bytes are gone, so nothing shows that they were the text its digest names, or that they were within the bound of their field",
 } as const;
 type Trust = keyof typeof TRUSTS;
 
@@ -133,6 +139,8 @@ interface Run {
   next: number | null;
   /** Being advanced now. A reference that needs a later entry of it is a circle (section 3). */
   busy: boolean;
+  /** Section 9.3: each detached text whose bytes are not at hand, with the entry that names it. A later tombstone of this scope answers for it. */
+  owed: { text: Digest; at: FactRef }[];
 }
 
 const sameScope = (a: ScopeRef, b: ScopeRef): boolean => a.scope === b.scope && a.inc === b.inc && a.kind === b.kind;
@@ -151,6 +159,8 @@ class Verifier {
   /** The foreign facts proven, by scope, position and hash: by replay of their source, or by an anchor. */
   readonly #proven = new Map<string, "replayed" | "anchored">();
   readonly #anchored: FactRef[] = [];
+  /** Each tombstone that answered for a text whose bytes are gone, with the slot that held the text. */
+  readonly #redacted: Report["redacted"][number][] = [];
   #entries = 0;
   #bytes = 0;
 
@@ -190,6 +200,7 @@ class Verifier {
       }
       const last = target.sealed[target.head.seq]!;
       if (last.hash !== target.head.hash) throw new Stop("mismatch", "the head the source states is not the hash of its last entry", { at: target.at!, seq: last.entry.seq, hash: last.hash });
+      await this.#settle();
     } catch (error) {
       if (!(error instanceof Stop)) throw error;
       stop = error;
@@ -210,6 +221,7 @@ class Verifier {
       anchors: this.#anchored,
       dependencies: { verified: proven.filter((how) => how === "replayed").length, anchored: proven.filter((how) => how === "anchored").length, missing: stop?.missing ? [stop.missing] : [] },
       trusts: (Object.keys(TRUSTS) as Trust[]).filter((trust) => this.#trusts.has(trust)).map((trust) => TRUSTS[trust]),
+      redacted: this.#redacted,
       result: stop ? stop.result : "consistent",
       ...(stop?.at ? { at: stop.at } : {}),
     };
@@ -223,7 +235,7 @@ class Verifier {
     if (this.#runs.size >= this.#limits.scopes) throw new Stop("incomplete", `the limit of ${this.#limits.scopes} scopes was reached`);
     const got = await this.#page(id, 0);
     if (!got.ok) return null;
-    const run: Run = { id, said: got.page.scope, head: got.page.head, at: null, named: null, definition: null, state: new MemoryState(), sealed: [], read: new Map(), next: 0, busy: false };
+    const run: Run = { id, said: got.page.scope, head: got.page.head, at: null, named: null, definition: null, state: new MemoryState(), sealed: [], read: new Map(), next: 0, busy: false, owed: [] };
     if (!this.#take(run, 0, got.page.entries, got.page.next)) return null;
     this.#runs.set(id, run);
     return run;
@@ -284,6 +296,47 @@ class Verifier {
     }
     this.#count(got.bytes);
     return got.input;
+  }
+
+  /**
+   * Section 9.3: a detached text that an entry names, checked against its
+   * digest. Returns the number of UTF-8 bytes of the text. Null: the scope
+   * holds no bytes under that digest, or holds bytes that are not that
+   * text. Such a text is owed until a tombstone answers for it.
+   */
+  async #text(run: Run, digest: Digest): Promise<number | null> {
+    const left = this.#limits.bytes - this.#bytes;
+    const got = await this.#source.retained(run.id, "text", digest, { bytes: Math.min(left, RETAINED_REPLY_BYTES) });
+    if (!got.ok) {
+      this.#unread(got.reason, left < RETAINED_REPLY_BYTES, `a retained input of ${run.id}`);
+      return null;
+    }
+    this.#count(got.bytes);
+    try {
+      const text: unknown = parseStrict(got.input.bytes);
+      return typeof text === "string" && textDigest(text) === digest ? utf8(text).length : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Section 9.3: a text whose bytes are gone is redacted when a tombstone of
+   * its scope lists it, and is otherwise a missing retained input. A source
+   * scope is checked only as far as a reference needs, and its tombstone may
+   * come later, so its history is read on to its head before the answer.
+   */
+  async #settle(): Promise<void> {
+    for (const run of [...this.#runs.values()]) {
+      if (run.owed.length === 0) continue;
+      try {
+        await this.#advance(run, run.head.seq, 0);
+      } catch (error) {
+        if (!(error instanceof Gap)) throw error;
+      }
+      const owed = run.owed[0];
+      if (owed) throw new Stop("incomplete", `a retained input is missing: the detached text ${owed.text}, which no later entry of ${run.id} redacts`, owed.at);
+    }
   }
 
   #count(bytes: number): void {
@@ -500,8 +553,16 @@ class Verifier {
     // The judgment, derived again on the entry's recorded time. A clamped entry was judged on a reading behind its history
     // (section 5.3): the reading is not recorded, and an entry that judges time is never written clamped.
     const clock: Clock = entry.clamped ? { reading: entry.time, behind: true, asOf: entry.time } : clockOf(state, entry.time);
+    // Section 9.3: each detached text that the input names, against its digest. One whose bytes are gone is not asked for again
+    // by the judge: it is owed, and a tombstone must answer for it.
+    const texts = new Map<Digest, number | null>();
+    for (const text of inputTexts(definition, input)) {
+      const size = await this.#text(run, text);
+      texts.set(text, size);
+      if (size === null) run.owed.push({ text, at: where });
+    }
     // Section 6.2: a local fact, and a part of one, are read from this scope's own history: the entries checked so far.
-    const reading = { clock, bounds, facts, prepared: entry.prepared, own: (at: number) => run.sealed[at] ?? null };
+    const reading = { clock, bounds, facts, prepared: entry.prepared, own: (at: number) => run.sealed[at] ?? null, texts: (digest: Digest) => texts.get(digest) ?? null };
     const copyOf = (fact: FactRef | null) => facts.find((f) => f.fact.hash === fact?.hash) ?? null;
     const own = (seq: unknown): Entry | null => (isLocalId(seq) ? (run.sealed[seq]?.entry ?? null) : null);
     let judged: ActJudgment | Judgment | TimedJudgment;
@@ -520,7 +581,7 @@ class Verifier {
       case "act":
         // Section 9.3: that a grant was fresh is not checked, beyond its recorded form. The authority port's verdict is trusted.
         this.#trusts.add("authority");
-        judged = judgeAct(state, definition, input.signed, { ...reading, grants: input.authority.map((grant) => ({ grant, current: true })) });
+        judged = judgeAct(state, definition, input.signed, { ...reading, presented: input.presented, grants: input.authority.map((grant) => ({ grant, current: true })) });
         break;
       case "delivery": {
         this.#trusts.add("delivered");
@@ -561,6 +622,16 @@ class Verifier {
     }
     if (canonicalize(derived) !== bytes) throw mismatch("the recorded entry is not the one derived again");
     applyEntry(state, definition, entry, hash);
+    // Section 9.3: this entry is the tombstone of each text that its `redact` effects list. The judge derived the list again from
+    // what the slot had held. A text that an earlier entry names, and whose bytes are gone, is reported as redacted.
+    for (const effect of entry.effects) {
+      if (effect.effect !== "redact") continue;
+      const answered = run.owed.filter((owed) => effect.texts.includes(owed.text));
+      if (answered.length === 0) continue;
+      run.owed = run.owed.filter((owed) => !answered.includes(owed));
+      this.#redacted.push({ tombstone: where, item: effect.item, slot: effect.slot });
+      this.#trusts.add("redacted");
+    }
   }
 }
 

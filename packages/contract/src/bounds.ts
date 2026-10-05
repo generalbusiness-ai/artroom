@@ -31,7 +31,7 @@ export interface Bounds {
   refs: number;                    // reference slots of one item type
   values: number;                  // value slots of one item type
   also: number;                    // other local items one act names
-  presents: number;                // facts presented beside one intent. No source reads a presented fact yet
+  presents: number;                // facts that one act declares it is presented beside its intent
   guards: number;                  // of one act or handler, as written; also the clauses of one `where`
   nestedGuards: number;            // of one act or handler, counting those nested in `each`, `has` and `anyOf`
   guardDepth: number;              // how deep a guard may be nested; a guard as written is at depth 1

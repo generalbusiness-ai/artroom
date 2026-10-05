@@ -107,7 +107,7 @@ export function judgeGenesis(view: StateView, definition: ValidDefinition, asked
   const read = given ? readFields(act.fields, given, bounds) : null;
   if (!read?.ok) return refuse({ code: "bad-field" });
   // A scope has no entry before its genesis, so a fact that names it names nothing: `fact-mismatch`.
-  const named = readFacts(view, act.fields, read.fields, source ? [...context.facts, source] : context.facts, { at, own: () => null });
+  const named = readFacts(view, act.fields, read.fields, source ? [...context.facts, source] : context.facts, { at, own: () => null, texts: context.texts });
   if (named.result === "unavailable") return { result: "unavailable", reason: "dependency-unavailable" };
   /** The source entry, then each named fact that was read. The source is recorded once. */
   const uses = [...sourceUse, ...named.uses.filter((u) => u.fact.hash !== source?.fact.hash)];

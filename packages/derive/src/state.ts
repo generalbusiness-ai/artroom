@@ -85,6 +85,7 @@ export interface StateSnapshot {
   decided: readonly Decided[];                                          // by source scope, incarnation, seq, n
   creations: readonly (readonly [seed: Digest, held: HeldCreation])[];  // by seed digest
   operations: readonly Operation[];                                     // by ID
+  texts: readonly (readonly [item: number, slot: string, texts: readonly Digest[]])[];   // by item, then slot; a slot that holds none is left out
 }
 
 /** The digest a checkpoint entry carries: SHA-256 of the snapshot's canonical JSON. */
@@ -123,6 +124,12 @@ export interface StateView {
   decided(from: ScopeRef, seq: number, n: number): Decided | null;
   creation(seed: Digest): HeldCreation | null;
   operation(id: OperationId): Operation | null;
+  /**
+   * The digests of the detached texts that a value slot of an item has held
+   * and that no entry has redacted, in the order in which the slot first
+   * held them (section 6.6). A `redact` effect lists exactly these.
+   */
+  texts(item: number, slot: string): readonly Digest[];
   /** How many duties are open, for the room they need to settle (section 9.2); see `Outstanding`. */
   outstanding(): Outstanding;
   /** Everything, for a checkpoint. This is the one read that is not bounded. */
@@ -140,6 +147,8 @@ export interface StateWriter extends StateView {
   putDecided(from: FactRef, n: number, by: number): void;
   putCreation(seed: Digest, held: HeldCreation): void;
   putOperation(operation: Operation): void;
+  /** The texts that a slot has held and that are not redacted. An empty list holds none. */
+  putTexts(item: number, slot: string, texts: readonly Digest[]): void;
 }
 
 type Key = readonly (string | number)[];
@@ -183,6 +192,7 @@ export class MemoryState implements StateWriter {
   readonly #decided = new Map<string, Decided>();
   readonly #creations = new Map<Digest, HeldCreation>();
   readonly #operations = new Map<OperationId, Operation>();
+  readonly #texts = new Map<string, readonly [number, string, readonly Digest[]]>();
 
   scope() { return this.#scope; }
   item(id: number) { return this.#items.get(id) ?? null; }
@@ -208,6 +218,7 @@ export class MemoryState implements StateWriter {
   decided(from: ScopeRef, seq: number, n: number) { return this.#decided.get(key(from.scope, from.inc, seq, n)) ?? null; }
   creation(seed: Digest) { return this.#creations.get(seed) ?? null; }
   operation(id: OperationId) { return this.#operations.get(id) ?? null; }
+  texts(item: number, slot: string) { return this.#texts.get(key(item, slot))?.[2] ?? []; }
   outstanding(): Outstanding {
     const open = [...this.#requests.values()].filter((r) => r.result === null);
     const attempts = [...this.#operations.values()].flatMap((o) => o.attempts);
@@ -238,6 +249,10 @@ export class MemoryState implements StateWriter {
   putDecided(from: FactRef, n: number, by: number) { this.#decided.set(key(from.at.scope, from.at.inc, from.seq, n), { from: { scope: from.at.scope, inc: from.at.inc }, seq: from.seq, hash: from.hash, n, by }); }
   putCreation(seed: Digest, held: HeldCreation) { this.#creations.set(seed, held); }
   putOperation(operation: Operation) { this.#operations.set(operation.id, operation); }
+  putTexts(item: number, slot: string, texts: readonly Digest[]) {
+    if (texts.length === 0) this.#texts.delete(key(item, slot));
+    else this.#texts.set(key(item, slot), [item, slot, texts]);
+  }
 
   all(): StateSnapshot {
     const sorted = <T>(values: Iterable<T>, of: (value: T) => Key) => [...values].sort((a, b) => keyOrder(of(a), of(b)));
@@ -251,6 +266,7 @@ export class MemoryState implements StateWriter {
       decided: sorted(this.#decided.values(), (d) => [d.from.scope, d.from.inc, d.seq, d.n]),
       creations: sorted(this.#creations.entries(), ([seed]) => [seed]),
       operations: sorted(this.#operations.values(), (o) => [o.id]),
+      texts: sorted(this.#texts.values(), ([item, slot]) => [item, slot]),
     };
   }
   /** The snapshot as one canonical text, to compare two states. */

@@ -22,6 +22,7 @@ import type { Item } from "./state.ts";
 import { LAST_MS, timeMs, timeOf } from "./time.ts";
 import { unsupported } from "./unsupported.ts";
 import { isFactRef, isLocalId, isMemberRef, isValue, memberFits, own, same } from "./values.ts";
+import { isDigest } from "@generalbusiness/artroom-bytes";
 
 /**
  * What a derivation gives: its result, a refusal, or `unavailable`. The last
@@ -240,6 +241,15 @@ export function deriveEffects(j: Judging, forms: readonly EffectForm[], attentio
         if (listed(slot).length >= most(slot)) return refuse("slot-full", `effects.${i}: ${slot}`);
         apply(subject, { effect: "list", item: id, slot, change: "add", member: one });
       }
+    } else if ("redact" in form) {
+      // Section 6.6: the bytes of every text the slot has held are removed: each digest that the scope keeps for the slot, and the
+      // one an earlier effect of this entry put there. The effect records those digests, and its entry is the tombstone. The
+      // slot keeps its digest. With no text to remove the effect would change nothing, and is not recorded.
+      const { slot } = form.redact;
+      const texts = [...j.view.texts(id, slot)];
+      const now = own(working.get(subject)!.values, slot);
+      if (isDigest(now) && now !== own(was?.values, slot) && !texts.includes(now)) texts.push(now);
+      if (texts.length > 0) effects.push({ effect: "redact", item: id, slot, texts });
     } else if (!("hold" in form)) return unsupported("that effect");
     else {
       // Section 6.8: the hold capability's effect on the hold item.

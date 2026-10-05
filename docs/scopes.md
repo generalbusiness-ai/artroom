@@ -359,7 +359,7 @@ a cursor `next` when there is more; or a refusal with a reason.
 | `outbox` | A page of the scope's sends, with the attempts and result of each. |
 | `duty` | The outbox row of one send, by its duty ID. |
 | `log` | A page of the history as stored: each entry's canonical bytes. For a verifier. |
-| `retained` | One retained input, by kind and digest: a definition, a foreign entry, or a rule's input. |
+| `retained` | One retained input, by kind and digest: a definition, a foreign entry, a rule's input, or a detached text until it is redacted. |
 
 **Settlement** answers one question: was this exact signed intent
 accepted? `settle` returns its receipt or `not-found`. It writes nothing.

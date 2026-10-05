@@ -15,10 +15,10 @@
  */
 
 import type {
-  Answer, Cursor, DeclaredDefinition, Digest, Duty, DutyId, Entry, Founded, Grant, Head, Item, PlatformDefinition, Read, ReadRefusal, Receipt, ScopeApi, ScopeId, Sealed, Settlement,
+  Answer, Beside, Cursor, DeclaredDefinition, Digest, Duty, DutyId, Entry, Founded, Grant, Head, Item, PlatformDefinition, Read, ReadRefusal, Receipt, ScopeApi, ScopeId, Sealed, Settlement,
   SignedIntent, Summary,
 } from "@generalbusiness/artroom-contract";
-import { definitionDigest, entryHash, isDigest, parseStrict } from "@generalbusiness/artroom-bytes";
+import { definitionDigest, entryHash, isDigest, parseStrict, textDigest } from "@generalbusiness/artroom-bytes";
 
 /** How a handle reaches a scope service: the contract's `ScopeApi`. `http.ts` and `binding.ts` each make one. */
 export type Transport = ScopeApi;
@@ -50,8 +50,13 @@ export class ScopeHandle {
     this.#reader = reader;
   }
 
-  /** Submit a signed intent, with the grants it is presented under. See "Retrying" above. */
-  submit(signed: SignedIntent, grants: readonly Grant[] = []): Promise<Answer> { return this.#transport.submit(this.scope, signed, grants); }
+  /**
+   * Submit a signed intent, with the grants it is presented under. `beside`:
+   * what travels beside the intent and is not signed: each detached text
+   * that a field names by its digest, and each fact the act is presented.
+   * A retry sends the same `beside`. See "Retrying" above.
+   */
+  submit(signed: SignedIntent, grants: readonly Grant[] = [], beside: Beside = {}): Promise<Answer> { return this.#transport.submit(this.scope, signed, grants, beside); }
 
   /** The receipt of an accepted act, by its exact signed intent, or `not-found` (section 4.2). It admits nothing. */
   settle(signed: SignedIntent): Promise<Settlement> { return this.#transport.settle(this.scope, signed); }
@@ -107,6 +112,22 @@ export class ScopeHandle {
     return { ok: true, at: read.at, entry };
   }
 
+  /**
+   * A detached text, by the digest that an entry or a slot holds for it
+   * (section 6.2). The scope retains the text as one JSON string, and the
+   * digest is computed here again. `not-found`: the scope holds no bytes
+   * under that digest, as after a redaction.
+   */
+  async text(digest: Digest): Promise<Read<string>> {
+    const kept = await this.#transport.retained(this.scope, this.#reader, "text", digest);
+    if (!kept.ok) return kept;
+    try {
+      const text: unknown = parseStrict(kept.value.bytes);
+      if (typeof text === "string" && textDigest(text) === digest) return { ok: true, at: kept.at, value: text, complete: true };
+    } catch { /* not canonical values */ }
+    return { ok: false, reason: "unavailable" };
+  }
+
   /** Follow a duty: the outbox status of one send, by the duty ID a receipt lists. */
   followDuty(duty: DutyId): Promise<Read<Duty>> { return this.#transport.duty(this.scope, this.#reader, duty); }
 }
@@ -115,11 +136,12 @@ export class ScopeHandle {
  * Found a repository's directory (section 7.1), and take a handle on it when
  * the founding is accepted. `definitions`: the declarations the directory's
  * definition names in `create` sends, which the directory retains for its
- * children. A founding is retried with the same signed intent, like an act.
+ * children. `beside`: the detached texts that the founding intent's fields
+ * name. A founding is retried with the same signed intent, like an act.
  */
 export async function found(
-  transport: Transport, founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions: readonly DeclaredDefinition[] = [], reader: unknown = null,
+  transport: Transport, founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions: readonly DeclaredDefinition[] = [], reader: unknown = null, beside: Beside = {},
 ): Promise<{ answer: Founded; scope: ScopeHandle | null }> {
-  const answer = await transport.found(founding, definition, definitions);
+  const answer = await transport.found(founding, definition, definitions, beside);
   return { answer, scope: answer.answer === "accepted" ? new ScopeHandle(transport, answer.receipt.fact.at.scope, reader) : null };
 }

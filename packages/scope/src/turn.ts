@@ -297,8 +297,8 @@ export class Turns {
   /**
    * Step 6.5, inside the commit's transaction: the entry at this head and
    * this reading, its hash, its row, the rows of its sends, its retained
-   * inputs, and the fold. `applyEntry` is the only code that changes folded
-   * state.
+   * inputs, the fold, and the removal of each text the entry redacts.
+   * `applyEntry` is the only code that changes folded state.
    */
   #seal(definition: ValidDefinition, draft: Draft, clock: Reading, retain: readonly Retained[]): Sealed {
     const entry = entryOf(this.#store, draft, clock);
@@ -315,6 +315,8 @@ export class Turns {
     this.#store.append(entry, hash, bytes, size);
     for (const input of retain) this.#store.retain(input);
     applyEntry(this.#store, definition, entry, hash);
+    // Section 6.6: a redaction removes the bytes of each text it lists from the retained inputs, in the commit that seals its tombstone.
+    for (const effect of entry.effects) if (effect.effect === "redact") for (const text of effect.texts) this.#store.forget("text", text);
     return { entry, hash };
   }
 

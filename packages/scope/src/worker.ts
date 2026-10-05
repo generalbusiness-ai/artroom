@@ -20,8 +20,8 @@
  *
  * | Route | Operation |
  * |---|---|
- * | `POST /v1/scopes` | Found a directory. Body `{ founding, definition, definitions? }`. |
- * | `POST /v1/scopes/:scope/acts` | Submit an act. Body `{ signed, grants }`. |
+ * | `POST /v1/scopes` | Found a directory. Body `{ founding, definition, definitions?, texts? }`. |
+ * | `POST /v1/scopes/:scope/acts` | Submit an act. Body `{ signed, grants, texts?, presented? }`. `texts`: each detached text that a field names by digest. `presented`: the facts presented beside the intent, by name. |
  * | `POST /v1/scopes/:scope/settle` | The receipt of an accepted act. Body `{ signed }`. |
  * | `GET /v1/scopes/:scope` | The summary. |
  * | `GET /v1/scopes/:scope/items/:type?cursor=` | A page of retained final items. |
@@ -30,14 +30,14 @@
  * | `GET /v1/scopes/:scope/outbox?cursor=` | A page of the outbox. |
  * | `GET /v1/scopes/:scope/outbox/:duty` | The outbox status of one send. |
  * | `GET /v1/scopes/:scope/log?cursor=` | A page of the history as stored: each entry's canonical bytes. |
- * | `GET /v1/scopes/:scope/retained/:kind/:digest` | One retained input. |
+ * | `GET /v1/scopes/:scope/retained/:kind/:digest` | One retained input. The kind `text` is a detached text, until it is redacted. |
  *
  * A reader presents itself in the `Authorization` header. What it must be is
  * the authority note's; the production readers port lets nobody read.
  */
 
 import { WorkerEntrypoint } from "cloudflare:workers";
-import type { Answer, Cursor, DeclaredDefinition, Digest, DutyId, Grant, LogPage, PlatformDefinition, Read, ReadRefusal, RetainedInput, ScopeApi, ScopeId, Seed, Settlement, SignedIntent } from "@generalbusiness/artroom-contract";
+import type { Answer, Beside, Cursor, DeclaredDefinition, Digest, DutyId, Grant, LogPage, PlatformDefinition, Read, ReadRefusal, RetainedInput, ScopeApi, ScopeId, Seed, Settlement, SignedIntent } from "@generalbusiness/artroom-contract";
 import { definitionDigest, intentDigest, isScopeId, positionOf, scopeIdOf } from "@generalbusiness/artroom-bytes";
 import { isObject, type Item } from "@generalbusiness/artroom-derive";
 import type { Founded } from "./core.ts";
@@ -51,8 +51,8 @@ export interface Env { SCOPES: DurableObjectNamespace }
 
 /** A scope's surface as a caller over RPC has it. */
 interface Remote {
-  found(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions?: readonly DeclaredDefinition[]): Promise<Founded>;
-  submit(signed: SignedIntent, grants: readonly Grant[]): Promise<Answer>;
+  found(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions?: readonly DeclaredDefinition[], beside?: Beside): Promise<Founded>;
+  submit(signed: SignedIntent, grants: readonly Grant[], beside?: Beside): Promise<Answer>;
   settle(signed: SignedIntent): Promise<Settlement>;
   summary(reader: unknown): Promise<Read<Summary>>;
   items(reader: unknown, type: string, cursor?: Cursor): Promise<Read<readonly Item[]>>;
@@ -76,8 +76,9 @@ export function api(binding: Binding): ScopeApi {
      * that name checks both again. `definition` is a declaration, or the
      * digest or platform name of one. `definitions`: the declarations it
      * names in `create` sends, which the directory retains for its children.
+     * `beside`: the detached texts that the founding intent's fields name.
      */
-    async found(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions: readonly DeclaredDefinition[] = []): Promise<Founded> {
+    async found(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions: readonly DeclaredDefinition[] = [], beside: Beside = {}): Promise<Founded> {
       let name: ScopeId;
       try {
         const seed: Seed = { v: 1, kind: "directory", definition: typeof definition === "string" ? definition : definitionDigest(definition), creator: null, cause: intentDigest(founding.intent), ordinal: 0 };
@@ -85,9 +86,9 @@ export function api(binding: Binding): ScopeApi {
       } catch {
         return { answer: "refused", reason: "source-unverified" };   // not values that have canonical bytes
       }
-      return at(name)!.found(founding, definition, definitions);
+      return at(name)!.found(founding, definition, definitions, beside);
     },
-    async submit(scope: string, signed: SignedIntent, grants: readonly Grant[]): Promise<Answer> { return (await at(scope)?.submit(signed, grants)) ?? { answer: "unavailable", reason: "unavailable" }; },
+    async submit(scope: string, signed: SignedIntent, grants: readonly Grant[], beside: Beside = {}): Promise<Answer> { return (await at(scope)?.submit(signed, grants, beside)) ?? { answer: "unavailable", reason: "unavailable" }; },
     async settle(scope: string, signed: SignedIntent): Promise<Settlement> { return (await at(scope)?.settle(signed)) ?? MISSING; },
     async summary(scope: string, reader: unknown): Promise<Read<Summary>> { return (await at(scope)?.summary(reader)) ?? MISSING; },
     async items(scope: string, reader: unknown, type: string, cursor?: Cursor): Promise<Read<readonly Item[]>> { return (await at(scope)?.items(reader, type, cursor)) ?? MISSING; },
@@ -171,8 +172,10 @@ export async function route(request: Request, binding: Binding): Promise<Respons
   if (posts) {
     const given = await body(request);
     if (!given) return json(400, { error: "bad-request" });
-    if (scope === undefined) return answered(await scopes.found(given["founding"] as SignedIntent, given["definition"] as DeclaredDefinition, (given["definitions"] ?? []) as DeclaredDefinition[]), 201);
-    if (what === "acts") return answered(await scopes.submit(scope, given["signed"] as SignedIntent, (given["grants"] ?? []) as Grant[]), 200);
+    // What travels beside the intent is untrusted, like the rest of the body: the scope reads each text and each presented fact itself.
+    const beside = { ...("texts" in given ? { texts: given["texts"] } : {}), ...("presented" in given ? { presented: given["presented"] } : {}) } as Beside;
+    if (scope === undefined) return answered(await scopes.found(given["founding"] as SignedIntent, given["definition"] as DeclaredDefinition, (given["definitions"] ?? []) as DeclaredDefinition[], beside), 201);
+    if (what === "acts") return answered(await scopes.submit(scope, given["signed"] as SignedIntent, (given["grants"] ?? []) as Grant[], beside), 200);
     return read(await scopes.settle(scope, given["signed"] as SignedIntent));
   }
   if (scope === undefined) return json(404, { error: "not-found" });
@@ -204,8 +207,8 @@ export class DeployedScope<E extends Env = Env> extends ScopeObject<E> {
 export class ScopeService<E extends Env = Env> extends WorkerEntrypoint<E> implements ScopeApi {
   /** The one scope namespace. */
   protected scopes(): Binding { return this.env.SCOPES; }
-  found(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions: readonly DeclaredDefinition[] = []): Promise<Founded> { return api(this.scopes()).found(founding, definition, definitions); }
-  submit(scope: string, signed: SignedIntent, grants: readonly Grant[]): Promise<Answer> { return api(this.scopes()).submit(scope, signed, grants); }
+  found(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions: readonly DeclaredDefinition[] = [], beside: Beside = {}): Promise<Founded> { return api(this.scopes()).found(founding, definition, definitions, beside); }
+  submit(scope: string, signed: SignedIntent, grants: readonly Grant[], beside: Beside = {}): Promise<Answer> { return api(this.scopes()).submit(scope, signed, grants, beside); }
   settle(scope: string, signed: SignedIntent): Promise<Settlement> { return api(this.scopes()).settle(scope, signed); }
   summary(scope: string, reader: unknown): Promise<Read<Summary>> { return api(this.scopes()).summary(scope, reader); }
   items(scope: string, reader: unknown, type: string, cursor?: Cursor): Promise<Read<readonly Item[]>> { return api(this.scopes()).items(scope, reader, type, cursor); }

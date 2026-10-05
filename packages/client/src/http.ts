@@ -81,8 +81,9 @@ export function httpTransport(service: string, options: { fetch?: Fetch; bytes?:
   const page = (cursor: string | undefined): string => (cursor === undefined ? "" : `?cursor=${part(cursor)}`);
 
   return {
-    found: (founding, definition, definitions = []) => call("found", "", null, { founding, definition, definitions }),
-    submit: (scope, signed, grants) => call("submit", `/${part(scope)}/acts`, null, { signed, grants }),
+    // What travels beside the intent goes in the same body: each detached text, and each presented fact by name.
+    found: (founding, definition, definitions = [], beside = {}) => call("found", "", null, { founding, definition, definitions, ...beside }),
+    submit: (scope, signed, grants, beside = {}) => call("submit", `/${part(scope)}/acts`, null, { signed, grants, ...beside }),
     settle: (scope, signed) => call("settle", `/${part(scope)}/settle`, null, { signed }),
     summary: (scope, reader) => call("summary", `/${part(scope)}`, reader),
     items: (scope, reader, type, cursor) => call("items", `/${part(scope)}/items/${part(type)}${page(cursor)}`, reader),

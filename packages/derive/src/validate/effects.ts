@@ -8,11 +8,11 @@ import { onSubject, subject, type Ctx, type Defining, type Slot, type Type } fro
 import { assignable } from "./fields.ts";
 import { guards, range } from "./guards.ts";
 import { holdEffect } from "./hold.ts";
-import { copy, operand } from "./operands.ts";
+import { copy, isDetached, operand } from "./operands.ts";
 import { at, type Rec } from "./shape.ts";
 import { memberBytes, stated } from "./sizes.ts";
 
-const EFFECTS = ["state", "party", "ref", "value", "attribute", "hold"];
+const EFFECTS = ["state", "party", "ref", "value", "attribute", "hold", "redact"];
 const MEMBER: FieldType = { type: "member" };
 
 /** The slot of the primary item that a written effect may set to a value, if any. An effect under a condition is one: the commit checks what was set. */
@@ -64,9 +64,13 @@ export function effect(d: Defining, v: unknown, path: string, ctx: Ctx, later: b
    * commit knows it, the commit checks the value against the slot.
    */
   const source = (from: unknown, fp: string, to: FieldType): void => {
-    const read = operand(d, from, fp, ctx, () => s, false);
+    const read = operand(d, from, fp, ctx, () => s, false, true);
     if (!read) return;
     if (read.form === "none") bad("shape", fp, "a source that is none is never applied; null empties a slot");
+    // Section 6.2: the bytes of a detached text are kept for the field that names it. So a slot for one is set only from a
+    // detached field or slot, whose bytes this scope then holds. A constant, or a value that only the commit knows, names bytes
+    // that nothing came with.
+    else if (isDetached(to) && !isDetached(read.type)) bad("shape", fp, "a slot for a detached text is set from a detached field or slot, or emptied");
     else if (read.form === "const") { if (!isValue(to, (from as Rec)["const"], bounds)) bad("shape", fp, "is not a value of the slot's type"); }
     // A position is an integer whose most the contract does not state. It goes in a slot of that type, and the commit checks its range.
     else if (read.open) { if (read.type?.type !== to.type) bad("name", fp, "names no source of the slot's type"); }
@@ -174,6 +178,17 @@ export function effect(d: Defining, v: unknown, path: string, ctx: Ctx, later: b
         }
       });
       return sets(r["slot"]);
+    }
+    case "redact": {
+      // Section 6.6: the slot is a detached text. The effect removes the bytes of every text the slot has held, and sets nothing,
+      // so a fixed slot may be named. Its entry is the tombstone: who removed the text, when, and under which grant. So it is
+      // an act's effect, and no handler, timed rule or result clause has one.
+      const r = rec(x, p, ["slot"]);
+      if (!r) return null;
+      const found = typeof r["slot"] === "string" ? s.slots.get(r["slot"]) : undefined;
+      if (found?.kind !== "value" || !isDetached(found.type)) return bad("name", p, `names no value slot of ${s.name} that holds a detached text`);
+      if (!ctx.signer || later) bad("shape", p, "a redaction is an effect of an act: its entry records who removed the text, and under which grant");
+      return { what: `the texts of slot ${String(r["slot"])} of ${sk}`, successive: false };
     }
     default: {
       const what = holdEffect(d, x, p, s, sk, ctx, nascent);

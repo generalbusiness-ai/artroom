@@ -1,7 +1,7 @@
 # @generalbusiness/artroom-bytes
 
 The one implementation of bytes for every Artroom package: canonical JSON,
-SHA-256, text encodings, Ed25519, and the six byte domains of the scope
+SHA-256, text encodings, Ed25519, and the seven byte domains of the scope
 contract (section 2.1). Every export but the two of `take` is synchronous
 and pure, so a scope can seal an entry inside one storage transaction. The
 two of `take`, `takeBytes` and `within`, are asynchronous: they read a
@@ -15,7 +15,7 @@ stream, set a timer and abort a signal, and no scope calls them.
 | `encode` | `hex`; `b64url` and `unb64url` (unpadded base64url); `base32` and `unbase32` (lowercase, unpadded). |
 | `hash` | `sha256`, `digestBytes`, `digestOfHash`, `isDigest`. |
 | `sign` | `keyIdOf`, `keyIdOfSecret`, `publicKeyOf`, `sign`, `verify`. |
-| `domains` | `domainBytes`; `intentDigest`, `signIntent`, `verifySignedIntent`; `seedDigest`, `scopeIdOf`, `newIncarnation`; `entryHash`, `factRefOf`; `messageDigest`, `deliveryCauseDigest`, `definitionDigest`; `isScopeId`, `isIncarnation`. |
+| `domains` | `domainBytes`; `intentDigest`, `signIntent`, `verifySignedIntent`; `seedDigest`, `scopeIdOf`, `newIncarnation`; `entryHash`, `factRefOf`; `messageDigest`, `deliveryCauseDigest`, `definitionDigest`; `textDigest`, the digest that names a detached text; `isScopeId`, `isIncarnation`. |
 | `ids` | The guard of each other identifier the contract names: `isKeyId`, `isSignature`, `isMemberId`, `isOperationId`, `isDutyId`, `isPlatformDefinition`, `isScopeKind` with `SCOPE_KINDS`; `positionOf`, the one reader of a position's decimal text; and `timeMs` and `timeOf`, the one form of a timestamp. No other package tests these forms with a pattern of its own. |
 | `records` | The guard of each fixed record the contract defines: `isScopeRef`, `isFactRef`, `isMemberRef`, `isHead`, `isSeed`, `isIntent`, `isSignedIntentShape`, `isGrant`, `isFieldValue`, `isParty`, `isMessage`, `isSend`, `isEffect`, `isInput`, `isFactUse`, `isPrepared`, `isEntry`, `isSealed`, `isReceipt`, `isItem`, `isSummary`, `isDuty`, `isLogPage`, `isRetainedInput`, `isRead`, `isListOf`; and `REFUSAL_REASONS`, `READ_REFUSALS`, `among`, `isRecord`, `isLocalId`, `isDefinitionName`. A record passes when it is a variant the contract names, with every member that variant requires and no other, and each member the contract types as an identifier is read by that identifier's guard. Shape only: no signature, hash or judgment. The head of the file says what stays opaque. |
 

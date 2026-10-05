@@ -37,7 +37,8 @@ export type Input =
       source: FactRef | null; n: number | null; // the creator's entry and send, for a child
       message: Request | null;                  // the creation request, for a child
       decision: "applied" | "refused" }
-  | { type: "act"; signed: SignedIntent; authority: readonly Grant[] }
+  | { type: "act"; signed: SignedIntent; authority: readonly Grant[];   // the one grant judged
+      presented: Record<string, FactRef> }      // the facts presented beside the intent, by the names the act declares (section 6.4)
   | { type: "delivery"; from: FactRef; n: number; message: Request;
       decision: "applied" | "refused" | "superseded"; reason?: Reason }
   | { type: "delivery"; from: FactRef; n: number; message: Result;
@@ -93,6 +94,7 @@ export type Effect =
   | { effect: "value"; item: number; slot: string; value: FieldValue | null }
   | { effect: "list"; item: number; slot: string; change: "add" | "remove"; member: MemberRef }
   | { effect: "hold"; item: number; change: "open" | "renew" | "end"; epoch: number }   // section 6.8
+  | { effect: "redact"; item: number; slot: string; texts: readonly Digest[] }          // the entry is the tombstone of those texts; section 6.6
   | { effect: "relation"; owner: ScopeRef; item: number; name: string; state: string; revision: number }   // the owner's item; section 7.3
   | { effect: "activate" }                                                              // section 7.2
   | { effect: "operation"; operation: OperationId; attempt: number }                    // opens an operation's next numbered attempt; section 4.3

@@ -9,7 +9,7 @@ import { canonicalize, isScopeKind } from "@generalbusiness/artroom-bytes";
 import { isObject, own } from "../values.ts";
 import { naming, onSubject, subject, type ClauseSet, type Ctx, type Defining, type Duties, type Type } from "./context.ts";
 import { effects, setsSlot } from "./effects.ts";
-import { declaredFields } from "./fields.ts";
+import { declaredFields, fieldType } from "./fields.ts";
 import { guards } from "./guards.ts";
 import { holdDoes, opensHold } from "./hold.ts";
 import { attention, sends } from "./sends.ts";
@@ -147,7 +147,7 @@ export function acts(d: Defining, v: unknown, timed: Readonly<Record<string, unk
   const { bounds, types, bad, rec, entries, str } = d;
   for (const [name, av] of entries(v, "acts", bounds.acts)) {
     const path = at("acts", name);
-    const o = rec(av, path, ["step", "on", "also", "fields", "grant", "guards", "effects", "sends", "attention"], ["settles"]);
+    const o = rec(av, path, ["step", "on", "also", "fields", "grant", "guards", "effects", "sends", "attention"], ["settles", "presents"]);
     if (!o) continue;
     const step = o["step"];
     if (step !== "open" && step !== "transition" && step !== "comment") bad("shape", at(path, "step"), "is open, transition or comment");
@@ -158,7 +158,20 @@ export function acts(d: Defining, v: unknown, timed: Readonly<Record<string, unk
     const fields = declaredFields(d, o["fields"], at(path, "fields"));
     // A transition's primary item exists before the entry, so a `via` may read its slots. The item an `open` act opens does not.
     const named = also(d, o["also"], at(path, "also"), fields, step === "transition" ? on : null, top);
-    const ctx: Ctx = { ...naming(), on, also: named.types, nascent: step === "open", fields, signer: true, kind: name, unsettled: named.unsettled };
+    // Section 6.4: the facts that are presented beside the intent, each with the kinds and the definition that a `fact` guard
+    // compares it with. Nothing travels beside a creation, so the genesis act is presented none.
+    const presented = new Map<string, FieldType>();
+    if ("presents" in o) {
+      if (name === top["genesis"]) bad("shape", at(path, "presents"), "the genesis act is presented no fact: nothing travels beside a creation");
+      for (const [p, pv] of entries(o["presents"], at(path, "presents"), bounds.presents)) {
+        const pp = at(at(path, "presents"), p);
+        const r = rec(pv, pp, ["kind", "under", "required"]);
+        if (!r || d.bool(r["required"], at(pp, "required")) === null) continue;
+        const type = fieldType(d, { type: "fact", kind: r["kind"], under: r["under"] }, pp);
+        if (type) presented.set(p, type);
+      }
+    }
+    const ctx: Ctx = { ...naming(), on, also: named.types, nascent: step === "open", fields, signer: true, kind: name, presented, unsettled: named.unsettled };
     // Section 6.4: a comment changes no item and meets no guard.
     if (step === "comment") for (const k of ["guards", "effects", "sends"]) if (!Array.isArray(o[k]) || o[k].length > 0) bad("shape", at(path, k), "a comment has none");
     if (step === "comment" && ctx.also.size > 0) bad("shape", at(path, "also"), "a comment names no other item");

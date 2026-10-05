@@ -11,7 +11,7 @@ cite its sections.
 | Module | Holds |
 |---|---|
 | `scope` | Identifiers, the seed, the delivery cause, and the four reference classes: identity, fact, grant, commitment. |
-| `intent` | The intent an actor signs, and the six byte-domain tags (`DOMAINS`). |
+| `intent` | The intent an actor signs, and the byte-domain tags (`DOMAINS`). |
 | `entry` | An entry, its inputs, the message classes, sends, derived effects, and the views built after sealing: duty ID, envelope, receipt. `Reason` is what a refused delivery records: a code and, where one exists, a name. |
 | `definition` | A declared definition, as revision 11 of the contract adopts it: its name, field and item types, acts, handlers, timed rules, rule expressions, and every operand, guard, effect, send and attention form. No form of the first delivery is left beside its adopted shape: each was removed when the source that read it moved. `ReceiveType` is the adopted form of a handler, and `AdoptedReceiveType` is another name for it. The types say what a definition may hold, not what a runtime derives: the validator of `derive` refuses every form it has no derivation for. |
 | `capability` | What a capability version declares: its records, guards, effects and steps. `CAPABILITIES` restates the contract's tables for `hold@1` and `git-read@1` as data. It holds no rule. |

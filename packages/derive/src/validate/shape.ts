@@ -29,6 +29,7 @@ export type ProblemCode =
   | "advisory-sends"     // a handler of class `advisory` declares a send or a notice (section 6.4)
   | "fan-out-unbounded"  // a fan-out over a final state or over a type whose `max` is past the bound, or a second fan-out in one list (section 6.6)
   | "attention-unbounded" // the attention forms of one act, handler or timed rule could tell more members than one entry may (section 6.6)
+  | "redactable-read"    // a guard, a rule, a send to a scope that is no lane, or an index send reads a detached text (section 6.2)
   | "capability" | "profile" | "rule";
 
 export interface Problem { code: ProblemCode; path: string; message: string }

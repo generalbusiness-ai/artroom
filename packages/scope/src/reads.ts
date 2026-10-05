@@ -134,7 +134,7 @@ export class Reads {
   retained(reader: unknown, kind: RetainedInput["kind"], digest: Digest): Read<RetainedInput> {
     const open = this.#open(reader, "retained");
     if (!("scope" in open)) return open;
-    if (!(kind === "definition" || kind === "entry" || kind === "rule") || typeof digest !== "string") return no("not-found");
+    if (!(kind === "definition" || kind === "entry" || kind === "rule" || kind === "text") || typeof digest !== "string") return no("not-found");
     // The size is asked of storage first, so an input over the bound is refused before any of it is read into memory.
     const size = this.#store.retainedSize(kind, digest);
     if (size === null) return no("not-found");

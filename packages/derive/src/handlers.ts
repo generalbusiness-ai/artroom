@@ -6,11 +6,11 @@
  * send is run again from the entry that sent it.
  */
 
-import type { ActType, Advisory, AlsoRule, Bounds, Digest, Effect, EffectForm, Entry, FactRef, FactUse, FieldType, FieldValue, Guard, Notify, Prepared, Reason, ReceiveType, RefusalReason, Request, ResultClauses, ScopeRef, Send, SendForm, Settles, UnavailableReason } from "@generalbusiness/artroom-contract";
+import type { ActType, Advisory, AlsoRule, Bounds, Digest, Effect, EffectForm, Entry, FactRef, FactUse, FieldType, FieldValue, Guard, Input, Notify, Prepared, Reason, ReceiveType, RefusalReason, Request, ResultClauses, ScopeRef, Send, SendForm, Settles, UnavailableReason } from "@generalbusiness/artroom-contract";
 import { entryHash } from "@generalbusiness/artroom-bytes";
 import type { Signer } from "./attribution.ts";
 import { deriveEffects } from "./effects.ts";
-import { creationFields, factsNamed, isLocalFact, messageFields, readFacts, readFields, updateOf, type Reading, type Update } from "./fields.ts";
+import { creationFields, factsNamed, isLocalFact, messageFields, presentedTypes, readFacts, readFields, textsNamed, updateOf, type Reading, type Update } from "./fields.ts";
 import { signerOf } from "./fold.ts";
 import { judgeGuards, slotOf, type Fetched, type Judging } from "./guards.ts";
 import { conditionsReadClock, deriveSends, formOf, readsClock } from "./sends.ts";
@@ -76,6 +76,28 @@ export function messageFacts(view: StateView, definition: ValidDefinition, messa
   if (!scope || !b?.handler || !b.fields) return [];
   const read = messageRead(view, scope.at, b.handler, b.fields, bounds);
   return read.ok ? factsNamed(b.handler.fields, read.fields, scope.at).filter((f) => f.hash !== from.hash) : [];
+}
+
+/**
+ * The digest of each detached text that an input names (section 6.2): in
+ * the fields of an act, of a founding or of a creation, and in the declared
+ * fields of a message that a handler receives. The scope keeps the bytes of
+ * each as a retained input with the entry that records the input, and a
+ * verifier asks for the same ones. A result, a control, a message that no
+ * handler receives, and an input that is not an act of the definition name
+ * none.
+ */
+export function inputTexts(definition: ValidDefinition, input: Input): Digest[] {
+  const { acts, genesis } = definition.declared;
+  if (input.type === "act") return textsNamed(own(acts, input.signed.intent.kind)?.fields ?? {}, input.signed.intent.fields);
+  if (input.type === "genesis") return textsNamed(own(acts, genesis)!.fields, input.founding ? input.founding.intent.fields : input.source ? creationFields(input.message, input.source) : null);
+  return input.type === "delivery" && (input.message.class === "request" || input.message.class === "advisory") ? messageTexts(definition, input.message, input.from) : [];
+}
+
+/** The digest of each detached text that the declared fields of a delivered message name. None when no handler receives the message. */
+export function messageTexts(definition: ValidDefinition, message: Request | Advisory, from: FactRef): Digest[] {
+  const b = bound(definition, message, from);
+  return b?.handler ? textsNamed(b.handler.fields, b.fields) : [];
 }
 
 // ---------------------------------------------------------------- the other items of an act or handler (section 6.4)
@@ -222,7 +244,7 @@ export function runHandler(view: StateView, definition: ValidDefinition, context
   // The source entry is one of the foreign entries this entry uses.
   if (factsNamed(handler.fields, read.fields, scope.at).length >= bounds.usesPerEntry) return refused("bad-field", `more than ${bounds.usesPerEntry} foreign entries`);
   // Section 6.2: a fact that names this scope is a local fact. A foreign one was fetched before the turn, or the delivery is not decided.
-  const named = readFacts(view, handler.fields, read.fields, sent ? [...context.facts, sent.source] : context.facts, { at: scope.at, own: context.own });
+  const named = readFacts(view, handler.fields, read.fields, sent ? [...context.facts, sent.source] : context.facts, { at: scope.at, own: context.own, texts: context.texts });
   if (named.result === "unavailable") return { result: "unavailable", reason: "dependency-unavailable" };
   if (named.result !== "read") return refused(named.result, named.detail, named.uses);
   const { fields, facts, uses } = named;
@@ -278,7 +300,8 @@ export function runClause(view: StateView, definition: ValidDefinition, context:
   const { declared } = definition;
   const input = origin.input;
   /** What the origin gives its clauses: its fields, how it selects its items, its primary item by ID, and its signer. */
-  let frame: { kind: string; fields: Record<string, FieldValue>; fieldTypes: ActType["fields"]; also: Readonly<Record<string, AlsoRule>>; on: number | null; signer: Signer | null; sends: readonly SendForm[] };
+  let frame: { kind: string; fields: Record<string, FieldValue>; fieldTypes: ActType["fields"]; also: Readonly<Record<string, AlsoRule>>; on: number | null; signer: Signer | null; sends: readonly SendForm[];
+               presents?: ActType["presents"]; presented?: Readonly<Record<string, FieldValue>> };
   if (input.type === "act" || input.type === "genesis") {
     const intent = input.type === "act" ? input.signed.intent : input.founding?.intent;
     const kind = input.type === "act" ? input.signed.intent.kind : declared.genesis;
@@ -292,6 +315,8 @@ export function runClause(view: StateView, definition: ValidDefinition, context:
     // out of the item's history. A grant is judged for the entry it is presented with, and for no later entry.
     const signed = signerOf(origin);
     frame = { kind, fields: read.fields, fieldTypes: act.fields, also: act.also, on: typeof on === "number" ? on : null, signer: signed && { member: signed.member, principal: null }, sends: act.sends };
+    // The facts that were presented beside the origin's intent, which a clause may read as the act's guards did.
+    if (input.type === "act") [frame.presents, frame.presented] = [act.presents, input.presented];
   } else if (input.type === "delivery" && (input.message.class === "request" || input.message.class === "advisory")) {
     const b = bound(definition, input.message, input.from);
     if (!b?.handler || !b.fields) throw new Error(`entry ${origin.seq} sent a request and ran no handler`);
@@ -312,8 +337,11 @@ export function runClause(view: StateView, definition: ValidDefinition, context:
 
   // The uses of the origin are the facts its fields name; a clause may read one (section 6.6, a party from a fetched fact).
   // A local fact that the origin's fields name was checked when the origin was judged. It is put in normal form again here.
-  const facts = readFacts(view, frame.fieldTypes, frame.fields, context.facts, { at: scope.at, own: context.own });
-  if (facts.result !== "read") return { result: "unavailable", reason: "dependency-unavailable" };
+  // A detached text that the origin's fields name was checked when the origin was judged, and is not asked for again.
+  const local = { at: scope.at, own: context.own, texts: () => null };
+  const facts = readFacts(view, frame.fieldTypes, frame.fields, context.facts, local);
+  const beside = readFacts(view, presentedTypes(frame.presents), frame.presented ?? {}, context.facts, local);
+  if (facts.result !== "read" || beside.result !== "read") return { result: "unavailable", reason: "dependency-unavailable" };
   // Section 6.6: a clause's subjects are those of the entry that made the send, as that entry resolved them, and they are read as
   // they are now. A name that the origin left unbound stays unbound. The validator lets a clause name no subject that was
   // selected through a slot which may have changed since.
@@ -328,10 +356,11 @@ export function runClause(view: StateView, definition: ValidDefinition, context:
   const update = "relate" in form && form.relate.each ? updateOf(origin.sends.find((s) => s.n === request.n)!.message as Request, { at: scope.at, seq: origin.seq, hash: request.hash }) : null;
   const j: Judging = {
     view, definition, bounds: context.bounds, clock: context.clock, scope, self: scope.head.seq + 1, kind: frame.kind, fields: facts.fields, fieldTypes: frame.fieldTypes, subjects, signer: frame.signer,
-    facts: facts.facts, prepared: [], used: [], own: context.own, sender: answered?.sender, result: answered?.reason, each: (update && view.item(update.item.seq)) ?? undefined,
+    facts: new Map([...facts.facts, ...beside.facts]), prepared: [], used: [], own: context.own, sender: answered?.sender, result: answered?.reason, each: (update && view.item(update.item.seq)) ?? undefined,
+    presented: beside.fields,
   };
   const effects = deriveEffects(j, forms, [], null);
   // Section 6.6: a clause's condition that is not completed leaves the result not recorded now. It is offered again.
   if (!effects.ok && "unavailable" in effects) return { result: "unavailable", reason: effects.unavailable };
-  return { result: "ran", effects: effects.ok ? effects.effects : [], uses: facts.uses, judgesTime: forms.some(timesEffect) };
+  return { result: "ran", effects: effects.ok ? effects.effects : [], uses: [...facts.uses, ...beside.uses.filter((use) => !facts.facts.has(use.fact.hash))], judgesTime: forms.some(timesEffect) };
 }

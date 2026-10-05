@@ -29,8 +29,8 @@ export function bindingTransport(service: ServiceBinding): Transport {
     return answer;
   };
   return {
-    found: (founding, definition, definitions = []) => call("found", () => service.found(founding, definition, definitions)),
-    submit: (scope, signed, grants) => call("submit", () => service.submit(scope, signed, grants)),
+    found: (founding, definition, definitions = [], beside = {}) => call("found", () => service.found(founding, definition, definitions, beside)),
+    submit: (scope, signed, grants, beside = {}) => call("submit", () => service.submit(scope, signed, grants, beside)),
     settle: (scope, signed) => call("settle", () => service.settle(scope, signed)),
     summary: (scope, reader) => call("summary", () => service.summary(scope, reader)),
     items: (scope, reader, type, cursor) => call("items", () => service.items(scope, reader, type, cursor)),

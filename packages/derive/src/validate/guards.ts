@@ -3,7 +3,7 @@
 import type { FieldType } from "@generalbusiness/artroom-contract";
 import { isObject } from "../values.ts";
 import { onSubject, subject, type Ctx, type Defining, type Type } from "./context.ts";
-import { fieldOf, operand, type Read } from "./operands.ts";
+import { fieldOf, isDetached, operand, type Read } from "./operands.ts";
 import { at, type Rec } from "./shape.ts";
 
 const GUARDS = ["state", "signer", "notIn", "set", "unset", "equals", "differs", "some", "none", "count", "every", "fact", "before", "after", "rule", "each", "has", "anyOf", "distinct", "sameSet"];
@@ -191,6 +191,10 @@ export function guard(d: Defining, v: unknown, path: string, ctx: Ctx, nesting: 
     }
     case "rule":
       if (typeof x !== "string" || !rules.has(x)) bad("rule", p, "names no rule the definition declares");
+      // Section 6.2: a rule reads the fields and the subjects' records whole (section 6.5), so it would read a detached value.
+      if ([...(ctx.fields?.values() ?? [])].some(isDetached) || [ctx.on, ...ctx.also.values()].some((t) => t !== null && [...t.slots.values()].some((s) => isDetached(s.type)))) {
+        bad("redactable-read", p, "a rule reads every field and every subject, and one of them holds a detached text");
+      }
       break;
     case "each": case "has": {
       const r = k === "each" ? rec(x, p, ["list", "as", "guards"], ["where"]) : rec(x, p, ["list", "as", "where"], ["guards"]);

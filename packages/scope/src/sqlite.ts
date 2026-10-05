@@ -44,7 +44,8 @@ export interface Sql {
  * - `inbox`: each incoming delivery this scope recorded, by source scope,
  *   incarnation, entry and ordinal.
  * - `folded`: folded records that are not items: relationship copies, held
- *   creations and outside operations.
+ *   creations, outside operations, and for each slot that holds a detached
+ *   text the digests it has held.
  * - `retained_input`: section 9.2; see `Retained`.
  */
 const SCHEMA = `
@@ -137,6 +138,7 @@ export class SqliteStore implements Store {
   }
   creation(seed: Digest): HeldCreation | null { return this.#folded("creation", seed); }
   operation(id: OperationId): Operation | null { return this.#folded("operation", id); }
+  texts(item: number, slot: string): readonly Digest[] { return this.#folded<[number, string, Digest[]]>("texts", canonicalize([item, slot]))?.[2] ?? []; }
   /**
    * Counted from the rows of requests with no result, which `outbox_open`
    * indexes, and from the operations, which no form opens yet.
@@ -164,6 +166,7 @@ export class SqliteStore implements Store {
     for (const row of this.#all("SELECT kind, key, value FROM folded")) {
       if (row["kind"] === "relation") memory.putRelation(json(row["value"]));
       else if (row["kind"] === "creation") memory.putCreation(row["key"] as Digest, json(row["value"]));
+      else if (row["kind"] === "texts") memory.putTexts(...json<[number, string, Digest[]]>(row["value"]));
       else memory.putOperation(json(row["value"]));
     }
     for (const row of this.#all("SELECT seq, actor, idem, intent FROM entry WHERE actor IS NOT NULL")) memory.putAccepted(row["actor"] as KeyId, row["idem"] as string, { seq: row["seq"] as number, intent: row["intent"] as Digest });
@@ -210,6 +213,10 @@ export class SqliteStore implements Store {
   }
   putCreation(seed: Digest, held: HeldCreation): void { this.#fold("creation", seed, held); }
   putOperation(operation: Operation): void { this.#fold("operation", operation.id, operation); }
+  putTexts(item: number, slot: string, texts: readonly Digest[]): void {
+    if (texts.length === 0) this.#run("DELETE FROM folded WHERE kind = 'texts' AND key = ?", canonicalize([item, slot]));
+    else this.#fold("texts", canonicalize([item, slot]), [item, slot, texts]);
+  }
 
   // ---------------------------------------------------------------- what the fold does not keep
 
@@ -223,6 +230,8 @@ export class SqliteStore implements Store {
   retain(input: Retained): void {
     this.#run("INSERT INTO retained_input (kind, digest, bytes, under) VALUES (?, ?, ?, ?) ON CONFLICT (kind, digest) DO NOTHING", input.kind, input.digest, input.bytes, input.under ?? null);
   }
+
+  forget(kind: Retained["kind"], digest: Digest): void { this.#run("DELETE FROM retained_input WHERE kind = ? AND digest = ?", kind, digest); }
 
   stored(seq: number): Stored | null { return this.storedFrom(seq, 1).find((s) => s.seq === seq) ?? null; }
   storedFrom(seq: number, limit: number): Stored[] {

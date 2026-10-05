@@ -54,7 +54,7 @@ test("on both transports, each operation of the handle returns a reply only when
   const sealed = { entry, hash: d };
   // An act's input, with an actor and a signature of the forms the contract fixes: a key ID of 32 bytes, a signature of 64.
   const intent = { v: 1, to: scope, actor: `key_${"A".repeat(43)}`, kind: "offer", on: null, expected: {}, fields: {}, idempotencyKey: "k", notAfter: entry.time };
-  const act = (over: object, sig = "A".repeat(86)) => read({ entry: { ...entry, input: { type: "act", signed: { intent: { ...intent, ...over }, sig }, authority: [] } }, hash: d });
+  const act = (over: object, sig = "A".repeat(86)) => read({ entry: { ...entry, input: { type: "act", signed: { intent: { ...intent, ...over }, sig }, authority: [], presented: {} } }, hash: d });
   // A refused delivery records why: a code the contract names and, where the failed guard declares one, a name.
   const refusal = (reason: unknown) => read({ entry: { ...entry, input: { type: "delivery", from: fact, n: 0, message: { class: "request", type: "tell", body: {} }, decision: "refused", reason } }, hash: d });
   const duty = { duty: "1.0", to: scope, class: "request", held: false, attempts: [{ at: entry.time, answer: "none" }], acknowledged: null, result: null, diagnosis: null };

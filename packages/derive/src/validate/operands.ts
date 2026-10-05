@@ -43,10 +43,12 @@ const POSITION: FieldType = { type: "int", min: 0, max: Number.MAX_SAFE_INTEGER 
  * One operand. A slot with no `of` is read from the item that `owner` gives:
  * the form's own subject, or in the `where` of a range each item the range
  * covers. `guard`: the operand is read by a guard, which may not read the
- * item that its act opens (section 6.3). Null: it is not an operand here,
- * which is reported.
+ * item that its act opens (section 6.3). `detached`: the place may read a
+ * detached text, which is its digest: the source of an effect, and a field
+ * of a send. Every other place is refused one, as `redactable-read`
+ * (section 6.2). Null: it is not an operand here, which is reported.
  */
-export function operand(d: Defining, v: unknown, path: string, ctx: Ctx, owner: () => Type | null, guard = true): Read | null {
+export function operand(d: Defining, v: unknown, path: string, ctx: Ctx, owner: () => Type | null, guard = true, detached = false): Read | null {
   const { bad, rec, str } = d;
   const f = d.form(v, path, OPERANDS, ["of", "part"]);
   if (!f) return null;
@@ -165,6 +167,8 @@ export function operand(d: Defining, v: unknown, path: string, ctx: Ctx, owner: 
       try { canonicalize(x); } catch { return bad("shape", path, "is not a value"); }
       break;
   }
+  // Section 6.2: no guard, and no form that only compares or lists, reads a detached value.
+  if (!detached && isDetached(type)) return bad("redactable-read", path, "reads a detached text, which only the source of an effect and a field of a send to a lane may read");
   if ("part" in o) {
     const read = part(o["part"], at(path, "part"), type);
     if (read === undefined) return null;
@@ -172,6 +176,9 @@ export function operand(d: Defining, v: unknown, path: string, ctx: Ctx, owner: 
   }
   return { form: k, type, open: type === POSITION, fields, slot };
 }
+
+/** True for the type of a detached text (section 6.2). */
+export const isDetached = (type: FieldType | null | undefined): boolean => type?.type === "text" && type.detached === true;
 
 /** The declared type of the field that a field operand names, when the definition states it. */
 export const fieldOf = (v: unknown, ctx: Ctx): FieldType | null => (isObject(v) && typeof v["field"] === "string" ? (ctx.fields?.get(v["field"]) ?? null) : null);

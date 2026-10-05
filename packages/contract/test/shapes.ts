@@ -28,7 +28,7 @@ const grant: Grant = {
 const seed: Seed = { v: 1, kind: "lane", definition: d("e"), creator: directory, cause: d("a"), ordinal: 0 };
 const d17: Entry = {
   v: 1, at: directory, seq: 17, prev: d("6"), time, clamped: false, epoch: 0,
-  input: { type: "act", signed: { intent, sig: "c2ln" }, authority: [grant] },
+  input: { type: "act", signed: { intent, sig: "c2ln" }, authority: [grant], presented: {} },
   uses: [], prepared: [],
   effects: [{ effect: "open", item: 17, type: "issue", state: "allocated" }],
   sends: [{ n: 0, to: seed, message: { class: "request", type: "create", body: { opener, title: "A flaky test" } } }],
@@ -77,7 +77,7 @@ const cause: DeliveryCause = { v: 1, from: d17Fact, n: 0, message: d("b") };
 
 const report: Report = {
   mode: "replay", target: d18Fact, coverage: [{ scope: directory, from: 0, through: 18 }, { scope: lane, from: 0, through: 1 }],
-  anchors: [], dependencies: { verified: 2, anchored: 0, missing: [] }, trusts: ["service clock"], result: "consistent",
+  anchors: [], dependencies: { verified: 2, anchored: 0, missing: [] }, trusts: ["service clock"], redacted: [], result: "consistent",
 };
 
 // A small lane definition using a guard, an effect, a send and an attention form of each kind of shape.

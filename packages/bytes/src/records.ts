@@ -85,7 +85,7 @@ const CLASS: Record<Message["class"], true> = { request: true, result: true, con
 const DECISION: Record<Extract<Input, { decision: unknown; type: "delivery" }>["decision"], true> = { applied: true, refused: true, superseded: true };
 const CLAUSE: Record<NonNullable<Duty["result"]>["clause"], true> = { applied: true, refused: true, superseded: true, conflict: true };
 const FINDING: Record<NonNullable<Duty["diagnosis"]>["finding"], true> = { undelivered: true, "delivery-unavailable": true };
-const RETAINED: Record<RetainedInput["kind"], true> = { definition: true, entry: true, rule: true };
+const RETAINED: Record<RetainedInput["kind"], true> = { definition: true, entry: true, rule: true, text: true };
 /** Why a delivery was refused: a code the contract names and, where one exists, the name the failed guard declares. */
 const reason = record({ code: among(REFUSAL_REASONS) }, { name: text });
 
@@ -152,6 +152,7 @@ const effect = variant("effect", {
   value: record({ effect: any, item: isLocalId, slot: text, value: orNull(isFieldValue) }),
   list: record({ effect: any, item: isLocalId, slot: text, change: among({ add: true, remove: true }), member: memberRef }),
   hold: record({ effect: any, item: isLocalId, change: among({ open: true, renew: true, end: true }), epoch: isLocalId }),
+  redact: record({ effect: any, item: isLocalId, slot: text, texts: listOf(isDigest) }),
   relation: record({ effect: any, owner: scopeRef, item: isLocalId, name: text, state: text, revision: isLocalId }),
   activate: record({ effect: any }),
   operation: record({ effect: any, operation: isOperationId, attempt: isLocalId }),
@@ -172,7 +173,7 @@ const input = variant("type", {
   genesis: record({
     type: any, seed, inc: isIncarnation, founding: orNull(signedIntent), source: orNull(factRef), n: orNull(isLocalId), message: orNull(request), decision: among({ applied: true, refused: true }),
   }),
-  act: record({ type: any, signed: signedIntent, authority: listOf(grant) }),
+  act: record({ type: any, signed: signedIntent, authority: listOf(grant), presented: named(factRef) }),
   delivery: (v) => {
     const of = isRecord(v) && isRecord(v["message"]) ? v["message"]["class"] : undefined;
     return among(CLASS)(of) && deliveryOf[of](v);

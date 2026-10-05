@@ -13,13 +13,20 @@
  *
  * The source entry's bytes are retained with the entry that used it, and the
  * message is inside that entry (section 9.2).
+ *
+ * A message carries a detached text as its digest, and the bytes travel
+ * beside it (section 6.2). The receiver reads them from the sender through
+ * the texts port before the turn, checks them against the digest, and
+ * retains them with the entry that records the message. While a text
+ * cannot be read the delivery is not decided, and the sender keeps the
+ * duty.
  */
 
-import type { Bounds, Entry, Incarnation, ScopeId, Seed, UnavailableReason } from "@generalbusiness/artroom-contract";
-import { canonicalize, isDigest, newIncarnation } from "@generalbusiness/artroom-bytes";
-import { creationFields, factsNamed, isEntryOf, isFactRef, isLocalId, isObject, isScopeRef, judgeDelivery, judgeGenesis, messageFacts, own, prepareRules, readFields } from "@generalbusiness/artroom-derive";
+import type { Bounds, Digest, Entry, FactRef, Incarnation, ScopeId, Seed, UnavailableReason } from "@generalbusiness/artroom-contract";
+import { canonicalize, isDigest, newIncarnation, parseStrict } from "@generalbusiness/artroom-bytes";
+import { creationFields, factsNamed, isEntryOf, isFactRef, isLocalId, isObject, isScopeRef, judgeDelivery, judgeGenesis, messageFacts, messageTexts, own, prepareRules, readFields, textsNamed } from "@generalbusiness/artroom-derive";
 import type { Clock as Reading, Creation, Delivered, DeliveryContext, Fetched, Judgment, StateView, ValidDefinition } from "@generalbusiness/artroom-derive";
-import { NO_INCARNATION, ownOf, retainedFacts, used, type Scope } from "./core.ts";
+import { NO_INCARNATION, Received, ownOf, retainedFacts, used, type Scope } from "./core.ts";
 import { namedBy } from "./definitions.ts";
 import type { DefinitionRead, Delivery, Ports } from "./ports.ts";
 import type { Retained, Store } from "./store.ts";
@@ -33,10 +40,10 @@ export class Deliveries {
   readonly #name: ScopeId | null;
   readonly #scope: Scope;
   readonly #store: Store;
-  readonly #ports: Pick<Ports, "resolver" | "definitions" | "random">;
+  readonly #ports: Pick<Ports, "resolver" | "definitions" | "texts" | "random">;
   readonly #bounds: Bounds;
 
-  constructor(name: ScopeId | null, scope: Scope, store: Store, ports: Pick<Ports, "resolver" | "definitions" | "random">, bounds: Bounds) {
+  constructor(name: ScopeId | null, scope: Scope, store: Store, ports: Pick<Ports, "resolver" | "definitions" | "texts" | "random">, bounds: Bounds) {
     this.#name = name;
     this.#scope = scope;
     this.#store = store;
@@ -75,6 +82,26 @@ export class Deliveries {
     return { valid, bytes: read.bytes, children: children.retain };
   }
 
+  /**
+   * Section 6.2: the detached texts that a message names, each at hand
+   * before the turn. One that this scope already retains is read from its
+   * own retained inputs. Any other is read from the sender, within the fetch
+   * time limit, and checked against its digest. Null: one could not be read,
+   * or the sender does not hold it, or what it sent is not that text. The
+   * delivery is then not decided.
+   */
+  async #texts(from: FactRef, named: readonly Digest[]): Promise<Received | null> {
+    const received = new Received();
+    for (const digest of named) {
+      const kept = this.#store.retained("text", digest);
+      const read = kept ? null : await within(() => this.#ports.texts.read(from, digest), this.#bounds.fetchSeconds);
+      if (read === LATE || (read && !read.ok)) return null;
+      const text: unknown = kept ? parseStrict(kept.bytes) : read!.text;
+      if (typeof text !== "string" || text.length > this.#bounds.textBytes || received.add(text) !== digest) return null;
+    }
+    return received;
+  }
+
   async deliver(delivered: Delivered): Promise<Delivery> {
     const name = this.#name;
     const bounds = this.#bounds;
@@ -102,9 +129,11 @@ export class Deliveries {
     // For a request or an advisory that a handler receives: the foreign entries that the message's declared fields name.
     let facts: Fetched[] = [];
     let origin: Entry | null = null;
+    let carried: Digest[] = [];
     if (!pinned && founding) {
       const act = own(founding.valid.declared.acts, founding.valid.declared.genesis)!;
       const given = creationFields(message.class === "request" ? message : null, from);
+      carried = textsNamed(act.fields, given);
       const fields = given ? readFields(act.fields, given, bounds) : null;
       // The scope has no genesis yet, so no fact can name it: every fact a creation names is foreign.
       const named = fields?.ok ? factsNamed(act.fields, fields.fields, null) : [];
@@ -118,13 +147,16 @@ export class Deliveries {
     } else if (pinned?.definition && (message.class === "request" || message.class === "advisory")) {
       // Section 6.4: the foreign entries that the declared fields of the message name. More than one entry may use are not fetched:
       // the judge refuses that message, `bad-field`, before it reads any.
-      const named = messageFacts(store, pinned.definition, message, from, bounds);
-      const fetched = named.length >= bounds.usesPerEntry ? [] : await fetchFacts(this.#ports.resolver, bounds, named);
+      const wanted = messageFacts(store, pinned.definition, message, from, bounds);
+      const fetched = wanted.length >= bounds.usesPerEntry ? [] : await fetchFacts(this.#ports.resolver, bounds, wanted);
       if (!fetched) return retry("dependency-unavailable");
       facts = fetched;
+      carried = messageTexts(pinned.definition, message, from);
     }
+    const texts = await this.#texts(from, carried);
+    if (!texts) return retry("dependency-unavailable");
 
-    const context = (clock: Reading): Omit<DeliveryContext, "prepared"> => ({ clock, bounds, facts, own: ownOf(store), source: { entry: source.entry, under: source.under }, origin });
+    const context = (clock: Reading): Omit<DeliveryContext, "prepared"> => ({ clock, bounds, facts, own: ownOf(store), texts: texts.sizes, source: { entry: source.entry, under: source.under }, origin });
     /** The definition a section of the turn runs under: the pinned one, or before the genesis the one the seed names. */
     const definition = (): ValidDefinition => this.#scope.pinned()?.definition ?? founding!.valid;
     /** A `create` goes to the genesis judge, which answers a repeat from the genesis when the scope exists. */
@@ -144,7 +176,7 @@ export class Deliveries {
           case "write": {
             // Section 9.2: an entry that settles nothing is written only while the scope has room; one that settles is counted for.
             if ((view.scope()?.head.seq ?? -1) + 1 >= bounds.scopeEntries) return said(retry("scope-full"));
-            const retain: Retained[] = used(judged.draft, [source, ...facts]);
+            const retain: Retained[] = [...used(judged.draft, [source, ...facts]), ...texts.retain(definition(), judged.draft)];
             if (genesis && founding) {
               store.cover(founding.valid.indexes);
               retain.push({ kind: "definition", digest: founding.valid.digest, bytes: canonicalize(JSON.parse(founding.bytes)) }, ...founding.children);
