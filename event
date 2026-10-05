@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:e3641374907151ecf0197408d6ce177a3ecdbb21","text":"Merge retired a covered predecessor; the successor is at packages/scope/src/worker.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:e3643635c9d8e6d0085c015afd341a5698c76256","text":"Merge retired a covered predecessor; the successor is at packages/lanes/vitest.scope.config.ts."}
