@@ -43,6 +43,7 @@ step replay packages/replay npx vitest run --config vitest.config.ts $(V replay)
 step client packages/client npx vitest run --config vitest.config.ts $(V client)
 step scope packages/scope npx vitest run --config vitest.config.ts $(V scope)
 step lanes packages/lanes npx vitest run --config vitest.config.ts $(V lanes)
+step lanes-scope packages/lanes npx vitest run --config vitest.scope.config.ts $(V lanes-scope)
 [ -z "$SERIAL" ] && step root-test . npm test
 uptime >> "$O/machine.txt"
 echo done > "$O/done"

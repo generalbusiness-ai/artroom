@@ -130,22 +130,36 @@ export function testPorts(c: Controls): Partial<Ports> {
 export interface Net {
   clock: ScriptedClock;
   bounds: Bounds;
+  /** The bounds of one scope, by the name of its object, in place of `bounds`. They are read once, when the object is constructed. */
+  sized: Map<string, Bounds>;
   hold: ((envelope: Delivered) => boolean) | null;
   deaf: ((envelope: Delivered) => boolean) | null;
   /** The table of the scripted test capability, a stand-in, for every scope of the namespace. Null: no capability, as in production. */
   capability: CapabilityScript | null;
+  /**
+   * The entries of scripted platform peers, by the hash of the fact that
+   * names each, with the name of the definition that the peer is said to
+   * pin. A scripted peer is a stand-in for a scope of a platform kind that
+   * is not delivered, such as a rules scope or a destination. Its entries
+   * are written by the test, and nothing judged them. A scope of the
+   * namespace reads one as it reads any source entry, so a test that uses
+   * one shows the receiver's side of a delivery and nothing about the peer.
+   */
+  peers: Map<Digest, { entry: Entry; under: string }>;
 }
 
-export const net: Net = { clock: new ScriptedClock("2099-01-01T00:00:00Z"), bounds: PROPOSED_BOUNDS, hold: null, deaf: null, capability: null };
+export const net: Net = { clock: new ScriptedClock("2099-01-01T00:00:00Z"), bounds: PROPOSED_BOUNDS, sized: new Map(), hold: null, deaf: null, capability: null, peers: new Map() };
 
 /**
  * Test ports for a scope in that namespace: the test authority and readers,
  * the shared clock, the given transport behind `hold` and `deaf`, and the
  * scripted test capability over the namespace's table, which is none until
- * a test sets one. The resolver and the definitions port are not replaced:
- * a source entry, and a child's declaration, are read from the real object.
+ * a test sets one. The definitions port is not replaced: a child's
+ * declaration is read from the real object. Given the namespace's
+ * `resolver`, an entry of a scripted peer is read from `peers`, and every
+ * other source entry from the real object.
  */
-export function netPorts(n: Net, transport: Transport): Partial<Ports> {
+export function netPorts(n: Net, transport: Transport, resolver?: Resolver): Partial<Ports> {
   const disturbed: Transport = {
     async send(envelope) {
       if (n.hold?.(envelope)) return null;
@@ -155,5 +169,6 @@ export function netPorts(n: Net, transport: Transport): Partial<Ports> {
       return null;
     },
   };
-  return { clock: n.clock, authority: testAuthority, readers: testReaders, transport: disturbed, capabilities: scriptedCapability(() => n.capability) };
+  const scripted: Partial<Ports> = resolver ? { resolver: { read: (fact, seconds) => { const peer = n.peers.get(fact.hash); return peer ? Promise.resolve(peer) : resolver.read(fact, seconds); } } } : {};
+  return { clock: n.clock, authority: testAuthority, readers: testReaders, transport: disturbed, capabilities: scriptedCapability(() => n.capability), ...scripted };
 }

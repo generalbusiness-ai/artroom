@@ -11,16 +11,21 @@
     "./definitions/change.json": "./definitions/change.json"
   },
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json",
-    "test": "vitest run --config vitest.config.ts",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json && tsc -p tsconfig.scope.json",
+    "test": "vitest run --config vitest.config.ts && vitest run --config vitest.scope.config.ts",
     "pin": "node scripts/pin.mjs"
   },
   "dependencies": {
     "@generalbusiness/artroom-contract": "0.1.0-dev.1"
   },
   "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "0.22.0",
+    "@cloudflare/workers-types": "5.20260815.1",
     "@generalbusiness/artroom-bytes": "0.1.0-dev.1",
+    "@generalbusiness/artroom-client": "0.1.0-dev.1",
     "@generalbusiness/artroom-derive": "0.1.0-dev.1",
+    "@generalbusiness/artroom-replay": "0.1.0-dev.1",
+    "@generalbusiness/artroom-scope": "0.1.0-dev.1",
     "@types/node": "26.6.3",
     "vitest": "4.1.11"
   },
