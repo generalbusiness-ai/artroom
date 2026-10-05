@@ -29,12 +29,12 @@ what a judge drafts, in one storage transaction for each entry.
 | `definitions` | `creates(declared)`: the digests a declaration names in its `create` sends. `namedBy(root, read, validate, limit)`: the declarations a scope retains for its children. |
 | `turn` | `Turns.run(waiting, founding?)`: section 5.2, steps 3 to 7, and section 5.3. `isSigned` and `fetchFacts`: step 1. `Waiting`, `Verdict`, `End`. |
 | `core` | `Scope`: `found`, `submit`, `settle`, `alarm`, `checkpoint`, `pinned`. `receiptOf`. The answers `Founded` and `Checkpointed`. |
-| `reads` | `Reads`: `summary`, `items`, `history`, `entry`, `outbox`. `ReadBounds` and `READ_BOUNDS`. |
+| `reads` | `Reads`: `summary`, `items`, `history`, `entry`, `outbox`, and `duty`, one send's row. For a verifier: `log`, a history page as stored bytes, and `retained`, one retained input. `ReadBounds` and `READ_BOUNDS`. |
 | `delivery` | `Deliveries.deliver(envelope)`: receiving. It reads the source entry through the resolver, checks it against the fact's hash, and runs derive's delivery judge, or its genesis judge for a `create` that reaches an empty store, in the scope's turn. It answers as transport does: `recorded` with a fact, `retry`, `routing` or `source-unverified`. |
 | `outbox` | `Dispatcher.run()`: sending. One pass at a time over the sends that are due: a durable record before each dispatch and after its answer, a retry delay that doubles, and a `diagnosis` input through the turn when a request is given up. `Wakes`: one alarm for the earliest deadline and the next dispatch. |
 | `namespace` | `namespace(binding)`: the production `Resolver`, `Transport` and `Definitions`, each one RPC call on the object a scope ID names. `routed`: the resolver of a name, which refuses a wrong address before any judgment. `sourced`: the answer to a read of one entry. `declaredBy`: the answer to a read of one retained declaration. |
 | `object` | `ScopeObject`: the Durable Object class. It wires the store, the ports, the core, receiving, the dispatcher and the reads, and exposes them over RPC: `found`, `submit`, `settle`, `checkpoint`, the reads, `deliver`, `source`, `declared` and `dispatch`. Its `alarm()` runs the alarm's turn and then a dispatch pass. With no transport, which is its default, nothing is dispatched. |
-| `worker` (its own entry, `@generalbusiness/artroom-scope/worker`) | `route(request, binding)`: the HTTP routes. `ScopeService`: the same operations over a service binding. `DeployedScope`: the object class with the namespace as its resolver, its transport and its source of declarations. `api(binding)`: what both call. The default export is the deployed Worker. |
+| `worker` (its own entry, `@generalbusiness/artroom-scope/worker`) | `route(request, binding)`: the HTTP routes. `ScopeService`: the same operations over a service binding; it implements the contract's `ScopeApi`, which a client's transport also is. `DeployedScope`: the object class with the namespace as its resolver, its transport and its source of declarations. `api(binding)`: what both call. The default export is the deployed Worker. |
 
 `@generalbusiness/artroom-scope/testing` is for tests only: a test
 authority that calls every grant current, a test readers port, a scripted
@@ -187,6 +187,9 @@ the contract's own answer.
 | `GET /v1/scopes/:scope/history?cursor=` | A page of the history | as above |
 | `GET /v1/scopes/:scope/entries/:seq` | One entry | as above |
 | `GET /v1/scopes/:scope/outbox?cursor=` | A page of the outbox | as above |
+| `GET /v1/scopes/:scope/outbox/:duty` | The outbox status of one send, by its duty ID | as above |
+| `GET /v1/scopes/:scope/log?cursor=` | A page of the history as stored: each entry's canonical bytes and hash, for a verifier | as above |
+| `GET /v1/scopes/:scope/retained/:kind/:digest` | One retained input: a `definition`, an `entry` or a `rule` input, by digest | as above; 413 past 1 MiB |
 
 A body that is not a JSON object is 400. A reader is the `Authorization`
 header, passed to the readers port as it is.
@@ -215,3 +218,15 @@ namespace.
 
 Pure derivation is tested in the derive package and is not tested again
 here.
+
+Three files here hold what needs this package and another together, so
+that neither of those imports the runtime in its source:
+
+- `test/replay.test.ts`: histories that real scopes wrote are read through
+  the Worker's read routes and replayed by
+  `@generalbusiness/artroom-replay`.
+- `test/client.test.ts`: a scope handle of
+  `@generalbusiness/artroom-client` over the Worker's routes and over its
+  service-binding entrypoint.
+- `test/conformance.types.ts`: typechecked only. The entrypoint and the
+  client's transport satisfy one interface, the contract's `ScopeApi`.

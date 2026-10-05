@@ -20,6 +20,8 @@
     "@generalbusiness/artroom-derive": "0.1.0-dev.1"
   },
   "devDependencies": {
+    "@generalbusiness/artroom-client": "0.1.0-dev.1",
+    "@generalbusiness/artroom-replay": "0.1.0-dev.1",
     "@cloudflare/vitest-pool-workers": "0.22.0",
     "@cloudflare/workers-types": "5.20260815.1",
     "vitest": "4.1.11"
