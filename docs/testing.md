@@ -83,6 +83,18 @@ deployed class with the production authority and those stand-ins: a
 test of real authority runs there, in the namespace `PLATFORM`
 (`packages/scope/test/repository.ts` lists what is real in it).
 
+The destination has stand-ins of its own, in
+`packages/platform/test/support-destination.ts`. `standInRules` is a rule
+for each of the ten marks of the destination's data that the platform
+package has no rule for (`notes/2026-10-05-i3-contract-deltas.md`,
+entries ER4 to ER9): without them nothing is created under
+`platform:destination@1`, in a test as in production. `bureau` is a
+made-up directory that creates one destination scope. The lane's and the
+register's entries are made by hand. `Branch` is a destination scope in
+memory below such a bureau. A test that uses one says so. It shows the
+destination's rows and its eight real rules, and nothing about an outcome
+entry, a push or a founding.
+
 A replay of a history that the test authority wrote says so:
 `grants: "as-recorded"`. Its grants hold no freshness proof, and the
 report lists them as trusted. The replay command never takes that option.
