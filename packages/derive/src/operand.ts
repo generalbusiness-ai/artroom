@@ -221,13 +221,17 @@ export function operand(j: Judging, o: Operand, item: Item | null): unknown {
 /**
  * Equality of two values that operands read (section 6.2): equal canonical
  * JSON, after local facts are put in normal form. A fact reference to this
- * scope's own entry, with that entry's hash, is that entry's `seq`. Null
- * equals null and nothing else.
+ * scope's own entry, with that entry's hash, is that entry's `seq`, where
+ * it is the value, an element of a list or a member of a record, to any
+ * depth. So a record as an entry's bytes hold it equals the same record as
+ * `readFacts` gave it to a field or a slot. Null equals null and nothing
+ * else.
  */
 export function equal(j: Judging, a: unknown, b: unknown): boolean {
   const normal = (v: unknown): unknown => {
     if (Array.isArray(v)) return v.map(normal);
-    return isFactRef(v) && isLocalFact(v, j.scope.at) && j.own?.(v.seq)?.hash === v.hash ? v.seq : v;
+    if (isFactRef(v)) return isLocalFact(v, j.scope.at) && j.own?.(v.seq)?.hash === v.hash ? v.seq : v;
+    return isObject(v) ? Object.fromEntries(Object.entries(v).map(([name, member]) => [name, normal(member)])) : v;
   };
   return same(normal(a), normal(b));
 }
