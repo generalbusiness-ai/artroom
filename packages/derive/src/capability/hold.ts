@@ -36,6 +36,7 @@ import type { Item, Operation, RecordState, StateView } from "../state.ts";
 import { timeMs, type Clock } from "../time.ts";
 import type { ValidDefinition } from "../validate/index.ts";
 import { own, same } from "../values.ts";
+import { isAncestryCheck } from "./ancestry.ts";
 
 export const HOLD: CapabilityName = "hold@1";
 
@@ -523,6 +524,14 @@ const next = (view: StateView): number => view.scope()!.head.seq + 1;
 
 const basis = (confirmed: Evidence["basis"]) => (result: OutcomeInput["result"], evidence: Evidence): boolean => result === "unknown" || evidence.basis === (result === "confirmed" ? confirmed : "own-answer");
 
+/**
+ * The body of the evidence of a `confirmed` check (section 6.11, the step
+ * `check`): the ancestry record, or null for a read that was cut short or a
+ * walk that passed a bound, which gives a record that is `too-large` and no
+ * judgment (I3 deltas, entry EF5).
+ */
+const isCheckEvidence = (body: unknown): body is { record: unknown } => isRecord(body) && Object.keys(body).length === 1 && (body["record"] === null || isAncestryCheck(body["record"]));
+
 /** The body of the evidence of a `confirmed` mint: the host's token ID and end time (authority note, section 5.7, "Evidence of each outside effect"; I3 deltas, entry EF5). */
 const minted = (body: unknown): { token: string; ends: Timestamp } | null => (isRecord(body) && typeof body["token"] === "string" && body["token"] !== "" && timeMs(body["ends"]) !== null ? { token: body["token"], ends: body["ends"] as Timestamp } : null);
 
@@ -546,7 +555,7 @@ function operationRules(definition: (view: StateView) => ValidDefinition | null)
     // Section 6.11, the step `check`: its outcome entry is the check entry. Its evidence is the ancestry record. It records the
     // `check` record, `recorded`, or `too-large` when the walk passed a bound (`gitread.ts` has the evidence's form).
     [HOLD_KINDS.check]: {
-      selects: false, read: true, retries: () => false, wellFormed: (result, evidence) => basis("read")(result, evidence) && (result !== "confirmed" || (isRecord(evidence.body) && "record" in evidence.body)),
+      selects: false, read: true, retries: () => false, wellFormed: (result, evidence) => basis("read")(result, evidence) && (result !== "confirmed" || isCheckEvidence(evidence.body)),
       derives: (view, operation, outcome) => {
         const pin = outcome.result === "confirmed" ? namedBy(view, "pin", ["provisional"], "check", operation) : null;
         const root = pin ? record(view, "root", [pin.values["root"] as number]) : null;

@@ -37,8 +37,8 @@ describe("the records of `hold@1` (scope contract, section 6.11; authority note,
       "refused not-staged", ["refused", "attempt 2 opened"], "creating", ["confirmed", "root live", "pin provisional", "opens check x1", "attempt 1 opened"], "refused not-staged",
     ]);
     // The check entry: the outcome of the one read, whose evidence is the ancestry record. Its record is what a presented pin carries.
-    expect([shape(s.outcome("9:0", "confirmed", { record: clean(X, 1) }, "read")), s.record("check", intentDigest(report.intent), 1)]).toEqual([["confirmed", "check recorded"], {
-      state: "recorded", intent: intentDigest(report.intent), commit: X, consumer: s.at, lane: s.at, hold: s.hold, instance: "i1", root: 1, attribution: [una.member, keys.paul.member], record: clean(X, 1),
+    expect([shape(s.outcome("9:0", "confirmed", { record: clean(s.at, X, 1) }, "read")), s.record("check", intentDigest(report.intent), 1)]).toEqual([["confirmed", "check recorded"], {
+      state: "recorded", intent: intentDigest(report.intent), commit: X, consumer: s.at, lane: s.at, hold: s.hold, instance: "i1", root: 1, attribution: [una.member, keys.paul.member], record: clean(s.at, X, 1),
     }]);
     expect(preparationStatus(s.state, s.own, intentDigest(report.intent))).toEqual([{ entry: s.fact(7), capability: "hold@1", step: "stage", operations: [{ operation: "7:0", kind: "stage", state: "settled" }], records: [{ kind: "root", key: [1], state: "live" }] }]);
 

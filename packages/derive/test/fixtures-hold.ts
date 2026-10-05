@@ -14,8 +14,8 @@
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { Effect, Entry, Evidence, FieldValue, OperationId, ScopeRef } from "@generalbusiness/artroom-contract";
 import { isScopeRef } from "@generalbusiness/artroom-bytes";
-import { checkpointOf, clockOf, holdCapability, judgePreparation, owed, settleOutcome, workspaceEffects } from "../src/index.ts";
-import type { CapabilityGiven, HoldReads, ValidDefinition } from "../src/index.ts";
+import { capabilitiesOf, checkpointOf, clockOf, gitRead, holdCapability, judgePreparation, owed, settleOutcome, snapshotOf, stagedRefName, workspaceEffects } from "../src/index.ts";
+import type { AncestryCheck, CapabilityGiven, HoldReads, StagedRef, ValidDefinition } from "../src/index.ts";
 import { Scope, grantOf, keys, lane, variant, type Actor } from "./fixtures.ts";
 
 /** A commit ID: forty of one hex digit. */
@@ -31,12 +31,13 @@ export const reads: HoldReads = {
 const commit = { type: "commit" } as const;
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export const staging: ValidDefinition = variant(lane, (def: any) => {
+  def.capabilities.push({ name: "git-read", version: 1 });
   def.items.report.states = { reported: { final: false }, accepted: { final: true }, refused: { final: true } };
   def.items.report.values = { commit: { fixed: false, required: false, of: commit } };
   def.items.export = { many: true, max: 4, states: { authorized: { final: false }, done: { final: true } }, initial: "authorized", parties: {}, refs: { hold: { fixed: true, required: true, to: { type: "item", of: "hold" } } }, values: {} };
   const report = def.acts.report;
   report.fields = { ...report.fields, commit: { ...commit, required: true }, hold: { type: "item", of: "hold", required: false }, instance: { type: "text", max: 128, required: false } };
-  report.guards.push({ capability: { name: "hold", guard: "staged", with: { commit: { field: "commit" }, under: { item: "also.commitment" } } } });
+  report.guards.push({ capability: { name: "hold", guard: "staged", with: { commit: { field: "commit" }, under: { item: "also.commitment" } } } }, { capability: { name: "git-read", guard: "ancestry", with: { commit: { field: "commit" }, row: { const: "report" } } } });
   report.effects.push({ value: { slot: "commit", from: { field: "commit" } } }, { capability: { name: "hold", do: "pin-hold", with: { commit: { field: "commit" } } } });
   def.acts["refuse-report"] = {
     step: "transition", on: "report", grant: "review", also: {}, fields: {}, guards: [{ state: ["reported"] }], sends: [], attention: [],
@@ -48,8 +49,17 @@ export const staging: ValidDefinition = variant(lane, (def: any) => {
   };
 });
 
-/** The capability's code over the fixture lane, with at most two tokens of one hold at once. */
-export const cap = holdCapability({ reads, tokensPerHold: 2 }, () => staging);
+/** The snapshots of staged refs that the fixture's scopes retain, by digest: what a scope's store keeps for the guard `ancestry`. */
+export const snapshots = new Map<string, readonly StagedRef[]>();
+/** Keep one snapshot, as a scope does before the check entry that names its digest. */
+export function kept(pairs: readonly StagedRef[]): AncestryCheck["snapshot"] {
+  const snapshot = snapshotOf(pairs)!;
+  snapshots.set(snapshot.digest, snapshot.pairs);
+  return { digest: snapshot.digest, count: snapshot.count };
+}
+
+/** The code of both capabilities over the fixture lane, with at most two tokens of one hold at once. */
+export const cap = capabilitiesOf(holdCapability({ reads, tokensPerHold: 2 }, () => staging), gitRead({ snapshot: (digest) => snapshots.get(digest) ?? null }));
 
 const said = (j: { result: string; reason?: string; name?: string; detail?: string }): string => [j.result, j.reason ?? "", j.name ?? ""].filter((part) => part !== "").join(" ");
 
@@ -127,5 +137,6 @@ export class Staging extends Scope {
   reserved(): number { return owed(this.state, this.definition, this.last.input, cap); }
 }
 
-/** An ancestry record that judges nothing foreign: the evidence of a check that found the commit clean. */
-export const clean = (commitId: string, root: number) => ({ commit: commitId, root: { number: root, state: "live" }, head: C("d"), snapshot: { digest: `sha256:${"5".repeat(64)}`, count: 1 }, start: { foreign: null }, stops: [], F: [], visited: 1 });
+/** An ancestry record that judges nothing foreign: the evidence of a check that found the commit clean. The one staged ref on it is the lane's own root. */
+export const clean = (at: ScopeRef, commitId: string, root: number): AncestryCheck =>
+  ({ commit: commitId, root: { number: root, state: "live" }, head: C("d"), snapshot: kept([{ ref: stagedRefName(at, commitId, root), target: commitId }]), start: { foreign: null }, stops: [], F: [], visited: 1 });

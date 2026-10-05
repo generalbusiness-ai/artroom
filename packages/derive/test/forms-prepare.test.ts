@@ -55,7 +55,10 @@ describe("a preparation (scope contract, section 5.5), with stand-in step rules"
       entry: s.fact(2), capability: "hold@1", step: "instance",
       operations: [{ operation: "2:0", kind: "mint", state: "pending" }], records: [{ kind: "instance", key: [0, "i1"], state: "current" }],
     }]);
-    expect([preparationStatus(s.state, s.own, intentDigest(s.intent(una, "take-hold").intent)), s.replay().snapshot() === s.state.snapshot(), s.replay(2).all().prepared]).toEqual([[], true, undefined]);
+    // The index and the record are members of the folded state. A state that holds neither has the members it had before they
+    // existed, and no other, so its canonical bytes and its digest are what they were.
+    expect([preparationStatus(s.state, s.own, intentDigest(s.intent(una, "take-hold").intent)), s.replay().snapshot() === s.state.snapshot(), Object.keys(s.state.all()).slice(-2), Object.keys(s.replay(2).all())])
+      .toEqual([[], true, ["prepared", "records"], ["v", "scope", "items", "counts", "relations", "accepted", "requests", "decided", "creations", "operations", "texts"]]);
   });
 
   test("a refusal is an answer and no entry: each check, in the order of an act's, with the window that the step asks of its grant", () => {
