@@ -103,6 +103,8 @@ export type RevokeReply = { revoked: true } | { revoked: false };
  * resolves: the driver then has no answer. An implementation presents the
  * host account's credential itself (section 5.5), and never returns it.
  */
+// I3 merge: no adapter of `GitHost` and no production `Custody` exist. The host session supplies the first (plan question Q6), and
+// step 27 the second, with the gateway's store. Until both exist `production()` keeps `NO_OUTSIDE` (`scope/src/ports.ts`).
 export interface GitHost {
   mint(ask: MintAsk): Promise<MintReply>;
   revoke(ask: RevokeAsk): Promise<RevokeReply>;

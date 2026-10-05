@@ -22,6 +22,7 @@
 import type { Answer, Entry, OperationId, Read } from "@generalbusiness/artroom-contract";
 import { TokenDriver } from "@generalbusiness/artroom-git";
 import { variant } from "@generalbusiness/artroom-derive/testing";
+// I3 merge: from the git package's `./testing` export, once its manifest has one and the scope's manifest names the package.
 import { TokenHost, Vault } from "../../git/test/support/tokens.ts";
 import { CAPABILITY_CODE, type Diagnosis, type EffectAnswer, type EffectRequest, type OperationStatus, type Outside } from "../src/index.ts";
 import { controls } from "../src/testing.ts";

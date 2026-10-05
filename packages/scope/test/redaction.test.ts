@@ -1,5 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
 import { MAX_FIELD, MAX_TEXT, diagnosis, redact, report, toConsole } from "../src/index.ts";
+// I3 merge: from the git package's `./testing` export, as in `hosted.ts`.
 import { secret } from "../../git/test/support/tokens.ts";
 import { hosted } from "./hosted.ts";
 import { reader } from "./support.ts";
