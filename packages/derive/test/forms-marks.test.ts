@@ -368,8 +368,36 @@ describe("a rule is run at the check of its mark's place (sections 4.2 and 6.1)"
     // The same data with every form made: k sends, and the second ordinal is the second form's again.
     const both = entered(listed(false, true), tell("a"), tell("b"));
     expect([both.sends, both.clauseOf(1), both.clauseOf(2)]).toEqual([[[0, "create"], [1, "a"], [2, "b"]], ["write", "a"], ["write", "b"]]);
+    // Row I3-38: the bound on the fields of one send holds for a rule's message. At the bound it is sent, and one field more is a
+    // fault of the rule.
+    const wide = (n: number) => ({ to: otherLane, message: { class: "request", type: "tell", body: { message: "a", fields: Object.fromEntries(Array.from({ length: n }, (_, i) => [`f${i}`, i])) } } }) as unknown as ReturnType<typeof tell>;
+    const most = PROPOSED_BOUNDS.sendFields;
+    expect([entered(listed(true, false), wide(most), null).answer, entered(listed(true, false), wide(most + 1), null).answer]).toEqual(["write", "unavailable"]);
     // Case 4: a mark that states `always`, whose rule gives no request: a fault. The input is not judged, and nothing is written.
     expect([entered(listed(true, true), null, tell("b")).answer, entered(listed(true, false), tell("a"), null).answer]).toEqual(["unavailable", "write"]);
+  });
+
+  // Scope contract, revision 19, section 6.1, "A rule that decides a further attempt is given the state" (row I3-35; I3 delta ER5).
+  test("the rule that says whether another attempt is allowed is given what every rule is given: it reads the folded state before the outcome entry, and the outcome as the judge set it", () => {
+    const s = new Scope(gateWith((d) => { d.acts.enter.grant = "gate.enter"; }));
+    for (const secret of ["one", "two"]) s.did(rita, "issue", { fields: { hash: textDigest(secret) } });
+    const opens = some(() => [{ effect: "operation", k: 0, owner: OWNER, kind: "probe", attempts: 2 }, { effect: "attempt", operation: { k: 0 }, attempt: 1, result: "opened", selected: null }]);
+    expect(said(enter(s, una, "one", owned({ "key-id": opens })))).toEqual(["write", null, null, null]);
+    const operation = `${s.last.seq}:0` as OperationId;
+    const given: unknown[] = [];
+    /** The outcome `refused` of attempt 1, under a retry rule that allows another attempt while a ticket in that state exists. */
+    const settled = (state: "open" | "used" | "none") => {
+      const retries: OutcomeRule["retries"] = (result, of, rule) => { given.push([result, of.id, rule.input.type === "outcome" && rule.input.kind, rule.resolved.self]); return state !== "none" && rule.state.count("ticket", state) > 0; };
+      const judged = settleOutcome(s.state, s.definition, { type: "outcome", operation, attempt: 1, result: "refused", evidence: { basis: "own-answer", body: {} } },
+        { clock: clockOf(s.state, s.now), bounds: PROPOSED_BOUNDS, own: s.own, platform: owned({ probe: { place: "outcome", rules: { selects: false, read: false, retries } } }) });
+      return judged.result === "write" ? judged.draft.effects.filter((effect) => effect.effect === "attempt").map((effect) => [effect.attempt, effect.result]) : judged.result;
+    };
+    // Ticket 2 is `used` and ticket 3 is `open`. A rule that reads no ticket of a state that the fold holds allows none.
+    expect([settled("open"), settled("used"), settled("none")]).toEqual([[[1, "refused"], [2, "opened"]], [[1, "refused"], [2, "opened"]], [[1, "refused"]]]);
+    expect(given[0]).toEqual(["refused", operation, "probe", s.head.seq + 1]);
+    // The state decides: with no open ticket left, the same rule allows no further attempt.
+    expect(said(enter(s, vic, "two", owned({ "key-id": some(() => []) })))).toEqual(["write", null, null, null]);
+    expect([settled("open"), settled("used")]).toEqual([[[1, "refused"]], [[1, "refused"], [2, "opened"]]]);
   });
 
   test("an item that a rule opens counts against its type's `max` in every entry: an outcome's rule that would pass it has a fault, and a clause's rule that would pass it changes nothing; an outcome's rule sends no more than one entry may", () => {

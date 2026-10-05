@@ -169,7 +169,7 @@ describe("the rules of platform:directory@1, each as a plain function (authority
     // Row d: basis `own-answer`, so no read is decisive; it selects nothing; another attempt may follow.
     const { rules: outcome } = directoryRules["import"] as { rules: OutcomeRule };
     const formed = (body: unknown) => outcome.wellFormed!("confirmed", { basis: "own-answer", body });
-    expect([outcome.selects, outcome.read, outcome.retries("refused", null as never), outcome.closure]).toEqual([false, false, true, undefined]);
+    expect([outcome.selects, outcome.read, outcome.retries("refused", null as never, null as never), outcome.closure]).toEqual([false, false, true, undefined]);
     expect([formed({ commit: "a".repeat(40) }), formed({ commit: "b".repeat(64) }), formed({ commit: "main" }), formed({ commit: "a".repeat(40), more: 1 }), formed(null), outcome.wellFormed!("refused", { basis: "own-answer", body: null })])
       .toEqual([true, true, false, false, false, true]);
   });

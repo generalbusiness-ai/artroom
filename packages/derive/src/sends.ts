@@ -227,6 +227,10 @@ export function deriveSends(j: Judging, forms: readonly SendForm[], working: Rea
         if (relations.has(key)) return { ok: false, reason: "duplicate-relation", detail: `sends.${i}` };
         relations.add(key);
       }
+      // Revision 19, section 6.1 (row I3-38): the bound on the fields of one send holds for a rule's message, as the validator
+      // holds a written one to it. A message with more is a fault of the rule.
+      const carried = message.type === "relate" ? body["detail"] : body["fields"];
+      if (isObject(carried) && Object.keys(carried).length > j.bounds.sendFields) throw outside(mark, `a message of more than ${j.bounds.sendFields} fields`);
       sends.push(request);
       continue;
     }

@@ -78,7 +78,7 @@ describe("the rules of platform:register@1, each as a plain function (authority 
     ]);
     for (const kind of ["revoke-credential", "delete-repository"]) {
       const { rules } = registerRules[kind] as { rules: OutcomeRule };
-      expect([rules.selects, rules.read, rules.retries("refused", null as never), rules.retries("unknown", null as never), rules.derives, rules.closure]).toEqual([false, false, true, true, undefined, undefined]);
+      expect([rules.selects, rules.read, rules.retries("refused", null as never, null as never), rules.retries("unknown", null as never, null as never), rules.derives, rules.closure]).toEqual([false, false, true, true, undefined, undefined]);
     }
     expect(CREATION_ATTEMPTS).toBe(3);
   });

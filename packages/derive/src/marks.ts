@@ -279,7 +279,8 @@ export interface OutcomeGives { effects: readonly RuleEffect[]; sends: readonly 
  * Place 7: the judgment of each outcome entry of one kind of operation, at
  * each thing that section 4.3 leaves to the owner. `selects`: the kind
  * selects one result. `read`: a read of the outside system is decisive for
- * it. `retries`: another attempt is allowed. `holds`: the owner's local
+ * it. `retries`: another attempt is allowed; it is given what every rule
+ * is given, with the folded state (revision 19, row I3-35). `holds`: the owner's local
  * guard for a selection; absent, it holds. `wellFormed`: the evidence is
  * well formed; absent, any body is. `derives`: the entry's effects and
  * requests; absent, none. `closure`: the most entries that the operations
@@ -289,7 +290,7 @@ export interface OutcomeRule {
   selects: boolean;
   read: boolean;
   closure?: number;
-  retries(result: "refused" | "unknown", operation: Operation): boolean;
+  retries(result: "refused" | "unknown", operation: Operation, given: RuleGiven): boolean;
   holds?(given: RuleGiven, operation: Operation): boolean;
   wellFormed?(result: "confirmed" | "refused" | "unknown", evidence: Evidence): boolean;
   derives?(given: RuleGiven, operation: Operation, selected: boolean | null): OutcomeGives;
