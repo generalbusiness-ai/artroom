@@ -970,6 +970,13 @@ force, and this work is not filed. The parts that rest on the adopted
 revision 24 alone are the three rules of membership, the register's guard
 and the answer to EM16. Everything else here rests on revision 19.
 
+**Added on 2026-10-05, later.** The planner has adopted the scope
+contract's revision 19 at `1ca8a59bf6b88f6f38b18b2fe36ae5d2cd2afb7e`
+(request `6e6ef421`). It replaces revision 18 as the contract in force. The
+paragraph above was true when it was written. This work was built before
+that adoption and is filed after it, with the second milestone of I3. The
+adoption is of the design, and accepts no source.
+
 No entry that an earlier source wrote has other bytes. Neither lane digest
 changes: `packages/lanes/test/definitions.test.ts` shows both pinned
 definitions with the same bytes, digest, reservations and static sizes at
