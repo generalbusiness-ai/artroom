@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:abb3595d3f0ac8d30e051d56e34fd464910ab78c","text":"Merge retired a covered predecessor; the successor is at scripts/active-source.test.mjs."}
+{"kind":"artifact","text":"docs/lanes-reference.md at exact 744f2447843e578a79d95486f42a649c13bb02c6 on request/i2-lane-forms, under promise git:sha1…2e7906d on request git:sha1…b0ddf9a","body":{"commit":"744f2447843e578a79d95486f42a649c13bb02c6","path":"docs/lanes-reference.md"}}
