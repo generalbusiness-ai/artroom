@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:8437874f998861ffec8d376f5eeb40a8759223dc","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-05-test-economy-bytes-client-replay.md."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:ab54a036652202b6562ea2d23bcc3e852fcf0b4d","text":"Merge retired a covered predecessor; the successor is at packages/client/test/intent.test.ts."}
