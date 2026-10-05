@@ -24,6 +24,7 @@ import { canonicalBytes, digestBytes } from "@generalbusiness/artroom-bytes";
 import type { Draft } from "./judge.ts";
 import type { AttemptState, Operation, OutcomeState, StateView } from "./state.ts";
 import { timeMs, type Clock } from "./time.ts";
+import type { ValidDefinition } from "./validate/index.ts";
 
 export type Owner = CapabilityName | PlatformDefinition;
 export type OutcomeInput = Extract<Input, { type: "outcome" }>;
@@ -65,8 +66,19 @@ export interface OperationRules {
   closure?: number;
 }
 
-/** The rules of the owners that a runtime or a verifier has code for. Null: none for that owner and kind. */
-export interface Owners { rules(owner: Owner, kind: string): OperationRules | null }
+/**
+ * The rules of the owners that a runtime or a verifier has code for. Null:
+ * none for that owner and kind.
+ *
+ * `reserves`: the entries that the owners' pending records reserve in this
+ * state, beside their operations (section 17.2, row 6: "a capability record
+ * awaiting its messages", and what the capability declares). `owed`, in
+ * `reserve.ts`, adds it. Absent: the owners keep no record that reserves.
+ */
+export interface Owners {
+  rules(owner: Owner, kind: string): OperationRules | null;
+  reserves?(view: StateView, definition: ValidDefinition): number;
+}
 
 /** The closure that the owner declares for one outcome entry of that kind of operation (section 17.2, row 5). With no rules, no outcome is judged, so none derives anything. */
 export const closureOf = (owners: Owners | null | undefined, owner: Owner, kind: string): number => owners?.rules(owner, kind)?.closure ?? 0;

@@ -19,3 +19,4 @@ export * from "./ledger.ts";
 export * from "./rules.ts";
 export * from "./reserve.ts";
 export * from "./prepare.ts";
+export * from "./capability/hold.ts";

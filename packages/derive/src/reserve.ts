@@ -34,6 +34,10 @@
  *   `ledger.ts`). With each of those outcome entries, the closure that the
  *   operation's owner declares for one: the entries of the operations that
  *   an outcome opens, such as a cleanup (`OperationRules.closure`);
+ * - a capability record that awaits its messages (row 6; authority note,
+ *   section 5.8): what its capability declares, which the owners' code
+ *   counts from the folded records (`Owners.reserves`). For `hold@1` that is
+ *   `holdReserves`, in `capability/hold.ts`;
  * - the closing checkpoint: one entry, once for the scope, from the genesis
  *   on, except while the head entry is a checkpoint and no other duty is
  *   pending.
@@ -73,6 +77,9 @@ export function owed(view: StateView, definition: ValidDefinition, head: Input, 
   entries += (2 + definition.clauseEntries) * open.requests + (1 + definition.clauseEntries) * open.unavailable;
   // Section 17.2, row 5: each outcome entry that an operation may still write, and with it the closure that its owner declares.
   for (const { owner, kind, entries: outcomes } of open.outcomes) entries += outcomes * (1 + closureOf(owners, owner, kind));
+  // Section 17.2, row 6: a capability record that awaits its messages, and what its capability declares for it. The owners' code
+  // counts its own records (`Owners.reserves`). With no code no such record is made, so none reserves.
+  entries += owners?.reserves?.(view, definition) ?? 0;
   // The closing checkpoint is reserved unless the history already ends on a checkpoint with nothing pending.
   return entries === 0 && head.type === "checkpoint" ? 0 : entries + 1;
 }

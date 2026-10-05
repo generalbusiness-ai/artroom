@@ -37,13 +37,16 @@ export interface Recorded { kind: string; key: readonly FieldValue[]; state: str
  * network.
  *
  * - `view`: the folded state before the entry.
+ * - `definition`: the pinned definition, which says which item types are
+ *   holds (authority note, section 5.7, "Who derives them").
  * - `scope` and `self`: this scope, and the `seq` of the entry being written.
+ * - `own`: this scope's own sealed entries, by position.
  * - `kind`, `fields`, `signer` and `intent`: the input, as the judge read it.
  * - `facts` and `source`: the entries in `uses` that the input names, and
  *   for a handler the verified source entry.
  * - `clock`: the one reading of the commit.
  */
-export type CapabilityGiven = Pick<Judging, "view" | "scope" | "self" | "kind" | "fields" | "signer" | "intent" | "facts" | "source" | "clock">;
+export type CapabilityGiven = Pick<Judging, "view" | "definition" | "scope" | "self" | "kind" | "fields" | "signer" | "intent" | "facts" | "source" | "own" | "clock">;
 
 /** One form that needs a capability's own code, as the validator lists it (section 6.1): the version, the kind of form and its name. */
 export type CapabilityForm = Pick<Underived, "capability" | "form" | "name">;
@@ -66,7 +69,7 @@ export interface Capabilities {
   effect(capability: CapabilityName, effect: string, args: Readonly<Record<string, unknown>>, given: CapabilityGiven): readonly Recorded[];
 }
 
-const given = ({ view, scope, self, kind, fields, signer, intent, facts, source, clock }: Judging): CapabilityGiven => ({ view, scope, self, kind, fields, signer, intent, facts, source, clock });
+const given = ({ view, definition, scope, self, kind, fields, signer, intent, facts, source, own, clock }: Judging): CapabilityGiven => ({ view, definition, scope, self, kind, fields, signer, intent, facts, source, own, clock });
 
 /** What a capability version declares, or undefined for a version that the contract's tables do not have. */
 export const declaredBy = (capability: string): Capability | undefined => own(CAPABILITIES as Readonly<Record<string, Capability>>, capability);
