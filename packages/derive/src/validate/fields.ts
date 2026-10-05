@@ -97,8 +97,9 @@ export function fieldType(d: Defining, v: unknown, path: string, extra: readonly
  * named after what holds the record, with a dot. `typed` gives the type of
  * what a name holds; null when only the commit knows it; undefined when
  * nothing has that name. A name that holds something is read whole, also
- * when it has a dot. Undefined: nothing has the name, or what it leads to is
- * no record that the definition states with that member.
+ * when it has a dot. A member of what only the commit knows is known only
+ * to the commit too. Undefined: nothing has the name, or what it leads to is
+ * a type that the definition states and that is no record with that member.
  */
 export function memberType(typed: (name: string) => FieldType | null | undefined, name: string): FieldType | null | undefined {
   const whole = typed(name);
@@ -106,7 +107,8 @@ export function memberType(typed: (name: string) => FieldType | null | undefined
   for (let dot = name.indexOf("."); dot !== -1; dot = name.indexOf(".", dot + 1)) {
     let type = typed(name.slice(0, dot));
     if (type === undefined) continue;
-    for (const member of name.slice(dot + 1).split(".")) type = type?.type === "record" ? own(type.of, member) : undefined;
+    // An element whose type only the commit knows may hold any member: one that is not there is none.
+    for (const member of name.slice(dot + 1).split(".")) type = type === null ? null : type?.type === "record" ? own(type.of, member) : undefined;
     return type;
   }
   return undefined;

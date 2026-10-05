@@ -50,8 +50,10 @@ describe("the record type (section 6.2)", () => {
       return defining.problems.length > 0 ? defining.problems.map((p) => p.code) : type;
     };
     expect([read("k"), read("k.job"), read("k.by")]).toEqual([element, { type: "item", of: "job", required: true }, { type: "fact", kind: ["ask"], under: "board", required: false }]);
-    // A member the record does not have, a member of a member that is no record, and a member of an element whose type only the commit knows.
-    expect([read("k.none"), read("k.job.of"), read("k.job", null), read("j.job")]).toEqual([["name"], ["name"], ["name"], ["name"]]);
+    // A member the record does not have, a member of a member that is no record, and a name that nothing binds.
+    expect([read("k.none"), read("k.job.of"), read("j.job")]).toEqual([["name"], ["name"], ["name"]]);
+    // An element whose type only the commit knows may hold any member, and the member's type is the commit's to know too.
+    expect(read("k.job", null)).toBeNull();
 
     const j = { elements: new Map<string, unknown>([["k", { job: 2, by: 7 }], ["k.why", "a name with a dot is read whole"]]) } as unknown as Judging;
     expect(["k", "k.job", "k.why", "k.none", "k.job.of", "j.job"].map((name) => operand(j, { element: name }, null))).toEqual([{ job: 2, by: 7 }, 2, "a name with a dot is read whole", null, null, null]);

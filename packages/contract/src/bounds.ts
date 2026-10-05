@@ -33,8 +33,8 @@ export interface Bounds {
   also: number;                    // other local items one act names
   presents: number;                // facts presented beside one intent. No source reads a presented fact yet
   guards: number;                  // of one act or handler, as written; also the clauses of one `where`
-  nestedGuards: number;            // of one act or handler, counting those nested in `each`, `has` and `anyOf`. No source reads a nested guard yet
-  guardDepth: number;              // how deep a guard may be nested. No source reads a nested guard yet
+  nestedGuards: number;            // of one act or handler, counting those nested in `each`, `has` and `anyOf`
+  guardDepth: number;              // how deep a guard may be nested; a guard as written is at depth 1
   effects: number;                 // of one act or handler, and of one result clause
   sends: number;                   // send forms of one act or handler, of which at most one is a fan-out
   fanOut: number;                  // sends of one fan-out: the most live items of the type its range covers. No source derives a fan-out yet
