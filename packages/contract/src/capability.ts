@@ -6,9 +6,11 @@
  *
  * `CAPABILITIES` restates the contract's tables for `hold@1` and
  * `git-read@1` as data, as far as the tables give names. It is what a
- * validator checks a `capability` guard or effect against. It holds no rule:
- * the rules behind each record, guard, effect and step are the authority
- * note's, and no source derives them yet.
+ * validator checks a `capability` guard or effect, a `carried` part and the
+ * kind of a preparation entry against. It holds no rule: the rules behind
+ * each record, guard, effect and step are the authority note's, and no
+ * source derives them yet. A runtime that has no code for them answers
+ * `unsupported-definition` for a definition that needs one.
  */
 
 export type CapabilityName = `${"hold" | "git-read"}@${number}`;

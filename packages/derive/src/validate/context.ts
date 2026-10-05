@@ -5,7 +5,8 @@
  * subject is resolved.
  */
 
-import type { Bounds, FieldType } from "@generalbusiness/artroom-contract";
+import type { Bounds, CapabilityName, FieldType } from "@generalbusiness/artroom-contract";
+import type { Underived } from "./capability.ts";
 import type { Shapes } from "./shape.ts";
 
 export interface Slot { kind: "party" | "ref" | "value"; fixed: boolean; required: boolean; list: boolean; type: FieldType; hasDefault: boolean }
@@ -69,6 +70,8 @@ export interface Defining extends Shapes {
   readonly types: Map<string, Type>;        // the item types that were read whole
   readonly rules: Set<string>;              // the names of the declared rule expressions
   holds: boolean;                           // the definition lists `hold@1`
+  readonly capabilities: Map<string, CapabilityName>;   // each capability the definition lists, by its name, with its version
+  readonly underived: Underived[];          // each form that needs a capability's own code to derive (section 6.11)
   readonly holdTypes: Set<string>;          // section 6.8: the types a `hold: open` effect targets
   readonly indexes: RangeIndex[];
   readonly clauseSets: ClauseSet[];         // one for each result clause that is reserved for (section 17.2)

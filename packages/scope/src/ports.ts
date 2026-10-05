@@ -8,7 +8,7 @@
  */
 
 import type { Digest, Entry, FactRef, Grant, PlatformDefinition, Prepared, RoutingRefusal, ScopeRef, Timestamp, UnavailableReason } from "@generalbusiness/artroom-contract";
-import { timeOf, type Delivered, type RuleInput } from "@generalbusiness/artroom-derive";
+import { timeOf, type Capabilities, type Delivered, type RuleInput } from "@generalbusiness/artroom-derive";
 import { evaluateRules } from "@generalbusiness/artroom-derive/rule";
 
 /** One reading for each call (section 5.3). The core calls it once in a step 3 and once in a commit. */
@@ -98,6 +98,13 @@ export interface Ports {
   clock: Clock; random: Random; authority: Authority; resolver: Resolver; rules: Rules; alarm: Alarm; definitions: Definitions; texts: SentTexts; readers: Readers;
   /** Null: this scope has no transport. Its sends stay in the outbox and nothing dispatches them. */
   transport: Transport | null;
+  /**
+   * The rules of the capability versions this runtime has code for (section
+   * 6.11), which derive a `capability` guard and effect. Null: it has none.
+   * A scope is then not founded or created under a definition that needs
+   * one: `unsupported-definition`.
+   */
+  capabilities: Capabilities | null;
 }
 
 /**
@@ -105,7 +112,9 @@ export interface Ports {
  * runtime's. The rules are derive's evaluator. The alarm does nothing until
  * the object supplies its own. There is no transport until a namespace
  * supplies one, and no declaration and no sent text can be read until a
- * namespace supplies the scope that retains it. Every other port refuses.
+ * namespace supplies the scope that retains it. There is no code for any
+ * capability record: the records, guards and effects of `hold@1`, and
+ * `git-read@1`, are not delivered yet. Every other port refuses.
  */
 export function production(): Ports {
   return {
@@ -121,5 +130,6 @@ export function production(): Ports {
     texts: { read: () => Promise.resolve({ ok: false, reason: "unavailable" }) },
     readers: { allows: () => false },
     transport: null,
+    capabilities: null,
   };
 }

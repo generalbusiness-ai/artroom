@@ -2,11 +2,12 @@
 
 import type { FieldType } from "@generalbusiness/artroom-contract";
 import { isObject } from "../values.ts";
+import { capabilityGuard } from "./capability.ts";
 import { onSubject, subject, type Ctx, type Defining, type Type } from "./context.ts";
 import { fieldOf, isDetached, operand, type Read } from "./operands.ts";
 import { at, type Rec } from "./shape.ts";
 
-const GUARDS = ["state", "signer", "notIn", "set", "unset", "equals", "differs", "some", "none", "count", "every", "fact", "before", "after", "rule", "each", "has", "anyOf", "distinct", "sameSet"];
+const GUARDS = ["state", "signer", "notIn", "set", "unset", "equals", "differs", "some", "none", "count", "every", "fact", "before", "after", "rule", "each", "has", "anyOf", "distinct", "sameSet", "capability"];
 
 /** The guards of one written list, counted with those nested in them (section 6.1). */
 interface Nesting { count: number }
@@ -195,6 +196,10 @@ export function guard(d: Defining, v: unknown, path: string, ctx: Ctx, nesting: 
       if ([...(ctx.fields?.values() ?? [])].some(isDetached) || [ctx.on, ...ctx.also.values()].some((t) => t !== null && [...t.slots.values()].some((s) => isDetached(s.type)))) {
         bad("redactable-read", p, "a rule reads every field and every subject, and one of them holds a detached text");
       }
+      break;
+    case "capability":
+      // Section 6.11: a guard that a listed capability declares. Its refusal has the name the capability gives, so a `reason` names nothing.
+      capabilityGuard(d, x, p, ctx, item);
       break;
     case "each": case "has": {
       const r = k === "each" ? rec(x, p, ["list", "as", "guards"], ["where"]) : rec(x, p, ["list", "as", "where"], ["guards"]);

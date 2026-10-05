@@ -33,14 +33,19 @@ what a judge drafts, in one storage transaction for each entry.
 | `delivery` | `Deliveries.deliver(envelope)`: receiving. It reads the source entry through the resolver, checks it against the fact's hash, and runs derive's delivery judge, or its genesis judge for a `create` that reaches an empty store, in the scope's turn. It answers as transport does: `recorded` with a fact, `retry`, `routing` or `source-unverified`. |
 | `outbox` | `Dispatcher.run()`: sending. One pass at a time over the sends that are due: a durable record before each dispatch and after its answer, a retry delay that doubles, and a `diagnosis` input through the turn when a request is given up. `Wakes`: one alarm for the earliest deadline and the next dispatch. |
 | `namespace` | `namespace(binding)`: the production `Resolver`, `Transport`, `Definitions` and `SentTexts`, each one RPC call on the object a scope ID names. `routed`: the resolver of a name, which refuses a wrong address before any judgment. `sourced`: the answer to a read of one entry. `declaredBy`: the answer to a read of one retained declaration. `sentText`: the answer to a read of one detached text that a send of this scope names. |
-| `object` | `ScopeObject`: the Durable Object class. It wires the store, the ports, the core, receiving, the dispatcher and the reads, and exposes them over RPC: `found`, `submit`, `settle`, `checkpoint`, the reads, `deliver`, `source`, `declared` and `dispatch`. Its `alarm()` runs the alarm's turn and then a dispatch pass. With no transport, which is its default, nothing is dispatched. |
+| `object` | `ScopeObject`: the Durable Object class. It wires the store, the ports, the core, receiving, the dispatcher and the reads, and exposes them over RPC: `found`, `submit`, `settle`, `checkpoint`, the reads, `deliver`, `source`, `declared`, `text` and `dispatch`. Its `alarm()` runs the alarm's turn and then a dispatch pass. With no transport, which is its default, nothing is dispatched. |
 | `worker` (its own entry, `@generalbusiness/artroom-scope/worker`) | `route(request, binding)`: the HTTP routes. `ScopeService`: the same operations over a service binding; it implements the contract's `ScopeApi`, which a client's transport also is. `DeployedScope`: the object class with the namespace as its resolver, its transport and its source of declarations. `api(binding)`: what both call. The default export is the deployed Worker. |
 
 `@generalbusiness/artroom-scope/testing` is for tests only: a test
 authority that calls every grant current, a test readers port, a scripted
 clock, a gate that pauses preparation, a resolver over entries a test
 supplies, and, for several scopes in one namespace, a transport that a test
-can hold back or make lose an answer. The main entry and `worker.ts` do not import it.
+can hold back or make lose an answer. It also has `scriptedCapability`, a
+stand-in for the code of `hold@1` and `git-read@1`: it answers each
+capability guard and effect from a table that the test supplies, and reads
+no hold, no record and no repository. A test that uses it shows what a
+definition does once a capability has answered, and nothing about a real
+hold, a Git read or a provider. The main entry and `worker.ts` do not import it.
 
 ## Ports and their production defaults
 
@@ -56,6 +61,7 @@ can hold back or make lose an answer. The main entry and `worker.ts` do not impo
 | `Definitions` | A declaration by digest or platform name, from the scope that retains it. | A platform name is `unsupported-definition`. A digest is unavailable. `DeployedScope` supplies the namespace, which reads a child's declaration from its creator. |
 | `SentTexts` | A detached text that a delivered message names by digest, from the scope that sent the message. | Unavailable: a delivery that names one is not decided. `DeployedScope` supplies the namespace, which reads the text from the sender. |
 | `Readers` | Whether a reader may make a read. | Nobody may: every read is `forbidden`. |
+| `capabilities` | The rules of the capability versions this runtime has code for: the records, guards and effects of `hold@1`, and `git-read@1`. | None. A scope is not founded or created under a definition that needs one: `unsupported-definition`. The item form of `hold@1`, with its `hold` effect, needs none and runs. |
 
 So a deployed scope can be founded and can create children, and then
 admits no act and answers no read. The authority note's rules and sessions

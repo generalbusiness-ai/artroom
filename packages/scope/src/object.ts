@@ -60,7 +60,7 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
     this.#scope = new Scope(this.#name, store, ports, bounds);
     this.#reads = new Reads(store, () => this.#scope.pinned(), ports.readers, wiring.reads ?? READ_BOUNDS);
     this.#deliveries = new Deliveries(this.#name, this.#scope, store, ports, bounds);
-    this.#dispatcher = wakes && given.transport ? new Dispatcher(this.#scope, store, { transport: given.transport, clock: ports.clock }, wakes, bounds) : null;
+    this.#dispatcher = wakes && given.transport ? new Dispatcher(this.#scope, store, { transport: given.transport, clock: ports.clock, capabilities: ports.capabilities }, wakes, bounds) : null;
   }
 
   /**

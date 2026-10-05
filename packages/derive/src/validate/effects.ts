@@ -4,6 +4,7 @@ import type { Bounds, EffectForm, FieldType } from "@generalbusiness/artroom-con
 import { canonicalize } from "@generalbusiness/artroom-bytes";
 import { LAST_MS } from "../time.ts";
 import { isObject, isValue } from "../values.ts";
+import { capabilityEffect } from "./capability.ts";
 import { onSubject, subject, type Ctx, type Defining, type Slot, type Type } from "./context.ts";
 import { assignable } from "./fields.ts";
 import { guards, range } from "./guards.ts";
@@ -12,7 +13,7 @@ import { copy, isDetached, operand } from "./operands.ts";
 import { at, type Rec } from "./shape.ts";
 import { memberBytes, stated } from "./sizes.ts";
 
-const EFFECTS = ["state", "party", "ref", "value", "attribute", "hold", "redact"];
+const EFFECTS = ["state", "party", "ref", "value", "attribute", "hold", "redact", "capability"];
 const MEMBER: FieldType = { type: "member" };
 
 /** The slot of the primary item that a written effect may set to a value, if any. An effect under a condition is one: the commit checks what was set. */
@@ -46,6 +47,14 @@ export function effect(d: Defining, v: unknown, path: string, ctx: Ctx, later: b
   if ("unless" in o) guards(d, o["unless"], at(path, "unless"), { ...judged, live: new Set() });
   // Section 6.4: a timed rule's effects are total. A condition could leave its item due, and one that is not completed leaves the entry unwritten.
   if (ctx.timed && ("if" in o || "unless" in o)) bad("timed-partial", path, "a timed rule's effects take no condition");
+  if (k === "capability") {
+    // Section 6.11: a capability's effect changes its own records and no item, so it needs no subject and conflicts with no
+    // other effect. A slot with no `of` is a slot of the subject it names, or of the primary item when there is one.
+    const named = "of" in o ? subject(d, of, at(path, "of"), ctx, false) : null;
+    if ("of" in o && (named === null || named === "scope")) return null;
+    capabilityEffect(d, x, p, ctx, () => (named as Type | null) ?? ctx.on ?? bad("name", p, "there is no primary item whose slot this could be"));
+    return { what: `the capability effect at ${p}`, successive: false };
+  }
   const s = subject(d, of, at(path, "of"), ctx, false);
   if (s === null || s === "scope") return null;
   const nascent = ctx.nascent && !later && onSubject(of);

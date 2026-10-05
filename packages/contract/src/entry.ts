@@ -7,6 +7,7 @@
 import type { Digest, FactRef, Incarnation, MemberRef, OperationId, PlatformDefinition, ScopeId, ScopeRef, Seed, Grant, Timestamp } from "./scope.ts";
 import type { FieldValue, SignedIntent } from "./intent.ts";
 import type { RefusalReason } from "./result.ts";
+import type { CapabilityName } from "./capability.ts";
 
 export interface Entry {
   v: 1;
@@ -96,6 +97,8 @@ export type Effect =
   | { effect: "hold"; item: number; change: "open" | "renew" | "end"; epoch: number }   // section 6.8
   | { effect: "redact"; item: number; slot: string; texts: readonly Digest[] }          // the entry is the tombstone of those texts; section 6.6
   | { effect: "relation"; owner: ScopeRef; item: number; name: string; state: string; revision: number }   // the owner's item; section 7.3
+  | { effect: "record"; capability: CapabilityName; kind: string; key: readonly FieldValue[];
+      state: string; values: Record<string, unknown> }                                  // one change of a capability's record; section 6.11
   | { effect: "activate" }                                                              // section 7.2
   | { effect: "operation"; operation: OperationId; attempt: number }                    // opens an operation's next numbered attempt; section 4.3
   | { effect: "index"; from: FactRef; fields: Record<string, FieldValue> }              // a projection row in the directory

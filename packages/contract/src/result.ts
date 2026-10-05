@@ -25,6 +25,7 @@ export type RefusalReason =
   | "fact-mismatch"     // a fact field names this scope, and the hash it gives is not the hash of this scope's entry at that position
   | "unauthorized"      // no presented grant is current and covers the action, the key and the scope
   | "guard-failed"      // a guard does not hold on a completed evaluation. When the guard declares a `reason`, the refusal carries it as its name
+  | "capability-refused" // a capability guard does not hold. The name is the refusal that the capability declares for it (section 6.11)
   | "slot-full"         // a party list would pass its `max`
   | "type-full"         // an opening would pass the type's `max` of live items, or a first relationship update the `copies` of its handler
   | "send-unresolved"   // a send's target or item resolves to nothing

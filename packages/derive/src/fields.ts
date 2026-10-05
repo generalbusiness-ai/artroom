@@ -8,6 +8,7 @@
 
 import type { ActType, Bounds, Digest, Entry, FactRef, FactUse, FieldRecord, FieldType, FieldValue, Prepared, Request, ScopeRef, Sealed } from "@generalbusiness/artroom-contract";
 import { canonicalBytes, digestBytes, entryHash, isDigest, isIntent } from "@generalbusiness/artroom-bytes";
+import type { Capabilities } from "./capability.ts";
 import type { Fetched, RuleInput } from "./guards.ts";
 import type { StateView } from "./state.ts";
 import type { Clock } from "./time.ts";
@@ -39,6 +40,7 @@ export interface Reading {
   asked?: RuleInput[] | undefined;      // set by `prepareRules` only
   own?: Own | undefined;                // this scope's own history. Without it an input that names a local fact is not judged
   texts?: Texts | undefined;            // the detached texts that came with the input. Without it an input that names one is not judged
+  capabilities?: Capabilities | undefined;   // the rules of the capabilities this runtime has code for (section 6.11). Without them a capability form is not judged
 }
 
 /** The shape of section 2.1, which the bytes package guards beside the contract's other fixed records. */

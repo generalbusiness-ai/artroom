@@ -9,7 +9,7 @@
 
 import type { ActType, Answer, Beside, Bounds, DeclaredDefinition, Digest, DutyId, Entry, FactRef, Founded, Grant, PlatformDefinition, Receipt, RefusalReason, ScopeId, Seed, Settlement, SignedIntent, UnavailableReason } from "@generalbusiness/artroom-contract";
 import { canonicalize, definitionDigest, intentDigest, isDigest, isGrant, newIncarnation, parseStrict, textDigest, utf8 } from "@generalbusiness/artroom-bytes";
-import { checkpointOf, factsNamed, inputTexts, isObject, judgeAct, judgeCheckpoint, judgeGenesis, own, prepareRules, presentedTypes, readFields, validateDefinition } from "@generalbusiness/artroom-derive";
+import { checkpointOf, derivable, factsNamed, inputTexts, isObject, judgeAct, judgeCheckpoint, judgeGenesis, own, prepareRules, presentedTypes, readFields, validateDefinition } from "@generalbusiness/artroom-derive";
 import type { ActJudgment, Clock as Reading, Draft, Fetched, Founding, JudgeContext, Own, Texts, ValidDefinition } from "@generalbusiness/artroom-derive";
 import { RULE_PROFILES } from "@generalbusiness/artroom-derive/rule";
 import { namedBy } from "./definitions.ts";
@@ -135,11 +135,16 @@ export class Scope {
     this.#turns = new Turns(store, ports, bounds, () => { const pinned = this.pinned(); return pinned ? pinned.definition : undefined; });
   }
 
-  /** A declaration, validated as its canonical bytes parse, so a scope reads one value before and after a restart. */
+  /**
+   * A declaration, validated as its canonical bytes parse, so a scope reads
+   * one value before and after a restart. Null: it does not validate, or it
+   * needs a capability record that this runtime has no code for (section
+   * 6.11). Either way this runtime cannot pin it: `unsupported-definition`.
+   */
   validate(bytes: string): ValidDefinition | null {
     try {
       const checked = validateDefinition(parseStrict(bytes), this.#bounds, RULE_PROFILES);
-      return checked.ok ? checked.definition : null;
+      return checked.ok && derivable(checked.definition, this.#ports.capabilities) ? checked.definition : null;
     } catch {
       return null;
     }
@@ -231,7 +236,7 @@ export class Scope {
 
     const texts = Received.beside(besideOf(beside).texts, act.fields, bounds);
     const asked = (inc: Founding["inc"]): Founding => ({ name, inc, seed, founding });
-    const context = (clock: Reading) => ({ clock, bounds, facts, source: null, texts: texts.sizes });
+    const context = (clock: Reading) => ({ clock, bounds, facts, source: null, texts: texts.sizes, capabilities: this.#ports.capabilities ?? undefined });
     const pinned = (): Pinned => this.pinned() ?? { named: valid.digest, definition: valid };
     const answer = (sealed: Sealed): Founded =>
       (sealed.entry.input.type === "genesis" && sealed.entry.input.decision === "applied" ? { answer: "accepted", receipt: receiptOf(sealed, pinned().named) } : refused("scope-refused"));
@@ -307,7 +312,7 @@ export class Scope {
     // Section 5.1: held authority is read with the clock. The verdict on each grant is asked for on the reading it is used with.
     const given = (Array.isArray(grants) ? grants : []).filter(isGrant);
     const context = (clock: Reading): Omit<JudgeContext, "prepared"> =>
-      ({ clock, bounds, facts, own: ownOf(this.#store), texts: texts.sizes, presented: offered, grants: given.map((grant) => ({ grant, current: authority.current(grant, scope.at, clock.reading) })) });
+      ({ clock, bounds, facts, own: ownOf(this.#store), texts: texts.sizes, presented: offered, capabilities: this.#ports.capabilities ?? undefined, grants: given.map((grant) => ({ grant, current: authority.current(grant, scope.at, clock.reading) })) });
 
     const end = await this.#turns.run<Answer>({
       asks: (view, clock) => prepareRules(view, definition, { act: signed, context: { ...context(clock), prepared: [] } }),

@@ -116,7 +116,7 @@ export function judgeGenesis(view: StateView, definition: ValidDefinition, asked
 
   const j: Judging = {
     view, definition, bounds, clock, scope: { at, creator: seed.creator }, self: 0, kind: definition.declared.genesis, fields: named.fields, fieldTypes: act.fields,
-    subjects: new Map(), signer: null, facts: named.facts, prepared: context.prepared, used: [], asked: context.asked,
+    subjects: new Map(), signer: null, facts: named.facts, prepared: context.prepared, used: [], asked: context.asked, capabilities: context.capabilities,
   };
   // A child's result is at ordinal 0; the sends its act declares follow. Each scope a genesis creates has that genesis's own seed digest as its cause.
   // Section 6.6: the scope records its directory with this entry: its creator, or the directory that its creator put in the creation.

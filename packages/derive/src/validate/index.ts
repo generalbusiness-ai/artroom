@@ -11,14 +11,15 @@
  * order. Each family of forms has its module beside it: `fields` and
  * `items` (sections 6.2 and 6.3), `operands` and `guards` (6.5), `effects`,
  * `sends` and `hold` (6.6 and 6.8), `handlers` for acts and handlers (6.4),
- * `timed` (5.2 and 6.4) and `capacity` (17.2). `shape` holds the readers and
- * the problems, `context` what the families share, and `sizes` the byte
- * bounds.
+ * `timed` (5.2 and 6.4), `capacity` (17.2) and `capability` (6.11). `shape`
+ * holds the readers and the problems, `context` what the families share,
+ * and `sizes` the byte bounds.
  */
 
 import type { Bounds, DeclaredDefinition, Digest } from "@generalbusiness/artroom-contract";
 import { canonicalize, definitionDigest, utf8 } from "@generalbusiness/artroom-bytes";
 import { isObject, own } from "../values.ts";
+import { capabilities, type Underived } from "./capability.ts";
 import { capacityOf, type PendingCopy } from "./capacity.ts";
 import type { Defining, RangeIndex } from "./context.ts";
 import { acts, receives } from "./handlers.ts";
@@ -29,6 +30,7 @@ import { timedEntryBytes, timedGraph, timedKinds, timedRules } from "./timed.ts"
 
 export type { RangeIndex } from "./context.ts";
 export type { Problem, ProblemCode } from "./shape.ts";
+export type { Underived } from "./capability.ts";
 export { timedGraph, type TimedGraph, type TimedMove } from "./timed.ts";
 
 /** A definition that passed, with what was derived from it. The judges and the fold take only this. */
@@ -60,6 +62,13 @@ export interface ValidDefinition {
   readonly pending: Readonly<Record<string, Readonly<Record<string, number>>>>;
   /** Section 17.2, row 4: each relationship whose copies await a settlement, with the states and the entries a copy in one of them reserves. */
   readonly pendingCopies: readonly PendingCopy[];
+  /**
+   * Section 6.11: each form that this package reads and does not derive by
+   * itself, with the capability version whose own code derives it. A runtime
+   * or a verifier that has no such code answers `unsupported-definition` for
+   * the whole definition (`derivable`). Empty: every form is derived here.
+   */
+  readonly underived: readonly Underived[];
 }
 
 export type Validation = { ok: true; definition: ValidDefinition } | { ok: false; problems: readonly Problem[] };
@@ -77,7 +86,7 @@ export const PROFILES: Readonly<Record<string, Profile>> = { "restricted@1": {} 
 
 export function validateDefinition(input: unknown, bounds: Bounds, profiles: Readonly<Record<string, Profile>> = PROFILES): Validation {
   const read = shapes(bounds);
-  const { problems, bad, rec, entries, list, str } = read;
+  const { problems, bad, rec, entries, str } = read;
 
   const top = rec(input, "", ["format", "name", "profile", "capabilities", "genesis", "items", "acts", "receives", "timed", "rules"]);
   if (!top) return { ok: false, problems };
@@ -93,6 +102,7 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
 
   const d: Defining = {
     ...read, bounds, name: typeof top["name"] === "string" ? top["name"] : null, typeNames: new Set(isObject(top["items"]) ? Object.keys(top["items"]) : []), types: new Map(), rules: new Set(), holds: false, holdTypes: new Set(),
+    capabilities: new Map(), underived: [],
     indexes: [], clauseSets: [], clause: null, duties: [],
   };
 
@@ -107,12 +117,8 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
     d.rules.add(name);
   }
 
-  list(top["capabilities"], "capabilities", 2).forEach((c, i) => {
-    const o = rec(c, at("capabilities", i), ["name", "version"]);
-    if (!o) return;
-    if (o["name"] === "hold" && o["version"] === 1) d.holds = true;
-    else bad("capability", at("capabilities", i), "is not a capability this runtime implements");
-  });
+  // Section 6.1: each capability the definition uses, by name and version. They are read first: a field type may name one.
+  capabilities(d, top["capabilities"]);
 
   // Fields and items (sections 6.2 and 6.3).
   itemTypes(d, top["items"]);
@@ -160,7 +166,7 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
   const capacity = capacityOf(d, graph, moves);
   if (problems.length > 0) return { ok: false, problems };
   try {
-    return { ok: true, definition: { declared, digest: definitionDigest(declared), timedTypes: [...timedTypes].sort(), holdTypes: [...d.holdTypes].sort(), indexes: d.indexes, ...capacity } };
+    return { ok: true, definition: { declared, digest: definitionDigest(declared), timedTypes: [...timedTypes].sort(), holdTypes: [...d.holdTypes].sort(), indexes: d.indexes, ...capacity, underived: d.underived } };
   } catch {
     return { ok: false, problems: [{ code: "shape", path: "", message: "has no canonical bytes" }] };
   }

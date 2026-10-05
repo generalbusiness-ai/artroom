@@ -82,7 +82,7 @@ const rows: readonly (readonly [string, DeclaredDefinition, Change, ProblemCode 
   ["a time offset longer than the span a timestamp can name", lane, (d) => { d.acts["take-hold"].effects[1].value.from.time.plusSeconds = Number.MAX_SAFE_INTEGER; }, "bound"],
   ["a timed rule over a final state", ticket, pausing((d) => d.timed.pause.states.push("answered")), "timed"],
   ["a profile this runtime does not implement", small, (d) => { d.profile.version = 2; }, "profile"],
-  ["a capability this runtime does not implement", small, (d) => d.capabilities.push({ name: "git-read", version: 1 }), "capability"],
+  ["a capability version that the contract does not declare", small, (d) => d.capabilities.push({ name: "git-read", version: 2 }), "capability"],
 
   // Section 6.10: forms that are not part of the grammar. No implementer invents them.
   ["G1: an operand path into a fact", small, (d) => d.acts.edit.guards.push({ equals: { a: { field: "text", path: "on" }, b: { const: 1 } } }), "shape"],

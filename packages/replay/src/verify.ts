@@ -36,7 +36,7 @@ import {
   MemoryState, applyEntry, clockOf, entryOf, inputTexts, isFactRef, isLocalId, isObject, isScopeRef, judgeAct, judgeCheckpoint, judgeDelivery, judgeDiagnosis, judgeGenesis, judgeOutcome, judgeTimed,
   nextDue, timeMs, updateOf, validateDefinition,
 } from "@generalbusiness/artroom-derive";
-import type { ActJudgment, Clock, Fetched, Judgment, TimedJudgment, ValidDefinition } from "@generalbusiness/artroom-derive";
+import type { ActJudgment, Capabilities, Clock, Fetched, Judgment, TimedJudgment, ValidDefinition } from "@generalbusiness/artroom-derive";
 import { RULE_PROFILES, evaluateRules } from "@generalbusiness/artroom-derive/rule";
 import { PAGE_ENTRIES, PAGE_REPLY_BYTES, RETAINED_REPLY_BYTES, hashOfBytes, type HistorySource, type Stored } from "./source.ts";
 
@@ -68,6 +68,12 @@ export interface Options {
   limits?: Partial<Limits> | undefined;
   /** The bounds the scopes run under. A replay scans every range guard to its end, whatever `guardScan` says (section 9.3). */
   bounds?: Bounds | undefined;
+  /**
+   * The rules of the capability versions this replay has code for (section
+   * 9.3). With none, a scope whose definition needs a capability record is
+   * `unsupported-definition`. The package itself has none.
+   */
+  capabilities?: Capabilities | undefined;
 }
 
 /** A report, and in words why its result is not `consistent`. */
@@ -154,6 +160,7 @@ class Verifier {
   readonly #anchors: readonly Anchor[];
   readonly #limits: Limits;
   readonly #bounds: Bounds;
+  readonly #capabilities: Capabilities | undefined;
   readonly #runs = new Map<ScopeId, Run>();
   readonly #trusts = new Set<Trust>();
   /** The foreign facts proven, by scope, position and hash: by replay of their source, or by an anchor. */
@@ -173,6 +180,7 @@ class Verifier {
     this.#limits = { ...LIMITS, ...options.limits };
     // Section 9.3: each range guard is derived over every item it covers, so the scan never stops unfinished.
     this.#bounds = { ...(options.bounds ?? PROPOSED_BOUNDS), guardScan: Number.MAX_SAFE_INTEGER };
+    this.#capabilities = options.capabilities;
   }
 
   async run(): Promise<Verification> {
@@ -450,6 +458,9 @@ class Verifier {
     // Bytes that do not parse, or do not hash to the value named, are rejected before anything in them is read (section 9.4).
     if (declared === undefined) throw new Stop("incomplete", `a retained input is not the one named: the definition's declaration, ${digest}`, where);
     const checked = validateDefinition(declared, this.#bounds, RULE_PROFILES);
+    // Section 9.3: a capability version that the verifier does not implement gives `unsupported-definition`.
+    const needs = checked.ok ? checked.definition.underived.find((u) => !this.#capabilities?.implements(u.capability)) : undefined;
+    if (needs) throw new Stop("unsupported-definition", `the pinned definition needs ${needs.capability}, which this replay has no code for: ${needs.form} ${needs.name} at ${needs.path}`, where);
     if (checked.ok) return checked.definition;
     // Section 9.3: a history whose genesis opens a timed item is invalid.
     if (checked.problems.some((p) => p.code === "genesis-timed")) throw new Stop("mismatch", "genesis-timed: the pinned definition's genesis act opens a timed item", where);
@@ -562,7 +573,7 @@ class Verifier {
       if (size === null) run.owed.push({ text, at: where });
     }
     // Section 6.2: a local fact, and a part of one, are read from this scope's own history: the entries checked so far.
-    const reading = { clock, bounds, facts, prepared: entry.prepared, own: (at: number) => run.sealed[at] ?? null, texts: (digest: Digest) => texts.get(digest) ?? null };
+    const reading = { clock, bounds, facts, prepared: entry.prepared, own: (at: number) => run.sealed[at] ?? null, texts: (digest: Digest) => texts.get(digest) ?? null, capabilities: this.#capabilities };
     const copyOf = (fact: FactRef | null) => facts.find((f) => f.fact.hash === fact?.hash) ?? null;
     const own = (seq: unknown): Entry | null => (isLocalId(seq) ? (run.sealed[seq]?.entry ?? null) : null);
     let judged: ActJudgment | Judgment | TimedJudgment;

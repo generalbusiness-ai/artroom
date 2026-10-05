@@ -72,7 +72,7 @@ const variant = (by: string, variants: Record<string, Check>): Check => (v) => {
 // Each table has every member of its union, and the compiler says so when the contract gains or loses one.
 export const REFUSAL_REASONS: Record<RefusalReason, true> = {
   "revision-moved": true, alias: true, "duplicate-relation": true, "required-unset": true, "scope-full": true, "bad-intent": true, misaddressed: true, expired: true, "scope-refused": true,
-  "unknown-act": true, "bad-field": true, "no-item": true, final: true, "fact-mismatch": true, unauthorized: true, "guard-failed": true, "slot-full": true, "type-full": true, "send-unresolved": true,
+  "unknown-act": true, "bad-field": true, "no-item": true, final: true, "fact-mismatch": true, unauthorized: true, "guard-failed": true, "capability-refused": true, "slot-full": true, "type-full": true, "send-unresolved": true,
   "unknown-message": true, "bad-input": true,
 };
 export const READ_REFUSALS: Record<ReadRefusal, true> = {
@@ -154,6 +154,8 @@ const effect = variant("effect", {
   hold: record({ effect: any, item: isLocalId, change: among({ open: true, renew: true, end: true }), epoch: isLocalId }),
   redact: record({ effect: any, item: isLocalId, slot: text, texts: listOf(isDigest) }),
   relation: record({ effect: any, owner: scopeRef, item: isLocalId, name: text, state: text, revision: isLocalId }),
+  // A capability's record: its name and version are of the one form `name@version`. What its key and its values hold is the capability's to say.
+  record: record({ effect: any, capability: (v) => typeof v === "string" && /^(hold|git-read)@(0|[1-9][0-9]*)$/.test(v), kind: text, key: listOf(isFieldValue), state: text, values: isRecord }),
   activate: record({ effect: any }),
   operation: record({ effect: any, operation: isOperationId, attempt: isLocalId }),
   index: record({ effect: any, from: factRef, fields: isRecord }),

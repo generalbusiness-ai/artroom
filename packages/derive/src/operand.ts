@@ -137,8 +137,12 @@ function entryPart(j: Judging, ref: Held, at: ScopeRef, part: EntryPart, item: I
     const id = operand(j, part.set.item, item);
     return isLocalId(id) ? given(entry, id, part.set.slot) : null;
   }
-  // A capability record is not derived by any source yet, and the validator refuses the part.
-  return null;
+  // Section 6.5: a member of a capability record that this entry's effects hold, written `kind.member`. None when the entry holds
+  // no record of that kind, or more than one.
+  const [kind, ...member] = part.carried.split(".");
+  const records = entry.effects.filter((e) => e.effect === "record" && e.kind === kind);
+  const record = records.length === 1 ? records[0] : undefined;
+  return record?.effect === "record" ? (own(record.values, member.join(".")) ?? null) : null;
 }
 
 /** A part of the entry that a fact reference names. Null when the value is not a fact reference, or the entry does not have the part. */

@@ -27,7 +27,7 @@
  */
 
 import type { Attempt, Bounds, Entry, Timestamp } from "@generalbusiness/artroom-contract";
-import { judgeDiagnosis, timeMs, timeOf } from "@generalbusiness/artroom-derive";
+import { judgeDiagnosis, timeMs, timeOf, type Capabilities } from "@generalbusiness/artroom-derive";
 import { ownOf, retainedFacts, used, type Scope } from "./core.ts";
 import type { Alarm, Clock, Transport } from "./ports.ts";
 import type { Dispatched, Outgoing, Store } from "./store.ts";
@@ -69,10 +69,13 @@ export class Dispatcher {
   readonly #clock: Clock;
   readonly #wakes: Wakes;
   readonly #bounds: Bounds;
+  /** For the clause of a diagnosis, which may hold a capability effect (section 6.11). */
+  readonly #capabilities: Capabilities | undefined;
   #running: Promise<number> | null = null;
   #again = false;
 
-  constructor(scope: Scope, store: Store, ports: { transport: Transport; clock: Clock }, wakes: Wakes, bounds: Bounds) {
+  constructor(scope: Scope, store: Store, ports: { transport: Transport; clock: Clock; capabilities?: Capabilities | null }, wakes: Wakes, bounds: Bounds) {
+    this.#capabilities = ports.capabilities ?? undefined;
     this.#scope = scope;
     this.#store = store;
     this.#transport = ports.transport;
@@ -172,7 +175,7 @@ export class Dispatcher {
       const end = await this.#scope.turns.run<boolean>({
         asks: () => [],
         judge: (view, clock) => {
-          const judged = judgeDiagnosis(view, definition, { of: { seq, n }, attempts }, { clock, bounds, facts, prepared: [], origin, own: ownOf(store) });
+          const judged = judgeDiagnosis(view, definition, { of: { seq, n }, attempts }, { clock, bounds, facts, prepared: [], origin, own: ownOf(store), capabilities: this.#capabilities });
           switch (judged.result) {
             case "write":
               // Room for this entry was counted when the request was sent (section 9.2).

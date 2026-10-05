@@ -7,6 +7,7 @@
 import type { FieldType } from "@generalbusiness/artroom-contract";
 import { isScopeKind } from "@generalbusiness/artroom-bytes";
 import { isObject, isValue, own } from "../values.ts";
+import { stepKind } from "./capability.ts";
 import type { Defining } from "./context.ts";
 import { at, type Rec } from "./shape.ts";
 
@@ -79,6 +80,8 @@ export function fieldType(d: Defining, v: unknown, path: string, extra: readonly
       // Section 6.2: an entry of one of those kinds, under a definition of that name.
       if (!Array.isArray(o["kind"]) || o["kind"].length === 0 || o["kind"].some((e) => typeof e !== "string" || e === "") || new Set(o["kind"]).size !== o["kind"].length) bad("shape", at(path, "kind"), "must be a list of distinct kinds");
       else if (o["kind"].length > bounds.listElements) bad("bound", at(path, "kind"), `has ${o["kind"].length}; at most ${bounds.listElements}`);
+      // Section 6.2: the kind of a preparation entry is its capability and step, as in `hold@1:check`.
+      else for (const kind of o["kind"] as string[]) stepKind(d, kind, at(path, "kind"));
       str(o["under"], at(path, "under"));
       break;
     case "scope":

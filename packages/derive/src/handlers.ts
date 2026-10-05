@@ -200,7 +200,13 @@ export function derive(j: Judging, forms: Forms, opens: string | null, cause: Di
   // Section 6.5: the guards are one list with three results. A guard that is false refuses, also after one that is not completed.
   // Section 6.4: a guard whose subject is unbound is not evaluated, and an effect whose subject is unbound is not applied.
   const guards = judgeGuards(j, forms.guards);
-  if (guards.result === "fail") return { result: "refused", reason: "guard-failed", ...refusalName(forms.guards[guards.at]!), detail: `guards.${guards.at}`, prepared: j.used };
+  if (guards.result === "fail") {
+    const failed = forms.guards[guards.at]!;
+    // Section 4.2: a capability guard that does not hold is `capability-refused`, with the name its capability declares.
+    const declined = j.declined?.get(failed);
+    if (declined !== undefined) return { result: "refused", reason: "capability-refused", name: declined, detail: `guards.${guards.at}`, prepared: j.used };
+    return { result: "refused", reason: "guard-failed", ...refusalName(failed), detail: `guards.${guards.at}`, prepared: j.used };
+  }
   if (guards.result !== "pass") return { result: "unavailable", reason: guards.result };
   // Sections 6.6 and 6.7: a condition, or a range that a source or a send reads, that is not completed leaves the input not judged.
   const effects = deriveEffects(j, forms.effects, forms.attention, opens);
@@ -264,7 +270,7 @@ export function runHandler(view: StateView, definition: ValidDefinition, context
   if (new Set([...subjects.values()].map((i) => i.id)).size !== subjects.size) return refused("alias", "two names resolve to one item", uses);
   const j: Judging = {
     view, definition, bounds, clock: context.clock, scope, self: scope.head.seq + 1, kind, fields, fieldTypes: handler.fields, subjects, signer: null,
-    facts, prepared: context.prepared, used: [], asked: context.asked, own: context.own,
+    facts, prepared: context.prepared, used: [], asked: context.asked, own: context.own, capabilities: context.capabilities,
     // Section 6.5: `sender` is the envelope's source scope, `source` reads the source entry, and `update` the update, whose revision is the `seq` of the owner's entry.
     sender: sent?.source.fact.at, source: sent?.source, update: sent?.update ? { state: sent.update.state, item: sent.update.item, revision: sent.source.fact.seq } : undefined,
   };
@@ -357,7 +363,7 @@ export function runClause(view: StateView, definition: ValidDefinition, context:
   const j: Judging = {
     view, definition, bounds: context.bounds, clock: context.clock, scope, self: scope.head.seq + 1, kind: frame.kind, fields: facts.fields, fieldTypes: frame.fieldTypes, subjects, signer: frame.signer,
     facts: new Map([...facts.facts, ...beside.facts]), prepared: [], used: [], own: context.own, sender: answered?.sender, result: answered?.reason, each: (update && view.item(update.item.seq)) ?? undefined,
-    presented: beside.fields,
+    presented: beside.fields, capabilities: context.capabilities,
   };
   const effects = deriveEffects(j, forms, [], null);
   // Section 6.6: a clause's condition that is not completed leaves the result not recorded now. It is offered again.

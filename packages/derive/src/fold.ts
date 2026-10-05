@@ -147,6 +147,8 @@ export function applyEntry(writer: StateWriter, definition: ValidDefinition, ent
         writer.putOperation({ ...operation, attempts: [...operation.attempts, { attempt: effect.attempt, opened: entry.seq, outcome: null }] });
         break;
       }
+      case "record":
+        break; // Section 6.11: a capability's record is the capability's own state. No source keeps one yet; the entry holds the change.
       case "index": case "attention":
         break; // Rows and notices that no guard of this scope reads.
     }

@@ -12,6 +12,7 @@
 
 import type { Condition, Effect, EffectForm, FieldType, FieldValue, MemberRef, Notify, Operand, RefusalReason, UnavailableReason } from "@generalbusiness/artroom-contract";
 import { attribution, byMember, historyOf } from "./attribution.ts";
+import { capabilityEffect } from "./capability.ts";
 import { isEntryOf, isLocalFact } from "./fields.ts";
 import { changeItem, newItem, type ItemEffect } from "./fold.ts";
 import { judgeGuards, members, readsUnbound, slotOf, type Judging } from "./guards.ts";
@@ -95,6 +96,8 @@ export function deriveEffects(j: Judging, forms: readonly EffectForm[], attentio
   const items = j.definition.declared.items;
   const working = new Map(j.subjects);
   const effects: Effect[] = [];
+  /** Section 4.1: the capability's own effects follow the written ones. */
+  const records: Effect[] = [];
   const refuse = (reason: RefusalReason, detail: string) => ({ ok: false, reason, detail }) as const;
   const notJudged = (unavailable: UnavailableReason) => ({ ok: false, unavailable }) as const;
   // A source reads each subject as the effects written before it left it, and the item this entry opens as `on`.
@@ -128,6 +131,18 @@ export function deriveEffects(j: Judging, forms: readonly EffectForm[], attentio
 
   for (const [i, form] of forms.entries()) {
     const subject = form.of ?? "on";
+    if ("capability" in form) {
+      // Section 6.11: a capability's effect changes the capability's own records and no item. It is applied when its condition
+      // lets it through, and when the subject it names is bound. Its arguments read each subject as the effects before it left it.
+      if (form.of !== undefined && !working.has(subject)) continue;
+      const through = lets(form);
+      if (through === false) continue;
+      if (through !== true) return notJudged(through);
+      const derived = capabilityEffect(after, form.capability, working.get(subject) ?? null);
+      if (typeof derived === "string") return notJudged(derived);
+      records.push(...derived);
+      continue;
+    }
     const item = working.get(subject);
     // Section 6.6: an effect whose subject is unbound is not applied.
     if (!item) continue;
@@ -258,7 +273,9 @@ export function deriveEffects(j: Judging, forms: readonly EffectForm[], attentio
       apply(subject, hold.effect);
     }
   }
-  // Section 6.8: a hold ends with what it is under. These are the capability's own effects, after the written ones (section 4.1).
+  // Section 6.8: a hold ends with what it is under. These are the capability's own effects, after the written ones (section 4.1):
+  // first the records of each written capability effect, then the ends.
+  effects.push(...records);
   for (const { subject, effect } of endsUnder(j, working)) {
     if (subject === null) effects.push(effect);
     else apply(subject, effect);

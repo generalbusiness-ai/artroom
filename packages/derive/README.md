@@ -41,6 +41,7 @@ The package has two entry points:
 | `time` | `clockOf(view, reading)`: one commit's reading, whether it is behind, and the time at which a transition is due. `timeMs`, `timeOf`. |
 | `attribution` | `historyOf(item, changed, definition, signer)`: an item's attribution history with what the entry's changed holds add. `attribution(history, signer)`: that history, then the signer and the signer's principal. |
 | `values` | `isValue` for each field type, `same`, `byteOrder`, and the reference shapes. |
+| `capability` | `Capabilities`: the rules of the capability versions that a runtime or a verifier has code for, which a judge is given in `Reading.capabilities` and asks for each `capability` guard and effect. This package holds no such rule. `derivable(definition, capabilities)`: whether every form in the definition's `underived` list has code. A runtime answers `unsupported-definition` when it is false. `Recorded`: one change of one record, which an entry holds as a `record` effect. |
 
 ## The validator's modules
 
@@ -57,6 +58,7 @@ has one module, so that work on one family touches one file.
 | `guards` | Guard forms. |
 | `effects` | Effect forms, and the rule against two effects on one slot. |
 | `hold` | The item form of the hold capability. |
+| `capability` | The capabilities a definition lists, a `capability` guard and effect, the part `carried` and the kind of a preparation entry, each checked against the contract package's `CAPABILITIES`. It derives none of them: each is listed in `ValidDefinition.underived`. |
 | `sends` | Send and attention forms, and result clauses. |
 | `handlers` | Acts and handlers, and the other items each names. |
 | `timed` | Timed rules, their graph, and the static size of a timed entry. |

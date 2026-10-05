@@ -13,6 +13,7 @@ import type { FieldType } from "@generalbusiness/artroom-contract";
 import { canonicalize } from "@generalbusiness/artroom-bytes";
 import { isObject } from "../values.ts";
 import { onSubject, subject, type Ctx, type Defining, type Type } from "./context.ts";
+import { carried } from "./capability.ts";
 import { assignable, memberType } from "./fields.ts";
 import { at, type Rec } from "./shape.ts";
 
@@ -67,8 +68,8 @@ export function operand(d: Defining, v: unknown, path: string, ctx: Ctx, owner: 
     }
     const pf = d.form(p, pp, ["field", "opened", "set", "carried"]);
     if (!pf) return undefined;
-    // Section 6.11: a part of a capability record is read from a `record` effect, which no source derives yet.
-    if (pf[0] === "carried") return bad("capability", pp, "reads a capability record, which no source derives yet") ?? undefined;
+    // Section 6.11: a member of a capability record that the entry's effects hold. Its type is the capability's to state.
+    if (pf[0] === "carried") return carried(d, pf[1], at(pp, "carried")) ? null : undefined;
     if (pf[0] !== "set") return str(pf[1], at(pp, pf[0])) === null ? undefined : null;
     const r = rec(pf[1], at(pp, "set"), ["item", "slot"]);
     // The item is an operand of this judgment: it gives a local ID in the entry's own scope.

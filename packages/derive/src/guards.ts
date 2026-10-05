@@ -8,6 +8,7 @@
 import type { Bounds, Entry, FactRef, FieldType, FieldValue, Guard, MemberRef, Operand, Prepared, Range, Reason, ScopeRef, Subject, UnavailableReason, Digest } from "@generalbusiness/artroom-contract";
 import { canonicalBytes, digestBytes } from "@generalbusiness/artroom-bytes";
 import type { Signer } from "./attribution.ts";
+import { capabilityGuard, type Capabilities } from "./capability.ts";
 import type { Own } from "./fields.ts";
 import { all, excepted, listGuard, scan, typeOfElement } from "./lists.ts";
 import { equal, kindOf, operand, slotOf } from "./operand.ts";
@@ -55,6 +56,8 @@ export interface Judging {
   elements?: ReadonlyMap<string, unknown> | undefined; // inside a list form: each element it binds, by its `as` name
   elementTypes?: ReadonlyMap<string, FieldType | null> | undefined;   // the type of each bound element, when the definition states it
   each?: Item | undefined;                             // a fan-out send: the item of that send
+  capabilities?: Capabilities | undefined;             // the rules of the capabilities this judge can derive (section 6.11). Without them a capability form is not judged
+  declined?: Map<Guard, string> | undefined;           // each capability guard that did not hold, with the refusal its capability names
 }
 
 /** Passed, failed, or not judged, with the reason for the Unavailable answer (section 4.2). */
@@ -214,7 +217,8 @@ export function judgeGuard(j: Judging, g: Guard, of: Subject = "on"): GuardResul
     return ok(deadline !== null && ("before" in g ? now < deadline : now > deadline));
   }
   if ("each" in g || "has" in g || "anyOf" in g || "distinct" in g || "sameSet" in g) return listGuard(j, g, subject, item, judgeGuard);
-  // Section 6.11: no source derives a capability guard, and the validator refuses one. It fails closed.
+  // Section 6.11: a guard that a capability declares, derived by the capability's own rules.
+  if ("capability" in g) return capabilityGuard(j, g, item);
   if (!("rule" in g)) return "fail";
   const input = ruleInput(j);
   const digest = digestBytes(canonicalBytes(input));

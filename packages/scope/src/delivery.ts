@@ -40,10 +40,10 @@ export class Deliveries {
   readonly #name: ScopeId | null;
   readonly #scope: Scope;
   readonly #store: Store;
-  readonly #ports: Pick<Ports, "resolver" | "definitions" | "texts" | "random">;
+  readonly #ports: Pick<Ports, "resolver" | "definitions" | "texts" | "random" | "capabilities">;
   readonly #bounds: Bounds;
 
-  constructor(name: ScopeId | null, scope: Scope, store: Store, ports: Pick<Ports, "resolver" | "definitions" | "texts" | "random">, bounds: Bounds) {
+  constructor(name: ScopeId | null, scope: Scope, store: Store, ports: Pick<Ports, "resolver" | "definitions" | "texts" | "random" | "capabilities">, bounds: Bounds) {
     this.#name = name;
     this.#scope = scope;
     this.#store = store;
@@ -156,7 +156,8 @@ export class Deliveries {
     const texts = await this.#texts(from, carried);
     if (!texts) return retry("dependency-unavailable");
 
-    const context = (clock: Reading): Omit<DeliveryContext, "prepared"> => ({ clock, bounds, facts, own: ownOf(store), texts: texts.sizes, source: { entry: source.entry, under: source.under }, origin });
+    const context = (clock: Reading): Omit<DeliveryContext, "prepared"> =>
+      ({ clock, bounds, facts, own: ownOf(store), texts: texts.sizes, capabilities: this.#ports.capabilities ?? undefined, source: { entry: source.entry, under: source.under }, origin });
     /** The definition a section of the turn runs under: the pinned one, or before the genesis the one the seed names. */
     const definition = (): ValidDefinition => this.#scope.pinned()?.definition ?? founding!.valid;
     /** A `create` goes to the genesis judge, which answers a repeat from the genesis when the scope exists. */

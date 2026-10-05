@@ -251,7 +251,7 @@ describe("operands, parts and a local fact (sections 6.2 and 6.5; witness 18.1)"
       ["a part of a value that is no fact", inAct(about({ slot: "text", part: "seq" })), "name"],
       ["a part the contract does not define", inAct(about({ field: "terms", part: "hash" as never })), "shape"],
       ["a part of a part that is not a scope or a position", inAct(about({ field: "terms", part: { of: "ref", then: "kind" as never } })), "shape"],
-      ["a part of a capability record, which no source derives", inAct(about({ field: "terms", part: { carried: "check.commit" } })), "capability"],
+      ["a part of a capability record, in a definition that lists no capability with such a record", inAct(about({ field: "terms", part: { carried: "check.commit" } })), "capability"],
       ["a guard that reads a slot of the item its act opens, named by `of`", refusal(asks, (d) => d.acts.ask.guards.push(about({ slot: "text", of: "on" }))), "nascent-guard"],
       ["a guard that reads the item its act opens", refusal(asks, (d) => d.acts.ask.guards.push(about({ item: "on" }))), "nascent-guard"],
       ["a reason that is not a text", refusal(asks, (d) => { d.acts.accept.guards[1].reason = 7; }), "shape"],

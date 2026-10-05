@@ -177,7 +177,7 @@ export function judgeAct(view: StateView, definition: ValidDefinition, signed: S
 
   const j: Judging = {
     view, definition, bounds, clock, scope, self: scope.head.seq + 1, kind: intent.kind, fields, fieldTypes: act.fields, subjects, signer, facts, prepared: context.prepared, used: [], asked: context.asked,
-    own: context.own, intent: digest, presented: beside.fields,
+    own: context.own, intent: digest, presented: beside.fields, capabilities: context.capabilities,
   };
 
   // Guards, then effects, then sends, then the bound on the type it opens, as for a handler. The cause of a scope it creates is the intent's digest.
