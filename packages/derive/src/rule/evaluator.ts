@@ -15,7 +15,7 @@
 
 import jsonata from "jsonata";
 import { digestBytes, utf8 } from "@generalbusiness/artroom-bytes";
-import { PROFILE } from "./profile.ts";
+import { ENGINE_NAMES, PROFILE } from "./profile.ts";
 import { RuleEvalError, RuleRuntimeFailure } from "./errors.ts";
 import { PreparedInput, canonicalJson, inspectIntermediate, jsonCopy, prepareInput, safeName, type Json } from "./values.ts";
 
@@ -78,9 +78,12 @@ function checkAst(ast: unknown): WeakMap<Ast, Ast | undefined> {
         (node["lhs"]?.type !== "variable" ||
           !node["lhs"].value ||
           node["lhs"].value === "$" ||
-          functions.has(node["lhs"].value))
+          functions.has(node["lhs"].value) ||
+          ENGINE_NAMES.has(node["lhs"].value))
       )
-        throw new RuleEvalError("unsupported_variable", "Cannot replace the root or a profile function");
+        // The check of reads below has no scopes: a name bound anywhere counts as bound everywhere. So a name of the engine's
+        // function table is never bound, and a read of one can only reach the refusal below.
+        throw new RuleEvalError("unsupported_variable", "Cannot bind the root or a name of the engine's function table");
       if (node["type"] === "bind") locals.add(node["lhs"].value);
       if (node["type"] === "name" && !safeName(node["value"]))
         throw new RuleEvalError("reserved_key", `Reserved property ${node["value"]}`);
@@ -102,17 +105,45 @@ interface Compiled {
   readonly parents: WeakMap<Ast, Ast | undefined>;
 }
 
+/**
+ * The deepest nesting of brackets in the source, outside string literals and
+ * backquoted names. The parser recurses once for each level, so this is read
+ * before the parser runs.
+ */
+function bracketDepth(source: string): number {
+  let depth = 0;
+  let deepest = 0;
+  let quote: string | null = null;
+  for (let i = 0; i < source.length; i++) {
+    const c = source[i]!;
+    if (quote !== null) {
+      if (c === "\\" && quote !== "`") i++;
+      else if (c === quote) quote = null;
+    } else if (c === '"' || c === "'" || c === "`") quote = c;
+    else if (c === "(" || c === "[" || c === "{") deepest = Math.max(deepest, ++depth);
+    else if (c === ")" || c === "]" || c === "}") depth--;
+  }
+  return deepest;
+}
+
 function compile(source: string): Compiled {
   if (utf8(source).length > PROFILE.programBytes)
     throw new RuleEvalError("source_bytes", "Program exceeds 64 KiB");
+  // A source the parser cannot hold is outside the profile, and is refused the same way each time. Brackets deeper than the
+  // syntax tree may be are refused before the parser runs.
+  if (bracketDepth(source) > PROFILE.astDepth)
+    throw new RuleEvalError("source_complexity", "Program nesting exceeds the profile");
   let expression: jsonata.Expression;
   // The engine's shared stack counter counts Promise.all siblings as nesting.
   // The host hooks instead count active AST ancestors. Recursion is not admitted.
   try {
     expression = jsonata(source, { sequence: PROFILE.sequenceLength });
   } catch (error) {
+    // Nesting without brackets, such as a run of prefix operators, can still exhaust the parser's stack. A tree that deep is past
+    // the profile's depth whenever it can be built, so the answer is the one the tree check would give.
+    if (error instanceof RangeError) throw new RuleEvalError("source_complexity", "Program nesting exceeds the profile");
     // JSONata syntax errors are plain objects with S0xxx parser codes. Any
-    // other exception (including a parser stack overflow) is a runtime fault.
+    // other exception is a runtime fault.
     if (
       !error ||
       typeof error !== "object" ||

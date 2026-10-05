@@ -52,6 +52,10 @@ describe("the evaluator profile restricted@1", () => {
       "$outside": "unsupported_variable", "function($x){$x}(1)": "unsupported_function", "**.a": "unsupported_expression", "a.%.b": "unsupported_expression",
       "signer != subjects.on": null,
     });
+    // A name of the engine's function table cannot be bound, also in a branch that never runs: the check of reads has no scopes.
+    expect([refusal("((false ? ($eval := 1) : 0); $eval)"), refusal("($x := 1; $x = 1)")]).toEqual(["unsupported_variable", null]);
+    // A source the parser cannot hold is refused as outside the profile, not reported as a fault of the engine: by brackets, and by prefix operators.
+    expect([refusal(`${"(".repeat(5000)}1${")".repeat(5000)}`), refusal(`${"-".repeat(60000)}1`)]).toEqual(["source_complexity", "source_complexity"]);
     // With the evaluator's table, the validator refuses a definition whose rule is outside the profile.
     expect(validateDefinition({ ...ticket, rules: { "two-eyes": "$now() != signer" } }, PROPOSED_BOUNDS, RULE_PROFILES)).toMatchObject({ ok: false, problems: [{ code: "rule", path: "rules.two-eyes" }] });
     expect(validateDefinition(ticket, PROPOSED_BOUNDS, RULE_PROFILES).ok).toBe(true);

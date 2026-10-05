@@ -27,3 +27,16 @@ export const PROFILE = Object.freeze({
 
 /** The pinned interpreter. `package.json` pins the same exact version, and `ENGINE_FINGERPRINT` pins its behaviour. */
 export const JSONATA_VERSION = "2.2.2";
+
+/**
+ * Every name in the function table of the pinned engine, with the two it
+ * binds for each evaluation. An expression may bind none of them, whether or
+ * not the profile lets it call the function.
+ */
+export const ENGINE_NAMES: ReadonlySet<string> = new Set([
+  "sum", "count", "max", "min", "average", "string", "substring", "substringBefore", "substringAfter", "lowercase", "uppercase", "length", "trim", "pad", "match",
+  "contains", "replace", "split", "join", "formatNumber", "formatBase", "formatInteger", "parseInteger", "number", "floor", "ceil", "round", "abs", "sqrt", "power",
+  "random", "boolean", "not", "map", "zip", "filter", "single", "reduce", "sift", "keys", "lookup", "append", "exists", "spread", "merge", "reverse", "each", "error",
+  "assert", "type", "sort", "shuffle", "distinct", "base64encode", "base64decode", "encodeUrlComponent", "encodeUrl", "decodeUrlComponent", "decodeUrl", "eval",
+  "toMillis", "fromMillis", "clone", "now", "millis",
+]);
