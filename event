@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:10a2e5b5974c5090f09ce95b066a42cc183faa2d","text":"Merge retired a covered predecessor; the successor is at parked/cli/README.md."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:10a41569f487ead8198b7123f122868dbef70acd","text":"Merge retired a covered predecessor with no successor at its old path."}
