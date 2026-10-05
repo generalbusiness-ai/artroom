@@ -8,7 +8,7 @@
  * |---|---|
  * | The definitions | `issue` and `change` of this package. The office creates each lane by its pinned digest, and each lane's handle is checked against the same pin. Real. |
  * | The lanes | Real scopes, written through the turn, the store and the dispatchers of the scope package. |
- * | The acts | Signed and sent through the client's declared handle, over the Worker's own HTTP routes. |
+ * | The acts | Signed by the client's declared handle, and sent to the scope service's own operations. An office is founded over the Worker's HTTP routes, and `over` sends one act over them. |
  * | The office | A made-up directory definition that creates the lanes. A test fixture: the real directory is not delivered. |
  * | The members | The key set of derive's fixtures. Test keys. |
  * | Authority | The scope package's test authority: every presented grant is current. A STAND-IN. It shows nothing about real authority. |
@@ -22,13 +22,14 @@ import { env } from "cloudflare:workers";
 import { SELF, runDurableObjectAlarm, runInDurableObject } from "cloudflare:test";
 import { expect, onTestFinished } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { Answer, Bounds, DeclaredDefinition, Duty, Entry, FactRef, FieldValue, Grant, Input, Message, Receipt, ScopeId, ScopeRef, Sealed, Seed, SignedIntent } from "@generalbusiness/artroom-contract";
+import type { Answer, Bounds, DeclaredDefinition, Digest, Duty, Entry, FactRef, FieldValue, Grant, Input, Message, Receipt, ScopeId, ScopeRef, Sealed, Seed, SignedIntent } from "@generalbusiness/artroom-contract";
 import { entryHash, intentDigest, newIncarnation, scopeIdOf, signIntent, textDigest } from "@generalbusiness/artroom-bytes";
-import { ScopeHandle, declaredHandle, found, httpTransport, secretSigner, signedIntent, type AskedOf, type DeclaredHandle, type Kind, type Signed } from "@generalbusiness/artroom-client";
+import { ScopeHandle, declaredHandle, found, httpTransport, secretSigner, signedIntent, type AskedOf, type DeclaredHandle, type Kind, type Signed, type Transport } from "@generalbusiness/artroom-client";
 import { MemoryState, alsoItems, applyEntry, isFactRef, timeMs, timeOf, validateDefinition, type Delivered, type Item, type ValidDefinition } from "@generalbusiness/artroom-derive";
 import { grantOf, keys, type Actor } from "@generalbusiness/artroom-derive/testing";
-import type { Delivery } from "@generalbusiness/artroom-scope";
+import type { Checkpointed, Delivery } from "@generalbusiness/artroom-scope";
 import { net, type CapabilityScript } from "@generalbusiness/artroom-scope/testing";
+import { api } from "@generalbusiness/artroom-scope/worker";
 import { DIGESTS, change, definitions, issue } from "../../src/index.ts";
 
 export { net };
@@ -37,8 +38,22 @@ export const { rita, una, vic, paul, sam } = keys;
 
 /** Any value: the test readers port lets every reader read. */
 export const reader = "a test reader";
-/** The client's transport over the Worker's own fetch routes. */
-export const transport = httpTransport("https://scopes.test", { fetch: (url, init) => SELF.fetch(url, init) });
+/**
+ * How the client reaches the scopes. `transport` is the scope service's own
+ * operations (`api`, which the Worker's routes and its service-binding
+ * entrypoint both call and add nothing to), called in the test's isolate:
+ * every act and read of the fixture goes through it. `http` is the client's
+ * transport over the Worker's HTTP routes, for the few calls that are about
+ * a route: the founding of an office, one act, and the replay.
+ *
+ * The reason is cost. In the Workers pool a call through the Worker's
+ * entrypoint, by `SELF.fetch` or by a service binding, takes longer the more
+ * of them one run has made: observed, 50 calls took 57 milliseconds at first
+ * and 321 after 150 more, while 300 calls of `api` took 150 each time. The
+ * scope package's own tests show both wire transports.
+ */
+export const transport: Transport = api(env.NET);
+export const http = httpTransport("https://scopes.test", { fetch: (url, init) => SELF.fetch(url, init) });
 
 /** `seconds` after the shared clock's `now`. */
 export const soon = (seconds: number) => timeOf(timeMs(net.clock.now)! + seconds * 1000);
@@ -119,7 +134,7 @@ export const capable: CapabilityScript = {
   },
 };
 
-type Remote = { deliver(envelope: Delivered): Promise<Delivery>; dispatch(): Promise<number> };
+type Remote = { deliver(envelope: Delivered): Promise<Delivery>; dispatch(): Promise<number>; checkpoint(): Promise<Checkpointed> };
 /** What the graph needs of a scope, whatever its definition: its entries and its dispatcher. */
 type Member = { entry(seq: number): Promise<Entry>; readonly stub: Remote };
 const objectOf = (name: string): DurableObjectStub => env.NET.get(env.NET.idFromName(name));
@@ -137,17 +152,27 @@ export class Node<D extends DeclaredDefinition> {
   get object(): DurableObjectStub { return objectOf(this.name); }
   get stub(): Remote { return this.object as unknown as Remote; }
 
-  /** The whole history, page by page, each entry with its hash. */
-  async sealed(): Promise<Sealed[]> {
-    const all: Sealed[] = [];
-    for (let cursor: string | undefined, more = true; more; ) {
-      const page = await this.handle.scope.history(cursor);
-      if (!page.ok) throw new Error(`no history of ${this.name}: ${page.reason}`);
-      all.push(...page.value);
-      cursor = page.next;
-      more = cursor !== undefined;
-    }
-    return all;
+  /** The history read so far, and the state it folds to. Each read asks only for the entries after these, one read at a time. */
+  readonly #log: Sealed[] = [];
+  readonly #state = new MemoryState();
+  #reading: Promise<unknown> = Promise.resolve();
+
+  /** The whole history, each entry with its hash: what was read before, and every page after it. */
+  sealed(): Promise<readonly Sealed[]> {
+    const read = this.#reading.then(async () => {
+      for (let more = true; more; ) {
+        const page = await this.handle.scope.history(String(this.#log.length));
+        if (!page.ok) throw new Error(`no history of ${this.name}: ${page.reason}`);
+        for (const sealed of page.value) {
+          applyEntry(this.#state, this.valid, sealed.entry, sealed.hash);
+          this.#log.push(sealed);
+        }
+        more = page.next !== undefined;
+      }
+      return this.#log;
+    });
+    this.#reading = read.catch(() => undefined);
+    return read;
   }
   async entries(): Promise<Entry[]> { return (await this.sealed()).map((s) => s.entry); }
   /** The entry at `seq`, and the fact that names it. */
@@ -155,11 +180,11 @@ export class Node<D extends DeclaredDefinition> {
   async fact(seq: number): Promise<FactRef> { return { at: this.at, seq, hash: (await this.sealed())[seq]!.hash }; }
   /** The state that the history folds to, by derive's own fold: every item, live or final, with its revision. */
   async state(): Promise<MemoryState> {
-    const state = new MemoryState();
-    for (const { entry, hash } of await this.sealed()) applyEntry(state, this.valid, entry, hash);
-    return state;
+    await this.sealed();
+    return this.#state;
   }
-  async item(id: number): Promise<Item> { return (await this.state()).item(id)!; }
+  /** One item as it is now: a copy, so that a scenario can compare it with the item later. */
+  async item(id: number): Promise<Item> { return structuredClone((await this.state()).item(id)!); }
   async duties(): Promise<readonly Duty[]> {
     const read = await this.handle.scope.outbox();
     if (!read.ok) throw new Error(`no outbox of ${this.name}: ${read.reason}`);
@@ -192,6 +217,8 @@ export class Node<D extends DeclaredDefinition> {
     return this.handle.intent(secretSigner(who.secret), kind, { ...asked, expected }, { now: timeMs(net.clock.now)! });
   }
   submit({ signed, beside }: Signed): Promise<Answer> { return this.handle.submit(signed, this.grants(), beside); }
+  /** The same submission through another transport of the client, such as the HTTP routes. */
+  over(through: Transport, { signed, beside }: Signed): Promise<Answer> { return new ScopeHandle(through, this.name, reader).submit(signed, this.grants(), beside); }
   async act<K extends Kind<D>>(who: Actor, kind: K, asked: AskedOf<D, K>): Promise<Answer> { return this.submit(await this.signed(who, kind, asked)); }
   /** How the act was answered, as `answered` writes it. */
   async asks<K extends Kind<D>>(who: Actor, kind: K, asked: AskedOf<D, K>): Promise<string> { return answered(await this.act(who, kind, asked)); }
@@ -297,21 +324,24 @@ export class Graph {
   }
 
   /** A goal: an `issue` lane that the office creates for rita, confirmed. `bounds`: the bounds of this one scope. */
-  async goal(conditions: readonly string[] = ["it works"], bounds?: Bounds): Promise<Node<typeof issue>> {
-    const asked = await this.office.signed(rita, "open-issue", { fields: { title: "A goal", conditions } });
-    // The seed of the lane names this one intent as its cause, so the name of its object is known before it exists.
-    const seed: Seed = { v: 1, kind: "lane", definition: DIGESTS.issue, creator: this.office.at, cause: intentDigest(asked.signed.intent), ordinal: 0 };
+  async goal(bounds?: Bounds): Promise<Node<typeof issue>> {
+    const asked = await this.office.signed(rita, "open-issue", { fields: { title: "A goal", conditions: ["it works"] } });
+    return this.#lane(asked, issue, VALID.issue, DIGESTS.issue, bounds);
+  }
+  /** A change lane: a `change` lane that the office creates for rita, open, which names the two scripted peers. `bounds`: the bounds of this one scope. */
+  async change(bounds?: Bounds): Promise<Node<typeof change>> {
+    const asked = await this.office.signed(rita, "open-change", { fields: { title: "A change", destination: this.destination.at, rules: this.rules.at } });
+    return this.#lane(asked, change, VALID.change, DIGESTS.change, bounds);
+  }
+  /** The lane that the office creates for that signed intent. The seed of the lane names this one intent as its cause, so the name of its object is known before it exists. */
+  async #lane<const D extends DeclaredDefinition>(asked: Signed, definition: D, validated: ValidDefinition, digest: Digest, bounds?: Bounds): Promise<Node<D>> {
+    const seed: Seed = { v: 1, kind: "lane", definition: digest, creator: this.office.at, cause: intentDigest(asked.signed.intent), ordinal: 0 };
     if (bounds) net.sized.set(scopeIdOf(seed), bounds);
     const answer = await this.office.submit(asked);
-    if (answer.answer !== "accepted") throw new Error(`the goal was not asked for: ${JSON.stringify(answer)}`);
-    const node = await this.created(this.office, answer.receipt.fact.seq, issue, VALID.issue);
-    if (bounds && node.name !== scopeIdOf(seed)) throw new Error("the goal has another name than its seed was expected to give");
+    if (answer.answer !== "accepted") throw new Error(`the lane was not asked for: ${JSON.stringify(answer)}`);
+    const node = await this.created(this.office, answer.receipt.fact.seq, definition, validated);
+    if (node.name !== scopeIdOf(seed)) throw new Error("the lane has another name than its seed was expected to give");
     return node;
-  }
-  /** A change lane: a `change` lane that the office creates for rita, open, which names the two scripted peers. */
-  async change(): Promise<Node<typeof change>> {
-    const made = await this.office.did(rita, "open-change", { fields: { title: "A change", destination: this.destination.at, rules: this.rules.at } });
-    return this.created(this.office, made.fact.seq, change, VALID.change);
   }
   /** The concern lane that the `add-concern` entry `seq` of `goal` created. */
   concern(goal: Node<typeof issue>, seq: number): Promise<Node<typeof issue>> {
@@ -333,15 +363,19 @@ export const README = "The office of a test repository.";
 export async function graph(): Promise<Graph> {
   net.hold = net.deaf = null;
   net.capability = {};
-  // The namespace's controls are shared with every test of the run. The test that asked for the graph leaves them as it found them.
-  onTestFinished(() => {
+  const founding = await signedIntent(secretSigner(rita.secret), { to: null, kind: "found", fields: { readme: textDigest(README) } }, { now: timeMs(net.clock.now)! });
+  // Over the Worker's HTTP route: the founding intent names the digest of the text, and the text travels beside it in the body.
+  const { answer, scope } = await found(http, founding, officeDefinition, definitions, reader, { texts: [README] });
+  if (answer.answer !== "accepted" || !scope) throw new Error(`the office was not founded: ${JSON.stringify(answer)}`);
+  const declared = await declaredHandle(new ScopeHandle(transport, scope.scope, reader), officeDefinition);
+  if (!declared.ok) throw new Error(`no handle on the office: ${JSON.stringify(declared)}`);
+  const made = new Graph(new Node(declared.handle, VALID.office));
+  // The namespace's controls are shared with every test of the run. The test that asked for the graph leaves them as it found
+  // them, once no dispatcher of the graph is still at work: a scope that reads its definition with no capability cannot run.
+  onTestFinished(async () => {
     net.hold = net.deaf = null;
+    await made.settle();
     net.capability = null;
   });
-  const founding = await signedIntent(secretSigner(rita.secret), { to: null, kind: "found", fields: { readme: textDigest(README) } }, { now: timeMs(net.clock.now)! });
-  const { answer, scope } = await found(transport, founding, officeDefinition, definitions, reader, { texts: [README] });
-  if (answer.answer !== "accepted" || !scope) throw new Error(`the office was not founded: ${JSON.stringify(answer)}`);
-  const declared = await declaredHandle(scope, officeDefinition);
-  if (!declared.ok) throw new Error(`no handle on the office: ${JSON.stringify(declared)}`);
-  return new Graph(new Node(declared.handle, VALID.office));
+  return made;
 }

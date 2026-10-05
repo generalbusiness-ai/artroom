@@ -506,7 +506,75 @@ Written 2026-10-05, by the worker of steps 15 and 16. The plan's sections
 | DK1 | The plan's section 6.4 says that a second project in the Workers runtime pool is measured, and that if it adds more than half a second the lane package's store tests join the `scope` project's one Worker load. | Measured, and they join it. In the root run, `vitest.config.ts` adds `packages/lanes/test/**/*.scope.test.ts` to what the `scope` project includes, so they run in the scope package's test Worker, loaded once. Observed, three runs each of `npx vitest run` at the root, on a shared machine with a warm cache, with one lane scenario of 0.1 seconds: no lane scenario, 4.05 to 4.10 seconds; a second project, 4.77 to 4.81; in the `scope` project, 4.21 to 4.29. The lanes package keeps `vitest.scope.config.ts` and `wrangler.test.jsonc`, which run the same files alone, in a Worker of its own with the same classes: for `npm test` in the package, for `scripts/control.mjs` and for `scripts/measure-tests.sh`. No file of the scope package names the lanes package: the root file does. | A second project costs 0.7 seconds, and the files in the one project cost 0.2, of which 0.1 is the scenario. The two arrangements run the same classes over the same namespace, so nothing a scenario shows differs. The scenarios then share the namespace's controls with the scope package's own tests in one isolate: each graph sets them when it is made, and its test puts them back when it ends. |
 | DK2 | The plan's section 6.1 gives the platform peers as "handwritten source entries of a rules scope and a destination, served by the test resolver". The test ports of a namespace did not replace the resolver. | `net.peers`, in `scope/src/testing.ts`: the entries of scripted peers, by the hash of the fact that names each, with the definition name the peer is said to pin. `netPorts` takes the namespace's resolver as a third argument, and then reads an entry of a peer from that table and every other entry from the real object. `Peer`, in the lanes fixture, writes one entry with one send, as an act of a given kind would have, and returns the envelope, which the test delivers. A peer has a reference and no object. So the lane's result for a peer's request reaches no scope: its dispatch is answered `not-found` by the resolver of the name. | The receiver's source checks are the real ones: the entry is read by its fact, its hash is checked, and the judge checks that it holds that send. What is not real is that the entry was ever judged: nothing signed for a peer is verified, and no receiver verifies a source entry's input in any case (section 7.4). A test that uses one says so. |
 | DK3 | The plan's step 15 names `scope/package.json`. | The scope package exports its test Worker as `./testing/worker` (`test/worker.ts`). `net.sized` gives one scope of a namespace its own bounds, by the name of its object, which the fixture knows before the object exists: the seed of a lane names the one intent that asked for it. | The lanes package's Worker is the scope package's test classes and nothing else, so the two arrangements of entry DK1 run one implementation. The capacity scenario needs a small bound on one lane and not on the scopes around it. |
-| DK4 | The plan's section 6.1 does not say how a scenario signs and sends an act. | Through the client's declared handle, over the Worker's HTTP routes: `declaredHandle` refuses a scope that does not publish the pinned digest of the value given, and `intent` is typed from the definition's own data. The office creates each lane by the digest in `DIGESTS`. The fixture fills in `expected`: it folds the scope's history with derive's `applyEntry`, and reads the revision of each item the act names with derive's `alsoItems`. The office is founded with a text beside its founding intent. | So every scenario runs on the pinned definitions by digest, at the client's boundary, and a scenario states what it asks and not the revisions. The compiler checks each scenario's fields against the two definitions. A scenario that is about a stale revision gives `expected` itself. |
+| DK4 | The plan's section 6.1 does not say how a scenario signs and sends an act. | Each act is signed by the client's declared handle: `declaredHandle` refuses a scope that does not publish the pinned digest of the value given, and `intent` is typed from the definition's own data. The office creates each lane by the digest in `DIGESTS`. The fixture fills in `expected`: it folds the scope's history with derive's `applyEntry`, and reads the revision of each item the act names with derive's `alsoItems`. The handle's transport is the scope service's own operations, `api` of `scope/src/worker.ts`, called in the test's isolate. The office is founded over the Worker's HTTP route, with a text beside its founding intent; one act of T3 and the replay of T9 go over the HTTP routes too. | So every scenario runs on the pinned definitions by digest, and a scenario states what it asks and not the revisions. The compiler checks each scenario's fields against the two definitions. The Worker's routes and its service-binding entrypoint both call `api` and add nothing to it, and the scope package's own tests show both wire transports. They are not used for every act because of what entry DK11 measured. |
 
 The witness of the fixture is `packages/lanes/test/hold.scope.test.ts`,
 "T1, responsibility is not a hold".
+
+## 20. Step 16: the scenarios on the two pinned definitions
+
+Written 2026-10-05, by the same worker. The plan's section 6.2. Ten tests
+in `packages/lanes/test/*.scope.test.ts`, on one fixture.
+
+### What a lane row cannot do today
+
+Neither row is changed. Each goes to the lane forms' owner, with the
+owner of the contract's open point that causes it. The test asserts what
+is true.
+
+| # | The row, and what the lane forms say | Observed | Why, and whose |
+|---|---|---|---|
+| DK5 | `change`, the act `propose-manifest`: the guard `{ fact: { field: "goal" }, ifPresent: true }` (`guards.18`), and the effect that copies `goal` into the slot `manifest.goal`, whose type is `{ type: "fact", kind: ["file", "revise"], under: "issue" }`. The lane forms' section 5.1: a manifest's goal is "that issue's `file` or `revise` entry"; section 5.2: "A `goal`, when named, is a `file` or `revise` entry of an `issue` lane." | A manifest that names the `file` entry of an issue lane as its goal is refused `guard-failed`, with no name, whatever else it holds. The same manifest that names a `revise` entry of that lane is accepted. So a change lane can answer only a goal that was revised at least once. | The `file` entry of an issue lane is its genesis. Entry D21: a reader learns the kind of a genesis only for a scope that pins the reader's own definition, and a change lane pins `change`. The `fact` guard fails closed. Entry D21 already asks the contract's owner to choose how a foreign genesis states its kind. This entry is what that open choice costs the lane forms: the common case of section 5.1 cannot run. Owners: the contract (`d56d7f65`), then the lane forms. Witness: the last lines of T3. |
+| DK6 | `change`, the act `propose-manifest`, in the form that is staged in another lane: the fields `lane` and `foreignHold`, with the presented fact `pin` of kind `hold@1:check`. | Without a presented `pin` the act is refused `guard-failed`, `source-shape`. With one, presented over the HTTP route, it gets past that guard and is refused `guard-failed`, with no name, at `{ fact: { presented: "pin" }, ifPresent: true }`. No stand-in makes it pass. | Entry DJ17: no source writes a preparation entry, so no entry has the kind `hold@1:check`. The row is as the lane forms state it and waits for I3 (the plan's W1). It is listed, and not faked. So the handlers `pin-confirm` and `unpin` of `issue` are never sent by a real change lane before I3. Witness: the last lines of T3, which are also the first witness of a presented fact over the HTTP route. |
+
+### What the plan or an earlier entry assumed
+
+| # | Assumed | Found, and implemented | Why |
+|---|---|---|---|
+| DK7 | Entry DI23: the lane package's capacity scenario, T7, is the storage witness of two lines, the draft's word passed to `fits` in `scope/src/turn.ts`, and the store's count of copies by state in `scope/src/sqlite.ts`. | The count of copies is witnessed by T7: two controls distinguish. The draft's word cannot be witnessed on the two lane definitions: with the argument removed, T7 and T8 still pass. On these definitions every settling entry frees at least the one entry it uses. No settling form of `issue` sends a request. The one of `change` that does, `publication`, sends requests whose clauses start nothing, and the most that a clause of any request of `change` can start is 0, so the runtime holds for each exactly what the merge reserved. The line decides only where a settling entry leaves more reserved than it found (entry DI22). So the storage witness is in the scope package, on a variant of its fixture lane where it does decide: `scope/test/turn.test.ts`, "a report that awaits its acceptance reserves that entry", which gained that case and no new test. `found` and `founding` of `scope/test/support.ts` take a definition. | A witness that passes with its line removed is none. The control on the scope test distinguishes. Owner of the remark: the proof plan, if it wants the rule "a settling entry is written whatever is held" shown on a lane definition: no row of revision 14 can show it. |
+| DK8 | The plan's T8: witness 18.9 on the real `change` definition in memory, in `capacity.test.ts`. | T8 is on real storage, in `capacity.scope.test.ts`: a change lane with a bound of 16 entries, where the first `check` is written at a full budget and a second answer is refused `scope-full`. | The fixture was there, and a commit's own rule of admission is then the runtime's and not a copy of it in a test. Derive's `compose.test.ts` has the in-memory witness on a made-up definition. |
+| DK9 | The plan's T5, second test: "the issue's side, with a scripted change-lane source", because "a real `merged` update needs a publication, which is I3's". | T5b uses a real change lane and two real issue lanes. What is scripted is the destination: one handwritten `publication` entry, with the rules peer and the test capability. The change lane's own `publication` handler then sends the real `merged` updates. | The lane's side of a publication runs with a scripted peer, so less is stood in for: the fan-out over the links that are set, the index row and the release of the pin are the real row's. It proves nothing about a destination. |
+| DK10 | The plan's T9: `replay.scope.test.ts`, on "the histories that T2 left". | T9 is the second test of `plan.scope.test.ts`, and reads the graph that T2 left in a variable of that file. | Two files cannot share a graph without depending on the order of files. T9 fails with "T2 left no graph" when T2 fails. |
+| DK11 | That a scenario may send every act through the Worker's routes. | Observed in the Workers pool: a call through the Worker's entrypoint, by `SELF.fetch` or by the service binding `API`, takes longer the more of them one run has made. 50 calls of the binding took 57 milliseconds at first and 321 after 150 more; 20 requests through `SELF.fetch` took 37 milliseconds in a first test and 499 in a third. A call on a Durable Object's own stub, and so `api(env.NET)`, does not slow: 300 calls took about 150 milliseconds each time. With every act over HTTP, six scenarios took 2.4 seconds; with `api`, 1.1. So the fixture uses `api`, and the routes only where a scenario is about them (entry DK4). | The cause is in the pool and not in this source: a route that reaches no object slows the same way. It also bounds how many calls the scope package's own tests should make through `SELF` and `API` in one run. Owner: the builder, if it should be reported to the pool's maintainers. |
+
+### Rows reached, and rows that cannot run before I3
+
+Counted by a script, not kept, over one run of the ten scenarios: the
+kind of every entry of every lane whose history the fixture read.
+
+| Definition | Act kinds written, of all | Handlers that ran | Timed rules |
+|---|---|---|---|
+| `issue` | 21 of 50: the genesis `file`, and `accept`, `accept-handover`, `accept-report`, `add-concern`, `agree`, `close-own`, `comment`, `fulfil`, `offer`, `offer-handover`, `open-plan`, `propose-terms`, `release-hold`, `reopen-own`, `report`, `resolve-concern`, `revise`, `seal-plan`, `take-hold`, `withdraw` | 2 of 7: `result`, and `closes` in the states `set`, `removed` and `merged`, applied and superseded | 1 of 1: `hold-end` |
+| `change` | 12 of 52: the genesis `open`, and `accept`, `check`, `comment`, `link-own`, `merge`, `offer`, `propose-manifest`, `request-check`, `review-verdict`, `take-hold`, `unlink-own` | 2 of 4: `rules` and `publication`, each from a scripted peer | 0 of 2 |
+
+Also reached: the clauses `applied` of a creation and of a relationship
+update, `superseded` of an update, and `undelivered` of the `reserve`
+request, by a diagnosis.
+
+Rows that cannot run before I3, even with the stand-ins:
+
+- `propose-manifest` staged in another lane (entry DK6), and so a real
+  `pin-confirm` or `unpin` to an issue lane.
+- `propose-manifest` with the `file` entry of an issue as its goal
+  (entry DK5).
+- A `reserve` or a `withdraw` that a destination answers, and so a merge
+  that a real destination commits, refuses or publishes.
+- A result clause that reads a presented fact: no row of either
+  definition has one.
+
+Rows that run only with a stand-in, and were run so: `report`,
+`propose-manifest` with a local hold, and the `publication` handler, on
+the scripted test capability; `rules` and `publication`, from a scripted
+peer. Rows that would run with the same stand-ins and are in no
+scenario: `refuse-report`; the handlers `export-license` and
+`export-settled` of both definitions, which also need a scripted task
+peer; `pin-confirm` and `unpin`, from a scripted change-lane peer;
+`authorize-export`, which needs none. The other rows that no scenario
+reaches use only forms that a scenario or a table in `derive` shows.
+
+### What the scenarios do not show
+
+Real grants. Any platform scope. A real hold, staging, ancestry, a pin, a
+license or an export. A publication by a destination. An inbox. Capacity
+in any dimension but entries. A deployed instance, a browser, a device.
+Each test says so in its name or its first comment.
