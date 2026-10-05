@@ -1,1 +1,1 @@
-{"kind":"assert","text":"Isolated planner index updated for sealed scope-test-cost landing and preserved full current overhead obligation. Documentation only; git diff --check passed.","body":{"no_git_artifact":"true"}}
+{"kind":"artifact","text":"notes/2026-10-05-recovery-successor/corrections.md at exact e354a24c323bc175455a9ebcc3bc2d1de45b35d4 on request/recovery-successor, under promise git:sha1…4e24b88 on request git:sha1…0c5b15c","body":{"commit":"e354a24c323bc175455a9ebcc3bc2d1de45b35d4","path":"notes/2026-10-05-recovery-successor/corrections.md"}}
