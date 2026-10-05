@@ -10,12 +10,12 @@
  * it.
  */
 
-import type { ObservationRequest, PlatformData } from "@generalbusiness/artroom-contract";
+import type { ObservationRequest, PlatformData, ScopeRef } from "@generalbusiness/artroom-contract";
 import { destination } from "./destination.ts";
 import { inbox } from "./inbox.ts";
 import { membership, standingOf } from "./membership.ts";
 import { register } from "./register.ts";
-import { directory } from "./directory.ts";
+import { directory, directoryMembership } from "./directory.ts";
 import type { Rules, StateView } from "@generalbusiness/artroom-derive";
 import { RULES } from "./rules.ts";
 import { rulesScope } from "./rules-scope.ts";
@@ -52,6 +52,14 @@ export interface Platform {
    * answers no observation.
    */
   readonly observed?: (state: StateView, asked: ObservationRequest) => unknown;
+  /**
+   * Where a scope under this version records its membership reference,
+   * when that is not its genesis entry (authority note, section 3.3, "Where
+   * it records its membership reference"): a pure function of its folded
+   * state. A replay reads the reference with it, as the production
+   * authority does. Absent: the genesis entry holds it.
+   */
+  readonly membership?: (state: StateView) => ScopeRef | null;
 }
 
 /**
@@ -64,5 +72,5 @@ export function platform(named: string): Platform | null {
   const name = named.slice(0, cut);
   const data = cut > 0 && named.slice(cut) === "@1" && Object.hasOwn(definitions, name) ? definitions[name] : undefined;
   if (!data) return null;
-  return { data, rules: Object.hasOwn(RULES, name) ? (RULES as Record<string, Rules>)[name]! : {}, ...(data === membership ? { observed: standingOf } : {}) };
+  return { data, rules: Object.hasOwn(RULES, name) ? (RULES as Record<string, Rules>)[name]! : {}, ...(data === membership ? { observed: standingOf } : {}), ...(data === directory ? { membership: directoryMembership } : {}) };
 }
