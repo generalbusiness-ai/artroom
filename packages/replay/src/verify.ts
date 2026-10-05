@@ -94,12 +94,7 @@ export interface Options {
    * each such grant is taken as current, as recorded, and the report lists
    * `authority` under `trusts`. A result with it proves nothing about
    * authority. A grant that holds a proof is derived again in either case.
-   *
-   * I3 merge: the default is `as-recorded` only while a caller that this
-   * step does not own replays such a history without saying so: the lane
-   * scenario `packages/lanes/test/plan.scope.test.ts`. When that call
-   * states `grants: "as-recorded"`, the default becomes `proven`, in the
-   * one line of the constructor below. It ends with the test authority.
+   * The default is `proven`. `as-recorded` ends with the test authority.
    */
   grants?: "proven" | "as-recorded" | undefined;
 }
@@ -251,8 +246,7 @@ class Verifier {
     this.#bounds = { ...(options.bounds ?? PROPOSED_BOUNDS), guardScan: Number.MAX_SAFE_INTEGER };
     this.#capabilities = options.capabilities;
     this.#platform = options.platform;
-    // I3 merge: `"proven"`, when every replay of a history of the test authority states `grants: "as-recorded"` (see `Options.grants`).
-    this.#grants = options.grants ?? "as-recorded";
+    this.#grants = options.grants ?? "proven";
   }
 
   async run(): Promise<Verification> {

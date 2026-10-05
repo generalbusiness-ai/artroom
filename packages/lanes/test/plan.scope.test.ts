@@ -66,7 +66,7 @@ describe("a plan's concerns are lanes of their own (lane forms, sections 3.5 and
     net.capability = {};
     onTestFinished(() => { net.capability = null; });
     const source = httpSource("https://scopes.test", { fetch: routed });
-    const replayed = async (node: { name: ScopeId }, rules = true) => (await verify(source, { mode: "replay", scope: node.name, ...(rules ? { capabilities: scriptedCapability(() => net.capability as CapabilityScript) } : {}) })).report;
+    const replayed = async (node: { name: ScopeId }, rules = true) => (await verify(source, { mode: "replay", grants: "as-recorded", scope: node.name, ...(rules ? { capabilities: scriptedCapability(() => net.capability as CapabilityScript) } : {}) })).report;
     const [office, goal, child] = [await replayed(g.office), await replayed(G), await replayed(K[0]!)];
     expect([office.result, goal.result, child.result]).toEqual(["consistent", "consistent", "consistent"]);
     // Each replay covers its own history whole, and every scope it used as far as it used it: the goal used its creator and both children.
