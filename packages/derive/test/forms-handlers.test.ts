@@ -58,7 +58,12 @@ const board: DeclaredDefinition = {
   receives: {
     post: {
       message: "post", class: "tell", from: { kind: "lane" }, opens: "card",
-      fields: { text: { ...text, required: true }, about: { type: "item", of: "card", required: false }, proof: { type: "fact", kind: ["link"], under: "ticket", required: false } },
+      fields: {
+        text: { ...text, required: true }, about: { type: "item", of: "card", required: false }, proof: { type: "fact", kind: ["link"], under: "ticket", required: false },
+        // A record that names a card, and a list of such records.
+        under: { type: "record", of: { card: { type: "item", of: "card", required: true } }, required: false },
+        beside: { type: "list", of: { type: "record", of: { card: { type: "item", of: "card", required: true } } }, max: 2, required: false },
+      },
       also: { about: { item: "card", by: "about" } },
       guards: [{ of: "also.about", state: ["open"], reason: "about-done" }, { equals: { a: { field: "proof", part: "kind" }, b: { const: "link" } }, ifPresent: true, reason: "not-a-link" }],
       effects: [{ value: { slot: "note", from: { field: "text" } } }, { ref: { slot: "postedAt", from: "self" } }], sends: [], attention: [],
@@ -161,7 +166,12 @@ describe("subjects and handlers (sections 6.4 and 7.3)", () => {
     expect(B.item(a)).toMatchObject({ type: "card", revision: 1, values: { note: "a" }, refs: { postedAt: a } });
     // A message names its receiver's item by the fact of the entry that opened it. A fact with another hash names none.
     expect([told("post", { text: "b", about: { ...B.fact(a), hash: B.fact(0).hash } }), told("post", { text: "b", about: B.fact(a) })]).toEqual([["refused", "bad-field"], ["applied"]]);
-    // The named card is done: the guard on it is evaluated, and the refusal carries its name.
+    // The same fact as a member of a record, and in a record of a list, names the same card: each is read by its declared type, with the same checks.
+    // Another hash names none, and the entry that opened the board names no card.
+    const within = (card: FieldValue) => [told("post", { text: "b", under: { card } }), told("post", { text: "b", beside: [{ card }] })];
+    expect([within({ ...B.fact(a), hash: B.fact(0).hash }), within(B.fact(0))]).toEqual([[["refused", "bad-field"], ["refused", "bad-field"]], [["refused", "no-item"], ["refused", "no-item"]]]);
+    expect([told("post", { text: "b", under: { card: B.fact(a) }, beside: [{ card: B.fact(a) }] }), B.state.count("card", "open")]).toEqual([["applied"], 3]);
+    B.did(rita, "done", on(B, B.last.seq));
     B.did(rita, "done", on(B, a));
     tell("post", { text: "c", about: B.fact(a) });
     expect(B.last.input).toMatchObject({ decision: "refused", reason: { code: "guard-failed", name: "about-done" } });

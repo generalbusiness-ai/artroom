@@ -55,13 +55,17 @@ export function bound(definition: ValidDefinition, message: Request | Advisory, 
  * The fields of a message, read against the fields its handler declares
  * (section 6.4). An unknown or ill-typed field is not read. A message names
  * a local item of its receiver by the fact of the entry that opened it
- * (section 6.6). So in a field of type `item`, or a list of them, that fact
- * is read as the item's local ID. A fact that names no such entry is left
- * as it is, and is then no value of the field's type.
+ * (section 6.6). So where the declared type is `item`, in a field, an element
+ * of a list or a member of a record, to any depth, that fact is read as the
+ * item's local ID: the inverse of `wire` in `sends.ts`. A fact that names no
+ * such entry is left as it is, and is then no value of the type. Whether
+ * the item is of the declared type is checked with the other items, by
+ * `readFacts`.
  */
 function messageRead(view: StateView, at: ScopeRef, handler: ReceiveType, given: Readonly<Record<string, FieldValue>>, bounds: Bounds) {
   const local = (type: FieldType | undefined, v: FieldValue): FieldValue => {
     if (type?.type === "list" && Array.isArray(v)) return v.map((e: FieldValue) => local(type.of, e));
+    if (type?.type === "record" && isObject(v)) return Object.fromEntries(Object.entries(v).map(([name, member]) => [name, local(own(type.of, name), member as FieldValue)]));
     return type?.type === "item" && isFactRef(v) && isLocalFact(v, at) && view.item(v.seq)?.opened === v.hash ? v.seq : v;
   };
   return readFields(handler.fields, Object.fromEntries(Object.entries(given).map(([name, v]) => [name, local(own(handler.fields, name), v)])), bounds);
