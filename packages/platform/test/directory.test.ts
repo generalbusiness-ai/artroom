@@ -80,12 +80,13 @@ describe("the rules of platform:directory@1, each as a plain function (authority
   const lane: ScopeRef = { scope: d.at.scope, inc: newIncarnation(new Uint8Array(16).fill(50)), kind: "lane" };
   const next = d.head.seq + 1;
   /** What is at hand: the further observations, and the values, by their canonical bytes. A value is matched by its digest in its domain. */
-  const hand = (observed: readonly ObservationUse[], values: readonly string[]): Pick<RuleGiven, "observed" | "value"> => ({
+  const hand = (observed: readonly ObservationUse[], values: readonly string[]): Pick<RuleGiven, "observed" | "value" | "placed"> => ({
+    placed: () => undefined,
     observed: (subject) => observed.find(({ observation: o }) => "subject" in o && ("asked" in subject ? o.subject === "rules" && o.content.asked === subject.asked : "member" in subject && o.subject === "member" && o.member === subject.member)) ?? null,
     value: (domain, digest) => values.map((bytes) => parseStrict(bytes)).find((value) => valueDigest(domain, value) === digest),
   });
   /** What a rule is given for an act of rita at that directory. */
-  const given = (s: Directory, kind: string, fields: Record<string, FieldValue> = {}, at: Pick<RuleGiven, "observed" | "value"> = hand([], []), grant: Grant | null = null): RuleGiven => ({
+  const given = (s: Directory, kind: string, fields: Record<string, FieldValue> = {}, at: Pick<RuleGiven, "observed" | "value" | "placed"> = hand([], []), grant: Grant | null = null): RuleGiven => ({
     state: s.state, input: { type: "act", signed: s.intent(rita, kind, { fields }), grant, presented: {} }, time: s.now, uses: [], own: s.own,
     resolved: { at: s.at, self: s.head.seq + 1, fields, subjects: new Map<string, Item>([["also.repository", s.item(0)]]), signer: { member: rita.member, principal: null }, bounds: PROPOSED_BOUNDS },
     ...at,

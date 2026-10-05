@@ -19,7 +19,7 @@ import { isIntent, presentedTypes, readFacts, readFields, type Reading } from ".
 import { covers } from "./grant.ts";
 import type { Judging } from "./guards.ts";
 import { alsoItems, derive, giving } from "./handlers.ts";
-import { actionOf, atHand, fieldOutsideType, grantByRule, markOf, retainedOf, selectedBy, unjudged, type JudgedInput, type ValueRead } from "./marks.ts";
+import { actionOf, atHand, fieldOutsideType, grantByRule, markOf, placeWithoutValue, placesOf, retainedOf, selectedBy, unjudged, type JudgedInput, type ValueRead } from "./marks.ts";
 import type { Item, StateView } from "./state.ts";
 import { nextDue, type Due } from "./timed.ts";
 import { timeMs, type Clock } from "./time.ts";
@@ -201,8 +201,14 @@ function actJudged(view: StateView, definition: ValidDefinition, signed: SignedI
   const clocked = { clock: false };
   const judged: JudgedInput = { type: "act", signed, grant: null, presented: context.presented ?? {} };
   // Sections 4.1 and 6.2: the further observations and the values at hand, which only a rule reads. What a rule reads of them is noted.
-  const beside = context.observed === undefined && context.values === undefined ? undefined : atHand(context.observed, context.values);
+  // Revision 19, section 6.2: the places of the act that name a value are in the pinned data, which only platform data states.
+  const places = placesOf(act.fields, fields);
+  const beside = context.observed === undefined && context.values === undefined && places.length === 0 ? undefined : atHand(context.observed, context.values, places);
   const g = { ...giving(view, context, scope, scope.head.seq + 1, judged, clocked, fields, facts), beside };
+  // Check 7, with the fields: a place that names a value and has none at hand is refused `bad-field` (section 6.2, "The checks, in
+  // the commit"). The value of each place is kept with the entry.
+  const unplaced = placeWithoutValue(beside);
+  if (unplaced) return refused("bad-field", `${unplaced} names a value that is not at hand`);
   // Check 7: a field whose type is a mark is checked by the mark's rule.
   const outside = fieldOutsideType(g, act.fields);
   if (outside) return refused("bad-field", `${outside} is not a value of its type`);

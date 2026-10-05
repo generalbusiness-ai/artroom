@@ -41,7 +41,7 @@ describe("the rules of platform:register@1, each as a plain function (authority 
   /** What a rule is given for a `found` of that signer at that register. */
   const given = (r: Register, who: typeof rita): RuleGiven => ({
     state: r.state, input: { type: "act", signed: r.intent(who, "found"), grant: null, presented: {} }, time: r.now, uses: [], own: r.own,
-    resolved: { at: r.at, self: r.head.seq + 1, fields: {}, subjects: new Map(), signer: null, bounds: PROPOSED_BOUNDS }, observed: () => null, value: () => undefined,
+    resolved: { at: r.at, self: r.head.seq + 1, fields: {}, subjects: new Map(), signer: null, bounds: PROPOSED_BOUNDS }, observed: () => null, value: () => undefined, placed: () => undefined,
   });
   /** What the rule `install` is given: the genesis, with its seed and its founding intent. */
   const installed = (install: SignedIntent, cause = intentDigest(install.intent)): RuleGiven =>

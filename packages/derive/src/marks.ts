@@ -17,12 +17,13 @@
  */
 
 import type { ActType, AlsoMark, Attempt, Bounds, CapabilityName, Digest, DomainTag, Effect, Evidence, FactRef, FieldType, FieldValue, Grant, GrantMark, Guard, KeyId, Mark, MemberId, MemberRef, Message, ObservationUse, OperationId, PlatformDefinition, Request, ScopeRef, Seed, SignedIntent, Timestamp } from "@generalbusiness/artroom-contract";
-import { canonicalize, digestBytes, domainBytes, isFieldValue, isMemberRef, parseStrict, utf8 } from "@generalbusiness/artroom-bytes";
+import { canonicalize, digestBytes, domainBytes, isDigest, isFieldValue, isMemberRef, parseStrict, utf8 } from "@generalbusiness/artroom-bytes";
 import type { Signer } from "./attribution.ts";
 import type { Own } from "./fields.ts";
 import type { Fetched, GuardResult, Judging } from "./guards.ts";
 import type { Opening } from "./ledger.ts";
 import type { Item, Operation, StateView } from "./state.ts";
+import { valuePlaces } from "./validate/fields.ts";
 import type { MarkKind, ValidDefinition } from "./validate/index.ts";
 import { isObject, own } from "./values.ts";
 
@@ -85,11 +86,65 @@ export interface AtHand {
   readonly observed: readonly ObservationUse[];
   readonly values: readonly string[];
   readonly read: { observed: ObservationUse[]; values: ValueRead[] };
+  /**
+   * Section 6.2, "How a version states a place" (revision 19): the places of
+   * the act that name a value, as its pinned data states them, each with the
+   * digest that its field holds in this intent. Empty: the data states none,
+   * as for every act of a declared definition.
+   */
+  readonly places: readonly Placed[];
 }
 
-/** What is at hand for one entry: the observations and the values that its judge was given. */
-export const atHand = (observed: readonly ObservationUse[] | undefined, values: readonly string[] | undefined): AtHand =>
-  ({ observed: observed ?? [], values: values ?? [], read: { observed: [], values: [] } });
+/** One place of an act, in one intent: the field, the byte domain and the bound that the data states, and the digest that the field holds. */
+export interface Placed { field: string; domain: string; max: number; digest: Digest }
+
+/** What is at hand for one entry: the observations and the values that its judge was given, and the places of its act that name a value. */
+export const atHand = (observed: readonly ObservationUse[] | undefined, values: readonly string[] | undefined, places: readonly Placed[] = []): AtHand =>
+  ({ observed: observed ?? [], values: values ?? [], read: { observed: [], values: [] }, places });
+
+/**
+ * The places of an act that an intent sets (section 6.2): each field that
+ * states `value` in the pinned data and that holds a digest in the fields
+ * as read.
+ */
+export const placesOf = (types: Readonly<Record<string, unknown>> | undefined, fields: Readonly<Record<string, FieldValue>>): Placed[] =>
+  valuePlaces(types).flatMap((place) => { const digest = own(fields, place.field); return isDigest(digest) ? [{ ...place, digest }] : []; });
+
+/**
+ * One value at hand, matched by its digest in one byte domain (section
+ * 6.2). Bytes that are not the canonical form of a JSON value, and a value
+ * that is longer than the bound of its domain, are no value at hand. The
+ * entry retains a value that is matched, once for a domain and a digest.
+ * Undefined: none at hand has that digest.
+ */
+function matched(hand: AtHand | undefined, domain: string, digest: Digest, most: number): unknown {
+  for (const bytes of hand?.values ?? []) {
+    if (typeof bytes !== "string" || utf8(bytes).length > most) continue;
+    let value: unknown;
+    try {
+      value = parseStrict(bytes);
+      if (canonicalize(value) !== bytes || valueDigest(domain, value) !== digest) continue;
+    } catch {
+      continue;
+    }
+    if (hand && !hand.read.values.some((read) => read.domain === domain && read.digest === digest)) hand.read.values.push({ domain, digest, bytes });
+    return value;
+  }
+  return undefined;
+}
+
+/**
+ * Section 6.2, "The checks, in the commit", with the places that the data
+ * states: the name of the first field that names a value and has none at
+ * hand, or null. That is so when no value came under its digest, when the
+ * bytes that came are not the canonical form of a JSON value, and when the
+ * value is longer than the bound of its domain. The input is then refused
+ * `bad-field`. A value that a place names is kept with the entry.
+ */
+export function placeWithoutValue(hand: AtHand | undefined): string | null {
+  for (const place of hand?.places ?? []) if (matched(hand, place.domain, place.digest, place.max) === undefined) return place.field;
+  return null;
+}
 
 /**
  * What the entry retains of what was at hand: each observation that a rule
@@ -177,6 +232,16 @@ export interface RuleGiven {
   readonly resolved: Resolved;
   observed(subject: Observed): ObservationUse | null;
   value(domain: string, digest: Digest, most: number): unknown;
+  /**
+   * Revision 19, section 6.2: the value that one field of the act names,
+   * which the judge matched by the domain and the bound that the pinned
+   * data states for the field. A rule states no domain and no bound of its
+   * own. Undefined: the data states no place at that field, or the intent
+   * leaves the field out. `value`, above, with the domain and the bound in
+   * a rule's code, is a STAND-IN for a row whose data does not state its
+   * places yet.
+   */
+  placed(field: string): unknown;
 }
 
 /** The members of `Effect` that a rule returns (section 6.1, "What a rule returns is in this contract's forms"). */
@@ -320,20 +385,11 @@ export function givenTo(g: Giving): RuleGiven {
     },
     // Section 6.2: a value is matched by its digest in the domain that its place states. Bytes that are not the canonical form of a
     // JSON value, and a value that is longer than the bound of its domain, are no value at hand.
-    value(domain, digest, most) {
-      for (const bytes of hand?.values ?? []) {
-        if (typeof bytes !== "string" || utf8(bytes).length > most) continue;
-        let value: unknown;
-        try {
-          value = parseStrict(bytes);
-          if (canonicalize(value) !== bytes || valueDigest(domain, value) !== digest) continue;
-        } catch {
-          continue;
-        }
-        if (hand && !hand.read.values.some((read) => read.domain === domain && read.digest === digest)) hand.read.values.push({ domain, digest, bytes });
-        return value;
-      }
-      return undefined;
+    value: (domain, digest, most) => matched(hand, domain, digest, most),
+    // Revision 19: the value of a place that the data states, by its field. The judge matched it at check 7.
+    placed(field) {
+      const place = hand?.places.find((at) => at.field === field);
+      return place ? matched(hand, place.domain, place.digest, place.max) : undefined;
     },
   };
 }

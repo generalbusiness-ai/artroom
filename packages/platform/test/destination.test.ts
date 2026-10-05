@@ -81,7 +81,7 @@ test("each rule of platform:destination@1 at an act or a handler, as a plain fun
   const given = (b: Branch, input: JudgedInput, fields: Record<string, unknown> = {}, subjects: Record<string, Item> = {}): RuleGiven => ({
     state: b.state, input, time: b.now, uses: [], own: b.own,
     resolved: { at: b.at, self: b.head.seq + 1, fields: fields as Record<string, FieldValue>, subjects: new Map(Object.entries(subjects)), signer: null, bounds: PROPOSED_BOUNDS },
-    observed: () => null, value: () => undefined,
+    observed: () => null, value: () => undefined, placed: () => undefined,
   });
   const run = (name: string, ...args: unknown[]): unknown => (destinationRules[name] as PlatformRule & { run: (...args: unknown[]) => unknown }).run(...args);
   const opens = (kind: string, attempts: number) => [{ effect: "operation", k: 0, owner: DESTINATION, kind, attempts }, { effect: "attempt", operation: { k: 0 }, attempt: 1, result: "opened", selected: null }];

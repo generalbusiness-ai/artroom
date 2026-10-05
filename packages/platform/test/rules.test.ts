@@ -44,7 +44,7 @@ describe("the rules of platform:membership@1, each as a plain function (authorit
     return {
       state: m.state, input: { type: "act", signed, grant, presented: {} }, time: m.now, uses: [], own: m.own,
       resolved: { at: m.at, self: m.head.seq + 1, fields, subjects: new Map(Object.entries(subjects).map(([name, id]): [string, Item] => [name, m.item(id)])), signer: null, bounds: PROPOSED_BOUNDS },
-      observed: () => null, value: () => undefined,
+      observed: () => null, value: () => undefined, placed: () => undefined,
     };
   };
   const run = (name: string, ...args: unknown[]): unknown => (membershipRules[name] as PlatformRule & { run: (...args: unknown[]) => unknown }).run(...args);

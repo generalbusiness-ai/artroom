@@ -123,7 +123,7 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
   const d: Defining = {
     ...read, bounds, name: typeof top["name"] === "string" ? top["name"] : null, typeNames: new Set(isObject(top["items"]) ? Object.keys(top["items"]) : []), types: new Map(), rules: new Set(), holds: false, holdTypes: new Set(),
     capabilities: new Map(), underived: [],
-    indexes: [], clauseSets: [], clause: null, duties: [], platform, marks: [],
+    indexes: [], clauseSets: [], clause: null, duties: [], platform, marks: [], places: new Map(),
   };
 
   const profile = rec(top["profile"], "profile", ["name", "version"]);

@@ -9,6 +9,8 @@ import { gate, gateRules, gateWith } from "./fixtures-marks.ts";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Change = (d: any) => void;
 const MARK = { code: "fresh", row: "P14" };
+/** A made-up place: a byte domain that the made-up data declares, and its bound on one value. */
+const PLACE = { domain: "gate-proof-1", max: 64 };
 
 /** The problems of a value with one change, as the code and the path of each: with the platform option, or without it. */
 function problems(base: unknown, change: Change, platform: boolean): (readonly [string, string])[] | null {
@@ -71,6 +73,17 @@ describe("a mark in a definition (section 6.1)", () => {
       d.acts.enter.sends[0].always = true;
       d.acts.enter.sends.push({ code: "again", row: "P21", result: {} }, { index: { fields: {} } });
     }, true, [["shape", "acts.enter.sends.0"]]],
+    // Revision 19, section 6.2, "How a version states a place" (witness 18.45, case 7): a field of type `digest` of an act may state
+    // `value: { domain, max }`, in platform data only. Two fields that state one domain state one `max`.
+    ["a field of an act that names a value passes", gate, (d) => { d.acts.issue.fields.hash.value = PLACE; }, true, null],
+    ["the same member without the option is unknown: no act of a declared definition has a place", small, (d) => { d.acts.edit.fields.proof = { type: "digest", required: false, value: PLACE }; }, false, [["shape", "acts.edit.fields.proof.value"]]],
+    ["two fields that state one domain with two bounds", gate, (d) => { d.acts.issue.fields.hash.value = PLACE; d.acts.issue.fields.other = { type: "digest", required: false, value: { ...PLACE, max: 65 } }; }, true, [["shape", "acts.issue.fields.other.value.max"]]],
+    ["two fields that state one domain with one bound pass", gate, (d) => { d.acts.issue.fields.hash.value = PLACE; d.acts.issue.fields.other = { type: "digest", required: false, value: PLACE }; }, true, null],
+    ["a place with no bound, and one with no domain", gate, (d) => { d.acts.issue.fields.hash.value = { domain: "gate-proof-1", max: 0 }; d.acts.issue.fields.other = { type: "digest", required: false, value: { domain: "", max: 4 } }; }, true, [
+      ["shape", "acts.issue.fields.hash.value.max"], ["shape", "acts.issue.fields.other.value.domain"], ["name", "acts.issue.effects.0.value.from"],
+    ]],
+    ["a place on a field of another type", gate, (d) => { d.acts.enter.fields.secret.value = PLACE; }, true, [["shape", "acts.enter.fields.secret.value"]]],
+    ["a place on a slot", gate, (d) => { d.items.ticket.values.hash.of = { type: "digest", value: PLACE }; }, true, [["shape", "items.ticket.values.hash.of.value"]]],
     ["`always` on a written send is no member of it", small, (d) => { d.acts.edit.sends = [{ index: { fields: {} }, always: true }]; }, false, [["shape", "acts.edit.sends.0"]]],
     // A written effect on a name that a mark selects, a required slot that only an effect mark could set, and a clause of the mark's own request all pass.
     ["a required slot that no written effect sets, in a row with an effect mark, passes", gate, (d) => { d.acts.issue.effects = [{ code: "hash-of", row: "P18" }]; }, true, null],
@@ -287,6 +300,26 @@ describe("a rule is run at the check of its mark's place (sections 4.2 and 6.1)"
     expect([said(enter(s, una, "one", by([operation(0)], [operation(1), first(1)]))), s.entries.length]).toEqual([["unavailable", "unavailable", null, null], 3]);
     // Section 6.1, "The joined lists are checked as one": the pair is in the entry's effects, each half from another rule.
     expect([said(enter(s, una, "one", by([operation(0)], [first(0)]))), s.last.effects]).toEqual([["write", null, null, null], [{ effect: "state", item: 2, state: "used" }, operation(0), first(0)]]);
+  });
+
+  // Scope contract, revision 19, section 6.2, "How a version states a place" and "The checks, in the commit"; witness 18.45, case 6.
+  test("a field that names a value: the judge matches the value at hand by the domain and the bound that the data states, a rule reads it by its field, and the draft names it for the scope to keep; with none at hand, with bytes that are not canonical, or with a value past the bound, the act is refused `bad-field`", () => {
+    const read: unknown[] = [];
+    const s = new Scope(gateWith((d) => { d.acts.issue.fields.hash.value = PLACE; d.acts.issue.effects.push({ code: "seen", row: "P21" }); }));
+    const platform = gateRules({ seen: { place: "effect", most: 0, run: (given) => { read.push(given.placed("hash"), given.placed("secret")); return []; } } });
+    const proof = { seat: 12, row: "c" };
+    const [digest, bytes] = [valueDigest(PLACE.domain, proof), canonicalize(proof)];
+    const issue = (values: readonly string[] | undefined, hash = digest) => s.act(rita, "issue", { fields: { hash } }, { platform, ...(values === undefined ? {} : { values }) });
+    // No value came; another value came; the bytes are not canonical; the value is past the bound of its domain; and its digest is
+    // of another domain. Each is `bad-field`, at check 7, before any rule of the row is run.
+    const long = { seat: 12, row: "c".repeat(64) };
+    expect([issue(undefined), issue([canonicalize({ seat: 13 })]), issue([JSON.stringify(proof, null, 1)]), issue([canonicalize(long)], valueDigest(PLACE.domain, long)), issue([bytes], valueDigest("gate-other-1", proof))].map(said))
+      .toEqual(Array.from({ length: 5 }, () => ["refused", "bad-field", null, "hash names a value that is not at hand"]));
+    expect(read).toEqual([]);
+    // The value is at hand, among others. The rule reads it by its field, and states no domain and no bound. The draft names the
+    // one value that a place names, with its domain, and no other that came.
+    const written = issue([canonicalize({ seat: 13 }), bytes]);
+    expect([written.result, written.result === "write" && written.draft.values, read]).toEqual(["write", [{ domain: PLACE.domain, digest, bytes }], [proof, undefined]]);
   });
 
   // Scope contract, revision 19, section 6.1, "More than one send mark"; witness 18.45, cases 1, 2, 4 and 5. The rules are STAND-INS.

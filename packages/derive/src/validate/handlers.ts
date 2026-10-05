@@ -177,7 +177,7 @@ export function acts(d: Defining, v: unknown, timed: Readonly<Record<string, unk
       const g = mark(d, o["grant"], at(path, "grant"), "grant", [], ["grant"]);
       if (g && "grant" in g) str(g["grant"], at(at(path, "grant"), "grant"));
     } else str(o["grant"], at(path, "grant"));
-    const fields = declaredFields(d, o["fields"], at(path, "fields"));
+    const fields = declaredFields(d, o["fields"], at(path, "fields"), true);
     // A transition's primary item exists before the entry, so a `via` may read its slots. The item an `open` act opens does not.
     const named = also(d, o["also"], at(path, "also"), fields, step === "transition" ? on : null, top);
     // Section 6.4: the facts that are presented beside the intent, each with the kinds and the definition that a `fact` guard

@@ -112,6 +112,7 @@ export interface Defining extends Shapes {
   readonly duties: Duties[];                // one for each act and handler that was read
   readonly platform: boolean;               // the platform option: the data of a platform definition, which may hold a mark at seven places (section 6.1)
   readonly marks: MarkPlace[];              // each mark that was read, with its place
+  readonly places: Map<string, number>;     // section 6.2, revision 19: each byte domain that a field of an act states for a value, with its one bound
 }
 
 export const onSubject = (of: unknown) => of === undefined || of === "on";

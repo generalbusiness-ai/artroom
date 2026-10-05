@@ -52,6 +52,16 @@ export type TypeMark = Mark & { type: "code" };
  */
 export type SendMark = Mark & { result: PlatformClauses; always?: true };
 
+/**
+ * A place of an act that names a value beside the intent (revision 19,
+ * section 6.2, "How a version states a place"): a field of type `digest`
+ * that states the byte domain of the place, and the bound on one value of
+ * that domain, in canonical bytes. Two fields of one definition that state
+ * one domain state one `max`. In platform data only, and only as the type
+ * of a field of an act.
+ */
+export interface ValuePlace { type: "digest"; value: { domain: string; max: number } }
+
 /** The type of a field or of a slot, in platform data. */
 export type PlatformFieldType = FieldType | TypeMark;
 /** An effect of a written list, in platform data. */
@@ -74,7 +84,7 @@ interface MarkedForms {
 
 export type PlatformAct = Omit<ActType, "grant" | "fields" | keyof MarkedForms> & MarkedForms & {
   grant: string | GrantMark;
-  fields: Record<string, PlatformFieldType & { required: boolean; default?: FieldValue }>;
+  fields: Record<string, (PlatformFieldType | ValuePlace) & { required: boolean; default?: FieldValue }>;
 };
 export type PlatformReceive = Omit<ReceiveType, "fields" | keyof MarkedForms> & MarkedForms & {
   fields: Record<string, PlatformFieldType & { required: boolean }>;
