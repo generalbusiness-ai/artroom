@@ -8,33 +8,29 @@
  * A read is one synchronous pass over storage, so it sees one head.
  */
 
-import { ENTRY_READ_BYTES, HISTORY_PAGE_BYTES, HISTORY_PAGE_ENTRIES, OUTBOX_PAGE_DUTIES, RETAINED_ITEMS_PAGE } from "@generalbusiness/artroom-contract";
-import type { Cursor, Digest, Entry, PlatformDefinition, Read, ReadRefusal, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
-import { byteOrder, type Item, type ScopeState, type Status, type ValidDefinition } from "@generalbusiness/artroom-derive";
+import { ENTRY_READ_BYTES, HISTORY_PAGE_BYTES, HISTORY_PAGE_ENTRIES, OUTBOX_PAGE_DUTIES, RETAINED_INPUT_BYTES, RETAINED_ITEMS_PAGE } from "@generalbusiness/artroom-contract";
+import type { Cursor, Digest, DutyId, Entry, LogPage, Read, ReadRefusal, RetainedInput, Summary } from "@generalbusiness/artroom-contract";
+import { utf8 } from "@generalbusiness/artroom-bytes";
+import { byteOrder, type Item, type ScopeState, type ValidDefinition } from "@generalbusiness/artroom-derive";
 import type { Pinned } from "./core.ts";
 import type { ReadName, Readers } from "./ports.ts";
-import type { Duty, Sealed, Store } from "./store.ts";
+import type { Duty, Sealed, Store, Stored } from "./store.ts";
 
-/** The bound of each read. The defaults are the contract's table. */
-export interface ReadBounds { retainedItems: number; historyEntries: number; historyBytes: number; entryBytes: number; outboxDuties: number }
+/** The bound of each read. The defaults are the contract's table, and for a retained input the history page's byte bound. */
+export interface ReadBounds { retainedItems: number; historyEntries: number; historyBytes: number; entryBytes: number; outboxDuties: number; retainedBytes: number }
 export const READ_BOUNDS: ReadBounds = {
   retainedItems: RETAINED_ITEMS_PAGE, historyEntries: HISTORY_PAGE_ENTRIES, historyBytes: HISTORY_PAGE_BYTES, entryBytes: ENTRY_READ_BYTES, outboxDuties: OUTBOX_PAGE_DUTIES,
+  retainedBytes: RETAINED_INPUT_BYTES,
 };
 
-/**
- * A scope's summary: its live items, and the exact number of items in each
- * type and state, retained final items included. Final items are counted
- * and not listed; `Reads.items` pages them.
- */
-export interface Summary {
-  scope: ScopeRef; status: Status; definition: Digest | PlatformDefinition; time: Timestamp;
-  items: readonly Item[];                                                    // live, by ID
-  counts: readonly (readonly [type: string, state: string, n: number])[];    // every type and state of the definition, by type, then state
-}
+export type { Summary };
 
 const no = (reason: ReadRefusal) => ({ ok: false, reason }) as const;
 /** A cursor made here is a decimal number. */
 const position = (cursor: Cursor | undefined, first: number | null): number | null | undefined => (cursor === undefined ? first : /^(0|[1-9][0-9]{0,15})$/.test(cursor) ? Number(cursor) : undefined);
+
+/** A duty ID: the `seq` of an entry and the ordinal of one of its sends. */
+const DUTY = /^(0|[1-9][0-9]{0,15})\.(0|[1-9][0-9]{0,5})$/;
 
 export class Reads {
   readonly #store: Store;
@@ -94,22 +90,53 @@ export class Reads {
     return { ok: true, at: open.scope.head, value: page.items, complete: !page.more, ...(page.more ? { next: String(page.items.at(-1)!.id) } : {}) };
   }
 
+  /** The stored rows of one history page from `from`: at most the bound's entries and bytes, and at least one entry. */
+  #page(from: number): { rows: Stored[]; more: boolean } {
+    const rows = this.#store.storedFrom(from, this.#bounds.historyEntries + 1);
+    const page: Stored[] = [];
+    let bytes = 0;
+    for (const row of rows.slice(0, this.#bounds.historyEntries)) {
+      if (page.length > 0 && bytes + row.size > this.#bounds.historyBytes) break;
+      bytes += row.size;
+      page.push(row);
+    }
+    return { rows: page, more: page.length < rows.length };
+  }
+
   /** A page of the history from the entry the cursor names, or from the genesis: at most the bound's entries and bytes, and at least one entry. */
   history(reader: unknown, cursor?: Cursor): Read<readonly Sealed[]> {
     const open = this.#open(reader, "history");
     if (!("scope" in open)) return open;
     const from = position(cursor, 0);
     if (from === undefined || from === null) return no("not-found");
-    const rows = this.#store.storedFrom(from, this.#bounds.historyEntries + 1);
-    const page: Sealed[] = [];
-    let bytes = 0;
-    for (const row of rows.slice(0, this.#bounds.historyEntries)) {
-      if (page.length > 0 && bytes + row.size > this.#bounds.historyBytes) break;
-      bytes += row.size;
-      page.push({ entry: JSON.parse(row.bytes) as Entry, hash: row.hash });
-    }
-    const more = page.length < rows.length;
-    return { ok: true, at: open.scope.head, value: page, complete: !more, ...(more ? { next: String(from + page.length) } : {}) };
+    const { rows, more } = this.#page(from);
+    return { ok: true, at: open.scope.head, value: rows.map((row) => ({ entry: JSON.parse(row.bytes) as Entry, hash: row.hash })), complete: !more, ...(more ? { next: String(from + rows.length) } : {}) };
+  }
+
+  /**
+   * The same page as it is stored (sections 9.2 and 9.4): each entry as its
+   * canonical JSON text, with the hash stored for it. A verifier hashes the
+   * bytes itself, before it reads the content. The page has the bounds of a
+   * history page.
+   */
+  log(reader: unknown, cursor?: Cursor): Read<LogPage> {
+    const open = this.#open(reader, "log");
+    if (!("scope" in open)) return open;
+    const from = position(cursor, 0);
+    if (from === undefined || from === null) return no("not-found");
+    const { rows, more } = this.#page(from);
+    const value: LogPage = { scope: open.scope.at, definition: open.pinned.named, entries: rows.map((row) => ({ seq: row.seq, hash: row.hash, bytes: row.bytes })) };
+    return { ok: true, at: open.scope.head, value, complete: !more, ...(more ? { next: String(from + rows.length) } : {}) };
+  }
+
+  /** One retained input, by kind and digest (section 9.2). One over the byte bound is `too-large`. */
+  retained(reader: unknown, kind: RetainedInput["kind"], digest: Digest): Read<RetainedInput> {
+    const open = this.#open(reader, "retained");
+    if (!("scope" in open)) return open;
+    const kept = (kind === "definition" || kind === "entry" || kind === "rule") && typeof digest === "string" ? this.#store.retained(kind, digest) : null;
+    if (!kept) return no("not-found");
+    if (utf8(kept.bytes).length > this.#bounds.retainedBytes) return no("too-large");
+    return { ok: true, at: open.scope.head, value: kept, complete: true };
   }
 
   /** One entry by `seq`. */
@@ -126,9 +153,18 @@ export class Reads {
   outbox(reader: unknown, cursor?: Cursor): Read<readonly Duty[]> {
     const open = this.#open(reader, "outbox");
     if (!("scope" in open)) return open;
-    const at = cursor === undefined ? null : /^(0|[1-9][0-9]{0,15})\.(0|[1-9][0-9]{0,5})$/.exec(cursor);
+    const at = cursor === undefined ? null : DUTY.exec(cursor);
     if (cursor !== undefined && !at) return no("not-found");
     const page = this.#store.duties(at ? { seq: Number(at[1]), n: Number(at[2]) } : null, this.#bounds.outboxDuties);
     return { ok: true, at: open.scope.head, value: page.duties, complete: !page.more, ...(page.more ? { next: page.duties.at(-1)!.duty } : {}) };
+  }
+
+  /** The outbox row of one send, by its duty ID. */
+  duty(reader: unknown, duty: DutyId): Read<Duty> {
+    const open = this.#open(reader, "outbox");
+    if (!("scope" in open)) return open;
+    const at = typeof duty === "string" ? DUTY.exec(duty) : null;
+    const row = at ? this.#store.duty(Number(at[1]), Number(at[2])) : null;
+    return row ? { ok: true, at: open.scope.head, value: row, complete: true } : no("not-found");
   }
 }

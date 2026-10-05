@@ -2,14 +2,15 @@
  * The state a scope's entries fold into (scope contract, sections 6.3, 6.5,
  * 4.2, 7.2 to 7.4). It is behind an interface so that the runtime can keep it
  * in storage and a verifier in memory, and both run the same fold and the
- * same judges over it.
+ * same judges over it. The shapes a read returns, `Item`, `Party` and
+ * `Status`, are the contract's, and are exported here again.
  */
 
-import type { Digest, FactRef, FieldValue, Head, Incarnation, KeyId, MemberRef, OperationId, Request, ScopeRef, Seed, Timestamp } from "@generalbusiness/artroom-contract";
+import type { Digest, FactRef, Head, Incarnation, Item, KeyId, OperationId, Party, Request, ScopeRef, Seed, Status, Timestamp } from "@generalbusiness/artroom-contract";
 import { canonicalBytes, canonicalize, digestBytes } from "@generalbusiness/artroom-bytes";
 import { byteOrder } from "./values.ts";
 
-export type Status = "provisional" | "active" | "refused";
+export type { Item, Party, Status };
 
 /** What every judgment reads first. `time` is the last entry's time (section 5.3). */
 export interface ScopeState {
@@ -22,29 +23,6 @@ export interface ScopeState {
    * result. The entry that records the confirmation empties it (section 7.2).
    */
   held: readonly number[];
-}
-
-/** A party slot holds one member, or a list of members. An empty slot is `null`; an empty list is unset. */
-export type Party = MemberRef | readonly MemberRef[] | null;
-
-export interface Item {
-  readonly id: number;                     // the `seq` of its opening entry (section 4.1)
-  readonly type: string;
-  readonly state: string;
-  readonly revision: number;               // section 6.3
-  /** The hash of its opening entry, so a send can name it by fact. Null only while that entry is being judged. */
-  readonly opened: Digest | null;
-  readonly parties: Readonly<Record<string, Party>>;
-  readonly refs: Readonly<Record<string, FieldValue | null>>;
-  readonly values: Readonly<Record<string, FieldValue | null>>;
-  /**
-   * The history attribution needs (section 6.7): every member ever in one of
-   * its `author` slots, every holder of a hold whose `under` names it, and
-   * the principal of each who signed under one: when put in the slot, or
-   * later, when changing this item or a hold under it.
-   */
-  readonly attributed: readonly MemberRef[];
-  readonly epoch?: number;                 // a hold item only (section 6.8)
 }
 
 /** This scope's copy of a relationship another scope owns (section 7.3). `revision` is the `seq` of the owner's entry. */

@@ -3,10 +3,11 @@
  * directory, submit an act, settle an accepted act, run an alarm's turn,
  * and write a checkpoint. Each is a waiting input handed to the turn, or a
  * read of the history. The judges are derive's; this file builds what they
- * are given and turns what they answer into the caller's answer.
+ * are given and turns what they answer into the caller's answer. `Founded`,
+ * the answer to a founding, is the contract's, and is exported here again.
  */
 
-import type { Answer, Bounds, DeclaredDefinition, Digest, DutyId, Entry, FactRef, Grant, PlatformDefinition, Receipt, RefusalReason, DeliveryRefusal, ScopeId, Seed, Settlement, SignedIntent, UnavailableReason } from "@generalbusiness/artroom-contract";
+import type { Answer, Bounds, DeclaredDefinition, Digest, DutyId, Entry, FactRef, Founded, Grant, PlatformDefinition, Receipt, RefusalReason, ScopeId, Seed, Settlement, SignedIntent, UnavailableReason } from "@generalbusiness/artroom-contract";
 import { canonicalize, definitionDigest, intentDigest, isDigest, newIncarnation, parseStrict } from "@generalbusiness/artroom-bytes";
 import { checkpointOf, factsNamed, isFactRef, isMemberRef, isObject, judgeAct, judgeCheckpoint, judgeGenesis, prepareRules, readFields, timeMs, validateDefinition } from "@generalbusiness/artroom-derive";
 import type { ActJudgment, Clock as Reading, Draft, Fetched, Founding, JudgeContext, ValidDefinition } from "@generalbusiness/artroom-derive";
@@ -16,16 +17,7 @@ import type { DefinitionRead, Ports } from "./ports.ts";
 import type { Retained, Sealed, Store } from "./store.ts";
 import { Turns, fetchFacts, isSigned, type Verdict } from "./turn.ts";
 
-/**
- * How a founding is answered (section 7.1). `accepted`: the genesis entry is
- * sealed, now or by an earlier call with the same intent, and its act
- * applied. `scope-refused`: the genesis entry is sealed and its act refused;
- * the scope is terminal. Every other refusal wrote nothing.
- */
-export type Founded =
-  | { answer: "accepted"; receipt: Receipt }
-  | { answer: "refused"; reason: RefusalReason | DeliveryRefusal | "unsupported-definition" }
-  | { answer: "unavailable"; reason: UnavailableReason };
+export type { Founded };
 
 /** How a checkpoint is answered (section 9.2). It has no caller outside the scope. */
 export type Checkpointed =

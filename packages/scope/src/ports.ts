@@ -77,7 +77,8 @@ export type DefinitionRead = { ok: true; bytes: string } | { ok: false; reason: 
 export interface Definitions { read(named: Digest | PlatformDefinition, holder: ScopeRef | null): Promise<DefinitionRead> }
 
 /** The reads of section 9.1. */
-export type ReadName = "summary" | "items" | "history" | "entry" | "outbox";
+/** `log` and `retained` are what a verifier reads (sections 9.2 and 9.4): the stored bytes of entries, and retained inputs. */
+export type ReadName = "summary" | "items" | "history" | "entry" | "outbox" | "log" | "retained";
 
 /** Who may read. `reader` is whatever the caller presented; sessions are the authority note's. */
 export interface Readers { allows(reader: unknown, read: ReadName): boolean }

@@ -14,7 +14,8 @@ cite its sections.
 | `intent` | The intent an actor signs, and the six byte-domain tags (`DOMAINS`). |
 | `entry` | An entry, its inputs, the message classes, sends, derived effects, and the views built after sealing: duty ID, envelope, receipt. |
 | `definition` | A declared definition: field and item types, acts, handlers, timed rules, rule expressions, and every guard, effect, send and attention form. |
-| `read` | Read results, cursors, settlement, and the page bounds. |
+| `read` | Read results, cursors, settlement, and the page bounds. What the reads return: an item, a summary, a sealed entry, a duty of the outbox, a page of the stored log, and a retained input. |
+| `transport` | `ScopeApi`: the operations of a scope service as one interface, which the service's entrypoint and a client's transport both satisfy. `Founded`, the answer to a founding. |
 | `report` | The report a verifier writes. |
 | `result` | The four answers to a submitted act, every refusal and unavailable reason the contract names, and the refusal reasons the derivation step adds. |
 | `bounds` | Every size and count limit as one `Bounds` value, with `PROPOSED_BOUNDS` as a temporary default. |

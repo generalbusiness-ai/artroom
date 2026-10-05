@@ -8,7 +8,8 @@
  *   JSON out. A body is the contract's own answer; the status code says the
  *   same thing in HTTP's terms.
  * - `ScopeService`: the same operations over a service binding, for a
- *   client in another Worker.
+ *   client in another Worker. It implements the contract's `ScopeApi`,
+ *   which a client's transport also is.
  * - `DeployedScope`: the scope's object class as it is deployed, with the
  *   namespace as its resolver, its transport and its source of
  *   declarations. Its authority and readers ports are the production
@@ -27,13 +28,16 @@
  * | `GET /v1/scopes/:scope/history?cursor=` | A page of the history. |
  * | `GET /v1/scopes/:scope/entries/:seq` | One entry. |
  * | `GET /v1/scopes/:scope/outbox?cursor=` | A page of the outbox. |
+ * | `GET /v1/scopes/:scope/outbox/:duty` | The outbox status of one send. |
+ * | `GET /v1/scopes/:scope/log?cursor=` | A page of the history as stored: each entry's canonical bytes. |
+ * | `GET /v1/scopes/:scope/retained/:kind/:digest` | One retained input. |
  *
  * A reader presents itself in the `Authorization` header. What it must be is
  * the authority note's; the production readers port lets nobody read.
  */
 
 import { WorkerEntrypoint } from "cloudflare:workers";
-import type { Answer, Cursor, DeclaredDefinition, Digest, Grant, PlatformDefinition, Read, ReadRefusal, ScopeId, Seed, Settlement, SignedIntent } from "@generalbusiness/artroom-contract";
+import type { Answer, Cursor, DeclaredDefinition, Digest, DutyId, Grant, LogPage, PlatformDefinition, Read, ReadRefusal, RetainedInput, ScopeApi, ScopeId, Seed, Settlement, SignedIntent } from "@generalbusiness/artroom-contract";
 import { definitionDigest, intentDigest, isScopeId, scopeIdOf } from "@generalbusiness/artroom-bytes";
 import { isObject, type Item } from "@generalbusiness/artroom-derive";
 import type { Founded } from "./core.ts";
@@ -55,12 +59,15 @@ interface Remote {
   history(reader: unknown, cursor?: Cursor): Promise<Read<readonly Sealed[]>>;
   entry(reader: unknown, seq: number): Promise<Read<Sealed>>;
   outbox(reader: unknown, cursor?: Cursor): Promise<Read<readonly Duty[]>>;
+  duty(reader: unknown, duty: DutyId): Promise<Read<Duty>>;
+  log(reader: unknown, cursor?: Cursor): Promise<Read<LogPage>>;
+  retained(reader: unknown, kind: RetainedInput["kind"], digest: Digest): Promise<Read<RetainedInput>>;
 }
 
 const MISSING = { ok: false, reason: "not-found" } as const;
 
 /** Every operation, each on the object the scope ID names. A name that is no scope ID names nothing. */
-export function api(binding: Binding) {
+export function api(binding: Binding): ScopeApi {
   const at = (scope: string): Remote | null => (isScopeId(scope) ? binding.get(binding.idFromName(scope)) as Remote : null);
   return {
     /**
@@ -87,9 +94,12 @@ export function api(binding: Binding) {
     async history(scope: string, reader: unknown, cursor?: Cursor): Promise<Read<readonly Sealed[]>> { return (await at(scope)?.history(reader, cursor)) ?? MISSING; },
     async entry(scope: string, reader: unknown, seq: number): Promise<Read<Sealed>> { return (await at(scope)?.entry(reader, seq)) ?? MISSING; },
     async outbox(scope: string, reader: unknown, cursor?: Cursor): Promise<Read<readonly Duty[]>> { return (await at(scope)?.outbox(reader, cursor)) ?? MISSING; },
+    async duty(scope: string, reader: unknown, duty: DutyId): Promise<Read<Duty>> { return (await at(scope)?.duty(reader, duty)) ?? MISSING; },
+    async log(scope: string, reader: unknown, cursor?: Cursor): Promise<Read<LogPage>> { return (await at(scope)?.log(reader, cursor)) ?? MISSING; },
+    async retained(scope: string, reader: unknown, kind: RetainedInput["kind"], digest: Digest): Promise<Read<RetainedInput>> { return (await at(scope)?.retained(reader, kind, digest)) ?? MISSING; },
   };
 }
-export type Api = ReturnType<typeof api>;
+export type Api = ScopeApi;
 
 // ---------------------------------------------------------------- HTTP
 
@@ -124,8 +134,10 @@ async function body(request: Request): Promise<Record<string, unknown> | null> {
 export async function route(request: Request, binding: Binding): Promise<Response> {
   const scopes = api(binding);
   const url = new URL(request.url);
-  const [v, root, scope, what, which, ...more] = url.pathname.split("/").slice(1).map(decodeURIComponent);
+  const [v, root, scope, what, which, last, ...more] = url.pathname.split("/").slice(1).map(decodeURIComponent);
   if (v !== "v1" || root !== "scopes" || more.length > 0) return json(404, { error: "not-found" });
+  // Only a retained input is named by two parts: its kind and its digest.
+  if (what === "retained" ? which === undefined || last === undefined : last !== undefined) return json(404, { error: "not-found" });
   const reader = request.headers.get("authorization");
   const cursor = url.searchParams.get("cursor") ?? undefined;
   const posts = (scope === undefined && what === undefined) || ((what === "acts" || what === "settle") && which === undefined);
@@ -143,7 +155,9 @@ export async function route(request: Request, binding: Binding): Promise<Respons
   if (what === "items" && which !== undefined) return read(await scopes.items(scope, reader, which, cursor));
   if (what === "history" && which === undefined) return read(await scopes.history(scope, reader, cursor));
   if (what === "entries" && which !== undefined && /^(0|[1-9][0-9]{0,15})$/.test(which)) return read(await scopes.entry(scope, reader, Number(which)));
-  if (what === "outbox" && which === undefined) return read(await scopes.outbox(scope, reader, cursor));
+  if (what === "outbox") return read(which === undefined ? await scopes.outbox(scope, reader, cursor) : await scopes.duty(scope, reader, which as DutyId));
+  if (what === "log" && which === undefined) return read(await scopes.log(scope, reader, cursor));
+  if (what === "retained") return read(await scopes.retained(scope, reader, which as RetainedInput["kind"], last as Digest));
   return json(404, { error: "not-found" });
 }
 
@@ -161,7 +175,7 @@ export class DeployedScope<E extends Env = Env> extends ScopeObject<E> {
 }
 
 /** The same operations over a service binding. */
-export class ScopeService<E extends Env = Env> extends WorkerEntrypoint<E> {
+export class ScopeService<E extends Env = Env> extends WorkerEntrypoint<E> implements ScopeApi {
   /** The one scope namespace. */
   protected scopes(): Binding { return this.env.SCOPES; }
   found(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions: readonly DeclaredDefinition[] = []): Promise<Founded> { return api(this.scopes()).found(founding, definition, definitions); }
@@ -172,6 +186,9 @@ export class ScopeService<E extends Env = Env> extends WorkerEntrypoint<E> {
   history(scope: string, reader: unknown, cursor?: Cursor): Promise<Read<readonly Sealed[]>> { return api(this.scopes()).history(scope, reader, cursor); }
   entry(scope: string, reader: unknown, seq: number): Promise<Read<Sealed>> { return api(this.scopes()).entry(scope, reader, seq); }
   outbox(scope: string, reader: unknown, cursor?: Cursor): Promise<Read<readonly Duty[]>> { return api(this.scopes()).outbox(scope, reader, cursor); }
+  duty(scope: string, reader: unknown, duty: DutyId): Promise<Read<Duty>> { return api(this.scopes()).duty(scope, reader, duty); }
+  log(scope: string, reader: unknown, cursor?: Cursor): Promise<Read<LogPage>> { return api(this.scopes()).log(scope, reader, cursor); }
+  retained(scope: string, reader: unknown, kind: RetainedInput["kind"], digest: Digest): Promise<Read<RetainedInput>> { return api(this.scopes()).retained(scope, reader, kind, digest); }
 }
 
 export default { fetch: (request: Request, env: Env): Promise<Response> => route(request, env.SCOPES) };

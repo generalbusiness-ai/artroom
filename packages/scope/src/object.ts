@@ -16,7 +16,7 @@
 
 import { DurableObject } from "cloudflare:workers";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { Answer, Bounds, Cursor, DeclaredDefinition, Digest, Grant, PlatformDefinition, Read, ScopeId, Settlement, SignedIntent } from "@generalbusiness/artroom-contract";
+import type { Answer, Bounds, Cursor, DeclaredDefinition, Digest, DutyId, Grant, LogPage, PlatformDefinition, Read, RetainedInput, ScopeId, Settlement, SignedIntent } from "@generalbusiness/artroom-contract";
 import { isScopeId } from "@generalbusiness/artroom-bytes";
 import { timeMs, type Item } from "@generalbusiness/artroom-derive";
 import type { Delivered } from "@generalbusiness/artroom-derive";
@@ -115,4 +115,7 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
   history(reader: unknown, cursor?: Cursor): Read<readonly Sealed[]> { return this.#reads.history(reader, cursor); }
   entry(reader: unknown, seq: number): Read<Sealed> { return this.#reads.entry(reader, seq); }
   outbox(reader: unknown, cursor?: Cursor): Read<readonly Duty[]> { return this.#reads.outbox(reader, cursor); }
+  duty(reader: unknown, duty: DutyId): Read<Duty> { return this.#reads.duty(reader, duty); }
+  log(reader: unknown, cursor?: Cursor): Read<LogPage> { return this.#reads.log(reader, cursor); }
+  retained(reader: unknown, kind: RetainedInput["kind"], digest: Digest): Read<RetainedInput> { return this.#reads.retained(reader, kind, digest); }
 }

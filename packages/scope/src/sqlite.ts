@@ -227,13 +227,13 @@ export class SqliteStore implements Store {
     const row = this.#one("SELECT bytes, under FROM retained_input WHERE kind = ? AND digest = ?", kind, digest);
     return row && { kind, digest, bytes: row["bytes"] as string, ...(row["under"] === null ? {} : { under: row["under"] as string }) };
   }
+  duty(seq: number, n: number): Duty | null {
+    const row = this.#one(`SELECT ${DUTY} FROM outbox WHERE seq = ? AND n = ?`, seq, n);
+    return row && dutyOf(row);
+  }
   duties(after: { seq: number; n: number } | null, limit: number): { duties: Duty[]; more: boolean } {
-    const rows = this.#all("SELECT seq, n, target, class, held, attempts, ack, result, diagnosis FROM outbox WHERE (seq, n) > (?, ?) ORDER BY seq, n LIMIT ?", after?.seq ?? -1, after?.n ?? -1, limit + 1);
-    const duties = rows.slice(0, limit).map((row): Duty => ({
-      duty: `${row["seq"] as number}.${row["n"] as number}`, to: json(row["target"]), class: row["class"] as Duty["class"], held: row["held"] === 1,
-      attempts: json(row["attempts"]), acknowledged: orNull(row["ack"]), result: orNull(row["result"]), diagnosis: orNull(row["diagnosis"]),
-    }));
-    return { duties, more: rows.length > limit };
+    const rows = this.#all(`SELECT ${DUTY} FROM outbox WHERE (seq, n) > (?, ?) ORDER BY seq, n LIMIT ?`, after?.seq ?? -1, after?.n ?? -1, limit + 1);
+    return { duties: rows.slice(0, limit).map(dutyOf), more: rows.length > limit };
   }
 
   // ---------------------------------------------------------------- the dispatcher's bookkeeping
@@ -254,6 +254,16 @@ export class SqliteStore implements Store {
     if (at === null) this.#run("DELETE FROM meta WHERE k = 'deadline'");
     else this.#run("INSERT INTO meta (k, v) VALUES ('deadline', ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v", at);
   }
+}
+
+/** The columns of an outbox row that a read of its duty returns. */
+const DUTY = "seq, n, target, class, held, attempts, ack, result, diagnosis";
+
+function dutyOf(row: Row): Duty {
+  return {
+    duty: `${row["seq"] as number}.${row["n"] as number}`, to: json(row["target"]), class: row["class"] as Duty["class"], held: row["held"] === 1,
+    attempts: json(row["attempts"]), acknowledged: orNull(row["ack"]), result: orNull(row["result"]), diagnosis: orNull(row["diagnosis"]),
+  };
 }
 
 function requestOf(row: Row): OwnRequest {
