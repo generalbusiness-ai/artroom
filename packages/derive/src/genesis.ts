@@ -4,13 +4,13 @@
  * for, and of a child, which a `create` send of its creator asks for.
  */
 
-import type { Entry, FactRef, FactUse, Incarnation, Prepared, Reason, Request, ScopeId, ScopeRef, Seed, Send, SignedIntent } from "@generalbusiness/artroom-contract";
+import type { Entry, FactRef, FactUse, GrantMark, Incarnation, Prepared, Reason, Request, ScopeId, ScopeRef, Seed, Send, SignedIntent } from "@generalbusiness/artroom-contract";
 import { deliveryCauseDigest, intentDigest, isDigest, isIncarnation, isSeed, messageDigest, scopeIdOf, seedDigest, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import { judgeDelivery, reasonOf, sentBy, type DeliveryContext } from "./delivery.ts";
 import { creationFields, isIntent, readFacts, readFields, useOf } from "./fields.ts";
 import type { Fetched, Judging } from "./guards.ts";
 import { derive, giving } from "./handlers.ts";
-import { fieldOutsideType, unjudged, type JudgedInput } from "./marks.ts";
+import { fieldOutsideType, grantByRule, markOf, unjudged, type JudgedInput } from "./marks.ts";
 import { directoryOf } from "./sends.ts";
 import type { Judgment } from "./judge.ts";
 import type { StateView } from "./state.ts";
@@ -126,11 +126,20 @@ function genesisJudged(view: StateView, definition: ValidDefinition, asked: Foun
   // Platform data: what a rule of the genesis act is given (section 6.1). Check 7: a field whose type is a mark is checked by its rule.
   const clocked = { clock: false };
   const judged: JudgedInput = { type: "genesis", seed, founding, source: child?.from ?? null, n: child?.n ?? null, message: child?.message ?? null };
-  if (fieldOutsideType(giving(view, context, { at, creator: seed.creator }, 0, judged, clocked, named.fields, named.facts, source ?? undefined), act.fields)) return refuse({ code: "bad-field" }, uses);
+  const g = giving(view, context, { at, creator: seed.creator }, 0, judged, clocked, named.fields, named.facts, source ?? undefined);
+  if (fieldOutsideType(g, act.fields)) return refuse({ code: "bad-field" }, uses);
+  // Section 4.2, "A founding": the genesis of a scope with no creator makes no check 9. When the genesis act's `grant` is a mark,
+  // its rule is run, after the signature and the seed are checked. A founding that the rule does not pass is refused
+  // `unauthorized`, and nothing is written: no scope exists on an authority that was not shown. The genesis of a child runs no
+  // such rule: its authority is its creator's entry.
+  const mark = founding ? (markOf(act.grant) as GrantMark | null) : null;
+  const passed = mark ? grantByRule(g, mark) : null;
+  if (passed && !passed.pass) return { result: "refused", reason: "unauthorized", detail: `the rule ${mark!.code} does not pass the founding key${passed.name === undefined ? "" : `: ${passed.name}`}` };
+  const signer = passed?.pass && passed.member ? { member: passed.member, principal: null } : null;
 
   const j: Judging = {
     view, definition, bounds, clock, scope: { at, creator: seed.creator }, self: 0, kind: definition.declared.genesis, fields: named.fields, fieldTypes: act.fields,
-    subjects: new Map(), signer: null, facts: named.facts, prepared: context.prepared, used: [], asked: context.asked, capabilities: context.capabilities,
+    subjects: new Map(), signer, facts: named.facts, prepared: context.prepared, used: [], asked: context.asked, capabilities: context.capabilities,
     platform: context.platform, judged, ran: clocked, source: source ?? undefined,
   };
   // A child's result is at ordinal 0; the sends its act declares follow. Each scope a genesis creates has that genesis's own seed digest as its cause.

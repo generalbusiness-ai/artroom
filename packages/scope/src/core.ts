@@ -9,7 +9,7 @@
 
 import type { ActType, Answer, Beside, Bounds, CapabilityName, DeclaredDefinition, Digest, DutyId, Entry, FactRef, Founded, Grant, PlatformDefinition, Receipt, RefusalReason, ScopeId, Seed, Settlement, SignedIntent, UnavailableReason } from "@generalbusiness/artroom-contract";
 import { canonicalize, definitionDigest, intentDigest, isDigest, isGrant, isPlatformDefinition, newIncarnation, parseStrict, platformName, textDigest, utf8 } from "@generalbusiness/artroom-bytes";
-import { checkpointOf, derivable, factsNamed, ownersOf, inputTexts, isObject, judgeAct, judgeCheckpoint, judgeGenesis, judgePreparation, own, prepareRules, presentedTypes, readFields, runnable, stepsOf, validateDefinition, windowOf } from "@generalbusiness/artroom-derive";
+import { actionOf, checkpointOf, derivable, factsNamed, ownersOf, inputTexts, isObject, judgeAct, judgeCheckpoint, judgeGenesis, judgePreparation, own, prepareRules, presentedTypes, readFields, runnable, stepsOf, validateDefinition, windowOf } from "@generalbusiness/artroom-derive";
 import type { ActJudgment, Clock as Reading, Draft, Fetched, Founding, GrantDecision, JudgeContext, Own, Owners, PlatformRules, Presented, StateView, Texts, ValidDefinition, Window } from "@generalbusiness/artroom-derive";
 import { RULE_PROFILES } from "@generalbusiness/artroom-derive/rule";
 import { namedBy } from "./definitions.ts";
@@ -458,7 +458,7 @@ export class Scope {
     // An accepted key is answered from history at check 3, so nothing is read for it (section 5.2, step 1). A read that fails or
     // is late leaves nothing: the act is then not judged at check 9, `authority-unavailable`, and no earlier check is hidden.
     const given = (Array.isArray(grants) ? grants : []).filter(isGrant);
-    const standing = known ? null : await this.#standing({ scope: scope.at, signed, action: act?.grant ?? null, grants: given, window: windowOf(definition, scope.at.kind, intent.kind) });
+    const standing = known ? null : await this.#standing({ scope: scope.at, signed, action: act ? actionOf(act) : null, grants: given, window: windowOf(definition, scope.at.kind, intent.kind) });
     // Phase two is in the commit: what that read holds at the commit's head, on the commit's one reading. The judge is given the
     // answer and reads nothing.
     const context = (view: StateView, clock: Reading): Omit<JudgeContext, "prepared"> =>

@@ -16,8 +16,8 @@
  * and nothing in an entry says that a rule ran.
  */
 
-import type { AlsoMark, Attempt, Bounds, Effect, Evidence, FactRef, FieldType, FieldValue, Grant, Guard, Mark, MemberRef, Message, OperationId, PlatformDefinition, Request, ScopeRef, Seed, SignedIntent, Timestamp } from "@generalbusiness/artroom-contract";
-import { isFieldValue } from "@generalbusiness/artroom-bytes";
+import type { ActType, AlsoMark, Attempt, Bounds, Effect, Evidence, FactRef, FieldType, FieldValue, Grant, GrantMark, Guard, Mark, MemberRef, Message, OperationId, PlatformDefinition, Request, ScopeRef, Seed, SignedIntent, Timestamp } from "@generalbusiness/artroom-contract";
+import { isFieldValue, isMemberRef } from "@generalbusiness/artroom-bytes";
 import type { Signer } from "./attribution.ts";
 import type { Own } from "./fields.ts";
 import type { Fetched, GuardResult, Judging } from "./guards.ts";
@@ -281,6 +281,32 @@ export function selectedBy(g: Giving, mark: AlsoMark): Item | null {
   const item = typeof id === "number" && Number.isSafeInteger(id) && id >= 0 ? g.view.item(id) : null;
   if (item?.type !== mark.item) throw outside(mark, `no item of the type ${mark.item}`);
   return item;
+}
+
+/**
+ * The action that an act's row names in `grant`: the action as written, or
+ * in platform data the action that a mark at `grant` states. Null: the mark
+ * states none. Such a row reads no observation for the signer, whose key
+ * membership may not know (section 4.2).
+ */
+export const actionOf = (act: Pick<ActType, "grant">): string | null => {
+  const mark = markOf(act.grant) as GrantMark | null;
+  return mark ? (mark.grant ?? null) : act.grant;
+};
+
+/**
+ * Place 1, at check 9: the rule of a mark at `grant`, which stands in place
+ * of the grant check. It answers that the signing key may act, with the
+ * member that the act's forms read as the signer, or none; or that it may
+ * not, with the refusal's name if the rule states one. A name that its
+ * specification does not state is a fault.
+ */
+export function grantByRule(g: Giving, mark: GrantMark): { pass: true; member: MemberRef | null } | { pass: false; name?: string } {
+  const rule = ruleFor(g, mark, "grant");
+  const answer = run(mark, () => rule.run(givenTo(g)));
+  if (isObject(answer) && answer.pass === true && (answer.member === null || (isMemberRef(answer.member) && new TextEncoder().encode(answer.member.member).length <= g.bounds.memberBytes))) return { pass: true, member: answer.member };
+  if (!isObject(answer) || answer.pass !== false || (answer.name !== undefined && (typeof answer.name !== "string" || !rule.refusals.includes(answer.name)))) throw outside(mark, "no answer on authority, or a refusal that its specification does not state");
+  return answer.name === undefined ? { pass: false } : { pass: false, name: answer.name };
 }
 
 /** What a guard that is a mark answered when it did not hold: the refusal's name, and its code when that is not `guard-failed`. */

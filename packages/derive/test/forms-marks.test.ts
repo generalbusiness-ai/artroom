@@ -106,6 +106,32 @@ describe("a rule is run at the check of its mark's place (sections 4.2 and 6.1)"
     expect(s.entries.length).toBe(5);
   });
 
+  test("a mark at `grant` stands in place of the grant check: a pass records an empty authority, a refusal is unauthorized with the rule's name, and a mark that states an action is judged on a held grant first", () => {
+    const authority = (s: Scope) => (s.last.input.type === "act" ? s.last.input.authority : null);
+    const issued = (s: Scope) => { for (const secret of ["one", "two"]) s.did(rita, "issue", { fields: { hash: textDigest(secret) } }); return s; };
+    const fields = (secret: string) => ({ on: 0, expected: { on: 1 }, fields: { secret } });
+    // The row as the data has it: the mark states no action. Nothing is read about the signer, so `grants` is null, and the act
+    // is never answered `authority-unavailable`. The rule passes the key of a ticket, with no member, and the entry records no grant.
+    const s = issued(new Scope(gateWith()));
+    const rules = gateRules();
+    expect([said(s.act(una, "enter", fields("one"), { platform: rules, grants: null })), authority(s), rules.ran["by-ticket"]]).toEqual([["write", null, null, null], [], 1]);
+    expect(s.last.effects).toEqual([{ effect: "state", item: 2, state: "used" }, { effect: "value", item: 2, slot: "key", value: una.key }]);
+    // A wrong secret selects no ticket: the rule does not pass, and the refusal has the name that it states. A grant of any action
+    // changes nothing, because no grant is judged.
+    expect(said(s.act(vic, "enter", fields("none"), { platform: gateRules() }))).toEqual(["refused", "unauthorized", "no-ticket", "the rule by-ticket does not pass this key"]);
+    expect(s.entries.length).toBe(5);
+
+    // The same row with a mark that states an action. With a current grant of it the check holds as written: the entry records
+    // that grant, and the rule is not run. With none, the rule is run. And with nothing read about the signer, an act that the
+    // rule does not pass is not judged.
+    const t = issued(new Scope(gateWith((d) => { d.acts.enter.grant.grant = "gate.enter"; })));
+    const held = gateRules();
+    expect([said(t.act(una, "enter", fields("one"), { platform: held })), authority(t)?.map((grant) => [grant.key, grant.actions.includes("gate.enter")]), held.ran["by-ticket"]]).toEqual([["write", null, null, null], [[una.key, true]], undefined]);
+    expect([said(t.act(vic, "enter", fields("two"), { platform: gateRules(), grants: [] })), authority(t)]).toEqual([["write", null, null, null], []]);
+    expect([said(t.act(rita, "enter", fields("none"), { platform: gateRules(), grants: null })), said(t.act(rita, "enter", fields("none"), { platform: gateRules(), grants: [] }))])
+      .toEqual([["unavailable", "authority-unavailable", null, null], ["refused", "unauthorized", "no-ticket", "the rule by-ticket does not pass this key"]]);
+  });
+
   test("a fault of a rule leaves the act not judged, and nothing is written: an effect outside the eight forms, an effect that conflicts with a written one, a refusal that is not stated, a rule that throws, and a mark with no rule", () => {
     const s = gated();
     const effect = (run: () => unknown): PlatformRule => ({ place: "effect", most: 2, run: run as never });

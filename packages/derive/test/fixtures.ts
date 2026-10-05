@@ -14,7 +14,7 @@
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { ActType, Bounds, DeclaredDefinition, Digest, Entry, FactRef, FieldValue, Grant, Guard, Input, Intent, KeyId, MemberId, MemberRef, ObservationUse, ScopeKind, ScopeRef, Seed, Send, SignedIntent, Timestamp } from "@generalbusiness/artroom-contract";
 import { entryHash, factRefOf, intentDigest, keyIdOfSecret, newIncarnation, scopeIdOf, signIntent } from "@generalbusiness/artroom-bytes";
-import { MemoryState, applyEntry, clockOf, entryOf, judgeAct, judgeDelivery, judgeGenesis, judgeTimed, messageFacts, nextDue, timeMs, timeOf, validateDefinition } from "../src/index.ts";
+import { MemoryState, actionOf, applyEntry, clockOf, entryOf, judgeAct, judgeDelivery, judgeGenesis, judgeTimed, messageFacts, nextDue, timeMs, timeOf, validateDefinition } from "../src/index.ts";
 import type { ActJudgment, Creation, Delivered, DeliveryContext, Draft, Fetched, JudgeContext, Judgment, Presented, Source, TimedJudgment, ValidDefinition, Validation } from "../src/index.ts";
 
 export const d = (c: string): Digest => `sha256:${c.repeat(64)}`;
@@ -410,8 +410,8 @@ export class Ledger {
   }
   /** Every actor of the key set holds every action here, unless the test presents other grants. */
   grants(): Presented[] {
-    // In platform data the `grant` of an act may be a mark, which names no action.
-    const actions = Object.values(this.definition.declared.acts).map((a) => a.grant).filter((action) => typeof action === "string");
+    // In platform data the `grant` of an act may be a mark, which states an action or none.
+    const actions = Object.values(this.definition.declared.acts).flatMap((a) => actionOf(a) ?? []);
     return Object.values(keys).map((who) => ({ grant: grantOf(who, this.at, actions), current: true }));
   }
   context(over: Context = {}): JudgeContext {

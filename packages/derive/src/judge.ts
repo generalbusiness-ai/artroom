@@ -11,13 +11,14 @@
  * or `deriveEffects`, and returns a `Draft`.
  */
 
-import type { Effect, Entry, FactRef, FactUse, Grant, Head, Input, MismatchReason, Prepared, RefusalReason, RoutingRefusal, ScopeRef, Send, SignedIntent, UnavailableReason } from "@generalbusiness/artroom-contract";
+import type { Effect, Entry, FactRef, FactUse, Grant, GrantMark, Head, Input, MismatchReason, Prepared, RefusalReason, RoutingRefusal, ScopeRef, Send, SignedIntent, UnavailableReason } from "@generalbusiness/artroom-contract";
 import { intentDigest, scopeIdOf, verifySignedIntent } from "@generalbusiness/artroom-bytes";
+import type { Signer } from "./attribution.ts";
 import { deriveEffects } from "./effects.ts";
 import { isIntent, presentedTypes, readFacts, readFields, type Reading } from "./fields.ts";
 import type { Judging } from "./guards.ts";
 import { alsoItems, derive, giving } from "./handlers.ts";
-import { fieldOutsideType, markOf, selectedBy, unjudged, type JudgedInput } from "./marks.ts";
+import { actionOf, fieldOutsideType, grantByRule, markOf, selectedBy, unjudged, type JudgedInput } from "./marks.ts";
 import type { Item, StateView } from "./state.ts";
 import { nextDue, type Due } from "./timed.ts";
 import { timeMs, type Clock } from "./time.ts";
@@ -97,8 +98,8 @@ export type Judgment =
  * The judge of an act, by the checks of section 4.2 in their order. In a
  * scope under a platform definition a row may hold marks, and each rule is
  * run at the check of its mark's place: a field's type at 7, a name of
- * `also` at 8, a guard at 10, an effect and a slot's type at 11, a send at
- * 12. No rule is run before check 7. A fault of a rule leaves the act not
+ * `also` at 8, the grant at 9, a guard at 10, an effect and a slot's type
+ * at 11, a send at 12. No rule is run before check 7. A fault of a rule leaves the act not
  * judged: `unavailable`, and nothing is written (section 6.1).
  */
 export function judgeAct(view: StateView, definition: ValidDefinition, signed: SignedIntent, context: JudgeContext): ActJudgment {
@@ -201,25 +202,44 @@ function actJudged(view: StateView, definition: ValidDefinition, signed: SignedI
   const primary = subjects.get("on");
   if (act.step === "transition" && primary && own(own(declared.items, primary.type)!.states, primary.state)?.final) return refused("final", `item ${primary.id} is ${primary.state}`);
 
-  // Section 4.2, check 9. Nothing was read about this signer that the commit can judge on: the act is not judged, and nothing above
-  // this line was hidden by that. Section 16.1: no judgment rests on a read that was not made, or on one that was discarded.
-  // I3 merge: a row whose `grant` is a mark is judged by the mark's rule, in place of the grant check. That is the next row of the
-  // contract's list for the source (section 11.13, row I3-7). Until then such an act is not judged.
-  if (markOf(act.grant)) return { result: "unavailable", reason: "unavailable" };
-  if (context.grants === null) return { result: "unavailable", reason: "authority-unavailable" };
-  // Section 6.4: every act needs a current grant for its `grant` action. The first presented grant that qualifies is the one recorded.
-  const presented = context.grants.find(({ grant, current }) =>
-    current && grant.key === intent.actor && grant.actions.includes(act.grant)
+  // Section 4.2, check 9. Section 6.4: every act of a declared definition needs a current grant for its `grant` action. In platform data the `grant` of a
+  // row may be a mark: its rule stands in place of the grant check. A mark may state an action as well, and then check 9 is made
+  // as written first: when a current grant of that action is held for the signing key the check holds, the entry records that
+  // grant, and the rule is not run.
+  const mark = markOf(act.grant) as GrantMark | null;
+  const action = actionOf(act);
+  // The first presented grant that qualifies is the one recorded. A grant's `within` covers this scope when it names it.
+  const presented = action === null ? undefined : context.grants?.find(({ grant, current }) =>
+    current && grant.key === intent.actor && grant.actions.includes(action)
     // A grant that names several scopes by a filter is the authority note's; here a grant covers the one scope it names.
     && isScopeRef(grant.within) && grant.within.scope === scope.at.scope && grant.within.inc === scope.at.inc
     && (grant.notAfter === null || asOf < (timeMs(grant.notAfter) ?? -Infinity)));
-  if (!presented) return refused("unauthorized", `no current grant of ${act.grant} to this key in this scope`);
-  const signer = { member: presented.grant.subject, principal: presented.grant.principal };
+  let signer: Signer | null;
+  if (presented) signer = { member: presented.grant.subject, principal: presented.grant.principal };
+  else if (!mark) {
+    // Nothing was read about this signer that the commit can judge on: the act is not judged, and nothing above this line was hidden
+    // by that. Section 16.1: no judgment rests on a read that was not made, or on one that was discarded.
+    if (context.grants === null) return { result: "unavailable", reason: "authority-unavailable" };
+    return refused("unauthorized", `no current grant of ${act.grant} to this key in this scope`);
+  } else {
+    // The rule checks the authority that the specification of its version names, and nothing less. It passes the signing key, with
+    // the member that the act's forms read as the signer, or none: the entry then records an empty `authority`. Or it does not,
+    // and the act is refused `unauthorized`, with the name that the rule states.
+    const answer = grantByRule({ ...g, subjects }, mark);
+    if (!answer.pass) {
+      // A mark that states an action: with nothing read about the signer, an act that the rule does not pass is not judged. A row
+      // whose mark states none reads no observation, so it is never answered so.
+      if (action !== null && context.grants === null) return { result: "unavailable", reason: "authority-unavailable" };
+      return { ...refused("unauthorized", `the rule ${mark.code} does not pass this key`), ...(answer.name === undefined ? {} : { name: answer.name }) };
+    }
+    signer = answer.member && { member: answer.member, principal: null };
+  }
+  const granted = presented?.grant ?? null;
 
   const j: Judging = {
     view, definition, bounds, clock, scope, self: scope.head.seq + 1, kind: intent.kind, fields, fieldTypes: act.fields, subjects, signer, facts, prepared: context.prepared, used: [], asked: context.asked,
     own: context.own, intent: digest, presented: beside.fields, capabilities: context.capabilities,
-    platform: context.platform, judged: { ...judged, grant: presented.grant }, ran: clocked,
+    platform: context.platform, judged: { ...judged, grant: granted }, ran: clocked,
   };
 
   // Guards, then effects, then sends, then the bound on the type it opens, as for a handler. The cause of a scope it creates is the intent's digest.
@@ -230,7 +250,8 @@ function actJudged(view: StateView, definition: ValidDefinition, signed: SignedI
   // Section 5.3: every act judges its `notAfter` and its grant's expiry on the commit clock, so no act is written while the clock is behind.
   if (clock.behind) return { result: "unavailable", reason: "clock-behind" };
   // The entry records each presented fact as it arrived: a whole fact reference, also for an entry of this scope.
-  const input = { type: "act", signed, authority: [presented.grant], presented: shown.fields as Record<string, FactRef> } as const;
+  // Section 4.2: the entry records the one grant judged. An act that the rule of a mark at `grant` passed records none.
+  const input = { type: "act", signed, authority: granted ? [granted] : [], presented: shown.fields as Record<string, FactRef> } as const;
   return { result: "write", draft: { input, uses, prepared: ran.prepared, effects: ran.effects, sends: ran.sends, judgesTime: true, settles: ran.settles } };
 }
 
