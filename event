@@ -1,1 +1,1 @@
-{"kind":"assert","text":"Isolated planner index records C2v5 changes requested, supported whole-save reservation/expiry corrections and existing repair owners. Prior C2v4 adoption and complete recovery scope remain. Documentation only; git diff --check passed.","body":{"no_git_artifact":"true"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:f61987143c7e7229e74d0a5d0c1ce8746a55ac7d"}
