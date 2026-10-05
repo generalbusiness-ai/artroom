@@ -122,4 +122,3 @@ describe("identifiers", () => {
     for (const [guard, good, bad] of forms) expect([good.map(guard), bad.map(guard)], guard.name).toEqual([good.map(() => true), bad.map(() => false)]);
   });
 });
-

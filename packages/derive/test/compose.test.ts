@@ -442,4 +442,3 @@ describe("room to settle (section 17.2 of the contract's candidate revision 10)"
     expect([x11.deadlines, row(S), S.drain().length, row(S)]).toEqual([{ request: { asked: 2, paused: 1 } }, [3, 5], 2, [5, 3]]);
   });
 });
-
