@@ -6,7 +6,7 @@
 import type { Timestamp } from "@generalbusiness/artroom-contract";
 import type { StateView } from "./state.ts";
 import { timeMs } from "./time.ts";
-import type { ValidDefinition } from "./validate.ts";
+import type { ValidDefinition } from "./validate/index.ts";
 import { byteOrder, own } from "./values.ts";
 
 /** One transition: the item that holds the deadline `due` under the timed rule `rule`. */

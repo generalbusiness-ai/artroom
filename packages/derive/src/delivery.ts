@@ -6,11 +6,12 @@
 
 import type { Advisory, Control, Effect, Entry, FactRef, FactUse, Message, Prepared, Request, Result, RoutingRefusal, ScopeRef, Seed, Send } from "@generalbusiness/artroom-contract";
 import { deliveryCauseDigest, messageDigest, scopeIdOf, seedDigest } from "@generalbusiness/artroom-bytes";
-import { bound, isEntryOf, runClause, runHandler, updateOf, useOf, type Clause, type Ran, type Reading } from "./frame.ts";
+import { isEntryOf, useOf, type Reading } from "./fields.ts";
+import { bound, runClause, runHandler, updateOf, type Clause, type Ran } from "./handlers.ts";
 import type { Judgment } from "./judge.ts";
 import type { ScopeState, StateView } from "./state.ts";
 import { nextDue } from "./timed.ts";
-import type { ValidDefinition } from "./validate.ts";
+import type { ValidDefinition } from "./validate/index.ts";
 import { isFactRef, isLocalId, isObject, isScopeRef, same } from "./values.ts";
 
 /**

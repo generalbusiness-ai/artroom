@@ -14,13 +14,14 @@
 import type { Effect, Entry, FactUse, Grant, Head, Input, MismatchReason, Prepared, RefusalReason, RoutingRefusal, ScopeRef, Send, SignedIntent, UnavailableReason } from "@generalbusiness/artroom-contract";
 import { intentDigest, scopeIdOf, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import { deriveEffects } from "./effects.ts";
-import { isIntent, namedBy, readFacts, readFields, type Reading } from "./frame.ts";
+import { isIntent, readFacts, readFields, type Reading } from "./fields.ts";
 import { judgeGuard, type Judging } from "./guards.ts";
 import { deriveSends } from "./sends.ts";
 import type { Item, StateView } from "./state.ts";
 import { nextDue, type Due } from "./timed.ts";
 import { timeMs, type Clock } from "./time.ts";
-import type { ValidDefinition } from "./validate.ts";
+import { namedBy } from "./unsupported.ts";
+import type { ValidDefinition } from "./validate/index.ts";
 import { isScopeRef, own, same } from "./values.ts";
 
 /** A grant as presented, with the authority port's verdict on whether it is current (section 5.1, held authority). */

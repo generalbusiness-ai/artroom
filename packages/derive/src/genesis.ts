@@ -7,12 +7,13 @@
 import type { Entry, FactRef, FactUse, Incarnation, Prepared, Request, Result, ScopeId, ScopeRef, Seed, Send, SignedIntent } from "@generalbusiness/artroom-contract";
 import { deliveryCauseDigest, intentDigest, isDigest, isIncarnation, isSeed, messageDigest, scopeIdOf, seedDigest, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import { judgeDelivery, sentBy, type DeliveryContext } from "./delivery.ts";
-import { creationFields, derive, isIntent, readFacts, readFields, useOf } from "./frame.ts";
+import { isIntent, readFacts, readFields, useOf } from "./fields.ts";
 import type { Fetched, Judging } from "./guards.ts";
+import { creationFields, derive } from "./handlers.ts";
 import type { Judgment } from "./judge.ts";
 import type { StateView } from "./state.ts";
 import { timeMs } from "./time.ts";
-import type { ValidDefinition } from "./validate.ts";
+import type { ValidDefinition } from "./validate/index.ts";
 import { isFactRef, isLocalId, isObject, own, same } from "./values.ts";
 
 /**

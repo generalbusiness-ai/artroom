@@ -13,7 +13,7 @@ import { judgeGenesis, type Creation, type Founding } from "./genesis.ts";
 import type { RuleInput } from "./guards.ts";
 import { judgeAct, type JudgeContext } from "./judge.ts";
 import type { StateView } from "./state.ts";
-import type { ValidDefinition } from "./validate.ts";
+import type { ValidDefinition } from "./validate/index.ts";
 
 /** An input whose guards may name a rule, with the context its judge takes. */
 export type Judged =

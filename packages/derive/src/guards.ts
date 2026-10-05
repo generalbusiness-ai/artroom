@@ -11,7 +11,7 @@ import type { Signer } from "./attribution.ts";
 import type { Item, Party, ScopeState, StateView } from "./state.ts";
 import { timeMs, type Clock } from "./time.ts";
 import { unsupported } from "./unsupported.ts";
-import type { ValidDefinition } from "./validate.ts";
+import type { ValidDefinition } from "./validate/index.ts";
 import { own, same } from "./values.ts";
 
 /** A foreign entry fetched before the turn, and the name of the definition its scope pins (section 6.2, the `fact` field). */

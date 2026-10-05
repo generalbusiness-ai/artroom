@@ -33,7 +33,7 @@
 
 import type { Bounds, Input } from "@generalbusiness/artroom-contract";
 import type { StateView } from "./state.ts";
-import type { ValidDefinition } from "./validate.ts";
+import type { ValidDefinition } from "./validate/index.ts";
 
 /** The entries the pending duties of this state reserve. `head` is the input of the head entry. */
 export function owed(view: StateView, definition: ValidDefinition, head: Input): number {

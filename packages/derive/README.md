@@ -33,12 +33,34 @@ The package has two entry points:
 | `settle` | `judgeDiagnosis`, `judgeOutcome`, `judgeCheckpoint`, and `checkpointOf(view)`. |
 | `reserve` | `owed(view, definition, head)`: the entries the pending duties of a state reserve, by section 17.2 of revision 10 of the contract, adopted since and a candidate when this was written: a deadline with its chain of timed rules, a request's result and diagnosis with what its clause can start, a confirmation, an attempt's outcome, and the closing checkpoint. `fits(view, definition, bounds, input)`: whether the entry just folded is a settling entry, or is new work that leaves them room. A checkpoint beside a pending duty is new work; one with nothing else pending is the closing checkpoint. The validator supplies `deadlines` and `clauseEntries`, and refuses, as `reserve-unbounded`, timed rules of one type that lead to one another in a cycle. |
 | `rules` | `prepareRules(view, definition, judged)`: for each `rule` guard an input would meet, the rule, its expression, its input and the input's digest. |
-| `frame` | What the judges share: `Reading`, `readFields`, `readFacts`, `factsNamed` (the foreign entries a runtime fetches before the turn), `bound` (the handler a message runs), `runHandler`, `runClause`, `derive`. |
+| `fields` | How the fields of an input are read: `Reading`, which every judge is given, `readFields`, `readFacts`, and `factsNamed` (the foreign entries a runtime fetches before the turn). |
+| `handlers` | What the judges share beside that: `bound` (the handler a message runs), `runHandler`, `runClause` and `derive`. |
 | `guards`, `effects`, `sends` | `judgeGuard`, `deriveEffects`, `deriveSends`, the `Judging` value they read, and `ruleInput`. |
 | `timed` | `nextDue(view, definition, asOf)`: the next due transition in the contract's order. |
 | `time` | `clockOf(view, reading)`: one commit's reading, whether it is behind, and the time at which a transition is due. `timeMs`, `timeOf`. |
 | `attribution` | `historyOf(item, changed, definition, signer)`: an item's attribution history with what the entry's changed holds add. `attribution(history, signer)`: that history, then the signer and the signer's principal. |
 | `values` | `isValue` for each field type, `same`, `byteOrder`, and the reference shapes. |
+
+## The validator's modules
+
+`validate` is a directory, `src/validate/`. Its `index.ts` reads a
+definition's own members and puts the parts in order. Each family of forms
+has one module, so that work on one family touches one file.
+
+| Module | Reads |
+|---|---|
+| `shape` | The readers of untrusted data, and the problems they report. |
+| `context` | What the families share: the item types as read, what one act, handler or timed rule may name, and how a subject is resolved. |
+| `fields`, `items` | Field types, the declared fields of an act, and when one type may be copied into another; item types and their slots. |
+| `operands` | Operands, and the rule for a copy into a slot. |
+| `guards` | Guard forms. |
+| `effects` | Effect forms, and the rule against two effects on one slot. |
+| `hold` | The item form of the hold capability. |
+| `sends` | Send and attention forms, and result clauses. |
+| `handlers` | Acts and handlers, and the other items each names. |
+| `timed` | Timed rules, their graph, and the static size of a timed entry. |
+| `capacity` | What a duty reserves, as far as the definition decides it. |
+| `sizes` | Upper bounds on canonical bytes. |
 
 ## How a commit uses it
 

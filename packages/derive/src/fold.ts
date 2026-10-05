@@ -14,7 +14,7 @@ import { intentDigest, seedDigest } from "@generalbusiness/artroom-bytes";
 import { UNDER, historyOf, withActing, withMembers, withPrincipal, type Signer } from "./attribution.ts";
 import type { Item, Party, StateWriter, Status } from "./state.ts";
 import { own, same } from "./values.ts";
-import type { ValidDefinition } from "./validate.ts";
+import type { ValidDefinition } from "./validate/index.ts";
 
 /** An entry that this state cannot take: out of sequence, or with an effect on nothing. */
 export class FoldError extends Error {

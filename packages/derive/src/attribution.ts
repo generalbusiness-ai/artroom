@@ -2,7 +2,7 @@
 
 import type { MemberRef } from "@generalbusiness/artroom-contract";
 import type { Item } from "./state.ts";
-import type { ValidDefinition } from "./validate.ts";
+import type { ValidDefinition } from "./validate/index.ts";
 import { own, same } from "./values.ts";
 
 /** The reference slot of a hold type that names the item the hold is under. */
