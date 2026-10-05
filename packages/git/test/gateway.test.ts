@@ -130,3 +130,82 @@ test("the gateway holds one grant for an attempt, records that it is forwarding 
   expect([records.written.join("\n"), logged.join("\n"), JSON.stringify(gateway), inspect(gateway, { depth: 8, showHidden: true })].map((kept) => kept.includes(TOKEN))).toEqual([false, false, false, false]);
   expect(records.written.length).toBeGreaterThan(5);
 });
+
+/** A promise that the test resolves, and nothing else does. */
+function deferred(): { promise: Promise<void>; resolve: () => void } {
+  let resolve!: () => void;
+  const promise = new Promise<void>((done) => { resolve = done; });
+  return { promise, resolve };
+}
+
+// Authority note, sections 5.3, 6.1 and 6.6, step 3. The calls overlap for real: each waits on a promise that the test resolves, and
+// no timer is used. The host and the records are stand-ins, as above.
+test("a grant has one lifecycle across calls that overlap: of two forwards of the granted update one is sent; a grant closed while it opens gets no plaintext; one closed before \"forwarding\" is durable sends nothing; one closed after its request left keeps its forward", async () => {
+  const records = new MemoryRecords();
+  const write = records.write.bind(records);
+  /** `hold(state)`: the next write of a record in that state waits. `asked` resolves when the gateway asks for it, and `release` lets it be written. */
+  let held: { state: string; asked: () => void; release: Promise<void> } | null = null;
+  records.write = async (record) => {
+    const waits = held?.state === (record as { state: string }).state ? held : null;
+    if (waits) { held = null; waits.asked(); await waits.release; }
+    return write(record);
+  };
+  const hold = (state: string) => { const asked = deferred(), release = deferred(); held = { state, asked: asked.resolve, release: release.promise }; return { asked: asked.promise, release: release.resolve }; };
+  /** Each request that reached the host, by its credential. While `host` is set, the next one waits there for its answer. */
+  const reached: (string | null)[] = [];
+  let host: { arrived: () => void; answer: Promise<void> } | null = null;
+  const gateway = new Gateway({
+    records, credential: (t) => ["authorization", `Bearer ${t}`],
+    upstream: async (request) => { reached.push(request.headers.get("authorization")); const waits = host; host = null; waits?.arrived(); await waits?.answer; return new Response("ok"); },
+  });
+  const grant = (attempt: string): GrantRequest => ({ attempt, repository: REPO, update: { ref: REF, old: OLD, new: NEW }, token: { id: "token-1", state: "live", plaintext: TOKEN } });
+  const forwarded = (request: Request): Promise<string> => gateway.forward(request).then(async (r) => `${r.status} ${(await r.text()).trim()}`);
+  const refused = (reason: GatewayReason) => `403 Refused by the gateway: ${reason}`;
+  const update = push(`${OLD} ${NEW} ${REF}`);
+  /** What was written for an attempt, in order: each record's state and its count of forwards. */
+  const written = (attempt: string) => records.written.map((r) => JSON.parse(r) as { attempt: string; state: string; forwarded: number }).filter((r) => r.attempt === attempt).map((r) => `${r.state} ${r.forwarded}`);
+
+  // Two forwards of the one granted update, both valid. Each passes the first check and waits for its body. The bodies then arrive.
+  await gateway.open(grant("d:8:1#1"));
+  const bodies = [0, 1].map(() => {
+    let controller!: ReadableStreamDefaultController<Uint8Array>;
+    const stream = new ReadableStream<Uint8Array>({ start(c) { controller = c; } });
+    return { request: new Request(`${REPO}/git-receive-pack`, { method: "POST", body: stream, duplex: "half" } as RequestInit), arrive: () => { controller.enqueue(update); controller.close(); } };
+  });
+  const both = bodies.map((b) => forwarded(b.request));
+  for (const b of bodies) b.arrive();
+  // One holds the claim and is sent. The other is refused, and the record's one forward is the one that reached the host.
+  expect([await Promise.all(both), reached.length, written("d:8:1#1")]).toEqual([["200 ok", refused("grant-used")], 1, ["open 0", "forwarding 1", "closed 1"]]);
+
+  // A close while `open` waits on the write of its record. The grant is closed: `open` is refused, and a request finds no grant.
+  const opens = hold("open");
+  const opened = opening(gateway.open(grant("d:8:2#1")));
+  await opens.asked;
+  const closed = gateway.close("d:8:2#1");
+  opens.release();
+  expect([await opened, await closed, await forwarded(get("git-upload-pack")), reached.length, written("d:8:2#1")]).toEqual([
+    "grant-closed", expect.objectContaining({ state: "closed", forwarded: 0, reads: 0 }), refused("no-grant"), 1, ["open 0", "closed 0"],
+  ]);
+
+  // A close while the forward waits on the write of "forwarding". Nothing was sent and nothing is: the record says so.
+  await gateway.open(grant("d:8:3#1"));
+  const forwards = hold("forwarding");
+  const stopped = forwarded(post(update));
+  await forwards.asked;
+  const closing = gateway.close("d:8:3#1");
+  forwards.release();
+  expect([await stopped, await closing, reached.length, written("d:8:3#1")]).toEqual([
+    refused("grant-used"), expect.objectContaining({ state: "closed", forwarded: 0 }), 1, ["open 0", "forwarding 1", "closed 0"],
+  ]);
+
+  // A close after the request has left, before its answer. The record keeps its forward: the send is unknown, and is not "not sent".
+  await gateway.open(grant("d:8:4#1"));
+  const arrived = deferred(), answer = deferred();
+  host = { arrived: arrived.resolve, answer: answer.promise };
+  const sent = forwarded(post(update));
+  await arrived.promise;
+  expect(await gateway.close("d:8:4#1")).toMatchObject({ state: "closed", forwarded: 1 });
+  answer.resolve();
+  expect([await sent, reached, written("d:8:4#1")]).toEqual(["200 ok", [`Bearer ${TOKEN}`, `Bearer ${TOKEN}`], ["open 0", "forwarding 1", "closed 1"]]);
+  expect(records.written.join("\n")).not.toContain(TOKEN);
+});

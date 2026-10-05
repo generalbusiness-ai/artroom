@@ -17,6 +17,30 @@
  * sent" (section 6.6, step 4), and any other record leaves the send
  * `unknown` unless the host's whole answer refused it.
  *
+ * **One lifecycle for a grant.** The calls of one gateway may overlap, and
+ * each waits in places: `open` and a forward on a write of the record, a
+ * forward on the body of a push. A grant has one phase, in memory, and every
+ * call reads it again after each wait, and moves it with no wait between
+ * the reading and the move:
+ *
+ * - `opening` to `open`, by `open`, once its record is durable. A grant
+ *   that was closed meanwhile is not opened: `grant-closed`, and its
+ *   plaintext is not kept.
+ * - `open` to `reserved`, by the first forward that has read the one granted
+ *   update. That is the one claim on the forward. A second forward that has
+ *   read the same update finds the claim taken: `grant-used`.
+ * - `reserved` to `sent`, once "forwarding" is durable. The request is
+ *   built and given to the host in that same step, so a close comes wholly
+ *   before it or wholly after it.
+ * - any phase to `closed`, by `close` or `ended`, at once. The plaintext is
+ *   dropped then. The closing record is written after the write in flight,
+ *   so the durable records are in the order of the phases.
+ *
+ * A grant that is closed while it is `reserved` forwards nothing, and its
+ * record says so. A grant that is closed after it is `sent` keeps
+ * `forwarded: 1`: the request has left, the send is `unknown` until the
+ * host's own answer, and nothing sends it again.
+ *
  * **Custody of the plaintext** (sections 5.3 and 5.7):
  *
  * - it is given to the gateway only for a token that its sealed outcome
@@ -40,7 +64,7 @@
 import { GitRefusal, ZERO_ID, objectId, refName, remoteUrl, type ObjectId, type Transport } from "./names.ts";
 
 export type GatewayReason =
-  | "bad-grant" | "token-not-live" | "grant-open" | "attempt-used" | "record-failed"   // opening
+  | "bad-grant" | "token-not-live" | "grant-open" | "attempt-used" | "record-failed" | "grant-closed"   // opening
   | "credential-in-url" | "no-grant" | "not-git" | "grant-used" | "reads-only" | "compressed" | "no-body" | "bad-commands" | "not-granted";   // forwarding
 
 /** A refusal by the gateway. It holds a fixed reason and nothing of a request, a token or a host. */
@@ -183,14 +207,26 @@ const DROPPED = ["authorization", "proxy-authorization", "cookie", "host", "conn
 
 const refusal = (reason: GatewayReason) => new Response(`Refused by the gateway: ${reason}\n`, { status: 403, headers: { "content-type": "text/plain" } });
 
+/**
+ * One grant in the gateway's memory: its record, its phase, the plaintext of
+ * its token, and the step of its lifecycle that waits on a durable write.
+ * `step` settles when that write and what follows it at once are done, and
+ * never rejects. `closing` is the one closing of the grant.
+ */
+interface Life {
+  record: GrantRecord;
+  phase: "opening" | "open" | "reserved" | "sent" | "closed";
+  plaintext: string | null;
+  step: Promise<unknown>;
+  closing: Promise<void> | null;
+}
+
 export class Gateway {
   readonly #options: GatewayOptions;
-  /** The open grants, by repository. One grant is open for a repository at a time: a request names a repository and no attempt. */
-  readonly #open = new Map<string, GrantRecord>();
-  /** The plaintext of each open grant's token, by attempt. In memory only. */
-  readonly #plaintext = new Map<string, string>();
-  /** The last record of every attempt this gateway was given, so that an attempt has one grant in the gateway's life. */
-  readonly #records = new Map<string, GrantRecord>();
+  /** The grants that are not closed, by repository. One is open for a repository at a time: a request names a repository and no attempt. */
+  readonly #open = new Map<string, Life>();
+  /** Every grant this gateway was given, by attempt, so that an attempt has one grant in the gateway's life. The plaintext of a token is here, in memory only, while its grant is `open` or `reserved`. */
+  readonly #lives = new Map<string, Life>();
 
   constructor(options: GatewayOptions) {
     this.#options = options;
@@ -200,11 +236,17 @@ export class Gateway {
     this.#options.log?.({ attempt, event });
   }
 
+  /** One write of the record as it is now. True: it is durable. It never rejects. */
+  #write(record: GrantRecord): Promise<boolean> {
+    return (async () => this.#options.records.write({ ...record }))().then(() => true, () => false);
+  }
+
   /**
    * Open the one grant of an attempt. Refused, with nothing kept: a grant
    * that is not well formed; a token that is not `live`; a repository that
    * already has an open grant; an attempt that had a grant before; a record
-   * that could not be written.
+   * that could not be written; a grant that was closed while its record was
+   * being written.
    */
   async open(request: GrantRequest): Promise<GrantRecord> {
     const refuse = (reason: GatewayReason) => {
@@ -226,29 +268,46 @@ export class Gateway {
     }
     // Section 5.7: the plaintext goes to a gateway only when the sealed outcome entry made the token `live`.
     if (request.token.state !== "live") throw refuse("token-not-live");
-    if (this.#records.has(record.attempt)) throw refuse("attempt-used");
+    if (this.#lives.has(record.attempt)) throw refuse("attempt-used");
     if (this.#open.has(record.repository)) throw refuse("grant-open");
-    this.#open.set(record.repository, record);
-    this.#records.set(record.attempt, record);
-    try {
-      await this.#options.records.write({ ...record });
-    } catch {
-      this.#open.delete(record.repository);
-      this.#records.set(record.attempt, { ...record, state: "closed" });
+    const written = this.#write(record);
+    const life: Life = { record, phase: "opening", plaintext: null, step: written, closing: null };
+    this.#open.set(record.repository, life);
+    this.#lives.set(record.attempt, life);
+    if (!(await written)) {
+      if (this.#open.get(record.repository) === life) this.#open.delete(record.repository);
+      // Nothing durable says that this grant was open, so there is nothing to close in the record.
+      if (life.phase === "opening") { life.phase = "closed"; record.state = "closed"; }
       throw refuse("record-failed");
     }
-    this.#plaintext.set(record.attempt, request.token.plaintext);
+    // A `close`, or the end of the token's use, came while the record was being written. The grant is closed: it gets no plaintext.
+    if (life.phase !== "opening") throw refuse("grant-closed");
+    life.plaintext = request.token.plaintext;
+    life.phase = "open";
     return { ...record };
   }
 
-  /** Close a grant: drop the plaintext first, then record. A failed write of the closing record leaves the durable record at its last state, which never says less was forwarded than was. */
-  async #close(record: GrantRecord): Promise<GrantRecord> {
-    this.#plaintext.delete(record.attempt);
-    if (this.#open.get(record.repository) === record) this.#open.delete(record.repository);
-    if (record.state !== "closed") {
-      record.state = "closed";
-      await this.#options.records.write({ ...record }).catch(() => this.#log(record.attempt, "record-failed"));
+  /**
+   * Close a grant: drop the plaintext and take the phase `closed`, both at
+   * once, then record. The closing record is written after the step in
+   * flight, which by then has said whether the update was sent. A failed
+   * write of the closing record leaves the durable record at its last
+   * state, which never says less was forwarded than was.
+   */
+  async #close(life: Life): Promise<GrantRecord> {
+    const { record } = life;
+    life.plaintext = null;
+    if (this.#open.get(record.repository) === life) this.#open.delete(record.repository);
+    if (life.phase !== "closed") {
+      life.phase = "closed";
+      life.closing = (async () => {
+        await life.step;
+        if (record.state === "closed") return;
+        record.state = "closed";
+        if (!(await this.#write(record))) this.#log(record.attempt, "record-failed");
+      })();
     }
+    await life.closing;
     return { ...record };
   }
 
@@ -258,8 +317,8 @@ export class Gateway {
    * same record. An attempt that never had a grant has no record: null.
    */
   async close(attempt: string): Promise<GrantRecord | null> {
-    const record = this.#records.get(attempt);
-    return record === undefined ? null : this.#close(record);
+    const life = this.#lives.get(attempt);
+    return life === undefined ? null : this.#close(life);
   }
 
   /**
@@ -269,9 +328,7 @@ export class Gateway {
    * ledger's operation, by the token's ID, and is not sent from here.
    */
   async ended(token: string): Promise<GrantRecord[]> {
-    const out: GrantRecord[] = [];
-    for (const record of [...this.#open.values()]) if (record.token === token) out.push(await this.#close(record));
-    return out;
+    return Promise.all([...this.#open.values()].filter((life) => life.record.token === token).map((life) => this.#close(life)));
   }
 
   /**
@@ -291,11 +348,12 @@ export class Gateway {
     }
     if (url.username !== "" || url.password !== "") return refusal("credential-in-url");
     const at = `${url.origin}${url.pathname}`;
-    const record = [...this.#open.values()].find((r) => at.startsWith(`${r.repository}/`));
-    if (record === undefined) {
+    const life = [...this.#open.values()].find((l) => at.startsWith(`${l.record.repository}/`));
+    if (life === undefined) {
       this.#log(null, "no-grant");
       return refusal("no-grant");
     }
+    const { record } = life;
     const refuse = (reason: GatewayReason) => {
       this.#log(record.attempt, reason);
       return refusal(reason);
@@ -306,7 +364,7 @@ export class Gateway {
     const fetching = path === "/git-upload-pack" && request.method === "POST" && url.search === "";
     const pushing = path === "/git-receive-pack" && request.method === "POST" && url.search === "";
     if (!discovery && !fetching && !pushing) return refuse("not-git");
-    if (record.state !== "open") return refuse("grant-used");
+    if (life.phase !== "open") return refuse("grant-used");
     if (record.update === null && (pushing || service === "git-receive-pack")) return refuse("reads-only");
 
     let body: ReadableStream<Uint8Array> | null = request.body;
@@ -331,34 +389,54 @@ export class Gateway {
       }
     }
 
-    const plaintext = this.#plaintext.get(record.attempt);
-    if (plaintext === undefined) return refuse("grant-used");
-    const headers = new Headers(request.headers);
-    for (const name of DROPPED) headers.delete(name);
-    const [name, value] = this.#options.credential(plaintext);
-    headers.set(name, value);
-
-    if (update) {
-      // "Forwarding" is recorded, durably, before the one update is forwarded. From here the grant forwards nothing more.
-      record.state = "forwarding";
-      record.forwarded = 1;
+    // The body was read in a wait. The grant may have been closed meanwhile, or another forward may hold the claim on its one update.
+    if (life.phase !== "open") return refuse("grant-used");
+    /** Give the request to the host, with the credential in its one header. Nothing waits between the reading of the phase and this call. */
+    const dispatch = (plaintext: string): Promise<Response> => {
+      // An async function runs at once, as far as its first wait, which is the host's. What it throws before that is a failed forward.
+      return (async () => {
+        const headers = new Headers(request.headers);
+        for (const name of DROPPED) headers.delete(name);
+        const [name, value] = this.#options.credential(plaintext);
+        headers.set(name, value);
+        return this.#options.upstream(new Request(url, { method: request.method, headers, ...(body === null ? {} : { body, duplex: "half" as const }) }));
+      })();
+    };
+    const answered = async (sent: Promise<Response>): Promise<Response> => {
       try {
-        await this.#options.records.write({ ...record });
+        return await sent;
       } catch {
-        record.forwarded = 0;   // nothing was forwarded, and nothing will be
-        await this.#close(record);
-        return refuse("record-failed");
+        // Not the error's text: it may repeat the request, with its header.
+        this.#log(record.attempt, "upstream-failed");
+        return new Response("The gateway had no answer from the host\n", { status: 502, headers: { "content-type": "text/plain" } });
       }
-    } else record.reads += 1;
+    };
+    if (!update) {
+      record.reads += 1;
+      return answered(dispatch(life.plaintext!));
+    }
 
+    // The claim on the one update. "Forwarding" is recorded, durably, before the update is forwarded. From here the grant forwards
+    // nothing more.
+    life.phase = "reserved";
+    record.state = "forwarding";
+    record.forwarded = 1;
+    const step = (async (): Promise<{ sent: Promise<Response> } | "record-failed" | "grant-used"> => {
+      const durable = await this.#write(record);
+      // Not durable, or closed while it was being written: nothing was forwarded, and nothing will be.
+      if (!durable || life.phase !== "reserved" || life.plaintext === null) {
+        record.forwarded = 0;
+        return durable ? "grant-used" : "record-failed";
+      }
+      life.phase = "sent";
+      return { sent: dispatch(life.plaintext) };
+    })();
+    life.step = step;
+    const reserved = await step;
     try {
-      return await this.#options.upstream(new Request(url, { method: request.method, headers, ...(body === null ? {} : { body, duplex: "half" as const }) }));
-    } catch {
-      // Not the error's text: it may repeat the request, with its header.
-      this.#log(record.attempt, "upstream-failed");
-      return new Response("The gateway had no answer from the host\n", { status: 502, headers: { "content-type": "text/plain" } });
+      return typeof reserved === "string" ? refuse(reserved) : await answered(reserved.sent);
     } finally {
-      if (update) await this.#close(record);
+      await this.#close(life);
     }
   }
 }
