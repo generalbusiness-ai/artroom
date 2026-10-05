@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:6458271781189d448d973158ad7d61a097fa41b9","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-05-scope-test-cost.md."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:8024445326aa2209fe24b59f5c33c983b4e99720","text":"Merge retired a covered predecessor; the successor is at packages/lanes/test/plan.scope.test.ts."}
