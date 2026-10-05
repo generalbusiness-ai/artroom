@@ -15,7 +15,8 @@
  *
  * The operations driver runs at the same two moments (`operations.ts`). By
  * default nothing is sent outside the service: the outside port of
- * `production()` sends nothing, and there are no owner rules.
+ * `production()` sends nothing. The owners' rules of `production()` are
+ * the capability code's, for the operations of `hold@1` and `git-read@1`.
  *
  * Four things here are no history, and no judgment reads any of them: the
  * read sessions that the object checks, and for a membership scope issues
