@@ -1,1 +1,1 @@
-{"kind":"assert","text":"Updated isolated planner index b0c246cf5 with finished I3 static preparation and its two new/three prior component P2s plus separate M1 sequencing finding. Full report reading and attribution are explicit; no ordinary source verdict/executed reproduction/source acceptance. Documentation-only; diff --check passed, no tests.","body":{"commit":"b0c246cf5","no_git_artifact":"true","path":"plans/README.md"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:70f7411663654d8392034b7d5957fe5446855b09"}
