@@ -29,7 +29,7 @@ describe("founding a directory (sections 2.2, 2.3 and 7.1)", () => {
     const unverified = { answer: "refused", reason: "source-unverified" };
     expect([await s.stub.found(other.signed, definition.declared), await empty.found(other.signed, definition.declared)]).toEqual([unverified, unverified]);
     expect(await empty.summary(reader)).toEqual({ ok: false, reason: "not-found" });
-    // A platform definition is supplied in code, and this one is not delivered.
+    // A platform definition is supplied in code. The package holds the data of this one and no rule for three of its marks, so it runs nothing.
     expect(await stubOf(other.name).found(other.signed, "platform:directory@1")).toEqual({ answer: "refused", reason: "unsupported-definition" });
   });
 
@@ -69,9 +69,11 @@ describe("founding a directory (sections 2.2, 2.3 and 7.1)", () => {
     expect(await stub.summary(reader)).toMatchObject({ ok: true, at: { seq: 0 } });
   });
 
-  test("the object as deployed has every production default: it records a founding on the real clock, calls no grant current and lets no reader read", async () => {
+  test("the object with no wiring has every production default: it records a founding on the real clock, calls no grant current and lets no reader read", async () => {
     const soon = () => timeOf(Date.now() + 60_000);
     const { signed, name } = founding(soon());
+    // The namespace `AS_DEPLOYED` is the class `ScopeObject`, with the ports of `production()` and nothing else. It is not the class that
+    // `wrangler.jsonc` names: that is `DeployedScope`, which adds the namespace, the authority of a repository and read sessions.
     const deployed = stubOf(name, env.AS_DEPLOYED);
     const founded = await deployed.found(signed, definition.declared);
     if (founded.answer !== "accepted") throw new Error(`not founded: ${JSON.stringify(founded)}`);
@@ -191,9 +193,9 @@ describe("founding a directory (sections 2.2, 2.3 and 7.1)", () => {
     const fields = { title: "A lane", opener: rita.member };
     const commit = "c".repeat(40);
 
-    // As deployed, the runtime has the code of `hold@1` and of `git-read@1`, so the definition is one that it can pin (section 6.1):
-    // the rule is on the code of the forms that a definition uses, and asks for no peer. The founding is written. That is all the
-    // scope does as deployed. No grant is read, so its acts and its steps are refused `unauthorized`: no hold is opened, and so no
+    // With the production defaults, the runtime has the code of `hold@1` and of `git-read@1`, so the definition is one that it can pin
+    // (section 6.1): the rule is on the code of the forms that a definition uses, and asks for no peer. The founding is written. That is
+    // all the scope does with those defaults. No grant is read, so its acts and its steps are refused `unauthorized`: no hold is opened, and so no
     // operation, and nothing is sent outside. No reader may read it.
     const asked: Intent = { v: 1, to: null, actor: rita.key, kind: "found", on: null, expected: {}, fields, idempotencyKey: crypto.randomUUID(), notAfter: timeOf(Date.now() + 60_000) };
     const seed: Seed = { v: 1, kind: "directory", definition: staged.digest, creator: null, cause: intentDigest(asked), ordinal: 0 };
