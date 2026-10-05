@@ -172,9 +172,17 @@ export class Operations {
     this.#first = false;
     if (due.length === 0) return 0;
     const scope = store.scope()!;
+    // Section 6.1: a scope whose pinned definition this runtime cannot run admits nothing, so no outcome can be written. Nothing
+    // is sent and nothing is offered. Each attempt stays as it is recorded, with no wake-up, until a runtime that can run the
+    // definition restarts the object.
+    const runs = Boolean(this.#scope.pinned()?.definition);
     const work: (() => Promise<void>)[] = [];
     for (const row of due) {
       const { operation: id, attempt } = row;
+      if (!runs) {
+        if (row.next !== null) store.postpone(id, attempt, null);
+        continue;
+      }
       if (row.sent !== null) {
         // The request may have left: the mark was written and no outcome followed. The answer in hand is offered if there is one.
         // Otherwise the process stopped between the send and the outcome, and the outcome is `unknown`. It is never sent again.

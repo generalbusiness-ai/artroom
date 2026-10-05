@@ -4,8 +4,10 @@ import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { OperationId, Read } from "@generalbusiness/artroom-contract";
 import { checkpointOf, operationId, operationOpening, timeMs, type Opening } from "@generalbusiness/artroom-derive";
 import { SqliteStore, Turns, Wakes, production, type EffectAnswer, type OperationStatus, type OutcomeRecorded } from "../src/index.ts";
+import { variant } from "@generalbusiness/artroom-derive/testing";
+import { controls } from "../src/testing.ts";
 import { outsideOf, owners, pushOf, type OutsideDouble } from "./outside.ts";
-import { START, at, definition, found, reader, rita, type Lane } from "./support.ts";
+import { Lane, START, at, definition, found, founding, reader, rita, stubOf } from "./support.ts";
 
 /** The delay before the second attempt of an operation. */
 const RETRY = PROPOSED_BOUNDS.dispatchRetrySeconds;
@@ -135,5 +137,29 @@ describe("outside operations at a real scope (scope contract, section 4.3; autho
     out.answer(retry, 1, { result: "confirmed", evidence: { basis: "read", body: { commit: "c1" } } });
     expect(await s.alarm()).toBe(true);
     expect([retry, out.attempts.at(-1), (await seen(s, retry)).state, (await seen(s, op)).state, outcomes(await seen(s, op))]).toEqual(["4:0", "4:0#1", "settled", "unknown", [["refused at 2"], ["unknown at 3"]]]);
+  });
+
+  test("a scope whose pinned definition the runtime cannot run sends nothing outside the service: the attempt stays recorded, with no wake-up, and is sent once the runtime can run the definition. The capability is the scripted stand-in", async () => {
+    // The lane of the other tests, with one capability guard. The scripted test capability, a stand-in, is the code for it.
+    const staged = variant(definition.declared, (def) => { def.acts.report.guards.push({ capability: { name: "hold", guard: "staged", with: { commit: { field: "commit" }, under: { item: "also.commitment" } } } }); def.acts.report.fields.commit = { type: "commit", required: true }; });
+    const { signed, name } = founding(at(60), staged);
+    const c = controls(name, START);
+    c.capability = {};
+    const founded = await stubOf(name).found(signed, staged.declared);
+    if (founded.answer !== "accepted") throw new Error(`not founded: ${JSON.stringify(founded)}`);
+    const s = new Lane(name, c, founded.receipt.fact.at, founded.receipt, signed);
+    const out = outsideOf(name);
+    const [op] = await open(s, pushOf(1)) as [OperationId];
+
+    // The outside system would answer. The runtime loses the code: section 6.1, the scope admits nothing. So no outcome could be
+    // written, and no request leaves.
+    out.answer(op, 1, { result: "confirmed", evidence: { basis: "read", body: { commit: "c1" } } });
+    c.capability = null;
+    await s.restart();
+    expect([await s.alarm(), out.sent.length, await s.alarmAt()]).toEqual([true, 0, null]);
+    // With the code again, the first pass after a restart finds the recorded attempt and sends it.
+    c.capability = {};
+    await s.restart();
+    expect([await surface(s).effect(), out.attempts, (await seen(s, op)).state]).toEqual([1, [`${op}#1`], "settled"]);
   });
 });

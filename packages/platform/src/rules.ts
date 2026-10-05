@@ -19,10 +19,12 @@
  * yet.
  *
  * `CODE` marks each entry that needs a rule, with its rows. A runtime or a
- * verifier derives an entry that is marked only with every rule it names.
- * Without one it derives nothing of that entry, and answers
- * `unsupported-definition` (the contract's section 6.1). `inbox` needs one,
- * P22, which is not written (I3 deltas, entry E10).
+ * verifier runs a definition only with every rule that its marked entries
+ * name. Without one it answers `unsupported-definition` for the whole
+ * scope: nothing is founded under the definition, and a scope that exists
+ * under it admits nothing (the contract's section 6.1; I3 deltas, entry
+ * EC4). `inbox` needs one, P22, which is not written (I3 deltas, entry
+ * E10), so no scope is founded under it yet.
  */
 
 import type { Effect, FactUse, Input, Reason, Send, Timestamp } from "@generalbusiness/artroom-contract";

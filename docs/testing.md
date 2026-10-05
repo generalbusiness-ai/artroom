@@ -58,6 +58,13 @@ delivered. A test that uses it says so in its name or its first comment.
 It shows what a definition does once a capability has answered, and
 nothing about a real hold, a Git read or a provider.
 
+`standInPlatform`, of the same module, supplies a rule that adds nothing
+for each row that a platform definition marks as code. It is a stand-in
+for the platform rules, which are not delivered, and no judge runs it. A
+test that uses it says so in its name or its first comment. It shows that
+a scope is founded and judges its acts once every rule is supplied, and
+nothing about any rule.
+
 A scripted peer, `net.peers` of the same module, is a stand-in for a scope
 of a platform kind that is not delivered, such as a rules scope or a
 destination. The test writes the peer's entry by hand, and nothing judged

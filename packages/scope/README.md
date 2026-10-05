@@ -125,13 +125,27 @@ code that no form can say.
   platform option. A declaration that an input, a peer or storage gave is
   validated without it, so a declared definition never takes a name that
   begins `platform:`.
-- A scope under a platform definition runs the rows that are data.
-- No judge runs a platform rule yet. So the scope derives nothing of an
-  entry that is marked as code. An act of that kind is answered
-  `unavailable`. A delivery of that message gets transport's `retry`, with
-  the reason `unsupported-definition`. A timed rule of that kind stays
-  due, and the turn ends. Nothing is written in any of the three.
-- A genesis act that is marked founds no scope: `unsupported-definition`.
+- The rule of the contract's section 6.1 is of the whole scope. A scope is
+  founded under a platform definition only when a rule is supplied for
+  every row that is marked as code. When one is missing, the founding is
+  refused `unsupported-definition`, and nothing is written. A scope that
+  exists under such a definition admits nothing: an act is answered
+  `unavailable`, a delivery gets `retry`, no timed entry is written, a
+  read is answered `unsupported-definition`, and the operations driver
+  sends nothing outside the service.
+- The platform package supplies no rule yet, and `platform:inbox@1` marks
+  one row, `notify`. So the production wiring founds no scope under any
+  platform definition.
+- No judge runs a platform rule yet, and no adopted text says how a
+  rule's result joins its row. `standInPlatform`, of the testing entry,
+  supplies a rule that adds nothing for every marked row. It is a
+  stand-in, and it shows only that a scope is founded and judges its acts
+  once every rule is supplied. In such a scope an entry that is marked is
+  still not derived. An act of that kind is answered `unavailable`. A
+  delivery of that message gets transport's `retry`, with the reason
+  `unsupported-definition`. A timed rule of that kind stays due, and the
+  turn ends. Nothing is written in any of the three. A genesis act that
+  is marked founds no scope.
 - A creation under a platform name is not built: it is answered
   `unsupported-definition`.
 

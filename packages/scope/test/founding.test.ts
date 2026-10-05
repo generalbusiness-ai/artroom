@@ -10,7 +10,7 @@ import { httpSource, verify } from "@generalbusiness/artroom-replay";
 import type { Delivery } from "../src/index.ts";
 import { controls, scriptedCapability } from "../src/testing.ts";
 import { Node, founding as foundingIn, net } from "./net.ts";
-import { HOLD, START, at, definition, found, founding, reader, rita, stubOf, una } from "./support.ts";
+import { HOLD, START, at, definition, found, founding, objectOf, reader, rita, stubOf, una } from "./support.ts";
 
 describe("founding a directory (sections 2.2, 2.3 and 7.1)", () => {
   test("entry 0 holds the seed, the signed intent and a minted incarnation, and the scope answers under its own name only", async () => {
@@ -83,21 +83,32 @@ describe("founding a directory (sections 2.2, 2.3 and 7.1)", () => {
     expect(await deployed.summary(reader)).toEqual({ ok: false, reason: "forbidden" });
   });
 
-  test("a scope is founded under platform:inbox@1 by the production wiring: the runtime's code supplies the definition, the genesis is written and retains no declaration, and a row that is data is judged, also after a restart; the row whose code is not written answers unsupported-definition and writes nothing; and the same data, given by an input, founds nothing", async () => {
-    const soon = () => timeOf(Date.now() + 60_000);
-    const asked = (): Intent => ({ v: 1, to: null, actor: rita.key, kind: "found", on: null, expected: {}, fields: { owner: rita.member, membership: rita.member.membership }, idempotencyKey: crypto.randomUUID(), notAfter: soon() });
+  test("platform:inbox@1 has a row that is code, `notify`, row P22, whose rule is not written. The production wiring founds nothing under it: unsupported-definition for the whole scope. With a rule supplied for every such row, by a STAND-IN that proves nothing about P22, a scope is founded, retains no declaration and judges its acts, also after a restart; when the rule is gone, the scope admits nothing; and the same data, given by an input, founds nothing", async () => {
+    // A STAND-IN: `standInPlatform`, of test support, supplies a rule that adds nothing for each row that the platform package marks as
+    // code. It is not the rule of P22, which plan step 11 writes, and no judge runs it. This test shows which definitions a scope
+    // runs under, and nothing about what a notice's `source` holds.
+    const asked = (notAfter: Intent["notAfter"]): Intent => ({ v: 1, to: null, actor: rita.key, kind: "found", on: null, expected: {}, fields: { owner: rita.member, membership: rita.member.membership }, idempotencyKey: crypto.randomUUID(), notAfter });
     const seedOf = (intent: Intent, definition: Seed["definition"]): Seed => ({ v: 1, kind: "directory", definition, creator: null, cause: intentDigest(intent), ordinal: 0 });
-    const stored = (name: string, query: string) => runInDurableObject(env.AS_DEPLOYED.get(env.AS_DEPLOYED.idFromName(name)), (_instance, state) => state.storage.sql.exec(query).toArray());
+    const stored = (name: string, query: string, namespace = env.SCOPES) => runInDurableObject(namespace.get(namespace.idFromName(name)), (_instance, state) => state.storage.sql.exec(query).toArray());
 
-    // `AS_DEPLOYED` has every production default: no test authority, and the definitions port of `production()`. The founding names
-    // the platform definition. The seed holds that name, and the object's name is the seed's digest.
-    const intent = asked();
+    // `AS_DEPLOYED` has every production default: the definitions port of `production()`, which supplies the inbox's data and no
+    // rule for `notify`. Section 6.1: a scope runs every turn under its whole pinned definition, or none. Nothing is founded.
+    const refused = asked(timeOf(Date.now() + 60_000));
+    const deployed = scopeIdOf(seedOf(refused, "platform:inbox@1"));
+    expect(await stubOf(deployed, env.AS_DEPLOYED).found(signIntent(refused, rita.secret), "platform:inbox@1")).toEqual({ answer: "refused", reason: "unsupported-definition" });
+    expect(await stored(deployed, "SELECT COUNT(*) AS n FROM entry", env.AS_DEPLOYED)).toEqual([{ n: 0 }]);
+
+    // The test wiring without the stand-in rules answers the same. With them, every row that is code has a rule, and the scope is
+    // founded. The founding names the platform definition: the seed holds that name, and the object's name is the seed's digest.
+    const intent = asked(at(60));
     const name = scopeIdOf(seedOf(intent, "platform:inbox@1"));
-    const deployed = stubOf(name, env.AS_DEPLOYED);
-    const founded = await deployed.found(signIntent(intent, rita.secret), "platform:inbox@1");
+    const scope = stubOf(name);
+    expect(await scope.found(signIntent(intent, rita.secret), "platform:inbox@1")).toEqual({ answer: "refused", reason: "unsupported-definition" });
+    controls(name, START).platformRules = true;
+    const founded = await scope.found(signIntent(intent, rita.secret), "platform:inbox@1");
     if (founded.answer !== "accepted") throw new Error(`not founded: ${JSON.stringify(founded)}`);
-    const at: ScopeRef = founded.receipt.fact.at;
-    expect([at.scope, founded.receipt.fact.seq, founded.receipt.definition]).toEqual([name, 0, "platform:inbox@1"]);
+    const ref: ScopeRef = founded.receipt.fact.at;
+    expect([ref.scope, founded.receipt.fact.seq, founded.receipt.definition]).toEqual([name, 0, "platform:inbox@1"]);
 
     // The genesis entry: the genesis act of section 12.1.6, `establish`, with the two effects that the definition's data writes.
     // A platform definition is pinned by its name and version, so no declaration is retained for it.
@@ -108,27 +119,34 @@ describe("founding a directory (sections 2.2, 2.3 and 7.1)", () => {
     });
     expect(await stored(name, "SELECT COUNT(*) AS n FROM retained_input WHERE kind = 'definition'")).toEqual([{ n: 0 }]);
 
-    // After a restart the definition is the code's again. A row that is data is judged: `mark-read` names no notice, which is check
-    // 8 of section 4.2. No act of this definition reaches check 9 without a notice, and a notice needs the row below.
-    await evictDurableObject(env.AS_DEPLOYED.get(env.AS_DEPLOYED.idFromName(name)));
+    // After a restart the definition is the code's again, and the scope runs: an act is judged. `mark-read` names no notice, which
+    // is check 8 of section 4.2. No act of this definition reaches check 9 without a notice, and a notice needs `notify`.
+    await evictDurableObject(objectOf(name));
     const head = { seq: 0, hash: founded.receipt.fact.hash };
-    const read = signIntent({ v: 1, to: at, actor: rita.key, kind: "mark-read", on: 7, expected: { on: 1, inbox: 1 }, fields: {}, idempotencyKey: "k", notAfter: soon() }, rita.secret);
-    expect(await deployed.submit(read, [grantOf(rita, at, ["inbox.own"])])).toEqual({ answer: "refused", reason: "no-item", judgedAt: head });
+    const read = (key: string) => signIntent({ v: 1, to: ref, actor: rita.key, kind: "mark-read", on: 7, expected: { on: 1, inbox: 1 }, fields: {}, idempotencyKey: key, notAfter: at(60) }, rita.secret);
+    expect(await scope.submit(read("k"), [grantOf(rita, ref, ["inbox.own"])])).toEqual({ answer: "refused", reason: "no-item", judgedAt: head });
 
-    // `notify` is marked as code, row P22, and no rule is written (I3 deltas, entry E10). The scope derives nothing of that row: the
-    // delivery is not decided, and the sender keeps the duty. The control is an advisory of a row that is not marked: it goes on to
-    // the read of its source entry, which the production resolver cannot make.
-    const from = { at: { ...at, kind: "lane" as const }, seq: 3, hash: founded.receipt.fact.hash };
-    const advisory = (type: "notify" | "index"): Delivered => ({ to: at, from, n: 0, message: { class: "advisory", type, body: { fields: { reason: "review" } } } });
-    const object = env.AS_DEPLOYED.get(env.AS_DEPLOYED.idFromName(name)) as unknown as { deliver(envelope: Delivered): Promise<Delivery> };
+    // No judge runs a platform rule yet (I3 deltas, entry EC6). So `notify`, whose rule is supplied and not run, is not derived:
+    // the delivery is not decided, and the sender keeps the duty. The control is an advisory of a row that is not marked: it goes
+    // on to the read of its source entry, which this resolver cannot make.
+    const from = { at: { ...ref, kind: "lane" as const }, seq: 3, hash: founded.receipt.fact.hash };
+    const advisory = (type: "notify" | "index"): Delivered => ({ to: ref, from, n: 0, message: { class: "advisory", type, body: { fields: { reason: "review" } } } });
+    const object = objectOf(name) as unknown as { deliver(envelope: Delivered): Promise<Delivery> };
     expect([await object.deliver(advisory("notify")), await object.deliver(advisory("index"))]).toEqual([{ answer: "retry", reason: "unsupported-definition" }, { answer: "retry", reason: "dependency-unavailable" }]);
+
+    // A scope that exists under the definition, in a runtime that has no rule for the row: it admits nothing, whatever the row. The
+    // act that was judged above is now not judged.
+    controls(name).platformRules = false;
+    await evictDurableObject(objectOf(name));
+    expect([await scope.summary(reader), await scope.submit(read("k2"), [grantOf(rita, ref, ["inbox.own"])])]).toEqual([{ ok: false, reason: "unsupported-definition" }, { answer: "unavailable", reason: "unavailable" }]);
     expect(await stored(name, "SELECT COUNT(*) AS n FROM entry")).toEqual([{ n: 1 }]);
 
     // The validator's platform option is reached by the name alone. The same data, given by an input as a declaration, is validated
-    // without it: a declared definition does not take a platform name, and nothing is founded.
-    const other = asked();
+    // without it: a declared definition does not take a platform name, and nothing is founded, also with the stand-in rules.
+    const other = asked(at(60));
     const declared = scopeIdOf(seedOf(other, definitionDigest(inbox)));
-    expect(await stubOf(declared, env.AS_DEPLOYED).found(signIntent(other, rita.secret), inbox)).toEqual({ answer: "refused", reason: "unsupported-definition" });
+    controls(declared, START).platformRules = true;
+    expect(await stubOf(declared).found(signIntent(other, rita.secret), inbox)).toEqual({ answer: "refused", reason: "unsupported-definition" });
     expect(await stored(declared, "SELECT COUNT(*) AS n FROM entry")).toEqual([{ n: 0 }]);
   });
 

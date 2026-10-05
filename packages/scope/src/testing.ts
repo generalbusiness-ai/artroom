@@ -12,7 +12,8 @@
 import { CAPABILITIES, PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { Bounds, Capability, CapabilityName, Digest, Entry, Timestamp } from "@generalbusiness/artroom-contract";
 import type { Capabilities, Delivered, Recorded } from "@generalbusiness/artroom-derive";
-import type { Authority, Clock, Ports, Readers, Resolver, Rules, Transport } from "./ports.ts";
+import { platform, type EntryRules, type Platform, type PlatformRule } from "@generalbusiness/artroom-platform";
+import type { Authority, Clock, Definitions, Ports, Readers, Resolver, Rules, Transport } from "./ports.ts";
 import { production } from "./ports.ts";
 import { READ_BOUNDS, type ReadBounds } from "./reads.ts";
 
@@ -68,6 +69,27 @@ export function scriptedCapability(script: () => CapabilityScript | null): Capab
   };
 }
 
+/**
+ * A stand-in for a platform rule: it adds nothing to its entry. It is not
+ * the rule of any row, and no judge runs it. It shows only what a scope
+ * does once every row that is code has a rule supplied.
+ */
+const STAND_IN_RULE: PlatformRule = () => ({ result: "applied", effects: [], sends: [] });
+
+/**
+ * A stand-in for the platform package's table of rules: the platform
+ * definition of that name as the package supplies it, with `STAND_IN_RULE`
+ * for every row that the package marks as code. So it proves nothing about
+ * the real rule of any row, such as P22 of the inbox, which a later step
+ * writes.
+ */
+export function standInPlatform(named: string): Platform | null {
+  const supplied = platform(named);
+  if (!supplied) return null;
+  const rules = Object.fromEntries(Object.entries(supplied.code).map(([entry, rows]): [string, EntryRules] => [entry, Object.fromEntries(rows.map((row) => [row, STAND_IN_RULE]))]));
+  return { ...supplied, rules };
+}
+
 /** A scripted clock. Each reading is the next of `script`, or `now` when the script is empty. */
 export class ScriptedClock implements Clock {
   readonly script: Timestamp[] = [];
@@ -108,6 +130,8 @@ export interface Controls {
   capability: CapabilityScript | null;
   /** False: the read of the test authority, a stand-in, gives nothing, as when membership does not answer. */
   authority: boolean;
+  /** True: a platform definition is supplied with the stand-in rules of `standInPlatform`. False: as the platform package supplies it, as in production. */
+  platformRules: boolean;
 }
 
 const all = new Map<string, Controls>();
@@ -115,7 +139,7 @@ const all = new Map<string, Controls>();
 /** The controls of the scope with that name, made on first use with a clock at `start`. They outlive a restart of the object. */
 export function controls(name: string, start: Timestamp = "2099-01-01T00:00:00Z"): Controls {
   let made = all.get(name);
-  if (!made) all.set(name, (made = { clock: new ScriptedClock(start), gate: new Gate(), foreign: new Map(), bounds: PROPOSED_BOUNDS, reads: READ_BOUNDS, capability: null, authority: true }));
+  if (!made) all.set(name, (made = { clock: new ScriptedClock(start), gate: new Gate(), foreign: new Map(), bounds: PROPOSED_BOUNDS, reads: READ_BOUNDS, capability: null, authority: true, platformRules: false }));
   return made;
 }
 
@@ -124,14 +148,17 @@ export function controls(name: string, start: Timestamp = "2099-01-01T00:00:00Z"
  * controls can silence, the test readers, the
  * scripted clock, a resolver that reads from `foreign`, derive's rule
  * evaluator behind the gate, and the scripted test capability over the
- * controls' table, which is none until a test sets one. The random source
- * and the alarm stay the runtime's and the object's.
+ * controls' table, which is none until a test sets one. The platform
+ * definitions are the platform package's, as in production, until a test
+ * asks for the stand-in rules. The random source and the alarm stay the
+ * runtime's and the object's.
  */
 export function testPorts(c: Controls): Partial<Ports> {
-  const { rules } = production();
+  const { rules, definitions: given } = production();
+  const definitions: Definitions = { read: given.read, platform: (named) => (c.platformRules ? standInPlatform(named) : given.platform(named)) };
   const resolver: Resolver = { read: (fact) => Promise.resolve(c.foreign.get(fact.hash) ?? null) };
   const gated: Rules = { evaluate: async (asked) => { await c.gate.pass(); return rules.evaluate(asked); } };
-  return { clock: c.clock, authority: testAuthority(() => c.authority), readers: testReaders, resolver, rules: gated, capabilities: scriptedCapability(() => c.capability) };
+  return { clock: c.clock, authority: testAuthority(() => c.authority), readers: testReaders, resolver, rules: gated, definitions, capabilities: scriptedCapability(() => c.capability) };
 }
 
 // ---------------------------------------------------------------- several scopes in one namespace

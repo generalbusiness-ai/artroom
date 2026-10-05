@@ -135,7 +135,7 @@ export class Turns {
   readonly #pinned: PinnedDefinition;
   readonly #lacks: (kind: string) => boolean;
 
-  /** `lacks`: true for the kind of an entry that this runtime cannot derive under the pinned definition (section 6.1). */
+  /** `lacks`: true for the kind of an entry that this runtime cannot derive under the pinned definition (`Scope.lacks`). */
   constructor(store: Store, ports: Pick<Ports, "clock" | "rules" | "alarm" | "owners">, bounds: Bounds, pinned: PinnedDefinition, lacks: (kind: string) => boolean) {
     this.#store = store;
     this.#ports = ports;
@@ -211,7 +211,7 @@ export class Turns {
       const due = scope && nextDue(this.#store, definition, clock.asOf);
       if (!scope || !due) return null;
       if (turn.attempts >= this.#bounds.timedAttemptsPerTurn) return { end: "busy" };
-      // Section 6.1: a timed rule whose row is code that this runtime lacks is not derived. The transition stays due and is never
+      // A timed rule whose row is code is not derived while no judge runs a platform rule. The transition stays due and is never
       // passed over, so the turn ends and no input is written ahead of it.
       if (this.#lacks(`timed:${due.rule}`)) return { end: "unavailable" };
       // Section 9.2: room for this entry was counted when its item was opened. A scope with no room at all writes nothing.

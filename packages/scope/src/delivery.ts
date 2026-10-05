@@ -125,8 +125,8 @@ export class Deliveries {
     const store = this.#store;
     if (!name || !isObject(delivered) || !isFactRef(delivered.from) || !isLocalId(delivered.n) || !isObject(delivered.message)) return UNVERIFIED;
     const { from, message } = delivered;
-    // Section 6.1: this runtime derives no entry of a row whose code it lacks. So it reads nothing for a message of that row and
-    // decides nothing: the sender keeps the duty. The message names its own row, and the pinned definition is immutable.
+    // No judge runs a platform rule yet, so this runtime derives no entry of a row that is code. It reads nothing for a message of
+    // that row and decides nothing: the sender keeps the duty. The message names its own row, and the pinned definition is immutable.
     if (this.#scope.lacks(rowOf(message as unknown as Readonly<Record<string, unknown>>))) return retry("unsupported-definition");
 
     // Section 7.4, "What the receiver trusts at run time". The source scope is reached by its scope ID in the one namespace, the

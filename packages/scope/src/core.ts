@@ -27,14 +27,16 @@ export type Checkpointed =
 
 /**
  * The definition a scope pins: what its seed names, and the validated
- * declaration. Null: this runtime cannot run it. `lacking`: the kind of
- * each entry of a platform definition that this runtime cannot derive,
- * because a row of it is code that the runtime does not run (section 6.1).
- * A declared definition has none.
+ * declaration. Null: this runtime cannot run it, and the scope admits
+ * nothing (section 6.1). `lacking`: the kind of each entry of a platform
+ * definition whose rows are code. Every rule of each is supplied, or the
+ * definition would be null. No judge runs a rule yet, so the runtime
+ * derives nothing of those entries (`Scope.lacks`). A declared definition
+ * has none.
  */
 export interface Pinned { named: Digest | PlatformDefinition; definition: ValidDefinition | null; lacking: ReadonlySet<string> }
 
-/** A platform definition as this runtime can run it: the validated data, and the kinds of the entries it cannot derive. */
+/** A platform definition as this runtime can run it: the validated data, and the kinds of the entries whose rows are code. */
 export interface Supplied { definition: ValidDefinition; lacking: ReadonlySet<string> }
 
 const NONE: ReadonlySet<string> = new Set();
@@ -179,8 +181,8 @@ export class Scope {
   /**
    * A platform definition, as this runtime's code supplies it through the
    * definitions port (section 6.1): its data, validated, and the kinds of
-   * the entries that this runtime cannot derive. Null: the runtime does not
-   * implement that version, or cannot run it: `unsupported-definition`.
+   * the entries whose rows are code. Null: the runtime does not implement
+   * that version, or cannot run it whole: `unsupported-definition`.
    *
    * The data is the platform package's, so it is validated with the
    * validator's platform option, which lets a name begin `platform:`. This
@@ -189,9 +191,13 @@ export class Scope {
    * peer or this scope's storage gave are validated by `validate`, without
    * the option.
    *
-   * An entry that the platform package marks as code is derived only with a
-   * rule for each row that it names. Without one, the runtime derives
-   * nothing of that entry (`lacks`), and runs the rows that are data.
+   * The rule of section 6.1 is of the whole scope, for a platform
+   * definition as for a capability form with no code: "a scope runs every
+   * turn under its whole pinned definition, or none". An entry that the
+   * platform package marks as code needs a rule for each row that it names.
+   * When one row of one entry has no rule, the definition is null: no scope
+   * is founded under it, and a scope that exists under it admits nothing
+   * (I3 deltas, entry EC4).
    */
   platform(named: PlatformDefinition): Supplied | null {
     const supplied = this.#ports.definitions.platform(named);
@@ -200,9 +206,12 @@ export class Scope {
       const checked = validateDefinition(parseStrict(canonicalize(supplied.declared)), this.#bounds, RULE_PROFILES, { platform: true });
       // Section 6.1: the name of a platform definition is its platform name without the version, which is what `under` compares.
       if (!checked.ok || checked.definition.declared.name !== platformName(named) || !derivable(checked.definition, this.#ports.capabilities)) return null;
-      // I3 merge: no judge runs a platform rule yet. So every entry that is marked lacks its code here, also one whose rules are
-      // supplied. The step that makes a judge run the rules of an entry narrows this to the entries with a row that has no rule.
-      return { definition: checked.definition, lacking: new Set(Object.keys(supplied.code)) };
+      const marked = Object.entries(supplied.code);
+      if (marked.some(([entry, rows]) => rows.some((row) => typeof own(supplied.rules, entry)?.[row] !== "function"))) return null;
+      // I3 merge: no judge runs a platform rule yet, and no adopted text says how a rule's result joins its row (I3 deltas, entry
+      // EC6). So an entry that is marked is not derived, though every rule of it is supplied: `lacks`. The step that makes the
+      // judges run the rules removes `lacking`, `lacks` and each place that asks it.
+      return { definition: checked.definition, lacking: new Set(marked.map(([entry]) => entry)) };
     } catch {
       return null;
     }
@@ -225,12 +234,17 @@ export class Scope {
 
   /**
    * True when this runtime cannot derive an entry of that kind under the
-   * pinned definition: a row of it is platform code that the runtime does
-   * not run (section 6.1). The scope then writes no entry of that kind, and
-   * judges no input that would be one. `kind` is an act's kind, a handler's
-   * message name, or `timed:` and the key of a timed rule. It is read from
-   * the input and the definition alone, which are immutable (section 5.1),
-   * so a writer asks before its turn.
+   * pinned definition: a row of it is platform code, and no judge runs a
+   * platform rule yet (I3 deltas, entry EC6). The scope then writes no entry
+   * of that kind, and judges no input that would be one. `kind` is an act's
+   * kind, a handler's message name, or `timed:` and the key of a timed rule.
+   * It is read from the input and the definition alone, which are immutable
+   * (section 5.1), so a writer asks before its turn.
+   *
+   * Under the production wiring it is false for every kind: a definition
+   * with a marked row whose rule is not supplied pins nothing, and the
+   * platform package supplies no rule yet. It answers true only where a
+   * test supplies stand-in rules.
    */
   lacks(kind: string | null): boolean {
     return kind !== null && (this.pinned()?.lacking.has(kind) ?? false);
@@ -279,7 +293,8 @@ export class Scope {
     if (typeof definition === "string" && definition.startsWith("platform:")) {
       // Section 6.1: the founding names a platform definition, and the runtime's code supplies it. Nothing of it comes from the input.
       const supplied = isPlatformDefinition(definition) ? this.platform(definition) : null;
-      // A genesis that this runtime cannot derive founds no scope.
+      // Null: a row of the definition is code with no rule, so nothing is founded under it. A genesis act that is marked is not derived
+      // either, while no judge runs a rule.
       if (!supplied || supplied.lacking.has(supplied.definition.declared.genesis)) return refused("unsupported-definition");
       ({ definition: valid, lacking } = supplied);
     } else {
@@ -383,8 +398,8 @@ export class Scope {
     if (!isSigned(signed)) return { answer: "refused", reason: "bad-intent", judgedAt: scope.head };
 
     const intent = signed.intent;
-    // Section 6.1: this runtime derives no entry of a row whose code it lacks, so it judges no act of that kind. The answer is the
-    // one a scope gives whose whole definition it cannot run: nothing was recorded.
+    // No judge runs a platform rule yet, so this runtime judges no act of a kind whose row is code. The answer is the one a scope
+    // gives whose whole definition it cannot run: nothing was recorded.
     if (this.lacks(intent.kind)) return unavailable("unavailable");
     const act = own(definition.declared.acts, intent.kind);
     const fields = act ? readFields(act.fields, intent.fields, bounds) : null;
