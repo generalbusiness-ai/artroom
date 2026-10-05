@@ -792,7 +792,7 @@ thrown `TransportError`. Neither is an assertion as the script reads one.
 Written 2026-10-05, for the review of the base milestone at `744f2447`,
 whose verdict is event `1993412c`. It found five supported P2 source
 findings. The entries DR1 to DR5 match the findings. DR6 and DR7 repair two
-faults of the same kinds that were found after the verdict: the `self` mark
+faults of the same kinds that the repair work itself found, after the verdict and not by the reviewer: the `self` mark
 read in a field of any type, and the order of a repeated founding. The first
 table holds DR1, DR2, DR5, DR6 and DR7, and the second DR3 and DR4. None of the
 seven changes a digest, a pinned definition or the bytes of an entry. Each was repaired in its own commit,
