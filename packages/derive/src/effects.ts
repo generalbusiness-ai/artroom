@@ -159,12 +159,17 @@ export function deriveEffects(j: Judging, forms: readonly EffectForm[], attentio
   };
   /** The item that this entry opens, when a rule opens it. */
   let byRule: Item | null = null;
+  /** The mark whose rule opened each operation that a rule of this entry opens, by the operation's ordinal. */
+  const openers = new Map<number, Mark>();
   /**
    * The effects of one rule, at its mark's position (section 6.1, place 5).
    * Each is a member of the allowed list, in the contract's form, on a local
    * item, in a slot and a state that its type declares, and on a fixed slot
    * only of the item that the entry opens. Anything else is a fault of the
-   * rule. The checks on effects are the ones that a written
+   * rule. An operation's owner, kind and ordinal, and the shape of an
+   * attempt, are checked here, on the effects joined so far. Whether each
+   * operation has its first attempt is asked of the whole entry, by
+   * `paired`. The checks on effects are the ones that a written
    * effect meets, and refuse as they do: `final`, `bad-field` for a value
    * outside its slot's type, and `slot-full`.
    */
@@ -181,6 +186,7 @@ export function deriveEffects(j: Judging, forms: readonly EffectForm[], attentio
         const k = effects.filter((e) => e.effect === "operation").length;
         if (effect.owner !== j.platform?.named || own(kinds, effect.kind) === undefined || effect.k !== k || !Number.isSafeInteger(effect.attempts) || effect.attempts < 1) throw outside(mark, "an operation that its definition does not own, or out of its ordinal");
         effects.push(effect);
+        openers.set(effect.k, mark);
         continue;
       }
       if (effect.effect === "attempt") {
@@ -250,11 +256,20 @@ export function deriveEffects(j: Judging, forms: readonly EffectForm[], attentio
       else others.set(item.id, changed);
       if (byRule && changed.id === byRule.id) byRule = changed;
     }
-    // Section 4.3, item 2: the entry that opens an operation opens its attempt 1. Item 1: a genesis may seal an operation as a held
-    // duty, with no attempt. Which genesis does is not built yet (I3 deltas, entry EB12), so a genesis is not asked here.
-    const first = (k: number) => effects.some((e) => e.effect === "attempt" && typeof e.operation === "object" && e.operation.k === k);
-    if (j.self !== 0 && (given as readonly RuleEffect[]).some((effect) => effect.effect === "operation" && !first(effect.k))) throw outside(mark, "an operation with no first attempt");
     return null;
+  };
+  /**
+   * Section 4.3, item 2: the entry that opens an operation opens its attempt
+   * 1. It is a property of the entry's joined effects (section 6.1, "The
+   * joined lists are checked as one"), and of no one rule's list: one mark
+   * may open the operation and a later mark its first attempt. So it is
+   * asked once, after every mark of the list has given its effects. The
+   * fault is of the rule that opened the operation.
+   */
+  const paired = (): void => {
+    for (const [k, mark] of openers) {
+      if (!effects.some((e) => e.effect === "attempt" && typeof e.operation === "object" && e.operation.k === k)) throw outside(mark, "an operation that its entry leaves with no first attempt");
+    }
   };
   /**
    * Section 6.6, `if` and `unless`: with `if`, the form is applied only when
@@ -435,6 +450,10 @@ export function deriveEffects(j: Judging, forms: readonly EffectForm[], attentio
       apply(subject, hold.effect);
     }
   }
+  // The whole-entry boundary for what the rules gave: every form of the list is derived, so every mark has joined. Section 4.3,
+  // item 1: a genesis may seal an operation as a held duty, with no attempt. Which genesis does is not built yet (I3 deltas, entry
+  // EB12), so a genesis is not asked.
+  if (j.self !== 0) paired();
   // Section 6.8: a hold ends with what it is under. These are the capability's own effects, after the written ones (section 4.1):
   // first the records of each written capability effect, then the ends.
   effects.push(...records);

@@ -461,3 +461,100 @@ test passed in that run, and `node notes/2026-10-05-07-i1-story/run.mjs`
 exits 0. The commit that adds this section changes notes only. The source and
 the tests are unchanged from the gated head: `packages` is the tree
 `8282a39a14dd4cb2d7baa51d314e5ea73f89c4fa` at both.
+
+## 12. After review b0aabc02: the repair
+
+Written 2026-10-05. The reviewer's verdict `b0aabc02`, at `a0bd0b593`, asked
+for changes: one finding, on a check that section 11's sweep added (entry
+EN5). The source bears it out. The adopted contract is revision 18 at
+`be90ff05`, and it was read before the change. The source choice is entry
+EN9 of the deltas note, section 13.
+
+**The finding: the first attempt of an operation was asked of each mark**
+(`e204d9966`, EN9). The contract says that the entry which opens an operation
+opens its attempt 1 (section 4.3, item 2), and that the checks on effects are
+made on the entry's joined list (section 6.1). The check ran at the end of
+each mark's rule. When one mark opened an operation and a later mark opened
+its first attempt, the first mark had a fault before the second was run, and
+an entry that the contract permits was not judged. No delivered rule opens an
+operation, so no scope met this.
+
+**The repair.** The question is asked once, in `deriveEffects`, after every
+form of the written list is derived, so after every mark has joined. It asks
+of each operation that a rule of the entry opened whether the joined effects
+hold its first attempt. An operation without one is a fault of the rule that
+opened it: the input is not judged and nothing is written. The checks that
+stay where each effect joins are the operation's owner, kind, ordinal and
+stated attempts, and the shape of an attempt. A genesis is still not asked
+(entry EB12). A result clause and an outcome's rule go through the same
+function.
+
+**Witness.** `derive/test/forms-marks.test.ts`, "the first attempt of an
+operation is asked of the entry's joined effects", on the made-up gate with a
+second effect mark. Two cases. One mark opens operation 0 and the next opens
+its attempt 1: the entry is written with both records. One mark opens
+operation 0 alone and the next opens operation 1 with its attempt: a fault,
+and nothing is written. The row of section 11, one mark that opens an
+operation alone, is kept.
+
+**Controls**, each by `scripts/control.mjs` on that test file. The question
+asked after each mark again: distinguishes, by the first case (expected
+`write`, got `unavailable`). The question removed: distinguishes, by the
+second case and by section 11's row. Two controls, both distinguish. They
+are not in the count of section 6, which was made before the reviews.
+
+**The sweep for this finding's family** (the deltas note, EN-sweep 3, filed
+with EN9). Every check that section 11's repairs added, and every other
+check that runs for each mark or each rule in `effects.ts`, `sends.ts`,
+`handlers.ts`, `outcomes.ts` and `marks.ts`, was read again with one
+question: does the contract state it of one rule's list, or of the entry's
+joined effects? 32 rows. One is the finding. No other row runs at the wrong
+boundary, and no other source was changed:
+
+- The checks that the contract states of the entry already read the entry:
+  the ordinal of an operation, the operation of an attempt, the one opening,
+  a fixed slot of the opened item, a list change that changes nothing, a
+  list's `max`, the conflict of two effects, the ends of holds, the required
+  slots, the type's `max`, the ordinal of a creation, `self` in a `relate`,
+  the key of a relationship, and `sendsPerEntry`. Each reads the effects of
+  every earlier mark, or runs once after all of them.
+- The checks that run for each mark are stated of one rule: its `most`, the
+  shape of each effect and request, a value's type, a hold's own slots, and
+  the answers at `grant`, `also`, a type and a guard.
+- No count of one mark lets two marks pass an entry's bound. A list's `max`
+  and the sends are counted for the entry. The effects that one entry derives
+  from rules have no bound yet (R4, request `cc570904`), as section 11 says.
+
+Four things are recorded there and not changed. The type's `max` is counted
+as the live items before the entry and one more, for a written opening too,
+so an entry that ends one item of a full type and opens another is refused:
+for the contract to say whether that is meant. A `ref` to the item that the
+entry opens is refused `bad-field` (the contract's row I3-27). A mark's own
+`most` of operation kinds and of an opened type is not built (rows I3-21 and
+I3-22). A refusal by a form later in the list is answered before the
+first-attempt question is asked, as it is before `required-unset`.
+
+**Bytes and digests.** No form of an entry, an input or an answer changes.
+Neither lane digest changes: no file of `packages/lanes` is touched. The
+folded state has no new member. One derivation changes: the entry of the
+first case above was not judged, and is now written. This rests on reading
+the one delivered rule and on the unchanged tests: no stored history was
+derived again.
+
+**Counts.** `forms-marks.test.ts` has 23 tests: the 20 of section 1, two
+from section 11 and one here. The branch differs from `origin/main`
+(`b2b62d260`) in 148 files, of which 135 are added or changed and 13 are
+deleted (`git diff --name-only origin/main...HEAD`, counted). The 144 files
+of this note's first page were counted at an earlier head.
+
+**The gate.** One run of `npm run gate`, at head `264aa406d`, tree
+`24b3b2a0d56efed9dda6ad901fb9f2d30014c084`, as printed: install skipped;
+whitespace 0.0 s elapsed; typecheck 2.7 s elapsed and 7.3 s CPU; test 9.2 s
+elapsed and 16.6 s CPU. It printed 341 tests passed in vitest and 5 in Node's
+runner. One observed run, on a shared machine with other sessions active
+(load averages 3.75, 3.64 and 4.73 just after it), with a warm package
+cache. The one test added is the 1 more than section 11 states. That head is
+the merge of `origin/main` at `b2b62d260`, which brought one plan and no
+source. The commit that adds this section changes notes only. The source and
+the tests are unchanged from the gated head: `packages` is the tree
+`9280c7deaccf9e219e2f051b516f7119472aaa64` at both.
