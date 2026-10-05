@@ -81,9 +81,12 @@ const rows: readonly (readonly [string, DeclaredDefinition, Change, ProblemCode 
   ["G3: a `when` on an effect", small, (d) => { d.acts.edit.effects[0].when = [{ state: ["draft"] }]; }, "shape"],
   ["G5: a count bound from a slot", small, (d) => { d.acts.few.guards[0].count.max = { slot: "limit" }; }, "shape"],
   ["G6: a `covers` guard", small, (d) => d.acts.edit.guards.push({ covers: { list: "notes", states: ["kept"] } }), "shape"],
-  ["G7: `follow` on a fact guard", small, (d) => { d.acts.edit.fields.proof = { type: "fact", kind: "report", under: "lane", required: false }; d.acts.edit.guards.push({ fact: { field: "proof", follow: "report" } }); }, "shape"],
+  ["G7: `follow` on a fact guard", small, (d) => { d.acts.edit.fields.proof = { type: "fact", kind: ["report"], under: "lane", required: false }; d.acts.edit.guards.push({ fact: { field: "proof", follow: "report" } }); }, "shape"],
   ["G11: an operand `sender`", small, (d) => d.acts.edit.guards.push({ equals: { a: { sender: true }, b: { const: 1 } } }), "shape"],
   ["a member the contract does not define", small, (d) => { d.imports = []; }, "shape"],
+  // Section 6.1: a definition states its name. The name of a platform definition is the platform's to give.
+  ["a declared definition that takes the name of a platform definition", small, (d) => { d.name = "platform:task"; }, "shape"],
+  ["a fact type that states no kind", small, (d) => { d.acts.edit.fields.proof = { type: "fact", kind: [], under: "lane", required: false }; }, "shape"],
 ];
 
 describe("the definition validator", () => {

@@ -266,7 +266,7 @@ describe("what a written refusal or a later clause records of what it read (sect
     l.did(rita, "offer", { fields: { intent: 0 }, expected: { intent: 1 } });
     const entry = l.did(rita, "assign", { ...on(l, 2), ...fields({ performer: una.member }) });
     const fetched = { fact: l.fact(entry.seq), entry, under: "lane" };
-    const proof = { type: "fact", kind: "assign", under: "lane", required: true };
+    const proof = { type: "fact", kind: ["assign"], under: "lane", required: true };
     const cited = variant(ticket, (def) => {
       def.acts.file.fields.proof = proof;
       def.acts.file.guards.push({ fact: { field: "proof", where: [{ equals: { a: { field: "performer" }, b: { field: "opener" } } }] } });

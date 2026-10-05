@@ -34,7 +34,7 @@ export const definition = variant(lane, (def) => {
   def.items.hold.max = 4;
   def.rules["not-self"] = "fields.performer.member != signer.member";
   def.acts.assign.guards.push({ rule: "not-self" });
-  def.acts.remark.fields.proof = { type: "fact", kind: "assign", under: "lane", required: false };
+  def.acts.remark.fields.proof = { type: "fact", kind: ["assign"], under: "lane", required: false };
 });
 const actions = Object.values(definition.declared.acts).map((a) => a.grant);
 

@@ -113,9 +113,6 @@ export function ruleInput(j: Judging): unknown {
   };
 }
 
-/** True when `kind` is the kind a `fact` type states. The validator takes one kind, written as a text; the contract's type is a list. */
-const kindIs = (stated: readonly string[] | string, kind: string): boolean => (typeof stated === "string" ? stated === kind : stated.includes(kind));
-
 /** The fields a guard names, for `ifPresent`. */
 function fieldsNamed(j: Judging, g: Guard): string[] {
   const of = (o: Operand) => ("field" in o ? [o.field] : []);
@@ -159,7 +156,7 @@ export function judgeGuard(j: Judging, g: Guard): GuardResult {
     const fetched = j.facts.get(ref.hash);
     if (!fetched) return "dependency-unavailable";
     const input = fetched.entry.input;
-    if (input.type !== "act" || !kindIs(type.kind, input.signed.intent.kind) || fetched.under !== type.under) return "fail";
+    if (input.type !== "act" || !type.kind.includes(input.signed.intent.kind) || fetched.under !== type.under) return "fail";
     // `a` is a field of the foreign intent; `b` is read in this act.
     return ok((fact.where ?? []).every((w) => "equals" in w && same("field" in w.equals.a ? (own(input.signed.intent.fields, w.equals.a.field) ?? null) : null, operand(j, w.equals.b, item))));
   }

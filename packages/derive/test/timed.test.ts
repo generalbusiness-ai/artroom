@@ -107,7 +107,7 @@ describe("the clock (section 5.3)", () => {
 describe("a name is whatever its definition chose (sections 6.1 and 17.2)", () => {
   // Parsed JSON, as a definition and an intent arrive: `__proto__` and `constructor` are own names of their records.
   const named = valid(validateDefinition(JSON.parse(`{
-    "format": "artroom-definition-1", "profile": { "name": "restricted", "version": 1 }, "capabilities": [], "genesis": "start", "receives": {}, "rules": {},
+    "format": "artroom-definition-1", "name": "constructor", "profile": { "name": "restricted", "version": 1 }, "capabilities": [], "genesis": "start", "receives": {}, "rules": {},
     "items": {
       "root": { "many": false, "max": 1, "states": { "open": { "final": false } }, "initial": "open", "parties": { "owner": { "fixed": true, "required": true, "list": false, "author": false } }, "refs": {}, "values": {} },
       "__proto__": {

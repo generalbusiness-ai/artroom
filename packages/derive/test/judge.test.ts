@@ -303,7 +303,7 @@ describe("a foreign fact (sections 5.1 and 6.5)", () => {
     const { entry, hash } = l.entries.at(-1)!;
     const proof = { at: l.at, seq: entry.seq, hash };
     // `cite` with a second fact field, later in byte order than `proof`.
-    const s = new Scope(variant(small, (def) => { def.acts.cite.fields.second = { type: "fact", kind: "assign", under: "lane", required: false }; }));
+    const s = new Scope(variant(small, (def) => { def.acts.cite.fields.second = { type: "fact", kind: ["assign"], under: "lane", required: false }; }));
     const cite = (second: typeof proof) => s.act(una, "cite", { ...on(s, 0), ...fields({ proof, second }) }, { facts: [{ fact: proof, entry, under: "lane" }] });
     expect(cite({ at: otherLane, seq: 99, hash })).toEqual({ result: "unavailable", reason: "dependency-unavailable" });
     // Two references that both pass are one reference: the entry is used once.

@@ -17,8 +17,8 @@ const FIELD_SHAPES: Readonly<Record<string, readonly string[]>> = {
 /**
  * Section 6.6: every value of `from` is a value of `to`. The two are the same
  * type, and the bounds of `from` are inside those of `to`: a text's `max`, an
- * integer's range, an enum's values, a reference's kind, a list's `max` and
- * its elements. A copy needs this; a comparison does not.
+ * integer's range, an enum's values, a reference's kind, a fact's kinds, a
+ * list's `max` and its elements. A copy needs this; a comparison does not.
  */
 export function assignable(from: FieldType, to: FieldType): boolean {
   switch (from.type) {
@@ -27,7 +27,7 @@ export function assignable(from: FieldType, to: FieldType): boolean {
     case "enum": return to.type === "enum" && from.of.every((v) => to.of.includes(v));
     case "item": return to.type === "item" && from.of === to.of;
     case "scope": return to.type === "scope" && from.kind === to.kind;
-    case "fact": return to.type === "fact" && from.kind === to.kind && from.under === to.under;
+    case "fact": return to.type === "fact" && from.kind.every((k) => to.kind.includes(k)) && from.under === to.under;
     case "list": return to.type === "list" && from.max <= to.max && assignable(from.of, to.of);
     default: return from.type === to.type;
   }
@@ -55,7 +55,9 @@ export function fieldType(d: Defining, v: unknown, path: string, extra: readonly
       if (typeof o["of"] !== "string" || !d.typeNames.has(o["of"])) bad("name", at(path, "of"), "names no item type");
       break;
     case "fact":
-      str(o["kind"], at(path, "kind"));
+      // Section 6.2: an entry of one of those kinds, under a definition of that name.
+      if (!Array.isArray(o["kind"]) || o["kind"].length === 0 || o["kind"].some((e) => typeof e !== "string" || e === "") || new Set(o["kind"]).size !== o["kind"].length) bad("shape", at(path, "kind"), "must be a list of distinct kinds");
+      else if (o["kind"].length > bounds.listElements) bad("bound", at(path, "kind"), `has ${o["kind"].length}; at most ${bounds.listElements}`);
       str(o["under"], at(path, "under"));
       break;
     case "scope":

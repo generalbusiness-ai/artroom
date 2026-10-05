@@ -72,7 +72,7 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
   const read = shapes(bounds);
   const { problems, bad, rec, entries, list, str } = read;
 
-  const top = rec(input, "", ["format", "profile", "capabilities", "genesis", "items", "acts", "receives", "timed", "rules"]);
+  const top = rec(input, "", ["format", "name", "profile", "capabilities", "genesis", "items", "acts", "receives", "timed", "rules"]);
   if (!top) return { ok: false, problems };
   // Section 6.1: the bound on a definition's canonical bytes limits the validator's work, so it is checked before anything is read.
   // A value with no canonical bytes is refused at the end, as before.
@@ -80,6 +80,9 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
   try { size = utf8(canonicalize(input)).length; } catch { /* refused below */ }
   if (size !== null && size > bounds.definitionBytes) return { ok: false, problems: [{ code: "bound", path: "", message: `has ${size} canonical bytes; at most ${bounds.definitionBytes}` }] };
   if (top["format"] !== "artroom-definition-1") bad("shape", "format", "must be artroom-definition-1");
+  // Section 6.1: a definition states its own name, which `under` is compared with. A name that begins `platform:` is the name of a
+  // platform definition, which the platform supplies in code, so no declared definition takes one.
+  if (str(top["name"], "name")?.startsWith("platform:")) bad("shape", "name", "a declared definition's name does not begin with platform:");
 
   const d: Defining = {
     ...read, bounds, typeNames: new Set(isObject(top["items"]) ? Object.keys(top["items"]) : []), types: new Map(), rules: new Set(), holds: false, holdTypes: new Set(),

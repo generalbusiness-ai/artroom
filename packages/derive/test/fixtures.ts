@@ -43,22 +43,14 @@ export const keys = { rita: actor(1, "rita"), una: actor(2, "una", "paul"), vic:
 
 // ---------------------------------------------------------------- the lane
 
-/**
- * The fixtures are in the form the validator takes today. The contract's
- * adopted type also asks for a `name`, and states a fact's kinds as a list.
- * The validator refuses both until the step of I2 that reads them, so until
- * then a fixture has no name, and states one kind as a text.
- */
-const landed = (definition: Omit<DeclaredDefinition, "name">): DeclaredDefinition => definition as DeclaredDefinition;
-const oneKind = (kind: string): readonly string[] => kind as unknown as readonly string[];
-
 const text = { type: "text", max: 200 } as const;
 const slot = { fixed: false, required: false } as const;
 const act = (a: Partial<ActType> & Pick<ActType, "step" | "on" | "grant">): ActType => ({ also: {}, fields: {}, guards: [], effects: [], sends: [], attention: [], ...a });
 const commitment = { also: { commitment: { item: "commitment", by: "commitment" } }, fields: { commitment: { type: "item", of: "commitment", required: true } } } as const;
 
-export const lane: DeclaredDefinition = landed({
+export const lane: DeclaredDefinition = {
   format: "artroom-definition-1",
+  name: "lane",
   profile: { name: "restricted", version: 1 },
   capabilities: [{ name: "hold", version: 1 }],
   genesis: "file",
@@ -143,15 +135,16 @@ export const lane: DeclaredDefinition = landed({
     "hold-end": { on: "hold", states: ["held"], deadline: "until", effects: [{ state: "ended" }, { hold: { do: "end" } }], attention: [{ notify: { slot: "holder", of: "on", when: "after", reason: "hold ended" } }] },
   },
   rules: {},
-});
+};
 
 // ---------------------------------------------------------------- the small definition
 
 const noteRange = (states: string[]) => ({ type: "note", states, where: [{ equals: { a: { slot: "text" }, b: { field: "text" } } }] });
 const probe = (guard: Guard) => act({ step: "transition", on: "note", grant: "probe", fields: { text: { ...text, required: true } }, guards: [guard] });
 
-export const small: DeclaredDefinition = landed({
+export const small: DeclaredDefinition = {
   format: "artroom-definition-1",
+  name: "small",
   profile: { name: "restricted", version: 1 },
   capabilities: [],
   genesis: "start",
@@ -181,7 +174,7 @@ export const small: DeclaredDefinition = landed({
     share: act({ step: "transition", on: "note", grant: "share", fields: { reader: { type: "member", required: true } }, guards: [{ state: ["draft"] }], effects: [{ party: { slot: "readers", from: { field: "reader" }, list: "add" } }] }),
     // Names a foreign fact: an `assign` entry of a lane, whose performer must be the signer.
     cite: act({
-      step: "transition", on: "note", grant: "edit", fields: { proof: { type: "fact", kind: oneKind("assign"), under: "lane", required: true } },
+      step: "transition", on: "note", grant: "edit", fields: { proof: { type: "fact", kind: ["assign"], under: "lane", required: true } },
       guards: [{ state: ["draft"] }, { fact: { field: "proof", where: [{ equals: { a: { field: "performer" }, b: { signer: true } } }] } }],
       effects: [{ party: { slot: "readers", from: { fact: "proof", field: "performer" }, list: "add" } }],
     }),
@@ -203,7 +196,7 @@ export const small: DeclaredDefinition = landed({
   receives: {},
   timed: {},
   rules: {},
-});
+};
 
 export function valid(v: Validation): ValidDefinition {
   if (!v.ok) throw new Error(`the fixture definition is refused: ${JSON.stringify(v.problems)}`);
@@ -229,8 +222,9 @@ export const smallDefinition = valid(validateDefinition(small, PROPOSED_BOUNDS))
  * the detail names. `ask` tells the desk to make another ticket. `approve`
  * is under a rule: its signer is not the requester.
  */
-export const ticket: DeclaredDefinition = landed({
+export const ticket: DeclaredDefinition = {
   format: "artroom-definition-1",
+  name: "ticket",
   profile: { name: "restricted", version: 1 },
   capabilities: [],
   genesis: "file",
@@ -279,7 +273,7 @@ export const ticket: DeclaredDefinition = landed({
   },
   timed: {},
   rules: { "two-eyes": "signer.member != subjects.on.parties.requester.member" },
-});
+};
 export const ticketDefinition = valid(validateDefinition(ticket, PROPOSED_BOUNDS));
 
 const makeTicket = { kind: "lane", definition: ticketDefinition.digest } as const;
@@ -290,8 +284,9 @@ const makeTicket = { kind: "lane", definition: ticketDefinition.digest } as cons
  * lane that asks. The handler for `echo` sends two updates that resolve to
  * one relationship key when its two fields name one item.
  */
-export const desk: DeclaredDefinition = landed({
+export const desk: DeclaredDefinition = {
   format: "artroom-definition-1",
+  name: "desk",
   profile: { name: "restricted", version: 1 },
   capabilities: [],
   genesis: "found",
@@ -321,7 +316,7 @@ export const desk: DeclaredDefinition = landed({
   },
   timed: {},
   rules: {},
-});
+};
 export const deskDefinition = valid(validateDefinition(desk, PROPOSED_BOUNDS));
 
 // ---------------------------------------------------------------- a scope in memory
@@ -337,7 +332,7 @@ export type Context = Partial<Omit<JudgeContext, "clock">> & { reading?: Timesta
 /**
  * One scope's history and state in memory. It does what a commit does: judge
  * at one reading, seal, hash, fold. `under` is the name a reader of this
- * scope gives its definition.
+ * scope gives its definition: the name the definition states.
  */
 export class Ledger {
   readonly state = new MemoryState();
@@ -347,7 +342,7 @@ export class Ledger {
   bounds: Bounds = PROPOSED_BOUNDS;
   #keys = 0;
 
-  constructor(readonly definition: ValidDefinition, readonly under = "ticket") {}
+  constructor(readonly definition: ValidDefinition, readonly under = definition.declared.name) {}
 
   get at() { return this.state.scope()!.at; }
   get head() { return this.state.scope()!.head; }
@@ -453,7 +448,7 @@ export class Scope extends Ledger {
 
 /** A directory founded by rita's signed intent (section 7.1): its genesis is judged, sealed and folded. */
 export function founded(): Ledger {
-  const ledger = new Ledger(deskDefinition, "desk");
+  const ledger = new Ledger(deskDefinition);
   const founding = signIntent({ v: 1, to: null, actor: keys.rita.key, kind: "found", on: null, expected: {}, fields: { source: "a repository" }, idempotencyKey: "found", notAfter: t(60) }, keys.rita.secret);
   const seed: Seed = { v: 1, kind: "directory", definition: deskDefinition.digest, creator: null, cause: intentDigest(founding.intent), ordinal: 0 };
   const context = { clock: clockOf(ledger.state, T0), bounds: PROPOSED_BOUNDS, facts: [], prepared: [], source: null };

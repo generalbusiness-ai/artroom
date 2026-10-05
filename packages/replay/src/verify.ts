@@ -463,8 +463,9 @@ class Verifier {
     for (const fact of foreign) {
       if (!isFactRef(fact)) throw mismatch("a reference is not a fact reference");
       const how = await this.#prove(fact, where, depth);
-      // The name of the definition the source pins, which a `fact` field and a handler may read, is the source's own genesis's to say.
-      const pinned = this.#runs.get(fact.at.scope)?.named;
+      // The name of the definition the source pins, which a `fact` field and a handler may read, is the source's own genesis's to say:
+      // the name that the declaration its seed names states (section 6.1). A source that was replayed has that declaration pinned.
+      const pinned = this.#runs.get(fact.at.scope)?.definition?.declared.name;
       for (const copy of facts) if (copy.fact.hash === fact.hash && how === "replayed" && copy.under !== pinned) throw mismatch(`the retained copy of entry ${fact.seq} of ${fact.at.scope} names another definition than that scope pins`);
     }
 

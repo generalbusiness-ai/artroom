@@ -48,6 +48,9 @@ describe("a history that is not consistent is reported with the right result, at
     { name: "a history that forks from the head the caller holds: sealed again, and consistent with itself",
       change: (w) => { const head = w.I.entries[2]!; rewrite(w.I, 2, (entry) => { entry.time = "2026-10-04T12:00:01Z"; }); return { head: { seq: 2, hash: head.hash } }; }, result: "mismatch", at: ["I", 2], why: /forks from the expected head/ },
     { name: "a missing retained input: the bytes of a used foreign entry", change: (w) => { w.I.retained = w.I.retained.filter((r) => r.digest !== entryOf(w.I, 1).uses[0]!.content); }, result: "incomplete", at: ["I", 1], why: /retained input is missing/ },
+    // The source scope's own definition states its name. A copy kept beside another name is not what that scope would have answered.
+    { name: "a retained copy of a used entry, kept with another definition name than its source's definition states",
+      change: (w) => { w.I.retained.find((r) => r.kind === "entry")!.under = "another"; }, result: "mismatch", at: ["I", 0], why: /names another definition than that scope pins/ },
     // The four entries read were I.0, D.0, D.1 and D.2. D.2 needed P.0, the fifth. Only D.0 and D.1 were checked to their end:
     // I.0 waits on D.4 and D.2 on P.0, and an entry is not covered until every fact it used is shown.
     // The runtime seals no entry over the entry size bound, so a history with one was not written under these bounds, though it derives.

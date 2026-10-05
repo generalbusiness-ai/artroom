@@ -45,7 +45,7 @@ function served(ledger: Ledger, all: readonly Ledger[]): MemoryScope {
   for (const { entry } of ledger.entries) {
     for (const use of entry.uses) {
       const owner = all.find((other) => other.at.scope === use.fact.at.scope)!;
-      retained.push({ kind: "entry", digest: use.content, bytes: canonicalize(owner.entries[use.fact.seq]!.entry), under: owner.definition.digest });
+      retained.push({ kind: "entry", digest: use.content, bytes: canonicalize(owner.entries[use.fact.seq]!.entry), under: owner.definition.declared.name });
     }
   }
   return { scope: ledger.at, entries: ledger.entries.map(({ entry, hash }) => ({ seq: entry.seq, hash, bytes: canonicalize(entry) })), retained };

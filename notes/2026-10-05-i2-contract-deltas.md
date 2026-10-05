@@ -25,8 +25,8 @@ Written 2026-10-05 with the plan. None is implemented by steps 1 to 3.
 | D1 | The effect record of a party list that is set whole (row 35). The `Effect` list of section 4.1 has `list` records for one member each. | Nothing yet. It is step 5's. The plan's question Q4 asks the contract's owner. | The form is in section 6.6 and its record is not in section 4.1. |
 | D2 | How detached texts and presented facts travel beside an intent, and beside a message (rows 7 and 13). | Nothing yet. It is step 9's. | Section 15.6e, entry 111, leaves the routes to the source. |
 | D3 | What a runtime does with a capability form that it cannot derive (rows 4, 31 and 44). | Nothing yet. It is step 11's, and waits for the plan's question Q1. Until then the validator refuses each capability form, and `git-read@1` in the list. | Section 6.1 gives `unsupported-definition` for a version that a runtime does not implement. It does not say whether a test may script one. |
-| D4 | Rows 8 and 9, the kinds of an entry, are adopted in section 6.2 and have no row in the source map of section 11.8. | Reported. Step 3 implements them, and its section of this note says how. | The source map is the contract's owner's to correct. |
-| D5 | Whether a declared definition may state a name that begins `platform:`. | Nothing yet. Step 3 lets a definition state its name, and its section of this note says what it does with such a name. | The plan's question Q5. |
+| D4 | Rows 8 and 9, the kinds of an entry, are adopted in section 6.2 and have no row in the source map of section 11.8. | Reported. Step 3 implements them: entries D16 and D21. | The source map is the contract's owner's to correct. |
+| D5 | Whether a declared definition may state a name that begins `platform:`. | Step 3 refuses it: entry D14. | The plan's question Q5. |
 | D6 | What `settles` reserves in entries, for each form (row 20). | Nothing yet. It is step 10's. | Section 17.2 states the rule and no count for each form. |
 
 ## 2. Step 1: the contract's types, the capability tables and the bounds
@@ -46,3 +46,16 @@ Written 2026-10-05.
 
 Written 2026-10-05. This step moves source and changes no behaviour, so it
 makes no choice that the contract leaves open. It has no entry.
+
+## 4. Step 3: the base forms every family reads
+
+Written 2026-10-05.
+
+### A definition's name, and a fact's kinds
+
+| # | Where the contract is silent | Implemented | Why |
+|---|---|---|---|
+| D13 | Section 6.1 gives a definition a `name` and no form for it. Section 4.1 says a bound on its length is needed and is owed (point R1-37). | A non-empty text. The validator requires it. No bound of its own: the bound on a definition's bytes is all that limits it. | No number is proposed, and inventing one here would be a bound nobody owns. The name is not in an entry yet (entry D15), so no static entry size reads it. |
+| D14 | Whether a declared definition may state a name that begins `platform:` (the plan's question Q5). | The validator refuses it. | Section 6.1 gives that prefix to platform definitions, whose code is the platform's. A declared definition under such a name could be taken for one by a `fact` type or a handler's `from`. It fails closed until the owner answers. |
+| D15 | Section 6.1 says `under` is compared with the name of the definition that the source scope pins. It does not say what a scope answers when it cannot read its own declaration, or what replay compares. | A scope answers a read of one of its entries with the name its pinned declaration states, or for a platform definition the platform name without its version (`platformName`, in bytes). A scope that pins a declaration it cannot read gives no answer: the call fails, so the reader's entry cannot be read now. Replay compares the name kept beside a retained copy with the name that the source scope's own pinned declaration states. This changes I1's delta 100, as section 11.8 asks. The name is still kept beside the retained copy and not inside `FactUse`: that row of section 11.9 is I1's and is not built here. | A digest was the name before, so no definition could name a fact of its own kind. A scope that guessed a name it cannot read would let a judgment rest on it. |
+| D16 | Section 6.2 makes a fact's `kind` a list and states no bound on it. | A list of distinct, non-empty kinds, with at least one and at most the bound on a list's elements, 32. A text is no longer taken: the fixtures and tests moved. A fact may be copied into a slot when each of its kinds is one of the slot's and the two name one definition. | Row 8. A type with no kind would name no entry. Section 6.6 calls a reference's kind a bound, and a list inside a list is how a bound is inside a bound. |

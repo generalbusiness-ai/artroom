@@ -16,7 +16,7 @@
  */
 
 import type { Digest, Entry, RoutingRefusal, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
-import { parseStrict, scopeIdOf } from "@generalbusiness/artroom-bytes";
+import { isPlatformDefinition, parseStrict, platformName, scopeIdOf } from "@generalbusiness/artroom-bytes";
 import { isObject, isScopeRef, type Delivered, type ScopeState } from "@generalbusiness/artroom-derive";
 import type { Pinned } from "./core.ts";
 import type { Definitions, Delivery, Resolver, Transport } from "./ports.ts";
@@ -71,11 +71,28 @@ export function routed(name: ScopeId | null, scope: ScopeState | null, delivered
   return scope || (isObject(message) && message["class"] === "request" && message["type"] === "create") ? null : "not-found";
 }
 
-/** One entry of this scope as another scope reads it, with the name of the definition this scope pins: its digest, or its platform name. */
+/**
+ * The name of the definition a scope pins, which a `fact` type's `under` and
+ * a handler's `from.under` are compared with (section 6.1): the name a
+ * declared definition states, or a platform definition's name without its
+ * version. Null: the scope pins a declaration that it cannot read now, so
+ * it cannot say.
+ */
+export function nameUnder(pinned: Pinned): string | null {
+  return isPlatformDefinition(pinned.named) ? platformName(pinned.named) : (pinned.definition?.declared.name ?? null);
+}
+
+/**
+ * One entry of this scope as another scope reads it, with the name of the
+ * definition this scope pins. A scope that cannot state that name gives no
+ * answer: the call fails, and the reader's entry cannot be read now.
+ */
 export function sourced(store: Store, pinned: Pinned | null, seq: number): Sourced | null {
   const scope = store.scope();
   if (!scope || !pinned) return null;
-  return { at: scope.at, under: pinned.named, bytes: (Number.isSafeInteger(seq) ? store.stored(seq) : null)?.bytes ?? null };
+  const under = nameUnder(pinned);
+  if (under === null) throw new Error("the pinned definition cannot be read, so its name cannot be stated");
+  return { at: scope.at, under, bytes: (Number.isSafeInteger(seq) ? store.stored(seq) : null)?.bytes ?? null };
 }
 
 /**
