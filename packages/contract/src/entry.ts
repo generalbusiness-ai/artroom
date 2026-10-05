@@ -52,6 +52,7 @@ export type Input =
       finding: "undelivered" | "delivery-unavailable";
       attempts: readonly Attempt[] }            // section 7.4
   | { type: "timed"; item: number; rule: string; due: Timestamp }
+  | PreparationInput
   | { type: "outcome"; operation: OperationId; attempt: number;
       result: "confirmed" | "refused" | "unknown"; evidence: Evidence }   // section 4.3
   | { type: "checkpoint"; through: number; state: Digest };
@@ -59,9 +60,8 @@ export type Input =
 /**
  * A preparation entry (section 4.1; 5.5): the signed intent that asks for a
  * capability's step, the one grant judged, the capability and the step. It is
- * not yet a member of `Input`: a replay's switch over the input's type
- * (`replay/src/verify.ts`) has no case for it, and the step that adds one
- * joins this type to `Input` (I3 deltas, entry E5).
+ * a member of `Input`. Until I3 step 16a, nothing writes, folds or derives it
+ * (I3 deltas, entry E5).
  */
 export interface PreparationInput {
   type: "preparation";

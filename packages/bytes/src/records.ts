@@ -149,6 +149,9 @@ export const isPrepared = (v: unknown): v is Prepared => prepared(v);
 const send = record({ n: isLocalId, to: (v) => scopeRef(v) || seed(v), message });
 export const isSend = (v: unknown): v is Send => send(v);
 
+/** A capability's name and version, of the one form `name@version`. */
+const capabilityName: Check = (v) => typeof v === "string" && /^(hold|git-read)@(0|[1-9][0-9]*)$/.test(v);
+
 const effect = variant("effect", {
   open: record({ effect: any, item: isLocalId, type: text, state: text }),
   state: record({ effect: any, item: isLocalId, state: text }),
@@ -160,7 +163,7 @@ const effect = variant("effect", {
   redact: record({ effect: any, item: isLocalId, slot: text, texts: listOf(isDigest) }),
   relation: record({ effect: any, owner: scopeRef, item: isLocalId, name: text, state: text, revision: isLocalId }),
   // A capability's record: its name and version are of the one form `name@version`. What its key and its values hold is the capability's to say.
-  record: record({ effect: any, capability: (v) => typeof v === "string" && /^(hold|git-read)@(0|[1-9][0-9]*)$/.test(v), kind: text, key: listOf(isFieldValue), state: text, values: isRecord }),
+  record: record({ effect: any, capability: capabilityName, kind: text, key: listOf(isFieldValue), state: text, values: isRecord }),
   activate: record({ effect: any }),
   operation: record({ effect: any, operation: isOperationId, attempt: isLocalId }),
   index: record({ effect: any, from: factRef, fields: isRecord }),
@@ -186,6 +189,8 @@ const input = variant("type", {
     return among(CLASS)(of) && deliveryOf[of](v);
   },
   diagnosis: record({ type: any, of: record({ seq: isLocalId, n: isLocalId }), finding: among(FINDING), attempts: listOf(attempt) }),
+  // Section 4.1 and 5.5: the signed intent, the one grant judged, the capability and its step. Depth is bounded as for an act.
+  preparation: record({ type: any, signed: signedIntent, authority: listOf(grant), capability: capabilityName, step: text }),
   timed: record({ type: any, item: isLocalId, rule: text, due: isTime }),
   outcome: record({ type: any, operation: isOperationId, attempt: isLocalId, result: among({ confirmed: true, refused: true, unknown: true }), evidence: any }),
   checkpoint: record({ type: any, through: isLocalId, state: isDigest }),

@@ -80,6 +80,11 @@ describe("a detached text whose bytes are gone (section 9.3)", () => {
 const altered = (w: World) => rewrite(w.I, 2, (entry) => { entry.effects[0].state = "removed"; });
 
 describe("a history that is not consistent is reported with the right result, at the entry that shows it", () => {
+  // A preparation input made from the signed intent and grant of the first act in the world's histories, with no step.
+  const preparing = (w: World) => {
+    const act = [w.D, w.P, w.I].flatMap((h) => h.entries.map((_, seq) => entryOf(h, seq).input)).find((i) => i.type === "act")!;
+    return { type: "preparation", signed: act.signed, authority: act.authority, capability: "hold@1" } as Record<string, unknown>;
+  };
   const cases: { name: string; change: (w: World) => Partial<Options> | void; result: Report["result"]; at?: ["D" | "P" | "I", number]; why: RegExp; covered?: ["D" | "P" | "I", number][] }[] = [
     { name: "a changed byte in an entry: its bytes no longer hash to its hash",
       change: (w) => { w.I.entries[1]!.bytes = w.I.entries[1]!.bytes.replace('"clamped":false', '"clamped":true'); }, result: "mismatch", at: ["I", 1], why: /do not hash/ },
@@ -93,6 +98,11 @@ describe("a history that is not consistent is reported with the right result, at
       change: (w) => { rewrite(w.I, 0, (entry) => { entry.input.kind = "link"; }); return { scope: w.P.scope.scope }; }, result: "mismatch", at: ["I", 0], why: /^genesis-kind: / },
     // The member is always present, and is never the empty text (section 4.1). Without it, the bytes are no entry of the contract.
     { name: "a genesis whose kind is the empty text: its bytes are not an entry", change: (w) => rewrite(w.I, 0, (entry) => { entry.input.kind = ""; }), result: "mismatch", at: ["I", 0], why: /bytes are not an entry/ },
+    // Section 9.3: the preparation entry has rules that this verifier lacks (I3 step 16a), so it says so and never reports `consistent`. The same entry without its step is no entry.
+    { name: "a well-formed preparation entry in a history, for a verifier with no preparation rules: `unsupported-definition`, at that entry",
+      change: (w) => rewrite(w.I, 2, (entry) => { entry.input = { ...preparing(w), step: "check" }; }), result: "unsupported-definition", at: ["I", 2], why: /a preparation, and this replay has no rules/ },
+    { name: "a preparation entry with no step: its bytes are not an entry",
+      change: (w) => rewrite(w.I, 2, (entry) => { entry.input = preparing(w); }), result: "mismatch", at: ["I", 2], why: /bytes are not an entry/ },
     // I.0 used D.4, and D.2, on the way to it, used P.0: the entry named is the one that used the history that cannot be read.
     { name: "a source history that cannot be read", change: (w) => { w.P.entries.length = 0; }, result: "missing-dependency", at: ["D", 2], why: /cannot be read, and no anchor/ },
     { name: "a wrong incarnation in a reference: the source scope's genesis minted another",

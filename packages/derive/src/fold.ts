@@ -174,6 +174,8 @@ export function applyEntry(writer: StateWriter, definition: ValidDefinition, ent
   }
 
   // Bookkeeping that the input implies.
+  // A preparation is judged by no code yet (I3 step 16a, delta E5): the fold refuses a history that holds one, as for any entry it cannot derive.
+  if (input.type === "preparation") throw new FoldError(`entry ${entry.seq} is a preparation, and this fold has no rules for one`);
   if (input.type === "genesis") {
     // Section 7.2: a repeat of the creation request is answered from the genesis, as a repeat of any delivery is from its entry.
     if (input.source && input.n !== null) writer.putDecided(input.source, input.n, entry.seq);

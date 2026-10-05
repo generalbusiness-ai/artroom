@@ -629,6 +629,11 @@ class Verifier {
       case "timed":
         judged = judgeTimed(state, definition, { item: input.item, rule: input.rule, due: input.due }, { clock, bounds });
         break;
+      case "preparation":
+        // Section 9.3 gives the preparation entry its rules, and I3 step 16a has not built them here. A verifier that does not
+        // derive a capability form answers `unsupported-definition` (sections 6.1 and 9.3, "A capability guard or effect").
+        // The contract does not name this entry for a verifier without preparation rules: recorded as I3 delta E13.
+        throw new Stop("unsupported-definition", `entry ${entry.seq} is a preparation, and this replay has no rules for one`, where);
       case "outcome":
         this.#trusts.add("outcomes");
         judged = judgeOutcome(state, definition, input, { clock, bounds });
