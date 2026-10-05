@@ -1,0 +1,29 @@
+{
+  "name": "@generalbusiness/artroom-scope",
+  "version": "0.1.0-dev.1",
+  "description": "Artroom's scope runtime for one scope: storage, the commit protocol, the outbox table and reads, as a Cloudflare Durable Object with SQLite storage.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./testing": "./src/testing.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json",
+    "test": "vitest run --config vitest.config.ts"
+  },
+  "dependencies": {
+    "@generalbusiness/artroom-bytes": "0.1.0-dev.1",
+    "@generalbusiness/artroom-contract": "0.1.0-dev.1",
+    "@generalbusiness/artroom-derive": "0.1.0-dev.1"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "0.22.0",
+    "@cloudflare/workers-types": "5.20260815.1",
+    "vitest": "4.1.11"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

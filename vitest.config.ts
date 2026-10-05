@@ -14,6 +14,7 @@ export default defineConfig({
     projects: [
       project("bytes", "bytes", "vitest.config.ts"),
       project("derive", "derive", "vitest.config.ts"),
+      project("scope", "scope", "vitest.config.ts"),
     ],
   },
 });
