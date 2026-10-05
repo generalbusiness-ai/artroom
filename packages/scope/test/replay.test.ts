@@ -1,10 +1,9 @@
-import { SELF } from "cloudflare:test";
 import { describe, expect, test } from "vitest";
 import type { Entry } from "@generalbusiness/artroom-contract";
 import { TRUSTS, httpSource, verify } from "@generalbusiness/artroom-replay";
 import type { Checkpointed } from "../src/index.ts";
 import { HOLD, definition } from "./support.ts";
-import { Node, desk, founding, later, net, rita, settle, ticket, una } from "./net.ts";
+import { Node, desk, founding, later, net, rita, routed, settle, ticket, una } from "./net.ts";
 
 /**
  * Replay agrees with the runtime. Each history below was written by real
@@ -13,7 +12,7 @@ import { Node, desk, founding, later, net, rita, settle, ticket, una } from "./n
  * derives every entry again with derive's judges. It shares no code with
  * the runtime but those judges and the fold.
  */
-const source = httpSource("https://scopes.test", { fetch: (url, init) => SELF.fetch(url, init) });
+const source = httpSource("https://scopes.test", { fetch: routed });
 const kinds = (entries: readonly Entry[]) => entries.map((e) => (e.input.type === "delivery" ? e.input.message.class : e.input.type));
 
 describe("replay of histories the runtime wrote, read through the Worker's read routes (sections 9.3 to 9.5)", () => {

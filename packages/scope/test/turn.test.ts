@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import { PROPOSED_BOUNDS, type Receipt } from "@generalbusiness/artroom-contract";
 import { MemoryState, applyEntry, stateDigest, timeMs } from "@generalbusiness/artroom-derive";
 import { variant } from "@generalbusiness/artroom-derive/testing";
@@ -97,13 +97,31 @@ describe("the budget of timed attempts, here 2 for a turn (section 5.2, step 7)"
     expect(await s.submit(remark)).toMatchObject({ answer: "accepted", receipt: { fact: { seq: head.seq + 2 } } });
   });
 
-  test("preparation has a time limit, here 10 milliseconds: an act whose rule is not evaluated in time is answered unavailable and writes nothing", async () => {
-    const s = await found({ preparationSeconds: 0.01 });
-    const commitment = (await s.did(rita, "offer", { fields: { intent: 0 }, expected: { intent: 1 } })).fact.seq;
-    const head = await s.head();
-    s.c.gate.hold();
-    expect([await s.act(rita, "assign", { on: commitment, expected: { on: 1 }, fields: { performer: una.member } }), await s.head()]).toEqual([{ answer: "unavailable", reason: "unavailable" }, head]);
-    s.c.gate.release();
+  test("preparation has a time limit, here 10 milliseconds: an act whose rule is not evaluated in time is answered unavailable and writes nothing; one that is evaluated in time is accepted", async () => {
+    // The limit is the turn's own timer, driven by fake timers: the test says when the 10 milliseconds have passed, and nothing waits on the clock.
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      const s = await found({ preparationSeconds: 0.01 });
+      const commitment = (await s.did(rita, "offer", { fields: { intent: 0 }, expected: { intent: 1 } })).fact.seq;
+      const head = await s.head();
+      const assign = (to: typeof una) => s.act(rita, "assign", { on: commitment, expected: { on: 1 }, fields: { performer: to.member } });
+      // The rule is held at the gate and the limit passes: the act is answered unavailable.
+      s.c.gate.hold();
+      const late = assign(una);
+      await s.c.gate.held();
+      await vi.advanceTimersByTimeAsync(10);
+      expect([await late, await s.head()]).toEqual([{ answer: "unavailable", reason: "unavailable" }, head]);
+      s.c.gate.release();
+      // The rule is held, and released before the limit passes: the act is not cut off.
+      s.c.gate.hold();
+      const inTime = assign(una);
+      await s.c.gate.held();
+      await vi.advanceTimersByTimeAsync(5);
+      s.c.gate.release();
+      expect(await inTime).toMatchObject({ answer: "accepted" });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   test("an alarm's turn has the same budget: it writes 2 of 3, leaves the third due and sets the alarm again; the next alarm writes it", async () => {

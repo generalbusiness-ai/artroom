@@ -29,7 +29,7 @@ import { MemoryState, alsoItems, applyEntry, isFactRef, timeMs, timeOf, validate
 import { grantOf, keys, type Actor } from "@generalbusiness/artroom-derive/testing";
 import type { Checkpointed, Delivery } from "@generalbusiness/artroom-scope";
 import { net, type CapabilityScript } from "@generalbusiness/artroom-scope/testing";
-import { api } from "@generalbusiness/artroom-scope/worker";
+import { api, route } from "@generalbusiness/artroom-scope/worker";
 import { DIGESTS, change, definitions, issue } from "../../src/index.ts";
 
 export { net };
@@ -54,6 +54,8 @@ export const reader = "a test reader";
  */
 export const transport: Transport = api(env.NET);
 export const http = httpTransport("https://scopes.test", { fetch: (url, init) => SELF.fetch(url, init) });
+/** The Worker's routes called in the test's isolate, for a verifier that reads the history over HTTP: the same `route` the Worker runs, without the pool's entrypoint. */
+export const routed = (url: string, init?: RequestInit): Promise<Response> => route(new Request(url, init), env.NET);
 
 /** `seconds` after the shared clock's `now`. */
 export const soon = (seconds: number) => timeOf(timeMs(net.clock.now)! + seconds * 1000);

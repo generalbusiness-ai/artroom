@@ -1,4 +1,4 @@
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import { LATE, MAX_DEPTH, isFieldValue, publicKeyOf, takeBytes, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import { ScopeHandle, TransportError, bindingTransport, found, httpTransport, signedIntent, webCryptoSigner, type ServiceBinding, type Transport } from "../src/index.ts";
@@ -41,9 +41,15 @@ test("a reply is an outcome only when it is an answer of its operation: a discri
   for (const answer of answers) expect(await submit(answer)).toEqual(answer);
   expect(await settle({ ok: true, at: { seq: 1, hash: d }, value: receipt, complete: true })).toMatchObject({ ok: true, value: receipt });
   expect(await settle({ ok: false, reason: "not-found" })).toEqual({ ok: false, reason: "not-found" });
+  // What each transport adds to the guard: over HTTP a body that is no JSON or no UTF-8 text, and a fetch that fails; over a binding a call that fails.
+  const bytesOf = (bytes: number[]) => httpTransport("https://scopes.test", { fetch: () => Promise.resolve({ status: 200, body: new Response(new Uint8Array(bytes)).body }) }).submit(fact.at.scope, {} as never, []);
+  await expect(bytesOf([...new TextEncoder().encode("not json")])).rejects.toThrow(/is not an answer of submit/);
+  await expect(bytesOf([0x7b, 0xff, 0x7d])).rejects.toThrow(/is not an answer of submit/);
+  await expect(httpTransport("https://scopes.test", { fetch: () => Promise.reject(new Error("refused")) }).submit(fact.at.scope, {} as never, [])).rejects.toThrow(/^no reply: refused\. The outcome of the submitted intent is unknown/);
+  await expect(bindingTransport({ submit: () => Promise.reject(new Error("gone")) } as unknown as ServiceBinding).submit(fact.at.scope, {} as never, [])).rejects.toThrow("no reply: gone");
 });
 
-test("on both transports, each operation of the handle returns a reply only when it has every member the contract requires of that operation's result; with one member missing or of another kind it is a TransportError", async () => {
+test("each operation of the handle returns a reply only when it has every member the contract requires of that operation's result; with one member missing or of another kind it is a TransportError", async () => {
   const d = `sha256:${"a".repeat(64)}`;
   const scope = { scope: `sc_${"a".repeat(52)}`, inc: `in_${"a".repeat(26)}`, kind: "lane" };
   const head = { seq: 1, hash: d };
@@ -95,27 +101,21 @@ test("on both transports, each operation of the handle returns a reply only when
       [read(duty), read({ ...duty, acknowledged: fact, result: { seq: 2, clause: "applied" }, diagnosis: { seq: 3, finding: "undelivered" } }), refused],
       [...each(duty).map((v) => read(v)), read({ ...duty, class: "letter" }), read({ ...duty, result: { seq: 2 } }), read({ ...duty, diagnosis: { seq: 3, finding: "lost" } }), read({ ...duty, attempts: [{ at: entry.time }] })]],
   ];
-  const transports: [string, (reply: unknown) => Transport][] = [
-    ["HTTP", (reply) => httpTransport("https://scopes.test", { fetch: () => Promise.resolve({ status: 200, body: new Response(JSON.stringify(reply)).body }) })],
-    ["a service binding", (reply) => bindingTransport(new Proxy({}, { get: () => () => Promise.resolve(reply) }) as ServiceBinding)],
-  ];
-  let checked = 0;
-  for (const [over, transport] of transports) for (const [name, call, good, bad] of rows) {
-    for (const reply of good) expect(await call(transport(reply)), `${name} over ${over}`).toEqual(reply);
-    for (const reply of bad) await expect(call(transport(reply)), `${name} over ${over}: ${JSON.stringify(reply)}`).rejects.toThrow(TransportError);
-    checked += good.length + bad.length;
+  // The guard is one function, `ANSWERS`, and both transports call it. So the table is run once, through the service binding, which hands a reply over as it is.
+  // What belongs to the HTTP transport (its bytes, its deadline) is in the tests below.
+  const binding = (reply: unknown) => bindingTransport(new Proxy({}, { get: () => () => Promise.resolve(reply) }) as ServiceBinding);
+  for (const [name, call, good, bad] of rows) {
+    for (const reply of good) expect(await call(binding(reply)), name).toEqual(reply);
+    for (const reply of bad) await expect(call(binding(reply)), `${name}: ${JSON.stringify(reply)}`).rejects.toThrow(TransportError);
   }
-  // The same rows on each transport: none is skipped by a table that came out empty.
-  expect(checked).toBe(2 * rows.reduce((n, [, , good, bad]) => n + good.length + bad.length, 0));
+  // No row is an empty table.
   expect(rows.every(([, , good, bad]) => good.length > 0 && bad.length > 0)).toBe(true);
 
   // Following a receipt reads the entry it names, so a reply that is no entry is no outcome of it either; a refusal the contract names is.
-  for (const [, transport] of transports) {
-    await expect(handle(transport(read({ entry: less(entry, "at"), hash: d }))).followReceipt(receipt as never)).rejects.toThrow(TransportError);
-    expect(await handle(transport({ ok: false, reason: "forbidden" })).followReceipt(receipt as never)).toEqual({ ok: false, reason: "forbidden" });
-    // An entry of the right shape and other bytes is the handle's own finding, not the transport's.
-    expect(await handle(transport(read(sealed))).followReceipt(receipt as never)).toEqual({ ok: false, reason: "hash-mismatch" });
-  }
+  await expect(handle(binding(read({ entry: less(entry, "at"), hash: d }))).followReceipt(receipt as never)).rejects.toThrow(TransportError);
+  expect(await handle(binding({ ok: false, reason: "forbidden" })).followReceipt(receipt as never)).toEqual({ ok: false, reason: "forbidden" });
+  // An entry of the right shape and other bytes is the handle's own finding, not the transport's.
+  expect(await handle(binding(read(sealed))).followReceipt(receipt as never)).toEqual({ ok: false, reason: "hash-mismatch" });
 });
 
 test("the intent that is signed is a detached copy: what the caller changes while the signer works, or afterwards, is not in the returned intent, which still verifies", async () => {
@@ -159,62 +159,102 @@ test("a reply nested far deeper than any value can be is no answer on either tra
   expect(disposed).toBe(11);
 });
 
-test("a reply over HTTP is taken in as raw bytes only as far as the limit, and within a deadline; past either the outcome of a submitted intent is unknown, and the error says so", async () => {
-  const unknown = /The outcome of the submitted intent is unknown: it may have been recorded\. The same signed intent may be sent again\.$/;
+/** A body with no end: each read answers 1 KiB at once. `sent` counts what was asked for. */
+const endlessOf = (sent: { bytes: number }) => () => Promise.resolve({ status: 200, body: new ReadableStream<Uint8Array>({ pull(c) { sent.bytes += 1024; c.enqueue(new Uint8Array(1024).fill(32)); } }, { highWaterMark: 0 }) });
+const unknown = /The outcome of the submitted intent is unknown: it may have been recorded\. The same signed intent may be sent again\.$/;
+
+test("a reply over HTTP is taken in as raw bytes only as far as the limit; past it the outcome of a submitted intent is unknown, and the error says so, while a read that failed says it changed nothing", async () => {
   // A body with no end: it is cancelled at the chunk that passes the limit, and nothing of it is parsed or kept.
-  let sent = 0;
-  const endless = () => Promise.resolve({ status: 200, body: new ReadableStream<Uint8Array>({ pull(c) { sent += 1024; c.enqueue(new Uint8Array(1024).fill(32)); } }, { highWaterMark: 0 }) });
-  const over = await httpTransport("https://scopes.test", { fetch: endless, bytes: 4096 }).submit("sc_a", {} as never, []).catch((error: unknown) => error);
-  expect([over instanceof TransportError, sent]).toEqual([true, 5120]);
+  const sent = { bytes: 0 };
+  const over = await httpTransport("https://scopes.test", { fetch: endlessOf(sent), bytes: 4096 }).submit("sc_a", {} as never, []).catch((error: unknown) => error);
+  expect([over instanceof TransportError, sent.bytes]).toEqual([true, 5120]);
   expect((over as Error).message).toMatch(/^the reply, status 200, is longer than 4096 bytes and was not read\. /);
   expect((over as Error).message).toMatch(unknown);
-  // A reply whose body starts and never ends, and a service that never answers: each is given up at the deadline, here 10 milliseconds, and the request is aborted.
-  const aborted: boolean[] = [];
-  const stalled = (_url: string, init?: { signal?: AbortSignal }) => { init!.signal!.addEventListener("abort", () => aborted.push(true)); return Promise.resolve({ status: 200, body: new ReadableStream<Uint8Array>({ start(c) { c.enqueue(new Uint8Array(1)); } }) }); };
-  const silent = (_url: string, init?: { signal?: AbortSignal }) => { init!.signal!.addEventListener("abort", () => aborted.push(true)); return new Promise<never>(() => undefined); };
-  for (const fetch of [stalled, silent]) {
-    const late = await httpTransport("https://scopes.test", { fetch: fetch as never, seconds: 0.01 }).submit("sc_a", {} as never, []).catch((error: unknown) => error);
-    expect(late).toBeInstanceOf(TransportError);
-    expect((late as Error).message).toMatch(/^no whole reply within 0\.01 seconds; the request was aborted\. /);
-    expect((late as Error).message).toMatch(unknown);
-  }
-  expect(aborted).toEqual([true, true]);
+  await expect(httpTransport("https://scopes.test", { fetch: endlessOf(sent), bytes: 4096 }).summary("sc_a", null)).rejects.toThrow(/was not read\. Nothing was read; the read may be made again\.$/);
+});
 
-  // A fetch that ignores the abort signal, as the `Fetch` type allows. What the reader owns still stops at the deadline.
-  const pause = (ms: number) => new Promise<void>((resolve) => { setTimeout(resolve, ms); });
+// The deadline is driven with fake timers: nothing here waits on the clock. A test advances the exchange's deadline by hand, and resolves each pending response or read itself.
+test("a reply over HTTP has a deadline: at expiry the request is aborted and the outcome of a submitted intent is unknown; no read starts after it, nothing a late response or read answers is taken, and the empty chunks of a body do not keep the deadline from running", async () => {
+  vi.useFakeTimers();
+  try {
+    const submit = (fetch: unknown) => httpTransport("https://scopes.test", { fetch: fetch as never, seconds: 0.01 }).submit("sc_a", {} as never, []).catch((error: unknown) => error);
+    /** Let the deadline of 0.01 seconds pass, and say what the call came to. */
+    const expire = async (call: Promise<unknown>) => { await vi.advanceTimersByTimeAsync(10); return call; };
+    /** Let every pending promise run, with no time passing. */
+    const settle = () => vi.advanceTimersByTimeAsync(0);
+    const expired = (error: unknown) => {
+      expect(error).toBeInstanceOf(TransportError);
+      expect((error as Error).message).toMatch(/^no whole reply within 0\.01 seconds; the request was aborted\. /);
+      expect((error as Error).message).toMatch(unknown);
+    };
+
+    // A reply whose body starts and never ends, and a service that never answers: each is given up at the deadline, and the request is aborted.
+    const aborted: boolean[] = [];
+    const stalled = (_url: string, init?: { signal?: AbortSignal }) => { init!.signal!.addEventListener("abort", () => aborted.push(true)); return Promise.resolve({ status: 200, body: new ReadableStream<Uint8Array>({ start(c) { c.enqueue(new Uint8Array(1)); } }) }); };
+    const silent = (_url: string, init?: { signal?: AbortSignal }) => { init!.signal!.addEventListener("abort", () => aborted.push(true)); return new Promise<never>(() => undefined); };
+    for (const fetch of [stalled, silent]) expired(await expire(submit(fetch)));
+    expect(aborted).toEqual([true, true]);
+
+    // A fetch that ignores the abort signal, as the `Fetch` type allows. What the reader owns still stops at the deadline.
+    const busy = new TextEncoder().encode(JSON.stringify({ answer: "unavailable", reason: "busy" }));
+    type Chunk = { done: boolean; value?: Uint8Array };
+    const count = { reads: 0, cancels: 0 };
+    const bodyOf = (read: () => Promise<Chunk>) => ({ getReader: () => ({ read: () => { count.reads++; return read(); }, cancel: () => { count.cancels++; return new Promise<never>(() => undefined); } }) });
+    const lateOf = async (fetch: () => Promise<{ status: number; body: ReturnType<typeof bodyOf> }>) => {
+      Object.assign(count, { reads: 0, cancels: 0 });
+      expired(await expire(submit(fetch)));
+    };
+    // A read that is pending at the deadline and answers afterwards with a whole, small answer: the answer is not taken, no other read follows, and the body was asked to cancel, with no wait for a cancellation that never answers.
+    let answer = (_chunk: Chunk): void => undefined;
+    await lateOf(() => Promise.resolve({ status: 200, body: bodyOf(() => new Promise<Chunk>((resolve) => { answer = resolve; })) }));
+    answer({ done: false, value: busy });
+    await settle();
+    expect(count).toEqual({ reads: 1, cancels: 1 });
+    // A response that arrives after the deadline: no read of its body is started.
+    let arrive = (_response: { status: number; body: ReturnType<typeof bodyOf> }): void => undefined;
+    await lateOf(() => new Promise((resolve) => { arrive = resolve; }));
+    arrive({ status: 200, body: bodyOf(() => Promise.resolve({ done: false, value: busy })) });
+    await settle();
+    expect(count).toEqual({ reads: 0, cancels: 1 });
+    // A body of empty chunks, each answered at once. None uses the byte limit, so the deadline ends the read, which it can only do if each empty chunk gives the timer queue a turn. The body ends itself far later, so that a reader which spun on it would come back with a body, not with a hang.
+    await lateOf(() => Promise.resolve({ status: 200, body: bodyOf(() => Promise.resolve(count.reads > 10_000 ? { done: true } : { done: false, value: new Uint8Array(0) })) }));
+    const reads = count.reads;
+    await vi.advanceTimersByTimeAsync(10);
+    expect([reads > 1, count.reads, count.cancels]).toEqual([true, reads, 1]);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+test("the bounded reader gives back nothing after its exchange expires, whatever a read answers; and an empty chunk between others is passed over", async () => {
   const busy = new TextEncoder().encode(JSON.stringify({ answer: "unavailable", reason: "busy" }));
   type Chunk = { done: boolean; value?: Uint8Array };
-  const count = { reads: 0, cancels: 0 };
-  const bodyOf = (read: () => Promise<Chunk>) => ({ getReader: () => ({ read: () => { count.reads++; return read(); }, cancel: () => { count.cancels++; return new Promise<never>(() => undefined); } }) });
-  const lateOf = async (fetch: () => Promise<{ status: number; body: ReturnType<typeof bodyOf> }>) => {
-    Object.assign(count, { reads: 0, cancels: 0 });
-    const error = await httpTransport("https://scopes.test", { fetch, seconds: 0.01 }).submit("sc_a", {} as never, []).catch((e: unknown) => e);
-    expect([error instanceof TransportError, (error as Error).message]).toEqual([true, expect.stringMatching(/^no whole reply within 0\.01 seconds; the request was aborted\. /)]);
+  // A body that answers its first read with a chunk, and holds every later read until the test answers it; `second` resolves when the second read is made.
+  const held = () => {
+    const pending: ((chunk: Chunk) => void)[] = [];
+    let asked = (): void => undefined;
+    const second = new Promise<void>((resolve) => { asked = resolve; });
+    let reads = 0;
+    const body = { getReader: () => ({ read: () => { reads++; if (reads === 1) return Promise.resolve<Chunk>({ done: false, value: busy }); asked(); return new Promise<Chunk>((resolve) => { pending.push(resolve); }); }, cancel: () => Promise.resolve() }) };
+    return { body, second, answer: (chunk: Chunk) => pending.shift()!(chunk) };
   };
-  // A read that is pending at the deadline and answers afterwards with a whole, small answer: the answer is not taken, no other read follows, and the body was asked to cancel, with no wait for a cancellation that never answers.
-  let answer = (_chunk: Chunk): void => undefined;
-  await lateOf(() => Promise.resolve({ status: 200, body: bodyOf(() => new Promise<Chunk>((resolve) => { answer = resolve; })) }));
-  answer({ done: false, value: busy });
-  await pause(5);
-  expect(count).toEqual({ reads: 1, cancels: 1 });
-  // A response that arrives after the deadline: no read of its body is started.
-  await lateOf(() => pause(30).then(() => ({ status: 200, body: bodyOf(() => Promise.resolve({ done: false, value: busy })) })));
-  await pause(40);
-  expect(count).toEqual({ reads: 0, cancels: 1 });
-  // A body of empty chunks, each answered at once. None uses the byte limit, so the deadline ends the read; and no read follows the deadline.
-  await lateOf(() => Promise.resolve({ status: 200, body: bodyOf(() => Promise.resolve({ done: false, value: new Uint8Array(0) })) }));
-  const reads = count.reads;
-  await pause(10);
-  expect([reads > 1, count.reads, count.cancels]).toEqual([true, reads, 1]);
-  // The reader itself. Chunks taken before the deadline are not given back after it, joined or otherwise; and an empty chunk between others is passed over.
+  // A chunk was taken before the deadline, and the next read is pending when it comes: what was taken is not given back.
+  const quiet = held();
   const expiry = new AbortController();
-  const queue: Chunk[] = [{ done: false, value: busy }];
-  const partial = takeBytes(bodyOf(() => (queue.length > 0 ? Promise.resolve(queue.shift()!) : new Promise<Chunk>(() => undefined))), 4096, expiry.signal);
-  await pause(1);
+  const partial = takeBytes(quiet.body, 4096, expiry.signal);
+  await quiet.second;
   expiry.abort();
   expect(await partial).toBe(LATE);
+  // A read answers in the same turn as the deadline, and before it: the answer is not taken, whether it is a chunk or the end of the body.
+  for (const late of [{ done: false, value: busy }, { done: true }]) {
+    const racing = held();
+    const exchange = new AbortController();
+    const result = takeBytes(racing.body, 4096, exchange.signal);
+    await racing.second;
+    racing.answer(late);
+    exchange.abort();
+    expect(await result, JSON.stringify(late)).toBe(LATE);
+  }
   const parts: Chunk[] = [{ done: false, value: new Uint8Array(0) }, { done: false, value: busy }, { done: false, value: new Uint8Array(0) }, { done: true }];
-  expect(await takeBytes(bodyOf(() => Promise.resolve(parts.shift()!)), 4096, new AbortController().signal)).toEqual(busy);
-  // A read that fails changed nothing, and says that instead.
-  await expect(httpTransport("https://scopes.test", { fetch: endless, bytes: 4096 }).summary("sc_a", null)).rejects.toThrow(/was not read\. Nothing was read; the read may be made again\.$/);
+  expect(await takeBytes({ getReader: () => ({ read: () => Promise.resolve(parts.shift()!), cancel: () => Promise.resolve() }) }, 4096, new AbortController().signal)).toEqual(busy);
 });
