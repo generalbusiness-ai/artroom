@@ -57,7 +57,7 @@ describe("a detached text whose bytes are gone (section 9.3)", () => {
     return { S, U, T, owed: textDigest("the body of U"), source: new MemorySource(all.map((ledger) => served(ledger, all)), 2) };
   };
 
-  test("a source scope that is first read while another scope's missing text is settled is itself read to its head: a text it owes with no tombstone makes the replay incomplete, and with one it is reported as redacted", async () => {
+  test("a source scope that is first read while another scope's missing text is settled is itself read to its head: a text it owes with no tombstone makes the replay incomplete, and with one it is reported as redacted; the depth of its chain is counted from the target", async () => {
     // T.1 needs S through 1, where S owes its text. Reading S on to its tombstone, S.3, proves U.1 at S.2: U is first read then.
     const { U, T, owed, source } = histories(false);
     const { report, why } = await verify(source, { mode: "replay", scope: T.at.scope });
@@ -69,6 +69,10 @@ describe("a detached text whose bytes are gone (section 9.3)", () => {
     const found = await verify(whole.source, { mode: "replay", scope: whole.T.at.scope });
     expect([found.report.result, found.why, found.report.redacted.map((r) => r.tombstone)]).toEqual(["consistent", null, [whole.S.fact(3), whole.U.fact(2)]]);
     expect(found.report.coverage).toEqual([whole.T, whole.S, whole.U].map((L) => ({ scope: L.at, from: 0, through: L.head.seq })));
+
+    // The limit on depth counts foreign facts from the target, also in the settlement. S is one fact from T, so U.1, which S.2 uses, is two.
+    const within = async (depth: number) => { const { report, why } = await verify(histories(true).source, { mode: "replay", scope: whole.T.at.scope, limits: { depth } }); return [report.result, report.at?.seq ?? null, why]; };
+    expect([await within(1), await within(2)]).toEqual([["incomplete", 2, "the limit of 1 on the depth of foreign facts was reached"], ["consistent", null, null]]);
   });
 });
 

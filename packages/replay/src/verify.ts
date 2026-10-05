@@ -49,7 +49,7 @@ export interface Limits {
   scopes: number;    // scopes whose history is read
   entries: number;   // entries checked, over all scopes
   bytes: number;     // raw bytes read from the source: every reply of a page or of a retained input, as it arrived
-  depth: number;     // how far a chain of foreign facts is followed from the target
+  depth: number;     // how far a chain of foreign facts is followed from the target, also while the texts that are owed are settled
 }
 /** Defaults for a command-line run. They are this package's choice; the contract owes the numbers to the proof plan. */
 export const LIMITS: Limits = { scopes: 64, entries: 100_000, bytes: 256 * 1024 * 1024, depth: 16 };
@@ -145,6 +145,8 @@ interface Run {
   next: number | null;
   /** Being advanced now. A reference that needs a later entry of it is a circle (section 3). */
   busy: boolean;
+  /** How many foreign facts lead to this scope from the target, by the shortest chain that was followed. The target is at 0. */
+  depth: number;
   /** Section 9.3: each detached text whose bytes are not at hand, with the entry that names it. A later tombstone of this scope answers for it. */
   owed: { text: Digest; at: FactRef }[];
 }
@@ -243,7 +245,7 @@ class Verifier {
     if (this.#runs.size >= this.#limits.scopes) throw new Stop("incomplete", `the limit of ${this.#limits.scopes} scopes was reached`);
     const got = await this.#page(id, 0);
     if (!got.ok) return null;
-    const run: Run = { id, said: got.page.scope, head: got.page.head, at: null, named: null, definition: null, state: new MemoryState(), sealed: [], read: new Map(), next: 0, busy: false, owed: [] };
+    const run: Run = { id, said: got.page.scope, head: got.page.head, at: null, named: null, definition: null, state: new MemoryState(), sealed: [], read: new Map(), next: 0, busy: false, depth: Number.POSITIVE_INFINITY, owed: [] };
     if (!this.#take(run, 0, got.page.entries, got.page.next)) return null;
     this.#runs.set(id, run);
     return run;
@@ -340,12 +342,17 @@ class Verifier {
    * does not stop the traversal has checked at least one more entry, the
    * tombstone that left its scope owing nothing, and the entries checked
    * are within the limit on entries, as the scopes are within theirs.
+   *
+   * The limit on depth counts from the target here too. A scope is read on
+   * at the depth at which the traversal reached it, so a fact that its
+   * later entries use is one step further from the target, and a chain
+   * that would pass the limit ends the replay `incomplete`.
    */
   async #settle(): Promise<void> {
     const owing = () => [...this.#runs.values()].find((run) => run.owed.length > 0);
     for (let run = owing(); run; run = owing()) {
       try {
-        await this.#advance(run, run.head.seq, 0);
+        await this.#advance(run, run.head.seq, run.depth);
       } catch (error) {
         if (!(error instanceof Gap)) throw error;
       }
@@ -368,6 +375,7 @@ class Verifier {
    * checked against that entry's bytes before its content is read.
    */
   async #advance(run: Run, through: number, depth: number, expect?: { hash: Digest; user: FactRef }): Promise<void> {
+    run.depth = Math.min(run.depth, depth);
     if (through < run.sealed.length) return;
     // A fact names a sealed entry, so no entry can need one that is sealed after it (section 3).
     if (run.busy) throw new Stop("mismatch", `a reference names entry ${through} of ${run.id}, which is not sealed before the entry that uses it`, expect?.user ?? null);
