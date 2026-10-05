@@ -23,7 +23,7 @@ import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { Answer, Beside, Bounds, Cursor, DeclaredDefinition, Digest, DutyId, Entry, Grant, Input, LogPage, OperationId, PlatformDefinition, Read, RetainedInput, ScopeId, Settlement, SignedIntent } from "@generalbusiness/artroom-contract";
 import { isScopeId } from "@generalbusiness/artroom-bytes";
 import { timeMs, type Item } from "@generalbusiness/artroom-derive";
-import type { Delivered } from "@generalbusiness/artroom-derive";
+import type { Delivered, StateView } from "@generalbusiness/artroom-derive";
 import { Scope, type Checkpointed, type Founded } from "./core.ts";
 import { Deliveries } from "./delivery.ts";
 import { declaredBy, observedAt, routed, sentText, sourced, type Sourced } from "./namespace.ts";
@@ -44,7 +44,7 @@ import type { Duty, OperationStatus, Sealed } from "./store.ts";
  */
 export interface Wiring {
   ports?: Partial<Ports>; bounds?: Bounds; reads?: ReadBounds;
-  authority?: (given: Pick<Ports, "clock" | "random"> & { genesis(): Extract<Input, { type: "genesis" }> | null }) => Authority;
+  authority?: (given: Pick<Ports, "clock" | "random"> & { genesis(): Extract<Input, { type: "genesis" }> | null; state: Pick<StateView, "page"> }) => Authority;
 }
 
 export class ScopeObject<Env = unknown> extends DurableObject<Env> {
@@ -79,7 +79,8 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
       const input = kept ? (JSON.parse(kept.bytes) as Entry).input : null;
       return input?.type === "genesis" ? input : null;
     };
-    const authority = wiring.authority?.({ clock: given.clock, random: given.random, genesis });
+    // A directory records its membership reference in an item, so the authority is also given the folded state (authority note, section 3.3).
+    const authority = wiring.authority?.({ clock: given.clock, random: given.random, genesis, state: store });
     const ports: Ports = { ...given, alarm: wakes.deadline, ...(authority ? { authority } : {}) };
     this.#name = isScopeId(name) ? name : null;
     this.#store = store;
