@@ -25,29 +25,37 @@
  * `compromised` is data, whole. The three creations of the genesis are held
  * sends of the entry, by the contract's rule for a provisional scope.
  *
- * **Two places that the note's rows state and no form can say, and that
+ * **Three places that the note's rows state and no form can say, and that
  * its table of marks does not list.** Each is a mark in this data, with the
  * entry of the I3 deltas note as its `row`, and with NO rule in
  * `directoryRules`: the note names none, and none is invented here. So the
- * version lacks two rules, and by the whole-scope rule (the contract's
+ * version lacks three rules, and by the whole-scope rule (the contract's
  * section 6.1) nothing is created under `platform:directory@1` by this
  * package's rules alone. Each stays so until its owner names the rule.
  *
  * | Mark | Place | At | What the row states (deltas entry) |
  * |---|---|---|---|
+ * | `create-rules` | 6, send | `establish` | The `create` of the rules scope carries membership's scope ID, which the directory derives from the seed that it sends. No form of a send says it (EP6). |
  * | `create-destination` | 6, send | `establish` | The destination's `create` carries `import` as a truth value, and the scope IDs of membership and of the rules scope, which the directory derives from the seeds that it sends. No form of a send says any of the three (EP6). |
  * | `import-spent` | 4, guard | `retry-import` | "The import's stated attempts are used, and none is `confirmed`." No guard form reads an operation (EP7). |
  *
- * Two more things cannot be written, and no mark can stand for either.
+ * The two send marks of the genesis both state `always`: the scope
+ * contract's revision 19 lets a written list hold several marks when at
+ * most one does not state it, and adds no operand for a sibling's scope ID
+ * (its section 6.1, "More than one send mark", and decision D19-7). Each
+ * rule gives its request in every genesis, so the three creations are at
+ * the positions of their forms. The contract states the form. The names of
+ * the two rules, and how each derives its request, are the authority
+ * note's next revision's (the contract's section 15.8, the row "From
+ * revision 19"), so neither rule is written here.
  *
- * - The `create` of the rules scope carries membership's scope ID too, and
- *   a written list of sends holds at most one mark (I3 deltas, entry EJ4).
- *   That send is written with the fields that a form can say (entry EP6).
- * - The register's `create` carries `founding`, the founder's signed
- *   intent. No field type holds a signed intent, and it is no field value,
- *   so no rule of a marked type could be given it. The data declares no
- *   such field. The founder's intent is in the claim's entry, which the
- *   creation names by its fact and the genesis retains (entry EP5).
+ * One more thing cannot be written, and no mark can stand for it. The
+ * register's `create` carries `founding`, the founder's signed intent. No
+ * field type holds a signed intent, and it is no field value, so no rule of
+ * a marked type could be given it. The data declares no such field. The
+ * founder's intent is in the claim's entry, which the creation names by
+ * its fact and the genesis retains (entry EP5; the contract's revision 19
+ * confirms it).
  *
  * The note's `max`, text lengths and ranges are examples that the proof
  * plan owns. They are written as the note has them.
@@ -229,19 +237,17 @@ export const directory: PlatformData = {
             result: { applied: [{ ref: { slot: "membership", from: { sender: true } } }] },
           },
         },
-        {
-          // The rules scope's creation also carries membership's scope ID, which no form of a send says (I3 deltas, entry EP6).
-          create: {
-            kind: "rules", definition: "platform:rules@1",
-            fields: { branch: { field: "branch" }, directory: { scope: true } },
-            result: { applied: [{ ref: { slot: "rules", from: { sender: true } } }] },
-          },
-        },
+        // The rules scope's creation: `branch`, `directory` and `membership`, which is membership's scope ID. No form of a send says
+        // the third, and the contract adds no operand for it: the rule of a send mark gives it (entry EP6; the contract's revision
+        // 19, section 6.1). The mark states `always`: every genesis creates the rules scope. Its clauses are data.
+        // I3 merge: this mark has no rule, until the authority note's rows name it and state its derivation.
+        { code: "create-rules", row: "EP6", always: true, result: { applied: [{ ref: { slot: "rules", from: { sender: true } } }] } },
         // The destination's creation: `repository`, `branch`, `import`, `claim`, `directory`, `membership` and `rules`. Three of
         // them no form of a send says, and the table of marks lists no rule for the send (entry EP6). Its clauses are data. When
-        // `import` is set, the entry that records its applied result opens the operation `import` (Code P16, row 7).
-        // I3 merge: this mark has no rule, and the `create` of the rules scope above lacks `membership`, until entry EP6 is answered.
-        { code: "create-destination", row: "EP6", result: { applied: [{ ref: { slot: "destination", from: { sender: true } } }, { code: "open-import", row: "P16" }] } },
+        // `import` is set, the entry that records its applied result opens the operation `import` (Code P16, row 7). The mark
+        // states `always`, as the other does, so the list holds two marks and each creation is at the position of its form.
+        // I3 merge: this mark has no rule, until the authority note's rows name it and state its derivation.
+        { code: "create-destination", row: "EP6", always: true, result: { applied: [{ ref: { slot: "destination", from: { sender: true } } }, { code: "open-import", row: "P16" }] } },
       ],
       attention: [],
     },

@@ -86,7 +86,7 @@ The register and the directory have stand-ins of their own, in
 `packages/platform/test/support-founding.ts`. `registerStandIns` is a rule
 for the one mark of the register's data that has no rule,
 `create-repository` (`notes/2026-10-05-i3-contract-deltas.md`, entry EJ1).
-`directoryStandIns` is a rule for each of the two marks of the directory's
+`directoryStandIns` is a rule for each of the three marks of the directory's
 data that the platform package has no rule for (entries EP6 and EP7).
 Without them nothing is founded under `platform:register@1` or created
 under `platform:directory@1`, in a test as in production. `Register` is a
