@@ -38,7 +38,7 @@
 
 import { WorkerEntrypoint } from "cloudflare:workers";
 import type { Answer, Cursor, DeclaredDefinition, Digest, DutyId, Grant, LogPage, PlatformDefinition, Read, ReadRefusal, RetainedInput, ScopeApi, ScopeId, Seed, Settlement, SignedIntent } from "@generalbusiness/artroom-contract";
-import { definitionDigest, intentDigest, isScopeId, scopeIdOf } from "@generalbusiness/artroom-bytes";
+import { definitionDigest, intentDigest, isScopeId, positionOf, scopeIdOf } from "@generalbusiness/artroom-bytes";
 import { isObject, type Item } from "@generalbusiness/artroom-derive";
 import type { Founded } from "./core.ts";
 import { namespace, type Binding } from "./namespace.ts";
@@ -179,7 +179,8 @@ export async function route(request: Request, binding: Binding): Promise<Respons
   if (what === undefined) return read(await scopes.summary(scope, reader));
   if (what === "items" && which !== undefined) return read(await scopes.items(scope, reader, which, cursor));
   if (what === "history" && which === undefined) return read(await scopes.history(scope, reader, cursor));
-  if (what === "entries" && which !== undefined && /^(0|[1-9][0-9]{0,15})$/.test(which)) return read(await scopes.entry(scope, reader, Number(which)));
+  const seq = what === "entries" ? positionOf(which) : null;
+  if (seq !== null) return read(await scopes.entry(scope, reader, seq));
   if (what === "outbox") return read(which === undefined ? await scopes.outbox(scope, reader, cursor) : await scopes.duty(scope, reader, which as DutyId));
   if (what === "log" && which === undefined) return read(await scopes.log(scope, reader, cursor));
   if (what === "retained") return read(await scopes.retained(scope, reader, which as RetainedInput["kind"], last as Digest));

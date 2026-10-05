@@ -13,7 +13,7 @@
 
 import { DOMAINS, HISTORY_PAGE_BYTES, HISTORY_PAGE_ENTRIES, RETAINED_INPUT_BYTES } from "@generalbusiness/artroom-contract";
 import type { Digest, Head, RetainedInput, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
-import { digestOfHash, sha256, utf8 } from "@generalbusiness/artroom-bytes";
+import { digestOfHash, positionOf, sha256, utf8 } from "@generalbusiness/artroom-bytes";
 import { isLocalId, isObject, isScopeRef } from "@generalbusiness/artroom-derive";
 
 /** One entry as stored: its canonical JSON text, and the hash the source gives for it. */
@@ -141,8 +141,7 @@ export function httpSource(service: string, options: { fetch?: Fetch; reader?: s
         if (!isObject(e) || !isLocalId(e["seq"]) || typeof e["bytes"] !== "string" || typeof e["hash"] !== "string") return unread("unavailable");
         entries.push({ seq: e["seq"], hash: e["hash"] as Digest, bytes: e["bytes"] });
       }
-      const more = complete === false && typeof next === "string" && /^(0|[1-9][0-9]{0,15})$/.test(next);
-      return { ok: true, page: { scope: value["scope"], head: at, entries, next: more ? Number(next) : null }, bytes: got.bytes };
+      return { ok: true, page: { scope: value["scope"], head: at, entries, next: complete === false ? positionOf(next) : null }, bytes: got.bytes };
     },
     async retained(scope, kind, digest, allow) {
       const got = await get(`/v1/scopes/${scope}/retained/${kind}/${encodeURIComponent(digest)}`, Math.min(allow.bytes, RETAINED_REPLY_BYTES));

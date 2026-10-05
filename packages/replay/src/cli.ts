@@ -14,7 +14,7 @@
  */
 
 import type { Head, Report } from "@generalbusiness/artroom-contract";
-import { isDigest, isScopeId } from "@generalbusiness/artroom-bytes";
+import { isDigest, isScopeId, positionOf } from "@generalbusiness/artroom-bytes";
 import { render } from "./report.ts";
 import { httpSource, type Fetch } from "./source.ts";
 import { SourceError, verify, type Anchor } from "./verify.ts";
@@ -23,8 +23,6 @@ export const USAGE = "usage: artroom-replay <service URL> <scope ID> [--mode int
 
 /** Where the command writes, and the `fetch` it reads with. */
 export interface Io { out(text: string): void; err(text: string): void; fetch?: Fetch }
-
-const seqOf = (text: string): number | null => (/^(0|[1-9][0-9]{0,15})$/.test(text) ? Number(text) : null);
 
 export async function main(argv: readonly string[], io: Io): Promise<number> {
   const usage = (what: string): number => {
@@ -49,7 +47,7 @@ export async function main(argv: readonly string[], io: Io): Promise<number> {
         // A digest holds a colon, so the hash is everything after the position.
         const parts = value.split(":");
         const hash = parts.slice(arg === "--head" ? 1 : 2).join(":");
-        const seq = seqOf(parts[arg === "--head" ? 0 : 1] ?? "");
+        const seq = positionOf(parts[arg === "--head" ? 0 : 1]);
         if (seq === null || !isDigest(hash)) return usage(`${arg} is not a position and a hash`);
         if (arg === "--head") head = { seq, hash };
         else if (isScopeId(parts[0])) anchors.push({ scope: parts[0], seq, hash });

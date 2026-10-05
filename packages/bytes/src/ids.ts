@@ -31,9 +31,15 @@ export function isOperationId(value: unknown): value is OperationId {
   return typeof value === "string" && /^op_./.test(value) && wellFormed(value);
 }
 
-/** One send of one entry: `seq.n`, each a whole number in its one decimal form. */
+/** A position in one scope's history, or an ordinal, from its one decimal text: no sign, no leading zero, at most 16 digits. Null for any other text. */
+export function positionOf(text: unknown): number | null {
+  return typeof text === "string" && /^(0|[1-9][0-9]{0,15})$/.test(text) && Number.isSafeInteger(Number(text)) ? Number(text) : null;
+}
+
+/** One send of one entry: `seq.n`, each a position in its one decimal form. */
 export function isDutyId(value: unknown): value is DutyId {
-  return typeof value === "string" && /^(0|[1-9][0-9]{0,15})\.(0|[1-9][0-9]{0,15})$/.test(value);
+  const parts = typeof value === "string" ? value.split(".") : [];
+  return parts.length === 2 && parts.every((part) => positionOf(part) !== null);
 }
 
 /** A definition the platform supplies in code: `platform:<name>@<version>`. */

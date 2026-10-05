@@ -10,7 +10,7 @@
 
 import { ENTRY_READ_BYTES, HISTORY_PAGE_BYTES, HISTORY_PAGE_ENTRIES, OUTBOX_PAGE_DUTIES, RETAINED_INPUT_BYTES, RETAINED_ITEMS_PAGE } from "@generalbusiness/artroom-contract";
 import type { Cursor, Digest, DutyId, Entry, LogPage, Read, ReadRefusal, RetainedInput, Summary } from "@generalbusiness/artroom-contract";
-import { isDutyId } from "@generalbusiness/artroom-bytes";
+import { isDutyId, positionOf } from "@generalbusiness/artroom-bytes";
 import { byteOrder, type Item, type ScopeState, type ValidDefinition } from "@generalbusiness/artroom-derive";
 import type { Pinned } from "./core.ts";
 import type { ReadName, Readers } from "./ports.ts";
@@ -27,7 +27,7 @@ export type { Summary };
 
 const no = (reason: ReadRefusal) => ({ ok: false, reason }) as const;
 /** A cursor made here is a decimal number. */
-const position = (cursor: Cursor | undefined, first: number | null): number | null | undefined => (cursor === undefined ? first : /^(0|[1-9][0-9]{0,15})$/.test(cursor) ? Number(cursor) : undefined);
+const position = (cursor: Cursor | undefined, first: number | null): number | null | undefined => (cursor === undefined ? first : (positionOf(cursor) ?? undefined));
 
 /** A duty ID: the `seq` of an entry and the ordinal of one of its sends. */
 /** The entry and the ordinal a duty ID names, or null. The form is the bytes package's to judge. */
