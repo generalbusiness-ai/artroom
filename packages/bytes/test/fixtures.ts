@@ -22,7 +22,7 @@ export const message: Message = { class: "request", type: "create", body: { titl
 export const cause: DeliveryCause = { v: 1, from: { at: directory, seq: 5, hash: d("5") }, n: 0, message: d("b") };
 
 export const definition: DeclaredDefinition = {
-  format: "artroom-definition-1", profile: { name: "restricted", version: 1 }, capabilities: [],
+  format: "artroom-definition-1", name: "example", profile: { name: "restricted", version: 1 }, capabilities: [],
   genesis: "file", items: {}, acts: {}, receives: {}, timed: {}, rules: {},
 };
 

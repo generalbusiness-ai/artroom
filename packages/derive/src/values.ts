@@ -45,6 +45,8 @@ export function isValue(type: FieldType, v: unknown, bounds: Bounds): boolean {
     case "digest": return isDigest(v);
     case "commit": case "tree": return isObjectId(v);
     case "list": return Array.isArray(v) && v.length <= Math.min(type.max, bounds.listElements) && v.every((e) => isValue(type.of, e, bounds));
+    // A record is not a type the validator takes yet, so nothing is a value of one.
+    case "record": return false;
   }
 }
 

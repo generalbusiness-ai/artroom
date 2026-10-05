@@ -12,6 +12,7 @@ import { HOLDER, changeItem, newItem, type ItemEffect } from "./fold.ts";
 import { members, slotOf, type Judging } from "./guards.ts";
 import type { Item } from "./state.ts";
 import { LAST_MS, timeMs, timeOf } from "./time.ts";
+import { unsupported } from "./unsupported.ts";
 import { isMemberRef, isValue, memberFits, own, same } from "./values.ts";
 
 export type Derived<T> = ({ ok: true } & T) | { ok: false; reason: RefusalReason; detail: string };
@@ -57,7 +58,7 @@ export function deriveEffects(j: Judging, forms: readonly EffectForm[], attentio
     const was = j.subjects.get(subject);
     if (was && own(type.states, was.state)?.final) return refuse("final", `effects.${i}: item ${id} is ${was.state}`);
     /** A list may take one more member. */
-    const room = (slot: string) => members(own(working.get(subject)!.parties, slot)).length < Math.min(own(type.parties, slot)?.max ?? j.bounds.listElements, j.bounds.listElements);
+    const room = (slot: string) => members(own(working.get(subject)!.parties, slot)).length < Math.min(own(type.parties, slot)?.max ?? j.bounds.partyMembers, j.bounds.partyMembers);
 
     if ("state" in form) {
       apply(subject, { effect: "state", item: id, state: form.state });
@@ -76,7 +77,8 @@ export function deriveEffects(j: Judging, forms: readonly EffectForm[], attentio
         const field = fieldFor(from.field, isMemberRef);
         if (!field.ok) return field;
         member = field.value as MemberRef | null;
-      } else member = (own(item.parties, from.slot) as MemberRef | null | undefined) ?? null;
+      } else if ("slot" in from) member = (own(item.parties, from.slot) as MemberRef | null | undefined) ?? null;
+      else return unsupported("a party from that source");
       // Whatever its source, a member put in a slot is within the bound of a handle.
       if (member && !memberFits(member, j.bounds)) return refuse("bad-field", `effects.${i}: the member's handle is longer than a handle may be`);
       const has = member !== null && members(own(item.parties, slot)).some((m) => same(m, member));
@@ -95,6 +97,7 @@ export function deriveEffects(j: Judging, forms: readonly EffectForm[], attentio
       apply(subject, { effect: "ref", item: id, slot, to });
     } else if ("value" in form) {
       const { slot, from } = form.value;
+      if (from === null || !("field" in from || "const" in from || "time" in from)) return unsupported("a value from that source");
       // The commit time plus a constant: a derived deadline, such as a new hold's end (section 5.2, step 6.4).
       const field = "field" in from ? fieldFor(from.field, (v) => isValue(own(type.values, slot)!.of, v, j.bounds)) : null;
       if (field && !field.ok) return field;
@@ -113,7 +116,8 @@ export function deriveEffects(j: Judging, forms: readonly EffectForm[], attentio
         if (!room(slot)) return refuse("slot-full", `effects.${i}: ${slot}`);
         apply(subject, { effect: "list", item: id, slot, change: "add", member });
       }
-    } else if (form.hold.do === "open") apply(subject, { effect: "hold", item: id, change: "open", epoch: 1 });
+    } else if (!("hold" in form)) return unsupported("that effect");
+    else if (form.hold.do === "open") apply(subject, { effect: "hold", item: id, change: "open", epoch: 1 });
     else if (form.hold.do === "end") apply(subject, { effect: "hold", item: id, change: "end", epoch: (item.epoch ?? 0) + 1 });
     else {
       // Whether a renewal is by another holder is known only when every effect has run. Its place in the order is kept.

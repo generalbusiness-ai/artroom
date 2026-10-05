@@ -11,6 +11,7 @@
 import type { Bounds, DeclaredDefinition, Digest, FieldType, TimedRule } from "@generalbusiness/artroom-contract";
 import { canonicalize, definitionDigest, isDigest, isPlatformDefinition, isScopeKind, utf8 } from "@generalbusiness/artroom-bytes";
 import { LAST_MS } from "./time.ts";
+import { unsupported } from "./unsupported.ts";
 import { isObject, isValue, own } from "./values.ts";
 
 export type ProblemCode =
@@ -178,6 +179,11 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
 
   const top = rec(input, "", ["format", "profile", "capabilities", "genesis", "items", "acts", "receives", "timed", "rules"]);
   if (!top) return { ok: false, problems };
+  // Section 6.1: the bound on a definition's canonical bytes limits the validator's work, so it is checked before anything is read.
+  // A value with no canonical bytes is refused at the end, as before.
+  let size: number | null = null;
+  try { size = utf8(canonicalize(input)).length; } catch { /* refused below */ }
+  if (size !== null && size > bounds.definitionBytes) return { ok: false, problems: [{ code: "bound", path: "", message: `has ${size} canonical bytes; at most ${bounds.definitionBytes}` }] };
   if (top["format"] !== "artroom-definition-1") bad("shape", "format", "must be artroom-definition-1");
 
   const profile = rec(top["profile"], "profile", ["name", "version"]);
@@ -185,7 +191,7 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
   if (profile && !evaluator) bad("profile", "profile", "is not a profile this runtime implements");
   // Section 6.5: a rule is a named expression in the profile's language.
   const rules = new Set<string>();
-  for (const [name, source] of entries(top["rules"], "rules", null)) {
+  for (const [name, source] of entries(top["rules"], "rules", bounds.rules)) {
     const text = str(source, at("rules", name));
     const refusal = text === null ? null : (evaluator?.admit?.(text) ?? null);
     if (refusal !== null) bad("rule", at("rules", name), refusal);
@@ -264,8 +270,9 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
         let type: FieldType | null;
         if (kind === "party") {
           if (bool(so["list"], at(p, "list")) === null || bool(so["author"], at(p, "author")) === null) continue;
-          if ("max" in so && (!so["list"] || (int(so["max"], at(p, "max"), 1) ?? 0) > bounds.listElements)) bad("bound", at(p, "max"), `only a list has a max, of at most ${bounds.listElements}`);
-          type = so["list"] ? { type: "list", of: { type: "member" }, max: (so["max"] as number | undefined) ?? bounds.listElements } : { type: "member" };
+          // Section 6.3: a party list holds at most 64 members. One that declares no `max` holds the bound itself.
+          if ("max" in so && (!so["list"] || (int(so["max"], at(p, "max"), 1) ?? 0) > bounds.partyMembers)) bad("bound", at(p, "max"), `only a list has a max, of at most ${bounds.partyMembers}`);
+          type = so["list"] ? { type: "list", of: { type: "member" }, max: (so["max"] as number | undefined) ?? bounds.partyMembers } : { type: "member" };
         } else type = fieldType(so[kind === "ref" ? "to" : "of"], at(p, kind === "ref" ? "to" : "of"));
         if (!type) continue;
         if ("default" in so && !isValue(type, so["default"], bounds)) bad("shape", at(p, "default"), "is not a value of the slot's type");
@@ -558,7 +565,7 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
     const k = operand(v, path, ctx, () => ctx.on ?? bad("name", path, "there is no primary item whose slot this could be"));
     return k === "field" ? fieldOf(v, ctx) : k === "slot" ? (ctx.on?.slots.get((v as Rec)["slot"] as string)?.type ?? null) : null;
   };
-  const sources = (v: unknown, path: string, ctx: Ctx) => { for (const [name, s] of entries(v, path, bounds.listElements)) source(s, at(path, name), ctx); };
+  const sources = (v: unknown, path: string, ctx: Ctx) => { for (const [name, s] of entries(v, path, bounds.sendFields)) source(s, at(path, name), ctx); };
   const clauses = (v: unknown, path: string, ctx: Ctx, conflict: boolean) => {
     const r = rec(v, path, [], ["applied", "refused", "superseded", "undelivered", ...(conflict ? ["conflict"] : [])]);
     for (const [name, e] of Object.entries(r ?? {})) {
@@ -715,7 +722,7 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
   const timedTypes = new Set<string>(holdTypes);
   /** Each timed rule that was read whole: its type, the states it applies in, and the state it leaves its item in. */
   const moves: TimedMove[] = [];
-  for (const [name, v] of entries(top["timed"], "timed", null)) {
+  for (const [name, v] of entries(top["timed"], "timed", bounds.timedRules)) {
     const path = at("timed", name);
     const o = rec(v, path, ["on", "states", "deadline", "effects", "attention"]);
     if (!o) continue;
@@ -936,6 +943,7 @@ function mostBytes(type: FieldType, bounds: Bounds): number {
     case "digest": return 73;
     case "commit": case "tree": return 66;
     case "list": return 2 + Math.min(type.max, bounds.listElements) * (1 + mostBytes(type.of, bounds));
+    case "record": return unsupported("a record type");
   }
 }
 
@@ -952,14 +960,18 @@ function mostBytes(type: FieldType, bounds: Bounds): number {
  * can hold.
  */
 function timedEntryBytes(name: string, rule: TimedRule, type: Type, bounds: Bounds): number {
-  const held = (slot: string): number => { const s = type.slots.get(slot); return s ? mostBytes(s.type, bounds) : 0; };
+  // A party list is counted at its own `max`, which the fold enforces. A list value is counted at the bound on a list's elements.
+  const held = (slot: string): number => {
+    const s = type.slots.get(slot);
+    return !s ? 0 : s.kind === "party" && s.type.type === "list" ? 2 + s.type.max * (1 + memberBytes(bounds)) : mostBytes(s.type, bounds);
+  };
   let bytes = ENTRY_BYTES + stated(name);
   for (const e of rule.effects) {
     bytes += RECORD_BYTES;
     if ("state" in e) bytes += stated(e.state);
     else if ("party" in e) bytes += stated(e.party.slot) + memberBytes(bounds);
     else if ("ref" in e) bytes += stated(e.ref.slot) + (e.ref.from !== null && e.ref.from !== "self" && "slot" in e.ref.from ? held(e.ref.from.slot) : 20);
-    else if ("value" in e) bytes += stated(e.value.slot) + ("const" in e.value.from ? stated(e.value.from.const) : 26);
+    else if ("value" in e) bytes += stated(e.value.slot) + (e.value.from !== null && "const" in e.value.from ? stated(e.value.from.const) : 26);
   }
   for (const { notify } of rule.attention) bytes += RECORD_BYTES + stated(notify.reason) + 2 + held(notify.slot);
   return bytes;

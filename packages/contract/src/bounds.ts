@@ -2,9 +2,14 @@
  * Every bound of the scope contract's sections 6 and 7.5, and the intent
  * lifetime of section 2.1, as one configurable value.
  *
- * The numbers in `PROPOSED_BOUNDS` are the contract's proposals. They are
- * temporary: measured budgets replace them. Code takes a `Bounds` value and
- * never reads a number from here directly.
+ * The numbers in `PROPOSED_BOUNDS` are the contract's proposals, as its
+ * revision 11 states them. They are temporary: measured budgets replace
+ * them. Code takes a `Bounds` value and never reads a number from here
+ * directly.
+ *
+ * A bound is a configured value from the moment it is listed here. A few of
+ * them bound forms that no source derives yet. Each says so, and the
+ * validator refuses those forms whatever the number is.
  */
 export interface Bounds {
   // Section 2.1
@@ -14,18 +19,28 @@ export interface Bounds {
   items: number;                   // item types
   acts: number;
   receives: number;
+  timedRules: number;
+  rules: number;                   // rule expressions
+  definitionBytes: number;         // the canonical bytes of one definition
   textBytes: number;               // one text field
   memberBytes: number;             // one member handle. The contract states none; temporary, and the authority note's to set
   listElements: number;            // one list field or slot; also what one `every` guard reads
+  partyMembers: number;            // one party list. The fold enforces it, and the size of a timed entry is counted at it
   states: number;                  // of one item type
   parties: number;                 // party slots of one item type
   refs: number;                    // reference slots of one item type
   values: number;                  // value slots of one item type
   also: number;                    // other local items one act names
-  guards: number;                  // of one act
-  effects: number;                 // of one act
-  sends: number;                   // of one act
-  attention: number;               // of one act
+  presents: number;                // facts presented beside one intent. No source reads a presented fact yet
+  guards: number;                  // of one act or handler, as written; also the clauses of one `where`
+  nestedGuards: number;            // of one act or handler, counting those nested in `each`, `has` and `anyOf`. No source reads a nested guard yet
+  guardDepth: number;              // how deep a guard may be nested. No source reads a nested guard yet
+  effects: number;                 // of one act or handler, and of one result clause
+  sends: number;                   // send forms of one act or handler, of which at most one is a fan-out
+  fanOut: number;                  // sends of one fan-out: the most live items of the type its range covers. No source derives a fan-out yet
+  attention: number;               // attention forms of one act, handler or timed rule
+  attentionMembers: number;        // members that the attention forms of one act, handler or timed rule can tell. The validator does not add them up yet
+  sendFields: number;              // fields of one sent message
 
   // Section 6.5: one range guard with a `where`. The contract owes these to the proof plan.
   guardPage: number;               // items in one page of the scan
@@ -34,7 +49,7 @@ export interface Bounds {
   // Section 7.5: a running scope
   entryBytes: number;
   usesPerEntry: number;            // foreign entries used by one entry
-  sendsPerEntry: number;
+  sendsPerEntry: number;           // every send of one entry: those declared, one fan-out, the platform's one result or control, and attention
   decompositionDepth: number;
   deliveryBatch: number;
   fetchSeconds: number;            // one fetch before the turn
@@ -55,26 +70,36 @@ export interface Bounds {
 
 export const PROPOSED_BOUNDS: Bounds = {
   intentLifetimeSeconds: 15 * 60,
-  items: 12,
-  acts: 48,
+  items: 16,
+  acts: 64,
   receives: 24,
+  timedRules: 8,
+  rules: 16,
+  definitionBytes: 256 * 1024,
   textBytes: 64 * 1024,
   memberBytes: 256,
   listElements: 32,
+  partyMembers: 64,
   states: 16,
   parties: 8,
   refs: 12,
-  values: 8,
-  also: 3,
-  guards: 16,
+  values: 12,
+  also: 4,
+  presents: 4,
+  guards: 24,
+  nestedGuards: 96,
+  guardDepth: 8,
   effects: 16,
   sends: 8,
+  fanOut: 32,
   attention: 8,
+  attentionMembers: 64,
+  sendFields: 32,
   guardPage: 100,
   guardScan: 1000,
   entryBytes: 256 * 1024,
-  usesPerEntry: 64,
-  sendsPerEntry: 32,
+  usesPerEntry: 128,
+  sendsPerEntry: 104,
   decompositionDepth: 4,
   deliveryBatch: 64,
   fetchSeconds: 10,

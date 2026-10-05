@@ -83,6 +83,7 @@ const report: Report = {
 // A small lane definition using a guard, an effect, a send and an attention form of each kind of shape.
 const definition: DeclaredDefinition = {
   format: "artroom-definition-1",
+  name: "issue",
   profile: { name: "restricted", version: 1 },
   capabilities: [{ name: "hold", version: 1 }],
   genesis: "file",
@@ -90,7 +91,8 @@ const definition: DeclaredDefinition = {
     intent: {
       many: false, max: 1, states: { open: { final: false }, closed: { final: true } }, initial: "open",
       parties: { requester: { fixed: true, required: true, list: false, author: true } },
-      refs: {}, values: { title: { fixed: false, required: true, of: { type: "text", max: 200 } } },
+      refs: { titledAt: { fixed: false, required: true, to: { type: "fact", kind: ["file", "retitle"], under: "issue" } } },
+      values: { title: { fixed: false, required: true, of: { type: "text", max: 200 } } },
     },
     link: { many: true, max: 32, states: { set: { final: false }, removed: { final: true } }, initial: "set", parties: {}, refs: { target: { fixed: true, required: true, to: { type: "scope", kind: "lane" } } }, values: {} },
   },
@@ -99,13 +101,20 @@ const definition: DeclaredDefinition = {
       step: "open", on: "intent", also: {}, grant: "file",
       fields: { title: { type: "text", max: 200, required: true }, opener: { type: "member", required: true } },
       guards: [],
-      effects: [{ party: { slot: "requester", from: { field: "opener" } } }, { value: { slot: "title", from: { field: "title" } } }],
+      effects: [{ party: { slot: "requester", from: { field: "opener" } } }, { value: { slot: "title", from: { field: "title" } } }, { ref: { slot: "titledAt", from: "self" } }],
       sends: [{ index: { fields: { title: { field: "title" } } } }],
       attention: [],
     },
+    // The forms of revision 8: a local fact compared with a slot that was set from `self`, a part of a fetched entry, and a named refusal.
     close: {
-      step: "transition", on: "intent", also: {}, fields: {}, grant: "close",
-      guards: [{ state: ["open"] }, { signer: ["requester"] }, { none: { type: "link", states: ["set"] } }],
+      step: "transition", on: "intent", also: { last: { item: "link", one: true } }, grant: "close",
+      fields: { titled: { type: "fact", kind: ["file", "retitle"], under: "issue", required: true }, answer: { type: "fact", kind: ["answer"], under: "issue", required: false } },
+      guards: [
+        { state: ["open"] }, { signer: ["requester"] }, { none: { type: "link", states: ["set"], except: ["also.last"] } },
+        { equals: { a: { field: "titled" }, b: { slot: "titledAt" } }, reason: "title-moved" },
+        { equals: { a: { field: "answer", part: "on" }, b: { slot: "titledAt", part: "seq" } }, ifPresent: true, reason: "not-this-ask" },
+        { anyOf: [[{ unset: "titledAt" }], [{ each: { list: { field: "titled", part: { opened: "watchers" } }, as: "w", guards: [{ differs: { a: { element: "w" }, b: { signer: true } } }] } }]] },
+      ],
       effects: [{ state: "closed" }],
       sends: [],
       attention: [{ notify: { slot: "requester", of: "on", when: "after", reason: "closed" } }],
@@ -119,7 +128,15 @@ const definition: DeclaredDefinition = {
       attention: [],
     },
   },
-  receives: {},
+  receives: {
+    closes: {
+      message: "closes", class: "relate", from: { kind: "lane", under: "change" }, fields: { about: { type: "int", min: 0, max: 1000, required: true } }, opens: null, copies: 32,
+      also: { intent: { item: "intent", one: true } },
+      guards: [{ equals: { a: { update: "state" }, b: { const: "merged" } } }],
+      effects: [{ of: "also.intent", state: "closed", if: [{ of: "also.intent", state: ["open"] }] }, { of: "also.intent", ref: { slot: "titledAt", from: null }, unless: [{ of: "also.intent", state: ["open"] }] }],
+      sends: [], attention: [],
+    },
+  },
   timed: {},
   rules: {},
 };

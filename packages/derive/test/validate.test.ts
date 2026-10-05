@@ -115,8 +115,10 @@ describe("the definition validator", () => {
       return d;
     };
     const graphOf = (d: any) => timedGraph(Object.entries<any>(d.timed).map(([name, r]) => ({ name, type: r.on, states: r.states, to: r.effects[0].state, deadline: r.deadline })));
+    // The contract's bound is 8 timed rules. The work of the graph is shown past it, at a configured bound that takes these.
+    const roomy = { ...PROPOSED_BOUNDS, timedRules: 61 };
 
-    const result = validateDefinition(stepped(false), PROPOSED_BOUNDS);
+    const result = validateDefinition(stepped(false), roomy);
     // The reserve of a state is its longest chain: 15 rules from s0, one from s14.
     expect(result.ok ? result.definition.deadlines : result.problems).toEqual({ step: Object.fromEntries(Array.from({ length: 15 }, (_, i) => [`s${i}`, 15 - i])) });
     const graph = graphOf(stepped(false));
@@ -125,11 +127,35 @@ describe("the definition validator", () => {
     expect(graph.work).toEqual({ rules: 60, edges: 224 });
 
     // With a rule from s14 back to s0, each of the other 57 rules leads back to itself. The four rules into the final state lead nowhere, and are not refused.
-    const cyclic = validateDefinition(stepped(true), PROPOSED_BOUNDS);
+    const cyclic = validateDefinition(stepped(true), roomy);
     expect(cyclic.ok ? null : [[...new Set(cyclic.problems.map((p) => p.code))], cyclic.problems.length]).toEqual([["reserve-unbounded"], 57]);
     expect(cyclic.ok ? null : cyclic.problems.map((p) => p.path)).not.toContain("timed.s14a");
     // One more rule, and eight more leads: four into it and four out of it.
     expect(graphOf(stepped(true)).work).toEqual({ rules: 61, edges: 232 });
+  });
+
+  test("a definition is held to its bounds as a whole: its timed rules, its rules, its canonical bytes, and the members of a party list", () => {
+    const refusal = (change: Change, bounds = PROPOSED_BOUNDS) => {
+      const definition = clone(lane) as any;
+      change(definition);
+      const result = validateDefinition(definition, bounds);
+      return result.ok ? null : result.problems.map((p) => [p.code, p.path]);
+    };
+    // Each at a small configured limit: the lane has one timed rule and no rule, and is a few thousand bytes.
+    expect(refusal(() => {}, { ...PROPOSED_BOUNDS, timedRules: 0 })).toEqual([["bound", "timed"]]);
+    expect(refusal((d) => { d.rules = { a: "true", b: "true" }; }, { ...PROPOSED_BOUNDS, rules: 1 })).toEqual([["bound", "rules"]]);
+    expect(refusal(() => {}, { ...PROPOSED_BOUNDS, definitionBytes: 1000 })).toEqual([["bound", ""]]);
+    // A party list holds at most 64 members, which is more than a list value holds.
+    const watched = (max: number): Change => (d) => {
+      d.items.hold.parties.watchers = { fixed: false, required: false, list: true, max, author: false };
+      d.timed["hold-end"].attention.push({ notify: { slot: "watchers", of: "on", when: "after", reason: "hold ended" } });
+    };
+    expect(refusal(watched(PROPOSED_BOUNDS.partyMembers))).toBeNull();
+    expect(refusal(watched(PROPOSED_BOUNDS.partyMembers + 1))).toEqual([["bound", "items.hold.parties.watchers.max"]]);
+    // The entry that tells such a list is counted at every member it can hold: more than 64 handles, each byte as a six-byte escape.
+    const tight = validateDefinition((() => { const d = clone(lane) as any; watched(PROPOSED_BOUNDS.partyMembers)(d); return d; })(), { ...PROPOSED_BOUNDS, entryBytes: 1 });
+    const most = Number(/could take (\d+) bytes/.exec(tight.ok ? "" : tight.problems[0]!.message)![1]);
+    expect(most).toBeGreaterThan(PROPOSED_BOUNDS.partyMembers * 6 * PROPOSED_BOUNDS.memberBytes);
   });
 
   test("a timed rule that copies a party list is counted at every member the list can hold, so the entry of an admitted rule fits the entry size bound", () => {

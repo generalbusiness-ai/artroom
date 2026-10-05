@@ -43,12 +43,21 @@ export const keys = { rita: actor(1, "rita"), una: actor(2, "una", "paul"), vic:
 
 // ---------------------------------------------------------------- the lane
 
+/**
+ * The fixtures are in the form the validator takes today. The contract's
+ * adopted type also asks for a `name`, and states a fact's kinds as a list.
+ * The validator refuses both until the step of I2 that reads them, so until
+ * then a fixture has no name, and states one kind as a text.
+ */
+const landed = (definition: Omit<DeclaredDefinition, "name">): DeclaredDefinition => definition as DeclaredDefinition;
+const oneKind = (kind: string): readonly string[] => kind as unknown as readonly string[];
+
 const text = { type: "text", max: 200 } as const;
 const slot = { fixed: false, required: false } as const;
 const act = (a: Partial<ActType> & Pick<ActType, "step" | "on" | "grant">): ActType => ({ also: {}, fields: {}, guards: [], effects: [], sends: [], attention: [], ...a });
 const commitment = { also: { commitment: { item: "commitment", by: "commitment" } }, fields: { commitment: { type: "item", of: "commitment", required: true } } } as const;
 
-export const lane: DeclaredDefinition = {
+export const lane: DeclaredDefinition = landed({
   format: "artroom-definition-1",
   profile: { name: "restricted", version: 1 },
   capabilities: [{ name: "hold", version: 1 }],
@@ -134,14 +143,14 @@ export const lane: DeclaredDefinition = {
     "hold-end": { on: "hold", states: ["held"], deadline: "until", effects: [{ state: "ended" }, { hold: { do: "end" } }], attention: [{ notify: { slot: "holder", of: "on", when: "after", reason: "hold ended" } }] },
   },
   rules: {},
-};
+});
 
 // ---------------------------------------------------------------- the small definition
 
 const noteRange = (states: string[]) => ({ type: "note", states, where: [{ equals: { a: { slot: "text" }, b: { field: "text" } } }] });
 const probe = (guard: Guard) => act({ step: "transition", on: "note", grant: "probe", fields: { text: { ...text, required: true } }, guards: [guard] });
 
-export const small: DeclaredDefinition = {
+export const small: DeclaredDefinition = landed({
   format: "artroom-definition-1",
   profile: { name: "restricted", version: 1 },
   capabilities: [],
@@ -172,7 +181,7 @@ export const small: DeclaredDefinition = {
     share: act({ step: "transition", on: "note", grant: "share", fields: { reader: { type: "member", required: true } }, guards: [{ state: ["draft"] }], effects: [{ party: { slot: "readers", from: { field: "reader" }, list: "add" } }] }),
     // Names a foreign fact: an `assign` entry of a lane, whose performer must be the signer.
     cite: act({
-      step: "transition", on: "note", grant: "edit", fields: { proof: { type: "fact", kind: "assign", under: "lane", required: true } },
+      step: "transition", on: "note", grant: "edit", fields: { proof: { type: "fact", kind: oneKind("assign"), under: "lane", required: true } },
       guards: [{ state: ["draft"] }, { fact: { field: "proof", where: [{ equals: { a: { field: "performer" }, b: { signer: true } } }] } }],
       effects: [{ party: { slot: "readers", from: { fact: "proof", field: "performer" }, list: "add" } }],
     }),
@@ -194,7 +203,7 @@ export const small: DeclaredDefinition = {
   receives: {},
   timed: {},
   rules: {},
-};
+});
 
 export function valid(v: Validation): ValidDefinition {
   if (!v.ok) throw new Error(`the fixture definition is refused: ${JSON.stringify(v.problems)}`);
@@ -220,7 +229,7 @@ export const smallDefinition = valid(validateDefinition(small, PROPOSED_BOUNDS))
  * the detail names. `ask` tells the desk to make another ticket. `approve`
  * is under a rule: its signer is not the requester.
  */
-export const ticket: DeclaredDefinition = {
+export const ticket: DeclaredDefinition = landed({
   format: "artroom-definition-1",
   profile: { name: "restricted", version: 1 },
   capabilities: [],
@@ -270,7 +279,7 @@ export const ticket: DeclaredDefinition = {
   },
   timed: {},
   rules: { "two-eyes": "signer.member != subjects.on.parties.requester.member" },
-};
+});
 export const ticketDefinition = valid(validateDefinition(ticket, PROPOSED_BOUNDS));
 
 const makeTicket = { kind: "lane", definition: ticketDefinition.digest } as const;
@@ -281,7 +290,7 @@ const makeTicket = { kind: "lane", definition: ticketDefinition.digest } as cons
  * lane that asks. The handler for `echo` sends two updates that resolve to
  * one relationship key when its two fields name one item.
  */
-export const desk: DeclaredDefinition = {
+export const desk: DeclaredDefinition = landed({
   format: "artroom-definition-1",
   profile: { name: "restricted", version: 1 },
   capabilities: [],
@@ -312,7 +321,7 @@ export const desk: DeclaredDefinition = {
   },
   timed: {},
   rules: {},
-};
+});
 export const deskDefinition = valid(validateDefinition(desk, PROPOSED_BOUNDS));
 
 // ---------------------------------------------------------------- a scope in memory

@@ -10,6 +10,7 @@ import { canonicalBytes, digestBytes } from "@generalbusiness/artroom-bytes";
 import type { Signer } from "./attribution.ts";
 import type { Item, Party, ScopeState, StateView } from "./state.ts";
 import { timeMs, type Clock } from "./time.ts";
+import { unsupported } from "./unsupported.ts";
 import type { ValidDefinition } from "./validate.ts";
 import { own, same } from "./values.ts";
 
@@ -59,7 +60,7 @@ export function operand(j: Judging, o: Operand, item: Item | null): unknown {
   if ("field" in o) return own(j.fields, o.field) ?? null;
   if ("slot" in o) return item ? slotOf(item, o.slot) : null;
   if ("signer" in o) return j.signer?.member ?? null;
-  return o.const;
+  return "const" in o ? o.const : unsupported("that operand");
 }
 
 /**
@@ -69,7 +70,7 @@ export function operand(j: Judging, o: Operand, item: Item | null): unknown {
  * is returned as soon as it is completed; every other result needs the whole
  * set, and without it the guard is not judged.
  */
-function range(j: Judging, form: "some" | "none" | "count", r: Range & { min?: number; max?: number }): GuardResult {
+function range(j: Judging, form: "some" | "none" | "count", r: Range & { min?: number | undefined; max?: number | undefined }): GuardResult {
   const decide = (n: number, complete: boolean): GuardResult | null => {
     if (form === "some") return n >= 1 ? "pass" : complete ? "fail" : null;
     if (form === "none") return n >= 1 ? "fail" : complete ? "pass" : null;
@@ -91,7 +92,7 @@ function range(j: Judging, form: "some" | "none" | "count", r: Range & { min?: n
     for (const item of page.items) {
       read++;
       after = item.id;
-      if (!where.every((w) => same(operand(j, w.equals.a, item), operand(j, w.equals.b, item)))) continue;
+      if (!where.every((w) => ("equals" in w ? same(operand(j, w.equals.a, item), operand(j, w.equals.b, item)) : unsupported("a where that is not equals")))) continue;
       const decided = decide(++matched, false);
       if (decided) return decided;
     }
@@ -112,13 +113,16 @@ export function ruleInput(j: Judging): unknown {
   };
 }
 
+/** True when `kind` is the kind a `fact` type states. The validator takes one kind, written as a text; the contract's type is a list. */
+const kindIs = (stated: readonly string[] | string, kind: string): boolean => (typeof stated === "string" ? stated === kind : stated.includes(kind));
+
 /** The fields a guard names, for `ifPresent`. */
 function fieldsNamed(j: Judging, g: Guard): string[] {
   const of = (o: Operand) => ("field" in o ? [o.field] : []);
   if ("equals" in g) return [...of(g.equals.a), ...of(g.equals.b)];
   if ("differs" in g) return [...of(g.differs.a), ...of(g.differs.b)];
   if ("every" in g) return Object.hasOwn(j.fieldTypes, g.every.list) ? [g.every.list] : [];
-  if ("fact" in g) return [g.fact.field, ...(g.fact.where ?? []).flatMap((w) => of(w.equals.b))];
+  if ("fact" in g) return "field" in g.fact ? [g.fact.field, ...(g.fact.where ?? []).flatMap((w) => ("equals" in w ? of(w.equals.b) : []))] : [];
   return [];
 }
 
@@ -136,7 +140,10 @@ export function judgeGuard(j: Judging, g: Guard): GuardResult {
   if ("differs" in g) return ok(!same(operand(j, g.differs.a, item), operand(j, g.differs.b, item)));
   if ("some" in g) return range(j, "some", g.some);
   if ("none" in g) return range(j, "none", g.none);
-  if ("count" in g) return range(j, "count", g.count);
+  if ("count" in g) {
+    const { min, max } = g.count;
+    return typeof min === "object" || typeof max === "object" ? unsupported("a count bound from an operand") : range(j, "count", { ...g.count, min, max });
+  }
   if ("every" in g) {
     // A field of that name when the act has one; otherwise a slot of the subject. At most 32 point reads.
     const fromField = Object.hasOwn(j.fieldTypes, g.every.list);
@@ -145,15 +152,16 @@ export function judgeGuard(j: Judging, g: Guard): GuardResult {
     return ok((Array.isArray(list) ? list : []).every((id) => g.every.states.includes(j.view.item(id as number)?.state ?? "")));
   }
   if ("fact" in g) {
-    const ref = own(j.fields, g.fact.field) as FactRef | undefined;
-    const type = own(j.fieldTypes, g.fact.field);
+    const fact = "field" in g.fact ? g.fact : unsupported("a fact guard over no field");
+    const ref = own(j.fields, fact.field) as FactRef | undefined;
+    const type = own(j.fieldTypes, fact.field);
     if (!ref || type?.type !== "fact") return "fail";
     const fetched = j.facts.get(ref.hash);
     if (!fetched) return "dependency-unavailable";
     const input = fetched.entry.input;
-    if (input.type !== "act" || input.signed.intent.kind !== type.kind || fetched.under !== type.under) return "fail";
+    if (input.type !== "act" || !kindIs(type.kind, input.signed.intent.kind) || fetched.under !== type.under) return "fail";
     // `a` is a field of the foreign intent; `b` is read in this act.
-    return ok((g.fact.where ?? []).every((w) => same("field" in w.equals.a ? (own(input.signed.intent.fields, w.equals.a.field) ?? null) : null, operand(j, w.equals.b, item))));
+    return ok((fact.where ?? []).every((w) => "equals" in w && same("field" in w.equals.a ? (own(input.signed.intent.fields, w.equals.a.field) ?? null) : null, operand(j, w.equals.b, item))));
   }
   if ("before" in g || "after" in g) {
     // Section 5.3: a reading that is behind the history proves nothing about a deadline.
@@ -162,6 +170,7 @@ export function judgeGuard(j: Judging, g: Guard): GuardResult {
     const now = timeMs(j.clock.reading)!;
     return ok(deadline !== null && ("before" in g ? now < deadline : now > deadline));
   }
+  if (!("rule" in g)) return unsupported("that guard");
   const input = ruleInput(j);
   const digest = digestBytes(canonicalBytes(input));
   if (j.asked) {

@@ -14,7 +14,7 @@
 import type { Effect, Entry, FactUse, Grant, Head, Input, MismatchReason, Prepared, RefusalReason, RoutingRefusal, ScopeRef, Send, SignedIntent, UnavailableReason } from "@generalbusiness/artroom-contract";
 import { intentDigest, scopeIdOf, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import { deriveEffects } from "./effects.ts";
-import { isIntent, readFacts, readFields, type Reading } from "./frame.ts";
+import { isIntent, namedBy, readFacts, readFields, type Reading } from "./frame.ts";
 import { judgeGuard, type Judging } from "./guards.ts";
 import { deriveSends } from "./sends.ts";
 import type { Item, StateView } from "./state.ts";
@@ -127,9 +127,9 @@ export function judgeAct(view: StateView, definition: ValidDefinition, signed: S
     if (act.step === "transition") expects.push("on");
   }
   for (const [name, also] of Object.entries(act.also)) {
-    const id = own(fields, also.by);
+    const id = own(fields, namedBy(also));
     const item = typeof id === "number" ? view.item(id) : null;
-    if (item?.type !== also.item) return refused("no-item", `${also.by} names no ${also.item}`);
+    if (item?.type !== also.item) return refused("no-item", `${namedBy(also)} names no ${also.item}`);
     subjects.set(`also.${name}`, item);
     expects.push(name);
   }

@@ -5,7 +5,7 @@
  * the clause of an earlier send is run again from the entry that sent it.
  */
 
-import type { ActType, Advisory, Bounds, Digest, Effect, EffectForm, Entry, FactRef, FactUse, FieldType, FieldValue, Guard, Notify, Prepared, ReceiveType, RefusalReason, Request, ResultClauses, ScopeKind, Send, SendForm, UnavailableReason } from "@generalbusiness/artroom-contract";
+import type { ActType, Advisory, AlsoRule, Bounds, Digest, Effect, EffectForm, Entry, FactRef, FactUse, FieldType, FieldValue, Guard, Notify, Prepared, ReceiveType, RefusalReason, Request, ResultClauses, ScopeKind, Send, SendForm, UnavailableReason } from "@generalbusiness/artroom-contract";
 import { canonicalBytes, digestBytes, entryHash, isIntent } from "@generalbusiness/artroom-bytes";
 import type { Signer } from "./attribution.ts";
 import { deriveEffects } from "./effects.ts";
@@ -14,6 +14,7 @@ import { judgeGuard, type Fetched, type Judging, type RuleInput } from "./guards
 import { deriveSends } from "./sends.ts";
 import type { Item, OwnRequest, ScopeState, StateView } from "./state.ts";
 import type { Clock } from "./time.ts";
+import { unsupported } from "./unsupported.ts";
 import { keptMessage, type ValidDefinition } from "./validate.ts";
 import { byteOrder, isFactRef, isLocalId, isObject, isValue, own, same } from "./values.ts";
 
@@ -169,6 +170,9 @@ export function bound(definition: ValidDefinition, message: Request | Advisory, 
   return { kind, handler, fields };
 }
 
+/** The field that names an `also` item. */
+export const namedBy = (also: AlsoRule): string => ("by" in also ? also.by : unsupported("an also name with no by"));
+
 /** The local item a handler's field names: by its local ID, or by the fact of the entry of this scope that opened it. */
 function localItem(view: StateView, scope: Pick<ScopeState, "at">, v: unknown): Item | null {
   if (isLocalId(v)) return view.item(v);
@@ -189,7 +193,7 @@ export type Ran =
   | { result: "unavailable"; reason: UnavailableReason };
 
 /** True when an effect sets a slot from the commit time. */
-const timesEffect = (e: EffectForm): boolean => "value" in e && "time" in e.value.from;
+const timesEffect = (e: EffectForm): boolean => "value" in e && e.value.from !== null && "time" in e.value.from;
 
 /**
  * Guards, then effects, then sends, for one input whose subjects are
@@ -219,8 +223,8 @@ export function derive(j: Judging, forms: Forms, opens: string | null, cause: Di
 export function runHandler(view: StateView, definition: ValidDefinition, context: Reading, scope: ScopeState, handler: ReceiveType, kind: string, fields: Record<string, FieldValue>, cause: Digest): Ran {
   const subjects = new Map<string, Item>();
   for (const [name, also] of Object.entries(handler.also)) {
-    const item = localItem(view, scope, own(fields, also.by));
-    if (item?.type !== also.item) return { result: "refused", reason: "no-item", detail: `${also.by} names no ${also.item}`, prepared: [] };
+    const item = localItem(view, scope, own(fields, namedBy(also)));
+    if (item?.type !== also.item) return { result: "refused", reason: "no-item", detail: `${namedBy(also)} names no ${also.item}`, prepared: [] };
     subjects.set(`also.${name}`, item);
   }
   if (new Set([...subjects.values()].map((i) => i.id)).size !== subjects.size) return { result: "refused", reason: "alias", detail: "two names resolve to one item", prepared: [] };
@@ -263,7 +267,7 @@ export function runClause(view: StateView, definition: ValidDefinition, context:
     const read = readFields(act.fields, given ?? {}, context.bounds);
     if (!read.ok) throw new Error(`entry ${origin.seq} was sealed with fields its act does not take`);
     const on = act.step === "open" ? origin.seq : intent?.on;
-    const subjects: [string, Item | null][] = Object.entries(act.also).map(([name, also]) => [`also.${name}`, view.item(own(read.fields, also.by) as number)]);
+    const subjects: [string, Item | null][] = Object.entries(act.also).map(([name, also]) => [`also.${name}`, view.item(own(read.fields, namedBy(also)) as number)]);
     if (typeof on === "number") subjects.push(["on", view.item(on)]);
     // A child's genesis sends its result at ordinal 0, before the sends its act declares.
     // The clause reads the member who signed the origin, and no principal. The entry that records the clause has no signer, so
@@ -275,7 +279,7 @@ export function runClause(view: StateView, definition: ValidDefinition, context:
     const b = bound(definition, input.message, input.from);
     if (!b?.handler) throw new Error(`entry ${origin.seq} sent a request and ran no handler`);
     const handler = b.handler;
-    frame = { kind: b.kind, fields: b.fields, fieldTypes: {}, subjects: Object.entries(handler.also).map(([name, also]) => [`also.${name}`, localItem(view, scope, own(b.fields, also.by))]), signer: null, sends: handler.sends, first: 0 };
+    frame = { kind: b.kind, fields: b.fields, fieldTypes: {}, subjects: Object.entries(handler.also).map(([name, also]) => [`also.${name}`, localItem(view, scope, own(b.fields, namedBy(also)))]), signer: null, sends: handler.sends, first: 0 };
   } else throw new Error(`entry ${origin.seq} is not one that sends a request`);
 
   const form = frame.sends[request.n - frame.first];

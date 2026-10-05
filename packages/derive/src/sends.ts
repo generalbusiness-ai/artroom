@@ -8,6 +8,7 @@ import type { Digest, FactRef, FieldType, Seed, SelfMark, Send, SendForm, SendSo
 import type { Derived } from "./effects.ts";
 import { slotOf, type Judging } from "./guards.ts";
 import type { Item } from "./state.ts";
+import { unsupported } from "./unsupported.ts";
 import { isLocalId, isScopeRef, own } from "./values.ts";
 
 /**
@@ -27,7 +28,7 @@ export function deriveSends(j: Judging, forms: readonly SendForm[], working: Rea
     if (s === "self") return { value: j.self, type: { type: "item", of: "" } };
     if ("field" in s) return { value: own(j.fields, s.field) ?? null, type: own(j.fieldTypes, s.field) ?? null };
     if ("slot" in s) return { value: on ? slotOf(on, s.slot) : null, type: slotType(s.slot) };
-    return { value: "signer" in s ? (j.signer?.member ?? null) : s.const, type: null };
+    return { value: "signer" in s ? (j.signer?.member ?? null) : "const" in s ? s.const : unsupported("that source of a send"), type: null };
   };
   /**
    * Section 6.4: a local reference is not sent as a number. The entry being
@@ -58,11 +59,13 @@ export function deriveSends(j: Judging, forms: readonly SendForm[], working: Rea
     const refuse = (what: string) => ({ ok: false, reason: "send-unresolved", detail: `sends.${i}: ${what}` }) as const;
     if ("create" in form) {
       // Section 7.2: the seed names this scope as creator, the input's cause, and which creation of that input this is.
-      const seed: Seed = { v: 1, kind: form.create.kind, definition: form.create.definition, creator: j.scope.at, cause, ordinal: creations++ };
+      const definition = form.create.definition === "self" ? unsupported("a creation under the creator's own definition") : form.create.definition;
+      const seed: Seed = { v: 1, kind: form.create.kind, definition, creator: j.scope.at, cause, ordinal: creations++ };
       sends.push({ n, to: seed, message: { class: "request", type: "create", body: { fields: fields(form.create.fields) } } });
     } else if ("tell" in form) {
-      const to = on ? slotOf(on, form.tell.to) : null;
-      if (!isScopeRef(to)) return refuse(`the slot ${form.tell.to} holds no scope`);
+      const slot = typeof form.tell.to === "string" ? form.tell.to : unsupported("a tell addressed by a slot of any subject");
+      const to = on ? slotOf(on, slot) : null;
+      if (!isScopeRef(to)) return refuse(`the slot ${slot} holds no scope`);
       sends.push({ n, to, message: { class: "request", type: "tell", body: { message: form.tell.message, fields: fields(form.tell.fields) } } });
     } else if ("relate" in form) {
       const to = held(form.relate.to).value;
