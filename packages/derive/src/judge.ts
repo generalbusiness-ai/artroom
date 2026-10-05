@@ -11,7 +11,7 @@
  * or `deriveEffects`, and returns a `Draft`.
  */
 
-import type { Effect, Entry, FactRef, FactUse, Grant, GrantMark, Head, Input, MismatchReason, Prepared, RefusalReason, RoutingRefusal, ScopeRef, Send, SignedIntent, UnavailableReason } from "@generalbusiness/artroom-contract";
+import type { Effect, Entry, FactRef, FactUse, Grant, GrantMark, Head, Input, MismatchReason, ObservationUse, Prepared, RefusalReason, RoutingRefusal, ScopeRef, Send, SignedIntent, UnavailableReason } from "@generalbusiness/artroom-contract";
 import { intentDigest, scopeIdOf, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import type { Signer } from "./attribution.ts";
 import { deriveEffects } from "./effects.ts";
@@ -19,7 +19,7 @@ import { isIntent, presentedTypes, readFacts, readFields, type Reading } from ".
 import { covers } from "./grant.ts";
 import type { Judging } from "./guards.ts";
 import { alsoItems, derive, giving } from "./handlers.ts";
-import { actionOf, fieldOutsideType, grantByRule, markOf, selectedBy, unjudged, type JudgedInput } from "./marks.ts";
+import { actionOf, atHand, fieldOutsideType, grantByRule, markOf, retainedOf, selectedBy, unjudged, type JudgedInput, type ValueRead } from "./marks.ts";
 import type { Item, StateView } from "./state.ts";
 import { nextDue, type Due } from "./timed.ts";
 import { timeMs, type Clock } from "./time.ts";
@@ -56,6 +56,22 @@ export interface JudgeContext extends Reading {
   membership?: ScopeRef | null | undefined;
   /** The facts presented beside the intent, by name, as they arrived (section 6.4). They are not signed. */
   presented?: Readonly<Record<string, unknown>> | undefined;
+  /**
+   * The further observations at hand for this act (sections 4.1 and 16.1):
+   * what the scope read before the turn, of another key, of a member or of
+   * the rules, each judged by the guards of an observation before the judge
+   * is given it. A verifier gives the records of the entry's own `observed`.
+   * Only a rule of a platform definition reads one, and the entry retains
+   * exactly those that its rules read. Absent: none is at hand.
+   */
+  observed?: readonly ObservationUse[] | undefined;
+  /**
+   * The values that came beside the intent (section 6.2, "A value beside an
+   * intent"), each as its canonical bytes. They are not signed. Only a rule
+   * of a platform definition reads one, by its domain and its digest, and
+   * the scope keeps exactly those that a rule read. Absent: none came.
+   */
+  values?: readonly string[] | undefined;
 }
 
 /** What a judged input writes. `seq`, `prev` and `time` are allocated when it is sealed; see `entryOf`. */
@@ -67,6 +83,14 @@ export interface Draft {
   sends: readonly Send[];
   /** It judges an expiry, a freshness or a deadline, so it is never written while the clock is behind (section 5.3). */
   judgesTime: boolean;
+  /**
+   * Section 6.2, "Retention": each value beside the intent that a rule of
+   * the entry read, by its domain and its digest, with its canonical bytes.
+   * The scope keeps each as one retained input, with the entry. It is in no
+   * entry: the entry holds the digest in a field of its intent. Absent: the
+   * rules read none.
+   */
+  values?: readonly ValueRead[];
   /**
    * Section 17.3: the entry settles what its form declares with `settles`.
    * Its subject was in a listed state at the commit, and the entry takes it
@@ -167,16 +191,18 @@ function actJudged(view: StateView, definition: ValidDefinition, signed: SignedI
   const presents = presentedTypes(act.presents);
   const shown = readFields(presents, context.presented ?? {}, bounds);
   if (!shown.ok) return refused("bad-field", `presented: ${shown.detail}`);
-  const beside = readFacts(view, presents, shown.fields, context.facts, local);
-  if (beside.result === "unavailable") return { result: "unavailable", reason: "dependency-unavailable" };
-  if (beside.result !== "read") return refused(beside.result, `presented: ${beside.detail}`);
-  const facts = new Map([...named.facts, ...beside.facts]);
-  const uses = [...named.uses, ...beside.uses.filter((use) => !named.facts.has(use.fact.hash))];
+  const shownFacts = readFacts(view, presents, shown.fields, context.facts, local);
+  if (shownFacts.result === "unavailable") return { result: "unavailable", reason: "dependency-unavailable" };
+  if (shownFacts.result !== "read") return refused(shownFacts.result, `presented: ${shownFacts.detail}`);
+  const facts = new Map([...named.facts, ...shownFacts.facts]);
+  const uses = [...named.uses, ...shownFacts.uses.filter((use) => !named.facts.has(use.fact.hash))];
   if (uses.length > bounds.usesPerEntry) return refused("bad-field", `more than ${bounds.usesPerEntry} foreign entries`);
   // Platform data: what a rule of this row is given (section 6.1). The input is the act as it arrived. No grant is judged yet.
   const clocked = { clock: false };
   const judged: JudgedInput = { type: "act", signed, grant: null, presented: context.presented ?? {} };
-  const g = giving(view, context, scope, scope.head.seq + 1, judged, clocked, fields, facts);
+  // Sections 4.1 and 6.2: the further observations and the values at hand, which only a rule reads. What a rule reads of them is noted.
+  const beside = context.observed === undefined && context.values === undefined ? undefined : atHand(context.observed, context.values);
+  const g = { ...giving(view, context, scope, scope.head.seq + 1, judged, clocked, fields, facts), beside };
   // Check 7: a field whose type is a mark is checked by the mark's rule.
   const outside = fieldOutsideType(g, act.fields);
   if (outside) return refused("bad-field", `${outside} is not a value of its type`);
@@ -248,8 +274,8 @@ function actJudged(view: StateView, definition: ValidDefinition, signed: SignedI
 
   const j: Judging = {
     view, definition, bounds, clock, scope, self: scope.head.seq + 1, kind: intent.kind, fields, fieldTypes: act.fields, subjects, signer, facts, prepared: context.prepared, used: [], asked: context.asked,
-    own: context.own, intent: digest, presented: beside.fields, capabilities: context.capabilities,
-    platform: context.platform, judged: { ...judged, grant: granted }, ran: clocked,
+    own: context.own, intent: digest, presented: shownFacts.fields, capabilities: context.capabilities,
+    platform: context.platform, judged: { ...judged, grant: granted }, ran: clocked, beside,
   };
 
   // Guards, then effects, then sends, then the bound on the type it opens, as for a handler. The cause of a scope it creates is the intent's digest.
@@ -261,8 +287,12 @@ function actJudged(view: StateView, definition: ValidDefinition, signed: SignedI
   if (clock.behind) return { result: "unavailable", reason: "clock-behind" };
   // The entry records each presented fact as it arrived: a whole fact reference, also for an entry of this scope.
   // Section 4.2: the entry records the one grant judged. An act that the rule of a mark at `grant` passed records none.
-  const input = { type: "act", signed, authority: granted ? [granted] : [], presented: shown.fields as Record<string, FactRef> } as const;
-  return { result: "write", draft: { input, uses, prepared: ran.prepared, effects: ran.effects, sends: ran.sends, judgesTime: true, settles: ran.settles } };
+  // Section 4.1, "An input may retain observations": the entry holds each further observation that a rule of its row read, in
+  // ascending order of `read.n`, and the member is left out when it retains none. Section 6.2: a value that a rule read is kept
+  // with the entry, and is in no entry.
+  const retained = retainedOf(beside);
+  const input = { type: "act", signed, authority: granted ? [granted] : [], presented: shown.fields as Record<string, FactRef>, ...(retained.observed.length > 0 ? { observed: retained.observed } : {}) } as const;
+  return { result: "write", draft: { input, uses, prepared: ran.prepared, effects: ran.effects, sends: ran.sends, judgesTime: true, settles: ran.settles, ...(retained.values.length > 0 ? { values: retained.values } : {}) } };
 }
 
 /**

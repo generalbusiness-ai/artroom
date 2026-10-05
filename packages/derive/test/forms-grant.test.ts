@@ -24,7 +24,7 @@ const asked: GrantAsked = { scope: otherLane, membership, key: rita.key, action:
 const prior = { seq: 5, hash: d("5") };
 const reused: ObservationUse = { ...fresh, use: "reused", prior };
 const last = { entry: prior, time: t(10), observation: standing };
-const of = (change: Partial<Observation>, use: ObservationUse = fresh): ObservationUse => ({ ...use, observation: { ...standing, ...change } });
+const of = (change: Partial<Observation>, use: ObservationUse = fresh): ObservationUse & { observation: Observation } => ({ ...use, observation: { ...standing, ...change } });
 const said = (judged: GrantJudgment) => (judged.result === "current" ? "current" : `${judged.result}: ${judged.failed}`);
 
 describe("the grant guard and the commit guards of an observation (authority note, section 3.3; section 16.1; T45)", () => {

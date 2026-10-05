@@ -18,7 +18,7 @@
  * `run-returned`, which is over the order of entries and is the verifier's.
  */
 
-import type { Grant, Head, KeyId, Observation, ObservationAnswer, ObservationUse, ScopeFilter, ScopeKind, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
+import type { Grant, Head, KeyId, Observation, ObservationUse, ScopeFilter, ScopeKind, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
 import { isHead, isKeyId, isMemberId, isPlatformDefinition, isRecord, platformName } from "@generalbusiness/artroom-bytes";
 import type { StateView } from "./state.ts";
 import { timeMs, type Clock } from "./time.ts";
@@ -113,7 +113,7 @@ export const covers = (within: unknown, scope: ScopeRef, membership: ScopeRef | 
  */
 export function observationOf(answer: unknown, at: Timestamp): Observation | null {
   if (!isRecord(answer) || Object.keys(answer).length !== 13 || timeMs(at) === null) return null;
-  const { of, head, key, keyState, member, memberState, role, actions, within, controller, controllerActive, notAfter, definition } = answer as Record<keyof ObservationAnswer, unknown>;
+  const { of, head, key, keyState, member, memberState, role, actions, within, controller, controllerActive, notAfter, definition } = answer as Record<keyof Omit<Observation, "at">, unknown>;
   if (!isScopeRef(of) || of.kind !== "membership" || !isHead(head) || !isKeyId(key) || !isMemberId(member) || typeof role !== "string") return null;
   if (keyState !== "active" && keyState !== "retired" && keyState !== "compromised" && keyState !== "unknown") return null;
   if (memberState !== "active" && memberState !== "removed") return null;

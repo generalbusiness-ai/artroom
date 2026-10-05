@@ -16,8 +16,8 @@
  * and nothing in an entry says that a rule ran.
  */
 
-import type { ActType, AlsoMark, Attempt, Bounds, Effect, Evidence, FactRef, FieldType, FieldValue, Grant, GrantMark, Guard, Mark, MemberRef, Message, OperationId, PlatformDefinition, Request, ScopeRef, Seed, SignedIntent, Timestamp } from "@generalbusiness/artroom-contract";
-import { isFieldValue, isMemberRef } from "@generalbusiness/artroom-bytes";
+import type { ActType, AlsoMark, Attempt, Bounds, Digest, DomainTag, Effect, Evidence, FactRef, FieldType, FieldValue, Grant, GrantMark, Guard, KeyId, Mark, MemberId, MemberRef, Message, ObservationUse, OperationId, PlatformDefinition, Request, ScopeRef, Seed, SignedIntent, Timestamp } from "@generalbusiness/artroom-contract";
+import { canonicalize, digestBytes, domainBytes, isFieldValue, isMemberRef, parseStrict, utf8 } from "@generalbusiness/artroom-bytes";
 import type { Signer } from "./attribution.ts";
 import type { Own } from "./fields.ts";
 import type { Fetched, GuardResult, Judging } from "./guards.ts";
@@ -44,6 +44,77 @@ export type JudgedInput =
   | { readonly type: "delivery"; readonly from: FactRef; readonly n: number; readonly message: Message }
   | { readonly type: "outcome"; readonly operation: OperationId; readonly attempt: number; readonly result: "confirmed" | "refused" | "unknown"; readonly evidence: Evidence }
   | { readonly type: "diagnosis"; readonly of: { seq: number; n: number }; readonly attempts: readonly Attempt[] };
+
+/**
+ * The subject of a further observation that a rule reads (section 16.1,
+ * "An observation outside a grant"): one key, one member, or what the rules
+ * scope holds, by what was asked of it.
+ */
+export type Observed = { key: KeyId } | { member: MemberId } | { asked: "rules" | "definitions" };
+
+/** A value beside an intent that a rule read (section 6.2): its byte domain, its digest in that domain, and its canonical bytes. */
+export interface ValueRead { domain: string; digest: Digest; bytes: string }
+
+/**
+ * What is at hand for one entry beside its input, and what the rules of its
+ * row read of it (sections 4.1, 6.2 and 16.1).
+ *
+ * `observed`: the further observations that the scope read before the turn
+ * for this input, each with its read and its use, and each already judged
+ * by the guards of section 16.1. A verifier gives the records of the
+ * entry's own `observed`. `values`: each value that came beside the intent,
+ * as its canonical bytes; a verifier gives the values that the entry
+ * retains. `read`: what a rule read of the two, in the order of the reads.
+ *
+ * The entry retains exactly what its rules read. An observation that no
+ * rule reads is not written, and a value that no rule reads is not kept.
+ * So an entry of a row whose rules read neither has the bytes it had.
+ *
+ * I3 merge: the judge of an act is given both and writes `observed`
+ * (`judge.ts`). Three things are owed in modules of other steps, and until
+ * then a rule that reads either is given none there and its guard is not
+ * completed. The judges of a result's delivery and of an outcome build no
+ * `AtHand` and write no `observed` (`delivery.ts`, `handlers.ts` and
+ * `outcomes.ts`). The scope makes no further read before a turn, reads no
+ * `values` from what came beside an intent and keeps no value
+ * (`scope/src/core.ts`, with the store). And a replay is given no retained
+ * value (`replay/src/verify.ts`). The I3 deltas note, entries EM1 to EM4,
+ * has the lines.
+ */
+export interface AtHand {
+  readonly observed: readonly ObservationUse[];
+  readonly values: readonly string[];
+  readonly read: { observed: ObservationUse[]; values: ValueRead[] };
+}
+
+/** What is at hand for one entry: the observations and the values that its judge was given. */
+export const atHand = (observed: readonly ObservationUse[] | undefined, values: readonly string[] | undefined): AtHand =>
+  ({ observed: observed ?? [], values: values ?? [], read: { observed: [], values: [] } });
+
+/**
+ * What the entry retains of what was at hand: each observation that a rule
+ * read, once, in ascending order of `read.n` (section 4.1), and each value
+ * that a rule read, once for a domain and a digest (section 6.2).
+ */
+export function retainedOf(hand: AtHand | undefined): { observed: readonly ObservationUse[]; values: readonly ValueRead[] } {
+  return { observed: [...(hand?.read.observed ?? [])].sort((a, b) => a.read.n - b.read.n), values: hand?.read.values ?? [] };
+}
+
+/** True when a retained observation is of that subject. An observation of a key has no member `subject`. */
+const isOf = (use: ObservationUse, subject: Observed): boolean => {
+  const o = use.observation;
+  if ("key" in subject) return !("subject" in o) && o.key === subject.key;
+  if ("member" in subject) return "subject" in o && o.subject === "member" && o.member === subject.member;
+  return "subject" in o && o.subject === "rules" && o.content.asked === subject.asked;
+};
+
+/**
+ * The digest of one value in one byte domain (section 6.2, "What a value
+ * is"): over the domain tag, a newline and the value's canonical bytes,
+ * like every digest of the contract. The domain is one that the contract
+ * names, or one that the owner of the value declares (section 2.1).
+ */
+export const valueDigest = (domain: string, value: unknown): Digest => digestBytes(domainBytes(domain as DomainTag, value));
 
 /**
  * What the judge resolved before the rule's place (section 6.1, item 6):
@@ -80,6 +151,17 @@ export interface Resolved {
  * 5. `own`: the scope's own earlier entries, by position.
  * 6. `resolved`: what the judge resolved before the rule's place.
  *
+ * Two readers belong to items 2 and 4. `observed` reads one of the further
+ * observations of the entry's input, by its subject: the member `observed`
+ * of an act, of an outcome and of a delivery of a result (sections 4.1 and
+ * 16.1). Null: the entry would lack it. `value` reads one value beside the
+ * intent, by its byte domain and its digest there, when it is no longer
+ * than `most` bytes, which is the bound that the owner of the domain
+ * states (section 6.2). Undefined: none at hand has that digest. The entry
+ * retains what a rule read through them, and nothing else of the two. A
+ * rule that needs one and is given none answers that its guard is not
+ * completed, `dependency-unavailable`, where its specification says so.
+ *
  * A rule is not given the bytes of a detached text, storage, the network,
  * any clock but that one reading, a random value, the order in which inputs
  * arrived, transport's acknowledgments, the present state of another scope,
@@ -93,6 +175,8 @@ export interface RuleGiven {
   readonly uses: readonly Fetched[];
   readonly own: Own;
   readonly resolved: Resolved;
+  observed(subject: Observed): ObservationUse | null;
+  value(domain: string, digest: Digest, most: number): unknown;
 }
 
 /** The members of `Effect` that a rule returns (section 6.1, "What a rule returns is in this contract's forms"). */
@@ -218,15 +302,39 @@ export function unjudged<T>(judge: () => T): T | { result: "unavailable"; reason
 export const markOf = (v: unknown): Mark | null => (isObject(v) && typeof v["code"] === "string" && typeof v["row"] === "string" ? (v as unknown as Mark) : null);
 
 /** What a judge holds when it gives a rule its six things: the parts of a `Judging` that a rule is given. */
-export type Giving = Pick<Judging, "view" | "clock" | "bounds" | "scope" | "self" | "fields" | "subjects" | "signer" | "facts" | "own" | "source" | "platform" | "judged" | "ran">;
+export type Giving = Pick<Judging, "view" | "clock" | "bounds" | "scope" | "self" | "fields" | "subjects" | "signer" | "facts" | "own" | "source" | "platform" | "judged" | "ran" | "beside">;
 
 /** The six things, and no other (section 6.1). The entries in `uses` are those that the input's fields name, and for a delivery its source entry. */
 export function givenTo(g: Giving): RuleGiven {
   if (!g.judged) throw new RuleFault("a rule is run for an entry whose input the judge did not state");
   const uses = [...(g.source ? [g.source] : []), ...[...g.facts.values()].filter((fact) => fact.fact.hash !== g.source?.fact.hash)];
+  const hand = g.beside;
   return {
     state: g.view, input: g.judged, time: g.clock.asOf, uses, own: g.own ?? (() => null),
     resolved: { at: g.scope.at, self: g.self, fields: g.fields, subjects: g.subjects, signer: g.signer, bounds: g.bounds },
+    // Sections 4.1 and 16.1: an observation that a rule reads is one that the entry retains. The judge notes each read.
+    observed(subject) {
+      const use = hand?.observed.find((at) => isOf(at, subject)) ?? null;
+      if (use && hand && !hand.read.observed.includes(use)) hand.read.observed.push(use);
+      return use;
+    },
+    // Section 6.2: a value is matched by its digest in the domain that its place states. Bytes that are not the canonical form of a
+    // JSON value, and a value that is longer than the bound of its domain, are no value at hand.
+    value(domain, digest, most) {
+      for (const bytes of hand?.values ?? []) {
+        if (typeof bytes !== "string" || utf8(bytes).length > most) continue;
+        let value: unknown;
+        try {
+          value = parseStrict(bytes);
+          if (canonicalize(value) !== bytes || valueDigest(domain, value) !== digest) continue;
+        } catch {
+          continue;
+        }
+        if (hand && !hand.read.values.some((read) => read.domain === domain && read.digest === digest)) hand.read.values.push({ domain, digest, bytes });
+        return value;
+      }
+      return undefined;
+    },
   };
 }
 

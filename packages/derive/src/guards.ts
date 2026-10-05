@@ -11,7 +11,7 @@ import type { Signer } from "./attribution.ts";
 import { capabilityGuard, type Capabilities } from "./capability.ts";
 import type { Own } from "./fields.ts";
 import { all, excepted, listGuard, scan, typeOfElement } from "./lists.ts";
-import { guardByRule, markOf, type Declined, type JudgedInput, type PlatformRules } from "./marks.ts";
+import { guardByRule, markOf, type AtHand, type Declined, type JudgedInput, type PlatformRules } from "./marks.ts";
 import { equal, kindOf, operand, slotOf } from "./operand.ts";
 import type { Item, Party, ScopeState, StateView } from "./state.ts";
 import { timeMs, type Clock } from "./time.ts";
@@ -64,6 +64,7 @@ export interface Judging {
   judged?: JudgedInput | undefined;                    // the input of the entry being judged, whole, as a rule is given it
   ran?: { clock: boolean } | undefined;                // one for a judgment: whether a rule that reads the clock was run for it
   coded?: Map<Guard, Declined> | undefined;            // each guard that is a mark and did not hold, with the refusal its rule states
+  beside?: AtHand | undefined;                         // the further observations and the values at hand for this entry, and what its rules read of them (sections 4.1 and 6.2)
 }
 
 /** Passed, failed, or not judged, with the reason for the Unavailable answer (section 4.2). */

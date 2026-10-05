@@ -674,7 +674,12 @@ class Verifier {
         // Section 9.3: that a grant was fresh is not checked, beyond its recorded form. The authority port's verdict is trusted.
         this.#trusts.add("authority");
         // Section 16.1, "Replay": that `within` covers the observing scope is checked by the reference that its genesis records.
-        judged = judgeAct(state, definition, input.signed, { ...reading, presented: input.presented, grants: input.authority.map((grant) => ({ grant, current: true })), membership: recordedMembership(run) });
+        // Section 16.1, "Replay": the entry holds exactly the observations that its judgment reads. The judge is given the recorded
+        // ones, and derives an input with those that a rule read: one that no rule reads, and one that a rule reads and the entry
+        // lacks, are each a mismatch.
+        // I3 merge: a value beside an intent is kept as a retained input under its domain and digest (section 6.2), and no store keeps
+        // one yet. So this replay gives the judge none, and an entry whose rule reads a value is not derived again.
+        judged = judgeAct(state, definition, input.signed, { ...reading, presented: input.presented, grants: input.authority.map((grant) => ({ grant, current: true })), membership: recordedMembership(run), ...(input.observed ? { observed: input.observed } : {}) });
         break;
       case "delivery": {
         this.#trusts.add("delivered");

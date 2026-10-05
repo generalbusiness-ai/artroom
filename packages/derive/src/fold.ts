@@ -86,13 +86,17 @@ function changeSlots(item: Item, effect: ItemEffect, definition: ValidDefinition
  * The heads that one retained observation states, by subject (section 16.1,
  * "How one observation follows another", rule 3, and "A key's observation
  * is also of its member"): an observation of a key counts under its key and
- * under its member, of its observed scope. None: the value is no
- * observation of a key, as a grant with no proof has.
+ * under its member, of its observed scope. An observation of a member
+ * counts under its member. The rules are one subject, whichever content was
+ * asked for. None: the value is no observation, as a grant with no proof
+ * has.
  */
 export function headsOf(proof: unknown): ObservedHead[] {
   const o = isObject(proof) ? proof["observation"] : null;
   if (!isObject(o) || !isScopeRef(o["of"]) || !isObject(o["head"]) || !isLocalId(o["head"]["seq"])) return [];
   const [of, seq] = [{ scope: o["of"].scope, inc: o["of"].inc }, o["head"]["seq"]];
+  // A key is `key_` and more, and a member is `@` and more, so the one name of the rules is neither.
+  if (o["subject"] === "rules") return [{ of, subject: "rules", seq }];
   return [o["key"], o["member"]].flatMap((subject) => (typeof subject === "string" ? [{ of, subject, seq }] : []));
 }
 
@@ -233,12 +237,12 @@ export function applyEntry(writer: StateWriter, definition: ValidDefinition, ent
     writer.putRequest({ ...request, diagnosis: { seq: entry.seq, finding: input.finding } });
   }
   // Section 16.1, "The fold holds the highest head": for each subject of an observation that this entry retains, the highest
-  // `head.seq` that an entry of the scope retained for it. An act and a preparation retain one in the grant that was judged.
-  if (input.type === "act" || input.type === "preparation") {
-    for (const head of headsOf(input.authority[0]?.fresh)) {
-      const held = writer.observed(head.of, head.subject);
-      if (held === null || head.seq > held) writer.putObserved(head);
-    }
+  // `head.seq` that an entry of the scope retained for it. An act and a preparation retain one in the grant that was judged. An
+  // act, an outcome and a delivery of a result retain the further ones in `observed` (section 4.1).
+  const proofs: unknown[] = [...(input.type === "act" || input.type === "preparation" ? [input.authority[0]?.fresh] : []), ...("observed" in input ? (input.observed ?? []) : [])];
+  for (const head of proofs.flatMap(headsOf)) {
+    const held = writer.observed(head.of, head.subject);
+    if (held === null || head.seq > held) writer.putObserved(head);
   }
 
   // Section 4.3, item 5: an outcome entry records the result of its own attempt, once, and no other entry records a result.
