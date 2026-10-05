@@ -30,6 +30,7 @@ export type RefusalReason =
   | "type-full"         // an opening would pass the type's `max` of live items, or a first relationship update the `copies` of its handler
   | "send-unresolved"   // a send's target or item resolves to nothing
   | "unknown-message"   // a delivered request names no handler of the definition for a scope of that kind
+  | "unsupported-definition" // a guard that is a mark of a platform definition refuses bytes that are no definition this runtime can pin, where its specification states it (sections 4.2 and 6.1)
   | "bad-input";        // a diagnosis, outcome or checkpoint that does not follow from the scope's state
 
 /**

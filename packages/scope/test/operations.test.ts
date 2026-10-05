@@ -26,7 +26,7 @@ function open(s: Lane, ...opens: Opening[]): Promise<OperationId[] | "scope-full
   return s.inside(async (state) => {
     const store = new SqliteStore({ exec: (query, ...bindings) => state.storage.sql.exec(query, ...bindings), transaction: (closure) => state.storage.transactionSync(closure) });
     const wakes = new Wakes(store, { set: (time) => (time === null ? state.storage.deleteAlarm() : state.storage.setAlarm(timeMs(time)!)) }, false);
-    const turns = new Turns(store, { clock: s.c.clock, rules: production().rules, alarm: wakes.deadline, owners, capabilities: null }, s.c.bounds, () => definition, () => false);
+    const turns = new Turns(store, { clock: s.c.clock, rules: production().rules, alarm: wakes.deadline, capabilities: null }, s.c.bounds, () => definition, () => false, () => owners);
     const end = await turns.run<OperationId[] | "scope-full">({
       asks: () => [],
       judge: (view) => ({

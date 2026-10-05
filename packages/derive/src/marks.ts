@@ -16,21 +16,23 @@
  * and nothing in an entry says that a rule ran.
  */
 
-import type { Bounds, Effect, Evidence, FactRef, FieldValue, Grant, MemberRef, Message, OperationId, PlatformDefinition, Request, ScopeRef, Seed, SignedIntent, Timestamp } from "@generalbusiness/artroom-contract";
+import type { AlsoMark, Attempt, Bounds, Effect, Evidence, FactRef, FieldType, FieldValue, Grant, Guard, Mark, MemberRef, Message, OperationId, PlatformDefinition, Request, ScopeRef, Seed, SignedIntent, Timestamp } from "@generalbusiness/artroom-contract";
+import { isFieldValue } from "@generalbusiness/artroom-bytes";
 import type { Signer } from "./attribution.ts";
 import type { Own } from "./fields.ts";
-import type { Fetched } from "./guards.ts";
+import type { Fetched, GuardResult, Judging } from "./guards.ts";
 import type { Opening } from "./ledger.ts";
 import type { Item, Operation, StateView } from "./state.ts";
 import type { MarkKind, ValidDefinition } from "./validate/index.ts";
-import { own } from "./values.ts";
+import { isObject, own } from "./values.ts";
 
 /**
  * The input of the entry that is judged, whole, as it arrived (section 6.1,
  * "What a rule is given", item 2): an act's signed intent, whose `actor` is
  * the signing key, with the grant and what was presented beside it; a
  * genesis's seed, with the founding intent or the creation request; a
- * delivery's `from` and message; an outcome's evidence.
+ * delivery's `from` and message; an outcome's evidence; and a diagnosis's
+ * attempt log, for a mark in the `undelivered` clause that it runs.
  *
  * `grant`, of an act: the grant that check 9 judged. Null: none was judged
  * yet, as at checks 7 and 8, or the act's `grant` is a mark and no grant is
@@ -40,7 +42,8 @@ export type JudgedInput =
   | { readonly type: "act"; readonly signed: SignedIntent; readonly grant: Grant | null; readonly presented: Readonly<Record<string, unknown>> }
   | { readonly type: "genesis"; readonly seed: Seed; readonly founding: SignedIntent | null; readonly source: FactRef | null; readonly n: number | null; readonly message: Request | null }
   | { readonly type: "delivery"; readonly from: FactRef; readonly n: number; readonly message: Message }
-  | { readonly type: "outcome"; readonly operation: OperationId; readonly attempt: number; readonly result: "confirmed" | "refused" | "unknown"; readonly evidence: Evidence };
+  | { readonly type: "outcome"; readonly operation: OperationId; readonly attempt: number; readonly result: "confirmed" | "refused" | "unknown"; readonly evidence: Evidence }
+  | { readonly type: "diagnosis"; readonly of: { seq: number; n: number }; readonly attempts: readonly Attempt[] };
 
 /**
  * What the judge resolved before the rule's place (section 6.1, item 6):
@@ -184,3 +187,117 @@ export function ruleAt<K extends MarkKind>(rules: Rules | null | undefined, code
  */
 export const runnable = (definition: ValidDefinition, rules: Rules | null | undefined): boolean =>
   definition.marks.every((mark) => ruleAt(rules, mark.code, mark.kind) !== null);
+
+// ---------------------------------------------------------------- running a rule
+
+/**
+ * Section 6.1, "A fault of a rule is no judgment": a rule that throws, that
+ * returns something outside its place's type, an effect that is no member
+ * of the allowed list, an item of another type, a refusal name that its
+ * specification does not state, or effects that conflict with a written
+ * effect. Also a mark that is met with no rule of its kind, which a runtime
+ * that can run the definition never meets. The input is then not judged:
+ * every judge answers `unavailable`, and nothing is written. It is the rule
+ * of section 6.11 for a capability's rules.
+ */
+export class RuleFault extends Error {
+  override readonly name = "RuleFault";
+}
+
+/** A fault of a rule leaves the input not judged. Every other failure is the judge's own, and is thrown on. */
+export function unjudged<T>(judge: () => T): T | { result: "unavailable"; reason: "unavailable" } {
+  try {
+    return judge();
+  } catch (error) {
+    if (error instanceof RuleFault) return { result: "unavailable", reason: "unavailable" };
+    throw error;
+  }
+}
+
+/** A mark, as a judge meets it at one of the seven places of platform data: a record with the two texts `code` and `row`. No written form has them. */
+export const markOf = (v: unknown): Mark | null => (isObject(v) && typeof v["code"] === "string" && typeof v["row"] === "string" ? (v as unknown as Mark) : null);
+
+/** What a judge holds when it gives a rule its six things: the parts of a `Judging` that a rule is given. */
+export type Giving = Pick<Judging, "view" | "clock" | "bounds" | "scope" | "self" | "fields" | "subjects" | "signer" | "facts" | "own" | "source" | "platform" | "judged" | "ran">;
+
+/** The six things, and no other (section 6.1). The entries in `uses` are those that the input's fields name, and for a delivery its source entry. */
+export function givenTo(g: Giving): RuleGiven {
+  if (!g.judged) throw new RuleFault("a rule is run for an entry whose input the judge did not state");
+  const uses = [...(g.source ? [g.source] : []), ...[...g.facts.values()].filter((fact) => fact.fact.hash !== g.source?.fact.hash)];
+  return {
+    state: g.view, input: g.judged, time: g.clock.asOf, uses, own: g.own ?? (() => null),
+    resolved: { at: g.scope.at, self: g.self, fields: g.fields, subjects: g.subjects, signer: g.signer, bounds: g.bounds },
+  };
+}
+
+/** The rule that a mark names, of the kind of the mark's place. A judge that is given no such rule cannot run the definition: a fault. It notes a rule that reads the clock. */
+export function ruleFor<K extends MarkKind>(g: Pick<Giving, "platform" | "ran">, mark: Mark, kind: K): Extract<PlatformRule, { place: K }> {
+  const rule = ruleAt(g.platform?.rules, mark.code, kind);
+  if (!rule) throw new RuleFault(`no rule ${mark.code} of the kind ${kind} was given`);
+  if (rule.clock === true && g.ran) g.ran.clock = true;
+  return rule;
+}
+
+/** One call of a rule. Whatever it throws is a fault of the rule. */
+export function run<T>(mark: Mark, call: () => T): T {
+  try {
+    return call();
+  } catch (error) {
+    throw error instanceof RuleFault ? error : new RuleFault(`the rule ${mark.code} failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+/** The fault of a rule that returned a value outside what its place allows. */
+export const outside = (mark: Mark, what: string): RuleFault => new RuleFault(`the rule ${mark.code} returned ${what}`);
+
+/**
+ * Place 3: whether a value is of a type that is a mark. The value is a
+ * `FieldValue`, whatever its shape: an entry's bytes hold it. Null: the type
+ * is one that the forms write, and the judge checks it as data.
+ */
+export function ofCodedType(g: Giving, type: FieldType | undefined, value: unknown, of: { field: string } | { item: number; slot: string }): boolean | null {
+  const mark = markOf(type);
+  if (!mark) return null;
+  if (!isFieldValue(value)) return false;
+  const answer = run(mark, () => ruleFor(g, mark, "type").run(givenTo(g), value, of));
+  if (typeof answer !== "boolean") throw outside(mark, "no answer on a type");
+  return answer;
+}
+
+/** Check 7 of section 4.2: the name of the first field whose type is a mark and whose value its rule says is not of the type, in the order of the names; or null. */
+export function fieldOutsideType(g: Giving, types: Readonly<Record<string, FieldType>>): string | null {
+  for (const [name, value] of Object.entries(g.fields)) if (ofCodedType(g, own(types, name), value, { field: name }) === false) return name;
+  return null;
+}
+
+/**
+ * Place 2, at check 8: the item that the rule of a mark selects, or null
+ * when it gives none. The rule gives the ID of one local item of the type
+ * that the mark states. Any other answer is a fault.
+ */
+export function selectedBy(g: Giving, mark: AlsoMark): Item | null {
+  const id = run(mark, () => ruleFor(g, mark, "also").run(givenTo(g), mark.item));
+  if (id === null) return null;
+  const item = typeof id === "number" && Number.isSafeInteger(id) && id >= 0 ? g.view.item(id) : null;
+  if (item?.type !== mark.item) throw outside(mark, `no item of the type ${mark.item}`);
+  return item;
+}
+
+/** What a guard that is a mark answered when it did not hold: the refusal's name, and its code when that is not `guard-failed`. */
+export interface Declined { name: string; code?: "bad-field" | "unsupported-definition" }
+
+/**
+ * Place 4, at check 10: the guard that is a mark, at its position in the
+ * written list. It holds, it does not, or it is not completed. When it does
+ * not hold, `coded` keeps the name that the rule states, for the judge.
+ */
+export function guardByRule(j: Judging, guard: Guard, mark: Mark): GuardResult {
+  const rule = ruleFor(j, mark, "guard");
+  const answer = run(mark, () => rule.run(givenTo(j)));
+  if (isObject(answer) && answer.holds === true) return "pass";
+  if (isObject(answer) && answer.holds === null && (answer.reason === "guard-incomplete" || answer.reason === "dependency-unavailable")) return answer.reason;
+  if (!isObject(answer) || answer.holds !== false || typeof answer.name !== "string" || !rule.refusals.includes(answer.name)) throw outside(mark, "no answer of a guard, or a refusal that its specification does not state");
+  if (answer.code !== undefined && answer.code !== "bad-field" && answer.code !== "unsupported-definition") throw outside(mark, "a refusal code that no guard has");
+  (j.coded ??= new Map()).set(guard, answer.code === undefined ? { name: answer.name } : { name: answer.name, code: answer.code });
+  return "fail";
+}

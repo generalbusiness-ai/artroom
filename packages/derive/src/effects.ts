@@ -10,7 +10,7 @@
  * nothing and is judged by no rule.
  */
 
-import type { Condition, Effect, EffectForm, FieldType, FieldValue, MemberRef, Notify, Operand, RefusalReason, UnavailableReason } from "@generalbusiness/artroom-contract";
+import type { Condition, Effect, EffectForm, FieldType, FieldValue, Mark, MemberRef, Notify, Operand, PlatformData, RefusalReason, UnavailableReason } from "@generalbusiness/artroom-contract";
 import { attribution, byMember, historyOf } from "./attribution.ts";
 import { capabilityEffect } from "./capability.ts";
 import { isEntryOf, isLocalFact } from "./fields.ts";
@@ -18,12 +18,13 @@ import { changeItem, newItem, type ItemEffect } from "./fold.ts";
 import { judgeGuards, members, readsUnbound, slotOf, type Judging } from "./guards.ts";
 import { deriveHold, endsUnder, type HoldEffect } from "./hold.ts";
 import { bindEach, covered, typeOfElement } from "./lists.ts";
+import { givenTo, markOf, ofCodedType, outside, ruleFor, run, type RuleEffect } from "./marks.ts";
 import { kindOf, operand } from "./operand.ts";
 import type { Item } from "./state.ts";
 import { LAST_MS, timeMs, timeOf } from "./time.ts";
 import { unsupported } from "./unsupported.ts";
 import { isFactRef, isLocalId, isMemberRef, isObject, isValue, memberFits, own, same } from "./values.ts";
-import { isDigest } from "@generalbusiness/artroom-bytes";
+import { isDigest, isEffect } from "@generalbusiness/artroom-bytes";
 
 /**
  * What a derivation gives: its result, a refusal, or `unavailable`. The last
@@ -101,14 +102,45 @@ function held(j: Judging, type: FieldType, value: unknown): FieldValue | undefin
   return isValue(type, value, j.bounds) ? (value as FieldValue) : undefined;
 }
 
+/** The members of `Effect` that a rule returns (section 6.1). Every other member is a fault of the rule. */
+const BY_RULE: readonly string[] = ["open", "state", "party", "list", "ref", "value", "operation", "attempt"];
+
 /**
  * `opens`: the item type this entry opens, or null. `working` in the result
  * holds each subject as it is after the effects, with the opened item as `on`.
+ * `opened`: the item that this entry opens, whatever opens it: the row, or
+ * in platform data a rule. Null: it opens none.
+ *
+ * Section 4.2, check 11: in platform data a mark in the written list gives
+ * its rule's effects at the mark's position, and every check on effects is
+ * made on the joined list. An entry opens at most one item. No two effects
+ * set one slot, or the state, of one item, apart from successive changes of
+ * one party list. Each value is checked against its slot's type. A slot
+ * whose type is a mark is checked by that mark's rule, for each effect that
+ * sets it.
  */
-export function deriveEffects(j: Judging, forms: readonly EffectForm[], attention: readonly Notify[], opens: string | null): Derived<{ effects: Effect[]; working: Map<string, Item> }> {
+export function deriveEffects(j: Judging, forms: readonly EffectForm[], attention: readonly Notify[], opens: string | null): Derived<{ effects: Effect[]; working: Map<string, Item>; opened: Item | null }> {
   const items = j.definition.declared.items;
   const working = new Map(j.subjects);
   const effects: Effect[] = [];
+  /** The items that a rule's effects change and that are no subject of the row, by ID, as the effects left them. The item that a rule opens is one. */
+  const others = new Map<number, Item>();
+  /** What each applied effect set, by item, for the conflict check on the joined list: whether a rule set it, and whether it is one change of a party list. */
+  const set = new Map<string, { rule: boolean; successive: boolean }>();
+  /**
+   * Section 6.1, "The joined lists are checked as one". The validator has
+   * checked each pair of written effects. A pair with an effect of a rule is
+   * checked here, on the effects that are applied. Such a conflict is a
+   * fault of the rule, which leaves the input not judged.
+   */
+  const sets = (effect: Effect, by: Mark | null): void => {
+    if (effect.effect !== "state" && effect.effect !== "party" && effect.effect !== "list" && effect.effect !== "ref" && effect.effect !== "value") return;
+    const what = JSON.stringify([effect.item, effect.effect === "state" ? null : effect.slot]);
+    const [earlier, successive] = [set.get(what), effect.effect === "list"];
+    const culprit = by ?? (earlier?.rule ? ({ code: "of an earlier mark", row: "" } satisfies Mark) : null);
+    if (earlier && culprit && !(earlier.successive && successive)) throw outside(culprit, "an effect that conflicts with another effect of the entry");
+    set.set(what, { rule: by !== null || (earlier?.rule ?? false), successive });
+  };
   /** Section 4.1: the capability's own effects follow the written ones. */
   const records: Effect[] = [];
   const refuse = (reason: RefusalReason, detail: string) => ({ ok: false, reason, detail }) as const;
@@ -116,8 +148,92 @@ export function deriveEffects(j: Judging, forms: readonly EffectForm[], attentio
   // A source reads each subject as the effects written before it left it, and the item this entry opens as `on`.
   const after: Judging = { ...j, subjects: working };
   const apply = (subject: string, effect: ItemEffect) => {
+    sets(effect, null);
     effects.push(effect);
     working.set(subject, changeItem(working.get(subject)!, effect, j.definition, j.signer));
+  };
+  /** The item that this entry opens, when a rule opens it. */
+  let byRule: Item | null = null;
+  /**
+   * The effects of one rule, at its mark's position (section 6.1, place 5).
+   * Each is a member of the allowed list, in the contract's form, on a local
+   * item, in a slot and a state that its type declares. Anything else is a
+   * fault of the rule. The checks on effects are the ones that a written
+   * effect meets, and refuse as they do: `final`, `bad-field` for a value
+   * outside its slot's type, and `slot-full`.
+   */
+  const join = (mark: Mark, at: number): Derived<object> | null => {
+    const rule = ruleFor(j, mark, "effect");
+    const given = run(mark, () => rule.run(givenTo(j)));
+    if (!Array.isArray(given) || given.length > rule.most) throw outside(mark, `no list of at most ${rule.most} effects`);
+    const bad = (what: string) => refuse("bad-field", `effects.${at}: the rule ${mark.code} ${what}`);
+    for (const effect of given as readonly RuleEffect[]) {
+      if (!isEffect(effect) || !BY_RULE.includes(effect.effect)) throw outside(mark, "a value that is none of the effects that a rule returns");
+      if (effect.effect === "operation") {
+        // Section 6.1, "An operation that a rule opens": its owner is this definition, and its kind is one that `outcomes` lists.
+        const kinds = (j.definition.declared as unknown as PlatformData).outcomes;
+        const k = effects.filter((e) => e.effect === "operation").length;
+        if (effect.owner !== j.platform?.named || own(kinds, effect.kind) === undefined || effect.k !== k || !Number.isSafeInteger(effect.attempts) || effect.attempts < 1) throw outside(mark, "an operation that its definition does not own, or out of its ordinal");
+        effects.push(effect);
+        continue;
+      }
+      if (effect.effect === "attempt") {
+        // The attempt that a rule opens is attempt 1 of an operation that this entry opens. Every other record of an attempt is an outcome's own.
+        const k = typeof effect.operation === "object" ? effect.operation.k : -1;
+        const open = effects.some((e) => e.effect === "operation" && e.k === k) && !effects.some((e) => e.effect === "attempt" && typeof e.operation === "object" && e.operation.k === k);
+        if (!open || effect.attempt !== 1 || effect.result !== "opened" || effect.selected !== null) throw outside(mark, "an attempt that is not the first of an operation that its entry opens");
+        effects.push(effect);
+        continue;
+      }
+      if (effect.effect === "open") {
+        // Section 4.1: an entry opens at most one item, whatever opens it, and its ID is the entry's `seq`. Section 6.3: in its initial state.
+        const type = own(items, effect.type);
+        if (opens !== null || byRule || !type || effect.item !== j.self || effect.state !== type.initial) throw outside(mark, "an opening that its entry cannot make");
+        byRule = newItem(effect, type, null);
+        others.set(effect.item, byRule);
+        effects.push(effect);
+        continue;
+      }
+      const subject = [...working].find(([, item]) => item.id === effect.item)?.[0];
+      const item = subject !== undefined ? working.get(subject)! : (others.get(effect.item) ?? j.view.item(effect.item));
+      if (!item) throw outside(mark, `an effect on item ${effect.item}, which does not exist`);
+      const type = own(items, item.type)!;
+      // Section 6.6: no effect changes an item that was final before the entry.
+      const was = subject !== undefined ? j.subjects.get(subject) : effect.item === j.self ? undefined : j.view.item(effect.item);
+      if (was && own(type.states, was.state)?.final) return refuse("final", `effects.${at}: item ${item.id} is ${was.state}`);
+      const of = { item: item.id, slot: "slot" in effect ? effect.slot : "" };
+      /** The value as the slot holds it, or undefined when it is not a value of the slot's type: by the type's rule when the type is a mark, and else as data. */
+      const fits = (to: FieldType, value: FieldValue): FieldValue | undefined => {
+        const coded = ofCodedType(j, to, value, of);
+        return coded === null ? held(j, to, value) : coded ? value : undefined;
+      };
+      let applied: ItemEffect = effect;
+      if (effect.effect === "state") {
+        if (own(type.states, effect.state) === undefined) throw outside(mark, `a state that ${item.type} does not declare`);
+      } else if (effect.effect === "party" || effect.effect === "list") {
+        const slot = own(type.parties, effect.slot);
+        if (!slot || (effect.effect === "list" ? !slot.list : slot.list && effect.member !== null)) throw outside(mark, `an effect on a party slot that ${item.type} does not declare so`);
+        if (effect.member !== null && !memberFits(effect.member, j.bounds)) return bad("gives a member whose handle is longer than a handle may be");
+        const listed = members(own(item.parties, effect.slot));
+        if (effect.effect === "list" && effect.change === "add" && !listed.some((m) => same(m, effect.member)) && listed.length >= Math.min(slot.max ?? j.bounds.partyMembers, j.bounds.partyMembers)) return refuse("slot-full", `effects.${at}: ${effect.slot}`);
+      } else {
+        const to = effect.effect === "ref" ? own(type.refs, effect.slot)?.to : own(type.values, effect.slot)?.of;
+        if (!to) throw outside(mark, `an effect on a slot that ${item.type} does not declare`);
+        const value = effect.effect === "ref" ? effect.to : effect.value;
+        // Section 6.2: the bytes of a detached text are kept for the input that came with them. A rule reads a text's digest only, and holds no bytes.
+        if (value !== null && to.type === "text" && to.detached) throw outside(mark, "a value for a detached text, whose bytes no rule holds");
+        const kept = value === null ? null : fits(to, value);
+        if (kept === undefined) return bad(`gives ${effect.slot} a value outside the slot's type`);
+        applied = effect.effect === "ref" ? { ...effect, to: kept } : { ...effect, value: kept };
+      }
+      sets(applied, mark);
+      effects.push(applied);
+      const changed = changeItem(item, applied, j.definition, j.signer);
+      if (subject !== undefined) working.set(subject, changed);
+      else others.set(item.id, changed);
+      if (byRule && changed.id === byRule.id) byRule = changed;
+    }
+    return null;
   };
   /**
    * Section 6.6, `if` and `unless`: with `if`, the form is applied only when
@@ -143,6 +259,12 @@ export function deriveEffects(j: Judging, forms: readonly EffectForm[], attentio
   }
 
   for (const [i, form] of forms.entries()) {
+    const mark = markOf(form);
+    if (mark) {
+      const stopped = join(mark, i);
+      if (stopped) return stopped as Derived<never>;
+      continue;
+    }
     const subject = form.of ?? "on";
     if ("capability" in form) {
       // Section 6.11: a capability's effect changes the capability's own records and no item. It is applied when its condition
@@ -179,8 +301,14 @@ export function deriveEffects(j: Judging, forms: readonly EffectForm[], attentio
     // that is applied, also one that records no change.
     const was = j.subjects.get(subject);
     if (was && own(type.states, was.state)?.final) return refuse("final", `effects.${i}: item ${id} is ${was.state}`);
-    /** The value as the slot holds it. The validator has shown it for a source of a stated type; the commit checks any other. */
-    const fits = (to: FieldType): FieldValue | undefined => (stated(j, reads!) ? (source as FieldValue) : held(j, to, source));
+    /**
+     * The value as the slot holds it. The validator has shown it for a source of a stated type; the commit checks any other.
+     * Section 6.1, place 3: a slot whose type is a mark is checked by that mark's rule, for each effect that would set it.
+     */
+    const fits = (to: FieldType, slot: string): FieldValue | undefined => {
+      const coded = ofCodedType(j, to, source, { item: id, slot });
+      return coded !== null ? (coded ? (source as FieldValue) : undefined) : stated(j, reads!) ? (source as FieldValue) : held(j, to, source);
+    };
     /** Whatever its source, a member put in a slot is a member reference within the bound of a handle. */
     const member = (v: unknown): MemberRef | null => (isMemberRef(v) && memberFits(v, j.bounds) ? v : null);
     const listed = (slot: string) => members(own(working.get(subject)!.parties, slot));
@@ -221,7 +349,7 @@ export function deriveEffects(j: Judging, forms: readonly EffectForm[], attentio
       const { slot } = form.ref;
       // Section 6.4: inside a scope, `self` is a local reference to the entry being written, and so to the item it opens.
       // Section 6.6: a copy preserves its source. A slot source is the slot of that name, of whatever kind.
-      const to = from === null ? null : from === "self" ? j.self : fits(own(type.refs, slot)!.to);
+      const to = from === null ? null : from === "self" ? j.self : fits(own(type.refs, slot)!.to, slot);
       if (to === undefined) return bad("the source is not a value of the slot's type");
       apply(subject, { effect: "ref", item: id, slot, to });
     } else if ("value" in form) {
@@ -230,7 +358,7 @@ export function deriveEffects(j: Judging, forms: readonly EffectForm[], attentio
       // The validator bounds the offset, so the sum is a safe integer. A time past the last timestamp is not a value of the slot.
       const derived = form.value.from !== null && "time" in form.value.from ? timeMs(j.clock.reading)! + form.value.from.time.plusSeconds * 1000 : null;
       if (derived !== null && derived > LAST_MS) return bad("the derived time is past the last timestamp");
-      const value = derived !== null ? timeOf(derived) : from === null ? null : fits(own(type.values, slot)!.of);
+      const value = derived !== null ? timeOf(derived) : from === null ? null : fits(own(type.values, slot)!.of, slot);
       if (value === undefined) return bad("the source is not a value of the slot's type");
       apply(subject, { effect: "value", item: id, slot, value });
     } else if ("attribute" in form) {
@@ -303,10 +431,11 @@ export function deriveEffects(j: Judging, forms: readonly EffectForm[], attentio
     effects.push(...j.capabilities.workspace(j.view, j.definition, j.self, k, holds, (id) => [...working.values()].find((held) => held.id === id) ?? null));
   }
 
-  if (opens !== null) {
-    // Section 6.3: after the opening effects every required slot must hold a value.
-    const opened = working.get("on")!;
-    const type = own(items, opens)!;
+  // Section 6.3: after the opening effects every required slot must hold a value. The item is the one that the row opens, or in
+  // platform data the one that a rule opened.
+  const opened: Item | null = opens !== null ? working.get("on")! : byRule;
+  if (opened) {
+    const type = own(items, opened.type)!;
     for (const [slot, rule] of [...Object.entries(type.parties), ...Object.entries(type.refs), ...Object.entries(type.values)]) {
       if (rule.required && slotOf(opened, slot) === null) return refuse("required-unset", slot);
     }
@@ -321,5 +450,5 @@ export function deriveEffects(j: Judging, forms: readonly EffectForm[], attentio
     const told = members(own((notify.when === "before" ? j.subjects : working).get(notify.of)?.parties, notify.slot));
     if (told.length > 0) effects.push({ effect: "attention", item: working.get(notify.of)!.id, members: told, reason: notify.reason });
   }
-  return { ok: true, effects, working };
+  return { ok: true, effects, working, opened };
 }

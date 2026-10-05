@@ -184,7 +184,7 @@ export class Deliveries {
     if (!texts) return retry("dependency-unavailable");
 
     const context = (clock: Reading): Omit<DeliveryContext, "prepared"> =>
-      ({ clock, bounds, facts, own: ownOf(store), texts: texts.sizes, capabilities: this.#ports.capabilities ?? undefined, source: { entry: source.entry, under: source.under }, origin });
+      ({ clock, bounds, facts, own: ownOf(store), texts: texts.sizes, capabilities: this.#ports.capabilities ?? undefined, platform: this.#scope.pinned()?.platform ?? undefined, source: { entry: source.entry, under: source.under }, origin });
     /** The definition a section of the turn runs under: the pinned one, or before the genesis the one the seed names. */
     const definition = (): ValidDefinition => this.#scope.pinned()?.definition ?? founding!.valid;
     /** A `create` goes to the genesis judge, which answers a repeat from the genesis when the scope exists. */

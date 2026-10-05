@@ -9,8 +9,8 @@
 
 import type { ActType, Answer, Beside, Bounds, CapabilityName, DeclaredDefinition, Digest, DutyId, Entry, FactRef, Founded, Grant, PlatformDefinition, Receipt, RefusalReason, ScopeId, Seed, Settlement, SignedIntent, UnavailableReason } from "@generalbusiness/artroom-contract";
 import { canonicalize, definitionDigest, intentDigest, isDigest, isGrant, isPlatformDefinition, newIncarnation, parseStrict, platformName, textDigest, utf8 } from "@generalbusiness/artroom-bytes";
-import { checkpointOf, derivable, factsNamed, inputTexts, isObject, judgeAct, judgeCheckpoint, judgeGenesis, judgePreparation, own, prepareRules, presentedTypes, readFields, runnable, stepsOf, validateDefinition, windowOf } from "@generalbusiness/artroom-derive";
-import type { ActJudgment, Clock as Reading, Draft, Fetched, Founding, GrantDecision, JudgeContext, Own, Presented, StateView, Texts, ValidDefinition, Window } from "@generalbusiness/artroom-derive";
+import { checkpointOf, derivable, factsNamed, ownersOf, inputTexts, isObject, judgeAct, judgeCheckpoint, judgeGenesis, judgePreparation, own, prepareRules, presentedTypes, readFields, runnable, stepsOf, validateDefinition, windowOf } from "@generalbusiness/artroom-derive";
+import type { ActJudgment, Clock as Reading, Draft, Fetched, Founding, GrantDecision, JudgeContext, Own, Owners, PlatformRules, Presented, StateView, Texts, ValidDefinition, Window } from "@generalbusiness/artroom-derive";
 import { RULE_PROFILES } from "@generalbusiness/artroom-derive/rule";
 import { namedBy } from "./definitions.ts";
 import type { Asked, DefinitionRead, Ports, Standing } from "./ports.ts";
@@ -34,10 +34,14 @@ export type Checkpointed =
  * derives nothing of those entries (`Scope.lacks`). A declared definition
  * has none.
  */
-export interface Pinned { named: Digest | PlatformDefinition; definition: ValidDefinition | null; lacking: ReadonlySet<string> }
+export interface Pinned {
+  named: Digest | PlatformDefinition; definition: ValidDefinition | null; lacking: ReadonlySet<string>;
+  /** The rules of the platform definition that the scope pins, which every judge of this scope is given (section 6.1). Null: a declared definition, or one that this runtime cannot run. */
+  platform: PlatformRules | null;
+}
 
-/** A platform definition as this runtime can run it: the validated data, and the kinds of the entries whose rows are code. */
-export interface Supplied { definition: ValidDefinition; lacking: ReadonlySet<string> }
+/** A platform definition as this runtime can run it: the validated data, its rules, and the kinds of the entries whose rows are code. */
+export interface Supplied { definition: ValidDefinition; lacking: ReadonlySet<string>; platform: PlatformRules }
 
 const NONE: ReadonlySet<string> = new Set();
 
@@ -169,7 +173,7 @@ export class Scope {
     this.#store = store;
     this.#ports = ports;
     this.#bounds = bounds;
-    this.#turns = new Turns(store, ports, bounds, () => { const pinned = this.pinned(); return pinned ? pinned.definition : undefined; }, (kind) => this.lacks(kind));
+    this.#turns = new Turns(store, ports, bounds, () => { const pinned = this.pinned(); return pinned ? pinned.definition : undefined; }, (kind) => this.lacks(kind), () => this.owners());
   }
 
   /**
@@ -226,7 +230,7 @@ export class Scope {
         const handler = Object.entries(declared.receives).find(([name]) => mark.path.startsWith(`receives.${name}.`));
         return act !== undefined ? [act] : handler ? [handler[1].message] : [];
       });
-      return { definition: checked.definition, lacking: new Set(kinds) };
+      return { definition: checked.definition, lacking: new Set(kinds), platform: { named, rules: supplied.rules } };
     } catch {
       return null;
     }
@@ -244,7 +248,18 @@ export class Scope {
     const kept = isDigest(named) ? this.#store.retained("definition", named) : null;
     const definition = supplied ? supplied.definition : kept ? this.validate(kept.bytes) : null;
     if (definition) this.#store.cover(definition.indexes);
-    return (this.#pinned = { named, definition, lacking: supplied?.lacking ?? NONE });
+    return (this.#pinned = { named, definition, lacking: supplied?.lacking ?? NONE, platform: supplied?.platform ?? null });
+  }
+
+  /**
+   * The rules of the owners of outside operations, for this scope: those of
+   * the owners port, and, under a platform definition, the rules that its
+   * data names in `outcomes` for the operations that it owns (section 6.1,
+   * place 7). Undefined: no owner has rules here.
+   */
+  owners(): Owners | undefined {
+    const pinned = this.pinned();
+    return pinned?.definition ? ownersOf(pinned.definition, pinned.platform, this.#ports.owners) : (this.#ports.owners ?? undefined);
   }
 
   /**
@@ -305,13 +320,14 @@ export class Scope {
     let bytes: string | null = null;
     let valid: ValidDefinition | null;
     let lacking = NONE;
+    let platform: PlatformRules | null = null;
     if (typeof definition === "string" && definition.startsWith("platform:")) {
       // Section 6.1: the founding names a platform definition, and the runtime's code supplies it. Nothing of it comes from the input.
       const supplied = isPlatformDefinition(definition) ? this.platform(definition) : null;
       // Null: a row of the definition is code with no rule, so nothing is founded under it. A genesis act that is marked is not derived
       // either, while no judge runs a rule.
       if (!supplied || supplied.lacking.has(supplied.definition.declared.genesis)) return refused("unsupported-definition");
-      ({ definition: valid, lacking } = supplied);
+      ({ definition: valid, lacking, platform } = supplied);
     } else {
       if (typeof definition === "string") {
         const read = await this.#ports.definitions.read(definition as Digest, null);
@@ -356,8 +372,8 @@ export class Scope {
 
     const texts = Received.beside(besideOf(beside).texts, act.fields, bounds);
     const asked = (inc: Founding["inc"]): Founding => ({ name, inc, seed, founding });
-    const context = (clock: Reading) => ({ clock, bounds, facts, source: null, texts: texts.sizes, capabilities: this.#ports.capabilities ?? undefined });
-    const pinned = (): Pinned => this.pinned() ?? { named: names, definition: valid, lacking };
+    const context = (clock: Reading) => ({ clock, bounds, facts, source: null, texts: texts.sizes, capabilities: this.#ports.capabilities ?? undefined, platform: platform ?? undefined });
+    const pinned = (): Pinned => this.pinned() ?? { named: names, definition: valid, lacking, platform };
     const answer = (sealed: Sealed): Founded =>
       (sealed.entry.input.type === "genesis" && sealed.entry.input.decision === "applied" ? { answer: "accepted", receipt: receiptOf(sealed, pinned().named) } : refused("scope-refused"));
 
@@ -408,6 +424,7 @@ export class Scope {
     const scope = this.#store.scope();
     if (!pinned?.definition || !scope) return unavailable("unavailable");
     const { definition, named } = pinned;
+    const platform = pinned.platform ?? undefined;
     const bounds = this.#bounds;
     const { resolver } = this.#ports;
     if (!isSigned(signed)) return { answer: "refused", reason: "bad-intent", judgedAt: scope.head };
@@ -445,7 +462,7 @@ export class Scope {
     // Phase two is in the commit: what that read holds at the commit's head, on the commit's one reading. The judge is given the
     // answer and reads nothing.
     const context = (view: StateView, clock: Reading): Omit<JudgeContext, "prepared"> =>
-      ({ clock, bounds, facts, own: ownOf(this.#store), texts: texts.sizes, presented: offered, capabilities: this.#ports.capabilities ?? undefined, grants: standing === null ? null : heldBy(standing, view, clock) });
+      ({ clock, bounds, facts, own: ownOf(this.#store), texts: texts.sizes, presented: offered, capabilities: this.#ports.capabilities ?? undefined, platform, grants: standing === null ? null : heldBy(standing, view, clock) });
 
     const end = await this.#turns.run<Answer>({
       // The walk that finds the rules judges nothing (section 5.2, step 4), so what it is given of phase two decides nothing.

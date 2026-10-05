@@ -81,9 +81,11 @@ test("each operation of the handle returns a reply only when it has every member
       [{ answer: "accepted", receipt }, { answer: "refused", reason: "unsupported-definition" }, { answer: "refused", reason: "source-unverified" }, { answer: "unavailable", reason: "busy" }],
       [{ answer: "mismatch", reason: "idempotency-mismatch" }, { answer: "refused", reason: "not-found" }, ...each(receipt).map((r) => ({ answer: "accepted", receipt: r }))]],
     ["submit", (t) => handle(t).submit({} as never), [{ answer: "accepted", receipt }], [...each(receipt).map((r) => ({ answer: "accepted", receipt: r })), { answer: "accepted", receipt: { ...receipt, sends: ["first"] } },
-      // An effect is one of the contract's, with its members; and an act's refusal is one an act can meet: a source check and a platform definition are a founding's.
+      // An effect is one of the contract's, with its members; and an act's refusal is one an act can meet: a source check is a founding's.
+      // `unsupported-definition` is now one that an act can meet: a guard that is a mark of a platform definition may refuse with it (the
+      // contract's revision 15, section 4.2, the table of refusal reasons).
       ...[{ effect: "state" }, { effect: "vanish" }].map((e) => ({ answer: "accepted", receipt: { ...receipt, effects: [e] } })),
-      ...["source-unverified", "unsupported-definition"].map((reason) => ({ answer: "refused", reason, judgedAt: head }))]],
+      ...["source-unverified", "undeclared-reason"].map((reason) => ({ answer: "refused", reason, judgedAt: head }))]],
     ["settle", (t) => handle(t).settle({} as never), [read(receipt), refused, { ...refused, detail: fact }], [...each(read(receipt)), ...each(receipt).map((r) => read(r)), { ...refused, detail: "elsewhere" }]],
     ["summary", (t) => handle(t).summary(), [read(summary)], [...each(summary).map((v) => read(v)), read({ ...summary, status: "open" }), read({ ...summary, counts: [["note", "draft"]] }), read({ ...summary, items: [less(item, "opened")] })]],
     ["items", (t) => handle(t).items("note", "c"), [read([item], { next: "c2" }), read([{ ...item, opened: null }])], [...each(item).map((v) => read([v])), read(item), read([item], { next: 2 }), read([{ ...item, attributed: [{}] }]), read([{ ...item, parties: { owner: {} } }])]],

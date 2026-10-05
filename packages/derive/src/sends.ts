@@ -6,14 +6,17 @@
  * the state before them.
  */
 
-import type { Digest, FactRef, FieldType, Guard, Input, Notify, Operand, Range, Seed, SelfMark, Send, SendForm, SendSource, ScopeRef, UnavailableReason } from "@generalbusiness/artroom-contract";
+import type { Digest, FactRef, FieldType, Guard, Input, Notify, Operand, Range, Seed, SelfMark, Send, SendForm, SendMark, SendSource, ScopeRef, UnavailableReason } from "@generalbusiness/artroom-contract";
+import { isSend } from "@generalbusiness/artroom-bytes";
 import type { Derived } from "./effects.ts";
+import { isLocalFact } from "./fields.ts";
 import { judgeGuards, readsUnbound, slotOf, type Judging } from "./guards.ts";
 import { covered } from "./lists.ts";
+import { givenTo, markOf, outside, ruleFor, run } from "./marks.ts";
 import { operand } from "./operand.ts";
 import type { Item } from "./state.ts";
 import type { ValidDefinition } from "./validate/index.ts";
-import { isLocalId, isObject, isScopeRef, own } from "./values.ts";
+import { isFactRef, isLocalId, isObject, isScopeRef, own, same } from "./values.ts";
 
 /** What the send forms of one input made. */
 export type Sends = Derived<{ sends: Send[] }>;
@@ -59,6 +62,12 @@ function holds(j: Judging, guards: readonly Guard[] | undefined): boolean | Unav
  * child's genesis, whose result is at ordinal 0. `recorded`: the directory
  * that the scope records, when the entry being written is its genesis. Any
  * later entry reads it from the genesis entry.
+ *
+ * Section 4.2, check 12: in platform data a mark in the written list gives
+ * no request, or one, at its position. The request takes the ordinal that a
+ * written send would take there. It is a `create`, a `tell` or a `relate`
+ * in the contract's form, and the checks on sends are made on it as on a
+ * written one.
  */
 export function deriveSends(j: Judging, forms: readonly SendForm[], working: ReadonlyMap<string, Item>, cause: Digest, first = 0, recorded?: ScopeRef | null): Sends {
   const items = j.definition.declared.items;
@@ -158,6 +167,32 @@ export function deriveSends(j: Judging, forms: readonly SendForm[], working: Rea
   for (const [i, form] of forms.entries()) {
     const refuse = (what: string) => ({ ok: false, reason: "send-unresolved", detail: `sends.${i}: ${what}` }) as const;
     const next = () => first + sends.length;
+    const mark = markOf(form);
+    if (mark) {
+      const given = run(mark, () => ruleFor(j, mark, "send").run(givenTo(j)));
+      if (given === null) continue;
+      const request: Send | null = isObject(given) ? { n: next(), to: given.to, message: given.message } : null;
+      const body = request && isSend(request) && request.message.class === "request" && isObject(request.message.body) ? request.message.body : null;
+      if (!request || !body || request.message.class !== "request") throw outside(mark, "no request");
+      const { to, message } = request;
+      if (message.type === "create") {
+        // Section 7.2: a creation is addressed by a seed that names this scope as creator, the input's cause, and which creation of the input it is.
+        if (isScopeRef(to) || !same(to.creator, j.scope.at) || to.cause !== cause || to.ordinal !== creations++ || !isObject(body["fields"])) throw outside(mark, "a creation that its entry cannot ask for");
+      } else if (message.type === "tell") {
+        if (!isScopeRef(to) || typeof body["message"] !== "string" || !isObject(body["fields"])) throw outside(mark, "a tell that is not in the contract's form");
+      } else {
+        // Section 6.4: the key is the target by its scope ID, the item by its local ID, and the name as written. The item is this
+        // scope's own: the entry being written, or an earlier one.
+        const named = body["item"];
+        const item = isObject(named) && named["self"] === true && Object.keys(named).length === 1 ? j.self : isFactRef(named) && isLocalFact(named, j.scope.at) && j.view.item(named.seq)?.opened === named.hash ? named.seq : null;
+        if (!isScopeRef(to) || typeof body["name"] !== "string" || typeof body["state"] !== "string" || !isObject(body["detail"]) || item === null) throw outside(mark, "a relate that is not in the contract's form");
+        const key = JSON.stringify([to.scope, item, body["name"]]);
+        if (relations.has(key)) return { ok: false, reason: "duplicate-relation", detail: `sends.${i}` };
+        relations.add(key);
+      }
+      sends.push(request);
+      continue;
+    }
     if ("create" in form) {
       // Section 7.2: the seed names this scope as creator, the input's cause, and which creation of that input this is.
       // Section 6.6: `self` is this scope's own pinned definition, which a definition cannot name by digest.
@@ -217,7 +252,18 @@ export function deriveSends(j: Judging, forms: readonly SendForm[], working: Rea
  * its type and name. A fan-out may have made the next send too. The
  * validator refuses a list in which that could find the wrong clause.
  */
-export function formOf(definition: ValidDefinition, forms: readonly SendForm[], entry: { sends: readonly Send[] }, n: number): SendForm | null {
+export function formOf(definition: ValidDefinition, forms: readonly SendForm[], entry: { sends: readonly Send[] }, n: number): SendForm | SendMark | null {
+  const sent = entry.sends.filter((s) => s.message.class === "request" || s.message.class === "advisory").sort((a, b) => a.n - b.n);
+  // Platform data, section 6.1, place 6: a rule's request states no type or name in the data. The validator lets a list hold one
+  // mark, and then each written send of it is always made exactly once. So the entry has one send for each written form, in their
+  // order, and one more, at the mark's position, when the rule gave a request.
+  const marked = forms.findIndex((form) => markOf(form) !== null);
+  if (marked !== -1) {
+    const at = sent.findIndex((s) => s.n === n);
+    const gave = sent.length - (forms.length - 1);
+    if (at === -1 || (gave !== 0 && gave !== 1)) return null;
+    return forms[gave === 1 || at < marked ? at : at + 1] ?? null;
+  }
   const made = (form: SendForm, { to, message }: Send): boolean => {
     if (message.class === "advisory") return "index" in form && message.type === "index";
     if (message.class !== "request" || !isObject(message.body)) return false;
@@ -226,7 +272,7 @@ export function formOf(definition: ValidDefinition, forms: readonly SendForm[], 
     return "relate" in form && message.type === "relate" && message.body["name"] === form.relate.name && message.body["state"] === form.relate.state;
   };
   let at = 0;
-  for (const send of entry.sends.filter((s) => s.message.class === "request" || s.message.class === "advisory").sort((a, b) => a.n - b.n)) {
+  for (const send of sent) {
     while (at < forms.length && !made(forms[at]!, send)) at++;
     const form = forms[at];
     if (!form) return null;

@@ -10,7 +10,9 @@ import type { Attempt, Digest, Entry, Input } from "@generalbusiness/artroom-con
 import type { Reading } from "./fields.ts";
 import { runClause } from "./handlers.ts";
 import { outcomeOf, recordedOutcome, type Owners } from "./ledger.ts";
+import { ownersOf } from "./outcomes.ts";
 import type { Judgment } from "./judge.ts";
+import { unjudged, type PlatformRules } from "./marks.ts";
 import { stateDigest, type ScopeState, type StateView } from "./state.ts";
 import { nextDue } from "./timed.ts";
 import { timeMs } from "./time.ts";
@@ -58,14 +60,21 @@ export function judgeDiagnosis(view: StateView, definition: ValidDefinition, dia
   if (attempts.length === 0 || attempts.some((a) => timeMs(a.at) === null || !ANSWERS.includes(a.answer))) return invalid("the log holds at least one attempt, each with a time and an answer");
 
   const finding = attempts.every((a) => ROUTING.includes(a.answer)) ? "undelivered" : "delivery-unavailable";
-  const ran = finding === "undelivered" ? runClause(view, definition, context, admit.scope, request, "undelivered") : { result: "ran", effects: [], uses: [], judgesTime: false } as const;
+  // Platform data: a mark among the effects of the `undelivered` clause is run when the clause runs, and a fault of its rule leaves
+  // the diagnosis not written now (section 6.1).
+  const ran = finding === "undelivered" ? unjudged(() => runClause(view, definition, context, admit.scope, request, "undelivered", undefined, { type: "diagnosis", of: { seq: of.seq, n: of.n }, attempts })) : { result: "ran", effects: [], uses: [], judgesTime: false } as const;
   if (ran.result === "unavailable") return ran;
   if (ran.judgesTime && context.clock.behind) return { result: "unavailable", reason: "clock-behind" };
   return { result: "write", draft: { input: { type: "diagnosis", of: { seq: of.seq, n: of.n }, finding, attempts }, uses: ran.uses, prepared: [], effects: ran.effects, sends: [], judgesTime: ran.judgesTime } };
 }
 
-/** What the judge of an outcome is given beside the reading: the rules of the owners this runtime has code for (`ledger.ts`). */
-export type OutcomeContext = Settling & { owners?: Owners | undefined };
+/**
+ * What the judge of an outcome is given beside the reading: the rules of
+ * the owners this runtime has code for (`ledger.ts`); and, in a scope under
+ * a platform definition, that definition's rules and the scope's own
+ * history, which a rule of an outcome entry is given (section 6.1, place 7).
+ */
+export type OutcomeContext = Settling & { owners?: Owners | undefined; platform?: PlatformRules | undefined; own?: Reading["own"] };
 
 /** `conflict`: the outcome contradicts a recorded `confirmed` or `refused` of the same attempt. It writes nothing, and is answered `outcome-conflict` with the entry it contradicts (section 4.3, item 6). */
 export type OutcomeJudgment = Judgment | { result: "conflict"; seq: number };
@@ -86,7 +95,13 @@ export function settleOutcome(view: StateView, definition: ValidDefinition, outc
   if (known) return known;
   const admit = admitted(view, definition, context);
   if (!("scope" in admit)) return admit;
-  return outcomeOf(view, outcome, context.owners);
+  // The owner of the operation may be the platform definition that this scope pins. Its rule for outcome entries of this kind is
+  // the one that `outcomes` names. A fault of the rule leaves the outcome not judged, and nothing is written (section 6.1).
+  const ran = { clock: false };
+  const judged = unjudged(() => outcomeOf(view, outcome, ownersOf(definition, context.platform, context.owners, { clock: context.clock, bounds: context.bounds, own: context.own, ran })));
+  // An outcome judges no time. An entry for which a rule read the clock does, and is never written clamped (section 6.1).
+  if (judged.result !== "write" || !ran.clock) return judged;
+  return context.clock.behind ? { result: "unavailable", reason: "clock-behind" } : { result: "write", draft: { ...judged.draft, judgesTime: true } };
 }
 
 /** `settleOutcome`, for a caller that only asks whether the outcome writes an entry: a contradiction is an input that the scope never writes. */

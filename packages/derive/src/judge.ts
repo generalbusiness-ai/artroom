@@ -16,7 +16,8 @@ import { intentDigest, scopeIdOf, verifySignedIntent } from "@generalbusiness/ar
 import { deriveEffects } from "./effects.ts";
 import { isIntent, presentedTypes, readFacts, readFields, type Reading } from "./fields.ts";
 import type { Judging } from "./guards.ts";
-import { alsoItems, derive } from "./handlers.ts";
+import { alsoItems, derive, giving } from "./handlers.ts";
+import { fieldOutsideType, markOf, selectedBy, unjudged, type JudgedInput } from "./marks.ts";
 import type { Item, StateView } from "./state.ts";
 import { nextDue, type Due } from "./timed.ts";
 import { timeMs, type Clock } from "./time.ts";
@@ -92,7 +93,19 @@ export type Judgment =
   | { result: "routing"; reason: RoutingRefusal }                 // a delivery addressed to another scope or incarnation (section 7.4)
   | { result: "refused"; reason: RefusalReason; detail: string }; // not an input this scope can ever write
 
+/**
+ * The judge of an act, by the checks of section 4.2 in their order. In a
+ * scope under a platform definition a row may hold marks, and each rule is
+ * run at the check of its mark's place: a field's type at 7, a name of
+ * `also` at 8, a guard at 10, an effect and a slot's type at 11, a send at
+ * 12. No rule is run before check 7. A fault of a rule leaves the act not
+ * judged: `unavailable`, and nothing is written (section 6.1).
+ */
 export function judgeAct(view: StateView, definition: ValidDefinition, signed: SignedIntent, context: JudgeContext): ActJudgment {
+  return unjudged(() => actJudged(view, definition, signed, context));
+}
+
+function actJudged(view: StateView, definition: ValidDefinition, signed: SignedIntent, context: JudgeContext): ActJudgment {
   const scope = view.scope();
   if (!scope) return { result: "unavailable", reason: "unavailable" };
   const refused = (reason: RefusalReason, detail: string): Refused => ({ result: "refused", reason, detail, judgedAt: scope.head });
@@ -148,6 +161,13 @@ export function judgeAct(view: StateView, definition: ValidDefinition, signed: S
   const facts = new Map([...named.facts, ...beside.facts]);
   const uses = [...named.uses, ...beside.uses.filter((use) => !named.facts.has(use.fact.hash))];
   if (uses.length > bounds.usesPerEntry) return refused("bad-field", `more than ${bounds.usesPerEntry} foreign entries`);
+  // Platform data: what a rule of this row is given (section 6.1). The input is the act as it arrived. No grant is judged yet.
+  const clocked = { clock: false };
+  const judged: JudgedInput = { type: "act", signed, grant: null, presented: context.presented ?? {} };
+  const g = giving(view, context, scope, scope.head.seq + 1, judged, clocked, fields, facts);
+  // Check 7: a field whose type is a mark is checked by the mark's rule.
+  const outside = fieldOutsideType(g, act.fields);
+  if (outside) return refused("bad-field", `${outside} is not a value of its type`);
 
   // Section 6.4: `on` and each `also` name are resolved to local items before any guard or effect.
   const subjects = new Map<string, Item>();
@@ -162,11 +182,13 @@ export function judgeAct(view: StateView, definition: ValidDefinition, signed: S
   }
   // An `also` name is unbound when its field is absent, its slot is empty or its type has no item yet. It is then no subject, and
   // `expected` has no key for it. A transition's primary item exists before the entry, so a `via` may read its slots.
-  const also = alsoItems(view, definition, act.also, fields, act.step === "transition" ? (subjects.get("on") ?? null) : null);
+  // Check 8: a name of `also` that a mark selects is resolved by the mark's rule, which gives one item or none. The signer named
+  // no item, so such a name has no key in `expected`. The rule on aliases holds for it.
+  const also = alsoItems(view, definition, act.also, fields, act.step === "transition" ? (subjects.get("on") ?? null) : null, undefined, (mark, bound) => selectedBy({ ...g, subjects: bound }, mark));
   if (!also.ok) return refused("no-item", also.detail);
   for (const [name, item] of also.items) {
     subjects.set(`also.${name}`, item);
-    expects.push(name);
+    if (!also.marked.has(name)) expects.push(name);
   }
   // No aliases: each subject is one distinct item, so its expected revision is checked once and it rises once.
   if (new Set([...subjects.values()].map((i) => i.id)).size !== subjects.size) return refused("alias", "two names resolve to one item");
@@ -181,6 +203,9 @@ export function judgeAct(view: StateView, definition: ValidDefinition, signed: S
 
   // Section 4.2, check 9. Nothing was read about this signer that the commit can judge on: the act is not judged, and nothing above
   // this line was hidden by that. Section 16.1: no judgment rests on a read that was not made, or on one that was discarded.
+  // I3 merge: a row whose `grant` is a mark is judged by the mark's rule, in place of the grant check. That is the next row of the
+  // contract's list for the source (section 11.13, row I3-7). Until then such an act is not judged.
+  if (markOf(act.grant)) return { result: "unavailable", reason: "unavailable" };
   if (context.grants === null) return { result: "unavailable", reason: "authority-unavailable" };
   // Section 6.4: every act needs a current grant for its `grant` action. The first presented grant that qualifies is the one recorded.
   const presented = context.grants.find(({ grant, current }) =>
@@ -194,6 +219,7 @@ export function judgeAct(view: StateView, definition: ValidDefinition, signed: S
   const j: Judging = {
     view, definition, bounds, clock, scope, self: scope.head.seq + 1, kind: intent.kind, fields, fieldTypes: act.fields, subjects, signer, facts, prepared: context.prepared, used: [], asked: context.asked,
     own: context.own, intent: digest, presented: beside.fields, capabilities: context.capabilities,
+    platform: context.platform, judged: { ...judged, grant: presented.grant }, ran: clocked,
   };
 
   // Guards, then effects, then sends, then the bound on the type it opens, as for a handler. The cause of a scope it creates is the intent's digest.

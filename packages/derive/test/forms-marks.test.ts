@@ -1,8 +1,9 @@
 import { describe, expect, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import { PROFILES, validateDefinition } from "../src/index.ts";
-import { small } from "./fixtures.ts";
-import { gate } from "./fixtures-marks.ts";
+import { textDigest } from "@generalbusiness/artroom-bytes";
+import { PROFILES, validateDefinition, type ActJudgment, type PlatformRule } from "../src/index.ts";
+import { Scope, keys, small, type Actor } from "./fixtures.ts";
+import { gate, gateRules, gateWith } from "./fixtures-marks.ts";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Change = (d: any) => void;
@@ -66,4 +67,65 @@ describe("a mark in a definition (section 6.1)", () => {
     ["an effect mark in a clause of the send mark passes", gate, (d) => { d.acts.enter.sends[0].result.applied = [{ code: "noted", row: "P16" }]; }, true, null],
   ];
   for (const [name, base, change, platform, expected] of rows) test(name, () => expect(problems(base, change, platform)).toEqual(expected));
+});
+
+// Scope contract, revision 15, sections 4.2, "Marks in the order of checks", and 6.1; witness 18.38. The rules are STAND-INS of test
+// support (`gateRules`): this shows where a rule is run and what joins the entry, and nothing about a rule of a platform definition.
+describe("a rule is run at the check of its mark's place (sections 4.2 and 6.1)", () => {
+  const { rita, una, vic } = keys;
+  /** What a judgment answered: the result, with the reason, the refusal's name and the path of the guard, where it has them. */
+  const said = (j: ActJudgment) => [j.result, "reason" in j ? j.reason : null, "name" in j ? (j.name ?? null) : null, "detail" in j ? j.detail : null];
+  /** A gate with two open tickets, issued for the secrets `one` and `two`: items 2 and 3. `enter` is judged on a written grant here. */
+  const gated = () => {
+    const s = new Scope(gateWith((d) => { d.acts.enter.grant = "gate.enter"; }));
+    for (const secret of ["one", "two"]) s.did(rita, "issue", { fields: { hash: textDigest(secret) } });
+    return s;
+  };
+  const enter = (s: Scope, who: Actor, secret: string, platform = gateRules(), note?: number) =>
+    s.act(who, "enter", { on: 0, expected: { on: 1 }, fields: { secret, ...(note === undefined ? {} : { note }) } }, { platform });
+
+  test("a name of `also` at check 8, a field's type at check 7, a guard at its position among the written guards, and an effect at its position among the written effects, with a slot's type checked by its rule", () => {
+    const s = gated();
+    const rules = gateRules();
+    // Check 8: `find` gives ticket 2, and `expected` has no key for it. Check 10: the written guard, then `fresh`. Check 11: the two
+    // written effects, then the effect of `key-id`, in that order. The slot `note` has the type `even`, and its rule is asked again.
+    expect(said(enter(s, una, "one", rules, 4))).toEqual(["write", null, null, null]);
+    expect(s.last.effects).toEqual([{ effect: "state", item: 2, state: "used" }, { effect: "value", item: 2, slot: "note", value: 4 }, { effect: "value", item: 2, slot: "key", value: una.key }]);
+    expect([s.last.sends, rules.ran]).toEqual([[], { even: 2, find: 1, fresh: 1, "key-id": 1, refer: 1 }]);
+    // Check 7: a value that the rule of the field's type does not accept is `bad-field`, before any item is selected.
+    const odd = gateRules();
+    expect([said(enter(s, vic, "two", odd, 3)), odd.ran]).toEqual([["refused", "bad-field", null, "note is not a value of its type"], { even: 1 }]);
+
+    // The same secret again. The ticket is used: the written guard, which stands first, refuses with its own name and path, and the
+    // rule of the mark after it is not run.
+    const again = gateRules();
+    expect([said(enter(s, vic, "one", again)), again.ran["fresh"]]).toEqual([["refused", "guard-failed", "used", "guards.0"], undefined]);
+    // An open ticket, and a key that a ticket holds: the written guard holds, and the mark refuses with the name that its rule
+    // states and the path of its position.
+    expect(said(enter(s, una, "two"))).toEqual(["refused", "guard-failed", "seated", "guards.1"]);
+    expect(s.entries.length).toBe(5);
+  });
+
+  test("a fault of a rule leaves the act not judged, and nothing is written: an effect outside the eight forms, an effect that conflicts with a written one, a refusal that is not stated, a rule that throws, and a mark with no rule", () => {
+    const s = gated();
+    const effect = (run: () => unknown): PlatformRule => ({ place: "effect", most: 2, run: run as never });
+    const faults: Record<string, Partial<Record<string, PlatformRule>>> = {
+      // A member of `Effect` that no rule returns: a capability's record, and a redaction of the ticket's key.
+      record: { "key-id": effect(() => [{ effect: "record", capability: "hold@1", kind: "pin", key: [], state: "held", values: {} }]) },
+      redact: { "key-id": effect(() => [{ effect: "redact", item: 2, slot: "key", texts: [] }]) },
+      // The written effect sets the ticket's state, so a second `state` effect on it conflicts.
+      conflict: { "key-id": effect(() => [{ effect: "state", item: 2, state: "used" }]) },
+      "more than it states": { "key-id": { place: "effect", most: 0, run: () => [{ effect: "value", item: 2, slot: "key", value: "k" }] } },
+      "a refusal that is not stated": { fresh: { place: "guard", refusals: ["seated"], run: () => ({ holds: false, name: "tired" }) } },
+      throws: { find: { place: "also", run: () => { throw new Error("no"); } } },
+      "an item of another type": { find: { place: "also", run: () => 0 } },
+      "no rule": { fresh: undefined },
+      "a rule of another place": { fresh: { place: "send", run: () => null } },
+    };
+    for (const [name, over] of Object.entries(faults)) expect([name, said(enter(s, una, "one", gateRules(over)))]).toEqual([name, ["unavailable", "unavailable", null, null]]);
+    // The control: with the stand-in rules as they are, the same act is written.
+    expect([s.entries.length, said(enter(s, una, "one"))]).toEqual([4, ["write", null, null, null]]);
+    // A check on effects refuses, as for a written effect: a value outside its slot's type is `bad-field`, and is no fault.
+    expect(said(enter(s, vic, "two", gateRules({ "key-id": effect(() => [{ effect: "value", item: 3, slot: "key", value: 7 }]) })))).toEqual(["refused", "bad-field", null, "effects.2: the rule key-id gives key a value outside the slot's type"]);
+  });
 });

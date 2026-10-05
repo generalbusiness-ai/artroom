@@ -73,7 +73,7 @@ const variant = (by: string, variants: Record<string, Check>): Check => (v) => {
 export const REFUSAL_REASONS: Record<RefusalReason, true> = {
   "revision-moved": true, alias: true, "duplicate-relation": true, "required-unset": true, "scope-full": true, "bad-intent": true, misaddressed: true, expired: true, "scope-refused": true,
   "unknown-act": true, "bad-field": true, "no-item": true, final: true, "fact-mismatch": true, unauthorized: true, "guard-failed": true, "capability-refused": true, "slot-full": true, "type-full": true, "send-unresolved": true,
-  "unknown-message": true, "bad-input": true,
+  "unknown-message": true, "unsupported-definition": true, "bad-input": true,
 };
 export const READ_REFUSALS: Record<ReadRefusal, true> = {
   "not-found": true, "wrong-incarnation": true, forbidden: true, "scope-provisional": true, "unsupported-definition": true, "history-unavailable": true, "too-large": true, unavailable: true,

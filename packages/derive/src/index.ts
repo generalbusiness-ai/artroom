@@ -24,3 +24,4 @@ export * from "./capability/hold.ts";
 export * from "./capability/ancestry.ts";
 export * from "./capability/gitread.ts";
 export * from "./marks.ts";
+export * from "./outcomes.ts";

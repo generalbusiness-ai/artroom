@@ -410,7 +410,8 @@ export class Ledger {
   }
   /** Every actor of the key set holds every action here, unless the test presents other grants. */
   grants(): Presented[] {
-    const actions = Object.values(this.definition.declared.acts).map((a) => a.grant);
+    // In platform data the `grant` of an act may be a mark, which names no action.
+    const actions = Object.values(this.definition.declared.acts).map((a) => a.grant).filter((action) => typeof action === "string");
     return Object.values(keys).map((who) => ({ grant: grantOf(who, this.at, actions), current: true }));
   }
   context(over: Context = {}): JudgeContext {

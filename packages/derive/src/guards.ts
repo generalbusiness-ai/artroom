@@ -11,6 +11,7 @@ import type { Signer } from "./attribution.ts";
 import { capabilityGuard, type Capabilities } from "./capability.ts";
 import type { Own } from "./fields.ts";
 import { all, excepted, listGuard, scan, typeOfElement } from "./lists.ts";
+import { guardByRule, markOf, type Declined, type JudgedInput, type PlatformRules } from "./marks.ts";
 import { equal, kindOf, operand, slotOf } from "./operand.ts";
 import type { Item, Party, ScopeState, StateView } from "./state.ts";
 import { timeMs, type Clock } from "./time.ts";
@@ -58,6 +59,11 @@ export interface Judging {
   each?: Item | undefined;                             // a fan-out send: the item of that send
   capabilities?: Capabilities | undefined;             // the rules of the capabilities this judge can derive (section 6.11). Without them a capability form is not judged
   declined?: Map<Guard, string> | undefined;           // each capability guard that did not hold, with the refusal its capability names
+  // Platform code (section 6.1). A declared definition holds no mark, so its judge needs none of these.
+  platform?: PlatformRules | undefined;                // the rules of the platform definition that the scope pins. Without them a mark is a fault
+  judged?: JudgedInput | undefined;                    // the input of the entry being judged, whole, as a rule is given it
+  ran?: { clock: boolean } | undefined;                // one for a judgment: whether a rule that reads the clock was run for it
+  coded?: Map<Guard, Declined> | undefined;            // each guard that is a mark and did not hold, with the refusal its rule states
 }
 
 /** Passed, failed, or not judged, with the reason for the Unavailable answer (section 4.2). */
@@ -142,11 +148,17 @@ export function readsUnbound(j: Pick<Judging, "subjects">, v: unknown): boolean 
  * the list: a later guard that is false still refuses. The guards of an act,
  * of a handler and of a condition are each such a list. `at`: the failed
  * guard, whose `reason` names a refusal; -1 when no guard is false.
+ *
+ * Section 4.2, check 10: in the written list of an act or a handler of
+ * platform data, a mark is one guard of the list. Its rule is run at its
+ * position: the guards before it were judged first, and it is not run after
+ * one that is false. The validator lets a mark stand in no other list.
  */
 export function judgeGuards(j: Judging, guards: readonly Guard[], of: Subject = "on"): { result: GuardResult; at: number } {
   let at = -1;
   const result = all(guards.map((g, i) => () => {
-    const r = judgeGuard(j, g, of);
+    const mark = markOf(g);
+    const r = mark ? guardByRule(j, g, mark) : judgeGuard(j, g, of);
     if (r === "fail") at = i;
     return r;
   }));

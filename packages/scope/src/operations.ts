@@ -36,7 +36,7 @@
 import type { Bounds, CapabilityName, DecisiveEvidence, Entry, Evidence, FactRef, Input, OperationId, PlatformDefinition, ScopeRef } from "@generalbusiness/artroom-contract";
 import { isOperationId } from "@generalbusiness/artroom-bytes";
 import { settleOutcome, timeMs, timeOf, type Owners } from "@generalbusiness/artroom-derive";
-import type { Scope } from "./core.ts";
+import { ownOf, type Scope } from "./core.ts";
 import type { Wakes } from "./outbox.ts";
 import type { Clock, Ports } from "./ports.ts";
 import type { Sealed, Sending, Store } from "./store.ts";
@@ -194,7 +194,7 @@ export class Operations {
       const origin = store.stored(Number(id.split(":")[0]));
       // Nothing is sent that this runtime cannot send, or whose outcome it could not judge. The attempt stays recorded and not sent,
       // and no wake-up is asked for it (rule 7). The first pass after a restart looks at it once more.
-      if (!operation || !origin || !this.#outside.accepts(operation.owner, operation.kind) || !this.#owners?.rules(operation.owner, operation.kind)) {
+      if (!operation || !origin || !this.#outside.accepts(operation.owner, operation.kind) || !this.#scope.owners()?.rules(operation.owner, operation.kind)) {
         if (row.next !== null) store.postpone(id, attempt, null);
         continue;
       }
@@ -268,7 +268,7 @@ export class Operations {
     const end = await this.#scope.turns.run<OutcomeRecorded>({
       asks: () => [],
       judge: (view, clock) => {
-        const judged = settleOutcome(view, definition, input, { clock, bounds, owners: this.#owners });
+        const judged = settleOutcome(view, definition, input, { clock, bounds, owners: this.#owners, platform: this.#scope.pinned()?.platform ?? undefined, own: ownOf(this.#store) });
         switch (judged.result) {
           case "write":
             // Room for this entry was reserved when its operation was opened (sections 17.2, row 5, and 17.3). A scope with no room at all writes nothing.
