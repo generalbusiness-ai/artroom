@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers";
-import { SELF, runInDurableObject } from "cloudflare:test";
+import { runInDurableObject } from "cloudflare:test";
 import { describe, expect, test } from "vitest";
 import type { Intent, Seed } from "@generalbusiness/artroom-contract";
 import { intentDigest, isIncarnation, scopeIdOf, signIntent } from "@generalbusiness/artroom-bytes";
@@ -7,7 +7,7 @@ import { timeOf } from "@generalbusiness/artroom-derive";
 import { Scope, grantOf, laneDefinition, variant } from "@generalbusiness/artroom-derive/testing";
 import { httpSource, verify } from "@generalbusiness/artroom-replay";
 import { controls, scriptedCapability } from "../src/testing.ts";
-import { Node, founding as foundingIn, net } from "./net.ts";
+import { Node, founding as foundingIn, net, routed } from "./net.ts";
 import { HOLD, START, at, definition, found, founding, reader, rita, stubOf, una } from "./support.ts";
 
 describe("founding a directory (sections 2.2, 2.3 and 7.1)", () => {
@@ -120,7 +120,7 @@ describe("founding a directory (sections 2.2, 2.3 and 7.1)", () => {
       expect(reported.effects.at(-1)).toEqual({ effect: "record", capability: "hold@1", kind: "pin", key: [commit], state: "held", values: { commit } });
 
       // A verifier derives the entry again only with the same rules. With none, it cannot derive under the definition at all.
-      const source = httpSource("https://scopes.test", { fetch: (url, init) => SELF.fetch(url, init) });
+      const source = httpSource("https://scopes.test", { fetch: routed });
       const replayed = async (capabilities?: ReturnType<typeof scriptedCapability>) => (await verify(source, { mode: "replay", scope: name, capabilities })).report;
       expect([await replayed(scriptedCapability(() => net.capability)), await replayed()]).toMatchObject([{ result: "consistent" }, { result: "unsupported-definition", at: { seq: 0 } }]);
 

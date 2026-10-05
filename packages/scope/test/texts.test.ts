@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers";
-import { SELF, runInDurableObject } from "cloudflare:test";
+import { runInDurableObject } from "cloudflare:test";
 import { expect, test } from "vitest";
 import type { DeclaredDefinition, Digest, Entry, Seed } from "@generalbusiness/artroom-contract";
 import { scopeIdOf, textDigest } from "@generalbusiness/artroom-bytes";
@@ -7,7 +7,7 @@ import { timeMs } from "@generalbusiness/artroom-derive";
 import { grantOf, variant } from "@generalbusiness/artroom-derive/testing";
 import { found, httpTransport, secretSigner, signedIntent } from "@generalbusiness/artroom-client";
 import { TRUSTS, httpSource, verify } from "@generalbusiness/artroom-replay";
-import { Node, founding, later, net, rita, settle } from "./net.ts";
+import { Node, founding, later, net, rita, routed, settle } from "./net.ts";
 import { reader } from "./support.ts";
 
 /**
@@ -40,13 +40,13 @@ const notes = variant(base, (def) => {
   };
   def.receives = { noted: { message: "noted", class: "tell", from: { kind: "lane" }, opens: "note", fields: { body: { ...body, required: true } }, also: {}, guards: [], effects: write, sends: [], attention: [] } };
 });
-const source = httpSource("https://scopes.test", { fetch: (url, init) => SELF.fetch(url, init) });
+const source = httpSource("https://scopes.test", { fetch: routed });
 
 test("a detached text over the real route: the entry holds its digest and the scope keeps its bytes; a text that is not the one named is bad-field; a redaction removes the bytes, and replay reports them as redacted", async () => {
   net.hold = net.deaf = null;
   const signer = secretSigner(rita.secret);
   const now = timeMs(net.clock.now)!;
-  const transport = httpTransport("https://scopes.test", { fetch: (url, init) => SELF.fetch(url, init) });
+  const transport = httpTransport("https://scopes.test", { fetch: routed });
   const { answer, scope } = await found(transport, await signedIntent(signer, { to: null, kind: "found" }, { now }), notes.declared, [], reader);
   if (answer.answer !== "accepted" || !scope) throw new Error(`not founded: ${JSON.stringify(answer)}`);
   const at = answer.receipt.fact.at;

@@ -13,6 +13,7 @@ import { intentDigest, scopeIdOf, signIntent } from "@generalbusiness/artroom-by
 import { timeMs, timeOf, type Delivered, type ValidDefinition } from "@generalbusiness/artroom-derive";
 import { deskDefinition, grantOf, keys, ticketDefinition, type Actor, type Over } from "@generalbusiness/artroom-derive/testing";
 import type { Delivery, Duty, Sealed, Summary } from "../src/index.ts";
+import { route } from "../src/worker.ts";
 import { net } from "../src/testing.ts";
 import type { NetScope } from "./worker.ts";
 import { reader, type Remote } from "./support.ts";
@@ -22,6 +23,14 @@ export const { rita, una } = keys;
 
 type Peer = Remote & { deliver(envelope: Delivered): Promise<Delivery>; dispatch(): Promise<number> };
 const stubOf = (name: string): DurableObjectStub => env.NET.get(env.NET.idFromName(name));
+
+/**
+ * The Worker's routes, called in the test's isolate: the same `route` that the Worker's `fetch` runs, over the same namespace.
+ * A test that is about a route and not about the pool's entrypoint uses this. In the Workers pool each call through
+ * `SELF.fetch` or the service binding takes longer the more of them one run has made (notes/2026-10-05-scope-test-cost.md),
+ * so `routes.test.ts` and `client.test.ts` keep the one test for each of those two paths.
+ */
+export const routed = (url: string, init?: RequestInit): Promise<Response> => route(new Request(url, init), env.NET);
 
 /** `seconds` after the shared clock's `now`. */
 export const soon = (seconds: number) => timeOf(timeMs(net.clock.now)! + seconds * 1000);
