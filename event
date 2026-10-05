@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at packages/scope/tsconfig.test.json","body":{"commit":"f1c456ce61d414c49cb6b3cd39525f4719b71fd9","path":"packages/scope/tsconfig.test.json"}}
+{"kind":"artifact","text":"Merge published the current artifact at packages/scope/vitest.config.ts","body":{"commit":"f1c456ce61d414c49cb6b3cd39525f4719b71fd9","path":"packages/scope/vitest.config.ts"}}
