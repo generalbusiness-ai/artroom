@@ -131,10 +131,11 @@ export class Deliveries {
     let origin: Entry | null = null;
     let carried: Digest[] = [];
     // Section 7.4, the order of a delivery's checks: a repeat is found after the source entry is read, and before the checks of the
-    // message's class. A send that this scope has recorded is answered from that entry. That answer reads no foreign entry and no
-    // text, so none is fetched for it, and a text that both scopes have redacted since cannot hide it. The judge still makes every
-    // check in that order, and gives the answer. A recorded decision stays recorded, so the judge finds it too. A repeated creation
-    // is under the same rule: its scope has a genesis, so the founding branch below, which reads a creation's texts, is not taken.
+    // message's class. A send that this scope has recorded is answered from that entry. The source entry is still read and checked.
+    // The answer reads no other foreign entry and no text, so none is fetched for it, and a text that both scopes have redacted since
+    // cannot hide it. The judge still makes every check in that order, and gives the answer. A recorded decision stays recorded, so
+    // the judge finds it too. A repeated creation is under the same rule: its scope has a genesis, so the founding branch below,
+    // which reads a creation's texts, is not taken.
     const known = store.decided(from.at, from.seq, delivered.n) !== null;
     if (!pinned && founding) {
       const act = own(founding.valid.declared.acts, founding.valid.declared.genesis)!;
