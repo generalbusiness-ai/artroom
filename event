@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:54266987a01ed215e61edcbada6dbdb9b9988f52","text":"Merge retired a covered predecessor; the successor is at packages/derive/src/unsupported.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:550cd478a1688887f99e7baa40dddf7af15e0099","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-05-i2-implementation-plan.md."}
