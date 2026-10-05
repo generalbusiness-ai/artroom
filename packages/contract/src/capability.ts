@@ -94,7 +94,10 @@ export const CAPABILITIES = {
     reserved: [{ record: "receiver-pin", while: "standing", request: { class: "tell", message: "export-license", number: "k" }, bound: 3, count: "decided" }],
   },
   "git-read@1": {
-    records: {},
+    // The authority note's, sections 3.11 and 5.7: a job's read token is a record "of the same form" as the `token` of `hold@1`, in
+    // the change lane, and belongs to this capability. The snapshot repository of a filtered check has no record here: the note
+    // names none and gives it no states (I3 deltas, entries E4 and EW3).
+    records: { token: { states: ["minting", "live", "revoking", "ended"], final: ["ended"] } },
     guards: {
       ancestry: { with: ["commit", "row", "pin", "selected", "earlier"], refusals: ["ancestry-too-large", "ancestry-stale", "unnamed-work"] },
     },

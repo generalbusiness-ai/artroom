@@ -10,7 +10,9 @@
  * is sent, sends the one request of an attempt at most once, and keeps an
  * outcome that is not known as `unknown`. This file adds no second ledger.
  * It is the port that the scope's driver gives one request to, for the two
- * kinds that the code of `hold@1` opens: `mint` and `revoke`.
+ * kinds that the code of `hold@1` opens, `mint` and `revoke`, and for the
+ * same two kinds of `git-read@1`, which owns a job's read token (section
+ * 3.11; plan step 24).
  *
  * `GitHost` is the host's side: one call that mints and one that revokes.
  * No adapter for a real host is here. A deployment has none until the
@@ -61,12 +63,15 @@
  * this file cannot read, is no answer: the attempt is `unknown`.
  */
 
-import { timeMs } from "@generalbusiness/artroom-bytes";
-import type { DecisiveEvidence, Digest, Effect, Entry, OperationId, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
+import { isFactRef, timeMs } from "@generalbusiness/artroom-bytes";
+import type { DecisiveEvidence, Digest, Effect, Entry, FactRef, OperationId, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
 
 /** The owner and the two kinds of operation that this driver sends: the names that the code of `hold@1` states (`derive/src/capability/hold.ts`, `HOLD_KINDS`). */
 export const TOKEN_OWNER = "hold@1";
+/** The second owner: `git-read@1`, for a job's read token, with the same two kinds (`derive/src/capability/gitread.ts`, `GIT_READ_KINDS`). */
+export const READ_TOKEN_OWNER = "git-read@1";
 export const TOKEN_KINDS = { mint: "mint", revoke: "revoke" } as const;
+const OWNERS: readonly string[] = [TOKEN_OWNER, READ_TOKEN_OWNER];
 
 /**
  * The form of a token's ID at the host, as this package takes one: the form
@@ -75,17 +80,30 @@ export const TOKEN_KINDS = { mint: "mint", revoke: "revoke" } as const;
  */
 const TOKEN_ID = /^[A-Za-z0-9._:-]{1,200}$/;
 
-/** What a token is for, as its record states it (section 5.7): a hold and one instance of it, or one attempt of an operation on a staged root. */
-export type TokenFor = { hold: number; instance: string } | { root: number; operation: OperationId; attempt: number };
+/**
+ * What a token is for, as its record states it (section 5.7): a hold and one
+ * instance of it, one attempt of an operation on a staged root, or, for a
+ * record of `git-read@1`, one check job, by the fact of its `request-check`
+ * entry.
+ */
+export type TokenFor = { hold: number; instance: string } | { root: number; operation: OperationId; attempt: number } | { job: FactRef };
 
 /** One mint, as the host is asked. Every member is read from the sealed entry that opened the operation. */
 export interface MintAsk {
   scope: ScopeRef; operation: OperationId; attempt: number;
   /** The token's number in the scope's ledger: the key of its record. */
   token: number;
-  /** `workspace`, `fork-read` or `staging`, as the record states it. */
+  /** `workspace`, `fork-read`, `staging` or `check-read`, as the record states it. */
   purpose: string;
   for: TokenFor;
+  /**
+   * For a job's read token: the job's deadline, as the record states it. The
+   * token must end before it, by its own end time at the host (section 3.11,
+   * "When the token ends"). The host is asked for that. The scope's rule
+   * judges what the host answers: a token that would not end before it is
+   * never `live`.
+   */
+  before?: Timestamp;
 }
 
 /** One revocation, by the token's ID at the host. The ID is the one in the sealed record, and no other. */
@@ -136,14 +154,19 @@ const keyOf = (at: AttemptOf): string => `${at.scope.scope}/${at.scope.inc}/${at
 const position = (value: unknown): value is number => typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 const isOperation = (value: unknown): value is OperationId => typeof value === "string" && /^(0|[1-9][0-9]{0,15}):(0|[1-9][0-9]{0,15})$/.test(value);
 
-/** The `token` record of the sealed entry that names the operation in the member `by`. Null: the entry holds none, or more than one. */
-function tokenOf(entry: Entry, by: "mint" | "revocation", operation: OperationId): Recorded | null {
-  const found = entry.effects.filter((e): e is Recorded => e.effect === "record" && e.capability === TOKEN_OWNER && e.kind === "token" && e.values[by] === operation);
+/** The `token` record of that owner in the sealed entry that names the operation in the member `by`. Null: the entry holds none, or more than one. */
+function tokenOf(entry: Entry, owner: string, by: "mint" | "revocation", operation: OperationId): Recorded | null {
+  const found = entry.effects.filter((e): e is Recorded => e.effect === "record" && e.capability === owner && e.kind === "token" && e.values[by] === operation);
   return found.length === 1 && position(found[0]!.key[0]) ? found[0]! : null;
 }
 
-/** What the record says the token is for, or null when it says neither form. */
-function forOf(values: Readonly<Record<string, unknown>>): TokenFor | null {
+/**
+ * What the record says the token is for, or null when it says no form of its
+ * owner. A record of `hold@1` names a hold or a root, and never a job. A
+ * record of `git-read@1` names a job and a deadline, and nothing else.
+ */
+function forOf(owner: string, values: Readonly<Record<string, unknown>>): TokenFor | null {
+  if (owner === READ_TOKEN_OWNER) return isFactRef(values["job"]) && timeMs(values["before"]) !== null ? { job: values["job"] } : null;
   if (position(values["hold"]) && typeof values["instance"] === "string") return { hold: values["hold"], instance: values["instance"] };
   if (position(values["root"]) && isOperation(values["operation"]) && position(values["attempt"])) return { root: values["root"], operation: values["operation"], attempt: values["attempt"] };
   return null;
@@ -161,7 +184,7 @@ export class TokenDriver {
    * custody, above. In memory only. An entry leaves when the scope has
    * judged that attempt's answer, or with the process.
    */
-  readonly #minted = new Map<string, { id: string; plaintext: string }>();
+  readonly #minted = new Map<string, { id: string; plaintext: string; owner: string }>();
   #deliver: ((operation: OperationId, attempt: number, answer: TokenAnswer) => Promise<unknown>) | null = null;
 
   constructor(options: TokenDriverOptions) {
@@ -173,9 +196,13 @@ export class TokenDriver {
   /** How many plaintexts the driver holds now. A count, and never a value. */
   get holding(): number { return this.#minted.size; }
 
-  /** Only a mint and a revocation of `hold@1`. No other owner's token has a record that a request could be read from (I3 deltas, entry ET4). */
+  /**
+   * Only a mint and a revocation of `hold@1` and of `git-read@1`. No other
+   * owner's token has a record that a request could be read from (I3 deltas,
+   * entries ET4 and EW8).
+   */
   accepts(owner: string, kind: string): boolean {
-    return owner === TOKEN_OWNER && (kind === TOKEN_KINDS.mint || kind === TOKEN_KINDS.revoke);
+    return OWNERS.includes(owner) && (kind === TOKEN_KINDS.mint || kind === TOKEN_KINDS.revoke);
   }
 
   /** The scope's driver gives the function that takes an answer which arrives by itself, after its request. */
@@ -195,9 +222,9 @@ export class TokenDriver {
         this.#log({ step: "mint", event: "host-failed" });
         return null;
       }
-      return this.#minting(request, reply);
+      return this.#minting(request, reply, request.owner);
     }
-    const record = tokenOf(request.origin.entry, "revocation", request.operation);
+    const record = tokenOf(request.origin.entry, request.owner, "revocation", request.operation);
     const id = record?.values["id"];
     // Rule 5: a revocation names the ID that this scope's own sealed record holds. With none, nothing is sent.
     if (!record || record.state !== "revoking" || typeof id !== "string" || !TOKEN_ID.test(id)) return notSent("no-token-record");
@@ -220,7 +247,7 @@ export class TokenDriver {
    * answers is returned, or null when the reply is no answer.
    */
   async answered(ask: MintAsk | RevokeAsk, reply: MintReply | RevokeReply): Promise<unknown> {
-    const answer = "id" in ask ? (TOKEN_ID.test(ask.id) ? this.#revoking(ask.id, reply) : null) : this.#minting(ask, reply);
+    const answer = "id" in ask ? (TOKEN_ID.test(ask.id) ? this.#revoking(ask.id, reply) : null) : this.#minting(ask, reply, "job" in ask.for ? READ_TOKEN_OWNER : TOKEN_OWNER);
     if (answer === null || this.#deliver === null) {
       this.#minted.delete(keyOf(ask));
       return null;
@@ -242,8 +269,8 @@ export class TokenDriver {
     const input = sealed?.entry.input;
     if (!sealed || input?.type !== "outcome" || input.operation !== at.operation || input.attempt !== at.attempt || input.result !== "confirmed") return;
     // Section 5.7: only when that entry made the token `live`. An entry that made it `revoking` gives the plaintext to nobody.
-    const record = tokenOf(sealed.entry, "mint", at.operation);
-    const of = record ? forOf(record.values) : null;
+    const record = tokenOf(sealed.entry, held.owner, "mint", at.operation);
+    const of = record ? forOf(held.owner, record.values) : null;
     if (!record || !of || record.state !== "live" || record.values["id"] !== held.id || timeMs(record.values["ends"]) === null || typeof record.values["purpose"] !== "string") return;
     try {
       this.#custody.take({ scope: at.scope, token: record.key[0] as number, id: held.id, ends: record.values["ends"] as Timestamp, purpose: record.values["purpose"], for: of, state: "live", plaintext: held.plaintext });
@@ -264,10 +291,11 @@ export class TokenDriver {
   }
 
   #mintAsk(request: TokenRequest): MintAsk | null {
-    const record = tokenOf(request.origin.entry, "mint", request.operation);
-    const of = record ? forOf(record.values) : null;
+    const record = tokenOf(request.origin.entry, request.owner, "mint", request.operation);
+    const of = record ? forOf(request.owner, record.values) : null;
     if (!record || !of || record.state !== "minting" || typeof record.values["purpose"] !== "string") return null;
-    return { scope: request.scope, operation: request.operation, attempt: request.attempt, token: record.key[0] as number, purpose: record.values["purpose"], for: of };
+    const before = "job" in of ? { before: record.values["before"] as Timestamp } : {};
+    return { scope: request.scope, operation: request.operation, attempt: request.attempt, token: record.key[0] as number, purpose: record.values["purpose"], for: of, ...before };
   }
 
   /**
@@ -282,7 +310,7 @@ export class TokenDriver {
    * plaintext is `confirmed`: the ledger then knows the ID, and can revoke
    * it, and nobody can use it.
    */
-  #minting(at: AttemptOf, reply: unknown): TokenAnswer | null {
+  #minting(at: AttemptOf, reply: unknown, owner: string): TokenAnswer | null {
     const r = reply as { minted?: unknown; id?: unknown; ends?: unknown; plaintext?: unknown } | null;
     if (r?.minted === false) return { result: "refused", evidence: { basis: "own-answer", body: { send: "refused", why: "host-refused" } } };
     const plaintext = typeof r?.plaintext === "string" ? r.plaintext : "";
@@ -290,7 +318,7 @@ export class TokenDriver {
       this.#log({ step: "mint", event: "no-answer" });
       return null;
     }
-    if (plaintext !== "") this.#minted.set(keyOf(at), { id: r.id, plaintext });
+    if (plaintext !== "") this.#minted.set(keyOf(at), { id: r.id, plaintext, owner });
     return { result: "confirmed", evidence: { basis: "own-answer", body: { token: r.id, ends: r.ends as Timestamp } } };
   }
 }

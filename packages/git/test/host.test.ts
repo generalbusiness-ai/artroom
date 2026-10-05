@@ -57,6 +57,39 @@ describe("the token ledger's driver (authority note, sections 5.3, 5.4 and 5.7).
     expect(vault.held.length).toBe(1);
   });
 
+  test("a job's read token is a token like any other (section 3.11; plan step 24): the host is asked with the job and its deadline, read from the `token` record of `git-read@1`; its plaintext goes to the gateway's side only when the sealed entry made it `live`; a record of the other owner, or one that names no job, sends nothing", async () => {
+    const { host, vault, driver } = made();
+    const job = { at, seq: 5, hash };
+    const reading = { purpose: "check-read", job, before: "2099-01-01T00:30:00Z" };
+    const read = (state: string, values: Record<string, unknown>, key = 1): Effect => ({ effect: "record", capability: "git-read@1", kind: "token", key: [key], state, values: { ...reading, ...values } });
+    const asking = (operation: string, effects: Effect[], owner = "git-read@1"): TokenRequest => ({ ...request("mint", operation, effects), owner });
+    const first = await driver.send(asking("7:0", [read("minting", { mint: "7:0", id: null, ends: null, revocation: null })]));
+    const second = await driver.send(asking("7:1", [read("minting", { mint: "7:1", id: null, ends: null, revocation: null }, 2)]));
+    expect([first, host.asked[0], driver.holding]).toEqual([
+      { result: "confirmed", evidence: { basis: "own-answer", body: { token: "tok-1", ends: host.ends } } },
+      { call: "mint", scope: at, operation: "7:0", attempt: 1, token: 1, purpose: "check-read", for: { job }, before: "2099-01-01T00:30:00Z" }, 2,
+    ]);
+    const plain = host.tokens.get("tok-1")!.plaintext;
+    expect(JSON.stringify([first, second])).not.toContain(plain);
+    const sealedBy = (operation: string, effects: Effect[]) => { const o = outcome(operation, "confirmed", effects); return { ...o, entry: { ...o.entry, input: { ...o.entry.input, owner: "git-read@1" } as Input } }; };
+    // `live`: handed to the gateway's side, which is the runner's gateway. The runner is given nothing.
+    driver.judged(of("7:0"), sealedBy("7:0", [read("live", { mint: "7:0", id: "tok-1", ends: host.ends, revocation: null })]));
+    // `revoking`, because the job was decided before the answer came, or the token would outlive the deadline: dropped.
+    driver.judged(of("7:1"), sealedBy("7:1", [read("revoking", { mint: "7:1", id: "tok-2", ends: host.ends, revocation: "9:0" }, 2)]));
+    expect([vault.held, driver.holding]).toEqual([[{ scope: at, token: 1, id: "tok-1", ends: host.ends, purpose: "check-read", for: { job }, state: "live", plaintext: plain }], 0]);
+    // The record is read under the request's own owner. A read token's record under `hold@1`, a record of `git-read@1` that names a hold, and one with no deadline: nothing reaches the host.
+    const asked = host.asked.length;
+    const none = [
+      await driver.send(asking("7:2", [read("minting", { mint: "7:2" })], "hold@1")),
+      await driver.send(asking("7:2", [{ effect: "record", capability: "git-read@1", kind: "token", key: [3], state: "minting", values: { ...staging, mint: "7:2" } }])),
+      await driver.send(asking("7:2", [read("minting", { mint: "7:2", before: null })])),
+    ];
+    expect([none.map((a) => a?.result), host.asked.length - asked]).toEqual([["refused", "refused", "refused"], 0]);
+    // Its revocation names the ID in the sealed record, as every revocation does.
+    const revoked = await driver.send({ ...request("revoke", "9:0", [read("revoking", { mint: "7:1", id: "tok-2", ends: host.ends, revocation: "9:0" }, 2)]), owner: "git-read@1" });
+    expect([revoked?.result, host.listing()]).toEqual(["confirmed", ["tok-1"]]);
+  });
+
   test("a request names only what the sealed entry records, and a host's failure is no answer: no record sends nothing; a revocation names the recorded ID; a refusal, a lost request, a lost reply and a reply with no ID or end time each give their one answer; nothing that a host threw is in an answer or a log line", async () => {
     const { host, vault, log, late, driver } = made();
     const leaked = secret();

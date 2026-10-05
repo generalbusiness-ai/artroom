@@ -17,7 +17,9 @@ export type GitReason =
   | "missing-object" | "wrong-type" | "wrong-size" | "hash-mismatch" | "malformed-commit" | "repeated-header" | "malformed-tree" | "unknown-mode" | "gitlink"
   | "too-large" | "unreadable"
   // what a push sends
-  | "same-commit" | "tree-mismatch" | "parent-mismatch" | "incomplete" | "not-a-branch";
+  | "same-commit" | "tree-mismatch" | "parent-mismatch" | "incomplete" | "not-a-branch"
+  // the files of a snapshot
+  | "bad-path" | "path-conflict";
 
 /**
  * A refusal by this package. `what` is a fixed word of the caller's own, such
