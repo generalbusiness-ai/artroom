@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"scripts/measure-tests.sh at exact 50bba45ca68ed5b43fa46a5ec79ed1c171261260 on request/i2-genesis-kind, under promise git:sha1…2e7906d on request git:sha1…b0ddf9a","body":{"commit":"50bba45ca68ed5b43fa46a5ec79ed1c171261260","path":"scripts/measure-tests.sh"}}
+{"kind":"artifact","text":"vitest.config.ts at exact 50bba45ca68ed5b43fa46a5ec79ed1c171261260 on request/i2-genesis-kind, under promise git:sha1…2e7906d on request git:sha1…b0ddf9a","body":{"commit":"50bba45ca68ed5b43fa46a5ec79ed1c171261260","path":"vitest.config.ts"}}
