@@ -13,7 +13,7 @@ import { deriveEffects } from "./effects.ts";
 import { creationFields, factsNamed, isLocalFact, messageFields, readFacts, readFields, updateOf, type Reading, type Update } from "./fields.ts";
 import { signerOf } from "./fold.ts";
 import { judgeGuard, slotOf, type Fetched, type Judging } from "./guards.ts";
-import { deriveSends } from "./sends.ts";
+import { conditionsReadClock, deriveSends, formOf, notices, readsClock } from "./sends.ts";
 import type { Item, OwnRequest, ScopeState, StateView } from "./state.ts";
 import type { ValidDefinition } from "./validate/index.ts";
 import { isFactRef, isLocalId, isObject, own } from "./values.ts";
@@ -147,6 +147,7 @@ export function alsoItems(view: StateView, definition: ValidDefinition, also: Re
  * guard whose subject is unbound is not evaluated, and an effect whose
  * subject is unbound is not applied.
  */
+// I2 merge: a guard nested in a list form whose own `of` is unbound is step 4's to skip; an effect whose `if` reads an unbound subject, and an `attribute` of one, are step 5's to leave out.
 export const unbound = (j: Pick<Judging, "subjects">, of: string | undefined): boolean => of !== undefined && of.startsWith("also.") && !j.subjects.has(of);
 
 /** Section 6.3: `max` bounds the live items of a type. What an opening of one more, into that state, would pass; or null. */
@@ -177,22 +178,26 @@ const timesEffect = (e: EffectForm): boolean => "value" in e && e.value.from !==
  * Guards, then effects, then sends, for one input whose subjects are
  * resolved (section 5.2, step 6.4). `judgesTime`: a guard read the clock, or
  * an effect derived a time from it, so the entry is not written while the
- * clock is behind (section 5.3).
+ * clock is behind (section 5.3). `directory`: the directory the scope
+ * records, when the entry is its genesis.
  */
-export function derive(j: Judging, forms: Forms, opens: string | null, cause: Digest, first = 0): Ran {
+export function derive(j: Judging, forms: Forms, opens: string | null, cause: Digest, first = 0, directory?: ScopeRef | null): Ran {
   for (const [i, guard] of forms.guards.entries()) {
     if (unbound(j, guard.of)) continue;
     const result = judgeGuard(j, guard);
     if (result === "fail") return { result: "refused", reason: "guard-failed", ...refusalName(guard), detail: `guards.${i}`, prepared: j.used };
     if (result !== "pass") return { result: "unavailable", reason: result };
   }
-  const effects = deriveEffects(j, forms.effects.filter((e) => !unbound(j, e.of)), forms.attention, opens);
+  // Section 6.6: a notice with `if` is made only when its guards hold, on the state before the effects.
+  const told = notices(j, forms.attention);
+  if (typeof told === "string") return { result: "unavailable", reason: told };
+  const effects = deriveEffects(j, forms.effects.filter((e) => !unbound(j, e.of)), told, opens);
   if (!effects.ok) return { result: "refused", reason: effects.reason, detail: effects.detail, prepared: j.used };
-  const sends = deriveSends(j, forms.sends, effects.working, cause, first);
-  if (!sends.ok) return { result: "refused", reason: sends.reason, detail: sends.detail, prepared: j.used };
+  const sends = deriveSends(j, forms.sends, effects.working, cause, first, directory);
+  if (!sends.ok) return "unavailable" in sends ? { result: "unavailable", reason: sends.unavailable } : { result: "refused", reason: sends.reason, detail: sends.detail, prepared: j.used };
   const full = opens === null ? null : overMax(j.view, j.definition, opens, effects.working.get("on")!.state);
   if (full !== null) return { result: "refused", reason: "type-full", detail: full, prepared: j.used };
-  const judgesTime = forms.guards.some((g) => "before" in g || "after" in g) || forms.effects.some(timesEffect);
+  const judgesTime = readsClock(forms.guards) || forms.effects.some(timesEffect) || conditionsReadClock(forms.sends, forms.attention);
   return { result: "ran", effects: effects.effects, sends: sends.sends, prepared: j.used, judgesTime };
 }
 
@@ -278,7 +283,7 @@ export function runClause(view: StateView, definition: ValidDefinition, context:
   const { declared } = definition;
   const input = origin.input;
   /** What the origin gives its clauses: its fields, how it selects its items, its primary item by ID, and its signer. */
-  let frame: { kind: string; fields: Record<string, FieldValue>; fieldTypes: ActType["fields"]; also: Readonly<Record<string, AlsoRule>>; on: number | null; signer: Signer | null; sends: readonly SendForm[]; first: number };
+  let frame: { kind: string; fields: Record<string, FieldValue>; fieldTypes: ActType["fields"]; also: Readonly<Record<string, AlsoRule>>; on: number | null; signer: Signer | null; sends: readonly SendForm[] };
   if (input.type === "act" || input.type === "genesis") {
     const intent = input.type === "act" ? input.signed.intent : input.founding?.intent;
     const kind = input.type === "act" ? input.signed.intent.kind : declared.genesis;
@@ -287,12 +292,11 @@ export function runClause(view: StateView, definition: ValidDefinition, context:
     const read = readFields(act.fields, given ?? {}, context.bounds);
     if (!read.ok) throw new Error(`entry ${origin.seq} was sealed with fields its act does not take`);
     const on = act.step === "open" ? origin.seq : intent?.on;
-    // A child's genesis sends its result at ordinal 0, before the sends its act declares.
     // The clause reads the member who signed the origin, and no principal. The entry that records the clause has no signer, so
     // the fold adds no principal for it; a principal here would put a member in an `attribute` effect whom the fold then leaves
     // out of the item's history. A grant is judged for the entry it is presented with, and for no later entry.
     const signed = signerOf(origin);
-    frame = { kind, fields: read.fields, fieldTypes: act.fields, also: act.also, on: typeof on === "number" ? on : null, signer: signed && { member: signed.member, principal: null }, sends: act.sends, first: input.type === "genesis" && input.source ? 1 : 0 };
+    frame = { kind, fields: read.fields, fieldTypes: act.fields, also: act.also, on: typeof on === "number" ? on : null, signer: signed && { member: signed.member, principal: null }, sends: act.sends };
   } else if (input.type === "delivery" && (input.message.class === "request" || input.message.class === "advisory")) {
     const b = bound(definition, input.message, input.from);
     if (!b?.handler) throw new Error(`entry ${origin.seq} sent a request and ran no handler`);
@@ -301,10 +305,11 @@ export function runClause(view: StateView, definition: ValidDefinition, context:
     if (!read.ok) throw new Error(`entry ${origin.seq} was sealed with fields its handler does not take`);
     // The handler's primary item: the one the origin opened, or the one item of the type that it found.
     const on = handler.opens === null ? null : origin.effects.some((e) => e.effect === "open") ? origin.seq : (ones(view, definition, handler.opens, origin.seq)[0]?.id ?? null);
-    frame = { kind: b.kind, fields: read.fields, fieldTypes: handler.fields, also: handler.also, on, signer: null, sends: handler.sends, first: 0 };
+    frame = { kind: b.kind, fields: read.fields, fieldTypes: handler.fields, also: handler.also, on, signer: null, sends: handler.sends };
   } else throw new Error(`entry ${origin.seq} is not one that sends a request`);
 
-  const form = frame.sends[request.n - frame.first];
+  // A send that was not made took no ordinal, and a fan-out made several: the form is found from the send the entry recorded.
+  const form = formOf(definition, frame.sends, origin, request.n);
   if (!form || "index" in form) throw new Error(`entry ${origin.seq} declares no request at ordinal ${request.n}`);
   const clauses: ResultClauses & { conflict?: readonly EffectForm[] } = "create" in form ? form.create.result : "tell" in form ? form.tell.result : form.relate.result;
   const forms = clauses[clause] ?? [];

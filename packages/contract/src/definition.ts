@@ -224,8 +224,7 @@ export type ResultClauses = Partial<Record<"applied" | "refused" | "superseded" 
 export type SendForm =
   | { create: { kind: ScopeKind; definition: Digest | PlatformDefinition | "self";
                 fields: Record<string, SendSource>; result: ResultClauses } }
-  // Landed form: `to` as the name of a slot of the primary item.
-  | { tell: { to: { slot: string; of?: Subject } | string; message: string; if?: readonly Guard[];
+  | { tell: { to: { slot: string; of?: Subject }; message: string; if?: readonly Guard[];
               fields: Record<string, SendSource>; result: ResultClauses } }
   | { relate: { each?: Range; to: SendSource; name: string; item: SendSource; state: string;
                 if?: readonly Guard[]; detail: Record<string, SendSource>; result: ResultClauses } }

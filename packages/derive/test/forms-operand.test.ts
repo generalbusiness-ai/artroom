@@ -258,7 +258,6 @@ describe("operands, parts and a local fact (sections 6.2 and 6.5; witness 18.1)"
       ["`self` in a fact slot whose kinds do not include the act's kind", refusal(asks, (d) => { d.items.ask.refs.termsAt.to.kind = ["ask"]; }), "name"],
       ["`self` in a fact slot under another definition's name", refusal(asks, (d) => { d.items.ask.refs.termsAt.to.under = "others"; d.acts.accept.fields.terms.under = "others"; }), "name"],
       ["an effect that takes an operand its derivation does not read yet", refusal(asks, (d) => { d.acts.revise.effects[0].value.from = { scope: true }; }), "shape"],
-      ["a send that takes an operand its derivation does not read yet", refusal(ticket, (d) => { d.acts.link.sends[0].relate.detail.about = { field: "about", part: "seq" }; }), "shape"],
     ];
     expect(rows.filter(([, found, code]) => found?.length !== 1 || found[0] !== code).map(([name, found]) => [name, found])).toEqual([]);
   });

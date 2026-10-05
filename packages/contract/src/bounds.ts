@@ -37,9 +37,9 @@ export interface Bounds {
   guardDepth: number;              // how deep a guard may be nested. No source reads a nested guard yet
   effects: number;                 // of one act or handler, and of one result clause
   sends: number;                   // send forms of one act or handler, of which at most one is a fan-out
-  fanOut: number;                  // sends of one fan-out: the most live items of the type its range covers. No source derives a fan-out yet
+  fanOut: number;                  // sends of one fan-out: the most live items of the type its range covers
   attention: number;               // attention forms of one act, handler or timed rule
-  attentionMembers: number;        // members that the attention forms of one act, handler or timed rule can tell. The validator does not add them up yet
+  attentionMembers: number;        // members that the attention forms of one act, handler or timed rule can tell
   sendFields: number;              // fields of one sent message
 
   // Section 6.5: one range guard with a `where`. The contract owes these to the proof plan.
@@ -49,8 +49,8 @@ export interface Bounds {
   // Section 7.5: a running scope
   entryBytes: number;
   usesPerEntry: number;            // foreign entries used by one entry
-  sendsPerEntry: number;           // every send of one entry: those declared, one fan-out, the platform's one result or control, and attention
-  decompositionDepth: number;
+  sendsPerEntry: number;           // every send of one entry: those declared, one fan-out, the platform's one result or control, and attention. The validator counts the most that an act or handler can make
+  decompositionDepth: number;      // the contract states the number and no rule that reads it. No source reads it
   deliveryBatch: number;
   fetchSeconds: number;            // one fetch before the turn
   preparationSeconds: number;

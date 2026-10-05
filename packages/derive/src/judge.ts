@@ -17,7 +17,7 @@ import { deriveEffects } from "./effects.ts";
 import { isIntent, readFacts, readFields, type Reading } from "./fields.ts";
 import { judgeGuard, type Judging } from "./guards.ts";
 import { alsoItems, overMax, refusalName, unbound } from "./handlers.ts";
-import { deriveSends } from "./sends.ts";
+import { deriveSends, notices } from "./sends.ts";
 import type { Item, StateView } from "./state.ts";
 import { nextDue, type Due } from "./timed.ts";
 import { timeMs, type Clock } from "./time.ts";
@@ -165,10 +165,13 @@ export function judgeAct(view: StateView, definition: ValidDefinition, signed: S
     if (result === "fail") return { ...refused("guard-failed", `guards.${i}`), ...refusalName(guard) };
     if (result !== "pass") return { result: "unavailable", reason: result };
   }
-  const effects = deriveEffects(j, act.effects.filter((e) => !unbound(j, e.of)), act.attention, act.step === "open" ? act.on : null);
+  // Section 6.6: a notice with `if` is made only when its guards hold, on the state before the effects.
+  const told = notices(j, act.attention);
+  if (typeof told === "string") return { result: "unavailable", reason: told };
+  const effects = deriveEffects(j, act.effects.filter((e) => !unbound(j, e.of)), told, act.step === "open" ? act.on : null);
   if (!effects.ok) return refused(effects.reason, effects.detail);
   const sends = deriveSends(j, act.sends, effects.working, digest);
-  if (!sends.ok) return refused(sends.reason, sends.detail);
+  if (!sends.ok) return "unavailable" in sends ? { result: "unavailable", reason: sends.unavailable } : refused(sends.reason, sends.detail);
 
   if (act.step === "open" && act.on !== null) {
     // Section 6.3: `max` bounds the live items of a type; an opening that would exceed it is refused.

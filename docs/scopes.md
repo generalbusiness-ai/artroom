@@ -314,6 +314,18 @@ A send's **result clauses** say what the sender does when the result
 arrives: one list of effects for each of `applied`, `refused`,
 `superseded`, `undelivered`, and for a creation `conflict`.
 
+**What a send may say.** A field of a message is read from any operand:
+a field, a slot of any subject, the signer, a constant, and in a handler
+the sender and the source entry. A `collect` lists one record for each
+item of a range. A `tell` is addressed by a slot that holds a scope. A
+`tell` or a `relate` with `if` is made only when its guards hold; one that
+is not made takes no ordinal. A `relate` with `each` is a fan-out: one
+update for each live item of a type, in order of item ID. A `create` may
+name `self`, the creating scope's own definition. An `index` row goes to
+the scope's directory: its creator, when that is a directory, or the
+directory that its creator recorded. The validator bounds what one entry
+can send and whom it can tell.
+
 **Diagnoses.** When a request cannot be delivered, the sender stops and
 writes a `diagnosis` entry with its attempt log. There are two findings.
 `undelivered`: every attempt was refused by routing, so the target does

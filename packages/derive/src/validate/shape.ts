@@ -27,6 +27,8 @@ export type ProblemCode =
   | "hold"               // the hold capability used without what it needs (section 6.8)
   | "handler"            // two handlers for one class and message from one kind of scope
   | "advisory-sends"     // a handler of class `advisory` declares a send or a notice (section 6.4)
+  | "fan-out-unbounded"  // a fan-out over a final state or over a type whose `max` is past the bound, or a second fan-out in one list (section 6.6)
+  | "attention-unbounded" // the attention forms of one act, handler or timed rule could tell more members than one entry may (section 6.6)
   | "capability" | "profile" | "rule";
 
 export interface Problem { code: ProblemCode; path: string; message: string }

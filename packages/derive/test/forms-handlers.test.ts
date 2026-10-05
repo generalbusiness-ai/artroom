@@ -1,9 +1,8 @@
 import { describe, expect, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { ActType, DeclaredDefinition, FieldValue, Input, Request, Result, Send } from "@generalbusiness/artroom-contract";
-import { factRefOf } from "@generalbusiness/artroom-bytes";
-import { judgeDelivery, validateDefinition, type Fetched, type Judgment, type ProblemCode } from "../src/index.ts";
-import { Scope, arriving, deliver, fields, forged, keys, on, ticket, ticketDefinition, valid, variant } from "./fixtures.ts";
+import type { ActType, DeclaredDefinition, FieldValue, Request, Result } from "@generalbusiness/artroom-contract";
+import { validateDefinition, type Fetched, type ProblemCode } from "../src/index.ts";
+import { Scope, arrive, decided, deliver, fields, keys, on, ticket, ticketDefinition, valid, variant } from "./fixtures.ts";
 
 const { rita } = keys;
 
@@ -68,33 +67,20 @@ const board: DeclaredDefinition = {
     relay: {
       message: "relay", class: "tell", from: { kind: "lane" }, opens: "card", fields: { peer: { type: "scope", kind: "lane", required: true } }, also: { tally: { item: "tally", one: true } }, guards: [],
       effects: [{ ref: { slot: "peer", from: { field: "peer" } } }], attention: [],
-      sends: [{ tell: { to: "peer", message: "seen", fields: {}, result: { applied: [{ value: { slot: "note", from: { const: "answered" } } }, { of: "also.tally", value: { slot: "last", from: { const: "answered" } } }] } } }],
+      sends: [{ tell: { to: { slot: "peer" }, message: "seen", fields: {}, result: { applied: [{ value: { slot: "note", from: { const: "answered" } } }, { of: "also.tally", value: { slot: "last", from: { const: "answered" } } }] } } }],
     },
   },
   timed: {}, rules: {},
 };
 const boardDefinition = valid(validateDefinition(board, PROPOSED_BOUNDS));
 
-/** The decision of the request that an entry decided, and the reason on its result. */
-const decided = (s: Scope) => { const r = s.last.sends.at(-1)!.message as Result; return r.reason ? [r.outcome, r.reason.code] : [r.outcome]; };
-
 /** A board B, and a lane X whose entries are made by hand: each holds one send to B, and nothing judged it. */
 function lanes() {
   const B = new Scope(boardDefinition);
   const X = new Scope(ticketDefinition, rita.member, true, 1);
-  let seq = 10;
-  /** A send of an entry of X, delivered to B with the foreign entries that were fetched for it. The entry is written if the judgment is to write. */
-  const arrive = (message: Send["message"], input: Input = X.entries[1]!.entry.input, facts: readonly Fetched[] = []): Judgment => {
-    const send: Send = { n: 0, to: B.at, message };
-    const source = forged(X.at, ++seq, input, [send]);
-    const arrival = { ...send, from: factRefOf(source.entry) };
-    const judgment = judgeDelivery(B.state, boardDefinition, arrival, arriving(B, arrival, source, facts));
-    if (judgment.result === "write") B.seal(judgment.draft);
-    return judgment;
-  };
-  const tell = (message: string, given: Record<string, FieldValue>, facts: readonly Fetched[] = []) => arrive({ class: "request", type: "tell", body: { message, fields: given } }, undefined, facts);
+  const tell = (message: string, given: Record<string, FieldValue>, facts: readonly Fetched[] = []) => arrive(B, X, { class: "request", type: "tell", body: { message, fields: given } }, undefined, facts);
   const told = (message: string, given: Record<string, FieldValue>) => { tell(message, given); return decided(B); };
-  return { B, X, arrive, tell, told };
+  return { B, X, tell, told };
 }
 
 describe("subjects and handlers (sections 6.4 and 7.3)", () => {
@@ -209,7 +195,7 @@ describe("subjects and handlers (sections 6.4 and 7.3)", () => {
   });
 
   test("a result clause changes the items that its entry selected, read as they are now, and not an item that the entry did not find", () => {
-    const { B, X, arrive, tell, told } = lanes();
+    const { B, X, tell, told } = lanes();
     // B.2 opens a card and tells X. The scope has no tally yet, so `tally` is unbound in that entry.
     tell("relay", { peer: X.at });
     const asked = B.last.seq;
@@ -218,7 +204,7 @@ describe("subjects and handlers (sections 6.4 and 7.3)", () => {
     // X decides the request, and its result returns. The clause runs on the card that B.2 opened. The tally came later: it is not changed.
     const request = { from: B.fact(asked), n: 0 };
     const result: Result = { class: "result", of: request, outcome: "applied" };
-    expect(arrive(result, { type: "delivery", ...request, message: B.entries[asked]!.entry.sends[0]!.message as Request, decision: "applied" }).result).toBe("write");
+    expect(arrive(B, X, result, { type: "delivery", ...request, message: B.entries[asked]!.entry.sends[0]!.message as Request, decision: "applied" }).result).toBe("write");
     expect([B.last.effects, B.item(tally).values["last"]]).toEqual([[{ effect: "value", item: asked, slot: "note", value: "answered" }], "x"]);
     expect(B.replay().snapshot()).toBe(B.state.snapshot());
   });
@@ -242,7 +228,7 @@ describe("subjects and handlers (sections 6.4 and 7.3)", () => {
       ["two ways to select one name", inBoard((d) => { d.acts.add.also.board.by = "parent"; }), "shape"],
       ["a result clause that names an item selected through a slot which may change", inBoard((d) => {
         d.items.board.refs.peer = { fixed: false, required: false, to: { type: "scope", kind: "lane" } };
-        d.acts.note.sends = [{ tell: { to: "peer", message: "seen", fields: {}, result: { applied: [{ of: "also.pinned", value: { slot: "note", from: { const: "told" } } }] } } }];
+        d.acts.note.sends = [{ tell: { to: { slot: "peer" }, message: "seen", fields: {}, result: { applied: [{ of: "also.pinned", value: { slot: "note", from: { const: "told" } } }] } } }];
         d.acts.note.on = "board"; d.acts.note.guards = []; d.acts.note.effects = []; d.acts.note.also = { pinned: { item: "card", via: { slot: "pinned", of: "on" } } };
       }), "name"],
 

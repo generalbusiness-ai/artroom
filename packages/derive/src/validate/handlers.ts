@@ -95,6 +95,16 @@ function also(d: Defining, v: unknown, path: string, fields: Map<string, FieldTy
   return { types: out, unsettled };
 }
 
+/**
+ * Section 7.5: every send of one entry is counted: those its forms declare,
+ * with a fan-out at its most, the platform's own, and one for each member
+ * that its attention can tell.
+ */
+function entrySends(d: Defining, path: string, declared: number, told: number, platform: number): void {
+  const most = declared + told + platform;
+  if (most > d.bounds.sendsPerEntry) d.bad("bound", path, `its entry could have ${most} sends; at most ${d.bounds.sendsPerEntry}`);
+}
+
 /** Every act. `timed`: the timed rules as written, which the opening of a hold reads. `top`: the definition as written. */
 export function acts(d: Defining, v: unknown, timed: Readonly<Record<string, unknown>>, top: Rec): void {
   const { bounds, types, bad, rec, entries, str } = d;
@@ -117,8 +127,8 @@ export function acts(d: Defining, v: unknown, timed: Readonly<Record<string, unk
     if (step === "comment" && ctx.also.size > 0) bad("shape", at(path, "also"), "a comment names no other item");
     guards(d, o["guards"], at(path, "guards"), ctx);
     effects(d, o["effects"], at(path, "effects"), ctx, false);
-    sends(d, o["sends"], at(path, "sends"), ctx);
-    attention(d, o["attention"], at(path, "attention"), ctx);
+    // A child's genesis sends the platform's one result beside what its act declares.
+    entrySends(d, path, sends(d, o["sends"], at(path, "sends"), ctx, top), attention(d, o["attention"], at(path, "attention"), ctx), name === top["genesis"] ? 1 : 0);
     if (step === "open" && on) {
       const set = new Set(Array.isArray(o["effects"]) ? o["effects"].map(setsSlot) : []);
       // Section 6.3: an opening sets every required slot.
@@ -170,8 +180,8 @@ export function receives(d: Defining, v: unknown, top: Rec): void {
     const ctx: Ctx = { ...naming(), on, also: named.types, nascent: on !== null, fields, kind: cls === "advisory" ? null : message, handler: { update: cls === "relate" }, unsettled: named.unsettled };
     guards(d, o["guards"], at(path, "guards"), ctx);
     effects(d, o["effects"], at(path, "effects"), ctx, false);
-    sends(d, o["sends"], at(path, "sends"), ctx);
-    attention(d, o["attention"], at(path, "attention"), ctx);
+    // The entry that decides a request sends the platform's one result.
+    entrySends(d, path, sends(d, o["sends"], at(path, "sends"), ctx, top), attention(d, o["attention"], at(path, "attention"), ctx), cls === "advisory" ? 0 : 1);
     // Section 6.4: an advisory has no result, so its handler ends the exchange: it sends nothing and tells nobody.
     if (cls === "advisory") for (const k of ["sends", "attention"]) if (Array.isArray(o[k]) && o[k].length > 0) bad("advisory-sends", at(path, k), "a handler of class advisory declares none");
     if (!on) continue;

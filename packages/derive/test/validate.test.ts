@@ -147,10 +147,11 @@ describe("the definition validator", () => {
     expect(refusal(() => {}, { ...PROPOSED_BOUNDS, timedRules: 0 })).toEqual([["bound", "timed"]]);
     expect(refusal((d) => { d.rules = { a: "true", b: "true" }; }, { ...PROPOSED_BOUNDS, rules: 1 })).toEqual([["bound", "rules"]]);
     expect(refusal(() => {}, { ...PROPOSED_BOUNDS, definitionBytes: 1000 })).toEqual([["bound", ""]]);
-    // A party list holds at most 64 members, which is more than a list value holds.
+    // A party list holds at most 64 members, which is more than a list value holds. The rule tells that list and nobody else:
+    // one entry tells at most 64 members.
     const watched = (max: number): Change => (d) => {
       d.items.hold.parties.watchers = { fixed: false, required: false, list: true, max, author: false };
-      d.timed["hold-end"].attention.push({ notify: { slot: "watchers", of: "on", when: "after", reason: "hold ended" } });
+      d.timed["hold-end"].attention = [{ notify: { slot: "watchers", of: "on", when: "after", reason: "hold ended" } }];
     };
     expect(refusal(watched(PROPOSED_BOUNDS.partyMembers))).toBeNull();
     expect(refusal(watched(PROPOSED_BOUNDS.partyMembers + 1))).toEqual([["bound", "items.hold.parties.watchers.max"]]);

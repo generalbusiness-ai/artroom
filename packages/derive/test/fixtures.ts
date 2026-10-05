@@ -13,7 +13,7 @@
 
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { ActType, Bounds, DeclaredDefinition, Digest, Entry, FactRef, FieldValue, Grant, Guard, Input, Intent, KeyId, MemberId, MemberRef, ScopeKind, ScopeRef, Seed, Send, SignedIntent, Timestamp } from "@generalbusiness/artroom-contract";
-import { entryHash, intentDigest, keyIdOfSecret, newIncarnation, scopeIdOf, signIntent } from "@generalbusiness/artroom-bytes";
+import { entryHash, factRefOf, intentDigest, keyIdOfSecret, newIncarnation, scopeIdOf, signIntent } from "@generalbusiness/artroom-bytes";
 import { MemoryState, applyEntry, clockOf, entryOf, judgeAct, judgeDelivery, judgeGenesis, judgeTimed, messageFacts, nextDue, timeMs, timeOf, validateDefinition } from "../src/index.ts";
 import type { ActJudgment, Creation, Delivered, DeliveryContext, Draft, Fetched, JudgeContext, Judgment, Presented, Source, TimedJudgment, ValidDefinition, Validation } from "../src/index.ts";
 
@@ -220,8 +220,10 @@ export const smallDefinition = valid(validateDefinition(small, PROPOSED_BOUNDS))
  * `link` and `unlink` send the two updates of one relationship key; the
  * handler for the relationship `closes` writes the update's state on the
  * lane's one intent, and keeps a copy for two keys. A link may name the
- * entry that filed a ticket as its cause, which the receiver fetches. `ask` tells the desk to make another ticket. `approve`
- * is under a rule: its signer is not the requester.
+ * entry that filed a ticket as its cause, which the receiver fetches. `ask`
+ * tells the desk to make another ticket, and `split` creates one itself,
+ * under its own definition. `approve` is under a rule: its signer is not the
+ * requester.
  */
 const filed = { type: "fact", kind: ["file"], under: "ticket" } as const;
 export const ticket: DeclaredDefinition = {
@@ -243,6 +245,7 @@ export const ticket: DeclaredDefinition = {
       many: true, max: 4, states: { asked: { final: false }, answered: { final: true }, failed: { final: true } }, initial: "asked", parties: {},
       refs: { desk: { fixed: true, required: true, to: { type: "scope", kind: "directory" } } }, values: {},
     },
+    part: { many: true, max: 4, states: { asked: { final: false }, created: { final: true }, refused: { final: true } }, initial: "asked", parties: {}, refs: {}, values: {} },
   },
   acts: {
     file: act({
@@ -263,9 +266,14 @@ export const ticket: DeclaredDefinition = {
     ask: act({
       step: "open", on: "request", grant: "ask", fields: { desk: { type: "scope", kind: "directory", required: true } },
       effects: [{ ref: { slot: "desk", from: { field: "desk" } } }],
-      sends: [{ tell: { to: "desk", message: "spawn", fields: { opener: { signer: true }, title: { const: "same" } }, result: { applied: [{ state: "answered" }], undelivered: [{ state: "failed" }] } } }],
+      sends: [{ tell: { to: { slot: "desk" }, message: "spawn", fields: { opener: { signer: true }, title: { const: "same" } }, result: { applied: [{ state: "answered" }], undelivered: [{ state: "failed" }] } } }],
     }),
     approve: act({ step: "transition", on: "intent", grant: "approve", guards: [{ state: ["open"] }, { rule: "two-eyes" }], effects: [{ state: "closed" }] }),
+    // A part of this ticket is a ticket of its own, created under this scope's own definition.
+    split: act({
+      step: "open", on: "part", grant: "split", fields: { title: { ...text, required: true } },
+      sends: [{ create: { kind: "lane", definition: "self", fields: { opener: { signer: true }, title: { field: "title" } }, result: { applied: [{ state: "created" }], refused: [{ state: "refused" }] } } }],
+    }),
   },
   receives: {
     // I2 merge: the detail states the update's state again, as `as`, because an effect reads no `update` operand until step 5.
@@ -455,13 +463,13 @@ export class Scope extends Ledger {
 
 // ---------------------------------------------------------------- entries passed between scopes
 
-/** A directory founded by rita's signed intent (section 7.1): its genesis is judged, sealed and folded. */
-export function founded(): Ledger {
-  const ledger = new Ledger(deskDefinition);
+/** A directory founded by rita's signed intent (section 7.1): its genesis is judged, sealed and folded. `definition`: the desk, or a desk with a change. */
+export function founded(definition: ValidDefinition = deskDefinition): Ledger {
+  const ledger = new Ledger(definition);
   const founding = signIntent({ v: 1, to: null, actor: keys.rita.key, kind: "found", on: null, expected: {}, fields: { source: "a repository" }, idempotencyKey: "found", notAfter: t(60) }, keys.rita.secret);
-  const seed: Seed = { v: 1, kind: "directory", definition: deskDefinition.digest, creator: null, cause: intentDigest(founding.intent), ordinal: 0 };
+  const seed: Seed = { v: 1, kind: "directory", definition: definition.digest, creator: null, cause: intentDigest(founding.intent), ordinal: 0 };
   const context = { clock: clockOf(ledger.state, T0), bounds: PROPOSED_BOUNDS, facts: [], prepared: [], source: null };
-  const judgment = judgeGenesis(ledger.state, deskDefinition, { name: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(1)), seed, founding }, context);
+  const judgment = judgeGenesis(ledger.state, definition, { name: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(1)), seed, founding }, context);
   if (judgment.result !== "write") throw new Error(`the directory was not founded: ${JSON.stringify(judgment)}`);
   ledger.seal(judgment.draft);
   return ledger;
@@ -524,6 +532,29 @@ export function born(from: Ledger, seq: number, n = 0, mint = 20): { child: Ledg
 /** An entry made by hand, as a source that some scope might return: it has a hash, and nothing judged it. */
 export function forged(at: ScopeRef, seq: number, input: Input, sends: readonly Send[]): Source {
   return { entry: { v: 1, at, seq, prev: d("0"), time: T0, clamped: false, epoch: 0, input, uses: [], prepared: [], effects: [], sends }, under: "ticket" };
+}
+
+let made = 100;
+/**
+ * A message from an entry of `from` that is made by hand, delivered to `to`.
+ * The entry holds that one send, and nothing judged it. `input`: what the
+ * entry says it recorded. `facts`: the foreign entries that were fetched for
+ * the delivery. The receiver's entry is written if the judgment is to write.
+ */
+export function arrive(to: Ledger, from: Ledger, message: Send["message"], input: Input = from.entries[1]!.entry.input, facts: readonly Fetched[] = []): Judgment {
+  const send: Send = { n: 0, to: to.at, message };
+  const source = forged(from.at, ++made, input, [send]);
+  const arrival = { ...send, from: factRefOf(source.entry) };
+  const judgment = judgeDelivery(to.state, to.definition, arrival, arriving(to, arrival, source, facts));
+  if (judgment.result === "write") to.seal(judgment.draft);
+  return judgment;
+}
+
+/** The decision of the request that the last entry of `s` decided, and the code of the reason on its result. */
+export function decided(s: Ledger): string[] {
+  const result = s.last.sends.at(-1)!.message;
+  if (result.class !== "result") throw new Error("the last entry decided no request");
+  return result.reason ? [result.outcome, result.reason.code] : [result.outcome];
 }
 
 /** Short forms for a transition's `on` with its expected revision, and for fields. */

@@ -41,6 +41,19 @@ describe("creating a child (section 7.2), in two real objects, by the dispatcher
     expect(await I.act(una, "approve", approve)).toMatchObject({ answer: "accepted", receipt: { fact: { seq: 2 } } });
   });
 
+  test("a lane creates a lane under its own definition: the child reads that definition from the lane, and sends its index row to the desk, which is its creator's directory", async () => {
+    const D = await desk();
+    const C = await ticket(D, "whole");
+    const split = await C.did(rita, "split", { fields: { title: "part" } });
+    const K = await C.created(split.fact.seq);
+    await settle(D, C, K);
+    // K ran its genesis under the definition that C pins, which no digest in that definition names. C recorded its result and confirmed it.
+    expect([(await K.summary()).value.status, (await C.duties()).find((duty) => duty.duty === `${split.fact.seq}.0`)?.result?.clause]).toEqual(["active", "applied"]);
+    // The desk recorded an index row from each lane. K's creator is C, and C recorded none.
+    const rows = async (node: Node) => (await node.entries()).flatMap((e) => (e.input.type === "delivery" && e.input.message.class === "advisory" ? [e.input.from.at.scope] : []));
+    expect([await rows(D), await rows(C)]).toEqual([[C.name, K.name], []]);
+  });
+
   test("two requests with identical message bytes create two children with different scope IDs; an exact repeated delivery adds no entry and is answered with the first fact", async () => {
     const D = await desk();
     const S = await ticket(D, "S");
