@@ -132,6 +132,10 @@ function given(entry: Entry, item: unknown, slot: string): unknown {
  * does. So the mark is not resolved in a foreign entry. It is read as that
  * record, which equals no fact reference. A reference to an earlier entry
  * is whole in the bytes, and is read whole.
+ *
+ * A request of this scope's own history that no handler received, which was
+ * decided `unknown-message`, is read in the same way: no declaration of this
+ * scope admitted its fields, as none gave it a kind (`kindOf`).
  */
 function fieldOf(j: Judging, entry: Entry, local: boolean, name: string): unknown {
   const input = entry.input;
@@ -140,7 +144,8 @@ function fieldOf(j: Judging, entry: Entry, local: boolean, name: string): unknow
   const message = input.type === "genesis" ? input.message : input.type === "delivery" && input.message.class === "request" ? input.message : null;
   const body = message?.body;
   if (!message || !isObject(body)) return null;
-  if (!local) {
+  const unread = input.type === "delivery" && "decision" in input && input.decision === "refused" && input.reason?.code === "unknown-message";
+  if (!local || unread) {
     const sent = message.type === "relate" ? body["detail"] : body["fields"];
     return isObject(sent) ? (own(sent, name) ?? null) : null;
   }

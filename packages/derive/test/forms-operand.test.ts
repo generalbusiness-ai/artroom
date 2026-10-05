@@ -204,6 +204,11 @@ describe("operands, parts and a local fact (sections 6.2 and 6.5; witness 18.1)"
       ];
       // `cite` names a delivery of `closes`, and may compare the `madeAt` that it delivered with a fact, or with a record.
       const madeAt = (b: string): Guard => ({ fact: { field: "closed", where: [{ equals: { a: { field: "madeAt" }, b: { field: b } } }] }, ifPresent: true, reason: b });
+      // `peek` compares the same field of an entry whose kind it does not ask for.
+      d.acts.peek = act({
+        step: "transition", on: "intent", grant: "link", fields: { closed: { type: "fact", kind: ["closes"], under: "ticket", required: true }, by: { type: "fact", kind: ["link"], under: "ticket", required: true } },
+        guards: [equals({ field: "closed", part: { field: "madeAt" } }, { field: "by" }, "peek")],
+      });
       d.acts.cite = act({
         step: "transition", on: "intent", grant: "link", guards: [{ state: ["open"] }, { fact: { field: "closed" } }, madeAt("by"), madeAt("flag")],
         fields: {
@@ -257,6 +262,12 @@ describe("operands, parts and a local fact (sections 6.2 and 6.5; witness 18.1)"
     const link = P.did(rita, "link", fields({ target: J.at, about: 0, because: P.fact(0) })).seq;
     expect([deliver(J, P, link).result, J.last.input]).toMatchObject(["write", { decision: "applied", message: { body: { detail: { madeAt: { self: true } } } } }]);
     expect([cited(fetched(J, J.head.seq), { by: P.fact(link) }, link), cited(fetched(J, J.head.seq), { flag: { self: true } })]).toEqual(["by", "write"]);
+    // K's handler is for a sender under another definition, so K decides the same update `unknown-message`. No handler of K received
+    // the field, and the handler of that name does not read it afterwards: in K's own entry it is the record too.
+    const K = new Scope(variant(ticket, (d) => { change(d); d.receives.closes.from.under = "board"; }), rita.member, true, 3);
+    const unread = P.did(rita, "link", fields({ target: K.at, about: 0, because: P.fact(0) })).seq;
+    deliver(K, P, unread);
+    expect([K.last.input, K.act(rita, "peek", { ...on(K, 0), ...fields({ closed: K.fact(K.head.seq), by: P.fact(unread) }) }, { facts: [fetched(P, unread)] })]).toMatchObject([{ decision: "refused", reason: { code: "unknown-message" } }, { result: "refused", name: "peek" }]);
   });
 
   test("an operand names only what its place has, and a part only what an entry can hold", () => {
