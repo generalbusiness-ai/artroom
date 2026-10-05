@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:cbb6ba1fec5b83df52cb40bd647d88514822919d","text":"Merge retired a covered predecessor; the successor is at packages/lanes/tsconfig.json."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:cbca9aeb9c1ea79b2cf9e4a2e23fdcb407383bb2","text":"Merge retired a covered predecessor; the successor is at packages/scope/src/outbox.ts."}
