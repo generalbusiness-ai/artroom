@@ -261,6 +261,43 @@ for its revision 20 or a successor.
 | EJ14 | The replay still takes each recorded grant as current. | The builder, at steps 14 and 22 | T44. |
 | EJ15 | The subject of an observation of the rules, in the fold and in the port. | The builder, with the read of the rules scope (step 9d) | The directory's `definition-active`, on a real read. |
 
+### 2.2 Added on 2026-10-05: what is built since milestone F, on `request/i3-m2`
+
+The table of section 2.1 is as it was written, and no row of it is
+changed. Its row for step 16, "Waiting", was true then and is no longer:
+the first row below replaces it. Milestone F is the head `783be9a07` of
+`request/i3-authority-effects`. Each step below was built on a branch of
+its own and merged into `request/i3-m2`. The delivery note of this second
+milestone, `notes/2026-10-05-i3-second-milestone-delivery.md`, has the
+witnesses, the limits and the one table of the adopted designs. The deltas
+note, sections 14 to 25, has every question.
+
+| Step | What is built | Commits | Not built, of that step |
+|---|---|---|---|
+| 16 | The production ports hold the code of `hold@1` and `git-read@1`. An outcome states its owner and its kind. The steps read a signed intent by the capability's table. The lane scenarios T3, T4 and T5b run on the code. | `335ceba8d`, `6259340ff`, `4ec016738`, `69595aa88`, `9cc3c9237`, `30702e5f8`, `c27da0435`, `300210775`; the deltas, `716f95bf2` | The scripted capability stays in test support, and T8 and the scope package's own tests use it. One port type for the forms and the steps (entry EL9). The numbers of entry EL5 are the floor and temporary values. |
+| 8a | `observed` on an act, an outcome and a result's delivery, and `values` beside an intent, as forms. The judge of an act gives a rule both. | `6a2a49fc8` | The judges of an outcome and of a delivery give a rule neither. The scope makes no further read, reads no `values` and keeps none (entries EM3 and EX6). |
+| 7 | Membership as data, with its ten rules and its answer to an observation. Seven rules at this step, and three with the rows of revision 19, below. | `1e3b6d4ad`; `dacecb7b4` | No entry sets `member.inbox` (entry EM9). A read that shows a member removed does not stop that member's other keys before their own read (entry EM23). |
+| 11 | Membership creates a member's inbox, and a creation under a platform name pins the runtime's own data and rules. | `0b7f9f63f` | A creation that a genesis sends holds no member `membership` (entry EM17). |
+| 12 | The deployed class has a real authority, `repositoryAuthority`. | `1193c9706`; a directory's slot, `6e02856c1` | A rules scope and a destination read nothing: an act there that needs a grant is `authority-unavailable` (entry EM21). The windows of a task scope. |
+| 14 | A replay derives each recorded grant again, and takes a grant with no freshness proof as a mismatch by default. | `79c157ddb`, `48e853687` | The option `as-recorded` stays for histories that the test authority wrote, until step 30. |
+| 16, 7, 8a, 11, 12, 14 | Their merge. | `97b8f41f0` | |
+| 8 | The fourth cause, and the founding of a register in the genesis judge. | `9c6f8fcdd` | `Scope.found` and the Worker build no seed of the kind `register`, so no object founds one (entry EP2). |
+| 9 | The register and the directory as data, with each rule that can be written. | `fee17d546`; the deltas, `fb7f2a9a8`; the merge, `5d59c6024` | The register lacks the rule `create-repository` (entry EJ1). The directory lacks rules for three marks: `create-rules`, `create-destination` and `import-spent` (entries EX4 and EP7). Neither is founded or created without stand-in rules. |
+| 9a, 9d | The rules scope as data, with its three rules. Its version is whole. | `e3abbcbfd`, `ff0a6ba68`, `b37f4148b`; the merge, `b8cfe86f7` | Its answer to an observation of the rules, and the read (entry EQ8). T37. No real scope ran one of its rules (entry EQ9). |
+| 9b, 9e | The destination as data, with eight rules at its acts and handlers. The confirmation of a provisional scope opens attempt 1 of each operation that its genesis holds. | `dad436356`, `503260d11`, `af5669da3`; the merge, `71200fd53` | `abort-if-behind` of step 9e, and the guard `resend-due`. |
+| 9f | Nothing. | None | All of it: no rule of an outcome entry of the destination exists (entries ER5 to ER9). |
+| 22 | The replay derives a preparation, an outcome and the checks of an ancestry record. | `c81a12957`, `e525472a6`, `cc7f14196`, `ae04a54d0`, `5c07a7eee`; the merge, `08c0c4c34` | The walk of an ancestry record: a history that holds one is `incomplete` (entry EU2). The replay command is given no capability code (entry EU1). |
+| 19, 20 | The host port, the token driver, diagnoses and the redactor, after the review of the parked code. | `94f2d2cee`, `323b091cc`, `04d31c21b`, `f6e538f96`; the merge, `cd0c55429` | An adapter of a real host, and a production `Custody` (entries ET2 and ET6). |
+| 15 | Read sessions, the serving limits of a join and the operator's record, after the review of the parked code. | `b89c0f304`, `b0b812c32`, `fae413da2`; the merge, `e87645962` | Most kinds of incident are named and nothing finds them (entry ES12). The operator's instruction has no route (entry ES13). |
+| Rows I3-31 to I3-38 of the contract's revision 19 | A list bound of 64, several send marks, a value place in platform data, the retained kind `value`, what a retry rule is given, the bound on a rule's message. | `de587e020`, `ad3140363`, `065ed345e`, `0d57c30f3`, `0962a64d5`, `a33d12fc5`, `ca42217b6`, `223dbb06f`; the merge, `e9127abe9` | Row I3-36. The store and the scope's read of a value (entry EX6). The two rules of the directory's send marks (entry EX4). |
+| Request `42de9e34`, extents | Judgments over data: the first three extents, the touched extents of a changed set, and which obligations are met. | `952cbb115`, `6fee68356`; the merge, `8ffe34e04` | No rules content holds an extent, nothing calls the functions, and no changed set is computed (entries EV1 to EV11). |
+| 24 | The step `job-read`, a job's read token and the pure parts of a snapshot. | `5006eb3f0` | The snapshot repository of a filtered check (entry EW3). Nothing opens the revocation of a `live` read token (entry EW7). |
+| 25 | The package `packages/checkers`: the pure parts of the checker service. | `97021d46a`, the workspace entry; `35f978143`; the merge, `64036f3a3` | A runner, a container, storage, an adapter of `Scopes`, a Worker and a route (the deltas note, section 25, "What is not built"). |
+
+Not started on this branch: steps 9c, 10, 13, 18, 26 to 28 and 29 to 32.
+Step 9f is listed above because the plan put it in M1. Steps 9c and 10
+wait on entry EJ1, as section 8.2 says.
+
 ## 3. The scope table
 
 Every element of sections 11, 11.1 and 11.2, one row each.
