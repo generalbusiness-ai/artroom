@@ -317,9 +317,12 @@ export function runClause(view: StateView, definition: ValidDefinition, context:
   if ((frame.on !== null && !on) || !also.ok) throw new Error(`entry ${origin.seq} names an item that does not exist`);
   if (on) subjects.set("on", on);
   for (const [name, item] of also.items) subjects.set(`also.${name}`, item);
+  // Section 6.6: a clause of a fan-out send reads `each`, the item of that send. The validator lets a clause read it only where the
+  // update's `item` is that item, so the send that the origin recorded names it.
+  const update = "relate" in form && form.relate.each ? updateOf(origin.sends.find((s) => s.n === request.n)!.message as Request, { at: scope.at, seq: origin.seq, hash: request.hash }) : null;
   const j: Judging = {
     view, definition, bounds: context.bounds, clock: context.clock, scope, self: scope.head.seq + 1, kind: frame.kind, fields: facts.fields, fieldTypes: frame.fieldTypes, subjects, signer: frame.signer,
-    facts: facts.facts, prepared: [], used: [], own: context.own, sender: answered?.sender, result: answered?.reason,
+    facts: facts.facts, prepared: [], used: [], own: context.own, sender: answered?.sender, result: answered?.reason, each: (update && view.item(update.item.seq)) ?? undefined,
   };
   const effects = deriveEffects(j, forms, [], null);
   // Section 6.6: a clause's condition that is not completed leaves the result not recorded now. It is offered again.

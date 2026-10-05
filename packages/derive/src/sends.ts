@@ -9,7 +9,8 @@
 import type { Digest, FactRef, FieldType, Guard, Input, Notify, Operand, Range, Seed, SelfMark, Send, SendForm, SendSource, ScopeRef, UnavailableReason } from "@generalbusiness/artroom-contract";
 import type { Derived } from "./effects.ts";
 import { judgeGuards, readsUnbound, slotOf, type Judging } from "./guards.ts";
-import { equal, operand } from "./operand.ts";
+import { covered } from "./lists.ts";
+import { operand } from "./operand.ts";
 import type { Item } from "./state.ts";
 import type { ValidDefinition } from "./validate/index.ts";
 import { isLocalId, isObject, isScopeRef, own } from "./values.ts";
@@ -124,19 +125,12 @@ export function deriveSends(j: Judging, forms: readonly SendForm[], working: Rea
 
   /**
    * The items a range covers, in ascending order of item ID, as the index
-   * holds them: the items of the state before this entry. The range lists live
-   * states only, and a type's `max` bounds its live items, so one page is all
-   * of them. Null: the page is more than one guard may read, so the range has
-   * no complete evidence.
+   * holds them: the items of the state before this entry. It is the range
+   * reading of a guard (section 6.5): every page is read, up to the work
+   * limit, and a `where` reads each subject as the effects left it. Null: the
+   * scan did not finish, so the range has no complete evidence.
    */
-  const covered = (range: Range, reading: Judging): readonly Item[] | null => {
-    const most = own(items, range.type)!.max;
-    const page = most > j.bounds.guardScan ? null : j.view.page(range.type, range.states, null, most);
-    if (!page || page.more) return null;
-    const except = new Set((range.except ?? []).map((s) => working.get(s)?.id));
-    return page.items.filter((item) => !except.has(item.id) && (range.where ?? []).every((w) =>
-      ("equals" in w ? equal(reading, operand(reading, w.equals.a, item), operand(reading, w.equals.b, item)) : !equal(reading, operand(reading, w.differs.a, item), operand(reading, w.differs.b, item)))));
-  };
+  const ranged = (range: Range, each: Item | null): readonly Item[] | null => covered(reading(each), range);
 
   let incomplete = false;
   /** A source's value as it is sent. `each`: the item of a fan-out send. */
@@ -144,7 +138,7 @@ export function deriveSends(j: Judging, forms: readonly SendForm[], working: Rea
     if (s === "self") return wire(j.self, { type: "item", of: "" });
     if (!("collect" in s)) return wire(operand(reading(each), s, on), typeOf(s, each));
     // Section 6.6: one record for each item the range covers, with the named members. A member whose slot is empty is left out.
-    const all = covered(s.collect.items, reading(each));
+    const all = ranged(s.collect.items, each);
     if (!all) incomplete = true;
     return (all ?? []).map((item) => Object.fromEntries(Object.entries(s.collect.fields)
       .map(([name, member]) => [name, member === "item" ? local(item.id) : member === "state" ? item.state : wire(slotOf(item, member), slotType(item, member))] as const)
@@ -182,7 +176,7 @@ export function deriveSends(j: Judging, forms: readonly SendForm[], working: Rea
       const { relate } = form;
       if (readsUnbound(reading(null), [relate.to, relate.item])) continue;
       // Section 6.6: a fan-out makes one send for each item that its range covers, in ascending order of item ID.
-      const all = relate.each ? covered(relate.each, reading(null)) : [null];
+      const all = relate.each ? ranged(relate.each, null) : [null];
       if (!all) return { ok: false, unavailable: "guard-incomplete" };
       for (const each of all) {
         const made = holds(each ? { ...j, each } : j, relate.if);

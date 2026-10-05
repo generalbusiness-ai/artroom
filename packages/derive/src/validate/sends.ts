@@ -6,32 +6,22 @@ import { canonicalize, isDigest, isPlatformDefinition, isScopeKind } from "@gene
 import { isObject, own } from "../values.ts";
 import { subject, type Ctx, type Defining, type Type } from "./context.ts";
 import { effects } from "./effects.ts";
-import { guards } from "./guards.ts";
+import { guards, range } from "./guards.ts";
 import { operand } from "./operands.ts";
 import { at, type Rec } from "./shape.ts";
 import { RECORD_BYTES, stated } from "./sizes.ts";
 
 /**
  * A range that a send reads whole: the items of a fan-out, and of a
- * `collect`. `live`: it lists no final state, so the type's `max` bounds the
- * items it covers. In its `where`, a slot with no `of` is a slot of each
- * item the range covers.
+ * `collect`. It is read as the range of a guard is, with the same `where`
+ * and `except`. `live`: it lists no final state, so the type's `max` bounds
+ * the items it covers.
  */
-function range(d: Defining, v: unknown, path: string, ctx: Ctx): { type: Type; live: boolean } | null {
-  const { bounds, types, bad, rec, form, list, names } = d;
-  const r = rec(v, path, ["type", "states"], ["where", "except"]);
+function ranged(d: Defining, v: unknown, path: string, ctx: Ctx): { type: Type; live: boolean } | null {
+  const r = range(d, v, path, ctx, [], false);
   if (!r) return null;
-  const t = typeof r["type"] === "string" ? types.get(r["type"]) : undefined;
-  if (!t) return bad("name", at(path, "type"), "names no item type");
-  const live = names(r["states"], at(path, "states"), t.states, "state").every((s) => t.states.get(s) === false);
-  list(r["where"] ?? [], at(path, "where"), bounds.guards).forEach((w, i) => {
-    const p = at(at(path, "where"), i);
-    const f = form(w, p, ["equals", "differs"]);
-    const pair = f && rec(f[1], p, ["a", "b"]);
-    if (pair) for (const side of ["a", "b"]) operand(d, pair[side], at(p, side), ctx, () => t, false);
-  });
-  list(r["except"] ?? [], at(path, "except"), bounds.also + 1).forEach((s, i) => subject(d, s, at(at(path, "except"), i), ctx, false));
-  return { type: t, live };
+  const states = Array.isArray(r.read["states"]) ? r.read["states"] : [];
+  return { type: r.type, live: states.every((s) => typeof s !== "string" || r.type.states.get(s) !== true) };
 }
 
 /**
@@ -47,7 +37,7 @@ function source(d: Defining, v: unknown, path: string, ctx: Ctx, field: boolean)
     const c = field ? rec(v, path, ["collect"]) : bad("shape", path, "a collect is a field of a send");
     const r = c && rec(c["collect"], at(path, "collect"), ["items", "fields"]);
     if (!r) return null;
-    const items = range(d, r["items"], at(at(path, "collect"), "items"), ctx);
+    const items = ranged(d, r["items"], at(at(path, "collect"), "items"), ctx);
     // Section 6.6: a `collect` needs complete evidence, and holds at most the type's `max` records.
     if (items && !items.live) bad("bound", at(at(path, "collect"), "items"), "a collect reads live items only: its range lists no final state");
     for (const [name, member] of entries(r["fields"], at(at(path, "collect"), "fields"), bounds.sendFields)) {
@@ -72,9 +62,7 @@ function clauses(d: Defining, v: unknown, path: string, ctx: Ctx, conflict: bool
     // Section 6.6: a clause's subjects are those of the entry that made the send, as that entry resolved them. A name that was
     // selected through a slot that is not fixed cannot be selected again when the clause runs, so a clause names none.
     const settled = new Map([...ctx.also].filter(([also]) => !ctx.unsettled?.has(also)));
-    // I2 merge: a clause of a fan-out send may read `each` (section 6.6). No effect reads an operand of another subject until step 5,
-    // so nothing here could be shown to read the right item. Until then a clause has no `each`.
-    effects(d, e, at(path, name), { ...ctx, also: settled, clause: true, each: null }, true);
+    effects(d, e, at(path, name), { ...ctx, also: settled, clause: true }, true);
     if (d.clause) d.clauseSets.push(d.clause);
     d.clause = null;
   }
@@ -141,7 +129,7 @@ export function sends(d: Defining, v: unknown, path: string, ctx: Ctx, top: Rec)
       if (!r) return;
       // Section 6.6: a fan-out makes one send for each item its range covers. Its sends are bounded because the range reads live items
       // only, and the type's `max` bounds those.
-      const each = "each" in r ? range(d, r["each"], at(p, "each"), ctx) : null;
+      const each = "each" in r ? ranged(d, r["each"], at(p, "each"), ctx) : null;
       if ("each" in r && ++fanOuts > 1) bad("fan-out-unbounded", at(p, "each"), "another send of this list is a fan-out; a list has at most one");
       const written = each && isObject(top["items"]) ? own(top["items"], each.type.name) : null;
       const max = !each ? 1 : isObject(written) && typeof written["max"] === "number" ? written["max"] : Infinity;
@@ -155,7 +143,9 @@ export function sends(d: Defining, v: unknown, path: string, ctx: Ctx, top: Rec)
       str(r["state"], at(p, "state"));
       condition(d, r, p, within);
       sources(d, r["detail"], at(p, "detail"), within);
-      clauses(d, r["result"], at(p, "result"), within, false);
+      // Section 6.6: a clause of a fan-out send may read `each`, the item of that send. The entry records the item of each update and
+      // nothing else of the range. So `each` is found again, when the result is recorded, only where the update's `item` is `each`.
+      clauses(d, r["result"], at(p, "result"), each && canonicalize(r["item"]) === canonicalize({ item: "each" }) ? within : ctx, false);
       [kind, result, always, made] = [[k, r["name"], r["state"]], r["result"], !("if" in r) && !each && alsoRead([r["to"], r["item"]]).length === 0, Number.isFinite(max) ? max : 0];
       if (problems.length === before) {
         // Section 6.4: no two `relate` sends written with the same `to`, `item` and `name`.

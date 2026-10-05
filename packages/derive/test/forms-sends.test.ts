@@ -25,7 +25,8 @@ const pull: DeclaredDefinition = {
   items: {
     proposal: {
       many: false, max: 1, states: { open: { final: false } }, initial: "open",
-      parties: { author: { fixed: true, required: true, list: false, author: false }, watchers: { ...slot, list: true, max: 2, author: false } }, refs: { staging: { ...slot, to: lane } }, values: {},
+      parties: { author: { fixed: true, required: true, list: false, author: false }, watchers: { ...slot, list: true, max: 2, author: false } },
+      refs: { staging: { ...slot, to: lane }, closed: { ...slot, to: { type: "item", of: "link" } } }, values: {},
     },
     link: {
       many: true, max: 3, states: { set: { final: false }, removed: { final: true } }, initial: "set", parties: {},
@@ -76,7 +77,9 @@ const pull: DeclaredDefinition = {
         {
           relate: {
             each: { type: "link", states: ["set"] }, to: { slot: "issue", of: "each" }, name: "closes", item: { item: "each" }, state: "merged", if: [{ equals: { a: { field: "outcome" }, b: { const: "published" } } }],
-            detail: { commit: { field: "commit" }, how: { slot: "how", of: "each" }, from: { sender: true }, by: { source: "ref" }, made: { slot: "madeAt", of: "each" }, seq: { slot: "madeAt", of: "each", part: "seq" } }, result: {},
+            detail: { commit: { field: "commit" }, how: { slot: "how", of: "each" }, from: { sender: true }, by: { source: "ref" }, made: { slot: "madeAt", of: "each" }, seq: { slot: "madeAt", of: "each", part: "seq" } },
+            // The clause of one send of the fan-out reads the item of that send.
+            result: { applied: [{ of: "also.proposal", ref: { slot: "closed", from: { item: "each" } } }] },
           },
         },
         { tell: { to: { slot: "staging", of: "also.proposal" }, message: "unpin", if: staged, fields: { because: { const: "published" } }, result: {} } },
@@ -122,7 +125,8 @@ describe("sends (section 6.6)", () => {
       { name: "closes", item: P.fact(second), state: "merged", detail: { commit: "c1", from: X.at, by: source.from, made: P.fact(second), seq: second } },
     ]);
     // The second send of the fan-out went to A. Its result is recorded: the request at that ordinal is found again as the fan-out's.
-    expect(answer(P, issue, sealed, 1, "applied")).toBe("write");
+    // Its clause reads `each`, which is the second link, and no other item of the range.
+    expect([answer(P, issue, sealed, 1, "applied"), P.item(0).refs["closed"]]).toEqual(["write", second]);
     // With the work staged, the `unpin` is made after the three updates, at ordinal 3.
     P.did(rita, "stage", { ...on(P, 0), ...fields({ staging: S, watcher: una.member }) });
     published(P, X);
@@ -132,7 +136,7 @@ describe("sends (section 6.6)", () => {
     expect([sent(P).map(([, kind]) => kind), told(P)]).toEqual([["unpin", "advisory", "result"], []]);
 
     // Each send of a fan-out has its own key. Two links to one issue, sent for one item, are one key: the delivery is refused, and sends its result alone.
-    const same = new Scope(valid(validateDefinition({ ...pull, receives: { published: { ...pull.receives["published"]!, sends: [{ relate: { ...(pull.receives["published"]!.sends[0] as { relate: object }).relate, item: { item: "also.proposal" } } }] } } }, tight)));
+    const same = new Scope(valid(validateDefinition({ ...pull, receives: { published: { ...pull.receives["published"]!, sends: [{ relate: { ...(pull.receives["published"]!.sends[0] as { relate: object }).relate, item: { item: "also.proposal" }, result: {} } }] } } }, tight)));
     for (const issue of [A, A]) same.did(rita, "link", fields({ issue }));
     published(same, X);
     expect([decided(same), same.last.sends.length]).toEqual([["refused", "duplicate-relation"], 1]);
@@ -214,6 +218,7 @@ describe("sends (section 6.6)", () => {
       ["a fan-out over a type that takes more live items than a fan-out may send", refusal(() => {}, { ...tight, fanOut: 2 }), "fan-out-unbounded"],
       ["a fan-out over a final state", refusal((d) => { fanOut(d).each.states.push("removed"); }), "fan-out-unbounded"],
       ["two fan-outs in one list", refusal((d) => { d.receives.published.sends.push({ relate: { ...fanOut(d), name: "follows" } }); }), "fan-out-unbounded"],
+      ["a clause that reads `each`, of a fan-out whose update is for another item than `each`", refusal((d) => { fanOut(d).item = { item: "also.proposal" }; }), "name"],
       ["`each` outside a fan-out", refusal((d) => { reserve(d).fields.how = { slot: "how", of: "each" }; }), "name"],
       ["a tell addressed by the name of a slot, as the first delivery wrote it", refusal((d) => { reserve(d).to = "staging"; }), "shape"],
       ["a tell addressed by a slot that holds no scope", refusal((d) => { reserve(d).to = { slot: "author", of: "also.proposal" }; }), "name"],
