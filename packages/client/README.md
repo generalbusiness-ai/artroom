@@ -20,7 +20,7 @@ its section "Client".
 | `handle` | `ScopeHandle`: `submit`, `settle`, the reads `summary`, `items`, `history`, `entry` and `outbox`, `definition`, `followReceipt` and `followDuty`. `found(transport, founding, definition, definitions?)`. `Transport`, `TransportError`. |
 | `http` | `httpTransport(service, options?)`: the transport over the service's HTTP routes. |
 | `binding` | `bindingTransport(service)`: the transport over a service binding to the Worker's entrypoint. |
-| `answers` | Not exported. For each operation, whether a reply is one of its answers. Both transports use it. |
+| `answers` | Not exported. For each operation, whether a reply is one of its answers, and which refusals that operation has. Both transports use it. The guards of the records inside a reply are the bytes package's `records`. |
 
 `Transport` is the contract's `ScopeApi`. The scope Worker's service
 entrypoint implements the same interface, and a typechecked file in the
@@ -30,15 +30,37 @@ drifts from it.
 ## What a transport returns
 
 A reply from a service is untrusted. A transport returns it only when it is
-an answer of its operation: `answer` or `ok` is a value the contract names,
-a reason is one the contract names for that answer, and what the answer
-must carry is there with its shape: a receipt with its fact, a refusal with
-the head it was judged at, a read with its position and a value of the
-route's kind. Any other reply is a `TransportError`. So `{ answer: null }`
-or an `accepted` with no receipt is never an outcome.
+an answer of its operation. Any other reply is a `TransportError`. So
+`{ answer: null }`, an `accepted` with no receipt, or an entry whose effect
+has no item is never an outcome.
 
-The check is of shape. It does not show that a receipt is of this history:
-`followReceipt` does that.
+What is checked:
+
+- `answer` or `ok` is a value the contract names for that operation, and
+  the reply has that answer's members and no other.
+- A reason is one that operation can give. An act is never refused
+  `source-unverified` or `unsupported-definition`; a founding may be.
+- Every fixed record the contract defines is one of its variants, with
+  each member that variant requires, of its kind, and no other member: a
+  receipt, an entry, its input of each type, a signed intent, a grant, a
+  message of each class, a send, an effect of each name, a use, a prepared
+  result, an attempt, an item with its slots and attribution, a summary, a
+  duty, a log page, a retained input, and each reference, seed, digest,
+  identifier and timestamp inside them.
+
+What is not read, because the contract leaves it to another owner or to
+the application:
+
+- the body of a request or an advisory, and the evidence of an outcome;
+- a grant's `within` and `fresh`;
+- the value of each field of an intent and of an `index` effect;
+- whether a slot's value is a value of the type its definition declares.
+  It is checked to be one of the forms a field value can have;
+- the text of a stored entry in a log page, and of a retained input. A
+  reader hashes and parses those itself.
+
+The check is of shape. It does not verify a signature, and it does not
+show that a receipt is of this history: `followReceipt` does that.
 
 ## Retrying
 

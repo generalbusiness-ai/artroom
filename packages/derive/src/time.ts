@@ -4,26 +4,14 @@
  */
 
 import type { Timestamp } from "@generalbusiness/artroom-contract";
+import { timeMs, timeOf } from "@generalbusiness/artroom-bytes";
 import type { StateView } from "./state.ts";
 
-const FORM = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{3}))?Z$/;
+/** The one text form of a timestamp and its guard are the bytes package's, beside the other identifiers. */
+export { timeMs, timeOf };
 
 /** The last instant a timestamp can name: the end of the year 9999. A derived time past it is not a timestamp. */
 export const LAST_MS = Date.UTC(9999, 11, 31, 23, 59, 59, 999);
-
-/** The text of an instant: whole seconds with no fraction, otherwise three digits. One instant has one text. */
-export function timeOf(ms: number): Timestamp {
-  return new Date(ms).toISOString().replace(".000Z", "Z");
-}
-
-/** Milliseconds of a timestamp in that one form, or null. A date that does not exist is null. */
-export function timeMs(value: unknown): number | null {
-  if (typeof value !== "string") return null;
-  const m = FORM.exec(value);
-  if (!m) return null;
-  const ms = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4]), Number(m[5]), Number(m[6]), Number(m[7] ?? 0));
-  return Number.isFinite(ms) && timeOf(ms) === value ? ms : null;
-}
 
 /**
  * One commit's clock reading, judged against the history. `behind`: the

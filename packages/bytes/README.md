@@ -14,7 +14,8 @@ seal an entry inside one storage transaction.
 | `hash` | `sha256`, `digestBytes`, `digestOfHash`, `isDigest`. |
 | `sign` | `keyIdOf`, `keyIdOfSecret`, `publicKeyOf`, `sign`, `verify`. |
 | `domains` | `domainBytes`; `intentDigest`, `signIntent`, `verifySignedIntent`; `seedDigest`, `scopeIdOf`, `newIncarnation`; `entryHash`, `factRefOf`; `messageDigest`, `deliveryCauseDigest`, `definitionDigest`; `isScopeId`, `isIncarnation`. |
-| `ids` | The guard of each other identifier the contract names: `isKeyId`, `isMemberId`, `isOperationId`, `isDutyId`, `isPlatformDefinition`, `isScopeKind` with `SCOPE_KINDS`; and `positionOf`, the one reader of a position's decimal text. No other package tests these forms with a pattern of its own. |
+| `ids` | The guard of each other identifier the contract names: `isKeyId`, `isMemberId`, `isOperationId`, `isDutyId`, `isPlatformDefinition`, `isScopeKind` with `SCOPE_KINDS`; `positionOf`, the one reader of a position's decimal text; and `timeMs` and `timeOf`, the one form of a timestamp. No other package tests these forms with a pattern of its own. |
+| `records` | The guard of each fixed record the contract defines: `isScopeRef`, `isFactRef`, `isMemberRef`, `isHead`, `isSeed`, `isIntent`, `isSignedIntentShape`, `isGrant`, `isFieldValue`, `isParty`, `isMessage`, `isSend`, `isEffect`, `isInput`, `isFactUse`, `isPrepared`, `isEntry`, `isSealed`, `isReceipt`, `isItem`, `isSummary`, `isDuty`, `isLogPage`, `isRetainedInput`, `isRead`, `isListOf`; and `REFUSAL_REASONS`, `READ_REFUSALS`, `among`, `isRecord`, `isLocalId`, `isDefinitionName`. A record passes when it is a variant the contract names, with every member that variant requires and no other. Shape only: no signature, hash or judgment. The head of the file says what stays opaque. |
 
 The entry `@generalbusiness/artroom-bytes/web` is the declarations of the
 Web text coders these sources compile against. A package that needs no

@@ -26,7 +26,7 @@
 
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { Bounds, Digest, Entry, FactRef, Head, PlatformDefinition, Report, RetainedInput, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
-import { canonicalize, definitionDigest, digestBytes, isDigest, parseStrict, scopeIdOf, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
+import { canonicalize, definitionDigest, digestBytes, isDigest, isEntry, parseStrict, scopeIdOf, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import {
   MemoryState, applyEntry, clockOf, entryOf, isFactRef, isLocalId, isObject, isScopeRef, judgeAct, judgeCheckpoint, judgeDelivery, judgeDiagnosis, judgeGenesis, judgeOutcome, judgeTimed,
   nextDue, timeMs, updateOf, validateDefinition,
@@ -133,24 +133,6 @@ interface Run {
   next: number | null;
   /** Being advanced now. A reference that needs a later entry of it is a circle (section 3). */
   busy: boolean;
-}
-
-const INPUTS = ["genesis", "act", "delivery", "diagnosis", "timed", "outcome", "checkpoint"];
-
-/** The shape of an entry, as far as the checks below read it before any judge does. */
-function isEntry(v: unknown): v is Entry {
-  if (!isObject(v) || Object.keys(v).length !== 12 || v["v"] !== 1 || v["epoch"] !== 0 || !isScopeRef(v["at"]) || !isLocalId(v["seq"]) || typeof v["clamped"] !== "boolean") return false;
-  if (!(v["prev"] === null || isDigest(v["prev"])) || timeMs(v["time"]) === null) return false;
-  const input = v["input"];
-  if (!isObject(input) || !INPUTS.includes(input["type"] as string)) return false;
-  if (input["type"] === "genesis" && (!isObject(input["seed"]) || typeof input["inc"] !== "string")) return false;
-  if (input["type"] === "act" && (!isObject(input["signed"]) || !isObject(input["signed"]["intent"]) || !Array.isArray(input["authority"]))) return false;
-  if (input["type"] === "delivery" && (!isFactRef(input["from"]) || !isLocalId(input["n"]) || !isObject(input["message"]))) return false;
-  if (input["type"] === "diagnosis" && (!isObject(input["of"]) || !Array.isArray(input["attempts"]))) return false;
-  const lists = [v["uses"], v["prepared"], v["effects"], v["sends"]];
-  if (!lists.every((list) => Array.isArray(list) && list.every(isObject))) return false;
-  return (v["uses"] as Record<string, unknown>[]).every((u) => isFactRef(u["fact"]) && isDigest(u["content"]))
-    && (v["sends"] as Record<string, unknown>[]).every((s) => isLocalId(s["n"]) && isObject(s["message"]) && isObject(s["to"]));
 }
 
 const sameScope = (a: ScopeRef, b: ScopeRef): boolean => a.scope === b.scope && a.inc === b.inc && a.kind === b.kind;

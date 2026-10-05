@@ -28,7 +28,13 @@ The library runs under Node and under Workers.
 **Integrity** checks, for the target scope only:
 
 - each entry's bytes hash to the hash the source gives for it, and are
-  canonical JSON in the shape of an entry;
+  canonical JSON that the bytes package's `isEntry` passes: the twelve
+  members of an entry, an input of one of the contract's types with its
+  members, and each effect, send, use and prepared result as one of the
+  contract's records. That guard does not read a request's body, an
+  outcome's evidence, a grant's `within` and `fresh`, or the values of an
+  intent's fields, and it does not compare a slot's value with the type the
+  definition declares;
 - the chain: `seq` counts from 0, `prev` is the hash of the entry before,
   every entry is at one scope and incarnation, times do not go back, and a
   clamped entry has the time of the entry before it;

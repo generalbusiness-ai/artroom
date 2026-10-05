@@ -1,7 +1,7 @@
 /** Values of the field types of section 6.2, as they appear in an intent, a slot and an effect. */
 
-import type { Bounds, FactRef, FieldType, MemberRef, ScopeRef } from "@generalbusiness/artroom-contract";
-import { SCOPE_KINDS, canonicalize, isDigest, isIncarnation, isMemberId, isScopeId, isScopeKind, utf8, wellFormed } from "@generalbusiness/artroom-bytes";
+import type { Bounds, FieldType, MemberRef } from "@generalbusiness/artroom-contract";
+import { SCOPE_KINDS, canonicalize, isDigest, isFactRef, isLocalId, isMemberRef, isRecord, isScopeRef, utf8, wellFormed } from "@generalbusiness/artroom-bytes";
 import { timeMs } from "./time.ts";
 
 /** The scope kinds, from the bytes package, which holds the one guard of each identifier. */
@@ -21,26 +21,11 @@ export { SCOPE_KINDS };
 export const own = <T>(record: Readonly<Record<string, T>> | null | undefined, name: string): T | undefined =>
   (record !== null && record !== undefined && Object.hasOwn(record, name) ? record[name] : undefined);
 
-export const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
-const hasOnly = (v: Record<string, unknown>, keys: readonly string[]) => Object.keys(v).length === keys.length && keys.every((k) => Object.hasOwn(v, k));
-
-export function isScopeRef(v: unknown): v is ScopeRef {
-  return isObject(v) && hasOnly(v, ["scope", "inc", "kind"]) && isScopeId(v["scope"]) && isIncarnation(v["inc"]) && isScopeKind(v["kind"]);
-}
-
-export function isMemberRef(v: unknown): v is MemberRef {
-  return isObject(v) && hasOnly(v, ["membership", "member"]) && isScopeRef(v["membership"]) && isMemberId(v["member"]);
-}
+/** The guards of a reference and of a position are the bytes package's, beside the other fixed records of the contract. */
+export { isFactRef, isLocalId, isMemberRef, isScopeRef, isRecord as isObject };
 
 /** A member handle within its bound. A slot never holds a longer one, so an entry that lists a slot's members has a known size. */
 export const memberFits = (v: MemberRef, bounds: Pick<Bounds, "memberBytes">): boolean => utf8(v.member).length <= bounds.memberBytes;
-
-export function isFactRef(v: unknown): v is FactRef {
-  return isObject(v) && hasOnly(v, ["at", "seq", "hash"]) && isScopeRef(v["at"]) && isLocalId(v["seq"]) && isDigest(v["hash"]);
-}
-
-/** A local item's ID is the `seq` of the entry that opened it. */
-export const isLocalId = (v: unknown): v is number => typeof v === "number" && Number.isSafeInteger(v) && v >= 0;
 
 /** A Git object ID: SHA-1 or SHA-256, lowercase hex. */
 const isObjectId = (v: unknown) => typeof v === "string" && /^([0-9a-f]{40}|[0-9a-f]{64})$/.test(v);

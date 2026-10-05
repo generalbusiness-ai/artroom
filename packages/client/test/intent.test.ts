@@ -62,14 +62,19 @@ test("on both transports, each operation of the handle returns a reply only when
   const refused = { ok: false, reason: "not-found" };
   const rows: Row[] = [
     ["found", (t) => found(t, {} as never, d as never).then((f) => f.answer),
-      [{ answer: "accepted", receipt }, { answer: "refused", reason: "unsupported-definition" }, { answer: "unavailable", reason: "busy" }],
+      [{ answer: "accepted", receipt }, { answer: "refused", reason: "unsupported-definition" }, { answer: "refused", reason: "source-unverified" }, { answer: "unavailable", reason: "busy" }],
       [{ answer: "mismatch", reason: "idempotency-mismatch" }, { answer: "refused", reason: "not-found" }, ...each(receipt).map((r) => ({ answer: "accepted", receipt: r }))]],
-    ["submit", (t) => handle(t).submit({} as never), [{ answer: "accepted", receipt }], [...each(receipt).map((r) => ({ answer: "accepted", receipt: r })), { answer: "accepted", receipt: { ...receipt, sends: ["first"] } }]],
+    ["submit", (t) => handle(t).submit({} as never), [{ answer: "accepted", receipt }], [...each(receipt).map((r) => ({ answer: "accepted", receipt: r })), { answer: "accepted", receipt: { ...receipt, sends: ["first"] } },
+      // An effect is one of the contract's, with its members; and an act's refusal is one an act can meet: a source check and a platform definition are a founding's.
+      ...[{ effect: "state" }, { effect: "vanish" }].map((e) => ({ answer: "accepted", receipt: { ...receipt, effects: [e] } })),
+      ...["source-unverified", "unsupported-definition"].map((reason) => ({ answer: "refused", reason, judgedAt: head }))]],
     ["settle", (t) => handle(t).settle({} as never), [read(receipt), refused, { ...refused, detail: fact }], [...each(read(receipt)), ...each(receipt).map((r) => read(r)), { ...refused, detail: "elsewhere" }]],
     ["summary", (t) => handle(t).summary(), [read(summary)], [...each(summary).map((v) => read(v)), read({ ...summary, status: "open" }), read({ ...summary, counts: [["note", "draft"]] }), read({ ...summary, items: [less(item, "opened")] })]],
-    ["items", (t) => handle(t).items("note", "c"), [read([item], { next: "c2" }), read([{ ...item, opened: null, epoch: 2 }])], [...each(item).map((v) => read([v])), read(item), read([item], { next: 2 })]],
+    ["items", (t) => handle(t).items("note", "c"), [read([item], { next: "c2" }), read([{ ...item, opened: null, epoch: 2 }])], [...each(item).map((v) => read([v])), read(item), read([item], { next: 2 }), read([{ ...item, attributed: [{}] }]), read([{ ...item, parties: { owner: {} } }])]],
     ["history", (t) => handle(t).history("c"), [read([sealed], { complete: false, next: "c2" })], [...each(sealed).map((v) => read([v])), ...each(entry).map((e) => read([{ entry: e, hash: d }])), read(sealed)]],
-    ["entry", (t) => handle(t).entry(1), [read(sealed)], [...each(sealed).map((v) => read(v)), ...each(entry).map((e) => read({ entry: e, hash: d })), read({ entry: { ...entry, at: { ...scope, kind: "room" } }, hash: d })]],
+    ["entry", (t) => handle(t).entry(1), [read(sealed)], [...each(sealed).map((v) => read(v)), ...each(entry).map((e) => read({ entry: e, hash: d })), read({ entry: { ...entry, at: { ...scope, kind: "room" } }, hash: d }),
+      // The fixed records inside an entry: an input is one of the contract's with its members, and so is each use, prepared result and send.
+      ...[{ input: { type: "act" } }, { input: { type: "mystery" } }, { uses: [{}] }, { prepared: [{}] }, { sends: [{}] }].map((part) => read({ entry: { ...entry, ...part }, hash: d }))]],
     ["outbox", (t) => handle(t).outbox("c"), [read([duty], { next: "c2" })], [...each(duty).map((v) => read([v])), read(duty)]],
     ["followDuty", (t) => handle(t).followDuty("1.0"),
       [read(duty), read({ ...duty, acknowledged: fact, result: { seq: 2, clause: "applied" }, diagnosis: { seq: 3, finding: "undelivered" } }), refused],

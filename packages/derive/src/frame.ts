@@ -5,17 +5,17 @@
  * the clause of an earlier send is run again from the entry that sent it.
  */
 
-import type { ActType, Advisory, Bounds, Digest, Effect, EffectForm, Entry, FactRef, FactUse, FieldType, FieldValue, Guard, Intent, Notify, Prepared, ReceiveType, RefusalReason, Request, ResultClauses, ScopeKind, Send, SendForm, UnavailableReason } from "@generalbusiness/artroom-contract";
-import { canonicalBytes, digestBytes, entryHash } from "@generalbusiness/artroom-bytes";
+import type { ActType, Advisory, Bounds, Digest, Effect, EffectForm, Entry, FactRef, FactUse, FieldType, FieldValue, Guard, Notify, Prepared, ReceiveType, RefusalReason, Request, ResultClauses, ScopeKind, Send, SendForm, UnavailableReason } from "@generalbusiness/artroom-contract";
+import { canonicalBytes, digestBytes, entryHash, isIntent } from "@generalbusiness/artroom-bytes";
 import type { Signer } from "./attribution.ts";
 import { deriveEffects } from "./effects.ts";
 import { signerOf } from "./fold.ts";
 import { judgeGuard, type Fetched, type Judging, type RuleInput } from "./guards.ts";
 import { deriveSends } from "./sends.ts";
 import type { Item, OwnRequest, ScopeState, StateView } from "./state.ts";
-import { timeMs, type Clock } from "./time.ts";
+import type { Clock } from "./time.ts";
 import { keptMessage, type ValidDefinition } from "./validate.ts";
-import { byteOrder, isFactRef, isLocalId, isObject, isScopeRef, isValue, own, same } from "./values.ts";
+import { byteOrder, isFactRef, isLocalId, isObject, isValue, own, same } from "./values.ts";
 
 /** What every judge is given: the one reading of the commit, the bounds, and the retained inputs. */
 export interface Reading {
@@ -26,12 +26,8 @@ export interface Reading {
   asked?: RuleInput[] | undefined;      // set by `prepareRules` only
 }
 
-/** The shape of section 2.1. A valid signature over some other shape is not an intent. */
-export function isIntent(v: unknown): v is Intent {
-  return isObject(v) && Object.keys(v).length === 9 && v["v"] === 1 && (v["to"] === null || isScopeRef(v["to"])) && typeof v["actor"] === "string" && typeof v["kind"] === "string"
-    && (v["on"] === null || isLocalId(v["on"])) && isObject(v["expected"]) && Object.values(v["expected"]).every(isLocalId) && isObject(v["fields"])
-    && typeof v["idempotencyKey"] === "string" && timeMs(v["notAfter"]) !== null;
-}
+/** The shape of section 2.1, which the bytes package guards beside the contract's other fixed records. */
+export { isIntent };
 
 /** Each value in a field with the type it must have: the field itself, or each element of a list. */
 function leaves(type: FieldType, value: FieldValue): [FieldType, FieldValue][] {

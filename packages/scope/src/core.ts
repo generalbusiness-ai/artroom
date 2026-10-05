@@ -8,8 +8,8 @@
  */
 
 import type { Answer, Bounds, DeclaredDefinition, Digest, DutyId, Entry, FactRef, Founded, Grant, PlatformDefinition, Receipt, RefusalReason, ScopeId, Seed, Settlement, SignedIntent, UnavailableReason } from "@generalbusiness/artroom-contract";
-import { canonicalize, definitionDigest, intentDigest, isDigest, newIncarnation, parseStrict } from "@generalbusiness/artroom-bytes";
-import { checkpointOf, factsNamed, isFactRef, isMemberRef, isObject, judgeAct, judgeCheckpoint, judgeGenesis, own, prepareRules, readFields, timeMs, validateDefinition } from "@generalbusiness/artroom-derive";
+import { canonicalize, definitionDigest, intentDigest, isDigest, isGrant, newIncarnation, parseStrict } from "@generalbusiness/artroom-bytes";
+import { checkpointOf, factsNamed, judgeAct, judgeCheckpoint, judgeGenesis, own, prepareRules, readFields, validateDefinition } from "@generalbusiness/artroom-derive";
 import type { ActJudgment, Clock as Reading, Draft, Fetched, Founding, JudgeContext, ValidDefinition } from "@generalbusiness/artroom-derive";
 import { RULE_PROFILES } from "@generalbusiness/artroom-derive/rule";
 import { namedBy } from "./definitions.ts";
@@ -34,11 +34,6 @@ export function receiptOf({ entry, hash }: Sealed, definition: Digest | Platform
   const intent = input.type === "act" ? intentDigest(input.signed.intent) : input.type === "genesis" && input.founding ? intentDigest(input.founding.intent) : null;
   return { fact: { at: entry.at, seq: entry.seq, hash }, definition, intent, effects: entry.effects, sends: entry.sends.map((s): DutyId => `${entry.seq}.${s.n}`), epoch: 0 };
 }
-
-/** The shape of a grant, as far as the judge and the entry read it. `within` and `fresh` are the authority note's. */
-const isGrant = (g: unknown): g is Grant =>
-  isObject(g) && isFactRef(g["issued"]) && isMemberRef(g["subject"]) && typeof g["key"] === "string" && (g["principal"] === null || isMemberRef(g["principal"]))
-  && Array.isArray(g["actions"]) && g["actions"].every((a) => typeof a === "string") && (g["notAfter"] === null || timeMs(g["notAfter"]) !== null);
 
 /** Section 9.2: the bytes of each foreign entry the draft's `uses` name, under its content digest. */
 export function used(draft: Draft, facts: readonly Fetched[]): Retained[] {
