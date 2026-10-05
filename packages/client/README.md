@@ -67,13 +67,15 @@ show that a receipt is of this history: `followReceipt` does that.
 | Limit | Value | When it is reached |
 |---|---|---|
 | Raw bytes of one reply | 4 MiB (`REPLY_BYTES`), or `options.bytes` | The body is cancelled at the chunk that passes the limit. Nothing of it is joined, decoded or parsed. |
-| One request with its whole reply | 30 seconds (`REPLY_SECONDS`), or `options.seconds` | The request is aborted. |
+| One request with its whole reply | 30 seconds (`REPLY_SECONDS`), or `options.seconds` | The request is aborted. The reader starts no read and keeps no chunk after that, and nothing is decoded or parsed. |
 
 Both values are temporary. Each case is a `TransportError`. For `found` and
 `submit` its message ends: "The outcome of the submitted intent is unknown:
 it may have been recorded. The same signed intent may be sent again." For a
 read it says that nothing was read. The reader is the bytes package's
-`takeBytes` and `within`, which the replay package's source uses too.
+`takeBytes` and `within`, which the replay package's source uses too. A
+`fetch` given in `options` that ignores the abort signal may keep its own
+buffers and its connection; the transport cannot stop it.
 
 The transport over a service binding has no such limit and no deadline: a
 call there is a call of the runtime, and its bounds are not set here.

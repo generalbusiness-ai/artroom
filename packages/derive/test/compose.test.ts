@@ -386,7 +386,7 @@ describe("outcomes and checkpoints (sections 4.3 and 9.2)", () => {
   });
 });
 
-describe("room to settle (section 17.2 of the contract's candidate revision 10)", () => {
+describe("room to settle (section 17.2 of the contract's revision 10, the adopted revision)", () => {
   /* eslint-disable @typescript-eslint/no-explicit-any */
   /** The ticket, with a request that a timed rule pauses at its `until`, which `ask` sets from a field. */
   const pausing = (d: any) => {

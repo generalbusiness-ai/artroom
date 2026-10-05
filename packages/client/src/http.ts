@@ -8,7 +8,10 @@
  * chunk by chunk, by the bytes package's bounded reader: at the chunk that
  * passes `bytes` the body is cancelled, and nothing of it is joined,
  * decoded or parsed. One request, with its whole reply, has `seconds`;
- * after that it is aborted. A body that is not one of the answers of its
+ * after that it is aborted: the reader starts no read, keeps no chunk and
+ * gives nothing back, so nothing is decoded or parsed after the error is
+ * thrown. A `fetch` that ignores the abort signal may keep its own buffers
+ * and its connection; that is outside this transport's control. A body that is not one of the answers of its
  * operation, with what that answer must carry (`answers.ts`), is no
  * outcome either. Each of these is a `TransportError`.
  *
@@ -54,16 +57,17 @@ export function httpTransport(service: string, options: { fetch?: Fetch; bytes?:
     const send = options.fetch ?? (globalThis as { fetch?: Fetch }).fetch;
     if (!send) throw new TransportError("this runtime has no fetch; nothing was sent");
     const headers: Record<string, string> = { ...(typeof reader === "string" ? { authorization: reader } : {}), ...(body === undefined ? {} : { "content-type": "application/json" }) };
-    let got: { status: number; bytes: Uint8Array | null } | typeof LATE;
+    let got: { status: number; bytes: Uint8Array | null | typeof LATE } | typeof LATE;
     try {
       got = await within(seconds, async (signal) => {
         const response = await send(`${base}${path}`, { ...(body === undefined ? { method: "GET", headers } : { method: "POST", headers, body: JSON.stringify(body) }), signal: signal as never });
-        return { status: response.status, bytes: response.body ? await takeBytes(response.body, most) : new Uint8Array(0) };
+        return { status: response.status, bytes: response.body ? await takeBytes(response.body, most, signal) : new Uint8Array(0) };
       });
     } catch (error) {
       throw failed(`no reply: ${error instanceof Error ? error.message : String(error)}`);
     }
-    if (got === LATE) throw failed(`no whole reply within ${seconds} seconds; the request was aborted`);
+    // Past the deadline nothing of a reply is joined, decoded or parsed: the reader gave none back, and what comes next is not reached.
+    if (got === LATE || got.bytes === LATE) throw failed(`no whole reply within ${seconds} seconds; the request was aborted`);
     if (got.bytes === null) throw failed(`the reply, status ${got.status}, is longer than ${most} bytes and was not read`);
     let answer: unknown;
     try {

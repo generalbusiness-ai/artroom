@@ -19,6 +19,6 @@ declare function setTimeout(run: () => void, ms: number): unknown;
 declare function clearTimeout(timer: ReturnType<typeof setTimeout> | undefined): void;
 
 declare class AbortController {
-  readonly signal: unknown;
+  readonly signal: { readonly aborted: boolean; addEventListener(type: "abort", listener: () => void): void; removeEventListener(type: "abort", listener: () => void): void };
   abort(): void;
 }

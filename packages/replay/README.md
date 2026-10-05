@@ -121,7 +121,7 @@ reply arrives, before anything in it is kept.
 | `depth` | Foreign facts followed in a chain from the target | 16 | `incomplete`. |
 | One page | Raw reply bytes, and entries | 4 MiB (`PAGE_REPLY_BYTES`); 200 (`PAGE_ENTRIES`) | The page is not taken in. The history cannot be read past it: `incomplete` for the target, `missing-dependency` for a source. |
 | One retained input | Raw reply bytes | 4 MiB (`RETAINED_REPLY_BYTES`) | It is not taken in: `incomplete`, as a retained input that is missing. |
-| One read | Seconds | 30 (`READ_SECONDS`) | The request is aborted. A read error: `verify` rejects with `SourceError`, and there is no report. |
+| One read | Seconds | 30 (`READ_SECONDS`) | The request is aborted, and the reader starts no read and keeps no chunk after that. A `fetch` that ignores the abort signal may keep its own buffers and its connection. A read error: `verify` rejects with `SourceError`, and there is no report. |
 
 A page is kept only if it is the entries from the position asked, in
 order. `httpSource` reads a body chunk by chunk and stops at the chunk that

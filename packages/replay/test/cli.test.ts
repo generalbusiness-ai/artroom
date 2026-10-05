@@ -61,6 +61,14 @@ test("a reply from a service is taken in as raw bytes, only as far as the read a
   // A service that never answers: the read is given up after its deadline, here 10 milliseconds.
   const silent: Fetch = () => new Promise(() => undefined);
   await expect(verify(httpSource("https://scopes.test", { fetch: silent, seconds: 0.01 }), { mode: "integrity", scope: id })).rejects.toThrow(SourceError);
+  // A fetch that ignores the abort signal, with a read that answers after the deadline: the read is `timeout`, what came late is not taken, decoded or parsed, and no other read follows.
+  let reads = 0;
+  let answer = (_chunk: { done: boolean; value?: Uint8Array }): void => undefined;
+  const deaf: Fetch = () => Promise.resolve({ status: 200, body: { getReader: () => ({ read: () => { reads++; return new Promise((resolve) => { answer = resolve; }); }, cancel: () => new Promise(() => undefined) }) } });
+  expect(await httpSource("https://scopes.test", { fetch: deaf, seconds: 0.01 }).page(id, 0, { bytes: 4096, entries: 10 })).toEqual({ ok: false, reason: "timeout" });
+  answer({ done: false, value: new TextEncoder().encode("{") });
+  await new Promise((resolve) => { setTimeout(resolve, 5); });
+  expect(reads).toBe(1);
   // A budget that does not allow the first read leaves nothing to report on.
   await expect(verify(sourceOf(w), { mode: "integrity", scope: id, limits: { scopes: 0 } })).rejects.toThrow(SourceError);
 });

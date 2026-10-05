@@ -13,7 +13,7 @@
 
 import { DOMAINS, HISTORY_PAGE_BYTES, HISTORY_PAGE_ENTRIES, RETAINED_INPUT_BYTES } from "@generalbusiness/artroom-contract";
 import type { Digest, Head, RetainedInput, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
-import { LATE, digestOfHash, positionOf, sha256, takeBytes, utf8, within, type ByteStream } from "@generalbusiness/artroom-bytes";
+import { LATE, digestOfHash, positionOf, sha256, takeBytes, utf8, within, type ByteStream, type Expiry } from "@generalbusiness/artroom-bytes";
 import { isLocalId, isObject, isScopeRef } from "@generalbusiness/artroom-derive";
 
 /** One entry as stored: its canonical JSON text, and the hash the source gives for it. */
@@ -84,7 +84,10 @@ const isHead = (v: unknown): v is Head => isObject(v) && isLocalId(v["seq"]) && 
  * transport uses too. At the chunk that passes what the read may take in,
  * the body is cancelled and the read is `too-large`: nothing of it is
  * decoded, parsed or kept. A read that has no
- * whole reply after `seconds` is aborted and is `timeout`. A reply that is
+ * whole reply after `seconds` is aborted and is `timeout`: the reader
+ * starts no read and keeps no chunk after that, and nothing is decoded or
+ * parsed. A `fetch` that ignores the abort signal may keep its own buffers
+ * and its connection; that is outside this source's control. A reply that is
  * not UTF-8, or not the route's JSON answer, is `unavailable`.
  */
 export function httpSource(service: string, options: { fetch?: Fetch; reader?: string; seconds?: number } = {}): HistorySource {
@@ -93,10 +96,12 @@ export function httpSource(service: string, options: { fetch?: Fetch; reader?: s
   const seconds = options.seconds ?? READ_SECONDS;
   const get = async (path: string, most: number): Promise<{ body: Record<string, unknown>; bytes: number } | Unread> => {
     if (!send) return unread("unavailable");
-    const read = async (signal: unknown): Promise<{ body: Record<string, unknown>; bytes: number } | Unread> => {
+    const read = async (signal: Expiry): Promise<{ body: Record<string, unknown>; bytes: number } | Unread> => {
       const response = await send(`${base}${path}`, { method: "GET", headers: options.reader === undefined ? {} : { authorization: options.reader }, signal: signal as never });
       if (!response.body) return unread("unavailable");
-      const all = await takeBytes(response.body, most);
+      const all = await takeBytes(response.body, most, signal);
+      // The read expired: its result is already `timeout`, and nothing is decoded or parsed here.
+      if (all === LATE) return unread("timeout");
       if (!all) return unread("too-large");
       const body: unknown = JSON.parse(new TextDecoder("utf-8", { fatal: true, ignoreBOM: false }).decode(all));
       if (!isObject(body) || typeof body["ok"] !== "boolean") return unread("unavailable");

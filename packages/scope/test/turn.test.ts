@@ -162,7 +162,7 @@ describe("the scope's budget (section 9.2), here 12 entries", () => {
     expect(await s.submit(s.remark())).toMatchObject({ answer: "refused", reason: "scope-full", judgedAt: { seq: 11 } });
   });
 
-  // The fourth witness of section 17.4 of the contract's candidate revision 10, and its last paragraph.
+  // The fourth witness of section 17.4 of revision 10 of the contract, adopted since and a candidate when this was written, and its last paragraph.
   test.each([
     { scopeEntries: 6, beside: { answer: "unavailable", reason: "unavailable" }, closing: 5 },
     { scopeEntries: 7, beside: { answer: "written" }, closing: 6 },

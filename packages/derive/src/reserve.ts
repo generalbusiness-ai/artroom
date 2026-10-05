@@ -6,7 +6,7 @@
  * entry leaves room for them. The runtime asks inside the commit, after the
  * fold; a verifier asks the same question of the same state.
  *
- * The count follows section 17.2 of the contract's candidate revision 10,
+ * The count follows section 17.2 of revision 10 of the contract, adopted since and a candidate when this was written,
  * which is not adopted yet. What is reserved:
  *
  * - a deadline: for each live item in a state a timed rule applies in, one

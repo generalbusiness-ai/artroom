@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import { publicKeyOf, verifySignedIntent } from "@generalbusiness/artroom-bytes";
+import { LATE, publicKeyOf, takeBytes, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import { ScopeHandle, TransportError, bindingTransport, found, httpTransport, signedIntent, webCryptoSigner, type ServiceBinding, type Transport } from "../src/index.ts";
 
 test("an intent signed by a WebCrypto key that cannot be read is one the bytes package verifies; each intent has a fresh idempotency key and a notAfter within the lifetime bound", async () => {
@@ -144,6 +144,42 @@ test("a reply over HTTP is taken in as raw bytes only as far as the limit, and w
     expect((late as Error).message).toMatch(unknown);
   }
   expect(aborted).toEqual([true, true]);
+
+  // A fetch that ignores the abort signal, as the `Fetch` type allows. What the reader owns still stops at the deadline.
+  const pause = (ms: number) => new Promise<void>((resolve) => { setTimeout(resolve, ms); });
+  const busy = new TextEncoder().encode(JSON.stringify({ answer: "unavailable", reason: "busy" }));
+  type Chunk = { done: boolean; value?: Uint8Array };
+  const count = { reads: 0, cancels: 0 };
+  const bodyOf = (read: () => Promise<Chunk>) => ({ getReader: () => ({ read: () => { count.reads++; return read(); }, cancel: () => { count.cancels++; return new Promise<never>(() => undefined); } }) });
+  const lateOf = async (fetch: () => Promise<{ status: number; body: ReturnType<typeof bodyOf> }>) => {
+    Object.assign(count, { reads: 0, cancels: 0 });
+    const error = await httpTransport("https://scopes.test", { fetch, seconds: 0.01 }).submit("sc_a", {} as never, []).catch((e: unknown) => e);
+    expect([error instanceof TransportError, (error as Error).message]).toEqual([true, expect.stringMatching(/^no whole reply within 0\.01 seconds; the request was aborted\. /)]);
+  };
+  // A read that is pending at the deadline and answers afterwards with a whole, small answer: the answer is not taken, no other read follows, and the body was asked to cancel, with no wait for a cancellation that never answers.
+  let answer = (_chunk: Chunk): void => undefined;
+  await lateOf(() => Promise.resolve({ status: 200, body: bodyOf(() => new Promise<Chunk>((resolve) => { answer = resolve; })) }));
+  answer({ done: false, value: busy });
+  await pause(5);
+  expect(count).toEqual({ reads: 1, cancels: 1 });
+  // A response that arrives after the deadline: no read of its body is started.
+  await lateOf(() => pause(30).then(() => ({ status: 200, body: bodyOf(() => Promise.resolve({ done: false, value: busy })) })));
+  await pause(40);
+  expect(count).toEqual({ reads: 0, cancels: 1 });
+  // A body of empty chunks, each answered at once. None uses the byte limit, so the deadline ends the read; and no read follows the deadline.
+  await lateOf(() => Promise.resolve({ status: 200, body: bodyOf(() => Promise.resolve({ done: false, value: new Uint8Array(0) })) }));
+  const reads = count.reads;
+  await pause(10);
+  expect([reads > 1, count.reads, count.cancels]).toEqual([true, reads, 1]);
+  // The reader itself. Chunks taken before the deadline are not given back after it, joined or otherwise; and an empty chunk between others is passed over.
+  const expiry = new AbortController();
+  const queue: Chunk[] = [{ done: false, value: busy }];
+  const partial = takeBytes(bodyOf(() => (queue.length > 0 ? Promise.resolve(queue.shift()!) : new Promise<Chunk>(() => undefined))), 4096, expiry.signal);
+  await pause(1);
+  expiry.abort();
+  expect(await partial).toBe(LATE);
+  const parts: Chunk[] = [{ done: false, value: new Uint8Array(0) }, { done: false, value: busy }, { done: false, value: new Uint8Array(0) }, { done: true }];
+  expect(await takeBytes(bodyOf(() => Promise.resolve(parts.shift()!)), 4096, new AbortController().signal)).toEqual(busy);
   // A read that fails changed nothing, and says that instead.
   await expect(httpTransport("https://scopes.test", { fetch: endless, bytes: 4096 }).summary("sc_a", null)).rejects.toThrow(/was not read\. Nothing was read; the read may be made again\.$/);
 });
