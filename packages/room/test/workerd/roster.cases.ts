@@ -20,10 +20,12 @@ import {
   digestBytes,
   expectOk,
   expectRefusal,
+  failure,
   iso,
   makeRoom,
   newKeyPair,
   randomBytes,
+  sign,
   type TestRoom,
 } from "./support.ts";
 
@@ -314,6 +316,19 @@ describe("R-ADM-12 and R-CRED-9: onboarding and custody by admission path", () =
     const keys = await heldKeyCount(room);
     expectRefusal(await call(room.stub.redeem({ custody: "room", invitation: inv.id, secret: inv.secret }, "x")), "custody-mismatch");
     expect(await heldKeyCount(room)).toBe(keys);
+    expect((await entries(room)).length).toBe(before);
+    expect(await invitationUsed(room, inv.id)).toBe(false);
+  });
+
+  it("a roster act whose body is not an object (review L2): bad-request at step 1 on submit and on redeem, not retryable, nothing recorded", async () => {
+    const room = await makeRoom();
+    const inv = await invite(room, "@late", "client");
+    const before = (await entries(room)).length;
+    const c = new Client(room, newKeyPair());
+    const envelope = { ...c.envelope("roster", null, { op: "join", invitation: inv.id, secret: inv.secret }), body: null };
+    const join = { envelope, sig: sign(c.keys.seed, "artroom-envelope-v1", envelope) };
+    expect(await failure(room.stub.submit(join as never))).toMatchObject({ code: "bad-request", retryable: false });
+    expect(await failure(room.stub.redeem({ custody: "client", join } as never, "x"))).toMatchObject({ code: "bad-request", retryable: false });
     expect((await entries(room)).length).toBe(before);
     expect(await invitationUsed(room, inv.id)).toBe(false);
   });

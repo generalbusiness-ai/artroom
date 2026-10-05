@@ -77,6 +77,18 @@ describe("the ten tools (R-API-9)", () => {
   });
 });
 
+describe("credentials in examples (review L4)", () => {
+  test("no tool description holds a token inside a command's arguments", () => {
+    // A code span is a command when it runs a program or passes an option. Other processes can read a command's arguments.
+    const command = /(^|[\s;|&])(git|curl|claude|npx|artroom)\s|(^|\s)--?[A-Za-z]/;
+    const spans = TOOL_LIST.flatMap((t) => (t.description.match(/`[^`]+`/g) ?? []).map((span) => [t.name, span.slice(1, -1)] as const));
+    expect(spans.some(([, span]) => command.test(span))).toBe(true);
+    for (const [name, span] of spans) if (command.test(span)) expect(span, name).not.toMatch(/token|bearer|authorization/i);
+    // The workspace tool still says how the token reaches git: in git's configuration variables, in the environment.
+    expect(TOOLS.workspace.description).toMatch(/GIT_CONFIG_VALUE_0/);
+  });
+});
+
 describe("input validation", () => {
   const head = "a".repeat(40);
   const lane = "act_7_0c1d2e3f";

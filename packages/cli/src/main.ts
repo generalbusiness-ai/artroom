@@ -746,8 +746,10 @@ const COMMANDS: Record<string, Command> = {
         `Redeemed an MCP invitation for ${shown.member} (${shown.role}), valid until ${shown.expiresAt}.`,
         `The bearer token is in ${path}, readable only by you. It is not shown anywhere else.`,
         `MCP URL: ${shown.mcp}`,
-        `Next: give your agent that URL with the header "Authorization: Bearer <token from the file>", for example:`,
-        `  claude mcp add --transport http artroom ${shown.mcp} --header "Authorization: Bearer $(cat ${path})"`,
+        `Next: give your agent that URL with the header "Authorization: Bearer <token from the file>".`,
+        `Keep the token out of command arguments: read the file into the agent's environment, and name the variable in its configuration, for example:`,
+        `  export ARTROOM_BEARER="$(cat ${path})"`,
+        `  claude mcp add-json --scope project artroom '{"type":"http","url":"${shown.mcp}","headers":{"Authorization":"Bearer \${ARTROOM_BEARER}"}}'`,
       ]);
     },
   },
