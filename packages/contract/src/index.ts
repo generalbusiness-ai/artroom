@@ -11,3 +11,4 @@ export type * from "./report.ts";
 export type * from "./result.ts";
 export type * from "./transport.ts";
 export * from "./bounds.ts";
+export * from "./session.ts";

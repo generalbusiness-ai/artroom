@@ -216,6 +216,20 @@ export interface Repository {
 }
 
 /**
+ * The membership scope that a scope records, with its incarnation, as the
+ * list below states it: from its own genesis entry, or for a directory
+ * under `platform:directory@1` from its slot. Null: it records none. The
+ * authority reads that scope for an observation, and a read session is
+ * accepted only when it names that scope (section 3.9; `sessions.ts`).
+ */
+export function recordedMembership(config: Pick<Repository, "genesis" | "state">, scope: ScopeRef): ScopeRef | null {
+  const genesis = config.genesis();
+  if (!genesis) return null;
+  if (scope.kind === "directory" && genesis.seed.definition === DIRECTORY) return config.state ? directoryMembership(config.state) : null;
+  return membershipOf(genesis, scope);
+}
+
+/**
  * The production authority of one scope of a repository (authority note,
  * section 3.3, "Where it records its membership reference").
  *
@@ -244,14 +258,6 @@ export interface Repository {
  */
 export function repositoryAuthority(config: Repository): Authority {
   const own = ownStanding(config.random);
-  const observed = observing({
-    clock: config.clock, random: config.random, reader: config.reader,
-    membership: (scope) => {
-      const genesis = config.genesis();
-      if (!genesis) return null;
-      if (scope.kind === "directory" && genesis.seed.definition === DIRECTORY) return config.state ? directoryMembership(config.state) : null;
-      return membershipOf(genesis, scope);
-    },
-  });
+  const observed = observing({ clock: config.clock, random: config.random, reader: config.reader, membership: (scope) => recordedMembership(config, scope) });
   return { read: (asked, seconds) => (asked.scope.kind === "membership" ? own : observed).read(asked, seconds) };
 }

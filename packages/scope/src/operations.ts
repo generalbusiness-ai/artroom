@@ -185,8 +185,12 @@ export class Operations {
   #running: Promise<number> | null = null;
   #again = false;
 
+  /** Told of an answer that contradicts the outcome that entry `seq` records. It is the operator's record, which no judgment reads. */
+  readonly #conflict: ((operation: OperationId, attempt: number, seq: number) => void) | undefined;
+
   /** `owners`: the rules of the owners this runtime has code for. With none, no outcome can be judged, so nothing is sent. */
-  constructor(scope: Scope, store: Store, ports: Pick<Ports, "outside" | "clock" | "owners" | "diagnoses">, wakes: Wakes, bounds: Bounds) {
+  constructor(scope: Scope, store: Store, ports: Pick<Ports, "outside" | "clock" | "owners" | "diagnoses">, wakes: Wakes, bounds: Bounds, conflict?: (operation: OperationId, attempt: number, seq: number) => void) {
+    this.#conflict = conflict;
     this.#scope = scope;
     this.#store = store;
     this.#outside = ports.outside;
@@ -448,6 +452,9 @@ export class Operations {
     }
     // The port is told of each decisive answer that the scope has judged, with the entry that it wrote, if it wrote one.
     if (input.result !== "unknown" && recorded.recorded !== "unavailable") this.#judged(input.operation, input.attempt, recorded.recorded === "written" ? wrote.sealed : null);
+    // An incident (authority note, section 12, G13): nothing is written for it, so it is kept in the operator's record alone. It is told
+    // once, after the turn, and not from the judgment, which a turn may run again.
+    if (recorded.recorded === "conflict") this.#conflict?.(input.operation, input.attempt, recorded.seq);
     return recorded;
   }
 

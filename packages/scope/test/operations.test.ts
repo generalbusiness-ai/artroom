@@ -99,6 +99,10 @@ describe("outside operations at a real scope (scope contract, section 4.3; autho
     expect([await late(s, out, op, 1, own("c1")), await late(s, out, op, 1, own("c9")), await late(s, out, op, 3, own("c3")), (await s.head()).seq]).toEqual([
       { recorded: "repeat", seq: 4 }, { recorded: "conflict", seq: 4 }, { recorded: "refused", detail: "no request of that attempt was sent" }, 4,
     ]);
+    // The plan's T41: the contradiction is an incident (authority note, section 12, G13). It wrote no entry, so it is kept in the operator's
+    // record alone, by the runtime that found it: the scope, the kind, and references to the attempt and to the entry that it contradicts.
+    const incidents = await (s.object as unknown as { incidents(reader: unknown): Promise<Read<readonly { kind: string; scope: unknown; refs: unknown }[]>> }).incidents(reader);
+    expect(incidents.ok && incidents.value.map(({ kind, scope, refs }) => ({ kind, scope, refs }))).toEqual([{ kind: "outcome-conflict", scope: s.at, refs: [{ operation: op, attempt: 1 }, { entry: 4 }] }]);
   });
 
   test("T20: an idle ledger writes nothing; a port that sends nothing leaves the attempt recorded and visible; an outcome is written at a scope with no free room; an operation opens at most its stated attempts and then none by itself; a retry is a new operation", async () => {

@@ -172,10 +172,20 @@ export interface SentTexts { read(from: FactRef, digest: Digest): Promise<TextRe
 /** The reads of section 9.1. */
 /** `log` and `retained` are what a verifier reads (sections 9.2 and 9.4): the stored bytes of entries, and retained inputs. */
 /** `operations` is the read of a scope's outside operations, which the contract does not list (I3 deltas, entry EB9). */
-export type ReadName = "summary" | "items" | "history" | "entry" | "outbox" | "operations" | "log" | "retained";
+/** `incidents` and `waiting` are the reads of the operator's record and of the two lists of waiting requests (authority note, section 12, G13 and G17). */
+export type ReadName = "summary" | "items" | "history" | "entry" | "outbox" | "operations" | "log" | "retained" | "incidents" | "waiting";
 
-/** Who may read. `reader` is whatever the caller presented; sessions are the authority note's. */
-export interface Readers { allows(reader: unknown, read: ReadName): boolean }
+/**
+ * Who may read. `reader` is whatever the caller presented. The production
+ * port is the read sessions of `sessions.ts` (authority note, section 3.9).
+ * True: this reader may make this read. False: it may not, and the read is
+ * answered `forbidden`. A name: a session was presented and could not be
+ * judged, and the read is answered with that name. `sessions-unavailable`:
+ * the scope has no usable session secret (section 5.5). `clock-behind`: the
+ * scope's clock reads earlier than its previous entry's time (section 3.12,
+ * W6). Nothing is read in any of the three cases.
+ */
+export interface Readers { allows(reader: unknown, read: ReadName): boolean | "sessions-unavailable" | "clock-behind" }
 
 export interface Ports {
   clock: Clock; random: Random; authority: Authority; resolver: Resolver; rules: Rules; alarm: Alarm; definitions: Definitions; texts: SentTexts; readers: Readers;

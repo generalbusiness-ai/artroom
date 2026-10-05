@@ -16,20 +16,33 @@
  * The operations driver runs at the same two moments (`operations.ts`). By
  * default nothing is sent outside the service: the outside port of
  * `production()` sends nothing, and there are no owner rules.
+ *
+ * Four things here are no history, and no judgment reads any of them: the
+ * read sessions that the object checks, and for a membership scope issues
+ * (`sessions.ts`); the streams that it holds open; the serving limits of a
+ * join, at the front of a membership scope (`limits.ts`); and the
+ * operator's record (`operator.ts`). By default the object has no session
+ * configuration: it issues no session, and its readers port is the
+ * refusing one of `production()`.
  */
 
 import { DurableObject } from "cloudflare:workers";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
+import type { SessionAnswer } from "@generalbusiness/artroom-contract";
 import type { Answer, Beside, Bounds, Cursor, DeclaredDefinition, Digest, DutyId, Entry, Grant, Input, LogPage, OperationId, PlatformDefinition, Read, RetainedInput, ScopeId, Settlement, SignedIntent } from "@generalbusiness/artroom-contract";
 import { isScopeId } from "@generalbusiness/artroom-bytes";
 import { timeMs, type Item } from "@generalbusiness/artroom-derive";
+import type { ScopeState } from "@generalbusiness/artroom-derive";
 import type { Delivered, StateView } from "@generalbusiness/artroom-derive";
 import { Scope, type Checkpointed, type Founded } from "./core.ts";
 import { Deliveries } from "./delivery.ts";
 import { declaredBy, observedAt, routed, sentText, sourced, type Sourced } from "./namespace.ts";
+import { JoinLimits, isJoin, type LimitConfig } from "./limits.ts";
 import { Operations } from "./operations.ts";
+import { OperatorRecord, sendAgain, type Incident, type Resent } from "./operator.ts";
 import { Dispatcher, Wakes } from "./outbox.ts";
-import { production, type Alarm, type Authority, type Delivery, type Ports } from "./ports.ts";
+import { production, type Alarm, type Authority, type Clock, type Delivery, type Ports, type Readers, type Transport } from "./ports.ts";
+import { SessionRequests, Streams, issueSession, type Opened, type Sessions, type StreamRefusal } from "./sessions.ts";
 import { READ_BOUNDS, Reads, type ReadBounds, type Summary } from "./reads.ts";
 import { SqliteStore } from "./sqlite.ts";
 import type { Duty, OperationStatus, Sealed } from "./store.ts";
@@ -41,10 +54,27 @@ import type { Duty, OperationStatus, Sealed } from "./store.ts";
  * scope reads its membership reference from its own genesis entry (the
  * contract's section 6.6). It is given the clock and the random source of
  * the ports as wired. With it, `ports.authority` is not used.
+ *
+ * `readers`: the readers port, made the same way, for a port that reads the
+ * scope's own record: a read session is checked against the membership
+ * reference that the scope records and against the time of its previous
+ * entry (authority note, section 3.9). With it, `ports.readers` is not
+ * used. `sessions`: the deployment's session configuration, asked at each
+ * request for a session. Absent, or null: this object issues none.
+ * `limits`: the serving limits of a join, in place of the proposed ones.
  */
+export interface Given extends Pick<Ports, "clock" | "random"> {
+  genesis(): Extract<Input, { type: "genesis" }> | null;
+  state: Pick<StateView, "page">;
+  /** The scope's record: its reference, its head and the time of its previous entry. */
+  scope(): ScopeState | null;
+}
 export interface Wiring {
   ports?: Partial<Ports>; bounds?: Bounds; reads?: ReadBounds;
-  authority?: (given: Pick<Ports, "clock" | "random"> & { genesis(): Extract<Input, { type: "genesis" }> | null; state: Pick<StateView, "page"> }) => Authority;
+  authority?: (given: Given) => Authority;
+  readers?: (given: Given) => Readers;
+  sessions?: () => Sessions | null;
+  limits?: LimitConfig;
 }
 
 export class ScopeObject<Env = unknown> extends DurableObject<Env> {
@@ -55,6 +85,14 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
   readonly #deliveries: Deliveries;
   readonly #dispatcher: Dispatcher | null;
   readonly #operations: Operations;
+  readonly #clock: Clock;
+  readonly #transport: Transport | null;
+  readonly #seconds: number;
+  readonly #record: OperatorRecord;
+  readonly #streams: Streams;
+  readonly #limits: JoinLimits;
+  readonly #sessions: () => Sessions | null;
+  readonly #requests: SessionRequests;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -80,15 +118,28 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
       return input?.type === "genesis" ? input : null;
     };
     // A directory records its membership reference in an item, so the authority is also given the folded state (authority note, section 3.3).
-    const authority = wiring.authority?.({ clock: given.clock, random: given.random, genesis, state: store });
-    const ports: Ports = { ...given, alarm: wakes.deadline, ...(authority ? { authority } : {}) };
+    const made: Given = { clock: given.clock, random: given.random, genesis, state: store, scope: () => store.scope() };
+    const authority = wiring.authority?.(made);
+    const readers = wiring.readers?.(made);
+    const ports: Ports = { ...given, alarm: wakes.deadline, ...(authority ? { authority } : {}), ...(readers ? { readers } : {}) };
+    // The operator's record: two tables of this object's storage that are no part of the store, and that no judgment is given.
+    const record = new OperatorRecord({ exec: (query, ...bindings) => ctx.storage.sql.exec(query, ...bindings) }, ports.clock, () => store.scope()?.at ?? null);
     this.#name = isScopeId(name) ? name : null;
     this.#store = store;
     this.#scope = new Scope(this.#name, store, ports, bounds);
-    this.#reads = new Reads(store, () => this.#scope.pinned(), ports.readers, wiring.reads ?? READ_BOUNDS);
+    this.#reads = new Reads(store, () => this.#scope.pinned(), ports.readers, wiring.reads ?? READ_BOUNDS, record);
     this.#deliveries = new Deliveries(this.#name, this.#scope, store, ports, bounds);
     this.#dispatcher = given.transport ? new Dispatcher(this.#scope, store, { transport: given.transport, clock: ports.clock, capabilities: ports.capabilities }, wakes, bounds) : null;
-    this.#operations = new Operations(this.#scope, store, ports, wakes, bounds);
+    this.#operations = new Operations(this.#scope, store, ports, wakes, bounds, (operation, attempt, seq) => { record.found("outcome-conflict", [{ operation, attempt }, { entry: seq }]); });
+    this.#clock = ports.clock;
+    this.#transport = given.transport;
+    this.#seconds = bounds.dispatchSeconds;
+    this.#record = record;
+    this.#streams = new Streams(ports.readers, () => store.scope()?.head ?? null);
+    this.#limits = new JoinLimits(wiring.limits);
+    this.#sessions = wiring.sessions ?? (() => null);
+    // The session requests that this scope has answered, each until its `notAfter`: one more table that is no part of the store.
+    this.#requests = new SessionRequests({ exec: (query, ...bindings) => ctx.storage.sql.exec(query, ...bindings) });
   }
 
   /**
@@ -106,13 +157,35 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
    * alarm.
    */
   #sent<A>(answer: A): A {
+    this.#followed();
     if (this.#dispatcher) this.ctx.waitUntil(this.#dispatcher.run().catch(() => 0));
     this.ctx.waitUntil(this.#operations.run().catch(() => 0));
     return answer;
   }
 
+  /**
+   * What is no history follows the commits: the operator's record reads the entries that are new, from its own mark, and each open stream
+   * is sent the head. Neither can change an answer: a failure of either is dropped here. An entry that a pass in the background wrote is
+   * read at the next call.
+   */
+  #followed(): void {
+    try {
+      this.#record.follow(this.#store);
+      this.#streams.publish();
+    } catch { /* a notice or a stream line was lost, and no fact */ }
+  }
+
   async found(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions: readonly DeclaredDefinition[] = [], beside: Beside = {}): Promise<Founded> { return this.#sent(await this.#scope.found(founding, definition, definitions, beside)); }
-  async submit(signed: SignedIntent, grants: readonly Grant[], beside: Beside = {}): Promise<Answer> { return this.#sent(await this.#scope.submit(signed, grants, beside)); }
+  /**
+   * `address`: the caller's address as the Worker's route had it, or null. Only the serving limits of a join read it (`limits.ts`):
+   * at a membership scope a join is served through them, and no other act and no other scope is.
+   */
+  async submit(signed: SignedIntent, grants: readonly Grant[], beside: Beside = {}, address: unknown = null): Promise<Answer> {
+    const scope = this.#store.scope();
+    const judged = () => this.#scope.submit(signed, grants, beside);
+    if (scope?.at.kind !== "membership" || !isJoin(signed)) return this.#sent(await judged());
+    return this.#sent(await this.#limits.serve({ address: typeof address === "string" ? address : null, now: timeMs(this.#clock.read()) ?? 0, head: scope.head }, signed, judged));
+  }
   /** One step of a capability, asked for with the signed intent that it prepares for (section 5.5). */
   async prepare(signed: SignedIntent, grants: readonly Grant[], capability: string, step: string): Promise<Answer> { return this.#sent(await this.#scope.prepare(signed, grants, capability, step)); }
   settle(signed: SignedIntent): Settlement { return this.#scope.settle(signed); }
@@ -141,6 +214,24 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
    */
   observe(asked: unknown): unknown { return observedAt(this.#store, this.#scope.pinned(), asked); }
 
+  /**
+   * A read session, for a device that asks with a signed request (authority note, section 3.9). Only an active membership scope
+   * answers one, from its head and its own clock. It is an answer and no entry: nothing is written.
+   */
+  session(asked: unknown): SessionAnswer { return issueSession({ sessions: this.#sessions(), clock: this.#clock, requests: this.#requests }, this.#store, this.#scope.pinned(), asked); }
+  /** A stream of this scope's head, for a read session that may read the summary; or why none is opened (`sessions.ts`, `Streams`). */
+  stream(reader: unknown): Opened | StreamRefusal { return this.#streams.open(reader); }
+  /** The reader of the stream with that ID went away. Its subscription is released at once. */
+  release(id: unknown): void { this.#streams.release(id); }
+  /** The streams open now and the subscriptions released in this run, and the windows and waiting joins of the serving limits. Counts only. */
+  serving(): { streams: { open: number; released: number }; limits: { windows: number; waiting: number } } { return { streams: this.#streams.counts(), limits: this.#limits.counts() }; }
+  /**
+   * The operator's instruction to send one waiting request again, by its duty ID (authority note, section 12, G17; `operator.ts`).
+   * It has no route: who an operator is, and how one is authenticated, is the installation design's. It is reached over the
+   * namespace binding, as `dispatch` is.
+   */
+  resend(duty: unknown): Promise<Resent> { return sendAgain(this.#store, this.#transport, this.#clock, this.#record, duty, this.#seconds); }
+
   /** A dispatch pass now, or the one in flight. Resolves when it ends, with the number of dispatches and diagnoses it made. */
   dispatch(): Promise<number> { return this.#dispatcher ? this.#dispatcher.run() : Promise.resolve(0); }
   /** A pass of the operations driver now, or the one in flight. Resolves when it ends, with the number of requests it sent and outcomes it offered. */
@@ -150,6 +241,7 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
     await this.#scope.alarm();
     await this.dispatch();
     await this.effect();
+    this.#followed();
   }
 
   summary(reader: unknown): Read<Summary> { return this.#reads.summary(reader); }
@@ -162,4 +254,6 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
   operation(reader: unknown, operation: OperationId): Read<OperationStatus> { return this.#reads.operation(reader, operation); }
   log(reader: unknown, cursor?: Cursor): Read<LogPage> { return this.#reads.log(reader, cursor); }
   retained(reader: unknown, kind: RetainedInput["kind"], digest: Digest): Read<RetainedInput> { return this.#reads.retained(reader, kind, digest); }
+  incidents(reader: unknown, cursor?: Cursor): Read<readonly Incident[]> { return this.#reads.incidents(reader, cursor); }
+  waiting(reader: unknown, list: "diagnosed" | "unanswered", cursor?: Cursor): Read<readonly Duty[]> { return this.#reads.waiting(reader, list, cursor); }
 }

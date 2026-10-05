@@ -17,7 +17,7 @@
  * records, through the namespace. Five of its ports are not the production
  * ones, and each is labelled: the shared scripted clock, and transport that
  * a test can hold; the test readers,
- * a stand-in for read sessions, which are not built; the scripted peers,
+ * a stand-in for read sessions, until a test sets `platformNet.sessions`, and from then the real read sessions; the scripted peers,
  * a stand-in for a lane that sends a notice; and, while `platformNet.standIns`
  * is set, the platform package's STAND-IN rules for the three marks of
  * membership that have no rule yet.
@@ -29,8 +29,9 @@
 import { platform } from "@generalbusiness/artroom-platform";
 import { withStandIns } from "@generalbusiness/artroom-platform/testing";
 import { ScopeObject, type Wiring } from "../src/index.ts";
-import { codeLost, controls, net, netPorts, testPorts, testReaders } from "../src/testing.ts";
-import { DeployedScope, ScopeService, route, type Env } from "../src/worker.ts";
+import { sessionsOf, type LimitConfig } from "../src/index.ts";
+import { codeLost, controls, net, netPorts, testPorts } from "../src/testing.ts";
+import { DeployedScope, ScopeService, route, sessionWiring, type Env } from "../src/worker.ts";
 import { outsideOf, owners, wired } from "./outside.ts";
 
 export { ScopeObject };
@@ -62,8 +63,19 @@ export class NetScope extends DeployedScope<NetEnv> {
  * under the production wiring. `without`: the name of one stand-in rule
  * that is left out, for a version of membership that lacks one rule. Both
  * are read at each use.
+ *
+ * `sessions`: false, the readers port is the test readers, a STAND-IN that
+ * lets every reader read, so that a fixture can be built and looked at.
+ * True: it is the real read sessions of `sessions.ts`, as deployed. `secret`:
+ * the session secret of the test deployment, a TEST SECRET that the test
+ * generates. Null: none is bound, and the session configuration is read
+ * from the Worker's own bindings, exactly as deployed, which hold none here.
+ * Both are read at each use. `limits`: the serving limits of a join, read
+ * when a scope's object starts. Null: the proposed ones.
  */
-export const platformNet: { standIns: boolean; without: string | null } = { standIns: true, without: null };
+export const platformNet: { standIns: boolean; without: string | null; sessions: boolean; secret: string | null; limits: LimitConfig | null } = { standIns: true, without: null, sessions: false, secret: null, limits: null };
+/** The name of the test deployment, which a session's token names. */
+export const TEST_DEPLOYMENT = "artroom-scope-test";
 
 type PlatformEnv = Env & { PLATFORM: DurableObjectNamespace };
 
@@ -72,10 +84,18 @@ export class PlatformScope extends DeployedScope<PlatformEnv> {
   protected override wiring(name: string | undefined): Wiring {
     const deployed = super.wiring(name);
     const { resolver, definitions, transport } = deployed.ports as Required<NonNullable<Wiring["ports"]>>;
+    // With a test secret the session configuration is the test's. With none it is the deployed one, from this Worker's bindings.
+    const wired = sessionWiring(() => (platformNet.secret === null ? deployed.sessions!() : sessionsOf(platformNet.secret, TEST_DEPLOYMENT)));
     return {
       ...deployed,
+      sessions: wired.sessions,
+      readers: (given) => {
+        const real = wired.readers(given);
+        return { allows: (reader, read) => (platformNet.sessions ? real.allows(reader, read) : true) };
+      },
+      ...(platformNet.limits ? { limits: platformNet.limits } : {}),
       ports: {
-        ...deployed.ports, clock: net.clock, readers: testReaders,
+        ...deployed.ports, clock: net.clock,
         // Transport that a test can hold: a send that `net.hold` matches is not delivered, and its attempt gets no answer.
         transport: { send: (envelope) => (net.hold?.(envelope) ? Promise.resolve(null) : transport!.send(envelope)) },
         // A scripted peer: an entry that a test wrote by hand, for a lane that sends a notice. Every other entry is read from the real object.
