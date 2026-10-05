@@ -184,9 +184,8 @@ export class Reads {
    * that are not settled, which are the duties this scope still holds. The
    * cursor is the ID of the last operation of the page before.
    */
-  // I3 merge: the read's own name, `operations`, joins `ReadName` in `ports.ts`. Until then a reader who may read the outbox may read this (I3 deltas, entry EB9).
   operations(reader: unknown, cursor?: Cursor, open = false): Read<readonly OperationStatus[]> {
-    const read = this.#open(reader, "outbox");
+    const read = this.#open(reader, "operations");
     if (!("scope" in read)) return read;
     const at = cursor === undefined ? null : operationOf(cursor);
     if (cursor !== undefined && !at) return no("not-found");
@@ -196,7 +195,7 @@ export class Reads {
 
   /** One operation, by its ID. */
   operation(reader: unknown, operation: OperationId): Read<OperationStatus> {
-    const read = this.#open(reader, "outbox");
+    const read = this.#open(reader, "operations");
     if (!("scope" in read)) return read;
     const found = operationOf(operation) ? this.#store.operationStatus(operation) : null;
     return found ? { ok: true, at: read.scope.head, value: found, complete: true } : no("not-found");

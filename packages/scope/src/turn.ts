@@ -130,13 +130,13 @@ const FOREVER = "9999-12-31T23:59:59Z";
 export class Turns {
   readonly #queue = new Queue();
   readonly #store: Store;
-  readonly #ports: Pick<Ports, "clock" | "rules" | "alarm">;
+  readonly #ports: Pick<Ports, "clock" | "rules" | "alarm" | "owners">;
   readonly #bounds: Bounds;
   readonly #pinned: PinnedDefinition;
   readonly #lacks: (kind: string) => boolean;
 
   /** `lacks`: true for the kind of an entry that this runtime cannot derive under the pinned definition (section 6.1). */
-  constructor(store: Store, ports: Pick<Ports, "clock" | "rules" | "alarm">, bounds: Bounds, pinned: PinnedDefinition, lacks: (kind: string) => boolean) {
+  constructor(store: Store, ports: Pick<Ports, "clock" | "rules" | "alarm" | "owners">, bounds: Bounds, pinned: PinnedDefinition, lacks: (kind: string) => boolean) {
     this.#store = store;
     this.#ports = ports;
     this.#bounds = bounds;
@@ -287,7 +287,7 @@ export class Turns {
         // Section 9.2: an entry that admits duties is kept only if every admitted duty still has room to settle. The count is of
         // the state the fold just wrote, so it is under the head check, and a verifier derives the same number. Section 17.3: an
         // entry that settles what its form declares is written against its own duty's reservation, and is not asked.
-        if (!fits(this.#store, definition, this.#bounds, sealed.entry.input, verdict.draft.settles)) {
+        if (!fits(this.#store, definition, this.#bounds, sealed.entry.input, verdict.draft.settles, this.#ports.owners)) {
           refuse(() => verdict.full(head ?? { seq: sealed.entry.seq, hash: sealed.hash }));
           throw new Full();
         }

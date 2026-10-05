@@ -38,7 +38,7 @@ import { isOperationId } from "@generalbusiness/artroom-bytes";
 import { settleOutcome, timeMs, timeOf, type Owners } from "@generalbusiness/artroom-derive";
 import type { Scope } from "./core.ts";
 import type { Wakes } from "./outbox.ts";
-import type { Clock } from "./ports.ts";
+import type { Clock, Ports } from "./ports.ts";
 import type { Sealed, Sending, Store } from "./store.ts";
 import { LATE, within } from "./turn.ts";
 
@@ -96,7 +96,8 @@ export interface Outside {
  * The production default: it sends nothing. So no attempt is sent. Each
  * stays recorded and not sent, with no outcome: its operation reads
  * `pending`, it keeps its reservation, and the driver asks for no wake-up on
- * its account. A host port replaces this (plan step 19).
+ * its account. A host port replaces this (plan step 19). It is the `outside`
+ * of `production()` in `ports.ts`.
  */
 export const NO_OUTSIDE: Outside = { accepts: () => false, send: () => Promise.resolve(null) };
 
@@ -127,7 +128,7 @@ export class Operations {
   #again = false;
 
   /** `owners`: the rules of the owners this runtime has code for. With none, no outcome can be judged, so nothing is sent. */
-  constructor(scope: Scope, store: Store, ports: { outside: Outside; clock: Clock; owners?: Owners | null }, wakes: Wakes, bounds: Bounds) {
+  constructor(scope: Scope, store: Store, ports: Pick<Ports, "outside" | "clock" | "owners">, wakes: Wakes, bounds: Bounds) {
     this.#scope = scope;
     this.#store = store;
     this.#outside = ports.outside;

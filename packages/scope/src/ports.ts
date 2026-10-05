@@ -3,15 +3,17 @@
  * storage, each as one narrow interface. `production()` gives the defaults.
  * A default that would decide something for another owner refuses: no grant
  * is read, no foreign entry can be read, no declared definition can be read
- * and no reader may read, and no sent text can be read. Transport, the dispatcher and the authority note's
+ * and no reader may read, no sent text can be read, and nothing is sent
+ * outside the service. Transport, the dispatcher and the authority note's
  * rules replace them, each behind its own port. The platform definitions
  * are the platform package's, which is code of this runtime.
  */
 
 import type { Digest, Entry, FactRef, Grant, PlatformDefinition, Prepared, RoutingRefusal, ScopeRef, SignedIntent, Timestamp, UnavailableReason } from "@generalbusiness/artroom-contract";
-import { timeOf, type Capabilities, type Clock as Reading, type Delivered, type Presented, type RuleInput, type StateView } from "@generalbusiness/artroom-derive";
+import { timeOf, type Capabilities, type Clock as Reading, type Delivered, type Owners, type Presented, type RuleInput, type StateView } from "@generalbusiness/artroom-derive";
 import { evaluateRules } from "@generalbusiness/artroom-derive/rule";
 import { platform, type Platform } from "@generalbusiness/artroom-platform";
+import { NO_OUTSIDE, type Outside } from "./operations.ts";
 
 /** One reading for each call (section 5.3). The core calls it once in a step 3 and once in a commit. */
 export interface Clock { read(): Timestamp }
@@ -146,7 +148,8 @@ export interface SentTexts { read(from: FactRef, digest: Digest): Promise<TextRe
 
 /** The reads of section 9.1. */
 /** `log` and `retained` are what a verifier reads (sections 9.2 and 9.4): the stored bytes of entries, and retained inputs. */
-export type ReadName = "summary" | "items" | "history" | "entry" | "outbox" | "log" | "retained";
+/** `operations` is the read of a scope's outside operations, which the contract does not list (I3 deltas, entry EB9). */
+export type ReadName = "summary" | "items" | "history" | "entry" | "outbox" | "operations" | "log" | "retained";
 
 /** Who may read. `reader` is whatever the caller presented; sessions are the authority note's. */
 export interface Readers { allows(reader: unknown, read: ReadName): boolean }
@@ -165,6 +168,15 @@ export interface Ports {
    * `unsupported-definition`.
    */
   capabilities: Capabilities | null;
+  /** The port for effects outside the service: one request of one attempt of an operation (`operations.ts`; section 4.3). */
+  outside: Outside;
+  /**
+   * The rules of the owners of outside operations that this runtime has
+   * code for (section 4.3; derive's `Owners`): a capability version or a
+   * platform definition, by the kind of operation. Null: it has none. Then
+   * no outcome is judged, and no attempt is sent.
+   */
+  owners: Owners | null;
 }
 
 /**
@@ -182,7 +194,9 @@ const NO_GRANT: Standing = { held: () => [] };
  * namespace supplies the scope that retains it. The platform definitions
  * are the platform package's. There is no code for any capability form:
  * the records, guards and effects of `hold@1`, and `git-read@1`, are not
- * delivered yet. Every other port refuses.
+ * delivered yet. Nothing is sent outside the service, and no owner of an
+ * outside operation has rules: a host port and the owners' rules replace
+ * them (plan steps 19 and 16). Every other port refuses.
  */
 export function production(): Ports {
   return {
@@ -199,5 +213,7 @@ export function production(): Ports {
     readers: { allows: () => false },
     transport: null,
     capabilities: null,
+    outside: NO_OUTSIDE,
+    owners: null,
   };
 }

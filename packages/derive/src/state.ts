@@ -88,9 +88,15 @@ export interface Operation {
  * `delivery-unavailable` diagnosis and no result. Of the operations that are
  * not settled (`pendingOf`, in `ledger.ts`): `opened`, attempts with no
  * outcome; `unknown`, attempts whose latest outcome is `unknown`; and
- * `unopened`, attempts that may still be opened.
+ * `unopened`, attempts that may still be opened. `outcomes`: for each owner
+ * and kind of those operations, in no stated order, the outcome entries
+ * that they may still write: 2 for each attempt that is opened or may be,
+ * and 1 for each that is `unknown`.
  */
-export interface Outstanding { requests: number; unavailable: number; opened: number; unknown: number; unopened: number }
+export interface Outstanding {
+  requests: number; unavailable: number; opened: number; unknown: number; unopened: number;
+  outcomes: readonly { owner: CapabilityName | PlatformDefinition; kind: string; entries: number }[];
+}
 
 /** Items in ascending ID order. `more`: the page stopped at its limit and at least one further item follows. */
 export interface Page { items: readonly Item[]; more: boolean }
@@ -247,11 +253,19 @@ export class MemoryState implements StateWriter {
   texts(item: number, slot: string) { return this.#texts.get(key(item, slot))?.[2] ?? []; }
   outstanding(): Outstanding {
     const open = [...this.#requests.values()].filter((r) => r.result === null);
-    const pending = [...this.#operations.values()].map(pendingOf);
+    const operations = [...this.#operations.values()];
+    const pending = operations.map(pendingOf);
     const sum = (of: (p: ReturnType<typeof pendingOf>) => number) => pending.reduce((n, p) => n + of(p), 0);
+    const outcomes = new Map<string, Outstanding["outcomes"][number]>();
+    operations.forEach(({ owner, kind }, i) => {
+      const entries = 2 * (pending[i]!.opened + pending[i]!.unopened) + pending[i]!.unknown;
+      const at = key(owner, kind);
+      if (entries > 0) outcomes.set(at, { owner, kind, entries: (outcomes.get(at)?.entries ?? 0) + entries });
+    });
     return {
       requests: open.filter((r) => r.diagnosis === null).length, unavailable: open.filter((r) => r.diagnosis?.finding === "delivery-unavailable").length,
       opened: sum((p) => p.opened), unknown: sum((p) => p.unknown), unopened: sum((p) => p.unopened),
+      outcomes: [...outcomes.values()],
     };
   }
 

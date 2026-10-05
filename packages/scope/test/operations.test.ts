@@ -4,7 +4,7 @@ import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { OperationId, Read } from "@generalbusiness/artroom-contract";
 import { checkpointOf, operationId, operationOpening, timeMs, type Opening } from "@generalbusiness/artroom-derive";
 import { SqliteStore, Turns, Wakes, production, type EffectAnswer, type OperationStatus, type OutcomeRecorded } from "../src/index.ts";
-import { outsideOf, pushOf, type OutsideDouble } from "./outside.ts";
+import { outsideOf, owners, pushOf, type OutsideDouble } from "./outside.ts";
 import { START, at, definition, found, reader, rita, type Lane } from "./support.ts";
 
 /** The delay before the second attempt of an operation. */
@@ -24,7 +24,7 @@ function open(s: Lane, ...opens: Opening[]): Promise<OperationId[] | "scope-full
   return s.inside(async (state) => {
     const store = new SqliteStore({ exec: (query, ...bindings) => state.storage.sql.exec(query, ...bindings), transaction: (closure) => state.storage.transactionSync(closure) });
     const wakes = new Wakes(store, { set: (time) => (time === null ? state.storage.deleteAlarm() : state.storage.setAlarm(timeMs(time)!)) }, false);
-    const turns = new Turns(store, { clock: s.c.clock, rules: production().rules, alarm: wakes.deadline }, s.c.bounds, () => definition, () => false);
+    const turns = new Turns(store, { clock: s.c.clock, rules: production().rules, alarm: wakes.deadline, owners }, s.c.bounds, () => definition, () => false);
     const end = await turns.run<OperationId[] | "scope-full">({
       asks: () => [],
       judge: (view) => ({

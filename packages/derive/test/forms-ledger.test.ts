@@ -15,7 +15,8 @@ import { Scope, t, ticketDefinition } from "./fixtures.ts";
  */
 const again = { retries: () => true };
 const kinds: Record<string, OperationRules> = {
-  create: { selects: true, read: false, ...again, derives: (_view, _operation, _outcome, selected) => ({ effects: [], sends: [], opens: selected === false ? [{ owner: "hold@1", kind: "delete", attempts: 3 }] : [] }) },
+  // The closure of one outcome entry of a create: the deletion that it may open, which reserves 2 entries for each of its 3 attempts.
+  create: { selects: true, read: false, ...again, closure: 6, derives: (_view, _operation, _outcome, selected) => ({ effects: [], sends: [], opens: selected === false ? [{ owner: "hold@1", kind: "delete", attempts: 3 }] : [] }) },
   delete: { selects: false, read: false, ...again },
   mint: { selects: false, read: false, retries: () => false },
   push: { selects: false, read: true, ...again },
@@ -45,8 +46,8 @@ function answer(s: Scope, operation: OperationId, attempt: number, result: "conf
 }
 /** Each attempt's outcomes in order, with `selected` where it is not null. */
 const shape = (s: Scope, id: OperationId) => s.state.operation(id)!.attempts.map((a) => a.outcomes.map((o) => (o.selected === null ? o.result : `${o.result}, selected ${o.selected}`)));
-/** The entries that the pending duties reserve. */
-const reserved = (s: Scope) => owed(s.state, ticketDefinition, s.last.input);
+/** The entries that the pending duties reserve, with the closures that the made-up owners declare. */
+const reserved = (s: Scope, given: Owners | null = owners) => owed(s.state, ticketDefinition, s.last.input, given);
 /** The last entry with one effect changed, folded into a copy of the state before it. */
 function forged(s: Scope, change: (entry: Entry) => Entry): () => void {
   const entry = change(s.last);
@@ -58,15 +59,19 @@ describe("the ledger of outside effects (scope contract, section 4.3; authority 
     const s = new Scope(ticketDefinition);
     const free = reserved(s);
     const [op] = open(s, create) as [OperationId];
-    // Entry 2 opened the operation at its ordinal 0, with attempt 1, and reserved two entries for each of its three attempts.
-    expect([op, s.last.effects, reserved(s) - free]).toEqual(["2:0", [{ effect: "operation", k: 0, owner: "hold@1", kind: "create", attempts: 3 }, { effect: "attempt", operation: { k: 0 }, attempt: 1, result: "opened", selected: null }], 6]);
+    // Entry 2 opened the operation at its ordinal 0, with attempt 1, and reserved two entries for each of its three attempts. With each
+    // of those six outcome entries it reserved the closure that its owner declares, 6: 42 in all. With no owner rules, the 6 alone.
+    expect([op, s.last.effects, reserved(s) - free, reserved(s, null) - reserved(new Scope(ticketDefinition), null)]).toEqual(["2:0", [{ effect: "operation", k: 0, owner: "hold@1", kind: "create", attempts: 3 }, { effect: "attempt", operation: { k: 0 }, attempt: 1, result: "opened", selected: null }], 42, 6]);
 
     // A listing is no decisive read for a create (rule 3). Attempt 1 is unknown, and its entry opens attempt 2. Attempt 2 is confirmed, and is selected.
     expect(answer(s, op, 1, "confirmed", "read", { listed: "A" })).toBe("a read is not decisive for that kind of operation");
     expect([answer(s, op, 1, "unknown"), s.last.effects.length, answer(s, op, 2, "confirmed", "own-answer", { repository: "B" })]).toEqual(["write", 2, "write"]);
     expect([shape(s, op), s.state.operation(op)!.selected, operationStanding(s.state.operation(op)!)]).toEqual([[["unknown"], ["confirmed, selected true"]], 2, "unknown"]);
-    // What stays reserved is the late answer of attempt 1: nothing more is opened after a selection.
-    expect(reserved(s) - free).toBe(1);
+    // What stays reserved is the late answer of attempt 1, with its closure: nothing more is opened after a selection.
+    expect(reserved(s) - free).toBe(7);
+    // An owner whose outcome would open more than the closure it declared writes nothing: an outcome entry is never asked whether it fits.
+    const short: Owners = { rules: (owner, kind) => (kind === "create" ? { ...kinds["create"]!, closure: 5 } : owners.rules(owner, kind)) };
+    expect([answer(s, op, 1, "confirmed", "own-answer", { repository: "A" }, short), s.head.seq]).toEqual(["unavailable", 4]);
     s.now = t(-5);
     // The late answer, written clamped while the clock is behind: an outcome judges no time. It is not selected, and its owner opens a deletion.
     expect([answer(s, op, 1, "confirmed", "own-answer", { repository: "A" }), s.last.clamped]).toEqual(["write", true]);
@@ -75,6 +80,8 @@ describe("the ledger of outside effects (scope contract, section 4.3; authority 
       { effect: "attempt", operation: op, attempt: 1, result: "confirmed", selected: false },
       { effect: "operation", k: 0, owner: "hold@1", kind: "delete", attempts: 3 }, { effect: "attempt", operation: { k: 0 }, attempt: 1, result: "opened", selected: null },
     ]);
+    // The deletion's six entries were reserved as that closure: the entry that opened it used one of the seven, and reserves no more than the rest.
+    expect(reserved(s) - free).toBe(6);
     // A second selection is no state: the fold refuses this entry if it records one.
     expect(forged(s, (e) => ({ ...e, effects: [{ effect: "attempt", operation: op, attempt: 1, result: "confirmed", selected: true }, ...e.effects.slice(1)] }))).toThrow(FoldError);
     // The `unknown` entry stays as written, and the selection did not move. The operation is settled.

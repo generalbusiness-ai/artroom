@@ -174,9 +174,12 @@ export class SqliteStore implements Store {
   outstanding(): Outstanding {
     const open = this.#one("SELECT COALESCE(SUM(diagnosis IS NULL), 0) AS requests, COALESCE(SUM(diagnosis LIKE '%\"delivery-unavailable\"%'), 0) AS unavailable FROM outbox WHERE request IS NOT NULL AND result IS NULL")!;
     const pending = this.#one(`SELECT COALESCE(SUM(opened), 0) AS opened, COALESCE(SUM(unknown), 0) AS unknown, COALESCE(SUM(unopened), 0) AS unopened FROM operation WHERE ${OPEN}`)!;
+    // The outcome entries that the open operations may still write, by owner and kind: an owner declares a closure for each (derive's `owed`).
+    const outcomes = this.#all(`SELECT json_extract(value, '$.owner') AS owner, json_extract(value, '$.kind') AS kind, SUM(2 * (opened + unopened) + unknown) AS entries FROM operation WHERE ${OPEN} GROUP BY 1, 2`)
+      .map((row) => ({ owner: row["owner"] as Outstanding["outcomes"][number]["owner"], kind: row["kind"] as string, entries: row["entries"] as number }));
     return {
       requests: open["requests"] as number, unavailable: open["unavailable"] as number,
-      opened: pending["opened"] as number, unknown: pending["unknown"] as number, unopened: pending["unopened"] as number,
+      opened: pending["opened"] as number, unknown: pending["unknown"] as number, unopened: pending["unopened"] as number, outcomes,
     };
   }
 

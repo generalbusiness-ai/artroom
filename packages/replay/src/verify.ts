@@ -33,7 +33,7 @@ import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { Bounds, Digest, Entry, FactRef, Head, PlatformDefinition, Report, RetainedInput, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
 import { canonicalize, definitionDigest, digestBytes, isDigest, isEntry, parseStrict, scopeIdOf, textDigest, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import {
-  MemoryState, applyEntry, clockOf, entryOf, inputTexts, isFactRef, isLocalId, isObject, isScopeRef, judgeAct, judgeCheckpoint, judgeDelivery, judgeDiagnosis, judgeGenesis, judgeOutcome, judgeTimed,
+  MemoryState, applyEntry, clockOf, entryOf, inputTexts, isFactRef, isLocalId, isObject, isScopeRef, judgeAct, judgeCheckpoint, judgeDelivery, judgeDiagnosis, judgeGenesis, judgeTimed,
   nextDue, timeMs, updateOf, validateDefinition,
 } from "@generalbusiness/artroom-derive";
 import type { ActJudgment, Capabilities, Clock, Fetched, Judgment, TimedJudgment, ValidDefinition } from "@generalbusiness/artroom-derive";
@@ -635,9 +635,11 @@ class Verifier {
         // The contract does not name this entry for a verifier without preparation rules: recorded as I3 delta E13.
         throw new Stop("unsupported-definition", `entry ${entry.seq} is a preparation, and this replay has no rules for one`, where);
       case "outcome":
-        this.#trusts.add("outcomes");
-        judged = judgeOutcome(state, definition, input, { clock, bounds });
-        break;
+        // Section 9.3, point E13, and section 9.4: an outcome entry of an operation whose rules the verifier does not derive is
+        // `unsupported-definition` at that entry, and never `consistent`. This verifier is given the rules of no owner, so it
+        // derives the outcome of no operation.
+        // I3 merge: step 22 gives the verifier the owners' rules, and judges an outcome that has them with `judgeOutcome`.
+        throw new Stop("unsupported-definition", `entry ${entry.seq} is an outcome, and this replay has no rules of the owner of its operation`, where);
       case "checkpoint":
         // Checked against the fold through that sequence. It is never taken as proof of the prefix (section 9.2).
         judged = judgeCheckpoint(state, definition, { through: input.through, state: input.state }, { clock, bounds });

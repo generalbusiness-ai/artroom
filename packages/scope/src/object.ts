@@ -14,8 +14,8 @@
  * With none, as this class is by default, its sends stay in the outbox.
  *
  * The operations driver runs at the same two moments (`operations.ts`). By
- * default nothing is sent outside the service: the outside port sends
- * nothing, and there are no owner rules.
+ * default nothing is sent outside the service: the outside port of
+ * `production()` sends nothing, and there are no owner rules.
  */
 
 import { DurableObject } from "cloudflare:workers";
@@ -23,24 +23,19 @@ import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { Answer, Beside, Bounds, Cursor, DeclaredDefinition, Digest, DutyId, Grant, LogPage, OperationId, PlatformDefinition, Read, RetainedInput, ScopeId, Settlement, SignedIntent } from "@generalbusiness/artroom-contract";
 import { isScopeId } from "@generalbusiness/artroom-bytes";
 import { timeMs, type Item } from "@generalbusiness/artroom-derive";
-import type { Delivered, Owners } from "@generalbusiness/artroom-derive";
+import type { Delivered } from "@generalbusiness/artroom-derive";
 import { Scope, type Checkpointed, type Founded } from "./core.ts";
 import { Deliveries } from "./delivery.ts";
 import { declaredBy, routed, sentText, sourced, type Sourced } from "./namespace.ts";
-import { NO_OUTSIDE, Operations, type Outside } from "./operations.ts";
+import { Operations } from "./operations.ts";
 import { Dispatcher, Wakes } from "./outbox.ts";
 import { production, type Alarm, type Delivery, type Ports } from "./ports.ts";
 import { READ_BOUNDS, Reads, type ReadBounds, type Summary } from "./reads.ts";
 import { SqliteStore } from "./sqlite.ts";
 import type { Duty, OperationStatus, Sealed } from "./store.ts";
 
-/**
- * What a deployment gives a scope in place of a default. `outside`: the port
- * for effects outside the service. `owners`: the rules of the owners of
- * outside operations that this runtime has code for.
- */
-// I3 merge: `outside` and `owners` belong in `Ports` and `production()` (`ports.ts`), beside `capabilities`. They are here because step 3 owns that file.
-export interface Wiring { ports?: Partial<Ports>; bounds?: Bounds; reads?: ReadBounds; outside?: Outside; owners?: Owners | null }
+/** What a deployment gives a scope in place of a default. */
+export interface Wiring { ports?: Partial<Ports>; bounds?: Bounds; reads?: ReadBounds }
 
 export class ScopeObject<Env = unknown> extends DurableObject<Env> {
   readonly #name: ScopeId | null;
@@ -75,7 +70,7 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
     this.#reads = new Reads(store, () => this.#scope.pinned(), ports.readers, wiring.reads ?? READ_BOUNDS);
     this.#deliveries = new Deliveries(this.#name, this.#scope, store, ports, bounds);
     this.#dispatcher = given.transport ? new Dispatcher(this.#scope, store, { transport: given.transport, clock: ports.clock, capabilities: ports.capabilities }, wakes, bounds) : null;
-    this.#operations = new Operations(this.#scope, store, { outside: wiring.outside ?? NO_OUTSIDE, clock: ports.clock, owners: wiring.owners ?? null }, wakes, bounds);
+    this.#operations = new Operations(this.#scope, store, ports, wakes, bounds);
   }
 
   /**

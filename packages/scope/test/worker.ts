@@ -23,7 +23,7 @@ export { ScopeObject };
 export class TestScope extends ScopeObject {
   protected override wiring(name: string | undefined): Wiring {
     const c = controls(name ?? "");
-    return { ports: testPorts(c), bounds: c.bounds, reads: c.reads, outside: outsideOf(name ?? ""), owners };
+    return { ports: { ...testPorts(c), outside: outsideOf(name ?? ""), owners }, bounds: c.bounds, reads: c.reads };
   }
 }
 

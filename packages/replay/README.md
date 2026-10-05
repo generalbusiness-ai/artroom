@@ -116,7 +116,7 @@ service being checked.
 | `mismatch` | An entry is not what its bytes, its chain, its signature or its replay say; or a reference names another entry, incarnation or kind than its source scope has; or the history does not reach or match the known head. `at` names the entry. |
 | `missing-dependency` | A source history cannot be read, or does not reach the entry a reference names, and no anchor names it. `at` names the entry that used it. |
 | `incomplete` | A retained input is missing or is not the bytes its digest names; or a detached text is gone and no later entry redacts it; or a limit was reached. |
-| `unsupported-definition` | The scope pins a platform definition, or a declaration that does not pass validation under the bounds given, or a declaration that needs a capability version the caller gave no rules for. `at` names the genesis. |
+| `unsupported-definition` | The scope pins a platform definition, or a declaration that does not pass validation under the bounds given, or a declaration that needs a capability version the caller gave no rules for. `at` names the genesis. Also a `preparation` entry or an `outcome` entry: this replay has no rules for either yet, and `at` names that entry. |
 
 The check stops at the first finding. The report's coverage lists, for each
 scope, the entries that were checked to their end, with every fact they

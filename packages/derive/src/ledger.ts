@@ -52,10 +52,31 @@ export interface OperationRules {
   wellFormed?(result: Result, evidence: Evidence): boolean;
   /** What the outcome derives beside the ledger's records. Absent: nothing. */
   derives?(view: StateView, operation: Operation, outcome: OutcomeInput, selected: boolean | null): OutcomeDerived;
+  /**
+   * Section 17.2, row 5: the owner declares what the outcomes of an
+   * operation derive. This is the most entries that the operations which one
+   * outcome entry of this kind opens, such as a cleanup, reserve, with their
+   * own closures (`reservedBy`). Each outcome entry that the operation may
+   * still write reserves it (`owed`, in `reserve.ts`), and an outcome that
+   * would open more writes nothing. Absent: 0, and an outcome opens none.
+   * It counts entries only: the other dimensions of section 17.1 are request
+   * `cc570904`'s.
+   */
+  closure?: number;
 }
 
 /** The rules of the owners that a runtime or a verifier has code for. Null: none for that owner and kind. */
 export interface Owners { rules(owner: Owner, kind: string): OperationRules | null }
+
+/** The closure that the owner declares for one outcome entry of that kind of operation (section 17.2, row 5). With no rules, no outcome is judged, so none derives anything. */
+export const closureOf = (owners: Owners | null | undefined, owner: Owner, kind: string): number => owners?.rules(owner, kind)?.closure ?? 0;
+
+/**
+ * The entries that one opening reserves when its entry is folded (section
+ * 17.2, row 5): for each attempt it states, its first outcome and its late
+ * answer, and with each of those the closure that its owner declares.
+ */
+export const reservedBy = (open: Opening, owners: Owners | null | undefined): number => 2 * open.attempts * (1 + closureOf(owners, open.owner, open.kind));
 
 /**
  * The effects that open one operation in the entry being derived, at its
@@ -67,6 +88,8 @@ export interface Owners { rules(owner: Owner, kind: string): OperationRules | nu
  * Section 5.8: the entry that opens an operation reserves for every attempt
  * it states, so the number is fixed here and never raised.
  */
+// I3 merge: no judge calls this yet, but the one of an outcome, for what its owner opens. The capability rules, a preparation and
+// the platform rules open their operations with it, each in its own step.
 export function operationOpening(k: number, open: Opening, held = false): Effect[] {
   if (!Number.isSafeInteger(open.attempts) || open.attempts < 1) throw new Error("an operation states at least one attempt");
   const operation: Effect = { effect: "operation", k, owner: open.owner, kind: open.kind, attempts: open.attempts };
@@ -78,6 +101,8 @@ export function operationOpening(k: number, open: Opening, held = false): Effect
  * holds, opened by the entry that records the confirmation. `genesis` is the
  * scope's entry 0.
  */
+// I3 merge: the judge of a confirmation does not call this yet. No genesis can declare an operation until an owner's rules exist,
+// so the call has no witness. It comes with the first definition whose genesis opens one (plan step 9b; I3 deltas, entry EB12).
 export function heldOpenings(view: StateView, genesis: Entry): Effect[] {
   return genesis.effects.flatMap((effect): Effect[] => {
     if (effect.effect !== "operation") return [];
@@ -252,6 +277,10 @@ export function outcomeOf(view: StateView, outcome: OutcomeInput, owners: Owners
   const last = attempt.attempt === operation.attempts.length;
   const next = result !== "confirmed" && last && operation.attempts.length < operation.most && operation.selected === null && rules.retries(result, operation);
   const derived = rules.derives?.(view, operation, outcome, selected) ?? { effects: [], sends: [], opens: [] };
+  // Section 17.2, row 5: an outcome entry is never asked whether it fits (section 17.3), so what it opens was reserved with its own
+  // operation, as the closure that the owner declares. An owner whose outcome would open more has broken its own declaration:
+  // fail closed, and nothing is written.
+  if (derived.opens.reduce((entries, open) => entries + reservedBy(open, owners), 0) > (rules.closure ?? 0)) return { result: "unavailable", reason: "unavailable" };
   const effects: Effect[] = [
     { effect: "attempt", operation: operation.id, attempt: attempt.attempt, result, selected },
     ...(next ? [{ effect: "attempt", operation: operation.id, attempt: attempt.attempt + 1, result: "opened", selected: null } as const] : []),
