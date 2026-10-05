@@ -80,8 +80,10 @@ export function ownersOf(definition: ValidDefinition, platform: PlatformRules | 
  * An operation that the outcome opens is stated in `opens`, with an owner
  * and a kind that `outcomes` lists. The ledger numbers it, so the effects
  * hold no `operation` and no `attempt`. A creation is not among the
- * requests: no cause is defined for a scope that an outcome entry creates
- * (the authority note's row P2, the fourth cause, which no source builds).
+ * requests: this judge lets no rule send a creation yet. The fourth cause,
+ * for a scope that an outcome entry creates (the authority note's row P2),
+ * is built: a child's genesis checks it (`genesis.ts`, `openerOf`). Only the
+ * sending side waits (I3 deltas note, entry EP1).
  */
 function given(mark: Mark, j: Judging, kinds: Readonly<Record<string, Mark>>, gives: OutcomeGives): OutcomeDerived {
   if (!isObject(gives) || !Array.isArray(gives.effects) || !Array.isArray(gives.sends) || !Array.isArray(gives.opens)) throw outside(mark, "no effects, requests and openings");
