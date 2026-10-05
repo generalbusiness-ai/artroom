@@ -16,7 +16,7 @@ import { capabilityEffect } from "./capability.ts";
 import { isEntryOf, isLocalFact } from "./fields.ts";
 import { changeItem, newItem, type ItemEffect } from "./fold.ts";
 import { judgeGuards, members, readsUnbound, slotOf, type Judging } from "./guards.ts";
-import { deriveHold, endsUnder } from "./hold.ts";
+import { deriveHold, endsUnder, type HoldEffect } from "./hold.ts";
 import { bindEach, covered, typeOfElement } from "./lists.ts";
 import { kindOf, operand } from "./operand.ts";
 import type { Item } from "./state.ts";
@@ -292,6 +292,15 @@ export function deriveEffects(j: Judging, forms: readonly EffectForm[], attentio
   for (const { subject, effect } of endsUnder(j, working)) {
     if (subject === null) effects.push(effect);
     else apply(subject, effect);
+  }
+  // Authority note, section 5.7, "What is derived, and at which entry": when the definition's holds have a workspace, the code of
+  // `hold@1` derives the fork, the instance and the token records of each `hold` effect of this entry, and the operations they
+  // open. It runs after the entry's declared effects and the ends, over the state before the entry. It refuses nothing. With rules
+  // that have no such code, as with none, the entry holds the item form only.
+  const holds = effects.filter((effect): effect is HoldEffect => effect.effect === "hold");
+  if (holds.length > 0 && j.capabilities?.workspace) {
+    const k = effects.filter((effect) => effect.effect === "operation").length;
+    effects.push(...j.capabilities.workspace(j.view, j.definition, j.self, k, holds, (id) => [...working.values()].find((held) => held.id === id) ?? null));
   }
 
   if (opens !== null) {

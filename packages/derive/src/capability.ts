@@ -21,7 +21,8 @@ import type { GuardResult, Judging } from "./guards.ts";
 import type { Underived } from "./validate/capability.ts";
 import { bindEach, covered } from "./lists.ts";
 import { operand, slotOf } from "./operand.ts";
-import type { Item } from "./state.ts";
+import type { HoldEffect } from "./hold.ts";
+import type { Item, StateView } from "./state.ts";
 import type { ValidDefinition } from "./validate/index.ts";
 import { own } from "./values.ts";
 
@@ -67,6 +68,16 @@ export interface Capabilities {
   guard(capability: CapabilityName, guard: string, args: Readonly<Record<string, unknown>>, given: CapabilityGiven): true | string;
   /** One effect: the records it changes, in order. */
   effect(capability: CapabilityName, effect: string, args: Readonly<Record<string, unknown>>, given: CapabilityGiven): readonly Recorded[];
+  /**
+   * What an entry with `hold` effects also derives when the definition's
+   * holds have a workspace (authority note, section 5.7, "What is derived,
+   * and at which entry"): `workspaceEffects` of `capability/hold.ts`.
+   * `holds` are the entry's `hold` effects, `working` gives an item as the
+   * entry's effects left it, and `k` is the ordinal of the first operation
+   * that the entry has not opened. Absent: these rules have no such code,
+   * and an entry holds the item form only.
+   */
+  workspace?(view: StateView, definition: ValidDefinition, self: number, k: number, holds: readonly HoldEffect[], working: (id: number) => Item | null): readonly Effect[];
 }
 
 const given = ({ view, definition, scope, self, kind, fields, signer, intent, facts, source, own, clock }: Judging): CapabilityGiven => ({ view, definition, scope, self, kind, fields, signer, intent, facts, source, own, clock });

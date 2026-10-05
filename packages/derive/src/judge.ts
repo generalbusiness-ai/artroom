@@ -214,8 +214,13 @@ export function judgeAct(view: StateView, definition: ValidDefinition, signed: S
  * rule; the reading is not earlier than the deadline; and no transition
  * earlier in the order is due. Others may be due later in the order; they
  * stay due. A timed entry judges time, so it is never clamped (section 5.3).
+ *
+ * `capabilities`: the rules that derive what a hold's expiry does to its
+ * workspace (authority note, section 5.7, the row "Expiry"). A timed entry
+ * has no signer, and these effects need none. A timed rule writes no
+ * capability form, so nothing else of the rules is asked.
  */
-export function judgeTimed(view: StateView, definition: ValidDefinition, selected: Due, context: Pick<JudgeContext, "clock" | "bounds">): TimedJudgment {
+export function judgeTimed(view: StateView, definition: ValidDefinition, selected: Due, context: Pick<JudgeContext, "clock" | "bounds" | "capabilities">): TimedJudgment {
   const { clock, bounds } = context;
   const scope = view.scope();
   const rule = own(definition.declared.timed, selected.rule);
@@ -226,7 +231,7 @@ export function judgeTimed(view: StateView, definition: ValidDefinition, selecte
   const next = nextDue(view, definition, clock.reading);
   if (next?.item !== selected.item || next.rule !== selected.rule) return { result: "dropped", failed: "next" };
 
-  const j: Judging = { view, definition, bounds, clock, scope, self: scope.head.seq + 1, kind: selected.rule, fields: {}, fieldTypes: {}, subjects: new Map([["on", item]]), signer: null, facts: new Map(), prepared: [], used: [] };
+  const j: Judging = { view, definition, bounds, clock, scope, self: scope.head.seq + 1, kind: selected.rule, fields: {}, fieldTypes: {}, subjects: new Map([["on", item]]), signer: null, facts: new Map(), prepared: [], used: [], capabilities: context.capabilities };
   const effects = deriveEffects(j, rule.effects, rule.attention, null);
   // Section 6.4: a timed rule's effects are total. The validator refuses, as `timed-partial`, a rule with an effect that could be
   // refused here, and requires one that takes the item out of the rule's states. So a selection that passes its three checks is

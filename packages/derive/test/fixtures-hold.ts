@@ -16,7 +16,7 @@ import type { Effect, Entry, Evidence, FieldValue, OperationId, ScopeRef } from 
 import { isScopeRef } from "@generalbusiness/artroom-bytes";
 import { capabilitiesOf, checkpointOf, clockOf, gitRead, holdCapability, judgePreparation, owed, settleOutcome, snapshotOf, stagedRefName, workspaceEffects } from "../src/index.ts";
 import type { AncestryCheck, CapabilityGiven, HoldReads, StagedRef, ValidDefinition } from "../src/index.ts";
-import { Scope, grantOf, keys, lane, variant, type Actor } from "./fixtures.ts";
+import { Scope, grantOf, keys, lane, variant, type Actor, type Context } from "./fixtures.ts";
 
 /** A commit ID: forty of one hex digit. */
 export const C = (digit: string): string => digit.repeat(40);
@@ -73,12 +73,15 @@ export class Staging extends Scope {
   readonly commitment = 2;
   readonly hold = 4;
 
-  constructor(definition: ValidDefinition = staging) {
+  /** `judged`: the judges are given the capability's code, and each entry holds what it derives. Otherwise `derived` folds it by hand. */
+  constructor(definition: ValidDefinition = staging, readonly judged = false) {
     super(definition);
     this.did(keys.rita, "offer", { expected: { intent: 1 }, fields: { intent: 0 } });
     this.did(keys.rita, "assign", { on: this.commitment, expected: { on: 1 }, fields: { performer: keys.una.member } });
     this.take(keys.una);
   }
+
+  override context(over: Context = {}) { return super.context(this.judged ? { capabilities: cap, ...over } : over); }
 
   /** `who` takes a hold under the commitment, and the capability's own effects for that entry are folded. Returns the hold's ID. */
   take(who: Actor): number {
@@ -94,11 +97,13 @@ export class Staging extends Scope {
 
   /**
    * What the capability derives for the `hold` effects of the last entry,
-   * folded as an entry made by hand. Step 16 makes the judges write these
-   * effects in the entry itself. They are derived over the state before that
-   * entry, as the judges would derive them. Null: nothing is derived.
+   * folded as an entry made by hand. The judges write these effects in the
+   * entry itself when they are given the capability's code, which `judged`
+   * does, and nothing is then folded here. They are derived over the state
+   * before that entry, as the judges derive them. Null: nothing is derived.
    */
   derived(): Entry | null {
+    if (this.judged) return null;
     const holds = this.last.effects.filter((e): e is Extract<Effect, { effect: "hold" }> => e.effect === "hold");
     const effects = workspaceEffects(this.replay(this.entries.length - 1), this.definition, this.head.seq + 1, 0, holds, (id) => this.state.item(id));
     return effects.length > 0 ? this.hand(effects) : null;

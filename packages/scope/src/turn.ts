@@ -130,13 +130,13 @@ const FOREVER = "9999-12-31T23:59:59Z";
 export class Turns {
   readonly #queue = new Queue();
   readonly #store: Store;
-  readonly #ports: Pick<Ports, "clock" | "rules" | "alarm" | "owners">;
+  readonly #ports: Pick<Ports, "clock" | "rules" | "alarm" | "owners" | "capabilities">;
   readonly #bounds: Bounds;
   readonly #pinned: PinnedDefinition;
   readonly #lacks: (kind: string) => boolean;
 
   /** `lacks`: true for the kind of an entry that this runtime cannot derive under the pinned definition (`Scope.lacks`). */
-  constructor(store: Store, ports: Pick<Ports, "clock" | "rules" | "alarm" | "owners">, bounds: Bounds, pinned: PinnedDefinition, lacks: (kind: string) => boolean) {
+  constructor(store: Store, ports: Pick<Ports, "clock" | "rules" | "alarm" | "owners" | "capabilities">, bounds: Bounds, pinned: PinnedDefinition, lacks: (kind: string) => boolean) {
     this.#store = store;
     this.#ports = ports;
     this.#bounds = bounds;
@@ -246,7 +246,7 @@ export class Turns {
       turn.last = clock;
       const head = this.#store.scope()?.head;
       if (head?.seq !== snapshot.seq || head.hash !== snapshot.hash) return "dropped";   // 6.2
-      const judged = judgeTimed(this.#store, definition, selected, { clock, bounds: this.#bounds });   // 6.3 and 6.4
+      const judged = judgeTimed(this.#store, definition, selected, { clock, bounds: this.#bounds, capabilities: this.#ports.capabilities ?? undefined });   // 6.3 and 6.4
       if (judged.result === "unavailable") return "clock-behind";
       if (judged.result === "dropped") return "dropped";
       this.#seal(definition, judged.draft, clock, []);                 // 6.5

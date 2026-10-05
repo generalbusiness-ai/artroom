@@ -645,8 +645,8 @@ export function holdReserves(view: StateView, definition: ValidDefinition): numb
  * The steps `retry` and `job-read`, and the operations of a fork, are not
  * built here: with no rules for them, nothing of them is judged or sent.
  */
-// I3 merge: step 16 gives the production ports this value, with `gitRead` beside it, and makes the judges call `workspaceEffects`,
-// `boundLicense` and `licenseRefused`. Step 18 adds the rules of the fork's creation, the head's read and the deletion.
+// I3 merge: step 16 gives the production ports this value, with `gitRead` beside it. The judges call `workspaceEffects`, `boundLicense`
+// and `licenseRefused` when they are given it. Step 18 adds the rules of the fork's creation, the head's read and the deletion.
 export function holdCapability(options: HoldOptions, definition: (view: StateView) => ValidDefinition | null): Capabilities & Steps & Owners {
   if (!Number.isSafeInteger(options.tokensPerHold) || options.tokensPerHold < 1) throw new Error("a hold may have at least one token");
   const rules = operationRules(definition);
@@ -673,6 +673,7 @@ export function holdCapability(options: HoldOptions, definition: (view: StateVie
       if (!rule) throw new Error(`${capability} has no code for the step ${step}`);
       return rule(given);
     },
+    workspace: workspaceEffects,
     rules: (owner, kind) => (owner === HOLD ? (own(rules, kind) ?? null) : null),
     reserves: holdReserves,
   };

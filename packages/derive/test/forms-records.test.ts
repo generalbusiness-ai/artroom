@@ -121,6 +121,19 @@ describe("the records of `hold@1` (scope contract, section 6.11; authority note,
     taken.prepare(una, "instance", { hold: taken.hold, task, instance: "i1" });
     taken.did(vic, "renew", { on: taken.hold, expected: { on: taken.item(taken.hold).revision } });
     expect([shape(taken.derived()!), taken.record("instance", taken.hold, "i1")?.state, taken.prepare(vic, "instance", { hold: taken.hold, task, instance: "i2" })]).toEqual([["instance past"], "past", "refused capability-refused holder-changed"]);
+
+    // The judges derive the same effects in the entry itself when they are given the capability's code: after the entry's own
+    // effects, at the opening and at the timed end. The entry's other effects are what they are with no code, and the derived ones
+    // are those that the fixture folds by hand, with the operation named by the entry itself.
+    const w = new Staging(staging, true);
+    const [opening, itemForm, byHand] = [w.entries[w.hold]!.entry.effects, taken.entries[taken.hold]!.entry.effects, taken.entries[taken.hold + 1]!.entry.effects];
+    expect([shape(w.entries[w.hold]!.entry).slice(-4), opening.slice(0, -3), w.record("fork", w.hold), byHand.slice(1)]).toEqual([
+      ["hold", "fork creating", "opens head x1", "attempt 1 opened"], itemForm, { ...taken.record("fork", taken.hold), operation: "4:0" }, opening.slice(-2),
+    ]);
+    w.prepare(una, "instance", { hold: w.hold, task, instance: "i1" });                 // entry 5
+    w.now = t(700);
+    w.drain();
+    expect([w.last.input.type, shape(w.last).slice(-3), w.record("instance", w.hold, "i1")?.state, w.replay().snapshot() === w.state.snapshot()]).toEqual(["timed", ["hold", "instance past", "attention"], "past", true]);
   });
 
   test("a license names one export, one hold and one instance; a bound request is decided once from the entry that the pin reserved, and a pin decides at most its highest number (T28)", () => {

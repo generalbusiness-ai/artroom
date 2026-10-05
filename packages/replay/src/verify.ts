@@ -627,7 +627,7 @@ class Verifier {
         judged = judgeDiagnosis(state, definition, { of: input.of, attempts: input.attempts }, { ...reading, prepared: [], origin: own(input.of.seq) });
         break;
       case "timed":
-        judged = judgeTimed(state, definition, { item: input.item, rule: input.rule, due: input.due }, { clock, bounds });
+        judged = judgeTimed(state, definition, { item: input.item, rule: input.rule, due: input.due }, { clock, bounds, capabilities: this.#capabilities });
         break;
       case "preparation":
         // Section 9.3 gives the preparation entry its rules, and I3 step 16a has not built them here. A verifier that does not
