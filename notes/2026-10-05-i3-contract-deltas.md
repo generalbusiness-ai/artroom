@@ -296,3 +296,104 @@ neither lane digest changes.
 | EK3 | The contract's section 4.1 gives `Evidence` two members, `basis` and `body`. Entry E2 left the body to the owner. No check required the body to be present: an outcome whose evidence had a basis and no body was written where the owner's rules had no `wellFormed`. | One guard of shape, `isEvidence` in the bytes package: a basis that the contract names and a body, both own members, and no other member. Any value is a body, and an absent one is not. The guard of an `outcome` input uses it, so a verifier refuses an entry without it. The ledger's `outcomeOf` uses it before the pairing of result and basis, and refuses with `bad-input`. The driver's check of a port's answer uses it, so such an answer is no answer and the attempt is `unknown`. The pairing rule, and the owner's checks of meaning and authenticity, are as they were. Witness: `forms-ledger.test.ts`, the mint's own answer with no body. | None: the contract states the form |
 | EK4 | The authority note's sections 5.3 and 6.1 say what a gateway records and forwards for one grant. They do not say what holds when calls of one gateway overlap. Entry EG10 counts the forward when "forwarding" is recorded. The gateway read a grant's state before a wait and did not read it again after: two forwards of the granted update could both be sent under a record of one, `open` could keep the plaintext of a grant that was closed while its record was written, and a close during the write of "forwarding" came before the request left. | One phase for a grant, in memory: `opening`, `open`, `reserved`, `sent`, `closed`. Every call reads it again after each wait, and moves it with no wait between. The first forward that has read the one granted update takes `reserved`, and a second is refused `grant-used`. The request is built, with the credential, and given to the host in the step that makes "forwarding" durable, so a close is wholly before it or wholly after. A close takes `closed` and drops the plaintext at once, and writes its record after the write in flight. A grant closed while it opens is refused with a new reason, `grant-closed`, and gets no plaintext. A grant closed while `reserved` sends nothing, and its record ends `closed`, `forwarded: 0`, after the durable "forwarding" record: if that last write fails, the durable record still says "forwarding", which is `unknown` and never less than was sent. A grant closed after `sent` keeps `forwarded: 1`. A read that follows the claim is refused. Witness: `gateway.test.ts`, "a grant has one lifecycle across calls that overlap". The limit of entry EG10 stands: the phase is in memory, and there is no production store. | The authority note's successor, for the reason's name; the builder, at step 27, for the store |
 | EK5 | The authority note's section 5.7, "Evidence of each outside effect", says the ancestry read is shown by "that read's own answer", and that its evidence is the ancestry record. The rules of the operation `check` took a `confirmed` outcome only with the basis `read`. The ledger lets only the basis `own-answer` follow an `unknown` (section 5.4, rule 2). So a check that was first `unknown` could never record its own late answer. | The rules of `check` take `confirmed` and `refused` with the basis `own-answer`, and no read is decisive for that kind. The body of a `confirmed` check is as entry EF5 has it: `{ record }`, the ancestry record or null. The late answer after an `unknown` is the ledger's, unchanged. The rules of `stage` are not changed: which attempt a read confirms is the note's point O11 (entry EG6). Witness: `forms-records.test.ts`, T21, the first check by its own answer and the second check `unknown` and then answered late. | None: the note states the basis |
+
+## 13. Repairs after the review of milestone F
+
+Written 2026-10-05, by the worker of the repairs. Entries have the prefix
+EN. The review is the reviewer's verdict `fe34edbe` at `5635689ee`:
+changes requested, with two findings. The adopted designs are now the
+scope contract's revision 16 at `54420b41` and the authority note's
+revision 21 at `f9ec25e4`. Each entry is a source choice that a repair
+made where the texts state no form.
+
+No form of an entry, an input or an answer changes. Neither lane digest
+changes: no file of `packages/lanes/src` or `packages/lanes/definitions`
+is touched. No member of the folded state changes. What changes is what
+the commit derives from a rule's output in the cases of EN2 to EN8. The
+one delivered rule, `notice-source` of the inbox, returns one `value`
+effect on the item that its entry opens, and meets none of those cases.
+This rests on reading that rule and on the unchanged tests. No stored
+history was derived again. The same holds for the sentence that opens
+section 12, "no entry's bytes, no state digest": it rested on the commit
+messages and on unchanged tests, and no stored history was recomputed.
+
+| # | Where the texts are silent | Implemented | Owner |
+|---|---|---|---|
+| EN1 | Entry EK2 offered the answers in hand oldest first and stopped at the first that could not be written. `unavailable` covers a turn that is busy, and also a cause of one input alone: an owner with no rule, an outcome that would open more than its owner declared (`ledger.ts`, `outcomeOf`), a fault of a rule (`settle.ts`). No text orders the answers in hand. One answer that stayed unavailable for its own cause kept every later answer from the scope. | An answer that cannot be written goes to the back of the line, as the same input of the same attempt. The cause is not asked, so no form carries it. A pass offers the first batch of the line, and each of them, whatever the one before it answered. An answer with n others before it is offered within floor(n / batch) + 1 passes, because none is ever put before it. Its operation keeps what it reserved, since no entry was written. No pass asks for a wake-up at once on an answer's account: the next is after `drainRetrySeconds`, on the scope's clock, as before. So an answer that fails again for its own cause costs one turn in each ceil(held / batch) delays, until it is judged or the process ends. The number of retries has no bound. This supersedes "oldest first" and "stops at the first" of EK2. Witness: `operations.test.ts`, "an answer in hand that stays unavailable". Controls: the old stop, and a line that does not turn. Both distinguish. | The builder. The authority note, for whether a retry of an answer that fails for its own cause should back off or end. |
+| EN2 | Entry EJ10 let a rule set a fixed slot of an item that existed before the entry. The contract's section 6.3 says only an effect of the entry that opens an item sets one of its fixed slots. Section 6.1 does not say whether a rule's effect that breaks it is refused or a fault. | A fault. A party, list, ref or value effect of a rule on a fixed slot, also one that empties it, is a fault of the rule unless the item is the one that the entry opens: the item whose ID is the entry's `seq`. The validator refuses a written effect that could do it, so no input makes one, as for a slot that the type does not declare. The input is not judged and nothing is written. In a result clause the entry is a later one, so a rule there sets no fixed slot of the item that the request's entry opened. This supersedes the last sentence of EJ10. Witness: `forms-marks.test.ts`, the row "a fixed slot of an item that existed before the entry", and the entry in which the same rule sets the hash of a ticket that it opens. Controls: the guard removed, and the guard without its exception. Both distinguish. | The contract, to confirm that it is a fault. |
+| EN3 | Section 6.8 says only a `hold` record changes the holder, the epoch and the state of a hold. The validator refuses a written effect that sets one of them, or that sets a hold's end from anything but the commit time, and an opening of a hold type that is not the primary item of an act. Nothing asked the same of a rule's effects. | A rule's `state` effect on a hold, and its effect on the slot `holder`, `epoch` or the hold's end, is a fault. So is a rule's opening of a hold type. No rule returns a `hold` record, so a rule changes none of these. The end is the deadline of the timed rule that ends the hold type. Witness: `forms-marks.test.ts`, "what a rule returns", five rows. Controls: each of the two guards removed. Both distinguish. | The contract, to confirm. |
+| EN4 | Section 6.3: adding a member who is in a list, or removing one who is not, records no effect. A rule's `list` effect was recorded whatever the list held. | Such an effect of a rule is not recorded, as for a written effect. Witness: the same test, the entry with two additions of one member. Control: the skip removed. It distinguishes. | The contract, to confirm. |
+| EN5 | Section 4.3, item 2: the entry that opens an operation opens attempt 1. A rule could return the `operation` record alone. The fold takes it, and the operation is then a duty that nothing sends. | A rule that opens an operation and leaves it with no first attempt in the entry has a fault. A genesis is not asked: item 1 lets a provisional genesis hold an operation with no attempt, and which genesis does is not built (entry EB12). Witness: the same test, one row. Control: the guard removed. It distinguishes. | The builder, at step 9b, for the genesis. |
+| EN6 | The validator lets a written `relate` name `self` as its item only in an entry that opens an item. A rule's `relate` could name `self` in any entry. | `self` is the item of a rule's `relate` only when the entry opens an item, by its row or by a rule. Otherwise the request is not in the contract's form: a fault. Witness: the same test, one row, and the entry in which the rule opens a ticket and relates it. Control: the guard removed. It distinguishes. | The contract, to confirm. |
+| EN7 | Section 6.8: a hold ends with the item that it is under. The ends were derived for the subjects of the row. A rule may take an item that is no subject to a final state. | The ends are derived over the subjects and over each item that a rule changed. Witness: the same test, the entry in which a rule ends ticket 3 and pass 5 ends with it. Control: the ends over the subjects alone. It distinguishes. | The builder |
+| EN8 | Section 6.3: an opening that would pass the type's `max` is refused `type-full`. The check was made for an act and a handler. An outcome's rule and a rule in a result clause could open an item past it. Section 7.5 bounds the sends of one entry, and the validator counts that for a row. An outcome entry has no row. | An outcome's rule that opens an item past `max` has a fault, as entry EJ11 has it for every check that would refuse. A clause's rule that does changes nothing, and the result is recorded, as for any clause whose effects cannot apply now. An outcome's rule that returns more requests than `sendsPerEntry` has a fault. Witness: `forms-marks.test.ts`, "an item that a rule opens counts against its type's `max`". It is the first witness of an outcome's rule that derives effects and requests. Controls: each of the three guards removed. Each distinguishes. | The contract, to confirm. R4, for the bound on what an outcome derives. |
+
+**EN-sweep. Each static check on a written form, and where the commit
+makes it of a rule's output.** The validator files are those of
+`packages/derive/src/validate`. "Join" is `join`, in `effects.ts`. "Mark
+branch" is the branch for a mark in `deriveSends`, in `sends.ts`. "Given"
+is `given`, in `outcomes.ts`, which runs both for an outcome's rule. A
+gap that is closed names its entry.
+
+| The validator's check on a written form | For a rule's output | Gap |
+|---|---|---|
+| An effect is one of the written forms (`effects.ts`) | Join: one of the eight members, in the contract's shape (`isEffect`, `BY_RULE`). `record`, `redact`, `hold`, `attention`: a fault | None |
+| A condition `if` or `unless`; a capability effect and its arguments | A mark has no condition (static). A rule returns no `record` | None |
+| The subject is named and bound | Join: the item exists in this scope, or the entry opens it. Any item of any type may be named (the contract's row P24) | None |
+| The slot is of the item's type, and of the effect's kind | Join: a fault | None |
+| A fixed slot is set only at the opening (`effects.ts`; `handlers.ts`, the one item of a type that is not `many`) | Join | Closed: EN2 |
+| A value is of the slot's type, with its list `max` and its bounds; a detached text only from a detached source | Join: `held`, or the type's rule for a type that is a mark. `bad-field`. A value for a detached text: a fault | None |
+| A `ref` of `self` to the item that the entry opens | Join refuses it `bad-field`: the item is not in the state yet. Narrower than a written effect | None. Recorded here |
+| A state is declared; the subject is shown live | Join: an undeclared state is a fault; an item that was final before the entry refuses `final` | None |
+| A party list: one member added or removed, or set whole, within `max` | Join: a `party` with a member on a list slot is a fault; an addition past `max` refuses `slot-full` | None |
+| A change of a list that changes nothing (section 6.3; derivation, not the validator) | Join | Closed: EN4 |
+| No two effects set one slot or the state of one item, but successive list changes | Join, `sets`, on the effects that are applied: a fault | None. A list that a written effect sets whole, and an attribution, are recorded as `list` records, so a rule's `list` change after one is taken as successive. The contract's sentence is about the entry's effects, which these are. For the contract to confirm |
+| A hold's state, holder and epoch are the hold effect's; its end is the commit time plus a constant; a hold is opened as the primary item of an act (`hold.ts`, `handlers.ts`) | Join | Closed: EN3 |
+| A hold ends with what it is under (section 6.8; derivation) | `deriveEffects`, over the subjects and what a rule changed | Closed: EN7 |
+| `attribute` and its sources; `redact` | A rule returns neither. A member in an `author` slot joins the attribution in `changeItem`, as for a written effect | None |
+| Every required slot is set by the opening (`handlers.ts`) | `deriveEffects`, for the item that the row or a rule opens: `required-unset`. In an outcome, a fault | None |
+| An opening within the type's `max` (the commit's `type-full`) | `derive`, for an act and a handler. `runClause` and Given | Closed: EN8 |
+| At most `effects` written effects in a list | An effect rule: `most`, a fault past it. An outcome's rule: none. The bound on the derived effects of one entry is R4's (revision 16, section 6.1), and no number exists | Open, recorded: R4 and request `cc570904` |
+| Attention is bounded by the slots' `max` (`sends.ts`) | A rule returns no notice. A notice reads the slots as a rule left them, and a rule's addition is within the slot's `max` | None |
+| A `create`: a scope kind, a definition, fields | Mark branch: the shape of a `Send` and of a seed (`isSend`), with this scope as creator, the input's cause and the next ordinal. Given: no creation in an outcome | None of the validator's. See "beside the family" below for a lane's directory |
+| A `tell`: addressed by a slot that holds a scope | Mark branch: `to` is a scope reference. A rule may address any scope (the contract's row P16) | None |
+| A `relate`: a scope, a local item, a name and a state; `self` only in an entry that opens an item; no two with one key | Mark branch: the shape, the item is one of this scope's, and one key once (`duplicate-relation`, with the written sends) | Closed for `self`: EN6 |
+| At most `sendFields` fields in a message; no detached text to a scope that is no lane | Not checked. A rule holds no text's bytes, and a digest is a value. The entry's size bounds the message | Open, recorded: the contract, for whether a rule's message has a bound of its own |
+| A fan-out is over live items of a bounded type; at most one in a list | A mark gives no request or one, and a list holds one mark (static) | None |
+| At most `sendsPerEntry` sends in an entry (`handlers.ts`) | A row counts a mark as one send (static). Given | Closed for an outcome: EN8 |
+| The clauses of a request; the clause of a result is found again | The mark's own clauses are data (static). A request of an outcome has no clause, and its result changes nothing (`runClause`) | None |
+| A handler of class advisory sends nothing | A mark in its sends is refused with the list (static) | None |
+| An operation: its owner, its kind, its ordinal and its attempts (no written form opens one) | Join: the owner is the pinned definition, the kind is one of `outcomes`, the ordinal is the next, and attempt 1 is of an operation of this entry. Given: the same for `opens`, within the owner's declared closure | Closed for a missing first attempt: EN5 |
+| The entries that an opening reserves (section 17.2) | An act and a handler are asked whether they fit, after the fold. An outcome is held to its owner's closure. A result clause is not asked, and what a mark in it can open is in no reservation | Open, recorded: entry EJ6, the contract and request `cc570904` |
+| A guard that is a mark; a type that is a mark | `guardByRule` and `ofCodedType`: the answer's shape, and a refusal's name among those the rule states. A fault otherwise | None |
+| A timed rule's effects are total | A timed rule holds no mark (static) | None |
+
+**Beside the family, found and not changed.** These are no static check of
+the validator, so they are recorded and left to their owners.
+
+- A written `create` of a lane is given the directory by the derivation
+  (section 6.6). A rule's `create` of a lane is taken as the rule wrote it,
+  with or without that member. No delivered rule creates a scope. Owner:
+  the builder, at step 9, with the member `membership` (entry EJ2).
+- An opening may state any number of attempts (entry EB7). Owner: the
+  authority note.
+
+**EN-sweep, the loops. Can one row's own lasting failure hold back the
+rows behind it?**
+
+| The loop | How the next rows are chosen | Starves |
+|---|---|---|
+| `operations.ts`, the attempts that are due (`store.unsent`) | By the time to look at each, earliest first. A row that cannot be judged is put off to the pass's time plus `drainRetrySeconds`, which is later than every row that is due now | No |
+| `operations.ts`, the walk of attempts with no time (`store.parked`) | After the row that the walk reached (entry EK1) | No |
+| `operations.ts`, the answers in hand (`#replies`) | The first batch of the line | It did. Closed: EN1 |
+| `operations.ts`, the requests of one pass | Each is sent and answered by itself (`Promise.all`) | No |
+| `outbox.ts`, the sends that are due (`store.outgoing`) | By the time of the next attempt, earliest first. Each dispatch is put off by its delay before it is sent | No. A send whose transport does not answer delays the rest of its batch by at most `dispatchSeconds`, because a batch is dispatched in turn |
+| `outbox.ts`, a diagnosis (`#giveUp`) | A diagnosis that is not written is put off to the pass's time plus `drainRetrySeconds` | No |
+
+One thing is the same in three of these and is not changed. A row, a
+diagnosis or an answer that fails for a cause of its own is tried again
+after `drainRetrySeconds`, for as long as it fails. The delay is on the
+scope's clock and is never zero, so nothing spins. The number of tries
+has no bound, and for a row and a diagnosis the wake-up is stored, so it
+outlives a restart. No text states a backoff or an end for them. Owner:
+the authority note.
