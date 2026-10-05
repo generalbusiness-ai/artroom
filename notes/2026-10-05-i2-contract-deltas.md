@@ -442,3 +442,46 @@ accept it, change it or remove it.
 | DJ19 | How a judge is given a capability's rules, and what it does without them. | `Capabilities`, in derive: whether a version is implemented, a guard's answer for its arguments (true, or the name of a declared refusal), and the records that an effect changes. A judge is given it in `Reading.capabilities`. A guard's answer that its version does not declare, and a record of a kind or a state that it does not declare, are faults of the rules and are thrown. With no rules a capability guard and effect are not judged: the answer is Unavailable. No runtime reaches that, because it pins no such definition. | A judge stays a function of what it is given. A guess in place of a missing rule would be a judgment. |
 
 What the two lane definitions list in `underived` is in section 17.
+
+## 17. Step 13: the two lane definitions, validated and pinned
+
+Written 2026-10-05, by the same worker, at the head that holds steps 9
+and 11. `validateDefinition` at the proposed bounds passes `issue` and
+`change` whole, with no change to any row of `packages/lanes`. No row is
+refused, so no row goes back to the lane forms' owner.
+`packages/lanes/test/definitions.test.ts` asserts it on the whole
+definition.
+
+| Definition | Digest | Canonical bytes |
+|---|---|---|
+| `issue` | `sha256:325cb4f33da9deb1a31d85ba0f1456068d4d9d08009978b779aed70cb08e00ad` | 46,160 |
+| `change` | `sha256:4ff0c7f681c664a3c2dae22bd0df4a9a1bb239e19bc185db41f7f140d4dfca45` | 56,293 |
+
+The bytes are `packages/lanes/definitions/issue.json` and `change.json`,
+and the digests are in `src/digests.ts`, with the lane forms' revision 14
+and commit `4b3bf5da`. `scripts/pin.mjs` writes all three from the values.
+A digest is exact for one value. An adopted change of a row makes a new
+one.
+
+What each definition lists as `underived`, by row. These are the rows that
+need the code of `hold@1` or `git-read@1`, and they are the 3 acts and 7
+handlers that entry DL4 counted.
+
+| Definition | Rows |
+|---|---|
+| `issue` | The list entry `git-read@1`. The acts `report` and `refuse-report`. The handlers `pin-confirm`, `unpin`, `export-license` and `export-settled`. 13 forms. |
+| `change` | The list entry `git-read@1`. The kind `hold@1:check`, in the slot `manifest.pin` and in what `propose-manifest` is presented. The act `propose-manifest`. The handlers `publication`, `export-license` and `export-settled`. 18 forms. |
+
+So under the production wiring neither definition founds or creates a
+scope, and no act and no handler of either runs: `unsupported-definition`
+(entry DJ14). With the scripted test capability, which is a stand-in, a
+test can found a scope under either pinned digest and run every row as far
+as the lane decides. The handlers `rules`, `publication`, `export-license`
+and `export-settled` also need a sender of a platform kind, which a test
+supplies as a scripted peer (the plan's section 6.1).
+
+| # | What the validation found | Implemented | Why |
+|---|---|---|---|
+| DJ20 | The plan's section 4.1 says the lane package's index exports "the bytes". | The package exports the two byte files by path, `./definitions/issue.json` and `./definitions/change.json`, and its index exports the two values, `DIGESTS`, `LANE_FORMS` and `definitions`, the list a founder supplies. The index reads no file. | A module that read a file would not load in the Workers runtime, where the scenarios of step 16 run. The canonical bytes of a value are one call of the bytes package. |
+| DJ21 | Section 6.1 gives, as an example of its bounds, that `propose-manifest` has 70 guards counting those nested, 7 deep, and its table says 23 as written. | Nothing is changed. As the validator counts (entry DG1), the row in `packages/lanes`, written from the lane forms' revision 14, has 24 guards as written, 73 counting those nested, and is nested 8 deep. All three are within the bounds, and two are exactly at them: 24 and 8. `propose-manifest` also has 16 effects, which is the bound. The `publication` handler's entry can hold 35 sends, as the validator counts them, which is the number that revision 12 proposes (the plan's question Q3). The pin test asserts these as observed, by the validator refusing each bound at one less. | The contract's example is of its companion file at revision 11. The lane forms' revision 14 is what the data was written from. Owners: the contract and the lane forms, to restate the example; the proof plan, for a definition that sits exactly at three bounds. |
+| DJ22 | Rows 11 and 62 of the plan: the kind `hold@1:check`, and the names `platform:task`, `platform:rules` and `platform:destination`. | The kind is checked against the steps that `hold@1` declares (entry DJ17). The platform names are texts to the validator, as section 14 above says, and are not checked. | They are the lane forms' gap G26, which the authority note's successor owns. |
