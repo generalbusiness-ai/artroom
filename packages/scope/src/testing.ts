@@ -63,24 +63,32 @@ export class ScriptedClock implements Clock {
   read(): Timestamp { return this.script.shift() ?? this.now; }
 }
 
-const tick = () => new Promise<void>((resolve) => { setTimeout(resolve, 1); });
-
 /**
  * Pauses preparation (section 5.2, step 5). After `hold()`, the next rule
  * evaluation waits at the gate until `release()`; later ones pass. `held()`
- * resolves when an evaluation is waiting there.
+ * resolves when an evaluation is waiting there. Each is a promise the other
+ * side resolves: nothing here polls or waits on a timer.
  */
 export class Gate {
   #armed = false;
   #waiting = false;
+  /** Resolvers of the `held()` calls that wait for an evaluation to arrive, and of the evaluation that waits to be released. */
+  #arrivals: (() => void)[] = [];
+  #releases: (() => void)[] = [];
   hold(): void { this.#armed = true; }
-  release(): void { this.#waiting = false; }
-  async held(): Promise<void> { while (!this.#waiting) await tick(); }
+  release(): void {
+    this.#waiting = false;
+    for (const resume of this.#releases.splice(0)) resume();
+  }
+  async held(): Promise<void> {
+    if (!this.#waiting) await new Promise<void>((resolve) => { this.#arrivals.push(resolve); });
+  }
   async pass(): Promise<void> {
     if (!this.#armed) return;
     this.#armed = false;
     this.#waiting = true;
-    while (this.#waiting) await tick();
+    for (const arrived of this.#arrivals.splice(0)) arrived();
+    await new Promise<void>((resolve) => { this.#releases.push(resolve); });
   }
 }
 
