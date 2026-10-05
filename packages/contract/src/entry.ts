@@ -7,6 +7,7 @@
 import type { Digest, FactRef, Incarnation, MemberRef, OperationId, PlatformDefinition, ScopeId, ScopeRef, Seed, Grant, Timestamp } from "./scope.ts";
 import type { FieldValue, SignedIntent } from "./intent.ts";
 import type { RefusalReason } from "./result.ts";
+import type { CapabilityName } from "./capability.ts";
 
 export interface Entry {
   v: 1;
@@ -23,16 +24,23 @@ export interface Entry {
   sends: readonly Send[];      // derived; each has an ordinal n
 }
 
-/** The reason a delivery entry records with a refusal. */
-export type Reason = RefusalReason;
+/**
+ * Why a refused delivery was refused (section 4.2): a code and, where one
+ * exists, a name. The name is the `reason` that the failed guard declares.
+ * The deciding entry records it, and its result carries the same value to
+ * the sender.
+ */
+export interface Reason { code: RefusalReason; name?: string }
 
 export type Input =
   | { type: "genesis"; seed: Seed; inc: Incarnation;
+      kind: string;                             // the genesis act of the pinned definition (section 4.1)
       founding: SignedIntent | null;            // a repository's directory only
       source: FactRef | null; n: number | null; // the creator's entry and send, for a child
       message: Request | null;                  // the creation request, for a child
       decision: "applied" | "refused" }
-  | { type: "act"; signed: SignedIntent; authority: readonly Grant[] }
+  | { type: "act"; signed: SignedIntent; authority: readonly Grant[];   // the one grant judged
+      presented: Record<string, FactRef> }      // the facts presented beside the intent, by the names the act declares (section 6.4)
   | { type: "delivery"; from: FactRef; n: number; message: Request;
       decision: "applied" | "refused" | "superseded"; reason?: Reason }
   | { type: "delivery"; from: FactRef; n: number; message: Result;
@@ -88,7 +96,10 @@ export type Effect =
   | { effect: "value"; item: number; slot: string; value: FieldValue | null }
   | { effect: "list"; item: number; slot: string; change: "add" | "remove"; member: MemberRef }
   | { effect: "hold"; item: number; change: "open" | "renew" | "end"; epoch: number }   // section 6.8
+  | { effect: "redact"; item: number; slot: string; texts: readonly Digest[] }          // the entry is the tombstone of those texts; section 6.6
   | { effect: "relation"; owner: ScopeRef; item: number; name: string; state: string; revision: number }   // the owner's item; section 7.3
+  | { effect: "record"; capability: CapabilityName; kind: string; key: readonly FieldValue[];
+      state: string; values: Record<string, unknown> }                                  // one change of a capability's record; section 6.11
   | { effect: "activate" }                                                              // section 7.2
   | { effect: "operation"; operation: OperationId; attempt: number }                    // opens an operation's next numbered attempt; section 4.3
   | { effect: "index"; from: FactRef; fields: Record<string, FieldValue> }              // a projection row in the directory

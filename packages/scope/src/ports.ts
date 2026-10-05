@@ -3,12 +3,12 @@
  * storage, each as one narrow interface. `production()` gives the defaults.
  * A default that would decide something for another owner refuses: no grant
  * is current, no foreign entry can be read, no definition can be read and
- * no reader may read. Transport, the dispatcher and the authority note's
+ * no reader may read, and no sent text can be read. Transport, the dispatcher and the authority note's
  * rules replace them, each behind its own port.
  */
 
 import type { Digest, Entry, FactRef, Grant, PlatformDefinition, Prepared, RoutingRefusal, ScopeRef, Timestamp, UnavailableReason } from "@generalbusiness/artroom-contract";
-import { timeOf, type Delivered, type RuleInput } from "@generalbusiness/artroom-derive";
+import { timeOf, type Capabilities, type Delivered, type RuleInput } from "@generalbusiness/artroom-derive";
 import { evaluateRules } from "@generalbusiness/artroom-derive/rule";
 
 /** One reading for each call (section 5.3). The core calls it once in a step 3 and once in a commit. */
@@ -76,6 +76,17 @@ export interface Alarm { set(at: Timestamp | null): void | Promise<void> }
 export type DefinitionRead = { ok: true; bytes: string } | { ok: false; reason: "unsupported-definition" | "unavailable" | "absent" };
 export interface Definitions { read(named: Digest | PlatformDefinition, holder: ScopeRef | null): Promise<DefinitionRead> }
 
+/**
+ * A detached text that a delivered message names by digest (section 6.2),
+ * read from the scope that sent the message: the bytes travel beside the
+ * message, and the receiver asks its sender for them before the turn.
+ * `from` is the entry that sent the message. The reader checks the digest
+ * itself. `absent`: the sender answered, and it holds no such text for that
+ * entry. `unavailable`: it cannot be read now, and may be later.
+ */
+export type TextRead = { ok: true; text: string } | { ok: false; reason: "absent" | "unavailable" };
+export interface SentTexts { read(from: FactRef, digest: Digest): Promise<TextRead> }
+
 /** The reads of section 9.1. */
 /** `log` and `retained` are what a verifier reads (sections 9.2 and 9.4): the stored bytes of entries, and retained inputs. */
 export type ReadName = "summary" | "items" | "history" | "entry" | "outbox" | "log" | "retained";
@@ -84,17 +95,26 @@ export type ReadName = "summary" | "items" | "history" | "entry" | "outbox" | "l
 export interface Readers { allows(reader: unknown, read: ReadName): boolean }
 
 export interface Ports {
-  clock: Clock; random: Random; authority: Authority; resolver: Resolver; rules: Rules; alarm: Alarm; definitions: Definitions; readers: Readers;
+  clock: Clock; random: Random; authority: Authority; resolver: Resolver; rules: Rules; alarm: Alarm; definitions: Definitions; texts: SentTexts; readers: Readers;
   /** Null: this scope has no transport. Its sends stay in the outbox and nothing dispatches them. */
   transport: Transport | null;
+  /**
+   * The rules of the capability versions this runtime has code for (section
+   * 6.11), which derive a `capability` guard and effect. Null: it has none.
+   * A scope is then not founded or created under a definition that needs
+   * one: `unsupported-definition`.
+   */
+  capabilities: Capabilities | null;
 }
 
 /**
  * The production defaults. The clock and the random source are the
  * runtime's. The rules are derive's evaluator. The alarm does nothing until
  * the object supplies its own. There is no transport until a namespace
- * supplies one, and no declaration can be read until a namespace supplies
- * the creator that retains it. Every other port refuses.
+ * supplies one, and no declaration and no sent text can be read until a
+ * namespace supplies the scope that retains it. There is no code for any
+ * capability record: the records, guards and effects of `hold@1`, and
+ * `git-read@1`, are not delivered yet. Every other port refuses.
  */
 export function production(): Ports {
   return {
@@ -107,7 +127,9 @@ export function production(): Ports {
     // A platform definition is supplied in code, and none is yet (section 6.1). A declared one is read from the scope that
     // retains it, through the namespace; with no namespace none can be read.
     definitions: { read: (named) => Promise.resolve({ ok: false, reason: named.startsWith("platform:") ? "unsupported-definition" : "unavailable" }) },
+    texts: { read: () => Promise.resolve({ ok: false, reason: "unavailable" }) },
     readers: { allows: () => false },
     transport: null,
+    capabilities: null,
   };
 }

@@ -1,10 +1,10 @@
 import { describe, expect, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { Attempt, Input, Result, ScopeRef, Seed, Send } from "@generalbusiness/artroom-contract";
-import { deliveryCauseDigest, factRefOf, intentDigest, messageDigest, scopeIdOf, seedDigest } from "@generalbusiness/artroom-bytes";
-import { MemoryState, checkpointOf, clockOf, fits, judgeCheckpoint, judgeDelivery, judgeDiagnosis, judgeGenesis, judgeOutcome, owed, prepareRules, stateDigest, useOf } from "../src/index.ts";
-import type { Creation, DeliveryContext, Judged, Source, ValidDefinition } from "../src/index.ts";
-import { Ledger, Scope, arriving, born, creation, d, deliver, deskDefinition, fields, forged, founded, judged, keys, laneDefinition, on, sent, t, ticket, ticketDefinition, variant } from "./fixtures.ts";
+import { deliveryCauseDigest, entryHash, factRefOf, intentDigest, messageDigest, scopeIdOf, seedDigest } from "@generalbusiness/artroom-bytes";
+import { MemoryState, applyEntry, checkpointOf, clockOf, entryOf, fits, judgeCheckpoint, judgeDelivery, judgeDiagnosis, judgeGenesis, judgeOutcome, owed, prepareRules, stateDigest, useOf } from "../src/index.ts";
+import type { Creation, DeliveryContext, Draft, Judged, Source, ValidDefinition } from "../src/index.ts";
+import { Ledger, Scope, arriving, born, creation, d, deliver, deskDefinition, fields, forged, founded, judged, keys, laneDefinition, on, sent, t, ticket, ticketDefinition, variant, type Over } from "./fixtures.ts";
 
 const { rita, una } = keys;
 const unverified = { result: "source-unverified" };
@@ -34,7 +34,7 @@ describe("founding a directory and creating a child (sections 7.1 and 7.2)", () 
     const { child: I } = born(D, 1);
     expect(I.last).toMatchObject({
       seq: 0, prev: null, at: { scope: scopeIdOf(seed), kind: "lane" },
-      input: { type: "genesis", seed, founding: null, source: D.fact(1), n: 0, decision: "applied" },
+      input: { type: "genesis", seed, kind: ticketDefinition.declared.genesis, founding: null, source: D.fact(1), n: 0, decision: "applied" },
       effects: [{ effect: "open", item: 0, type: "intent", state: "open" }, { effect: "party", item: 0, slot: "requester", member: rita.member }, { effect: "value", item: 0, slot: "title", value: "A flaky test" }],
       sends: [
         { n: 0, to: D.at, message: { class: "result", of: { from: D.fact(1), n: 0 }, outcome: "applied" } },
@@ -74,7 +74,7 @@ describe("founding a directory and creating a child (sections 7.1 and 7.2)", () 
     D.did(rita, "open-issue", fields({ title: "refuse" }));
     const { child: R } = born(D, 1);
     // The genesis act's guard refused: the entry is written with no effect, and sends its `refused` result and nothing else.
-    expect(R.last).toMatchObject({ input: { decision: "refused" }, effects: [], sends: [{ n: 0, message: { class: "result", outcome: "refused", reason: "guard-failed" } }] });
+    expect(R.last).toMatchObject({ input: { decision: "refused" }, effects: [], sends: [{ n: 0, message: { class: "result", outcome: "refused", reason: { code: "guard-failed" } } }] });
     expect([R.state.scope()!.status, judged(R, D, 1)]).toEqual(["refused", { result: "repeat", seq: 0 }]);
     expect(R.act(rita, "ask", fields({ desk: D.at }))).toMatchObject({ result: "refused", reason: "scope-refused" });
     deliver(D, R, 0);
@@ -142,7 +142,7 @@ describe("a relationship update (section 7.3)", () => {
     expect(results).toEqual(expected);
     // The copy is keyed by the owner's scope, incarnation, name and item; its revision is the owner entry's seq.
     expect(I.state.relation(P.at, "closes", 2)).toEqual({ owner: P.at, name: "closes", item: 2, state: "removed", revision: 3 });
-    // The handler for `relate:closes` ran for each applied update, and not for a superseded one.
+    // The handler for the relationship `closes` ran for each applied update, and not for a superseded one.
     expect(I.item(0).values["linked"]).toBe("removed");
     expect(deliver(I, P, order[1]!)).toEqual({ result: "repeat", seq: I.head.seq });
     expect(I.replay().snapshot()).toBe(I.state.snapshot());
@@ -167,7 +167,7 @@ describe("a relationship update (section 7.3)", () => {
     const source = resealed(X, 1, [tell]);
     const arrival = { ...tell, from: factRefOf(source.entry) };
     expect(judgeDelivery(D.state, deskDefinition, arrival, arriving(D, arrival, source))).toMatchObject({
-      result: "write", draft: { input: { decision: "refused", reason: "duplicate-relation" }, effects: [], sends: [{ n: 0, to: X.at, message: { class: "result", outcome: "refused", reason: "duplicate-relation" } }] },
+      result: "write", draft: { input: { decision: "refused", reason: { code: "duplicate-relation" } }, effects: [], sends: [{ n: 0, to: X.at, message: { class: "result", outcome: "refused", reason: { code: "duplicate-relation" } } }] },
     });
   });
 });
@@ -244,7 +244,7 @@ describe("what a written refusal or a later clause records of what it read (sect
     const forGenesis = falsely(new MemoryState(), strict, { genesis: asked, context });
     expect(forGenesis).toHaveLength(1);
     expect(judgeGenesis(new MemoryState(), strict, asked, { ...context, prepared: forGenesis })).toMatchObject({
-      result: "write", draft: { input: { decision: "refused" }, prepared: forGenesis, effects: [], sends: [{ n: 0, message: { outcome: "refused", reason: "guard-failed" } }] },
+      result: "write", draft: { input: { decision: "refused" }, prepared: forGenesis, effects: [], sends: [{ n: 0, message: { outcome: "refused", reason: { code: "guard-failed" } } }] },
     });
 
     // A lane's update reaches a ticket whose handler for it is under the same rule.
@@ -256,7 +256,7 @@ describe("what a written refusal or a later clause records of what it read (sect
     const forHandler = falsely(I.state, strict, { delivery: delivered, context: arrival });
     expect(forHandler).toHaveLength(1);
     expect(judgeDelivery(I.state, strict, delivered, { ...arrival, prepared: forHandler })).toMatchObject({
-      result: "write", draft: { input: { decision: "refused", reason: "guard-failed" }, prepared: forHandler, effects: [] },
+      result: "write", draft: { input: { decision: "refused", reason: { code: "guard-failed" } }, prepared: forHandler, effects: [] },
     });
   });
 
@@ -266,7 +266,7 @@ describe("what a written refusal or a later clause records of what it read (sect
     l.did(rita, "offer", { fields: { intent: 0 }, expected: { intent: 1 } });
     const entry = l.did(rita, "assign", { ...on(l, 2), ...fields({ performer: una.member }) });
     const fetched = { fact: l.fact(entry.seq), entry, under: "lane" };
-    const proof = { type: "fact", kind: "assign", under: "lane", required: true };
+    const proof = { type: "fact", kind: ["assign"], under: "lane", required: true };
     const cited = variant(ticket, (def) => {
       def.acts.file.fields.proof = proof;
       def.acts.file.guards.push({ fact: { field: "proof", where: [{ equals: { a: { field: "performer" }, b: { field: "opener" } } }] } });
@@ -276,7 +276,7 @@ describe("what a written refusal or a later clause records of what it read (sect
     const { asked, context } = creationUnder(D, cited, { proof: fetched.fact });
     // The opener is rita, so the guard is false. The entry holds the source entry and P: the child can derive the refusal again from its own retained bytes.
     expect(judgeGenesis(new MemoryState(), cited, asked, { ...context, facts: [fetched] })).toMatchObject({
-      result: "write", draft: { input: { decision: "refused" }, uses: [useOf(asked.from, context.source!.entry), useOf(fetched.fact, entry)], sends: [{ message: { outcome: "refused", reason: "guard-failed" } }] },
+      result: "write", draft: { input: { decision: "refused" }, uses: [useOf(asked.from, context.source!.entry), useOf(fetched.fact, entry)], sends: [{ message: { outcome: "refused", reason: { code: "guard-failed" } } }] },
     });
 
     // The same creation under a definition whose later field names a local item. No item exists before a genesis, so it is refused
@@ -287,7 +287,7 @@ describe("what a written refusal or a later clause records of what it read (sect
     });
     const early = creationUnder(D, itemised, { proof: fetched.fact, zItem: 0 });
     expect(judgeGenesis(new MemoryState(), itemised, early.asked, { ...early.context, facts: [fetched] })).toMatchObject({
-      result: "write", draft: { input: { decision: "refused" }, uses: [useOf(early.asked.from, early.context.source!.entry), useOf(fetched.fact, entry)], sends: [{ message: { outcome: "refused", reason: "no-item" } }] },
+      result: "write", draft: { input: { decision: "refused" }, uses: [useOf(early.asked.from, early.context.source!.entry), useOf(fetched.fact, entry)], sends: [{ message: { outcome: "refused", reason: { code: "no-item" } } }] },
     });
 
     // An `ask` whose fields name P. Its `undelivered` clause runs in a later entry and reads P again; the origin entry recorded P first.
@@ -386,7 +386,7 @@ describe("outcomes and checkpoints (sections 4.3 and 9.2)", () => {
   });
 });
 
-describe("room to settle (section 17.2 of the contract's revision 10, the adopted revision)", () => {
+describe("room to settle (section 17.2)", () => {
   /* eslint-disable @typescript-eslint/no-explicit-any */
   /** The ticket, with a request that a timed rule pauses at its `until`, which `ask` sets from a field. */
   const pausing = (d: any) => {
@@ -431,6 +431,106 @@ describe("room to settle (section 17.2 of the contract's revision 10, the adopte
     rows.push(row(S));
     // Timed; both diagnoses; a result and its timed entry, twice; the closing checkpoint. Written and reserved are 11 in every row.
     expect(rows).toEqual([[4, 7], [6, 5], [7, 4], [8, 3], [9, 2], [10, 1], [11, 0]]);
+  });
+
+  test("a pending job at a full budget (the first witness of section 17.4, in entries): its first answer is written from what the job reserved, also after its deadline and with the request it sends; an answer that leaves it pending, a second answer and every other new work are refused; a copy that awaits its settlement is the same", () => {
+    // X15: a job is `requested` with a deadline, which times it out. `check` declares that it settles a job in the listed states.
+    // It answers `ok` or not, and tells the job's desk. The `closes` handler declares that it settles a copy that is `set`. A
+    // `note` is a comment: one entry, and no duty. As in X12, the clause of another request, of `ask`, can start a deadline.
+    const form = { also: {}, fields: {}, guards: [], effects: [], sends: [], attention: [] };
+    const jobs = (listed: string[]) => variant(ticket, (d) => {
+      pausing(d);
+      d.acts.ask.sends[0].tell.result = { applied: [{ state: "asked" }] };
+      d.items.job = {
+        many: true, max: 4, states: { requested: { final: false }, "timed-out": { final: false }, passed: { final: false } }, initial: "requested", parties: {},
+        refs: { desk: { fixed: true, required: true, to: { type: "scope", kind: "directory" } } }, values: { until: { fixed: false, required: true, of: { type: "time" } } },
+      };
+      d.acts.request = {
+        ...form, step: "open", on: "job", grant: "request", fields: { until: { type: "time", required: true }, desk: { type: "scope", kind: "directory", required: true } },
+        effects: [{ value: { slot: "until", from: { field: "until" } } }, { ref: { slot: "desk", from: { field: "desk" } } }],
+      };
+      d.acts.check = {
+        ...form, step: "transition", on: "job", grant: "check", settles: { of: "on", in: listed }, fields: { ok: { type: "bool", required: true } },
+        guards: [{ state: ["requested", "timed-out", "passed"] }], effects: [{ state: "passed", if: [{ equals: { a: { field: "ok" }, b: { const: true } } }] }],
+        sends: [{ tell: { to: { slot: "desk" }, message: "checked", fields: {}, result: {} } }],
+      };
+      d.acts.note = { ...form, step: "comment", on: null, grant: "note" };
+      d.timed.deadline = { on: "job", states: ["requested"], deadline: "until", effects: [{ state: "timed-out" }], attention: [] };
+      d.receives.closes.settles = { copy: ["set"] };
+    });
+    const x15 = jobs(["requested", "timed-out"]);
+    // A job reserves its deadline's entry, and for its answer three: the answer's own, and the two of the request that it sends, whose
+    // clauses start nothing. Timed out, it still reserves the three. A copy that is `set` reserves one entry. For any request the
+    // runtime holds the two entries and one more, the most that a clause of any request of the definition can start.
+    expect([x15.deadlines["job"], x15.pending, x15.pendingCopies, x15.clauseEntries]).toEqual([{ requested: 1 }, { job: { requested: 3, "timed-out": 3 } }, [{ name: "closes", kind: "lane", states: ["set"], entries: 1 }], 1]);
+    // A timed entry is never refused. So a job that its deadline can take to a state that awaits an answer reserves the answer before it.
+    expect(jobs(["timed-out"]).pending).toEqual({ job: { requested: 3, "timed-out": 3 } });
+
+    const budget = { scopeEntries: 10 };
+    const [S, P, D] = [new Scope(x15), new Scope(x15, rita.member, true, 1), founded()];
+    /** What the commit does with a judged input at this budget: the entry is folded into a copy of the state, and is kept only if it fits. */
+    const commit = (j: { result: string; draft?: Draft }) => {
+      if (j.result !== "write" || !j.draft) return j.result;
+      const [copy, entry] = [S.replay(), entryOf(S.state, j.draft, clockOf(S.state, S.now))];
+      applyEntry(copy, x15, entry, entryHash(entry));
+      if (!fits(copy, x15, budget, entry.input, j.draft.settles)) return "scope-full";
+      S.seal(j.draft);
+      return j.draft.settles ? "settles" : "new work";
+    };
+    const act = (kind: string, over: Over = {}) => commit(S.judge(S.intent(una, kind, over)));
+    const request = () => act("request", fields({ until: t(600), desk: D.at }));
+    const check = (ok: boolean) => act("check", { ...on(S, 3), ...fields({ ok }) });
+    /** P sets a link to this scope, or removes one, and the update arrives. */
+    const update = (kind: string, over: Over) => commit(judged(S, P, P.did(rita, kind, over).seq));
+    const linked = fields({ target: S.at, about: 0 });
+    const done: [string, number[]][] = [];
+    const step = (what: string) => done.push([what, row(S)]);
+
+    step(update("link", linked));                             // entry 2: the copy is `set`
+    step(request());                                          // entry 3: job 3, with its deadline
+    // Written and reserved are 10: the scope is full for new work. A note, a second job and a second link are each refused.
+    step([act("note"), request(), update("link", linked)].join(", "));
+    S.now = t(600);
+    step(S.drain().map((j) => j.result).join());              // entry 4: the deadline passes first, and the job is `timed-out`
+    step(check(false));                                       // an answer that leaves the job `timed-out` settles nothing: new work
+    step(check(true));                                        // entry 5: the first answer, late, with its request
+    step(check(true));                                        // a second answer: the job is `passed`, which no `settles` lists
+    step(update("unlink", on(P, 2)));                         // entry 6: the update that takes the copy out of `set`
+    step(act("note"));
+    // The two settling entries are written though written and reserved then pass the budget: for the request that the answer sent,
+    // the runtime holds one entry more than that request's own closure, which the job reserved. That is used only against new work.
+    expect(done).toEqual([
+      ["new work", [3, 2]], ["new work", [4, 6]], ["scope-full, scope-full, scope-full", [4, 6]], ["write", [5, 5]],
+      ["scope-full", [5, 5]], ["settles", [6, 5]], ["scope-full", [6, 5]], ["settles", [7, 4]], ["scope-full", [7, 4]],
+    ]);
+    expect(S.replay().snapshot()).toBe(S.state.snapshot());
+  });
+
+  test("an item type named __proto__ reserves like any other: the pending table holds it as an own name, its pending item is reserved, a note at a full budget is refused, and Object.prototype is as it was", () => {
+    const form = { also: {}, fields: {}, guards: [], effects: [], sends: [], attention: [] };
+    const x = variant(ticket, (d) => {
+      // Defined, not assigned: an assignment to `__proto__` would set the prototype.
+      const proto = { many: true, max: 4, states: { open: { final: false }, done: { final: true } }, initial: "open", parties: {}, refs: {}, values: {} };
+      Object.defineProperty(d.items, "__proto__", { value: proto, enumerable: true, writable: true, configurable: true });
+      Object.assign(d.acts, {
+        start: { ...form, step: "open", on: "__proto__", grant: "start" },
+        finish: { ...form, step: "transition", on: "__proto__", grant: "finish", settles: { of: "on", in: ["open"] }, guards: [{ state: ["open"] }], effects: [{ state: "done" }] },
+        note: { ...form, step: "comment", on: null, grant: "note" },
+      });
+    });
+    expect(Object.hasOwn(x.pending, "__proto__")).toBe(true);
+    expect(Object.keys(Object.prototype)).toEqual([]);
+    expect(({} as Record<string, unknown>)["open"]).toBeUndefined();
+    const S = new Scope(x);
+    S.did(una, "start");
+    // Written 3, and reserved: the item's closing entry and the closing checkpoint. Without the item's reservation it would be 1.
+    expect(owed(S.state, x, S.last.input)).toBe(2);
+    // At 5 entries a note makes 4 written and 2 reserved: refused. With one reserved it would have been kept.
+    const note = S.judge(S.intent(una, "note", {}));
+    if (note.result !== "write") throw new Error("the note was not judged");
+    const [copy, entry] = [S.replay(), entryOf(S.state, note.draft, clockOf(S.state, S.now))];
+    applyEntry(copy, x, entry, entryHash(entry));
+    expect(fits(copy, x, { scopeEntries: 5 }, entry.input, note.draft.settles)).toBe(false);
   });
 
   test("a chain of timed rules (the table of section 17.3a): a deadline reserves one entry for each rule its rule leads to", () => {

@@ -1,7 +1,8 @@
 # @generalbusiness/artroom-client
 
-A client for an Artroom scope service: build and sign an intent, and hold a
-typed handle on one scope. It runs under Node, Workers and browsers.
+A client for an Artroom scope service: build and sign an intent, hold a
+typed handle on one scope, and hold a handle whose act kinds and fields are
+typed from a declared definition. It runs under Node, Workers and browsers.
 
 It depends on the contract's types and on the bytes package, and on nothing
 else. It derives no judgment. What a caller may do in a scope it learns by
@@ -10,14 +11,16 @@ reading the scope's summary and its published definition.
 The scope and replay contract is the authority, in its sections 2.1, 4.2,
 9.1 and 11.5. Where the contract was silent,
 `notes/2026-10-04-i1-contract-deltas.md` records what was implemented, in
-its section "Client".
+its section "Client", and `notes/2026-10-05-i2-contract-deltas.md` in its
+entries DJ1, DJ7 and DJ23 to DJ25.
 
 ## What it exports
 
 | Module | Holds |
 |---|---|
 | `intent` | `signedIntent(signer, asked, signing?)`: an intent with a fresh idempotency key and a `notAfter` within the lifetime bound, signed. The intent is a detached copy of what was asked, taken before the signer is awaited, so the value returned is the value signed. `Signer`; `secretSigner(secret)`; `webCryptoSigner()`, over a key that cannot be read; `newIdempotencyKey()`. |
-| `handle` | `ScopeHandle`: `submit`, `settle`, the reads `summary`, `items`, `history`, `entry` and `outbox`, `definition`, `followReceipt` and `followDuty`. `found(transport, founding, definition, definitions?)`. `Transport`, `TransportError`. |
+| `handle` | `ScopeHandle`: `submit(signed, grants?, beside?)`, `settle`, the reads `summary`, `items`, `history`, `entry` and `outbox`, `definition`, `text(digest)`, `followReceipt` and `followDuty`. `found(transport, founding, definition, definitions?, reader?, beside?)`. `Transport`, `TransportError`. |
+| `declared` | `declaredHandle(scope, definition)`: a `DeclaredHandle` typed from the definition's own data, or a refusal when the scope publishes another definition. `DeclaredHandle`: `intent(signer, kind, asked, signing?)` and `submit(signed, grants?, beside?)`. `ShapeError`. The types `Kind`, `AskedOf`, `ValueOf`, `Members`, `Signed` and `Declared`. The section "A handle from a declared definition" below says what it checks. |
 | `http` | `httpTransport(service, options?)`: the transport over the service's HTTP routes. `options`: `fetch`, `bytes` and `seconds`. `REPLY_BYTES`, `REPLY_SECONDS`. |
 | `binding` | `bindingTransport(service)`: the transport over a service binding to the Worker's entrypoint. |
 | `answers` | Not exported. For each operation, whether a reply is one of its answers, and which refusals that operation has. Both transports use it. The guards of the records inside a reply are the bytes package's `records`. |
@@ -26,6 +29,45 @@ its section "Client".
 entrypoint implements the same interface, and a typechecked file in the
 scope package, `test/conformance.types.ts`, stops compiling if either side
 drifts from it.
+
+## What travels beside an intent
+
+Two things travel beside a signed intent and are not signed. `submit` and
+`found` take them as the contract's `Beside`, and both transports carry
+them: over HTTP in the same body, over a service binding as one more
+argument.
+
+- `texts`: each detached text that a field of the intent names. A field
+  whose type says `detached: true` holds the digest of its text, in the
+  byte domain `artroom-text-1`, and the scope receives the text beside the
+  intent. The scope computes each digest itself, so a text needs no name.
+  A text that is not the one a field names is refused `bad-field`.
+- `presented`: the facts that the act declares in `presents`, by name.
+
+A retry sends the same signed intent with the same `beside`.
+`ScopeHandle.text(digest)` reads a detached text back, and checks it
+against the digest. After a redaction the scope holds no bytes under that
+digest, and the read is `not-found`.
+
+## A handle from a declared definition
+
+`declaredHandle(scope, definition)` takes a `ScopeHandle` and a definition
+value, such as one of the two lane definitions of the lanes package. It
+names no lane: any declared definition works, and a value written
+`as const` gives the narrowest types.
+
+| Step | What happens |
+|---|---|
+| `declaredHandle` | It reads the scope's summary, which names the definition the scope pins. It answers `{ ok: true, handle }` only when that name is the digest of the value given. Otherwise it answers `definition-mismatch` with what the scope publishes, or the reason of the read that failed. |
+| `handle.intent(signer, kind, asked)` | `kind` is an act kind of the definition, but not its genesis act. `asked` has the act's `fields`, `on` for an act on an existing item, `expected`, and `presented`. The compiler checks all of them against the definition's data. Then, before the signer is asked, each field is checked against its declared type: a text's `max`, an integer's range, an enum's values, a reference's form, a list's `max`, a record's members, no undeclared field and every required one. A value that fails throws `ShapeError`, with the path of the value, and nothing is signed. A detached text is given as the text: the intent holds its digest. It returns `{ signed, beside }`. |
+| `handle.submit(signed, grants, beside)` | It submits the three through the `ScopeHandle`. |
+
+The handle checks no guard, no grant and no state, and derives no
+judgment. A shape that passes may still be refused: the scope checks every
+field again, with its own bounds on a member's handle and on a list, and
+then judges the act. In this delivery no production scope runs a
+definition that uses a capability record, which both lane definitions do:
+a founding under one is answered `unsupported-definition`.
 
 ## What a transport returns
 

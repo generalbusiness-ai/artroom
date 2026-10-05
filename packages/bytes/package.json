@@ -1,7 +1,7 @@
 {
   "name": "@generalbusiness/artroom-bytes",
   "version": "0.1.0-dev.1",
-  "description": "Artroom's one implementation of bytes: canonical JSON, SHA-256, encodings, Ed25519, and the six byte domains.",
+  "description": "Artroom's one implementation of bytes: canonical JSON, SHA-256, encodings, Ed25519, and the seven byte domains.",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,

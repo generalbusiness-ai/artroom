@@ -1,0 +1,10 @@
+{
+  // The scenarios that run in the Workers runtime: the target is Cloudflare Workers, as for the scope package's tests.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "ESNext.Disposable"],
+    "types": ["@cloudflare/workers-types", "@cloudflare/vitest-pool-workers/types"],
+    "skipLibCheck": true
+  },
+  "include": ["src", "test/**/*.scope.test.ts", "test/support", "vitest.scope.config.ts"]
+}

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { PROPOSED_BOUNDS, type Receipt } from "@generalbusiness/artroom-contract";
 import { MemoryState, applyEntry, stateDigest, timeMs } from "@generalbusiness/artroom-derive";
+import { variant } from "@generalbusiness/artroom-derive/testing";
 import { HOLD, at, definition, found, rita, una, vic } from "./support.ts";
 
 describe("the head check (section 5.2, steps 4 to 6)", () => {
@@ -162,7 +163,7 @@ describe("the scope's budget (section 9.2), here 12 entries", () => {
     expect(await s.submit(s.remark())).toMatchObject({ answer: "refused", reason: "scope-full", judgedAt: { seq: 11 } });
   });
 
-  // The fourth witness of section 17.4 of revision 10 of the contract, adopted since and a candidate when this was written, and its last paragraph.
+  // The fourth witness of section 17.4 of the contract, and its last paragraph.
   test.each([
     { scopeEntries: 6, beside: { answer: "unavailable", reason: "unavailable" }, closing: 5 },
     { scopeEntries: 7, beside: { answer: "written" }, closing: 6 },
@@ -175,6 +176,33 @@ describe("the scope's budget (section 9.2), here 12 entries", () => {
     await s.alarm();
     // No other duty is pending and the head is not a checkpoint: this one is the closing checkpoint, and the history ends on it.
     expect([await s.stub.checkpoint(), (await s.head()).seq]).toMatchObject([{ answer: "written", fact: { seq: closing } }, scopeEntries - 1]);
+  });
+
+  test("a report that awaits its acceptance reserves that entry: at a full budget new work is refused, and the acceptance is written", async () => {
+    const s = await found({ scopeEntries: 6 });
+    const commitment = await s.commitment();                  // entries 1 and 2
+    const report = (await s.did(una, "report", { fields: { commitment }, expected: { commitment: 2 } })).fact.seq;   // entry 3: four written, two reserved
+    expect(await s.submit(s.remark())).toMatchObject({ answer: "refused", reason: "scope-full" });
+    // The act that takes the report out of `reported` settles it. It is written against the report's own reservation, in the commit.
+    expect(await s.act(vic, "accept-report", { on: report, expected: { on: 1 } })).toMatchObject({ answer: "accepted", receipt: { fact: { seq: 4 } } });
+    expect(await s.stub.checkpoint()).toMatchObject({ answer: "written", fact: { seq: 5 } });
+
+    // The same lane, where the acceptance also asks for a lane to be created, and where the clause of another request, of a
+    // renewal, can move a hold's end. A report then reserves three entries: the acceptance, and the two of the request it sends.
+    // For any pending request the runtime holds one entry more, the most that a clause of any request of the definition can start.
+    // So the state after the acceptance reserves more than the report did. It is written all the same, because the turn passes the
+    // judge's word that the entry settles: no free entry is asked of it. Everything else is still refused.
+    const asks = { create: { kind: "lane", definition: "self", fields: { title: { const: "another" }, opener: { signer: true } } } };
+    const asking = variant(definition.declared, (def) => {
+      def.acts["accept-report"].sends = [{ create: { ...asks.create, result: {} } }];
+      def.acts.renew.sends = [{ create: { ...asks.create, result: { applied: [{ value: { slot: "until", from: { time: { plusSeconds: 600 } } } }] } } }];
+    });
+    expect([asking.pending, asking.clauseEntries]).toEqual([{ report: { reported: 3 } }, 1]);
+    const a = await found({ scopeEntries: 8 }, {}, asking);
+    const under = await a.commitment();
+    const reported = (await a.did(una, "report", { fields: { commitment: under }, expected: { commitment: 2 } })).fact.seq;   // four written, four reserved
+    expect([await a.submit(a.remark()), await a.act(vic, "accept-report", { on: reported, expected: { on: 1 } }), await a.submit(a.remark())])
+      .toMatchObject([{ answer: "refused", reason: "scope-full" }, { answer: "accepted", receipt: { fact: { seq: 4 }, sends: ["4.0"] } }, { answer: "refused", reason: "scope-full" }]);
   });
 
   test("after a closing checkpoint nothing is reserved; the next entry that is not a checkpoint is admitted only with a closing checkpoint reserved again", async () => {

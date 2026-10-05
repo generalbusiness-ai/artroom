@@ -12,9 +12,10 @@
 import type { Digest, Effect, Entry, ItemType, MemberRef } from "@generalbusiness/artroom-contract";
 import { intentDigest, seedDigest } from "@generalbusiness/artroom-bytes";
 import { UNDER, historyOf, withActing, withMembers, withPrincipal, type Signer } from "./attribution.ts";
+import { HOLDER, changeHold } from "./hold.ts";
 import type { Item, Party, StateWriter, Status } from "./state.ts";
 import { own, same } from "./values.ts";
-import type { ValidDefinition } from "./validate.ts";
+import type { ValidDefinition } from "./validate/index.ts";
 
 /** An entry that this state cannot take: out of sequence, or with an effect on nothing. */
 export class FoldError extends Error {
@@ -25,7 +26,7 @@ export class FoldError extends Error {
 export type ItemEffect = Extract<Effect, { effect: "state" | "party" | "ref" | "value" | "list" | "hold" }>;
 
 /** The slot of a hold type whose member is the holder (section 6.8). */
-export const HOLDER = "holder";
+export { HOLDER };
 
 /** Section 6.3: a new item is in its initial state, each slot takes its default or is empty, and its revision is 1. */
 export function newItem(effect: Extract<Effect, { effect: "open" }>, type: ItemType, opened: Digest | null): Item {
@@ -76,7 +77,7 @@ function changeSlots(item: Item, effect: ItemEffect, definition: ValidDefinition
     }
     case "ref": return { ...item, refs: { ...item.refs, [effect.slot]: effect.to } };
     case "value": return { ...item, values: { ...item.values, [effect.slot]: effect.value } };
-    case "hold": return { ...item, epoch: effect.epoch };
+    case "hold": return changeHold(item, effect, definition, signer);
   }
 }
 
@@ -115,8 +116,22 @@ export function applyEntry(writer: StateWriter, definition: ValidDefinition, ent
         now.set(effect.item, newItem(effect, type, hash));
         break;
       }
-      case "state": case "party": case "list": case "ref": case "value": case "hold":
-        now.set(effect.item, changeItem(touch(effect.item), effect, definition, signer));
+      case "state": case "party": case "list": case "ref": case "value": case "hold": {
+        const item = changeItem(touch(effect.item), effect, definition, signer);
+        now.set(effect.item, item);
+        // Section 6.6: the scope keeps, for a slot that holds a detached text, each digest the slot has held, so that a redaction
+        // can list them. The bytes are a retained input, which the fold does not keep.
+        const of = effect.effect === "value" ? own(own(definition.declared.items, item.type)?.values, effect.slot)?.of : undefined;
+        if (effect.effect === "value" && of?.type === "text" && of.detached && typeof effect.value === "string") {
+          const held = writer.texts(effect.item, effect.slot);
+          if (!held.includes(effect.value as Digest)) writer.putTexts(effect.item, effect.slot, [...held, effect.value as Digest]);
+        }
+        break;
+      }
+      case "redact":
+        // The entry is the tombstone of those texts. The slot keeps its digest, and holds no text that is still to be redacted.
+        now.set(effect.item, touch(effect.item));
+        writer.putTexts(effect.item, effect.slot, []);
         break;
       case "relation":
         writer.putRelation({ owner: effect.owner, name: effect.name, item: effect.item, state: effect.state, revision: effect.revision });
@@ -132,6 +147,8 @@ export function applyEntry(writer: StateWriter, definition: ValidDefinition, ent
         writer.putOperation({ ...operation, attempts: [...operation.attempts, { attempt: effect.attempt, opened: entry.seq, outcome: null }] });
         break;
       }
+      case "record":
+        break; // Section 6.11: a capability's record is the capability's own state. No source keeps one yet; the entry holds the change.
       case "index": case "attention":
         break; // Rows and notices that no guard of this scope reads.
     }

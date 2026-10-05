@@ -7,6 +7,9 @@
  * default export are the deployed entrypoint and routes over that
  * namespace. The test authority reaches a scope only through these classes,
  * which the production entry, `src/worker.ts`, does not import.
+ *
+ * The package exports this file as `./testing/worker`, for the test Worker
+ * of a package that runs its own definitions on real scopes.
  */
 
 import { ScopeObject, type Wiring } from "../src/index.ts";
@@ -28,7 +31,7 @@ export class NetScope extends DeployedScope<NetEnv> {
   protected override scopes() { return this.env.NET; }
   protected override wiring(name: string | undefined): Wiring {
     const deployed = super.wiring(name);
-    return { bounds: net.bounds, ports: { ...deployed.ports, ...netPorts(net, deployed.ports!.transport!) } };
+    return { bounds: net.sized.get(name ?? "") ?? net.bounds, ports: { ...deployed.ports, ...netPorts(net, deployed.ports!.transport!, deployed.ports!.resolver) } };
   }
 }
 

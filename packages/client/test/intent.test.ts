@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import { LATE, publicKeyOf, takeBytes, verifySignedIntent } from "@generalbusiness/artroom-bytes";
+import { LATE, MAX_DEPTH, isFieldValue, publicKeyOf, takeBytes, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import { ScopeHandle, TransportError, bindingTransport, found, httpTransport, signedIntent, webCryptoSigner, type ServiceBinding, type Transport } from "../src/index.ts";
 
 test("an intent signed by a WebCrypto key that cannot be read is one the bytes package verifies; each intent has a fresh idempotency key and a notAfter within the lifetime bound", async () => {
@@ -29,12 +29,15 @@ test("a reply is an outcome only when it is an answer of its operation: a discri
   const submit = (reply: unknown) => replying(reply).submit(fact.at.scope, {} as never, []);
   const settle = (reply: unknown) => replying(reply).settle(fact.at.scope, {} as never);
   // Each has the member its route's answers have, and is not one of them.
-  for (const reply of [{ answer: null }, { answer: "accepted" }, { answer: "accepted", receipt: {} }, { answer: "refused", reason: "guard-failed" }, { answer: "refused", reason: "no", judgedAt: fact }, { answer: "done" }]) {
+  for (const reply of [{ answer: null }, { answer: "accepted" }, { answer: "accepted", receipt: {} }, { answer: "refused", reason: "guard-failed" }, { answer: "refused", reason: "no", judgedAt: fact }, { answer: "done" },
+    { answer: "refused", reason: "guard-failed", name: 7, judgedAt: { seq: 1, hash: d } }]) {
     await expect(submit(reply)).rejects.toThrow(TransportError);
   }
   for (const reply of [{ ok: "yes" }, { ok: true }, { ok: true, at: fact, value: {}, complete: true }, { ok: false }, { ok: false, reason: "gone" }]) await expect(settle(reply)).rejects.toThrow(TransportError);
   // An answer of the route is returned as it came.
-  const answers = [{ answer: "accepted", receipt }, { answer: "refused", reason: "guard-failed", judgedAt: { seq: 1, hash: d } }, { answer: "unavailable", reason: "busy" }, { answer: "mismatch", reason: "idempotency-mismatch" }];
+  // A refusal may carry the name that the failed guard declares.
+  const answers = [{ answer: "accepted", receipt }, { answer: "refused", reason: "guard-failed", judgedAt: { seq: 1, hash: d } }, { answer: "refused", reason: "guard-failed", name: "not-this-ask", judgedAt: { seq: 1, hash: d } },
+    { answer: "unavailable", reason: "busy" }, { answer: "mismatch", reason: "idempotency-mismatch" }];
   for (const answer of answers) expect(await submit(answer)).toEqual(answer);
   expect(await settle({ ok: true, at: { seq: 1, hash: d }, value: receipt, complete: true })).toMatchObject({ ok: true, value: receipt });
   expect(await settle({ ok: false, reason: "not-found" })).toEqual({ ok: false, reason: "not-found" });
@@ -51,7 +54,11 @@ test("on both transports, each operation of the handle returns a reply only when
   const sealed = { entry, hash: d };
   // An act's input, with an actor and a signature of the forms the contract fixes: a key ID of 32 bytes, a signature of 64.
   const intent = { v: 1, to: scope, actor: `key_${"A".repeat(43)}`, kind: "offer", on: null, expected: {}, fields: {}, idempotencyKey: "k", notAfter: entry.time };
-  const act = (over: object, sig = "A".repeat(86)) => read({ entry: { ...entry, input: { type: "act", signed: { intent: { ...intent, ...over }, sig }, authority: [] } }, hash: d });
+  const act = (over: object, sig = "A".repeat(86)) => read({ entry: { ...entry, input: { type: "act", signed: { intent: { ...intent, ...over }, sig }, authority: [], presented: {} } }, hash: d });
+  // A refused delivery records why: a code the contract names and, where the failed guard declares one, a name.
+  const refusal = (reason: unknown) => read({ entry: { ...entry, input: { type: "delivery", from: fact, n: 0, message: { class: "request", type: "tell", body: {} }, decision: "refused", reason } }, hash: d });
+  // A genesis states its act kind (section 4.1): one text, always present, and never empty.
+  const genesis = (kind: object) => read({ entry: { ...entry, input: { type: "genesis", seed: { v: 1, kind: "lane", definition: d, creator: scope, cause: d, ordinal: 0 }, inc: scope.inc, founding: null, source: fact, n: 0, message: { class: "request", type: "create", body: {} }, decision: "refused", ...kind } }, hash: d });
   const duty = { duty: "1.0", to: scope, class: "request", held: false, attempts: [{ at: entry.time, answer: "none" }], acknowledged: null, result: null, diagnosis: null };
   const summary = { scope, status: "active", definition: "platform:directory@1", time: entry.time, items: [item], counts: [["note", "draft", 1]] };
   const read = (value: unknown, more: object = {}) => ({ ok: true, at: head, value, complete: true, ...more });
@@ -73,13 +80,16 @@ test("on both transports, each operation of the handle returns a reply only when
       ...["source-unverified", "unsupported-definition"].map((reason) => ({ answer: "refused", reason, judgedAt: head }))]],
     ["settle", (t) => handle(t).settle({} as never), [read(receipt), refused, { ...refused, detail: fact }], [...each(read(receipt)), ...each(receipt).map((r) => read(r)), { ...refused, detail: "elsewhere" }]],
     ["summary", (t) => handle(t).summary(), [read(summary)], [...each(summary).map((v) => read(v)), read({ ...summary, status: "open" }), read({ ...summary, counts: [["note", "draft"]] }), read({ ...summary, items: [less(item, "opened")] })]],
-    ["items", (t) => handle(t).items("note", "c"), [read([item], { next: "c2" }), read([{ ...item, opened: null, epoch: 2 }])], [...each(item).map((v) => read([v])), read(item), read([item], { next: 2 }), read([{ ...item, attributed: [{}] }]), read([{ ...item, parties: { owner: {} } }])]],
+    ["items", (t) => handle(t).items("note", "c"), [read([item], { next: "c2" }), read([{ ...item, opened: null }])], [...each(item).map((v) => read([v])), read(item), read([item], { next: 2 }), read([{ ...item, attributed: [{}] }]), read([{ ...item, parties: { owner: {} } }])]],
     ["history", (t) => handle(t).history("c"), [read([sealed], { complete: false, next: "c2" })], [...each(sealed).map((v) => read([v])), ...each(entry).map((e) => read([{ entry: e, hash: d }])), read(sealed)]],
-    ["entry", (t) => handle(t).entry(1), [read(sealed), act({})], [...each(sealed).map((v) => read(v)), ...each(entry).map((e) => read({ entry: e, hash: d })), read({ entry: { ...entry, at: { ...scope, kind: "room" } }, hash: d }),
+    ["entry", (t) => handle(t).entry(1), [read(sealed), act({}), genesis({ kind: "file" }), refusal({ code: "guard-failed" }), refusal({ code: "guard-failed", name: "not-this-ask" })], [...each(sealed).map((v) => read(v)), ...each(entry).map((e) => read({ entry: e, hash: d })), read({ entry: { ...entry, at: { ...scope, kind: "room" } }, hash: d }),
       // The fixed records inside an entry: an input is one of the contract's with its members, and so is each use, prepared result and send.
       ...[{ input: { type: "act" } }, { input: { type: "mystery" } }, { uses: [{}] }, { prepared: [{}] }, { sends: [{}] }].map((part) => read({ entry: { ...entry, ...part }, hash: d })),
       // A member the contract types as an identifier is one: an actor that is text and no key ID, and a signature that is base64url and not 64 bytes.
-      act({ actor: "alice" }), act({}, "c2ln")]],
+      act({ actor: "alice" }), act({}, "c2ln"),
+      // A reason is that record, with a code the contract names: not a text, and not a name alone.
+      refusal("guard-failed"), refusal({ code: "tired" }), refusal({ name: "not-this-ask" }),
+      genesis({}), genesis({ kind: "" }), genesis({ kind: null })]],
     ["outbox", (t) => handle(t).outbox("c"), [read([duty], { next: "c2" })], [...each(duty).map((v) => read([v])), read(duty)]],
     ["followDuty", (t) => handle(t).followDuty("1.0"),
       [read(duty), read({ ...duty, acknowledged: fact, result: { seq: 2, clause: "applied" }, diagnosis: { seq: 3, finding: "undelivered" } }), refused],
@@ -122,6 +132,31 @@ test("the intent that is signed is a detached copy: what the caller changes whil
   release();
   const signed = await pending;
   expect([verifySignedIntent(signed), signed.intent.fields, signed.intent.expected]).toEqual([true, { source: "a repository", tags: ["a"] }, { on: 1 }]);
+});
+
+test("a reply nested far deeper than any value can be is no answer on either transport, and is no field value: the guard returns false and does not throw, and a service binding's result is disposed whatever the guard does", async () => {
+  const d = `sha256:${"a".repeat(64)}`;
+  const fact = { at: { scope: `sc_${"a".repeat(52)}`, inc: `in_${"a".repeat(26)}`, kind: "lane" }, seq: 1, hash: d };
+  /** A record nested `n` deep, from text and not by recursion. */
+  const nested = (n: number) => '{"x":'.repeat(n) + "0" + "}".repeat(n);
+  const receipt = (text: string) => `{"answer":"accepted","receipt":{"fact":${JSON.stringify(fact)},"definition":"${d}","intent":"${d}","effects":[{"effect":"value","item":0,"slot":"s","value":${text}}],"sends":[],"epoch":0}}`;
+  // The bound is the canonical form's: a record at MAX_DEPTH is a value, one level more is not, and a hundred thousand is not.
+  const guarded = (n: number) => { try { return isFieldValue(JSON.parse(nested(n))); } catch (error) { return error instanceof Error ? error.name : "threw"; } };
+  expect([MAX_DEPTH - 1, MAX_DEPTH, MAX_DEPTH + 1, 100_000].map(guarded)).toEqual([true, true, false, false]);
+  const deep = receipt(nested(100_000));
+  const http = httpTransport("https://scopes.test", { fetch: () => Promise.resolve({ status: 200, body: new Response(deep).body }) });
+  const refused = await http.submit(fact.at.scope, {} as never, []).catch((error: unknown) => error);
+  expect([refused instanceof TransportError, (refused as Error).message]).toEqual([true, expect.stringMatching(/is not an answer of submit\. The outcome of the submitted intent is unknown/)]);
+  // Over a binding the result is disposed after it is checked, and also when the guard throws, here a reply that cannot be read.
+  let disposed = 0;
+  const kept = Object.assign(JSON.parse(deep), { [Symbol.dispose]: () => { disposed += 1; } });
+  const unreadable = { get answer(): never { throw new RangeError("a reply the guard cannot walk"); }, [Symbol.dispose]: () => { disposed += 10; } };
+  for (const reply of [kept, unreadable]) {
+    const binding = bindingTransport(new Proxy({}, { get: () => () => Promise.resolve(reply) }) as ServiceBinding);
+    const error = await binding.submit(fact.at.scope, {} as never, []).catch((e: unknown) => e);
+    expect([error instanceof TransportError, (error as Error).message]).toEqual([true, "the reply is not an answer of submit"]);
+  }
+  expect(disposed).toBe(11);
 });
 
 test("a reply over HTTP is taken in as raw bytes only as far as the limit, and within a deadline; past either the outcome of a submitted intent is unknown, and the error says so", async () => {

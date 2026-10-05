@@ -40,6 +40,9 @@ export function render(report: Report, why: string | null = null): string {
   const { verified, anchored, missing } = report.dependencies;
   lines.push(`Foreign facts: ${verified} shown by replay of their source scope, ${anchored} taken from an anchor, ${missing.length} missing.`);
   for (const m of missing) lines.push(`  - missing: ${fact(m)}`);
+  // Section 9.3: a text that a tombstone removed is not missing. It is reported, and nothing was derived from its bytes.
+  if (report.redacted.length > 0) lines.push("Redacted texts, not derived again:");
+  for (const r of report.redacted) lines.push(`  - the text of slot ${r.slot} of item ${r.item}, removed by ${fact(r.tombstone)}`);
   lines.push("Trusts, which this report does not show:");
   for (const t of report.trusts) lines.push(`  - ${t}`);
   return lines.join("\n");

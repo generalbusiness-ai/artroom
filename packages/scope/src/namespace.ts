@@ -11,25 +11,27 @@
  * The answering side is what the object at a name does before any of its
  * scope's judgment: `routed`, the resolver of the name, which refuses an
  * address that is not this scope and incarnation; `sourced`, which answers
- * a read of one entry; and `declaredBy`, which answers a read of one
- * retained declaration.
+ * a read of one entry; `declaredBy`, which answers a read of one retained
+ * declaration; and `sentText`, which answers a read of one detached text
+ * that a send of this scope names.
  */
 
 import type { Digest, Entry, RoutingRefusal, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
-import { parseStrict, scopeIdOf } from "@generalbusiness/artroom-bytes";
+import { canonicalize, isDigest, isPlatformDefinition, parseStrict, platformName, scopeIdOf } from "@generalbusiness/artroom-bytes";
 import { isObject, isScopeRef, type Delivered, type ScopeState } from "@generalbusiness/artroom-derive";
 import type { Pinned } from "./core.ts";
-import type { Definitions, Delivery, Resolver, Transport } from "./ports.ts";
+import type { Definitions, Delivery, Resolver, SentTexts, Transport } from "./ports.ts";
 import type { Store } from "./store.ts";
 
 /** What the object at a name answers to a read of one of its entries. `bytes` null: it has no entry at that sequence number. */
 export interface Sourced { at: ScopeRef; under: string; bytes: string | null }
 
-/** The three calls one scope's object takes from another's. */
+/** The four calls one scope's object takes from another's. */
 export interface Peer {
   deliver(envelope: Delivered): Promise<Delivery>;
   source(seq: number): Promise<Sourced | null>;
   declared(digest: Digest): Promise<string | null>;
+  text(seq: number, digest: Digest): Promise<string | null>;
 }
 
 /** The little of a Durable Object namespace binding this file uses. */
@@ -71,11 +73,28 @@ export function routed(name: ScopeId | null, scope: ScopeState | null, delivered
   return scope || (isObject(message) && message["class"] === "request" && message["type"] === "create") ? null : "not-found";
 }
 
-/** One entry of this scope as another scope reads it, with the name of the definition this scope pins: its digest, or its platform name. */
+/**
+ * The name of the definition a scope pins, which a `fact` type's `under` and
+ * a handler's `from.under` are compared with (section 6.1): the name a
+ * declared definition states, or a platform definition's name without its
+ * version. Null: the scope pins a declaration that it cannot read now, so
+ * it cannot say.
+ */
+export function nameUnder(pinned: Pinned): string | null {
+  return isPlatformDefinition(pinned.named) ? platformName(pinned.named) : (pinned.definition?.declared.name ?? null);
+}
+
+/**
+ * One entry of this scope as another scope reads it, with the name of the
+ * definition this scope pins. A scope that cannot state that name gives no
+ * answer: the call fails, and the reader's entry cannot be read now.
+ */
 export function sourced(store: Store, pinned: Pinned | null, seq: number): Sourced | null {
   const scope = store.scope();
   if (!scope || !pinned) return null;
-  return { at: scope.at, under: pinned.named, bytes: (Number.isSafeInteger(seq) ? store.stored(seq) : null)?.bytes ?? null };
+  const under = nameUnder(pinned);
+  if (under === null) throw new Error("the pinned definition cannot be read, so its name cannot be stated");
+  return { at: scope.at, under, bytes: (Number.isSafeInteger(seq) ? store.stored(seq) : null)?.bytes ?? null };
 }
 
 /**
@@ -89,11 +108,26 @@ export function declaredBy(store: Store, digest: Digest): string | null {
 }
 
 /**
- * The resolver, the transport and the definitions over one namespace binding. A call that
- * fails is no answer: the entry cannot be read now, or the attempt is
- * unanswered.
+ * A detached text that a send of this scope's entry at `seq` names by
+ * digest, as the scope retains it: one JSON string (section 6.2). The
+ * bytes travel beside the message, so the receiver of that send asks for
+ * them. Null: this scope has no such entry, no send of that entry names
+ * that digest, or the scope holds no bytes under it, as after a redaction.
+ * A text that no send names is not answered: a reader asks the read port
+ * for it.
  */
-export function namespace(binding: Binding): { resolver: Resolver; transport: Transport; definitions: Definitions } {
+export function sentText(store: Store, seq: number, digest: Digest): string | null {
+  const kept = Number.isSafeInteger(seq) && isDigest(digest) ? store.stored(seq) : null;
+  if (!kept || !canonicalize((JSON.parse(kept.bytes) as Entry).sends).includes(`"${digest}"`)) return null;
+  return store.retained("text", digest)?.bytes ?? null;
+}
+
+/**
+ * The resolver, the transport, the definitions and the sent texts over one
+ * namespace binding. A call that fails is no answer: the entry cannot be
+ * read now, or the attempt is unanswered.
+ */
+export function namespace(binding: Binding): { resolver: Resolver; transport: Transport; definitions: Definitions; texts: SentTexts } {
   const peer = (name: ScopeId): Peer => binding.get(binding.idFromName(name)) as Peer;
   return {
     resolver: {
@@ -133,6 +167,18 @@ export function namespace(binding: Binding): { resolver: Resolver; transport: Tr
         try {
           const bytes = await peer(holder.scope).declared(named as Digest);
           return bytes === null ? { ok: false, reason: "absent" } : { ok: true, bytes };
+        } catch {
+          return { ok: false, reason: "unavailable" };
+        }
+      },
+    },
+    texts: {
+      // Section 6.2: the bytes of a detached text travel beside the message that names it. The receiver reads them from the sender.
+      async read(from, digest) {
+        try {
+          const bytes = await peer(from.at.scope).text(from.seq, digest);
+          const text: unknown = bytes === null ? null : parseStrict(bytes);
+          return typeof text === "string" ? { ok: true, text } : { ok: false, reason: "absent" };
         } catch {
           return { ok: false, reason: "unavailable" };
         }

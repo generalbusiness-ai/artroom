@@ -279,8 +279,9 @@ export class Turns {
       try {
         const sealed = this.#seal(definition, verdict.draft, clock, [...verdict.retain, ...rules]);   // 6.5
         // Section 9.2: an entry that admits duties is kept only if every admitted duty still has room to settle. The count is of
-        // the state the fold just wrote, so it is under the head check, and a verifier derives the same number.
-        if (!fits(this.#store, definition, this.#bounds, sealed.entry.input)) {
+        // the state the fold just wrote, so it is under the head check, and a verifier derives the same number. Section 17.3: an
+        // entry that settles what its form declares is written against its own duty's reservation, and is not asked.
+        if (!fits(this.#store, definition, this.#bounds, sealed.entry.input, verdict.draft.settles)) {
           refuse(() => verdict.full(head ?? { seq: sealed.entry.seq, hash: sealed.hash }));
           throw new Full();
         }
@@ -296,8 +297,8 @@ export class Turns {
   /**
    * Step 6.5, inside the commit's transaction: the entry at this head and
    * this reading, its hash, its row, the rows of its sends, its retained
-   * inputs, and the fold. `applyEntry` is the only code that changes folded
-   * state.
+   * inputs, the fold, and the removal of each text the entry redacts.
+   * `applyEntry` is the only code that changes folded state.
    */
   #seal(definition: ValidDefinition, draft: Draft, clock: Reading, retain: readonly Retained[]): Sealed {
     const entry = entryOf(this.#store, draft, clock);
@@ -314,6 +315,8 @@ export class Turns {
     this.#store.append(entry, hash, bytes, size);
     for (const input of retain) this.#store.retain(input);
     applyEntry(this.#store, definition, entry, hash);
+    // Section 6.6: a redaction removes the bytes of each text it lists from the retained inputs, in the commit that seals its tombstone.
+    for (const effect of entry.effects) if (effect.effect === "redact") for (const text of effect.texts) this.#store.forget("text", text);
     return { entry, hash };
   }
 

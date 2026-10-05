@@ -11,7 +11,7 @@ runtime writes and what a verifier derives cannot drift apart.
 
 The scope and replay contract is the authority. Comments cite its sections.
 Where the contract was silent, `notes/2026-10-04-i1-contract-deltas.md`
-records what was implemented.
+and `notes/2026-10-05-i2-contract-deltas.md` record what was implemented.
 
 The package has two entry points:
 
@@ -24,21 +24,46 @@ The package has two entry points:
 
 | Module | Holds |
 |---|---|
-| `validate` | `validateDefinition(definition, bounds, profiles?)`: a `ValidDefinition` with its digest, timed types, hold types, the slots each range guard's `where` reads, the chain of timed rules from each state (`deadlines`) and the most a result clause can start (`clauseEntries`); or a list of problems. `PROFILES`, `Profile`, `keptMessage`. |
+| `validate` | `validateDefinition(definition, bounds, profiles?)`: a `ValidDefinition` with its digest, timed types, hold types, the slots each range guard's `where` reads, the chain of timed rules from each state (`deadlines`) and the most a result clause can start (`clauseEntries`); or a list of problems. `PROFILES`, `Profile`. |
 | `state` | `StateView` and `StateWriter`; the records of an item (`Item`, `Party` and `Status` are the contract's, exported here again), a relationship copy, a sent request, a consumed delivery, a held creation and an outside operation; `MemoryState`; `StateSnapshot` and `stateDigest`, the digest a checkpoint carries. `StateView.page` is the one paged read: by type and states, in ID order, with the last ID as its cursor. An implementation reads it from an index ordered by type, state and ID, as `MemoryState` does, so a page costs the items it returns. Keeping the index has a cost too. In `MemoryState` a new item has the highest ID and is appended to its bucket. An item that changes state is found in its old bucket by binary search and placed in the new one, and each of those two steps shifts the IDs after it: one old live item that becomes final is inserted before every later ID in that bucket, which is linear in the retained final items of that type and state. A store with an ordered index, such as the scope runtime's SQLite index, pays a logarithmic update instead. Rebuilding a state from its history costs one such update for each entry. None of this has been measured. |
 | `fold` | `applyEntry(writer, definition, entry, hash)`, the only code that changes state. `changeItem` and `newItem`, which the judges use on their working copy. `FoldError`. |
 | `judge` | `judgeAct`, `judgeTimed`, and `entryOf`, which makes a draft the entry at a head and a reading, or entry 0 for a genesis. The answer types `ActJudgment`, `TimedJudgment` and `Judgment`. |
 | `genesis` | `judgeGenesis(view, definition, asked, context)` for a `Founding` (a directory) or a `Creation` (a child). |
 | `delivery` | `judgeDelivery(view, definition, delivered, context)` for a request, a result, a control and an advisory. `Delivered`, `Source`, `DeliveryContext`, `sentBy`. |
 | `settle` | `judgeDiagnosis`, `judgeOutcome`, `judgeCheckpoint`, and `checkpointOf(view)`. |
-| `reserve` | `owed(view, definition, head)`: the entries the pending duties of a state reserve, by section 17.2 of revision 10 of the contract, adopted since and a candidate when this was written: a deadline with its chain of timed rules, a request's result and diagnosis with what its clause can start, a confirmation, an attempt's outcome, and the closing checkpoint. `fits(view, definition, bounds, input)`: whether the entry just folded is a settling entry, or is new work that leaves them room. A checkpoint beside a pending duty is new work; one with nothing else pending is the closing checkpoint. The validator supplies `deadlines` and `clauseEntries`, and refuses, as `reserve-unbounded`, timed rules of one type that lead to one another in a cycle. |
+| `reserve` | `owed(view, definition, head)`: the entries the pending duties of a state reserve, by section 17.2 of the contract, revision 11, which is adopted: a deadline with its chain of timed rules, an item or a relationship copy that awaits the settlement an act or handler declares with `settles`, a request's result and diagnosis with what its clause can start, a confirmation, an attempt's outcome, and the closing checkpoint. The count is of entries only. `fits(view, definition, bounds, input, settled)`: whether the entry just folded is a settling entry, or is new work that leaves them room. `settled` is the judge's word, in `Draft.settles`, that an act or a delivered request took its subject out of the states its form's `settles` lists. A checkpoint beside a pending duty is new work; one with nothing else pending is the closing checkpoint. The validator supplies `deadlines`, `pending`, `pendingCopies` and `clauseEntries`, and refuses, as `reserve-unbounded`, timed rules of one type that lead to one another in a cycle, and forms that settle one another's pending states in a cycle. |
 | `rules` | `prepareRules(view, definition, judged)`: for each `rule` guard an input would meet, the rule, its expression, its input and the input's digest. |
-| `frame` | What the judges share: `Reading`, `readFields`, `readFacts`, `factsNamed` (the foreign entries a runtime fetches before the turn), `bound` (the handler a message runs), `runHandler`, `runClause`, `derive`. |
-| `guards`, `effects`, `sends` | `judgeGuard`, `deriveEffects`, `deriveSends`, the `Judging` value they read, and `ruleInput`. |
+| `fields` | How the fields of an input are read: `Reading`, which every judge is given, `readFields`, `readFacts`, and `factsNamed` (the foreign entries a runtime fetches before the turn). A fact that names the judging scope is a local fact: it is not fetched, `readFacts` checks it against the scope's own entry and puts it in normal form, the entry's `seq`, and a wrong hash is `fact-mismatch`. `Own` is the reader of a scope's own sealed entries, which a caller gives in `Reading.own`: the runtime from its stored history, a verifier from the entries it has checked. The fields of a delivered message: `messageFields` and `creationFields`, each read against the declared field types of the handler or the genesis act, and `updateOf`. The `self` mark is read as the sender's fact only in a field of type fact or a list of facts. |
+| `operand` | Not exported, but for `operand` and `slotOf` through `guards`. What an operand of the contract's section 6.5 reads, what a part reads inside an entry that a fact names, the kind of an entry, and equality after local facts are put in normal form. A field of this scope's own entry is read by this scope's types, and a field of a foreign entry as its bytes hold it. |
+| `handlers` | What the judges share beside that: `bound` (the handler a message runs, found by the message's class and name and the sender's kind, and not found for a sender under another definition than its `from` names, where the caller has read the source entry), `messageFacts` (the foreign entries that a message's declared fields name, which a runtime fetches before the turn), `alsoItems` (the other items an act or handler selects: by a field, through a slot, or as the one item of a type), `overMax`, `runHandler`, `runClause` and `derive`, which every judge of an act, a genesis or a delivery derives its written forms with. `Sent` is what a handler reads of its delivery beside the message's fields. `refusalName` gives the name a failed guard declares. |
+| `guards`, `effects`, `sends` | `judgeGuard`, `judgeGuards` (one written list of guards, with its three results), `deriveEffects`, `deriveSends`, the `Judging` value they read, and `ruleInput`. Effect and send derivation answer their result, a refusal, or that the input is not judged. From `sends` also: `directoryOf` (the directory a scope records at its genesis, where its index rows go), and `formOf` (the send form that made one recorded send of an entry, which a result's clause is found by). |
 | `timed` | `nextDue(view, definition, asOf)`: the next due transition in the contract's order. |
 | `time` | `clockOf(view, reading)`: one commit's reading, whether it is behind, and the time at which a transition is due. `timeMs`, `timeOf`. |
 | `attribution` | `historyOf(item, changed, definition, signer)`: an item's attribution history with what the entry's changed holds add. `attribution(history, signer)`: that history, then the signer and the signer's principal. |
 | `values` | `isValue` for each field type, `same`, `byteOrder`, and the reference shapes. |
+| `capability` | `Capabilities`: the rules of the capability versions that a runtime or a verifier has code for, which a judge is given in `Reading.capabilities` and asks for each `capability` guard and effect. This package holds no such rule. `derivable(definition, capabilities)`: whether every form in the definition's `underived` list has code. A runtime answers `unsupported-definition` when it is false. `Recorded`: one change of one record, which an entry holds as a `record` effect. |
+
+## The validator's modules
+
+`validate` is a directory, `src/validate/`. Its `index.ts` reads a
+definition's own members and puts the parts in order. Each family of forms
+has one module, so that work on one family touches one file.
+
+| Module | Reads |
+|---|---|
+| `shape` | The readers of untrusted data, and the problems they report. |
+| `context` | What the families share: the item types as read, what one act, handler or timed rule may name, and how a subject is resolved. |
+| `fields`, `items` | Field types, the declared fields of an act, and when one type may be copied into another; item types and their slots. |
+| `operands` | Operands, and the rule for a copy into a slot. |
+| `guards` | Guard forms. |
+| `effects` | Effect forms, and the rule against two effects on one slot. |
+| `hold` | The item form of the hold capability. |
+| `capability` | The capabilities a definition lists, a `capability` guard and effect, the part `carried` and the kind of a preparation entry, each checked against the contract package's `CAPABILITIES`. It derives none of them: each is listed in `ValidDefinition.underived`. |
+| `sends` | Send and attention forms, and result clauses. |
+| `handlers` | Acts and handlers, and the other items each names. |
+| `timed` | Timed rules, their graph, and the static size of a timed entry. |
+| `capacity` | What a duty reserves, as far as the definition decides it. |
+| `sizes` | Upper bounds on canonical bytes. |
 
 ## How a commit uses it
 
@@ -60,7 +85,7 @@ A judge answers one of these. Only the first records anything.
 | `repeat` (`accepted-before` for an act) | Already recorded, by the entry of that `seq`. |
 | `due` | A transition is due. Nothing is written and the drain runs first. |
 | `routing` | A delivery addressed to another scope or incarnation. |
-| `refused` | An act that is refused, with the head it was judged at; or an input the scope can never write. |
+| `refused` | An act that is refused, with the head it was judged at, and with the name its failed guard declares, if it declares one; or an input the scope can never write. |
 | `mismatch` | An act whose key is on another sealed intent. |
 
 The drain selects with `nextDue` and commits with `judgeTimed`, which
@@ -70,7 +95,7 @@ What the caller supplies for each input:
 
 | Input | Beside the clock and bounds |
 |---|---|
-| An act | The presented grants with the authority port's verdict; each fetched foreign entry its fields name; the prepared rule results. |
+| An act | The presented grants with the authority port's verdict; each fetched foreign entry its fields name; the prepared rule results; `own`, the reader of the scope's own entries, for a local fact. |
 | A genesis | The scope's own name and a new incarnation. For a child, the source entry: the creator's entry that holds the `create` send. |
 | A delivery | The send's address, source fact, ordinal and message; the source entry as read from the source scope. For a result, this scope's own entry that sent the request. |
 | A diagnosis | The request by `seq` and ordinal, the attempt log, and this scope's own entry that sent the request. |
@@ -164,3 +189,13 @@ does, and helpers that pass the entries of one scope to another. It is not
 exported from the package's main entry. The export
 `@generalbusiness/artroom-derive/testing` gives it to the tests of the
 packages that build on derive, and to nothing else.
+
+`test/fixtures-f.ts` adds two definitions for the tests of fields and of
+the hold type: `board`, and `works`, which is the fixture lane with the
+acts that end a commitment and a hold. It is not exported.
+
+Each family of forms has one test file, `test/forms-*.test.ts`: operands,
+guards, effects, sends, handlers, fields, the hold type, what travels
+beside an intent, and capability forms. Each shows on a small made-up
+definition what the validator accepts and refuses and what the judges
+derive. The two real lane definitions are validated in the lanes package.

@@ -3,7 +3,7 @@ import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { Effect, MemberRef, RefusalReason } from "@generalbusiness/artroom-contract";
 import { canonicalBytes, digestBytes, intentDigest } from "@generalbusiness/artroom-bytes";
 import { LAST_MS, type ActJudgment } from "../src/index.ts";
-import { Scope, d, fields, grantOf, keys, lane, laneDefinition, on, otherLane, small, smallDefinition, t, variant, type Actor } from "./fixtures.ts";
+import { Scope, d, directory, fields, grantOf, keys, lane, laneDefinition, on, otherLane, small, smallDefinition, t, variant, type Actor } from "./fixtures.ts";
 
 const { rita, una, vic, paul, sam } = keys;
 const names = (list: unknown) => (list as readonly MemberRef[]).map((m) => m.member);
@@ -46,13 +46,14 @@ describe("an accepted act", () => {
       { effect: "attention", item: 2, members: [una.member], reason: "replaced" }, { effect: "attention", item: 2, members: [vic.member], reason: "assigned" },
     ]);
 
-    // Sends take ordinals in written order. `self` is not expanded; an earlier local item is sent as its fact; a creation is addressed by a seed.
+    // Sends take ordinals in written order. `self` is not expanded; an earlier local item is sent as its fact; a creation is addressed by a seed,
+    // and the creation of a lane carries the directory that this scope records: here, its creator.
     const signed = s.intent(rita, "link", fields({ target: otherLane, about: 0 }));
     s.submit(signed);
     const link = s.entries.at(-1)!.entry;
     expect(link.sends).toEqual([
       { n: 0, to: otherLane, message: { class: "request", type: "relate", body: { name: "closes", item: { self: true }, state: "set", detail: { about: { at: s.at, seq: 0, hash: s.entries[0]!.hash } } } } },
-      { n: 1, to: { v: 1, kind: "lane", definition: d("e"), creator: s.at, cause: intentDigest(signed.intent), ordinal: 0 }, message: { class: "request", type: "create", body: { fields: { parent: { self: true }, by: rita.member } } } },
+      { n: 1, to: { v: 1, kind: "lane", definition: d("e"), creator: s.at, cause: intentDigest(signed.intent), ordinal: 0 }, message: { class: "request", type: "create", body: { fields: { parent: { self: true }, by: rita.member }, directory } } },
     ]);
     // Each request is outstanding until its one result.
     expect([s.state.request(link.seq, 0), s.state.request(link.seq, 1)].map((r) => r && [r.type, r.result, r.diagnosis])).toEqual([["relate", null, null], ["create", null, null]]);
@@ -238,9 +239,10 @@ describe("attribution (sections 6.7 and 10.2)", () => {
     const report = s.did(vic, "report", under(s, 2));
 
     // The attribution is taken of the commitment, not of the new report, which has no history: una is in it.
-    expect(names(s.item(report.seq).parties["authors"])).toEqual(["@una", "@paul", "@vic", "@quinn"]);
+    // The list is in byte order of member identifier, and not in the order in which the members joined the history.
+    expect(names(s.item(report.seq).parties["authors"])).toEqual(["@paul", "@quinn", "@una", "@vic"]);
     // A hold ending changed the hold only: the commitment kept its performer through it.
-    expect(s.item(hold.seq)).toMatchObject({ state: "ended", epoch: 2 });
+    expect(s.item(hold.seq)).toMatchObject({ state: "ended", values: { epoch: 2 } });
 
     // `notIn: [authors]`: an author, a principal of one, and a key that acts for one are all refused; an outsider is not.
     const forPaul: Actor = { ...sam, principal: paul.member };
@@ -252,18 +254,17 @@ describe("attribution (sections 6.7 and 10.2)", () => {
 });
 
 describe("attribution within an entry, and under later authority (section 6.7)", () => {
-  test("a holder set by an earlier effect of the entry is in the attribution; so is the principal of an attributed member's later grant", () => {
-    // A report that first hands the hold under its commitment to the member in `to`, renews it, and then takes the attribution.
+  test("a performer set by an earlier effect of the entry is in the attribution; so is the principal of an attributed member's later grant", () => {
+    // A report that first hands its commitment to the member in `to`, and then takes the attribution. Only a hold effect sets a
+    // holder, and it sets the signer, who is in every attribution. So the member an earlier effect brings in is a performer.
     const s = laneWithCommitment(variant(lane, (def) => {
       const report = def.acts.report;
-      report.also = { ...report.also, hold: { item: "hold", by: "hold" } };
-      report.fields = { ...report.fields, hold: { type: "item", of: "hold", required: true }, to: { type: "member", required: true } };
-      report.effects.splice(2, 0, { of: "also.hold", party: { slot: "holder", from: { field: "to" } } }, { of: "also.hold", hold: { do: "renew" } });
+      report.fields = { ...report.fields, to: { type: "member", required: true } };
+      report.effects.splice(2, 0, { of: "also.commitment", party: { slot: "performer", from: { field: "to" } } });
     }));
-    const hold = s.did(una, "take-hold", under(s, 2)).seq;
-    const report = s.did(una, "report", { fields: { commitment: 2, hold, to: vic.member }, expected: { commitment: s.item(2).revision, hold: 1 } });
-    // vic holds from this entry on, so vic is not outside the report's authors. Another signer set vic, so vic brings no principal.
-    expect(names(s.item(report.seq).parties["authors"])).toEqual(["@una", "@paul", "@vic"]);
+    const report = s.did(una, "report", { fields: { commitment: 2, to: vic.member }, expected: { commitment: s.item(2).revision } });
+    // vic performs from this entry on, so vic is not outside the report's authors. Another signer set vic, so vic brings no principal.
+    expect(names(s.item(report.seq).parties["authors"])).toEqual(["@paul", "@una", "@vic"]);
 
     // rita opens a note with una as owner: no grant of una's was judged. Later una edits it under a grant that names paul.
     const n = new Scope(smallDefinition);
@@ -303,7 +304,7 @@ describe("a foreign fact (sections 5.1 and 6.5)", () => {
     const { entry, hash } = l.entries.at(-1)!;
     const proof = { at: l.at, seq: entry.seq, hash };
     // `cite` with a second fact field, later in byte order than `proof`.
-    const s = new Scope(variant(small, (def) => { def.acts.cite.fields.second = { type: "fact", kind: "assign", under: "lane", required: false }; }));
+    const s = new Scope(variant(small, (def) => { def.acts.cite.fields.second = { type: "fact", kind: ["assign"], under: "lane", required: false }; }));
     const cite = (second: typeof proof) => s.act(una, "cite", { ...on(s, 0), ...fields({ proof, second }) }, { facts: [{ fact: proof, entry, under: "lane" }] });
     expect(cite({ at: otherLane, seq: 99, hash })).toEqual({ result: "unavailable", reason: "dependency-unavailable" });
     // Two references that both pass are one reference: the entry is used once.

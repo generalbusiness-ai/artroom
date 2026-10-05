@@ -53,6 +53,9 @@ export function isPlatformDefinition(value: unknown): value is PlatformDefinitio
   return typeof value === "string" && /^platform:(directory|membership|rules|destination|inbox|task)@(0|[1-9][0-9]*)$/.test(value);
 }
 
+/** The name of a platform definition, which `under` is compared with: its platform name without the version, such as `platform:task` (section 6.1). */
+export const platformName = (definition: PlatformDefinition): string => definition.slice(0, definition.lastIndexOf("@"));
+
 const TIME = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{3}))?Z$/;
 
 /** The text of an instant: whole seconds with no fraction, otherwise three digits. One instant has one text. */

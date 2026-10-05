@@ -14,6 +14,11 @@
  * the entry records; and proves each foreign fact the entry used, by replay
  * of the source scope up to that entry or by an anchor the caller supplies.
  *
+ * A detached text is checked against the digest that names it. A text whose
+ * bytes are gone is reported as redacted when a later entry of the same
+ * scope is its tombstone, and is not derived again. With no tombstone the
+ * replay is `incomplete` (section 9.3).
+ *
  * It runs none of the runtime's code. The judges and the fold are the pure
  * functions the runtime also calls; the turn, the store and transport are
  * not here.
@@ -26,12 +31,12 @@
 
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { Bounds, Digest, Entry, FactRef, Head, PlatformDefinition, Report, RetainedInput, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
-import { canonicalize, definitionDigest, digestBytes, isDigest, isEntry, parseStrict, scopeIdOf, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
+import { canonicalize, definitionDigest, digestBytes, isDigest, isEntry, parseStrict, scopeIdOf, textDigest, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import {
-  MemoryState, applyEntry, clockOf, entryOf, isFactRef, isLocalId, isObject, isScopeRef, judgeAct, judgeCheckpoint, judgeDelivery, judgeDiagnosis, judgeGenesis, judgeOutcome, judgeTimed,
+  MemoryState, applyEntry, clockOf, entryOf, inputTexts, isFactRef, isLocalId, isObject, isScopeRef, judgeAct, judgeCheckpoint, judgeDelivery, judgeDiagnosis, judgeGenesis, judgeOutcome, judgeTimed,
   nextDue, timeMs, updateOf, validateDefinition,
 } from "@generalbusiness/artroom-derive";
-import type { ActJudgment, Clock, Fetched, Judgment, TimedJudgment, ValidDefinition } from "@generalbusiness/artroom-derive";
+import type { ActJudgment, Capabilities, Clock, Fetched, Judgment, TimedJudgment, ValidDefinition } from "@generalbusiness/artroom-derive";
 import { RULE_PROFILES, evaluateRules } from "@generalbusiness/artroom-derive/rule";
 import { PAGE_ENTRIES, PAGE_REPLY_BYTES, RETAINED_REPLY_BYTES, hashOfBytes, type HistorySource, type Stored } from "./source.ts";
 
@@ -44,7 +49,7 @@ export interface Limits {
   scopes: number;    // scopes whose history is read
   entries: number;   // entries checked, over all scopes
   bytes: number;     // raw bytes read from the source: every reply of a page or of a retained input, as it arrived
-  depth: number;     // how far a chain of foreign facts is followed from the target
+  depth: number;     // how far a chain of foreign facts is followed from the target, also while the texts that are owed are settled
 }
 /** Defaults for a command-line run. They are this package's choice; the contract owes the numbers to the proof plan. */
 export const LIMITS: Limits = { scopes: 64, entries: 100_000, bytes: 256 * 1024 * 1024, depth: 16 };
@@ -63,6 +68,12 @@ export interface Options {
   limits?: Partial<Limits> | undefined;
   /** The bounds the scopes run under. A replay scans every range guard to its end, whatever `guardScan` says (section 9.3). */
   bounds?: Bounds | undefined;
+  /**
+   * The rules of the capability versions this replay has code for (section
+   * 9.3). With none, a scope whose definition needs a capability record is
+   * `unsupported-definition`. The package itself has none.
+   */
+  capabilities?: Capabilities | undefined;
 }
 
 /** A report, and in words why its result is not `consistent`. */
@@ -88,6 +99,7 @@ export const TRUSTS = {
   outcomes: "each outcome's evidence, and that the outside write happened",
   anchors: "each anchor as the caller supplied it, and the definition name retained with each anchored entry",
   bounds: "the bounds: each scope is taken to run under the bounds this replay was given",
+  redacted: "each redacted text: its bytes are gone, so nothing shows that they were the text its digest names, or that they were within the bound of their field",
 } as const;
 type Trust = keyof typeof TRUSTS;
 
@@ -133,6 +145,10 @@ interface Run {
   next: number | null;
   /** Being advanced now. A reference that needs a later entry of it is a circle (section 3). */
   busy: boolean;
+  /** How many foreign facts lead to this scope from the target, by the shortest chain that was followed. The target is at 0. */
+  depth: number;
+  /** Section 9.3: each detached text whose bytes are not at hand, with the entry that names it. A later tombstone of this scope answers for it. */
+  owed: { text: Digest; at: FactRef }[];
 }
 
 const sameScope = (a: ScopeRef, b: ScopeRef): boolean => a.scope === b.scope && a.inc === b.inc && a.kind === b.kind;
@@ -146,11 +162,14 @@ class Verifier {
   readonly #anchors: readonly Anchor[];
   readonly #limits: Limits;
   readonly #bounds: Bounds;
+  readonly #capabilities: Capabilities | undefined;
   readonly #runs = new Map<ScopeId, Run>();
   readonly #trusts = new Set<Trust>();
   /** The foreign facts proven, by scope, position and hash: by replay of their source, or by an anchor. */
   readonly #proven = new Map<string, "replayed" | "anchored">();
   readonly #anchored: FactRef[] = [];
+  /** Each tombstone that answered for a text whose bytes are gone, with the slot that held the text. */
+  readonly #redacted: Report["redacted"][number][] = [];
   #entries = 0;
   #bytes = 0;
 
@@ -163,6 +182,7 @@ class Verifier {
     this.#limits = { ...LIMITS, ...options.limits };
     // Section 9.3: each range guard is derived over every item it covers, so the scan never stops unfinished.
     this.#bounds = { ...(options.bounds ?? PROPOSED_BOUNDS), guardScan: Number.MAX_SAFE_INTEGER };
+    this.#capabilities = options.capabilities;
   }
 
   async run(): Promise<Verification> {
@@ -190,6 +210,7 @@ class Verifier {
       }
       const last = target.sealed[target.head.seq]!;
       if (last.hash !== target.head.hash) throw new Stop("mismatch", "the head the source states is not the hash of its last entry", { at: target.at!, seq: last.entry.seq, hash: last.hash });
+      await this.#settle();
     } catch (error) {
       if (!(error instanceof Stop)) throw error;
       stop = error;
@@ -210,6 +231,7 @@ class Verifier {
       anchors: this.#anchored,
       dependencies: { verified: proven.filter((how) => how === "replayed").length, anchored: proven.filter((how) => how === "anchored").length, missing: stop?.missing ? [stop.missing] : [] },
       trusts: (Object.keys(TRUSTS) as Trust[]).filter((trust) => this.#trusts.has(trust)).map((trust) => TRUSTS[trust]),
+      redacted: this.#redacted,
       result: stop ? stop.result : "consistent",
       ...(stop?.at ? { at: stop.at } : {}),
     };
@@ -223,7 +245,7 @@ class Verifier {
     if (this.#runs.size >= this.#limits.scopes) throw new Stop("incomplete", `the limit of ${this.#limits.scopes} scopes was reached`);
     const got = await this.#page(id, 0);
     if (!got.ok) return null;
-    const run: Run = { id, said: got.page.scope, head: got.page.head, at: null, named: null, definition: null, state: new MemoryState(), sealed: [], read: new Map(), next: 0, busy: false };
+    const run: Run = { id, said: got.page.scope, head: got.page.head, at: null, named: null, definition: null, state: new MemoryState(), sealed: [], read: new Map(), next: 0, busy: false, depth: Number.POSITIVE_INFINITY, owed: [] };
     if (!this.#take(run, 0, got.page.entries, got.page.next)) return null;
     this.#runs.set(id, run);
     return run;
@@ -286,6 +308,59 @@ class Verifier {
     return got.input;
   }
 
+  /**
+   * Section 9.3: a detached text that an entry names, checked against its
+   * digest. Returns the number of UTF-8 bytes of the text. Null: the scope
+   * holds no bytes under that digest, or holds bytes that are not that
+   * text. Such a text is owed until a tombstone answers for it.
+   */
+  async #text(run: Run, digest: Digest): Promise<number | null> {
+    const left = this.#limits.bytes - this.#bytes;
+    const got = await this.#source.retained(run.id, "text", digest, { bytes: Math.min(left, RETAINED_REPLY_BYTES) });
+    if (!got.ok) {
+      this.#unread(got.reason, left < RETAINED_REPLY_BYTES, `a retained input of ${run.id}`);
+      return null;
+    }
+    this.#count(got.bytes);
+    try {
+      const text: unknown = parseStrict(got.input.bytes);
+      return typeof text === "string" && textDigest(text) === digest ? utf8(text).length : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Section 9.3: a text whose bytes are gone is redacted when a tombstone of
+   * its scope lists it, and is otherwise a missing retained input. A source
+   * scope is checked only as far as a reference needs, and its tombstone may
+   * come later, so its history is read on to its head before the answer.
+   *
+   * Reading a scope on may prove a fact of a scope that was not read before,
+   * or read an earlier scope further, and either may owe a text. So this
+   * goes on until no scope that was read owes one. It ends: a round that
+   * does not stop the traversal has checked at least one more entry, the
+   * tombstone that left its scope owing nothing, and the entries checked
+   * are within the limit on entries, as the scopes are within theirs.
+   *
+   * The limit on depth counts from the target here too. A scope is read on
+   * at the depth at which the traversal reached it, so a fact that its
+   * later entries use is one step further from the target, and a chain
+   * that would pass the limit ends the replay `incomplete`.
+   */
+  async #settle(): Promise<void> {
+    const owing = () => [...this.#runs.values()].find((run) => run.owed.length > 0);
+    for (let run = owing(); run; run = owing()) {
+      try {
+        await this.#advance(run, run.head.seq, run.depth);
+      } catch (error) {
+        if (!(error instanceof Gap)) throw error;
+      }
+      const owed = run.owed[0];
+      if (owed) throw new Stop("incomplete", `a retained input is missing: the detached text ${owed.text}, which no later entry of ${run.id} redacts`, owed.at);
+    }
+  }
+
   #count(bytes: number): void {
     this.#bytes += bytes;
     if (this.#bytes > this.#limits.bytes) throw new Stop("incomplete", `the limit of ${this.#limits.bytes} bytes was reached`);
@@ -300,6 +375,7 @@ class Verifier {
    * checked against that entry's bytes before its content is read.
    */
   async #advance(run: Run, through: number, depth: number, expect?: { hash: Digest; user: FactRef }): Promise<void> {
+    run.depth = Math.min(run.depth, depth);
     if (through < run.sealed.length) return;
     // A fact names a sealed entry, so no entry can need one that is sealed after it (section 3).
     if (run.busy) throw new Stop("mismatch", `a reference names entry ${through} of ${run.id}, which is not sealed before the entry that uses it`, expect?.user ?? null);
@@ -397,6 +473,9 @@ class Verifier {
     // Bytes that do not parse, or do not hash to the value named, are rejected before anything in them is read (section 9.4).
     if (declared === undefined) throw new Stop("incomplete", `a retained input is not the one named: the definition's declaration, ${digest}`, where);
     const checked = validateDefinition(declared, this.#bounds, RULE_PROFILES);
+    // Section 9.3: a capability version that the verifier does not implement gives `unsupported-definition`.
+    const needs = checked.ok ? checked.definition.underived.find((u) => !this.#capabilities?.implements(u.capability)) : undefined;
+    if (needs) throw new Stop("unsupported-definition", `the pinned definition needs ${needs.capability}, which this replay has no code for: ${needs.form} ${needs.name} at ${needs.path}`, where);
     if (checked.ok) return checked.definition;
     // Section 9.3: a history whose genesis opens a timed item is invalid.
     if (checked.problems.some((p) => p.code === "genesis-timed")) throw new Stop("mismatch", "genesis-timed: the pinned definition's genesis act opens a timed item", where);
@@ -442,6 +521,8 @@ class Verifier {
     const state = run.state;
     const definition = run.definition ?? (run.definition = await this.#pin(run, where));
     const bounds = this.#bounds;
+    // Sections 4.1 and 9.4: a genesis states the genesis act of the definition that it pins. Integrity mode reads no definition, and does not check this.
+    if (input.type === "genesis" && input.kind !== definition.declared.genesis) throw mismatch(`genesis-kind: the genesis records the kind ${input.kind}, and the genesis act of the pinned definition is ${definition.declared.genesis}`);
 
     // The retained copy of each foreign entry this entry used, by its content digest (section 9.2).
     const facts: Fetched[] = [];
@@ -463,8 +544,9 @@ class Verifier {
     for (const fact of foreign) {
       if (!isFactRef(fact)) throw mismatch("a reference is not a fact reference");
       const how = await this.#prove(fact, where, depth);
-      // The name of the definition the source pins, which a `fact` field and a handler may read, is the source's own genesis's to say.
-      const pinned = this.#runs.get(fact.at.scope)?.named;
+      // The name of the definition the source pins, which a `fact` field and a handler may read, is the source's own genesis's to say:
+      // the name that the declaration its seed names states (section 6.1). A source that was replayed has that declaration pinned.
+      const pinned = this.#runs.get(fact.at.scope)?.definition?.declared.name;
       for (const copy of facts) if (copy.fact.hash === fact.hash && how === "replayed" && copy.under !== pinned) throw mismatch(`the retained copy of entry ${fact.seq} of ${fact.at.scope} names another definition than that scope pins`);
     }
 
@@ -499,7 +581,17 @@ class Verifier {
     // The judgment, derived again on the entry's recorded time. A clamped entry was judged on a reading behind its history
     // (section 5.3): the reading is not recorded, and an entry that judges time is never written clamped.
     const clock: Clock = entry.clamped ? { reading: entry.time, behind: true, asOf: entry.time } : clockOf(state, entry.time);
-    const reading = { clock, bounds, facts, prepared: entry.prepared };
+    // Section 9.3: each detached text that the input names, against its digest. One whose bytes are gone is not asked for again
+    // by the judge: it is owed, and a tombstone must answer for it.
+    const texts = new Map<Digest, number | null>();
+    // A message that no handler received names none: a handler whose `from` names another definition than the sender pins did not.
+    for (const text of inputTexts(definition, input, input.type === "delivery" ? facts.find((f) => f.fact.hash === input.from.hash)?.under : undefined)) {
+      const size = await this.#text(run, text);
+      texts.set(text, size);
+      if (size === null) run.owed.push({ text, at: where });
+    }
+    // Section 6.2: a local fact, and a part of one, are read from this scope's own history: the entries checked so far.
+    const reading = { clock, bounds, facts, prepared: entry.prepared, own: (at: number) => run.sealed[at] ?? null, texts: (digest: Digest) => texts.get(digest) ?? null, capabilities: this.#capabilities };
     const copyOf = (fact: FactRef | null) => facts.find((f) => f.fact.hash === fact?.hash) ?? null;
     const own = (seq: unknown): Entry | null => (isLocalId(seq) ? (run.sealed[seq]?.entry ?? null) : null);
     let judged: ActJudgment | Judgment | TimedJudgment;
@@ -518,7 +610,7 @@ class Verifier {
       case "act":
         // Section 9.3: that a grant was fresh is not checked, beyond its recorded form. The authority port's verdict is trusted.
         this.#trusts.add("authority");
-        judged = judgeAct(state, definition, input.signed, { ...reading, grants: input.authority.map((grant) => ({ grant, current: true })) });
+        judged = judgeAct(state, definition, input.signed, { ...reading, presented: input.presented, grants: input.authority.map((grant) => ({ grant, current: true })) });
         break;
       case "delivery": {
         this.#trusts.add("delivered");
@@ -559,6 +651,16 @@ class Verifier {
     }
     if (canonicalize(derived) !== bytes) throw mismatch("the recorded entry is not the one derived again");
     applyEntry(state, definition, entry, hash);
+    // Section 9.3: this entry is the tombstone of each text that its `redact` effects list. The judge derived the list again from
+    // what the slot had held. A text that an earlier entry names, and whose bytes are gone, is reported as redacted.
+    for (const effect of entry.effects) {
+      if (effect.effect !== "redact") continue;
+      const answered = run.owed.filter((owed) => effect.texts.includes(owed.text));
+      if (answered.length === 0) continue;
+      run.owed = run.owed.filter((owed) => !answered.includes(owed));
+      this.#redacted.push({ tombstone: where, item: effect.item, slot: effect.slot });
+      this.#trusts.add("redacted");
+    }
   }
 }
 

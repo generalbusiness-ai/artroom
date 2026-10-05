@@ -12,7 +12,7 @@
 import type { Answer, DeliveryRefusal, RefusalReason, UnavailableReason } from "./result.ts";
 import type { DeclaredDefinition } from "./definition.ts";
 import type { DutyId, Receipt } from "./entry.ts";
-import type { Grant, Digest, PlatformDefinition } from "./scope.ts";
+import type { FactRef, Grant, Digest, PlatformDefinition } from "./scope.ts";
 import type { SignedIntent } from "./intent.ts";
 import type { Cursor, Duty, Item, LogPage, Read, RetainedInput, Sealed, Settlement, Summary } from "./read.ts";
 
@@ -27,15 +27,28 @@ export type Founded =
   | { answer: "refused"; reason: RefusalReason | DeliveryRefusal | "unsupported-definition" }
   | { answer: "unavailable"; reason: UnavailableReason };
 
+/**
+ * What travels beside a signed intent, and is not signed (sections 6.2 and
+ * 6.4). `texts`: each detached text that a field of the intent names by its
+ * digest. The scope computes each digest itself, so a text needs no name. A
+ * text that no field names is not kept. `presented`: the facts presented
+ * beside the intent, by the names the act declares in `presents`.
+ */
+export interface Beside { texts?: readonly string[]; presented?: Record<string, FactRef> }
+
 export interface ScopeApi {
   /**
    * Found a repository's directory. `definition` is a declaration, or the
    * digest or platform name of one. `definitions`: the declarations it names
    * in `create` sends, which the directory retains for its children.
+   * `beside`: the detached texts that the founding intent's fields name.
    */
-  found(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions?: readonly DeclaredDefinition[]): Promise<Founded>;
-  /** Submit an act (section 4.2). A caller with no answer, or an unavailable one, sends the same signed intent again. */
-  submit(scope: string, signed: SignedIntent, grants: readonly Grant[]): Promise<Answer>;
+  found(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions?: readonly DeclaredDefinition[], beside?: Beside): Promise<Founded>;
+  /**
+   * Submit an act (section 4.2). A caller with no answer, or an unavailable
+   * one, sends the same signed intent again, with the same `beside`.
+   */
+  submit(scope: string, signed: SignedIntent, grants: readonly Grant[], beside?: Beside): Promise<Answer>;
   /** The receipt of an accepted act, for its exact signed intent (section 4.2). */
   settle(scope: string, signed: SignedIntent): Promise<Settlement>;
 

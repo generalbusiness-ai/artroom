@@ -7,12 +7,13 @@
  */
 
 import type { Attempt, Digest, Entry, Input } from "@generalbusiness/artroom-contract";
-import { runClause, type Reading } from "./frame.ts";
+import type { Reading } from "./fields.ts";
+import { runClause } from "./handlers.ts";
 import type { Judgment } from "./judge.ts";
 import { stateDigest, type ScopeState, type StateView } from "./state.ts";
 import { nextDue } from "./timed.ts";
 import { timeMs } from "./time.ts";
-import type { ValidDefinition } from "./validate.ts";
+import type { ValidDefinition } from "./validate/index.ts";
 import { isLocalId } from "./values.ts";
 
 type Settling = Pick<Reading, "clock" | "bounds">;

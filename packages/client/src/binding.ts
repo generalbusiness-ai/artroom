@@ -22,15 +22,21 @@ export function bindingTransport(service: ServiceBinding): Transport {
     } catch (error) {
       throw new TransportError(`no reply: ${error instanceof Error ? error.message : String(error)}`);
     }
-    const ok = ANSWERS[op](answer);
-    // A result over RPC can keep the service's side open until it is disposed. Every answer here is plain data, which stays readable.
-    if (typeof answer === "object" && answer !== null) (answer as Partial<Disposable>)[Symbol.dispose]?.();
+    let ok = false;
+    try {
+      ok = ANSWERS[op](answer);
+    } catch {
+      ok = false;   // A reply the guard cannot walk is no answer.
+    } finally {
+      // A result over RPC can keep the service's side open until it is disposed. Every answer here is plain data, which stays readable.
+      if (typeof answer === "object" && answer !== null) (answer as Partial<Disposable>)[Symbol.dispose]?.();
+    }
     if (!ok) throw new TransportError(`the reply is not an answer of ${op}`);
     return answer;
   };
   return {
-    found: (founding, definition, definitions = []) => call("found", () => service.found(founding, definition, definitions)),
-    submit: (scope, signed, grants) => call("submit", () => service.submit(scope, signed, grants)),
+    found: (founding, definition, definitions = [], beside = {}) => call("found", () => service.found(founding, definition, definitions, beside)),
+    submit: (scope, signed, grants, beside = {}) => call("submit", () => service.submit(scope, signed, grants, beside)),
     settle: (scope, signed) => call("settle", () => service.settle(scope, signed)),
     summary: (scope, reader) => call("summary", () => service.summary(scope, reader)),
     items: (scope, reader, type, cursor) => call("items", () => service.items(scope, reader, type, cursor)),

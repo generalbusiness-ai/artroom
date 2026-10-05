@@ -1,5 +1,5 @@
 /**
- * The six byte domains (scope contract, section 2.1). Every digest and
+ * The seven byte domains (scope contract, section 2.1). Every digest and
  * signature is over a domain tag, one newline byte, and the canonical JSON of
  * one value. No value contains its own digest.
  */
@@ -77,6 +77,16 @@ export function deliveryCauseDigest(cause: DeliveryCause): Digest {
 
 export function definitionDigest(definition: DeclaredDefinition): Digest {
   return digest(DOMAINS.definition, definition);
+}
+
+/**
+ * The digest that names a detached text (section 6.2): over the text as one
+ * JSON string. An intent, an entry and an effect hold this digest, and never
+ * the text. Throws for a text with a lone surrogate, which has no canonical
+ * bytes.
+ */
+export function textDigest(text: string): Digest {
+  return digest(DOMAINS.text, text);
 }
 
 const named = (value: unknown, prefix: string, chars: number, bytes: number): boolean =>

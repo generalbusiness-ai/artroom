@@ -3,7 +3,7 @@ import { DOMAINS } from "@generalbusiness/artroom-contract";
 import type { Digest, Message, Seed, SignedIntent } from "@generalbusiness/artroom-contract";
 import {
   b64url, canonicalBytes, canonicalize, definitionDigest, deliveryCauseDigest, digestBytes, domainBytes, entryHash, factRefOf, intentDigest,
-  isDutyId, isIncarnation, isKeyId, isMemberId, isOperationId, isPlatformDefinition, isScopeId, isScopeKind, keyIdOfSecret, messageDigest, newIncarnation, scopeIdOf, seedDigest, sign, signIntent, unb64url, utf8, verifySignedIntent,
+  isDutyId, isIncarnation, isKeyId, isMemberId, isOperationId, isPlatformDefinition, isScopeId, isScopeKind, keyIdOfSecret, messageDigest, newIncarnation, scopeIdOf, seedDigest, sign, signIntent, textDigest, unb64url, utf8, verifySignedIntent,
 } from "../src/index.ts";
 import { cause, definition, directory, entry, intent, message, otherSecret, secret, seed } from "./fixtures.ts";
 
@@ -36,6 +36,19 @@ describe("byte domains", () => {
     const value: Message = { class: "advisory", type: "index", body: { n: 1 } };
     expect(domainBytes(DOMAINS.message, value)).toEqual(new TextEncoder().encode(text));
     expect(messageDigest(value)).toBe("sha256:8e6e8bab371f3c95f753a75291f29a9cad024babc6f69c70b35d476b89aef1f6");
+  });
+
+  test("a detached text is named by the digest of its own tag, a newline and the text as one JSON string", () => {
+    // The expected value was not produced by this package: the bytes are the tag, a newline, and the text as canonical JSON written
+    // by hand, with its quotes and its line break escaped. Their SHA-256 was computed once with Node's `crypto.createHash("sha256")`.
+    const text = 'She said "ok".\nπ';
+    expect(domainBytes(DOMAINS.text, text)).toEqual(new TextEncoder().encode('artroom-text-1\n"She said \\"ok\\".\\nπ"'));
+    expect(textDigest(text)).toBe("sha256:1c2580bc44ef94569e0e445903667e564def426064c37ea836e795c5d4a6d907");
+    // It is not the digest of the text's own bytes, and one more space is another text.
+    expect(textDigest(text)).not.toBe(digestBytes(utf8(text)));
+    expect(textDigest(`${text} `)).not.toBe(textDigest(text));
+    // A text with a lone surrogate has no canonical bytes, so it has no digest.
+    expect(() => textDigest("\ud800")).toThrow();
   });
 });
 

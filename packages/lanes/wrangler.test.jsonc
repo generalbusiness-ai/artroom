@@ -1,0 +1,15 @@
+// The scopes that the lane scenarios run on, as the workerd test pool runs
+// them (vitest.scope.config.ts): the scope package's test classes, in one
+// namespace with real Durable Object SQLite storage, and the Worker's own
+// entrypoint bound as a service. Nothing is deployed from this file.
+{
+  "name": "artroom-lanes-test",
+  "main": "test/support/worker.ts",
+  "compatibility_date": "2026-08-15",
+  "compatibility_flags": ["nodejs_compat"],
+  "durable_objects": {
+    "bindings": [{ "name": "NET", "class_name": "NetScope" }]
+  },
+  "services": [{ "binding": "API", "service": "artroom-lanes-test", "entrypoint": "NetService" }],
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["NetScope"] }]
+}

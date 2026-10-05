@@ -5,7 +5,7 @@
  * compiling. The digests and names are made up.
  */
 
-import type { Answer, DeclaredDefinition, DeliveryCause, Digest, DutyId, Entry, Envelope, FactRef, Grant, Intent, MemberRef, Read, Receipt, Report, ScopeRef, Seed } from "../src/index.ts";
+import type { AdoptedReceiveType, Answer, DeclaredDefinition, DeliveryCause, Digest, DutyId, Entry, Envelope, FactRef, Grant, Intent, MemberRef, Read, Receipt, Report, ScopeRef, Seed } from "../src/index.ts";
 import { DOMAINS, PROPOSED_BOUNDS, type Bounds, type DomainTag } from "../src/index.ts";
 
 const d = (c: string): Digest => `sha256:${c.repeat(64)}`;
@@ -28,7 +28,7 @@ const grant: Grant = {
 const seed: Seed = { v: 1, kind: "lane", definition: d("e"), creator: directory, cause: d("a"), ordinal: 0 };
 const d17: Entry = {
   v: 1, at: directory, seq: 17, prev: d("6"), time, clamped: false, epoch: 0,
-  input: { type: "act", signed: { intent, sig: "c2ln" }, authority: [grant] },
+  input: { type: "act", signed: { intent, sig: "c2ln" }, authority: [grant], presented: {} },
   uses: [], prepared: [],
   effects: [{ effect: "open", item: 17, type: "issue", state: "allocated" }],
   sends: [{ n: 0, to: seed, message: { class: "request", type: "create", body: { opener, title: "A flaky test" } } }],
@@ -39,7 +39,7 @@ const d17Fact: FactRef = { at: directory, seq: 17, hash: d("7") };
 const lane: ScopeRef = { scope: "sc_issue", inc: "in_i", kind: "lane" };
 const i0: Entry = {
   v: 1, at: lane, seq: 0, prev: null, time, clamped: false, epoch: 0,
-  input: { type: "genesis", seed, inc: lane.inc, founding: null, source: d17Fact, n: 0,
+  input: { type: "genesis", seed, inc: lane.inc, kind: "file", founding: null, source: d17Fact, n: 0,
            message: { class: "request", type: "create", body: { opener, title: "A flaky test" } }, decision: "applied" },
   uses: [], prepared: [],
   effects: [{ effect: "open", item: 0, type: "intent", state: "open" }, { effect: "party", item: 0, slot: "requester", member: opener }],
@@ -77,12 +77,13 @@ const cause: DeliveryCause = { v: 1, from: d17Fact, n: 0, message: d("b") };
 
 const report: Report = {
   mode: "replay", target: d18Fact, coverage: [{ scope: directory, from: 0, through: 18 }, { scope: lane, from: 0, through: 1 }],
-  anchors: [], dependencies: { verified: 2, anchored: 0, missing: [] }, trusts: ["service clock"], result: "consistent",
+  anchors: [], dependencies: { verified: 2, anchored: 0, missing: [] }, trusts: ["service clock"], redacted: [], result: "consistent",
 };
 
 // A small lane definition using a guard, an effect, a send and an attention form of each kind of shape.
 const definition: DeclaredDefinition = {
   format: "artroom-definition-1",
+  name: "issue",
   profile: { name: "restricted", version: 1 },
   capabilities: [{ name: "hold", version: 1 }],
   genesis: "file",
@@ -90,7 +91,8 @@ const definition: DeclaredDefinition = {
     intent: {
       many: false, max: 1, states: { open: { final: false }, closed: { final: true } }, initial: "open",
       parties: { requester: { fixed: true, required: true, list: false, author: true } },
-      refs: {}, values: { title: { fixed: false, required: true, of: { type: "text", max: 200 } } },
+      refs: { titledAt: { fixed: false, required: true, to: { type: "fact", kind: ["file", "retitle"], under: "issue" } } },
+      values: { title: { fixed: false, required: true, of: { type: "text", max: 200 } } },
     },
     link: { many: true, max: 32, states: { set: { final: false }, removed: { final: true } }, initial: "set", parties: {}, refs: { target: { fixed: true, required: true, to: { type: "scope", kind: "lane" } } }, values: {} },
   },
@@ -99,13 +101,20 @@ const definition: DeclaredDefinition = {
       step: "open", on: "intent", also: {}, grant: "file",
       fields: { title: { type: "text", max: 200, required: true }, opener: { type: "member", required: true } },
       guards: [],
-      effects: [{ party: { slot: "requester", from: { field: "opener" } } }, { value: { slot: "title", from: { field: "title" } } }],
+      effects: [{ party: { slot: "requester", from: { field: "opener" } } }, { value: { slot: "title", from: { field: "title" } } }, { ref: { slot: "titledAt", from: "self" } }],
       sends: [{ index: { fields: { title: { field: "title" } } } }],
       attention: [],
     },
+    // The forms of revision 8: a local fact compared with a slot that was set from `self`, a part of a fetched entry, and a named refusal.
     close: {
-      step: "transition", on: "intent", also: {}, fields: {}, grant: "close",
-      guards: [{ state: ["open"] }, { signer: ["requester"] }, { none: { type: "link", states: ["set"] } }],
+      step: "transition", on: "intent", also: { last: { item: "link", one: true } }, grant: "close",
+      fields: { titled: { type: "fact", kind: ["file", "retitle"], under: "issue", required: true }, answer: { type: "fact", kind: ["answer"], under: "issue", required: false } },
+      guards: [
+        { state: ["open"] }, { signer: ["requester"] }, { none: { type: "link", states: ["set"], except: ["also.last"] } },
+        { equals: { a: { field: "titled" }, b: { slot: "titledAt" } }, reason: "title-moved" },
+        { equals: { a: { field: "answer", part: "on" }, b: { slot: "titledAt", part: "seq" } }, ifPresent: true, reason: "not-this-ask" },
+        { anyOf: [[{ unset: "titledAt" }], [{ each: { list: { field: "titled", part: { opened: "watchers" } }, as: "w", guards: [{ differs: { a: { element: "w" }, b: { signer: true } } }] } }]] },
+      ],
       effects: [{ state: "closed" }],
       sends: [],
       attention: [{ notify: { slot: "requester", of: "on", when: "after", reason: "closed" } }],
@@ -119,7 +128,15 @@ const definition: DeclaredDefinition = {
       attention: [],
     },
   },
-  receives: {},
+  receives: {
+    closes: {
+      message: "closes", class: "relate", from: { kind: "lane", under: "change" }, fields: { about: { type: "int", min: 0, max: 1000, required: true } }, opens: null, copies: 32,
+      also: { intent: { item: "intent", one: true } },
+      guards: [{ equals: { a: { update: "state" }, b: { const: "merged" } } }],
+      effects: [{ of: "also.intent", state: "closed", if: [{ of: "also.intent", state: ["open"] }] }, { of: "also.intent", ref: { slot: "titledAt", from: null }, unless: [{ of: "also.intent", state: ["open"] }] }],
+      sends: [], attention: [],
+    } satisfies AdoptedReceiveType,
+  },
   timed: {},
   rules: {},
 };

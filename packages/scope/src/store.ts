@@ -21,7 +21,9 @@ export interface Stored { seq: number; hash: Digest; bytes: string; size: number
 /**
  * A retained input (section 9.2): the contract's `RetainedInput`. A
  * delivered message, a rule's result and an outcome's evidence are whole
- * inside the entry that records them, so the entry row retains them.
+ * inside the entry that records them, so the entry row retains them. A
+ * detached text is kept as one JSON string under its digest, until a
+ * `redact` effect removes it (section 6.6).
  */
 export type Retained = RetainedInput;
 
@@ -37,6 +39,8 @@ export interface Store extends StateWriter {
   /** The entry row and one outbox row for each of its sends. The caller then folds the entry with `applyEntry`. */
   append(entry: Entry, hash: Digest, bytes: string, size: number): void;
   retain(input: Retained): void;
+  /** Remove the bytes of one retained input. Only a redaction does: the entry that holds the `redact` effect is the tombstone (section 6.6). */
+  forget(kind: Retained["kind"], digest: Digest): void;
 
   stored(seq: number): Stored | null;
   /** At most `limit` entries from `seq` on, in order. */

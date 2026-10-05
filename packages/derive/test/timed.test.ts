@@ -1,7 +1,8 @@
 import { describe, expect, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import { clockOf, fits, judgeTimed, nextDue, owed, validateDefinition } from "../src/index.ts";
-import { Scope, fields, keys, lane, laneDefinition, on, t, valid } from "./fixtures.ts";
+import { Scope, fields, keys, laneDefinition, on, t, valid } from "./fixtures.ts";
+import { board } from "./fixtures-f.ts";
 
 const { rita, una, vic, sam } = keys;
 
@@ -28,10 +29,11 @@ describe("the order of due transitions (section 5.2)", () => {
   });
 
   test("of two rules on one item with one deadline, the rule whose name is first in byte order is next", () => {
-    // U+E000 sorts before U+1F600 by UTF-8 bytes and after it by UTF-16 code units.
-    const rule = lane.timed["hold-end"]!;
-    const s = twoHolds(valid(validateDefinition({ ...lane, timed: { "\u{1F600}": rule, "": rule } }, PROPOSED_BOUNDS)));
-    expect(nextDue(s.state, s.definition, t(600))).toEqual({ item: 6, rule: "", due: t(600) });
+    // U+E000 sorts before U+1F600 by UTF-8 bytes and after it by UTF-16 code units. A hold type has one rule, so the item is a job.
+    const rule = { ...board.timed["job-deadline"]!, effects: [{ state: "timed-out" }] };
+    const s = new Scope(valid(validateDefinition({ ...board, timed: { "\u{1F600}": rule, "": rule } }, PROPOSED_BOUNDS)));
+    const job = s.did(sam, "ask", fields({ deadline: t(600) })).seq;
+    expect(nextDue(s.state, s.definition, t(600))).toEqual({ item: job, rule: "", due: t(600) });
   });
 
   test("an act meets `due` at a reading where a transition is due, and is judged once the drain has applied it", () => {
@@ -44,7 +46,7 @@ describe("the order of due transitions (section 5.2)", () => {
     // The drain applies each as its own entry, lower ID first; each is the exception for itself only.
     expect(s.drain().map((j) => j.result)).toEqual(["write", "write"]);
     expect(s.entries.slice(-2).map(({ entry }) => entry.input)).toEqual([{ type: "timed", ...end }, { type: "timed", ...end, item: 7 }]);
-    expect(s.entries.at(-2)!.entry.effects.slice(0, 2)).toEqual([{ effect: "state", item: 6, state: "ended" }, { effect: "hold", item: 6, change: "end", epoch: 2 }]);
+    expect(s.entries.at(-2)!.entry.effects[0]).toEqual({ effect: "hold", item: 6, change: "end", epoch: 2 });
     expect(remark(s).result).toBe("write");
     expect(s.replay().snapshot()).toBe(s.state.snapshot());
   });
@@ -107,7 +109,7 @@ describe("the clock (section 5.3)", () => {
 describe("a name is whatever its definition chose (sections 6.1 and 17.2)", () => {
   // Parsed JSON, as a definition and an intent arrive: `__proto__` and `constructor` are own names of their records.
   const named = valid(validateDefinition(JSON.parse(`{
-    "format": "artroom-definition-1", "profile": { "name": "restricted", "version": 1 }, "capabilities": [], "genesis": "start", "receives": {}, "rules": {},
+    "format": "artroom-definition-1", "name": "constructor", "profile": { "name": "restricted", "version": 1 }, "capabilities": [], "genesis": "start", "receives": {}, "rules": {},
     "items": {
       "root": { "many": false, "max": 1, "states": { "open": { "final": false } }, "initial": "open", "parties": { "owner": { "fixed": true, "required": true, "list": false, "author": false } }, "refs": {}, "values": {} },
       "__proto__": {

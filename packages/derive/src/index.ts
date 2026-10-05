@@ -1,4 +1,4 @@
-export * from "./validate.ts";
+export * from "./validate/index.ts";
 export * from "./state.ts";
 export * from "./fold.ts";
 export * from "./time.ts";
@@ -6,9 +6,11 @@ export * from "./values.ts";
 export * from "./attribution.ts";
 export * from "./guards.ts";
 export * from "./effects.ts";
+export { derivable, type Capabilities, type Recorded } from "./capability.ts";
 export * from "./sends.ts";
 export * from "./timed.ts";
-export * from "./frame.ts";
+export * from "./fields.ts";
+export * from "./handlers.ts";
 export * from "./judge.ts";
 export * from "./delivery.ts";
 export * from "./genesis.ts";

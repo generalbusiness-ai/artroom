@@ -27,8 +27,7 @@ const rows: readonly (readonly [string, DeclaredDefinition, Change, ProblemCode 
   ["the desk passes", desk, () => {}, null],
   ["the ticket passes, with a rule guard that names a rule it declares", ticket, () => {}, null],
   ["a rule guard that names no declared rule", ticket, (d) => { d.rules = {}; }, "rule"],
-  ["two handlers for one message from one kind of scope", desk, (d) => { d.receives.again = clone(d.receives.spawn); }, "handler"],
-  ["a tell under a name the platform keeps for a relate", ticket, (d) => { d.acts.ask.sends[0].tell.message = "relate:closes"; }, "handler"],
+  ["two handlers for one class and message from one kind of scope", desk, (d) => { d.receives.again = clone(d.receives.spawn); }, "handler"],
   ["a time value set by a genesis, with no timed rule on its type, passes", small, (d) => d.acts.start.effects.push({ value: { slot: "due", from: { time: { plusSeconds: 60 } } } }), null],
 
   // Section 6.4, the table of X1 and X2.
@@ -62,7 +61,7 @@ const rows: readonly (readonly [string, DeclaredDefinition, Change, ProblemCode 
   // Timed rules and the hold capability, as the deltas note records them.
   ["a hold with no timed rule that ends it", lane, (d) => { d.timed = {}; }, "hold"],
   ["a hold effect in a definition that does not list hold@1", lane, (d) => { d.capabilities = []; }, "capability"],
-  ["a timed rule that leaves its item due", lane, (d) => { d.timed["hold-end"].effects = [{ hold: { do: "end" } }]; }, "timed"],
+  ["a timed rule that leaves its item due", ticket, pausing((d) => { d.timed.pause.effects = []; }), "timed"],
   ["a timed rule with an effect its commit could refuse: an add to a party list that may be full", lane, (d) => {
     d.items.hold.parties.past = { fixed: false, required: false, list: true, max: 1, author: false };
     d.timed["hold-end"].effects.push({ party: { slot: "past", from: { slot: "holder" }, list: "add" } });
@@ -71,19 +70,30 @@ const rows: readonly (readonly [string, DeclaredDefinition, Change, ProblemCode 
   ["a timed rule whose entry, with its attention reason, could pass the entry size bound: its due item could never be written", lane, (d) => { d.timed["hold-end"].attention[0].notify.reason = "r".repeat(PROPOSED_BOUNDS.entryBytes); }, "bound"],
   // Section 17.2: a reservation covers what its duty can start, so that must be finite.
   ["timed rules of one type that lead to one another in a cycle", ticket, pausing((d) => { d.timed.resume = { ...d.timed.pause, states: ["paused"], effects: [{ state: "asked" }] }; }), "reserve-unbounded"],
-  ["a time offset longer than the span a timestamp can name", lane, (d) => { d.acts["take-hold"].effects[2].value.from.time.plusSeconds = Number.MAX_SAFE_INTEGER; }, "bound"],
-  ["a timed rule over a final state", lane, (d) => d.timed["hold-end"].states.push("ended"), "timed"],
+  ["forms that settle create one another's pending states in a cycle", ticket, pausing((d) => {
+    const moves = (from: string, to: string) => ({ ...clone(d.acts.approve), on: "request", settles: { of: "on", in: [from] }, guards: [{ state: [from] }], effects: [{ state: to }] });
+    Object.assign(d.acts, { wait: moves("asked", "paused"), resume: moves("paused", "asked") });
+  }), "reserve-unbounded"],
+  // Section 6.4, `settles`: an item in stated states, or the copy that a relate handler's update is for.
+  ["an act that settles an item, and a relate handler that settles its copy, pass", ticket, (d) => { d.acts.unlink.settles = { of: "on", in: ["set"] }; d.receives.closes.settles = { copy: ["set"] }; }, null],
+  ["an act that settles the item it opens", ticket, (d) => { d.acts.link.settles = { of: "on", in: ["set"] }; }, "name"],
+  ["an act that settles an item in a state its type does not have", ticket, (d) => { d.acts.unlink.settles = { of: "on", in: ["gone"] }; }, "name"],
+  ["an act that settles a copy", ticket, (d) => { d.acts.unlink.settles = { copy: ["set"] }; }, "shape"],
+  ["a time offset longer than the span a timestamp can name", lane, (d) => { d.acts["take-hold"].effects[1].value.from.time.plusSeconds = Number.MAX_SAFE_INTEGER; }, "bound"],
+  ["a timed rule over a final state", ticket, pausing((d) => d.timed.pause.states.push("answered")), "timed"],
   ["a profile this runtime does not implement", small, (d) => { d.profile.version = 2; }, "profile"],
-  ["a capability this runtime does not implement", small, (d) => d.capabilities.push({ name: "git-read", version: 1 }), "capability"],
+  ["a capability version that the contract does not declare", small, (d) => d.capabilities.push({ name: "git-read", version: 2 }), "capability"],
 
   // Section 6.10: forms that are not part of the grammar. No implementer invents them.
   ["G1: an operand path into a fact", small, (d) => d.acts.edit.guards.push({ equals: { a: { field: "text", path: "on" }, b: { const: 1 } } }), "shape"],
   ["G3: a `when` on an effect", small, (d) => { d.acts.edit.effects[0].when = [{ state: ["draft"] }]; }, "shape"],
-  ["G5: a count bound from a slot", small, (d) => { d.acts.few.guards[0].count.max = { slot: "limit" }; }, "shape"],
   ["G6: a `covers` guard", small, (d) => d.acts.edit.guards.push({ covers: { list: "notes", states: ["kept"] } }), "shape"],
-  ["G7: `follow` on a fact guard", small, (d) => { d.acts.edit.fields.proof = { type: "fact", kind: "report", under: "lane", required: false }; d.acts.edit.guards.push({ fact: { field: "proof", follow: "report" } }); }, "shape"],
-  ["G11: an operand `sender`", small, (d) => d.acts.edit.guards.push({ equals: { a: { sender: true }, b: { const: 1 } } }), "shape"],
+  ["G7: `follow` on a fact guard", small, (d) => { d.acts.edit.fields.proof = { type: "fact", kind: ["report"], under: "lane", required: false }; d.acts.edit.guards.push({ fact: { field: "proof", follow: "report" } }); }, "shape"],
+  ["G11: an operand `sender` in an act, which has no sender", small, (d) => d.acts.edit.guards.push({ equals: { a: { sender: true }, b: { const: 1 } } }), "name"],
   ["a member the contract does not define", small, (d) => { d.imports = []; }, "shape"],
+  // Section 6.1: a definition states its name. The name of a platform definition is the platform's to give.
+  ["a declared definition that takes the name of a platform definition", small, (d) => { d.name = "platform:task"; }, "shape"],
+  ["a fact type that states no kind", small, (d) => { d.acts.edit.fields.proof = { type: "fact", kind: [], under: "lane", required: false }; }, "shape"],
 ];
 
 describe("the definition validator", () => {
@@ -115,8 +125,10 @@ describe("the definition validator", () => {
       return d;
     };
     const graphOf = (d: any) => timedGraph(Object.entries<any>(d.timed).map(([name, r]) => ({ name, type: r.on, states: r.states, to: r.effects[0].state, deadline: r.deadline })));
+    // The contract's bound is 8 timed rules. The work of the graph is shown past it, at a configured bound that takes these.
+    const roomy = { ...PROPOSED_BOUNDS, timedRules: 61 };
 
-    const result = validateDefinition(stepped(false), PROPOSED_BOUNDS);
+    const result = validateDefinition(stepped(false), roomy);
     // The reserve of a state is its longest chain: 15 rules from s0, one from s14.
     expect(result.ok ? result.definition.deadlines : result.problems).toEqual({ step: Object.fromEntries(Array.from({ length: 15 }, (_, i) => [`s${i}`, 15 - i])) });
     const graph = graphOf(stepped(false));
@@ -125,11 +137,36 @@ describe("the definition validator", () => {
     expect(graph.work).toEqual({ rules: 60, edges: 224 });
 
     // With a rule from s14 back to s0, each of the other 57 rules leads back to itself. The four rules into the final state lead nowhere, and are not refused.
-    const cyclic = validateDefinition(stepped(true), PROPOSED_BOUNDS);
+    const cyclic = validateDefinition(stepped(true), roomy);
     expect(cyclic.ok ? null : [[...new Set(cyclic.problems.map((p) => p.code))], cyclic.problems.length]).toEqual([["reserve-unbounded"], 57]);
     expect(cyclic.ok ? null : cyclic.problems.map((p) => p.path)).not.toContain("timed.s14a");
     // One more rule, and eight more leads: four into it and four out of it.
     expect(graphOf(stepped(true)).work).toEqual({ rules: 61, edges: 232 });
+  });
+
+  test("a definition is held to its bounds as a whole: its timed rules, its rules, its canonical bytes, and the members of a party list", () => {
+    const refusal = (change: Change, bounds = PROPOSED_BOUNDS) => {
+      const definition = clone(lane) as any;
+      change(definition);
+      const result = validateDefinition(definition, bounds);
+      return result.ok ? null : result.problems.map((p) => [p.code, p.path]);
+    };
+    // Each at a small configured limit: the lane has one timed rule and no rule, and is a few thousand bytes.
+    expect(refusal(() => {}, { ...PROPOSED_BOUNDS, timedRules: 0 })).toEqual([["bound", "timed"]]);
+    expect(refusal((d) => { d.rules = { a: "true", b: "true" }; }, { ...PROPOSED_BOUNDS, rules: 1 })).toEqual([["bound", "rules"]]);
+    expect(refusal(() => {}, { ...PROPOSED_BOUNDS, definitionBytes: 1000 })).toEqual([["bound", ""]]);
+    // A party list holds at most 64 members, which is more than a list value holds. The rule tells that list and nobody else:
+    // one entry tells at most 64 members.
+    const watched = (max: number): Change => (d) => {
+      d.items.hold.parties.watchers = { fixed: false, required: false, list: true, max, author: false };
+      d.timed["hold-end"].attention = [{ notify: { slot: "watchers", of: "on", when: "after", reason: "hold ended" } }];
+    };
+    expect(refusal(watched(PROPOSED_BOUNDS.partyMembers))).toBeNull();
+    expect(refusal(watched(PROPOSED_BOUNDS.partyMembers + 1))).toEqual([["bound", "items.hold.parties.watchers.max"]]);
+    // The entry that tells such a list is counted at every member it can hold: more than 64 handles, each byte as a six-byte escape.
+    const tight = validateDefinition((() => { const d = clone(lane) as any; watched(PROPOSED_BOUNDS.partyMembers)(d); return d; })(), { ...PROPOSED_BOUNDS, entryBytes: 1 });
+    const most = Number(/could take (\d+) bytes/.exec(tight.ok ? "" : tight.problems[0]!.message)![1]);
+    expect(most).toBeGreaterThan(PROPOSED_BOUNDS.partyMembers * 6 * PROPOSED_BOUNDS.memberBytes);
   });
 
   test("a timed rule that copies a party list is counted at every member the list can hold, so the entry of an admitted rule fits the entry size bound", () => {

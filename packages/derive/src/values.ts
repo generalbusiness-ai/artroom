@@ -30,10 +30,15 @@ export const memberFits = (v: MemberRef, bounds: Pick<Bounds, "memberBytes">): b
 /** A Git object ID: SHA-1 or SHA-256, lowercase hex. */
 const isObjectId = (v: unknown) => typeof v === "string" && /^([0-9a-f]{40}|[0-9a-f]{64})$/.test(v);
 
-/** True when `v` is a value of `type`. An `item` is checked as a local ID only; whether it exists is a question for the state. */
+/**
+ * True when `v` is a value of `type`. An `item` is checked as a local ID
+ * only; whether it exists is a question for the state. The value of a
+ * detached text is its digest (section 6.2); whether the text is at hand,
+ * and within the field's `max`, is a question for what came with the input.
+ */
 export function isValue(type: FieldType, v: unknown, bounds: Bounds): boolean {
   switch (type.type) {
-    case "text": return typeof v === "string" && wellFormed(v) && utf8(v).length <= type.max;
+    case "text": return type.detached ? isDigest(v) : typeof v === "string" && wellFormed(v) && utf8(v).length <= type.max;
     case "int": return typeof v === "number" && Number.isSafeInteger(v) && !Object.is(v, -0) && v >= type.min && v <= type.max;
     case "bool": return typeof v === "boolean";
     case "time": return timeMs(v) !== null;
@@ -45,7 +50,28 @@ export function isValue(type: FieldType, v: unknown, bounds: Bounds): boolean {
     case "digest": return isDigest(v);
     case "commit": case "tree": return isObjectId(v);
     case "list": return Array.isArray(v) && v.length <= Math.min(type.max, bounds.listElements) && v.every((e) => isValue(type.of, e, bounds));
+    // Section 6.2: a record has named members. An unknown member is refused, and a member that is not required may be absent.
+    case "record": return isRecord(v) && Object.keys(v).every((m) => Object.hasOwn(type.of, m)) && Object.entries(type.of).every(([m, of]) => (Object.hasOwn(v, m) ? isValue(of, v[m], bounds) : !of.required));
   }
+}
+
+/**
+ * Section 6.2: a member of a record is named after what holds the record,
+ * with a dot. `k.item` is the member `item` of the record that `k` names.
+ * `held` gives what a name holds, or undefined when nothing has that name. A
+ * name that holds something is read whole, also when it has a dot. Null:
+ * nothing has the name, or what it leads to is no record with that member.
+ */
+export function memberOf(held: (name: string) => unknown, name: string): unknown {
+  const whole = held(name);
+  if (whole !== undefined) return whole;
+  for (let dot = name.indexOf("."); dot !== -1; dot = name.indexOf(".", dot + 1)) {
+    let value = held(name.slice(0, dot));
+    if (value === undefined) continue;
+    for (const member of name.slice(dot + 1).split(".")) value = isRecord(value) ? own(value, member) : undefined;
+    return value ?? null;
+  }
+  return null;
 }
 
 /** Equality of two values: equal canonical JSON. An empty slot or an absent field is `null`, and equals only another. */

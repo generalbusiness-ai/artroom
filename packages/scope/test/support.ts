@@ -9,7 +9,7 @@ import { evictDurableObject, runDurableObjectAlarm, runInDurableObject } from "c
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { Answer, Bounds, Entry, Grant, Head, Intent, Read, Receipt, ScopeId, ScopeRef, Seed, SignedIntent, Timestamp } from "@generalbusiness/artroom-contract";
 import { intentDigest, scopeIdOf, signIntent } from "@generalbusiness/artroom-bytes";
-import { timeMs, timeOf } from "@generalbusiness/artroom-derive";
+import { timeMs, timeOf, type ValidDefinition } from "@generalbusiness/artroom-derive";
 import { grantOf, keys, lane, variant, type Actor, type Over } from "@generalbusiness/artroom-derive/testing";
 import { READ_BOUNDS, type ReadBounds, type Sealed, type Summary } from "../src/index.ts";
 import { controls, type Controls } from "../src/testing.ts";
@@ -26,25 +26,26 @@ export const HOLD = 600;
 
 /**
  * Derive's fixture lane, with room for four live holds, a rule on `assign`
- * (the requester may not assign themselves), and a fact that a remark may
- * name. A directory is founded under it: the kind of a scope is in its seed,
+ * (the requester may not assign themselves), a fact that a remark may
+ * name, and a report that awaits its acceptance (section 17.2, row 3). A directory is founded under it: the kind of a scope is in its seed,
  * and no form of this definition reads it.
  */
 export const definition = variant(lane, (def) => {
   def.items.hold.max = 4;
   def.rules["not-self"] = "fields.performer.member != signer.member";
   def.acts.assign.guards.push({ rule: "not-self" });
-  def.acts.remark.fields.proof = { type: "fact", kind: "assign", under: "lane", required: false };
+  def.acts.remark.fields.proof = { type: "fact", kind: ["assign"], under: "lane", required: false };
+  def.acts["accept-report"].settles = { of: "on", in: ["reported"] };
 });
 const actions = Object.values(definition.declared.acts).map((a) => a.grant);
 
 /** Any value: the test readers port lets every reader read. */
 export const reader = "a test reader";
 
-/** A founding intent signed by rita, the seed it asks for, and the name of the object that holds that scope. */
-export function founding(notAfter: Timestamp = at(60)): { signed: SignedIntent; seed: Seed; name: ScopeId } {
+/** A founding intent signed by rita, the seed it asks for, and the name of the object that holds that scope. `under`: the definition, when it is not the one above. */
+export function founding(notAfter: Timestamp = at(60), under: ValidDefinition = definition): { signed: SignedIntent; seed: Seed; name: ScopeId } {
   const intent: Intent = { v: 1, to: null, actor: rita.key, kind: "found", on: null, expected: {}, fields: { title: "A lane", opener: rita.member }, idempotencyKey: crypto.randomUUID(), notAfter };
-  const seed: Seed = { v: 1, kind: "directory", definition: definition.digest, creator: null, cause: intentDigest(intent), ordinal: 0 };
+  const seed: Seed = { v: 1, kind: "directory", definition: under.digest, creator: null, cause: intentDigest(intent), ordinal: 0 };
   return { signed: signIntent(intent, rita.secret), seed, name: scopeIdOf(seed) };
 }
 
@@ -131,13 +132,13 @@ export class Lane {
   alarmAt(): Promise<number | null> { return this.inside((state) => state.storage.getAlarm()); }
 }
 
-/** Found a scope on real storage, with its clock at the start. `bounds` and `reads` replace the defaults for this scope only. */
-export async function found(bounds: Partial<Bounds> = {}, reads: Partial<ReadBounds> = {}): Promise<Lane> {
-  const { signed, name } = founding();
+/** Found a scope on real storage, with its clock at the start. `bounds` and `reads` replace the defaults for this scope only. `under`: a variant of the definition above, with the same grants. */
+export async function found(bounds: Partial<Bounds> = {}, reads: Partial<ReadBounds> = {}, under: ValidDefinition = definition): Promise<Lane> {
+  const { signed, name } = founding(at(60), under);
   const c = controls(name, START);
   c.bounds = { ...PROPOSED_BOUNDS, ...bounds };
   c.reads = { ...READ_BOUNDS, ...reads };
-  const answer = await stubOf(name).found(signed, definition.declared);
+  const answer = await stubOf(name).found(signed, under.declared);
   if (answer.answer !== "accepted") throw new Error(`the scope was not founded: ${JSON.stringify(answer)}`);
   return new Lane(name, c, answer.receipt.fact.at, answer.receipt, signed);
 }

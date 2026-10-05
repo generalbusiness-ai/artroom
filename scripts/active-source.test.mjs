@@ -34,3 +34,11 @@ test("no active source or configuration file reaches into parked/, and parked/ i
   const lock = JSON.parse(text("package-lock.json"));
   assert.deepEqual(Object.keys(lock.packages).filter((p) => p.startsWith("parked/")), []);
 });
+
+// A lane is a definition, and the platform holds no lane (I2 plan, section 4.1). The lanes
+// package may depend on any platform package. No platform package names it or reaches into it.
+test("no platform package depends on the lanes package or imports from it", () => {
+  assert.ok(files.includes("packages/lanes/package.json"), "the lanes package was listed");
+  const platform = files.filter((f) => f.startsWith("packages/") && !f.startsWith("packages/lanes/") && !f.endsWith(".md"));
+  assert.deepEqual(platform.filter((f) => /artroom-lanes|[.\/]\/lanes\//.test(text(f))), []);
+});

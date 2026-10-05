@@ -34,7 +34,7 @@ import type {
   Attempt, Dispatched, Duty, Effect, Entry, FactRef, FactUse, FieldValue, Grant, Head, Input, Intent, Item, LogPage, MemberRef, Message, Party, Prepared, Read, ReadRefusal, Receipt, RefusalReason,
   RetainedInput, ScopeRef, Sealed, Seed, Send, SignedIntent, Status, Summary,
 } from "@generalbusiness/artroom-contract";
-import { wellFormed } from "./canonical.ts";
+import { MAX_DEPTH, wellFormed } from "./canonical.ts";
 import { isIncarnation, isScopeId } from "./domains.ts";
 import { isDigest } from "./hash.ts";
 import { isDutyId, isKeyId, isMemberId, isOperationId, isPlatformDefinition, isScopeKind, isSignature, timeMs } from "./ids.ts";
@@ -72,7 +72,7 @@ const variant = (by: string, variants: Record<string, Check>): Check => (v) => {
 // Each table has every member of its union, and the compiler says so when the contract gains or loses one.
 export const REFUSAL_REASONS: Record<RefusalReason, true> = {
   "revision-moved": true, alias: true, "duplicate-relation": true, "required-unset": true, "scope-full": true, "bad-intent": true, misaddressed: true, expired: true, "scope-refused": true,
-  "unknown-act": true, "bad-field": true, "no-item": true, final: true, unauthorized: true, "guard-failed": true, "slot-full": true, "type-full": true, "send-unresolved": true,
+  "unknown-act": true, "bad-field": true, "no-item": true, final: true, "fact-mismatch": true, unauthorized: true, "guard-failed": true, "capability-refused": true, "slot-full": true, "type-full": true, "send-unresolved": true,
   "unknown-message": true, "bad-input": true,
 };
 export const READ_REFUSALS: Record<ReadRefusal, true> = {
@@ -85,8 +85,9 @@ const CLASS: Record<Message["class"], true> = { request: true, result: true, con
 const DECISION: Record<Extract<Input, { decision: unknown; type: "delivery" }>["decision"], true> = { applied: true, refused: true, superseded: true };
 const CLAUSE: Record<NonNullable<Duty["result"]>["clause"], true> = { applied: true, refused: true, superseded: true, conflict: true };
 const FINDING: Record<NonNullable<Duty["diagnosis"]>["finding"], true> = { undelivered: true, "delivery-unavailable": true };
-const RETAINED: Record<RetainedInput["kind"], true> = { definition: true, entry: true, rule: true };
-const reason = among(REFUSAL_REASONS);
+const RETAINED: Record<RetainedInput["kind"], true> = { definition: true, entry: true, rule: true, text: true };
+/** Why a delivery was refused: a code the contract names and, where one exists, the name the failed guard declares. */
+const reason = record({ code: among(REFUSAL_REASONS) }, { name: text });
 
 // ---------------------------------------------------------------- references, the seed and the intent (sections 2.1 and 3)
 
@@ -103,9 +104,18 @@ export const isDefinitionName: Check = (v) => isDigest(v) || isPlatformDefinitio
 const seed = record({ v: is(1), kind: isScopeKind, definition: isDefinitionName, creator: orNull(scopeRef), cause: isDigest, ordinal: isLocalId });
 export const isSeed = (v: unknown): v is Seed => seed(v);
 
-/** One of the forms a field value can have (section 6.2): a text, an integer, a truth value, a reference, or a list of those. A list holds no list. */
+/**
+ * One of the forms a field value can have (section 6.2): a text, an integer, a truth value, a reference, a record of named
+ * values, or a list of those. A list holds no list.
+ */
 const scalar: Check = (v) => text(v) || (typeof v === "number" && Number.isSafeInteger(v) && !Object.is(v, -0)) || flag(v) || memberRef(v) || factRef(v) || scopeRef(v);
-export const isFieldValue = (v: unknown): v is FieldValue => scalar(v) || listOf(scalar)(v);
+/**
+ * A value that nests deeper than the canonical form allows, MAX_DEPTH containers, is no field value: no entry that holds it has canonical bytes. The
+ * walk stops at that depth, so a reply cannot make it deeper than any value could be. `depth`: that of the value, from 1.
+ */
+const one = (v: unknown, depth: number): boolean => scalar(v) || (isRecord(v) && depth <= MAX_DEPTH && Object.values(v).every((m) => anyOf(m, depth + 1)));
+const anyOf = (v: unknown, depth: number): boolean => one(v, depth) || (Array.isArray(v) && depth <= MAX_DEPTH && v.every((m) => one(m, depth + 1)));
+export const isFieldValue = (v: unknown): v is FieldValue => anyOf(v, 1);
 const party: Check = (v) => v === null || memberRef(v) || listOf(memberRef)(v);
 export const isParty = (v: unknown): v is Party => party(v);
 /** A record by chosen names, each value passing `check`. */
@@ -147,7 +157,10 @@ const effect = variant("effect", {
   value: record({ effect: any, item: isLocalId, slot: text, value: orNull(isFieldValue) }),
   list: record({ effect: any, item: isLocalId, slot: text, change: among({ add: true, remove: true }), member: memberRef }),
   hold: record({ effect: any, item: isLocalId, change: among({ open: true, renew: true, end: true }), epoch: isLocalId }),
+  redact: record({ effect: any, item: isLocalId, slot: text, texts: listOf(isDigest) }),
   relation: record({ effect: any, owner: scopeRef, item: isLocalId, name: text, state: text, revision: isLocalId }),
+  // A capability's record: its name and version are of the one form `name@version`. What its key and its values hold is the capability's to say.
+  record: record({ effect: any, capability: (v) => typeof v === "string" && /^(hold|git-read)@(0|[1-9][0-9]*)$/.test(v), kind: text, key: listOf(isFieldValue), state: text, values: isRecord }),
   activate: record({ effect: any }),
   operation: record({ effect: any, operation: isOperationId, attempt: isLocalId }),
   index: record({ effect: any, from: factRef, fields: isRecord }),
@@ -165,9 +178,9 @@ const deliveryOf: Record<Message["class"], Check> = {
 };
 const input = variant("type", {
   genesis: record({
-    type: any, seed, inc: isIncarnation, founding: orNull(signedIntent), source: orNull(factRef), n: orNull(isLocalId), message: orNull(request), decision: among({ applied: true, refused: true }),
+    type: any, seed, inc: isIncarnation, kind: (v) => text(v) && v !== "", founding: orNull(signedIntent), source: orNull(factRef), n: orNull(isLocalId), message: orNull(request), decision: among({ applied: true, refused: true }),
   }),
-  act: record({ type: any, signed: signedIntent, authority: listOf(grant) }),
+  act: record({ type: any, signed: signedIntent, authority: listOf(grant), presented: named(factRef) }),
   delivery: (v) => {
     const of = isRecord(v) && isRecord(v["message"]) ? v["message"]["class"] : undefined;
     return among(CLASS)(of) && deliveryOf[of](v);
@@ -193,7 +206,6 @@ const sealed = record({ entry, hash: isDigest });
 export const isSealed = (v: unknown): v is Sealed => sealed(v);
 const item = record(
   { id: isLocalId, type: text, state: text, revision: isLocalId, opened: orNull(isDigest), parties: named(party), refs: named(orNull(isFieldValue)), values: named(orNull(isFieldValue)), attributed: listOf(memberRef) },
-  { epoch: isLocalId },
 );
 export const isItem = (v: unknown): v is Item => item(v);
 const summary = record({
