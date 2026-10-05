@@ -16,7 +16,13 @@
  *
  * The validator does not read this table. A test lists it, so that a rule
  * cannot be added without its row. The table is empty: no rule is written
- * yet, and `inbox` needs none.
+ * yet.
+ *
+ * `CODE` marks each entry that needs a rule, with its rows. A runtime or a
+ * verifier derives an entry that is marked only with every rule it names.
+ * Without one it derives nothing of that entry, and answers
+ * `unsupported-definition` (the contract's section 6.1). `inbox` needs one,
+ * P22, which is not written (I3 deltas, entry E10).
  */
 
 import type { Effect, FactUse, Input, Reason, Send, Timestamp } from "@generalbusiness/artroom-contract";
@@ -55,3 +61,12 @@ export type RuleTable = { readonly [name in PlatformName]?: { readonly [entry: s
 
 /** No rule is written yet. */
 export const RULES: RuleTable = {};
+
+/**
+ * The rows that an entry needs a rule for: by definition, then by the entry's kind. The kind is an act's kind, a handler's message
+ * name, or `timed:` and the key of a timed rule, as a `fact` type's `kind` names an entry (the contract's section 6.2).
+ */
+export type CodeTable = { readonly [name in PlatformName]?: { readonly [entry: string]: readonly PlatformRow[] } };
+
+/** Each cell of section 12.1 that begins "Code", for the definitions that this package holds. Section 12.1.6: a notice's `source`. */
+export const CODE: CodeTable = { "platform:inbox": { notify: ["P22"] } };

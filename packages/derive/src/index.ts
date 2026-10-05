@@ -6,7 +6,7 @@ export * from "./values.ts";
 export * from "./attribution.ts";
 export * from "./guards.ts";
 export * from "./effects.ts";
-export { derivable, type Capabilities, type Recorded } from "./capability.ts";
+export { derivable, type Capabilities, type CapabilityForm, type CapabilityGiven, type Recorded } from "./capability.ts";
 export * from "./sends.ts";
 export * from "./timed.ts";
 export * from "./fields.ts";

@@ -682,9 +682,9 @@ and nothing here guesses at it.
 
 | Not delivered | Owner | What the substrate has in its place |
 |---|---|---|
-| Grants and membership: who may act, how a grant is shown to be current, revocation | The authority design, then the authority and publication delivery | The `Grant` shape and the check that a grant names the action, the key and the scope. Whether a grant is current is asked of a port, `Authority`, whose production default says no. The tests use a test authority that is named as one. |
+| Grants and membership: who may act, how a grant is shown to be current, revocation | The authority design, then the authority and publication delivery | The `Grant` shape and the check that a grant names the action, the key and the scope. Whether a grant is current is asked of a port, `Authority`, in two phases: a read before the turn, and a decision in the commit on what was read. The production default reads no grant, so none is current. The tests use a test authority that is named as one. |
 | Who may read, and sessions | The same | The `Readers` port, whose production default lets nobody read. |
-| Platform definitions: directory, membership, rules, destination, inbox, task | The same | A platform name is answered `unsupported-definition`. The tests run declared definitions. |
+| Platform definitions: register, directory, membership, rules, destination, inbox, task | The same | The data of `platform:inbox@1`, in `packages/platform`. A scope can be founded under it and runs the rows that are data. The row `notify` is code that is not written, and is answered `unsupported-definition`. Every other platform name is answered `unsupported-definition`. |
 | Hold tokens, workspaces and their export | The same | The hold item, its epoch, and its timed end. |
 | Git reads, and the rules of the `hold@1` and `git-read@1` capabilities: their records, guards, effects and steps | The same | The validator reads the capability forms against the contract package's tables, and derives none. The production runtime and the verifier answer `unsupported-definition` for a definition that uses one. The tests have a scripted stand-in, which is named as one. |
 | Publication to a destination, and the evidence of an outside write | The same | The `outcome` input and the numbering of operations and attempts. No form opens an operation. |

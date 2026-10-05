@@ -1,11 +1,13 @@
 import { env } from "cloudflare:workers";
-import { SELF, runInDurableObject } from "cloudflare:test";
+import { SELF, evictDurableObject, runInDurableObject } from "cloudflare:test";
 import { describe, expect, test } from "vitest";
-import type { Intent, Seed } from "@generalbusiness/artroom-contract";
-import { intentDigest, isIncarnation, scopeIdOf, signIntent } from "@generalbusiness/artroom-bytes";
-import { timeOf } from "@generalbusiness/artroom-derive";
+import type { Entry, Intent, ScopeRef, Seed } from "@generalbusiness/artroom-contract";
+import { definitionDigest, intentDigest, isIncarnation, scopeIdOf, signIntent } from "@generalbusiness/artroom-bytes";
+import { timeOf, type Delivered } from "@generalbusiness/artroom-derive";
 import { Scope, grantOf, laneDefinition, variant } from "@generalbusiness/artroom-derive/testing";
+import { inbox } from "@generalbusiness/artroom-platform";
 import { httpSource, verify } from "@generalbusiness/artroom-replay";
+import type { Delivery } from "../src/index.ts";
 import { controls, scriptedCapability } from "../src/testing.ts";
 import { Node, founding as foundingIn, net } from "./net.ts";
 import { HOLD, START, at, definition, found, founding, reader, rita, stubOf, una } from "./support.ts";
@@ -28,7 +30,7 @@ describe("founding a directory (sections 2.2, 2.3 and 7.1)", () => {
     const unverified = { answer: "refused", reason: "source-unverified" };
     expect([await s.stub.found(other.signed, definition.declared), await empty.found(other.signed, definition.declared)]).toEqual([unverified, unverified]);
     expect(await empty.summary(reader)).toEqual({ ok: false, reason: "not-found" });
-    // A platform definition is supplied in code, and none is yet.
+    // A platform definition is supplied in code, and this one is not delivered.
     expect(await stubOf(other.name).found(other.signed, "platform:directory@1")).toEqual({ answer: "refused", reason: "unsupported-definition" });
   });
 
@@ -79,6 +81,55 @@ describe("founding a directory (sections 2.2, 2.3 and 7.1)", () => {
     const offer = signIntent({ v: 1, to: at, actor: rita.key, kind: "offer", on: null, expected: { intent: 1 }, fields: { intent: 0 }, idempotencyKey: "k", notAfter: soon() }, rita.secret);
     expect(await deployed.submit(offer, [grantOf(rita, at, ["offer"])])).toEqual({ answer: "refused", reason: "unauthorized", judgedAt: { seq, hash } });
     expect(await deployed.summary(reader)).toEqual({ ok: false, reason: "forbidden" });
+  });
+
+  test("a scope is founded under platform:inbox@1 by the production wiring: the runtime's code supplies the definition, the genesis is written and retains no declaration, and a row that is data is judged, also after a restart; the row whose code is not written answers unsupported-definition and writes nothing; and the same data, given by an input, founds nothing", async () => {
+    const soon = () => timeOf(Date.now() + 60_000);
+    const asked = (): Intent => ({ v: 1, to: null, actor: rita.key, kind: "found", on: null, expected: {}, fields: { owner: rita.member, membership: rita.member.membership }, idempotencyKey: crypto.randomUUID(), notAfter: soon() });
+    const seedOf = (intent: Intent, definition: Seed["definition"]): Seed => ({ v: 1, kind: "directory", definition, creator: null, cause: intentDigest(intent), ordinal: 0 });
+    const stored = (name: string, query: string) => runInDurableObject(env.AS_DEPLOYED.get(env.AS_DEPLOYED.idFromName(name)), (_instance, state) => state.storage.sql.exec(query).toArray());
+
+    // `AS_DEPLOYED` has every production default: no test authority, and the definitions port of `production()`. The founding names
+    // the platform definition. The seed holds that name, and the object's name is the seed's digest.
+    const intent = asked();
+    const name = scopeIdOf(seedOf(intent, "platform:inbox@1"));
+    const deployed = stubOf(name, env.AS_DEPLOYED);
+    const founded = await deployed.found(signIntent(intent, rita.secret), "platform:inbox@1");
+    if (founded.answer !== "accepted") throw new Error(`not founded: ${JSON.stringify(founded)}`);
+    const at: ScopeRef = founded.receipt.fact.at;
+    expect([at.scope, founded.receipt.fact.seq, founded.receipt.definition]).toEqual([name, 0, "platform:inbox@1"]);
+
+    // The genesis entry: the genesis act of section 12.1.6, `establish`, with the two effects that the definition's data writes.
+    // A platform definition is pinned by its name and version, so no declaration is retained for it.
+    const [genesis] = await stored(name, "SELECT bytes FROM entry WHERE seq = 0");
+    expect(JSON.parse(genesis!["bytes"] as string) as Entry).toMatchObject({
+      seq: 0, input: { type: "genesis", seed: { definition: "platform:inbox@1" }, kind: "establish", decision: "applied" },
+      effects: [{ effect: "open", item: 0, type: "inbox", state: "open" }, { effect: "party", slot: "owner" }, { effect: "ref", slot: "membership" }],
+    });
+    expect(await stored(name, "SELECT COUNT(*) AS n FROM retained_input WHERE kind = 'definition'")).toEqual([{ n: 0 }]);
+
+    // After a restart the definition is the code's again. A row that is data is judged: `mark-read` names no notice, which is check
+    // 8 of section 4.2. No act of this definition reaches check 9 without a notice, and a notice needs the row below.
+    await evictDurableObject(env.AS_DEPLOYED.get(env.AS_DEPLOYED.idFromName(name)));
+    const head = { seq: 0, hash: founded.receipt.fact.hash };
+    const read = signIntent({ v: 1, to: at, actor: rita.key, kind: "mark-read", on: 7, expected: { on: 1, inbox: 1 }, fields: {}, idempotencyKey: "k", notAfter: soon() }, rita.secret);
+    expect(await deployed.submit(read, [grantOf(rita, at, ["inbox.own"])])).toEqual({ answer: "refused", reason: "no-item", judgedAt: head });
+
+    // `notify` is marked as code, row P22, and no rule is written (I3 deltas, entry E10). The scope derives nothing of that row: the
+    // delivery is not decided, and the sender keeps the duty. The control is an advisory of a row that is not marked: it goes on to
+    // the read of its source entry, which the production resolver cannot make.
+    const from = { at: { ...at, kind: "lane" as const }, seq: 3, hash: founded.receipt.fact.hash };
+    const advisory = (type: "notify" | "index"): Delivered => ({ to: at, from, n: 0, message: { class: "advisory", type, body: { fields: { reason: "review" } } } });
+    const object = env.AS_DEPLOYED.get(env.AS_DEPLOYED.idFromName(name)) as unknown as { deliver(envelope: Delivered): Promise<Delivery> };
+    expect([await object.deliver(advisory("notify")), await object.deliver(advisory("index"))]).toEqual([{ answer: "retry", reason: "unsupported-definition" }, { answer: "retry", reason: "dependency-unavailable" }]);
+    expect(await stored(name, "SELECT COUNT(*) AS n FROM entry")).toEqual([{ n: 1 }]);
+
+    // The validator's platform option is reached by the name alone. The same data, given by an input as a declaration, is validated
+    // without it: a declared definition does not take a platform name, and nothing is founded.
+    const other = asked();
+    const declared = scopeIdOf(seedOf(other, definitionDigest(inbox)));
+    expect(await stubOf(declared, env.AS_DEPLOYED).found(signIntent(other, rita.secret), inbox)).toEqual({ answer: "refused", reason: "unsupported-definition" });
+    expect(await stored(declared, "SELECT COUNT(*) AS n FROM entry")).toEqual([{ n: 0 }]);
   });
 
   test("a definition that needs a capability record: the production wiring founds no scope under it; the scripted test capability, a stand-in that shows nothing about a real hold, runs it in a test; a replay with no code for the capability answers unsupported-definition", async () => {

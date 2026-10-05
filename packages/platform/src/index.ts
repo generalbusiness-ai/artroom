@@ -10,10 +10,36 @@
 
 import type { DeclaredDefinition } from "@generalbusiness/artroom-contract";
 import { inbox } from "./inbox.ts";
+import { CODE, RULES, type EntryRules, type PlatformRow } from "./rules.ts";
 
 export { inbox };
-export { RULES } from "./rules.ts";
-export type { EntryRules, PlatformName, PlatformRow, PlatformRule, RuleGiven, RuleResult, RuleTable } from "./rules.ts";
+export { CODE, RULES };
+export type { CodeTable, EntryRules, PlatformName, PlatformRow, PlatformRule, RuleGiven, RuleResult, RuleTable } from "./rules.ts";
 
 /** The platform definitions delivered so far, by name without the version. */
 export const definitions: Readonly<Record<string, DeclaredDefinition>> = { "platform:inbox": inbox };
+
+/**
+ * One platform definition as a runtime or a verifier is supplied it: its
+ * data, the rows of each entry that are code, and the rules written for
+ * them, both by the entry's kind.
+ */
+export interface Platform {
+  readonly declared: DeclaredDefinition;
+  readonly code: Readonly<Record<string, readonly PlatformRow[]>>;
+  readonly rules: Readonly<Record<string, EntryRules>>;
+}
+
+/**
+ * The definition that a platform name and version pin (the contract's
+ * section 6.1), such as `platform:inbox@1`. Every definition here is version
+ * 1. Null: this package holds no definition of that name and version.
+ */
+export function platform(named: string): Platform | null {
+  const cut = named.lastIndexOf("@");
+  const name = named.slice(0, cut);
+  const declared = cut > 0 && named.slice(cut) === "@1" && Object.hasOwn(definitions, name) ? definitions[name] : undefined;
+  if (!declared) return null;
+  const of = <T>(table: object): Readonly<Record<string, T>> => (Object.hasOwn(table, name) ? (table as Record<string, Record<string, T>>)[name]! : {});
+  return { declared, code: of(CODE), rules: of(RULES) };
+}

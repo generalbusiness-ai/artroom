@@ -37,7 +37,8 @@ what a judge drafts, in one storage transaction for each entry.
 | `worker` (its own entry, `@generalbusiness/artroom-scope/worker`) | `route(request, binding)`: the HTTP routes. `ScopeService`: the same operations over a service binding; it implements the contract's `ScopeApi`, which a client's transport also is. `DeployedScope`: the object class with the namespace as its resolver, its transport and its source of declarations. `api(binding)`: what both call. The default export is the deployed Worker. |
 
 `@generalbusiness/artroom-scope/testing` is for tests only: a test
-authority that calls every grant current, a test readers port, a scripted
+authority, which is a stand-in that reads no membership scope and calls
+every presented grant current, a test readers port, a scripted
 clock, a gate that pauses preparation, a resolver over entries a test
 supplies, and, for several scopes in one namespace, a transport that a test
 can hold back or make lose an answer. It also has `scriptedCapability`, a
@@ -69,19 +70,70 @@ for a few acts
 |---|---|---|
 | `Clock` | One reading for each call. | The runtime's clock. |
 | `Random` | The bytes of a new incarnation. | The runtime's random source. |
-| `Authority` | Whether a presented grant is current, in the commit, on the commit's reading. | No grant is current. Every act is refused `unauthorized`. |
+| `Authority` | Two phases. `read`, before the turn: what the judgment of one act's signer needs, within the fetch time limit. `held`, a method of what was read, in the commit: each grant the act may be judged on, and whether it is current at the commit's reading. It is a pure function of the folded state, that reading and what was read. | The read finds no grant, so none is current. Every act that needs one is refused `unauthorized`. |
 | `Resolver` | One foreign entry by fact reference, within the fetch time limit: the entry, `absent` when the object at that name does not hold it, or nothing when it cannot be read now. | Nothing can be read. An act that names a foreign entry is answered `dependency-unavailable`. `DeployedScope` supplies the namespace. |
 | `Transport` | One dispatch of one send to the object its address names, answered or not. | None: the sends stay in the outbox. `DeployedScope` supplies the namespace. |
 | `Rules` | The results of prepared rule inputs. | Derive's evaluator, `evaluateRules`. |
 | `Alarm` | The next wake time. | In `production()`, nothing. `ScopeObject` supplies the object's own alarm. |
-| `Definitions` | A declaration by digest or platform name, from the scope that retains it. | A platform name is `unsupported-definition`. A digest is unavailable. `DeployedScope` supplies the namespace, which reads a child's declaration from its creator. |
+| `Definitions` | `read`: a declaration by digest, from the scope that retains it. `platform`: a platform definition by name and version, with the rows of each entry that are code and the rules written for them. | `read`: a digest is unavailable. `DeployedScope` supplies the namespace, which reads a child's declaration from its creator. `platform`: the platform package's definitions. A name it does not hold is `unsupported-definition`. |
 | `SentTexts` | A detached text that a delivered message names by digest, from the scope that sent the message. | Unavailable: a delivery that names one is not decided. `DeployedScope` supplies the namespace, which reads the text from the sender. |
 | `Readers` | Whether a reader may make a read. | Nobody may: every read is `forbidden`. |
-| `capabilities` | The rules of the capability versions this runtime has code for: the records, guards and effects of `hold@1`, and `git-read@1`. | None. A scope is not founded or created under a definition that needs one: `unsupported-definition`. The item form of `hold@1`, with its `hold` effect, needs none and runs. |
+| `capabilities` | The rules of the capability forms this runtime has code for: the records, guards and effects of `hold@1`, and `git-read@1`. Each rule is a pure function of its arguments, the folded state and the input being judged. | None. A scope is not founded or created under a definition that needs one: `unsupported-definition`. The item form of `hold@1`, with its `hold` effect, needs none and runs. |
 
 So a deployed scope can be founded and can create children, and then
 admits no act and answers no read. The authority note's rules and sessions
 each replace one port.
+
+## Authority, in two phases
+
+An act's authority is read before the turn and decided in the commit.
+
+1. Before the turn, after the foreign entries are fetched, the core asks
+   the authority port to read what the judgment of this signer needs. The
+   read is for this one act. The core keeps what it returns in the memory
+   of the call and nowhere else. Nothing stores it, so a restart leaves
+   none, and no other act is judged on it.
+2. In the commit, the core asks what was read which grants it holds, at
+   the commit's head and on the commit's one reading. The judge is given
+   the answer. It reads nothing.
+
+- A read that fails, is late or gives nothing leaves the act with nothing
+  to be judged on. The act is answered `authority-unavailable` at check 9
+  of the contract's section 4.2. It is Unavailable: nothing was recorded,
+  its key is not consumed, and the same signed intent may be sent again.
+  The earlier checks still answer first.
+- An act whose key is on a sealed entry is answered from history. Nothing
+  is read for it.
+- The entry records the one grant that was judged. A replay gives the
+  judge that grant and derives the same decision.
+
+The production port reads no membership scope yet. Its read finds no
+grant, and every act that needs one is refused `unauthorized`.
+
+## A platform definition
+
+A platform definition is code of the runtime. It is pinned by its name and
+version, such as `platform:inbox@1`, and no scope retains bytes for it.
+The platform package supplies its data, and marks each entry whose row is
+code that no form can say.
+
+- A founding that names a platform definition is run under the platform
+  package's data. That data alone is validated with the validator's
+  platform option. A declaration that an input, a peer or storage gave is
+  validated without it, so a declared definition never takes a name that
+  begins `platform:`.
+- A scope under a platform definition runs the rows that are data.
+- No judge runs a platform rule yet. So the scope derives nothing of an
+  entry that is marked as code. An act of that kind is answered
+  `unavailable`. A delivery of that message gets transport's `retry`, with
+  the reason `unsupported-definition`. A timed rule of that kind stays
+  due, and the turn ends. Nothing is written in any of the three.
+- A genesis act that is marked founds no scope: `unsupported-definition`.
+- A creation under a platform name is not built: it is answered
+  `unsupported-definition`.
+
+The founding makes a scope of the kind `directory`, as every founding
+does. The kinds of the platform scopes come with their own definitions.
 
 ## A child's definition
 

@@ -2,14 +2,16 @@
  * The ports of a scope: everything the core asks of the world outside its
  * storage, each as one narrow interface. `production()` gives the defaults.
  * A default that would decide something for another owner refuses: no grant
- * is current, no foreign entry can be read, no definition can be read and
- * no reader may read, and no sent text can be read. Transport, the dispatcher and the authority note's
- * rules replace them, each behind its own port.
+ * is read, no foreign entry can be read, no declared definition can be read
+ * and no reader may read, and no sent text can be read. Transport, the dispatcher and the authority note's
+ * rules replace them, each behind its own port. The platform definitions
+ * are the platform package's, which is code of this runtime.
  */
 
-import type { Digest, Entry, FactRef, Grant, PlatformDefinition, Prepared, RoutingRefusal, ScopeRef, Timestamp, UnavailableReason } from "@generalbusiness/artroom-contract";
-import { timeOf, type Capabilities, type Delivered, type RuleInput } from "@generalbusiness/artroom-derive";
+import type { Digest, Entry, FactRef, Grant, PlatformDefinition, Prepared, RoutingRefusal, ScopeRef, SignedIntent, Timestamp, UnavailableReason } from "@generalbusiness/artroom-contract";
+import { timeOf, type Capabilities, type Clock as Reading, type Delivered, type Presented, type RuleInput, type StateView } from "@generalbusiness/artroom-derive";
 import { evaluateRules } from "@generalbusiness/artroom-derive/rule";
+import { platform, type Platform } from "@generalbusiness/artroom-platform";
 
 /** One reading for each call (section 5.3). The core calls it once in a step 3 and once in a commit. */
 export interface Clock { read(): Timestamp }
@@ -18,11 +20,56 @@ export interface Clock { read(): Timestamp }
 export interface Random { bytes(length: number): Uint8Array }
 
 /**
- * Held authority (section 5.1): whether a presented grant is current. It is
- * asked in the commit, with the commit's clock reading, so it is
- * synchronous. The freshness rule is the authority note's.
+ * What the read phase of the authority port is asked: the judgment that one
+ * act needs (authority note, section 3.3).
  */
-export interface Authority { current(grant: Grant, scope: ScopeRef, reading: Timestamp): boolean }
+export interface Asked {
+  /** The scope that judges, with its incarnation. */
+  scope: ScopeRef;
+  /** The act, with its signature and shape checked. Its signer is the intent's `actor`, and its kind says what kind of commit this is. */
+  signed: SignedIntent;
+  /** The action that the act's row names in `grant`. Null: the pinned definition has no act of that kind. */
+  action: string | null;
+  /** The grants presented beside the intent, each of a grant's form. Nothing signs them. */
+  grants: readonly Grant[];
+}
+
+/**
+ * What one read of the authority port obtained for one act: phase two of the
+ * port, which decides in the commit.
+ *
+ * `held` is given the folded state at the commit's head and the commit's one
+ * reading. It answers each grant that the act may be judged on, with whether
+ * it is current at that reading. The judge then looks for one that is to
+ * the signing key, names the action and covers the scope (section 4.2,
+ * check 9). Null: what was read cannot serve this commit, as when its window
+ * has passed or it must be read again: `authority-unavailable`.
+ *
+ * It is a pure function of those two and of what was read. It is
+ * synchronous, so it cannot wait on a read. The judge of a replay does not
+ * call it: it derives the same decision from the grant that the entry
+ * records (section 9.3).
+ *
+ * A `Standing` is working memory of one input's turn (section 5.2, step 2).
+ * The core holds it in the call that read it and nowhere else. It is never
+ * stored, so none outlives the process (authority note, section 3.3), and no
+ * other input is judged on it.
+ */
+export interface Standing { held(view: StateView, clock: Reading): readonly Presented[] | null }
+
+/**
+ * Held authority, in two phases (section 5.1, the rows "Held authority" and
+ * "Retained judgment input"; section 16.1; authority note, section 3.3).
+ *
+ * `read` is phase one. It runs before the turn, off the scope's queue, for
+ * one act. It obtains what the judgment needs, and notes its own clock when
+ * it begins. The core stops waiting after `seconds`. Null, a late answer or
+ * a failure: nothing was read, and the act is not judged at check 9.
+ *
+ * Phase two is the method of what phase one returns. So no commit decides
+ * on authority without a read that was made for its own input.
+ */
+export interface Authority { read(asked: Asked, seconds: number): Promise<Standing | null> }
 
 /**
  * One foreign entry, by fact reference (section 5.2, step 1, and section
@@ -64,17 +111,27 @@ export interface Rules { evaluate(asked: readonly RuleInput[]): Promise<Prepared
 export interface Alarm { set(at: Timestamp | null): void | Promise<void> }
 
 /**
- * A definition's declaration, by what a seed names (section 6.1). A
- * declaration is immutable bytes named by their digest, so it is read before
- * the turn (section 5.1), and the reader checks the digest itself.
+ * A definition, by what a seed names (section 6.1).
  *
- * `holder` is the scope that retains the bytes (section 9.2): for a child,
- * the creator its seed names. Null: nobody is named, as for a founding.
- * `absent`: the holder answered, and it retains no bytes under that digest.
- * `unavailable`: the bytes cannot be read now, and may be later.
+ * `read`: a declaration. It is immutable bytes named by their digest, so it
+ * is read before the turn (section 5.1), and the reader checks the digest
+ * itself. `holder` is the scope that retains the bytes (section 9.2): for a
+ * child, the creator its seed names. Null: nobody is named, as for a
+ * founding. `absent`: the holder answered, and it retains no bytes under
+ * that digest. `unavailable`: the bytes cannot be read now, and may be
+ * later.
+ *
+ * `platform`: a platform definition, which is code that the runtime
+ * supplies. It is pinned by its name and version, no scope retains it and
+ * nothing is read, so it is synchronous. It comes with the rows of each
+ * entry that are code, and the rules written for them. Null: this runtime
+ * does not implement that version: `unsupported-definition`.
  */
 export type DefinitionRead = { ok: true; bytes: string } | { ok: false; reason: "unsupported-definition" | "unavailable" | "absent" };
-export interface Definitions { read(named: Digest | PlatformDefinition, holder: ScopeRef | null): Promise<DefinitionRead> }
+export interface Definitions {
+  read(named: Digest, holder: ScopeRef | null): Promise<DefinitionRead>;
+  platform(named: PlatformDefinition): Platform | null;
+}
 
 /**
  * A detached text that a delivered message names by digest (section 6.2),
@@ -99,34 +156,45 @@ export interface Ports {
   /** Null: this scope has no transport. Its sends stay in the outbox and nothing dispatches them. */
   transport: Transport | null;
   /**
-   * The rules of the capability versions this runtime has code for (section
-   * 6.11), which derive a `capability` guard and effect. Null: it has none.
-   * A scope is then not founded or created under a definition that needs
-   * one: `unsupported-definition`.
+   * The rules of the capability forms this runtime has code for (section
+   * 6.11), which derive a `capability` guard and effect. Each rule is a pure
+   * function of its arguments, the folded state, which holds the
+   * capability's records, and the input being judged: derive's
+   * `Capabilities`. Null: it has none. A scope is not founded or created
+   * under a definition that uses a form with no rule here:
+   * `unsupported-definition`.
    */
   capabilities: Capabilities | null;
 }
+
+/**
+ * What the production authority reads: no grant. The membership scope
+ * cannot be read yet, so no grant is current, and every act that needs one
+ * is refused `unauthorized`.
+ */
+const NO_GRANT: Standing = { held: () => [] };
 
 /**
  * The production defaults. The clock and the random source are the
  * runtime's. The rules are derive's evaluator. The alarm does nothing until
  * the object supplies its own. There is no transport until a namespace
  * supplies one, and no declaration and no sent text can be read until a
- * namespace supplies the scope that retains it. There is no code for any
- * capability record: the records, guards and effects of `hold@1`, and
- * `git-read@1`, are not delivered yet. Every other port refuses.
+ * namespace supplies the scope that retains it. The platform definitions
+ * are the platform package's. There is no code for any capability form:
+ * the records, guards and effects of `hold@1`, and `git-read@1`, are not
+ * delivered yet. Every other port refuses.
  */
 export function production(): Ports {
   return {
     clock: { read: () => timeOf(Date.now()) },
     random: { bytes: (length) => crypto.getRandomValues(new Uint8Array(length)) },
-    authority: { current: () => false },
+    authority: { read: () => Promise.resolve(NO_GRANT) },
     resolver: { read: () => Promise.resolve(null) },
     rules: { evaluate: evaluateRules },
     alarm: { set: () => undefined },
-    // A platform definition is supplied in code, and none is yet (section 6.1). A declared one is read from the scope that
-    // retains it, through the namespace; with no namespace none can be read.
-    definitions: { read: (named) => Promise.resolve({ ok: false, reason: named.startsWith("platform:") ? "unsupported-definition" : "unavailable" }) },
+    // A platform definition is supplied in code (section 6.1). A declared one is read from the scope that retains it, through the
+    // namespace; with no namespace none can be read.
+    definitions: { read: () => Promise.resolve({ ok: false, reason: "unavailable" }), platform },
     texts: { read: () => Promise.resolve({ ok: false, reason: "unavailable" }) },
     readers: { allows: () => false },
     transport: null,

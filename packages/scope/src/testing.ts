@@ -16,8 +16,19 @@ import type { Authority, Clock, Ports, Readers, Resolver, Rules, Transport } fro
 import { production } from "./ports.ts";
 import { READ_BOUNDS, type ReadBounds } from "./reads.ts";
 
-/** A test authority: every presented grant is current. It proves nothing about real authority. */
-export const testAuthority: Authority = { current: () => true };
+/**
+ * A test authority: a stand-in for the authority port, over its two phases.
+ * Its read phase reads no membership scope. It keeps the grants that were
+ * presented beside the intent, and its commit phase calls each of them
+ * current. So it proves nothing about real authority, an observation or a
+ * window: a test that uses it shows what a scope does once a grant is held.
+ *
+ * `answers` is read at each read. While it gives false, the read gives
+ * nothing, as when membership does not answer.
+ */
+export function testAuthority(answers: () => boolean = () => true): Authority {
+  return { read: (asked) => Promise.resolve(answers() ? { held: () => asked.grants.map((grant) => ({ grant, current: true })) } : null) };
+}
 
 /** A test reader port: every reader may read everything. */
 export const testReaders: Readers = { allows: () => true };
@@ -37,8 +48,9 @@ export interface CapabilityScript {
 /**
  * A scripted test capability: a stand-in for the code of `hold@1` and
  * `git-read@1`, which is not delivered. It answers every guard and every
- * effect from the table that the test supplies, and reads no record, no
- * hold, no Git repository and no provider. So it proves nothing about
+ * effect from the table that the test supplies. The port also gives a rule
+ * the folded state and the input, and this stand-in reads neither: no
+ * record, no hold, no Git repository and no provider. So it proves nothing about
  * staging, ancestry, pins, licenses or exports: a test that uses it shows
  * only what a definition does once a capability has answered.
  *
@@ -94,6 +106,8 @@ export interface Controls {
   reads: ReadBounds;
   /** The table of the scripted test capability, a stand-in. Null: no capability, as in production. */
   capability: CapabilityScript | null;
+  /** False: the read of the test authority, a stand-in, gives nothing, as when membership does not answer. */
+  authority: boolean;
 }
 
 const all = new Map<string, Controls>();
@@ -101,12 +115,13 @@ const all = new Map<string, Controls>();
 /** The controls of the scope with that name, made on first use with a clock at `start`. They outlive a restart of the object. */
 export function controls(name: string, start: Timestamp = "2099-01-01T00:00:00Z"): Controls {
   let made = all.get(name);
-  if (!made) all.set(name, (made = { clock: new ScriptedClock(start), gate: new Gate(), foreign: new Map(), bounds: PROPOSED_BOUNDS, reads: READ_BOUNDS, capability: null }));
+  if (!made) all.set(name, (made = { clock: new ScriptedClock(start), gate: new Gate(), foreign: new Map(), bounds: PROPOSED_BOUNDS, reads: READ_BOUNDS, capability: null, authority: true }));
   return made;
 }
 
 /**
- * Test ports over those controls: the test authority and readers, the
+ * Test ports over those controls: the test authority, a stand-in that the
+ * controls can silence, the test readers, the
  * scripted clock, a resolver that reads from `foreign`, derive's rule
  * evaluator behind the gate, and the scripted test capability over the
  * controls' table, which is none until a test sets one. The random source
@@ -116,7 +131,7 @@ export function testPorts(c: Controls): Partial<Ports> {
   const { rules } = production();
   const resolver: Resolver = { read: (fact) => Promise.resolve(c.foreign.get(fact.hash) ?? null) };
   const gated: Rules = { evaluate: async (asked) => { await c.gate.pass(); return rules.evaluate(asked); } };
-  return { clock: c.clock, authority: testAuthority, readers: testReaders, resolver, rules: gated, capabilities: scriptedCapability(() => c.capability) };
+  return { clock: c.clock, authority: testAuthority(() => c.authority), readers: testReaders, resolver, rules: gated, capabilities: scriptedCapability(() => c.capability) };
 }
 
 // ---------------------------------------------------------------- several scopes in one namespace
@@ -170,5 +185,5 @@ export function netPorts(n: Net, transport: Transport, resolver?: Resolver): Par
     },
   };
   const scripted: Partial<Ports> = resolver ? { resolver: { read: (fact, seconds) => { const peer = n.peers.get(fact.hash); return peer ? Promise.resolve(peer) : resolver.read(fact, seconds); } } } : {};
-  return { clock: n.clock, authority: testAuthority, readers: testReaders, transport: disturbed, capabilities: scriptedCapability(() => n.capability), ...scripted };
+  return { clock: n.clock, authority: testAuthority(), readers: testReaders, transport: disturbed, capabilities: scriptedCapability(() => n.capability), ...scripted };
 }

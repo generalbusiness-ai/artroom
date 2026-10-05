@@ -36,6 +36,19 @@ const retry = (reason: UnavailableReason | "scope-full" | "unsupported-definitio
 const UNVERIFIED: Delivery = { answer: "source-unverified" };
 const said = (answer: Delivery): Verdict<Delivery> => ({ verdict: "answer", answer });
 
+/**
+ * The kind of the entry that a delivered request or advisory would be
+ * judged under, as derive's `bound` names a handler's: the name a `tell`
+ * states, a relationship's name, or an advisory's type. Null: the message
+ * is no such thing, or states no name.
+ */
+function rowOf(message: Readonly<Record<string, unknown>>): string | null {
+  const body = message["body"];
+  const named = message["class"] === "advisory" ? message["type"]
+    : message["class"] === "request" && isObject(body) ? (message["type"] === "tell" ? body["message"] : message["type"] === "relate" ? body["name"] : null) : null;
+  return typeof named === "string" ? named : null;
+}
+
 export class Deliveries {
   readonly #name: ScopeId | null;
   readonly #scope: Scope;
@@ -61,8 +74,12 @@ export class Deliveries {
    *
    * `dependency-unavailable`: the creator cannot be read now, or does not
    * hold the bytes. `unsupported-definition`: the seed names a platform
-   * definition, which no code supplies yet, or the bytes are not a valid
-   * declaration with that digest. Either way nothing is recorded.
+   * definition, or the bytes are not a valid declaration with that digest.
+   * Either way nothing is recorded.
+   *
+   * I3 merge: a creation under a platform name is not built. The code
+   * supplies that definition, as `Scope.platform` reads it for a founding,
+   * and the step that makes a platform scope create another asks it here.
    */
   async #declared(seed: Seed): Promise<{ valid: ValidDefinition; bytes: string; children: Retained[] } | "dependency-unavailable" | "unsupported-definition"> {
     if (!isObject(seed) || !isDigest(seed.definition) || !isScopeRef(seed.creator)) return "unsupported-definition";
@@ -108,6 +125,9 @@ export class Deliveries {
     const store = this.#store;
     if (!name || !isObject(delivered) || !isFactRef(delivered.from) || !isLocalId(delivered.n) || !isObject(delivered.message)) return UNVERIFIED;
     const { from, message } = delivered;
+    // Section 6.1: this runtime derives no entry of a row whose code it lacks. So it reads nothing for a message of that row and
+    // decides nothing: the sender keeps the duty. The message names its own row, and the pinned definition is immutable.
+    if (this.#scope.lacks(rowOf(message as unknown as Readonly<Record<string, unknown>>))) return retry("unsupported-definition");
 
     // Section 7.4, "What the receiver trusts at run time". The source scope is reached by its scope ID in the one namespace, the
     // answer's incarnation is checked against the envelope, and the entry's bytes against the hash. Nothing has been recorded.

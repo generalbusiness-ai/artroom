@@ -4,7 +4,7 @@ import { Scope, grantOf, laneDefinition } from "@generalbusiness/artroom-derive/
 import { at, definition, found, rita, una } from "./support.ts";
 
 describe("the answers to a submitted act, on real storage (section 4.2)", () => {
-  test("accepted, with a receipt that an exact retry and a settlement return again; mismatch; and refused, which writes nothing and consumes no key", async () => {
+  test("accepted, with a receipt that an exact retry and a settlement return again; mismatch; refused, which writes nothing and consumes no key; and, with the test authority, a stand-in, silent, a new act is not judged while an accepted key keeps its receipt", async () => {
     const s = await found();
     const offer = s.offer();
     const accepted = await s.submit(offer);
@@ -32,6 +32,17 @@ describe("the answers to a submitted act, on real storage (section 4.2)", () => 
     const settled = await s.stub.settle(offer);
     expect(settled).toEqual({ ok: true, at: await s.head(), value: accepted.receipt, complete: true });
     expect([await s.stub.settle(s.offer()), (await s.head()).seq]).toEqual([{ ok: false, reason: "not-found" }, 2]);
+
+    // The read of authority before the turn gives nothing, as when membership does not answer. The test authority is a stand-in:
+    // this shows what the scope does with no read, and nothing about an observation. A new act is not judged, and nothing is written.
+    s.c.authority = false;
+    const later = s.offer();
+    expect([await s.submit(later), (await s.head()).seq]).toEqual([{ answer: "unavailable", reason: "authority-unavailable" }, 2]);
+    // An accepted key is answered from history. It needs no read, so a lost authority does not hide its receipt.
+    expect(await s.submit(offer)).toEqual(accepted);
+    // The key of the act that was not judged was not consumed: with a read, the same signed intent is accepted.
+    s.c.authority = true;
+    expect(await s.submit(later)).toMatchObject({ answer: "accepted", receipt: { fact: { seq: 3 } } });
   });
 
   test("an act whose entry would pass the size bound is refused and nothing is written", async () => {

@@ -19,6 +19,7 @@
 import type { Digest, Entry, RoutingRefusal, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
 import { canonicalize, isDigest, isPlatformDefinition, parseStrict, platformName, scopeIdOf } from "@generalbusiness/artroom-bytes";
 import { isObject, isScopeRef, type Delivered, type ScopeState } from "@generalbusiness/artroom-derive";
+import { platform } from "@generalbusiness/artroom-platform";
 import type { Pinned } from "./core.ts";
 import type { Definitions, Delivery, Resolver, SentTexts, Transport } from "./ports.ts";
 import type { Store } from "./store.ts";
@@ -162,15 +163,16 @@ export function namespace(binding: Binding): { resolver: Resolver; transport: Tr
     definitions: {
       // Sections 5.1 and 9.2: a child reads its declaration from its creator, by digest, before its genesis turn.
       async read(named, holder) {
-        if (named.startsWith("platform:")) return { ok: false, reason: "unsupported-definition" };
         if (!holder) return { ok: false, reason: "unavailable" };
         try {
-          const bytes = await peer(holder.scope).declared(named as Digest);
+          const bytes = await peer(holder.scope).declared(named);
           return bytes === null ? { ok: false, reason: "absent" } : { ok: true, bytes };
         } catch {
           return { ok: false, reason: "unavailable" };
         }
       },
+      // Section 6.1: a platform definition is the runtime's own code. No scope retains it, so no name of this namespace is asked.
+      platform,
     },
     texts: {
       // Section 6.2: the bytes of a detached text travel beside the message that names it. The receiver reads them from the sender.

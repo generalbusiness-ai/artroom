@@ -41,7 +41,7 @@ The package has two entry points:
 | `time` | `clockOf(view, reading)`: one commit's reading, whether it is behind, and the time at which a transition is due. `timeMs`, `timeOf`. |
 | `attribution` | `historyOf(item, changed, definition, signer)`: an item's attribution history with what the entry's changed holds add. `attribution(history, signer)`: that history, then the signer and the signer's principal. |
 | `values` | `isValue` for each field type, `same`, `byteOrder`, and the reference shapes. |
-| `capability` | `Capabilities`: the rules of the capability versions that a runtime or a verifier has code for, which a judge is given in `Reading.capabilities` and asks for each `capability` guard and effect. This package holds no such rule. `derivable(definition, capabilities)`: whether every form in the definition's `underived` list has code. A runtime answers `unsupported-definition` when it is false. `Recorded`: one change of one record, which an entry holds as a `record` effect. |
+| `capability` | `Capabilities`: the rules of the capability forms that a runtime or a verifier has code for, which a judge is given in `Reading.capabilities` and asks for each `capability` guard and effect. Each rule is given its arguments and `CapabilityGiven`: the folded state before the entry and the input being judged. `implements` is asked for each form, not for a version. This package holds no such rule. `derivable(definition, capabilities)`: whether every form in the definition's `underived` list has code. A runtime answers `unsupported-definition` when it is false. `Recorded`: one change of one record, which an entry holds as a `record` effect. |
 
 ## The validator's modules
 
@@ -95,7 +95,7 @@ What the caller supplies for each input:
 
 | Input | Beside the clock and bounds |
 |---|---|
-| An act | The presented grants with the authority port's verdict; each fetched foreign entry its fields name; the prepared rule results; `own`, the reader of the scope's own entries, for a local fact. |
+| An act | Each grant the act may be judged on, with whether it is current, as the commit decided it from what was read before the turn; or null when nothing was read, which is `authority-unavailable`; each fetched foreign entry its fields name; the prepared rule results; `own`, the reader of the scope's own entries, for a local fact. |
 | A genesis | The scope's own name and a new incarnation. For a child, the source entry: the creator's entry that holds the `create` send. |
 | A delivery | The send's address, source fact, ordinal and message; the source entry as read from the source scope. For a result, this scope's own entry that sent the request. |
 | A diagnosis | The request by `seq` and ordinal, the attempt log, and this scope's own entry that sent the request. |

@@ -23,11 +23,24 @@ import { timeMs, type Clock } from "./time.ts";
 import type { ValidDefinition } from "./validate/index.ts";
 import { isScopeRef, own, same } from "./values.ts";
 
-/** A grant as presented, with the authority port's verdict on whether it is current (section 5.1, held authority). */
+/**
+ * A grant that an act may be judged on, with whether it is current (section
+ * 5.1, held authority). `current` is decided in the commit, on the commit's
+ * reading, from what was read about the signer before the turn. The judge
+ * is given the answer. It reads nothing, and it asks no port.
+ */
 export interface Presented { grant: Grant; current: boolean }
 
 export interface JudgeContext extends Reading {
-  grants: readonly Presented[];
+  /**
+   * What was read about the signer's authority before the turn, as the
+   * commit decided it: each grant the act may be judged on. Null: nothing
+   * was read that this commit can judge on. An act that reaches check 9 of
+   * section 4.2 is then not judged: `authority-unavailable` (section 16.1).
+   * A verifier gives the one grant that the entry records, which retains
+   * what was read (section 9.3).
+   */
+  grants: readonly Presented[] | null;
   /** The facts presented beside the intent, by name, as they arrived (section 6.4). They are not signed. */
   presented?: Readonly<Record<string, unknown>> | undefined;
 }
@@ -166,6 +179,9 @@ export function judgeAct(view: StateView, definition: ValidDefinition, signed: S
   const primary = subjects.get("on");
   if (act.step === "transition" && primary && own(own(declared.items, primary.type)!.states, primary.state)?.final) return refused("final", `item ${primary.id} is ${primary.state}`);
 
+  // Section 4.2, check 9. Nothing was read about this signer that the commit can judge on: the act is not judged, and nothing above
+  // this line was hidden by that. Section 16.1: no judgment rests on a read that was not made, or on one that was discarded.
+  if (context.grants === null) return { result: "unavailable", reason: "authority-unavailable" };
   // Section 6.4: every act needs a current grant for its `grant` action. The first presented grant that qualifies is the one recorded.
   const presented = context.grants.find(({ grant, current }) =>
     current && grant.key === intent.actor && grant.actions.includes(act.grant)

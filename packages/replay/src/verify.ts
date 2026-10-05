@@ -474,7 +474,7 @@ class Verifier {
     if (declared === undefined) throw new Stop("incomplete", `a retained input is not the one named: the definition's declaration, ${digest}`, where);
     const checked = validateDefinition(declared, this.#bounds, RULE_PROFILES);
     // Section 9.3: a capability version that the verifier does not implement gives `unsupported-definition`.
-    const needs = checked.ok ? checked.definition.underived.find((u) => !this.#capabilities?.implements(u.capability)) : undefined;
+    const needs = checked.ok ? checked.definition.underived.find((u) => !this.#capabilities?.implements(u)) : undefined;
     if (needs) throw new Stop("unsupported-definition", `the pinned definition needs ${needs.capability}, which this replay has no code for: ${needs.form} ${needs.name} at ${needs.path}`, where);
     if (checked.ok) return checked.definition;
     // Section 9.3: a history whose genesis opens a timed item is invalid.
