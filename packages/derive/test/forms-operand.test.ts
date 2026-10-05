@@ -195,29 +195,45 @@ describe("operands, parts and a local fact (sections 6.2 and 6.5; witness 18.1)"
     expect([(O.entries[0]!.entry.input as { kind?: string }).kind, trace(P, O)]).toEqual(["start", expect.objectContaining({ result: "refused", reason: "guard-failed", detail: "guards.0" })]);
   });
 
-  test("a handler reads its sender, the source entry and the update; a refused delivery records the name its guard declares, and the result carries it; the delivery's kind is its message's name", () => {
-    const definition = variant(ticket, (d) => {
+  test("a handler reads its sender, the source entry and the update; a refused delivery records the name its guard declares, and the result carries it; the delivery's kind is its message's name; a field of a foreign delivery is read as its bytes hold it, whatever handler its reader declares", () => {
+    const change = (d: any) => {   // eslint-disable-line @typescript-eslint/no-explicit-any
       d.receives.closes.guards = [
         equals({ update: "state" }, { const: "set" }, "not-set"),
         equals({ sender: true }, { source: "scope" }, "sender"), equals({ update: "revision" }, { source: "seq" }, "revision"),
         equals({ update: "item" }, { source: "ref" }, "item"), equals({ source: "kind" }, { const: "link" }, "kind"), equals({ source: { field: "about" } }, { field: "about" }, "about"),
       ];
-      d.acts.cite = act({ step: "transition", on: "intent", grant: "link", fields: { closed: { type: "fact", kind: ["closes"], under: "ticket", required: true } }, guards: [{ state: ["open"] }, { fact: { field: "closed" } }] });
-      // The link keeps the entry that made it, set from `self`, and its update carries that slot and a fact that the act names.
+      // `cite` names a delivery of `closes`, and may compare the `madeAt` that it delivered with a fact, or with a record.
+      const madeAt = (b: string): Guard => ({ fact: { field: "closed", where: [{ equals: { a: { field: "madeAt" }, b: { field: b } } }] }, ifPresent: true, reason: b });
+      // `peek` compares the same field of an entry whose kind it does not ask for.
+      d.acts.peek = act({
+        step: "transition", on: "intent", grant: "link", fields: { closed: { type: "fact", kind: ["closes"], under: "ticket", required: true }, by: { type: "fact", kind: ["link"], under: "ticket", required: true } },
+        guards: [equals({ field: "closed", part: { field: "madeAt" } }, { field: "by" }, "peek")],
+      });
+      d.acts.cite = act({
+        step: "transition", on: "intent", grant: "link", guards: [{ state: ["open"] }, { fact: { field: "closed" } }, madeAt("by"), madeAt("flag")],
+        fields: {
+          closed: { type: "fact", kind: ["closes"], under: "ticket", required: true }, by: { type: "fact", kind: ["link"], under: "ticket", required: false },
+          flag: { type: "record", of: { self: { type: "bool", required: true } }, required: false },
+        },
+      });
+      // The link keeps the entry that made it, set from `self`, and its update carries that slot, a fact that the act names, and a fact that it is presented.
       d.items.link.refs.madeAt = { fixed: true, required: true, to: { type: "fact", kind: ["link"], under: "ticket" } };
       d.acts.link.fields.because = { type: "fact", kind: ["file"], under: "ticket", required: true };
       d.acts.link.effects.push({ ref: { slot: "madeAt", from: "self" } });
-      Object.assign(d.acts.link.sends[0].relate.detail, { madeAt: { slot: "madeAt" }, because: { field: "because" } });
-      Object.assign(d.receives.closes.fields, { madeAt: { type: "fact", kind: ["link"], under: "ticket", required: false }, because: { type: "fact", kind: ["file"], under: "ticket", required: false } });
+      d.acts.link.presents = { shown: { kind: ["file"], under: "ticket", required: false } };
+      Object.assign(d.acts.link.sends[0].relate.detail, { madeAt: { slot: "madeAt" }, because: { field: "because" }, shown: { presented: "shown" } });
+      const filed = { type: "fact", kind: ["file"], under: "ticket", required: false };
+      Object.assign(d.receives.closes.fields, { madeAt: { type: "fact", kind: ["link"], under: "ticket", required: false }, because: filed, shown: filed });
       d.receives.closes.guards.push(equals({ field: "madeAt" }, { source: "ref" }, "made at"));
-    });
+    };
+    const definition = variant(ticket, change);
     const P = new Scope(definition);
     const I = new Scope(definition, rita.member, true, 1);
     // P.2 opens link 2 and sends its update, `set`. The source entry is that `link` act, and the owner's item is the entry itself.
-    P.did(rita, "link", fields({ target: I.at, about: 0, because: P.fact(0) }));
+    expect(P.act(rita, "link", fields({ target: I.at, about: 0, because: P.fact(0) }), { presented: { shown: P.fact(0) } }).result).toBe("write");
     // Section 6.4: a local entry reference is not sent as a position. The entry being written is sent as the `self` mark, which the
-    // receiver reads as the envelope's source, and an earlier entry as its fact reference.
-    expect(P.last.sends[0]!.message).toMatchObject({ body: { detail: { madeAt: { self: true }, because: P.fact(0) } } });
+    // receiver reads as the envelope's source, and an earlier entry as its fact reference: one that a field names, and one that is presented.
+    expect(P.last.sends[0]!.message).toMatchObject({ body: { detail: { madeAt: { self: true }, because: P.fact(0), shown: P.fact(0) } } });
     expect(deliver(I, P, 2)).toMatchObject({ result: "write", draft: { input: { decision: "applied" } } });
     const applied = I.head.seq;
     // P.3 removes the link. The handler's first guard fails, so the deciding entry is `refused`, with the code and the guard's name, and so is its result.
@@ -232,6 +248,26 @@ describe("operands, parts and a local fact (sections 6.2 and 6.5; witness 18.1)"
     // The entry that recorded the first update is a delivery of the request `closes`: that is its kind, for a fact of this scope's own.
     const cite = (seq: number) => I.act(rita, "cite", { ...on(I, 0), ...fields({ closed: I.fact(seq) }) }).result;
     expect([cite(applied), cite(0)]).toEqual(["write", "refused"]);
+
+    // A field of this scope's own delivery is read by the types of the handler that received it: I's `madeAt` is a fact, so the mark is P.2.
+    const cited = (closed: Fetched | FactRef, given: Record<string, FieldValue>, link = 2) => {
+      const judgment = I.act(rita, "cite", { ...on(I, 0), ...fields({ closed: "fact" in closed ? closed.fact : closed, ...given }) }, { facts: ["fact" in closed ? [closed] : [], "by" in given ? [fetched(P, link)] : []].flat() });
+      return "name" in judgment ? judgment.name : judgment.result;
+    };
+    expect([cited(I.fact(applied), { by: P.fact(2) }), cited(I.fact(applied), { flag: { self: true } })]).toEqual(["write", "flag"]);
+    // J is a lane under a definition of the same name, whose `closes` takes `madeAt` as a record with a boolean member `self`. P.5 sends
+    // it the same bytes, and J admits a record. I reads J's entry, and declares a handler of that name whose `madeAt` is a fact. That
+    // handler says nothing of J's entry: the field is the record that the bytes hold, and it equals no reference to P.5.
+    const J = new Scope(variant(ticket, (d) => { change(d); d.receives.closes.guards.pop(); d.receives.closes.fields.madeAt = { type: "record", of: { self: { type: "bool", required: true } }, required: false }; }), rita.member, true, 2);
+    const link = P.did(rita, "link", fields({ target: J.at, about: 0, because: P.fact(0) })).seq;
+    expect([deliver(J, P, link).result, J.last.input]).toMatchObject(["write", { decision: "applied", message: { body: { detail: { madeAt: { self: true } } } } }]);
+    expect([cited(fetched(J, J.head.seq), { by: P.fact(link) }, link), cited(fetched(J, J.head.seq), { flag: { self: true } })]).toEqual(["by", "write"]);
+    // K's handler is for a sender under another definition, so K decides the same update `unknown-message`. No handler of K received
+    // the field, and the handler of that name does not read it afterwards: in K's own entry it is the record too.
+    const K = new Scope(variant(ticket, (d) => { change(d); d.receives.closes.from.under = "board"; }), rita.member, true, 3);
+    const unread = P.did(rita, "link", fields({ target: K.at, about: 0, because: P.fact(0) })).seq;
+    deliver(K, P, unread);
+    expect([K.last.input, K.act(rita, "peek", { ...on(K, 0), ...fields({ closed: K.fact(K.head.seq), by: P.fact(unread) }) }, { facts: [fetched(P, unread)] })]).toMatchObject([{ decision: "refused", reason: { code: "unknown-message" } }, { result: "refused", name: "peek" }]);
   });
 
   test("an operand names only what its place has, and a part only what an entry can hold", () => {

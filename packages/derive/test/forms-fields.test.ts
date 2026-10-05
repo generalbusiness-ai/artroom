@@ -3,6 +3,7 @@ import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { DeclaredDefinition, FieldType } from "@generalbusiness/artroom-contract";
 import { isSealed } from "@generalbusiness/artroom-bytes";
 import { operand, validateDefinition, type Judging, type ProblemCode } from "../src/index.ts";
+import { equal } from "../src/operand.ts";
 import { naming, type Defining } from "../src/validate/context.ts";
 import { operand as operandType } from "../src/validate/operands.ts";
 import { shapes } from "../src/validate/shape.ts";
@@ -26,7 +27,10 @@ describe("the record type (section 6.2)", () => {
       { effect: "value", item: planned.seq, slot: "mark", value: { label: "plain" } },
     ]);
     expect(s.did(sam, "stamp", on(s, planned.seq)).effects).toEqual([{ effect: "value", item: planned.seq, slot: "mark", value: { label: "stamped", weight: 2 } }]);
-    // An entry that holds a record is an entry, and a fold of the entries gives the same state.
+    // Equality puts a local fact in normal form at any depth: the rows as the intent holds them equal the rows as the slot holds them.
+    const j = { scope: { at: s.at }, own: s.own } as unknown as Judging;
+    const given = planned.input.type === "act" ? planned.input.signed.intent.fields["rows"] : null;
+    expect([given, equal(j, given, s.item(planned.seq).values["rows"]), equal(j, [{ job, by: { ...s.fact(job), hash: d("f") } }], [{ job, by: job }])]).toEqual([[{ job, why: "first", by: s.fact(job) }, { job }], true, false]);
     expect(s.entries.slice(-2).every(isSealed)).toBe(true);
     expect(s.replay().snapshot()).toBe(s.state.snapshot());
 

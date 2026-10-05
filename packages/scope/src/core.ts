@@ -97,9 +97,9 @@ export class Received {
   /** What a judge asks: the size of the text under a digest, or undefined when none came. */
   readonly sizes: Texts = (digest) => this.#texts.get(digest)?.size;
 
-  /** Section 9.2: the bytes of each text that the entry's input names, under its digest, to be retained with the entry. */
-  retain(definition: ValidDefinition, draft: Draft): Retained[] {
-    return inputTexts(definition, draft.input).flatMap((digest): Retained[] => {
+  /** Section 9.2: the bytes of each text that the entry's input names, under its digest, to be retained with the entry. `under`: for a delivery, the name of the definition that its sender pins. */
+  retain(definition: ValidDefinition, draft: Draft, under?: string): Retained[] {
+    return inputTexts(definition, draft.input, under).flatMap((digest): Retained[] => {
       const text = this.#texts.get(digest);
       return text ? [{ kind: "text", digest, bytes: text.bytes }] : [];
     });

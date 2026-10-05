@@ -530,7 +530,7 @@ export function judged(to: Ledger, from: Ledger, seq: number, n = 0, over: Arriv
   const { source: read = source, ...envelope } = over;
   const arrival = { ...delivered, ...envelope };
   const message = arrival.message;
-  const named = message.class === "request" || message.class === "advisory" ? messageFacts(to.state, to.definition, message, arrival.from, to.bounds) : [];
+  const named = message.class === "request" || message.class === "advisory" ? messageFacts(to.state, to.definition, message, arrival.from, to.bounds, read?.under ?? from.under) : [];
   const facts = named.flatMap((fact): Fetched[] => (fact.at.scope === from.at.scope && from.entries[fact.seq] ? [{ fact, entry: from.entries[fact.seq]!.entry, under: from.under }] : []));
   return judgeDelivery(to.state, to.definition, arrival, arriving(to, arrival, read, facts));
 }

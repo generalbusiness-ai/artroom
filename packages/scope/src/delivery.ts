@@ -131,10 +131,11 @@ export class Deliveries {
     let origin: Entry | null = null;
     let carried: Digest[] = [];
     // Section 7.4, the order of a delivery's checks: a repeat is found after the source entry is read, and before the checks of the
-    // message's class. A send that this scope has recorded is answered from that entry. That answer reads no foreign entry and no
-    // text, so none is fetched for it, and a text that both scopes have redacted since cannot hide it. The judge still makes every
-    // check in that order, and gives the answer. A recorded decision stays recorded, so the judge finds it too. A repeated creation
-    // is under the same rule: its scope has a genesis, so the founding branch below, which reads a creation's texts, is not taken.
+    // message's class. A send that this scope has recorded is answered from that entry. The source entry is still read and checked.
+    // The answer reads no other foreign entry and no text, so none is fetched for it, and a text that both scopes have redacted since
+    // cannot hide it. The judge still makes every check in that order, and gives the answer. A recorded decision stays recorded, so
+    // the judge finds it too. A repeated creation is under the same rule: its scope has a genesis, so the founding branch below,
+    // which reads a creation's texts, is not taken.
     const known = store.decided(from.at, from.seq, delivered.n) !== null;
     if (!pinned && founding) {
       const act = own(founding.valid.declared.acts, founding.valid.declared.genesis)!;
@@ -153,11 +154,11 @@ export class Deliveries {
     } else if (!known && pinned?.definition && (message.class === "request" || message.class === "advisory")) {
       // Section 6.4: the foreign entries that the declared fields of the message name. More than one entry may use are not fetched:
       // the judge refuses that message, `bad-field`, before it reads any.
-      const wanted = messageFacts(store, pinned.definition, message, from, bounds);
+      const wanted = messageFacts(store, pinned.definition, message, from, bounds, source.under);
       const fetched = wanted.length >= bounds.usesPerEntry ? [] : await fetchFacts(this.#ports.resolver, bounds, wanted);
       if (!fetched) return retry("dependency-unavailable");
       facts = fetched;
-      carried = messageTexts(pinned.definition, message, from);
+      carried = messageTexts(pinned.definition, message, from, source.under);
     }
     const texts = await this.#texts(from, carried);
     if (!texts) return retry("dependency-unavailable");
@@ -183,7 +184,7 @@ export class Deliveries {
           case "write": {
             // Section 9.2: an entry that settles nothing is written only while the scope has room; one that settles is counted for.
             if ((view.scope()?.head.seq ?? -1) + 1 >= bounds.scopeEntries) return said(retry("scope-full"));
-            const retain: Retained[] = [...used(judged.draft, [source, ...facts]), ...texts.retain(definition(), judged.draft)];
+            const retain: Retained[] = [...used(judged.draft, [source, ...facts]), ...texts.retain(definition(), judged.draft, source.under)];
             if (genesis && founding) {
               store.cover(founding.valid.indexes);
               retain.push({ kind: "definition", digest: founding.valid.digest, bytes: canonicalize(JSON.parse(founding.bytes)) }, ...founding.children);

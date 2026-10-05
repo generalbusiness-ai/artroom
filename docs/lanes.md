@@ -353,8 +353,8 @@ entry is the issue's genesis. A genesis records its act kind, and a change
 lane reads the kind from the entry (`docs/scopes.md`, "The kind of an
 entry"). T3 names the `file` entry as the goal of its plan and of its
 manifests, with the scripted capability. A goal of another kind is still
-refused. This follows a proposed revision of the scope contract, which is
-not adopted yet (section 24 of the deltas note).
+refused. This follows revision 12 of the scope contract, which is adopted
+(section 24 of the deltas note).
 
 One row cannot do today what the lane forms say, with or without a
 stand-in. The row was not changed.

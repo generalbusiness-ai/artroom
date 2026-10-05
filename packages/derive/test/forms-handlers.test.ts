@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { ActType, DeclaredDefinition, FieldValue, Request, Result } from "@generalbusiness/artroom-contract";
-import { validateDefinition, type Fetched, type ProblemCode } from "../src/index.ts";
+import { messageFacts, validateDefinition, type Fetched, type ProblemCode } from "../src/index.ts";
 import { Scope, arrive, decided, deliver, fields, keys, on, ticket, ticketDefinition, valid, variant } from "./fixtures.ts";
 
 const { rita } = keys;
@@ -58,7 +58,12 @@ const board: DeclaredDefinition = {
   receives: {
     post: {
       message: "post", class: "tell", from: { kind: "lane" }, opens: "card",
-      fields: { text: { ...text, required: true }, about: { type: "item", of: "card", required: false }, proof: { type: "fact", kind: ["link"], under: "ticket", required: false } },
+      fields: {
+        text: { ...text, required: true }, about: { type: "item", of: "card", required: false }, proof: { type: "fact", kind: ["link"], under: "ticket", required: false },
+        // A record that names a card, and a list of such records.
+        under: { type: "record", of: { card: { type: "item", of: "card", required: true } }, required: false },
+        beside: { type: "list", of: { type: "record", of: { card: { type: "item", of: "card", required: true } } }, max: 2, required: false },
+      },
       also: { about: { item: "card", by: "about" } },
       guards: [{ of: "also.about", state: ["open"], reason: "about-done" }, { equals: { a: { field: "proof", part: "kind" }, b: { const: "link" } }, ifPresent: true, reason: "not-a-link" }],
       effects: [{ value: { slot: "note", from: { field: "text" } } }, { ref: { slot: "postedAt", from: "self" } }], sends: [], attention: [],
@@ -161,7 +166,12 @@ describe("subjects and handlers (sections 6.4 and 7.3)", () => {
     expect(B.item(a)).toMatchObject({ type: "card", revision: 1, values: { note: "a" }, refs: { postedAt: a } });
     // A message names its receiver's item by the fact of the entry that opened it. A fact with another hash names none.
     expect([told("post", { text: "b", about: { ...B.fact(a), hash: B.fact(0).hash } }), told("post", { text: "b", about: B.fact(a) })]).toEqual([["refused", "bad-field"], ["applied"]]);
-    // The named card is done: the guard on it is evaluated, and the refusal carries its name.
+    // The same fact as a member of a record, and in a record of a list, names the same card: each is read by its declared type, with the same checks.
+    // Another hash names none, and the entry that opened the board names no card.
+    const within = (card: FieldValue) => [told("post", { text: "b", under: { card } }), told("post", { text: "b", beside: [{ card }] })];
+    expect([within({ ...B.fact(a), hash: B.fact(0).hash }), within(B.fact(0))]).toEqual([[["refused", "bad-field"], ["refused", "bad-field"]], [["refused", "no-item"], ["refused", "no-item"]]]);
+    expect([told("post", { text: "b", under: { card: B.fact(a) }, beside: [{ card: B.fact(a) }] }), B.state.count("card", "open")]).toEqual([["applied"], 3]);
+    B.did(rita, "done", on(B, B.last.seq));
     B.did(rita, "done", on(B, a));
     tell("post", { text: "c", about: B.fact(a) });
     expect(B.last.input).toMatchObject({ decision: "refused", reason: { code: "guard-failed", name: "about-done" } });
@@ -197,6 +207,11 @@ describe("subjects and handlers (sections 6.4 and 7.3)", () => {
     B.bounds = PROPOSED_BOUNDS;
     tell("post", { text: "f", proof: proof.fact }, [proof]);
     expect([decided(B), B.last.uses.map((u) => u.fact).at(-1), B.last.uses.length]).toEqual([["applied"], proof.fact, 2]);
+
+    // A handler for a sender under another definition does not receive the message, so its declared fields name nothing to fetch.
+    const under = variant(board, (d) => { d.receives.post.from.under = "ticket"; });
+    const message = { class: "request", type: "tell", body: { message: "post", fields: { text: "f", proof: proof.fact } } } as const;
+    expect(["ticket", "desk"].map((sender) => messageFacts(B.state, under, message, X.fact(1), B.bounds, sender))).toEqual([[proof.fact], []]);
   });
 
   test("a result clause changes the items that its entry selected, read as they are now, and not an item that the entry did not find", () => {
