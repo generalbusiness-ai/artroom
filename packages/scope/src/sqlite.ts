@@ -119,8 +119,9 @@ export class SqliteStore implements Store {
 
   relation(owner: ScopeRef, name: string, item: number): Relation | null { return this.#folded("relation", canonicalize([owner.scope, owner.inc, name, item])); }
   /** Counted from the copies themselves. A `relate` handler bounds how many its scope keeps, so the rows read are bounded by the definition. */
-  copies(name: string, kind: ScopeKind): number {
-    return this.#one("SELECT COUNT(*) AS n FROM folded WHERE kind = 'relation' AND json_extract(value, '$.name') = ? AND json_extract(value, '$.owner.kind') = ?", name, kind)!["n"] as number;
+  copies(name: string, kind: ScopeKind, states?: readonly string[]): number {
+    const among = states ? ` AND json_extract(value, '$.state') IN (${states.map(() => "?").join(", ")})` : "";
+    return this.#one(`SELECT COUNT(*) AS n FROM folded WHERE kind = 'relation' AND json_extract(value, '$.name') = ? AND json_extract(value, '$.owner.kind') = ?${among}`, name, kind, ...(states ?? []))!["n"] as number;
   }
   accepted(actor: KeyId, idempotencyKey: string): Accepted | null {
     const row = this.#one("SELECT seq, intent FROM entry WHERE actor = ? AND idem = ?", actor, idempotencyKey);

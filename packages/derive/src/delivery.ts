@@ -100,8 +100,8 @@ export function judgeDelivery(view: StateView, definition: ValidDefinition, deli
   const use = useOf(from, source);
   /** Section 5.3: an entry that judges no time condition may be written clamped; one that does is `clock-behind`. */
   /** `read`: the foreign entries a clause read beside the source entry. Each fact is recorded once (section 9.2). */
-  const write = (input: Extract<Judgment, { result: "write" }>["draft"]["input"], effects: readonly Effect[], sends: readonly Send[], prepared: readonly Prepared[], judgesTime: boolean, read: readonly FactUse[] = []): Judgment =>
-    (judgesTime && clock.behind ? { result: "unavailable", reason: "clock-behind" } : { result: "write", draft: { input, uses: [use, ...read.filter((u) => u.fact.hash !== from.hash)], prepared, effects, sends, judgesTime } });
+  const write = (input: Extract<Judgment, { result: "write" }>["draft"]["input"], effects: readonly Effect[], sends: readonly Send[], prepared: readonly Prepared[], judgesTime: boolean, read: readonly FactUse[] = [], settles = false): Judgment =>
+    (judgesTime && clock.behind ? { result: "unavailable", reason: "clock-behind" } : { result: "write", draft: { input, uses: [use, ...read.filter((u) => u.fact.hash !== from.hash)], prepared, effects, sends, judgesTime, settles } });
   /** Section 7.2: the cause of any scope this delivery's handler creates names this one delivery. */
   const cause = () => deliveryCauseDigest({ v: 1, from, n, message: messageDigest(message) });
 
@@ -127,9 +127,9 @@ export function judgeDelivery(view: StateView, definition: ValidDefinition, deli
    * entry sends exactly one result, which names the request by its source
    * fact and ordinal. The result follows the sends the handler declares.
    */
-  const decide = (decision: "applied" | "refused" | "superseded", reason: Reason | undefined, effects: readonly Effect[] = [], sends: readonly Send[] = [], prepared: readonly Prepared[] = [], judgesTime = false, read: readonly FactUse[] = []): Judgment => {
+  const decide = (decision: "applied" | "refused" | "superseded", reason: Reason | undefined, effects: readonly Effect[] = [], sends: readonly Send[] = [], prepared: readonly Prepared[] = [], judgesTime = false, read: readonly FactUse[] = [], settles = false): Judgment => {
     const answer: Result = { class: "result", of: { from, n }, outcome: decision, ...(reason ? { reason } : {}) };
-    return write({ type: "delivery", from, n, message: message as Request, decision, ...(reason ? { reason } : {}) }, effects, [...sends, { n: sends.length, to: from.at, message: answer }], prepared, judgesTime, read);
+    return write({ type: "delivery", from, n, message: message as Request, decision, ...(reason ? { reason } : {}) }, effects, [...sends, { n: sends.length, to: from.at, message: answer }], prepared, judgesTime, read, settles);
   };
   const b = bound(definition, message, from);
   if (!b) return decide("refused", { code: "bad-field" });
@@ -143,6 +143,8 @@ export function judgeDelivery(view: StateView, definition: ValidDefinition, deli
 
   const platform: Effect[] = [];
   let first = false;
+  /** Section 17.3: the update takes a copy that awaits its settlement out of the states that its handler's `settles` lists. */
+  let settlesCopy = false;
   if (message.type === "relate") {
     const update = updateOf(message, from)!;
     if (!oneUpdateForKey(source, from, delivered.to, update.name, update.item.seq)) return unverified("the source entry has two relate sends for one key");
@@ -151,6 +153,8 @@ export function judgeDelivery(view: StateView, definition: ValidDefinition, deli
     const held = view.relation(from.at, update.name, update.item.seq);
     if (held && from.seq <= held.revision) return decide("superseded", undefined);
     first = !held;
+    const pending = handler.settles && "copy" in handler.settles ? handler.settles.copy : null;
+    settlesCopy = !!pending && !!held && pending.includes(held.state) && !pending.includes(update.state);
     platform.push({ effect: "relation", owner: from.at, item: update.item.seq, name: update.name, state: update.state, revision: from.seq });
   }
 
@@ -162,7 +166,8 @@ export function judgeDelivery(view: StateView, definition: ValidDefinition, deli
   // Section 7.3: copies are bounded. The first update for a key beyond the number its handler states is refused, like an opening
   // past a type's `max`. An update for a key that is already held is never refused for that reason.
   if (first && view.copies(b.kind, from.at.kind) >= (handler.copies ?? 0)) return decide("refused", { code: "type-full" }, [], [], ran.prepared, false, ran.uses);
-  return decide("applied", undefined, [...platform, ...ran.effects], ran.sends, ran.prepared, ran.judgesTime, ran.uses);
+  // A refusal takes nothing out of a pending state, so it is new work (section 17.3). An applied update or message may settle.
+  return decide("applied", undefined, [...platform, ...ran.effects], ran.sends, ran.prepared, ran.judgesTime, ran.uses, ran.settles || settlesCopy);
 }
 
 /** The reason an entry records for a refusal: the code, and the name when the failed guard declares one (section 4.2). */

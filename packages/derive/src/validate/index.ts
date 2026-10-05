@@ -19,7 +19,7 @@
 import type { Bounds, DeclaredDefinition, Digest } from "@generalbusiness/artroom-contract";
 import { canonicalize, definitionDigest, utf8 } from "@generalbusiness/artroom-bytes";
 import { isObject, own } from "../values.ts";
-import { capacityOf } from "./capacity.ts";
+import { capacityOf, type PendingCopy } from "./capacity.ts";
 import type { Defining, RangeIndex } from "./context.ts";
 import { acts, receives } from "./handlers.ts";
 import { heldUnderBytes, holdForms, holdTypes } from "./hold.ts";
@@ -52,6 +52,14 @@ export interface ValidDefinition {
    * deadlines that clause can create.
    */
   readonly clauseEntries: number;
+  /**
+   * Section 17.2, row 3: for each item type and each state in which an item
+   * awaits a settlement that an act or handler declares with `settles`, the
+   * entries that item reserves: the settling entry and what it can start.
+   */
+  readonly pending: Readonly<Record<string, Readonly<Record<string, number>>>>;
+  /** Section 17.2, row 4: each relationship whose copies await a settlement, with the states and the entries a copy in one of them reserves. */
+  readonly pendingCopies: readonly PendingCopy[];
 }
 
 export type Validation = { ok: true; definition: ValidDefinition } | { ok: false; problems: readonly Problem[] };
@@ -85,7 +93,7 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
 
   const d: Defining = {
     ...read, bounds, name: typeof top["name"] === "string" ? top["name"] : null, typeNames: new Set(isObject(top["items"]) ? Object.keys(top["items"]) : []), types: new Map(), rules: new Set(), holds: false, holdTypes: new Set(),
-    indexes: [], clauseSets: [], clause: null,
+    indexes: [], clauseSets: [], clause: null, duties: [],
   };
 
   const profile = rec(top["profile"], "profile", ["name", "version"]);
@@ -148,9 +156,11 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
     if (most > bounds.entryBytes) bad("bound", at("timed", name), `its entry could take ${most} bytes; at most ${bounds.entryBytes}`);
   }
   if (problems.length > 0) return { ok: false, problems };
-  const { deadlines, clauseEntries } = capacityOf(graph, d.clauseSets);
+  // Section 17.2: each reservation is derived from the definition. A closure that is not finite is refused.
+  const capacity = capacityOf(d, graph, moves);
+  if (problems.length > 0) return { ok: false, problems };
   try {
-    return { ok: true, definition: { declared, digest: definitionDigest(declared), timedTypes: [...timedTypes].sort(), holdTypes: [...d.holdTypes].sort(), indexes: d.indexes, deadlines, clauseEntries } };
+    return { ok: true, definition: { declared, digest: definitionDigest(declared), timedTypes: [...timedTypes].sort(), holdTypes: [...d.holdTypes].sort(), indexes: d.indexes, ...capacity } };
   } catch {
     return { ok: false, problems: [{ code: "shape", path: "", message: "has no canonical bytes" }] };
   }

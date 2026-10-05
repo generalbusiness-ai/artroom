@@ -6,8 +6,8 @@
  * entry leaves room for them. The runtime asks inside the commit, after the
  * fold; a verifier asks the same question of the same state.
  *
- * The count follows section 17.2 of revision 10 of the contract, adopted since and a candidate when this was written,
- * which is not adopted yet. What is reserved:
+ * The count follows section 17.2 of the contract, revision 11, which is
+ * adopted. What is reserved:
  *
  * - a deadline: for each live item in a state a timed rule applies in, one
  *   entry for each rule of the longest chain of timed rules from that state
@@ -19,6 +19,11 @@
  *   result; and the entries of what its clause can start
  *   (`ValidDefinition.clauseEntries`). Each request reserves that for
  *   itself;
+ * - an item that awaits its settlement: for each item in a state that an
+ *   act or handler declares with `settles`, the entry of that form and what
+ *   it can start (`ValidDefinition.pending`). A copy of a relationship in a
+ *   state that its handler declares with `settles: { copy }` reserves the
+ *   same (`ValidDefinition.pendingCopies`);
  * - a provisional scope: the entry that records its confirmation;
  * - each opened attempt of an outside operation: one entry for its outcome,
  *   and before any outcome one more, because `unknown` may be followed by
@@ -43,6 +48,11 @@ export function owed(view: StateView, definition: ValidDefinition, head: Input):
   for (const [type, states] of Object.entries(definition.deadlines)) {
     for (const [state, chain] of Object.entries(states)) entries += chain * view.count(type, state);
   }
+  // Section 17.2, rows 3 and 4: an item, and a relationship copy, that awaits its settlement.
+  for (const [type, states] of Object.entries(definition.pending)) {
+    for (const [state, reserved] of Object.entries(states)) entries += reserved * view.count(type, state);
+  }
+  for (const copy of definition.pendingCopies) entries += copy.entries * view.copies(copy.name, copy.kind, copy.states);
   const open = view.outstanding();
   entries += (2 + definition.clauseEntries) * open.requests + (1 + definition.clauseEntries) * open.unavailable + 2 * open.opened + open.unknown;
   // The closing checkpoint is reserved unless the history already ends on a checkpoint with nothing pending.
@@ -54,8 +64,10 @@ export function owed(view: StateView, definition: ValidDefinition, head: Input):
  * folded left it. `input` is that entry's input.
  *
  * A settling entry was reserved by its duty, and is not asked: a timed
- * entry, a diagnosis, an outcome, and a delivery of a control or of a
- * request's result. Everything else is new work, and is kept only if the
+ * entry, a diagnosis, an outcome, a delivery of a control or of a
+ * request's result, and an act or a delivery of a request that settles what
+ * its form declares, which its judge says in `settles`. Everything else is
+ * new work, and is kept only if the
  * entries written and reserved are within the budget: an act, a genesis, a
  * delivery of a request or an advisory, a `conflict` result of a creation,
  * and a checkpoint.
@@ -66,10 +78,10 @@ export function owed(view: StateView, definition: ValidDefinition, head: Input):
  * reserved, and it fits because its entry was. The next entry that is not a
  * checkpoint is asked with the reservation counted again.
  */
-export function fits(view: StateView, definition: ValidDefinition, bounds: Pick<Bounds, "scopeEntries">, input: Input): boolean {
+export function fits(view: StateView, definition: ValidDefinition, bounds: Pick<Bounds, "scopeEntries">, input: Input, settled = false): boolean {
   const scope = view.scope();
   if (!scope) return true;
-  const settles = input.type === "timed" || input.type === "diagnosis" || input.type === "outcome"
+  const settles = settled || input.type === "timed" || input.type === "diagnosis" || input.type === "outcome"
     || (input.type === "delivery" && (input.message.class === "control" || ("clause" in input && input.clause !== "conflict")));
   return settles || scope.head.seq + 1 + owed(view, definition, input) <= bounds.scopeEntries;
 }

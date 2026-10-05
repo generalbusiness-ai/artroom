@@ -126,7 +126,9 @@ budget and the alarm's retry delay are temporary values there.
 
 An entry that is new work (a genesis, an act, a delivered request or
 advisory, a `conflict` result, a checkpoint beside a pending duty) is kept
-only if every pending duty still has an entry to settle in. Derive's `owed`
+only if every pending duty still has an entry to settle in. An act or a
+delivered request that settles what its form declares with `settles` is
+not new work: it is written against what its item or copy reserved. Derive's `owed`
 counts those entries from the folded state, inside the commit. An act that
 does not fit is refused `scope-full`; a delivery is answered `retry`; a
 checkpoint is `unavailable`. One entry is reserved for the closing

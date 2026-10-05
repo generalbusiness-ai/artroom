@@ -70,6 +70,15 @@ const rows: readonly (readonly [string, DeclaredDefinition, Change, ProblemCode 
   ["a timed rule whose entry, with its attention reason, could pass the entry size bound: its due item could never be written", lane, (d) => { d.timed["hold-end"].attention[0].notify.reason = "r".repeat(PROPOSED_BOUNDS.entryBytes); }, "bound"],
   // Section 17.2: a reservation covers what its duty can start, so that must be finite.
   ["timed rules of one type that lead to one another in a cycle", ticket, pausing((d) => { d.timed.resume = { ...d.timed.pause, states: ["paused"], effects: [{ state: "asked" }] }; }), "reserve-unbounded"],
+  ["forms that settle create one another's pending states in a cycle", ticket, pausing((d) => {
+    const moves = (from: string, to: string) => ({ ...clone(d.acts.approve), on: "request", settles: { of: "on", in: [from] }, guards: [{ state: [from] }], effects: [{ state: to }] });
+    Object.assign(d.acts, { wait: moves("asked", "paused"), resume: moves("paused", "asked") });
+  }), "reserve-unbounded"],
+  // Section 6.4, `settles`: an item in stated states, or the copy that a relate handler's update is for.
+  ["an act that settles an item, and a relate handler that settles its copy, pass", ticket, (d) => { d.acts.unlink.settles = { of: "on", in: ["set"] }; d.receives.closes.settles = { copy: ["set"] }; }, null],
+  ["an act that settles the item it opens", ticket, (d) => { d.acts.link.settles = { of: "on", in: ["set"] }; }, "name"],
+  ["an act that settles an item in a state its type does not have", ticket, (d) => { d.acts.unlink.settles = { of: "on", in: ["gone"] }; }, "name"],
+  ["an act that settles a copy", ticket, (d) => { d.acts.unlink.settles = { copy: ["set"] }; }, "shape"],
   ["a time offset longer than the span a timestamp can name", lane, (d) => { d.acts["take-hold"].effects[1].value.from.time.plusSeconds = Number.MAX_SAFE_INTEGER; }, "bound"],
   ["a timed rule over a final state", ticket, pausing((d) => d.timed.pause.states.push("answered")), "timed"],
   ["a profile this runtime does not implement", small, (d) => { d.profile.version = 2; }, "profile"],

@@ -111,8 +111,12 @@ export interface StateView {
    */
   page(type: string, states: readonly string[], after: number | null, limit: number): Page;
   relation(owner: ScopeRef, name: string, item: number): Relation | null;
-  /** The exact number of keys this scope keeps a copy for, of the relationship of that name, whose owner is a scope of that kind (section 7.3). */
-  copies(name: string, kind: ScopeKind): number;
+  /**
+   * The exact number of keys this scope keeps a copy for, of the relationship
+   * of that name, whose owner is a scope of that kind (section 7.3). With
+   * `states`: only the copies in one of those states.
+   */
+  copies(name: string, kind: ScopeKind, states?: readonly string[]): number;
   accepted(actor: KeyId, idempotencyKey: string): Accepted | null;
   request(seq: number, n: number): OwnRequest | null;
   /** The record of the incoming delivery from that scope, entry and ordinal, if one was recorded. */
@@ -198,7 +202,7 @@ export class MemoryState implements StateWriter {
     }
   }
   relation(owner: ScopeRef, name: string, item: number) { return this.#relations.get(key(owner.scope, owner.inc, name, item)) ?? null; }
-  copies(name: string, kind: ScopeKind) { return [...this.#relations.values()].filter((r) => r.name === name && r.owner.kind === kind).length; }
+  copies(name: string, kind: ScopeKind, states?: readonly string[]) { return [...this.#relations.values()].filter((r) => r.name === name && r.owner.kind === kind && (!states || states.includes(r.state))).length; }
   accepted(actor: KeyId, idempotencyKey: string) { return this.#accepted.get(key(actor, idempotencyKey))?.[2] ?? null; }
   request(seq: number, n: number) { return this.#requests.get(key(seq, n)) ?? null; }
   decided(from: ScopeRef, seq: number, n: number) { return this.#decided.get(key(from.scope, from.inc, seq, n)) ?? null; }

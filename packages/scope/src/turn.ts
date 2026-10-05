@@ -279,8 +279,9 @@ export class Turns {
       try {
         const sealed = this.#seal(definition, verdict.draft, clock, [...verdict.retain, ...rules]);   // 6.5
         // Section 9.2: an entry that admits duties is kept only if every admitted duty still has room to settle. The count is of
-        // the state the fold just wrote, so it is under the head check, and a verifier derives the same number.
-        if (!fits(this.#store, definition, this.#bounds, sealed.entry.input)) {
+        // the state the fold just wrote, so it is under the head check, and a verifier derives the same number. Section 17.3: an
+        // entry that settles what its form declares is written against its own duty's reservation, and is not asked.
+        if (!fits(this.#store, definition, this.#bounds, sealed.entry.input, verdict.draft.settles)) {
           refuse(() => verdict.full(head ?? { seq: sealed.entry.seq, hash: sealed.hash }));
           throw new Full();
         }

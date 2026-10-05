@@ -7,7 +7,7 @@
 import type { FieldType } from "@generalbusiness/artroom-contract";
 import { canonicalize, isScopeKind } from "@generalbusiness/artroom-bytes";
 import { isObject, own } from "../values.ts";
-import { naming, onSubject, type Ctx, type Defining, type Type } from "./context.ts";
+import { naming, onSubject, subject, type ClauseSet, type Ctx, type Defining, type Duties, type Type } from "./context.ts";
 import { effects, setsSlot } from "./effects.ts";
 import { declaredFields } from "./fields.ts";
 import { guards } from "./guards.ts";
@@ -105,12 +105,49 @@ function entrySends(d: Defining, path: string, declared: number, told: number, p
   if (most > d.bounds.sendsPerEntry) d.bad("bound", path, `its entry could have ${most} sends; at most ${d.bounds.sendsPerEntry}`);
 }
 
+/**
+ * Section 6.4, `settles`: an act or handler declares that it settles an
+ * item in stated states, or a relationship copy in stated states. An item
+ * is named by a subject that exists before the entry. A copy is the one
+ * that a `relate` handler's update is for: `copy` gives the relationship's
+ * name and the kind of scope that owns it. Null: it declares none, or what
+ * it declares is refused.
+ */
+function settling(d: Defining, v: unknown, path: string, ctx: Ctx, copy: { name: string; kind: string } | null): Duties["settles"] {
+  const { bad, form, rec, names, list } = d;
+  const f = form(v, path, ["of", "copy"], ["in"]);
+  if (!f) return null;
+  if (f[0] === "copy") {
+    if (!rec(v, path, ["copy"])) return null;
+    if (!copy) return bad("shape", at(path, "copy"), "only a relate handler settles a copy");
+    const states = list(f[1], at(path, "copy"), d.bounds.listElements);
+    if (states.length === 0 || !states.every((s) => typeof s === "string" && s !== "")) return bad("shape", at(path, "copy"), "is a list of states of the relationship, and is not empty");
+    return { copy: states as string[], ...copy };
+  }
+  const r = rec(v, path, ["of", "in"]);
+  const s = r && subject(d, r["of"], at(path, "of"), ctx, false);
+  if (!r || !s || s === "scope") return null;
+  // The item it opens is in no state before the entry, so it awaits nothing.
+  if (ctx.nascent && onSubject(r["of"])) return bad("name", at(path, "of"), "an entry settles an item that exists before it, and not the one it opens");
+  const states = names(r["in"], at(path, "in"), s.states, "state");
+  return states.length === 0 || states.some((state) => !s.states.has(state)) ? null : { subject: r["of"] as string, type: s.name, states };
+}
+
+/** What a list of effects can set, read while `read` validates it, with the item the entry opens in its initial state. */
+function setsOf(d: Defining, opens: Type | null, read: () => void): ClauseSet {
+  const sets: ClauseSet = opens ? [{ subject: "on", type: opens.name, state: opens.initial }] : [];
+  d.clause = sets;
+  read();
+  d.clause = null;
+  return sets;
+}
+
 /** Every act. `timed`: the timed rules as written, which the opening of a hold reads. `top`: the definition as written. */
 export function acts(d: Defining, v: unknown, timed: Readonly<Record<string, unknown>>, top: Rec): void {
   const { bounds, types, bad, rec, entries, str } = d;
   for (const [name, av] of entries(v, "acts", bounds.acts)) {
     const path = at("acts", name);
-    const o = rec(av, path, ["step", "on", "also", "fields", "grant", "guards", "effects", "sends", "attention"]);
+    const o = rec(av, path, ["step", "on", "also", "fields", "grant", "guards", "effects", "sends", "attention"], ["settles"]);
     if (!o) continue;
     const step = o["step"];
     if (step !== "open" && step !== "transition" && step !== "comment") bad("shape", at(path, "step"), "is open, transition or comment");
@@ -126,9 +163,11 @@ export function acts(d: Defining, v: unknown, timed: Readonly<Record<string, unk
     if (step === "comment") for (const k of ["guards", "effects", "sends"]) if (!Array.isArray(o[k]) || o[k].length > 0) bad("shape", at(path, k), "a comment has none");
     if (step === "comment" && ctx.also.size > 0) bad("shape", at(path, "also"), "a comment names no other item");
     guards(d, o["guards"], at(path, "guards"), ctx);
-    effects(d, o["effects"], at(path, "effects"), ctx, false);
+    const duties: Duties = { path, settles: "settles" in o ? settling(d, o["settles"], at(path, "settles"), ctx, null) : null, sets: [], requests: [] };
+    duties.sets = setsOf(d, step === "open" ? on : null, () => effects(d, o["effects"], at(path, "effects"), ctx, false));
     // A child's genesis sends the platform's one result beside what its act declares.
-    entrySends(d, path, sends(d, o["sends"], at(path, "sends"), ctx, top), attention(d, o["attention"], at(path, "attention"), ctx), name === top["genesis"] ? 1 : 0);
+    entrySends(d, path, sends(d, o["sends"], at(path, "sends"), ctx, top, duties.requests), attention(d, o["attention"], at(path, "attention"), ctx), name === top["genesis"] ? 1 : 0);
+    d.duties.push(duties);
     if (step === "open" && on) {
       const set = new Set(Array.isArray(o["effects"]) ? o["effects"].map(setsSlot) : []);
       // Section 6.3: an opening sets every required slot.
@@ -148,7 +187,7 @@ export function receives(d: Defining, v: unknown, top: Rec): void {
   const handled = new Set<string>();
   for (const [name, hv] of entries(v, "receives", bounds.receives)) {
     const path = at("receives", name);
-    const o = rec(hv, path, ["message", "class", "from", "fields", "opens", "also", "guards", "effects", "sends", "attention"], ["copies"]);
+    const o = rec(hv, path, ["message", "class", "from", "fields", "opens", "also", "guards", "effects", "sends", "attention"], ["copies", "settles"]);
     if (!o) continue;
     const message = str(o["message"], at(path, "message"));
     const cls = o["class"];
@@ -179,9 +218,12 @@ export function receives(d: Defining, v: unknown, top: Rec): void {
     const named = also(d, o["also"], at(path, "also"), fields, null, top);
     const ctx: Ctx = { ...naming(), on, also: named.types, nascent: on !== null, fields, kind: cls === "advisory" ? null : message, handler: { update: cls === "relate", under: typeof from?.["under"] === "string" ? from["under"] : null }, unsettled: named.unsettled };
     guards(d, o["guards"], at(path, "guards"), ctx);
-    effects(d, o["effects"], at(path, "effects"), ctx, false);
+    const copy = cls === "relate" && message !== null && isScopeKind(from?.["kind"]) ? { name: message, kind: from["kind"] } : null;
+    const duties: Duties = { path, settles: "settles" in o ? settling(d, o["settles"], at(path, "settles"), ctx, copy) : null, sets: [], requests: [] };
+    duties.sets = setsOf(d, on, () => effects(d, o["effects"], at(path, "effects"), ctx, false));
     // The entry that decides a request sends the platform's one result.
-    entrySends(d, path, sends(d, o["sends"], at(path, "sends"), ctx, top), attention(d, o["attention"], at(path, "attention"), ctx), cls === "advisory" ? 0 : 1);
+    entrySends(d, path, sends(d, o["sends"], at(path, "sends"), ctx, top, duties.requests), attention(d, o["attention"], at(path, "attention"), ctx), cls === "advisory" ? 0 : 1);
+    d.duties.push(duties);
     // Section 6.4: an advisory has no result, so its handler ends the exchange: it sends nothing and tells nobody.
     if (cls === "advisory") for (const k of ["sends", "attention"]) if (Array.isArray(o[k]) && o[k].length > 0) bad("advisory-sends", at(path, k), "a handler of class advisory declares none");
     if (!on) continue;

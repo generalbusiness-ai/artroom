@@ -43,6 +43,21 @@ export interface RangeIndex { path: string; type: string; slots: readonly string
 export type ClauseSet = { subject: string; type: string; state?: string; slot?: string }[];
 
 /**
+ * What one act or handler can start, as the reservations of section 17.2
+ * read it. `settles`: an item of that type in those states, which that
+ * subject names; or a copy of that relationship, owned by a scope of that
+ * kind, in those states. `sets`: what its own effects can set, and the item
+ * it opens. `requests`: each request among its send forms, with the most
+ * sends that form can make and what each reserved clause can set.
+ */
+export interface Duties {
+  path: string;
+  settles: { subject: string; type: string; states: readonly string[] } | { copy: readonly string[]; name: string; kind: string } | null;
+  sets: ClauseSet;
+  requests: { most: number; clauses: readonly ClauseSet[] }[];
+}
+
+/**
  * One definition while it is validated: the readers and their problems, the
  * bounds, and what each family leaves for the others. The item types are
  * read first, so every later form resolves its names against `types`.
@@ -57,7 +72,8 @@ export interface Defining extends Shapes {
   readonly holdTypes: Set<string>;          // section 6.8: the types a `hold: open` effect targets
   readonly indexes: RangeIndex[];
   readonly clauseSets: ClauseSet[];         // one for each result clause that is reserved for (section 17.2)
-  clause: ClauseSet | null;                 // the clause whose effects are being read, if it is one that is reserved for
+  clause: ClauseSet | null;                 // the list of effects being read, when what it can set is asked: a reserved clause, or the effects of an act or handler
+  readonly duties: Duties[];                // one for each act and handler that was read
 }
 
 export const onSubject = (of: unknown) => of === undefined || of === "on";

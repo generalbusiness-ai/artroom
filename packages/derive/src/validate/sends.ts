@@ -4,7 +4,7 @@ import type { Notify } from "@generalbusiness/artroom-contract";
 import type { FieldType } from "@generalbusiness/artroom-contract";
 import { canonicalize, isDigest, isPlatformDefinition, isScopeKind } from "@generalbusiness/artroom-bytes";
 import { isObject, own } from "../values.ts";
-import { subject, type Ctx, type Defining, type Type } from "./context.ts";
+import { subject, type ClauseSet, type Ctx, type Defining, type Duties, type Type } from "./context.ts";
 import { effects } from "./effects.ts";
 import { guards, range } from "./guards.ts";
 import { operand } from "./operands.ts";
@@ -53,9 +53,10 @@ const sources = (d: Defining, v: unknown, path: string, ctx: Ctx) => { for (cons
 /** True when a result clause list is written with an effect. */
 const hasClause = (result: unknown): boolean => isObject(result) && Object.values(result).some((e) => Array.isArray(e) && e.length > 0);
 
-/** The result clauses of one request. Each is its own list of effects, which run in a later entry. */
-function clauses(d: Defining, v: unknown, path: string, ctx: Ctx, conflict: boolean): void {
+/** The result clauses of one request. Each is its own list of effects, which run in a later entry. Returns what each reserved clause can set. */
+function clauses(d: Defining, v: unknown, path: string, ctx: Ctx, conflict: boolean): ClauseSet[] {
   const r = d.rec(v, path, [], ["applied", "refused", "superseded", "undelivered", ...(conflict ? ["conflict"] : [])]);
+  const reserved: ClauseSet[] = [];
   for (const [name, e] of Object.entries(r ?? {})) {
     // Section 17.2: a `conflict` is not reserved. Its entry is new work, and what its clause starts is counted when it is admitted.
     d.clause = name === "conflict" ? null : [];
@@ -63,9 +64,10 @@ function clauses(d: Defining, v: unknown, path: string, ctx: Ctx, conflict: bool
     // selected through a slot that is not fixed cannot be selected again when the clause runs, so a clause names none.
     const settled = new Map([...ctx.also].filter(([also]) => !ctx.unsettled?.has(also)));
     effects(d, e, at(path, name), { ...ctx, also: settled, clause: true }, true);
-    if (d.clause) d.clauseSets.push(d.clause);
+    if (d.clause) { d.clauseSets.push(d.clause); reserved.push(d.clause); }
     d.clause = null;
   }
+  return reserved;
 }
 
 /** The condition of a send or a notice: guards, judged on the state before the entry's effects (section 6.6). */
@@ -85,9 +87,10 @@ function alsoRead(v: unknown): string[] {
  * The send forms of one act or handler, in the order written. Returns the
  * most sends that they can make in one entry: one for each form, and for a
  * fan-out one for each live item of its type. `top` is the definition as
- * written, which holds each type's `max`.
+ * written, which holds each type's `max`. `requests` takes each request
+ * form, for the reservations of section 17.2.
  */
-export function sends(d: Defining, v: unknown, path: string, ctx: Ctx, top: Rec): number {
+export function sends(d: Defining, v: unknown, path: string, ctx: Ctx, top: Rec, requests: Duties["requests"]): number {
   const { bounds, problems, bad, rec, form, list, str } = d;
   const relations = new Set<string>();
   /** For each kind of message a form makes: whether every form of that kind always makes exactly one send, and whether one has a clause. */
@@ -111,7 +114,7 @@ export function sends(d: Defining, v: unknown, path: string, ctx: Ctx, top: Rec)
       // Section 6.6: a definition cannot hold its own digest, so `self` names the creating scope's own pinned definition.
       if (r["definition"] !== "self" && !isDigest(r["definition"]) && !isPlatformDefinition(r["definition"])) bad("shape", at(p, "definition"), "is a definition digest, a platform definition, or self");
       sources(d, r["fields"], at(p, "fields"), ctx);
-      clauses(d, r["result"], at(p, "result"), ctx, true);
+      requests.push({ most: 1, clauses: clauses(d, r["result"], at(p, "result"), ctx, true) });
       [kind, result] = [[k, r["kind"], r["definition"]], r["result"]];
     } else if (k === "tell") {
       const r = rec(x, p, ["to", "message", "fields", "result"], ["if"]);
@@ -122,7 +125,7 @@ export function sends(d: Defining, v: unknown, path: string, ctx: Ctx, top: Rec)
       str(r["message"], at(p, "message"));
       condition(d, r, p, ctx);
       sources(d, r["fields"], at(p, "fields"), ctx);
-      clauses(d, r["result"], at(p, "result"), ctx, false);
+      requests.push({ most: 1, clauses: clauses(d, r["result"], at(p, "result"), ctx, false) });
       [kind, result, always] = [[k, r["message"]], r["result"], !("if" in r) && alsoRead(r["to"]).length === 0];
     } else if (k === "relate") {
       const r = rec(x, p, ["to", "name", "item", "state", "detail", "result"], ["each", "if"]);
@@ -145,7 +148,7 @@ export function sends(d: Defining, v: unknown, path: string, ctx: Ctx, top: Rec)
       sources(d, r["detail"], at(p, "detail"), within);
       // Section 6.6: a clause of a fan-out send may read `each`, the item of that send. The entry records the item of each update and
       // nothing else of the range. So `each` is found again, when the result is recorded, only where the update's `item` is `each`.
-      clauses(d, r["result"], at(p, "result"), each && canonicalize(r["item"]) === canonicalize({ item: "each" }) ? within : ctx, false);
+      requests.push({ most: Number.isFinite(max) ? max : 0, clauses: clauses(d, r["result"], at(p, "result"), each && canonicalize(r["item"]) === canonicalize({ item: "each" }) ? within : ctx, false) });
       [kind, result, always, made] = [[k, r["name"], r["state"]], r["result"], !("if" in r) && !each && alsoRead([r["to"], r["item"]]).length === 0, Number.isFinite(max) ? max : 0];
       if (problems.length === before) {
         // Section 6.4: no two `relate` sends written with the same `to`, `item` and `name`.

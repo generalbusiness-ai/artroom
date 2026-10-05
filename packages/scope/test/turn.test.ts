@@ -162,7 +162,7 @@ describe("the scope's budget (section 9.2), here 12 entries", () => {
     expect(await s.submit(s.remark())).toMatchObject({ answer: "refused", reason: "scope-full", judgedAt: { seq: 11 } });
   });
 
-  // The fourth witness of section 17.4 of revision 10 of the contract, adopted since and a candidate when this was written, and its last paragraph.
+  // The fourth witness of section 17.4 of the contract, and its last paragraph.
   test.each([
     { scopeEntries: 6, beside: { answer: "unavailable", reason: "unavailable" }, closing: 5 },
     { scopeEntries: 7, beside: { answer: "written" }, closing: 6 },
@@ -175,6 +175,16 @@ describe("the scope's budget (section 9.2), here 12 entries", () => {
     await s.alarm();
     // No other duty is pending and the head is not a checkpoint: this one is the closing checkpoint, and the history ends on it.
     expect([await s.stub.checkpoint(), (await s.head()).seq]).toMatchObject([{ answer: "written", fact: { seq: closing } }, scopeEntries - 1]);
+  });
+
+  test("a report that awaits its acceptance reserves that entry: at a full budget new work is refused, and the acceptance is written", async () => {
+    const s = await found({ scopeEntries: 6 });
+    const commitment = await s.commitment();                  // entries 1 and 2
+    const report = (await s.did(una, "report", { fields: { commitment }, expected: { commitment: 2 } })).fact.seq;   // entry 3: four written, two reserved
+    expect(await s.submit(s.remark())).toMatchObject({ answer: "refused", reason: "scope-full" });
+    // The act that takes the report out of `reported` settles it. It is written against the report's own reservation, in the commit.
+    expect(await s.act(vic, "accept-report", { on: report, expected: { on: 1 } })).toMatchObject({ answer: "accepted", receipt: { fact: { seq: 4 } } });
+    expect(await s.stub.checkpoint()).toMatchObject({ answer: "written", fact: { seq: 5 } });
   });
 
   test("after a closing checkpoint nothing is reserved; the next entry that is not a checkpoint is admitted only with a closing checkpoint reserved again", async () => {

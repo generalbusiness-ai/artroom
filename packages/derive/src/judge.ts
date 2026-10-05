@@ -39,6 +39,13 @@ export interface Draft {
   sends: readonly Send[];
   /** It judges an expiry, a freshness or a deadline, so it is never written while the clock is behind (section 5.3). */
   judgesTime: boolean;
+  /**
+   * Section 17.3: the entry settles what its form declares with `settles`.
+   * Its subject was in a listed state at the commit, and the entry takes it
+   * out of the listed states. It is then admitted against its own duty's
+   * reservation, and is not asked whether it fits. It is in no entry.
+   */
+  settles?: boolean;
 }
 
 /** `name`: the reason the failed guard declares, if it declares one. `detail` is for the caller and is in no entry. */
@@ -164,7 +171,7 @@ export function judgeAct(view: StateView, definition: ValidDefinition, signed: S
 
   // Section 5.3: every act judges its `notAfter` and its grant's expiry on the commit clock, so no act is written while the clock is behind.
   if (clock.behind) return { result: "unavailable", reason: "clock-behind" };
-  return { result: "write", draft: { input: { type: "act", signed, authority: [presented.grant] }, uses, prepared: ran.prepared, effects: ran.effects, sends: ran.sends, judgesTime: true } };
+  return { result: "write", draft: { input: { type: "act", signed, authority: [presented.grant] }, uses, prepared: ran.prepared, effects: ran.effects, sends: ran.sends, judgesTime: true, settles: ran.settles } };
 }
 
 /**

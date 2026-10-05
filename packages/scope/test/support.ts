@@ -26,8 +26,8 @@ export const HOLD = 600;
 
 /**
  * Derive's fixture lane, with room for four live holds, a rule on `assign`
- * (the requester may not assign themselves), and a fact that a remark may
- * name. A directory is founded under it: the kind of a scope is in its seed,
+ * (the requester may not assign themselves), a fact that a remark may
+ * name, and a report that awaits its acceptance (section 17.2, row 3). A directory is founded under it: the kind of a scope is in its seed,
  * and no form of this definition reads it.
  */
 export const definition = variant(lane, (def) => {
@@ -35,6 +35,7 @@ export const definition = variant(lane, (def) => {
   def.rules["not-self"] = "fields.performer.member != signer.member";
   def.acts.assign.guards.push({ rule: "not-self" });
   def.acts.remark.fields.proof = { type: "fact", kind: ["assign"], under: "lane", required: false };
+  def.acts["accept-report"].settles = { of: "on", in: ["reported"] };
 });
 const actions = Object.values(definition.declared.acts).map((a) => a.grant);
 

@@ -156,7 +156,9 @@ judges no time is written with the previous entry's time and
 
 **Room to settle.** A scope has a budget of entries. Some entries create
 duties that need a later entry: a deadline needs its timed entry, a
-request needs its result. Before an entry that is new work is kept, the
+request needs its result, and an item in a state that an act or handler
+declares with `settles` needs that act's or handler's entry. Before an
+entry that is new work is kept, the
 scope counts the entries its pending duties still need, and one for a
 closing checkpoint. If they do not all fit, nothing is written and an act
 is refused `scope-full`. So a duty that was admitted can always be

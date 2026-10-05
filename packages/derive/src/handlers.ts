@@ -6,7 +6,7 @@
  * send is run again from the entry that sent it.
  */
 
-import type { ActType, Advisory, AlsoRule, Bounds, Digest, Effect, EffectForm, Entry, FactRef, FactUse, FieldType, FieldValue, Guard, Notify, Prepared, Reason, ReceiveType, RefusalReason, Request, ResultClauses, ScopeRef, Send, SendForm, UnavailableReason } from "@generalbusiness/artroom-contract";
+import type { ActType, Advisory, AlsoRule, Bounds, Digest, Effect, EffectForm, Entry, FactRef, FactUse, FieldType, FieldValue, Guard, Notify, Prepared, Reason, ReceiveType, RefusalReason, Request, ResultClauses, ScopeRef, Send, SendForm, Settles, UnavailableReason } from "@generalbusiness/artroom-contract";
 import { entryHash } from "@generalbusiness/artroom-bytes";
 import type { Signer } from "./attribution.ts";
 import { deriveEffects } from "./effects.ts";
@@ -151,11 +151,12 @@ export function overMax(view: StateView, definition: ValidDefinition, type: stri
 
 // ---------------------------------------------------------------- deriving the written forms
 
-/** The guards, effects, sends and attention of one act or handler. */
-export interface Forms { guards: readonly Guard[]; effects: readonly EffectForm[]; sends: readonly SendForm[]; attention: readonly Notify[] }
+/** The guards, effects, sends and attention of one act or handler, and what it declares that it settles. */
+export interface Forms { guards: readonly Guard[]; effects: readonly EffectForm[]; sends: readonly SendForm[]; attention: readonly Notify[]; settles?: Settles | undefined }
 
 export type Ran =
-  | { result: "ran"; effects: Effect[]; sends: Send[]; prepared: Prepared[]; judgesTime: boolean }
+  /** `settles`: the form declares that it settles an item, the item was in a listed state, and these effects take it out of them (section 17.3). */
+  | { result: "ran"; effects: Effect[]; sends: Send[]; prepared: Prepared[]; judgesTime: boolean; settles: boolean }
   /** `name`: the reason the failed guard declares. `prepared`: the rule results the guards read before the refusal. An entry that records the refusal records them (section 9.2). */
   | { result: "refused"; reason: RefusalReason; name?: string; detail: string; prepared: Prepared[] }
   | { result: "unavailable"; reason: UnavailableReason };
@@ -187,7 +188,12 @@ export function derive(j: Judging, forms: Forms, opens: string | null, cause: Di
   const full = opens === null ? null : overMax(j.view, j.definition, opens, effects.working.get("on")!.state);
   if (full !== null) return { result: "refused", reason: "type-full", detail: full, prepared: j.used };
   const judgesTime = readsClock(forms.guards) || forms.effects.some(timesEffect) || conditionsReadClock(forms.sends, forms.attention);
-  return { result: "ran", effects: effects.effects, sends: sends.sends, prepared: j.used, judgesTime };
+  // Section 17.3: a form that declares `settles` is judged in full. It settles when its subject is in a listed state at the
+  // commit and the entry takes it out of the listed states. Any other entry of the form is new work.
+  const settled = forms.settles && "of" in forms.settles ? forms.settles : null;
+  const [was, is] = settled ? [j.subjects.get(settled.of), effects.working.get(settled.of)] : [];
+  const settles = !!settled && !!was && !!is && settled.in.includes(was.state) && !settled.in.includes(is.state);
+  return { result: "ran", effects: effects.effects, sends: sends.sends, prepared: j.used, judgesTime, settles };
 }
 
 /**
