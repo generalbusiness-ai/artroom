@@ -120,7 +120,20 @@ export class Operations {
   readonly #clock: Clock;
   readonly #wakes: Wakes;
   readonly #bounds: Bounds;
-  /** Answers in hand that the scope could not record yet, by attempt. They are in memory only: one that is lost with the process leaves its attempt `unknown`. */
+  /**
+   * Answers in hand that the scope could not record yet, by attempt, oldest
+   * first: at most one for each attempt that was sent. Each is the `outcome`
+   * input as it was first offered, so it keeps the operation, the attempt
+   * and the evidence of its answer. An answer stays here until the scope
+   * has judged it: written, a copy, a contradiction, or no answer. It is
+   * offered again by the row of its attempt while that row is open, and by
+   * `#replies` whether the row is open or closed. Nothing here sends: the
+   * request of an attempt left once.
+   *
+   * They are in memory only. A process that ends loses them: the outside
+   * system's answer is then gone, and the attempt stays `unknown`, a duty,
+   * as rule 2 requires, until that request's own answer is given again.
+   */
   readonly #held = new Map<string, Outcome>();
   /**
    * The walk of this object's life over the attempts that nothing could send
@@ -185,15 +198,14 @@ export class Operations {
     // row it reached, so a row that stays as it is recorded is passed, and holds back no row after it.
     const page = walked && runs ? store.parked(walked.after, batch) : [];
     this.#walk = page.length < batch ? null : { after: page.at(-1)! };
-    // While pages remain, the driver asks to be woken at once. The wake-up is in memory, as the walk is: a restart begins the walk again.
-    this.#wakes.driver(this.#walk ? now : null);
     const due = [...store.unsent(now, batch), ...page];
-    if (due.length === 0) {
-      if (walked) await this.#wakes.set();
+    if (due.length === 0 && (this.#held.size === 0 || !runs)) {
+      if (walked) await this.#wake(now);
       return 0;
     }
     const scope = store.scope()!;
     const work: (() => Promise<void>)[] = [];
+    const offered = new Set<string>();
     for (const row of due) {
       const { operation: id, attempt } = row;
       if (!runs) {
@@ -204,6 +216,7 @@ export class Operations {
         // The request may have left: the mark was written and no outcome followed. The answer in hand is offered if there is one.
         // Otherwise the process stopped between the send and the outcome, and the outcome is `unknown`. It is never sent again.
         const input = this.#held.get(keyOf(id, attempt)) ?? { type: "outcome", operation: id, attempt, result: "unknown", evidence: UNKNOWN };
+        offered.add(keyOf(id, attempt));
         work.push(() => this.#offer(row, input, now));
         continue;
       }
@@ -221,11 +234,43 @@ export class Operations {
       const request: EffectRequest = { scope: scope.at, operation: id, attempt, owner: operation.owner, kind: operation.kind, origin: { entry: JSON.parse(origin.bytes) as Entry, hash: origin.hash } };
       work.push(() => this.#send(row, request, now));
     }
-    await this.#wakes.set();
+    await this.#wake(now);
     // Rule 6: each attempt is sent and answered by itself. One that waits for its answer delays no other, and its answer changes no other.
     await Promise.all(work.map((start) => start()));
-    await this.#wakes.set();
-    return work.length;
+    const replies = runs ? await this.#replies(offered, batch) : 0;
+    await this.#wake(now);
+    return work.length + replies;
+  }
+
+  /**
+   * The answers in hand that no row of this pass offered: each is offered
+   * to the scope again, oldest first, at most `batch` of them. This is how
+   * a late answer is written after its attempt's row was closed by the
+   * `unknown` entry. It stops at the first that cannot be written yet: what
+   * kept the turn from that one keeps it from the rest. Resolves with the
+   * number that the scope judged.
+   */
+  async #replies(offered: ReadonlySet<string>, batch: number): Promise<number> {
+    let judged = 0;
+    for (const [key, input] of [...this.#held].filter(([key]) => !offered.has(key)).slice(0, batch)) {
+      if ((await this.#record(input)).recorded === "unavailable") break;
+      if (this.#held.get(key) === input) this.#held.delete(key);
+      judged++;
+    }
+    return judged;
+  }
+
+  /**
+   * The driver's wake for what it holds in memory only, and the alarm at the
+   * earliest of all wakes. While pages of the walk remain, the driver asks to
+   * be woken at once. While an answer is in hand, it asks to be woken after
+   * the delay of a turn that left work due. A scope whose definition cannot
+   * be run can write nothing, and asks for neither.
+   */
+  #wake(now: number): void | Promise<void> {
+    const runs = Boolean(this.#scope.pinned()?.definition);
+    this.#wakes.driver(this.#walk && runs ? now : this.#held.size > 0 && runs ? now + this.#bounds.drainRetrySeconds * 1000 : null);
+    return this.#wakes.set();
   }
 
   /** The one request of one attempt, and the outcome that its answer gives. */
@@ -236,14 +281,15 @@ export class Operations {
     if (isAnswer(answer)) return this.#offer(row, { type: "outcome", operation, attempt, result: answer.result, evidence: answer.evidence }, now);
     // No answer in time, none at all, or one that is no answer: the outcome is `unknown`. If the request's own answer still
     // comes, it is the late answer, and adds one more outcome.
-    if (answer === LATE) void sent.then((late) => (isAnswer(late) ? this.answered(operation, attempt, late) : null), () => null);
+    // `answered` keeps it in hand if the scope cannot write it then.
+    if (answer === LATE) void sent.then((late) => (isAnswer(late) ? this.answered(operation, attempt, late) : null)).catch(() => null);
     return this.#offer(row, { type: "outcome", operation, attempt, result: "unknown", evidence: UNKNOWN }, now);
   }
 
   /**
    * Offer the first outcome of an attempt that may have been sent. An answer
-   * that the judge refuses is no answer: the attempt is then `unknown`. One
-   * that cannot be written now is kept in hand and offered again.
+   * that the judge refuses is no answer: the attempt is then `unknown`. An
+   * answer that cannot be written now is kept in hand and offered again.
    */
   async #offer(row: Sending, input: Outcome, now: number): Promise<void> {
     const { operation, attempt } = row;
@@ -251,7 +297,7 @@ export class Operations {
     let recorded = await this.#record(input);
     if (recorded.recorded === "refused" && input.result !== "unknown") recorded = await this.#record({ ...input, result: "unknown", evidence: UNKNOWN });
     if (recorded.recorded === "unavailable") {
-      this.#held.set(key, input);
+      if (input.result !== "unknown") this.#held.set(key, input);
       return this.#store.postpone(operation, attempt, now + this.#bounds.drainRetrySeconds * 1000);
     }
     this.#held.delete(key);
@@ -265,14 +311,24 @@ export class Operations {
    * what it is: the first outcome, the late answer, a copy of a recorded
    * answer, or a contradiction of one. An answer to an attempt that was
    * never sent is no answer to it, and is refused here.
+   *
+   * An answer that the scope cannot write now, because its turn is
+   * unavailable, is answered `unavailable` and kept in hand. The driver
+   * offers it again, with a wake-up of its own, until the scope has judged
+   * it or the process ends. The first answer in hand for an attempt is the
+   * one kept.
    */
   async answered(operation: OperationId, attempt: number, answer: EffectAnswer): Promise<OutcomeRecorded> {
     if (!isAnswer(answer)) return { recorded: "refused", detail: "not an answer" };
     const row = isOperationId(operation) && Number.isSafeInteger(attempt) ? this.#store.sending(operation, attempt) : null;
     if (!row || row.sent === null) return { recorded: "refused", detail: "no request of that attempt was sent" };
-    const recorded = await this.#record({ type: "outcome", operation, attempt, result: answer.result, evidence: answer.evidence });
-    if (recorded.recorded === "written") this.#held.delete(keyOf(operation, attempt));
-    await this.#wakes.set();
+    const key = keyOf(operation, attempt);
+    const input: Outcome = { type: "outcome", operation, attempt, result: answer.result, evidence: answer.evidence };
+    const recorded = await this.#record(input);
+    if (recorded.recorded === "unavailable") {
+      if (!this.#held.has(key)) this.#held.set(key, input);
+    } else if (recorded.recorded !== "refused") this.#held.delete(key);
+    await this.#wake(timeMs(this.#clock.read())!);
     return recorded;
   }
 

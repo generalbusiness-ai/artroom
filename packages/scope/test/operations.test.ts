@@ -7,7 +7,7 @@ import { SqliteStore, Turns, Wakes, production, type EffectAnswer, type Operatio
 import { variant } from "@generalbusiness/artroom-derive/testing";
 import { controls } from "../src/testing.ts";
 import { FENCE, outsideOf, owners, pushOf, type OutsideDouble } from "./outside.ts";
-import { Lane, START, at, definition, found, founding, reader, rita, stubOf } from "./support.ts";
+import { HOLD, Lane, START, at, definition, found, founding, reader, rita, stubOf } from "./support.ts";
 
 /** The delay before the second attempt of an operation. */
 const RETRY = PROPOSED_BOUNDS.dispatchRetrySeconds;
@@ -137,6 +137,28 @@ describe("outside operations at a real scope (scope contract, section 4.3; autho
     out.answer(retry, 1, { result: "confirmed", evidence: { basis: "read", body: { commit: "c1" } } });
     expect(await s.alarm()).toBe(true);
     expect([retry, out.attempts.at(-1), (await seen(s, retry)).state, (await seen(s, op)).state, outcomes(await seen(s, op))]).toEqual(["4:0", "4:0#1", "settled", "unknown", [["refused at 2"], ["unknown at 3"]]]);
+  });
+
+  test("a late answer that arrives while the scope's turn is unavailable is kept in hand, and the driver writes it at the next wake-up, after the attempt's row is closed; the request is not sent again", async () => {
+    // A turn writes one timed entry. Two holds end at one time, so a turn at that time leaves one due and is `busy`.
+    const s = await found({ timedAttemptsPerTurn: 1 });
+    const out = outsideOf(s.name);
+    await s.holds(2);
+    const [op] = await open(s, pushOf(1)) as [OperationId];
+    // The request gets no answer. Its outcome is `unknown`, in entry 8, and that entry closes the driver's row.
+    out.answer(op, 1, null);
+    expect([await s.alarm(), outcomes(await seen(s, op))]).toEqual([true, [["unknown at 8"]]]);
+
+    // The request's own answer arrives when both holds are due. The turn writes one end and is spent: the answer cannot be written.
+    s.c.clock.now = at(HOLD);
+    const retry = timeMs(at(HOLD + PROPOSED_BOUNDS.drainRetrySeconds));
+    expect([await late(s, out, op, 1, own("c1")), (await s.head()).seq, outcomes(await seen(s, op)), await s.alarmAt()]).toEqual([{ recorded: "unavailable" }, 9, [["unknown at 8"]], retry]);
+    // The wake-up's turn writes the other end. The driver then offers the answer it kept: the late answer, of that operation and attempt, with its evidence.
+    expect([await s.alarm(), (await s.sealed(11))[0]?.entry.input, (await seen(s, op)).state, out.attempts, await s.alarmAt()]).toEqual([
+      true, { type: "outcome", operation: op, attempt: 1, result: "confirmed", evidence: { basis: "own-answer", body: { commit: "c1" } } }, "settled", [`${op}#1`], null,
+    ]);
+    // Nothing is in hand any more: a pass offers nothing, and the same answer again is a copy.
+    expect([await surface(s).effect(), await late(s, out, op, 1, own("c1")), (await s.head()).seq]).toEqual([0, { recorded: "repeat", seq: 11 }, 11]);
   });
 
   test("after a restart the driver walks every attempt that nothing could send, one page at a pass: an attempt that still cannot be sent holds back none after it, and what is due does not use the page up", async () => {
