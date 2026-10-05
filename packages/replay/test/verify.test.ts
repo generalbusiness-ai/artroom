@@ -1,7 +1,9 @@
 import { describe, expect, test } from "vitest";
 import { PROPOSED_BOUNDS, type Report } from "@generalbusiness/artroom-contract";
-import { TRUSTS, render, verify, type Options } from "../src/index.ts";
-import { entryOf, rewrite, sourceOf, world, type World } from "./world.ts";
+import { textDigest } from "@generalbusiness/artroom-bytes";
+import { founded, keys, notesDefinition, on, type Ledger } from "@generalbusiness/artroom-derive/testing";
+import { MemorySource, TRUSTS, render, verify, type Options } from "../src/index.ts";
+import { entryOf, rewrite, served, sourceOf, world, type World } from "./world.ts";
 
 const replay = (w: World, over: Partial<Options> = {}) => verify(sourceOf(w), { mode: "replay", scope: w.I.scope.scope, ...over });
 
@@ -25,6 +27,48 @@ describe("replay of a good history (sections 9.3 to 9.5)", () => {
     // I.2 used P.2, which no anchor names: the replay stops there, having covered I.0 and I.1 on the anchors alone.
     expect(report).toMatchObject({ result: "missing-dependency", at: { seq: 2 }, coverage: [{ scope: w.I.scope, from: 0, through: 1 }], dependencies: { verified: 0, anchored: 2 } });
     expect([report.anchors.map((a) => a.seq), report.trusts.includes(TRUSTS.anchors), report.trusts.includes(TRUSTS.head)]).toEqual([[4, 5], true, false]);
+  });
+});
+
+describe("a detached text whose bytes are gone (section 9.3)", () => {
+  /**
+   * Three directories under the notes definition, each with the note of its genesis. S and U write a body, T vouches with S.1,
+   * S vouches with U.1, and S strikes its note. The bytes of both texts were there when the entries were written. The source
+   * now serves neither: S redacted its text, and U lost its own, unless `struck` says that U redacted it too.
+   *
+   *   S: 0 genesis, 1 write, 2 vouch (U.1), 3 strike      U: 0 genesis, 1 write, and 2 strike if `struck`      T: 0 genesis, 1 vouch (S.1)
+   */
+  const histories = (struck: boolean) => {
+    const [S, U, T] = ["s", "u", "t"].map((key) => founded(notesDefinition, {}, key)) as [Ledger, Ledger, Ledger];
+    /** An act of rita on the note of the genesis, with what travels beside it. It must be written. */
+    const did = (L: Ledger, kind: string, fields: Record<string, string> = {}, beside: object = {}) => {
+      const judgment = L.act(keys.rita, kind, { ...on(L, 0), fields }, beside);
+      if (judgment.result !== "write") throw new Error(`${kind} was not written: ${JSON.stringify(judgment)}`);
+      return L.last.seq;
+    };
+    const wrote = (L: Ledger, body: string) => did(L, "write", { body: textDigest(body) }, { texts: () => body.length });
+    const vouched = (L: Ledger, from: Ledger, seq: number) => did(L, "vouch", {}, { presented: { proof: from.fact(seq) }, facts: [{ fact: from.fact(seq), entry: from.entries[seq]!.entry, under: from.under }] });
+    const [s, u] = [wrote(S, "the body of S"), wrote(U, "the body of U")];
+    vouched(T, S, s);
+    vouched(S, U, u);
+    did(S, "strike");
+    if (struck) did(U, "strike");
+    const all = [S, U, T];
+    return { S, U, T, owed: textDigest("the body of U"), source: new MemorySource(all.map((ledger) => served(ledger, all)), 2) };
+  };
+
+  test("a source scope that is first read while another scope's missing text is settled is itself read to its head: a text it owes with no tombstone makes the replay incomplete, and with one it is reported as redacted", async () => {
+    // T.1 needs S through 1, where S owes its text. Reading S on to its tombstone, S.3, proves U.1 at S.2: U is first read then.
+    const { U, T, owed, source } = histories(false);
+    const { report, why } = await verify(source, { mode: "replay", scope: T.at.scope });
+    expect([report.result, report.at, report.redacted.map((r) => r.tombstone.seq)]).toEqual(["incomplete", U.fact(1), [3]]);
+    expect(why).toBe(`a retained input is missing: the detached text ${owed}, which no later entry of ${U.at.scope} redacts`);
+
+    // The same histories, and U redacts its text at U.2, which no reference names. U is read to its head, and both tombstones answer.
+    const whole = histories(true);
+    const found = await verify(whole.source, { mode: "replay", scope: whole.T.at.scope });
+    expect([found.report.result, found.why, found.report.redacted.map((r) => r.tombstone)]).toEqual(["consistent", null, [whole.S.fact(3), whole.U.fact(2)]]);
+    expect(found.report.coverage).toEqual([whole.T, whole.S, whole.U].map((L) => ({ scope: L.at, from: 0, through: L.head.seq })));
   });
 });
 

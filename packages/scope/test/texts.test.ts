@@ -7,20 +7,21 @@ import { timeMs } from "@generalbusiness/artroom-derive";
 import { grantOf, variant } from "@generalbusiness/artroom-derive/testing";
 import { found, httpTransport, secretSigner, signedIntent } from "@generalbusiness/artroom-client";
 import { TRUSTS, httpSource, verify } from "@generalbusiness/artroom-replay";
-import { Node, founding, later, net, rita } from "./net.ts";
+import { Node, founding, later, net, rita, settle } from "./net.ts";
 import { reader } from "./support.ts";
 
 /**
  * A made-up definition with one detached text (section 6.2): a note whose
  * body is held beside the intent and named in it by digest. `strike`
  * redacts it. `copy` creates a scope under the same definition, with the
- * note's body in the creation message.
+ * note's body in the creation message. `share` stores a peer lane in the
+ * note and tells it the body, and the peer's handler opens a note with it.
  */
 const body = { type: "text", max: 40, detached: true } as const;
 const base: DeclaredDefinition = {
   format: "artroom-definition-1", name: "notes", profile: { name: "restricted", version: 1 }, capabilities: [], genesis: "start",
   items: {
-    note: { many: true, max: 8, states: { kept: { final: false }, struck: { final: true } }, initial: "kept", parties: {}, refs: {}, values: { body: { fixed: false, required: false, of: body } } },
+    note: { many: true, max: 8, states: { kept: { final: false }, struck: { final: true } }, initial: "kept", parties: {}, refs: { peer: { fixed: false, required: false, to: { type: "scope", kind: "lane" } } }, values: { body: { fixed: false, required: false, of: body } } },
   },
   acts: {},
   receives: {}, timed: {}, rules: {},
@@ -35,7 +36,9 @@ const notes = variant(base, (def) => {
     edit: act({ step: "transition", grant: "write", fields: { body: { ...body, required: true } }, guards: kept, effects: write }),
     strike: act({ step: "transition", grant: "strike", guards: kept, effects: [{ state: "struck" }, { redact: { slot: "body" } }] }),
     copy: act({ step: "transition", grant: "write", guards: kept, sends: [{ create: { kind: "lane", definition: "self", fields: { body: { slot: "body" } }, result: {} } }] }),
+    share: act({ step: "transition", grant: "write", fields: { peer: { type: "scope", kind: "lane", required: true } }, guards: kept, effects: [{ ref: { slot: "peer", from: { field: "peer" } } }], sends: [{ tell: { to: { slot: "peer" }, message: "noted", fields: { body: { slot: "body" } }, result: {} } }] }),
   };
+  def.receives = { noted: { message: "noted", class: "tell", from: { kind: "lane" }, opens: "note", fields: { body: { ...body, required: true } }, also: {}, guards: [], effects: write, sends: [], attention: [] } };
 });
 const source = httpSource("https://scopes.test", { fetch: (url, init) => SELF.fetch(url, init) });
 
@@ -140,4 +143,39 @@ test("a detached text in a creation message: the child reads the bytes from its 
   expect(await L.stub.summary(reader)).toMatchObject({ ok: false });
   const duty = (await P.duties()).find((d) => d.duty === `${late.fact.seq}.0`)!;
   expect([duty.result, duty.diagnosis, duty.acknowledged, duty.attempts.at(-1)?.answer]).toEqual([null, null, null, "retry"]);
+});
+
+test("a repeat of a decided send is answered from the entry that recorded it, and writes nothing, after both scopes have redacted the text that the message carries", async () => {
+  net.hold = net.deaf = null;
+  const { signed, name } = founding(notes, {});
+  const P = new Node(name, notes.declared);
+  expect(await P.stub.found(signed, notes.declared)).toMatchObject({ answer: "accepted" });
+  const text = "A body that is told.";
+  const wrote = await P.stub.submit(await P.intent(rita, "write", { fields: { body: textDigest(text) } }), await P.grants(), { texts: [text] });
+  if (wrote.answer !== "accepted") throw new Error(`not accepted: ${JSON.stringify(wrote)}`);
+  // Two lanes, each with the note of its genesis. A stores B as the note's peer and tells it the body: B reads the text from A,
+  // and its handler opens a note with it.
+  const lane = async () => {
+    const copied = await P.did(rita, "copy", { on: wrote.receipt.fact.seq, expected: { on: 1 } });
+    return new Node(scopeIdOf((await P.entries())[copied.fact.seq]!.sends[0]!.to as Seed), notes.declared);
+  };
+  const [A, B] = [await lane(), await lane()];
+  await settle(P, A, B);
+  const shared = await A.did(rita, "share", { on: 0, expected: { on: 1 }, fields: { peer: await B.at() } });
+  await settle(A, B);
+  const told = (await B.sealed()).at(-1)!;
+  expect(told.entry).toMatchObject({ input: { type: "delivery", from: shared.fact, decision: "applied" }, effects: [{ effect: "open" }, { effect: "value", slot: "body", value: textDigest(text) }] });
+
+  // Both redact the text, so neither holds its bytes. The same envelope again is still that send of that entry of A. B answers it
+  // with the fact of the entry that decided it, as it answered the first delivery, and its head does not move.
+  await A.did(rita, "strike", { on: 0, expected: { on: 2 } });
+  await B.did(rita, "strike", { on: told.entry.seq, expected: { on: 1 } });
+  const asks = A.stub as unknown as { text(seq: number, digest: Digest): Promise<string | null> };
+  const keeps = B.stub as unknown as { retained(reader: unknown, kind: string, digest: Digest): Promise<unknown> };
+  const head = (await B.summary()).at;
+  expect([
+    await asks.text(shared.fact.seq, textDigest(text)), await keeps.retained(reader, "text", textDigest(text)),
+    await B.stub.deliver(await A.envelope(shared.fact.seq)),
+    (await B.summary()).at,
+  ]).toMatchObject([null, { ok: false }, { answer: "recorded", fact: { at: told.entry.at, seq: told.entry.seq, hash: told.hash } }, head]);
 });
