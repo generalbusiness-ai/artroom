@@ -12,7 +12,7 @@ import { HOLDER, changeItem, newItem, type ItemEffect } from "./fold.ts";
 import { members, slotOf, type Judging } from "./guards.ts";
 import type { Item } from "./state.ts";
 import { LAST_MS, timeMs, timeOf } from "./time.ts";
-import { isMemberRef, isValue, same } from "./values.ts";
+import { isMemberRef, isValue, memberFits, same } from "./values.ts";
 
 export type Derived<T> = ({ ok: true } & T) | { ok: false; reason: RefusalReason; detail: string };
 
@@ -77,6 +77,8 @@ export function deriveEffects(j: Judging, forms: readonly EffectForm[], attentio
         if (!field.ok) return field;
         member = field.value as MemberRef | null;
       } else member = (item.parties[from.slot] as MemberRef | null | undefined) ?? null;
+      // Whatever its source, a member put in a slot is within the bound of a handle.
+      if (member && !memberFits(member, j.bounds)) return refuse("bad-field", `effects.${i}: the member's handle is longer than a handle may be`);
       const has = member !== null && members(item.parties[slot]).some((m) => same(m, member));
       if (list === undefined) apply(subject, { effect: "party", item: id, slot, member });
       else if (member && list === "add" && !has) {
@@ -107,6 +109,7 @@ export function deriveEffects(j: Judging, forms: readonly EffectForm[], attentio
       const { slot } = form.attribute;
       for (const member of attribution(historyOf(working.get(form.attribute.of)!, working.values(), j.definition, j.signer), j.signer)) {
         if (members(working.get(subject)!.parties[slot]).some((m) => same(m, member))) continue;
+        if (!memberFits(member, j.bounds)) return refuse("bad-field", `effects.${i}: a member's handle is longer than a handle may be`);
         if (!room(slot)) return refuse("slot-full", `effects.${i}: ${slot}`);
         apply(subject, { effect: "list", item: id, slot, change: "add", member });
       }

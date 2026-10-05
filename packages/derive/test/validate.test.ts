@@ -61,6 +61,7 @@ const rows: readonly (readonly [string, DeclaredDefinition, Change, ProblemCode 
     d.timed["hold-end"].effects.push({ party: { slot: "past", from: { slot: "holder" }, list: "add" } });
   }, "timed-partial"],
   ["a timed rule that sets a time from the commit clock, which a commit could refuse", lane, (d) => d.timed["hold-end"].effects.push({ value: { slot: "until", from: { time: { plusSeconds: 60 } } } }), "timed-partial"],
+  ["a timed rule whose entry, with its attention reason, could pass the entry size bound: its due item could never be written", lane, (d) => { d.timed["hold-end"].attention[0].notify.reason = "r".repeat(PROPOSED_BOUNDS.entryBytes); }, "bound"],
   ["a time offset longer than the span a timestamp can name", lane, (d) => { d.acts["take-hold"].effects[2].value.from.time.plusSeconds = Number.MAX_SAFE_INTEGER; }, "bound"],
   ["a timed rule over a final state", lane, (d) => d.timed["hold-end"].states.push("ended"), "timed"],
   ["a profile this runtime does not implement", small, (d) => { d.profile.version = 2; }, "profile"],

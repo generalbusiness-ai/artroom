@@ -211,7 +211,11 @@ export class Turns {
       // Section 9.2: room for this entry was counted when its item was opened. A scope with no room at all writes nothing.
       if (scope.head.seq + 1 >= this.#bounds.scopeEntries) return { end: "unavailable" };
       turn.attempts++;
-      if (this.#commitTimed(definition, turn, due, scope.head) === "clock-behind") return { end: "clock-behind" };
+      const done = this.#commitTimed(definition, turn, due, scope.head);
+      if (done === "clock-behind") return { end: "clock-behind" };
+      // The validator bounds a timed entry's size, so this is a fault: a definition validated under larger bounds. The transition
+      // stays due and is never passed over. The turn ends, nothing more is written, and the alarm is set again.
+      if (done === "unfit") return { end: "unavailable" };
     }
   }
 
@@ -221,7 +225,16 @@ export class Turns {
    * again. A timed entry judges time, so while the clock is behind the drain
    * stops (section 5.3).
    */
-  #commitTimed(definition: ValidDefinition, turn: Counts, selected: Due, snapshot: Head): "written" | "dropped" | "clock-behind" {
+  #commitTimed(definition: ValidDefinition, turn: Counts, selected: Due, snapshot: Head): "written" | "dropped" | "clock-behind" | "unfit" {
+    try {
+      return this.#timed(definition, turn, selected, snapshot);
+    } catch (error) {
+      if (error instanceof Unfit) return "unfit";   // thrown before anything was written
+      throw error;
+    }
+  }
+
+  #timed(definition: ValidDefinition, turn: Counts, selected: Due, snapshot: Head): "written" | "dropped" | "clock-behind" {
     return this.#store.transaction(() => {
       const clock = clockOf(this.#store, this.#ports.clock.read());    // 6.1
       turn.last = clock;

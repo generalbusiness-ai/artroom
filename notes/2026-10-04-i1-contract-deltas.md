@@ -16,7 +16,8 @@ Section 13 is two repairs made after the review's second reading of the
 eight (report `947a4116`). Entries 2 and 66 are corrected in place.
 Section 14, "The runtime", has entries 79 to 95, from step 3
 (`packages/scope`). Section 15 is repairs to the runtime after its reviews;
-entry 81 is corrected in place.
+entry 81 is corrected in place. Section 16 is two repairs to the rule
+evaluator.
 
 Each entry is a place where the contract was silent or needed a concrete
 form, what was implemented, and why. Nothing here is adopted by being
@@ -340,3 +341,69 @@ What the count does not cover. The code guarantees nothing for these:
 
 `scopeEntries` stays a temporary value. No number was raised, no duty is
 dropped, no expiry is skipped and nothing is evicted.
+
+### A timed entry always fits the entry size bound (report b423c994, finding 1)
+
+A timed rule's attention reason had no bound. A reason longer than the
+entry size bound made the end of every hold an entry that could not be
+written. The seal threw, the turn ended by an exception, and the hold
+stayed due for good.
+
+Three changes, so that every timed entry a validated definition can
+produce fits:
+
+| Change | Rule |
+|---|---|
+| The validator bounds a timed rule's entry. | For each timed rule it computes an upper bound on the canonical bytes of the entry the rule writes, whatever its item holds, and refuses the definition, as `bound`, when that passes `entryBytes`. The bound adds: 768 bytes for the entry without its effects, with the rule's name; 128 bytes for each effect record; each state name, slot name, constant and attention reason as the definition states it; each value copied from a slot at the most its type allows, with a text counted at six bytes for each byte; and for each attention, every member its party slot can hold. |
+| A member handle has a bound. | `memberBytes`, 256, temporary. A field of type `member` is a value only within it. An effect that would put a longer handle in a party slot, from the signer, a fact or an attribution, is refused `bad-field`. So a slot never holds a member the timed bound did not count. |
+| The turn has a defined end for a timed draft that cannot be an entry. | The drain stops, the turn ends `unavailable`, nothing is written, the transition stays due and the alarm is set again. No due item is passed over and nothing is dropped from the entry. With the first two changes this is reached only by a fault, such as a scope restarted under a smaller `entryBytes` than its definition was validated under; such a scope's definition no longer validates, and it answers `unavailable`. |
+
+Witness: a validator row, the fixture lane with a reason of `entryBytes`
+bytes, refused `bound`. The third change has no witness: no validated
+definition reaches it.
+
+Limits. The estimate is an upper bound and is not tight: a definition whose
+timed rule copies a large text slot, or tells many long lists, can be
+refused though its entries would fit. The contract states no bound on a
+member handle; the number is the authority note's to set. Entries that are
+not timed are not bounded at validation: an act or a delivery whose entry
+is too large is refused or retried when it is judged (entry 89).
+
+### An accepted key answers before any fetch (report b423c994, finding 2)
+
+`submit` fetched the foreign entries an intent names before the turn, and
+answered `dependency-unavailable` when one could not be read. So after a
+dependency was lost, the exact retry of an accepted intent did not get its
+receipt, and another intent under that key did not get its mismatch.
+
+The precedence, stated: the signature and shape; then the accepted-key
+index; then, for a key that is not accepted, the fetch and every other
+check. When the intent's actor and key are on a sealed entry, `submit`
+fetches nothing. The turn still runs, drains what is due, and the act judge
+answers from the index, as before: the same receipt for the same intent, a
+mismatch for another, `misaddressed` for an intent to another scope. An
+intent whose key is not accepted is new work and meets the fetch, the
+authority check and the clock unchanged. This is entry 10's decision
+applied to step 1 of section 5.2. It is not a promise that a scope answers
+during every outage: the answer still waits behind the drain and can be
+`busy` or `clock-behind`. `settle` reads the history with no turn and is
+unchanged.
+
+Witness: the existing dependency test. After the remark that names a proof
+is accepted, the proof is removed from the resolver; the exact retry gets
+the same receipt and another intent under the key gets the mismatch.
+
+## 16. Repairs to the rule evaluator (security review, L8 and L9)
+
+Both findings were made against the earlier evaluator and were carried
+into the copy in `packages/derive/src/rule/`. Both apply to the new role
+and both are repaired, with one witness each in the rule test.
+
+| Finding | What was wrong here | What changed | Witness |
+|---|---|---|---|
+| L8 | A source nested too deeply for the parser threw a stack overflow, which was reported as a fault of the engine. In the new role a fault prepares nothing, so a definition with such a rule was not refused by the validator: validation threw. | A source the parser cannot hold is outside the profile and is refused `source_complexity`. Brackets nested deeper than the profile's tree depth, 64, are counted outside string literals and refused before the parser runs. A stack overflow in the parser, which nesting without brackets can still cause, is given the same code: a tree that deep is past the depth bound whenever it can be built. | 5,000 nested parentheses, and 60,000 prefix minus signs, are each `source_complexity`. |
+| L9 | The check of variable reads has no scopes: a name bound anywhere in the expression counted as bound everywhere. `((false ? ($eval := 1) : 0); $eval)` passed admission and was stopped only when evaluated. | No name of the pinned engine's function table, nor `now` or `millis`, can be bound. The 65 names are listed in `profile.ts` for engine 2.2.2. A read of such a name is then always refused at admission. The check of reads still has no scopes: an ordinary name bound in one branch may be read in another, where it reads nothing, and the rule is false. | That expression is `unsupported_variable` at admission; `($x := 1; $x = 1)` still passes. |
+
+The engine fingerprint is unchanged. The list of names is fixed text for
+one engine version; a change of engine must review it, and nothing checks
+that automatically.

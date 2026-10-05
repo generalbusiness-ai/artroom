@@ -15,6 +15,7 @@ export interface Bounds {
   acts: number;
   receives: number;
   textBytes: number;               // one text field
+  memberBytes: number;             // one member handle. The contract states none; temporary, and the authority note's to set
   listElements: number;            // one list field or slot; also what one `every` guard reads
   states: number;                  // of one item type
   parties: number;                 // party slots of one item type
@@ -53,6 +54,7 @@ export const PROPOSED_BOUNDS: Bounds = {
   acts: 48,
   receives: 24,
   textBytes: 64 * 1024,
+  memberBytes: 256,
   listElements: 32,
   states: 16,
   parties: 8,

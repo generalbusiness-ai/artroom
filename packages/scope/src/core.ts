@@ -196,7 +196,11 @@ export class Scope {
     const intent = signed.intent;
     const act = Object.hasOwn(definition.declared.acts, intent.kind) ? definition.declared.acts[intent.kind] : undefined;
     const fields = act ? readFields(act.fields, intent.fields, bounds) : null;
-    const wanted = act && fields?.ok ? factsNamed(act.fields, fields.fields) : [];
+    // Section 4.2: a key on a sealed entry is answered from history, with the same receipt or a mismatch. That answer reads no
+    // foreign entry, so none is fetched for it, and a lost dependency cannot hide it. The turn still drains first, and the
+    // judge gives the answer; an intent with a key that is not accepted is new work and meets every check below.
+    const known = this.#store.accepted(intent.actor, intent.idempotencyKey) !== null;
+    const wanted = !known && act && fields?.ok ? factsNamed(act.fields, fields.fields) : [];
     if (wanted.length > bounds.usesPerEntry) return { answer: "refused", reason: "bad-field", judgedAt: scope.head };
     const facts = await fetchFacts(resolver, bounds, wanted);
     if (!facts) return unavailable("dependency-unavailable");

@@ -17,6 +17,9 @@ export function isMemberRef(v: unknown): v is MemberRef {
   return isObject(v) && hasOnly(v, ["membership", "member"]) && isScopeRef(v["membership"]) && typeof v["member"] === "string" && /^@./.test(v["member"]) && wellFormed(v["member"]);
 }
 
+/** A member handle within its bound. A slot never holds a longer one, so an entry that lists a slot's members has a known size. */
+export const memberFits = (v: MemberRef, bounds: Pick<Bounds, "memberBytes">): boolean => utf8(v.member).length <= bounds.memberBytes;
+
 export function isFactRef(v: unknown): v is FactRef {
   return isObject(v) && hasOnly(v, ["at", "seq", "hash"]) && isScopeRef(v["at"]) && isLocalId(v["seq"]) && isDigest(v["hash"]);
 }
@@ -35,7 +38,7 @@ export function isValue(type: FieldType, v: unknown, bounds: Bounds): boolean {
     case "bool": return typeof v === "boolean";
     case "time": return timeMs(v) !== null;
     case "enum": return typeof v === "string" && type.of.includes(v);
-    case "member": return isMemberRef(v);
+    case "member": return isMemberRef(v) && memberFits(v, bounds);
     case "item": return isLocalId(v);
     case "fact": return isFactRef(v);
     case "scope": return isScopeRef(v) && v.kind === type.kind;

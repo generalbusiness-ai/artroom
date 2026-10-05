@@ -8,8 +8,8 @@
  * define is refused, which refuses the forms of section 6.10.
  */
 
-import type { Bounds, DeclaredDefinition, Digest, FieldType } from "@generalbusiness/artroom-contract";
-import { canonicalize, definitionDigest, isDigest } from "@generalbusiness/artroom-bytes";
+import type { Bounds, DeclaredDefinition, Digest, FieldType, ItemType, TimedRule } from "@generalbusiness/artroom-contract";
+import { canonicalize, definitionDigest, isDigest, utf8 } from "@generalbusiness/artroom-bytes";
 import { LAST_MS } from "./time.ts";
 import { SCOPE_KINDS, isObject, isValue } from "./values.ts";
 
@@ -725,9 +725,71 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
 
   if (problems.length > 0) return { ok: false, problems };
   const declared = input as DeclaredDefinition;
+  // Section 5.2: a due transition is always written, so its entry must fit whatever its item holds by then.
+  for (const [name, rule] of Object.entries(declared.timed)) {
+    const most = timedEntryBytes(name, rule, declared.items[rule.on]!, bounds);
+    if (most > bounds.entryBytes) bad("bound", at("timed", name), `its entry could take ${most} bytes; at most ${bounds.entryBytes}`);
+  }
+  if (problems.length > 0) return { ok: false, problems };
   try {
     return { ok: true, definition: { declared, digest: definitionDigest(declared), timedTypes: [...timedTypes].sort(), holdTypes: [...holdTypes].sort(), indexes } };
   } catch {
     return { ok: false, problems: [{ code: "shape", path: "", message: "has no canonical bytes" }] };
   }
+}
+
+// ---------------------------------------------------------------- the size of a timed entry (sections 5.2 and 7.5)
+
+/** The canonical bytes of a value that the definition states. */
+const stated = (v: unknown): number => utf8(canonicalize(v)).length;
+
+/** More than the canonical bytes of a scope reference, and of a fact reference. */
+const SCOPE_BYTES = 160;
+const FACT_BYTES = SCOPE_BYTES + 128;
+/** More than the bytes of one effect record without the values it carries, and of an entry without its effects and its rule's name. */
+const RECORD_BYTES = 128;
+const ENTRY_BYTES = 768;
+
+/** The most bytes a member reference takes: each byte of a handle may be written as a six-byte escape. */
+const memberBytes = (bounds: Bounds): number => SCOPE_BYTES + 64 + 6 * bounds.memberBytes;
+
+/** The most canonical bytes a value of that type takes. */
+function mostBytes(type: FieldType, bounds: Bounds): number {
+  switch (type.type) {
+    case "text": return 2 + 6 * type.max;
+    case "int": return 20;
+    case "bool": return 5;
+    case "time": return 26;
+    case "enum": return Math.max(2, ...type.of.map(stated));
+    case "member": return memberBytes(bounds);
+    case "item": return 20;
+    case "fact": return FACT_BYTES;
+    case "scope": return SCOPE_BYTES;
+    case "digest": return 73;
+    case "commit": case "tree": return 66;
+    case "list": return 2 + Math.min(type.max, bounds.listElements) * (1 + mostBytes(type.of, bounds));
+  }
+}
+
+/**
+ * An upper bound on the canonical bytes of the entry a timed rule writes,
+ * whatever its item holds. A timed rule has no field and no signer, so each
+ * effect carries a name or a constant the definition states, or a copy of a
+ * slot, which its type bounds. Attention lists the members of a party slot,
+ * each within the bound of a handle, with a reason the definition states.
+ */
+function timedEntryBytes(name: string, rule: TimedRule, type: ItemType, bounds: Bounds): number {
+  const slotType = (slot: string): FieldType | null => type.refs[slot]?.to ?? type.values[slot]?.of ?? (type.parties[slot] ? { type: "member" } : null);
+  const held = (slot: string): number => { const t = slotType(slot); return t ? mostBytes(t, bounds) : 0; };
+  const listed = (slot: string): number => (type.parties[slot]?.list ? Math.min(type.parties[slot]!.max ?? bounds.listElements, bounds.listElements) : 1);
+  let bytes = ENTRY_BYTES + stated(name);
+  for (const e of rule.effects) {
+    bytes += RECORD_BYTES;
+    if ("state" in e) bytes += stated(e.state);
+    else if ("party" in e) bytes += stated(e.party.slot) + memberBytes(bounds);
+    else if ("ref" in e) bytes += stated(e.ref.slot) + (e.ref.from !== null && e.ref.from !== "self" && "slot" in e.ref.from ? held(e.ref.from.slot) : 20);
+    else if ("value" in e) bytes += stated(e.value.slot) + ("const" in e.value.from ? stated(e.value.from.const) : 26);
+  }
+  for (const { notify } of rule.attention) bytes += RECORD_BYTES + stated(notify.reason) + listed(notify.slot) * (1 + memberBytes(bounds));
+  return bytes;
 }
