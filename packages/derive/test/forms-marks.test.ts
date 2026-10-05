@@ -62,7 +62,16 @@ describe("a mark in a definition (section 6.1)", () => {
     // The field is then no field, so the effect that copies it names nothing.
     ["a default on a field whose type is a mark", gate, (d) => { d.acts.enter.fields.note.default = 2; }, true, [["shape", "acts.enter.fields.note.default"], ["name", "acts.enter.effects.1.value.from"]]],
     ["a value of another type copied into a slot whose type is a mark", gate, (d) => { d.acts.enter.effects[1].value.from = { field: "secret" }; }, true, [["name", "acts.enter.effects.1.value.from"]]],
-    ["a second send that is a mark", gate, (d) => d.acts.enter.sends.push({ code: "again", row: "P21", result: {} }), true, [["shape", "acts.enter.sends.1"]]],
+    // Revision 19, "More than one send mark" (witness 18.45, case 3): a list may hold several marks when at most one does not state `always`.
+    ["a second send mark, where neither states `always`", gate, (d) => d.acts.enter.sends.push({ code: "again", row: "P21", result: {} }), true, [["shape", "acts.enter.sends.1"]]],
+    ["a second send mark, where one states `always`, passes", gate, (d) => d.acts.enter.sends.push({ code: "again", row: "P21", result: {}, always: true }), true, null],
+    ["three send marks, where two state `always`, pass, and each is listed", gate, (d) => { d.acts.enter.sends[0].always = true; d.acts.enter.sends.push({ code: "again", row: "P21", result: {} }, { code: "third", row: "P21", result: {}, always: true }); }, true, null],
+    ["`always` is true, or is left out", gate, (d) => { d.acts.enter.sends[0].always = false; }, true, [["shape", "acts.enter.sends.0.always"]]],
+    ["a written send that is not always made, beside two marks", gate, (d) => {
+      d.acts.enter.sends[0].always = true;
+      d.acts.enter.sends.push({ code: "again", row: "P21", result: {} }, { index: { fields: {} } });
+    }, true, [["shape", "acts.enter.sends.0"]]],
+    ["`always` on a written send is no member of it", small, (d) => { d.acts.edit.sends = [{ index: { fields: {} }, always: true }]; }, false, [["shape", "acts.edit.sends.0"]]],
     // A written effect on a name that a mark selects, a required slot that only an effect mark could set, and a clause of the mark's own request all pass.
     ["a required slot that no written effect sets, in a row with an effect mark, passes", gate, (d) => { d.acts.issue.effects = [{ code: "hash-of", row: "P18" }]; }, true, null],
     ["an effect mark in a clause of the send mark passes", gate, (d) => { d.acts.enter.sends[0].result.applied = [{ code: "noted", row: "P16" }]; }, true, null],
@@ -278,6 +287,56 @@ describe("a rule is run at the check of its mark's place (sections 4.2 and 6.1)"
     expect([said(enter(s, una, "one", by([operation(0)], [operation(1), first(1)]))), s.entries.length]).toEqual([["unavailable", "unavailable", null, null], 3]);
     // Section 6.1, "The joined lists are checked as one": the pair is in the entry's effects, each half from another rule.
     expect([said(enter(s, una, "one", by([operation(0)], [first(0)]))), s.last.effects]).toEqual([["write", null, null, null], [{ effect: "state", item: 2, state: "used" }, operation(0), first(0)]]);
+  });
+
+  // Scope contract, revision 19, section 6.1, "More than one send mark"; witness 18.45, cases 1, 2, 4 and 5. The rules are STAND-INS.
+  test("a list of sends with several marks: each recorded send, and the clause of each result, is found by counting, with k sends or with k less 1; a rule whose mark states `always` and that gives no request has a fault", () => {
+    // Three forms: a written `create`, the mark `refer` and the mark `again`. The clause `applied` of each is one effect mark of its own.
+    const listed = (first: boolean, second: boolean) => gateWith((d) => {
+      d.acts.enter.grant = "gate.enter";
+      d.acts.enter.sends = [
+        { create: { kind: "inbox", definition: "platform:inbox@1", fields: {}, result: { applied: [{ code: "noted-w", row: "P16" }] } } },
+        { code: "refer", row: "P21", result: { applied: [{ code: "noted-a", row: "P16" }] }, ...(first ? { always: true } : {}) },
+        { code: "again", row: "P21", result: { applied: [{ code: "noted-b", row: "P16" }] }, ...(second ? { always: true } : {}) },
+      ];
+    });
+    const tell = (message: string) => ({ to: otherLane, message: { class: "request", type: "tell", body: { message, fields: {} } } }) as const;
+    const gives = (request: ReturnType<typeof tell> | null): PlatformRule => ({ place: "send", run: () => request });
+    /** One `enter` under those marks and rules. Returns the scope, what the judge answered, and the clause that runs for the `applied` result of one recorded send. */
+    const entered = (definition: ReturnType<typeof listed>, refer: ReturnType<typeof tell> | null, again: ReturnType<typeof tell> | null) => {
+      const s = new Scope(definition);
+      s.did(rita, "issue", { fields: { hash: textDigest("one") } });
+      const answer = said(enter(s, una, "one", gateRules({ refer: gives(refer), again: gives(again) })));
+      const asked = s.last.seq;
+      const clauseOf = (n: number): string[] => {
+        const ran: string[] = [];
+        const noting = (name: string): PlatformRule => ({ place: "effect", most: 0, run: () => { ran.push(name); return []; } });
+        const request = { from: s.fact(asked), n };
+        const send: Send = { n: 0, to: s.at, message: { class: "result", of: request, outcome: "applied" } };
+        const source = forged(otherLane, 40 + n, { type: "delivery", ...request, message: s.entries[asked]!.entry.sends[n]!.message as Request, decision: "applied" }, [send]);
+        const arrival = { ...send, from: factRefOf(source.entry) };
+        const judged = judgeDelivery(s.state, s.definition, arrival, { ...arriving(s, arrival, source), platform: gateRules({ "noted-w": noting("w"), "noted-a": noting("a"), "noted-b": noting("b") }) });
+        return [judged.result, ...ran];
+      };
+      const sends = answer[0] === "write" ? s.last.sends.map((made) => [made.n, made.message.class === "request" && (made.message.type === "tell" ? (made.message.body as { message: string }).message : made.message.type)]) : null;
+      return { answer: answer[0], sends, clauseOf };
+    };
+    // Case 1: both marks state `always`, and each form makes one send, at the position of its form. Case 5: the result of the
+    // request at the third position runs the clause of the third form. No send holds a member that says which form made it.
+    const all = entered(listed(true, true), tell("a"), tell("b"));
+    expect([all.answer, all.sends, all.clauseOf(1), all.clauseOf(2)]).toEqual(["write", [[0, "create"], [1, "a"], [2, "b"]], ["write", "a"], ["write", "b"]]);
+    // Case 2: the last mark does not state `always`, and its rule gives none: two sends, those of the first two forms.
+    const less = entered(listed(true, false), tell("a"), null);
+    expect([less.answer, less.sends, less.clauseOf(1)]).toEqual(["write", [[0, "create"], [1, "a"]], ["write", "a"]]);
+    // The counting argument, at k less 1 with a later form: the mark that does not state `always` stands second and gives none.
+    // The send of the third form is one ordinal earlier, and its result runs the third form's clause, and not the second's.
+    const earlier = entered(listed(false, true), null, tell("b"));
+    expect([earlier.answer, earlier.sends, earlier.clauseOf(1)]).toEqual(["write", [[0, "create"], [1, "b"]], ["write", "b"]]);
+    // The same data with every form made: k sends, and the second ordinal is the second form's again.
+    const both = entered(listed(false, true), tell("a"), tell("b"));
+    expect([both.sends, both.clauseOf(1), both.clauseOf(2)]).toEqual([[[0, "create"], [1, "a"], [2, "b"]], ["write", "a"], ["write", "b"]]);
+    // Case 4: a mark that states `always`, whose rule gives no request: a fault. The input is not judged, and nothing is written.
+    expect([entered(listed(true, true), null, tell("b")).answer, entered(listed(true, false), tell("a"), null).answer]).toEqual(["unavailable", "write"]);
   });
 
   test("an item that a rule opens counts against its type's `max` in every entry: an outcome's rule that would pass it has a fault, and a clause's rule that would pass it changes nothing; an outcome's rule sends no more than one entry may", () => {

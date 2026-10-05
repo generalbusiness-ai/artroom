@@ -105,16 +105,23 @@ export function sends(d: Defining, v: unknown, path: string, ctx: Ctx, top: Rec,
   const kinds = new Map<string, { always: boolean; clause: boolean }[]>();
   let fanOuts = 0;
   let most = 0;
-  /** The marks of the list, in platform data, and whether each written send of it always makes exactly one send. */
+  /**
+   * The marks of the list, in platform data; those of them that do not state `always`, whose rule may give no request; and whether
+   * each written send of the list always makes exactly one send.
+   */
   const marks: string[] = [];
+  const unsure: string[] = [];
   let steady = true;
   list(v, path, bounds.sends).forEach((s, i) => {
     if (d.platform && marked(s)) {
       // Section 6.1, place 6: the rule gives no request, or one: a `create`, a `tell` or a `relate`. Its clauses are the mark's
       // own, as data, with the `conflict` clause of a creation. It is counted as one send and one request.
-      const o = mark(d, s, at(path, i), "send", ["result"]);
+      // Revision 19, "More than one send mark": a mark may state `always: true`. Its rule then gives exactly one request.
+      const o = mark(d, s, at(path, i), "send", ["result"], ["always"]);
       if (o) requests.push({ most: 1, clauses: clauses(d, o["result"], at(at(path, i), "result"), ctx, true) });
+      if (o && "always" in o && o["always"] !== true) bad("shape", at(at(path, i), "always"), "is true, or is left out");
       marks.push(at(path, i));
+      if (!isObject(s) || s["always"] !== true) unsure.push(at(path, i));
       most += 1;
       return;
     }
@@ -195,10 +202,11 @@ export function sends(d: Defining, v: unknown, path: string, ctx: Ctx, top: Rec,
     kinds.set(said, [...others, { always, clause }]);
   });
   // A result names its request by ordinal, and a rule's request states no type or name in the data. So the form that made a
-  // recorded send is found again, in a list with a mark, by counting: the list holds one mark, and each written send of it is
-  // always made exactly once. The entry then has one send for each written form, and one more when the rule gave a request.
-  if (marks.length > 1) bad("shape", marks[1]!, "another send of this list is a mark; a list has at most one, so that the clause of a result is found again");
-  else if (marks.length === 1 && !steady) bad("shape", marks[0]!, "a written send of this list is not always made exactly once, so the clause of a result could not be found again beside a mark");
+  // recorded send is found again, in a list with a mark, by counting (section 6.1, the points on EJ4 and "More than one send
+  // mark"): each written send of the list is always made exactly once, and at most one mark does not state `always`. A list of k
+  // forms then records k sends, each at the position of its form, or k less 1, when that one mark's rule gave none.
+  if (unsure.length > 1) bad("shape", unsure[1]!, "another send mark of this list does not state always; a list has at most one such mark, so that the clause of a result is found again");
+  else if (marks.length > 0 && !steady) bad("shape", marks[0]!, "a written send of this list is not always made exactly once, so the clause of a result could not be found again beside a mark");
   return most;
 }
 

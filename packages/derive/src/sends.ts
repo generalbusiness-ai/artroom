@@ -205,6 +205,8 @@ export function deriveSends(j: Judging, forms: readonly SendForm[], working: Rea
     const mark = markOf(form);
     if (mark) {
       const given = run(mark, () => ruleFor(j, mark, "send").run(givenTo(j)));
+      // Revision 19, "More than one send mark": a rule whose mark states `always` returns exactly one request. None is a fault.
+      if (given === null && (mark as SendMark).always === true) throw outside(mark, "no request, where its mark states always");
       if (given === null) continue;
       const request: Send | null = isObject(given) ? { n: next(), to: given.to, message: given.message } : null;
       const body = request && isSend(request) && request.message.class === "request" && isObject(request.message.body) ? request.message.body : null;
@@ -294,15 +296,17 @@ export function deriveSends(j: Judging, forms: readonly SendForm[], working: Rea
  */
 export function formOf(definition: ValidDefinition, forms: readonly SendForm[], entry: { sends: readonly Send[] }, n: number): SendForm | SendMark | null {
   const sent = entry.sends.filter((s) => s.message.class === "request" || s.message.class === "advisory").sort((a, b) => a.n - b.n);
-  // Platform data, section 6.1, place 6: a rule's request states no type or name in the data. The validator lets a list hold one
-  // mark, and then each written send of it is always made exactly once. So the entry has one send for each written form, in their
-  // order, and one more, at the mark's position, when the rule gave a request.
-  const marked = forms.findIndex((form) => markOf(form) !== null);
-  if (marked !== -1) {
+  // Platform data, section 6.1, place 6: a rule's request states no type or name in the data. In a list with a mark the validator
+  // lets at most one mark not state `always`, and each written send of the list is always made exactly once. So for a list of k
+  // forms the entry records k sends of the list, or k less 1. With k, each form made its send at its own position. With k less 1,
+  // the one mark that does not state `always` made none, and the send of each later form is one position earlier.
+  if (forms.some((form) => markOf(form) !== null)) {
+    const unsure = forms.map((form, i) => (markOf(form) !== null && (form as unknown as SendMark).always !== true ? i : -1)).filter((i) => i !== -1);
     const at = sent.findIndex((s) => s.n === n);
-    const gave = sent.length - (forms.length - 1);
-    if (at === -1 || (gave !== 0 && gave !== 1)) return null;
-    return forms[gave === 1 || at < marked ? at : at + 1] ?? null;
+    if (at === -1 || unsure.length > 1) return null;
+    if (sent.length === forms.length) return forms[at] ?? null;
+    if (sent.length !== forms.length - 1 || unsure.length !== 1) return null;
+    return forms[at < unsure[0]! ? at : at + 1] ?? null;
   }
   const made = (form: SendForm, { to, message }: Send): boolean => {
     if (message.class === "advisory") return "index" in form && message.type === "index";

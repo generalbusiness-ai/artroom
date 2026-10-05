@@ -42,8 +42,15 @@ export type GrantMark = Mark & { grant?: string };
 export type AlsoMark = Mark & { item: string };
 /** Place 3. The data states no shape for the value: the rule says whether a value is of the type. */
 export type TypeMark = Mark & { type: "code" };
-/** Place 6. The rule gives no request or one. Its clauses are the mark's own, as data. */
-export type SendMark = Mark & { result: PlatformClauses };
+/**
+ * Place 6. The rule gives no request or one. Its clauses are the mark's own,
+ * as data. `always`, on a send mark of a written list (revision 19, section
+ * 6.1, "More than one send mark"): the rule returns exactly one request in
+ * every entry of its row, and a rule that returns none there has a fault. A
+ * written list may hold several marks when at most one of them does not
+ * state it.
+ */
+export type SendMark = Mark & { result: PlatformClauses; always?: true };
 
 /** The type of a field or of a slot, in platform data. */
 export type PlatformFieldType = FieldType | TypeMark;
