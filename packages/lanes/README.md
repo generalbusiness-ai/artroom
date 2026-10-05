@@ -41,7 +41,7 @@ contract package's types. Its tests and scripts also use `bytes`,
 | `scripts/pin.mjs` | Writes the two byte files and `src/digests.ts` from the values. |
 | `scripts/reference.mjs` | Writes `docs/lanes-reference.md` from the values. With `--check` it writes nothing and exits 1 when the file is stale. |
 | `test/definitions.test.ts` | Three plain tests: the pins, with the generated reference; the counts against the bounds; and validation of both definitions whole. |
-| `test/*.scope.test.ts` | Ten scenarios on real scopes under the two pinned digests, T1 to T9, in the workerd test pool. Each names the stand-ins it uses. |
+| `test/*.scope.test.ts` | Eleven scenarios on real scopes under the two pinned digests, T1 to T9 and T34, in the workerd test pool. Each names the stand-ins it uses. |
 | `test/support/graph.ts`, `worker.ts` | The one fixture of the scenarios, and the test Worker, which is the scope package's `./testing/worker`. |
 | `vitest.scope.config.ts`, `wrangler.test.jsonc` | The configuration that runs the scenarios alone. From the root they run inside the `scope` project. Nothing is deployed from either file. |
 
