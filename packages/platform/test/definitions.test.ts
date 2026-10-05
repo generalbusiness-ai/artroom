@@ -2,7 +2,7 @@ import { expect, test } from "vitest";
 import { PROPOSED_BOUNDS, type DeclaredDefinition } from "@generalbusiness/artroom-contract";
 import { definitionDigest } from "@generalbusiness/artroom-bytes";
 import { PROFILES, derivable, runnable, validateDefinition } from "@generalbusiness/artroom-derive";
-import { ROLE_LISTS, RULES, definitions, inbox, membership, platform } from "../src/index.ts";
+import { FIRST_ACTIONS, ROLE_LISTS, RULES, definitions, inbox, membership, platform } from "../src/index.ts";
 
 // The plan's T43, for the one definition that exists: `platform:inbox@1` (authority note, revision 16, section 12.1.6).
 test("the inbox definition validates whole with the platform option, with its marks listed, and is refused without it", () => {
@@ -79,6 +79,13 @@ test("the membership definition validates whole with the platform option; every 
   // bound on a list from its revision 19. At a bound of 32 the data does not validate: no scope is founded under it there.
   const at32 = validateDefinition(JSON.parse(JSON.stringify(membership)), { ...PROPOSED_BOUNDS, listElements: 32 }, PROFILES, { platform: true });
   expect(at32.ok ? null : at32.problems.map((p) => [p.code, p.path])).toEqual(Object.values(ROLE_LISTS).map((slot) => ["bound", `items.roster.values.${slot}.of.max`]));
+  // The check that the note's section 12.1.8 leaves to I3 ("One thing that was not checked"): the validator takes a constant list as
+  // the source of a list slot. The same data with the mark `role-table` replaced by five written `value` effects, each from a
+  // constant, validates. It is a check of the validator only: no entry was derived from that data, and the row stays a rule until
+  // the note writes it as data.
+  const asData = JSON.parse(JSON.stringify(membership));
+  asData.acts.establish.effects = [...asData.acts.establish.effects.filter((effect: object) => !("code" in effect)), ...Object.entries(ROLE_LISTS).map(([role, slot]) => ({ value: { slot, from: { const: FIRST_ACTIONS[role as keyof typeof ROLE_LISTS] } } }))];
+  expect(validateDefinition(asData, PROPOSED_BOUNDS, PROFILES, { platform: true }).ok).toBe(true);
   // The whole-scope rule (the contract's section 6.1): a version with a mark and no rule runs nothing. The package has the ten rules
   // of the note's table, each of the kind of its mark's place, and no other. Without any one of them the version is not runnable.
   const { rules } = platform("platform:membership@1")!;
