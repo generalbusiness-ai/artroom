@@ -16,27 +16,46 @@ import { ENTRY_BYTES, RECORD_BYTES, memberBytes, mostBytes, stated } from "./siz
 /** What the kind of a timed entry begins with (section 6.2). Its rule's key follows. */
 const TIMED = "timed:";
 
+/** What the kind of an outcome entry of a platform definition's operation begins with (section 6.2): the owner's name. */
+const PLATFORM = "platform:";
+/** The form of a step kind (section 6.2): a text with no `:` and no `@`, an `@`, a second such text, a `:`, and any text. */
+const STEP_KIND = /^[^:@]+@[^:@]+:/;
+
 /**
- * Section 6.2: no act kind and no message name begins with `timed:`, so the
- * kind of a timed entry is the kind of no act and of no delivery. A message
- * is named where a handler receives it, and where a `tell` or a `relate`
- * sends it. A relationship's name is the message of its handler.
+ * Section 6.2: no act kind and no message name is a kind that only other
+ * entries have. A message is named where a handler receives it, and where a
+ * `tell` or a `relate` sends it. A relationship's name is the message of
+ * its handler.
+ *
+ * - It does not begin with `timed:`, so the kind of a timed entry is the
+ *   kind of no act and of no delivery.
+ * - It has not the form of a step kind, so the kind of a preparation entry
+ *   and of an outcome entry of a capability's operation, such as
+ *   `hold@1:check`, is one that only the capability's code writes.
+ * - It does not begin with `platform:`, so the kind of an outcome entry of
+ *   a platform definition's operation is no act's and no delivery's
+ *   ("An outcome's kind cannot be chosen by a sender or by a definition",
+ *   revision 16). This holds with the platform option too.
  */
 export function timedKinds(d: Defining, acts: unknown, receives: unknown): void {
-  const kept = (name: unknown) => typeof name === "string" && name.startsWith(TIMED);
+  const kept = (name: unknown): string | null => (typeof name !== "string" ? null
+    : name.startsWith(TIMED) ? "does not begin with timed:" : name.startsWith(PLATFORM) ? "does not begin with platform:" : STEP_KIND.test(name) ? "has not the form of a step kind" : null);
+  const message = (name: unknown, path: string) => { const why = kept(name); if (why) d.bad("handler", path, `a message's name ${why}`); };
   const sent = (sends: unknown, path: string) => {
     if (Array.isArray(sends)) sends.forEach((s, i) => {
       const [tell, relate] = isObject(s) ? [s["tell"], s["relate"]] : [];
-      if ((isObject(tell) && kept(tell["message"])) || (isObject(relate) && kept(relate["name"]))) d.bad("handler", at(path, i), "a message's name does not begin with timed:");
+      if (isObject(tell)) message(tell["message"], at(path, i));
+      if (isObject(relate)) message(relate["name"], at(path, i));
     });
   };
   for (const [name, a] of isObject(acts) ? Object.entries(acts) : []) {
-    if (kept(name)) d.bad("shape", at("acts", name), "an act kind does not begin with timed:");
+    const why = kept(name);
+    if (why) d.bad("shape", at("acts", name), `an act kind ${why}`);
     if (isObject(a)) sent(a["sends"], at(at("acts", name), "sends"));
   }
   for (const [name, h] of isObject(receives) ? Object.entries(receives) : []) {
     if (!isObject(h)) continue;
-    if (kept(h["message"])) d.bad("handler", at(at("receives", name), "message"), "a message's name does not begin with timed:");
+    message(h["message"], at(at("receives", name), "message"));
     sent(h["sends"], at(at("receives", name), "sends"));
   }
 }
