@@ -11,7 +11,8 @@
 
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { Bounds, Digest, Entry, Timestamp } from "@generalbusiness/artroom-contract";
-import type { Authority, Clock, Ports, Readers, Resolver, Rules } from "./ports.ts";
+import type { Delivered } from "@generalbusiness/artroom-derive";
+import type { Authority, Clock, Definitions, Ports, Readers, Resolver, Rules, Transport } from "./ports.ts";
 import { production } from "./ports.ts";
 import { READ_BOUNDS, type ReadBounds } from "./reads.ts";
 
@@ -79,4 +80,43 @@ export function testPorts(c: Controls): Partial<Ports> {
   const resolver: Resolver = { read: (fact) => Promise.resolve(c.foreign.get(fact.hash) ?? null) };
   const gated: Rules = { evaluate: async (asked) => { await c.gate.pass(); return rules.evaluate(asked); } };
   return { clock: c.clock, authority: testAuthority, readers: testReaders, resolver, rules: gated };
+}
+
+// ---------------------------------------------------------------- several scopes in one namespace
+
+/**
+ * What a test holds of the scopes of one namespace: one clock for all of
+ * them, the declarations a new child may be created under, and two ways to
+ * disturb transport. `hold`: a send it matches is not delivered, and its
+ * attempt gets no answer. `deaf`: the next send it matches is delivered, and
+ * the answer is lost.
+ */
+export interface Net {
+  clock: ScriptedClock;
+  bounds: Bounds;
+  declared: Map<Digest, string>;
+  hold: ((envelope: Delivered) => boolean) | null;
+  deaf: ((envelope: Delivered) => boolean) | null;
+}
+
+export const net: Net = { clock: new ScriptedClock("2099-01-01T00:00:00Z"), bounds: PROPOSED_BOUNDS, declared: new Map(), hold: null, deaf: null };
+
+/**
+ * Test ports for a scope in that namespace: the test authority and readers,
+ * the shared clock, the declarations a test registered, and the given
+ * transport behind `hold` and `deaf`. The resolver is not replaced: a
+ * source entry is read from the real object.
+ */
+export function netPorts(n: Net, transport: Transport): Partial<Ports> {
+  const definitions: Definitions = { read: (named) => { const bytes = n.declared.get(named as Digest); return Promise.resolve(bytes === undefined ? { ok: false, reason: "unavailable" } : { ok: true, bytes }); } };
+  const disturbed: Transport = {
+    async send(envelope) {
+      if (n.hold?.(envelope)) return null;
+      const answer = await transport.send(envelope);
+      if (!n.deaf?.(envelope)) return answer;
+      n.deaf = null;
+      return null;
+    },
+  };
+  return { clock: n.clock, authority: testAuthority, readers: testReaders, definitions, transport: disturbed };
 }

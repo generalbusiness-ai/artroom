@@ -5,3 +5,6 @@ export * from "./turn.ts";
 export * from "./core.ts";
 export * from "./reads.ts";
 export * from "./object.ts";
+export * from "./delivery.ts";
+export * from "./outbox.ts";
+export * from "./namespace.ts";

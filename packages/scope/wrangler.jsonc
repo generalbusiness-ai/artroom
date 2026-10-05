@@ -1,0 +1,14 @@
+// The scope Worker as it would be deployed: one Durable Object namespace, in
+// which a scope's object is named by its scope ID and by nothing else, and
+// the SQLite migration of its class. This file is configuration only.
+// Nothing in this repository deploys it.
+{
+  "name": "artroom-scope",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-08-15",
+  "compatibility_flags": ["nodejs_compat"],
+  "durable_objects": {
+    "bindings": [{ "name": "SCOPES", "class_name": "DeployedScope" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["DeployedScope"] }]
+}

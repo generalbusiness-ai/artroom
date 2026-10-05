@@ -7,8 +7,8 @@
  * rules replace them, each behind its own port.
  */
 
-import type { Digest, Entry, FactRef, Grant, PlatformDefinition, Prepared, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
-import { timeOf, type RuleInput } from "@generalbusiness/artroom-derive";
+import type { Digest, Entry, FactRef, Grant, PlatformDefinition, Prepared, RoutingRefusal, ScopeRef, Timestamp, UnavailableReason } from "@generalbusiness/artroom-contract";
+import { timeOf, type Delivered, type RuleInput } from "@generalbusiness/artroom-derive";
 import { evaluateRules } from "@generalbusiness/artroom-derive/rule";
 
 /** One reading for each call (section 5.3). The core calls it once in a step 3 and once in a commit. */
@@ -25,11 +25,36 @@ export interface Random { bytes(length: number): Uint8Array }
 export interface Authority { current(grant: Grant, scope: ScopeRef, reading: Timestamp): boolean }
 
 /**
- * One foreign entry, by fact reference (section 5.2, step 1), with the name
- * of the definition its scope pins. Null: it cannot be read now. The core
- * also stops waiting after `seconds`.
+ * One foreign entry, by fact reference (section 5.2, step 1, and section
+ * 7.4), with the name of the definition its scope pins. Null: it cannot be
+ * read now, and may be later. `absent`: the object with that name answered,
+ * and it does not hold that entry: it is empty, it is another incarnation,
+ * or it has no entry there. The core also stops waiting after `seconds`,
+ * and checks the entry against the fact's hash itself.
  */
-export interface Resolver { read(fact: FactRef, seconds: number): Promise<{ entry: Entry; under: string } | null> }
+export type Foreign = { entry: Entry; under: string } | { absent: true } | null;
+export interface Resolver { read(fact: FactRef, seconds: number): Promise<Foreign> }
+
+/**
+ * How transport answers one delivery (section 7.4). None of these is an
+ * entry. `recorded`: the fact of the entry that recorded the message, now or
+ * before; a repeat gets the same fact. `retry`: not decided yet; the sender
+ * keeps the duty. `routing`: the resolver of the name refused it before it
+ * reached the scope's judgment, and nothing was recorded. `source-unverified`:
+ * a source check failed, and nothing was recorded.
+ */
+export type Delivery =
+  | { answer: "recorded"; fact: FactRef }
+  | { answer: "retry"; reason: UnavailableReason | "scope-full" }
+  | { answer: "routing"; reason: RoutingRefusal }
+  | { answer: "source-unverified" };
+
+/**
+ * One dispatch of one send to the object its address names: by a reference's
+ * scope ID or, for a creation, by the digest of the seed. Null: no answer.
+ * It makes one dispatch for each call, and never retries or forwards.
+ */
+export interface Transport { send(envelope: Delivered): Promise<Delivery | null> }
 
 /** Evaluation of prepared rule inputs (section 5.2, step 5). A fault is thrown, and nothing is prepared. */
 export interface Rules { evaluate(asked: readonly RuleInput[]): Promise<Prepared[]> }
@@ -49,12 +74,15 @@ export interface Readers { allows(reader: unknown, read: ReadName): boolean }
 
 export interface Ports {
   clock: Clock; random: Random; authority: Authority; resolver: Resolver; rules: Rules; alarm: Alarm; definitions: Definitions; readers: Readers;
+  /** Null: this scope has no transport. Its sends stay in the outbox and nothing dispatches them. */
+  transport: Transport | null;
 }
 
 /**
  * The production defaults. The clock and the random source are the
  * runtime's. The rules are derive's evaluator. The alarm does nothing until
- * the object supplies its own. Every other port refuses.
+ * the object supplies its own. There is no transport until a namespace
+ * supplies one. Every other port refuses.
  */
 export function production(): Ports {
   return {
@@ -67,5 +95,6 @@ export function production(): Ports {
     // A platform definition is supplied in code, and none is yet (section 6.1). No source of declared definitions is wired in this step.
     definitions: { read: (named) => Promise.resolve({ ok: false, reason: named.startsWith("platform:") ? "unsupported-definition" : "unavailable" }) },
     readers: { allows: () => false },
+    transport: null,
   };
 }

@@ -1,6 +1,7 @@
 // The scope as the workerd test pool runs it (vitest.config.ts): the test
-// worker's object class, with real Durable Object SQLite storage. Nothing is
-// deployed from this file.
+// worker's object classes, with real Durable Object SQLite storage, and the
+// Worker's own entrypoint bound as a service. Nothing is deployed from this
+// file.
 {
   "name": "artroom-scope-test",
   "main": "test/worker.ts",
@@ -9,8 +10,10 @@
   "durable_objects": {
     "bindings": [
       { "name": "SCOPES", "class_name": "TestScope" },
-      { "name": "AS_DEPLOYED", "class_name": "ScopeObject" }
+      { "name": "AS_DEPLOYED", "class_name": "ScopeObject" },
+      { "name": "NET", "class_name": "NetScope" }
     ]
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["TestScope", "ScopeObject"] }]
+  "services": [{ "binding": "API", "service": "artroom-scope-test", "entrypoint": "NetService" }],
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["TestScope", "ScopeObject", "NetScope"] }]
 }

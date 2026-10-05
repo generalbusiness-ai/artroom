@@ -29,10 +29,10 @@ import type { Retained, Sealed, Store } from "./store.ts";
 /** The signature and the shape of an intent. Both are immutable facts about the input (section 5.1). */
 export const isSigned = (signed: SignedIntent): boolean => verifySignedIntent(signed) && isIntent(signed.intent);
 
-const LATE = Symbol("late");
+export const LATE = Symbol("late");
 
 /** The result of `work`, or `LATE` when it takes longer than `seconds` or fails. */
-async function within<T>(work: () => Promise<T>, seconds: number): Promise<T | typeof LATE> {
+export async function within<T>(work: () => Promise<T>, seconds: number): Promise<T | typeof LATE> {
   let stop = (): void => undefined;
   const late = new Promise<typeof LATE>((resolve) => {
     const timer = setTimeout(() => resolve(LATE), seconds * 1000);
@@ -56,7 +56,7 @@ async function within<T>(work: () => Promise<T>, seconds: number): Promise<T | t
 export async function fetchFacts(resolver: Resolver, bounds: Bounds, named: readonly FactRef[]): Promise<Fetched[] | null> {
   const read = await Promise.all(named.map(async (fact): Promise<Fetched | null> => {
     const found = await within(() => resolver.read(fact, bounds.fetchSeconds), bounds.fetchSeconds);
-    return found !== LATE && found !== null && isEntryOf(found.entry, fact) ? { fact, entry: found.entry, under: found.under } : null;
+    return found !== LATE && found !== null && "entry" in found && isEntryOf(found.entry, fact) ? { fact, entry: found.entry, under: found.under } : null;
   }));
   return read.every((f) => f !== null) ? read : null;
 }
@@ -331,8 +331,8 @@ export class Turns {
    */
   async #wake(definition: ValidDefinition, turn: Counts): Promise<void> {
     const scope = this.#store.scope();
-    if (!scope || definition.timedTypes.length === 0) return;
-    const next = nextDue(this.#store, definition, FOREVER);
+    if (!scope) return;
+    const next = definition.timedTypes.length === 0 ? null : nextDue(this.#store, definition, FOREVER);
     if (!next) return this.#ports.alarm.set(null);
     const now = Math.max(turn.last ? timeMs(turn.last.reading)! : -Infinity, timeMs(scope.time)!);
     await this.#ports.alarm.set(timeMs(next.due)! > now ? next.due : timeOf(now + this.#bounds.drainRetrySeconds * 1000));

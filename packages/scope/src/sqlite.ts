@@ -13,11 +13,11 @@
  * the canonical bytes.
  */
 
-import type { Digest, Entry, FactRef, KeyId, OperationId, ScopeRef } from "@generalbusiness/artroom-contract";
+import type { Digest, Entry, FactRef, KeyId, OperationId, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
 import { canonicalize } from "@generalbusiness/artroom-bytes";
-import { MemoryState, slotOf } from "@generalbusiness/artroom-derive";
+import { MemoryState, slotOf, timeMs } from "@generalbusiness/artroom-derive";
 import type { Accepted, Decided, HeldCreation, Item, Operation, Outstanding, OwnRequest, Page, RangeIndex, Relation, ScopeState, StateSnapshot } from "@generalbusiness/artroom-derive";
-import type { Duty, Retained, Store, Stored } from "./store.ts";
+import type { Dispatched, Duty, Outgoing, Retained, Store, Stored } from "./store.ts";
 
 export type SqlValue = string | number | null | ArrayBuffer;
 export interface Sql {
@@ -37,7 +37,10 @@ export interface Sql {
  * - `item_slot`: for each slot that a range guard's `where` reads, the
  *   slot's value in each item of that type, indexed by value.
  * - `outbox`: one row for each send. `request`, `result` and `diagnosis`
- *   are set for a request, which is the only send with a result.
+ *   are set for a request, which is the only send with a result. `attempts`,
+ *   `next` and `ack` are the dispatcher's: the attempt log, when the next
+ *   attempt is due, and the fact transport acknowledged the send with.
+ *   `outbox_due` indexes the sends that are still to be dispatched.
  * - `inbox`: each incoming delivery this scope recorded, by source scope,
  *   incarnation, entry and ordinal.
  * - `folded`: folded records that are not items: relationship copies, held
@@ -54,12 +57,16 @@ CREATE TABLE IF NOT EXISTS item_count (type TEXT NOT NULL, state TEXT NOT NULL, 
 CREATE TABLE IF NOT EXISTS item_slot (id INTEGER NOT NULL, slot TEXT NOT NULL, type TEXT NOT NULL, state TEXT NOT NULL, value TEXT NOT NULL, PRIMARY KEY (id, slot)) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS item_by_slot ON item_slot (type, slot, value, state, id);
 CREATE TABLE IF NOT EXISTS outbox (seq INTEGER NOT NULL, n INTEGER NOT NULL, target TEXT NOT NULL, class TEXT NOT NULL, message TEXT NOT NULL, held INTEGER NOT NULL DEFAULT 0,
-  attempts TEXT NOT NULL DEFAULT '[]', request TEXT, result TEXT, diagnosis TEXT, PRIMARY KEY (seq, n)) WITHOUT ROWID;
+  attempts TEXT NOT NULL DEFAULT '[]', next INTEGER NOT NULL, ack TEXT, request TEXT, result TEXT, diagnosis TEXT, PRIMARY KEY (seq, n)) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS outbox_due ON outbox (next, seq, n) WHERE held = 0 AND ack IS NULL AND result IS NULL AND diagnosis IS NULL;
 CREATE INDEX IF NOT EXISTS outbox_open ON outbox (seq, n) WHERE request IS NOT NULL AND result IS NULL;
 CREATE TABLE IF NOT EXISTS inbox (scope TEXT NOT NULL, inc TEXT NOT NULL, seq INTEGER NOT NULL, n INTEGER NOT NULL, hash TEXT NOT NULL, by INTEGER NOT NULL, PRIMARY KEY (scope, inc, seq, n)) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS folded (kind TEXT NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL, PRIMARY KEY (kind, key)) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS retained_input (kind TEXT NOT NULL, digest TEXT NOT NULL, bytes TEXT NOT NULL, under TEXT, PRIMARY KEY (kind, digest)) WITHOUT ROWID;
 `;
+
+/** A send that is still to be dispatched: not held, not acknowledged, and for a request with no result and no diagnosis. */
+const DUE = "o.held = 0 AND o.ack IS NULL AND o.result IS NULL AND o.diagnosis IS NULL";
 
 type Row = Record<string, SqlValue>;
 const json = <T>(text: SqlValue | undefined): T => JSON.parse(text as string) as T;
@@ -204,7 +211,8 @@ export class SqliteStore implements Store {
   append(entry: Entry, hash: Digest, bytes: string, size: number): void {
     this.#run("INSERT INTO entry (seq, hash, time, bytes, size) VALUES (?, ?, ?, ?, ?)", entry.seq, hash, entry.time, bytes, size);
     for (const send of entry.sends) {
-      this.#run("INSERT INTO outbox (seq, n, target, class, message) VALUES (?, ?, ?, ?, ?)", entry.seq, send.n, canonicalize(send.to), send.message.class, canonicalize(send.message));
+      // A new send is due at once: its first attempt may start at its entry's time.
+      this.#run("INSERT INTO outbox (seq, n, target, class, message, next) VALUES (?, ?, ?, ?, ?, ?)", entry.seq, send.n, canonicalize(send.to), send.message.class, canonicalize(send.message), timeMs(entry.time)!);
     }
   }
   retain(input: Retained): void {
@@ -220,12 +228,31 @@ export class SqliteStore implements Store {
     return row && { kind, digest, bytes: row["bytes"] as string, ...(row["under"] === null ? {} : { under: row["under"] as string }) };
   }
   duties(after: { seq: number; n: number } | null, limit: number): { duties: Duty[]; more: boolean } {
-    const rows = this.#all("SELECT seq, n, target, class, held, attempts, result, diagnosis FROM outbox WHERE (seq, n) > (?, ?) ORDER BY seq, n LIMIT ?", after?.seq ?? -1, after?.n ?? -1, limit + 1);
+    const rows = this.#all("SELECT seq, n, target, class, held, attempts, ack, result, diagnosis FROM outbox WHERE (seq, n) > (?, ?) ORDER BY seq, n LIMIT ?", after?.seq ?? -1, after?.n ?? -1, limit + 1);
     const duties = rows.slice(0, limit).map((row): Duty => ({
       duty: `${row["seq"] as number}.${row["n"] as number}`, to: json(row["target"]), class: row["class"] as Duty["class"], held: row["held"] === 1,
-      attempts: json(row["attempts"]), result: orNull(row["result"]), diagnosis: orNull(row["diagnosis"]),
+      attempts: json(row["attempts"]), acknowledged: orNull(row["ack"]), result: orNull(row["result"]), diagnosis: orNull(row["diagnosis"]),
     }));
     return { duties, more: rows.length > limit };
+  }
+
+  // ---------------------------------------------------------------- the dispatcher's bookkeeping
+
+  outgoing(now: number, limit: number): Outgoing[] {
+    return this.#all(`SELECT o.seq, o.n, o.target, o.message, o.attempts, e.hash FROM outbox o JOIN entry e ON e.seq = o.seq WHERE ${DUE} AND o.next <= ? ORDER BY o.next, o.seq, o.n LIMIT ?`, now, limit)
+      .map((row) => ({ seq: row["seq"] as number, n: row["n"] as number, hash: row["hash"] as Digest, to: json(row["target"]), message: json(row["message"]), attempts: json(row["attempts"]) }));
+  }
+  nextDispatch(): number | null { return (this.#one(`SELECT MIN(o.next) AS next FROM outbox o WHERE ${DUE}`)?.["next"] as number | null | undefined) ?? null; }
+  attempted(seq: number, n: number, attempts: readonly Dispatched[], next: number): void {
+    this.#run("UPDATE outbox SET attempts = ?, next = ? WHERE seq = ? AND n = ?", canonicalize(attempts), next, seq, n);
+  }
+  acknowledge(seq: number, n: number, attempts: readonly Dispatched[], fact: FactRef): void {
+    this.#run("UPDATE outbox SET attempts = ?, ack = ? WHERE seq = ? AND n = ?", canonicalize(attempts), canonicalize(fact), seq, n);
+  }
+  deadline(): Timestamp | null { return (this.#one("SELECT v FROM meta WHERE k = 'deadline'")?.["v"] as Timestamp | undefined) ?? null; }
+  setDeadline(at: Timestamp | null): void {
+    if (at === null) this.#run("DELETE FROM meta WHERE k = 'deadline'");
+    else this.#run("INSERT INTO meta (k, v) VALUES ('deadline', ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v", at);
   }
 }
 

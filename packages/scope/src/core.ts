@@ -48,7 +48,7 @@ const isGrant = (g: unknown): g is Grant =>
   && Array.isArray(g["actions"]) && g["actions"].every((a) => typeof a === "string") && (g["notAfter"] === null || timeMs(g["notAfter"]) !== null);
 
 /** Section 9.2: the bytes of each foreign entry the draft's `uses` name, under its content digest. */
-function used(draft: Draft, facts: readonly Fetched[]): Retained[] {
+export function used(draft: Draft, facts: readonly Fetched[]): Retained[] {
   return draft.uses.map((use) => {
     const read = facts.find((f) => f.fact.hash === use.fact.hash);
     if (!read) throw new Error(`the foreign entry ${use.fact.hash} was not fetched before the turn`);
@@ -56,8 +56,21 @@ function used(draft: Draft, facts: readonly Fetched[]): Retained[] {
   });
 }
 
+/**
+ * The foreign entries an entry of this scope read, from the scope's own
+ * retained inputs (section 9.2). A clause run in a later entry reads them
+ * again (sections 6.6 and 7.4). One that is missing is left out, and the
+ * clause is then not judged.
+ */
+export function retainedFacts(store: Store, entry: Entry): Fetched[] {
+  return entry.uses.flatMap((use): Fetched[] => {
+    const kept = store.retained("entry", use.content);
+    return kept ? [{ fact: use.fact, entry: JSON.parse(kept.bytes) as Entry, under: kept.under ?? "" }] : [];
+  });
+}
+
 /** Asked for while rules are found in preparation, where nothing is written. The commit mints the real one. */
-const NO_INCARNATION = newIncarnation(new Uint8Array(16));
+export const NO_INCARNATION = newIncarnation(new Uint8Array(16));
 
 const unavailable = (reason: UnavailableReason) => ({ answer: "unavailable", reason }) as const;
 const said = <A>(answer: A): Verdict<A> => ({ verdict: "answer", answer });
@@ -70,6 +83,9 @@ export class Scope {
   readonly #turns: Turns;
   #pinned: Pinned | null = null;
 
+  /** The one queue of this scope. Every writer's input waits in it: an act here, a delivery and a diagnosis from their own modules. */
+  get turns(): Turns { return this.#turns; }
+
   /** `name`: the name of the object that holds this scope (section 2.3), or null when it has none. */
   constructor(name: ScopeId | null, store: Store, ports: Ports, bounds: Bounds) {
     this.#name = name;
@@ -80,7 +96,7 @@ export class Scope {
   }
 
   /** A declaration, validated as its canonical bytes parse, so a scope reads one value before and after a restart. */
-  #validate(bytes: string): ValidDefinition | null {
+  validate(bytes: string): ValidDefinition | null {
     try {
       const checked = validateDefinition(parseStrict(bytes), this.#bounds, RULE_PROFILES);
       return checked.ok ? checked.definition : null;
@@ -97,7 +113,7 @@ export class Scope {
     const input = (JSON.parse(genesis.bytes) as Entry).input as Extract<Entry["input"], { type: "genesis" }>;
     const named = input.seed.definition;
     const kept = isDigest(named) ? this.#store.retained("definition", named) : null;
-    const definition = kept ? this.#validate(kept.bytes) : null;
+    const definition = kept ? this.validate(kept.bytes) : null;
     if (definition) this.#store.cover(definition.indexes);
     return (this.#pinned = { named, definition });
   }
@@ -137,7 +153,7 @@ export class Scope {
         return refused("unsupported-definition");
       }
     }
-    const valid = this.#validate(bytes);
+    const valid = this.validate(bytes);
     if (!valid || (typeof definition === "string" && isDigest(definition) && valid.digest !== definition)) return refused("unsupported-definition");
 
     const seed: Seed = { v: 1, kind: "directory", definition: valid.digest, creator: null, cause: intentDigest(founding.intent), ordinal: 0 };

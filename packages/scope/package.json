@@ -1,12 +1,13 @@
 {
   "name": "@generalbusiness/artroom-scope",
   "version": "0.1.0-dev.1",
-  "description": "Artroom's scope runtime for one scope: storage, the commit protocol, the outbox table and reads, as a Cloudflare Durable Object with SQLite storage.",
+  "description": "Artroom's scope runtime: storage, the commit protocol, delivery between scopes, the outbox dispatcher, reads and the Worker's routes, as Cloudflare Durable Objects with SQLite storage in one namespace.",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
   "exports": {
     ".": "./src/index.ts",
+    "./worker": "./src/worker.ts",
     "./testing": "./src/testing.ts"
   },
   "scripts": {
