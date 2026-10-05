@@ -336,9 +336,9 @@ type:
 | For each family of forms: what the validator accepts and refuses, and what the judges derive | The `forms-*.test.ts` files of `packages/derive/test` | Real derivation, on small made-up definitions and not on the lane rows |
 | The production wiring founds a scope under a definition that needs a capability record, and that scope admits no act and no step and sends nothing; a runtime that lacks the code founds none | `packages/scope/test/founding.test.ts` | Real: the object as deployed |
 | What a definition does once a capability has answered | The same test, with `scriptedCapability` of `@generalbusiness/artroom-scope/testing` | A stand-in |
-| What the two pinned definitions do on real scopes: ten scenarios, T1 to T9 | `packages/lanes/test/*.scope.test.ts`, on the one fixture `test/support/graph.ts` | Real scopes, storage, turn and dispatchers, founded and created by the two pinned digests. T3, T4 and T5b run on the capability's code, as the production ports hold it. Stand-ins, each named in the test: the test authority, a Git host (`Host`), the scripted capability where a scenario still uses it, scripted peers for the rules scope and the destination, and a made-up directory |
+| What the two pinned definitions do on real scopes: eleven scenarios, T1 to T9 and T34 | `packages/lanes/test/*.scope.test.ts`, on the one fixture `test/support/graph.ts` | Real scopes, storage, turn and dispatchers, founded and created by the two pinned digests. T3, T4 and T5b run on the capability's code, as the production ports hold it. Stand-ins, each named in the test: the test authority, a Git host (`Host`), the scripted capability where a scenario still uses it, scripted peers for the rules scope and the destination, and a made-up directory |
 
-The ten scenarios found and create scopes under both definitions. A
+The eleven scenarios found and create scopes under both definitions. A
 scenario chooses the capability code of its namespace. `onCode`, of the
 fixture, runs every scope on the code of `hold@1` and `git-read@1` as the
 production ports hold it, with `Host` for the outside: a stand-in that
@@ -360,7 +360,7 @@ the HTTP routes for a few acts. `net.peers` holds the scripted peers'
 entries, and `net.sized` gives one lane a small budget of entries for the
 two capacity scenarios.
 
-One run of the ten scenarios writes 21 of the 50 act kinds of `issue` and
+One run of the ten scenarios T1 to T9 writes 21 of the 50 act kinds of `issue` and
 12 of the 52 of `change`, and runs 2 of 7 and 2 of 4 handlers (counted by
 a script over one run; `notes/2026-10-05-i2-contract-deltas.md`, section
 20, lists them). The counts are the same after I3 step 16. Of those rows,
@@ -369,8 +369,11 @@ these now run on the capability's code: `report` of `issue`, and
 `take-hold` and `release-hold` of both, whose entries hold what a
 workspace derives. The run also writes preparation entries of the steps
 `instance`, `stage` and `check`, and outcome entries of the operations
-`stage`, `check`, `mint` and `revoke`. The other rows are shown only as
-data, and by the tables of forms in `derive`.
+`stage`, `check`, `mint` and `revoke`. The eleventh scenario, T34, is not
+in these counts: it also writes `check-error` of `change` and a timed
+entry of the rule `job-deadline`, and no script has counted a run with
+it. The other rows are shown only as data, and by the tables of forms in
+`derive`.
 
 A manifest may name the `file` entry of an issue lane as its `goal`. That
 entry is the issue's genesis. A genesis records its act kind, and a change
