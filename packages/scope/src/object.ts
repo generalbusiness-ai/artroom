@@ -154,15 +154,22 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
    * alarm.
    */
   #sent<A>(answer: A): A {
-    // What is no history follows the commit: the operator's record reads the entries that are new, and each open stream is sent the head.
-    // Neither can change the answer: a failure of either is dropped here.
+    this.#followed();
+    if (this.#dispatcher) this.ctx.waitUntil(this.#dispatcher.run().catch(() => 0));
+    this.ctx.waitUntil(this.#operations.run().catch(() => 0));
+    return answer;
+  }
+
+  /**
+   * What is no history follows the commits: the operator's record reads the entries that are new, from its own mark, and each open stream
+   * is sent the head. Neither can change an answer: a failure of either is dropped here. An entry that a pass in the background wrote is
+   * read at the next call.
+   */
+  #followed(): void {
     try {
       this.#record.follow(this.#store);
       this.#streams.publish();
     } catch { /* a notice or a stream line was lost, and no fact */ }
-    if (this.#dispatcher) this.ctx.waitUntil(this.#dispatcher.run().catch(() => 0));
-    this.ctx.waitUntil(this.#operations.run().catch(() => 0));
-    return answer;
   }
 
   async found(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions: readonly DeclaredDefinition[] = [], beside: Beside = {}): Promise<Founded> { return this.#sent(await this.#scope.found(founding, definition, definitions, beside)); }
@@ -231,6 +238,7 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
     await this.#scope.alarm();
     await this.dispatch();
     await this.effect();
+    this.#followed();
   }
 
   summary(reader: unknown): Read<Summary> { return this.#reads.summary(reader); }

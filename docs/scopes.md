@@ -588,8 +588,13 @@ The contract's `ScopeApi` is all of these as one interface. The Worker
 serves it twice: over HTTP (`route`, with the routes listed in the scope
 package's guide) and over a service binding (`ScopeService`).
 
-Who may read is decided by a port, `Readers`. Its production default lets
-nobody read.
+Who may read is decided by a port, `Readers`. In a deployment that port
+is a read session: a token that a membership scope issues to a device key
+of an active member, for the scopes of that one repository, for at most
+ten minutes. A scope checks it under the deployment's session secret, with
+no call to membership. A reader with no session reads nothing, and a
+deployment with no secret bound issues and accepts no session. The scope
+package's guide says what a session binds and how it ends.
 
 ## Replay, and what a report means
 
@@ -694,7 +699,7 @@ and nothing here guesses at it.
 | Not delivered | Owner | What the substrate has in its place |
 |---|---|---|
 | Grants and membership: who may act, how a grant is shown to be current, revocation | The authority design, then the authority and publication delivery | The `Grant` shape and the check that a grant names the action, the key and the scope. Whether a grant is current is asked of a port, `Authority`, in two phases: a read before the turn, and a decision in the commit on what was read. The production default reads no grant, so none is current. The tests use a test authority that is named as one. |
-| Who may read, and sessions | The same | The `Readers` port, whose production default lets nobody read. |
+| Who may read, and sessions | The same | Read sessions bound to one repository, in `packages/scope/src/sessions.ts`, with the client's side in `packages/client/src/session.ts`. The form of a token and of a session request are source choices (I3 deltas, entries ES1 to ES9). |
 | Platform definitions: register, directory, membership, rules, destination, inbox, task | The same | The data of six definitions, and the rules that are written, in `packages/platform`: the inbox (runnable under the package's own rules; it has one rule), the rules scope (runnable, as data and rules), membership (not runnable: three marks lack rules), the register (not: one rule waits), the directory (not: two marks lack rules) and the destination (not: ten marks lack rules). The rest of this entry describes the inbox first. Its `notify` handlers hold the mark `notice-source`, and the judges run its rule, so a scope is founded under it and records a notice. A runtime or a replay that lacks a rule for a mark answers `unsupported-definition` for the whole scope. This builds the scope contract's revision 15 and the authority note's revision 20. Both are adopted. The adoption is of the designs, and is no review of this source. Every other platform name is answered `unsupported-definition`. Since then `packages/platform` also holds the data and the three rules of `platform:rules@1` (`rules-scope.ts`), which are its whole version. Its rules read an observation and a value beside an intent, and the scope's runtime gives a rule neither yet, so on a real scope its three marked acts are not completed or are refused (`notes/2026-10-05-i3-contract-deltas.md`, entry EQ9). The data of `platform:destination@1` is there too, with eight of its rules. Ten of its marks have no rule, so nothing is created under it yet (`notes/2026-10-05-i3-contract-deltas.md`, section 18). |
 | Hold tokens, workspaces and their export | The same | The hold item, its epoch, and its timed end. The records of a hold's workspace are derived by `workspaceEffects` in `packages/derive` when a judge is given the code of `hold@1`, which the production ports hold. No grant is read in production, so no hold is opened there yet. |
 | The rules of the `hold@1` and `git-read@1` capabilities in a running scope: their records, guards, effects and steps | The same | The rules are pure functions in `packages/derive` (`src/capability/`, `src/prepare.ts`), with tests on made-up definitions, and the Git reader is `packages/git`. The production ports hold them (`CAPABILITY_CODE`, in `packages/scope/src/ports.ts`). No grant is read in production and nothing is sent outside, so there every act and step is refused `unauthorized` and no attempt is sent. A verifier is not given them yet, and answers `unsupported-definition` for a definition that uses a capability form. The tests of a scope have a scripted stand-in, which is named as one, and the lane scenarios T3, T4 and T5b run on the code itself with a stand-in for the Git host. |
