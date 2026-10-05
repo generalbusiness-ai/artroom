@@ -1,9 +1,9 @@
 import { describe, expect, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { DeclaredDefinition } from "@generalbusiness/artroom-contract";
-import { definitionDigest } from "@generalbusiness/artroom-bytes";
+import { canonicalBytes, definitionDigest } from "@generalbusiness/artroom-bytes";
 import { validateDefinition, type ProblemCode } from "../src/index.ts";
-import { desk, lane, laneDefinition, small, smallDefinition, ticket } from "./fixtures.ts";
+import { Scope, desk, fields, keys, lane, laneDefinition, member, on, small, smallDefinition, t, ticket, valid } from "./fixtures.ts";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Change = (d: any) => void;
@@ -94,5 +94,30 @@ describe("the definition validator", () => {
     expect(laneDefinition.indexes).toEqual([{ path: "acts.take-hold.guards.2.none", type: "hold", slots: ["under"] }]);
     expect(smallDefinition.timedTypes).toEqual([]);
     expect(smallDefinition.indexes.map((i) => [i.type, i.slots])).toEqual(Array(4).fill(["note", ["text"]]));
+  });
+
+  test("a timed rule that copies a party list is counted at every member the list can hold, so the entry of an admitted rule fits the entry size bound", () => {
+    // A hold with a list of four watchers, which its end copies into a reference slot.
+    const watched = clone(lane) as any;
+    watched.items.hold.parties.watchers = { fixed: false, required: false, list: true, max: 4, author: false };
+    watched.items.hold.refs.saved = { fixed: false, required: false, to: { type: "list", of: { type: "member" }, max: 4 } };
+    watched.acts.watch = { ...clone(lane.acts["renew"]), fields: { who: { type: "member", required: true } }, effects: [{ party: { slot: "watchers", from: { field: "who" }, list: "add" } }] };
+    watched.timed["hold-end"].effects.push({ ref: { slot: "saved", from: { slot: "watchers" } } });
+    // With the list counted as one member the bound came to under 6,000 bytes, and this definition passed there.
+    const tight = validateDefinition(watched, { ...PROPOSED_BOUNDS, entryBytes: 6000 });
+    expect(tight.ok ? null : tight.problems.map((p) => [p.code, p.path])).toEqual([["bound", "timed.hold-end"]]);
+    const most = Number(/could take (\d+) bytes/.exec(tight.ok ? "" : tight.problems[0]!.message)![1]);
+
+    // The entry itself, with the list full of the longest handles, each byte of which is written as a six-byte escape.
+    const s = new Scope(valid(validateDefinition(watched, PROPOSED_BOUNDS)));
+    const commitment = s.did(keys.rita, "offer", { fields: { intent: 0 }, expected: { intent: 1 } }).seq;
+    s.did(keys.rita, "assign", { ...on(s, commitment), ...fields({ performer: keys.una.member }) });
+    const hold = s.did(keys.una, "take-hold", { fields: { commitment }, expected: { commitment: 2 } }).seq;
+    for (let i = 0; i < 4; i++) s.did(keys.una, "watch", { ...on(s, hold), ...fields({ who: member(String(i) + "\u0001".repeat(PROPOSED_BOUNDS.memberBytes - 2)) }) });
+    s.now = t(600);
+    expect(s.drain().map((j) => j.result)).toEqual(["write"]);
+    const size = canonicalBytes(s.last).length;
+    expect(size).toBeGreaterThan(6000);
+    expect(size).toBeLessThanOrEqual(most);
   });
 });

@@ -22,6 +22,8 @@ rule evaluator. Section 17, "Composition and transport", has entries 96 to
 118, which complete step 4; entry 101 is corrected in place. Section 19,
 "Replay", has entries 119 to 129, and section 20, "Client", entries 130 to
 136, both from step 5.
+Section 21 is three corrections after the static report `a8a34b4d`,
+entries 137 to 139.
 
 Each entry is a place where the contract was silent or needed a concrete
 form, what was implemented, and why. Nothing here is adopted by being
@@ -358,7 +360,7 @@ produce fits:
 
 | Change | Rule |
 |---|---|
-| The validator bounds a timed rule's entry. | For each timed rule it computes an upper bound on the canonical bytes of the entry the rule writes, whatever its item holds, and refuses the definition, as `bound`, when that passes `entryBytes`. The bound adds: 768 bytes for the entry without its effects, with the rule's name; 128 bytes for each effect record; each state name, slot name, constant and attention reason as the definition states it; each value copied from a slot at the most its type allows, with a text counted at six bytes for each byte; and for each attention, every member its party slot can hold. |
+| The validator bounds a timed rule's entry. | For each timed rule it computes an upper bound on the canonical bytes of the entry the rule writes, whatever its item holds, and refuses the definition, as `bound`, when that passes `entryBytes`. The bound adds: 768 bytes for the entry without its effects, with the rule's name; 128 bytes for each effect record; each state name, slot name, constant and attention reason as the definition states it; each value copied from a slot at the most its type allows, with a text counted at six bytes for each byte, and a party list at every member its declared `max` allows (corrected by entry 137); and for each attention, every member its party slot can hold. |
 | A member handle has a bound. | `memberBytes`, 256, temporary. A field of type `member` is a value only within it. An effect that would put a longer handle in a party slot, from the signer, a fact or an attribution, is refused `bad-field`. So a slot never holds a member the timed bound did not count. |
 | The turn has a defined end for a timed draft that cannot be an entry. | The drain stops, the turn ends `unavailable`, nothing is written, the transition stays due and the alarm is set again. No due item is passed over and nothing is dropped from the entry. With the first two changes this is reached only by a fault, such as a scope restarted under a smaller `entryBytes` than its definition was validated under; such a scope's definition no longer validates, and it answers `unavailable`. |
 
@@ -493,3 +495,10 @@ From step 5, in `packages/client` and `packages/contract`.
 What step 5 does not do: a reader credential for the command or a session
 for the client, which are the authority note's; an anchor read from a
 repository; export of sealed segments; replay of a platform definition.
+
+## 21. Corrections after the static report a8a34b4d
+
+| # | Where the contract is silent, or the source was wrong | Implemented | Why |
+|---|---|---|---|
+| 137 | The size of a timed entry that copies a party list (section 15, "A timed entry always fits"). The estimate read every party slot as one member. A timed rule may copy a party list into a reference slot of a matching list type, and the entry then holds every member of the list. | The estimate reads each slot with the type the validator gave it: a party list is a list of members with its declared `max`, or `listElements` when it declares none. A copy of it, and a notice to it, are counted at every member it can hold. | A definition passed whose due transition could become an entry over `entryBytes`, which the turn can never write. Witness, in derive's validator test: the fixture lane with a list of four watchers that the hold's end copies. At `entryBytes` 6,000 it is refused `bound`; before, it passed there. Under the proposed bounds it passes, and its real entry, with the list full of the longest handles, is over 6,000 bytes and within the bound the validator states. |
+

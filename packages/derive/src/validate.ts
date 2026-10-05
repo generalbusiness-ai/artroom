@@ -8,7 +8,7 @@
  * define is refused, which refuses the forms of section 6.10.
  */
 
-import type { Bounds, DeclaredDefinition, Digest, FieldType, ItemType, TimedRule } from "@generalbusiness/artroom-contract";
+import type { Bounds, DeclaredDefinition, Digest, FieldType, TimedRule } from "@generalbusiness/artroom-contract";
 import { canonicalize, definitionDigest, isDigest, utf8 } from "@generalbusiness/artroom-bytes";
 import { LAST_MS } from "./time.ts";
 import { SCOPE_KINDS, isObject, isValue } from "./values.ts";
@@ -727,7 +727,7 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
   const declared = input as DeclaredDefinition;
   // Section 5.2: a due transition is always written, so its entry must fit whatever its item holds by then.
   for (const [name, rule] of Object.entries(declared.timed)) {
-    const most = timedEntryBytes(name, rule, declared.items[rule.on]!, bounds);
+    const most = timedEntryBytes(name, rule, types.get(rule.on)!, bounds);
     if (most > bounds.entryBytes) bad("bound", at("timed", name), `its entry could take ${most} bytes; at most ${bounds.entryBytes}`);
   }
   if (problems.length > 0) return { ok: false, problems };
@@ -777,11 +777,14 @@ function mostBytes(type: FieldType, bounds: Bounds): number {
  * effect carries a name or a constant the definition states, or a copy of a
  * slot, which its type bounds. Attention lists the members of a party slot,
  * each within the bound of a handle, with a reason the definition states.
+ *
+ * `type` is the item type as the validator read it: each slot with the type
+ * of what it holds. A party list is a list of members with its declared
+ * `max`, so a copy of it, and a notice to it, are counted at every member it
+ * can hold.
  */
-function timedEntryBytes(name: string, rule: TimedRule, type: ItemType, bounds: Bounds): number {
-  const slotType = (slot: string): FieldType | null => type.refs[slot]?.to ?? type.values[slot]?.of ?? (type.parties[slot] ? { type: "member" } : null);
-  const held = (slot: string): number => { const t = slotType(slot); return t ? mostBytes(t, bounds) : 0; };
-  const listed = (slot: string): number => (type.parties[slot]?.list ? Math.min(type.parties[slot]!.max ?? bounds.listElements, bounds.listElements) : 1);
+function timedEntryBytes(name: string, rule: TimedRule, type: Type, bounds: Bounds): number {
+  const held = (slot: string): number => { const s = type.slots.get(slot); return s ? mostBytes(s.type, bounds) : 0; };
   let bytes = ENTRY_BYTES + stated(name);
   for (const e of rule.effects) {
     bytes += RECORD_BYTES;
@@ -790,6 +793,6 @@ function timedEntryBytes(name: string, rule: TimedRule, type: ItemType, bounds: 
     else if ("ref" in e) bytes += stated(e.ref.slot) + (e.ref.from !== null && e.ref.from !== "self" && "slot" in e.ref.from ? held(e.ref.from.slot) : 20);
     else if ("value" in e) bytes += stated(e.value.slot) + ("const" in e.value.from ? stated(e.value.from.const) : 26);
   }
-  for (const { notify } of rule.attention) bytes += RECORD_BYTES + stated(notify.reason) + listed(notify.slot) * (1 + memberBytes(bounds));
+  for (const { notify } of rule.attention) bytes += RECORD_BYTES + stated(notify.reason) + 2 + held(notify.slot);
   return bytes;
 }
