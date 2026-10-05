@@ -156,10 +156,11 @@ per batch.
 
 The bare objects have no product code, and they grow like the scope
 objects. So this is the pool or workerd and not the scope runtime. It
-carries across tests: a second test that made 200 more objects after 800
-earlier ones ran at about 600 ms per 50 calls to `found`, and later
-batches at 25 to 35 s per 50 foundings (the same objects, with `evict`, and
-with acts, grew the same way). A stub on an existing object does not slow.
+carries across tests. In an earlier probe run, one test made 400 foundings,
+then evictions, then 400 more foundings with an act each, and the batches grew
+from 0.3 s to 68 s per 50. A second test then ran at 25 to 35 s per 50
+foundings. (One run, observed; that probe timed out, so the large figures show
+the direction only.) A stub on an existing object does not slow.
 
 For the suite this is small. It makes about 85 objects, which is the first
 two batches of the table, 2 to 4 ms for each.
@@ -192,7 +193,7 @@ anything.
 The tests that read a history through the replay verifier's `httpSource`
 (`replay.test.ts` twice, `founding.test.ts`, `texts.test.ts` for both its
 source and its client transport, and lane test T9) each made calls through
-`SELF.fetch`. About 150 of the 176 entrypoint calls of a run were these.
+`SELF.fetch`. About 135 of the 176 entrypoint calls of a run were these.
 They now pass `route(new Request(url, init), env.NET)`: the same function
 the Worker's `fetch` runs, over the same namespace, so the HTTP routes, the
 status codes and the verifier's reading are still the code under test. What
