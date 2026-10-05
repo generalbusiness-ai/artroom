@@ -116,12 +116,14 @@ export function deriveSends(j: Judging, forms: readonly SendForm[], working: Rea
     if (!kept) unresolved = `entry ${v}`;
     return kept ? ({ at: j.scope.at, seq: v, hash: kept.hash } satisfies FactRef) : null;
   };
+  // By the declared type, to any depth: as `fields.ts` reads a local fact in a record or a list as its `seq`, it is sent as its reference.
   const wire = (value: unknown, type: FieldType | null): unknown => {
     if (value === null) return null;
     if (type?.type === "item") return local(value);
     if (type?.type === "fact") return fact(value);
-    const each = type?.type === "list" && Array.isArray(value) ? (type.of.type === "item" ? local : type.of.type === "fact" ? fact : null) : null;
-    return each ? (value as unknown[]).map(each) : value;
+    if (type?.type === "list" && Array.isArray(value)) return value.map((v) => wire(v, type.of));
+    if (type?.type === "record" && isObject(value)) return Object.fromEntries(Object.entries(value).map(([name, member]) => [name, wire(member, own(type.of, name) ?? null)]));
+    return value;
   };
 
   /**

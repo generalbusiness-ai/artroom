@@ -187,6 +187,34 @@ describe("sends (section 6.6)", () => {
     expect(P.replay().snapshot()).toBe(P.state.snapshot());
   });
 
+  test("a record that holds a reference to this scope's own entry is sent with the full reference, and a receiver with the same record type accepts it", () => {
+    // `note` is a comment: its entry is the own fact that the record names. `cite` sends a record of it to the staging lane.
+    const proof = { type: "fact", kind: ["note"], under: "pull" } as const;
+    const evidence = { type: "record", of: { proof: { ...proof, required: true } } } as const;
+    const cited = valid(validateDefinition((() => {
+      const d = structuredClone(pull) as any;   // eslint-disable-line @typescript-eslint/no-explicit-any
+      d.acts.note = act({ step: "comment", on: null, grant: "write" });
+      d.acts.cite = act({
+        step: "transition", on: "proposal", grant: "write", fields: { evidence: { ...evidence, required: true } }, guards: [{ state: ["open"] }],
+        sends: [{ tell: { to: { slot: "staging" }, message: "evidence", fields: { evidence: { field: "evidence" } }, result: {} } }],
+      });
+      d.receives.evidence = { message: "evidence", class: "tell", from: { kind: "lane" }, opens: null, fields: { evidence: { ...evidence, required: true } }, also: {}, guards: [], effects: [], sends: [], attention: [] };
+      return d as DeclaredDefinition;
+    })(), tight));
+    const R = new Scope(cited, rita.member, true, 5);
+    const P = new Scope(cited);
+    P.did(rita, "stage", { ...on(P, 0), ...fields({ staging: R.at, watcher: una.member }) });
+    const q = P.did(rita, "note").seq;
+    // The act holds the reference to its own entry, which is not the genesis: the fold reads it as the number q.
+    expect(P.act(rita, "cite", { ...on(P, 0), ...fields({ evidence: { proof: P.fact(q) } }) }).result).toBe("write");
+    const cite = P.last;
+    expect((cite.sends[0]!.message as Request).body).toEqual({ message: "evidence", fields: { evidence: { proof: P.fact(q) } } });
+    expect([deliver(R, P, cite.seq).result, decided(R)]).toEqual(["write", ["applied"]]);
+    // The receiver still refuses a number in the record: its shape check is as it was.
+    arrive(R, P, { class: "request", type: "tell", body: { message: "evidence", fields: { evidence: { proof: q } } } });
+    expect(decided(R)).toEqual(["refused", "bad-field"]);
+  });
+
   test("a scope created under `self` pins its creator's definition, and its index row goes to the directory that its creator recorded; a scope with no directory sends none", () => {
     const D = founded();
     D.did(rita, "open-issue", fields({ title: "whole" }));
