@@ -29,11 +29,14 @@ export class TransportError extends Error {
 }
 
 /**
- * The entry a receipt names, checked. `hash-mismatch`: the scope has an
- * entry at that position whose bytes do not hash to the receipt's fact, so
- * the receipt is not of this history.
+ * The entry a receipt names, checked against the whole fact reference: scope,
+ * incarnation, kind, position and hash. `wrong-incarnation`: the entry at
+ * that position is of another incarnation of the scope than the receipt
+ * names. `reference-mismatch`: it is of another scope or kind, or at another
+ * position. `hash-mismatch`: its bytes do not hash to the receipt's fact. In
+ * each case the receipt is not of this history.
  */
-export type Followed = { ok: true; at: Head; entry: Entry } | { ok: false; reason: ReadRefusal | "hash-mismatch" };
+export type Followed = { ok: true; at: Head; entry: Entry } | { ok: false; reason: ReadRefusal | "hash-mismatch" | "reference-mismatch" };
 
 export class ScopeHandle {
   readonly scope: ScopeId;
@@ -82,9 +85,11 @@ export class ScopeHandle {
   }
 
   /**
-   * Follow a receipt: read the entry it names, and check that the entry's
-   * own bytes hash to the receipt's fact. The hash is computed here; the
-   * hash the service sends beside the entry is not used.
+   * Follow a receipt: read the entry it names, and check it against every
+   * part of the receipt's fact. The identity is checked whether or not the
+   * hash matches: a fact with a true position and hash and another
+   * incarnation or kind is not a fact of this history. The hash is computed
+   * here; the hash the service sends beside the entry is not used.
    */
   async followReceipt(receipt: Receipt): Promise<Followed> {
     const { at, seq, hash } = receipt.fact;
@@ -92,11 +97,13 @@ export class ScopeHandle {
     const read = await this.entry(seq);
     if (!read.ok) return { ok: false, reason: read.reason };
     const entry = read.value.entry;
+    if (entry.at?.scope !== at.scope || entry.at.kind !== at.kind || entry.seq !== seq) return { ok: false, reason: "reference-mismatch" };
+    if (entry.at.inc !== at.inc) return { ok: false, reason: "wrong-incarnation" };
     let found: Digest | null = null;
     try {
       found = entryHash(entry);
     } catch { /* not canonical values */ }
-    if (found !== hash) return { ok: false, reason: entry.at?.scope === at.scope && entry.at.inc !== at.inc ? "wrong-incarnation" : "hash-mismatch" };
+    if (found !== hash) return { ok: false, reason: "hash-mismatch" };
     return { ok: true, at: read.at, entry };
   }
 

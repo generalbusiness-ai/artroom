@@ -11,7 +11,7 @@
 
 import { DOMAINS, PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { Base64Url, FieldValue, Intent, KeyId, ScopeRef, SignedIntent, Timestamp } from "@generalbusiness/artroom-contract";
-import { b64url, domainBytes, keyIdOf, keyIdOfSecret, sign } from "@generalbusiness/artroom-bytes";
+import { b64url, canonicalBytes, domainBytes, keyIdOf, keyIdOfSecret, parseStrictBytes, sign } from "@generalbusiness/artroom-bytes";
 
 /** Signs bytes as one Ed25519 key. It gives out the key's ID and signatures, and never the private key. */
 export interface Signer {
@@ -77,14 +77,26 @@ export const DEFAULT_LIFETIME_SECONDS = 5 * 60;
 /** Whole seconds, in the one form a timestamp has (section 5.3). */
 const timestamp = (ms: number): Timestamp => new Date(Math.floor(ms / 1000) * 1000).toISOString().replace(".000Z", "Z");
 
-/** An intent by `signer`, with a fresh idempotency key and a `notAfter` within the bound, signed. */
+/**
+ * An intent by `signer`, with a fresh idempotency key and a `notAfter` within
+ * the bound, signed.
+ *
+ * The intent is a detached copy of what the caller asked: its address,
+ * expected revisions and fields are read once, as canonical values, before
+ * the signer is awaited. So the bytes that are signed and the intent that is
+ * returned are the same value, whatever the caller does to its own objects
+ * while the signer works or afterwards. Keep the returned value to retry:
+ * it is the one the signature covers. Values with no canonical form are
+ * refused before anything is signed.
+ */
 export async function signedIntent(signer: Signer, asked: Asked, signing: Signing = {}): Promise<SignedIntent> {
   const bound = signing.maxLifetimeSeconds ?? PROPOSED_BOUNDS.intentLifetimeSeconds;
   const lifetime = signing.lifetimeSeconds ?? Math.min(DEFAULT_LIFETIME_SECONDS, bound);
   if (!(lifetime > 0 && lifetime <= bound)) throw new RangeError(`an intent lives more than 0 and at most ${bound} seconds`);
-  const intent: Intent = {
+  const bytes = canonicalBytes({
     v: 1, to: asked.to, actor: signer.key, kind: asked.kind, on: asked.on ?? null, expected: asked.expected ?? {}, fields: asked.fields ?? {},
     idempotencyKey: signing.idempotencyKey ?? newIdempotencyKey(), notAfter: timestamp((signing.now ?? Date.now()) + lifetime * 1000),
-  };
+  } satisfies Intent);
+  const intent = parseStrictBytes(bytes) as Intent;
   return { intent, sig: await signer.sign(domainBytes(DOMAINS.intent, intent)) };
 }

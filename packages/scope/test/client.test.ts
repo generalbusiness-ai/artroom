@@ -2,6 +2,7 @@ import { env } from "cloudflare:workers";
 import { SELF } from "cloudflare:test";
 import { expect, test } from "vitest";
 import { ScopeHandle, bindingTransport, found, httpTransport, secretSigner, signedIntent, type ServiceBinding, type Transport } from "@generalbusiness/artroom-client";
+import { newIncarnation } from "@generalbusiness/artroom-bytes";
 import { timeMs } from "@generalbusiness/artroom-derive";
 import { deskDefinition, grantOf, ticketDefinition } from "@generalbusiness/artroom-derive/testing";
 import { net, rita } from "./net.ts";
@@ -39,6 +40,9 @@ test.each(transports)("a scope handle over %s: an act returns its receipt; the e
   expect(await scope.followReceipt(receipt)).toMatchObject({ ok: true, entry: { seq: 1, input: { type: "act", signed } } });
   // A receipt that names another hash at that position is not of this history.
   expect(await scope.followReceipt({ ...receipt, fact: { ...receipt.fact, hash: answer.receipt.fact.hash } })).toEqual({ ok: false, reason: "hash-mismatch" });
+  // A fact with the true position and hash and another incarnation, or another kind, is not a fact of this history either.
+  const elsewhere = (over: object) => scope.followReceipt({ ...receipt, fact: { ...receipt.fact, at: { ...at, ...over } } });
+  expect([await elsewhere({ inc: newIncarnation(new Uint8Array(16).fill(7)) }), await elsewhere({ kind: "lane" })]).toEqual([{ ok: false, reason: "wrong-incarnation" }, { ok: false, reason: "reference-mismatch" }]);
   expect(await scope.followDuty(receipt.sends[0]!)).toMatchObject({ ok: true, value: { duty: "1.0", class: "request", held: false, result: null } });
   net.hold = null;
 });
