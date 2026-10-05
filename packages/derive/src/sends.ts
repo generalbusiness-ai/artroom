@@ -104,6 +104,21 @@ export function deriveSends(j: Judging, forms: readonly SendForm[], working: Rea
     return directory;
   };
 
+  /**
+   * Section 6.6, "`membership` in a `create`": the membership scope that this scope records, which the platform puts in every
+   * `create`. A membership scope is its own, and every other scope reads it from its genesis entry (`membershipOf`). Null: the
+   * scope records none, and its creations hold no such member. Undefined: its genesis entry cannot be read now.
+   */
+  const recordedMembership = (): ScopeRef | null | undefined => {
+    if (j.scope.at.kind === "membership") return j.scope.at;
+    // I3 merge: a genesis that creates a scope reads its own membership reference from the creation that it is recording, which
+    // the step of the real directory builds with the scopes that are created beside membership (authority note, section 12.1,
+    // "The membership reference"). Until then a creation that a genesis sends holds no such member.
+    if (j.self === 0) return null;
+    const genesis = j.own?.(0)?.entry.input;
+    return genesis?.type === "genesis" ? membershipOf(genesis, j.scope.at) : undefined;
+  };
+
   const slotType = (item: Item | null | undefined, slot: string): FieldType | null => {
     const type = item ? own(items, item.type) : undefined;
     return own(type?.refs, slot)?.to ?? own(type?.values, slot)?.of ?? null;
@@ -219,7 +234,12 @@ export function deriveSends(j: Judging, forms: readonly SendForm[], working: Rea
       // Section 6.6: the platform puts the directory in every `create` of a lane: this scope, when it is one, or the one it records.
       const lanes = form.create.kind !== "lane" ? null : j.scope.at.kind === "directory" ? j.scope.at : recordedDirectory();
       if (lanes === undefined) return { ok: false, unavailable: "unavailable" };
-      sends.push({ n: next(), to: seed, message: { class: "request", type: "create", body: { fields: fields(form.create.fields), ...(lanes ? { directory: lanes } : {}) } } });
+      // Section 6.6: the body of a `create` is `{ fields, directory, membership }`. The membership scope is the one that the creating
+      // scope records. A scope that records none creates without the member, so a creation of a scope that knows no membership
+      // scope has the bytes it had. A membership scope itself is created without it.
+      const membership = form.create.kind === "membership" ? null : recordedMembership();
+      if (membership === undefined) return { ok: false, unavailable: "unavailable" };
+      sends.push({ n: next(), to: seed, message: { class: "request", type: "create", body: { fields: fields(form.create.fields), ...(lanes ? { directory: lanes } : {}), ...(membership ? { membership } : {}) } } });
     } else if ("tell" in form) {
       // Section 6.4: a send whose subject is unbound is not made.
       if (readsUnbound(reading(null), form.tell.to)) continue;

@@ -626,9 +626,12 @@ result is one of:
 
 "Consistent" is always for a stated mode, target, coverage and set of
 trusts. It is not "verified". A replay trusts, among other things, the
-service's clock, that each recorded grant was current, and, when the
-caller gives no known head, the service's word for where the history
-ends. Give a head from a receipt you kept, and a history that is shorter
+service's clock, that each read of membership behind a recorded grant
+was made as recorded, and, when the caller gives no known head, the
+service's word for where the history ends. The grant itself is derived
+again, from the observation that it retains and from the membership
+scope's history. A grant with no such observation is no grant: the
+command line reports its entry as a mismatch. Give a head from a receipt you kept, and a history that is shorter
 or different is a mismatch.
 
 Everything a source returns is untrusted. The verifier limits the bytes,

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import type { Entry, KeyId, ObservationAnswer, ObservationUse } from "@generalbusiness/artroom-contract";
+import type { Entry, KeyId, Observation, ObservationUse } from "@generalbusiness/artroom-contract";
 import { WINDOWS, agrees } from "@generalbusiness/artroom-derive";
 import { d, membership } from "@generalbusiness/artroom-derive/testing";
 import { HOLD, at, definition, found, rita, una, type Lane } from "./support.ts";
@@ -15,10 +15,13 @@ const UNAVAILABLE = { answer: "unavailable", reason: "authority-unavailable" };
  * that reached it. While `silent`, it gives no answer.
  */
 function scripted(s: Lane) {
-  const m = { reads: 0, silent: false, head: 40, over: {} as Record<KeyId, Partial<ObservationAnswer>> };
+  const m = { reads: 0, silent: false, head: 40, over: {} as Record<KeyId, Partial<Omit<Observation, "at">>> };
   s.c.membership = {
     at: membership,
-    answers: ({ of, key }): ObservationAnswer | null => {
+    answers: (asked): Omit<Observation, "at"> | null => {
+      // The read of this scope asks the standing of one key, and no other form of the request.
+      if (!("key" in asked)) return null;
+      const { of, key } = asked;
       m.reads++;
       const who = [rita, una].find((actor) => actor.key === key);
       if (m.silent || !who) return null;

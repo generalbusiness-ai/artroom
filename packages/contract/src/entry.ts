@@ -9,6 +9,7 @@ import type { FieldValue, SignedIntent } from "./intent.ts";
 import type { RefusalReason } from "./result.ts";
 import type { CapabilityName } from "./capability.ts";
 import type { Evidence } from "./evidence.ts";
+import type { ObservationUse } from "./observation.ts";
 
 export interface Entry {
   v: 1;
@@ -33,6 +34,18 @@ export interface Entry {
  */
 export interface Reason { code: RefusalReason; name?: string }
 
+/**
+ * An input may retain observations (section 4.1, "An input may retain
+ * observations"; section 16.1). Three inputs may hold the member `observed`:
+ * an `act`, an `outcome`, and a `delivery` whose message is a `Result`. No
+ * other input may. It is a list of `ObservationUse` records, in ascending
+ * order of `read.n`. It holds each read at most once, and no read that the
+ * entry's grant holds. The member is left out when the entry retains no
+ * such observation: it is never an empty list. The scope that writes the
+ * entry sets it, from reads that it made itself before the turn, and only
+ * the code of a platform definition reads one.
+ */
+
 export type Input =
   | { type: "genesis"; seed: Seed; inc: Incarnation;
       kind: string;                             // the genesis act of the pinned definition (section 4.1)
@@ -41,11 +54,13 @@ export type Input =
       message: Request | null;                  // the creation request, for a child
       decision: "applied" | "refused" }
   | { type: "act"; signed: SignedIntent; authority: readonly Grant[];   // the one grant judged
-      presented: Record<string, FactRef> }      // the facts presented beside the intent, by the names the act declares (section 6.4)
+      presented: Record<string, FactRef>;       // the facts presented beside the intent, by the names the act declares (section 6.4)
+      observed?: readonly ObservationUse[] }    // further observations that the judgment read (sections 4.1 and 16.1)
   | { type: "delivery"; from: FactRef; n: number; message: Request;
       decision: "applied" | "refused" | "superseded"; reason?: Reason }
   | { type: "delivery"; from: FactRef; n: number; message: Result;
-      clause: "applied" | "refused" | "superseded" | "conflict" }
+      clause: "applied" | "refused" | "superseded" | "conflict";
+      observed?: readonly ObservationUse[] }    // as for an act
   | { type: "delivery"; from: FactRef; n: number; message: Control }
   | { type: "delivery"; from: FactRef; n: number; message: Advisory }
   | { type: "diagnosis"; of: { seq: number; n: number };
@@ -55,7 +70,8 @@ export type Input =
   | PreparationInput
   | { type: "outcome"; operation: OperationId; attempt: number;
       owner: CapabilityName | PlatformDefinition; kind: string;           // of the operation, as the entry that opened it states them (section 4.1, revision 16)
-      result: "confirmed" | "refused" | "unknown"; evidence: Evidence }   // section 4.3
+      result: "confirmed" | "refused" | "unknown"; evidence: Evidence;    // section 4.3
+      observed?: readonly ObservationUse[] }    // as for an act
   | { type: "checkpoint"; through: number; state: Digest };
 
 /**

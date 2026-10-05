@@ -31,7 +31,7 @@
  */
 
 import type {
-  Attempt, Dispatched, Duty, Effect, Entry, Evidence, FactRef, FactUse, FieldValue, Grant, Head, Input, Intent, Item, LogPage, MemberRef, Message, Party, Prepared, Read, ReadRefusal, Receipt, RefusalReason,
+  Attempt, Dispatched, Duty, Effect, Entry, Evidence, FactRef, FactUse, FieldValue, Grant, Head, Input, Intent, Item, LogPage, MemberRef, Message, ObservationUse, Party, Prepared, Read, ReadRefusal, Receipt, RefusalReason,
   RetainedInput, ScopeRef, Sealed, Seed, Send, SignedIntent, Status, Summary,
 } from "@generalbusiness/artroom-contract";
 import { MAX_DEPTH, wellFormed } from "./canonical.ts";
@@ -187,11 +187,50 @@ const BASIS: Record<Evidence["basis"], true> = { "own-answer": true, read: true,
 const evidence = record({ basis: among(BASIS), body: (v) => v !== undefined });
 export const isEvidence = (v: unknown): v is Evidence => evidence(v);
 
-/** A delivery records what its message's class requires beside it: a request its decision, a result the clause that ran, a control or an advisory nothing more. */
+/**
+ * A retained observation (section 16.1): an observation, the read it came
+ * from and how the entry used it. An observation is one of three fixed
+ * records, each with exactly its members: the standing of one key, which
+ * has no member `subject`; the standing of one member; and what the rules
+ * scope holds. Whether a value is true of the observed scope's history, and
+ * every guard of freshness, are the judges' and the verifier's questions.
+ */
+const observedFrom = { of: scopeRef, head, definition: isPlatformDefinition, at: isTime };
+const controlled = { controller: orNull(isMemberId), controllerActive: orNull(flag) };
+const keyObservation = record({
+  ...observedFrom, ...controlled, key: isKeyId, keyState: among({ active: true, retired: true, compromised: true, unknown: true }), member: isMemberId, memberState: among({ active: true, removed: true }),
+  role: text, actions: listOf(text), within: record({ membership: scopeRef }), notAfter: orNull(isTime),
+});
+const furtherObservation = variant("subject", {
+  member: record({ ...observedFrom, ...controlled, subject: any, member: isMemberId, memberState: among({ active: true, removed: true, unknown: true }), role: orNull(text), activeKey: orNull(flag) }),
+  rules: record({
+    ...observedFrom, subject: any, revision: isLocalId,
+    content: variant("asked", {
+      rules: record({ asked: any, approvals: isLocalId, ownerMayReview: flag, checks: listOf(record({ name: text, configuration: isDigest, required: flag, checker: isMemberId })), labels: listOf(text) }),
+      definitions: record({ asked: any, active: listOf(record({ digest: isDigest, name: text })) }),
+    }),
+  }),
+});
+const observationUse = record({
+  observation: (v) => (isRecord(v) && Object.hasOwn(v, "subject") ? furtherObservation(v) : keyObservation(v)),
+  read: record({ run: text, n: isLocalId }), use: among({ fresh: true, reused: true }), prior: orNull(head),
+});
+export const isObservationUse = (v: unknown): v is ObservationUse => observationUse(v);
+/**
+ * The member `observed` of an input (section 4.1): a list of retained
+ * observations in ascending order of `read.n`, each read at most once. It
+ * is never an empty list: an input that retains none has no such member.
+ */
+const observed: Check = (v) => Array.isArray(v) && v.length > 0 && v.every(observationUse) && v.every((use: ObservationUse, i) => i === 0 || (v[i - 1] as ObservationUse).read.n < use.read.n);
+
+/**
+ * A delivery records what its message's class requires beside it: a request its decision, a result the clause that ran, a control
+ * or an advisory nothing more. Of the four, only a delivery of a result may hold `observed` (section 4.1).
+ */
 const delivered = { type: any, from: factRef, n: isLocalId, message };
 const deliveryOf: Record<Message["class"], Check> = {
   request: record({ ...delivered, decision: among(DECISION) }, { reason }),
-  result: record({ ...delivered, clause: among(CLAUSE) }),
+  result: record({ ...delivered, clause: among(CLAUSE) }, { observed }),
   control: record(delivered),
   advisory: record(delivered),
 };
@@ -199,7 +238,8 @@ const input = variant("type", {
   genesis: record({
     type: any, seed, inc: isIncarnation, kind: (v) => text(v) && v !== "", founding: orNull(signedIntent), source: orNull(factRef), n: orNull(isLocalId), message: orNull(request), decision: among({ applied: true, refused: true }),
   }),
-  act: record({ type: any, signed: signedIntent, authority: listOf(grant), presented: named(factRef) }),
+  // Section 4.1: an act, an outcome and a delivery of a result may hold `observed`, and no other input may.
+  act: record({ type: any, signed: signedIntent, authority: listOf(grant), presented: named(factRef) }, { observed }),
   delivery: (v) => {
     const of = isRecord(v) && isRecord(v["message"]) ? v["message"]["class"] : undefined;
     return among(CLASS)(of) && deliveryOf[of](v);
@@ -212,7 +252,7 @@ const input = variant("type", {
   outcome: record({
     type: any, operation: isOperationId, attempt: isLocalId, owner: (v) => capabilityName(v) || isPlatformDefinition(v), kind: (v) => text(v) && v !== "",
     result: among({ confirmed: true, refused: true, unknown: true }), evidence,
-  }),
+  }, { observed }),
   checkpoint: record({ type: any, through: isLocalId, state: isDigest }),
 } satisfies Record<Input["type"], Check>);
 export const isInput = (v: unknown): v is Input => input(v);

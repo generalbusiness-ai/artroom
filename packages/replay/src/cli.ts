@@ -62,7 +62,8 @@ export async function main(argv: readonly string[], io: Io): Promise<number> {
 
   try {
     const source = httpSource(service, io.fetch ? { fetch: io.fetch } : {});
-    const { report, why } = await verify(source, { mode, scope, head, anchors });
+    // The command line never reads a grant with no freshness proof as a grant: such a history is a mismatch (the contract's section 15.6n, on E8).
+    const { report, why } = await verify(source, { mode, scope, head, anchors, grants: "proven" });
     io.out(json ? JSON.stringify({ report, why }, null, 2) : render(report, why));
     return report.result === "consistent" ? 0 : 1;
   } catch (error) {

@@ -1,8 +1,8 @@
 import { expect, test, vi } from "vitest";
-import type { Digest, ScopeId } from "@generalbusiness/artroom-contract";
+import type { Digest, Entry, ScopeId } from "@generalbusiness/artroom-contract";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { SourceError, httpSource, main, verify, type Fetch, type MemorySource } from "../src/index.ts";
+import { SourceError, httpSource, main, verify, type Fetch, type MemoryScope, type MemorySource } from "../src/index.ts";
 import { rewrite, sourceOf, world } from "./world.ts";
 
 /** A scope service's two verifier routes, answered from histories in memory, in the form the Worker answers them. */
@@ -31,20 +31,37 @@ async function run(source: MemorySource, ...argv: string[]) {
   return { code, out: out.join("\n"), err: err.join("\n") };
 }
 
-test("the command prints the report of a consistent history in plain English and exits 0; a command it cannot read as one exits 2 with the usage", async () => {
+/**
+ * An `--anchor` for each foreign fact that the entries of one scope use. The fixture histories were written under the test
+ * authority of derive's fixtures, a STAND-IN whose grants hold no freshness proof. The command never reads such a grant as one.
+ * The scope I holds no act, so with every fact that it uses anchored, no entry with such a grant is derived again.
+ */
+function anchored(scope: MemoryScope): string[] {
+  const facts = scope.entries.flatMap(({ bytes }) => {
+    const { input, uses } = JSON.parse(bytes) as Entry;
+    return [...uses.map((use) => use.fact), ...(input.type === "delivery" ? [input.from] : []), ...(input.type === "genesis" && input.source ? [input.source] : [])];
+  });
+  return [...new Set(facts.map((fact) => `${fact.at.scope}:${fact.seq}:${fact.hash}`))].flatMap((anchor) => ["--anchor", anchor]);
+}
+
+test("the command prints the report of a consistent history in plain English and exits 0; a command it cannot read as one exits 2 with the usage; and it reads no grant that holds no freshness proof as a grant", async () => {
   const w = world();
-  const good = await run(sourceOf(w), "https://scopes.test/", w.I.scope.scope, "--head", `2:${w.I.entries[2]!.hash}`);
+  const good = await run(sourceOf(w), "https://scopes.test/", w.I.scope.scope, "--head", `2:${w.I.entries[2]!.hash}`, ...anchored(w.I));
   expect([good.code, good.err]).toEqual([0, ""]);
   expect(good.out).toMatch(/^Result: consistent, for the mode, target, coverage and trusts stated below\.\nMode: replay\./);
   expect(good.out).toContain(`Target: ${w.I.scope.scope}, incarnation ${w.I.scope.inc}, lane, through entry 2 (${w.I.entries[2]!.hash}).`);
-  expect(good.out).toContain("Foreign facts: 7 shown by replay of their source scope, 0 taken from an anchor, 0 missing.");
+  expect(good.out).toContain("Foreign facts: 0 shown by replay of their source scope, 3 taken from an anchor, 0 missing.");
+  // The scope contract, section 15.6n, on the I3 delta E8: a grant without a freshness proof is no grant. Without the anchors the
+  // replay reaches the desk's first act, which the fixture's stand-in authority granted. The command reports it, and exits 1.
+  const unproven = await run(sourceOf(w), "https://scopes.test/", w.I.scope.scope, "--json");
+  expect([unproven.code, JSON.parse(unproven.out)]).toMatchObject([1, { report: { result: "mismatch", at: { at: w.D.scope, seq: 1 } }, why: "the recorded grant holds no freshness proof of a key's standing: it is no grant" }]);
   expect(await run(sourceOf(w), "https://scopes.test/", "not a scope")).toMatchObject({ code: 2, out: "", err: expect.stringMatching(/^the second argument is not a scope ID\nusage: artroom-replay /) });
 });
 
 test("the command exits 1 for a history that is not consistent, and with --json prints the report as data, with the entry it names", async () => {
   const w = world();
   rewrite(w.I, 2, (entry) => { entry.effects[0].state = "removed"; });
-  const bad = await run(sourceOf(w), "https://scopes.test", w.I.scope.scope, "--mode", "replay", "--json");
+  const bad = await run(sourceOf(w), "https://scopes.test", w.I.scope.scope, "--mode", "replay", "--json", ...anchored(w.I));
   expect(bad.code).toBe(1);
   expect(JSON.parse(bad.out)).toMatchObject({ report: { mode: "replay", result: "mismatch", at: { at: w.I.scope, seq: 2 } }, why: "the recorded effects are not the ones derived again" });
 });

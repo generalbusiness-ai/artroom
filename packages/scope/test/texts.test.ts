@@ -83,7 +83,7 @@ test("a detached text over the real route: the entry holds its digest and the sc
 
   // Replay derives every entry again. The two texts are not missing: they are reported as redacted, with the tombstone.
   expect(await act("write", { body: t3 }, [third])).toMatchObject({ answer: "accepted" });
-  const replayed = async () => verify(source, { mode: "replay", scope: at.scope });
+  const replayed = async () => verify(source, { mode: "replay", scope: at.scope, grants: "as-recorded" });
   const { report, why } = await replayed();
   expect([report.result, why, report.redacted]).toEqual(["consistent", null, [{ tombstone: struck.receipt.fact, item: note, slot: "body" }]]);
   expect(report.trusts).toContain(TRUSTS.redacted);
@@ -126,7 +126,7 @@ test("a detached text in a creation message: the child reads the bytes from its 
   await later(2, P, K);
   expect(genesis(await K.entries())).toMatchObject({ type: "genesis", decision: "applied", message: { body: { fields: { body: textDigest(shared) } } } });
   expect(await (K.stub as unknown as { retained(reader: unknown, kind: string, digest: Digest): Promise<unknown> }).retained(reader, "text", textDigest(shared))).toMatchObject({ ok: true, value: { bytes: JSON.stringify(shared) } });
-  expect((await verify(source, { mode: "replay", scope: K.name })).report).toMatchObject({ result: "consistent", redacted: [] });
+  expect((await verify(source, { mode: "replay", scope: K.name, grants: "as-recorded" })).report).toMatchObject({ result: "consistent", redacted: [] });
   // P answers for a text only to the receiver of a send that names it: the entry that wrote the note sent nothing.
   const asks = P.stub as unknown as { text(seq: number, digest: Digest): Promise<string | null> };
   expect([await asks.text(copied.fact.seq, textDigest(shared)), await asks.text(a, textDigest(shared))]).toEqual([JSON.stringify(shared), null]);

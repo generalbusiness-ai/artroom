@@ -5,7 +5,12 @@ import { founded, keys, notesDefinition, on, type Ledger } from "@generalbusines
 import { MemorySource, TRUSTS, render, verify, type Options } from "../src/index.ts";
 import { entryOf, rewrite, served, sourceOf, world, type World } from "./world.ts";
 
-const replay = (w: World, over: Partial<Options> = {}) => verify(sourceOf(w), { mode: "replay", scope: w.I.scope.scope, ...over });
+/**
+ * The fixture histories were written under the test authority of derive's fixtures, a STAND-IN whose grants hold no freshness
+ * proof. Each replay here says so (`AS_RECORDED`): such a grant is taken as recorded, and the report lists `authority` as trusted.
+ */
+const AS_RECORDED = { grants: "as-recorded" } as const;
+const replay = (w: World, over: Partial<Options> = {}) => verify(sourceOf(w), { mode: "replay", scope: w.I.scope.scope, ...AS_RECORDED, ...over });
 
 describe("replay of a good history (sections 9.3 to 9.5)", () => {
   test("a child's history is consistent only with the histories it used: each scope is covered once, as far as the highest entry needed, and every foreign fact is shown by replay of its source", async () => {
@@ -60,18 +65,18 @@ describe("a detached text whose bytes are gone (section 9.3)", () => {
   test("a source scope that is first read while another scope's missing text is settled is itself read to its head: a text it owes with no tombstone makes the replay incomplete, and with one it is reported as redacted; the depth of its chain is counted from the target", async () => {
     // T.1 needs S through 1, where S owes its text. Reading S on to its tombstone, S.3, proves U.1 at S.2: U is first read then.
     const { U, T, owed, source } = histories(false);
-    const { report, why } = await verify(source, { mode: "replay", scope: T.at.scope });
+    const { report, why } = await verify(source, { mode: "replay", scope: T.at.scope, ...AS_RECORDED });
     expect([report.result, report.at, report.redacted.map((r) => r.tombstone.seq)]).toEqual(["incomplete", U.fact(1), [3]]);
     expect(why).toBe(`a retained input is missing: the detached text ${owed}, which no later entry of ${U.at.scope} redacts`);
 
     // The same histories, and U redacts its text at U.2, which no reference names. U is read to its head, and both tombstones answer.
     const whole = histories(true);
-    const found = await verify(whole.source, { mode: "replay", scope: whole.T.at.scope });
+    const found = await verify(whole.source, { mode: "replay", scope: whole.T.at.scope, ...AS_RECORDED });
     expect([found.report.result, found.why, found.report.redacted.map((r) => r.tombstone)]).toEqual(["consistent", null, [whole.S.fact(3), whole.U.fact(2)]]);
     expect(found.report.coverage).toEqual([whole.T, whole.S, whole.U].map((L) => ({ scope: L.at, from: 0, through: L.head.seq })));
 
     // The limit on depth counts foreign facts from the target, also in the settlement. S is one fact from T, so U.1, which S.2 uses, is two.
-    const within = async (depth: number) => { const { report, why } = await verify(histories(true).source, { mode: "replay", scope: whole.T.at.scope, limits: { depth } }); return [report.result, report.at?.seq ?? null, why]; };
+    const within = async (depth: number) => { const { report, why } = await verify(histories(true).source, { mode: "replay", ...AS_RECORDED, scope: whole.T.at.scope, limits: { depth } }); return [report.result, report.at?.seq ?? null, why]; };
     expect([await within(1), await within(2)]).toEqual([["incomplete", 2, "the limit of 1 on the depth of foreign facts was reached"], ["consistent", null, null]]);
   });
 });

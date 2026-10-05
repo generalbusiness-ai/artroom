@@ -11,9 +11,10 @@
     "bindings": [
       { "name": "SCOPES", "class_name": "TestScope" },
       { "name": "AS_DEPLOYED", "class_name": "ScopeObject" },
-      { "name": "NET", "class_name": "NetScope" }
+      { "name": "NET", "class_name": "NetScope" },
+      { "name": "PLATFORM", "class_name": "PlatformScope" }
     ]
   },
   "services": [{ "binding": "API", "service": "artroom-scope-test", "entrypoint": "NetService" }],
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["TestScope", "ScopeObject", "NetScope"] }]
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["TestScope", "ScopeObject", "NetScope", "PlatformScope"] }]
 }

@@ -1,8 +1,9 @@
 import { describe, expect, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import { textDigest } from "@generalbusiness/artroom-bytes";
-import { PROFILES, validateDefinition, type ActJudgment, type PlatformRule } from "../src/index.ts";
-import { Scope, keys, small, type Actor } from "./fixtures.ts";
+import type { MemberId, ObservationUse } from "@generalbusiness/artroom-contract";
+import { canonicalize, entryHash, isEntry, textDigest } from "@generalbusiness/artroom-bytes";
+import { PROFILES, validateDefinition, valueDigest, type ActJudgment, type PlatformRule } from "../src/index.ts";
+import { Scope, T0, d, keys, membership, small, type Actor } from "./fixtures.ts";
 import { gate, gateRules, gateWith } from "./fixtures-marks.ts";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -130,6 +131,52 @@ describe("a rule is run at the check of its mark's place (sections 4.2 and 6.1)"
     expect([said(t.act(vic, "enter", fields("two"), { platform: gateRules(), grants: [] })), authority(t)]).toEqual([["write", null, null, null], []]);
     expect([said(t.act(rita, "enter", fields("none"), { platform: gateRules(), grants: null })), said(t.act(rita, "enter", fields("none"), { platform: gateRules(), grants: [] }))])
       .toEqual([["unavailable", "authority-unavailable", null, null], ["refused", "unauthorized", "no-ticket", "the rule by-ticket does not pass this key"]]);
+  });
+
+  // Scope contract, sections 4.1, 6.2 and 16.1; witnesses 18.34 and 18.35. The rule `vouched` is a STAND-IN, as every rule here: it
+  // shows what a rule is given and what the entry then retains, and nothing about a rule of a platform definition.
+  test("a rule reads a further observation and a value beside the intent: the entry retains exactly what was read; without either the act is not completed; an entry whose rules read neither has the bytes it had", () => {
+    const DOMAIN = "artroom-check-configuration-1";
+    const configuration = { image: d("a") };
+    const [bytes, digest] = [canonicalize(configuration), valueDigest(DOMAIN, configuration)];
+    const standing = (member: MemberId, n: number): ObservationUse => ({
+      observation: { subject: "member", of: membership, head: { seq: 40, hash: d("4") }, member, memberState: "active", role: "member", activeKey: true, controller: null, controllerActive: null, definition: "platform:membership@1", at: T0 },
+      read: { run: "r1", n }, use: "fresh", prior: null,
+    });
+    const [vic, una] = [standing("@vic", 7), standing("@una", 8)];
+    /** The guard reads the standing of one member and one value. With either missing it is not completed. */
+    const vouched: PlatformRule = {
+      place: "guard", refusals: ["not-vouched"],
+      run: (given) => {
+        const use = given.observed({ member: "@una" });
+        const value = given.value(DOMAIN, digest, 256);
+        if (!use || value === undefined) return { holds: null, reason: "dependency-unavailable" };
+        return "subject" in use.observation && use.observation.subject === "member" && use.observation.memberState === "active" && canonicalize(value) === bytes ? { holds: true } : { holds: false, name: "not-vouched" };
+      },
+    };
+    const reading = () => gateRules({ fresh: vouched });
+    const fields = (secret: string) => ({ on: 0, expected: { on: 1 }, fields: { secret } });
+
+    // Neither is at hand, then one of the two, then a value that is longer than the bound of its domain: the act is not completed.
+    const s = gated();
+    for (const beside of [{}, { observed: [una] }, { values: [bytes] }, { observed: [una], values: [canonicalize({ image: d("a"), pad: "x".repeat(256) })] }]) {
+      expect(said(s.act(keys.una, "enter", fields("one"), { platform: reading(), ...beside }))).toEqual(["unavailable", "dependency-unavailable", null, null]);
+    }
+    // Both are at hand, with an observation and with bytes that no rule reads. The entry retains the one observation that was read, in
+    // `observed`, and the draft names the one value that was read, for the scope to keep. What no rule read is in neither.
+    const judged = s.act(keys.una, "enter", fields("one"), { platform: reading(), observed: [vic, una], values: ["not canonical ", bytes, canonicalize("another value")] });
+    expect([said(judged), s.last.input.type === "act" && s.last.input.observed, judged.result === "write" && judged.draft.values]).toEqual([["write", null, null, null], [una], [{ domain: DOMAIN, digest, bytes }]]);
+    // The entry is one that the bytes package's guard takes. The same member on an input that may hold none is no entry (witness 18.34, case 8).
+    expect([isEntry(s.last), isEntry({ ...s.last, input: { ...s.last.input, observed: [] } }), isEntry({ ...s.last, input: { type: "timed", item: 2, rule: "lapse", due: T0, observed: [una] } })]).toEqual([true, false, false]);
+    // The fold holds the head of the member that the entry observed (section 16.1, "The fold holds the highest head").
+    expect([s.state.observed(membership, "@una"), s.state.observed(membership, "@vic")]).toEqual([40, null]);
+
+    // The control: the same row with the stand-in rules that read neither. With the same things at hand, and with nothing at hand,
+    // the entry has the same bytes: no member `observed`, and no value to keep.
+    const [a, b] = [gated(), gated()];
+    const first = a.submit(a.intent(keys.una, "enter", fields("one")), { platform: gateRules(), observed: [vic, una], values: [bytes] });
+    b.submit(b.intent(keys.una, "enter", fields("one")), { platform: gateRules() });
+    expect([first.result === "write" && first.draft.values, "observed" in a.last.input, entryHash(a.last)]).toEqual([undefined, false, entryHash(b.last)]);
   });
 
   test("a fault of a rule leaves the act not judged, and nothing is written: an effect outside the eight forms, an effect that conflicts with a written one, a refusal that is not stated, a rule that throws, and a mark with no rule", () => {

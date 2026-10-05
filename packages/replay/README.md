@@ -160,7 +160,18 @@ A report lists these under `trusts`, each only when it applies:
 - that each incarnation was minted once;
 - that a provisional scope dispatched no held send before its confirmation;
 - when each message was delivered;
-- that each recorded grant was current, and the fact that issued it;
+- `observation-read`: that each read of membership behind a retained
+  observation was made as recorded, and when. A recorded grant itself is
+  derived again: from the observation that it retains, with the guards
+  of freshness on the entry's time, and from the membership scope's
+  history at the observed head. A history that breaks a guard is a
+  mismatch, named `observation-older`, `observation-reused`,
+  `observation-not-moved` or `run-returned`;
+- for a grant with no freshness proof, that it was current, and the fact
+  that issued it. Only a replay that is told so reads such a grant
+  (`grants: "as-recorded"`): it is a test authority's, a stand-in, and
+  the result then proves nothing about authority. The command line never
+  does: there such an entry is a mismatch;
 - each diagnosis's attempt log;
 - each outcome's evidence, and that the outside write happened;
 - each anchor, and the definition name retained with an anchored entry;

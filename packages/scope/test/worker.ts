@@ -9,12 +9,26 @@
  * namespace. The test authority reaches a scope only through these classes,
  * which the production entry, `src/worker.ts`, does not import.
  *
+ * `PlatformScope` is the deployed class in a third namespace, `PLATFORM`,
+ * with the production authority: no test authority and no scripted
+ * membership. A membership scope there judges its own acts on its own head,
+ * and every other scope reads the membership scope that its genesis
+ * records, through the namespace. Five of its ports are not the production
+ * ones, and each is labelled: the shared scripted clock, and transport that
+ * a test can hold; the test readers,
+ * a stand-in for read sessions, which are not built; the scripted peers,
+ * a stand-in for a lane that sends a notice; and, while `platformNet.standIns`
+ * is set, the platform package's STAND-IN rules for the three marks of
+ * membership that have no rule yet.
+ *
  * The package exports this file as `./testing/worker`, for the test Worker
  * of a package that runs its own definitions on real scopes.
  */
 
+import { platform } from "@generalbusiness/artroom-platform";
+import { withStandIns } from "@generalbusiness/artroom-platform/testing";
 import { ScopeObject, type Wiring } from "../src/index.ts";
-import { codeLost, controls, net, netPorts, testPorts } from "../src/testing.ts";
+import { codeLost, controls, net, netPorts, testPorts, testReaders } from "../src/testing.ts";
 import { DeployedScope, ScopeService, route, type Env } from "../src/worker.ts";
 import { outsideOf, owners } from "./outside.ts";
 
@@ -36,6 +50,38 @@ export class NetScope extends DeployedScope<NetEnv> {
     const ports = { ...deployed.ports, ...netPorts(net, deployed.ports!.transport!, deployed.ports!.resolver) };
     // The definitions port is the deployed one, whose platform definitions are the platform package's, until a test takes their code away.
     return { bounds: net.sized.get(name ?? "") ?? net.bounds, ports: { ...ports, definitions: codeLost(deployed.ports!.definitions!, () => !net.platformCode) } };
+  }
+}
+
+/**
+ * What a test holds of the namespace `PLATFORM`. `standIns`: true, a scope
+ * there is given the STAND-IN rules of the platform package's test support
+ * for the three marks of membership that the package has no rule for.
+ * False: the platform definitions are exactly the platform package's, as
+ * under the production wiring. `without`: the name of one stand-in rule
+ * that is left out, for a version of membership that lacks one rule. Both
+ * are read at each use.
+ */
+export const platformNet: { standIns: boolean; without: string | null } = { standIns: true, without: null };
+
+type PlatformEnv = Env & { PLATFORM: DurableObjectNamespace };
+
+export class PlatformScope extends DeployedScope<PlatformEnv> {
+  protected override scopes() { return this.env.PLATFORM; }
+  protected override wiring(name: string | undefined): Wiring {
+    const deployed = super.wiring(name);
+    const { resolver, definitions, transport } = deployed.ports as Required<NonNullable<Wiring["ports"]>>;
+    return {
+      ...deployed,
+      ports: {
+        ...deployed.ports, clock: net.clock, readers: testReaders,
+        // Transport that a test can hold: a send that `net.hold` matches is not delivered, and its attempt gets no answer.
+        transport: { send: (envelope) => (net.hold?.(envelope) ? Promise.resolve(null) : transport!.send(envelope)) },
+        // A scripted peer: an entry that a test wrote by hand, for a lane that sends a notice. Every other entry is read from the real object.
+        resolver: { read: (fact, seconds) => { const peer = net.peers.get(fact.hash); return peer ? Promise.resolve(peer) : resolver.read(fact, seconds); } },
+        definitions: { read: (named, holder) => definitions.read(named, holder), platform: (named) => (platformNet.standIns ? withStandIns(named, platformNet.without) : platform(named)) },
+      },
+    };
   }
 }
 
