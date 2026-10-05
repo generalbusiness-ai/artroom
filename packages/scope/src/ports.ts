@@ -206,9 +206,11 @@ export interface Ports {
 }
 
 /**
- * What the production authority reads: no grant. The membership scope
- * cannot be read yet, so no grant is current, and every act that needs one
- * is refused `unauthorized`.
+ * What the default authority port reads: no grant, so every act that needs
+ * one is refused `unauthorized`. The deployed class does not use it: it
+ * supplies `Wiring.authority`, which reads the membership scope that the
+ * scope's genesis records (`authority.ts`, `repositoryAuthority`). This
+ * default is what a scope has when no wiring gives an authority.
  */
 const NO_GRANT: Standing = { held: () => [] };
 
