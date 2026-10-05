@@ -109,13 +109,14 @@ test("a join with a valid invitation admits the key; a used one and none are eac
   expect([said(join(m, una, 99)), said(join(m, una, invitation, "a wrong secret")), said(join(m, una, 3))]).toEqual(Array(3).fill(["refused", "unauthorized", "invitation-refused"]));
 
   // Case a of section 12.1.3: one entry. The key is active with the signing key as its ID, the member is active, and the `create` of
-  // the member's inbox is at ordinal 0. No grant judged it: the invitation is its authority.
+  // the member's inbox is at ordinal 0. No grant judged it: the invitation is its authority. The body of the creation holds the
+  // membership scope that the inbox will record and read its observations from (the contract's section 6.6).
   const before = m.entries.length;
   expect(said(join(m, una, invitation))).toEqual(WRITTEN);
   const key = m.head.seq;
   expect([m.entries.length - before, m.item(key).state, m.item(key).values["id"], m.item(key).refs["member"], m.item(invitation).state, authority(m)]).toEqual([1, "active", una.key, invitation, "active", []]);
   expect(m.last.sends.map((send) => [send.n, send.message.class === "request" && send.message.type, "definition" in send.to && send.to.definition, send.message.class === "request" && send.message.body]))
-    .toEqual([[0, "create", "platform:inbox@1", { fields: { owner: { membership: m.at, member: "@una" }, membership: m.at } }]]);
+    .toEqual([[0, "create", "platform:inbox@1", { fields: { owner: { membership: m.at, member: "@una" }, membership: m.at }, membership: m.at }]]);
   // Check 7: the right secret after the invitation was used (section 3.6, case e).
   expect(said(join(m, vic, invitation))).toEqual(["refused", "guard-failed", "invitation-used"]);
 
