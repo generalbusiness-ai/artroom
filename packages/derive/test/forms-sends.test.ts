@@ -251,6 +251,7 @@ describe("sends (section 6.6)", () => {
       ["a tell addressed by the name of a slot, as the first delivery wrote it", refusal((d) => { reserve(d).to = "staging"; }), "shape"],
       ["a tell addressed by a slot that holds no scope", refusal((d) => { reserve(d).to = { slot: "author", of: "also.proposal" }; }), "name"],
       ["an update for something that is no local item", refusal((d) => { fanOut(d).item = { slot: "issue", of: "each" }; }), "name"],
+      ["`self` inside a record: the mark is the value of a whole field and of no member", refusal((d) => { reserve(d).fields.how = { proof: "self" }; }), "shape"],
       ["a collect as an address", refusal((d) => { fanOut(d).to = { collect: reserve(d).fields.links.collect }; }), "shape"],
       ["a collect over a final state", refusal((d) => { reserve(d).fields.links.collect.items.states.push("removed"); }), "bound"],
       ["a collect of a member that is no slot of the type", refusal((d) => { reserve(d).fields.links.collect.fields.peer = "peer"; }), "name"],
