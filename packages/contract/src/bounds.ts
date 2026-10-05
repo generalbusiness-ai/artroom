@@ -45,6 +45,7 @@ export interface Bounds {
 
   // Section 9.2: a scope's budget. The contract owes both to the proof plan (R4). The values are temporary.
   scopeEntries: number;            // entries one scope may hold. An entry that admits duties is refused `scope-full` unless every admitted duty still has an entry to settle in
+  namedDefinitions: number;        // the definitions a scope's own definition may name in `create` sends, and those name in turn, whose bytes the scope retains for its children. The contract states none; temporary
   // Section 7.4: sending. The contract states none of these; all are retry policies, temporary, and owed to the proof plan.
   dispatchSeconds: number;         // how long a sender waits for the answer to one dispatch before the attempt counts as unanswered
   dispatchRetrySeconds: number;    // the delay before a duty's second attempt; it doubles with each further attempt
@@ -82,6 +83,7 @@ export const PROPOSED_BOUNDS: Bounds = {
   timedAttemptsPerTurn: 64,
   routingRefusals: 3,
   scopeEntries: 100_000,
+  namedDefinitions: 16,
   dispatchSeconds: 30,
   dispatchRetrySeconds: 1,
   dispatchRetryMaxSeconds: 300,

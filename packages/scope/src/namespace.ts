@@ -4,29 +4,32 @@
  * holds both sides of what crosses between two scopes.
  *
  * The asking side is `namespace`: the production `Resolver`, which reads a
- * foreign entry, and the `Transport`, which delivers one send. Each is one
- * RPC call on the object the name gives.
+ * foreign entry; the `Transport`, which delivers one send; and the
+ * `Definitions`, which reads a declaration from the scope that retains it.
+ * Each is one RPC call on the object the name gives.
  *
  * The answering side is what the object at a name does before any of its
  * scope's judgment: `routed`, the resolver of the name, which refuses an
- * address that is not this scope and incarnation; and `sourced`, which
- * answers a read of one entry.
+ * address that is not this scope and incarnation; `sourced`, which answers
+ * a read of one entry; and `declaredBy`, which answers a read of one
+ * retained declaration.
  */
 
-import type { Entry, RoutingRefusal, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
+import type { Digest, Entry, RoutingRefusal, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
 import { parseStrict, scopeIdOf } from "@generalbusiness/artroom-bytes";
 import { isObject, isScopeRef, type Delivered, type ScopeState } from "@generalbusiness/artroom-derive";
 import type { Pinned } from "./core.ts";
-import type { Delivery, Resolver, Transport } from "./ports.ts";
+import type { Definitions, Delivery, Resolver, Transport } from "./ports.ts";
 import type { Store } from "./store.ts";
 
 /** What the object at a name answers to a read of one of its entries. `bytes` null: it has no entry at that sequence number. */
 export interface Sourced { at: ScopeRef; under: string; bytes: string | null }
 
-/** The two calls one scope's object takes from another's. */
+/** The three calls one scope's object takes from another's. */
 export interface Peer {
   deliver(envelope: Delivered): Promise<Delivery>;
   source(seq: number): Promise<Sourced | null>;
+  declared(digest: Digest): Promise<string | null>;
 }
 
 /** The little of a Durable Object namespace binding this file uses. */
@@ -76,11 +79,21 @@ export function sourced(store: Store, pinned: Pinned | null, seq: number): Sourc
 }
 
 /**
- * The resolver and the transport over one namespace binding. A call that
+ * The bytes of a declaration this scope retains, by digest: its own, or one
+ * it retains for its children (section 9.2). Null: it retains none under
+ * that digest. The bytes are immutable and the reader checks their digest,
+ * so the answer says nothing else about this scope.
+ */
+export function declaredBy(store: Store, digest: Digest): string | null {
+  return typeof digest === "string" ? (store.retained("definition", digest)?.bytes ?? null) : null;
+}
+
+/**
+ * The resolver, the transport and the definitions over one namespace binding. A call that
  * fails is no answer: the entry cannot be read now, or the attempt is
  * unanswered.
  */
-export function namespace(binding: Binding): { resolver: Resolver; transport: Transport } {
+export function namespace(binding: Binding): { resolver: Resolver; transport: Transport; definitions: Definitions } {
   const peer = (name: ScopeId): Peer => binding.get(binding.idFromName(name)) as Peer;
   return {
     resolver: {
@@ -109,6 +122,19 @@ export function namespace(binding: Binding): { resolver: Resolver; transport: Tr
           return await peer(name).deliver(envelope);
         } catch {
           return null;
+        }
+      },
+    },
+    definitions: {
+      // Sections 5.1 and 9.2: a child reads its declaration from its creator, by digest, before its genesis turn.
+      async read(named, holder) {
+        if (named.startsWith("platform:")) return { ok: false, reason: "unsupported-definition" };
+        if (!holder) return { ok: false, reason: "unavailable" };
+        try {
+          const bytes = await peer(holder.scope).declared(named as Digest);
+          return bytes === null ? { ok: false, reason: "absent" } : { ok: true, bytes };
+        } catch {
+          return { ok: false, reason: "unavailable" };
         }
       },
     },

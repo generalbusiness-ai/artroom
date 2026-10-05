@@ -9,7 +9,7 @@
 import { env } from "cloudflare:workers";
 import { evictDurableObject, runDurableObjectAlarm, runInDurableObject } from "cloudflare:test";
 import type { Answer, DeclaredDefinition, Entry, Grant, Intent, Read, Receipt, ScopeId, ScopeRef, Seed, SignedIntent } from "@generalbusiness/artroom-contract";
-import { canonicalize, intentDigest, scopeIdOf, signIntent } from "@generalbusiness/artroom-bytes";
+import { intentDigest, scopeIdOf, signIntent } from "@generalbusiness/artroom-bytes";
 import { timeMs, timeOf, type Delivered, type ValidDefinition } from "@generalbusiness/artroom-derive";
 import { deskDefinition, grantOf, keys, ticketDefinition, type Actor, type Over } from "@generalbusiness/artroom-derive/testing";
 import type { Delivery, Duty, Sealed, Summary } from "../src/index.ts";
@@ -19,9 +19,6 @@ import { reader, type Remote } from "./support.ts";
 
 export { net };
 export const { rita, una } = keys;
-
-// A desk creates its tickets by this digest; the test definitions port supplies the declaration.
-net.declared.set(ticketDefinition.digest, canonicalize(ticketDefinition.declared));
 
 type Peer = Remote & { deliver(envelope: Delivered): Promise<Delivery>; dispatch(): Promise<number> };
 const stubOf = (name: string): DurableObjectStub => env.NET.get(env.NET.idFromName(name));
@@ -121,12 +118,15 @@ export async function later(seconds: number, ...nodes: readonly Node[]): Promise
   await settle(...nodes);
 }
 
-/** A desk founded by rita. Transport is undisturbed from here on. */
+/**
+ * A desk founded by rita, with the declaration of the ticket its definition names in a `create`: the desk retains it,
+ * and each ticket reads it from the desk. Transport is undisturbed from here on.
+ */
 export async function desk(): Promise<Node> {
   net.hold = net.deaf = null;
   const { signed, name } = founding(deskDefinition, { source: "a repository" });
   const node = new Node(name, deskDefinition.declared);
-  const answer = await node.stub.found(signed, deskDefinition.declared);
+  const answer = await node.stub.found(signed, deskDefinition.declared, [ticketDefinition.declared]);
   if (answer.answer !== "accepted") throw new Error(`the desk was not founded: ${JSON.stringify(answer)}`);
   await settle(node);
   return node;

@@ -20,11 +20,12 @@ import { canonicalize, isDigest, newIncarnation } from "@generalbusiness/artroom
 import { creationFields, factsNamed, isEntryOf, isFactRef, isLocalId, isObject, isScopeRef, judgeDelivery, judgeGenesis, prepareRules, readFields } from "@generalbusiness/artroom-derive";
 import type { Clock as Reading, Creation, Delivered, DeliveryContext, Fetched, Judgment, StateView, ValidDefinition } from "@generalbusiness/artroom-derive";
 import { NO_INCARNATION, retainedFacts, used, type Scope } from "./core.ts";
-import type { Delivery, Ports } from "./ports.ts";
+import { namedBy } from "./definitions.ts";
+import type { DefinitionRead, Delivery, Ports } from "./ports.ts";
 import type { Retained, Store } from "./store.ts";
 import { LATE, fetchFacts, within, type Verdict } from "./turn.ts";
 
-const retry = (reason: UnavailableReason | "scope-full"): Delivery => ({ answer: "retry", reason });
+const retry = (reason: UnavailableReason | "scope-full" | "unsupported-definition"): Delivery => ({ answer: "retry", reason });
 const UNVERIFIED: Delivery = { answer: "source-unverified" };
 const said = (answer: Delivery): Verdict<Delivery> => ({ verdict: "answer", answer });
 
@@ -44,15 +45,34 @@ export class Deliveries {
   }
 
   /**
-   * Section 7.2: the definition an empty store runs its genesis under, by the
-   * digest its seed names, with the declaration's bytes. The definitions
-   * port supplies them.
+   * Sections 5.1, 7.2 and 9.2: the definition an empty store runs its genesis
+   * under. Its declaration is immutable bytes named by the digest in the
+   * seed, so it is read before the turn: from the creator the seed names,
+   * which retains it, through the definitions port. The digest is checked
+   * here. With it come the declarations this scope will retain for its own
+   * children, read from the same creator.
+   *
+   * `dependency-unavailable`: the creator cannot be read now, or does not
+   * hold the bytes. `unsupported-definition`: the seed names a platform
+   * definition, which no code supplies yet, or the bytes are not a valid
+   * declaration with that digest. Either way nothing is recorded.
    */
-  async #declared(seed: Seed): Promise<{ valid: ValidDefinition; bytes: string } | null> {
-    if (!isObject(seed) || !isDigest(seed.definition)) return null;
-    const read = await this.#ports.definitions.read(seed.definition);
-    const valid = read.ok ? this.#scope.validate(read.bytes) : null;
-    return read.ok && valid?.digest === seed.definition ? { valid, bytes: read.bytes } : null;
+  async #declared(seed: Seed): Promise<{ valid: ValidDefinition; bytes: string; children: Retained[] } | "dependency-unavailable" | "unsupported-definition"> {
+    if (!isObject(seed) || !isDigest(seed.definition) || !isScopeRef(seed.creator)) return "unsupported-definition";
+    const { definitions } = this.#ports;
+    const creator = seed.creator;
+    const seconds = this.#bounds.fetchSeconds;
+    const from = async (digest: typeof seed.definition): Promise<DefinitionRead> => {
+      const read = await within(() => definitions.read(digest, creator), seconds);
+      return read === LATE ? { ok: false, reason: "unavailable" } : read;
+    };
+    const read = await from(seed.definition);
+    if (!read.ok) return read.reason === "unsupported-definition" ? "unsupported-definition" : "dependency-unavailable";
+    const valid = this.#scope.validate(read.bytes);
+    if (valid?.digest !== seed.definition) return "unsupported-definition";
+    const children = await namedBy(valid, from, (text) => this.#scope.validate(text), this.#bounds.namedDefinitions);
+    if (!children.ok) return children.reason === "unavailable" ? "dependency-unavailable" : "unsupported-definition";
+    return { valid, bytes: read.bytes, children: children.retain };
   }
 
   async deliver(delivered: Delivered): Promise<Delivery> {
@@ -71,7 +91,9 @@ export class Deliveries {
 
     // An empty store: only a creation reaches it, and it needs the definition its seed names.
     const creates = message.class === "request" && message.type === "create" && !isScopeRef(delivered.to);
-    const founding = this.#scope.pinned() || !creates ? null : await this.#declared(delivered.to as Seed);
+    const declared = this.#scope.pinned() || !creates ? null : await this.#declared(delivered.to as Seed);
+    if (typeof declared === "string") return retry(declared);
+    const founding = declared;
     const pinned = this.#scope.pinned();
     if (pinned ? !pinned.definition : !founding) return retry("unavailable");
 
@@ -116,7 +138,7 @@ export class Deliveries {
             const retain: Retained[] = used(judged.draft, [source, ...facts]);
             if (genesis && founding) {
               store.cover(founding.valid.indexes);
-              retain.push({ kind: "definition", digest: founding.valid.digest, bytes: canonicalize(JSON.parse(founding.bytes)) });
+              retain.push({ kind: "definition", digest: founding.valid.digest, bytes: canonicalize(JSON.parse(founding.bytes)) }, ...founding.children);
             }
             return {
               verdict: "write", draft: judged.draft, retain,

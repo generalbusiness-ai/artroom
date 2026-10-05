@@ -8,7 +8,7 @@ SQLite storage for each scope, named by the scope's ID in one namespace.
 The scope and replay contract is the authority. Comments cite its sections.
 Where the contract was silent, `notes/2026-10-04-i1-contract-deltas.md`
 records what was implemented, in its sections "The runtime", "Repairs to
-the runtime" and "Composition and transport".
+the runtime", "Composition and transport" and "A child's definition".
 
 Nothing in this package deploys anything. `wrangler.jsonc` is
 configuration only.
@@ -26,21 +26,21 @@ what a judge drafts, in one storage transaction for each entry.
 | `store` | `Store`: the storage the core needs. It is derive's `StateView` and `StateWriter`, with `transaction`, `append` (an entry and the row of each send), `retain`, and bounded reads of entries, retained inputs and duties. |
 | `sqlite` | `SqliteStore`, the one implementation, over `Sql`: `exec` and `transaction`, which a Durable Object's `ctx.storage.sql.exec` and `ctx.storage.transactionSync` satisfy. It keeps nothing in memory but the list of indexed slots. |
 | `ports` | `Clock`, `Random`, `Authority`, `Resolver`, `Rules`, `Alarm`, `Definitions`, `Readers`, and `production()`, their defaults. |
+| `definitions` | `creates(declared)`: the digests a declaration names in its `create` sends. `namedBy(root, read, validate, limit)`: the declarations a scope retains for its children. |
 | `turn` | `Turns.run(waiting, founding?)`: section 5.2, steps 3 to 7, and section 5.3. `isSigned` and `fetchFacts`: step 1. `Waiting`, `Verdict`, `End`. |
 | `core` | `Scope`: `found`, `submit`, `settle`, `alarm`, `checkpoint`, `pinned`. `receiptOf`. The answers `Founded` and `Checkpointed`. |
 | `reads` | `Reads`: `summary`, `items`, `history`, `entry`, `outbox`. `ReadBounds` and `READ_BOUNDS`. |
 | `delivery` | `Deliveries.deliver(envelope)`: receiving. It reads the source entry through the resolver, checks it against the fact's hash, and runs derive's delivery judge, or its genesis judge for a `create` that reaches an empty store, in the scope's turn. It answers as transport does: `recorded` with a fact, `retry`, `routing` or `source-unverified`. |
 | `outbox` | `Dispatcher.run()`: sending. One pass at a time over the sends that are due: a durable record before each dispatch and after its answer, a retry delay that doubles, and a `diagnosis` input through the turn when a request is given up. `Wakes`: one alarm for the earliest deadline and the next dispatch. |
-| `namespace` | `namespace(binding)`: the production `Resolver` and `Transport`, each one RPC call on the object a scope ID names. `routed`: the resolver of a name, which refuses a wrong address before any judgment. `sourced`: the answer to a read of one entry. |
-| `object` | `ScopeObject`: the Durable Object class. It wires the store, the ports, the core, receiving, the dispatcher and the reads, and exposes them over RPC: `found`, `submit`, `settle`, `checkpoint`, the reads, `deliver`, `source` and `dispatch`. Its `alarm()` runs the alarm's turn and then a dispatch pass. With no transport, which is its default, nothing is dispatched. |
-| `worker` (its own entry, `@generalbusiness/artroom-scope/worker`) | `route(request, binding)`: the HTTP routes. `ScopeService`: the same operations over a service binding. `DeployedScope`: the object class with the namespace as its resolver and transport. `api(binding)`: what both call. The default export is the deployed Worker. |
+| `namespace` | `namespace(binding)`: the production `Resolver`, `Transport` and `Definitions`, each one RPC call on the object a scope ID names. `routed`: the resolver of a name, which refuses a wrong address before any judgment. `sourced`: the answer to a read of one entry. `declaredBy`: the answer to a read of one retained declaration. |
+| `object` | `ScopeObject`: the Durable Object class. It wires the store, the ports, the core, receiving, the dispatcher and the reads, and exposes them over RPC: `found`, `submit`, `settle`, `checkpoint`, the reads, `deliver`, `source`, `declared` and `dispatch`. Its `alarm()` runs the alarm's turn and then a dispatch pass. With no transport, which is its default, nothing is dispatched. |
+| `worker` (its own entry, `@generalbusiness/artroom-scope/worker`) | `route(request, binding)`: the HTTP routes. `ScopeService`: the same operations over a service binding. `DeployedScope`: the object class with the namespace as its resolver, its transport and its source of declarations. `api(binding)`: what both call. The default export is the deployed Worker. |
 
 `@generalbusiness/artroom-scope/testing` is for tests only: a test
 authority that calls every grant current, a test readers port, a scripted
 clock, a gate that pauses preparation, a resolver over entries a test
-supplies, and, for several scopes in one namespace, a definitions port over
-declarations a test registers and a transport that a test can hold back or
-make lose an answer. The main entry and `worker.ts` do not import it.
+supplies, and, for several scopes in one namespace, a transport that a test
+can hold back or make lose an answer. The main entry and `worker.ts` do not import it.
 
 ## Ports and their production defaults
 
@@ -53,13 +53,30 @@ make lose an answer. The main entry and `worker.ts` do not import it.
 | `Transport` | One dispatch of one send to the object its address names, answered or not. | None: the sends stay in the outbox. `DeployedScope` supplies the namespace. |
 | `Rules` | The results of prepared rule inputs. | Derive's evaluator, `evaluateRules`. |
 | `Alarm` | The next wake time. | In `production()`, nothing. `ScopeObject` supplies the object's own alarm. |
-| `Definitions` | A declaration by digest or platform name. | A platform name is `unsupported-definition`. A digest is unavailable. |
+| `Definitions` | A declaration by digest or platform name, from the scope that retains it. | A platform name is `unsupported-definition`. A digest is unavailable. `DeployedScope` supplies the namespace, which reads a child's declaration from its creator. |
 | `Readers` | Whether a reader may make a read. | Nobody may: every read is `forbidden`. |
 
-So a deployed scope can be founded, and then admits no act and answers no
-read, and no child can be created under a definition named by digest,
-because nothing supplies the declaration. The authority note's rules,
-sessions and a source of declarations each replace one port.
+So a deployed scope can be founded and can create children, and then
+admits no act and answers no read. The authority note's rules and sessions
+each replace one port.
+
+## A child's definition
+
+No registry holds a declaration. A declaration is immutable bytes named by
+its digest, and the scope that may create a child under it retains the
+bytes.
+
+- A founding supplies, beside the directory's own declaration, the
+  declarations its definition names in `create` sends, and those they name
+  in turn. The directory retains each by its digest, with its genesis.
+- A child, before its genesis turn, reads the declaration its seed names
+  from its creator, by digest, and checks that the bytes are a valid
+  declaration with that digest. It reads the declarations it must retain
+  for its own children from the same creator.
+- A creator that cannot be read, or that retains no such bytes, is
+  `dependency-unavailable`. Bytes that are not a valid declaration with
+  that digest, and a platform definition, are `unsupported-definition`.
+  Transport answers `retry` with that reason, and nothing is recorded.
 
 ## Storage
 
@@ -127,7 +144,7 @@ record. So an attempt with no recorded completion reads as unanswered.
 | Transport answers | The dispatcher |
 |---|---|
 | `recorded`, with the fact of the entry that recorded the message | Marks the send acknowledged with that fact. This is bookkeeping, not an entry. A request then waits for its result, which arrives as a delivery. |
-| `retry`, or `source-unverified` | Logs `retry` and sends again after the delay. |
+| `retry`, with any reason, or `source-unverified` | Logs `retry` and sends again after the delay. |
 | `routing`: `wrong-incarnation` or `not-found` | Logs it and sends again after the delay. When a request's log holds as many routing refusals as `routingRefusals`, it is given up. |
 | No answer within `dispatchSeconds` | Leaves the record `none`. |
 
@@ -162,7 +179,7 @@ the contract's own answer.
 
 | Route | Answer | Status |
 |---|---|---|
-| `POST /v1/scopes`, body `{ founding, definition }` | `Founded` | 201 accepted; 422 refused; 503 unavailable |
+| `POST /v1/scopes`, body `{ founding, definition, definitions? }` | `Founded` | 201 accepted; 422 refused; 503 unavailable |
 | `POST /v1/scopes/:scope/acts`, body `{ signed, grants }` | `Answer` | 200 accepted; 403 refused `unauthorized`; 422 refused otherwise; 409 mismatch; 503 unavailable |
 | `POST /v1/scopes/:scope/settle`, body `{ signed }` | `Settlement` | as a read |
 | `GET /v1/scopes/:scope` | The summary | 200; 404 `not-found`; 403 `forbidden`; 409 `wrong-incarnation`, `scope-provisional`; 413 `too-large`; 501 `unsupported-definition`; 503 otherwise |

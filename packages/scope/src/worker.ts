@@ -10,15 +10,16 @@
  * - `ScopeService`: the same operations over a service binding, for a
  *   client in another Worker.
  * - `DeployedScope`: the scope's object class as it is deployed, with the
- *   namespace as its resolver and transport. Its authority, definitions and
- *   readers ports are the production defaults, which refuse.
+ *   namespace as its resolver, its transport and its source of
+ *   declarations. Its authority and readers ports are the production
+ *   defaults, which refuse.
  *
  * Nothing here reaches a test port. A test builds its own Worker from
  * `route`, and its own classes from these, in its own files.
  *
  * | Route | Operation |
  * |---|---|
- * | `POST /v1/scopes` | Found a directory. Body `{ founding, definition }`. |
+ * | `POST /v1/scopes` | Found a directory. Body `{ founding, definition, definitions? }`. |
  * | `POST /v1/scopes/:scope/acts` | Submit an act. Body `{ signed, grants }`. |
  * | `POST /v1/scopes/:scope/settle` | The receipt of an accepted act. Body `{ signed }`. |
  * | `GET /v1/scopes/:scope` | The summary. |
@@ -46,7 +47,7 @@ export interface Env { SCOPES: DurableObjectNamespace }
 
 /** A scope's surface as a caller over RPC has it. */
 interface Remote {
-  found(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition): Promise<Founded>;
+  found(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions?: readonly DeclaredDefinition[]): Promise<Founded>;
   submit(signed: SignedIntent, grants: readonly Grant[]): Promise<Answer>;
   settle(signed: SignedIntent): Promise<Settlement>;
   summary(reader: unknown): Promise<Read<Summary>>;
@@ -66,9 +67,10 @@ export function api(binding: Binding) {
      * Section 7.1: the service computes the seed from the signed intent and
      * the definition, and the scope ID is the seed's digest. The object with
      * that name checks both again. `definition` is a declaration, or the
-     * digest or platform name of one.
+     * digest or platform name of one. `definitions`: the declarations it
+     * names in `create` sends, which the directory retains for its children.
      */
-    async found(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition): Promise<Founded> {
+    async found(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions: readonly DeclaredDefinition[] = []): Promise<Founded> {
       let name: ScopeId;
       try {
         const seed: Seed = { v: 1, kind: "directory", definition: typeof definition === "string" ? definition : definitionDigest(definition), creator: null, cause: intentDigest(founding.intent), ordinal: 0 };
@@ -76,7 +78,7 @@ export function api(binding: Binding) {
       } catch {
         return { answer: "refused", reason: "source-unverified" };   // not values that have canonical bytes
       }
-      return at(name)!.found(founding, definition);
+      return at(name)!.found(founding, definition, definitions);
     },
     async submit(scope: string, signed: SignedIntent, grants: readonly Grant[]): Promise<Answer> { return (await at(scope)?.submit(signed, grants)) ?? { answer: "unavailable", reason: "unavailable" }; },
     async settle(scope: string, signed: SignedIntent): Promise<Settlement> { return (await at(scope)?.settle(signed)) ?? MISSING; },
@@ -132,7 +134,7 @@ export async function route(request: Request, binding: Binding): Promise<Respons
   if (posts) {
     const given = await body(request);
     if (!given) return json(400, { error: "bad-request" });
-    if (scope === undefined) return answered(await scopes.found(given["founding"] as SignedIntent, given["definition"] as DeclaredDefinition), 201);
+    if (scope === undefined) return answered(await scopes.found(given["founding"] as SignedIntent, given["definition"] as DeclaredDefinition, (given["definitions"] ?? []) as DeclaredDefinition[]), 201);
     if (what === "acts") return answered(await scopes.submit(scope, given["signed"] as SignedIntent, (given["grants"] ?? []) as Grant[]), 200);
     return read(await scopes.settle(scope, given["signed"] as SignedIntent));
   }
@@ -148,8 +150,9 @@ export async function route(request: Request, binding: Binding): Promise<Respons
 // ---------------------------------------------------------------- the deployed classes
 
 /**
- * The scope's object as deployed: the namespace is its resolver and its
- * transport. Every other port is the production default.
+ * The scope's object as deployed: the namespace is its resolver, its
+ * transport and its source of declarations. Every other port is the
+ * production default.
  */
 export class DeployedScope<E extends Env = Env> extends ScopeObject<E> {
   /** The one scope namespace. */
@@ -161,7 +164,7 @@ export class DeployedScope<E extends Env = Env> extends ScopeObject<E> {
 export class ScopeService<E extends Env = Env> extends WorkerEntrypoint<E> {
   /** The one scope namespace. */
   protected scopes(): Binding { return this.env.SCOPES; }
-  found(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition): Promise<Founded> { return api(this.scopes()).found(founding, definition); }
+  found(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions: readonly DeclaredDefinition[] = []): Promise<Founded> { return api(this.scopes()).found(founding, definition, definitions); }
   submit(scope: string, signed: SignedIntent, grants: readonly Grant[]): Promise<Answer> { return api(this.scopes()).submit(scope, signed, grants); }
   settle(scope: string, signed: SignedIntent): Promise<Settlement> { return api(this.scopes()).settle(scope, signed); }
   summary(scope: string, reader: unknown): Promise<Read<Summary>> { return api(this.scopes()).summary(scope, reader); }

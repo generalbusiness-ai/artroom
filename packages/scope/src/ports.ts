@@ -2,7 +2,7 @@
  * The ports of a scope: everything the core asks of the world outside its
  * storage, each as one narrow interface. `production()` gives the defaults.
  * A default that would decide something for another owner refuses: no grant
- * is current, no foreign entry can be read, no definition is supplied and
+ * is current, no foreign entry can be read, no definition can be read and
  * no reader may read. Transport, the dispatcher and the authority note's
  * rules replace them, each behind its own port.
  */
@@ -39,13 +39,14 @@ export interface Resolver { read(fact: FactRef, seconds: number): Promise<Foreig
  * How transport answers one delivery (section 7.4). None of these is an
  * entry. `recorded`: the fact of the entry that recorded the message, now or
  * before; a repeat gets the same fact. `retry`: not decided yet; the sender
- * keeps the duty. `routing`: the resolver of the name refused it before it
+ * keeps the duty. Its reason `unsupported-definition`: a creation whose
+ * definition, as its creator holds it, is not one this runtime can pin. `routing`: the resolver of the name refused it before it
  * reached the scope's judgment, and nothing was recorded. `source-unverified`:
  * a source check failed, and nothing was recorded.
  */
 export type Delivery =
   | { answer: "recorded"; fact: FactRef }
-  | { answer: "retry"; reason: UnavailableReason | "scope-full" }
+  | { answer: "retry"; reason: UnavailableReason | "scope-full" | "unsupported-definition" }
   | { answer: "routing"; reason: RoutingRefusal }
   | { answer: "source-unverified" };
 
@@ -62,9 +63,18 @@ export interface Rules { evaluate(asked: readonly RuleInput[]): Promise<Prepared
 /** The next wake time, or none (section 5.2). A convenience: a late or lost alarm delays a drain and loses nothing. */
 export interface Alarm { set(at: Timestamp | null): void | Promise<void> }
 
-/** A definition's declaration, by what a seed names (section 6.1). */
-export type DefinitionRead = { ok: true; bytes: string } | { ok: false; reason: "unsupported-definition" | "unavailable" };
-export interface Definitions { read(named: Digest | PlatformDefinition): Promise<DefinitionRead> }
+/**
+ * A definition's declaration, by what a seed names (section 6.1). A
+ * declaration is immutable bytes named by their digest, so it is read before
+ * the turn (section 5.1), and the reader checks the digest itself.
+ *
+ * `holder` is the scope that retains the bytes (section 9.2): for a child,
+ * the creator its seed names. Null: nobody is named, as for a founding.
+ * `absent`: the holder answered, and it retains no bytes under that digest.
+ * `unavailable`: the bytes cannot be read now, and may be later.
+ */
+export type DefinitionRead = { ok: true; bytes: string } | { ok: false; reason: "unsupported-definition" | "unavailable" | "absent" };
+export interface Definitions { read(named: Digest | PlatformDefinition, holder: ScopeRef | null): Promise<DefinitionRead> }
 
 /** The reads of section 9.1. */
 export type ReadName = "summary" | "items" | "history" | "entry" | "outbox";
@@ -82,7 +92,8 @@ export interface Ports {
  * The production defaults. The clock and the random source are the
  * runtime's. The rules are derive's evaluator. The alarm does nothing until
  * the object supplies its own. There is no transport until a namespace
- * supplies one. Every other port refuses.
+ * supplies one, and no declaration can be read until a namespace supplies
+ * the creator that retains it. Every other port refuses.
  */
 export function production(): Ports {
   return {
@@ -92,7 +103,8 @@ export function production(): Ports {
     resolver: { read: () => Promise.resolve(null) },
     rules: { evaluate: evaluateRules },
     alarm: { set: () => undefined },
-    // A platform definition is supplied in code, and none is yet (section 6.1). No source of declared definitions is wired in this step.
+    // A platform definition is supplied in code, and none is yet (section 6.1). A declared one is read from the scope that
+    // retains it, through the namespace; with no namespace none can be read.
     definitions: { read: (named) => Promise.resolve({ ok: false, reason: named.startsWith("platform:") ? "unsupported-definition" : "unavailable" }) },
     readers: { allows: () => false },
     transport: null,

@@ -7,11 +7,12 @@
  */
 
 import type { Answer, Bounds, DeclaredDefinition, Digest, DutyId, Entry, FactRef, Grant, PlatformDefinition, Receipt, RefusalReason, DeliveryRefusal, ScopeId, Seed, Settlement, SignedIntent, UnavailableReason } from "@generalbusiness/artroom-contract";
-import { canonicalize, intentDigest, isDigest, newIncarnation, parseStrict } from "@generalbusiness/artroom-bytes";
+import { canonicalize, definitionDigest, intentDigest, isDigest, newIncarnation, parseStrict } from "@generalbusiness/artroom-bytes";
 import { checkpointOf, factsNamed, isFactRef, isMemberRef, isObject, judgeAct, judgeCheckpoint, judgeGenesis, prepareRules, readFields, timeMs, validateDefinition } from "@generalbusiness/artroom-derive";
 import type { ActJudgment, Clock as Reading, Draft, Fetched, Founding, JudgeContext, ValidDefinition } from "@generalbusiness/artroom-derive";
 import { RULE_PROFILES } from "@generalbusiness/artroom-derive/rule";
-import type { Ports } from "./ports.ts";
+import { namedBy } from "./definitions.ts";
+import type { DefinitionRead, Ports } from "./ports.ts";
 import type { Retained, Sealed, Store } from "./store.ts";
 import { Turns, fetchFacts, isSigned, type Verdict } from "./turn.ts";
 
@@ -131,19 +132,26 @@ export class Scope {
    * declaration, or the digest or platform name of one, which the
    * definitions port is asked for.
    *
+   * `definitions`: the declarations of the definitions this one names in
+   * `create` sends, and of those they name in turn. Each that is named is
+   * retained by its digest with the genesis (section 9.2), so that a child
+   * can read it from this scope. One that is named and not supplied is not
+   * retained, and a creation under it waits. One that is supplied and is not
+   * a valid declaration is refused `unsupported-definition`.
+   *
    * No grant is asked for: who may found a repository is the authority
    * note's (section 7.1).
    */
-  async found(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition): Promise<Founded> {
+  async found(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions: readonly DeclaredDefinition[] = []): Promise<Founded> {
     const refused = (reason: Extract<Founded, { answer: "refused" }>["reason"]): Founded => ({ answer: "refused", reason });
     const name = this.#name;
     if (!name || !isSigned(founding)) return refused("source-unverified");
-    const { random, definitions, resolver } = this.#ports;
+    const { random, resolver } = this.#ports;
     const bounds = this.#bounds;
 
     let bytes: string;
     if (typeof definition === "string") {
-      const read = await definitions.read(definition);
+      const read = await this.#ports.definitions.read(definition, null);
       if (!read.ok) return read.reason === "unavailable" ? unavailable("dependency-unavailable") : refused("unsupported-definition");
       bytes = read.bytes;
     } else {
@@ -155,6 +163,19 @@ export class Scope {
     }
     const valid = this.validate(bytes);
     if (!valid || (typeof definition === "string" && isDigest(definition) && valid.digest !== definition)) return refused("unsupported-definition");
+
+    // Section 9.2: the declarations this scope retains for its children, from what the founder supplied.
+    const supplied = new Map<Digest, string>();
+    try {
+      for (const declared of Array.isArray(definitions) ? definitions : []) supplied.set(definitionDigest(declared), canonicalize(declared));
+    } catch {
+      return refused("unsupported-definition");   // not values that have canonical bytes
+    }
+    const children = await namedBy(valid, (digest): Promise<DefinitionRead> => {
+      const given = supplied.get(digest);
+      return Promise.resolve(given === undefined ? { ok: false, reason: "absent" } : { ok: true, bytes: given });
+    }, (text) => this.validate(text), bounds.namedDefinitions);
+    if (!children.ok) return refused("unsupported-definition");
 
     const seed: Seed = { v: 1, kind: "directory", definition: valid.digest, creator: null, cause: intentDigest(founding.intent), ordinal: 0 };
     // Step 1: the facts the founding intent's fields name.
@@ -179,7 +200,7 @@ export class Scope {
           case "write":
             // The item the genesis opens is indexed as this definition says, from its first write.
             this.#store.cover(valid.indexes);
-            return { verdict: "write", draft: judged.draft, retain: [{ kind: "definition", digest: valid.digest, bytes }, ...used(judged.draft, facts)], sealed: answer, unfit: () => refused("bad-field"), full: () => refused("scope-full") };
+            return { verdict: "write", draft: judged.draft, retain: [{ kind: "definition", digest: valid.digest, bytes }, ...children.retain, ...used(judged.draft, facts)], sealed: answer, unfit: () => refused("bad-field"), full: () => refused("scope-full") };
           case "repeat": {
             const kept = this.#store.stored(0)!;
             return said(answer({ entry: JSON.parse(kept.bytes) as Entry, hash: kept.hash }));

@@ -22,7 +22,7 @@ import { timeMs, type Item } from "@generalbusiness/artroom-derive";
 import type { Delivered } from "@generalbusiness/artroom-derive";
 import { Scope, type Checkpointed, type Founded } from "./core.ts";
 import { Deliveries } from "./delivery.ts";
-import { routed, sourced, type Sourced } from "./namespace.ts";
+import { declaredBy, routed, sourced, type Sourced } from "./namespace.ts";
 import { Dispatcher, Wakes } from "./outbox.ts";
 import { production, type Alarm, type Delivery, type Ports } from "./ports.ts";
 import { READ_BOUNDS, Reads, type ReadBounds, type Summary } from "./reads.ts";
@@ -82,7 +82,7 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
     return answer;
   }
 
-  async found(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition): Promise<Founded> { return this.#sent(await this.#scope.found(founding, definition)); }
+  async found(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions: readonly DeclaredDefinition[] = []): Promise<Founded> { return this.#sent(await this.#scope.found(founding, definition, definitions)); }
   async submit(signed: SignedIntent, grants: readonly Grant[]): Promise<Answer> { return this.#sent(await this.#scope.submit(signed, grants)); }
   settle(signed: SignedIntent): Settlement { return this.#scope.settle(signed); }
   checkpoint(): Promise<Checkpointed> { return this.#scope.checkpoint(); }
@@ -99,6 +99,8 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
   }
   /** One entry of this scope, for a scope that received a send of it and checks its source (section 7.4). */
   source(seq: number): Sourced | null { return sourced(this.#store, this.#scope.pinned(), seq); }
+  /** The bytes of one declaration this scope retains, for a child that is about to write its genesis (sections 7.2 and 9.2). */
+  declared(digest: Digest): string | null { return declaredBy(this.#store, digest); }
 
   /** A dispatch pass now, or the one in flight. Resolves when it ends, with the number of dispatches and diagnoses it made. */
   dispatch(): Promise<number> { return this.#dispatcher ? this.#dispatcher.run() : Promise.resolve(0); }
