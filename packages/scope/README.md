@@ -97,7 +97,13 @@ alarm is set to the earliest deadline, or a retry delay ahead when that
 deadline has already passed.
 
 Every number is a member of the contract's `Bounds`. The scope's entry
-budget, its reserve and the alarm's retry delay are temporary values there.
+budget and the alarm's retry delay are temporary values there.
+
+An entry that admits duties (a genesis, an act, a delivered request or
+advisory) is kept only if every admitted duty still has an entry to settle
+in. Derive's `owed` counts those entries from the folded state, inside the
+commit. An act that does not fit is refused `scope-full`. The deltas note,
+section 15, lists what is counted and what is not.
 
 ## How to test
 

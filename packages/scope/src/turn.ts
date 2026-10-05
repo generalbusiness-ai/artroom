@@ -19,7 +19,7 @@
 
 import type { Bounds, FactRef, Head, Prepared, SignedIntent } from "@generalbusiness/artroom-contract";
 import { CanonicalError, canonicalize, entryHash, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
-import { applyEntry, clockOf, entryOf, isEntryOf, isIntent, judgeTimed, nextDue, timeMs, timeOf } from "@generalbusiness/artroom-derive";
+import { applyEntry, clockOf, entryOf, fits, isEntryOf, isIntent, judgeTimed, nextDue, timeMs, timeOf } from "@generalbusiness/artroom-derive";
 import type { Clock as Reading, Draft, Due, Fetched, RuleInput, StateView, ValidDefinition } from "@generalbusiness/artroom-derive";
 import type { Ports, Resolver } from "./ports.ts";
 import type { Retained, Sealed, Store } from "./store.ts";
@@ -66,7 +66,8 @@ export async function fetchFacts(resolver: Resolver, bounds: Bounds, named: read
 /** What the commit does with the waiting input (step 6). */
 export type Verdict<A> =
   /** Write the draft. `retain`: the inputs it names by digest. `sealed` builds the answer from the sealed entry. `unfit` answers for a draft that cannot be an entry: over the size bound, or not canonical values. */
-  | { verdict: "write"; draft: Draft; retain: readonly Retained[]; sealed(sealed: Sealed): A; unfit(why: "size" | "form"): A }
+  /** `full` answers for an entry that admits new duties and would leave no room for them to settle (section 9.2). Nothing is written then. */
+  | { verdict: "write"; draft: Draft; retain: readonly Retained[]; sealed(sealed: Sealed): A; unfit(why: "size" | "form"): A; full(head: Head): A }
   /** Step 6.3: a transition is due. Nothing is written, and the turn goes back to step 3. */
   | { verdict: "stop" }
   /** Nothing is written. */
@@ -99,6 +100,9 @@ class Queue {
     return result;
   }
 }
+
+/** Thrown inside a commit's transaction after the entry was written and folded: the transaction keeps nothing. */
+class Full extends Error {}
 
 /** A draft that cannot be an entry. Thrown before anything is written. */
 class Unfit extends Error {
@@ -204,7 +208,7 @@ export class Turns {
       const due = scope && nextDue(this.#store, definition, clock.asOf);
       if (!scope || !due) return null;
       if (turn.attempts >= this.#bounds.timedAttemptsPerTurn) return { end: "busy" };
-      // Section 9.2: the reserve is for entries such as this one. A scope with no room at all writes nothing.
+      // Section 9.2: room for this entry was counted when its item was opened. A scope with no room at all writes nothing.
       if (scope.head.seq + 1 >= this.#bounds.scopeEntries) return { end: "unavailable" };
       turn.attempts++;
       if (this.#commitTimed(definition, turn, due, scope.head) === "clock-behind") return { end: "clock-behind" };
@@ -234,7 +238,18 @@ export class Turns {
 
   /** Step 6 for the waiting input, in one transaction. `stopped`: nothing was written, and the turn goes back to step 3. */
   #commit<A>(definition: ValidDefinition, waiting: Waiting<A>, turn: Counts, attempt: Attempt): End<A> | "stopped" {
-    return this.#store.transaction((): End<A> | "stopped" => {
+    let full: (() => A) | null = null;
+    try {
+      return this.#store.transaction((): End<A> | "stopped" => this.#judged(definition, waiting, turn, attempt, (answer) => { full = answer; }));
+    } catch (error) {
+      // The entry would have left an admitted duty no room to settle. The transaction wrote nothing.
+      if (error instanceof Full && full) return { end: "answer", answer: (full as () => A)() };
+      throw error;
+    }
+  }
+
+  #judged<A>(definition: ValidDefinition, waiting: Waiting<A>, turn: Counts, attempt: Attempt, refuse: (full: () => A) => void): End<A> | "stopped" {
+    {
       const clock = clockOf(this.#store, this.#ports.clock.read());    // 6.1: the one reading
       turn.last = clock;
       const head = this.#store.scope()?.head ?? null;
@@ -250,13 +265,19 @@ export class Turns {
       });
       try {
         const sealed = this.#seal(definition, verdict.draft, clock, [...verdict.retain, ...rules]);   // 6.5
+        // Section 9.2: an entry that admits duties is kept only if every admitted duty still has room to settle. The count is of
+        // the state the fold just wrote, so it is under the head check, and a verifier derives the same number.
+        if (!fits(this.#store, definition, this.#bounds, sealed.entry.input)) {
+          refuse(() => verdict.full(head ?? { seq: sealed.entry.seq, hash: sealed.hash }));
+          throw new Full();
+        }
         turn.wrote = true;
         return { end: "answer", answer: verdict.sealed(sealed) };
       } catch (error) {
         if (error instanceof Unfit) return { end: "answer", answer: verdict.unfit(error.why) };
         throw error;
       }
-    });
+    }
   }
 
   /**

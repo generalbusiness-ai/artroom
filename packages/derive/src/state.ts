@@ -79,6 +79,15 @@ export interface Decided { from: Pick<ScopeRef, "scope" | "inc">; seq: number; h
 export interface AttemptState { attempt: number; opened: number; outcome: { seq: number; result: "confirmed" | "refused" | "unknown" } | null }
 export interface Operation { id: OperationId; attempts: readonly AttemptState[] }
 
+/**
+ * The duties that are open and are not items (section 9.2). `requests`: sent
+ * requests with no result and no diagnosis. `unavailable`: those with a
+ * `delivery-unavailable` diagnosis and no result. `opened`: attempts of
+ * outside operations with no outcome. `unknown`: attempts whose outcome is
+ * `unknown`.
+ */
+export interface Outstanding { requests: number; unavailable: number; opened: number; unknown: number }
+
 /** Items in ascending ID order. `more`: the page stopped at its limit and at least one further item follows. */
 export interface Page { items: readonly Item[]; more: boolean }
 
@@ -130,6 +139,8 @@ export interface StateView {
   decided(from: ScopeRef, seq: number, n: number): Decided | null;
   creation(seed: Digest): HeldCreation | null;
   operation(id: OperationId): Operation | null;
+  /** How many duties are open, for the room they need to settle (section 9.2); see `Outstanding`. */
+  outstanding(): Outstanding;
   /** Everything, for a checkpoint. This is the one read that is not bounded. */
   all(): StateSnapshot;
 }
@@ -212,6 +223,14 @@ export class MemoryState implements StateWriter {
   decided(from: ScopeRef, seq: number, n: number) { return this.#decided.get(key(from.scope, from.inc, seq, n)) ?? null; }
   creation(seed: Digest) { return this.#creations.get(seed) ?? null; }
   operation(id: OperationId) { return this.#operations.get(id) ?? null; }
+  outstanding(): Outstanding {
+    const open = [...this.#requests.values()].filter((r) => r.result === null);
+    const attempts = [...this.#operations.values()].flatMap((o) => o.attempts);
+    return {
+      requests: open.filter((r) => r.diagnosis === null).length, unavailable: open.filter((r) => r.diagnosis?.finding === "delivery-unavailable").length,
+      opened: attempts.filter((a) => a.outcome === null).length, unknown: attempts.filter((a) => a.outcome?.result === "unknown").length,
+    };
+  }
 
   setScope(scope: ScopeState) { this.#scope = scope; }
   putItem(item: Item) {

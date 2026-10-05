@@ -16,7 +16,7 @@
 import type { Digest, Entry, FactRef, KeyId, OperationId, ScopeRef } from "@generalbusiness/artroom-contract";
 import { canonicalize } from "@generalbusiness/artroom-bytes";
 import { MemoryState, slotOf } from "@generalbusiness/artroom-derive";
-import type { Accepted, Decided, HeldCreation, Item, Operation, OwnRequest, Page, RangeIndex, Relation, ScopeState, StateSnapshot } from "@generalbusiness/artroom-derive";
+import type { Accepted, Decided, HeldCreation, Item, Operation, Outstanding, OwnRequest, Page, RangeIndex, Relation, ScopeState, StateSnapshot } from "@generalbusiness/artroom-derive";
 import type { Duty, Retained, Store, Stored } from "./store.ts";
 
 export type SqlValue = string | number | null | ArrayBuffer;
@@ -55,6 +55,7 @@ CREATE TABLE IF NOT EXISTS item_slot (id INTEGER NOT NULL, slot TEXT NOT NULL, t
 CREATE INDEX IF NOT EXISTS item_by_slot ON item_slot (type, slot, value, state, id);
 CREATE TABLE IF NOT EXISTS outbox (seq INTEGER NOT NULL, n INTEGER NOT NULL, target TEXT NOT NULL, class TEXT NOT NULL, message TEXT NOT NULL, held INTEGER NOT NULL DEFAULT 0,
   attempts TEXT NOT NULL DEFAULT '[]', request TEXT, result TEXT, diagnosis TEXT, PRIMARY KEY (seq, n)) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS outbox_open ON outbox (seq, n) WHERE request IS NOT NULL AND result IS NULL;
 CREATE TABLE IF NOT EXISTS inbox (scope TEXT NOT NULL, inc TEXT NOT NULL, seq INTEGER NOT NULL, n INTEGER NOT NULL, hash TEXT NOT NULL, by INTEGER NOT NULL, PRIMARY KEY (scope, inc, seq, n)) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS folded (kind TEXT NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL, PRIMARY KEY (kind, key)) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS retained_input (kind TEXT NOT NULL, digest TEXT NOT NULL, bytes TEXT NOT NULL, under TEXT, PRIMARY KEY (kind, digest)) WITHOUT ROWID;
@@ -124,6 +125,18 @@ export class SqliteStore implements Store {
   }
   creation(seed: Digest): HeldCreation | null { return this.#folded("creation", seed); }
   operation(id: OperationId): Operation | null { return this.#folded("operation", id); }
+  /**
+   * Counted from the rows of requests with no result, which `outbox_open`
+   * indexes, and from the operations, which no form opens yet.
+   */
+  outstanding(): Outstanding {
+    const open = this.#one("SELECT COALESCE(SUM(diagnosis IS NULL), 0) AS requests, COALESCE(SUM(diagnosis LIKE '%\"delivery-unavailable\"%'), 0) AS unavailable FROM outbox WHERE request IS NOT NULL AND result IS NULL")!;
+    const attempts = this.#all("SELECT value FROM folded WHERE kind = 'operation'").flatMap((row) => json<Operation>(row["value"]).attempts);
+    return {
+      requests: open["requests"] as number, unavailable: open["unavailable"] as number,
+      opened: attempts.filter((a) => a.outcome === null).length, unknown: attempts.filter((a) => a.outcome?.result === "unknown").length,
+    };
+  }
 
   /**
    * Everything, for a checkpoint: the one read that is not bounded. The rows

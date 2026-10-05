@@ -15,7 +15,8 @@ review (event `fbcdc3bd`). Entries 55 and 78 are corrected in place.
 Section 13 is two repairs made after the review's second reading of the
 eight (report `947a4116`). Entries 2 and 66 are corrected in place.
 Section 14, "The runtime", has entries 79 to 95, from step 3
-(`packages/scope`).
+(`packages/scope`). Section 15 is repairs to the runtime after its reviews;
+entry 81 is corrected in place.
 
 Each entry is a place where the contract was silent or needed a concrete
 form, what was implemented, and why. Nothing here is adopted by being
@@ -256,7 +257,7 @@ From step 3, `packages/scope`: one scope on Durable Object storage.
 |---|---|---|---|
 | 79 | **For review.** Step 2 says a scope processes one input at a time. Step 6.2 has a head check, which matters only if another input can commit between a snapshot and its commit. | A queue admits one input at a time to steps 3 and 4, and to step 6. Step 5, the evaluation of rules, is outside the queue: it is the one place a turn waits, for up to the preparation time limit. Another input may commit meanwhile, and the head check then sends the first back to step 3. An input with no rule to evaluate does not wait, so its steps 3 to 6 are one section. | With the whole turn in the queue, the head check and the restart budget could never act, and one slow rule would hold every input and every expiry for its time limit. |
 | 80 | Where step 6.3's due check is made. | In derive's judges, which the verifier also runs. So an answer that needs no state is given without it: the exact retry of an accepted act gets its receipt, and a mismatch, a bad intent or an expired intent its refusal. Every input that could be written meets the check. | One implementation of the check. Nothing is written past a due expiry. |
-| 81 | The scope's budget (section 9.2). | Two temporary bounds: `scopeEntries`, 100,000, and `settlementReserve`, 10,000. An act that would be written as entry `scopeEntries - settlementReserve` or later is refused `scope-full`, with the head it was judged at. Every other answer to an act is unchanged, so an exact retry still gets its receipt. A timed entry or a checkpoint is written until `scopeEntries`. Past that, nothing is written and the turn ends `unavailable`. | The contract owes the numbers and what a full scope does next to R4. |
+| 81 | The scope's budget (section 9.2). | Corrected by section 15: one temporary bound, `scopeEntries`, 100,000, and a count of the entries the admitted duties still need. An entry that admits duties is written only when that count fits beside the entries already written; an act is otherwise refused `scope-full`, with the head it was judged at. Every other answer to an act is unchanged, so an exact retry still gets its receipt. Past `scopeEntries` nothing is written and the turn ends `unavailable`. | The contract owes the numbers and what a full scope does next to R4. |
 | 82 | When the alarm is set, and the delay after a spent budget. | After a turn that wrote, that ended without an answer, or that an alarm started: at the earliest deadline any live item holds; or, when that deadline has passed, `drainRetrySeconds` (1, temporary) after the later of the last reading and the last entry's time. With no deadline the alarm is cleared. | Section 5.2: the delay is a retry policy, owed to R4. |
 | 83 | How a founding is answered. | `Founded`: `accepted` with the receipt of entry 0, also for the same founding again; `refused` with a reason, where `scope-refused` means the genesis entry was written with its act refused; `unavailable`. No grant is asked for. | Section 7.1 gives the founder a receipt. Who may found a repository is R3's; until then the caller of `found` decides. |
 | 84 | What `found` is given as the definition. | A declaration, or the digest or platform name of one, which the definitions port is asked for. The declaration is validated as its canonical bytes parse, with the evaluator's profile table, so a scope reads one value before and after a restart. One that fails, and a platform name, is refused `unsupported-definition`. | Section 6.1. A platform definition is code that does not exist yet. |
@@ -271,3 +272,71 @@ From step 3, `packages/scope`: one scope on Durable Object storage.
 | 93 | Settlement. | It asks no port. The intent must be signed and addressed to this scope: another incarnation is `wrong-incarnation`, anything else that does not match an accepted intent is `not-found`. A founding intent is not settled this way; the same founding again returns its receipt. | Section 4.2: the exact signed intent is the authority for this read. |
 | 94 | Inputs this step can take. | A founding, an act, a timed transition and a checkpoint. `checkpoint()` writes one through the head; it reads the whole state, which is not bounded. Deliveries, diagnoses and outcomes wait for transport and the dispatcher. | A checkpoint is the one input here that judges no time, so it shows the clamped entry of section 5.3. |
 | 95 | How an object knows its name. | From the name it was reached by, which the runtime gives the object. An object reached without a name has none, and a founding of it is refused `source-unverified`. | Section 2.3: the genesis checks the seed's digest against the object's own name. |
+
+## 15. Repairs to the runtime
+
+### Room to settle is counted by admitted duty (event 1f52493c)
+
+The first runtime kept a fixed number of entries, `settlementReserve`, for
+entries that settle. That number did not follow what the scope had
+admitted. With 12 entries and a reserve of 2, three holds were opened in
+entries 1 to 9, the drain wrote two ends as entries 10 and 11, and the third
+end had no entry left: an admitted duty could not settle.
+
+The fixed reserve is removed. `owed(view, definition)`, in derive, counts
+the entries that the admitted duties of a folded state still need. In the
+commit, after an entry is written and folded and before the transaction
+ends, `fits` checks that the entries written and the entries owed are
+together at most `scopeEntries`. If they are not, the transaction is
+abandoned, nothing is kept, and the input is answered: an act and a
+founding `scope-full`; a checkpoint `unavailable`. The count reads the
+folded state only, inside the commit, so it is under the head check and a
+verifier can derive the same number from the same history. It reads
+nothing that transport keeps outside the history.
+
+| A duty that is counted | Entries |
+|---|---|
+| A live item of a timed item type | One for each timed rule on that type, in whatever live state the item is and whether or not its deadline is set. |
+| A request this scope sent, with no result and no `undelivered` diagnosis | Two before any diagnosis: a `delivery-unavailable` diagnosis may be followed by a late result. One after that diagnosis. |
+| A provisional scope | One: the confirmation. |
+| An opened attempt of an outside operation | Two before any outcome: `unknown` may be followed by the same attempt's outcome. One after `unknown`. |
+| A checkpoint | One, always. A checkpoint is written only into that entry. |
+
+Entries that are checked, because they admit duties or are new work: a
+genesis, an act, a delivery of a request and a delivery of an advisory.
+Entries that are not checked, because their duty was counted when it was
+admitted: a timed entry, a delivery of a result or of a control, a
+diagnosis and an outcome. Those are refused only at `scopeEntries` itself,
+which the count is meant to keep them from reaching.
+
+The planner's case now: with `scopeEntries` 12, two holds are opened in
+entries 1 to 6 and a third commitment in entries 7 and 8. The act that
+would open the third hold is refused `scope-full`: it would be the tenth
+entry and four would be owed. Both ends are then written as entries 9 and
+10, and a checkpoint as entry 11. That is the one witness, in the scope
+package's turn test, which replaces the earlier budget witness.
+
+What the count does not cover. The code guarantees nothing for these:
+
+- **Bytes.** The count is of entries. Retained inputs, the size of an
+  entry and the storage of a scope are not budgeted.
+- **Sends by number.** A send that is not a request (a result, a control,
+  an advisory) needs no entry in this scope and is not counted. Nothing
+  bounds the outbox rows of a scope beyond the sends of each entry.
+- **Nested duties.** A delivered request is checked for the duties its own
+  entry admits, the requests its handler sends among them. What the
+  receivers of those sends will need is theirs to count. A result's clause
+  that sends a confirmation admits no entry here.
+- **A second result.** A `conflict`, the answer of a second incarnation to
+  a creation, is an entry that no count foresaw.
+- **Chains of timed rules.** A timed rule that moves its item into the
+  states of another timed rule is counted once for each rule, not once for
+  each time a rule could apply. A definition whose timed rules form a cycle
+  is not bounded by this count, or by anything else in this step.
+- **Cost.** The count reads one number for each state of each timed type,
+  one aggregate over the requests with no result, and the operations, which
+  no form opens yet. Requests diagnosed `undelivered` stay among the rows
+  that aggregate reads.
+
+`scopeEntries` stays a temporary value. No number was raised, no duty is
+dropped, no expiry is skipped and nothing is evicted.

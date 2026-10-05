@@ -163,7 +163,7 @@ export class Scope {
           case "write":
             // The item the genesis opens is indexed as this definition says, from its first write.
             this.#store.cover(valid.indexes);
-            return { verdict: "write", draft: judged.draft, retain: [{ kind: "definition", digest: valid.digest, bytes }, ...used(judged.draft, facts)], sealed: answer, unfit: () => refused("bad-field") };
+            return { verdict: "write", draft: judged.draft, retain: [{ kind: "definition", digest: valid.digest, bytes }, ...used(judged.draft, facts)], sealed: answer, unfit: () => refused("bad-field"), full: () => refused("scope-full") };
           case "repeat": {
             const kept = this.#store.stored(0)!;
             return said(answer({ entry: JSON.parse(kept.bytes) as Entry, hash: kept.hash }));
@@ -213,13 +213,13 @@ export class Scope {
         switch (judged.result) {
           case "write": {
             const head = view.scope()!.head;
-            // Section 9.2: a scope at its budget refuses new acts and keeps the reserve for the entries that settle.
-            if (head.seq + 1 >= bounds.scopeEntries - bounds.settlementReserve) return said<Answer>({ answer: "refused", reason: "scope-full", judgedAt: head });
             return {
               verdict: "write", draft: judged.draft, retain: used(judged.draft, facts),
               sealed: (sealed) => ({ answer: "accepted", receipt: receiptOf(sealed, named) }),
               // An entry over the size bound, or a grant that is not canonical values, is never written.
               unfit: (why) => ({ answer: "refused", reason: why === "size" ? "bad-field" : "unauthorized", judgedAt: head }),
+              // Section 9.2: an act is refused when the duties it would admit, with those already admitted, have no room to settle.
+              full: () => ({ answer: "refused", reason: "scope-full", judgedAt: head }),
             };
           }
           case "due": return { verdict: "stop" };
@@ -272,7 +272,7 @@ export class Scope {
         switch (judged.result) {
           case "write":
             if (view.scope()!.head.seq + 1 >= bounds.scopeEntries) return said<Checkpointed>(unavailable("unavailable"));
-            return { verdict: "write", draft: judged.draft, retain: [], sealed: ({ entry, hash }) => ({ answer: "written", fact: { at: entry.at, seq: entry.seq, hash } }), unfit: () => unavailable("unavailable") };
+            return { verdict: "write", draft: judged.draft, retain: [], sealed: ({ entry, hash }) => ({ answer: "written", fact: { at: entry.at, seq: entry.seq, hash } }), unfit: () => unavailable("unavailable"), full: () => unavailable("unavailable") };
           case "due": return { verdict: "stop" };
           case "refused": return said<Checkpointed>({ answer: "refused", reason: judged.reason });
           case "unavailable": return said<Checkpointed>(unavailable(judged.reason));
