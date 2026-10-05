@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers";
-import { evictDurableObject, runInDurableObject } from "cloudflare:test";
+import { runInDurableObject } from "cloudflare:test";
 import { describe, expect, test } from "vitest";
 import type { DeclaredDefinition, Entry, Intent, ScopeRef, Seed } from "@generalbusiness/artroom-contract";
 import { definitionDigest, intentDigest, isIncarnation, scopeIdOf, signIntent } from "@generalbusiness/artroom-bytes";
@@ -7,10 +7,9 @@ import { timeOf, type Delivered } from "@generalbusiness/artroom-derive";
 import { Scope, grantOf, laneDefinition, variant } from "@generalbusiness/artroom-derive/testing";
 import { inbox } from "@generalbusiness/artroom-platform";
 import { httpSource, verify } from "@generalbusiness/artroom-replay";
-import type { Delivery } from "../src/index.ts";
 import { controls, scriptedCapability } from "../src/testing.ts";
-import { Node, founding as foundingIn, net, routed } from "./net.ts";
-import { HOLD, START, at, definition, found, founding, objectOf, reader, rita, stubOf, una } from "./support.ts";
+import { Node, founding as foundingIn, net, routed, soon } from "./net.ts";
+import { HOLD, START, at, definition, found, founding, reader, rita, stubOf, una } from "./support.ts";
 
 describe("founding a directory (sections 2.2, 2.3 and 7.1)", () => {
   test("entry 0 holds the seed, the signed intent and a minted incarnation, and the scope answers under its own name only", async () => {
@@ -83,72 +82,75 @@ describe("founding a directory (sections 2.2, 2.3 and 7.1)", () => {
     expect(await deployed.summary(reader)).toEqual({ ok: false, reason: "forbidden" });
   });
 
-  test("platform:inbox@1 has a row that is code, `notify`, row P22, whose rule is not written. The production wiring founds nothing under it: unsupported-definition for the whole scope. With a rule supplied for every such row, by a STAND-IN that proves nothing about P22, a scope is founded, retains no declaration and judges its acts, also after a restart; when the rule is gone, the scope admits nothing; and the same data, given by an input, founds nothing", async () => {
-    // A STAND-IN: `standInPlatform`, of test support, supplies a rule that adds nothing for each row that the platform package marks as
-    // code. It is not the rule of P22, which plan step 11 writes, and no judge runs it. This test shows which definitions a scope
-    // runs under, and nothing about what a notice's `source` holds.
+  test("platform:inbox@1 has one mark, `notice-source`, and the platform package has its rule. The production wiring founds a scope under it, which retains no declaration and judges its acts, also after a restart; a runtime that has lost the rule admits nothing to that scope and founds none; and the same data, given by an input, founds nothing", async () => {
+    const NAMED = "platform:inbox@1";
     const asked = (notAfter: Intent["notAfter"]): Intent => ({ v: 1, to: null, actor: rita.key, kind: "found", on: null, expected: {}, fields: { owner: rita.member, membership: rita.member.membership }, idempotencyKey: crypto.randomUUID(), notAfter });
     const seedOf = (intent: Intent, definition: Seed["definition"]): Seed => ({ v: 1, kind: "directory", definition, creator: null, cause: intentDigest(intent), ordinal: 0 });
-    const stored = (name: string, query: string, namespace = env.SCOPES) => runInDurableObject(namespace.get(namespace.idFromName(name)), (_instance, state) => state.storage.sql.exec(query).toArray());
+    const stored = (name: string, query: string, namespace = env.NET) => runInDurableObject(namespace.get(namespace.idFromName(name)), (_instance, state) => state.storage.sql.exec(query).toArray());
 
-    // `AS_DEPLOYED` has every production default: the definitions port of `production()`, which supplies the inbox's data and no
-    // rule for `notify`. Section 6.1: a scope runs every turn under its whole pinned definition, or none. Nothing is founded.
-    const refused = asked(timeOf(Date.now() + 60_000));
-    const deployed = scopeIdOf(seedOf(refused, "platform:inbox@1"));
-    expect(await stubOf(deployed, env.AS_DEPLOYED).found(signIntent(refused, rita.secret), "platform:inbox@1")).toEqual({ answer: "refused", reason: "unsupported-definition" });
-    expect(await stored(deployed, "SELECT COUNT(*) AS n FROM entry", env.AS_DEPLOYED)).toEqual([{ n: 0 }]);
+    // `AS_DEPLOYED` has every production default: the definitions port of `production()`, which supplies the inbox's data with its
+    // rule. Every mark has its rule, so the definition is one that this runtime can run, and the scope is founded.
+    const first = asked(timeOf(Date.now() + 60_000));
+    const deployed = scopeIdOf(seedOf(first, NAMED));
+    expect(await stubOf(deployed, env.AS_DEPLOYED).found(signIntent(first, rita.secret), NAMED)).toMatchObject({ answer: "accepted", receipt: { definition: NAMED, fact: { at: { scope: deployed }, seq: 0 } } });
+    expect(await stored(deployed, "SELECT COUNT(*) AS n FROM entry", env.AS_DEPLOYED)).toEqual([{ n: 1 }]);
 
-    // The test wiring without the stand-in rules answers the same. With them, every row that is code has a rule, and the scope is
-    // founded. The founding names the platform definition: the seed holds that name, and the object's name is the seed's digest.
-    const intent = asked(at(60));
-    const name = scopeIdOf(seedOf(intent, "platform:inbox@1"));
-    const scope = stubOf(name);
-    expect(await scope.found(signIntent(intent, rita.secret), "platform:inbox@1")).toEqual({ answer: "refused", reason: "unsupported-definition" });
-    controls(name, START).platformRules = true;
-    const founded = await scope.found(signIntent(intent, rita.secret), "platform:inbox@1");
-    if (founded.answer !== "accepted") throw new Error(`not founded: ${JSON.stringify(founded)}`);
-    const ref: ScopeRef = founded.receipt.fact.at;
-    expect([ref.scope, founded.receipt.fact.seq, founded.receipt.definition]).toEqual([name, 0, "platform:inbox@1"]);
+    // The rest is in the namespace `NET`: the deployed class and its definitions port, with the test clock, authority and readers.
+    try {
+      net.hold = net.deaf = null;
+      const intent = asked(soon(60));
+      const name = scopeIdOf(seedOf(intent, NAMED));
+      const I = new Node(name, inbox as unknown as DeclaredDefinition);
+      // The founding names the platform definition: the seed holds that name, and the object's name is the seed's digest.
+      const founded = await I.stub.found(signIntent(intent, rita.secret), NAMED);
+      if (founded.answer !== "accepted") throw new Error(`not founded: ${JSON.stringify(founded)}`);
+      const ref: ScopeRef = founded.receipt.fact.at;
+      expect([ref.scope, founded.receipt.fact.seq, founded.receipt.definition]).toEqual([name, 0, NAMED]);
 
-    // The genesis entry: the genesis act of section 12.1.6, `establish`, with the two effects that the definition's data writes.
-    // A platform definition is pinned by its name and version, so no declaration is retained for it.
-    const [genesis] = await stored(name, "SELECT bytes FROM entry WHERE seq = 0");
-    expect(JSON.parse(genesis!["bytes"] as string) as Entry).toMatchObject({
-      seq: 0, input: { type: "genesis", seed: { definition: "platform:inbox@1" }, kind: "establish", decision: "applied" },
-      effects: [{ effect: "open", item: 0, type: "inbox", state: "open" }, { effect: "party", slot: "owner" }, { effect: "ref", slot: "membership" }],
-    });
-    expect(await stored(name, "SELECT COUNT(*) AS n FROM retained_input WHERE kind = 'definition'")).toEqual([{ n: 0 }]);
+      // The genesis entry: the genesis act of section 12.1.6, `establish`, with the two effects that the definition's data writes.
+      // A platform definition is pinned by its name and version, so no declaration is retained for it.
+      const [genesis] = await stored(name, "SELECT bytes FROM entry WHERE seq = 0");
+      expect(JSON.parse(genesis!["bytes"] as string) as Entry).toMatchObject({
+        seq: 0, input: { type: "genesis", seed: { definition: NAMED }, kind: "establish", decision: "applied" },
+        effects: [{ effect: "open", item: 0, type: "inbox", state: "open" }, { effect: "party", slot: "owner" }, { effect: "ref", slot: "membership" }],
+      });
+      expect(await stored(name, "SELECT COUNT(*) AS n FROM retained_input WHERE kind = 'definition'")).toEqual([{ n: 0 }]);
 
-    // After a restart the definition is the code's again, and the scope runs: an act is judged. `mark-read` names no notice, which
-    // is check 8 of section 4.2. No act of this definition reaches check 9 without a notice, and a notice needs `notify`.
-    await evictDurableObject(objectOf(name));
-    const head = { seq: 0, hash: founded.receipt.fact.hash };
-    const read = (key: string) => signIntent({ v: 1, to: ref, actor: rita.key, kind: "mark-read", on: 7, expected: { on: 1, inbox: 1 }, fields: {}, idempotencyKey: key, notAfter: at(60) }, rita.secret);
-    expect(await scope.submit(read("k"), [grantOf(rita, ref, ["inbox.own"])])).toEqual({ answer: "refused", reason: "no-item", judgedAt: head });
+      // After a restart the definition is the code's again, and the scope runs: an act is judged. `mark-read` names no notice, which
+      // is check 8 of section 4.2.
+      await I.restart();
+      const head = { seq: 0, hash: founded.receipt.fact.hash };
+      const read = (on: number) => I.act(rita, "mark-read", { on, expected: { on: 1, inbox: 1 } });
+      expect(await read(7)).toEqual({ answer: "refused", reason: "no-item", judgedAt: head });
 
-    // No judge runs a platform rule yet (I3 deltas, entry EC6). So `notify`, whose rule is supplied and not run, is not derived:
-    // the delivery is not decided, and the sender keeps the duty. The control is an advisory of a row that is not marked: it goes
-    // on to the read of its source entry, which this resolver cannot make.
-    const from = { at: { ...ref, kind: "lane" as const }, seq: 3, hash: founded.receipt.fact.hash };
-    const advisory = (type: "notify" | "index"): Delivered => ({ to: ref, from, n: 0, message: { class: "advisory", type, body: { fields: { reason: "review" } } } });
-    const object = objectOf(name) as unknown as { deliver(envelope: Delivered): Promise<Delivery> };
-    expect([await object.deliver(advisory("notify")), await object.deliver(advisory("index"))]).toEqual([{ answer: "retry", reason: "unsupported-definition" }, { answer: "retry", reason: "dependency-unavailable" }]);
+      // I3 merge: no judge runs a platform rule yet, so `notify`, whose rule is supplied and not run, is not derived: the delivery is
+      // not decided, and the sender keeps the duty. The control is an advisory of a row with no mark: it goes on to the read of its
+      // source entry, which no scope of this namespace holds.
+      const from = { at: { ...ref, kind: "lane" as const }, seq: 3, hash: founded.receipt.fact.hash };
+      const advisory = (type: "notify" | "index"): Delivered => ({ to: ref, from, n: 0, message: { class: "advisory", type, body: { fields: { reason: "review" } } } });
+      expect([await I.stub.deliver(advisory("notify")), await I.stub.deliver(advisory("index"))]).toEqual([{ answer: "retry", reason: "unsupported-definition" }, { answer: "source-unverified" }]);
 
-    // A scope that exists under the definition, in a runtime that has no rule for the row: it admits nothing, whatever the row. The
-    // act that was judged above is now not judged.
-    controls(name).platformRules = false;
-    await evictDurableObject(objectOf(name));
-    expect([await scope.summary(reader), await scope.submit(read("k2"), [grantOf(rita, ref, ["inbox.own"])])]).toEqual([{ ok: false, reason: "unsupported-definition" }, { answer: "unavailable", reason: "unavailable" }]);
-    expect(await stored(name, "SELECT COUNT(*) AS n FROM entry")).toEqual([{ n: 1 }]);
+      // The same scope, in a runtime that has lost the rule: test support supplies the data with no rule. Section 6.1, "A mark with
+      // no rule: the whole scope": the scope admits nothing, whatever the row. The act that was judged above is now not judged, and
+      // nothing is founded under the definition.
+      net.platformCode = false;
+      await I.restart();
+      expect([await I.stub.summary(reader), await read(7)]).toEqual([{ ok: false, reason: "unsupported-definition" }, { answer: "unavailable", reason: "unavailable" }]);
+      expect(await stored(name, "SELECT COUNT(*) AS n FROM entry")).toEqual([{ n: 1 }]);
+      const lost = asked(soon(60));
+      expect(await new Node(scopeIdOf(seedOf(lost, NAMED)), I.declared).stub.found(signIntent(lost, rita.secret), NAMED)).toEqual({ answer: "refused", reason: "unsupported-definition" });
+      expect(await stored(scopeIdOf(seedOf(lost, NAMED)), "SELECT COUNT(*) AS n FROM entry")).toEqual([{ n: 0 }]);
+      net.platformCode = true;
 
-    // The validator's platform option is reached by the name alone. The same data, given by an input as a declaration, is validated
-    // without it: a declared definition does not take a platform name, and nothing is founded, also with the stand-in rules.
-    const other = asked(at(60));
-    const given = inbox as unknown as DeclaredDefinition;
-    const declared = scopeIdOf(seedOf(other, definitionDigest(given)));
-    controls(declared, START).platformRules = true;
-    expect(await stubOf(declared).found(signIntent(other, rita.secret), given)).toEqual({ answer: "refused", reason: "unsupported-definition" });
-    expect(await stored(declared, "SELECT COUNT(*) AS n FROM entry")).toEqual([{ n: 0 }]);
+      // The validator's platform option is reached by the name alone. The same data, given by an input as a declaration, is validated
+      // without it: a declared definition holds no mark, and nothing is founded.
+      const other = asked(soon(60));
+      const declared = scopeIdOf(seedOf(other, definitionDigest(I.declared)));
+      expect(await new Node(declared, I.declared).stub.found(signIntent(other, rita.secret), I.declared)).toEqual({ answer: "refused", reason: "unsupported-definition" });
+      expect(await stored(declared, "SELECT COUNT(*) AS n FROM entry")).toEqual([{ n: 0 }]);
+    } finally {
+      net.platformCode = true;
+    }
   });
 
   test("a definition that needs a capability record: the production wiring founds no scope under it; the scripted test capability, a stand-in that shows nothing about a real hold, runs it in a test; a replay with no code for the capability answers unsupported-definition", async () => {

@@ -1,8 +1,8 @@
 import { expect, test } from "vitest";
 import { PROPOSED_BOUNDS, type DeclaredDefinition } from "@generalbusiness/artroom-contract";
 import { definitionDigest } from "@generalbusiness/artroom-bytes";
-import { PROFILES, derivable, validateDefinition } from "@generalbusiness/artroom-derive";
-import { RULES, definitions, inbox } from "../src/index.ts";
+import { PROFILES, derivable, runnable, validateDefinition } from "@generalbusiness/artroom-derive";
+import { RULES, definitions, inbox, platform } from "../src/index.ts";
 
 // The plan's T43, for the one definition that exists: `platform:inbox@1` (authority note, revision 16, section 12.1.6).
 test("the inbox definition validates whole with the platform option, with its marks listed, and is refused without it", () => {
@@ -23,14 +23,20 @@ test("the inbox definition validates whole with the platform option, with its ma
   // is found before the rows are read; and under a declared name each mark is a form that the contract does not define.
   const { outcomes: _, ...rows } = inbox;
   const refused = (value: unknown) => { const checked = validateDefinition(value, PROPOSED_BOUNDS); return checked.ok ? null : checked.problems.map((p) => [p.code, p.path]); };
-  const marks = [["shape", "receives.notify-from-lane.effects.4"], ["shape", "receives.notify-from-task.effects.4"]];
+  // A declared definition would also leave the required slot `source` unset: no written effect sets it.
+  const marks = ["lane", "task"].flatMap((kind) => [["shape", `receives.notify-from-${kind}.effects.3`], ["required-unset", `receives.notify-from-${kind}.effects`]]);
   expect([refused(inbox), refused(rows), refused({ ...rows, name: "inbox" })]).toEqual([[["shape", "outcomes"]], [["shape", "name"]], marks]);
 
-  // The data says where each rule stands: the mark `notice-source`, row P22, is the last effect of each `notify` handler. No table
-  // beside the data says so. The table of rules is empty, so no runtime can run the inbox yet.
+  // The data says where each rule stands: the mark `notice-source`, row P22, is the last effect of each `notify` handler, and no
+  // written effect sets `source`. No table beside the data says which entries are code.
   expect(checked.definition.marks.map((m) => [m.place, m.path, m.code, m.row])).toEqual([
-    [5, "receives.notify-from-lane.effects.4", "notice-source", "P22"], [5, "receives.notify-from-task.effects.4", "notice-source", "P22"],
+    [5, "receives.notify-from-lane.effects.3", "notice-source", "P22"], [5, "receives.notify-from-task.effects.3", "notice-source", "P22"],
   ]);
-  expect(RULES).toEqual({});
+  expect(Object.values(inbox.receives).flatMap((h) => h.effects).filter((e) => "value" in e && e.value.slot === "source")).toEqual([]);
+  // The table has a rule of the right kind for every mark, so a runtime with this package can run the inbox. Without the rule, or
+  // with a rule of another place under that name, it cannot.
+  const { rules } = platform("platform:inbox@1")!;
+  expect(Object.keys(RULES)).toEqual(["platform:inbox"]);
+  expect([runnable(checked.definition, rules), runnable(checked.definition, {}), runnable(checked.definition, { "notice-source": { place: "send", run: () => null } })]).toEqual([true, false, false]);
   expect(Object.keys(definitions)).toEqual(["platform:inbox"]);
 });

@@ -27,12 +27,12 @@
  *   entry, an input, a message or an envelope.
  * - An entry that it joins is checked by the same checks as any other.
  *
- * The validator does not read this table. The table is empty: no rule is
- * written yet. The inbox marks one, `notice-source`, so no scope is founded
- * under it yet.
+ * The validator does not read this table. Each definition's rules are
+ * written beside its data, in the definition's own file.
  */
 
 import type { Rules } from "@generalbusiness/artroom-derive";
+import { inboxRules } from "./inbox.ts";
 
 /** The platform definitions that this package holds, by name without the version (section 12.1). `platform:task` is not here: it is IA's. */
 export type PlatformName = "platform:register" | "platform:directory" | "platform:membership" | "platform:rules" | "platform:destination" | "platform:inbox";
@@ -40,5 +40,5 @@ export type PlatformName = "platform:register" | "platform:directory" | "platfor
 /** Every rule: by definition, then by the name that a mark of its data states. */
 export type RuleTable = { readonly [name in PlatformName]?: Rules };
 
-/** No rule is written yet. */
-export const RULES: RuleTable = {};
+/** The rules that are written: those of the inbox. */
+export const RULES: RuleTable = { "platform:inbox": inboxRules };

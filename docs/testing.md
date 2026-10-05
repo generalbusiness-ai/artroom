@@ -68,12 +68,12 @@ real observation read, with the real guards and windows. A test that uses
 it says so in its name or its first comment. It shows the observing
 scope's side of a read, and nothing about membership.
 
-`standInPlatform`, of the same module, supplies a rule that adds nothing
-for each row that a platform definition marks as code. It is a stand-in
-for the platform rules, which are not delivered, and no judge runs it. A
-test that uses it says so in its name or its first comment. It shows that
-a scope is founded and judges its acts once every rule is supplied, and
-nothing about any rule.
+`codeLost`, of the same module, supplies each platform definition with
+its data and with no rule, while a test's control says so
+(`platformCode`). It stands for a runtime that lacks the rules of a
+version. It shows what a scope answers when its pinned definition cannot
+be run, and nothing about any rule. Without it the platform definitions
+are the platform package's, with their rules, as in production.
 
 A scripted peer, `net.peers` of the same module, is a stand-in for a scope
 of a platform kind that is not delivered, such as a rules scope or a

@@ -11,9 +11,7 @@
 
 import { CAPABILITIES, PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { Bounds, Capability, CapabilityName, Digest, Entry, ObservationRequest, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
-import { PROFILES, validateDefinition } from "@generalbusiness/artroom-derive";
-import type { Capabilities, Delivered, MarkKind, PlatformRule, Recorded, Steps, Window } from "@generalbusiness/artroom-derive";
-import { platform, type Platform } from "@generalbusiness/artroom-platform";
+import type { Capabilities, Delivered, Recorded, Steps, Window } from "@generalbusiness/artroom-derive";
 import { observing } from "./authority.ts";
 import type { Authority, Clock, Definitions, Ports, Readers, Resolver, Rules, Transport } from "./ports.ts";
 import { production } from "./ports.ts";
@@ -93,34 +91,15 @@ export function scriptedCapability(script: () => CapabilityScript | null): Capab
 }
 
 /**
- * A stand-in for a platform rule of each kind of place: it passes, selects
- * nothing, accepts every value and adds nothing. It is not the rule of any
- * mark, and no judge runs it. It shows only what a scope does once every
- * mark has a rule supplied.
+ * A definitions port that has lost the code of its platform definitions
+ * while `lost` gives true: each definition is supplied with its data and
+ * with no rule, as by a runtime that lacks the rules of that version. It
+ * is how a test replaces a scope's runtime by one that cannot run its
+ * pinned definition (the contract's revision 15, witness 18.39, case 4).
+ * While `lost` gives false the port is the one given, unchanged.
  */
-const STAND_IN_RULES: { readonly [kind in MarkKind]: PlatformRule } = {
-  grant: { place: "grant", run: () => ({ pass: true, member: null }), refusals: [] },
-  also: { place: "also", run: () => null },
-  type: { place: "type", run: () => true },
-  guard: { place: "guard", run: () => ({ holds: true }), refusals: [] },
-  effect: { place: "effect", run: () => [], most: 0 },
-  send: { place: "send", run: () => null },
-  outcome: { place: "outcome", rules: { selects: false, read: false, retries: () => false } },
-};
-
-/**
- * A stand-in for the platform package's table of rules: the platform
- * definition of that name as the package supplies it, with a stand-in rule
- * of the right kind for every mark of its data. So it proves nothing about
- * the real rule of any mark, such as `notice-source` of the inbox, which a
- * later step writes. The marks are read as the runtime reads them, by the
- * validator with its platform option.
- */
-export function standInPlatform(named: string): Platform | null {
-  const supplied = platform(named);
-  const checked = supplied && validateDefinition(supplied.data, PROPOSED_BOUNDS, PROFILES, { platform: true });
-  if (!supplied || !checked?.ok) return null;
-  return { ...supplied, rules: Object.fromEntries(checked.definition.marks.map((mark): [string, PlatformRule] => [mark.code, STAND_IN_RULES[mark.kind]])) };
+export function codeLost(definitions: Definitions, lost: () => boolean): Definitions {
+  return { read: (named, holder) => definitions.read(named, holder), platform: (named) => { const supplied = definitions.platform(named); return supplied && lost() ? { ...supplied, rules: {} } : supplied; } };
 }
 
 /** A scripted clock. Each reading is the next of `script`, or `now` when the script is empty. */
@@ -171,8 +150,8 @@ export interface Controls {
   capability: CapabilityScript | null;
   /** False: the read of the test authority, a stand-in, gives nothing, as when membership does not answer. */
   authority: boolean;
-  /** True: a platform definition is supplied with the stand-in rules of `standInPlatform`. False: as the platform package supplies it, as in production. */
-  platformRules: boolean;
+  /** True: a platform definition is as the platform package supplies it, as in production. False: its data with no rule, as in a runtime that has lost the code (`codeLost`). */
+  platformCode: boolean;
   /**
    * The scripted membership, a stand-in. With one, the scope's authority is
    * the real observation read of `authority.ts` over it, and the grants
@@ -186,7 +165,7 @@ const all = new Map<string, Controls>();
 /** The controls of the scope with that name, made on first use with a clock at `start`. They outlive a restart of the object. */
 export function controls(name: string, start: Timestamp = "2099-01-01T00:00:00Z"): Controls {
   let made = all.get(name);
-  if (!made) all.set(name, (made = { clock: new ScriptedClock(start), gate: new Gate(), foreign: new Map(), bounds: PROPOSED_BOUNDS, reads: READ_BOUNDS, capability: null, authority: true, platformRules: false, membership: null }));
+  if (!made) all.set(name, (made = { clock: new ScriptedClock(start), gate: new Gate(), foreign: new Map(), bounds: PROPOSED_BOUNDS, reads: READ_BOUNDS, capability: null, authority: true, platformCode: true, membership: null }));
   return made;
 }
 
@@ -198,12 +177,12 @@ export function controls(name: string, start: Timestamp = "2099-01-01T00:00:00Z"
  * evaluator behind the gate, and the scripted test capability over the
  * controls' table, which is none until a test sets one. The platform
  * definitions are the platform package's, as in production, until a test
- * asks for the stand-in rules. The random source and the alarm stay the
+ * takes their code away. The random source and the alarm stay the
  * runtime's and the object's.
  */
 export function testPorts(c: Controls): Partial<Ports> {
   const { rules, definitions: given, random } = production();
-  const definitions: Definitions = { read: given.read, platform: (named) => (c.platformRules ? standInPlatform(named) : given.platform(named)) };
+  const definitions = codeLost(given, () => !c.platformCode);
   const resolver: Resolver = { read: (fact) => Promise.resolve(c.foreign.get(fact.hash) ?? null) };
   const gated: Rules = { evaluate: async (asked) => { await c.gate.pass(); return rules.evaluate(asked); } };
   // One run for the life of these ports, which is the life of the object: a restart makes new ports, and so a new run that holds nothing.
@@ -230,6 +209,8 @@ export interface Net {
   deaf: ((envelope: Delivered) => boolean) | null;
   /** The table of the scripted test capability, a stand-in, for every scope of the namespace. Null: no capability, as in production. */
   capability: CapabilityScript | null;
+  /** True: a platform definition is as the platform package supplies it, as in production. False: its data with no rule, for every scope of the namespace (`codeLost`). */
+  platformCode: boolean;
   /**
    * The entries of scripted platform peers, by the hash of the fact that
    * names each, with the name of the definition that the peer is said to
@@ -242,7 +223,7 @@ export interface Net {
   peers: Map<Digest, { entry: Entry; under: string }>;
 }
 
-export const net: Net = { clock: new ScriptedClock("2099-01-01T00:00:00Z"), bounds: PROPOSED_BOUNDS, sized: new Map(), hold: null, deaf: null, capability: null, peers: new Map() };
+export const net: Net = { clock: new ScriptedClock("2099-01-01T00:00:00Z"), bounds: PROPOSED_BOUNDS, sized: new Map(), hold: null, deaf: null, capability: null, platformCode: true, peers: new Map() };
 
 /**
  * Test ports for a scope in that namespace: the test authority and readers,
