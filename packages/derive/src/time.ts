@@ -8,6 +8,9 @@ import type { StateView } from "./state.ts";
 
 const FORM = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{3}))?Z$/;
 
+/** The last instant a timestamp can name: the end of the year 9999. A derived time past it is not a timestamp. */
+export const LAST_MS = Date.UTC(9999, 11, 31, 23, 59, 59, 999);
+
 /** The text of an instant: whole seconds with no fraction, otherwise three digits. One instant has one text. */
 export function timeOf(ms: number): Timestamp {
   return new Date(ms).toISOString().replace(".000Z", "Z");

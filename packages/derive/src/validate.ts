@@ -10,6 +10,7 @@
 
 import type { Bounds, DeclaredDefinition, Digest, FieldType } from "@generalbusiness/artroom-contract";
 import { canonicalize, definitionDigest, isDigest } from "@generalbusiness/artroom-bytes";
+import { LAST_MS } from "./time.ts";
 import { SCOPE_KINDS, isObject, isValue } from "./values.ts";
 
 export type ProblemCode =
@@ -477,7 +478,13 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
         if (fk?.[0] === "const" && !isValue(sl.type, fk[1], bounds)) bad("shape", at(p, "from"), "is not a value of the slot's type");
         if (fk?.[0] === "time") {
           const t = rec(fk[1], at(p, "from"), ["plusSeconds"]);
-          if (t) int(t["plusSeconds"], at(p, "from"));
+          // No offset is longer than the whole span a timestamp can name. So the sum with any reading is a number the runtime can
+          // compare with that span, and effect derivation refuses a time past it; nothing throws.
+          const plus = t && int(t["plusSeconds"], at(p, "from"));
+          if (typeof plus === "number" && plus * 1000 > LAST_MS) bad("bound", at(p, "from"), "is longer than the span a timestamp can name");
+          // Section 6.4: a timed rule's effects are total. A time derived from the commit clock can pass the last timestamp, which the
+          // commit would refuse; and a timed rule ends its deadline by leaving its states, not by moving it.
+          if (ctx.timed) bad("timed-partial", p, "a timed rule sets no time from the commit clock");
           if (sl.type.type !== "time") bad("name", p, "the commit time goes in a slot of type time");
         }
         return `slot ${String(r["slot"])} of ${sk}`;
@@ -692,7 +699,8 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
     if (!(deadline?.kind === "value" && deadline.type.type === "time")) bad("name", at(path, "deadline"), "names no value slot of type time");
     const ctx: Ctx = { on: t, also: new Map(), nascent: false, fields: new Map(), signer: false, timed: true, live: new Set(["on"]) };
     // Section 6.4: a timed rule's effects are total. With no field, no signer and no other subject, what is left that a commit
-    // could refuse is an effect that needs room in a party list, and `effect` refuses each as `timed-partial`.
+    // could refuse is an effect that needs room in a party list, or a time derived from the commit clock, and `effect` refuses
+    // each as `timed-partial`.
     effects(o["effects"], at(path, "effects"), ctx, false);
     // Otherwise the transition would be due again as soon as it was applied, and the drain would never end.
     if (!(Array.isArray(o["effects"]) && o["effects"].some((e) => isObject(e) && typeof e["state"] === "string" && !states.includes(e["state"])))) bad("timed", at(path, "effects"), "a timed rule takes its item out of the rule's states");

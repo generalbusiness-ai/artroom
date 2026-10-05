@@ -289,6 +289,26 @@ describe("what a written refusal or a later clause records of what it read (sect
   });
 });
 
+describe("a clause run in a later entry (sections 6.6 and 6.7)", () => {
+  test("it reads the member who signed the origin and no principal, so what it attributes is what the fold records", () => {
+    // The request has a party slot that attributes, and a list that takes the request's attribution. The `applied` clause sets the
+    // first from the signer and fills the second. Una asked, under a grant that names Paul.
+    const owned = variant(ticket, (def) => {
+      def.items.request.parties = { owner: { fixed: false, required: false, list: false, author: true }, authors: { fixed: false, required: false, list: true, max: 4, author: false } };
+      def.acts.ask.sends[0].tell.result.applied = [{ state: "answered" }, { party: { slot: "owner", from: { signer: true } } }, { attribute: { slot: "authors", of: "on" } }];
+    });
+    const D = founded();
+    const S = new Scope(owned);
+    S.did(una, "ask", fields({ desk: D.at }));
+    deliver(D, S, 2);
+    expect(deliver(S, D, 1, 1).result).toBe("write");
+    // The entry that records the result has no signer and judges no grant: Paul is in neither the list nor the item's history.
+    const members = (list: unknown) => (list as readonly { member: string }[]).map((m) => m.member);
+    expect([members(S.item(2).parties["authors"]), members(S.item(2).attributed)]).toEqual([["@una"], ["@una"]]);
+    expect(S.replay().snapshot()).toBe(S.state.snapshot());
+  });
+});
+
 describe("a diagnosis (section 7.4)", () => {
   const answers = (...list: Attempt["answer"][]): Attempt[] => list.map((answer, i) => ({ at: t(i), answer }));
 

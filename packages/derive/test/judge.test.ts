@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { Effect, MemberRef, RefusalReason } from "@generalbusiness/artroom-contract";
 import { canonicalBytes, digestBytes, intentDigest } from "@generalbusiness/artroom-bytes";
-import type { ActJudgment } from "../src/index.ts";
+import { LAST_MS, type ActJudgment } from "../src/index.ts";
 import { Scope, d, fields, grantOf, keys, lane, laneDefinition, on, otherLane, small, smallDefinition, t, variant, type Actor } from "./fixtures.ts";
 
 const { rita, una, vic, paul, sam } = keys;
@@ -141,6 +141,13 @@ describe("effects (section 6.6)", () => {
       def.acts.restore = { ...def.acts.keep, effects: [{ ref: { slot: "peer", from: { slot: "backup" } } }] };
     }));
     expect(s.did(rita, "restore", on(s, 0)).effects).toEqual([{ effect: "ref", item: 0, slot: "peer", to: otherLane }]);
+  });
+
+  test("a time derived from the commit clock past the last timestamp is refused; nothing throws and nothing is written", () => {
+    const s = new Scope(variant(small, (def) => {
+      def.acts.late = { ...def.acts.keep, effects: [{ value: { slot: "due", from: { time: { plusSeconds: Math.floor(LAST_MS / 1000) } } } }] };
+    }));
+    expect([s.act(rita, "late", on(s, 0)), s.item(0).values["due"]]).toMatchObject([{ result: "refused", reason: "bad-field" }, null]);
   });
 
   test("no effect changes an item that was final before the entry; a final item may still be named and read", () => {

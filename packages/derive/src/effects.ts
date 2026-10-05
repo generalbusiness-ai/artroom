@@ -11,7 +11,7 @@ import { attribution, historyOf } from "./attribution.ts";
 import { HOLDER, changeItem, newItem, type ItemEffect } from "./fold.ts";
 import { members, slotOf, type Judging } from "./guards.ts";
 import type { Item } from "./state.ts";
-import { timeMs, timeOf } from "./time.ts";
+import { LAST_MS, timeMs, timeOf } from "./time.ts";
 import { isMemberRef, isValue, same } from "./values.ts";
 
 export type Derived<T> = ({ ok: true } & T) | { ok: false; reason: RefusalReason; detail: string };
@@ -96,7 +96,10 @@ export function deriveEffects(j: Judging, forms: readonly EffectForm[], attentio
       // The commit time plus a constant: a derived deadline, such as a new hold's end (section 5.2, step 6.4).
       const field = "field" in from ? fieldFor(from.field, (v) => isValue(type.values[slot]!.of, v, j.bounds)) : null;
       if (field && !field.ok) return field;
-      const value: FieldValue | null = field ? field.value : "const" in from ? from.const : "time" in from ? timeOf(timeMs(j.clock.reading)! + from.time.plusSeconds * 1000) : null;
+      // The validator bounds the offset, so the sum is a safe integer. A time past the last timestamp is not a value of the slot.
+      const derived = "time" in from ? timeMs(j.clock.reading)! + from.time.plusSeconds * 1000 : null;
+      if (derived !== null && derived > LAST_MS) return refuse("bad-field", `effects.${i}: the derived time is past the last timestamp`);
+      const value: FieldValue | null = field ? field.value : "const" in from ? from.const : derived !== null ? timeOf(derived) : null;
       apply(subject, { effect: "value", item: id, slot, value });
     } else if ("attribute" in form) {
       // Section 6.7: the attribution of the named subject, not of the item that receives it, as it stands after the effects

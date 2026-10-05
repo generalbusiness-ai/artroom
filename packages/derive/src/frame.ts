@@ -250,7 +250,11 @@ export function runClause(view: StateView, definition: ValidDefinition, context:
     const subjects: [string, Item | null][] = Object.entries(act.also).map(([name, also]) => [`also.${name}`, view.item(read.fields[also.by] as number)]);
     if (typeof on === "number") subjects.push(["on", view.item(on)]);
     // A child's genesis sends its result at ordinal 0, before the sends its act declares.
-    frame = { kind, fields: read.fields, fieldTypes: act.fields, subjects, signer: signerOf(origin), sends: act.sends, first: input.type === "genesis" && input.source ? 1 : 0 };
+    // The clause reads the member who signed the origin, and no principal. The entry that records the clause has no signer, so
+    // the fold adds no principal for it; a principal here would put a member in an `attribute` effect whom the fold then leaves
+    // out of the item's history. A grant is judged for the entry it is presented with, and for no later entry.
+    const signed = signerOf(origin);
+    frame = { kind, fields: read.fields, fieldTypes: act.fields, subjects, signer: signed && { member: signed.member, principal: null }, sends: act.sends, first: input.type === "genesis" && input.source ? 1 : 0 };
   } else if (input.type === "delivery" && (input.message.class === "request" || input.message.class === "advisory")) {
     const b = bound(definition, input.message, input.from);
     if (!b?.handler) throw new Error(`entry ${origin.seq} sent a request and ran no handler`);

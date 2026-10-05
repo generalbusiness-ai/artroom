@@ -12,6 +12,8 @@ place where a repair made them untrue.
 
 Section 12 is one repair made after a supplementary finding of the same
 review (event `fbcdc3bd`). Entries 55 and 78 are corrected in place.
+Section 13 is two repairs made after the review's second reading of the
+eight (report `947a4116`). Entries 2 and 66 are corrected in place.
 
 Each entry is a place where the contract was silent or needed a concrete
 form, what was implemented, and why. Nothing here is adopted by being
@@ -23,7 +25,7 @@ changes it or removes it.
 | # | Where the contract is silent | Implemented | Why |
 |---|---|---|---|
 | 1 | Section 5.2 names timed rules, and the `timed` input names a rule, but `DeclaredDefinition` has no member that declares one. | `timed: Record<string, TimedRule>`. A rule names an item type (`on`), the live states in which it applies, the value slot of type `time` that holds the deadline, its effects and its attention. | The drain, the `timed` input and `genesis-timed` all need a declared rule to read. |
-| 2 | Section 6.8 says a hold ending changes the hold item only. No rule says what a timed rule's effects may name. | A timed rule's effects may change only its own item. It has no signer and no fields. Its effects are total: the validator refuses, as `timed-partial`, an `add` to a party list and an `attribute`, which a full list would refuse in the commit (repair 5). | Section 6.8, applied to every timed rule. A due transition that could be refused would stay due and block the drain. |
+| 2 | Section 6.8 says a hold ending changes the hold item only. No rule says what a timed rule's effects may name. | A timed rule's effects may change only its own item. It has no signer and no fields. Its effects are total: the validator refuses, as `timed-partial`, an `add` to a party list and an `attribute`, which a full list would refuse in the commit (repair 5), and a time set from the commit clock (section 13). | Section 6.8, applied to every timed rule. A due transition that could be refused would stay due and block the drain. |
 | 3 | Nothing says a timed rule must stop being due. | The validator requires a `state` effect that takes the item out of the rule's states. A rule cannot instead clear or move its deadline: the grammar has no form that empties a value slot. | Otherwise the transition is due again as soon as it is applied, and the drain never ends. |
 | 4 | Section 6.8 gives the hold capability no shape. | As far as I1 needs: a definition that lists `hold@1` may use the `hold` effect. The hold type is any type that a `hold: open` effect targets. It has a party slot named `holder` that holds one member, and may have a reference slot named `under` that names a local item. Its end time is an ordinary `time` value slot, set by the opening act, under a timed rule whose effects include `hold: end`. The validator requires that rule for every hold type, and requires the opening act to set its deadline slot. Opening sets the epoch to 1. An end raises it. A renewal raises it when the holder after the entry's effects differs from the holder before them. `extent` is checked to name a field or slot and is not recorded. | The task's stated form. The two slot names are a convention this step had to choose. Tokens, workspaces and export are the authority note's. |
 | 5 | Section 6.4 says `self` is not expanded in a message, and gives it no form on the wire. | `{ "self": true }` (`SelfMark`). It is not a value of any field type. | The receiver must be able to tell it from every field value. |
@@ -125,7 +127,7 @@ section 4 below.
 | 63 | A `tell` with no handler, or a body that is not the shape of its message. | A deciding entry `refused`: `unknown-message`, or `bad-field`. | Every verified request gets one deciding entry. |
 | 64 | An advisory. | Recorded as one entry. It runs a handler for its type if the definition declares one; a handler that refuses leaves the entry with no effect. No `index` effect is derived without a handler. | Section 7.4: "as the receiver's own definition says". The directory's index is a platform definition's. |
 | 65 | **For review.** A second result for one request. | The result's outcome must equal the decision of the source entry. A request has one recorded result. A later result from another deciding entry is recorded only as a `conflict`: an applied creation result with another incarnation than the one held. Any other is answered as a repeat of the recorded result. A result that arrives after an `undelivered` diagnosis is answered as a repeat of the diagnosis. | Sections 7.2 and 7.4. The contract does not say what a refused creation followed by another incarnation's answer is, or what a result after a terminal `undelivered` is. |
-| 66 | **For review.** How a clause is run in a later entry. | The state keeps the hash of each entry that sent a request. The caller supplies that entry from the scope's own history. The send's form, and the fields, subjects and signer the clause reads, are read again from it. The subjects are read as they are now. If the clause's effects cannot apply now, as when its item has reached a final state, the result is still recorded and nothing changes. A member the clause puts in a slot from the signer brings no principal. | Sections 6.6 and 7.4. A result must be recorded once whatever the item's state has become. |
+| 66 | **For review.** How a clause is run in a later entry. | The state keeps the hash of each entry that sent a request. The caller supplies that entry from the scope's own history. The send's form, and the fields, subjects and signer the clause reads, are read again from it. The subjects are read as they are now. If the clause's effects cannot apply now, as when its item has reached a final state, the result is still recorded and nothing changes. The signer a clause reads is the member who signed the origin, with no principal: derivation and the fold agree on that (section 13). | Sections 6.6 and 7.4. A result must be recorded once whatever the item's state has become. |
 | 67 | The confirmation. | Beside section 7.2's conditions, the source entry's clause must be `applied`. A confirmation of a scope that is already active, from an entry other than the one recorded, is `source-unverified`. | A `conflict` or `refused` clause sends no confirmation. |
 | 68 | Which deliveries judge time (section 5.3). | One whose handler or clause has a `before` or `after` guard, or sets a value from the commit time. It is answered `clock-behind` while the clock is behind. Every other delivery may be written clamped. | The contract's rule, applied to the forms that read the clock. |
 | 69 | A `create` that reaches an existing scope from another source entry. | `source-unverified`. | A seed is asked for by one input. |
@@ -212,3 +214,25 @@ entry already recorded the same facts, so its history was not made
 impossible to derive; the entry now states what it read. A verifier may
 also be able to compute a rule result again from the rule and its input,
 so not every refusal under a rule was impossible to replay before.
+
+## 13. Repairs after the second reading of the eight (947a4116)
+
+The review read the eight repairs again at `a217774c` and found two of
+them incomplete. Each is repaired, with a witness that failed before.
+
+| Group | What was still wrong | What changed | Witness |
+|---|---|---|---|
+| 5 | A timed rule could set a time from the commit clock, with any offset. A very large offset made the time arithmetic throw inside the drain, and the due item stayed due for good. | Three things. The validator refuses, as `timed-partial`, a timed rule that sets a time from the commit clock. It refuses, as `bound`, an offset in any act, handler or clause that is longer than the span a timestamp can name, the years 0000 to 9999. Effect derivation refuses, as `bad-field`, a derived time past the end of the year 9999. So the arithmetic stays in safe integers, nothing throws, and a selected timed transition is still always written. No due item is passed over. | Two validator rows, and an act whose derived time passes the last timestamp: refused, with nothing written. |
+| 7 | A clause run in a later entry was derived with the origin's signer and that signer's principal. The fold of the recording entry has no signer. So an `attribute` in the clause could list a principal whom the fold then left out of the item's history. | The clause reads the member who signed the origin, and no principal. Derivation and the fold now see the same thing. | A request whose `applied` clause sets an attributing slot from the signer and takes the item's attribution: the list and the item's history both hold the signer only. |
+
+The rule of group 7, for review: a grant is judged for the entry it is
+presented with. A principal joins an attribution history only through an
+entry that its grant was judged for. An entry that records a result or a
+diagnosis judges no grant, so its clause brings no principal, also when
+the member it reads signed the origin under one. This is the behaviour
+entry 66 stated. No authority rule is added.
+
+Group 8, the item index: what the review asked to be stated, about cost,
+is in the derive package's README under `state`. Nothing was measured and
+no gain is claimed.
+
