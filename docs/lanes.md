@@ -256,13 +256,14 @@ node packages/lanes/scripts/reference.mjs   # docs/lanes-reference.md
 ```
 
 `packages/lanes/test/definitions.test.ts` fails while the byte files or
-the digests are not the ones that `pin.mjs` writes. Its three tests show
-that each definition is exactly its pinned bytes and digest, that the
-counts are the ones above, and that both definitions pass
+the digests are not the ones that `pin.mjs` writes, and while
+`docs/lanes-reference.md` is not the file that `reference.mjs` writes. Its
+three tests show that each definition is exactly its pinned bytes and
+digest, that the counts are the ones above, and that both definitions pass
 `validateDefinition` whole at the bounds of `PROPOSED_BOUNDS`.
 
-`node packages/lanes/scripts/reference.mjs --check` exits 1 when the
-reference file is not the one the script writes.
+`node packages/lanes/scripts/reference.mjs --check` makes the same
+comparison outside a test run, and exits 1 when the file is stale.
 
 ## How a client uses a definition
 
@@ -327,6 +328,38 @@ type:
 | For each family of forms: what the validator accepts and refuses, and what the judges derive | The `forms-*.test.ts` files of `packages/derive/test` | Real derivation, on small made-up definitions and not on the lane rows |
 | The production wiring founds no scope under a definition that needs a capability record | `packages/scope/test/founding.test.ts` | Real: the object as deployed |
 | What a definition does once a capability has answered | The same test, with `scriptedCapability` of `@generalbusiness/artroom-scope/testing` | A stand-in |
+| What the two pinned definitions do on real scopes: ten scenarios, T1 to T9 | `packages/lanes/test/*.scope.test.ts`, on the one fixture `test/support/graph.ts` | Real scopes, storage, turn and dispatchers, founded and created by the two pinned digests. Stand-ins, each named in the test: the test authority, the scripted capability, scripted peers for the rules scope and the destination, and a made-up directory |
+
+The ten scenarios found and create scopes under both definitions, which
+the production wiring refuses. They can do so only because the test
+Worker supplies the scripted capability. From the root they run inside
+the `scope` project's one test Worker. The lanes package keeps a
+configuration of its own, `vitest.scope.config.ts`, that runs them alone.
+The scope package exports its test Worker for that, as
+`@generalbusiness/artroom-scope/testing/worker`. A scenario's client is
+the declared handle over the scope service's own operations (`api`), with
+the HTTP routes for a few acts. `net.peers` holds the scripted peers'
+entries, and `net.sized` gives one lane a small budget of entries for the
+two capacity scenarios.
+
+One run of the ten scenarios writes 21 of the 50 act kinds of `issue` and
+12 of the 52 of `change`, and runs 2 of 7 and 2 of 4 handlers (counted by
+a script over one run; `notes/2026-10-05-i2-contract-deltas.md`, section
+20, lists them). The other rows are shown only as data, and by the tables
+of forms in `derive`.
+
+Two rows cannot do today what the lane forms say, with or without a
+stand-in. Neither row was changed.
+
+- `propose-manifest` refuses a manifest whose `goal` is the `file` entry
+  of an issue lane. That entry is the issue's genesis, and a change lane
+  cannot read the kind of a genesis under another definition. A goal that
+  names a `revise` entry is accepted. The scope contract's owner has the
+  question (entries D21 and DK5 of the deltas note).
+- `propose-manifest` staged in another lane needs a presented entry of
+  the kind `hold@1:check`. No source writes such an entry. So no real
+  change lane sends `pin-confirm` or `unpin` to an issue lane yet (entry
+  DK6).
 
 The scripted capability is a stand-in and is named as one wherever it is
 used. It answers each capability guard and effect from a table that the

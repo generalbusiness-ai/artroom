@@ -16,8 +16,8 @@ are, how to read a row, and what runs today.
 
 No platform package depends on this one or imports from it.
 `scripts/active-source.test.mjs` checks that. This package depends on the
-contract package's types. Its tests and scripts also use `bytes` and
-`derive`.
+contract package's types. Its tests and scripts also use `bytes`,
+`derive`, `client`, `scope` and `replay`.
 
 ## What it exports
 
@@ -40,7 +40,10 @@ contract package's types. Its tests and scripts also use `bytes` and
 | `definitions/*.json` | The canonical bytes. `scripts/pin.mjs` writes them. |
 | `scripts/pin.mjs` | Writes the two byte files and `src/digests.ts` from the values. |
 | `scripts/reference.mjs` | Writes `docs/lanes-reference.md` from the values. With `--check` it writes nothing and exits 1 when the file is stale. |
-| `test/definitions.test.ts` | Three plain tests: the pins, the counts against the bounds, and validation of both definitions whole. |
+| `test/definitions.test.ts` | Three plain tests: the pins, with the generated reference; the counts against the bounds; and validation of both definitions whole. |
+| `test/*.scope.test.ts` | Ten scenarios on real scopes under the two pinned digests, T1 to T9, in the workerd test pool. Each names the stand-ins it uses. |
+| `test/support/graph.ts`, `worker.ts` | The one fixture of the scenarios, and the test Worker, which is the scope package's `./testing/worker`. |
+| `vitest.scope.config.ts`, `wrangler.test.jsonc` | The configuration that runs the scenarios alone. From the root they run inside the `scope` project. Nothing is deployed from either file. |
 
 ## Changing a row
 
@@ -65,7 +68,10 @@ Both definitions use forms that need the code of the capabilities `hold@1`
 and `git-read@1`. No runtime in this repository has that code. The
 validator lists those forms in `ValidDefinition.underived`, and the test
 asserts the list. Under the production wiring a scope is not founded or
-created under either digest: `unsupported-definition`.
+created under either digest: `unsupported-definition`. The scenarios run
+only because their test Worker supplies a scripted capability, which is a
+stand-in. [docs/lanes.md](../../docs/lanes.md) lists what they show and
+the rows that cannot run yet.
 
 ## How to test
 

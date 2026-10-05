@@ -4,6 +4,7 @@ import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { Bounds, DeclaredDefinition } from "@generalbusiness/artroom-contract";
 import { canonicalize, definitionDigest, parseStrict } from "@generalbusiness/artroom-bytes";
 import { derivable, validateDefinition, type ValidDefinition } from "@generalbusiness/artroom-derive";
+import { reference } from "../scripts/reference.mjs";
 import { DIGESTS, LANE_FORMS, change, definitions, issue } from "../src/index.ts";
 
 const lanes = { issue, change } as const;
@@ -28,6 +29,8 @@ describe("the two lane definitions, as data (lane forms, revision 14)", () => {
       expect([definitionDigest(lanes[name]), definitionDigest(parseStrict(file(name)) as DeclaredDefinition)], name).toEqual([DIGESTS[name], DIGESTS[name]]);
     }
     expect(DIGESTS.issue).not.toBe(DIGESTS.change);
+    // The generated reference is exactly what its generator writes from the two values, stamp and rows. A changed row with an old guide fails here.
+    expect(readFileSync(new URL("../../../docs/lanes-reference.md", import.meta.url), "utf8") === reference(), "docs/lanes-reference.md is stale; run scripts/reference.mjs").toBe(true);
   });
 
   test("the counts: the item types, acts, timed rules and handlers that the lane forms state, each within its adopted bound, and each bound a row meets is met exactly", () => {

@@ -281,7 +281,11 @@ entry's kind. An act entry has its intent's kind. A delivered `tell` has
 its message's name, and a delivered relationship update its relationship's
 name. A timed entry has `timed:` and its rule's name, so the validator
 refuses an act kind or a message name that begins `timed:`. A delivered
-request that no handler received has no kind.
+request that no handler received has no kind. A genesis entry has the kind
+of its definition's genesis act. A reader knows that kind only for a scope
+that pins the reader's own definition. So a `fact` guard over the genesis
+of a scope under another definition fails. The contract's owner has that
+question (`notes/2026-10-05-i2-contract-deltas.md`, entries D21 and DK5).
 
 **Operands.** An operand is what a guard, an effect or a send reads.
 
@@ -392,9 +396,10 @@ the entry records it in its input.
 
 **Capability forms.** A definition may list the capabilities `hold@1` and
 `git-read@1`, and may write a `capability` guard, a `capability` effect,
-the part `{ carried }`, and a fact kind such as `hold@1:check`. The
-validator checks each against what the listed version declares, in the
-contract package's `CAPABILITIES`. It derives none of them: a definition
+the part `{ carried }`, and a fact kind such as `hold@1:check`. No source
+writes an entry of such a kind, so a `fact` guard over one does not hold.
+The validator checks each form against what the listed version declares,
+in the contract package's `CAPABILITIES`. It derives none of them: a definition
 that passes lists each such form in `ValidDefinition.underived`. This
 repository has no code for a capability's rules. So the production runtime
 founds and creates no scope under a definition whose list is not empty,
@@ -403,7 +408,9 @@ item form of `hold@1`, with its `hold` effect, needs no such code and
 runs. A test may use `scriptedCapability`, from
 `@generalbusiness/artroom-scope/testing`. It is a stand-in: it answers
 from a table that the test supplies, and shows nothing about a real hold
-or a Git read.
+or a Git read. The same module has `net.peers`, for scripted peers: entries
+that a test writes by hand in place of a platform scope that is not
+delivered. A scripted peer shows the receiver's side of a delivery only.
 
 ### Validation and bounds
 
@@ -664,7 +671,7 @@ and nothing here guesses at it.
 | Hold tokens, workspaces and their export | The same | The hold item, its epoch, and its timed end. |
 | Git reads, and the rules of the `hold@1` and `git-read@1` capabilities: their records, guards, effects and steps | The same | The validator reads the capability forms against the contract package's tables, and derives none. The production runtime and the verifier answer `unsupported-definition` for a definition that uses one. The tests have a scripted stand-in, which is named as one. |
 | Publication to a destination, and the evidence of an outside write | The same | The `outcome` input and the numbering of operations and attempts. No form opens an operation. |
-| Running the two lane definitions, `issue` and `change` | The authority and publication delivery, for the capability rules and the platform scopes that the rows read | The two definitions as data, in `packages/lanes`, validated whole and pinned by digest. Both use capability forms, so under the production wiring a scope is not founded or created under either: `unsupported-definition`. [lanes.md](lanes.md) says which rows wait and on whom. The fixtures' lane and ticket are made up for tests. |
+| Running the two lane definitions, `issue` and `change` | The authority and publication delivery, for the capability rules and the platform scopes that the rows read | The two definitions as data, in `packages/lanes`, validated whole and pinned by digest. Both use capability forms, so under the production wiring a scope is not founded or created under either: `unsupported-definition`. Ten test scenarios run them on real scopes with stand-ins that each test names. [lanes.md](lanes.md) says which rows wait and on whom. The fixtures' lane and ticket are made up for tests. |
 | The application: browser pages, the command line, tools for agents | The application delivery | The client handle. |
 | A deployment | Not authorized | `packages/scope/wrangler.jsonc` is configuration only. Nothing in this repository deploys it. |
 | Budgets in bytes, items, records and pending requests; the numbers of every bound | The proof plan | A budget of entries, with temporary numbers. `settles` is counted in entries only. |

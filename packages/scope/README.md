@@ -47,6 +47,22 @@ no hold, no record and no repository. A test that uses it shows what a
 definition does once a capability has answered, and nothing about a real
 hold, a Git read or a provider. The main entry and `worker.ts` do not import it.
 
+Two more controls of that module serve tests of several scopes. `net.peers`
+holds the entries of scripted peers: stand-ins for scopes of a platform
+kind that is not delivered, such as a rules scope or a destination. A
+receiver reads such an entry as it reads any source entry, and nothing
+judged it. `net.sized` gives one scope of the namespace its own bounds, by
+the name of its object.
+
+`@generalbusiness/artroom-scope/testing/worker` is this package's test
+Worker, `test/worker.ts`, as an export. The lanes package loads it to run
+its scenarios alone. From the root, those scenarios run inside this
+package's own test project, which the root `vitest.config.ts` arranges:
+no file of this package names the lanes package. A scenario's client
+calls `api` of `worker.ts` in the test's isolate, and uses the HTTP routes
+for a few acts
+(`notes/2026-10-05-i2-contract-deltas.md`, entries DK1 to DK4 and DK11).
+
 ## Ports and their production defaults
 
 | Port | Asked for | Production default |

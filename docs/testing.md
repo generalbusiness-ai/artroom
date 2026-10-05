@@ -47,6 +47,7 @@ Put each test at the cheapest boundary that can show its property.
 | What a client builds, signs and accepts as an answer | as plain functions in `client`; the handle against the real Worker, in `scope` |
 | A form of a definition: that the validator accepts or refuses it, and what the judges derive from it | as a plain function in `derive`, on a small made-up definition, in the `forms-*.test.ts` file of its family |
 | That a lane definition is exactly its pinned bytes and digest, meets its bounds, and passes the validator whole | as plain functions in `lanes`, once for both definitions. Do not write a test for one row, one field or one guard of a lane definition. |
+| What only the two real lane definitions can show: several commitments and a hold, a plan's concerns, a manifest and its evidence, links, attention, capacity | against real scopes under the two pinned digests, in a scenario of `packages/lanes/test/*.scope.test.ts`, on the one fixture `test/support/graph.ts`. One scenario states one invariant. |
 
 A stand-in proves only the boundary it exposes. A retry, an ordering or a
 restart is shown against the thing that really retries, orders or restarts.
@@ -56,6 +57,12 @@ stand-in for the code of `hold@1` and `git-read@1`, which is not
 delivered. A test that uses it says so in its name or its first comment.
 It shows what a definition does once a capability has answered, and
 nothing about a real hold, a Git read or a provider.
+
+A scripted peer, `net.peers` of the same module, is a stand-in for a scope
+of a platform kind that is not delivered, such as a rules scope or a
+destination. The test writes the peer's entry by hand, and nothing judged
+it. A test that uses one says so in the same way. It shows the receiver's
+side of a delivery, and nothing about the peer.
 
 ## Time, size and setup
 
@@ -116,15 +123,30 @@ what the branch changed. `npm run gate -- --ci` reinstalls first.
 The `scope` project runs in the workerd pool, against real Durable Objects
 with SQLite storage. The others run in Node. Nothing runs twice.
 
+The ten lane scenarios, `packages/lanes/test/*.scope.test.ts`, run from
+the root inside the `scope` project: the same test Worker, loaded once.
+The root `vitest.config.ts` adds them, and no file of the scope package
+names the lanes package. The lanes package keeps
+`vitest.scope.config.ts` and `wrangler.test.jsonc`, which run the same
+files alone, in a Worker of its own with the same classes: for `npm test`
+in the package, for `scripts/control.mjs` and for
+`scripts/measure-tests.sh`. A scenario's client calls the scope service's
+own operations, `api` of `@generalbusiness/artroom-scope/worker`, in the
+test's isolate. A few acts go over the Worker's HTTP routes, where the
+scenario is about a route. The reason is cost: in the workerd pool a call
+through the Worker's entrypoint takes longer the more of them one run has
+made (observed; `notes/2026-10-05-i2-contract-deltas.md`, entry DK11).
+
 The `lanes` project is the three tests of
 `packages/lanes/test/definitions.test.ts`. They read the two byte files
-under `packages/lanes/definitions` without importing them. So, by the
-rule above, a change to a byte file alone is not selected by
-`npm run test:changed`; the gate runs it. Two generated files follow the lane definitions:
+under `packages/lanes/definitions`, and `docs/lanes-reference.md`,
+without importing them. So, by the rule above, a change to one of those
+files alone is not selected by `npm run test:changed`; the gate runs it.
+Two sets of generated files follow the lane definitions:
 `packages/lanes/src/digests.ts` with the byte files, written by
 `packages/lanes/scripts/pin.mjs`, and `docs/lanes-reference.md`, written
-by `packages/lanes/scripts/reference.mjs`. The test fails while the first
-are stale. For the second, run the script with `--check`.
+by `packages/lanes/scripts/reference.mjs`. The pins test fails while
+either is stale.
 
 Nothing under `parked/` is installed, typechecked or tested.
 [parked/README.md](../parked/README.md) says what is there.

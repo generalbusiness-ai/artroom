@@ -13,7 +13,8 @@
   "scripts": {
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json && tsc -p tsconfig.scope.json",
     "test": "vitest run --config vitest.config.ts && vitest run --config vitest.scope.config.ts",
-    "pin": "node scripts/pin.mjs"
+    "pin": "node scripts/pin.mjs",
+    "reference": "node scripts/reference.mjs"
   },
   "dependencies": {
     "@generalbusiness/artroom-contract": "0.1.0-dev.1"
