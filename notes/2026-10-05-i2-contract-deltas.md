@@ -55,6 +55,7 @@ the contract.
 | 22 | Step 18: the assembly | DN1 to DN6 |
 | 23 | For owners | None: a list by owner |
 | 24 | After the base milestone: the genesis kind | DP1 to DP5 |
+| 25 | I2 review repairs (verdict 1993412c) | DR3 and DR4 here; DR1, DR2 and DR5 are written with their repairs |
 
 ## 1. The silences the plan named
 
@@ -784,3 +785,16 @@ Two more runs were inconclusive by the script's rule and are not counted:
 the last two changes, run against `client/test/intent.test.ts`. That test
 failed both times, by a reply that resolved where it must reject, and by a
 thrown `TransportError`. Neither is an assertion as the script reads one.
+
+## 25. I2 review repairs (verdict 1993412c)
+
+Written 2026-10-05. The review of the base milestone at `744f2447`
+(verdict `1993412c`) asked for five repairs. Each entry here is one of
+them: what the contract states, what the source did, and what it does
+now. In this section "revision 12" is the scope and replay contract at
+`53f0e183`, as in section 24. The entries are numbered DR1 to DR5, by the
+order of the findings in the verdict.
+
+| # | What the contract states | What was wrong, and what is implemented | Why, and the witness |
+|---|---|---|---|
+| DR3 | Section 7.4, "The order of a delivery's checks": the address, the shape, the source entry, then a repeat, before a due transition, the scope's status and the checks of the message's class. A repeat writes nothing and is answered with the entry that recorded it. | `scope/src/delivery.ts` fetched what a first decision reads, the foreign entries and the detached texts that the handler's declared fields name, before the judge looked for a repeat. A repeat whose text both scopes had redacted since was answered `retry`, and the sender's duty did not end. Now the receiver reads the source entry as before, then asks its store whether it holds a decision for that source scope, incarnation, position and ordinal. If it does, it fetches no foreign entry and no text. The judge runs as before, makes every check in the contract's order, and gives the answer: `recorded` with the first entry's fact, or `source-unverified` for another hash at that position. A first delivery is not changed, and entry DJ3 stays as it is and open. | A recorded decision is never removed, so a decision that the store holds before the turn is one the judge finds in the turn: the judge reaches no handler with the fetch skipped. This is the rule that `submit` already follows for an idempotency key on a sealed entry. A repeated creation was already answered without its texts, because a store with a genesis does not take the founding branch; it now also meets the same test of the store, so both paths follow one rule. Witness: `scope/test/texts.test.ts`, "a repeat of a decided send is answered from the entry that recorded it", on real storage with two lanes. Control: with the test of the store removed from the branch, that test fails by its assertion, with `retry` where `recorded` is expected. |
