@@ -277,9 +277,8 @@ a `Git` outside a test.
 T9 runs the real `git` program, as client and as server, on this
 machine. The server is `git http-backend` over a real bare repository,
 behind the package's real gateway: a labelled stand-in for a host
-(`test/support/host.ts`). It can lose a reply after the update, lose a
-request before it, and let another writer move the ref before the update
-arrives. The table's expected values are in `test/support/sends.ts`, from
+(`test/support/host.ts`). It can let another writer move the ref before
+the update arrives. The table's expected values are in `test/support/sends.ts`, from
 the authority note's text. The plan also runs that table against
 `MemoryHost`, which is step 9's and is not in this worktree: the table is
 exported for it, with a mark in the source.
@@ -292,7 +291,7 @@ Failure controls, each run once with `scripts/control.mjs`, each
 | Change | Test | What failed |
 |---|---|---|
 | `Git.send` does not compare the first parent with the reserved base. | T9 | The row "its first parent is not the reserved base" was sent. |
-| The gateway records "forwarding" with no forward counted. | T9 | The rows of a lost reply read "not sent" and `refused`, not `unknown`. |
+| The gateway records "forwarding" with no forward counted. | T9 and T27 | T9: the table of the rows that ran read "not sent" and `refused`, not `unknown`. T27: the grant's record after a forward did not equal `forwarded: 1`. |
 | `Git.send` runs the push again when it fails. | T9 | A row ran the push command twice. |
 | The gateway passes on the host's error. | T27 | `expected 'threw Error: upstream 500 for https:/…' not to contain` the plaintext. |
 | The gateway opens a grant for a token that is not `live`. | T27 | `expected [ 'opened', ... ] to deeply equal [ 'token-not-live', ... ]` |
@@ -307,3 +306,55 @@ Observed, one run of the package's three test files, `npx vitest run` in
 vitest printed a duration of 2.6 seconds, and 3.6 seconds of test bodies
 summed across the files. The command was not timed from outside. T9 is
 nearly all of it: each push is several processes.
+
+## 8. Test cost of the Git package
+
+The tests of this package were cut for cost without losing an invariant.
+What changed, and which test now witnesses what:
+
+- A fixture object is written straight into the object directory, as Git
+  writes a loose object, with Node's own SHA-1 (not the package's). That
+  costs no process. `confirm` asks the real `git` once for each fixture
+  repository whether it reads every object written, with the type and size
+  written. Refs are written as loose ref files.
+- `reader.test.ts` builds one repository in `beforeAll`. Its second test
+  removes one loose object that the first does not read. A stand-in that
+  changes one answer of the real source reads the real answers once,
+  and not again for each row.
+- T9 builds its canonical repository with no process, reads refs from the
+  files, and runs only the rows of the send table that Git or its server
+  decides. The two rows that lose a reply or a request moved to the
+  first test of `push.test.ts`.
+
+| Row of the send table (`sends.ts`) | Invariant | Witness before | Witness after |
+|---|---|---|---|
+| The update is applied and its answer arrives | One forward; confirmed by a read; class unknown with basis `read` | T9, real push | T9, real push (unchanged) |
+| Another writer moves the ref first | The host's own compare-and-set refuses; class `refused`, basis `own-answer` | T9, real push | T9, real push (unchanged) |
+| The ref has left the base when the client reads it | Nothing is sent (`reached` 0); class `not-sent`, outcome `refused` | T9, real push | T9, real push (unchanged) |
+| The update is applied and its reply is lost | Class `unknown`, outcome `unknown`, basis `none`, though the read shows the commit | T9, real push, host fault `lost-after` | First test: `classifySend` of Git's recorded report of a lost reply with one forward, then `attemptOutcome` with a read of the commit; compared with the row in `SENDS`. The gateway's 502 for a failed upstream, with the record showing one forward: T27 |
+| The request is lost before it arrives | Class `unknown`, outcome `unknown`, basis `none`, the read shows the base | T9, real push, host fault `lost-before` | The same, with a read of the base |
+| A lost request causes no second push (an attempt that asks again forwards nothing) | A closed grant forwards nothing, and Git's report is `ran`, not reported | T9, after the row `lost-before` | T9, on a new branch at the base after the first attempt closed: no update and no request reached the host, and the closed record is unchanged. A forward would have been applied. T27 shows the same for the gateway alone |
+
+What is not witnessed now by a real client and server: Git's own words
+when a connection fails after or before an update. The first test uses
+the report as recorded for the earlier classifier. The real report of a
+refused request (the gateway answers 403 to an attempt under a closed
+grant) is still read from a real client, in T9.
+
+Measured, `npx vitest run --project git`, observed, warm, shared machine
+with other sessions active. The package's processes are counted by a
+throwaway `git` wrapper on `PATH`, not committed.
+
+| | Before | After |
+|---|---|---|
+| Reader, first test: processes | 49 | 36 (of which 1 is `confirm` for the file) |
+| Reader, second test: processes | 77 | 55 (of which 1 is `confirm`) |
+| T9: processes | 243 | 177 |
+| T9 alone, observed in the verbose report | 2.43 to 2.46 s | 1.82 to 1.92 s |
+| Reader tests, observed in the verbose report | 0.37 s and 0.63 s | 0.28 s and 0.43 s |
+| `npx vitest run --project git`, three runs, duration printed | 2.55, 2.54, 2.57 s | 2.04, 1.93, 1.93 s |
+| The same, summed test time printed | 3.46 to 3.49 s | 2.58 to 2.75 s |
+
+Most of what is left in T9 is the package's own: the reader runs two
+`cat-file` processes for each object, and a send runs about fifteen
+processes. That is production behaviour and was not changed.

@@ -1,8 +1,7 @@
-import { execFileSync } from "node:child_process";
 import { afterAll, expect, test } from "vitest";
 import { Gateway, Git, attemptOutcome, classifySend, readAnswer, type Forwarding, type PushAnswer, type SendEvidence } from "../src/index.ts";
 import { Bridge, Host, MemoryRecords } from "./support/host.ts";
-import { bare, blob, cleanup, commit, git, program, scratch, tree } from "./support/repo.ts";
+import { bare, blob, cleanup, commit, confirm, git, program, refAt, scratch, setRef, tag, tree } from "./support/repo.ts";
 import { SENDS } from "./support/sends.ts";
 
 let bridge: Bridge | null = null;
@@ -64,6 +63,16 @@ test("a send is not sent, refused or unknown by the gateway's record and Git's r
     .toEqual(outcomes.map(([name, , , result, basis]) => [name, result, basis]));
   // A read of another ref confirms nothing.
   expect(attemptOutcome(update, reported, { ref: "refs/heads/other", value: COMMIT }).result).toBe("unknown");
+
+  // The two rows of the table of sends that lose a reply or a request (`SENDS`), judged from Git's report of a lost reply and the gateway's
+  // record of one forward. What the host then holds, `shows`, is the read: the commit when the host applied the update, the base when it did not.
+  const lostRows = SENDS.filter((row) => row.fault === "lost-after" || row.fault === "lost-before");
+  expect(lostRows.map((row) => {
+    const send = classifySend(lost, one);
+    const o = attemptOutcome(update, send, { ref: REF, value: row.shows === "commit" ? COMMIT : BASE });
+    return { fault: row.fault, send: send.class, result: o.result, basis: o.evidence.basis, shows: row.shows };
+  })).toEqual(lostRows.map(({ fault, send, result, basis, shows }) => ({ fault, send, result, basis, shows })));
+  expect(lostRows.map((row) => row.fault)).toEqual(["lost-after", "lost-before"]);
 });
 
 // The plan's T9. A real local repository behind `git http-backend`, a labelled stand-in for a host, and the package's real gateway
@@ -80,16 +89,17 @@ test("every send is one compare-and-set, checked before it is sent and sent once
   const seen = { argv: [] as string[], env: [] as string[] };
   const ops = new Git(program(seen), { workdir: scratch() });
 
-  // The canonical repository: a base, the reviewed commit above it under a staged ref, and another writer's commit.
-  const file = blob(remote, "base\n");
-  const base = commit(remote, tree(remote, [`100644 blob ${file}\tfile`]), [], "base");
+  // The canonical repository, written without a process: a base, the reviewed commit above it under a staged ref, and another writer's commit.
+  const baseTree = tree(remote, [`100644 blob ${blob(remote, "base\n")}\tfile`]);
+  const base = commit(remote, baseTree, [], "base");
   const reviewedTree = tree(remote, [`100644 blob ${blob(remote, "reviewed\n")}\tfile`]);
   const reviewed = commit(remote, reviewedTree, [base], "reviewed");
   const other = commit(remote, tree(remote, [`100644 blob ${blob(remote, "other\n")}\tfile`]), [base], "another writer");
+  expect(confirm(remote)).toEqual([]);
   const staged = `refs/artroom/staged/s/1/${reviewed}/1`;
-  git(remote, ["update-ref", staged, reviewed]);
+  setRef(remote, staged, reviewed);
   const shows = (value: string | null) => (value === reviewed ? "commit" : value === base ? "base" : value === other ? "other" : value);
-  const at = (ref: string): string | null => { try { return git(remote, ["rev-parse", "--verify", "-q", ref]); } catch { return null; } };
+  const at = (ref: string): string | null => refAt(remote, ref);
 
   let n = 0;
   /** One attempt, as its driver runs it: open the grant, send once, close the grant, read its record, and judge. */
@@ -104,51 +114,56 @@ test("every send is one compare-and-set, checked before it is sent and sent once
     return { name, answer, record, evidence, outcome, reached: host.updates - before, pushes: seen.argv.filter((a) => a.includes(" push ")).length - pushes };
   };
 
-  // The table. Each row has a branch of its own at the base.
+  // The table, for the rows that Git or its server decides: the update is applied and answered, another writer moves the ref first and the
+  // host's own compare-and-set refuses, and the ref has left the base so that Git's own check sends nothing. The two rows that lose a request or
+  // a reply are judged from Git's recorded report, in the first test: nothing about them is Git's, or a server's, to decide. Each row has a branch of its own.
+  const real = SENDS.filter((row) => row.fault === "none" || row.fault === "moved" || row.fault === "stale");
   const got: unknown[] = [];
-  for (const [i, row] of SENDS.entries()) {
-    const branch = `refs/heads/row-${i}`;
-    git(remote, ["update-ref", branch, row.fault === "stale" ? other : base]);
-    host.fault = row.fault === "moved" ? { kind: "moved", ref: branch, to: other } : row.fault === "lost-after" || row.fault === "lost-before" ? { kind: row.fault } : null;
+  const first = { attempt: "", record: null as unknown, branch: "" };
+  for (const row of real) {
+    const branch = `refs/heads/row-${row.fault}`;
+    setRef(remote, branch, row.fault === "stale" ? other : base);
+    host.fault = row.fault === "moved" ? { kind: "moved", ref: branch, to: other } : null;
     const publish = () => ops.publish({ remote: url, branch, base, commit: reviewed, tree: reviewedTree, from: staged });
     const r = await attempt({ ref: branch, old: base, new: reviewed }, publish);
     got.push({ name: row.name, fault: row.fault, send: r.evidence.class, result: r.outcome.result, basis: r.outcome.evidence.basis, shows: shows(at(branch)), reached: r.reached });
 
-    // A send runs the push command once, whatever it answers: a lost reply is never sent again by the sender.
+    // A send runs the push command once, whatever it answers: a refusal is never sent again by the sender.
     expect([row.name, r.pushes]).toEqual([row.name, 1]);
-    if (row.fault === "lost-before") {
-      // The reply is lost and the ref still holds the base. Whatever asks again under that attempt, nothing more is forwarded:
-      // the grant is closed. A further try is another attempt, which an entry opens (section 6.6; scope contract, section 4.3, item 2).
-      const reached = host.updates;
-      const again = await publish();
-      expect([again.ran, again.reported, host.updates - reached, at(branch)]).toEqual([true, null, 0, base]);
-      expect(await gateway.close(r.name)).toEqual(r.record);
-    }
+    if (row.fault === "none") Object.assign(first, { attempt: r.name, record: r.record, branch });
   }
-  expect(got).toEqual(SENDS);
+  expect(got).toEqual(real);
+
+  // Whatever asks again under a closed attempt, nothing more is forwarded: the grant is closed. A further try is another attempt, which an
+  // entry opens (section 6.6; scope contract, section 4.3, item 2). The branch is at the base, so a forward would be applied.
+  setRef(remote, "refs/heads/again", base);
+  const [reached, requests] = [host.updates, host.credentials.length];
+  const again = await ops.publish({ remote: url, branch: "refs/heads/again", base, commit: reviewed, tree: reviewedTree, from: staged });
+  expect([again.ran, again.reported, host.updates - reached, host.credentials.length - requests, at("refs/heads/again")]).toEqual([true, null, 0, 0, base]);
+  expect(await gateway.close(first.attempt)).toEqual(first.record);
 
   // The read that decides goes through a grant that only reads, and a push under it is refused by the gateway.
+  setRef(remote, "refs/heads/read-only", base);
   await gateway.open({ attempt: "d:7:read#1", repository: url, update: null, token: { id: "token-read", state: "live", plaintext: TOKEN } });
-  expect(await ops.readRef(url, "refs/heads/row-0")).toEqual({ ref: "refs/heads/row-0", value: reviewed });
+  expect(await ops.readRef(url, first.branch)).toEqual({ ref: first.branch, value: reviewed });
   expect(await ops.readRef(url, "refs/heads/absent")).toEqual({ ref: "refs/heads/absent", value: null });
   const reads = host.updates;
-  expect(classifySend(await ops.send({ remote: url, ref: "refs/heads/row-2", old: base, new: reviewed }), await gateway.close("d:7:read#1"))).toMatchObject({ class: "not-sent" });
+  expect(classifySend(await ops.send({ remote: url, ref: "refs/heads/read-only", old: base, new: reviewed }), await gateway.close("d:7:read#1"))).toMatchObject({ class: "not-sent" });
   expect(host.updates).toBe(reads);
 
   // What a publication refuses before anything is sent: the commit is not the reviewed one, or the ref is not the branch.
   const dir = await ops.repository(url);
-  git(remote, ["update-ref", "refs/heads/checks", base]);
-  const tag = execFileSync("git", ["-C", dir, "mktag"], { input: `object ${reviewed}\ntype commit\ntag v1\ntagger T <t@artroom.invalid> 1700000000 +0000\n\nv1\n`, encoding: "utf8" }).trim();
-  const cut = commit(dir, tree(dir, [`100644 blob ${"9".repeat(40)}\tabsent`]), [base], "an object is absent");
-  const linked = commit(dir, tree(dir, [`160000 commit ${"9".repeat(40)}\tmodule`]), [base], "a gitlink");
+  setRef(remote, "refs/heads/checks", base);
+  const [cutTree, linkedTree] = [tree(dir, [`100644 blob ${"9".repeat(40)}\tabsent`]), tree(dir, [`160000 commit ${"9".repeat(40)}\tmodule`])];
+  const [cut, linked, tagged] = [commit(dir, cutTree, [base], "an object is absent"), commit(dir, linkedTree, [base], "a gitlink"), tag(dir, reviewed, "v1")];
   const good = { remote: url, branch: "refs/heads/checks", base, commit: reviewed, tree: reviewedTree, from: staged };
   const sent = host.updates;
   const checks: [string, Parameters<Git["publish"]>[0], string][] = [
     ["its first parent is not the reserved base", { ...good, base: other }, "parent-mismatch"],
-    ["its tree is not the tree that the destination's row states", { ...good, tree: git(remote, ["rev-parse", `${base}^{tree}`]) }, "tree-mismatch"],
-    ["a tag of the reviewed commit is not the commit", { ...good, commit: tag }, "wrong-type"],
-    ["an object under it is absent", { ...good, commit: cut, tree: git(dir, ["rev-parse", `${cut}^{tree}`]) }, "incomplete"],
-    ["its tree holds a gitlink", { ...good, commit: linked, tree: git(dir, ["rev-parse", `${linked}^{tree}`]) }, "gitlink"],
+    ["its tree is not the tree that the destination's row states", { ...good, tree: baseTree }, "tree-mismatch"],
+    ["a tag of the reviewed commit is not the commit", { ...good, commit: tagged }, "wrong-type"],
+    ["an object under it is absent", { ...good, commit: cut, tree: cutTree }, "incomplete"],
+    ["its tree holds a gitlink", { ...good, commit: linked, tree: linkedTree }, "gitlink"],
     ["the commit is the base", { ...good, commit: base }, "same-commit"],
     ["the commit is no object ID", { ...good, commit: "--force" }, "bad-object-id"],
     ["the ref is an option", { ...good, branch: "--mirror" }, "bad-ref-name"],
@@ -173,7 +188,7 @@ test("every send is one compare-and-set, checked before it is sent and sent once
   // A ref that is created only if absent, and a delete on the expected old value (sections 6.2 and 6.10): the same compare-and-set.
   const receipt = "refs/artroom/receipts/r1";
   const created = await attempt({ ref: receipt, old: null, new: reviewed }, () => ops.send({ remote: url, ref: receipt, old: null, new: reviewed, have: [base] }));
-  const second = await attempt({ ref: receipt, old: null, new: other }, () => ops.send({ remote: url, ref: receipt, old: null, new: other, have: [base], from: "refs/heads/row-3" }));
+  const second = await attempt({ ref: receipt, old: null, new: other }, () => ops.send({ remote: url, ref: receipt, old: null, new: other, have: [base], from: "refs/heads/row-moved" }));
   expect([created.evidence, created.outcome.result, second.evidence, second.outcome.result, at(receipt)])
     .toEqual([{ class: "unknown", reported: "created" }, "confirmed", { class: "not-sent", why: "stale" }, "refused", reviewed]);
   const deleted = await attempt({ ref: receipt, old: reviewed, new: null }, () => ops.send({ remote: url, ref: receipt, old: reviewed, new: null }));

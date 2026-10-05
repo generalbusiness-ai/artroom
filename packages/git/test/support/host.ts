@@ -11,19 +11,22 @@
  * the client holds no token, as in the publisher's container.
  *
  * A fault is set for the next push that reaches the host:
- * - `lost-after`: the host applies the update, and its reply is lost;
- * - `lost-before`: the request is lost on the way, and nothing is applied;
  * - `moved`: another writer moves the ref after the client read it and
  *   before the update arrives, so the host's own compare-and-set decides.
+ *
+ * A lost request or a lost reply is not made here: what a send is judged
+ * to be when its reply is lost needs no server, and `push.test.ts` shows it
+ * from Git's recorded report.
  */
 
-import { execFile, execFileSync } from "node:child_process";
+import { execFile } from "node:child_process";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { dirname } from "node:path";
 import type { Gateway } from "../../src/gateway.ts";
+import { setRef } from "./repo.ts";
 
-export type Fault = { kind: "lost-after" } | { kind: "lost-before" } | { kind: "moved"; ref: string; to: string };
+export type Fault = { kind: "moved"; ref: string; to: string };
 
 export class Host {
   /** The pushes that reached the host: receive-pack requests that carry an update. */
@@ -52,8 +55,7 @@ export class Host {
       this.updates += 1;
       this.fault = null;
     }
-    if (fault?.kind === "lost-before") throw new Error(`connection reset before the request arrived, Authorization: Bearer ${this.#token}`);
-    if (fault?.kind === "moved") execFileSync("git", ["-C", this.#repo, "update-ref", fault.ref, fault.to]);
+    if (fault !== null) setRef(this.#repo, fault.ref, fault.to);
     const out = await new Promise<Buffer>((resolve, reject) => {
       const child = execFile("git", ["http-backend"], {
         encoding: "buffer",
@@ -77,7 +79,6 @@ export class Host {
       }, (error, stdout) => (error === null ? resolve(stdout) : reject(error)));
       child.stdin?.end(Buffer.from(body));
     });
-    if (fault?.kind === "lost-after") throw new Error(`connection reset after the update was applied, Authorization: Bearer ${this.#token}`);
     const split = out.indexOf("\r\n\r\n");
     const headers = new Headers();
     let status = 200;
