@@ -11,18 +11,20 @@
  */
 
 import type { ObservationRequest, PlatformData } from "@generalbusiness/artroom-contract";
+import { destination } from "./destination.ts";
 import { inbox } from "./inbox.ts";
 import { membership, standingOf } from "./membership.ts";
 import type { Rules, StateView } from "@generalbusiness/artroom-derive";
 import { RULES } from "./rules.ts";
 
-export { inbox, membership };
+export { inbox, membership, destination };
 export { MEMBERSHIP, NO_MEMBER, ROLE_LISTS, ROLE_TABLE, actionsIn, standingOf, type Role } from "./membership.ts";
+export { COLLECT_MOST, DESTINATION, DESTINATION_ATTEMPTS, DESTINATION_KINDS } from "./destination.ts";
 export { RULES };
 export type { PlatformName, RuleTable } from "./rules.ts";
 
 /** The platform definitions delivered so far, by name without the version. */
-export const definitions: Readonly<Record<string, PlatformData>> = { "platform:inbox": inbox, "platform:membership": membership };
+export const definitions: Readonly<Record<string, PlatformData>> = { "platform:inbox": inbox, "platform:membership": membership, "platform:destination": destination };
 
 /**
  * One version of a platform definition, as a runtime or a verifier is

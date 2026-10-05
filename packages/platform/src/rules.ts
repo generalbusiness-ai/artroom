@@ -32,6 +32,7 @@
  */
 
 import type { Rules } from "@generalbusiness/artroom-derive";
+import { destinationRules } from "./destination.ts";
 import { inboxRules } from "./inbox.ts";
 import { membershipRules } from "./membership.ts";
 
@@ -46,6 +47,9 @@ export type RuleTable = { readonly [name in PlatformName]?: Rules };
  * that the authority note's table of marks names. Membership's data holds
  * three more marks, for places that the note's rows state and its table
  * does not list, and no rule is written for them (`membership.ts`). So this
- * table does not make `platform:membership@1` runnable.
+ * table does not make `platform:membership@1` runnable. The destination's
+ * data holds ten marks with no rule: `abort-if-behind`, `resend-due` and the
+ * eight rules of its `outcomes` (`destination.ts`). So this table does not
+ * make `platform:destination@1` runnable either.
  */
-export const RULES: RuleTable = { "platform:inbox": inboxRules, "platform:membership": membershipRules };
+export const RULES: RuleTable = { "platform:inbox": inboxRules, "platform:membership": membershipRules, "platform:destination": destinationRules };
