@@ -66,8 +66,8 @@ export function deriveSends(j: Judging, forms: readonly SendForm[], working: Rea
   /** A send reads each subject as the effects left it. `each`: the item of a fan-out send. */
   const reading = (each: Item | null): Judging => ({ ...j, subjects: working, each: each ?? undefined });
 
-  // I2 merge: the directory could be a member of the scope's state, which the fold sets from the genesis entry. The fold is
-  // another step's module, so it is read from the genesis entry here.
+  // The directory is a function of the genesis entry, and is read from it, through the scope's own history. It is no member of the
+  // folded state: the state that a checkpoint digests is as the first delivery left it, and a verifier reads the same entry.
   let directory = recorded;
   /** The directory this scope records. Undefined: its genesis entry cannot be read now. */
   const recordedDirectory = (): ScopeRef | null | undefined => {
