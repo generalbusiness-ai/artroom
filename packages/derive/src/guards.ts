@@ -115,12 +115,31 @@ function namesAbsent(j: Judging, g: Guard): boolean {
 }
 
 /**
+ * Section 6.4: an `also` name is unbound when it selects no item. It is then
+ * not among the subjects. A guard whose subject is unbound is not evaluated,
+ * and the input does not rest on it.
+ */
+const unbound = (j: Pick<Judging, "subjects">, of: string): boolean => of.startsWith("also.") && !j.subjects.has(of);
+
+/**
+ * True when a written form reads an unbound `also` name as a subject: as an
+ * `of`, or as the `item` of an operand. Section 6.4: an effect, a send or a
+ * notice whose `if` reads one is not applied.
+ */
+export function readsUnbound(j: Pick<Judging, "subjects">, v: unknown): boolean {
+  if (Array.isArray(v)) return v.some((x) => readsUnbound(j, x));
+  if (typeof v !== "object" || v === null) return false;
+  return Object.entries(v).some(([k, x]) => ((k === "of" || k === "item") && typeof x === "string" ? unbound(j, x) : readsUnbound(j, x)));
+}
+
+/**
  * The guards of one written list, by the three results of section 6.5: false
  * when one is false on a completed evaluation; otherwise not completed when
- * one is not; otherwise true. `at`: the failed guard, whose `reason` names a
- * refusal; -1 when no guard is false.
+ * one is not; otherwise true. So a guard that is not completed does not end
+ * the list: a later guard that is false still refuses. The guards of an act,
+ * of a handler and of a condition are each such a list. `at`: the failed
+ * guard, whose `reason` names a refusal; -1 when no guard is false.
  */
-// I2 merge: the guards of an act and of a handler are a list of this kind. `judgeAct` and `derive` still stop at the first guard that is not completed.
 export function judgeGuards(j: Judging, guards: readonly Guard[], of: Subject = "on"): { result: GuardResult; at: number } {
   let at = -1;
   const result = all(guards.map((g, i) => () => {
@@ -136,6 +155,8 @@ export function judgeGuard(j: Judging, g: Guard, of: Subject = "on"): GuardResul
   if (g.ifPresent && namesAbsent(j, g)) return "pass";
   // The validator has shown that a guard which reads its subject has one, and that it is not the item being opened.
   const subject = g.of ?? of;
+  // Section 6.4: a guard whose subject is unbound is not evaluated, at the top of a list or nested in a form. It fails no list.
+  if (unbound(j, subject)) return "pass";
   const item = j.subjects.get(subject) ?? null;
   const inSlots = (slots: readonly string[], member: MemberRef | null | undefined) => !!member && !!item && slots.some((s) => members(own(item.parties, s)).some((m) => same(m, member)));
   if ("state" in g) return ok(!!item && g.state.includes(item.state));

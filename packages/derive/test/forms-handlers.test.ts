@@ -24,7 +24,7 @@ const board: DeclaredDefinition = {
     card: {
       many: true, max: 3, states: live, initial: "open", parties: {},
       refs: { parent: { fixed: true, required: false, to: { type: "item", of: "card" } }, postedAt: { ...slot, to: { type: "fact", kind: ["post"], under: "board" } }, peer: { ...slot, to: { type: "scope", kind: "lane" } } },
-      values: { note: { ...slot, of: text } },
+      values: { note: { ...slot, of: text }, echo: { ...slot, of: text } },
     },
     tally: { many: false, max: 1, states: { kept: { final: false }, shut: { final: true } }, initial: "kept", parties: {}, refs: {}, values: { last: { ...slot, of: text } } },
   },
@@ -47,8 +47,12 @@ const board: DeclaredDefinition = {
     note: act({
       step: "transition", on: "card", grant: "write", fields: { note: { ...text, required: true } },
       also: { pinned: { item: "card", via: { slot: "pinned", of: "also.board" } }, board: { item: "board", one: true }, tally: { item: "tally", one: true } },
-      guards: [{ state: ["open"] }, { of: "also.pinned", state: ["open"], reason: "pinned-done" }, { of: "also.tally", equals: { a: { slot: "last" }, b: { field: "note" } }, reason: "not-the-last" }],
-      effects: [{ value: { slot: "note", from: { field: "note" } } }, { of: "also.pinned", value: { slot: "note", from: { field: "note" } } }],
+      // The guard on the tally is nested in a form. The last effect's condition reads the tally, and would hold on none.
+      guards: [{ state: ["open"] }, { of: "also.pinned", state: ["open"], reason: "pinned-done" }, { anyOf: [[{ of: "also.tally", equals: { a: { slot: "last" }, b: { field: "note" } } }]], reason: "not-the-last" }],
+      effects: [
+        { value: { slot: "note", from: { field: "note" } } }, { of: "also.pinned", value: { slot: "note", from: { field: "note" } } },
+        { value: { slot: "echo", from: { field: "note" } }, if: [{ differs: { a: { slot: "last", of: "also.tally" }, b: { field: "note" } } }] },
+      ],
     }),
   },
   receives: {
@@ -93,7 +97,8 @@ describe("subjects and handlers (sections 6.4 and 7.3)", () => {
     // A key for a name that is unbound is refused, as any unknown key is.
     expect(B.act(rita, "add", { ...fields({ note: "c" }), expected: { board: 1, parent: 1 } })).toMatchObject({ result: "refused", reason: "bad-intent" });
 
-    // Nothing is pinned and the scope has no tally: both names are unbound. The entry changes its own card and nothing else.
+    // Nothing is pinned and the scope has no tally: both names are unbound. The entry changes its own card and nothing else. The guard
+    // on the tally is not evaluated, though it is nested, and the effect whose `if` reads the tally is not applied.
     expect(note(a, { board: 0 }).result).toBe("write");
     expect(B.last.effects).toEqual([{ effect: "value", item: a, slot: "note", value: "seen" }]);
     // The board pins b. The slot now selects b: `expected` needs its key, and the effect on it is applied.

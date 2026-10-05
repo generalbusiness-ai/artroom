@@ -226,6 +226,8 @@ describe("attribution: its sources and its order (section 6.7)", () => {
       { ok: true, effects: [{ effect: "value", item: p, slot: "text", value: "x" }, { effect: "attention", item: p, members: [una.member], reason: "told" }] },
       { ok: true, effects: [] }, { ok: true, effects: [] }, { ok: false, reason: "required-unset", detail: "authors" },
     ]);
+    // The judge answers that the act is not judged. It is no refusal, and nothing is written.
+    expect(s.act(rita, "sum", under(s, p), { bounds: stopped })).toEqual({ result: "unavailable", reason: "guard-incomplete" });
 
     // A source that reads no member, or no list of members, refuses the input: a further source of an attribution, and the source of a
     // party slot. The validator cannot know what a constant, the scope's own reference or a field with no declared type holds.
@@ -240,7 +242,7 @@ describe("attribution: its sources and its order (section 6.7)", () => {
     // card is named by its ID, or by the fact of the entry that opened it, with that entry's hash; the deck is no card, and 99 is no item. A list is within its bound.
     const copy = (to: "ref" | "value", name: string, sent: FieldValue) => {
       const r = derived(s, "pair", [{ [to]: { slot: name, from: { field: "sent" } } } as never], { on: p }, { given: { sent } });
-      return r.ok ? r.effects.map((e) => ("to" in e ? e.to : "value" in e ? e.value : e)) : r.reason;
+      return r.ok ? r.effects.map((e) => ("to" in e ? e.to : "value" in e ? e.value : e)) : "reason" in r ? r.reason : r.unavailable;
     };
     const forged = { ...s.fact(q), hash: s.fact(0).hash };
     expect([copy("ref", "parent", q), copy("ref", "parent", s.fact(q)), copy("ref", "parent", forged), copy("ref", "parent", 0), copy("ref", "parent", 99)]).toEqual([[q], [q], "bad-field", "bad-field", "bad-field"]);
@@ -275,7 +277,8 @@ describe("effects in a handler and in a result clause (sections 6.6 and 7.4)", (
     const refusing = variant(ticket, (d) => {
       d.acts.link.fields.why = { type: "int", min: 0, max: 9, required: true };
       d.acts.link.sends[0].relate.detail.why = { field: "why" };
-      d.acts.link.sends[0].relate.result = { refused: [{ state: "removed", if: [{ equals: { a: { result: "reason" }, b: { const: "one" } } }] }] };
+      const set = { some: { type: "link", states: ["set"], where: [{ equals: { a: { slot: "me" }, b: { item: "on" } } }] } };
+      d.acts.link.sends[0].relate.result = { refused: [{ state: "removed", if: [{ equals: { a: { result: "reason" }, b: { const: "one" } } }, set] }] };
       d.receives.closes.fields.why = { type: "int", min: 0, max: 9, required: true };
       d.receives.closes.guards = [{ differs: { a: { field: "why" }, b: { const: 1 } }, reason: "one" }, { differs: { a: { field: "why" }, b: { const: 2 } }, reason: "two" }];
     });
@@ -288,6 +291,13 @@ describe("effects in a handler and in a result clause (sections 6.6 and 7.4)", (
       return [(P.last.input as { message: { reason?: { name?: string } } }).message.reason?.name, P.last.effects, P.item(link).state];
     };
     expect([recorded(1), recorded(2)]).toEqual([["one", [{ effect: "state", item: 2, state: "removed" }], "removed"], ["two", [], "set"]]);
+
+    // A condition that is not completed leaves the result not recorded. It is offered again, and is recorded when the range is read whole.
+    deliver(I, P, P.did(rita, "link", fields({ target: I.at, about: 0, why: 1 })).seq);
+    P.bounds = { ...PROPOSED_BOUNDS, guardScan: 0 };
+    expect(deliver(P, I, I.head.seq)).toEqual({ result: "unavailable", reason: "guard-incomplete" });
+    P.bounds = PROPOSED_BOUNDS;
+    expect([deliver(P, I, I.head.seq).result, P.last.effects.length]).toEqual(["write", 1]);
   });
 });
 

@@ -7,17 +7,16 @@
  *
  * This file holds the judges of an act and of a timed transition, and what
  * every judge returns. `genesis.ts`, `delivery.ts` and `settle.ts` hold the
- * others. Each builds a `Judging`, derives with `judgeGuard`, `deriveEffects`
- * and `deriveSends`, and returns a `Draft`.
+ * others. Each builds a `Judging`, derives the written forms with `derive`
+ * or `deriveEffects`, and returns a `Draft`.
  */
 
 import type { Effect, Entry, FactUse, Grant, Head, Input, MismatchReason, Prepared, RefusalReason, RoutingRefusal, ScopeRef, Send, SignedIntent, UnavailableReason } from "@generalbusiness/artroom-contract";
 import { intentDigest, scopeIdOf, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import { deriveEffects } from "./effects.ts";
 import { isIntent, readFacts, readFields, type Reading } from "./fields.ts";
-import { judgeGuard, type Judging } from "./guards.ts";
-import { alsoItems, overMax, refusalName, unbound } from "./handlers.ts";
-import { deriveSends, notices } from "./sends.ts";
+import type { Judging } from "./guards.ts";
+import { alsoItems, derive } from "./handlers.ts";
 import type { Item, StateView } from "./state.ts";
 import { nextDue, type Due } from "./timed.ts";
 import { timeMs, type Clock } from "./time.ts";
@@ -158,30 +157,14 @@ export function judgeAct(view: StateView, definition: ValidDefinition, signed: S
 
   const j: Judging = { view, definition, bounds, clock, scope, self: scope.head.seq + 1, kind: intent.kind, fields, fieldTypes: act.fields, subjects, signer, facts, prepared: context.prepared, used: [], asked: context.asked, own: context.own, intent: digest };
 
-  for (const [i, guard] of act.guards.entries()) {
-    // Section 6.4: a guard whose subject is unbound is not evaluated, and an effect whose subject is unbound is not applied.
-    if (unbound(j, guard.of)) continue;
-    const result = judgeGuard(j, guard);
-    if (result === "fail") return { ...refused("guard-failed", `guards.${i}`), ...refusalName(guard) };
-    if (result !== "pass") return { result: "unavailable", reason: result };
-  }
-  // Section 6.6: a notice with `if` is made only when its guards hold, on the state before the effects.
-  const told = notices(j, act.attention);
-  if (typeof told === "string") return { result: "unavailable", reason: told };
-  const effects = deriveEffects(j, act.effects.filter((e) => !unbound(j, e.of)), told, act.step === "open" ? act.on : null);
-  if (!effects.ok) return refused(effects.reason, effects.detail);
-  const sends = deriveSends(j, act.sends, effects.working, digest);
-  if (!sends.ok) return "unavailable" in sends ? { result: "unavailable", reason: sends.unavailable } : refused(sends.reason, sends.detail);
-
-  if (act.step === "open" && act.on !== null) {
-    // Section 6.3: `max` bounds the live items of a type; an opening that would exceed it is refused.
-    const full = overMax(view, definition, act.on, effects.working.get("on")!.state);
-    if (full !== null) return refused("type-full", full);
-  }
+  // Guards, then effects, then sends, then the bound on the type it opens, as for a handler. The cause of a scope it creates is the intent's digest.
+  const ran = derive(j, act, act.step === "open" ? act.on : null, digest);
+  if (ran.result === "unavailable") return ran;
+  if (ran.result === "refused") return { ...refused(ran.reason, ran.detail), ...(ran.name === undefined ? {} : { name: ran.name }) };
 
   // Section 5.3: every act judges its `notAfter` and its grant's expiry on the commit clock, so no act is written while the clock is behind.
   if (clock.behind) return { result: "unavailable", reason: "clock-behind" };
-  return { result: "write", draft: { input: { type: "act", signed, authority: [presented.grant] }, uses, prepared: j.used, effects: effects.effects, sends: sends.sends, judgesTime: true } };
+  return { result: "write", draft: { input: { type: "act", signed, authority: [presented.grant] }, uses, prepared: ran.prepared, effects: ran.effects, sends: ran.sends, judgesTime: true } };
 }
 
 /**
@@ -208,7 +191,7 @@ export function judgeTimed(view: StateView, definition: ValidDefinition, selecte
   // refused here, and requires one that takes the item out of the rule's states. So a selection that passes its three checks is
   // written, and its item is not due again under this rule: the drain makes progress. A refusal here is a fault of the validator,
   // and is never answered by passing over the due item.
-  if (!effects.ok) throw new Error(`timed rule ${selected.rule} cannot apply: ${effects.reason}`);
+  if (!effects.ok) throw new Error(`timed rule ${selected.rule} cannot apply: ${"unavailable" in effects ? effects.unavailable : effects.reason}`);
   return { result: "write", draft: { input: { type: "timed", item: selected.item, rule: selected.rule, due: selected.due }, uses: [], prepared: [], effects: effects.effects, sends: [], judgesTime: true } };
 }
 

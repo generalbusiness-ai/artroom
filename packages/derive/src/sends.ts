@@ -8,14 +8,14 @@
 
 import type { Digest, FactRef, FieldType, Guard, Input, Notify, Operand, Range, Seed, SelfMark, Send, SendForm, SendSource, ScopeRef, UnavailableReason } from "@generalbusiness/artroom-contract";
 import type { Derived } from "./effects.ts";
-import { judgeGuard, slotOf, type Judging } from "./guards.ts";
+import { judgeGuards, readsUnbound, slotOf, type Judging } from "./guards.ts";
 import { equal, operand } from "./operand.ts";
 import type { Item } from "./state.ts";
 import type { ValidDefinition } from "./validate/index.ts";
 import { isLocalId, isObject, isScopeRef, own } from "./values.ts";
 
-/** What the send forms of one input made. `unavailable`: a condition or a range could not be completed, so the input is not judged. */
-export type Sends = Derived<{ sends: Send[] }> | { ok: false; unavailable: UnavailableReason };
+/** What the send forms of one input made. */
+export type Sends = Derived<{ sends: Send[] }>;
 
 /**
  * Section 6.6, "Where an `index` send goes": the directory that a scope
@@ -30,13 +30,6 @@ export function directoryOf(genesis: Pick<Extract<Input, { type: "genesis" }>, "
   return isScopeRef(named) && named.kind === "directory" ? named : null;
 }
 
-/** The `also` names that a written form reads as a subject: every `of`, and every `item` of an operand, that names one. */
-function alsoRead(v: unknown): string[] {
-  if (Array.isArray(v)) return v.flatMap(alsoRead);
-  if (!isObject(v)) return [];
-  return Object.entries(v).flatMap(([k, x]) => ((k === "of" || k === "item") && typeof x === "string" && x.startsWith("also.") ? [x] : alsoRead(x)));
-}
-
 /** True when a guard of the list, as written at the top of it, reads the clock. */
 export const readsClock = (guards: readonly Guard[] | undefined): boolean => (guards ?? []).some((g) => "before" in g || "after" in g);
 
@@ -45,30 +38,16 @@ export const conditionsReadClock = (sends: readonly SendForm[], attention: reado
   sends.some((s) => readsClock("tell" in s ? s.tell.if : "relate" in s ? s.relate.if : undefined)) || attention.some((n) => readsClock(n.notify.if));
 
 /**
- * Section 6.6: a send or a notice with `if` is made only when every guard
- * holds, on the state before the entry's effects. One whose `if` reads an
- * unbound subject is not made. A guard that is not completed leaves the
- * input not judged.
+ * Section 6.6: a send with `if` is made only when every guard holds, on the
+ * state before the entry's effects. One whose `if` reads an unbound subject
+ * is not made. The guards are one list with three results: when none is
+ * false and one is not completed, the input is not judged. Effect derivation
+ * judges the `if` of a notice by the same rule.
  */
 function holds(j: Judging, guards: readonly Guard[] | undefined): boolean | UnavailableReason {
-  if (alsoRead(guards ?? []).some((name) => !j.subjects.has(name))) return false;
-  for (const guard of guards ?? []) {
-    const result = judgeGuard(j, guard);
-    if (result === "fail") return false;
-    if (result !== "pass") return result;
-  }
-  return true;
-}
-
-/** The attention forms that are made: each with no `if`, and each whose `if` holds. Or why the input is not judged. */
-export function notices(j: Judging, attention: readonly Notify[]): Notify[] | UnavailableReason {
-  const made: Notify[] = [];
-  for (const form of attention) {
-    const held = holds(j, form.notify.if);
-    if (typeof held === "string") return held;
-    if (held) made.push(form);
-  }
-  return made;
+  if (readsUnbound(j, guards ?? [])) return false;
+  const { result } = judgeGuards(j, guards ?? []);
+  return result === "pass" ? true : result === "fail" ? false : result;
 }
 
 /**
@@ -83,6 +62,8 @@ export function deriveSends(j: Judging, forms: readonly SendForm[], working: Rea
   const items = j.definition.declared.items;
   const on = working.get("on") ?? null;
   let unresolved: string | null = null;
+  /** A send reads each subject as the effects left it. `each`: the item of a fan-out send. */
+  const reading = (each: Item | null): Judging => ({ ...j, subjects: working, each: each ?? undefined });
 
   // I2 merge: the directory could be a member of the scope's state, which the fold sets from the genesis entry. The fold is
   // another step's module, so it is read from the genesis entry here.
@@ -160,12 +141,10 @@ export function deriveSends(j: Judging, forms: readonly SendForm[], working: Rea
   let incomplete = false;
   /** A source's value as it is sent. `each`: the item of a fan-out send. */
   const sent = (s: SendSource, each: Item | null): unknown => {
-    // Each subject is read as the effects left it.
-    const reading: Judging = { ...j, subjects: working, each: each ?? undefined };
     if (s === "self") return wire(j.self, { type: "item", of: "" });
-    if (!("collect" in s)) return wire(operand(reading, s, on), typeOf(s, each));
+    if (!("collect" in s)) return wire(operand(reading(each), s, on), typeOf(s, each));
     // Section 6.6: one record for each item the range covers, with the named members. A member whose slot is empty is left out.
-    const all = covered(s.collect.items, reading);
+    const all = covered(s.collect.items, reading(each));
     if (!all) incomplete = true;
     return (all ?? []).map((item) => Object.fromEntries(Object.entries(s.collect.fields)
       .map(([name, member]) => [name, member === "item" ? local(item.id) : member === "state" ? item.state : wire(slotOf(item, member), slotType(item, member))] as const)
@@ -191,7 +170,7 @@ export function deriveSends(j: Judging, forms: readonly SendForm[], working: Rea
       sends.push({ n: next(), to: seed, message: { class: "request", type: "create", body: { fields: fields(form.create.fields), ...(lanes ? { directory: lanes } : {}) } } });
     } else if ("tell" in form) {
       // Section 6.4: a send whose subject is unbound is not made.
-      if (alsoRead(form.tell.to).some((name) => !working.has(name))) continue;
+      if (readsUnbound(reading(null), form.tell.to)) continue;
       const made = holds(j, form.tell.if);
       if (typeof made === "string") return { ok: false, unavailable: made };
       if (!made) continue;
@@ -201,17 +180,16 @@ export function deriveSends(j: Judging, forms: readonly SendForm[], working: Rea
       sends.push({ n: next(), to, message: { class: "request", type: "tell", body: { message: form.tell.message, fields: fields(form.tell.fields) } } });
     } else if ("relate" in form) {
       const { relate } = form;
-      if (alsoRead([relate.to, relate.item]).some((name) => !working.has(name))) continue;
+      if (readsUnbound(reading(null), [relate.to, relate.item])) continue;
       // Section 6.6: a fan-out makes one send for each item that its range covers, in ascending order of item ID.
-      const all = relate.each ? covered(relate.each, { ...j, subjects: working }) : [null];
+      const all = relate.each ? covered(relate.each, reading(null)) : [null];
       if (!all) return { ok: false, unavailable: "guard-incomplete" };
       for (const each of all) {
         const made = holds(each ? { ...j, each } : j, relate.if);
         if (typeof made === "string") return { ok: false, unavailable: made };
         if (!made) continue;
-        const reading: Judging = { ...j, subjects: working, each: each ?? undefined };
-        const to = relate.to === "self" || "collect" in relate.to ? null : operand(reading, relate.to, on);
-        const item = relate.item === "self" ? j.self : "collect" in relate.item ? null : operand(reading, relate.item, on);
+        const to = relate.to === "self" || "collect" in relate.to ? null : operand(reading(each), relate.to, on);
+        const item = relate.item === "self" ? j.self : "collect" in relate.item ? null : operand(reading(each), relate.item, on);
         if (!isScopeRef(to)) return refuse("the target is not a scope");
         if (!isLocalId(item)) return refuse("the item is not a local item");
         // Section 6.4: the key is the target by its scope ID, the item by its local ID, and the name as written.

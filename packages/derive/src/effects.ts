@@ -14,7 +14,7 @@ import type { Condition, Effect, EffectForm, FieldType, FieldValue, MemberRef, N
 import { attribution, byMember, historyOf } from "./attribution.ts";
 import { isEntryOf, isLocalFact } from "./fields.ts";
 import { changeItem, newItem, type ItemEffect } from "./fold.ts";
-import { judgeGuards, members, slotOf, type Judging } from "./guards.ts";
+import { judgeGuards, members, readsUnbound, slotOf, type Judging } from "./guards.ts";
 import { deriveHold, endsUnder } from "./hold.ts";
 import { bindEach, covered, typeOfElement } from "./lists.ts";
 import { kindOf, operand } from "./operand.ts";
@@ -24,12 +24,12 @@ import { unsupported } from "./unsupported.ts";
 import { isFactRef, isLocalId, isMemberRef, isValue, memberFits, own, same } from "./values.ts";
 
 /**
- * `unavailable`: the input is not judged, for that reason: a condition, or a
- * range that a source reads, was not completed (sections 6.6 and 6.7). It is
- * then no refusal, whatever `reason` says.
+ * What a derivation gives: its result, a refusal, or `unavailable`. The last
+ * is no refusal: the input is not judged, for that reason, because a
+ * condition, or a range that a source or a send reads, was not completed
+ * (sections 6.6 and 6.7).
  */
-// I2 merge: `judgeAct`, `derive` and `runClause` read `ok`, `reason` and `detail` only, so until they answer `unavailable` when it is set, such an input is refused `guard-failed` and nothing is applied.
-export type Derived<T> = ({ ok: true } & T) | { ok: false; reason: RefusalReason; detail: string; unavailable?: UnavailableReason };
+export type Derived<T> = ({ ok: true } & T) | { ok: false; reason: RefusalReason; detail: string } | { ok: false; unavailable: UnavailableReason };
 
 const isList = (from: unknown): from is readonly Operand[] => Array.isArray(from);
 
@@ -94,7 +94,7 @@ export function deriveEffects(j: Judging, forms: readonly EffectForm[], attentio
   const working = new Map(j.subjects);
   const effects: Effect[] = [];
   const refuse = (reason: RefusalReason, detail: string) => ({ ok: false, reason, detail }) as const;
-  const notJudged = (unavailable: UnavailableReason, detail: string) => ({ ok: false, reason: "guard-failed", detail: `${detail} is not completed`, unavailable }) as const;
+  const notJudged = (unavailable: UnavailableReason) => ({ ok: false, unavailable }) as const;
   // A source reads each subject as the effects written before it left it, and the item this entry opens as `on`.
   const after: Judging = { ...j, subjects: working };
   const apply = (subject: string, effect: ItemEffect) => {
@@ -106,9 +106,11 @@ export function deriveEffects(j: Judging, forms: readonly EffectForm[], attentio
    * every guard holds; with `unless`, only when not every guard holds. The
    * guards are judged on the state before the entry's effects. A condition
    * that is not completed, and that no other condition of the form decides,
-   * leaves the input not judged.
+   * leaves the input not judged. Section 6.4: a form whose `if` reads an
+   * unbound subject is not applied.
    */
   const lets = (c: Condition): boolean | UnavailableReason => {
+    if (c.if && readsUnbound(j, c.if)) return false;
     const holds = c.if ? judgeGuards(j, c.if).result : "pass";
     const bars = c.unless ? judgeGuards(j, c.unless).result : "fail";
     if (holds === "fail" || bars === "pass") return false;
@@ -129,7 +131,7 @@ export function deriveEffects(j: Judging, forms: readonly EffectForm[], attentio
     if (!item) continue;
     const through = lets(form);
     if (through === false) continue;
-    if (through !== true) return notJudged(through, `effects.${i}: its condition`);
+    if (through !== true) return notJudged(through);
     const type = own(items, item.type)!;
     const id = item.id;
     const bad = (what: string) => refuse("bad-field", `effects.${i}: ${what}`);
@@ -212,7 +214,7 @@ export function deriveEffects(j: Judging, forms: readonly EffectForm[], attentio
         if ("items" in w) {
           // A range in a source is an exact set, so it needs complete evidence, as a guard does.
           const range = covered(j, w.items);
-          if (range === null) return notJudged("guard-incomplete", `effects.${i}: the range of with.${n}`);
+          if (range === null) return notJudged("guard-incomplete");
           lists = range.map((r) => members(own(r.parties, w.slot)));
         } else if ("subject" in w) lists = [members(own(working.get(w.subject)?.parties, w.slot))];
         else if ("each" in w) {
@@ -260,11 +262,11 @@ export function deriveEffects(j: Judging, forms: readonly EffectForm[], attentio
     }
   }
 
-  for (const [i, { notify }] of attention.entries()) {
+  for (const { notify } of attention) {
     // Section 6.6: a notice with `if` is made only when its guards hold, on the state before the effects.
     const through = lets(notify.if ? { if: notify.if } : {});
     if (through === false) continue;
-    if (through !== true) return notJudged(through, `attention.${i}: its condition`);
+    if (through !== true) return notJudged(through);
     // The members in that slot as it was before the effects, or as it is after. An unbound subject has none.
     const told = members(own((notify.when === "before" ? j.subjects : working).get(notify.of)?.parties, notify.slot));
     if (told.length > 0) effects.push({ effect: "attention", item: working.get(notify.of)!.id, members: told, reason: notify.reason });

@@ -12,8 +12,8 @@ import type { Signer } from "./attribution.ts";
 import { deriveEffects } from "./effects.ts";
 import { creationFields, factsNamed, isLocalFact, messageFields, readFacts, readFields, updateOf, type Reading, type Update } from "./fields.ts";
 import { signerOf } from "./fold.ts";
-import { judgeGuard, slotOf, type Fetched, type Judging } from "./guards.ts";
-import { conditionsReadClock, deriveSends, formOf, notices, readsClock } from "./sends.ts";
+import { judgeGuards, slotOf, type Fetched, type Judging } from "./guards.ts";
+import { conditionsReadClock, deriveSends, formOf, readsClock } from "./sends.ts";
 import type { Item, OwnRequest, ScopeState, StateView } from "./state.ts";
 import type { ValidDefinition } from "./validate/index.ts";
 import { isFactRef, isLocalId, isObject, own } from "./values.ts";
@@ -142,14 +142,6 @@ export function alsoItems(view: StateView, definition: ValidDefinition, also: Re
   return refusal === null ? { ok: true, items } : { ok: false, detail: refusal };
 }
 
-/**
- * Section 6.4: an `also` name that is unbound is not among the subjects. A
- * guard whose subject is unbound is not evaluated, and an effect whose
- * subject is unbound is not applied.
- */
-// I2 merge: a guard nested in a list form whose own `of` is unbound is step 4's to skip; an effect whose `if` reads an unbound subject, and an `attribute` of one, are step 5's to leave out.
-export const unbound = (j: Pick<Judging, "subjects">, of: string | undefined): boolean => of !== undefined && of.startsWith("also.") && !j.subjects.has(of);
-
 /** Section 6.3: `max` bounds the live items of a type. What an opening of one more, into that state, would pass; or null. */
 export function overMax(view: StateView, definition: ValidDefinition, type: string, state: string): string | null {
   const declared = own(definition.declared.items, type)!;
@@ -182,17 +174,14 @@ const timesEffect = (e: EffectForm): boolean => "value" in e && e.value.from !==
  * records, when the entry is its genesis.
  */
 export function derive(j: Judging, forms: Forms, opens: string | null, cause: Digest, first = 0, directory?: ScopeRef | null): Ran {
-  for (const [i, guard] of forms.guards.entries()) {
-    if (unbound(j, guard.of)) continue;
-    const result = judgeGuard(j, guard);
-    if (result === "fail") return { result: "refused", reason: "guard-failed", ...refusalName(guard), detail: `guards.${i}`, prepared: j.used };
-    if (result !== "pass") return { result: "unavailable", reason: result };
-  }
-  // Section 6.6: a notice with `if` is made only when its guards hold, on the state before the effects.
-  const told = notices(j, forms.attention);
-  if (typeof told === "string") return { result: "unavailable", reason: told };
-  const effects = deriveEffects(j, forms.effects.filter((e) => !unbound(j, e.of)), told, opens);
-  if (!effects.ok) return { result: "refused", reason: effects.reason, detail: effects.detail, prepared: j.used };
+  // Section 6.5: the guards are one list with three results. A guard that is false refuses, also after one that is not completed.
+  // Section 6.4: a guard whose subject is unbound is not evaluated, and an effect whose subject is unbound is not applied.
+  const guards = judgeGuards(j, forms.guards);
+  if (guards.result === "fail") return { result: "refused", reason: "guard-failed", ...refusalName(forms.guards[guards.at]!), detail: `guards.${guards.at}`, prepared: j.used };
+  if (guards.result !== "pass") return { result: "unavailable", reason: guards.result };
+  // Sections 6.6 and 6.7: a condition, or a range that a source or a send reads, that is not completed leaves the input not judged.
+  const effects = deriveEffects(j, forms.effects, forms.attention, opens);
+  if (!effects.ok) return "unavailable" in effects ? { result: "unavailable", reason: effects.unavailable } : { result: "refused", reason: effects.reason, detail: effects.detail, prepared: j.used };
   const sends = deriveSends(j, forms.sends, effects.working, cause, first, directory);
   if (!sends.ok) return "unavailable" in sends ? { result: "unavailable", reason: sends.unavailable } : { result: "refused", reason: sends.reason, detail: sends.detail, prepared: j.used };
   const full = opens === null ? null : overMax(j.view, j.definition, opens, effects.working.get("on")!.state);
@@ -332,6 +321,8 @@ export function runClause(view: StateView, definition: ValidDefinition, context:
     view, definition, bounds: context.bounds, clock: context.clock, scope, self: scope.head.seq + 1, kind: frame.kind, fields: facts.fields, fieldTypes: frame.fieldTypes, subjects, signer: frame.signer,
     facts: facts.facts, prepared: [], used: [], own: context.own, sender: answered?.sender, result: answered?.reason,
   };
-  const effects = deriveEffects(j, forms.filter((e) => !unbound(j, e.of)), [], null);
+  const effects = deriveEffects(j, forms, [], null);
+  // Section 6.6: a clause's condition that is not completed leaves the result not recorded now. It is offered again.
+  if (!effects.ok && "unavailable" in effects) return { result: "unavailable", reason: effects.unavailable };
   return { result: "ran", effects: effects.ok ? effects.effects : [], uses: facts.uses, judgesTime: forms.some(timesEffect) };
 }

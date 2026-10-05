@@ -130,6 +130,8 @@ describe("the list forms (section 6.5)", () => {
     const each: Guard[] = [{ each: { list: { field: "names" }, as: "n", where: kept, guards: [some(["passed"], n)] } }];
     const names = (...list: string[]) => () => ({ names: list });
     expect(judged([
+      // The guards of an act are one list: the first is not completed, and the second is false on complete evidence.
+      ["a guard that is false refuses, after one that is not completed", [open, { ...fails, reason: "later" }], none, "later", { bounds: stopped }],
       ["an alternative holds beside one that is not completed", [{ anyOf: [[open], [holds]] }], none, "passes", { bounds: stopped }],
       ["no alternative holds, and one is not completed", [{ anyOf: [[open], [fails]] }], none, "guard-incomplete", { bounds: stopped }],
       ["an alternative with a false guard is false, whatever its other guards are", [{ anyOf: [[open, fails]], reason: "no-alternative" }], none, "no-alternative", { bounds: stopped }],
