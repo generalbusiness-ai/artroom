@@ -27,7 +27,7 @@ Written 2026-10-05 with the plan. None is implemented by steps 1 to 3.
 | D3 | What a runtime does with a capability form that it cannot derive (rows 4, 31 and 44). | Nothing yet. It is step 11's, and waits for the plan's question Q1. Until then the validator refuses each capability form, and `git-read@1` in the list. | Section 6.1 gives `unsupported-definition` for a version that a runtime does not implement. It does not say whether a test may script one. |
 | D4 | Rows 8 and 9, the kinds of an entry, are adopted in section 6.2 and have no row in the source map of section 11.8. | Reported. Step 3 implements them: entries D16 and D21. | The source map is the contract's owner's to correct. |
 | D5 | Whether a declared definition may state a name that begins `platform:`. | Step 3 refuses it: entry D14. | The plan's question Q5. |
-| D6 | What `settles` reserves in entries, for each form (row 20). | Nothing yet. It is step 10's. | Section 17.2 states the rule and no count for each form. |
+| D6 | What `settles` reserves in entries, for each form (row 20). | Step 10 implements it: entries DI17 to DI23. | Section 17.2 states the rule and no count for each form. |
 
 ## 2. Step 1: the contract's types, the capability tables and the bounds
 
@@ -267,3 +267,113 @@ Written 2026-10-05. Rows 46, 48, 50 to 54, 57 and 58 of the plan.
 | DH19 | Section 7.4 names a request by its source fact and ordinal. With conditional sends and a fan-out, the ordinal no longer says which form made a send, and the clause of a result is the form's. | The form is found from the entry's recorded sends. The forms and the sends are in one order, so each send is matched to the first form, at or after the last one matched, that makes a message of its type and name: a `create` by its kind and definition, a `tell` by its message, a `relate` by its name and state, an `index` by its type. The validator refuses, as a `shape` problem, a list in which two forms make a message of one type and name, when one of the two is not always made exactly once and one of them has a result clause with an effect. | An entry does not record which form made each send. No row of the lane forms has two such forms: `propose-manifest` and `publication` are the two rows with more than one send form, and each of their forms has its own name. Owner: the contract, if an entry should record the form. |
 | DH20 | Section 6.6 gives `notify` an `if`, and the bound `attention-unbounded`. | A notice with `if` is made only when its guards hold on the state before the effects, and not when its `if` reads an unbound name. The validator adds 1 for a single slot and the slot's `max` for a list, over the attention forms of one act, handler or timed rule, and refuses a sum over 64. It refuses an `if` on a notice of a timed rule, as a `timed` problem. | Rows 57 and 58. A timed entry is always written (section 6.4). A condition that is not completed would leave it not judged, and no rule says what then. Owner of that part: the contract. |
 | DH21 | Section 7.5 bounds the sends of one entry by kind, "and at most 104 in all". | The validator counts, for each act and handler, the most sends its entry can have: one for each send form, a fan-out at its type's `max`, each member its attention can tell, and the platform's one result for a handler of a request and for the genesis act. A count over the bound is refused, as a `bound` problem. At the proposed values the bounds by kind already keep every entry within 104, so this refuses nothing: it holds when the values are configured apart. `decompositionDepth`: section 7.5 states "Depth of the decomposition chain: 4" and no rule that reads it. No source reads it, and none was added. | The bound was a configured value that nothing read. Owner of the depth: the contract. |
+
+## 12. The merge of steps 4 to 8: seams and defects (integration)
+
+Written 2026-10-05, by the integrator. The four tracks left `// I2 merge:`
+marks where one needed another's module. This section says how each was
+closed, and where two tracks had chosen differently. The entries are
+numbered DI1 and so on. An entry that changes an earlier one names it.
+
+### Where two tracks met
+
+| # | Where the contract is silent, or two entries differed | Implemented | Why |
+|---|---|---|---|
+| DI1 | Entry DF3 took a member of an element only where the definition states the element's type as a record. Entry DG7 took any member of an element whose type only the commit knows. | Entry DG7's rule, inside entry DF3's one reader of a dotted name. Where the definition states the type, it must be a record with that member. Where only the commit knows it, any member may be named, its type is the commit's to know, and one that is not there is none. | The lane rows read members of elements of a list that a part reads from a fetched entry: `k.child`, `k.item`. Section 6.5: a part that is not there is none, and a part is never an error. |
+| DI2 | Entries DF8, DF14 and DH6 each refused a handler that opens a hold. Three places reported it, with two codes. | One refusal, as `hold`, by the validator of handlers: a handler that opens a hold type, or has `hold: open`. The `hold` effect reports `one-item` only for an opening that is not the entry's primary item. | One mistake is one problem. |
+| DI3 | Entry DF5 refused a handler whose message begins `relate:timed:`. Entry DH1 removed the name `relate:` and a relationship's name: a handler states its class. | A message's name is read as written, for every class: it does not begin `timed:`. | A relationship is no longer named after `relate:`. |
+| DI4 | Entry DH4 gave a handler declared fields. A test of step 4 sent a handler a value that is no list, to show that a list form fails closed. | A value that is not of its field's declared type is `refused`, `bad-field`, before any guard. A list form still fails closed over a value that is no list, which only a part of an entry's bytes can now be. | Section 6.4, "A message's fields". |
+
+### The seams
+
+| # | Where the contract is silent | Implemented | Why |
+|---|---|---|---|
+| DI5 | Entries DG2 and DG16 left the judges stopping at the first guard that was not completed, and refusing `guard-failed` for a condition that was not completed. | The guards of an act and of a handler are one list with the three results of section 6.5, judged by `judgeGuards`. A guard that is false refuses, also after one that is not completed, and the refusal names that guard. Effect derivation answers a refusal or "not judged", and the judges of an act, of a handler and of a result clause read it. An act is answered Unavailable. A delivery is not decided. A result whose clause has a condition that is not completed is not recorded now, and is offered again. The act judge derives its forms with the function the other judges use. | Section 6.5, "Three results", and section 6.6: a condition "that is not completed leaves the input not judged". A fact that a field names is fetched before any guard, so a later guard never fails only because an earlier one could not read its entry. |
+| DI6 | Section 6.4 says a guard whose subject is unbound is not evaluated. It does not say what that is inside a list form. Entry DH11 left it. | A guard whose subject is unbound is not evaluated wherever it is written. In its list it counts for nothing: the list holds if its other guards do. So an alternative of `anyOf` whose every guard is unbound holds. An effect, a send or a notice whose `if` reads an unbound name, as a guard's `of` or in an operand, is not applied. An `unless` is judged as written: an operand that reads an unbound subject is none. | Section 6.4: "the input does not rest on it", and an effect or a send "whose `if` reads an unbound subject, is not applied". The contract names `if` only. Owner of the nested reading: the contract. |
+| DI7 | Entries DG28 and DH20 each derived the `if` of a notice. | It is judged once, in effect derivation, by the rule of entry DI5. The validator takes it on an act and a handler, and refuses it on a timed rule, as entry DH20 says. | One reading. |
+| DI8 | Entry DG14 left unbuilt the validator's half of section 6.6's rule for `{ source: "ref" }`. Entry D23 and entry DH7 left `self` in a handler to this merge. | The validator refuses a copy of the source entry into a `fact` slot whose `under` is not the name that the handler's `from.under` states. When `from` states none, the commit checks the kind and the name. A handler of a `tell` or of a relationship sets a `fact` slot from `self` when the slot's kinds include its message. The entry of an advisory has no kind, so its handler may not. | Section 6.6, "A slot never holds a value outside its type". |
+| DI9 | Entry DH13 read a scope's directory from its genesis entry and left open whether the fold should keep it. | It stays a function of the genesis entry, read through the scope's own history. It is no member of the folded state. | The state that a checkpoint digests does not change, and the runtime and a verifier read one entry the same way. |
+| DI10 | Entries DH17 and DH18 read the range of a fan-out and of a `collect` in one page of the type's `max`, and gave no complete evidence for a type whose `max` is past the work of one guard. Entry DH17 gave a clause of a fan-out no `each`. | The range is read as a guard's is (entry DG5): every page up to the work limit, with `where` and `except`. A scan that stops completes nothing, and the input is not judged. So what decides is the items read, and not the type's `max`. The validator derives the index slots for these ranges too. A result clause of a fan-out send may read `each` where the update's `item` is `{ item: "each" }`: the entry records that item, and the clause finds it again from the recorded send. Where the update is for another item, a clause that reads `each` is refused, as `name`. | Section 6.6: a clause's subjects are those of the entry that made the send, "and `each` for a fan-out send". An entry records the item of each update and nothing else of the range. Owner of the refused case: the contract, if an entry should record more. |
+| DI11 | Entry DF14's seams in `derive/src/hold.ts` and `derive/src/validate/operands.ts`. | Left, each still marked: the records and operations of `hold@1` are step 11's and I3's; a member of a record field or slot is not read, because `ifPresent` reads a field's name whole (entry DF3). | Neither is this step's. No lane row reads a member of a field or of a slot. |
+
+### Defects found in the landed source
+
+| # | Place | Implemented | Why |
+|---|---|---|---|
+| DI12 | `kindOf`, the finding of section 7 above: a delivered request that no handler receives had its message's name as its kind. | A delivery of a request that was decided `refused`, `unknown-message` has no kind. The decision is in the entry's bytes, so a reader that does not hold the receiver's definition reads it too. The judge of a delivery looks for the handler before it reads the fields, so a message that no handler receives is `unknown-message` whatever it holds. A delivery that a handler received and refused keeps its kind. | Section 6.2 compares a kind "with the handler's message name". Owner of the wording, and of the refused case: the contract. |
+| DI13 | The judges asked whether an entry judges time of the guards written at the top of a list only. | The forms are read as written, at any depth: nested guards, the conditions of effects, sends and notices, and a clause's effects. Whether a guard is evaluated is not asked. So a delivery whose `anyOf` holds by its first alternative, with a clock guard in its second, is not written while the clock is behind. | Section 5.3. The same reading already held for a guard that `ifPresent` passes over. |
+| DI14 | A `reason` on a nested guard names nothing (entry DG9). | Not changed. Section 4.2 names the failed guard "by its path, such as `guards.2`", which is a guard of the written list. No row of either lane definition carries a `reason` on a nested guard, or in a condition: counted by a script outside the repository, 0. | Owner: the contract, to say so or to give a nested guard a name. |
+| DI15 | `given()` does not read `hold` records (entry DF9). `equal` does not look for a local fact inside a record (entry DF4). `decompositionDepth` is read by no source (entry DH21). | Not changed. Each fails closed, or bounds nothing. The entries stand. | Owners: the builder for the first two, when a row reads one; the contract for the depth. |
+| DI16 | Entries D19 and D20 gave a position, the `seq` of an entry and the revision of an update, the type of an integer up to the largest safe integer. The validator then refused, as `bound`, a copy of one into an integer slot of a narrower range. Found by reading the two lane definitions through the validator. | A position has a type and no stated most. The validator asks only that the slot is an integer. The commit checks the value against the slot and refuses `bad-field`. A timed rule may not copy one. | The contract states no most for a position. Its companion file writes `parentItem`, an integer up to 1,000,000,000, from `{ field: "origin", part: "seq" }`, and the `revision` of `rules` from `{ update: "revision" }`. Section 6.6: where the validator cannot know, the commit checks. |
+
+## 13. Step 10: capacity, `settles` in entries
+
+Written 2026-10-05, by the integrator. Row 20 of the plan, and entry D6.
+Entries only: items, records, bytes and pending requests are not counted,
+and stay owed (the plan's section 3).
+
+| # | Where the contract is silent | Implemented | Why |
+|---|---|---|---|
+| DI17 | Section 6.4 gives `settles` a type and one sentence. | `{ of, in }`: `of` is `on` or an `also` name, and not the item the entry opens; `in` is a list of states of that subject's type, and is not empty. A final state may be listed. `{ copy }`: in a `relate` handler only, a list of states of the relationship, each a non-empty text; the copy is the one the handler's update is for. Other forms are refused: `name` for a subject or a state that is not there, `shape` for the rest. | Row 20. An item that an entry opens was in no state before it. A relationship's states are the sender's words, so the validator cannot check them. Whether a final state should be listed is the lane forms' question (the plan's Q6, point R1-45). |
+| DI18 | Section 17.2, rows 3 and 4, state what an item or a copy that awaits its settlement reserves. They give no count for each form. | For a settling form: 1 entry; what its own effects can start, by subject; and for each request among its sends, at the bounds, 2 entries and the most that one clause of that send can start. A fan-out counts at its type's `max`. "What a list of effects can start" is, for each subject, the largest over the states the list can set of the chain of a deadline in that state and what an item in that state reserves for its settlement; or the chain of a deadline slot that it sets. An item that the form opens counts in its initial state. A state of the settled subject that the form's own `settles` lists is not counted: an entry that leaves it there settles nothing. Where several forms settle one state, the largest. `ValidDefinition.pending` and `pendingCopies` hold the amounts, and `owed` multiplies each by the count of items, or of copies, in that state. | Section 17.2: "A reservation covers what its settling entry starts". At the proposed bounds this gives 67 entries for a merge that is asked for in the `change` definition: its entry and two for each of 33 requests, which is the number the contract states. |
+| DI19 | Section 17.2 does not say what a timed rule does to an item that awaits no settlement in its state and does after the rule. | An item in a state from which a timed rule leads to a state that awaits a settlement reserves that settlement already. | A timed entry is a settling entry and is never refused. So the room for what it leaves pending must exist before it. |
+| DI20 | Section 17.2 names `reserve-unbounded` for "settling forms [that] create each other's pending states in a cycle". | The validator follows what each settling form can set, through its effects and the clauses of its requests, and refuses the definition when that leads back to a state the form settles. The problem is at the form. | As written. |
+| DI21 | Section 17.3 says which act or delivery is settling. It does not say how a commit knows. | The judge says so: `Draft.settles`, which is in no entry. It is true when the form declares `settles`, its subject was in a listed state before the entry, and is in none after its effects; or, for a copy, the copy held was in a listed state and the update's state is not listed. `fits` does not ask such an entry whether it fits. An entry of the form that leaves its subject in a listed state, a second answer on an item that is settled, and every refusal, are new work. A verifier calls the same judge and gets the same word. | Section 17.3, the table, and "A refusal takes no item and no copy out of a pending state". |
+| DI22 | Section 17.2, "More, and never less": the runtime holds, for every pending request, the largest amount over all the request forms of the definition (I1's rule). A settling form's reservation counts each request it sends at that request's own closure. | Kept. So after a settling entry that sends a request, written and reserved together may pass the budget by the difference, until that request settles. That is used only against new work. A settling entry is written whatever is held. | Condition 3 of that paragraph. The amounts that a verifier derives are the least ones, and they stay within the budget. |
+| DI23 | Where this step has no witness on real storage. | Two lines: the draft's word passed to `fits` in `scope/src/turn.ts`, and the store's count of copies by state in `scope/src/sqlite.ts`. The first has a test in `derive`, and a test in `scope` that it does not change: in the fixture lane a settling entry frees what it uses. The second has a test over the state in memory. | Both are the lane package's capacity scenario, T7 of the plan, in step 16. |
+
+The witness is `derive/test/compose.test.ts`, "a pending job at a full
+budget": the first witness of section 17.4, in entries, on a made-up
+definition, with a copy beside the job.
+
+## 14. The two lane definitions, read by the validator
+
+Written 2026-10-05, by the integrator, at the head that holds step 10.
+A script outside the repository ran `validateDefinition` at the proposed
+bounds over `issue` and `change` from `packages/lanes`. It is no test,
+and nothing is pinned. This is what steps 9, 11 and 13 start from.
+
+As written, the validator reports 4 problems for each definition and
+stops, because it reads nothing past a refused item type.
+
+| Definition | Problem | Count | One path | Supplied by |
+|---|---|---|---|---|
+| `issue` | `shape`: `detached` is not a member of a text type | 3 | `items.intent.values.body.of.detached` | Step 9 |
+| `issue` | `capability`: `git-read@1` is not implemented | 1 | `capabilities.1` | Step 11 |
+| `change` | `shape`: `detached` is not a member of a text type | 3 | `items.proposal.values.body.of.detached` | Step 9 |
+| `change` | `capability`: `git-read@1` is not implemented | 1 | `capabilities.1` | Step 11 |
+
+To see behind them, the script validated a copy of each definition from
+which it had taken, in turn, the forms that a later step supplies. No
+file of `packages/lanes` was changed. Counted from the data as written:
+`issue` holds 11 text types with `detached`, 2 `redact` effects, 6
+`capability` guards and 6 `capability` effects. `change` holds 10 text
+types with `detached`, 1 act with `presents`, 13 operands that read a
+presented fact, 6 parts that read a capability record, 2 `redact`
+effects, 4 `capability` guards and 5 `capability` effects.
+
+| Taken out of the copy | `issue` then reports | `change` then reports |
+|---|---|---|
+| Nothing | 4, as above | 4, as above |
+| `detached` on every text type | 1: `git-read@1` | 1: `git-read@1` |
+| `git-read@1` in `capabilities` | 14 `shape`: 8 effects that are `redact` or `capability`, 6 guards that are `capability` | 8 `shape`: 5 such effects, 2 such guards, and `presents` on `propose-manifest` |
+| `presents`, with what reads a presented fact | The same 14 | 9 `shape`: 7 such effects, 2 such guards |
+| Every `redact` effect | 12 | 7 |
+| Every `capability` guard and effect | Valid | Valid |
+
+One more problem was reported in each definition at the third row, before
+this delivery's own correction: `bound`, at `acts.file.effects.6.value.from`
+in `issue` and at `receives.rules.effects.3.value.from` in `change`. Both
+were the validator's (entry DI16), and are gone.
+
+So no row of `packages/lanes` departs from the lane forms as far as the
+validator reads today, and none is refused for a form that steps 1 to 8
+and 10 deliver. What steps 9 and 11 must take is exactly: `detached` and
+`redact`; `presents`, a presented operand, and a `fact` guard and
+`ifPresent` over one; `git-read@1` in the list; the `capability` guard and
+effect; and the part `carried`. The names `platform:task`,
+`platform:rules` and `platform:destination`, the kind `publish` and the
+kind `hold@1:check` are texts to the validator, and are not refused: they
+stay the lane forms' gap G26 and the plan's rows 11 and 62. From the valid
+copies the validator derived, for `change`, 67 entries for a merge that
+awaits its publication, and for both definitions a finite closure.

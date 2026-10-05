@@ -7,10 +7,9 @@
  * do not say what a runtime can derive yet: the validator of the derive
  * package refuses every form that it has no derivation for.
  *
- * A few forms are marked "landed form". Each is what the first delivery
- * built before the contract gave the form its adopted shape. It stays in its
- * union until the source that reads it moves to the adopted form, and is
- * then removed. A new definition does not use one.
+ * Each form that the first delivery built before the contract gave it its
+ * adopted shape was removed when the source that read it moved. None is
+ * left.
  */
 
 import type { Digest, PlatformDefinition, ScopeKind } from "./scope.ts";
