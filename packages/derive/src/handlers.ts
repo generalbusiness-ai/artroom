@@ -26,10 +26,12 @@ import { isFactRef, isLocalId, isObject, own } from "./values.ts";
  * a `tell` by the name the request declares, a `relate` by the
  * relationship's name, and an advisory by its type. The validator has shown
  * there is at most one. The fields are the message's own, and for a `relate`
- * the update's detail. Null: the body is not the shape of its message.
- * `handler` null: the definition declares none.
+ * the update's detail. Null: the message states no name. `fields` null: the
+ * body is not the shape of its message. `handler` null: the definition
+ * declares none. A handler is looked for before the fields are read, so a
+ * message that no handler receives is `unknown-message` whatever it holds.
  */
-export function bound(definition: ValidDefinition, message: Request | Advisory, from: FactRef): { kind: string; handler: ReceiveType | null; fields: Record<string, FieldValue> } | null {
+export function bound(definition: ValidDefinition, message: Request | Advisory, from: FactRef): { kind: string; handler: ReceiveType | null; fields: Record<string, FieldValue> | null } | null {
   const body = message.body;
   let kind: string;
   let fields: Record<string, FieldValue> | null;
@@ -38,11 +40,9 @@ export function bound(definition: ValidDefinition, message: Request | Advisory, 
     if (!isObject(body) || typeof body["message"] !== "string") return null;
     [kind, fields] = [body["message"], messageFields(body["fields"], from)];
   } else if (message.type === "relate") {
-    const update = updateOf(message, from);
-    if (!update) return null;
-    [kind, fields] = [update.name, update.detail];
+    if (!isObject(body) || typeof body["name"] !== "string") return null;
+    [kind, fields] = [body["name"], updateOf(message, from)?.detail ?? null];
   } else return null;
-  if (!fields) return null;
   const cls = message.class === "advisory" ? "advisory" : message.type;
   const handler = Object.values(definition.declared.receives).find((h) => h.class === cls && h.message === kind && h.from.kind === from.at.kind) ?? null;
   return { kind, handler, fields };
@@ -73,7 +73,7 @@ function messageRead(view: StateView, at: ScopeRef, handler: ReceiveType, given:
 export function messageFacts(view: StateView, definition: ValidDefinition, message: Request | Advisory, from: FactRef, bounds: Bounds): FactRef[] {
   const scope = view.scope();
   const b = scope && bound(definition, message, from);
-  if (!scope || !b?.handler) return [];
+  if (!scope || !b?.handler || !b.fields) return [];
   const read = messageRead(view, scope.at, b.handler, b.fields, bounds);
   return read.ok ? factsNamed(b.handler.fields, read.fields, scope.at).filter((f) => f.hash !== from.hash) : [];
 }
@@ -288,7 +288,7 @@ export function runClause(view: StateView, definition: ValidDefinition, context:
     frame = { kind, fields: read.fields, fieldTypes: act.fields, also: act.also, on: typeof on === "number" ? on : null, signer: signed && { member: signed.member, principal: null }, sends: act.sends };
   } else if (input.type === "delivery" && (input.message.class === "request" || input.message.class === "advisory")) {
     const b = bound(definition, input.message, input.from);
-    if (!b?.handler) throw new Error(`entry ${origin.seq} sent a request and ran no handler`);
+    if (!b?.handler || !b.fields) throw new Error(`entry ${origin.seq} sent a request and ran no handler`);
     const handler = b.handler;
     const read = messageRead(view, scope.at, handler, b.fields, context.bounds);
     if (!read.ok) throw new Error(`entry ${origin.seq} was sealed with fields its handler does not take`);

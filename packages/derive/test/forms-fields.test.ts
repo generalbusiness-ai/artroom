@@ -6,7 +6,7 @@ import { operand, validateDefinition, type Judging, type ProblemCode } from "../
 import { naming, type Defining } from "../src/validate/context.ts";
 import { operand as operandType } from "../src/validate/operands.ts";
 import { shapes } from "../src/validate/shape.ts";
-import { Scope, d, fields, keys, on, otherLane, t, ticket } from "./fixtures.ts";
+import { Scope, arrive, d, decided, fields, keys, on, otherLane, t, ticket } from "./fixtures.ts";
 import { board, boardDefinition } from "./fixtures-f.ts";
 
 const { sam } = keys;
@@ -71,6 +71,10 @@ describe("the kind of a timed entry (sections 6.2 and 6.4)", () => {
     // The entry that opened the job is no timed entry: its kind is `ask`. The timed entry is what decided the job.
     const cite = (seq: number) => s.act(sam, "cite", { ...on(s, job), ...fields({ by: s.fact(seq) }) });
     expect(cite(job)).toMatchObject({ result: "refused", reason: "guard-failed", detail: "guards.1" });
+    // Another lane tells this scope a message with that name. No handler receives it, whatever its fields hold, so its entry has no
+    // kind, and is no such fact.
+    arrive(s, new Scope(boardDefinition, sam.member, true, 1), { class: "request", type: "tell", body: { message: "timed:job-deadline", fields: 7 } });
+    expect([decided(s), cite(s.last.seq)]).toMatchObject([["refused", "unknown-message"], { result: "refused", reason: "guard-failed", detail: "guards.1" }]);
     expect(cite(timed.seq).result).toBe("write");
     expect(s.replay().snapshot()).toBe(s.state.snapshot());
   });

@@ -166,18 +166,6 @@ export function operand(d: Defining, v: unknown, path: string, ctx: Ctx, owner: 
   return { form: k, type, fields, slot };
 }
 
-const LANDED = ["field", "slot", "signer", "const"];
-
-/**
- * An operand in one of the four forms of the first delivery, with no `of`
- * and no part: a field, a slot of the owner, the signer or a constant. A
- * family whose derivation reads only those validates its operands here,
- * until its own step reads every operand.
- */
-export function landedOperand(d: Defining, v: unknown, path: string, ctx: Ctx, owner: () => Type | null): Read | null {
-  return d.form(v, path, LANDED) ? operand(d, v, path, ctx, owner, false) : null;
-}
-
 /** The declared type of the field that a field operand names, when the definition states it. */
 export const fieldOf = (v: unknown, ctx: Ctx): FieldType | null => (isObject(v) && typeof v["field"] === "string" ? (ctx.fields?.get(v["field"]) ?? null) : null);
 

@@ -25,9 +25,16 @@ export function slotOf(item: Item, slot: string): FieldValue | null {
 
 /**
  * The kind that a `fact` type's `kind` is compared with: the act kind of an
- * act; the genesis act's kind of a genesis; and, for a delivery of a
- * request, the name of its message, which for a relationship update is the
+ * act; the genesis act's kind of a genesis; `timed:` and its rule's key of a
+ * timed entry; and, for a delivery of a request that a handler received,
+ * the handler's message name, which for a relationship update is the
  * relationship's name. Null: the entry has no kind that is derived here.
+ *
+ * A request that no handler of its receiver's definition receives is decided
+ * `refused`, `unknown-message`. Its entry has no kind: the name in it is the
+ * sender's choice, and could be an act kind of this definition, or `timed:`
+ * and a rule's key. The decision is in the entry's bytes, so a reader that
+ * does not hold the receiver's definition reads it too.
  *
  * A genesis entry does not hold its act's kind. The definition that its
  * seed names does. `held` is the definition this scope pins: it gives the
@@ -40,7 +47,8 @@ export function kindOf(entry: Entry, held: ValidDefinition, local: boolean): str
   if (input.type === "act") return input.signed.intent.kind;
   if (input.type === "genesis") return local || input.seed.definition === held.digest ? held.declared.genesis : null;
   if (input.type === "timed") return `timed:${input.rule}`;
-  if (input.type !== "delivery" || input.message.class !== "request") return null;
+  if (input.type !== "delivery" || input.message.class !== "request" || !("decision" in input)) return null;
+  if (input.decision === "refused" && input.reason?.code === "unknown-message") return null;
   const body = input.message.body;
   if (!isObject(body)) return null;
   const name = input.message.type === "tell" ? body["message"] : input.message.type === "relate" ? body["name"] : null;

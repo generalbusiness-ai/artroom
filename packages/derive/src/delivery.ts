@@ -113,7 +113,7 @@ export function judgeDelivery(view: StateView, definition: ValidDefinition, deli
   if (message.class === "advisory") {
     // As the receiver's own definition says: a handler for its type, or a record with no effect. An advisory has no decision.
     const b = bound(definition, message, from);
-    const ran: Handled | null = b?.handler && under(b.handler, context.source) ? runHandler(view, definition, context, scope, b.handler, b.kind, b.fields, cause(), sent) : null;
+    const ran: Handled | null = b?.handler && b.fields && under(b.handler, context.source) ? runHandler(view, definition, context, scope, b.handler, b.kind, b.fields, cause(), sent) : null;
     if (ran?.result === "unavailable") return ran;
     // A handler that refuses leaves the entry with no effect. The entry still records each rule result its guards read, and each
     // foreign entry its fields named.
@@ -135,8 +135,11 @@ export function judgeDelivery(view: StateView, definition: ValidDefinition, deli
   if (!b) return decide("refused", { code: "bad-field" });
   // Section 4.2: a request that names no handler of the definition, for a scope of the sender's kind and definition, is decided
   // `refused`. That holds for a relationship update too: a scope keeps a copy only for a relationship it declares a handler for.
+  // An entry so decided has no kind (section 6.2): no handler of this definition received it.
   const handler = b.handler && under(b.handler, context.source) ? b.handler : null;
   if (!handler) return decide("refused", { code: "unknown-message" });
+  const given = b.fields;
+  if (!given) return decide("refused", { code: "bad-field" });
 
   const platform: Effect[] = [];
   let first = false;
@@ -151,7 +154,7 @@ export function judgeDelivery(view: StateView, definition: ValidDefinition, deli
     platform.push({ effect: "relation", owner: from.at, item: update.item.seq, name: update.name, state: update.state, revision: from.seq });
   }
 
-  const ran = runHandler(view, definition, context, scope, handler, b.kind, b.fields, cause(), sent);
+  const ran = runHandler(view, definition, context, scope, handler, b.kind, given, cause(), sent);
   if (ran.result === "unavailable") return ran;
   // A refusal, among them `duplicate-relation` for a handler whose sends hold two for one key: no effect and no send but the result.
   // The deciding entry records each rule result a guard read before the refusal, and each foreign entry the fields named (section 9.2).
