@@ -31,6 +31,20 @@ custom domains are not part of it.
    agent's grant if an agent took part, the rule that admitted the merge,
    and the deploy, in one history.
 
+## Comments on the preview page (second priority)
+
+Hugh's addition of 2026-10-05, 15:39 Eastern: a reviewer looks at the
+preview and comments on it where they see the problem, not in a separate
+place. A comment on the page is a lane comment with an anchor: the
+preview's version, the page path, and a selector for the element, with an
+optional screenshot. It appears on the pull request as any other comment,
+threads resolve the same way, and because it is a fact of the lane it
+survives the next preview version and names the version it was made on.
+This fits the model without a new object: the lane forms already have a
+thread item anchored to a path and a line of a diff; the page anchor is a
+second kind of anchor on the same item. It is second priority: the five
+steps come first, and this follows in the same package if time allows.
+
 ## What it needs
 
 | Need | Where it is decided |
@@ -40,11 +54,16 @@ custom domains are not part of it.
 | Per-lane and production hostnames on the standard Workers domain, with a version per deploy | The destination's effect class; installation duty for namespaces |
 | The deploy entry's `artroom://` URI shown on the pull request | Contract revision 18 (adopted) and the lane forms successor |
 | Acceptance story: the five steps on the demo repository, with the agent refusal and the extents story of plans 016 and 019 beside them | The proof plan's successors |
+| A dependency cache keyed by the lockfile digest, and no build when a version's inputs are unchanged (the deploy entry already names the version) | The build job definition and the destination's effect class |
+| Previews readable only by members, through the membership scope's grants, not a password | The authority note's successor; the destination's effect class |
+| Per-environment variables and secrets held by the destination under declared names, never in the repository | The authority note's successor (destination definition) |
+| A page anchor (version, path, selector, optional screenshot) on the lane forms' thread item, so a comment made on the preview page is a lane comment | The lane forms successor (`fdc3d7e2`) |
 
 ## What it is not
 
 - Not staged or canary rollout; that is a later package for larger
   applications and is not needed for the demo.
 - Not custom domains or certificates.
+- Not framework detection: the demo repository declares its build command.
 - Not a build system of its own: the build runs a declared command in the
   existing sandbox.
