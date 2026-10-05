@@ -75,8 +75,16 @@ export function httpTransport(service: string, options: { fetch?: Fetch; bytes?:
     } catch {
       answer = null;
     }
-    if (!ANSWERS[op](answer)) throw failed(`the reply, status ${got.status}, is not an answer of ${op}`);
-    return answer;
+    // The guard walks the reply. A reply it cannot walk is no answer, as one that does not parse is none.
+    const sound = (): boolean => {
+      try {
+        return ANSWERS[op](answer);
+      } catch {
+        return false;
+      }
+    };
+    if (!sound()) throw failed(`the reply, status ${got.status}, is not an answer of ${op}`);
+    return answer as Answered<K>;
   }
   const page = (cursor: string | undefined): string => (cursor === undefined ? "" : `?cursor=${part(cursor)}`);
 

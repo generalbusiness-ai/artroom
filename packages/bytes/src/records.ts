@@ -34,7 +34,7 @@ import type {
   Attempt, Dispatched, Duty, Effect, Entry, FactRef, FactUse, FieldValue, Grant, Head, Input, Intent, Item, LogPage, MemberRef, Message, Party, Prepared, Read, ReadRefusal, Receipt, RefusalReason,
   RetainedInput, ScopeRef, Sealed, Seed, Send, SignedIntent, Status, Summary,
 } from "@generalbusiness/artroom-contract";
-import { wellFormed } from "./canonical.ts";
+import { MAX_DEPTH, wellFormed } from "./canonical.ts";
 import { isIncarnation, isScopeId } from "./domains.ts";
 import { isDigest } from "./hash.ts";
 import { isDutyId, isKeyId, isMemberId, isOperationId, isPlatformDefinition, isScopeKind, isSignature, timeMs } from "./ids.ts";
@@ -109,8 +109,13 @@ export const isSeed = (v: unknown): v is Seed => seed(v);
  * values, or a list of those. A list holds no list.
  */
 const scalar: Check = (v) => text(v) || (typeof v === "number" && Number.isSafeInteger(v) && !Object.is(v, -0)) || flag(v) || memberRef(v) || factRef(v) || scopeRef(v);
-const one: Check = (v) => scalar(v) || (isRecord(v) && Object.values(v).every(isFieldValue));
-export const isFieldValue = (v: unknown): v is FieldValue => one(v) || listOf(one)(v);
+/**
+ * A value that nests deeper than the canonical form allows, MAX_DEPTH containers, is no field value: no entry that holds it has canonical bytes. The
+ * walk stops at that depth, so a reply cannot make it deeper than any value could be. `depth`: that of the value, from 1.
+ */
+const one = (v: unknown, depth: number): boolean => scalar(v) || (isRecord(v) && depth <= MAX_DEPTH && Object.values(v).every((m) => anyOf(m, depth + 1)));
+const anyOf = (v: unknown, depth: number): boolean => one(v, depth) || (Array.isArray(v) && depth <= MAX_DEPTH && v.every((m) => one(m, depth + 1)));
+export const isFieldValue = (v: unknown): v is FieldValue => anyOf(v, 1);
 const party: Check = (v) => v === null || memberRef(v) || listOf(memberRef)(v);
 export const isParty = (v: unknown): v is Party => party(v);
 /** A record by chosen names, each value passing `check`. */

@@ -22,12 +22,13 @@ The prefixes are kept. Sections 7, 8 and 10 say that the builder renumbers
 the entries at the merge. That was not done, because later entries, the
 guides and the source comments cite the entries by these names.
 
-The note holds 170 entries: 26 numbered D, 5 DL, 14 DF, 29 DG, 21 DH, 23
-DI, 25 DJ, 11 DK, 5 DM, 6 DN and 5 DP. The count was made by a script over
+The note holds 173 entries: 26 numbered D, 5 DL, 14 DF, 29 DG, 21 DH, 23
+DI, 25 DJ, 11 DK, 5 DM, 6 DN, 5 DP and 3 DR (DR1, DR2 and DR5; DR3 and DR4 are
+counted where they are written). The count was made by a script over
 the first cell of each table row of this file. Section 23 lists, by owner,
 the entries that need an owner's decision. Section 24 was written after
 the base milestone, and is the only section that names a later revision of
-the contract.
+the contract. Section 25 repairs findings of a review of the base milestone.
 
 | Section | Holds | Entries |
 |---|---|---|
@@ -55,6 +56,7 @@ the contract.
 | 22 | Step 18: the assembly | DN1 to DN6 |
 | 23 | For owners | None: a list by owner |
 | 24 | After the base milestone: the genesis kind | DP1 to DP5 |
+| 25 | I2 review repairs (verdict 1993412c) | DR1, DR2 and DR5 here; DR3 and DR4 are written beside them |
 
 ## 1. The silences the plan named
 
@@ -784,3 +786,19 @@ Two more runs were inconclusive by the script's rule and are not counted:
 the last two changes, run against `client/test/intent.test.ts`. That test
 failed both times, by a reply that resolved where it must reject, and by a
 thrown `TransportError`. Neither is an assertion as the script reads one.
+
+## 25. I2 review repairs (verdict 1993412c)
+
+Written 2026-10-05, for the review of the base milestone at `744f2447`,
+whose verdict is event `1993412c`. It found five supported P2 source
+findings. This section holds the repairs of the first, the second and the
+fifth, numbered DR1, DR2 and DR5 to match the findings. The third and the
+fourth are DR3 and DR4. None of the three changes a digest, a pinned
+definition or the bytes of an entry. Each was repaired in its own commit,
+and its control was run by hand with `scripts/control.mjs`.
+
+| # | What was wrong | Implemented | Why |
+|---|---|---|---|
+| DR1 | `capacityOf` built its table of pending items, by item type and state, as a plain object and wrote it by assignment. A legal item type named `__proto__` wrote the prototype and left no own entry, so `owed` omitted the reservation of a pending item of that type, and a settling close could pass the budget. | `validate/capacity.ts` collects the pending states in maps, and builds the table with `Object.fromEntries`, as the table of deadlines is built. Every legal name is an own name of the table. Its readers use `Object.entries`, which are unchanged. The rest of `validate/capacity.ts` and `reserve.ts`, and the other writes by a chosen name in `derive/src`, were read: the table of deadlines was already built from entries, and every other read goes through `own`. | The rule of `own` (`values.ts`): a record keyed by a chosen name is built so that each name is an own property. Witness: `derive/test/compose.test.ts`, the item type named `__proto__`: its table entry, a reservation of 2, a note refused at 5 entries, and an unchanged `Object.prototype`. Control: the old assignment fails it. |
+| DR2 | `sends.ts` restored this scope's own fact references to full references only for a field that is a fact or a list of facts. The fold reads a local fact inside a record as its `seq` (`fields.ts`). A record that held one was sent as a number, and the receiver refused it as `bad-field`. | `wire` follows the declared field type through records and lists, to any depth, and restores items and facts at every level. The receiver's shape checks are as they were. | Section 6.4 sends a local entry reference as that entry's fact reference. The same type that normalizes a value on the way in restores it on the way out. Witness: `derive/test/forms-sends.test.ts`, a record of an own non-genesis entry, accepted by a receiver of the same record type; a number in the record is still `bad-field`. Control: without the record case the message holds the number. The `self` mark inside a record is not changed: the receiver reads `self` in a field and in a list only (`fields.ts`, `unmarked`), and that is not part of this finding. |
+| DR5 | `isFieldValue` walked a record's members with no depth bound, and both client transports ran the reply guard outside their error handling. A reply of 100000 nested records, 600001 bytes, is inside the byte limit. It could exhaust the stack and escape as an engine error, not a `TransportError`, and the binding did not dispose its result. | `bytes/src/records.ts` stops the walk at `MAX_DEPTH`, 64 containers, the depth that the canonical form allows: no entry holds a deeper value. A deeper value is no field value, and the guard returns false. `client/src/http.ts` and `client/src/binding.ts` treat a guard that throws as a reply that is no answer, with the error they already raise. The binding disposes its result in a `finally`. The replay source reader (`replay/src/source.ts`) was read: its parse is inside its handler, and its guards are shallow. It is unchanged. | The bound is one the code already has, and no new number: `PROPOSED_BOUNDS` holds none for the nesting of a value. Witness: `client/test/intent.test.ts`, a reply nested 100000 deep through HTTP and through a binding, the bound at 63, 64, 65 and 100000, and disposal when the guard throws. Controls: no bound in the walk, and disposal only after a guard that passes. Each fails the test by an assertion. The catch in the HTTP transport has no control of its own: with the bound in place nothing reaches it. |

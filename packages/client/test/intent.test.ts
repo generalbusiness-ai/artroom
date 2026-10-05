@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import { LATE, publicKeyOf, takeBytes, verifySignedIntent } from "@generalbusiness/artroom-bytes";
+import { LATE, MAX_DEPTH, isFieldValue, publicKeyOf, takeBytes, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import { ScopeHandle, TransportError, bindingTransport, found, httpTransport, signedIntent, webCryptoSigner, type ServiceBinding, type Transport } from "../src/index.ts";
 
 test("an intent signed by a WebCrypto key that cannot be read is one the bytes package verifies; each intent has a fresh idempotency key and a notAfter within the lifetime bound", async () => {
@@ -132,6 +132,31 @@ test("the intent that is signed is a detached copy: what the caller changes whil
   release();
   const signed = await pending;
   expect([verifySignedIntent(signed), signed.intent.fields, signed.intent.expected]).toEqual([true, { source: "a repository", tags: ["a"] }, { on: 1 }]);
+});
+
+test("a reply nested far deeper than any value can be is no answer on either transport, and is no field value: the guard returns false and does not throw, and a service binding's result is disposed whatever the guard does", async () => {
+  const d = `sha256:${"a".repeat(64)}`;
+  const fact = { at: { scope: `sc_${"a".repeat(52)}`, inc: `in_${"a".repeat(26)}`, kind: "lane" }, seq: 1, hash: d };
+  /** A record nested `n` deep, from text and not by recursion. */
+  const nested = (n: number) => '{"x":'.repeat(n) + "0" + "}".repeat(n);
+  const receipt = (text: string) => `{"answer":"accepted","receipt":{"fact":${JSON.stringify(fact)},"definition":"${d}","intent":"${d}","effects":[{"effect":"value","item":0,"slot":"s","value":${text}}],"sends":[],"epoch":0}}`;
+  // The bound is the canonical form's: a record at MAX_DEPTH is a value, one level more is not, and a hundred thousand is not.
+  const guarded = (n: number) => { try { return isFieldValue(JSON.parse(nested(n))); } catch (error) { return error instanceof Error ? error.name : "threw"; } };
+  expect([MAX_DEPTH - 1, MAX_DEPTH, MAX_DEPTH + 1, 100_000].map(guarded)).toEqual([true, true, false, false]);
+  const deep = receipt(nested(100_000));
+  const http = httpTransport("https://scopes.test", { fetch: () => Promise.resolve({ status: 200, body: new Response(deep).body }) });
+  const refused = await http.submit(fact.at.scope, {} as never, []).catch((error: unknown) => error);
+  expect([refused instanceof TransportError, (refused as Error).message]).toEqual([true, expect.stringMatching(/is not an answer of submit\. The outcome of the submitted intent is unknown/)]);
+  // Over a binding the result is disposed after it is checked, and also when the guard throws, here a reply that cannot be read.
+  let disposed = 0;
+  const kept = Object.assign(JSON.parse(deep), { [Symbol.dispose]: () => { disposed += 1; } });
+  const unreadable = { get answer(): never { throw new RangeError("a reply the guard cannot walk"); }, [Symbol.dispose]: () => { disposed += 10; } };
+  for (const reply of [kept, unreadable]) {
+    const binding = bindingTransport(new Proxy({}, { get: () => () => Promise.resolve(reply) }) as ServiceBinding);
+    const error = await binding.submit(fact.at.scope, {} as never, []).catch((e: unknown) => e);
+    expect([error instanceof TransportError, (error as Error).message]).toEqual([true, "the reply is not an answer of submit"]);
+  }
+  expect(disposed).toBe(11);
 });
 
 test("a reply over HTTP is taken in as raw bytes only as far as the limit, and within a deadline; past either the outcome of a submitted intent is unknown, and the error says so", async () => {

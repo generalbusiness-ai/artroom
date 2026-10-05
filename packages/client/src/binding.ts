@@ -22,9 +22,15 @@ export function bindingTransport(service: ServiceBinding): Transport {
     } catch (error) {
       throw new TransportError(`no reply: ${error instanceof Error ? error.message : String(error)}`);
     }
-    const ok = ANSWERS[op](answer);
-    // A result over RPC can keep the service's side open until it is disposed. Every answer here is plain data, which stays readable.
-    if (typeof answer === "object" && answer !== null) (answer as Partial<Disposable>)[Symbol.dispose]?.();
+    let ok = false;
+    try {
+      ok = ANSWERS[op](answer);
+    } catch {
+      ok = false;   // A reply the guard cannot walk is no answer.
+    } finally {
+      // A result over RPC can keep the service's side open until it is disposed. Every answer here is plain data, which stays readable.
+      if (typeof answer === "object" && answer !== null) (answer as Partial<Disposable>)[Symbol.dispose]?.();
+    }
     if (!ok) throw new TransportError(`the reply is not an answer of ${op}`);
     return answer;
   };
