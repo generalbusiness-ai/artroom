@@ -165,7 +165,12 @@ const effect = variant("effect", {
   // A capability's record: its name and version are of the one form `name@version`. What its key and its values hold is the capability's to say.
   record: record({ effect: any, capability: capabilityName, kind: text, key: listOf(isFieldValue), state: text, values: isRecord }),
   activate: record({ effect: any }),
-  operation: record({ effect: any, operation: isOperationId, attempt: isLocalId }),
+  // Section 4.3: an operation's opening, and one change of one numbered attempt. An operation of the entry itself is named by its ordinal.
+  operation: record({ effect: any, k: isLocalId, owner: (v) => capabilityName(v) || isPlatformDefinition(v), kind: text, attempts: isLocalId }),
+  attempt: record({
+    effect: any, operation: (v) => isOperationId(v) || record({ k: isLocalId })(v), attempt: isLocalId,
+    result: among({ opened: true, confirmed: true, refused: true, unknown: true }), selected: (v) => v === null || typeof v === "boolean",
+  }),
   index: record({ effect: any, from: factRef, fields: isRecord }),
   attention: record({ effect: any, item: isLocalId, members: listOf(memberRef), reason: text }),
 } satisfies Record<Effect["effect"], Check>);

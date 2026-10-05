@@ -30,8 +30,12 @@ export type Timestamp = string;
 /** Unpadded base64url (RFC 4648 section 5). Used for keys and signatures. */
 export type Base64Url = string;
 
-/** An operation that writes outside the service. Stable across its attempts (section 4.3). */
-export type OperationId = `op_${string}`;
+/**
+ * An operation that writes outside the service: the `seq` of the entry that
+ * opened it, and its ordinal there. Stable across its attempts (sections 4.1
+ * and 4.3).
+ */
+export type OperationId = `${number}:${number}`;
 
 /** A definition the platform supplies in code, by name and version (section 6.1). */
 export type PlatformDefinition = `platform:${"register" | "directory" | "membership" | "rules" | "destination" | "inbox" | "task"}@${number}`;

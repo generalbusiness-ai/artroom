@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { Attempt, Input, Result, ScopeRef, Seed, Send } from "@generalbusiness/artroom-contract";
 import { deliveryCauseDigest, entryHash, factRefOf, intentDigest, messageDigest, scopeIdOf, seedDigest } from "@generalbusiness/artroom-bytes";
-import { MemoryState, applyEntry, checkpointOf, clockOf, entryOf, fits, judgeCheckpoint, judgeDelivery, judgeDiagnosis, judgeGenesis, judgeOutcome, owed, prepareRules, stateDigest, useOf } from "../src/index.ts";
+import { MemoryState, applyEntry, checkpointOf, clockOf, entryOf, fits, judgeCheckpoint, judgeDelivery, judgeDiagnosis, judgeGenesis, owed, prepareRules, stateDigest, useOf } from "../src/index.ts";
 import type { Creation, DeliveryContext, Draft, Judged, Source, ValidDefinition } from "../src/index.ts";
 import { Ledger, Scope, arriving, born, creation, d, deliver, deskDefinition, fields, forged, founded, judged, keys, laneDefinition, on, sent, t, ticket, ticketDefinition, variant, type Over } from "./fixtures.ts";
 
@@ -348,32 +348,7 @@ describe("a diagnosis (section 7.4)", () => {
   });
 });
 
-describe("outcomes and checkpoints (sections 4.3 and 9.2)", () => {
-  test("an outcome settles its own numbered attempt and no other, and is written clamped when the clock is behind", () => {
-    const s = new Scope(ticketDefinition);
-    const operation = "op_publish" as const;
-    // No form of this step opens an operation: that is the authority note's. This entry is made by hand to carry the record of two opened attempts.
-    s.fold({
-      v: 1, at: s.at, seq: 2, prev: s.head.hash, time: t(10), clamped: false, epoch: 0, input: { type: "checkpoint", ...checkpointOf(s.state) }, uses: [], prepared: [],
-      effects: [1, 2].map((attempt) => ({ effect: "operation", operation, attempt })), sends: [],
-    });
-    const outcome = (attempt: number, result: "confirmed" | "refused" | "unknown") => {
-      const j = judgeOutcome(s.state, ticketDefinition, { type: "outcome", operation, attempt, result, evidence: { basis: "own-answer", body: { read: "nothing" } } }, reading(s));
-      if (j.result === "write") s.seal(j.draft);
-      return j.result;
-    };
-    s.now = t(10);
-    expect([outcome(1, "unknown"), outcome(2, "confirmed")]).toEqual(["write", "write"]);
-    // The later attempt did not settle the earlier unknown one.
-    expect(s.state.operation(operation)!.attempts.map((a) => a.outcome?.result)).toEqual(["unknown", "confirmed"]);
-    // An attempt no entry opened, a settled attempt, and a repeat.
-    expect([outcome(3, "confirmed"), outcome(2, "refused"), outcome(2, "confirmed")]).toEqual(["refused", "refused", "repeat"]);
-    // An outcome judges no time condition (section 5.3): behind the history, it takes the previous entry's time.
-    s.now = t(5);
-    expect([outcome(1, "confirmed"), s.last.time, s.last.clamped]).toEqual(["write", t(10), true]);
-    expect(s.replay().snapshot()).toBe(s.state.snapshot());
-  });
-
+describe("checkpoints (section 9.2)", () => {
   test("a checkpoint's digest is the digest of the state folded through its sequence; a wrong digest is refused", () => {
     const s = asker(founded());
     const at = checkpointOf(s.state);

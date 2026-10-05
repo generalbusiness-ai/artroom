@@ -25,15 +25,23 @@
  *   state that its handler declares with `settles: { copy }` reserves the
  *   same (`ValidDefinition.pendingCopies`);
  * - a provisional scope: the entry that records its confirmation;
- * - each opened attempt of an outside operation: one entry for its outcome,
- *   and before any outcome one more, because `unknown` may be followed by
- *   the same attempt's outcome;
+ * - an operation that is not settled (row 5; authority note, section 5.8):
+ *   2 entries for each attempt that has no outcome or may still be opened,
+ *   its first outcome and its late answer, and 1 for each attempt whose
+ *   latest outcome is `unknown`. The entry that opens the operation states
+ *   the most attempts, so all of this is reserved at the opening, and an
+ *   outcome entry is never refused for want of room (`pendingOf`, in
+ *   `ledger.ts`);
  * - the closing checkpoint: one entry, once for the scope, from the genesis
  *   on, except while the head entry is a checkpoint and no other duty is
  *   pending.
  *
  * What is not counted is in the deltas note. The count is of entries, never
- * of bytes.
+ * of bytes. For an operation it is partial in two ways. The other four
+ * dimensions of section 17.1 are request `cc570904`'s. And row 5 also
+ * reserves the records and operations that an outcome derives, such as a
+ * cleanup, which the owner declares: no adopted effect states them at the
+ * opening, so they are not counted here (I3 deltas, entry EB6).
  */
 
 import type { Bounds, Input } from "@generalbusiness/artroom-contract";
@@ -54,7 +62,9 @@ export function owed(view: StateView, definition: ValidDefinition, head: Input):
   }
   for (const copy of definition.pendingCopies) entries += copy.entries * view.copies(copy.name, copy.kind, copy.states);
   const open = view.outstanding();
-  entries += (2 + definition.clauseEntries) * open.requests + (1 + definition.clauseEntries) * open.unavailable + 2 * open.opened + open.unknown;
+  entries += (2 + definition.clauseEntries) * open.requests + (1 + definition.clauseEntries) * open.unavailable;
+  // I3 merge: the closure of an operation, which is what its outcomes derive (row 5), joins this sum when an owner's rules declare it.
+  entries += 2 * (open.opened + open.unopened) + open.unknown;
   // The closing checkpoint is reserved unless the history already ends on a checkpoint with nothing pending.
   return entries === 0 && head.type === "checkpoint" ? 0 : entries + 1;
 }

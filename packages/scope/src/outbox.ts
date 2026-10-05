@@ -34,10 +34,14 @@ import type { Dispatched, Outgoing, Store } from "./store.ts";
 import { LATE, within } from "./turn.ts";
 
 /**
- * One alarm for two wakes (section 5.2): the earliest deadline, which the
- * turn asks for through `deadline`, and the next dispatch, which is read
- * from the outbox. The deadline is kept in storage, so either wake can be
- * set again without the other being lost, also after a restart.
+ * One alarm for three wakes (section 5.2): the earliest deadline, which the
+ * turn asks for through `deadline`; the next dispatch, which is read from
+ * the outbox; and the next attempt of an outside operation that the
+ * operations driver has to look at (`operations.ts`), which is read from its
+ * rows. The deadline is kept in storage, so any wake can be set again
+ * without another being lost, also after a restart. The alarm is always the
+ * earliest of them, so a stored wake-up is never replaced by a later one
+ * (authority note, section 5.4, rule 7).
  */
 export class Wakes {
   readonly #store: Store;
@@ -45,17 +49,21 @@ export class Wakes {
   /** The alarm port the turn uses. */
   readonly deadline: Alarm;
 
-  constructor(store: Store, alarm: Alarm) {
+  /** False: this scope has no transport, nothing dispatches its sends, and no wake is asked for them. */
+  readonly #dispatches: boolean;
+
+  constructor(store: Store, alarm: Alarm, dispatches = true) {
     this.#store = store;
     this.#alarm = alarm;
+    this.#dispatches = dispatches;
     this.deadline = { set: (at) => { store.setDeadline(at); return this.set(); } };
   }
 
-  /** Set the alarm at the earlier of the two wakes, or clear it when there is neither. */
+  /** Set the alarm at the earliest of the wakes, or clear it when there is none. */
   set(): void | Promise<void> {
     const deadline = this.#store.deadline();
-    const dispatch = this.#store.nextDispatch();
-    const at = [deadline === null ? null : timeMs(deadline), dispatch].filter((ms): ms is number => ms !== null);
+    const dispatch = this.#dispatches ? this.#store.nextDispatch() : null;
+    const at = [deadline === null ? null : timeMs(deadline), dispatch, this.#store.nextSend()].filter((ms): ms is number => ms !== null);
     return this.#alarm.set(at.length === 0 ? null : timeOf(Math.min(...at)));
   }
 }

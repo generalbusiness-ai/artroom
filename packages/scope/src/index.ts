@@ -7,5 +7,6 @@ export * from "./reads.ts";
 export * from "./object.ts";
 export * from "./delivery.ts";
 export * from "./outbox.ts";
+export * from "./operations.ts";
 export * from "./namespace.ts";
 export * from "./definitions.ts";
