@@ -78,9 +78,10 @@ export interface ValueRead { domain: string; digest: Digest; bytes: string }
  * `AtHand` and write no `observed` (`delivery.ts`, `handlers.ts` and
  * `outcomes.ts`). The scope makes no further read before a turn, reads no
  * `values` from what came beside an intent and keeps no value
- * (`scope/src/core.ts`, with the store). And a replay is given no retained
- * value (`replay/src/verify.ts`). The I3 deltas note, entries EM1 to EM4,
- * has the lines.
+ * (`scope/src/core.ts`, with the store). A replay is given the retained
+ * value of each place that the pinned data states, and none for a row whose
+ * rule holds the domain in its own code (`replay/src/verify.ts`). The I3
+ * deltas note, entries EM1 to EM4 and EX4 to EX6, has the lines.
  */
 export interface AtHand {
   readonly observed: readonly ObservationUse[];

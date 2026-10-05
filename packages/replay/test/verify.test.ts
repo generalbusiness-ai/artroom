@@ -282,6 +282,22 @@ describe("an outcome entry of a platform definition, and where a scope records i
     expect(await changed((o) => { o.of.inc = otherLane.inc; })).toEqual(["mismatch", 2, "a retained observation is not of the membership scope that the scope records, with that incarnation"]);
   });
 
+  // Scope contract, revision 19, sections 6.2 and 9.2; witness 18.45, case 8. The data and the rules are STAND-INS.
+  test("a value that an entry names is a retained input of the kind `value`, under its domain: a replay with the bytes derives the entry again, and one without them, with other bytes, or with the bytes under another domain is `incomplete` and no mismatch", async () => {
+    const g = new Gate(opens as never, false, true);
+    const good = await replayed(g, g.served(), g.coded());
+    expect([entryOf(g.served(), 1).input, good.report.result, good.why]).toMatchObject([{ signed: { intent: { fields: { proof: g.proof!.digest } } } }, "consistent", null]);
+    const without = async (change: (retained: MemoryScope["retained"]) => MemoryScope["retained"]) => {
+      const history = g.served();
+      const found = await replayed(g, { ...history, retained: change(history.retained) }, g.coded());
+      return [found.report.result, found.report.at?.seq, found.why];
+    };
+    const what = `the value that the field proof names, in the domain ${g.proof!.domain}, ${g.proof!.digest}`;
+    expect(await without(() => [])).toEqual(["incomplete", 1, `a retained input is missing: ${what} (not-found)`]);
+    expect(await without(([value]) => [{ ...value!, domain: "gate-other-1" }])).toEqual(["incomplete", 1, `a retained input is missing: ${what} (not-found)`]);
+    expect(await without(([value]) => [{ ...value!, bytes: '{"seat":13}' }])).toEqual(["incomplete", 1, `a retained input is not the one named: ${what}`]);
+  });
+
   test("a scope whose platform version records its membership reference in its state is replayed on that reference, as a directory's slot is read; with no such reference its grant covers nothing (I3 deltas, entry EP14)", async () => {
     // The scope was founded, so its genesis records no membership scope. Its grants are filters on the membership scope.
     const g = new Gate(opens as never);
