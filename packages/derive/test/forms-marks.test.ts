@@ -220,6 +220,20 @@ describe("a rule is run at the check of its mark's place (sections 4.2 and 6.1)"
     ]]);
   });
 
+  test("the first attempt of an operation is asked of the entry's joined effects, after every mark: one mark opens the operation and a later mark its first attempt, and the entry is written; an operation that the whole entry leaves with no first attempt is a fault, and nothing is written", () => {
+    // The row `enter` with a second effect mark, `then`, after `key-id`.
+    const s = new Scope(gateWith((d) => { d.acts.enter.grant = "gate.enter"; d.acts.enter.effects.push({ code: "then", row: "P14" }); }));
+    s.did(rita, "issue", { fields: { hash: textDigest("one") } });
+    const operation = (k: number) => ({ effect: "operation", k, owner: OWNER, kind: "probe", attempts: 1 }) as const;
+    const first = (k: number) => ({ effect: "attempt", operation: { k }, attempt: 1, result: "opened", selected: null }) as const;
+    const by = (a: readonly unknown[], b: readonly unknown[]) => owned({ "key-id": some(() => a), then: some(() => b) });
+    // Section 4.3, item 2. `key-id` opens operation 0 alone. `then` opens operation 1 with its first attempt, so the entry has a
+    // first attempt, and operation 0 has none.
+    expect([said(enter(s, una, "one", by([operation(0)], [operation(1), first(1)]))), s.entries.length]).toEqual([["unavailable", "unavailable", null, null], 3]);
+    // Section 6.1, "The joined lists are checked as one": the pair is in the entry's effects, each half from another rule.
+    expect([said(enter(s, una, "one", by([operation(0)], [first(0)]))), s.last.effects]).toEqual([["write", null, null, null], [{ effect: "state", item: 2, state: "used" }, operation(0), first(0)]]);
+  });
+
   test("an item that a rule opens counts against its type's `max` in every entry: an outcome's rule that would pass it has a fault, and a clause's rule that would pass it changes nothing; an outcome's rule sends no more than one entry may", () => {
     // The row `enter` tells another scope, by its rule `refer`, and opens an operation, by its rule `key-id`. The clause of the tell is the mark `noted`.
     const s = new Scope(gateWith((d) => { d.acts.enter.grant = "gate.enter"; d.acts.enter.sends[0].result.applied = [{ code: "noted", row: "P16" }]; }));
