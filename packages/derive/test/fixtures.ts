@@ -447,7 +447,7 @@ export class Scope extends Ledger {
     const slot = Object.keys(declared.items[type]!.parties)[0]!;
     this.fold({
       v: 1, at, seq: 0, prev: null, time: T0, clamped: false, epoch: 0,
-      input: { type: "genesis", seed, inc: at.inc, founding: null, source, n: 0, message, decision: "applied" }, uses: [], prepared: [],
+      input: { type: "genesis", seed, inc: at.inc, kind: declared.genesis, founding: null, source, n: 0, message, decision: "applied" }, uses: [], prepared: [],
       effects: [{ effect: "open", item: 0, type, state: declared.items[type]!.initial }, { effect: "party", item: 0, slot, member: opener }],
       sends: [{ n: 0, to: directory, message: { class: "result", of: { from: source, n: 0 }, outcome: "applied" } }],
     });

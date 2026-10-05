@@ -200,8 +200,8 @@ export function judgeGuard(j: Judging, g: Guard, of: Subject = "on"): GuardResul
     const local = isLocalId(ref);
     const read = local ? j.own?.(ref) : isFactRef(ref) ? j.facts.get(ref.hash) : undefined;
     if (!read) return local ? "unavailable" : "dependency-unavailable";
-    // The kind of the entry, as section 6.2 defines it: an act's kind, a genesis act's, or the name of a delivered request.
-    const kind = kindOf(read.entry, j.definition, local);
+    // The kind of the entry, as section 6.2 defines it: an act's kind, the kind a genesis records, or the name of a delivered request.
+    const kind = kindOf(read.entry);
     const under = "under" in read ? read.under : j.definition.declared.name;
     if (kind === null || !type.kind.includes(kind) || under !== type.under) return "fail";
     if (!("field" in fact)) return "pass";

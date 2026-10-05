@@ -22,10 +22,12 @@ The prefixes are kept. Sections 7, 8 and 10 say that the builder renumbers
 the entries at the merge. That was not done, because later entries, the
 guides and the source comments cite the entries by these names.
 
-The note holds 165 entries: 26 numbered D, 5 DL, 14 DF, 29 DG, 21 DH, 23
-DI, 25 DJ, 11 DK, 5 DM and 6 DN. The count was made by a script over the
-first cell of each table row of this file. Section 23 lists, by owner, the
-entries that need an owner's decision.
+The note holds 170 entries: 26 numbered D, 5 DL, 14 DF, 29 DG, 21 DH, 23
+DI, 25 DJ, 11 DK, 5 DM, 6 DN and 5 DP. The count was made by a script over
+the first cell of each table row of this file. Section 23 lists, by owner,
+the entries that need an owner's decision. Section 24 was written after
+the base milestone, and is the only section that names a later revision of
+the contract.
 
 | Section | Holds | Entries |
 |---|---|---|
@@ -52,6 +54,7 @@ entries that need an owner's decision.
 | 21 | Step 17: removal and guides | DM1 to DM5 |
 | 22 | Step 18: the assembly | DN1 to DN6 |
 | 23 | For owners | None: a list by owner |
+| 24 | After the base milestone: the genesis kind | DP1 to DP5 |
 
 ## 1. The silences the plan named
 
@@ -677,7 +680,8 @@ that no owner was asked about by name.
 - D5, D14: whether a declared definition may state a name that begins `platform:`. Built: refused. With `406983fe`.
 - D13: a bound on the length of a definition's name.
 - D17: which member of an answer carries the path of the failed guard.
-- D21, DK5: how a reader learns the kind of a genesis entry under another definition. Until then `propose-manifest` cannot name an issue's `file` entry as its goal.
+- D21, DK5: how a reader learns the kind of a genesis entry under another definition. Answered by the proposed revision 12 as amended, and built as it states (section 24, entries DP1 and DP2). What is left: to adopt that revision, and the parts of D21 that it leaves.
+- DP3: whether a replay report carries the name of a mismatch, `genesis-kind` or `genesis-timed`, as a member. Built: the name begins the words beside the report.
 - DF8: the wording that only a `hold` effect changes a hold's holder, epoch and state.
 - DG26: the base of `attribute` when its subject is unbound (gap G27). Built: fails closed.
 - DH6, DH10: what `on` or `one` selects when a type that is not `many` holds more than one item. Built: `no-item`.
@@ -712,7 +716,7 @@ that no owner was asked about by name.
 - DL1: confirm the reading of the notation of section 3 as members.
 - DI17: whether a `settles` declaration should list a final state (the plan's question Q6).
 - DJ21: restate the counts of `propose-manifest`, which sits exactly at three bounds.
-- DK5: section 5.1's common case, a goal that is an issue's `file` entry, cannot run until the contract decides entry D21.
+- DK5: section 5.1's common case, a goal that is an issue's `file` entry, runs as far as the lane decides (section 24, entry DP2). Nothing to decide.
 - DK6: the form of `propose-manifest` that is staged in another lane waits for I3. Nothing to decide.
 
 ### The proof plan
@@ -739,3 +743,44 @@ that no owner was asked about by name.
 - DF14, DI11: two seams stay marked `// I2 merge:` in the source: the records of `hold@1`, and a member of a record field or slot.
 - DJ24: the client's reader of shapes is a second reading of field types.
 - DK11: a call through the Worker's entrypoint slows with the number made, in the workerd test pool. To report to the pool's maintainers, or not.
+
+## 24. After the base milestone: the genesis kind
+
+Written 2026-10-05, after the base milestone at `744f2447`, as a
+follow-up that is filed only when the design it builds is adopted. In
+this section "revision 12" is the scope and replay contract, revision 12
+as amended before its review, at `53f0e183`. It is proposed and not
+adopted. Its sections 4.1, 6.2, 9.3, 9.4, 11.10 (row 10) and 15.6j, and
+its witness 18.26, were read. The entries are numbered DP1 and so on.
+Entries D21 and DK5 are not changed: DP1 and DP2 say what of them is
+closed.
+
+| # | What revision 12 states, or where it is silent | Implemented | Why |
+|---|---|---|---|
+| DP1 | Sections 4.1 and 6.2, and row 10 of section 11.10: a genesis input holds `kind`, the genesis act of the pinned definition, and every reader takes the kind of a genesis entry from the entry. This is the first of the three ways that entry D21 offered. | Built as stated. `contract/src/entry.ts`: the member. `bytes/src/records.ts`: the guard of the fixed record requires one text that is not empty, so the client's reply checks and the verifier refuse an entry without it. `derive/src/genesis.ts`: `judgeGenesis` sets it from the definition that the scope pins, for an applied and for a refused genesis, so the founding and the creation paths of the scope package write it with no change of their own. `derive/src/operand.ts`: `kindOf` returns the member, and no longer takes a definition. The `under` check is as it was. `replay/src/verify.ts`: in replay mode, a genesis whose `kind` is not the genesis act of the pinned definition is `mismatch`, `genesis-kind`, at the genesis. Integrity mode does not check it. | This closes the part of entry D21 that is about a genesis. The other choices of D21 stand as they were: the kind of a delivered request, a refused request that has no kind, and what a `where` reads. The bytes of every genesis entry changed, and so its hash and every later hash of its history. No definition changed: the pins test passes with the two digests unchanged. No platform definition has code here, so no genesis act of one is stated (the contract's point R1-48). Witnesses: `derive/test/forms-operand.test.ts`, "witness 18.26"; `derive/test/compose.test.ts`, the genesis of a child; `replay/test/verify.test.ts`, two rows and one line of the integrity test; `client/test/intent.test.ts`, four rows. |
+| DP2 | Section 15.6j, on entry DK5: "The `fact` guard on the goal holds when row 10 of section 11.10 is built." | It holds. T3 (`lanes/test/manifest.scope.test.ts`) no longer revises its goal. The plan is sealed with the goal's `file` entry as `goalAt`, and each manifest names that entry as its `goal`. `propose-manifest` is sealed, the manifest is reviewed and checked, `merge` is sealed, and its `reserve` ends `refused`, `undelivered`, as before. T3 keeps one assertion that a goal of a wrong kind is refused: the entry that sealed the plan, which is an entry of an issue lane and is neither `file` nor `revise`. | This closes entry DK5. No lane row changed. The stand-ins of T3 are the same: the scripted capability, the rules peer, and no destination. So T3 shows that the lane accepts the `file` goal. It shows nothing more about the capabilities than before. |
+| DP3 | Section 9.4 gives the result as "`mismatch`, `genesis-kind`", and section 4.1 says that the name "stands beside `mismatch`, as `genesis-timed` does". The contract's `Report` has no member for a name. | The name is the first word of the words that `verify` returns beside the report (`why`), followed by a colon. `genesis-timed` is reported the same way since I1. The report itself holds `result: "mismatch"` and `at`. | No member was invented. A caller that needs the name reads the words. Owner: the contract (`d56d7f65`), to say whether the report holds the name as a member. |
+| DP4 | Witness 18.26, case 1: "`uses` holds I.0, with `under: "issue"`." | The witness asserts that `uses` holds the genesis entry. It does not assert `under` there: a `FactUse` of this source has no such member, and the name is kept beside the retained copy (entry D15). Case 4 shows the name check itself. | The member of `FactUse` is a row of section 11.9 that entry D15 already reports as not built. Nothing new is owed. |
+| DP5 | Witness 18.26 has seven cases. | Four have a new witness: case 1 (accepted under another definition, whose own genesis act has another name), case 3 (refused when the kinds omit the genesis act), case 4 (refused when the name differs although the kind passes) and case 6 (`mismatch`, `genesis-kind`, at the genesis of a scope that is replayed as a source). Case 2, a `revise` entry, is what the tests of a `fact` guard over an act already show. Cases 5 and 7 have no witness of their own: no replayed history here holds a `fact` guard over a genesis of another scope. Replay of a retained copy, and an anchor in place of a source, are shown for other entries by the tests of `replay` that existed. | Test economy. The two cases without a witness add no new code path: the guard is derived again by the same judge, from the retained bytes, which hold the kind. This is stated as a limit, and not as evidence. |
+
+Controls, by hand with `scripts/control.mjs`, one change at a time, each
+restored. Eleven were run, and each distinguished by an assertion.
+
+| Change | Test that failed |
+|---|---|
+| `kindOf` gives a genesis no kind | `forms-operand`, "witness 18.26": the genesis is refused where it is accepted |
+| The same change | T3: the first `propose-manifest` is refused with no name, where `not-complete` is expected |
+| The `fact` guard does not compare the kind | `forms-operand`, "witness 18.26", case 3; and two tests that existed |
+| The same change | T3: the goal of a wrong kind is not refused by the `fact` guard |
+| The `fact` guard does not compare `under` | `forms-operand`, "witness 18.26", case 4 |
+| `judgeGenesis` records another kind than the definition's genesis act | `derive/test/compose.test.ts`, the genesis of a child |
+| The same change | `scope/test/replay.test.ts`: the histories that the runtime wrote are `mismatch` |
+| The verifier does not check the kind of a genesis | `replay/test/verify.test.ts`: the words are those of a derived input, and not `genesis-kind` |
+| The verifier checks the kind in integrity mode too | `replay/test/verify.test.ts`, the integrity test |
+| The guard of the fixed record accepts an empty `kind` | `replay/test/verify.test.ts`: the row of the empty kind is `genesis-kind`, where "not an entry" is expected |
+| The guard of the fixed record has no member `kind` | `replay/test/verify.test.ts`: 16 tests, since every genesis is then no entry |
+
+Two more runs were inconclusive by the script's rule and are not counted:
+the last two changes, run against `client/test/intent.test.ts`. That test
+failed both times, by a reply that resolved where it must reject, and by a
+thrown `TransportError`. Neither is an assertion as the script reads one.

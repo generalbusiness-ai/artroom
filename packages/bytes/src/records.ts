@@ -173,7 +173,7 @@ const deliveryOf: Record<Message["class"], Check> = {
 };
 const input = variant("type", {
   genesis: record({
-    type: any, seed, inc: isIncarnation, founding: orNull(signedIntent), source: orNull(factRef), n: orNull(isLocalId), message: orNull(request), decision: among({ applied: true, refused: true }),
+    type: any, seed, inc: isIncarnation, kind: (v) => text(v) && v !== "", founding: orNull(signedIntent), source: orNull(factRef), n: orNull(isLocalId), message: orNull(request), decision: among({ applied: true, refused: true }),
   }),
   act: record({ type: any, signed: signedIntent, authority: listOf(grant), presented: named(factRef) }),
   delivery: (v) => {

@@ -98,7 +98,7 @@ There are seven inputs:
 
 | Input | What it is |
 |---|---|
-| `genesis` | The first entry. It records the seed, and a founding intent or a creation request. |
+| `genesis` | The first entry. It records the seed, the kind of its genesis act, and a founding intent or a creation request. |
 | `act` | An intent that an actor signed, with the grant it was judged under and the facts that were presented beside it. |
 | `delivery` | A message from another scope. |
 | `timed` | A deadline that an item held and that has passed. |
@@ -282,10 +282,18 @@ its message's name, and a delivered relationship update its relationship's
 name. A timed entry has `timed:` and its rule's name, so the validator
 refuses an act kind or a message name that begins `timed:`. A delivered
 request that no handler received has no kind. A genesis entry has the kind
-of its definition's genesis act. A reader knows that kind only for a scope
-that pins the reader's own definition. So a `fact` guard over the genesis
-of a scope under another definition fails. The contract's owner has that
-question (`notes/2026-10-05-i2-contract-deltas.md`, entries D21 and DK5).
+that its input records in the member `kind`: the genesis act of the
+definition that its scope pins. The scope that writes the genesis sets it
+from that definition, and no sender can choose it. Every reader reads the
+kind from the entry: the scope itself, another scope that fetched the
+entry, and a verifier. So a lane under one definition can name the genesis
+of a lane under another, when the type's kinds include that genesis act
+and its `under` is that definition's name. The kind and the name are two
+checks, and one does not excuse the other. A reader that does not hold the
+other definition cannot check the recorded kind itself. It relies on the
+other scope's judge, as it does for every member of a fetched entry. This
+follows a proposed revision of the scope contract, which is not adopted
+yet (`notes/2026-10-05-i2-contract-deltas.md`, section 24).
 
 **Operands.** An operand is what a guard, an effect or a send reads.
 
@@ -580,8 +588,10 @@ runtime. `verify(source, options)` reads a scope's stored bytes through a
 - **Replay** also folds the history from its genesis and derives every
   entry again with the judges of `derive`, from the recorded input, the
   retained inputs and the recorded time. It compares the result with the
-  entry, byte for byte. It evaluates each rule again from its retained
-  input. For each entry of another scope that was used, it replays that
+  entry, byte for byte. It checks that the kind which the genesis records
+  is the genesis act of the pinned definition, and reports a difference
+  as `mismatch`, in words that begin `genesis-kind`. It evaluates each
+  rule again from its retained input. For each entry of another scope that was used, it replays that
   scope up to that entry, or takes an **anchor** the caller supplies.
 
 A report (`Report`) states its mode, the head it aimed for, its

@@ -40,6 +40,11 @@ describe("a history that is not consistent is reported with the right result, at
     { name: "a changed recorded effect: the entry is not what replay derives", change: altered, result: "mismatch", at: ["I", 2], why: /recorded effects are not the ones derived/ },
     { name: "a changed recorded decision: the entry is not what replay derives",
       change: (w) => rewrite(w.I, 2, (entry) => { entry.input.decision = "superseded"; }), result: "mismatch", at: ["I", 2], why: /recorded input, with its decision/ },
+    // Witness 18.26, case 6. P.3 used I.2, so I is replayed as a source, and its genesis is checked against the definition that I pins.
+    { name: "a source's genesis that records another kind than the genesis act of the definition it pins: `genesis-kind`, at that genesis",
+      change: (w) => { rewrite(w.I, 0, (entry) => { entry.input.kind = "link"; }); return { scope: w.P.scope.scope }; }, result: "mismatch", at: ["I", 0], why: /^genesis-kind: / },
+    // The member is always present, and is never the empty text (section 4.1). Without it, the bytes are no entry of the contract.
+    { name: "a genesis whose kind is the empty text: its bytes are not an entry", change: (w) => rewrite(w.I, 0, (entry) => { entry.input.kind = ""; }), result: "mismatch", at: ["I", 0], why: /bytes are not an entry/ },
     // I.0 used D.4, and D.2, on the way to it, used P.0: the entry named is the one that used the history that cannot be read.
     { name: "a source history that cannot be read", change: (w) => { w.P.entries.length = 0; }, result: "missing-dependency", at: ["D", 2], why: /cannot be read, and no anchor/ },
     { name: "a wrong incarnation in a reference: the source scope's genesis minted another",
@@ -85,5 +90,9 @@ describe("integrity mode (section 9.5)", () => {
     // Section 9.5: the word is not used alone. This rendering does not use it at all.
     expect(text).not.toMatch(/verified/i);
     expect((await replay(w)).report.result).toBe("mismatch");
+    // Integrity mode reads no definition, so it does not check the kind that a genesis records (section 4.1).
+    const k = world();
+    rewrite(k.I, 0, (entry) => { entry.input.kind = "link"; });
+    expect((await replay(k, { mode: "integrity" })).report.result).toBe("consistent");
   });
 });

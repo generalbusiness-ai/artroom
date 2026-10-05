@@ -88,8 +88,9 @@ export function judgeGenesis(view: StateView, definition: ValidDefinition, asked
   const child = "founding" in asked ? null : asked;
   const result = (outcome: "applied" | "refused", reason?: Reason): Send[] =>
     (child ? [{ n: 0, to: child.from.at, message: { class: "result", of: { from: child.from, n: child.n }, outcome, ...(reason ? { reason } : {}) } }] : []);
+  // Section 4.1: the genesis states its act kind, from the definition that the scope pins. No sender supplies it. A refused genesis holds it too.
   const input = (decision: "applied" | "refused") =>
-    ({ type: "genesis", seed, inc: asked.inc, founding, source: child?.from ?? null, n: child?.n ?? null, message: child?.message ?? null, decision }) as const;
+    ({ type: "genesis", seed, inc: asked.inc, kind: definition.declared.genesis, founding, source: child?.from ?? null, n: child?.n ?? null, message: child?.message ?? null, decision }) as const;
   const sourceUse = source ? [useOf(source.fact, source.entry)] : [];
   /**
    * Section 7.2: a refused genesis is written, sends its `refused` result and

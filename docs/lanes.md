@@ -348,14 +348,17 @@ a script over one run; `notes/2026-10-05-i2-contract-deltas.md`, section
 20, lists them). The other rows are shown only as data, and by the tables
 of forms in `derive`.
 
-Two rows cannot do today what the lane forms say, with or without a
-stand-in. Neither row was changed.
+A manifest may name the `file` entry of an issue lane as its `goal`. That
+entry is the issue's genesis. A genesis records its act kind, and a change
+lane reads the kind from the entry (`docs/scopes.md`, "The kind of an
+entry"). T3 names the `file` entry as the goal of its plan and of its
+manifests, with the scripted capability. A goal of another kind is still
+refused. This follows a proposed revision of the scope contract, which is
+not adopted yet (section 24 of the deltas note).
 
-- `propose-manifest` refuses a manifest whose `goal` is the `file` entry
-  of an issue lane. That entry is the issue's genesis, and a change lane
-  cannot read the kind of a genesis under another definition. A goal that
-  names a `revise` entry is accepted. The scope contract's owner has the
-  question (entries D21 and DK5 of the deltas note).
+One row cannot do today what the lane forms say, with or without a
+stand-in. The row was not changed.
+
 - `propose-manifest` staged in another lane needs a presented entry of
   the kind `hold@1:check`. No source writes such an entry. So no real
   change lane sends `pin-confirm` or `unpin` to an issue lane yet (entry

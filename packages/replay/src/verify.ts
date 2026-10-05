@@ -506,6 +506,8 @@ class Verifier {
     const state = run.state;
     const definition = run.definition ?? (run.definition = await this.#pin(run, where));
     const bounds = this.#bounds;
+    // Sections 4.1 and 9.4: a genesis states the genesis act of the definition that it pins. Integrity mode reads no definition, and does not check this.
+    if (input.type === "genesis" && input.kind !== definition.declared.genesis) throw mismatch(`genesis-kind: the genesis records the kind ${input.kind}, and the genesis act of the pinned definition is ${definition.declared.genesis}`);
 
     // The retained copy of each foreign entry this entry used, by its content digest (section 9.2).
     const facts: Fetched[] = [];

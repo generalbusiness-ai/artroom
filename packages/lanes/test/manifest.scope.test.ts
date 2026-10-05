@@ -13,8 +13,9 @@ test("T3, a manifest and its evidence: it is complete only by the plan's recorde
   const g = await graph();
   net.capability = capable;
   const G = await g.goal();
-  // The goal is revised once, and everything below names that entry as the goal's conditions. See the last lines for why.
-  const goal = (await G.did(rita, "revise", { on: 0, fields: { conditions: ["it parses", "it prints"] } })).fact;
+  // Everything below names the entry that filed the goal as the goal's conditions: the genesis of the issue lane, of the kind `file`.
+  // The change lane pins another definition, and reads that kind from the entry (scope contract, sections 4.1 and 6.2).
+  const goal = await G.fact(0);
   const plan = (await G.did(rita, "open-plan", {})).fact.seq;
   const a = (await G.did(rita, "add-concern", { fields: { plan, purpose: "The parser", role: "required", title: "Parse", conditions: ["it parses"] } })).fact.seq;
   const b = (await G.did(rita, "add-concern", { fields: { plan, purpose: "The printer", role: "required", title: "Print", conditions: ["it prints"] } })).fact.seq;
@@ -117,12 +118,13 @@ test("T3, a manifest and its evidence: it is complete only by the plan's recorde
   await C.did(sam, "review-verdict", { fields: { manifest: m2, verdict: "approve" } });
   expect(await merges(m2)).toBe("guard-failed: required-check-not-passed");
 
-  // Two rows that cannot do today what the lane forms say (deltas DK5 and DK6). A manifest cannot name the entry that filed a goal:
-  // a change lane cannot read the kind of an issue lane's genesis. And a manifest staged in another lane needs a check entry of the
-  // hold capability, which no source writes: with one presented, over the HTTP route, the act gets past its shape and is refused there.
+  // A goal of a wrong kind is still refused: the entry that sealed the plan is an entry of the goal's lane, under the definition
+  // `issue`, and its kind is neither `file` nor `revise`. And one row cannot do today what the lane forms say (delta DK6): a manifest
+  // staged in another lane needs a check entry of the hold capability, which no source writes: with one presented, over the HTTP
+  // route, the act gets past its shape and is refused there.
   const elsewhere = { instance: "i-1", lane: A.at, foreignHold: 7, base: oid("0"), integration: oid("f"), tree: oid("6"), complete: false, previous: m2, selected: [], decisions: [] } as const;
   expect([
-    await C.asks(una, "propose-manifest", { fields: { ...version, previous: m2, goal: await G.fact(0), selected: [fromA, fromB], decisions: [decided] } }),
+    await C.asks(una, "propose-manifest", { fields: { ...version, previous: m2, goal: sealed, selected: [fromA, fromB], decisions: [decided] } }),
     await C.asks(una, "propose-manifest", { fields: elsewhere }),
     answered(await C.over(http, await C.signed(una, "propose-manifest", { fields: elsewhere, presented: { pin: ra } }))),
   ]).toEqual(["guard-failed", "guard-failed: source-shape", "guard-failed"]);

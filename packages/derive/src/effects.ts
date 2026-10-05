@@ -81,7 +81,7 @@ function held(j: Judging, type: FieldType, value: unknown): FieldValue | undefin
     const kept = local ? j.own?.(value.seq) : undefined;
     const fetched = local ? undefined : j.source && same(j.source.fact, value) ? j.source : j.facts.get(value.hash);
     const entry = kept?.hash === value.hash ? kept.entry : fetched && isEntryOf(fetched.entry, value) ? fetched.entry : null;
-    const kind = entry && kindOf(entry, j.definition, local);
+    const kind = entry && kindOf(entry);
     const under = fetched ? fetched.under : j.definition.declared.name;
     return kind && type.kind.includes(kind) && under === type.under ? (local ? value.seq : value) : undefined;
   }

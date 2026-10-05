@@ -12,7 +12,6 @@ import { intentDigest } from "@generalbusiness/artroom-bytes";
 import { creationFields, isEntryOf, isLocalFact, messageFields, updateOf } from "./fields.ts";
 import type { Judging } from "./guards.ts";
 import type { Item } from "./state.ts";
-import type { ValidDefinition } from "./validate/index.ts";
 import { isFactRef, isLocalId, isObject, memberOf, own, same } from "./values.ts";
 
 /** What a slot holds, or null. An empty list is unset. */
@@ -36,16 +35,17 @@ export function slotOf(item: Item, slot: string): FieldValue | null {
  * and a rule's key. The decision is in the entry's bytes, so a reader that
  * does not hold the receiver's definition reads it too.
  *
- * A genesis entry does not hold its act's kind. The definition that its
- * seed names does. `held` is the definition this scope pins: it gives the
- * kind of this scope's own genesis, and of the genesis of a scope whose seed
- * names the same definition by digest. The genesis of a scope under any
- * other definition has no kind here.
+ * A genesis entry holds its act's kind, as the member `kind` of its input
+ * (section 4.1). Every reader reads it there, for this scope's own genesis
+ * and for the genesis of a scope under any other definition. A reader that
+ * does not hold the foreign definition cannot check the value: it relies on
+ * the foreign scope's judge, as for every other member of a fetched entry.
+ * The kind does not name the definition. The `under` check does that.
  */
-export function kindOf(entry: Entry, held: ValidDefinition, local: boolean): string | null {
+export function kindOf(entry: Entry): string | null {
   const input = entry.input;
   if (input.type === "act") return input.signed.intent.kind;
-  if (input.type === "genesis") return local || input.seed.definition === held.digest ? held.declared.genesis : null;
+  if (input.type === "genesis") return input.kind;
   if (input.type === "timed") return `timed:${input.rule}`;
   if (input.type !== "delivery" || input.message.class !== "request" || !("decision" in input)) return null;
   if (input.decision === "refused" && input.reason?.code === "unknown-message") return null;
@@ -125,9 +125,9 @@ function entryPart(j: Judging, ref: Held, at: ScopeRef, part: EntryPart, item: I
   // Read from the entry's bytes.
   const found = entryOf(j, ref);
   if (!found) return null;
-  const { entry, local } = found;
+  const { entry } = found;
   const input = entry.input;
-  if (part === "kind") return kindOf(entry, j.definition, local);
+  if (part === "kind") return kindOf(entry);
   if (part === "intent") return input.type === "act" ? intentDigest(input.signed.intent) : input.type === "genesis" && input.founding ? intentDigest(input.founding.intent) : null;
   // The primary item: the item the entry opens, by the entry's own `seq`, or the item an act or a timed entry is on.
   if (part === "on") return entry.effects.some((e) => e.effect === "open") ? entry.seq : input.type === "act" ? input.signed.intent.on : input.type === "timed" ? input.item : null;

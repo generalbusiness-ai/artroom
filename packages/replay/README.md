@@ -46,7 +46,11 @@ No judgment is derived again, and the report says so in words. A history
 whose recorded effects were altered and whose chain was sealed again passes
 this mode.
 
-**Replay** does all of that, and for every entry, from the genesis:
+**Replay** does all of that. For the genesis, it also checks that the
+recorded `kind` is the genesis act of the pinned definition. If it is not,
+the result is `mismatch`, and the report's words begin `genesis-kind`.
+Integrity mode reads no definition and does not check this. Then, for
+every entry, from the genesis:
 
 1. reads the retained copy of each foreign entry the entry used, and checks
    it against the content digest the entry records;

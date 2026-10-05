@@ -34,6 +34,7 @@ export interface Reason { code: RefusalReason; name?: string }
 
 export type Input =
   | { type: "genesis"; seed: Seed; inc: Incarnation;
+      kind: string;                             // the genesis act of the pinned definition (section 4.1)
       founding: SignedIntent | null;            // a repository's directory only
       source: FactRef | null; n: number | null; // the creator's entry and send, for a child
       message: Request | null;                  // the creation request, for a child

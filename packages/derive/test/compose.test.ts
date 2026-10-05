@@ -34,7 +34,7 @@ describe("founding a directory and creating a child (sections 7.1 and 7.2)", () 
     const { child: I } = born(D, 1);
     expect(I.last).toMatchObject({
       seq: 0, prev: null, at: { scope: scopeIdOf(seed), kind: "lane" },
-      input: { type: "genesis", seed, founding: null, source: D.fact(1), n: 0, decision: "applied" },
+      input: { type: "genesis", seed, kind: ticketDefinition.declared.genesis, founding: null, source: D.fact(1), n: 0, decision: "applied" },
       effects: [{ effect: "open", item: 0, type: "intent", state: "open" }, { effect: "party", item: 0, slot: "requester", member: rita.member }, { effect: "value", item: 0, slot: "title", value: "A flaky test" }],
       sends: [
         { n: 0, to: D.at, message: { class: "result", of: { from: D.fact(1), n: 0 }, outcome: "applied" } },

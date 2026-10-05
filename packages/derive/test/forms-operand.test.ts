@@ -172,18 +172,27 @@ describe("operands, parts and a local fact (sections 6.2 and 6.5; witness 18.1)"
     expect(L.act(una, "own", { ...on(L, ask), ...fields({ terms: L.fact(ask) }) })).toMatchObject({ result: "refused", reason: "guard-failed", name: "another intent", detail: "guards.5" });
   });
 
-  test("the kind of a genesis entry is its definition's genesis act: for this scope's own genesis, and for a scope whose seed names the same definition; under another definition it has none here", () => {
+  test("witness 18.26: the kind of a genesis entry is read from the entry. A lane under another definition accepts a fact that names it when the type's kinds include that kind and its `under` is the name the source answered; it refuses when the kinds omit it, and when the name differs although the kind passes", () => {
     const M = other();
     const trace = (L: Scope, origin: Scope) => {
       const ask = L.did(una, "ask", fields({ text: "why" })).seq;
-      return L.act(una, "trace", { ...on(L, ask), ...fields({ origin: origin.fact(0) }) }, { facts: origin === L ? [] : [fetched(origin, 0)] }).result;
+      return L.act(una, "trace", { ...on(L, ask), ...fields({ origin: origin.fact(0) }) }, { facts: origin === L ? [] : [fetched(origin, 0)] });
     };
-    // The genesis entry holds its seed, and the seed names the definition by digest. It does not hold the act's kind.
+    // This scope's own genesis, and the genesis of another lane under the same definition.
     const L = new Scope(asksDefinition);
-    expect([trace(L, L), trace(L, M)]).toEqual(["write", "write"]);
-    // The same lane with one more act is another definition, with another digest: its scope cannot say what M's genesis act is called.
-    const N = new Scope(variant(asks, (d) => { d.acts.again = d.acts.answer; }));
-    expect([trace(N, N), trace(N, M)]).toEqual(["write", "refused"]);
+    expect([trace(L, L).result, trace(L, M).result]).toEqual(["write", "write"]);
+    // P pins another definition, with another name and another genesis act. It holds no bytes of M's definition: the kind `start` is in M.0.
+    // A definition with another name: the slot that an ask sets from `self` holds a fact under its own definition.
+    const named = (name: string, change: (d: any) => void = () => {}) => variant(asks, (d) => { d.name = name; d.items.ask.refs.termsAt.to = { ...d.items.ask.refs.termsAt.to, under: name }; change(d); });   // eslint-disable-line @typescript-eslint/no-explicit-any
+    const elsewhere = (change: (d: any) => void = () => {}) => named("elsewhere", (d) => { d.genesis = "begin"; d.acts.begin = d.acts.start; delete d.acts.start; change(d); });   // eslint-disable-line @typescript-eslint/no-explicit-any
+    const P = new Scope(elsewhere());
+    expect([(M.entries[0]!.entry.input as { kind?: string }).kind, trace(P, M).result, P.last.uses]).toEqual(["start", "write", [{ fact: M.fact(0), content: expect.any(String) }]]);
+    // Q differs from P in one thing: the kinds of the field omit that genesis act.
+    const Q = new Scope(elsewhere((d) => { d.acts.trace.fields.origin.kind = ["ask"]; }));
+    expect(trace(Q, M)).toMatchObject({ result: "refused", reason: "guard-failed", detail: "guards.0" });
+    // A lane whose definition has another name and the same genesis act: the kind passes, and the name does not. A kind does not excuse a name.
+    const O = new Scope(named("other"));
+    expect([(O.entries[0]!.entry.input as { kind?: string }).kind, trace(P, O)]).toEqual(["start", expect.objectContaining({ result: "refused", reason: "guard-failed", detail: "guards.0" })]);
   });
 
   test("a handler reads its sender, the source entry and the update; a refused delivery records the name its guard declares, and the result carries it; the delivery's kind is its message's name", () => {

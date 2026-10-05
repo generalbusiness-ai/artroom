@@ -39,7 +39,7 @@ const d17Fact: FactRef = { at: directory, seq: 17, hash: d("7") };
 const lane: ScopeRef = { scope: "sc_issue", inc: "in_i", kind: "lane" };
 const i0: Entry = {
   v: 1, at: lane, seq: 0, prev: null, time, clamped: false, epoch: 0,
-  input: { type: "genesis", seed, inc: lane.inc, founding: null, source: d17Fact, n: 0,
+  input: { type: "genesis", seed, inc: lane.inc, kind: "file", founding: null, source: d17Fact, n: 0,
            message: { class: "request", type: "create", body: { opener, title: "A flaky test" } }, decision: "applied" },
   uses: [], prepared: [],
   effects: [{ effect: "open", item: 0, type: "intent", state: "open" }, { effect: "party", item: 0, slot: "requester", member: opener }],

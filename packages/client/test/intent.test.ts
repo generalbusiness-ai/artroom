@@ -57,6 +57,8 @@ test("on both transports, each operation of the handle returns a reply only when
   const act = (over: object, sig = "A".repeat(86)) => read({ entry: { ...entry, input: { type: "act", signed: { intent: { ...intent, ...over }, sig }, authority: [], presented: {} } }, hash: d });
   // A refused delivery records why: a code the contract names and, where the failed guard declares one, a name.
   const refusal = (reason: unknown) => read({ entry: { ...entry, input: { type: "delivery", from: fact, n: 0, message: { class: "request", type: "tell", body: {} }, decision: "refused", reason } }, hash: d });
+  // A genesis states its act kind (section 4.1): one text, always present, and never empty.
+  const genesis = (kind: object) => read({ entry: { ...entry, input: { type: "genesis", seed: { v: 1, kind: "lane", definition: d, creator: scope, cause: d, ordinal: 0 }, inc: scope.inc, founding: null, source: fact, n: 0, message: { class: "request", type: "create", body: {} }, decision: "refused", ...kind } }, hash: d });
   const duty = { duty: "1.0", to: scope, class: "request", held: false, attempts: [{ at: entry.time, answer: "none" }], acknowledged: null, result: null, diagnosis: null };
   const summary = { scope, status: "active", definition: "platform:directory@1", time: entry.time, items: [item], counts: [["note", "draft", 1]] };
   const read = (value: unknown, more: object = {}) => ({ ok: true, at: head, value, complete: true, ...more });
@@ -80,13 +82,14 @@ test("on both transports, each operation of the handle returns a reply only when
     ["summary", (t) => handle(t).summary(), [read(summary)], [...each(summary).map((v) => read(v)), read({ ...summary, status: "open" }), read({ ...summary, counts: [["note", "draft"]] }), read({ ...summary, items: [less(item, "opened")] })]],
     ["items", (t) => handle(t).items("note", "c"), [read([item], { next: "c2" }), read([{ ...item, opened: null }])], [...each(item).map((v) => read([v])), read(item), read([item], { next: 2 }), read([{ ...item, attributed: [{}] }]), read([{ ...item, parties: { owner: {} } }])]],
     ["history", (t) => handle(t).history("c"), [read([sealed], { complete: false, next: "c2" })], [...each(sealed).map((v) => read([v])), ...each(entry).map((e) => read([{ entry: e, hash: d }])), read(sealed)]],
-    ["entry", (t) => handle(t).entry(1), [read(sealed), act({}), refusal({ code: "guard-failed" }), refusal({ code: "guard-failed", name: "not-this-ask" })], [...each(sealed).map((v) => read(v)), ...each(entry).map((e) => read({ entry: e, hash: d })), read({ entry: { ...entry, at: { ...scope, kind: "room" } }, hash: d }),
+    ["entry", (t) => handle(t).entry(1), [read(sealed), act({}), genesis({ kind: "file" }), refusal({ code: "guard-failed" }), refusal({ code: "guard-failed", name: "not-this-ask" })], [...each(sealed).map((v) => read(v)), ...each(entry).map((e) => read({ entry: e, hash: d })), read({ entry: { ...entry, at: { ...scope, kind: "room" } }, hash: d }),
       // The fixed records inside an entry: an input is one of the contract's with its members, and so is each use, prepared result and send.
       ...[{ input: { type: "act" } }, { input: { type: "mystery" } }, { uses: [{}] }, { prepared: [{}] }, { sends: [{}] }].map((part) => read({ entry: { ...entry, ...part }, hash: d })),
       // A member the contract types as an identifier is one: an actor that is text and no key ID, and a signature that is base64url and not 64 bytes.
       act({ actor: "alice" }), act({}, "c2ln"),
       // A reason is that record, with a code the contract names: not a text, and not a name alone.
-      refusal("guard-failed"), refusal({ code: "tired" }), refusal({ name: "not-this-ask" })]],
+      refusal("guard-failed"), refusal({ code: "tired" }), refusal({ name: "not-this-ask" }),
+      genesis({}), genesis({ kind: "" }), genesis({ kind: null })]],
     ["outbox", (t) => handle(t).outbox("c"), [read([duty], { next: "c2" })], [...each(duty).map((v) => read([v])), read(duty)]],
     ["followDuty", (t) => handle(t).followDuty("1.0"),
       [read(duty), read({ ...duty, acknowledged: fact, result: { seq: 2, clause: "applied" }, diagnosis: { seq: 3, finding: "undelivered" } }), refused],
