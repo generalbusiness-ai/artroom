@@ -61,7 +61,7 @@ I2.
 |---|---|---|---|---|---|
 | `contract` | 7 | `landing.ts`, `roster.ts`, `checker.ts`; `guards.ts`; the manifest and two build configurations. No guide. `evidence.ts` was here: I2 replaced it and deleted it. | I3 for landing, the roster and the check job | `checker.ts`. Of `guards.ts`, the three guards on landing and evidence types; its identifier guards are the bytes package's now | I3 rewrites each as items, commitments, grants and check jobs, and deletes it here. The directory goes with the last. `checker.ts` imports the type `CheckInput` from the deleted `evidence.ts`, and `guards.ts` imports `Evidence` and `Carried`. Neither file is edited. |
 | `room` | 109 | Sources: `authority.ts`, `roster.ts`, `requests.ts`, `founding.ts`, `registry.ts`, `jobs.ts`, `snapshot.ts`, `artifacts.ts`, `logremote.ts`, `policy.ts`, `mcp.ts`, `secrets.ts`, `ratelimit.ts`, `diag.ts`, `errors.ts`, `budgets.ts`, `memory/artifacts.ts`. Node case files for kept sources and for the measurement scripts. `wrangler.jsonc`, `wrangler.spike.jsonc`, `scripts/`, and `measure/` with its 70 files | I3 for membership, the directory, founding and check issue; I5 for the tool endpoint; I4 for `measure/`; E1 for the spike configuration and `scripts/` | `secrets.ts`, `ratelimit.ts`, `diag.ts`, `errors.ts`, `budgets.ts`; `memory/artifacts.ts` as test support | I3 removes the package when the last scope kind is accepted. I5 removes `mcp.ts`. I4 deletes `measure/` with its results. E1 deletes the spike configuration and scripts after settlement. |
-| `log` | 7 | `git.ts`, `gitcli.ts`, `web.d.ts`; the guide, the manifest and two build configurations | I3: Git reads for a verifier and for publication | `git.ts`, `gitcli.ts` | I3 moves or rewrites the Git object reader and deletes the directory. |
+| `log` | 0 | Nothing. I3 removed the directory at its step 17: "What I3 removed", below. | `packages/git` | None left | Done. |
 | `policy` | 10 | `admin.ts`, its test and the test's fixtures; the guide, the manifest and configurations | I3: part of the membership definition | None named | I3 rewrites it and deletes the directory. |
 | `git` | 63 | The whole package | I3 | The publisher (`publisher/client.ts`, `container.ts`, `git-publisher.ts`, `gitops.ts`, `push-outcome.ts`, `ref-fence.ts`); reads and support (`artifacts.ts`, `diff/treediff.ts`, `first-commit.ts`, `snapshot/repos.ts`, `safe-errors.ts`, `sql.ts`, `index.ts`) | I3 rewrites landing, workspaces, fork tokens and the mint ledger, keyed by hold and epoch; retires `publisher/log-push.ts`; I4 deletes `measure/`. |
 | `checkers` | 43 | The whole package | I3. I2 delivered the subject of a check, as data: the `job` item type of the `change` definition. Nothing here was removed for it. | The runner: `sandbox.ts`, `runner.ts`, `container.ts`, `checkers.ts`, `llm.ts`, `worker.ts`, `index.ts` | I3 rewrites `job.ts`, `checker.ts`, `signing.ts` and `snapshot-commit.ts`; I4 deletes `measure/`; E1 the spike configuration. |
@@ -129,6 +129,23 @@ What still waits, and on whom, for the rows that name I2:
 | `checkers` | I3 | The check job and its signing, rewritten against the `job` item. |
 | `ui`, with the three files of the generation history | I5 | The application, in its own repository. |
 | `policy`: `admin.ts` and the kept manifest with its `./helpers` and `./pack` entries | I3 | The membership definition. |
+
+## What I3 removed
+
+I3 removes each parked path in the step that makes its successor pass its
+witness (`notes/2026-10-05-i3-implementation-plan.md`, section 6.1). Every
+removal is bound to the plan's list of retained paths (its section 6.2):
+the two spike configurations, `room/scripts/`, `room/src/mcp.ts`, every
+`measure/` directory, and `.github/workflows/row-writes.yml`. No step
+deletes, moves or reads the body of a path on that list.
+
+| Step | Removed | Successor | The review, and what did not move | Checked against the retained paths |
+|---|---|---|---|---|
+| 17 | `log/`, whole: `src/git.ts`, `src/gitcli.ts`, `src/web.d.ts`, the guide, the manifest and two build configurations. 7 files. | `packages/git/src/names.ts`, `reader.ts`, `program.ts` | `notes/2026-10-05-i3-git-review.md`, section 2. No file moved as it was. The reader's parsers and its read of an object and a ref were written again against the review. The object writers, the log's push, the transfer in parts, the in-memory repository and `gitcli.ts` have no successor. | `log/` held no `measure/` directory and no other retained path. |
+
+Parked files that imported what a step removed still name it, and are not
+edited: after step 17, some sources and manifests of `room`, `git`,
+`contract` and `ui` name the earlier log package.
 
 ## Outside this directory, and not active either
 
