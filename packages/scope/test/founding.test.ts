@@ -4,11 +4,11 @@ import { describe, expect, test } from "vitest";
 import type { Intent, Seed } from "@generalbusiness/artroom-contract";
 import { intentDigest, isIncarnation, scopeIdOf, signIntent } from "@generalbusiness/artroom-bytes";
 import { timeOf } from "@generalbusiness/artroom-derive";
-import { grantOf, variant } from "@generalbusiness/artroom-derive/testing";
+import { Scope, grantOf, laneDefinition, variant } from "@generalbusiness/artroom-derive/testing";
 import { httpSource, verify } from "@generalbusiness/artroom-replay";
-import { scriptedCapability } from "../src/testing.ts";
+import { controls, scriptedCapability } from "../src/testing.ts";
 import { Node, founding as foundingIn, net } from "./net.ts";
-import { HOLD, at, definition, found, founding, reader, rita, stubOf, una } from "./support.ts";
+import { HOLD, START, at, definition, found, founding, reader, rita, stubOf, una } from "./support.ts";
 
 describe("founding a directory (sections 2.2, 2.3 and 7.1)", () => {
   test("entry 0 holds the seed, the signed intent and a minted incarnation, and the scope answers under its own name only", async () => {
@@ -41,6 +41,31 @@ describe("founding a directory (sections 2.2, 2.3 and 7.1)", () => {
     expect(await s.stub.found(founding(at(HOLD + 60)).signed, other.declared)).toEqual({ answer: "refused", reason: "source-unverified" });
     // The turn drained first, as every turn does, and the end it wrote is the pinned definition's.
     expect((await s.entries(4)).map((e) => e.effects)).toEqual([[{ effect: "hold", item: hold, change: "end", epoch: 2 }, { effect: "attention", item: hold, members: [una.member], reason: "hold ended" }]]);
+  });
+
+  test("a founding that names a foreign fact waits for it the first time; asked again, once the fact cannot be read, it is answered with its receipt and writes nothing", async () => {
+    // Another scope's entry from derive's fixture lane, which the founding names in an optional field of its genesis act.
+    const l = new Scope(laneDefinition);
+    l.did(rita, "offer", { fields: { intent: 0 }, expected: { intent: 1 } });
+    const entry = l.did(rita, "assign", { on: 2, expected: { on: 1 }, fields: { performer: una.member } });
+    const proof = l.fact(entry.seq);
+    const naming = variant(definition.declared, (def) => {
+      def.acts[def.genesis].fields.proof = { type: "fact", kind: ["assign"], under: "lane", required: false };
+    });
+    const signed = signIntent({ v: 1, to: null, actor: rita.key, kind: "found", on: null, expected: {}, fields: { title: "A lane", opener: rita.member, proof }, idempotencyKey: "k", notAfter: at(60) }, rita.secret);
+    const name = scopeIdOf({ v: 1, kind: "directory", definition: naming.digest, creator: null, cause: intentDigest(signed.intent), ordinal: 0 });
+    const c = controls(name, START);
+    const stub = stubOf(name);
+    // The first founding reads the fact. Unread, it waits and records nothing.
+    expect(await stub.found(signed, naming.declared)).toEqual({ answer: "unavailable", reason: "dependency-unavailable" });
+    expect(await stub.summary(reader)).toEqual({ ok: false, reason: "not-found" });
+    c.foreign.set(proof.hash, { entry, under: "lane" });
+    const first = await stub.found(signed, naming.declared);
+    expect(first).toMatchObject({ answer: "accepted", receipt: { fact: { seq: 0 } } });
+    // The fact is lost. The same founding again is a repeat: it reads no fact, and is answered from the genesis.
+    c.foreign.clear();
+    expect(await stub.found(signed, naming.declared)).toEqual(first);
+    expect(await stub.summary(reader)).toMatchObject({ ok: true, at: { seq: 0 } });
   });
 
   test("the object as deployed has every production default: it records a founding on the real clock, calls no grant current and lets no reader read", async () => {

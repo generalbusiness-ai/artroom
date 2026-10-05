@@ -226,11 +226,13 @@ export class Scope {
     if (!children.ok) return refused("unsupported-definition");
 
     const seed: Seed = { v: 1, kind: "directory", definition: valid.digest, creator: null, cause: intentDigest(founding.intent), ordinal: 0 };
-    // Step 1: the facts the founding intent's fields name.
+    // Step 1: the facts the founding intent's fields name. A scope that has its genesis is asked again, a repeat: the judge answers it
+    // from the genesis, or refuses it as another founding, and reads no fact. So none is fetched, and a fact that cannot be read
+    // now does not hide the receipt (section 7.4, as for a delivery that the store has decided).
     const act = own(valid.declared.acts, valid.declared.genesis)!;
     const fields = readFields(act.fields, founding.intent.fields, bounds);
     // No scope exists yet, so no fact can name it: every fact a founding names is foreign.
-    const named = fields.ok ? factsNamed(act.fields, fields.fields, null) : [];
+    const named = fields.ok && !this.#store.scope() ? factsNamed(act.fields, fields.fields, null) : [];
     const facts = named.length > bounds.usesPerEntry ? null : await fetchFacts(resolver, bounds, named);
     if (!facts) return unavailable("dependency-unavailable");
 
