@@ -4,10 +4,10 @@
  * advisory.
  */
 
-import type { Advisory, Control, Effect, Entry, FactRef, FactUse, Message, Prepared, Request, Result, RoutingRefusal, ScopeRef, Seed, Send } from "@generalbusiness/artroom-contract";
+import type { Advisory, Control, Effect, Entry, FactRef, FactUse, Message, Prepared, Reason, Request, Result, RoutingRefusal, ScopeRef, Seed, Send } from "@generalbusiness/artroom-contract";
 import { deliveryCauseDigest, messageDigest, scopeIdOf, seedDigest } from "@generalbusiness/artroom-bytes";
-import { isEntryOf, useOf, type Reading } from "./fields.ts";
-import { bound, runClause, runHandler, updateOf, type Clause, type Ran } from "./handlers.ts";
+import { isEntryOf, updateOf, useOf, type Reading } from "./fields.ts";
+import { bound, runClause, runHandler, type Clause, type Ran, type Sent } from "./handlers.ts";
 import type { Judgment } from "./judge.ts";
 import type { ScopeState, StateView } from "./state.ts";
 import { nextDue } from "./timed.ts";
@@ -107,10 +107,13 @@ export function judgeDelivery(view: StateView, definition: ValidDefinition, deli
 
   if (message.class === "result") return result(view, definition, context, scope, delivered, message, source, write);
 
+  /** What a handler reads of this delivery beside the message's fields: the verified source entry, and the update it applies, if it is one. */
+  const sent: Sent = { source: { fact: from, entry: source, under: context.source.under }, update: message.class === "request" && message.type === "relate" ? updateOf(message, from) : null };
+
   if (message.class === "advisory") {
     // As the receiver's own definition says: a handler for its type, or a record with no effect. An advisory has no decision.
     const b = bound(definition, message, from);
-    const ran: Ran | null = b?.handler && under(b.handler, context.source) ? runHandler(view, definition, context, scope, b.handler, b.kind, b.fields, cause()) : null;
+    const ran: Ran | null = b?.handler && under(b.handler, context.source) ? runHandler(view, definition, context, scope, b.handler, b.kind, b.fields, cause(), sent) : null;
     if (ran?.result === "unavailable") return ran;
     // A handler that refuses leaves the entry with no effect. The entry still records each rule result its guards read.
     const done = ran?.result === "ran" ? ran : { effects: [], sends: [], prepared: ran?.prepared ?? [], judgesTime: false };
@@ -123,12 +126,12 @@ export function judgeDelivery(view: StateView, definition: ValidDefinition, deli
    * entry sends exactly one result, which names the request by its source
    * fact and ordinal. The result follows the sends the handler declares.
    */
-  const decide = (decision: "applied" | "refused" | "superseded", reason: Result["reason"] | undefined, effects: readonly Effect[] = [], sends: readonly Send[] = [], prepared: readonly Prepared[] = [], judgesTime = false): Judgment => {
+  const decide = (decision: "applied" | "refused" | "superseded", reason: Reason | undefined, effects: readonly Effect[] = [], sends: readonly Send[] = [], prepared: readonly Prepared[] = [], judgesTime = false): Judgment => {
     const answer: Result = { class: "result", of: { from, n }, outcome: decision, ...(reason ? { reason } : {}) };
     return write({ type: "delivery", from, n, message: message as Request, decision, ...(reason ? { reason } : {}) }, effects, [...sends, { n: sends.length, to: from.at, message: answer }], prepared, judgesTime);
   };
   const b = bound(definition, message, from);
-  if (!b) return decide("refused", "bad-field");
+  if (!b) return decide("refused", { code: "bad-field" });
   const handler = b.handler && under(b.handler, context.source) ? b.handler : null;
 
   const platform: Effect[] = [];
@@ -141,15 +144,18 @@ export function judgeDelivery(view: StateView, definition: ValidDefinition, deli
     if (held && from.seq <= held.revision) return decide("superseded", undefined);
     platform.push({ effect: "relation", owner: from.at, item: update.item.seq, name: update.name, state: update.state, revision: from.seq });
     if (!handler) return decide("applied", undefined, platform);
-  } else if (!handler) return decide("refused", "unknown-message");
+  } else if (!handler) return decide("refused", { code: "unknown-message" });
 
-  const ran = runHandler(view, definition, context, scope, handler, b.kind, b.fields, cause());
+  const ran = runHandler(view, definition, context, scope, handler, b.kind, b.fields, cause(), sent);
   if (ran.result === "unavailable") return ran;
   // A refusal, among them `duplicate-relation` for a handler whose sends hold two for one key: no effect and no send but the result.
   // The deciding entry records each rule result a guard read before the refusal (section 9.2).
-  if (ran.result === "refused") return decide("refused", ran.reason, [], [], ran.prepared);
+  if (ran.result === "refused") return decide("refused", reasonOf(ran), [], [], ran.prepared);
   return decide("applied", undefined, [...platform, ...ran.effects], ran.sends, ran.prepared, ran.judgesTime);
 }
+
+/** The reason an entry records for a refusal: the code, and the name when the failed guard declares one (section 4.2). */
+export const reasonOf = (refused: { reason: Reason["code"]; name?: string }): Reason => ({ code: refused.reason, ...(refused.name === undefined ? {} : { name: refused.name }) });
 
 /** A handler may name the definition its sender must pin (section 6.4). */
 const under = (handler: { from: { under?: string } }, source: Source): boolean => handler.from.under === undefined || handler.from.under === source.under;
@@ -202,7 +208,7 @@ function result(view: StateView, definition: ValidDefinition, context: DeliveryC
     if (!held || message.outcome !== "applied" || held.inc === from.at.inc) return { result: "repeat", seq: request.result.seq };
     clause = "conflict";
   }
-  const ran = runClause(view, definition, context, scope, request, clause);
+  const ran = runClause(view, definition, context, scope, request, clause, { sender: from.at, ...(message.reason ? { reason: message.reason } : {}) });
   if (ran.result === "unavailable") return ran;
   // Section 7.2: the creator confirms the incarnation of the first applied result it records, and no other.
   const confirm: Send[] = clause === "applied" && request.type === "create" ? [{ n: 0, to: from.at, message: { class: "control", type: "confirm", genesis: from } }] : [];

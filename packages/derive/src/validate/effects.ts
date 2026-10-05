@@ -6,7 +6,7 @@ import { isObject, isValue } from "../values.ts";
 import { onSubject, subject, type Ctx, type Defining, type Slot } from "./context.ts";
 import { assignable } from "./fields.ts";
 import { holdEffect } from "./hold.ts";
-import { copy, fieldOf, operand } from "./operands.ts";
+import { copy, fieldOf, landedOperand } from "./operands.ts";
 import { at, type Rec } from "./shape.ts";
 import { memberBytes, stated } from "./sizes.ts";
 
@@ -62,7 +62,7 @@ export function effect(d: Defining, v: unknown, path: string, ctx: Ctx, later: b
         if (fk?.[0] === "slot") {
           const other = typeof fk[1] === "string" ? s.slots.get(fk[1]) : undefined;
           if (other?.kind !== "party" || other.list) bad("name", at(p, "from"), "names no party slot that holds one member");
-        } else if (fk && operand(d, from, at(p, "from"), ctx, () => null) === "field" && ctx.fields && fieldOf(from, ctx)?.type !== "member") bad("name", at(p, "from"), "names no field of type member");
+        } else if (fk && landedOperand(d, from, at(p, "from"), ctx, () => null)?.form === "field" && ctx.fields && fieldOf(from, ctx)?.type !== "member") bad("name", at(p, "from"), "names no field of type member");
       }
       return `slot ${String(r["slot"])} of ${sk}`;
     }
@@ -73,7 +73,10 @@ export function effect(d: Defining, v: unknown, path: string, ctx: Ctx, later: b
       const from = r["from"];
       if (from === "self") {
         // Section 6.4: `self` is a local reference to the entry being written, and so to the item it opens.
-        if (!ctx.nascent || later || !ctx.on || !assignable({ type: "item", of: ctx.on.name }, sl.type)) bad("name", at(p, "from"), "self is the item this entry opens, in a slot that refers to an item of that type");
+        const item = ctx.nascent && !later && ctx.on !== null && assignable({ type: "item", of: ctx.on.name }, sl.type);
+        // Section 6.2: it may fill a slot of type `fact` when the slot's kinds include the kind of the entry being written, under this definition's name.
+        const fact = !later && ctx.kind !== null && sl.type.type === "fact" && sl.type.kind.includes(ctx.kind) && sl.type.under === d.name;
+        if (!item && !fact) bad("name", at(p, "from"), "self is the item this entry opens, in a slot that refers to an item of that type; or this entry, in a slot for a fact of its kind under this definition");
       } else if (from !== null) {
         const fk = form(from, at(p, "from"), ["field", "slot"]);
         // A slot source is any slot of the subject, of whatever kind: the effect reads the slot of that name.

@@ -6,7 +6,7 @@ import { canonicalize, isDigest, isPlatformDefinition, isScopeKind } from "@gene
 import { isObject } from "../values.ts";
 import { subject, type Ctx, type Defining } from "./context.ts";
 import { effects } from "./effects.ts";
-import { fieldOf, operand } from "./operands.ts";
+import { fieldOf, landedOperand } from "./operands.ts";
 import { at, type Rec } from "./shape.ts";
 import { RECORD_BYTES, stated } from "./sizes.ts";
 
@@ -16,7 +16,7 @@ export const keptMessage = (name: string): boolean => name.startsWith("relate:")
 /** A send's source: `self`, or an operand whose slot is a slot of the primary item. Returns its type when the definition states it. */
 function source(d: Defining, v: unknown, path: string, ctx: Ctx): FieldType | null {
   if (v === "self") return null;
-  const k = operand(d, v, path, ctx, () => ctx.on ?? d.bad("name", path, "there is no primary item whose slot this could be"));
+  const k = landedOperand(d, v, path, ctx, () => ctx.on ?? d.bad("name", path, "there is no primary item whose slot this could be"))?.form;
   return k === "field" ? fieldOf(v, ctx) : k === "slot" ? (ctx.on?.slots.get((v as Rec)["slot"] as string)?.type ?? null) : null;
 }
 const sources = (d: Defining, v: unknown, path: string, ctx: Ctx) => { for (const [name, s] of d.entries(v, path, d.bounds.sendFields)) source(d, s, at(path, name), ctx); };
@@ -27,7 +27,7 @@ function clauses(d: Defining, v: unknown, path: string, ctx: Ctx, conflict: bool
   for (const [name, e] of Object.entries(r ?? {})) {
     // Section 17.2: a `conflict` is not reserved. Its entry is new work, and what its clause starts is counted when it is admitted.
     d.clause = name === "conflict" ? null : [];
-    effects(d, e, at(path, name), ctx, true);
+    effects(d, e, at(path, name), { ...ctx, clause: true }, true);
     if (d.clause) d.clauseSets.push(d.clause);
     d.clause = null;
   }

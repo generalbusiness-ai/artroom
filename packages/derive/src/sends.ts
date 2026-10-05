@@ -42,11 +42,25 @@ export function deriveSends(j: Judging, forms: readonly SendForm[], working: Rea
     if (!opened) unresolved = `item ${String(id)}`;
     return opened ? { at: j.scope.at, seq: id as number, hash: opened } : null;
   };
+  /**
+   * Section 6.4: a local entry reference is sent as that entry's fact
+   * reference, and as the `self` mark when it is the entry being written. A
+   * fact that names another scope is sent as it is.
+   */
+  const fact = (v: unknown): unknown => {
+    if (!isLocalId(v)) return v;
+    if (v === j.self) return { self: true } satisfies SelfMark;
+    const kept = j.own?.(v);
+    if (!kept) unresolved = `entry ${v}`;
+    return kept ? ({ at: j.scope.at, seq: v, hash: kept.hash } satisfies FactRef) : null;
+  };
   const wire = (s: SendSource): unknown => {
     const { value, type } = held(s);
     if (value === null) return null;
     if (type?.type === "item") return local(value);
-    return type?.type === "list" && type.of.type === "item" && Array.isArray(value) ? value.map(local) : value;
+    if (type?.type === "fact") return fact(value);
+    const each = type?.type === "list" && Array.isArray(value) ? (type.of.type === "item" ? local : type.of.type === "fact" ? fact : null) : null;
+    return each ? (value as unknown[]).map(each) : value;
   };
   /** An absent value is left out of a message, as an absent field is left out of an intent. */
   const fields = (sources: Record<string, SendSource>) => Object.fromEntries(Object.entries(sources).map(([name, s]) => [name, wire(s)] as const).filter(([, v]) => v !== null));

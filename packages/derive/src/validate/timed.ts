@@ -6,7 +6,7 @@
 
 import type { Bounds, TimedRule } from "@generalbusiness/artroom-contract";
 import { isObject } from "../values.ts";
-import type { Ctx, Defining, Type } from "./context.ts";
+import { naming, type Ctx, type Defining, type Type } from "./context.ts";
 import { effectBytes, effects } from "./effects.ts";
 import { attention, notifyBytes } from "./sends.ts";
 import { at } from "./shape.ts";
@@ -31,7 +31,7 @@ export function timedRules(d: Defining, v: unknown, timedTypes: Set<string>): Ti
     if (states.some((s) => t.states.get(s) === true)) bad("timed", at(path, "states"), "a timed rule applies in live states only");
     const deadline = typeof o["deadline"] === "string" ? t.slots.get(o["deadline"]) : undefined;
     if (!(deadline?.kind === "value" && deadline.type.type === "time")) bad("name", at(path, "deadline"), "names no value slot of type time");
-    const ctx: Ctx = { on: t, also: new Map(), nascent: false, fields: new Map(), signer: false, timed: true, live: new Set(["on"]) };
+    const ctx: Ctx = { ...naming(), on: t, fields: new Map(), timed: true, live: new Set(["on"]) };
     // Section 6.4: a timed rule's effects are total. With no field, no signer and no other subject, what is left that a commit
     // could refuse is an effect that needs room in a party list, or a time derived from the commit clock, and `effect` refuses
     // each as `timed-partial`.

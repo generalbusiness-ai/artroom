@@ -29,12 +29,15 @@ test("a reply is an outcome only when it is an answer of its operation: a discri
   const submit = (reply: unknown) => replying(reply).submit(fact.at.scope, {} as never, []);
   const settle = (reply: unknown) => replying(reply).settle(fact.at.scope, {} as never);
   // Each has the member its route's answers have, and is not one of them.
-  for (const reply of [{ answer: null }, { answer: "accepted" }, { answer: "accepted", receipt: {} }, { answer: "refused", reason: "guard-failed" }, { answer: "refused", reason: "no", judgedAt: fact }, { answer: "done" }]) {
+  for (const reply of [{ answer: null }, { answer: "accepted" }, { answer: "accepted", receipt: {} }, { answer: "refused", reason: "guard-failed" }, { answer: "refused", reason: "no", judgedAt: fact }, { answer: "done" },
+    { answer: "refused", reason: "guard-failed", name: 7, judgedAt: { seq: 1, hash: d } }]) {
     await expect(submit(reply)).rejects.toThrow(TransportError);
   }
   for (const reply of [{ ok: "yes" }, { ok: true }, { ok: true, at: fact, value: {}, complete: true }, { ok: false }, { ok: false, reason: "gone" }]) await expect(settle(reply)).rejects.toThrow(TransportError);
   // An answer of the route is returned as it came.
-  const answers = [{ answer: "accepted", receipt }, { answer: "refused", reason: "guard-failed", judgedAt: { seq: 1, hash: d } }, { answer: "unavailable", reason: "busy" }, { answer: "mismatch", reason: "idempotency-mismatch" }];
+  // A refusal may carry the name that the failed guard declares.
+  const answers = [{ answer: "accepted", receipt }, { answer: "refused", reason: "guard-failed", judgedAt: { seq: 1, hash: d } }, { answer: "refused", reason: "guard-failed", name: "not-this-ask", judgedAt: { seq: 1, hash: d } },
+    { answer: "unavailable", reason: "busy" }, { answer: "mismatch", reason: "idempotency-mismatch" }];
   for (const answer of answers) expect(await submit(answer)).toEqual(answer);
   expect(await settle({ ok: true, at: { seq: 1, hash: d }, value: receipt, complete: true })).toMatchObject({ ok: true, value: receipt });
   expect(await settle({ ok: false, reason: "not-found" })).toEqual({ ok: false, reason: "not-found" });
@@ -52,6 +55,8 @@ test("on both transports, each operation of the handle returns a reply only when
   // An act's input, with an actor and a signature of the forms the contract fixes: a key ID of 32 bytes, a signature of 64.
   const intent = { v: 1, to: scope, actor: `key_${"A".repeat(43)}`, kind: "offer", on: null, expected: {}, fields: {}, idempotencyKey: "k", notAfter: entry.time };
   const act = (over: object, sig = "A".repeat(86)) => read({ entry: { ...entry, input: { type: "act", signed: { intent: { ...intent, ...over }, sig }, authority: [] } }, hash: d });
+  // A refused delivery records why: a code the contract names and, where the failed guard declares one, a name.
+  const refusal = (reason: unknown) => read({ entry: { ...entry, input: { type: "delivery", from: fact, n: 0, message: { class: "request", type: "tell", body: {} }, decision: "refused", reason } }, hash: d });
   const duty = { duty: "1.0", to: scope, class: "request", held: false, attempts: [{ at: entry.time, answer: "none" }], acknowledged: null, result: null, diagnosis: null };
   const summary = { scope, status: "active", definition: "platform:directory@1", time: entry.time, items: [item], counts: [["note", "draft", 1]] };
   const read = (value: unknown, more: object = {}) => ({ ok: true, at: head, value, complete: true, ...more });
@@ -75,11 +80,13 @@ test("on both transports, each operation of the handle returns a reply only when
     ["summary", (t) => handle(t).summary(), [read(summary)], [...each(summary).map((v) => read(v)), read({ ...summary, status: "open" }), read({ ...summary, counts: [["note", "draft"]] }), read({ ...summary, items: [less(item, "opened")] })]],
     ["items", (t) => handle(t).items("note", "c"), [read([item], { next: "c2" }), read([{ ...item, opened: null, epoch: 2 }])], [...each(item).map((v) => read([v])), read(item), read([item], { next: 2 }), read([{ ...item, attributed: [{}] }]), read([{ ...item, parties: { owner: {} } }])]],
     ["history", (t) => handle(t).history("c"), [read([sealed], { complete: false, next: "c2" })], [...each(sealed).map((v) => read([v])), ...each(entry).map((e) => read([{ entry: e, hash: d }])), read(sealed)]],
-    ["entry", (t) => handle(t).entry(1), [read(sealed), act({})], [...each(sealed).map((v) => read(v)), ...each(entry).map((e) => read({ entry: e, hash: d })), read({ entry: { ...entry, at: { ...scope, kind: "room" } }, hash: d }),
+    ["entry", (t) => handle(t).entry(1), [read(sealed), act({}), refusal({ code: "guard-failed" }), refusal({ code: "guard-failed", name: "not-this-ask" })], [...each(sealed).map((v) => read(v)), ...each(entry).map((e) => read({ entry: e, hash: d })), read({ entry: { ...entry, at: { ...scope, kind: "room" } }, hash: d }),
       // The fixed records inside an entry: an input is one of the contract's with its members, and so is each use, prepared result and send.
       ...[{ input: { type: "act" } }, { input: { type: "mystery" } }, { uses: [{}] }, { prepared: [{}] }, { sends: [{}] }].map((part) => read({ entry: { ...entry, ...part }, hash: d })),
       // A member the contract types as an identifier is one: an actor that is text and no key ID, and a signature that is base64url and not 64 bytes.
-      act({ actor: "alice" }), act({}, "c2ln")]],
+      act({ actor: "alice" }), act({}, "c2ln"),
+      // A reason is that record, with a code the contract names: not a text, and not a name alone.
+      refusal("guard-failed"), refusal({ code: "tired" }), refusal({ name: "not-this-ask" })]],
     ["outbox", (t) => handle(t).outbox("c"), [read([duty], { next: "c2" })], [...each(duty).map((v) => read([v])), read(duty)]],
     ["followDuty", (t) => handle(t).followDuty("1.0"),
       [read(duty), read({ ...duty, acknowledged: fact, result: { seq: 2, clause: "applied" }, diagnosis: { seq: 3, finding: "undelivered" } }), refused],

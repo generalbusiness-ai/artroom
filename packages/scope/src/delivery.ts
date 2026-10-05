@@ -19,7 +19,7 @@ import type { Bounds, Entry, Incarnation, ScopeId, Seed, UnavailableReason } fro
 import { canonicalize, isDigest, newIncarnation } from "@generalbusiness/artroom-bytes";
 import { creationFields, factsNamed, isEntryOf, isFactRef, isLocalId, isObject, isScopeRef, judgeDelivery, judgeGenesis, own, prepareRules, readFields } from "@generalbusiness/artroom-derive";
 import type { Clock as Reading, Creation, Delivered, DeliveryContext, Fetched, Judgment, StateView, ValidDefinition } from "@generalbusiness/artroom-derive";
-import { NO_INCARNATION, retainedFacts, used, type Scope } from "./core.ts";
+import { NO_INCARNATION, ownOf, retainedFacts, used, type Scope } from "./core.ts";
 import { namedBy } from "./definitions.ts";
 import type { DefinitionRead, Delivery, Ports } from "./ports.ts";
 import type { Retained, Store } from "./store.ts";
@@ -105,7 +105,8 @@ export class Deliveries {
       const act = own(founding.valid.declared.acts, founding.valid.declared.genesis)!;
       const given = creationFields(message.class === "request" ? message : null, from);
       const fields = given ? readFields(act.fields, given, bounds) : null;
-      const named = fields?.ok ? factsNamed(act.fields, fields.fields) : [];
+      // The scope has no genesis yet, so no fact can name it: every fact a creation names is foreign.
+      const named = fields?.ok ? factsNamed(act.fields, fields.fields, null) : [];
       const fetched = named.length > bounds.usesPerEntry ? null : await fetchFacts(this.#ports.resolver, bounds, named);
       if (!fetched) return retry("dependency-unavailable");
       facts = fetched;
@@ -115,7 +116,7 @@ export class Deliveries {
       facts = origin ? retainedFacts(store, origin) : [];
     }
 
-    const context = (clock: Reading): Omit<DeliveryContext, "prepared"> => ({ clock, bounds, facts, source: { entry: source.entry, under: source.under }, origin });
+    const context = (clock: Reading): Omit<DeliveryContext, "prepared"> => ({ clock, bounds, facts, own: ownOf(store), source: { entry: source.entry, under: source.under }, origin });
     /** The definition a section of the turn runs under: the pinned one, or before the genesis the one the seed names. */
     const definition = (): ValidDefinition => this.#scope.pinned()?.definition ?? founding!.valid;
     /** A `create` goes to the genesis judge, which answers a repeat from the genesis when the scope exists. */

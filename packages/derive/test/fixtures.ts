@@ -348,6 +348,8 @@ export class Ledger {
   get head() { return this.state.scope()!.head; }
   get last() { return this.entries.at(-1)!.entry; }
   item(id: number) { return this.state.item(id)!; }
+  /** This scope's own entry at a position, as a commit reads it from its history. */
+  readonly own = (seq: number) => this.entries[seq] ?? null;
   /** The fact of a sealed entry: a view beside it. */
   fact(seq: number): FactRef { return { at: this.at, seq, hash: this.entries[seq]!.hash }; }
   fold(entry: Entry): Entry {
@@ -372,7 +374,7 @@ export class Ledger {
   }
   context(over: Context = {}): JudgeContext {
     const { reading, ...rest } = over;
-    return { clock: clockOf(this.state, reading ?? this.now), grants: this.grants(), facts: [], prepared: [], bounds: this.bounds, ...rest };
+    return { clock: clockOf(this.state, reading ?? this.now), grants: this.grants(), facts: [], prepared: [], bounds: this.bounds, own: this.own, ...rest };
   }
   /** Judge only: nothing is written. */
   judge(signed: SignedIntent, over: Context = {}): ActJudgment {
@@ -471,7 +473,7 @@ export type Arrival = Partial<Delivered> & { source?: Source | null };
 /** The context of a delivery to `to`: the source entry, and for a result this scope's own entry that sent the request. */
 export function arriving(to: Ledger, delivered: Delivered, source: Source | null): DeliveryContext {
   const of = delivered.message.class === "result" ? delivered.message.of : null;
-  return { clock: clockOf(to.state, to.now), bounds: to.bounds, facts: [], prepared: [], source, origin: of ? (to.entries[of.from.seq]?.entry ?? null) : null };
+  return { clock: clockOf(to.state, to.now), bounds: to.bounds, facts: [], prepared: [], own: to.own, source, origin: of ? (to.entries[of.from.seq]?.entry ?? null) : null };
 }
 
 /** Judge the delivery of that send to `to`. Nothing is written. */

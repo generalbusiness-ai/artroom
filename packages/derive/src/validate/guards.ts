@@ -2,7 +2,7 @@
 
 import { isObject } from "../values.ts";
 import { onSubject, subject, type Ctx, type Defining, type Type } from "./context.ts";
-import { fieldOf, operand } from "./operands.ts";
+import { fieldOf, operand, type Read } from "./operands.ts";
 import { at, type Rec } from "./shape.ts";
 
 const GUARDS = ["state", "signer", "notIn", "set", "unset", "equals", "differs", "some", "none", "count", "every", "fact", "before", "after", "rule"];
@@ -10,7 +10,7 @@ const GUARDS = ["state", "signer", "notIn", "set", "unset", "equals", "differs",
 /** One guard of an act or handler. */
 export function guard(d: Defining, v: unknown, path: string, ctx: Ctx): void {
   const { bounds, types, rules, indexes, bad, rec, form, list, int, bool, names } = d;
-  const f = form(v, path, GUARDS, ["of", "ifPresent"]);
+  const f = form(v, path, GUARDS, ["of", "ifPresent", "reason"]);
   if (!f) return;
   const [k, x] = f;
   const o = v as Rec;
@@ -24,12 +24,12 @@ export function guard(d: Defining, v: unknown, path: string, ctx: Ctx): void {
     return s;
   };
   let namesField = false;
-  const pair = (e: unknown, ep: string, a: (v: unknown, path: string) => string | null) => {
+  const pair = (e: unknown, ep: string, a: (v: unknown, path: string) => Read | null) => {
     const r = rec(e, ep, ["a", "b"]);
     if (!r) return;
     // Section 6.5: each operand is validated by itself. A valid first operand excuses nothing about the second.
-    const forms = [a(r["a"], at(ep, "a")), operand(d, r["b"], at(ep, "b"), ctx, item)];
-    if (forms.includes("field")) namesField = true;
+    const read = [a(r["a"], at(ep, "a")), operand(d, r["b"], at(ep, "b"), ctx, item)];
+    if (read.some((o) => o && o.fields.length > 0)) namesField = true;
   };
   switch (k) {
     case "state": {
@@ -62,8 +62,11 @@ export function guard(d: Defining, v: unknown, path: string, ctx: Ctx): void {
         const wo = rec(w, at(at(p, "where"), i), ["equals"]);
         const eq = wo && rec(wo["equals"], at(at(p, "where"), i), ["a", "b"]);
         if (!eq) return;
-        // In a `where`, a slot is a slot of each item the range covers.
-        for (const side of ["a", "b"]) if (operand(d, eq[side], at(at(at(p, "where"), i), side), ctx, () => t) === "slot") slots.add((eq[side] as Rec)["slot"] as string);
+        // In a `where`, a slot with no `of` is a slot of each item the range covers.
+        for (const side of ["a", "b"]) {
+          const slot = operand(d, eq[side], at(at(at(p, "where"), i), side), ctx, () => t)?.slot;
+          if (typeof slot === "string") slots.add(slot);
+        }
       });
       if (slots.size > 0 || (Array.isArray(r["where"]) && r["where"].length > 0)) indexes.push({ path: p, type: t.name, slots: [...slots].sort() });
       if (k === "count") {
@@ -95,10 +98,10 @@ export function guard(d: Defining, v: unknown, path: string, ctx: Ctx): void {
       if (!r) break;
       namesField = true;
       if (fieldOf(r, ctx)?.type !== "fact") bad("name", at(p, "field"), "names no field of type fact");
-      // `a` is a field of the foreign intent, which this definition cannot resolve; `b` is read in this act.
+      // `a` is a field of the named entry's intent or message, which this definition cannot resolve; `b` is read in this act.
       list(r["where"] ?? [], at(p, "where"), bounds.guards).forEach((w, i) => {
         const wo = rec(w, at(at(p, "where"), i), ["equals"]);
-        if (wo) pair(wo["equals"], at(at(p, "where"), i), (a, ap) => (isObject(a) && Object.keys(a).length === 1 && typeof a["field"] === "string" ? null : bad("shape", ap, "must be a field of the foreign intent")));
+        if (wo) pair(wo["equals"], at(at(p, "where"), i), (a, ap) => (isObject(a) && Object.keys(a).length === 1 && typeof a["field"] === "string" ? null : bad("shape", ap, "must be a field of the entry's intent or message")));
       });
       break;
     }
@@ -113,6 +116,8 @@ export function guard(d: Defining, v: unknown, path: string, ctx: Ctx): void {
       if (typeof x !== "string" || !rules.has(x)) bad("rule", p, "names no rule the definition declares");
       break;
   }
+  // Section 6.5: `reason` names the refusal. It changes no judgment.
+  if ("reason" in o) d.str(o["reason"], at(path, "reason"));
   if ("ifPresent" in o && (bool(o["ifPresent"], at(path, "ifPresent")) === null || !namesField)) bad("shape", at(path, "ifPresent"), "is for a guard that names a field");
 }
 

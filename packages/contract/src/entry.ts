@@ -23,8 +23,13 @@ export interface Entry {
   sends: readonly Send[];      // derived; each has an ordinal n
 }
 
-/** The reason a delivery entry records with a refusal. */
-export type Reason = RefusalReason;
+/**
+ * Why a refused delivery was refused (section 4.2): a code and, where one
+ * exists, a name. The name is the `reason` that the failed guard declares.
+ * The deciding entry records it, and its result carries the same value to
+ * the sender.
+ */
+export interface Reason { code: RefusalReason; name?: string }
 
 export type Input =
   | { type: "genesis"; seed: Seed; inc: Incarnation;

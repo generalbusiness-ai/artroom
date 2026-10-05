@@ -72,7 +72,7 @@ const variant = (by: string, variants: Record<string, Check>): Check => (v) => {
 // Each table has every member of its union, and the compiler says so when the contract gains or loses one.
 export const REFUSAL_REASONS: Record<RefusalReason, true> = {
   "revision-moved": true, alias: true, "duplicate-relation": true, "required-unset": true, "scope-full": true, "bad-intent": true, misaddressed: true, expired: true, "scope-refused": true,
-  "unknown-act": true, "bad-field": true, "no-item": true, final: true, unauthorized: true, "guard-failed": true, "slot-full": true, "type-full": true, "send-unresolved": true,
+  "unknown-act": true, "bad-field": true, "no-item": true, final: true, "fact-mismatch": true, unauthorized: true, "guard-failed": true, "slot-full": true, "type-full": true, "send-unresolved": true,
   "unknown-message": true, "bad-input": true,
 };
 export const READ_REFUSALS: Record<ReadRefusal, true> = {
@@ -86,7 +86,8 @@ const DECISION: Record<Extract<Input, { decision: unknown; type: "delivery" }>["
 const CLAUSE: Record<NonNullable<Duty["result"]>["clause"], true> = { applied: true, refused: true, superseded: true, conflict: true };
 const FINDING: Record<NonNullable<Duty["diagnosis"]>["finding"], true> = { undelivered: true, "delivery-unavailable": true };
 const RETAINED: Record<RetainedInput["kind"], true> = { definition: true, entry: true, rule: true };
-const reason = among(REFUSAL_REASONS);
+/** Why a delivery was refused: a code the contract names and, where one exists, the name the failed guard declares. */
+const reason = record({ code: among(REFUSAL_REASONS) }, { name: text });
 
 // ---------------------------------------------------------------- references, the seed and the intent (sections 2.1 and 3)
 

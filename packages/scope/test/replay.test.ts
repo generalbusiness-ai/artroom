@@ -23,14 +23,18 @@ describe("replay of histories the runtime wrote, read through the Worker's read 
     const L = new Node(name, definition.declared);
     expect(await L.stub.found(signed, definition.declared)).toMatchObject({ answer: "accepted" });
     const commitment = (await L.did(rita, "offer", { fields: { intent: 0 }, expected: { intent: 1 } })).fact.seq;
-    await L.did(rita, "assign", { on: commitment, expected: { on: 1 }, fields: { performer: una.member } });   // under the rule `not-self`
+    const assigned = (await L.did(rita, "assign", { on: commitment, expected: { on: 1 }, fields: { performer: una.member } })).fact;   // under the rule `not-self`
     await L.did(una, "take-hold", { fields: { commitment }, expected: { commitment: 2 } });
     await later(HOLD, L);
     expect(await L.alarm()).toBe(true);                         // the hold's end, by the drain
     expect(await (L.stub as unknown as { checkpoint(): Promise<Checkpointed> }).checkpoint()).toMatchObject({ answer: "written" });
-    await L.did(rita, "remark", { on: 0, fields: { text: "after the checkpoint" } });
+    // The remark names this scope's own `assign` entry as a fact. It is a local fact: the scope checks it against its own history,
+    // fetches nothing and records no use, and the verifier checks it against the entries it has replayed.
+    await L.did(rita, "remark", { on: 0, fields: { text: "after the checkpoint", proof: assigned } });
     const head = (await L.summary()).at;
     expect(kinds(await L.entries())).toEqual(["genesis", "act", "act", "act", "timed", "checkpoint", "act"]);
+    expect((await L.entries()).at(-1)!.uses).toEqual([]);
+    expect(await L.act(rita, "remark", { on: 0, fields: { text: "another hash", proof: { ...assigned, hash: head.hash } } })).toMatchObject({ answer: "refused", reason: "fact-mismatch" });
 
     const { report, why } = await verify(source, { mode: "replay", scope: name, head });
     expect([report.result, why, report.target]).toEqual(["consistent", null, { at: await L.at(), ...head }]);

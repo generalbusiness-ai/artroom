@@ -6,7 +6,7 @@
 
 import type { FieldType } from "@generalbusiness/artroom-contract";
 import { canonicalize, isScopeKind } from "@generalbusiness/artroom-bytes";
-import type { Ctx, Defining, Type } from "./context.ts";
+import { naming, type Ctx, type Defining, type Type } from "./context.ts";
 import { effects, setsSlot } from "./effects.ts";
 import { declaredFields } from "./fields.ts";
 import { guards } from "./guards.ts";
@@ -47,7 +47,7 @@ export function acts(d: Defining, v: unknown, timed: Readonly<Record<string, unk
     if (o["on"] === null && step !== "comment") bad("shape", at(path, "on"), "an open or a transition has a primary item type");
     str(o["grant"], at(path, "grant"));
     const fields = declaredFields(d, o["fields"], at(path, "fields"));
-    const ctx: Ctx = { on, also: also(d, o["also"], at(path, "also"), fields), nascent: step === "open", fields, signer: true, timed: false, live: new Set() };
+    const ctx: Ctx = { ...naming(), on, also: also(d, o["also"], at(path, "also"), fields), nascent: step === "open", fields, signer: true, kind: name };
     // Section 6.4: a comment changes no item and meets no guard.
     if (step === "comment") for (const k of ["guards", "effects", "sends"]) if (!Array.isArray(o[k]) || o[k].length > 0) bad("shape", at(path, k), "a comment has none");
     if (step === "comment" && ctx.also.size > 0) bad("shape", at(path, "also"), "a comment names no other item");
@@ -80,7 +80,8 @@ export function receives(d: Defining, v: unknown): void {
     handled.add(key);
     if (from && (!isScopeKind(from["kind"]) || ("under" in from && str(from["under"], at(path, "from")) === null))) bad("shape", at(path, "from"), "is a scope kind, and a definition name");
     // A handler has no signer and opens no item; its message fields are not declared, so a field name is not resolved.
-    const ctx: Ctx = { on: null, also: also(d, o["also"], at(path, "also"), null), nascent: false, fields: null, signer: false, timed: false, live: new Set() };
+    // Section 6.5: it has a sender and a source entry, and a handler of a relationship has the update being applied.
+    const ctx: Ctx = { ...naming(), also: also(d, o["also"], at(path, "also"), null), handler: { update: typeof o["message"] === "string" && o["message"].startsWith("relate:") } };
     guards(d, o["guards"], at(path, "guards"), ctx);
     effects(d, o["effects"], at(path, "effects"), ctx, false);
     sends(d, o["sends"], at(path, "sends"), ctx);

@@ -16,6 +16,7 @@ import { intentDigest, scopeIdOf, verifySignedIntent } from "@generalbusiness/ar
 import { deriveEffects } from "./effects.ts";
 import { isIntent, readFacts, readFields, type Reading } from "./fields.ts";
 import { judgeGuard, type Judging } from "./guards.ts";
+import { refusalName } from "./handlers.ts";
 import { deriveSends } from "./sends.ts";
 import type { Item, StateView } from "./state.ts";
 import { nextDue, type Due } from "./timed.ts";
@@ -42,7 +43,8 @@ export interface Draft {
   judgesTime: boolean;
 }
 
-export type Refused = { result: "refused"; reason: RefusalReason; detail: string; judgedAt: Head };
+/** `name`: the reason the failed guard declares, if it declares one. `detail` is for the caller and is in no entry. */
+export type Refused = { result: "refused"; reason: RefusalReason; name?: string; detail: string; judgedAt: Head };
 
 export type ActJudgment =
   | { result: "write"; draft: Draft }
@@ -109,11 +111,11 @@ export function judgeAct(view: StateView, definition: ValidDefinition, signed: S
 
   const read = readFields(act.fields, intent.fields, bounds);
   if (!read.ok) return refused("bad-field", read.detail);
-  const fields = read.fields;
-  const named = readFacts(view, act.fields, fields, context.facts);
-  if (named.result === "no-item") return refused("no-item", named.detail);
+  // Section 6.2: a fact that names this scope is a local fact. It is checked against this scope's own entry, and is then its `seq`.
+  const named = readFacts(view, act.fields, read.fields, context.facts, { at: scope.at, own: context.own });
   if (named.result === "unavailable") return { result: "unavailable", reason: "dependency-unavailable" };
-  const { facts, uses } = named;
+  if (named.result !== "read") return refused(named.result, named.detail);
+  const { fields, facts, uses } = named;
   if (uses.length > bounds.usesPerEntry) return refused("bad-field", `more than ${bounds.usesPerEntry} foreign entries`);
 
   // Section 6.4: `on` and each `also` name are resolved to local items before any guard or effect.
@@ -154,11 +156,11 @@ export function judgeAct(view: StateView, definition: ValidDefinition, signed: S
   if (!presented) return refused("unauthorized", `no current grant of ${act.grant} to this key in this scope`);
   const signer = { member: presented.grant.subject, principal: presented.grant.principal };
 
-  const j: Judging = { view, definition, bounds, clock, scope, self: scope.head.seq + 1, kind: intent.kind, fields, fieldTypes: act.fields, subjects, signer, facts, prepared: context.prepared, used: [], asked: context.asked };
+  const j: Judging = { view, definition, bounds, clock, scope, self: scope.head.seq + 1, kind: intent.kind, fields, fieldTypes: act.fields, subjects, signer, facts, prepared: context.prepared, used: [], asked: context.asked, own: context.own, intent: digest };
 
   for (const [i, guard] of act.guards.entries()) {
     const result = judgeGuard(j, guard);
-    if (result === "fail") return refused("guard-failed", `guards.${i}`);
+    if (result === "fail") return { ...refused("guard-failed", `guards.${i}`), ...refusalName(guard) };
     if (result !== "pass") return { result: "unavailable", reason: result };
   }
   const effects = deriveEffects(j, act.effects, act.attention, act.step === "open" ? act.on : null);

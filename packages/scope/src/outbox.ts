@@ -28,7 +28,7 @@
 
 import type { Attempt, Bounds, Entry, Timestamp } from "@generalbusiness/artroom-contract";
 import { judgeDiagnosis, timeMs, timeOf } from "@generalbusiness/artroom-derive";
-import { retainedFacts, used, type Scope } from "./core.ts";
+import { ownOf, retainedFacts, used, type Scope } from "./core.ts";
 import type { Alarm, Clock, Transport } from "./ports.ts";
 import type { Dispatched, Outgoing, Store } from "./store.ts";
 import { LATE, within } from "./turn.ts";
@@ -172,7 +172,7 @@ export class Dispatcher {
       const end = await this.#scope.turns.run<boolean>({
         asks: () => [],
         judge: (view, clock) => {
-          const judged = judgeDiagnosis(view, definition, { of: { seq, n }, attempts }, { clock, bounds, facts, prepared: [], origin });
+          const judged = judgeDiagnosis(view, definition, { of: { seq, n }, attempts }, { clock, bounds, facts, prepared: [], origin, own: ownOf(store) });
           switch (judged.result) {
             case "write":
               // Room for this entry was counted when the request was sent (section 9.2).

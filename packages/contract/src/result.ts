@@ -22,8 +22,9 @@ export type RefusalReason =
   | "bad-field"         // a field is unknown, missing or not a value of its type
   | "no-item"           // `on`, an `also` field or an item field names no item of that type
   | "final"             // a transition of an item in a final state
+  | "fact-mismatch"     // a fact field names this scope, and the hash it gives is not the hash of this scope's entry at that position
   | "unauthorized"      // no presented grant is current and covers the action, the key and the scope
-  | "guard-failed"
+  | "guard-failed"      // a guard does not hold on a completed evaluation. When the guard declares a `reason`, the refusal carries it as its name
   | "slot-full"         // a party list would pass its `max`
   | "type-full"         // an opening would pass the type's `max` of live items
   | "send-unresolved"   // a send's target or item resolves to nothing
@@ -56,6 +57,6 @@ export interface Head { seq: number; hash: Digest }
 
 export type Answer =
   | { answer: "accepted"; receipt: Receipt }
-  | { answer: "refused"; reason: RefusalReason; judgedAt: Head }
+  | { answer: "refused"; reason: RefusalReason; name?: string; judgedAt: Head }   // `name`: the `reason` that the failed guard declares, if it declares one
   | { answer: "unavailable"; reason: UnavailableReason }
   | { answer: "mismatch"; reason: MismatchReason };

@@ -5,14 +5,18 @@
  * evidence that the rest of an enumeration could overturn.
  */
 
-import type { Bounds, Entry, FactRef, FieldType, FieldValue, Guard, MemberRef, Operand, Prepared, Range, UnavailableReason, Digest } from "@generalbusiness/artroom-contract";
+import type { Bounds, Entry, FactRef, FieldType, FieldValue, Guard, MemberRef, Operand, Prepared, Range, Reason, ScopeRef, UnavailableReason, Digest } from "@generalbusiness/artroom-contract";
 import { canonicalBytes, digestBytes } from "@generalbusiness/artroom-bytes";
 import type { Signer } from "./attribution.ts";
+import type { Own } from "./fields.ts";
+import { equal, kindOf, operand, slotOf } from "./operand.ts";
 import type { Item, Party, ScopeState, StateView } from "./state.ts";
 import { timeMs, type Clock } from "./time.ts";
 import { unsupported } from "./unsupported.ts";
 import type { ValidDefinition } from "./validate/index.ts";
-import { own, same } from "./values.ts";
+import { isFactRef, isLocalId, own, same } from "./values.ts";
+
+export { operand, slotOf };
 
 /** A foreign entry fetched before the turn, and the name of the definition its scope pins (section 6.2, the `fact` field). */
 export interface Fetched { fact: FactRef; entry: Entry; under: string }
@@ -32,7 +36,7 @@ export interface Judging {
   scope: Pick<ScopeState, "at" | "creator">;           // a genesis is judged before its scope has a state
   self: number;                                        // the `seq` of the entry being written (section 6.4)
   kind: string;
-  fields: Readonly<Record<string, FieldValue>>;        // with defaults; an absent optional field has no key
+  fields: Readonly<Record<string, FieldValue>>;        // with defaults; an absent optional field has no key; a local fact in normal form
   fieldTypes: Readonly<Record<string, FieldType>>;
   subjects: ReadonlyMap<string, Item>;                 // `on` and each `also.<name>`, as they are before the effects
   signer: Signer | null;
@@ -40,6 +44,16 @@ export interface Judging {
   prepared: readonly Prepared[];
   used: Prepared[];                                    // the prepared results the guards read, for the entry
   asked?: RuleInput[] | undefined;                     // set by `prepareRules` only: collect each rule's input and judge nothing on it
+  // What the operands of section 6.5 read beside the above. Each is absent where the input has none, and its operand is then none.
+  own?: Own | undefined;                               // this scope's own history: a local fact, and a part of one
+  intent?: Digest | undefined;                         // an act: the digest of the intent being judged
+  sender?: ScopeRef | undefined;                       // a handler and a result clause: the envelope's source scope, as verified
+  source?: Fetched | undefined;                        // a handler: the verified source entry
+  update?: { state: string; item: FactRef; revision: number } | undefined;   // a `relate` handler: the update being applied
+  result?: Reason | undefined;                         // a result clause: the reason on the result being recorded
+  presented?: Readonly<Record<string, FieldValue>> | undefined;   // an act: the facts presented beside the intent
+  elements?: ReadonlyMap<string, unknown> | undefined; // inside a list form: each element it binds, by its `as` name
+  each?: Item | undefined;                             // a fan-out send: the item of that send
 }
 
 /** Passed, failed, or not judged, with the reason for the Unavailable answer (section 4.2). */
@@ -47,21 +61,7 @@ export type GuardResult = "pass" | "fail" | UnavailableReason;
 
 const ok = (holds: boolean): GuardResult => (holds ? "pass" : "fail");
 
-/** What a slot holds, or null. An empty list is unset. */
-export function slotOf(item: Item, slot: string): FieldValue | null {
-  const v = own(item.parties, slot) ?? own(item.refs, slot) ?? own(item.values, slot) ?? null;
-  return Array.isArray(v) && v.length === 0 ? null : (v as FieldValue | null);
-}
-
 export const members = (party: Party | undefined): readonly MemberRef[] => (party === null || party === undefined ? [] : Array.isArray(party) ? (party as readonly MemberRef[]) : [party as MemberRef]);
-
-/** An operand's value. A slot is read from `item`. An absent field and an empty slot are null. */
-export function operand(j: Judging, o: Operand, item: Item | null): unknown {
-  if ("field" in o) return own(j.fields, o.field) ?? null;
-  if ("slot" in o) return item ? slotOf(item, o.slot) : null;
-  if ("signer" in o) return j.signer?.member ?? null;
-  return "const" in o ? o.const : unsupported("that operand");
-}
 
 /**
  * A range guard (section 6.5). With no `where` it is answered from the exact
@@ -92,7 +92,7 @@ function range(j: Judging, form: "some" | "none" | "count", r: Range & { min?: n
     for (const item of page.items) {
       read++;
       after = item.id;
-      if (!where.every((w) => ("equals" in w ? same(operand(j, w.equals.a, item), operand(j, w.equals.b, item)) : unsupported("a where that is not equals")))) continue;
+      if (!where.every((w) => ("equals" in w ? equal(j, operand(j, w.equals.a, item), operand(j, w.equals.b, item)) : unsupported("a where that is not equals")))) continue;
       const decided = decide(++matched, false);
       if (decided) return decided;
     }
@@ -113,9 +113,10 @@ export function ruleInput(j: Judging): unknown {
   };
 }
 
-/** The fields a guard names, for `ifPresent`. */
+/** The fields a guard names, for `ifPresent`: those its operands read, and those an operand inside a part reads. */
 function fieldsNamed(j: Judging, g: Guard): string[] {
-  const of = (o: Operand) => ("field" in o ? [o.field] : []);
+  const inPart = (o: Operand): string[] => ("part" in o && typeof o.part === "object" && "set" in o.part ? of(o.part.set.item) : "source" in o && typeof o.source === "object" && "set" in o.source ? of(o.source.set.item) : []);
+  const of = (o: Operand): string[] => [...("field" in o ? [o.field] : []), ...inPart(o)];
   if ("equals" in g) return [...of(g.equals.a), ...of(g.equals.b)];
   if ("differs" in g) return [...of(g.differs.a), ...of(g.differs.b)];
   if ("every" in g) return Object.hasOwn(j.fieldTypes, g.every.list) ? [g.every.list] : [];
@@ -133,8 +134,8 @@ export function judgeGuard(j: Judging, g: Guard): GuardResult {
   if ("notIn" in g) return ok(!inSlots(g.notIn, j.signer?.member) && !inSlots(g.notIn, j.signer?.principal));
   if ("set" in g) return ok(!!item && slotOf(item, g.set) !== null);
   if ("unset" in g) return ok(!!item && slotOf(item, g.unset) === null);
-  if ("equals" in g) return ok(same(operand(j, g.equals.a, item), operand(j, g.equals.b, item)));
-  if ("differs" in g) return ok(!same(operand(j, g.differs.a, item), operand(j, g.differs.b, item)));
+  if ("equals" in g) return ok(equal(j, operand(j, g.equals.a, item), operand(j, g.equals.b, item)));
+  if ("differs" in g) return ok(!equal(j, operand(j, g.differs.a, item), operand(j, g.differs.b, item)));
   if ("some" in g) return range(j, "some", g.some);
   if ("none" in g) return range(j, "none", g.none);
   if ("count" in g) {
@@ -150,15 +151,21 @@ export function judgeGuard(j: Judging, g: Guard): GuardResult {
   }
   if ("fact" in g) {
     const fact = "field" in g.fact ? g.fact : unsupported("a fact guard over no field");
-    const ref = own(j.fields, fact.field) as FactRef | undefined;
+    const ref = own(j.fields, fact.field);
     const type = own(j.fieldTypes, fact.field);
-    if (!ref || type?.type !== "fact") return "fail";
-    const fetched = j.facts.get(ref.hash);
-    if (!fetched) return "dependency-unavailable";
-    const input = fetched.entry.input;
-    if (input.type !== "act" || !type.kind.includes(input.signed.intent.kind) || fetched.under !== type.under) return "fail";
-    // `a` is a field of the foreign intent; `b` is read in this act.
-    return ok((fact.where ?? []).every((w) => "equals" in w && same("field" in w.equals.a ? (own(input.signed.intent.fields, w.equals.a.field) ?? null) : null, operand(j, w.equals.b, item))));
+    if (ref === undefined || type?.type !== "fact") return "fail";
+    // Section 6.2: a local fact is in normal form, and is read from this scope's own history. Its kind and definition are this scope's own.
+    // A foreign fact was fetched before the turn, with the name of the definition its scope pins.
+    const local = isLocalId(ref);
+    const read = local ? j.own?.(ref) : isFactRef(ref) ? j.facts.get(ref.hash) : undefined;
+    if (!read) return local ? "unavailable" : "dependency-unavailable";
+    // The kind of the entry, as section 6.2 defines it: an act's kind, a genesis act's, or the name of a delivered request.
+    const kind = kindOf(read.entry, j.definition, local);
+    const under = "under" in read ? read.under : j.definition.declared.name;
+    if (kind === null || !type.kind.includes(kind) || under !== type.under) return "fail";
+    // `a` is a field of the entry's intent, or of the message it delivered; `b` is read in this act.
+    const named: Operand = { field: fact.field };
+    return ok((fact.where ?? []).every((w) => "equals" in w && "field" in w.equals.a && equal(j, operand(j, { ...named, part: { field: w.equals.a.field } }, item), operand(j, w.equals.b, item))));
   }
   if ("before" in g || "after" in g) {
     // Section 5.3: a reading that is behind the history proves nothing about a deadline.

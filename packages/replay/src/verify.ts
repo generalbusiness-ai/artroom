@@ -500,7 +500,8 @@ class Verifier {
     // The judgment, derived again on the entry's recorded time. A clamped entry was judged on a reading behind its history
     // (section 5.3): the reading is not recorded, and an entry that judges time is never written clamped.
     const clock: Clock = entry.clamped ? { reading: entry.time, behind: true, asOf: entry.time } : clockOf(state, entry.time);
-    const reading = { clock, bounds, facts, prepared: entry.prepared };
+    // Section 6.2: a local fact, and a part of one, are read from this scope's own history: the entries checked so far.
+    const reading = { clock, bounds, facts, prepared: entry.prepared, own: (at: number) => run.sealed[at] ?? null };
     const copyOf = (fact: FactRef | null) => facts.find((f) => f.fact.hash === fact?.hash) ?? null;
     const own = (seq: unknown): Entry | null => (isLocalId(seq) ? (run.sealed[seq]?.entry ?? null) : null);
     let judged: ActJudgment | Judgment | TimedJudgment;

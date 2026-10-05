@@ -44,7 +44,8 @@ function isAnswer(v: unknown): v is Answer {
   if (!isRecord(v)) return false;
   switch (v["answer"]) {
     case "accepted": return only(v, "answer", "receipt") && isReceipt(v["receipt"]);
-    case "refused": return only(v, "answer", "reason", "judgedAt") && among(ACT_REFUSED)(v["reason"]) && isHead(v["judgedAt"]);
+    // A refusal may carry the name that the failed guard declares.
+    case "refused": return (only(v, "answer", "reason", "judgedAt") || (only(v, "answer", "reason", "name", "judgedAt") && typeof v["name"] === "string")) && among(ACT_REFUSED)(v["reason"]) && isHead(v["judgedAt"]);
     case "unavailable": return only(v, "answer", "reason") && among(UNAVAILABLE)(v["reason"]);
     case "mismatch": return only(v, "answer", "reason") && among(MISMATCH)(v["reason"]);
     default: return false;

@@ -10,7 +10,7 @@
 import type { Answer, Bounds, DeclaredDefinition, Digest, DutyId, Entry, FactRef, Founded, Grant, PlatformDefinition, Receipt, RefusalReason, ScopeId, Seed, Settlement, SignedIntent, UnavailableReason } from "@generalbusiness/artroom-contract";
 import { canonicalize, definitionDigest, intentDigest, isDigest, isGrant, newIncarnation, parseStrict } from "@generalbusiness/artroom-bytes";
 import { checkpointOf, factsNamed, judgeAct, judgeCheckpoint, judgeGenesis, own, prepareRules, readFields, validateDefinition } from "@generalbusiness/artroom-derive";
-import type { ActJudgment, Clock as Reading, Draft, Fetched, Founding, JudgeContext, ValidDefinition } from "@generalbusiness/artroom-derive";
+import type { ActJudgment, Clock as Reading, Draft, Fetched, Founding, JudgeContext, Own, ValidDefinition } from "@generalbusiness/artroom-derive";
 import { RULE_PROFILES } from "@generalbusiness/artroom-derive/rule";
 import { namedBy } from "./definitions.ts";
 import type { DefinitionRead, Ports } from "./ports.ts";
@@ -34,6 +34,12 @@ export function receiptOf({ entry, hash }: Sealed, definition: Digest | Platform
   const intent = input.type === "act" ? intentDigest(input.signed.intent) : input.type === "genesis" && input.founding ? intentDigest(input.founding.intent) : null;
   return { fact: { at: entry.at, seq: entry.seq, hash }, definition, intent, effects: entry.effects, sends: entry.sends.map((s): DutyId => `${entry.seq}.${s.n}`), epoch: 0 };
 }
+
+/** This scope's own sealed entry at a position, from its stored history, for the judges (section 6.2, a local fact). */
+export const ownOf = (store: Store): Own => (seq) => {
+  const kept = store.stored(seq);
+  return kept ? { entry: JSON.parse(kept.bytes) as Entry, hash: kept.hash } : null;
+};
 
 /** Section 9.2: the bytes of each foreign entry the draft's `uses` name, under its content digest. */
 export function used(draft: Draft, facts: readonly Fetched[]): Retained[] {
@@ -168,7 +174,8 @@ export class Scope {
     // Step 1: the facts the founding intent's fields name.
     const act = own(valid.declared.acts, valid.declared.genesis)!;
     const fields = readFields(act.fields, founding.intent.fields, bounds);
-    const named = fields.ok ? factsNamed(act.fields, fields.fields) : [];
+    // No scope exists yet, so no fact can name it: every fact a founding names is foreign.
+    const named = fields.ok ? factsNamed(act.fields, fields.fields, null) : [];
     const facts = named.length > bounds.usesPerEntry ? null : await fetchFacts(resolver, bounds, named);
     if (!facts) return unavailable("dependency-unavailable");
 
@@ -224,7 +231,8 @@ export class Scope {
     // foreign entry, so none is fetched for it, and a lost dependency cannot hide it. The turn still drains first, and the
     // judge gives the answer; an intent with a key that is not accepted is new work and meets every check below.
     const known = this.#store.accepted(intent.actor, intent.idempotencyKey) !== null;
-    const wanted = !known && act && fields?.ok ? factsNamed(act.fields, fields.fields) : [];
+    // Section 6.2: a fact that names this scope is a local fact. It is not fetched: the judge reads this scope's own history.
+    const wanted = !known && act && fields?.ok ? factsNamed(act.fields, fields.fields, scope.at) : [];
     if (wanted.length > bounds.usesPerEntry) return { answer: "refused", reason: "bad-field", judgedAt: scope.head };
     const facts = await fetchFacts(resolver, bounds, wanted);
     if (!facts) return unavailable("dependency-unavailable");
@@ -232,7 +240,7 @@ export class Scope {
     // Section 5.1: held authority is read with the clock. The verdict on each grant is asked for on the reading it is used with.
     const presented = (Array.isArray(grants) ? grants : []).filter(isGrant);
     const context = (clock: Reading): Omit<JudgeContext, "prepared"> =>
-      ({ clock, bounds, facts, grants: presented.map((grant) => ({ grant, current: authority.current(grant, scope.at, clock.reading) })) });
+      ({ clock, bounds, facts, own: ownOf(this.#store), grants: presented.map((grant) => ({ grant, current: authority.current(grant, scope.at, clock.reading) })) });
 
     const end = await this.#turns.run<Answer>({
       asks: (view, clock) => prepareRules(view, definition, { act: signed, context: { ...context(clock), prepared: [] } }),
@@ -252,7 +260,7 @@ export class Scope {
           }
           case "due": return { verdict: "stop" };
           case "accepted-before": return said<Answer>({ answer: "accepted", receipt: this.#receipt(judged.seq, named) });
-          case "refused": return said<Answer>({ answer: "refused", reason: judged.reason, judgedAt: judged.judgedAt });
+          case "refused": return said<Answer>({ answer: "refused", reason: judged.reason, ...(judged.name === undefined ? {} : { name: judged.name }), judgedAt: judged.judgedAt });
           case "unavailable": return said<Answer>(unavailable(judged.reason));
           case "mismatch": return said<Answer>({ answer: "mismatch", reason: judged.reason });
         }

@@ -2,7 +2,7 @@
 
 import { isObject } from "../values.ts";
 import { onSubject, type Ctx, type Defining, type Type } from "./context.ts";
-import { operand } from "./operands.ts";
+import { landedOperand } from "./operands.ts";
 import { at } from "./shape.ts";
 
 /** True when a list of written effects holds a `hold` effect of that kind on the primary item. */
@@ -28,7 +28,7 @@ export function holdEffect(d: Defining, x: unknown, p: string, s: Type, sk: stri
   else if (r["do"] === "renew" && (ctx.timed || nascent)) bad("hold", p, "a hold is renewed by an act on the hold");
   if ("extent" in r) {
     const e = form(r["extent"], at(p, "extent"), ["field", "slot"]);
-    if (e) operand(d, r["extent"], at(p, "extent"), ctx, () => s);
+    if (e) landedOperand(d, r["extent"], at(p, "extent"), ctx, () => s);
   }
   return `the hold of ${sk}`;
 }

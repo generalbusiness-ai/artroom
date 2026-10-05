@@ -74,7 +74,7 @@ describe("founding a directory and creating a child (sections 7.1 and 7.2)", () 
     D.did(rita, "open-issue", fields({ title: "refuse" }));
     const { child: R } = born(D, 1);
     // The genesis act's guard refused: the entry is written with no effect, and sends its `refused` result and nothing else.
-    expect(R.last).toMatchObject({ input: { decision: "refused" }, effects: [], sends: [{ n: 0, message: { class: "result", outcome: "refused", reason: "guard-failed" } }] });
+    expect(R.last).toMatchObject({ input: { decision: "refused" }, effects: [], sends: [{ n: 0, message: { class: "result", outcome: "refused", reason: { code: "guard-failed" } } }] });
     expect([R.state.scope()!.status, judged(R, D, 1)]).toEqual(["refused", { result: "repeat", seq: 0 }]);
     expect(R.act(rita, "ask", fields({ desk: D.at }))).toMatchObject({ result: "refused", reason: "scope-refused" });
     deliver(D, R, 0);
@@ -167,7 +167,7 @@ describe("a relationship update (section 7.3)", () => {
     const source = resealed(X, 1, [tell]);
     const arrival = { ...tell, from: factRefOf(source.entry) };
     expect(judgeDelivery(D.state, deskDefinition, arrival, arriving(D, arrival, source))).toMatchObject({
-      result: "write", draft: { input: { decision: "refused", reason: "duplicate-relation" }, effects: [], sends: [{ n: 0, to: X.at, message: { class: "result", outcome: "refused", reason: "duplicate-relation" } }] },
+      result: "write", draft: { input: { decision: "refused", reason: { code: "duplicate-relation" } }, effects: [], sends: [{ n: 0, to: X.at, message: { class: "result", outcome: "refused", reason: { code: "duplicate-relation" } } }] },
     });
   });
 });
@@ -244,7 +244,7 @@ describe("what a written refusal or a later clause records of what it read (sect
     const forGenesis = falsely(new MemoryState(), strict, { genesis: asked, context });
     expect(forGenesis).toHaveLength(1);
     expect(judgeGenesis(new MemoryState(), strict, asked, { ...context, prepared: forGenesis })).toMatchObject({
-      result: "write", draft: { input: { decision: "refused" }, prepared: forGenesis, effects: [], sends: [{ n: 0, message: { outcome: "refused", reason: "guard-failed" } }] },
+      result: "write", draft: { input: { decision: "refused" }, prepared: forGenesis, effects: [], sends: [{ n: 0, message: { outcome: "refused", reason: { code: "guard-failed" } } }] },
     });
 
     // A lane's update reaches a ticket whose handler for it is under the same rule.
@@ -256,7 +256,7 @@ describe("what a written refusal or a later clause records of what it read (sect
     const forHandler = falsely(I.state, strict, { delivery: delivered, context: arrival });
     expect(forHandler).toHaveLength(1);
     expect(judgeDelivery(I.state, strict, delivered, { ...arrival, prepared: forHandler })).toMatchObject({
-      result: "write", draft: { input: { decision: "refused", reason: "guard-failed" }, prepared: forHandler, effects: [] },
+      result: "write", draft: { input: { decision: "refused", reason: { code: "guard-failed" } }, prepared: forHandler, effects: [] },
     });
   });
 
@@ -276,7 +276,7 @@ describe("what a written refusal or a later clause records of what it read (sect
     const { asked, context } = creationUnder(D, cited, { proof: fetched.fact });
     // The opener is rita, so the guard is false. The entry holds the source entry and P: the child can derive the refusal again from its own retained bytes.
     expect(judgeGenesis(new MemoryState(), cited, asked, { ...context, facts: [fetched] })).toMatchObject({
-      result: "write", draft: { input: { decision: "refused" }, uses: [useOf(asked.from, context.source!.entry), useOf(fetched.fact, entry)], sends: [{ message: { outcome: "refused", reason: "guard-failed" } }] },
+      result: "write", draft: { input: { decision: "refused" }, uses: [useOf(asked.from, context.source!.entry), useOf(fetched.fact, entry)], sends: [{ message: { outcome: "refused", reason: { code: "guard-failed" } } }] },
     });
 
     // The same creation under a definition whose later field names a local item. No item exists before a genesis, so it is refused
@@ -287,7 +287,7 @@ describe("what a written refusal or a later clause records of what it read (sect
     });
     const early = creationUnder(D, itemised, { proof: fetched.fact, zItem: 0 });
     expect(judgeGenesis(new MemoryState(), itemised, early.asked, { ...early.context, facts: [fetched] })).toMatchObject({
-      result: "write", draft: { input: { decision: "refused" }, uses: [useOf(early.asked.from, early.context.source!.entry), useOf(fetched.fact, entry)], sends: [{ message: { outcome: "refused", reason: "no-item" } }] },
+      result: "write", draft: { input: { decision: "refused" }, uses: [useOf(early.asked.from, early.context.source!.entry), useOf(fetched.fact, entry)], sends: [{ message: { outcome: "refused", reason: { code: "no-item" } } }] },
     });
 
     // An `ask` whose fields name P. Its `undelivered` clause runs in a later entry and reads P again; the origin entry recorded P first.

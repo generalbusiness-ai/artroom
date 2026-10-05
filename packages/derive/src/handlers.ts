@@ -5,50 +5,20 @@
  * the clause of an earlier send is run again from the entry that sent it.
  */
 
-import type { ActType, Advisory, Digest, Effect, EffectForm, Entry, FactRef, FactUse, FieldValue, Guard, Notify, Prepared, ReceiveType, RefusalReason, Request, ResultClauses, ScopeKind, Send, SendForm, UnavailableReason } from "@generalbusiness/artroom-contract";
+import type { ActType, Advisory, Digest, Effect, EffectForm, Entry, FactRef, FactUse, FieldValue, Guard, Notify, Prepared, Reason, ReceiveType, RefusalReason, Request, ResultClauses, ScopeKind, ScopeRef, Send, SendForm, UnavailableReason } from "@generalbusiness/artroom-contract";
 import { entryHash } from "@generalbusiness/artroom-bytes";
 import type { Signer } from "./attribution.ts";
 import { deriveEffects } from "./effects.ts";
-import { readFacts, readFields, type Reading } from "./fields.ts";
+import { creationFields, messageFields, readFacts, readFields, updateOf, type Reading, type Update } from "./fields.ts";
 import { signerOf } from "./fold.ts";
-import { judgeGuard, type Judging } from "./guards.ts";
+import { judgeGuard, type Fetched, type Judging } from "./guards.ts";
 import { deriveSends } from "./sends.ts";
 import type { Item, OwnRequest, ScopeState, StateView } from "./state.ts";
 import { namedBy } from "./unsupported.ts";
 import { keptMessage, type ValidDefinition } from "./validate/index.ts";
-import { isFactRef, isLocalId, isObject, own, same } from "./values.ts";
+import { isFactRef, isLocalId, isObject, own } from "./values.ts";
 
 // ---------------------------------------------------------------- messages and handlers (sections 6.4 and 7.4)
-
-const isSelf = (v: unknown): boolean => isObject(v) && Object.keys(v).length === 1 && v["self"] === true;
-
-/** Section 6.4: in a message `self` is not expanded by the sender. The receiver reads it as the envelope's `from`. */
-function unmarked(value: unknown, from: FactRef): unknown {
-  return isSelf(value) ? from : Array.isArray(value) ? value.map((v) => unmarked(v, from)) : value;
-}
-
-/** The fields of a delivered message, with each `self` read. Null when they are not a set of named values. */
-export function messageFields(sent: unknown, from: FactRef): Record<string, FieldValue> | null {
-  return isObject(sent) ? Object.fromEntries(Object.entries(sent).map(([name, v]) => [name, unmarked(v, from) as FieldValue])) : null;
-}
-
-/** The fields a creation request gives the child's genesis act (section 7.2). */
-export function creationFields(message: Request | null, from: FactRef): Record<string, FieldValue> | null {
-  return message && isObject(message.body) ? messageFields(message.body["fields"], from) : null;
-}
-
-/** A relationship update as its receiver reads it (section 7.3). `item` is the owner's item, by the fact of the entry that opened it. */
-export interface Update { name: string; item: FactRef; state: string; detail: Record<string, FieldValue> }
-
-export function updateOf(message: Request, from: FactRef): Update | null {
-  const body = message.body;
-  if (message.type !== "relate" || !isObject(body) || typeof body["name"] !== "string" || typeof body["state"] !== "string") return null;
-  const item = unmarked(body["item"], from);
-  const detail = messageFields(body["detail"], from);
-  // The owner names its own item: the entry it is writing, or an earlier entry of its own history.
-  if (!detail || !isFactRef(item) || !same(item.at, from.at)) return null;
-  return { name: body["name"], item, state: body["state"], detail };
-}
 
 /**
  * The handler a delivered message runs, and the fields that handler reads.
@@ -96,9 +66,12 @@ export interface Forms { guards: readonly Guard[]; effects: readonly EffectForm[
 
 export type Ran =
   | { result: "ran"; effects: Effect[]; sends: Send[]; prepared: Prepared[]; judgesTime: boolean }
-  /** `prepared`: the rule results the guards read before the refusal. An entry that records the refusal records them (section 9.2). */
-  | { result: "refused"; reason: RefusalReason; detail: string; prepared: Prepared[] }
+  /** `name`: the reason the failed guard declares. `prepared`: the rule results the guards read before the refusal. An entry that records the refusal records them (section 9.2). */
+  | { result: "refused"; reason: RefusalReason; name?: string; detail: string; prepared: Prepared[] }
   | { result: "unavailable"; reason: UnavailableReason };
+
+/** Section 4.2: when a failed guard declares a `reason`, that is the refusal's name. */
+export const refusalName = (guard: Guard): { name?: string } => (guard.reason === undefined ? {} : { name: guard.reason });
 
 /** True when an effect sets a slot from the commit time. */
 const timesEffect = (e: EffectForm): boolean => "value" in e && e.value.from !== null && "time" in e.value.from;
@@ -112,7 +85,7 @@ const timesEffect = (e: EffectForm): boolean => "value" in e && e.value.from !==
 export function derive(j: Judging, forms: Forms, opens: string | null, cause: Digest, first = 0): Ran {
   for (const [i, guard] of forms.guards.entries()) {
     const result = judgeGuard(j, guard);
-    if (result === "fail") return { result: "refused", reason: "guard-failed", detail: `guards.${i}`, prepared: j.used };
+    if (result === "fail") return { result: "refused", reason: "guard-failed", ...refusalName(guard), detail: `guards.${i}`, prepared: j.used };
     if (result !== "pass") return { result: "unavailable", reason: result };
   }
   const effects = deriveEffects(j, forms.effects, forms.attention, opens);
@@ -124,11 +97,18 @@ export function derive(j: Judging, forms: Forms, opens: string | null, cause: Di
 }
 
 /**
+ * What a handler reads of its delivery beside the message's fields (section
+ * 6.5): the source entry, which the receiver read and checked before it
+ * recorded anything, and for a relationship update the update being applied.
+ */
+export interface Sent { source: Fetched; update: Update | null }
+
+/**
  * A handler, run on a delivered message (section 6.4): it has guards and
  * effects like an act, no signer and no primary item. Each `also` name is
  * resolved from a field of the message, and no two may name one item.
  */
-export function runHandler(view: StateView, definition: ValidDefinition, context: Reading, scope: ScopeState, handler: ReceiveType, kind: string, fields: Record<string, FieldValue>, cause: Digest): Ran {
+export function runHandler(view: StateView, definition: ValidDefinition, context: Reading, scope: ScopeState, handler: ReceiveType, kind: string, fields: Record<string, FieldValue>, cause: Digest, sent?: Sent): Ran {
   const subjects = new Map<string, Item>();
   for (const [name, also] of Object.entries(handler.also)) {
     const item = localItem(view, scope, own(fields, namedBy(also)));
@@ -138,7 +118,9 @@ export function runHandler(view: StateView, definition: ValidDefinition, context
   if (new Set([...subjects.values()].map((i) => i.id)).size !== subjects.size) return { result: "refused", reason: "alias", detail: "two names resolve to one item", prepared: [] };
   const j: Judging = {
     view, definition, bounds: context.bounds, clock: context.clock, scope, self: scope.head.seq + 1, kind, fields, fieldTypes: {}, subjects, signer: null,
-    facts: new Map(), prepared: context.prepared, used: [], asked: context.asked,
+    facts: new Map(), prepared: context.prepared, used: [], asked: context.asked, own: context.own,
+    // Section 6.5: `sender` is the envelope's source scope, `source` reads the source entry, and `update` the update, whose revision is the `seq` of the owner's entry.
+    sender: sent?.source.fact.at, source: sent?.source, update: sent?.update ? { state: sent.update.state, item: sent.update.item, revision: sent.source.fact.seq } : undefined,
   };
   return derive(j, handler, null, cause);
 }
@@ -159,8 +141,12 @@ export type Clause = keyof ResultClauses | "conflict";
  * `uses`: the foreign entries this judgment read. A clause with effects reads
  * every fact the origin's fields name, so the entry that records the clause
  * records them again (section 9.2). The origin entry recorded them first.
+ *
+ * `answered`: for a result, the scope that answered and the reason on the
+ * result, which a clause may read as `sender` and `result` (section 6.6). A
+ * diagnosis has neither.
  */
-export function runClause(view: StateView, definition: ValidDefinition, context: Reading & { origin?: Entry | null | undefined }, scope: ScopeState, request: OwnRequest, clause: Clause):
+export function runClause(view: StateView, definition: ValidDefinition, context: Reading & { origin?: Entry | null | undefined }, scope: ScopeState, request: OwnRequest, clause: Clause, answered?: { sender: ScopeRef; reason?: Reason }):
   { result: "ran"; effects: Effect[]; uses: FactUse[]; judgesTime: boolean } | { result: "unavailable"; reason: UnavailableReason } {
   const origin = context.origin;
   if (!origin || origin.seq !== request.seq || entryHash(origin) !== request.hash) return { result: "unavailable", reason: "unavailable" };
@@ -197,7 +183,8 @@ export function runClause(view: StateView, definition: ValidDefinition, context:
   if (forms.length === 0) return { result: "ran", effects: [], uses: [], judgesTime: false };
 
   // The uses of the origin are the facts its fields name; a clause may read one (section 6.6, a party from a fetched fact).
-  const facts = readFacts(view, frame.fieldTypes, frame.fields, context.facts);
+  // A local fact that the origin's fields name was checked when the origin was judged. It is put in normal form again here.
+  const facts = readFacts(view, frame.fieldTypes, frame.fields, context.facts, { at: scope.at, own: context.own });
   if (facts.result !== "read") return { result: "unavailable", reason: "dependency-unavailable" };
   const subjects = new Map<string, Item>();
   for (const [name, item] of frame.subjects) {
@@ -205,8 +192,8 @@ export function runClause(view: StateView, definition: ValidDefinition, context:
     subjects.set(name, item);
   }
   const j: Judging = {
-    view, definition, bounds: context.bounds, clock: context.clock, scope, self: scope.head.seq + 1, kind: frame.kind, fields: frame.fields, fieldTypes: frame.fieldTypes, subjects, signer: frame.signer,
-    facts: facts.facts, prepared: [], used: [],
+    view, definition, bounds: context.bounds, clock: context.clock, scope, self: scope.head.seq + 1, kind: frame.kind, fields: facts.fields, fieldTypes: frame.fieldTypes, subjects, signer: frame.signer,
+    facts: facts.facts, prepared: [], used: [], own: context.own, sender: answered?.sender, result: answered?.reason,
   };
   const effects = deriveEffects(j, forms, [], null);
   return { result: "ran", effects: effects.ok ? effects.effects : [], uses: facts.uses, judgesTime: forms.some(timesEffect) };

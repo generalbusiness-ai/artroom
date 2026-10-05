@@ -20,7 +20,20 @@ export interface Ctx {
   signer: boolean;
   timed: boolean;
   live: Set<string>;                      // subjects under a `state` guard that lists no final state
+  // What the operands of section 6.5 may name here, beside the above.
+  kind: string | null;                    // the kind of the entry these forms write: an act's own kind. Null where none is derived yet, as for a handler and a timed rule
+  handler: { update: boolean } | null;    // a handler: it has a sender and a source entry, and a `relate` handler an update
+  clause: boolean;                        // a result clause: it has a sender and a result
+  presented: Map<string, FieldType>;      // an act: the facts presented beside the intent, by name
+  elements: Map<string, FieldType | null>;// inside a list form: each element it binds, by its `as` name, with its type when the definition states it
+  each: Type | null;                      // a fan-out send: the type of the items its range covers
 }
+
+/** Forms that name nothing yet. Each act, handler and timed rule starts from this and says what it has. */
+export const naming = (): Ctx => ({
+  on: null, also: new Map(), nascent: false, fields: null, signer: false, timed: false, live: new Set(),
+  kind: null, handler: null, clause: false, presented: new Map(), elements: new Map(), each: null,
+});
 
 /** What a `where` of one range guard reads: the slots an index on that type must cover (section 6.5). */
 export interface RangeIndex { path: string; type: string; slots: readonly string[] }
@@ -35,6 +48,7 @@ export type ClauseSet = { subject: string; type: string; state?: string; slot?: 
  */
 export interface Defining extends Shapes {
   readonly bounds: Bounds;
+  readonly name: string | null;             // the name the definition states, which `under` is compared with. Null: it states none, which is reported
   readonly typeNames: ReadonlySet<string>;  // every key of `items`, known before any item type is read
   readonly types: Map<string, Type>;        // the item types that were read whole
   readonly rules: Set<string>;              // the names of the declared rule expressions
