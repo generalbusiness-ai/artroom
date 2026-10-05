@@ -68,16 +68,8 @@ interface Remote {
 
 const MISSING = { ok: false, reason: "not-found" } as const;
 
-/**
- * The preparation path (section 5.5): one step of a capability, asked for
- * with the signed intent that it prepares for. A caller with no answer, or
- * an unavailable one, sends the same request again.
- */
-// I3 merge: the contract's `ScopeApi` states no preparation yet, so the operation is typed here. Step 16 moves it there.
-export interface Preparing { prepare(scope: string, signed: SignedIntent, grants: readonly Grant[], capability: string, step: string): Promise<Answer> }
-
 /** Every operation, each on the object the scope ID names. A name that is no scope ID names nothing. */
-export function api(binding: Binding): ScopeApi & Preparing {
+export function api(binding: Binding): ScopeApi {
   const at = (scope: string): Remote | null => (isScopeId(scope) ? binding.get(binding.idFromName(scope)) as Remote : null);
   return {
     /**
@@ -221,6 +213,7 @@ export class ScopeService<E extends Env = Env> extends WorkerEntrypoint<E> imple
   protected scopes(): Binding { return this.env.SCOPES; }
   found(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions: readonly DeclaredDefinition[] = [], beside: Beside = {}): Promise<Founded> { return api(this.scopes()).found(founding, definition, definitions, beside); }
   submit(scope: string, signed: SignedIntent, grants: readonly Grant[], beside: Beside = {}): Promise<Answer> { return api(this.scopes()).submit(scope, signed, grants, beside); }
+  prepare(scope: string, signed: SignedIntent, grants: readonly Grant[], capability: string, step: string): Promise<Answer> { return api(this.scopes()).prepare(scope, signed, grants, capability, step); }
   settle(scope: string, signed: SignedIntent): Promise<Settlement> { return api(this.scopes()).settle(scope, signed); }
   summary(scope: string, reader: unknown): Promise<Read<Summary>> { return api(this.scopes()).summary(scope, reader); }
   items(scope: string, reader: unknown, type: string, cursor?: Cursor): Promise<Read<readonly Item[]>> { return api(this.scopes()).items(scope, reader, type, cursor); }

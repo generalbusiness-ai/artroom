@@ -29,7 +29,8 @@ test("one real route: a founding, an act and a request for a step through the Wo
   // The preparation route reaches the same turn and its judge. This runtime has no code for a step of `hold@1`, as in production,
   // so the request is not judged and nothing is written: the summary below is still at entry 1.
   const prepared = await post(`/v1/scopes/${name}/preparations`, { ...body, capability: "hold@1", step: "stage" });
-  expect([prepared.status, await prepared.json()]).toEqual([503, { answer: "unavailable", reason: "unavailable" }]);
+  const unjudged = { answer: "unavailable", reason: "unavailable" };
+  expect([prepared.status, await prepared.json(), await (env.API as unknown as Api).prepare(name, body.signed, body.grants, "hold@1", "stage")]).toEqual([503, unjudged, unjudged]);
 
   const summary = await SELF.fetch(`https://scopes.test/v1/scopes/${name}`);
   expect([summary.status, await summary.json()]).toMatchObject([200, { ok: true, complete: true, at: { seq: 1, hash: accepted.answer === "accepted" && accepted.receipt.fact.hash }, value: { scope: at, status: "active" } }]);

@@ -52,8 +52,8 @@ export function httpTransport(service: string, options: { fetch?: Fetch; bytes?:
 
   /** One request of operation `op`. Its reply is returned only when it is an answer of that operation. */
   async function call<K extends keyof ScopeApi>(op: K, path: string, reader: unknown, body?: unknown): Promise<Answered<K>> {
-    // A founding and an act submit an intent, and a failure leaves its outcome unknown. A read changes nothing.
-    const failed = (what: string) => new TransportError(op === "found" || op === "submit" ? `${what}. ${UNKNOWN}` : `${what}. Nothing was read; the read may be made again.`);
+    // A founding, an act and a request for a step submit an intent, and a failure leaves its outcome unknown. A read changes nothing.
+    const failed = (what: string) => new TransportError(op === "found" || op === "submit" || op === "prepare" ? `${what}. ${UNKNOWN}` : `${what}. Nothing was read; the read may be made again.`);
     const send = options.fetch ?? (globalThis as { fetch?: Fetch }).fetch;
     if (!send) throw new TransportError("this runtime has no fetch; nothing was sent");
     const headers: Record<string, string> = { ...(typeof reader === "string" ? { authorization: reader } : {}), ...(body === undefined ? {} : { "content-type": "application/json" }) };
@@ -92,6 +92,7 @@ export function httpTransport(service: string, options: { fetch?: Fetch; bytes?:
     // What travels beside the intent goes in the same body: each detached text, and each presented fact by name.
     found: (founding, definition, definitions = [], beside = {}) => call("found", "", null, { founding, definition, definitions, ...beside }),
     submit: (scope, signed, grants, beside = {}) => call("submit", `/${part(scope)}/acts`, null, { signed, grants, ...beside }),
+    prepare: (scope, signed, grants, capability, step) => call("prepare", `/${part(scope)}/preparations`, null, { signed, grants, capability, step }),
     settle: (scope, signed) => call("settle", `/${part(scope)}/settle`, null, { signed }),
     summary: (scope, reader) => call("summary", `/${part(scope)}`, reader),
     items: (scope, reader, type, cursor) => call("items", `/${part(scope)}/items/${part(type)}${page(cursor)}`, reader),

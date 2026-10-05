@@ -15,10 +15,7 @@
  */
 
 import type { Answer, CapabilityName, Grant, SignedIntent } from "@generalbusiness/artroom-contract";
-import { LATE, takeBytes, within } from "@generalbusiness/artroom-bytes";
-import { ANSWERS } from "./answers.ts";
-import { TransportError } from "./handle.ts";
-import { REPLY_BYTES, REPLY_SECONDS, type Fetch } from "./http.ts";
+import type { Transport } from "./handle.ts";
 import { signedIntent, type Asked, type Signer, type Signing } from "./intent.ts";
 
 /** One request for a step: the signed intent that it prepares for, the capability and the step. Only the intent is signed. */
@@ -37,37 +34,11 @@ export async function preparation(signer: Signer, asked: Asked, capability: Capa
 }
 
 /**
- * Send one request to the scope that owns the resource, over the service's
- * HTTP route. The reply is read as `httpTransport` reads one: within
- * `seconds`, at most `bytes`, and only when it is one of the answers of an
- * act, which a preparation shares. Anything else is a `TransportError`: the
- * outcome is unknown, and the same request may be sent again.
+ * Send one request to the scope that owns the resource, through a
+ * transport: the operation `prepare` of the contract's `ScopeApi`. The
+ * transport reads the reply as it reads an act's. A `TransportError` says
+ * that the outcome is unknown, and the same request may be sent again.
  */
-export async function sendPreparation(service: string, scope: string, request: Preparation, grants: readonly Grant[] = [], options: { fetch?: Fetch; bytes?: number; seconds?: number } = {}): Promise<Answer> {
-  const failed = (what: string) => new TransportError(`${what}. The outcome of the request is unknown: it may have been recorded. The same request may be sent again.`);
-  const send = options.fetch ?? (globalThis as { fetch?: Fetch }).fetch;
-  if (!send) throw new TransportError("this runtime has no fetch; nothing was sent");
-  const seconds = options.seconds ?? REPLY_SECONDS;
-  const most = options.bytes ?? REPLY_BYTES;
-  const url = `${service.replace(/\/+$/, "")}/v1/scopes/${encodeURIComponent(scope)}/preparations`;
-  let got: { status: number; bytes: Uint8Array | null | typeof LATE } | typeof LATE;
-  try {
-    got = await within(seconds, async (signal) => {
-      const response = await send(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...request, grants }), signal: signal as never });
-      return { status: response.status, bytes: response.body ? await takeBytes(response.body, most, signal) : new Uint8Array(0) };
-    });
-  } catch (error) {
-    throw failed(`no reply: ${error instanceof Error ? error.message : String(error)}`);
-  }
-  if (got === LATE || got.bytes === LATE) throw failed(`no whole reply within ${seconds} seconds; the request was aborted`);
-  if (got.bytes === null) throw failed(`the reply, status ${got.status}, is longer than ${most} bytes and was not read`);
-  let answer: unknown = null;
-  try {
-    answer = JSON.parse(new TextDecoder("utf-8", { fatal: true, ignoreBOM: false }).decode(got.bytes));
-    if (!ANSWERS.submit(answer)) answer = null;
-  } catch {
-    answer = null;
-  }
-  if (answer === null) throw failed(`the reply, status ${got.status}, is not an answer to a preparation`);
-  return answer as Answer;
+export function sendPreparation(transport: Transport, scope: string, request: Preparation, grants: readonly Grant[] = []): Promise<Answer> {
+  return transport.prepare(scope, request.signed, grants, request.capability, request.step);
 }
