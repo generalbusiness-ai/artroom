@@ -1,6 +1,0 @@
-{
-  "format": "artroom-checker-v1",
-  "volatile": true,
-  "timeoutSeconds": 300,
-  "advisory": true
-}

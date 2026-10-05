@@ -995,6 +995,48 @@ seals a `job-read` preparation, which no scope did before.
 are shown as pure functions on a made-up lane with the names of entry EW2
 (`derive/test/forms-prepare.test.ts`), and the driver on entries made by
 hand with a stand-in host (`git/test/host.test.ts`). No real scope sealed
-a `job-read` entry in a test: the lanes' fixture has no outside port for
-`git-read@1`, and step 25's scenario of the `change` lane runs its checks
-without a read token.
+a `job-read` entry in a test: step 25's scenario of the `change` lane runs
+its checks without a read token.
+
+## 23. Step 25: the checker service
+
+Written 2026-10-05, on `request/i3-checkers`, with the same two adopted
+texts as section 22. Sections 3.11, 5.5 and 6.3 of the authority note have
+the same text at revision 24 as at revision 21.
+
+The step adds the package `packages/checkers`, and removes the earlier
+checkers package but its retained paths, the earlier Room's jobs module and
+the earlier contract's checker types, after their review
+(`notes/2026-10-05-i3-checkers-review.md`). A new workspace package needs
+an entry in the lockfile, as the Git package did at step 17. That entry is
+a commit of its own: the workspace link and the package's block, and no new
+external dependency. No entry of any scope changes its bytes, and neither
+pinned digest moves. One line of `packages/git/src/gateway.ts` changes: a
+forwarded request follows no redirect (entry EW16).
+
+| # | Where the texts differ or are silent | Implemented | Owner, and the question |
+|---|---|---|---|
+| EW11 | The plan's row T34 puts the check results table in `platform/test/checks.scope.test.ts`. The table is about rows of the `change` lane, which is the lanes package's, and no platform package may name that package. The plan names the files `job.ts`, `signing.ts`, `service.ts`, `runner.ts` and `sandbox.ts`. | T34 is `packages/lanes/test/checks.scope.test.ts`, on the lanes' one fixture, and its command is the plan's. It imports the checker service's origin read and signer by path, so the lanes package states no new dependency. The package also has `configuration.ts`, `outcome.ts` and `store.ts`. `scripts/active-source.test.mjs` holds the package to contract, bytes and git, and lets that one test file reach it. | The builder: a dependency of the lanes package on the checkers package, in its manifest, at the merge or later. |
+| EW12 | The form of each member of a configuration. Section 3.11 lists six members and says that they are "a proposal for R2 and R4 to agree". Only `image` has a stated type. The rules scope's rule checks `image` and no other member. | `Configuration`, the narrowest reading of the table: `name`, a text; `image`, a digest; `environment`, a list of `{ name, value }` with each name once; `steps`, a list of lists of arguments, at least one; `judged`, `{ passed, failed }`, each `{ status, line }`, and the two differ; `limits`, `{ seconds, outputBytes }`. The value has exactly those members. Bytes in any other form are no configuration: `check-error`, `configuration-unavailable`, and nothing runs. The bounds on each member are this package's. | R2 and R4, with the authority note, for the forms. The proof plan, for the bounds. |
+| EW13 | The details of a result, and three members of `RunProvenance`. The note says that the record "is part of the result's details" and states nothing else of them. It types `image.resolved` as a digest, and its table has the case "No resolved value". A step has a `name`, and a configuration's step is "a list of arguments". No domain is stated for the digest of the details or of the environment. | The details are `{ provenance }` and nothing else. No output of a run is in them. `image.resolved` is null when the platform reported none. A step's name is its position in the configuration, counted from 1, as text. `run` is a name that the service draws at random when it makes the job's record. Both digests are the SHA-256 of the value's canonical bytes, with no domain tag. With no configuration there are no details. | The authority note, for the details, the step's name and the two domains. |
+| EW14 | The reason of a `check-error`. The note gives four words: `configuration-unavailable`, `image-mismatch`, `image-unresolved` and `run-lost`. For the other rows of "What the checker signs" it says "with that reason" or "naming the step". The lane's field is a text of at most 4,096 bytes. | Seven more fixed words, and one form: `environment-mismatch`, `checkout-unconfirmed`, `runner-not-started`, `runner-lost`, `limits-passed`, `report-malformed`, `judgment-unreadable`, and `step-failed:<n>`, where n is the step's position. A reason is never a run's output. | The authority note, with R2, for the words. |
+| EW15 | How the checker service reaches scopes, and which rules scope is "the repository's". No text gives the form of a notice, the read by which the rules scope serves a kept configuration's bytes, or how the service knows the rules scope of a lane. The contract's `RetainedInput` has no kind for a value beside an intent. | The service is configured with one rules scope, for the one repository that its key is a checker of (section 5.5, "One key for one member"). No notice and no lane names it. `Scopes` is the port: seven calls, of which five are reads. No adapter of it exists. A notice is `{ lane, job, name, tree }`, and nothing of it is used but what to read. The base and the integration commit of a job are read from the manifest's own entry, which the job's entry names. | The builder, for the adapter and the Worker, with a deployment (plan question Q8). The contract, for the read of a kept value. |
+| EW16 | The runner's network, and the gateway. The note gives a runner one repository through its gateway, and "the exact rule is an item of I3's review". The earlier sandbox also let a runner read a package registry. The gateway of `packages/git` built its forwarded request with the default redirect mode. | The runner's gateway is the Git package's gateway with a grant whose `update` is null: two read requests of the granted repository pass, by their whole path, and nothing else. A registry is not carried: a runner has no other network, so a check that installs packages needs an image that holds them. The gateway now forwards with `redirect: "manual"`, for every grant: a redirect is returned to the Git client and never followed with the credential. One gateway serves one run. | R4, with the authority note: may a check reach a registry, and through what? The builder: the gateway's change is in a file of step 21. |
+| EW17 | "At most one run for a job" rests on "one write that creates the record only if it is absent", and a lost run is found "because the host or the runner's own record was lost". No text says how a delivery tells a run that another delivery is about to start from a run that was lost. | Three things, in this order. The durable record, by a write that creates it only if it is absent. A mark in the memory of the process that made the record, from that write to the run's end: a delivery that finds it waits. And the runner's own record of the run: `running`, the run's end, or nothing, which is `run-lost`. So a second process that receives the same job, between the first one's record and its runner's start, would conclude `run-lost` while the first goes on to run. No second run starts in that case either, and no pass is signed for the job: the kept outcome is the error. A deployment that sends one job's notices to one process does not meet the case. With no read token no runner starts, and that is `run-lost` too: the request for the token is not asked again. | The builder, with a deployment (plan question Q8): one process for one job's deliveries, or a runner whose record exists from the moment the job's record does. |
+| EW18 | Submitting a kept outcome again. "A result the lane refused for now, for example during a merge, is submitted again later." No text says with which bytes, or how the service learns that a job is superseded. | A later delivery of the same job submits again. It sends the exact bytes of the last submit first, so a lane that admitted them answers with their receipt. If they are not accepted it reads the job's state and the revisions that the act names, signs anew and submits. A job that it reads as `superseded` is submitted no more. Nothing here submits by itself, on a timer. T34 shows what the real lane does with a late or a second answer: the rows of `change` admit it as history, and the job and its deciding entry stay. | The authority note, to confirm. The builder, for what causes a later delivery. |
+| EW19 | What the checkout is held to. The plan's T36 says "the commit, its tree and its parents against the job". A job fixes a manifest and a tree. The manifest holds the integration commit and its base, "which is the first parent" (sections 6.5 and 12.2). No text says what a job states of a second parent. | The commit is the manifest's integration commit, its tree is the job's tree, and its first parent is the manifest's base. Every parent is read as a commit. A second parent is not compared with anything. The fetch has depth 2, so that the parents are there to read. The work tree is made with the Git package's settings, under which a symbolic link is written as a file. | The authority note, with R2: does a job fix more of a merge commit's parents? |
+
+**What is not built.** No runner and no container: `Runner` has no adapter,
+and the stand-in of test support returns a stated end. No storage: `Durable`
+has no adapter. No adapter of `Scopes`, no Worker and no route for a
+notice. Nothing routes a `live` read token from the driver's `Custody` to a
+run's gateway. No filtered check (entry EW3). No image. Each needs a
+deployment, which is not authorized here (plan question Q8). The review's
+section 7 has the same list.
+
+**What was not run.** No container, no real runner, no host and no
+deployment. The checkout was run against a local repository with the real
+`git` program, which shows what Git's objects do and nothing about a host.
+The service was run on stand-ins for the lane, the rules scope, the storage
+and the runner. The lane's side of a result was run on a real change lane,
+with a scripted rules peer and the scripted test capability.

@@ -399,7 +399,9 @@ export class Gateway {
         for (const name of DROPPED) headers.delete(name);
         const [name, value] = this.#options.credential(plaintext);
         headers.set(name, value);
-        return this.#options.upstream(new Request(url, { method: request.method, headers, ...(body === null ? {} : { body, duplex: "half" as const }) }));
+        // `redirect: "manual"`: the credential goes to the granted repository and to no other place. A host's redirect is returned to
+        // the Git client as it is, and is never followed with the header (checkers review, fault G4).
+        return this.#options.upstream(new Request(url, { method: request.method, headers, redirect: "manual", ...(body === null ? {} : { body, duplex: "half" as const }) }));
       })();
     };
     const answered = async (sent: Promise<Response>): Promise<Response> => {

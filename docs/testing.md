@@ -168,6 +168,20 @@ destination. The test writes the peer's entry by hand, and nothing judged
 it. A test that uses one says so in the same way. It shows the receiver's
 side of a delivery, and nothing about the peer.
 
+The checker service has three stand-ins, in
+`packages/checkers/test/support.ts`. `Lane` stands for the scope
+namespace: one change lane and its repository's rules scope, with entries
+made by hand that no scope judged, and answers to a submit from a script.
+`MemoryDurable` stands for the service's durable storage. `ScriptedRunner`
+stands for a runner: it returns a stated end and runs nothing. A test that
+uses one says so. Such a test shows the service's own side: what it reads
+before it runs, what it starts, keeps and signs. It shows nothing about a
+lane's judgment, a storage's loss, a container or a real runner. The
+runner's checkout is tested on a real local repository, which is not a
+host. What a real change lane does with the service's signed results is
+one scenario of the lanes, `packages/lanes/test/checks.scope.test.ts`,
+which calls the service's origin read and its signer as functions.
+
 ## Time, size and setup
 
 - No test waits on the wall clock. Use the test clock, a gate, or an
@@ -217,8 +231,8 @@ npm run gate
 It installs only if `package-lock.json` changed since the last install,
 typechecks every workspace, and runs every test: one vitest process for
 the repository (`vitest.config.ts` at the root, one project for each of
-`bytes`, `derive`, `platform`, `git`, `replay`, `client`, `scope` and
-`lanes`), then one script (`scripts/active-source.test.mjs`). The script checks that no
+`bytes`, `derive`, `platform`, `git`, `checkers`, `replay`, `client`,
+`scope` and `lanes`), then one script (`scripts/active-source.test.mjs`). The script checks that no
 active file imports from `parked/` or names a removed format, and that no
 platform package depends on the lanes package or imports from it. It prints the head, the tree and
 each step's elapsed and CPU time. It also fails on a whitespace error in
@@ -229,9 +243,10 @@ with SQLite storage. The others run in Node, as one group at the same time,
 and the `scope` project runs after them, by itself: it has one worker, and
 vitest lets projects share a group only when their worker counts agree. The
 `git` project runs the real `git` program, as a client and as a server, on
-local repositories. Nothing runs twice.
+local repositories, and one file of the `checkers` project runs it for the
+runner's checkout. Nothing runs twice.
 
-The ten lane scenarios, `packages/lanes/test/*.scope.test.ts`, run from
+The eleven lane scenarios, `packages/lanes/test/*.scope.test.ts`, run from
 the root inside the `scope` project: the same test Worker, loaded once.
 The root `vitest.config.ts` adds them, and no file of the scope package
 names the lanes package. The lanes package keeps
