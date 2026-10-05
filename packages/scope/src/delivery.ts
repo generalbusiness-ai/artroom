@@ -36,19 +36,6 @@ const retry = (reason: UnavailableReason | "scope-full" | "unsupported-definitio
 const UNVERIFIED: Delivery = { answer: "source-unverified" };
 const said = (answer: Delivery): Verdict<Delivery> => ({ verdict: "answer", answer });
 
-/**
- * The kind of the entry that a delivered request or advisory would be
- * judged under, as derive's `bound` names a handler's: the name a `tell`
- * states, a relationship's name, or an advisory's type. Null: the message
- * is no such thing, or states no name.
- */
-function rowOf(message: Readonly<Record<string, unknown>>): string | null {
-  const body = message["body"];
-  const named = message["class"] === "advisory" ? message["type"]
-    : message["class"] === "request" && isObject(body) ? (message["type"] === "tell" ? body["message"] : message["type"] === "relate" ? body["name"] : null) : null;
-  return typeof named === "string" ? named : null;
-}
-
 export class Deliveries {
   readonly #name: ScopeId | null;
   readonly #scope: Scope;
@@ -125,10 +112,6 @@ export class Deliveries {
     const store = this.#store;
     if (!name || !isObject(delivered) || !isFactRef(delivered.from) || !isLocalId(delivered.n) || !isObject(delivered.message)) return UNVERIFIED;
     const { from, message } = delivered;
-    // No judge runs a platform rule yet, so this runtime derives no entry of a row that is code. It reads nothing for a message of
-    // that row and decides nothing: the sender keeps the duty. The message names its own row, and the pinned definition is immutable.
-    if (this.#scope.lacks(rowOf(message as unknown as Readonly<Record<string, unknown>>))) return retry("unsupported-definition");
-
     // Section 7.4, "What the receiver trusts at run time". The source scope is reached by its scope ID in the one namespace, the
     // answer's incarnation is checked against the envelope, and the entry's bytes against the hash. Nothing has been recorded.
     const read = await within(() => this.#ports.resolver.read(from, bounds.fetchSeconds), bounds.fetchSeconds);

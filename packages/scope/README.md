@@ -138,35 +138,42 @@ and every act that needs one is refused `unauthorized`.
 
 A platform definition is code of the runtime. It is pinned by its name and
 version, such as `platform:inbox@1`, and no scope retains bytes for it.
-The platform package supplies its data, and marks each entry whose row is
-code that no form can say.
+One version is its data and its rules, and the platform package supplies
+both. The data holds a mark, `{ code, row }`, at each place where a rule is
+run, and `code` names the rule. What follows builds a design that is filed
+for review and is not adopted yet: the scope contract's revision 15 and
+the authority note's revision 20.
 
 - A founding that names a platform definition is run under the platform
   package's data. That data alone is validated with the validator's
-  platform option. A declaration that an input, a peer or storage gave is
-  validated without it, so a declared definition never takes a name that
-  begins `platform:`.
-- The rule of the contract's section 6.1 is of the whole scope. A scope is
-  founded under a platform definition only when a rule is supplied for
-  every row that is marked as code. When one is missing, the founding is
-  refused `unsupported-definition`, and nothing is written. A scope that
-  exists under such a definition admits nothing: an act is answered
-  `unavailable`, a delivery gets `retry`, no timed entry is written, a
-  read is answered `unsupported-definition`, and the operations driver
-  sends nothing outside the service.
-- The platform package supplies no rule yet, and `platform:inbox@1` marks
-  one row, `notify`. So the production wiring founds no scope under any
-  platform definition.
-- No judge runs a platform rule yet, and no adopted text says how a
-  rule's result joins its row. `standInPlatform`, of the testing entry,
-  supplies a rule that adds nothing for every marked row. It is a
-  stand-in, and it shows only that a scope is founded and judges its acts
-  once every rule is supplied. In such a scope an entry that is marked is
-  still not derived. An act of that kind is answered `unavailable`. A
-  delivery of that message gets transport's `retry`, with the reason
-  `unsupported-definition`. A timed rule of that kind stays due, and the
-  turn ends. Nothing is written in any of the three. A genesis act that
-  is marked founds no scope.
+  platform option, which reads a mark at seven places and lists it. A
+  declaration that an input, a peer or storage gave is validated without
+  it. So a declared definition never takes a name that begins
+  `platform:`, and never holds a mark.
+- The judges run each rule at the check of its mark's place, in a
+  commit and again in a replay. A rule is given the folded state before
+  the entry, the entry's input, the entry's time, the entries in `uses`,
+  the scope's own earlier entries, and what the judge resolved. It is
+  given no storage, no network and no other clock. A rule that throws, or
+  that returns a value outside what its place allows, leaves the input
+  not judged: an act is answered `unavailable`, a delivery gets `retry`,
+  and nothing is written.
+- The rule of the contract's section 6.1 is of the whole scope. A scope
+  is founded under a platform definition only when a rule of the right
+  kind is supplied for every mark of its data. When one is missing, the
+  founding is refused `unsupported-definition`, and nothing is written. A
+  scope that exists under such a definition admits nothing: an act is
+  answered `unavailable`, a delivery gets `retry`, no timed entry is
+  written, a read is answered `unsupported-definition`, and the
+  operations driver sends nothing outside the service.
+- `platform:inbox@1` has one mark, `notice-source`, among the effects of
+  its `notify` handlers, and the platform package has its rule. So the
+  production wiring founds a scope under it. A `notify` writes a notice
+  whose `source` the rule set. `codeLost`, of the testing entry, supplies
+  the data with no rule. It stands for a runtime that lacks the code.
+- An act of a row whose `grant` is a mark is judged by the mark's rule in
+  place of the grant check. When the rule passes, the entry records
+  `authority: []`.
 - A creation under a platform name is not built: it is answered
   `unsupported-definition`.
 

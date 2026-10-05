@@ -28,22 +28,15 @@ export type Checkpointed =
 /**
  * The definition a scope pins: what its seed names, and the validated
  * declaration. Null: this runtime cannot run it, and the scope admits
- * nothing (section 6.1). `lacking`: the kind of each entry of a platform
- * definition whose rows are code. Every rule of each is supplied, or the
- * definition would be null. No judge runs a rule yet, so the runtime
- * derives nothing of those entries (`Scope.lacks`). A declared definition
- * has none.
+ * nothing (section 6.1). `platform`: the rules of the platform definition
+ * that the scope pins, which every judge of this scope is given, and which
+ * the judges run at the place of each mark. Null: a declared definition,
+ * which holds no mark, or a definition that this runtime cannot run.
  */
-export interface Pinned {
-  named: Digest | PlatformDefinition; definition: ValidDefinition | null; lacking: ReadonlySet<string>;
-  /** The rules of the platform definition that the scope pins, which every judge of this scope is given (section 6.1). Null: a declared definition, or one that this runtime cannot run. */
-  platform: PlatformRules | null;
-}
+export interface Pinned { named: Digest | PlatformDefinition; definition: ValidDefinition | null; platform: PlatformRules | null }
 
-/** A platform definition as this runtime can run it: the validated data, its rules, and the kinds of the entries whose rows are code. */
-export interface Supplied { definition: ValidDefinition; lacking: ReadonlySet<string>; platform: PlatformRules }
-
-const NONE: ReadonlySet<string> = new Set();
+/** A platform definition as this runtime can run it: the validated data, and its rules. */
+export interface Supplied { definition: ValidDefinition; platform: PlatformRules }
 
 /** The receipt of a sealed entry: a view, built after sealing (section 4.1). */
 export function receiptOf({ entry, hash }: Sealed, definition: Digest | PlatformDefinition): Receipt {
@@ -173,7 +166,7 @@ export class Scope {
     this.#store = store;
     this.#ports = ports;
     this.#bounds = bounds;
-    this.#turns = new Turns(store, ports, bounds, () => { const pinned = this.pinned(); return pinned ? pinned.definition : undefined; }, (kind) => this.lacks(kind), () => this.owners());
+    this.#turns = new Turns(store, ports, bounds, () => { const pinned = this.pinned(); return pinned ? pinned.definition : undefined; }, () => this.owners());
   }
 
   /**
@@ -193,9 +186,9 @@ export class Scope {
 
   /**
    * A platform definition, as this runtime's code supplies it through the
-   * definitions port (section 6.1): its data, validated, and the kinds of
-   * the entries whose rows are code. Null: the runtime does not implement
-   * that version, or cannot run it whole: `unsupported-definition`.
+   * definitions port (section 6.1): its data, validated, and its rules.
+   * Null: the runtime does not implement that version, or cannot run it
+   * whole: `unsupported-definition`.
    *
    * The data is the platform package's, so it is validated with the
    * validator's platform option, which lets a name begin `platform:`. This
@@ -220,17 +213,10 @@ export class Scope {
       // Section 6.1: the name of a platform definition is its platform name without the version, which is what `under` compares.
       if (!checked.ok || checked.definition.declared.name !== platformName(named) || !derivable(checked.definition, this.#ports.capabilities)) return null;
       // The marks are in the data, and the validator lists them: no table beside the data says which entries are code.
-      const { marks, declared } = checked.definition;
       // Section 6.1, "A mark with no rule: the whole scope": every mark needs a rule of that name, of the kind of the mark's place.
       if (!runnable(checked.definition, supplied.rules)) return null;
-      // I3 merge: no judge runs a platform rule yet. So an entry of a row that holds a mark is not derived, though every rule of it
-      // is supplied: `lacks`. The step that makes the judges run the rules removes `lacking`, `lacks` and each place that asks it.
-      const kinds = marks.flatMap((mark): string[] => {
-        const act = Object.keys(declared.acts).find((name) => mark.path.startsWith(`acts.${name}.`));
-        const handler = Object.entries(declared.receives).find(([name]) => mark.path.startsWith(`receives.${name}.`));
-        return act !== undefined ? [act] : handler ? [handler[1].message] : [];
-      });
-      return { definition: checked.definition, lacking: new Set(kinds), platform: { named, rules: supplied.rules } };
+      // A scope whose every rule is supplied runs every row of its definition: the judges run each rule at the place of its mark.
+      return { definition: checked.definition, platform: { named, rules: supplied.rules } };
     } catch {
       return null;
     }
@@ -248,7 +234,7 @@ export class Scope {
     const kept = isDigest(named) ? this.#store.retained("definition", named) : null;
     const definition = supplied ? supplied.definition : kept ? this.validate(kept.bytes) : null;
     if (definition) this.#store.cover(definition.indexes);
-    return (this.#pinned = { named, definition, lacking: supplied?.lacking ?? NONE, platform: supplied?.platform ?? null });
+    return (this.#pinned = { named, definition, platform: supplied?.platform ?? null });
   }
 
   /**
@@ -260,24 +246,6 @@ export class Scope {
   owners(): Owners | undefined {
     const pinned = this.pinned();
     return pinned?.definition ? ownersOf(pinned.definition, pinned.platform, this.#ports.owners) : (this.#ports.owners ?? undefined);
-  }
-
-  /**
-   * True when this runtime cannot derive an entry of that kind under the
-   * pinned definition: a row of it is platform code, and no judge runs a
-   * platform rule yet (I3 deltas, entry EC6). The scope then writes no entry
-   * of that kind, and judges no input that would be one. `kind` is an act's
-   * kind, a handler's message name, or `timed:` and the key of a timed rule.
-   * It is read from the input and the definition alone, which are immutable
-   * (section 5.1), so a writer asks before its turn.
-   *
-   * Under the production wiring it is false for every kind: a definition
-   * with a marked row whose rule is not supplied pins nothing, and the
-   * platform package supplies no rule yet. It answers true only where a
-   * test supplies stand-in rules.
-   */
-  lacks(kind: string | null): boolean {
-    return kind !== null && (this.pinned()?.lacking.has(kind) ?? false);
   }
 
   #receipt(seq: number, named: Digest | PlatformDefinition): Receipt {
@@ -319,15 +287,13 @@ export class Scope {
     // Null: a platform definition, which has no bytes to retain.
     let bytes: string | null = null;
     let valid: ValidDefinition | null;
-    let lacking = NONE;
     let platform: PlatformRules | null = null;
     if (typeof definition === "string" && definition.startsWith("platform:")) {
       // Section 6.1: the founding names a platform definition, and the runtime's code supplies it. Nothing of it comes from the input.
       const supplied = isPlatformDefinition(definition) ? this.platform(definition) : null;
-      // Null: a row of the definition is code with no rule, so nothing is founded under it. A genesis act that is marked is not derived
-      // either, while no judge runs a rule.
-      if (!supplied || supplied.lacking.has(supplied.definition.declared.genesis)) return refused("unsupported-definition");
-      ({ definition: valid, lacking, platform } = supplied);
+      // Null: a mark of the definition has no rule, so nothing is founded under it.
+      if (!supplied) return refused("unsupported-definition");
+      ({ definition: valid, platform } = supplied);
     } else {
       if (typeof definition === "string") {
         const read = await this.#ports.definitions.read(definition as Digest, null);
@@ -373,7 +339,7 @@ export class Scope {
     const texts = Received.beside(besideOf(beside).texts, act.fields, bounds);
     const asked = (inc: Founding["inc"]): Founding => ({ name, inc, seed, founding });
     const context = (clock: Reading) => ({ clock, bounds, facts, source: null, texts: texts.sizes, capabilities: this.#ports.capabilities ?? undefined, platform: platform ?? undefined });
-    const pinned = (): Pinned => this.pinned() ?? { named: names, definition: valid, lacking, platform };
+    const pinned = (): Pinned => this.pinned() ?? { named: names, definition: valid, platform };
     const answer = (sealed: Sealed): Founded =>
       (sealed.entry.input.type === "genesis" && sealed.entry.input.decision === "applied" ? { answer: "accepted", receipt: receiptOf(sealed, pinned().named) } : refused("scope-refused"));
 
@@ -430,9 +396,6 @@ export class Scope {
     if (!isSigned(signed)) return { answer: "refused", reason: "bad-intent", judgedAt: scope.head };
 
     const intent = signed.intent;
-    // No judge runs a platform rule yet, so this runtime judges no act of a kind whose row is code. The answer is the one a scope
-    // gives whose whole definition it cannot run: nothing was recorded.
-    if (this.lacks(intent.kind)) return unavailable("unavailable");
     const act = own(definition.declared.acts, intent.kind);
     const fields = act ? readFields(act.fields, intent.fields, bounds) : null;
     // Section 4.2: a key on a sealed entry is answered from history, with the same receipt or a mismatch. That answer reads no

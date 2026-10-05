@@ -133,19 +133,14 @@ export class Turns {
   readonly #ports: Pick<Ports, "clock" | "rules" | "alarm" | "capabilities">;
   readonly #bounds: Bounds;
   readonly #pinned: PinnedDefinition;
-  readonly #lacks: (kind: string) => boolean;
   readonly #owners: () => Owners | undefined;
 
-  /**
-   * `lacks`: true for the kind of an entry that this runtime cannot derive under the pinned definition (`Scope.lacks`).
-   * `owners`: the rules of the owners of outside operations for this scope, with those of its platform definition (`Scope.owners`).
-   */
-  constructor(store: Store, ports: Pick<Ports, "clock" | "rules" | "alarm" | "capabilities">, bounds: Bounds, pinned: PinnedDefinition, lacks: (kind: string) => boolean, owners: () => Owners | undefined) {
+  /** `owners`: the rules of the owners of outside operations for this scope, with those of its platform definition (`Scope.owners`). */
+  constructor(store: Store, ports: Pick<Ports, "clock" | "rules" | "alarm" | "capabilities">, bounds: Bounds, pinned: PinnedDefinition, owners: () => Owners | undefined) {
     this.#store = store;
     this.#ports = ports;
     this.#bounds = bounds;
     this.#pinned = pinned;
-    this.#lacks = lacks;
     this.#owners = owners;
   }
 
@@ -218,7 +213,6 @@ export class Turns {
       if (turn.attempts >= this.#bounds.timedAttemptsPerTurn) return { end: "busy" };
       // A timed rule whose row is code is not derived while no judge runs a platform rule. The transition stays due and is never
       // passed over, so the turn ends and no input is written ahead of it.
-      if (this.#lacks(`timed:${due.rule}`)) return { end: "unavailable" };
       // Section 9.2: room for this entry was counted when its item was opened. A scope with no room at all writes nothing.
       if (scope.head.seq + 1 >= this.#bounds.scopeEntries) return { end: "unavailable" };
       turn.attempts++;

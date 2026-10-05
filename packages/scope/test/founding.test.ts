@@ -2,9 +2,9 @@ import { env } from "cloudflare:workers";
 import { runInDurableObject } from "cloudflare:test";
 import { describe, expect, test } from "vitest";
 import type { DeclaredDefinition, Entry, Intent, ScopeRef, Seed } from "@generalbusiness/artroom-contract";
-import { definitionDigest, intentDigest, isIncarnation, scopeIdOf, signIntent } from "@generalbusiness/artroom-bytes";
+import { definitionDigest, factRefOf, intentDigest, isIncarnation, newIncarnation, scopeIdOf, signIntent } from "@generalbusiness/artroom-bytes";
 import { timeOf, type Delivered } from "@generalbusiness/artroom-derive";
-import { Scope, grantOf, laneDefinition, variant } from "@generalbusiness/artroom-derive/testing";
+import { Scope, forged, grantOf, laneDefinition, variant } from "@generalbusiness/artroom-derive/testing";
 import { inbox } from "@generalbusiness/artroom-platform";
 import { httpSource, verify } from "@generalbusiness/artroom-replay";
 import { controls, scriptedCapability } from "../src/testing.ts";
@@ -82,7 +82,7 @@ describe("founding a directory (sections 2.2, 2.3 and 7.1)", () => {
     expect(await deployed.summary(reader)).toEqual({ ok: false, reason: "forbidden" });
   });
 
-  test("platform:inbox@1 has one mark, `notice-source`, and the platform package has its rule. The production wiring founds a scope under it, which retains no declaration and judges its acts, also after a restart; a runtime that has lost the rule admits nothing to that scope and founds none; and the same data, given by an input, founds nothing", async () => {
+  test("platform:inbox@1 has one mark, `notice-source`, and the platform package has its rule. The production wiring founds a scope under it, which retains no declaration and judges its acts, also after a restart; a `notify` writes a notice whose `source` the rule set; a runtime that has lost the rule admits nothing to that scope and founds none; and the same data, given by an input, founds nothing", async () => {
     const NAMED = "platform:inbox@1";
     const asked = (notAfter: Intent["notAfter"]): Intent => ({ v: 1, to: null, actor: rita.key, kind: "found", on: null, expected: {}, fields: { owner: rita.member, membership: rita.member.membership }, idempotencyKey: crypto.randomUUID(), notAfter });
     const seedOf = (intent: Intent, definition: Seed["definition"]): Seed => ({ v: 1, kind: "directory", definition, creator: null, cause: intentDigest(intent), ordinal: 0 });
@@ -123,20 +123,38 @@ describe("founding a directory (sections 2.2, 2.3 and 7.1)", () => {
       const read = (on: number) => I.act(rita, "mark-read", { on, expected: { on: 1, inbox: 1 } });
       expect(await read(7)).toEqual({ answer: "refused", reason: "no-item", judgedAt: head });
 
-      // I3 merge: no judge runs a platform rule yet, so `notify`, whose rule is supplied and not run, is not derived: the delivery is
-      // not decided, and the sender keeps the duty. The control is an advisory of a row with no mark: it goes on to the read of its
-      // source entry, which no scope of this namespace holds.
-      const from = { at: { ...ref, kind: "lane" as const }, seq: 3, hash: founded.receipt.fact.hash };
-      const advisory = (type: "notify" | "index"): Delivered => ({ to: ref, from, n: 0, message: { class: "advisory", type, body: { fields: { reason: "review" } } } });
-      expect([await I.stub.deliver(advisory("notify")), await I.stub.deliver(advisory("index"))]).toEqual([{ answer: "retry", reason: "unsupported-definition" }, { answer: "source-unverified" }]);
+      // A `notify` from a lane. A scripted peer, a STAND-IN: the lane's entry is written by hand, and nothing judged it, so this shows
+      // the inbox's side of the delivery and nothing about a lane. The handler's written effects set `reason`, `item` and `at`.
+      // The mark `notice-source` stands after them, and its rule, the platform package's own, sets `source`: the record of the source
+      // fact's scope ID, incarnation, position and hash (authority note, section 12.1.6, case a).
+      const lane: ScopeRef = { scope: scopeIdOf(seedOf(asked(soon(60)), NAMED)), inc: newIncarnation(new Uint8Array(16).fill(7)), kind: "lane" };
+      const message = { class: "advisory", type: "notify", body: { fields: { reason: "review", item: 4 } } } as const;
+      const source = forged(lane, 3, { type: "checkpoint", through: 2, state: `sha256:${"0".repeat(64)}` }, [{ n: 0, to: ref, message }]);
+      const from = factRefOf(source.entry);
+      net.peers.set(from.hash, { entry: source.entry, under: "issue" });
+      const notified: Delivered = { to: ref, from, n: 0, message };
+      const recorded = await I.stub.deliver(notified);
+      expect(recorded).toMatchObject({ answer: "recorded", fact: { at: ref, seq: 1 } });
+      expect((await I.entries())[1]).toMatchObject({
+        input: { type: "delivery", from, n: 0, message },
+        effects: [
+          { effect: "open", item: 1, type: "notice", state: "unread" }, { effect: "value", item: 1, slot: "reason", value: "review" }, { effect: "value", item: 1, slot: "item", value: 4 },
+          { effect: "value", item: 1, slot: "at", value: net.clock.now }, { effect: "value", item: 1, slot: "source", value: { scope: lane.scope, incarnation: lane.inc, seq: 3, hash: from.hash } },
+        ],
+        sends: [],
+      });
+      // Case b: the same advisory again writes nothing. The owner then marks the notice read, on a grant that the test authority calls current.
+      expect(await I.stub.deliver(notified)).toEqual(recorded);
+      await I.did(rita, "mark-read", { on: 1, expected: { on: 1, inbox: 1 } });
+      expect([(await I.item(1))?.state, (await I.entries()).length]).toEqual(["read", 3]);
 
       // The same scope, in a runtime that has lost the rule: test support supplies the data with no rule. Section 6.1, "A mark with
       // no rule: the whole scope": the scope admits nothing, whatever the row. The act that was judged above is now not judged, and
       // nothing is founded under the definition.
       net.platformCode = false;
       await I.restart();
-      expect([await I.stub.summary(reader), await read(7)]).toEqual([{ ok: false, reason: "unsupported-definition" }, { answer: "unavailable", reason: "unavailable" }]);
-      expect(await stored(name, "SELECT COUNT(*) AS n FROM entry")).toEqual([{ n: 1 }]);
+      expect([await I.stub.summary(reader), await read(7), await I.stub.deliver({ ...notified, n: 1 })]).toEqual([{ ok: false, reason: "unsupported-definition" }, { answer: "unavailable", reason: "unavailable" }, { answer: "retry", reason: "unavailable" }]);
+      expect(await stored(name, "SELECT COUNT(*) AS n FROM entry")).toEqual([{ n: 3 }]);
       const lost = asked(soon(60));
       expect(await new Node(scopeIdOf(seedOf(lost, NAMED)), I.declared).stub.found(signIntent(lost, rita.secret), NAMED)).toEqual({ answer: "refused", reason: "unsupported-definition" });
       expect(await stored(scopeIdOf(seedOf(lost, NAMED)), "SELECT COUNT(*) AS n FROM entry")).toEqual([{ n: 0 }]);
