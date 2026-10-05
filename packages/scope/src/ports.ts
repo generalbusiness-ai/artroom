@@ -137,10 +137,11 @@ export interface Alarm { set(at: Timestamp | null): void | Promise<void> }
  *
  * `platform`: a platform definition, which is code that the runtime
  * supplies. It is pinned by its name and version, no scope retains it and
- * nothing is read, so it is synchronous. It comes with the rows of each
- * entry that are code, and the rules written for them. Null: this runtime
- * does not implement that version: `unsupported-definition`. The core
- * answers the same when a row that is code has no rule.
+ * nothing is read, so it is synchronous. It is the version's data, which
+ * holds a mark at each place that is code, and its rules, by the name that
+ * a mark states. Null: this runtime does not implement that version:
+ * `unsupported-definition`. The core answers the same when a mark has no
+ * rule.
  */
 export type DefinitionRead = { ok: true; bytes: string } | { ok: false; reason: "unsupported-definition" | "unavailable" | "absent" };
 export interface Definitions {

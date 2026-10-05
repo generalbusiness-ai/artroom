@@ -202,25 +202,30 @@ export class Scope {
    *
    * The rule of section 6.1 is of the whole scope, for a platform
    * definition as for a capability form with no code: "a scope runs every
-   * turn under its whole pinned definition, or none". An entry that the
-   * platform package marks as code needs a rule for each row that it names.
-   * When one row of one entry has no rule, the definition is null: no scope
-   * is founded under it, and a scope that exists under it admits nothing
-   * (I3 deltas, entry EC4).
+   * turn under its whole pinned definition, or none". The data holds a mark
+   * at each place that is code, and the validator lists the marks. When one
+   * mark of that list has no rule, the definition is null: no scope is
+   * founded under it, and a scope that exists under it admits nothing (I3
+   * deltas, entry EC4).
    */
   platform(named: PlatformDefinition): Supplied | null {
     const supplied = this.#ports.definitions.platform(named);
     if (!supplied) return null;
     try {
-      const checked = validateDefinition(parseStrict(canonicalize(supplied.declared)), this.#bounds, RULE_PROFILES, { platform: true });
+      const checked = validateDefinition(parseStrict(canonicalize(supplied.data)), this.#bounds, RULE_PROFILES, { platform: true });
       // Section 6.1: the name of a platform definition is its platform name without the version, which is what `under` compares.
       if (!checked.ok || checked.definition.declared.name !== platformName(named) || !derivable(checked.definition, this.#ports.capabilities)) return null;
-      const marked = Object.entries(supplied.code);
-      if (marked.some(([entry, rows]) => rows.some((row) => typeof own(supplied.rules, entry)?.[row] !== "function"))) return null;
-      // I3 merge: no judge runs a platform rule yet, and no adopted text says how a rule's result joins its row (I3 deltas, entry
-      // EC6). So an entry that is marked is not derived, though every rule of it is supplied: `lacks`. The step that makes the
-      // judges run the rules removes `lacking`, `lacks` and each place that asks it.
-      return { definition: checked.definition, lacking: new Set(marked.map(([entry]) => entry)) };
+      // The marks are in the data, and the validator lists them: no table beside the data says which entries are code.
+      const { marks, declared } = checked.definition;
+      if (marks.some((mark) => typeof own(supplied.rules, mark.code) !== "function")) return null;
+      // I3 merge: no judge runs a platform rule yet. So an entry of a row that holds a mark is not derived, though every rule of it
+      // is supplied: `lacks`. The step that makes the judges run the rules removes `lacking`, `lacks` and each place that asks it.
+      const kinds = marks.flatMap((mark): string[] => {
+        const act = Object.keys(declared.acts).find((name) => mark.path.startsWith(`acts.${name}.`));
+        const handler = Object.entries(declared.receives).find(([name]) => mark.path.startsWith(`receives.${name}.`));
+        return act !== undefined ? [act] : handler ? [handler[1].message] : [];
+      });
+      return { definition: checked.definition, lacking: new Set(kinds) };
     } catch {
       return null;
     }

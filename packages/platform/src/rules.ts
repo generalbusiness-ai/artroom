@@ -4,6 +4,15 @@
  * contract says: a cell of the authority note's section 12.1 that begins
  * "Code", with its row P1 to P25 of section 12.1.8.
  *
+ * The data of a definition says where each rule stands: it holds a mark,
+ * `{ code, row }`, at that place, and `code` names the rule (the contract's
+ * revision 15, section 6.1). No table beside the data says which entries
+ * are code. The validator lists the marks of the data, and a runtime or a
+ * verifier runs a definition only with a rule for every mark of that list.
+ * Without one it answers `unsupported-definition` for the whole scope:
+ * nothing is founded under the definition, and a scope that exists under it
+ * admits nothing (I3 deltas, entry EC4).
+ *
  * What a rule may do, which the types below hold:
  *
  * - It is a pure function of the folded state, the one input and the
@@ -14,17 +23,9 @@
  *   member to an entry, an input, a message or an envelope.
  * - An entry that it writes is checked by the same checks as any other.
  *
- * The validator does not read this table. A test lists it, so that a rule
- * cannot be added without its row. The table is empty: no rule is written
- * yet.
- *
- * `CODE` marks each entry that needs a rule, with its rows. A runtime or a
- * verifier runs a definition only with every rule that its marked entries
- * name. Without one it answers `unsupported-definition` for the whole
- * scope: nothing is founded under the definition, and a scope that exists
- * under it admits nothing (the contract's section 6.1; I3 deltas, entry
- * EC4). `inbox` needs one, P22, which is not written (I3 deltas, entry
- * E10), so no scope is founded under it yet.
+ * The validator does not read this table. The table is empty: no rule is
+ * written yet. The inbox marks one, `notice-source`, so no scope is founded
+ * under it yet.
  */
 
 import type { Effect, FactUse, Input, Reason, Send, Timestamp } from "@generalbusiness/artroom-contract";
@@ -32,13 +33,6 @@ import type { StateView } from "@generalbusiness/artroom-derive";
 
 /** The platform definitions that this package holds, by name without the version (section 12.1). `platform:task` is not here: it is IA's. */
 export type PlatformName = "platform:register" | "platform:directory" | "platform:membership" | "platform:rules" | "platform:destination" | "platform:inbox";
-
-/**
- * The rows of section 12.1.8 that the plan's section 4 marks "platform code", whole or in the part that it names: P13 to P18, P22, P24
- * and P25 whole; and the platform-code part of P19 (an outcome entry), P20 (the rules scope and the destination) and P21 (a `create`
- * under a named digest).
- */
-export type PlatformRow = "P13" | "P14" | "P15" | "P16" | "P17" | "P18" | "P19" | "P20" | "P21" | "P22" | "P24" | "P25";
 
 /** What a rule is given. Nothing else reaches it. */
 export interface RuleGiven {
@@ -55,20 +49,11 @@ export type RuleResult =
 
 export type PlatformRule = (given: RuleGiven) => RuleResult;
 
-/** The rules of one entry of one definition, by the row that each answers. */
-export type EntryRules = { readonly [row in PlatformRow]?: PlatformRule };
+/** The rules of one definition, by the name that a mark of its data states in `code`. */
+export type Rules = Readonly<Record<string, PlatformRule>>;
 
-/** Every rule: by definition, then by the entry's act kind or message name, then by row. */
-export type RuleTable = { readonly [name in PlatformName]?: { readonly [entry: string]: EntryRules } };
+/** Every rule: by definition, then by the rule's name. */
+export type RuleTable = { readonly [name in PlatformName]?: Rules };
 
 /** No rule is written yet. */
 export const RULES: RuleTable = {};
-
-/**
- * The rows that an entry needs a rule for: by definition, then by the entry's kind. The kind is an act's kind, a handler's message
- * name, or `timed:` and the key of a timed rule, as a `fact` type's `kind` names an entry (the contract's section 6.2).
- */
-export type CodeTable = { readonly [name in PlatformName]?: { readonly [entry: string]: readonly PlatformRow[] } };
-
-/** Each cell of section 12.1 that begins "Code", for the definitions that this package holds. Section 12.1.6: a notice's `source`. */
-export const CODE: CodeTable = { "platform:inbox": { notify: ["P22"] } };

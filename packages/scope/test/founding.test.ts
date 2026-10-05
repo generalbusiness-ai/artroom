@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
 import { evictDurableObject, runInDurableObject } from "cloudflare:test";
 import { describe, expect, test } from "vitest";
-import type { Entry, Intent, ScopeRef, Seed } from "@generalbusiness/artroom-contract";
+import type { DeclaredDefinition, Entry, Intent, ScopeRef, Seed } from "@generalbusiness/artroom-contract";
 import { definitionDigest, intentDigest, isIncarnation, scopeIdOf, signIntent } from "@generalbusiness/artroom-bytes";
 import { timeOf, type Delivered } from "@generalbusiness/artroom-derive";
 import { Scope, grantOf, laneDefinition, variant } from "@generalbusiness/artroom-derive/testing";
@@ -144,9 +144,10 @@ describe("founding a directory (sections 2.2, 2.3 and 7.1)", () => {
     // The validator's platform option is reached by the name alone. The same data, given by an input as a declaration, is validated
     // without it: a declared definition does not take a platform name, and nothing is founded, also with the stand-in rules.
     const other = asked(at(60));
-    const declared = scopeIdOf(seedOf(other, definitionDigest(inbox)));
+    const given = inbox as unknown as DeclaredDefinition;
+    const declared = scopeIdOf(seedOf(other, definitionDigest(given)));
     controls(declared, START).platformRules = true;
-    expect(await stubOf(declared).found(signIntent(other, rita.secret), inbox)).toEqual({ answer: "refused", reason: "unsupported-definition" });
+    expect(await stubOf(declared).found(signIntent(other, rita.secret), given)).toEqual({ answer: "refused", reason: "unsupported-definition" });
     expect(await stored(declared, "SELECT COUNT(*) AS n FROM entry")).toEqual([{ n: 0 }]);
   });
 

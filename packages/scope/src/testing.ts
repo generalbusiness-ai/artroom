@@ -12,7 +12,7 @@
 import { CAPABILITIES, PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { Bounds, Capability, CapabilityName, Digest, Entry, ObservationRequest, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
 import type { Capabilities, Delivered, Recorded, Steps, Window } from "@generalbusiness/artroom-derive";
-import { platform, type EntryRules, type Platform, type PlatformRule } from "@generalbusiness/artroom-platform";
+import { platform, type Platform, type PlatformRule } from "@generalbusiness/artroom-platform";
 import { observing } from "./authority.ts";
 import type { Authority, Clock, Definitions, Ports, Readers, Resolver, Rules, Transport } from "./ports.ts";
 import { production } from "./ports.ts";
@@ -98,18 +98,23 @@ export function scriptedCapability(script: () => CapabilityScript | null): Capab
  */
 const STAND_IN_RULE: PlatformRule = () => ({ result: "applied", effects: [], sends: [] });
 
+/** The name of each rule that a value of platform data marks: every record of it that has the two texts `code` and `row`. */
+function marked(value: unknown): string[] {
+  if (typeof value !== "object" || value === null) return [];
+  const here = "code" in value && "row" in value && typeof value.code === "string" && typeof value.row === "string" ? [value.code] : [];
+  return [...here, ...Object.values(value).flatMap(marked)];
+}
+
 /**
  * A stand-in for the platform package's table of rules: the platform
  * definition of that name as the package supplies it, with `STAND_IN_RULE`
- * for every row that the package marks as code. So it proves nothing about
- * the real rule of any row, such as P22 of the inbox, which a later step
- * writes.
+ * for every mark of its data. So it proves nothing about the real rule of
+ * any mark, such as `notice-source` of the inbox, which a later step writes.
  */
 export function standInPlatform(named: string): Platform | null {
   const supplied = platform(named);
   if (!supplied) return null;
-  const rules = Object.fromEntries(Object.entries(supplied.code).map(([entry, rows]): [string, EntryRules] => [entry, Object.fromEntries(rows.map((row) => [row, STAND_IN_RULE]))]));
-  return { ...supplied, rules };
+  return { ...supplied, rules: Object.fromEntries(marked(supplied.data).map((code): [string, PlatformRule] => [code, STAND_IN_RULE])) };
 }
 
 /** A scripted clock. Each reading is the next of `script`, or `now` when the script is empty. */

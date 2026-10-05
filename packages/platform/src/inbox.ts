@@ -4,18 +4,20 @@
  * the application. No send leaves it, no timed rule exists and no entry
  * starts a duty.
  *
- * One member is one row of the note's tables. The note's cells that begin
- * "Code" are the rules of `rules.ts`, and this definition holds none: the
- * address of a notice (P23) is transport's at dispatch, and a notice's
- * `source` is a record of four values (P22).
+ * One member is one row of the note's tables. A cell of the note that
+ * begins "Code" is a mark in this data, at the place where its rule is run
+ * (the contract's revision 15, section 6.1), and the rule is in `rules.ts`.
+ * The inbox has one: the mark `notice-source`, row P22, among the effects of
+ * each `notify` handler. The address of a notice (P23) is transport's at
+ * dispatch, and derives nothing of an entry, so it has no mark.
  *
  * The note's `max` and text lengths are examples that the proof plan's
  * section 4 owns. They are written as the note has them.
  */
 
-import type { DeclaredDefinition } from "@generalbusiness/artroom-contract";
+import type { PlatformData } from "@generalbusiness/artroom-contract";
 
-export const inbox: DeclaredDefinition & { outcomes: Record<string, never> } = {
+export const inbox: PlatformData = {
   format: "artroom-definition-1",
   name: "platform:inbox",
   profile: { name: "restricted", version: 1 },
@@ -100,12 +102,11 @@ export const inbox: DeclaredDefinition & { outcomes: Record<string, never> } = {
   },
   timed: {},
   rules: {},
-  // The validator's platform option reads the data of a platform definition, which states the operation kinds that it owns (the
-  // contract's revision 15, section 6.1). The inbox opens no operation.
+  // The operation kinds that this definition owns, each with the mark of the rule for its outcome entries. The inbox opens none.
   outcomes: {},
 };
 
-function notify(kind: "lane" | "task"): DeclaredDefinition["receives"][string] {
+function notify(kind: "lane" | "task"): PlatformData["receives"][string] {
   return {
     message: "notify", class: "advisory", from: { kind }, opens: "notice",
     also: {},
@@ -120,6 +121,8 @@ function notify(kind: "lane" | "task"): DeclaredDefinition["receives"][string] {
       // `at` is the commit time. `source` is the envelope's source fact (Code P22).
       { value: { slot: "at", from: { time: { plusSeconds: 0 } } } },
       { value: { slot: "source", from: { source: "ref" } } },
+      // Code P22, as a mark in the data: the rule `notice-source` is run here, at its position among the effects.
+      { code: "notice-source", row: "P22" },
     ],
     sends: [],
     attention: [],
