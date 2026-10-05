@@ -102,7 +102,7 @@ export function settleOutcome(view: StateView, definition: ValidDefinition, outc
   // The owner of the operation may be the platform definition that this scope pins. Its rule for outcome entries of this kind is
   // the one that `outcomes` names. A fault of the rule leaves the outcome not judged, and nothing is written (section 6.1).
   const ran = { clock: false };
-  const judged = unjudged(() => outcomeOf(view, outcome, ownersOf(definition, context.platform, context.owners, { clock: context.clock, bounds: context.bounds, own: context.own, ran })));
+  const judged = unjudged(() => outcomeOf(view, definition, outcome, ownersOf(definition, context.platform, context.owners, { clock: context.clock, bounds: context.bounds, own: context.own, ran })));
   // An outcome judges no time. An entry for which a rule read the clock does, and is never written clamped (section 6.1).
   if (judged.result !== "write" || !ran.clock) return judged;
   return context.clock.behind ? { result: "unavailable", reason: "clock-behind" } : { result: "write", draft: { ...judged.draft, judgesTime: true } };

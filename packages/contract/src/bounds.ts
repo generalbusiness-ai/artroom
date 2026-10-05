@@ -50,6 +50,7 @@ export interface Bounds {
   entryBytes: number;
   usesPerEntry: number;            // foreign entries used by one entry
   sendsPerEntry: number;           // every send of one entry: those declared, one fan-out, the platform's one result or control, and attention. The validator counts the most that an act or handler can make
+  derivedEffects: number;          // the effects that code derives in one entry: a capability's effects, steps, outcomes and a hold's workspace (section 6.1, revision 16). The contract states the bound and no number; temporary, and the proof plan's to set
   decompositionDepth: number;      // the contract states the number and no rule that reads it. No source reads it
   deliveryBatch: number;
   fetchSeconds: number;            // one fetch before the turn
@@ -100,6 +101,7 @@ export const PROPOSED_BOUNDS: Bounds = {
   entryBytes: 256 * 1024,
   usesPerEntry: 128,
   sendsPerEntry: 104,
+  derivedEffects: 256,
   decompositionDepth: 4,
   deliveryBatch: 64,
   fetchSeconds: 10,

@@ -28,6 +28,7 @@ export type RefusalReason =
   | "capability-refused" // a capability guard does not hold. The name is the refusal that the capability declares for it (section 6.11)
   | "slot-full"         // a party list would pass its `max`
   | "type-full"         // an opening would pass the type's `max` of live items, or a first relationship update the `copies` of its handler
+  | "entry-too-large"   // the entry would pass a bound of section 7.5. The name is the bound's. Nothing is truncated (section 4.2). The source answers it for the bound on derived effects only
   | "send-unresolved"   // a send's target or item resolves to nothing
   | "unknown-message"   // a delivered request names no handler of the definition for a scope of that kind
   | "unsupported-definition" // a guard that is a mark of a platform definition refuses bytes that are no definition this runtime can pin, where its specification states it (sections 4.2 and 6.1)

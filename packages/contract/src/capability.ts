@@ -90,8 +90,8 @@ export const CAPABILITIES = {
       license: { with: [["export", "from", "checkpoint", "hold", "instance", "k"]] },
       settle: { with: [["export", "by"]] },
     },
-    // `instance`, `token` and `retry` are the authority note's, section 5.7. Each is asked of the lane that owns the hold or the ledger.
-    steps: { stage: { foreign: true }, check: { foreign: true }, instance: { foreign: false }, token: { foreign: false }, retry: { foreign: false } },
+    // `instance`, `token`, `retire` and `retry` are the authority note's, section 5.7. Each is asked of the lane that owns the hold or the ledger.
+    steps: { stage: { foreign: true }, check: { foreign: true }, instance: { foreign: false }, token: { foreign: false }, retire: { foreign: false }, retry: { foreign: false } },
     reserved: [{ record: "receiver-pin", while: "standing", request: { class: "tell", message: "export-license", number: "k" }, bound: 3, count: "decided" }],
   },
   "git-read@1": {

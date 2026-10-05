@@ -72,7 +72,7 @@ const variant = (by: string, variants: Record<string, Check>): Check => (v) => {
 // Each table has every member of its union, and the compiler says so when the contract gains or loses one.
 export const REFUSAL_REASONS: Record<RefusalReason, true> = {
   "revision-moved": true, alias: true, "duplicate-relation": true, "required-unset": true, "scope-full": true, "bad-intent": true, misaddressed: true, expired: true, "scope-refused": true,
-  "unknown-act": true, "bad-field": true, "no-item": true, final: true, "fact-mismatch": true, unauthorized: true, "guard-failed": true, "capability-refused": true, "slot-full": true, "type-full": true, "send-unresolved": true,
+  "unknown-act": true, "bad-field": true, "no-item": true, final: true, "fact-mismatch": true, unauthorized: true, "guard-failed": true, "capability-refused": true, "slot-full": true, "type-full": true, "entry-too-large": true, "send-unresolved": true,
   "unknown-message": true, "unsupported-definition": true, "bad-input": true,
 };
 export const READ_REFUSALS: Record<ReadRefusal, true> = {

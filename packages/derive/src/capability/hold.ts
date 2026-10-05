@@ -27,13 +27,13 @@
  * (section 6.8). Nothing here changes it.
  */
 
-import type { CapabilityName, Digest, Effect, Evidence, FieldValue, Intent, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
+import type { CapabilityName, Digest, Effect, Evidence, FieldValue, Intent, OperationId, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
 import { isDigest, isFactRef, isLocalId, isRecord, isScopeRef, utf8 } from "@generalbusiness/artroom-bytes";
-import type { Capabilities, CapabilityGiven, Recorded } from "../capability.ts";
+import type { Capabilities, CapabilityGiven, Maximum, Recorded } from "../capability.ts";
 import { WINDOWS, type Window } from "../grant.ts";
 import { EPOCH, HOLDER, holdStates, type HoldEffect } from "../hold.ts";
 import { UNDER } from "../attribution.ts";
-import { operationId, operationOpening, type OperationRules, type Opening, type OutcomeDerived, type OutcomeInput, type Owners } from "../ledger.ts";
+import { operationId, operationOpening, type OperationRules, type Opening, type OutcomeAt, type OutcomeDerived, type OutcomeInput, type Owners } from "../ledger.ts";
 import { recordEffects, type StepDerived, type StepGiven, type StepRefusal, type Steps } from "../prepare.ts";
 import type { Item, Operation, RecordState, StateView } from "../state.ts";
 import { timeMs, type Clock } from "../time.ts";
@@ -48,10 +48,18 @@ export const HOLD: CapabilityName = "hold@1";
  * `stage` and `check` (section 6.11). The others have no name in the texts
  * (I3 deltas, entry EF4).
  */
-export const HOLD_KINDS = { stage: "stage", check: "check", fork: "fork", head: "head", mint: "mint", revoke: "revoke" } as const;
+export const HOLD_KINDS = { stage: "stage", check: "check", fork: "fork", head: "head", mint: "mint", revoke: "revoke", delete: "delete", deletion: "deletion" } as const;
 
-/** The most attempts of each operation (authority note, sections 5.1 and 5.8; section 12, G3 and U9). Proposals of the note, and the proof plan's numbers. */
-export const HOLD_ATTEMPTS = { stage: 3, check: 1, fork: 3, head: 1, mint: 1, revoke: 3, deletion: 3 } as const;
+/** The most attempts of each operation (authority note, sections 5.1, 5.7 and 5.8; section 12, G3 and U9). Proposals of the note, and the proof plan's numbers. `delete` is the delete of a staged ref, and `deletion` that of a fork. */
+export const HOLD_ATTEMPTS = { stage: 3, check: 1, fork: 3, head: 1, mint: 1, revoke: 3, delete: 3, deletion: 3 } as const;
+
+/**
+ * The tokens of one attempt, by the kind of its operation (authority note,
+ * section 5.7, "Which entry makes a token, a retirement and a deletion").
+ * An attempt of a staging has two: one that reads the fork, and one that
+ * writes the staged ref. An attempt of a staged ref's delete has one.
+ */
+const ATTEMPT_TOKENS: Readonly<Record<string, readonly string[]>> = { [HOLD_KINDS.stage]: ["fork-read", "staging"], [HOLD_KINDS.delete]: ["staging"] };
 
 /** The highest number that a license request may carry (section 6.11, "The license requests of a receiver pin"). */
 export const LICENSE_BOUND = 3;
@@ -221,16 +229,36 @@ function tokenAsked(intent: Intent): { hold: number; instance: string } | null {
   return isLocalId(hold) && isInstanceId(instance) ? { hold, instance } : null;
 }
 
+/** The intent of the step `retire`: exactly one of `root`, a root's number, and `fork`, a hold's item ID. */
+function retireAsked(intent: Intent): { root: number } | { fork: number } | null {
+  const fields = ownFields(intent, "retire", ["root", "fork"]);
+  const [root, fork] = fields ? [own(fields, "root"), own(fields, "fork")] : [];
+  if ((root === undefined) === (fork === undefined)) return null;
+  return isLocalId(root) ? { root } : isLocalId(fork) ? { fork } : null;
+}
+
+/** The floor of `tokensPerHold` (authority note, section 5.7, "The bound on the tokens of one hold"): the old and the new workspace token stand side by side while a credential is renewed. */
+export const TOKENS_FLOOR = 2;
+
 export interface HoldOptions {
   /**
-   * The most tokens of one hold that may be `minting` or `live` at once. The
-   * entry that ends a hold changes each of them and opens a revocation for
-   * each, and it cannot be refused. The texts ask for this bound and propose
-   * no number (authority note, section 5.7, "The fan-out of one entry"; I3
-   * deltas, entry EF7). A renewal of a credential needs two (section 5.3,
-   * rule 4).
+   * The state bound of this version (authority note, section 5.7, "The
+   * bound on the tokens of one hold", stated in revision 21): the most
+   * tokens of one hold that may be `minting` or `live` at once. The step
+   * `token` is the opening, and it is refused `tokens-full` at the bound.
+   * So the entry that ends a hold, which cannot be refused, derives at most
+   * 1 + 3 times this number of effects. The floor is 2. The number is the
+   * proof plan's, and none is proposed: it is required, with no default.
+   * A staging's tokens are not counted here.
    */
   tokensPerHold: number;
+  /**
+   * The retention that must have passed since the entry that made a root
+   * `live`, before the step `retire` may retire it (authority note, section
+   * 6.2, "Retiring a root"). The number is the proof plan's, and none is
+   * proposed. Null: none is set, and no root is retired.
+   */
+  rootRetentionSeconds: number | null;
 }
 
 // ---------------------------------------------------------------- guards and effects
@@ -510,11 +538,55 @@ function stepGrant(step: string, given: Omit<StepGiven, "signer">): { action: st
   // The step `check` reuses a root and writes nothing outside: the act's own grant, in its ordinary window (section 6.11; authority
   // note, section 6.2, "A new staging, and the reuse of a completed one"). For an intent that is addressed to another scope the
   // act is not this scope's, and the grant is the one that this scope judges staging on (I3 deltas, entry EF3).
+  if (step === "retire") return { action: RETIRE_ACTION, window: WINDOWS.once };
   const act = step === "check" && same(intent.to, scope.at) ? own(definition.declared.acts, intent.kind) : undefined;
   if (act) return { action: act.grant, window: WINDOWS.ordinary };
   const hold = step === "instance" ? instanceAsked(intent)?.hold : step === "token" ? tokenAsked(intent)?.hold : stagedSource(given)?.hold;
   const action = openingGrant(definition, isLocalId(hold) ? view.item(hold)?.type : undefined);
   return action === null ? null : { action, window: step === "check" ? WINDOWS.ordinary : WINDOWS.once };
+}
+
+const MINT: Opening = { owner: HOLD, kind: HOLD_KINDS.mint, attempts: HOLD_ATTEMPTS.mint };
+const REVOKE: Opening = { owner: HOLD, kind: HOLD_KINDS.revoke, attempts: HOLD_ATTEMPTS.revoke };
+
+/**
+ * The tokens of one attempt of a staging or of a staged ref's delete
+ * (authority note, section 5.7, "Which entry makes a token, a retirement
+ * and a deletion", decided in revision 21). The entry that opens the
+ * attempt makes them: each `minting`, with its mint, an operation with 1
+ * attempt. Each is for the root, and not for the hold: its values name the
+ * root, the operation and the attempt, and no hold. So it is not counted in
+ * the bound on a hold's tokens, and the end of the hold does not revoke it.
+ *
+ * `self` is the entry being written, `k` the ordinal of the first operation
+ * that these mints take there, and `numbered` how many token records the
+ * entry has made before them.
+ */
+function attemptTokens(view: StateView, kind: string, root: number, operation: OperationId, attempt: number, self: number, k: number, numbered: number): { made: Recorded[]; opens: Opening[] } {
+  const purposes = own(ATTEMPT_TOKENS, kind) ?? [];
+  return {
+    made: purposes.map((purpose, i) => ({ kind: "token", key: [nextNumber(view, "token") + numbered + i], state: "minting", values: { purpose, root, operation, attempt, mint: operationId(self, k + i), id: null, ends: null, revocation: null } })),
+    opens: purposes.map(() => MINT),
+  };
+}
+
+/**
+ * The end of the tokens of one attempt (section 5.7, the same table): the
+ * outcome entry that records the attempt `confirmed` or `refused` makes each
+ * `live` token of it `revoking`, with its revocation. A token that is still
+ * `minting` does not move: the entry that records its mint's own answer
+ * revokes it, because its use has ended (`attemptEnded`).
+ */
+function endTokens(view: StateView, operation: OperationId, attempt: number, self: number, k: number): { made: Recorded[]; opens: Opening[] } {
+  const live = records(view, "token", ["live"], "operation", operation).filter((token) => token.values["attempt"] === attempt);
+  return { made: live.map((token, i) => moved(token, "revoking", { revocation: operationId(self, k + i) })), opens: live.map(() => REVOKE) };
+}
+
+/** When the use of an attempt's token has ended: the attempt has a `confirmed` or a `refused` outcome. An attempt that is `unknown` leaves its tokens. */
+function attemptEnded(view: StateView, token: Pick<RecordState, "values">): boolean {
+  const attempt = view.operation(token.values["operation"] as OperationId)?.attempts.find((a) => a.attempt === token.values["attempt"]);
+  const last = attempt?.outcomes.at(-1);
+  return !attempt || (last !== undefined && last.result !== "unknown");   // Fail closed: a token of no attempt is given to nobody.
 }
 
 /** A hold that the signer's member holds now, or the refusal. */
@@ -542,11 +614,13 @@ function stage(given: StepGiven): StepDerived | { refused: StepRefusal } {
   if (!hold || hold.under !== source.under || source.instance === null || record(given.view, "instance", [hold.item.id, source.instance])?.state !== "current") return { refused: refusal("not-staged") };
   if (records(given.view, "root", ["live"], "commit", source.commit).some((root) => root.values["under"] === source.under)) return { refused: failed("a live root holds this commit under this commitment: the step `check` reuses it") };
   const number = nextNumber(given.view, "root");
+  // Section 5.7, "Which entry makes a token": this entry opens attempt 1 of the staging, so it makes that attempt's two tokens.
+  const tokens = attemptTokens(given.view, HOLD_KINDS.stage, number, operationId(given.self, 0), 1, given.self, 1, 0);
   return {
     records: [{ kind: "root", key: [number], state: "creating", values: {
       commit: source.commit, hold: hold.item.id, instance: source.instance, under: source.under, intent: given.digest, consumer: given.intent.to, operation: operationId(given.self, 0),
-    } }],
-    opens: [{ owner: HOLD, kind: HOLD_KINDS.stage, attempts: HOLD_ATTEMPTS.stage }],
+    } }, ...tokens.made],
+    opens: [{ owner: HOLD, kind: HOLD_KINDS.stage, attempts: HOLD_ATTEMPTS.stage }, ...tokens.opens],
   };
 }
 
@@ -595,7 +669,8 @@ function instance(given: StepGiven): StepDerived | { refused: StepRefusal } {
 /**
  * The step `token` (authority note, section 5.7): the instance named is
  * `current` and the `fork` is `selected`. It derives a `token` record,
- * `minting`, and its mint operation with its one attempt.
+ * `minting`, and its mint operation with its one attempt. At the bound on
+ * the tokens of one hold it is refused `tokens-full`.
  */
 function token(options: HoldOptions, given: StepGiven): StepDerived | { refused: StepRefusal } {
   const asked = tokenAsked(given.intent);
@@ -604,11 +679,58 @@ function token(options: HoldOptions, given: StepGiven): StepDerived | { refused:
   if ("refused" in hold) return hold;
   if (record(given.view, "instance", [asked.hold, asked.instance])?.state !== "current") return { refused: failed("the instance named is not the hold's current one") };
   if (record(given.view, "fork", [asked.hold])?.state !== "selected") return { refused: failed("the hold's fork is not selected") };
-  if (records(given.view, "token", ["minting", "live"], "hold", asked.hold).length >= options.tokensPerHold) return { refused: failed(`the hold has ${options.tokensPerHold} tokens that are minting or live`) };
+  // Section 5.7, "The judges refuse at the bound". This step is the one opening that raises the count, so the entry that ends the
+  // hold never holds more than the bound allows (scope contract, section 6.1, "An entry that cannot be refused").
+  if (records(given.view, "token", ["minting", "live"], "hold", asked.hold).length >= options.tokensPerHold) return { refused: refusal("tokens-full") };
   return {
     records: [{ kind: "token", key: [nextNumber(given.view, "token")], state: "minting", values: { purpose: "workspace", hold: asked.hold, instance: asked.instance, mint: operationId(given.self, 0), id: null, ends: null, revocation: null } }],
     opens: [{ owner: HOLD, kind: HOLD_KINDS.mint, attempts: HOLD_ATTEMPTS.mint }],
   };
+}
+
+/** The action of the step `retire` (authority note, section 5.7, the row `retire`): the grant of the act `retry`, which is an admin's (section 3.2). */
+export const RETIRE_ACTION = "ledger.retry";
+
+/**
+ * The step `retire` (authority note, section 5.7, new in revision 21). It
+ * names one root by its number, or one fork by its hold. Each refusal is
+ * `not-retirable`.
+ *
+ * - A root: it is `live`, no pin on it is `provisional` or `held`, and the
+ *   retention has passed since the entry that made it `live`. It derives the
+ *   root, `retiring`, and its delete, an operation with at most 3 attempts,
+ *   with the one staging token of attempt 1. From this entry on no pin is
+ *   accepted on the root.
+ * - A fork: its hold is `ended`; the fork is `selected`; no token of that
+ *   hold is `minting`, `live` or `revoking`; no instance of it is `current`;
+ *   no root that was staged from it is `creating`; and no `receiver-pin`
+ *   that is `standing` names it. It derives the fork, `deleting`, and its
+ *   deletion, an operation with at most 3 attempts.
+ *
+ * No entry that ends a hold makes either state, and no timed rule and no
+ * outcome retires a root or deletes a fork.
+ */
+function retire(options: HoldOptions, given: StepGiven): StepDerived | { refused: StepRefusal } {
+  const asked = retireAsked(given.intent);
+  if (!asked) return { refused: badField("the intent is not the one of the step retire: exactly one of a root and a fork") };
+  const { view, definition, self, clock } = given;
+  const no = { refused: refusal("not-retirable") };
+  if ("root" in asked) {
+    const root = record(view, "root", [asked.root]);
+    if (root?.state !== "live" || records(view, "pin", ["provisional", "held"], "root", asked.root).length > 0) return no;
+    // The fold keeps the entry that last recorded a record. A root is recorded `live` once, so that is the entry that made it live.
+    const since = timeMs(given.own?.(root.seq)?.entry.time);
+    if (options.rootRetentionSeconds === null || since === null || clock.behind || timeMs(clock.reading)! < since + options.rootRetentionSeconds * 1000) return no;
+    const operation = operationId(self, 0);
+    const tokens = attemptTokens(view, HOLD_KINDS.delete, asked.root, operation, 1, self, 1, 0);
+    return { records: [moved(root, "retiring", { retirement: operation }), ...tokens.made], opens: [{ owner: HOLD, kind: HOLD_KINDS.delete, attempts: HOLD_ATTEMPTS.delete }, ...tokens.opens] };
+  }
+  const hold = holdOf(view, definition, asked.fork);
+  const fork = record(view, "fork", [asked.fork]);
+  if (!hold || hold.held || fork?.state !== "selected") return no;
+  if (records(view, "token", ["minting", "live", "revoking"], "hold", asked.fork).length > 0 || currentInstance(view, asked.fork) !== null) return no;
+  if (records(view, "root", ["creating"], "hold", asked.fork).length > 0 || records(view, "receiver-pin", ["standing"], "hold", asked.fork).length > 0) return no;
+  return { records: [moved(fork, "deleting", { deletion: operationId(self, 0) })], opens: [{ owner: HOLD, kind: HOLD_KINDS.deletion, attempts: HOLD_ATTEMPTS.deletion }] };
 }
 
 // ---------------------------------------------------------------- the operations
@@ -633,69 +755,118 @@ const isCheckEvidence = (body: unknown): body is { record: unknown } => isRecord
 /** The body of the evidence of a `confirmed` mint: the host's token ID and end time (authority note, section 5.7, "Evidence of each outside effect"; I3 deltas, entry EF5). */
 const minted = (body: unknown): { token: string; ends: Timestamp } | null => (isRecord(body) && typeof body["token"] === "string" && body["token"] !== "" && timeMs(body["ends"]) !== null ? { token: body["token"], ends: body["ends"] as Timestamp } : null);
 
-function operationRules(definition: (view: StateView) => ValidDefinition | null): Readonly<Record<string, OperationRules>> {
-  return {
-    // Section 6.11, the step `stage`: its outcome `confirmed`, on a read that shows the ref, makes the root `live`, records the
-    // `provisional` pin and opens the operation `check`. An attempt that is refused or unknown leaves the root `creating`.
-    [HOLD_KINDS.stage]: {
-      selects: false, read: true, retries: () => true, closure: 2 * HOLD_ATTEMPTS.check, wellFormed: basis("read"),
-      derives: (view, operation, outcome) => {
-        const root = outcome.result === "confirmed" ? namedBy(view, "root", ["creating"], "operation", operation) : null;
-        if (!root) return NOTHING;
+/** The entries that one revocation, and one mint with the revocation that its answer may open, reserve when they are opened (section 17.2, row 5). */
+const REVOKED = 2 * HOLD_ATTEMPTS.revoke;
+const MINTED = 2 * HOLD_ATTEMPTS.mint * (1 + REVOKED);
+
+/** What the outcome entry of one attempt of a staging or of a delete derives for the attempt's tokens: the end of this attempt's, and the tokens of the attempt that the entry opens. */
+function tokensAt(view: StateView, operation: Operation, root: number, outcome: OutcomeInput, at: OutcomeAt, self: number, k: number): { made: Recorded[]; opens: Opening[] } {
+  const ended = outcome.result === "unknown" ? { made: [], opens: [] } : endTokens(view, operation.id, outcome.attempt, self, k);
+  const next = at.opens === null ? { made: [], opens: [] } : attemptTokens(view, operation.kind, root, operation.id, at.opens, self, k + ended.opens.length, 0);
+  return { made: [...ended.made, ...next.made], opens: [...ended.opens, ...next.opens] };
+}
+
+const OPERATION_RULES: Readonly<Record<string, OperationRules>> = {
+  // Section 6.11, the step `stage`: its outcome `confirmed`, on a read that shows the ref, makes the root `live`, records the
+  // `provisional` pin and opens the operation `check`. An attempt that is refused or unknown leaves the root `creating`.
+  // Authority note, section 5.7, "Which entry makes a token": the entry that records an attempt `confirmed` or `refused` ends
+  // that attempt's two tokens, and the entry that opens the next attempt makes its two.
+  [HOLD_KINDS.stage]: {
+    selects: false, read: true, retries: () => true, wellFormed: basis("read"),
+    // The most that one outcome entry opens: two revocations, and the check or the two mints of the next attempt.
+    closure: 2 * REVOKED + Math.max(2 * HOLD_ATTEMPTS.check, 2 * MINTED),
+    // A confirmed attempt: the root, the pin, the check and two revocations, 2 + 2 + 2 * 3. A refused one: two revocations and the two tokens of the next attempt, 2 * 3 + 2 * 3.
+    most: { effects: 12, requests: 0, operations: 4 },
+    derives: (view, operation, outcome, _selected, at) => {
+      const root = records(view, "root", ["creating", "live", "retiring", "retired"], "operation", operation.id)[0];
+      if (!root) return NOTHING;
+      const self = next(view);
+      const made: Recorded[] = [];
+      const opens: Opening[] = [];
+      if (outcome.result === "confirmed" && root.state === "creating") {
+        made.push(moved(root, "live"));
         const key = [root.values["consumer"] as ScopeRef, root.values["intent"] as Digest];
         const pin = record(view, "pin", key);
         // A pin that is `held` or `released` is of an intent that was admitted or settled: it does not move, and no check is opened for it.
-        if (pin && pin.state !== "provisional") return recorded([moved(root, "live")]);
-        const values = { root: root.key[0]!, commit: root.values["commit"], admitted: null, released: null, by: null, check: operationId(next(view), 0) };
-        return recorded([moved(root, "live"), pin ? moved(pin, "provisional", values) : { kind: "pin", key, state: "provisional", values }], [{ owner: HOLD, kind: HOLD_KINDS.check, attempts: HOLD_ATTEMPTS.check }]);
-      },
+        if (!pin || pin.state === "provisional") {
+          const values = { root: root.key[0]!, commit: root.values["commit"], admitted: null, released: null, by: null, check: operationId(self, 0) };
+          made.push(pin ? moved(pin, "provisional", values) : { kind: "pin", key, state: "provisional", values });
+          opens.push({ owner: HOLD, kind: HOLD_KINDS.check, attempts: HOLD_ATTEMPTS.check });
+        }
+      }
+      const tokens = tokensAt(view, operation, root.key[0] as number, outcome, at, self, opens.length);
+      return recorded([...made, ...tokens.made], [...opens, ...tokens.opens]);
     },
-    // Section 6.11, the step `check`: its outcome entry is the check entry. It records the `check` record, `recorded`, or
-    // `too-large` when the walk passed a bound (`gitread.ts` has the evidence's form). Authority note, section 5.7, "Evidence of
-    // each outside effect", the row of the ancestry read: it is shown by that read's own answer, and the evidence is the ancestry
-    // record. So the basis is `own-answer`, as a first outcome and as the late answer after an `unknown` (section 5.4, rule 2). No
-    // other read is decisive for it. The operation has one attempt: a check that stays `unknown` is read again as a new operation.
-    [HOLD_KINDS.check]: {
-      selects: false, read: false, retries: () => false, wellFormed: (result, evidence) => basis("own-answer")(result, evidence) && (result !== "confirmed" || isCheckEvidence(evidence.body)),
-      derives: (view, operation, outcome) => {
-        const pin = outcome.result === "confirmed" ? namedBy(view, "pin", ["provisional"], "check", operation) : null;
-        const root = pin ? record(view, "root", [pin.values["root"] as number]) : null;
-        if (!pin || !root) return NOTHING;
-        const found = (outcome.evidence.body as { record: unknown }).record;
-        return recorded([{ kind: "check", key: [pin.key[1]!, root.key[0]!], state: found === null ? "too-large" : "recorded", values: {
-          intent: pin.key[1], commit: pin.values["commit"], consumer: pin.key[0], lane: view.scope()!.at, hold: root.values["hold"], instance: root.values["instance"], root: root.key[0],
-          // Section 16.3: the attribution list of the source commitment, as it is at the check entry.
-          attribution: view.item(root.values["under"] as number)?.attributed ?? [], record: found,
-        } }]);
-      },
+  },
+  // Section 6.11, the step `check`: its outcome entry is the check entry. It records the `check` record, `recorded`, or
+  // `too-large` when the walk passed a bound (`gitread.ts` has the evidence's form). Authority note, section 5.7, "Evidence of
+  // each outside effect", the row of the ancestry read: it is shown by that read's own answer, and the evidence is the ancestry
+  // record. So the basis is `own-answer`, as a first outcome and as the late answer after an `unknown` (section 5.4, rule 2). No
+  // other read is decisive for it. The operation has one attempt: a check that stays `unknown` is read again as a new operation.
+  [HOLD_KINDS.check]: {
+    selects: false, read: false, retries: () => false, wellFormed: (result, evidence) => basis("own-answer")(result, evidence) && (result !== "confirmed" || isCheckEvidence(evidence.body)),
+    most: { effects: 1, requests: 0, operations: 0 },
+    derives: (view, operation, outcome) => {
+      const pin = outcome.result === "confirmed" ? namedBy(view, "pin", ["provisional"], "check", operation) : null;
+      const root = pin ? record(view, "root", [pin.values["root"] as number]) : null;
+      if (!pin || !root) return NOTHING;
+      const found = (outcome.evidence.body as { record: unknown }).record;
+      return recorded([{ kind: "check", key: [pin.key[1]!, root.key[0]!], state: found === null ? "too-large" : "recorded", values: {
+        intent: pin.key[1], commit: pin.values["commit"], consumer: pin.key[0], lane: view.scope()!.at, hold: root.values["hold"], instance: root.values["instance"], root: root.key[0],
+        // Section 16.3: the attribution list of the source commitment, as it is at the check entry.
+        attribution: view.item(root.values["under"] as number)?.attributed ?? [], record: found,
+      } }]);
     },
-    // Authority note, section 5.7, "A mint that is answered after its use has ended". The answer is the attempt's own, as a first
-    // outcome or as a late answer after an `unknown`. Confirmed while the use has not ended: `live`. Confirmed after it ended:
-    // `revoking`, straight from `minting`, with the revocation by that ID. The token is never `live`. Refused: `ended`, and nothing
-    // is revoked because nothing was minted. Unknown: it stays `minting`, and nothing is minted again for that operation.
-    [HOLD_KINDS.mint]: {
-      selects: false, read: false, retries: () => false, closure: 2 * HOLD_ATTEMPTS.revoke,
-      wellFormed: (result, evidence) => basis("own-answer")(result, evidence) && (result !== "confirmed" || minted(evidence.body) !== null),
-      derives: (view, operation, outcome) => {
-        const token = namedBy(view, "token", ["minting"], "mint", operation);
-        const pinned = definition(view);
-        if (!token || outcome.result === "unknown") return NOTHING;
-        if (outcome.result === "refused") return recorded([moved(token, "ended")]);
-        const { token: id, ends } = minted(outcome.evidence.body)!;
-        if (pinned && !useEnded(view, pinned, token)) return recorded([moved(token, "live", { id, ends })]);
-        return recorded([moved(token, "revoking", { id, ends, revocation: operationId(next(view), 0) })], [{ owner: HOLD, kind: HOLD_KINDS.revoke, attempts: HOLD_ATTEMPTS.revoke }]);
-      },
+  },
+  // Authority note, section 5.7, "A mint that is answered after its use has ended". The answer is the attempt's own, as a first
+  // outcome or as a late answer after an `unknown`. Confirmed while the use has not ended: `live`. Confirmed after it ended:
+  // `revoking`, straight from `minting`, with the revocation by that ID. The token is never `live`. Refused: `ended`, and nothing
+  // is revoked because nothing was minted. Unknown: it stays `minting`, and nothing is minted again for that operation. The use
+  // of a hold's token ends with the hold, a changed holder or a past instance. The use of an attempt's token ends with a
+  // `confirmed` or a `refused` outcome of its attempt.
+  [HOLD_KINDS.mint]: {
+    selects: false, read: false, retries: () => false, closure: REVOKED, most: { effects: 3, requests: 0, operations: 1 },
+    wellFormed: (result, evidence) => basis("own-answer")(result, evidence) && (result !== "confirmed" || minted(evidence.body) !== null),
+    derives: (view, operation, outcome, _selected, at) => {
+      const token = namedBy(view, "token", ["minting"], "mint", operation);
+      if (!token || outcome.result === "unknown") return NOTHING;
+      if (outcome.result === "refused") return recorded([moved(token, "ended")]);
+      const { token: id, ends } = minted(outcome.evidence.body)!;
+      const ended = "hold" in token.values ? useEnded(view, at.definition, token) : attemptEnded(view, token);
+      if (!ended) return recorded([moved(token, "live", { id, ends })]);
+      return recorded([moved(token, "revoking", { id, ends, revocation: operationId(next(view), 0) })], [REVOKE]);
     },
-    // A revocation by the token's ID: its `confirmed` outcome makes the token `ended` (authority note, section 5.7, the record `token`).
-    [HOLD_KINDS.revoke]: {
-      selects: false, read: false, retries: () => true, wellFormed: basis("own-answer"),
-      derives: (view, operation, outcome) => {
-        const token = outcome.result === "confirmed" ? namedBy(view, "token", ["revoking"], "revocation", operation) : null;
-        return token ? recorded([moved(token, "ended")]) : NOTHING;
-      },
+  },
+  // A revocation by the token's ID: its `confirmed` outcome makes the token `ended` (authority note, section 5.7, the record `token`).
+  [HOLD_KINDS.revoke]: {
+    selects: false, read: false, retries: () => true, wellFormed: basis("own-answer"), most: { effects: 1, requests: 0, operations: 0 },
+    derives: (view, operation, outcome) => {
+      const token = outcome.result === "confirmed" ? namedBy(view, "token", ["revoking"], "revocation", operation) : null;
+      return token ? recorded([moved(token, "ended")]) : NOTHING;
     },
-  };
-}
+  },
+  // The delete of a staged ref (authority note, section 6.2, "Retiring a root"; section 5.7, the row of a root that is
+  // `retiring`). A read that shows the ref absent makes the root `retired`. A delete whose answer was lost stays `unknown`,
+  // whatever a read shows later. Each attempt has one staging token, made and ended as the tokens of a staging are.
+  [HOLD_KINDS.delete]: {
+    selects: false, read: true, retries: () => true, wellFormed: basis("read"), closure: REVOKED + MINTED, most: { effects: 6, requests: 0, operations: 2 },
+    derives: (view, operation, outcome, _selected, at) => {
+      const root = records(view, "root", ["retiring", "retired"], "retirement", operation.id)[0];
+      if (!root) return NOTHING;
+      const tokens = tokensAt(view, operation, root.key[0] as number, outcome, at, next(view), 0);
+      return recorded([...(outcome.result === "confirmed" && root.state === "retiring" ? [moved(root, "retired")] : []), ...tokens.made], tokens.opens);
+    },
+  },
+  // The deletion of a fork (section 5.7, the row of a fork that is `deleting`): its `confirmed` outcome, by that request's own
+  // answer, makes the fork `deleted`.
+  [HOLD_KINDS.deletion]: {
+    selects: false, read: false, retries: () => true, wellFormed: basis("own-answer"), most: { effects: 1, requests: 0, operations: 0 },
+    derives: (view, operation, outcome) => {
+      const fork = outcome.result === "confirmed" ? namedBy(view, "fork", ["deleting"], "deletion", operation) : null;
+      return fork ? recorded([moved(fork, "deleted")]) : NOTHING;
+    },
+  },
+};
 
 // ---------------------------------------------------------------- capacity
 
@@ -732,9 +903,9 @@ export function holdReserves(view: StateView, definition: ValidDefinition): numb
  * a preparation (`Steps`), and the operations that those steps open with
  * what the pending records reserve (`Owners`).
  *
- * `definition` gives the pinned definition of a state, for the rule of a
- * mint, which reads the hold's state. A runtime gives the one its scope
- * pins.
+ * The value holds no state and reads no port. Its two options are numbers
+ * of the version that the texts leave to the proof plan. `maxima` declares
+ * the most that each piece of this code derives in one entry.
  *
  * `implements` answers for each form (section 6.1). The four guards, the
  * four effects and a `carried` part are derived. So is the kind of a step's
@@ -742,17 +913,20 @@ export function holdReserves(view: StateView, definition: ValidDefinition): numb
  * preparation entry and of an outcome entry from the entry's own input, and
  * only this code writes an entry of such a kind (section 6.2; source row
  * I3-13).
- * The steps `retry` and `job-read`, and the operations of a fork, are not
- * built here: with no rules for them, nothing of them is judged or sent.
+ * The steps `retry` and `job-read`, and the creation of a fork with the
+ * read of a head, are not built here: with no rules for them, nothing of
+ * them is judged or sent.
  */
-// I3 merge: step 16 gives the production ports this value, with `gitRead` beside it. The judges call `workspaceEffects`, `boundLicense`
-// and `licenseRefused` when they are given it. Step 18 adds the rules of the fork's creation, the head's read and the deletion.
-export function holdCapability(options: HoldOptions, definition: (view: StateView) => ValidDefinition | null): Capabilities & Steps & Owners {
-  if (!Number.isSafeInteger(options.tokensPerHold) || options.tokensPerHold < 1) throw new Error("a hold may have at least one token");
-  const rules = operationRules(definition);
+// I3 merge: step 18 adds the rules of the fork's creation and of the head's read, and step 19 the driver's rule that the request of
+// an attempt is sent only when its tokens are `live`. The step `retry` and the step `job-read` have no code here.
+export function holdCapability(options: HoldOptions): Capabilities & Steps & Owners {
+  const { tokensPerHold: tokens, rootRetentionSeconds: retention } = options;
+  if (!Number.isSafeInteger(tokens) || tokens < TOKENS_FLOOR) throw new Error(`a hold may have at least ${TOKENS_FLOOR} tokens at once`);
+  if (retention !== null && (!Number.isSafeInteger(retention) || retention < 0)) throw new Error("the retention of a root is a number of seconds, or none");
   const steps: Readonly<Record<string, (given: StepGiven) => StepDerived | { refused: StepRefusal }>> = {
-    stage, check, instance, token: (given) => token(options, given),
+    stage, check, instance, token: (given) => token(options, given), retire: (given) => retire(options, given),
   };
+  const most = (form: Maximum["form"], name: string, effects: number, operations = 0): Maximum => ({ form, capability: HOLD, name, effects, requests: 0, operations });
   return {
     implements: (form: unknown, step?: string) => (typeof form === "string"
       ? form === HOLD && step !== undefined && own(steps, step) !== undefined
@@ -779,7 +953,18 @@ export function holdCapability(options: HoldOptions, definition: (view: StateVie
       const found = capability === HOLD ? boundLicense(view, at, from, fields) : null;
       return found && licenseRefused(found);
     },
-    rules: (owner, kind) => (owner === HOLD ? (own(rules, kind) ?? null) : null),
+    rules: (owner, kind) => (owner === HOLD ? (own(OPERATION_RULES, kind) ?? null) : null),
     reserves: holdReserves,
+    // Section 6.1, "A declared maximum for everything that derives". Each written effect changes at most one record. A step: its
+    // records, and two effects for each operation that it opens. An outcome: what its rule states above. One hold of an entry: an
+    // opening derives the fork and one operation, 3; an end derives the instance and, for each live token, its record and its
+    // revocation, 1 + 3 times the state bound (authority note, section 5.7, "What one ending entry then holds").
+    maxima: [
+      ...Object.keys(EFFECTS).map((name) => most("effect", name, 1)),
+      most("step", "stage", 9, 3), most("step", "check", 3, 1), most("step", "instance", 2), most("step", "token", 3, 1), most("step", "retire", 6, 2),
+      ...Object.entries(OPERATION_RULES).map(([kind, rules]) => ({ ...most("outcome", kind, 0), ...rules.most! })),
+      most("bound", "export-license", 1),
+      most("workspace", "hold", 1 + 3 * tokens, tokens),
+    ],
   };
 }

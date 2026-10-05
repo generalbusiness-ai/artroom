@@ -29,7 +29,7 @@ import { CAPABILITIES } from "@generalbusiness/artroom-contract";
 import type { Capability, CapabilityName, Digest, Effect, FactRef, FieldValue, Grant, Head, Intent, KeyId, OperationId, RefusalReason, ScopeRef, SignedIntent, UnavailableReason } from "@generalbusiness/artroom-contract";
 import { intentDigest, isScopeRef, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import type { Signer } from "./attribution.ts";
-import type { Capabilities, Recorded } from "./capability.ts";
+import { maximumOf, type Capabilities, type Maximum, type Recorded } from "./capability.ts";
 import { isIntent, type Own, type Reading } from "./fields.ts";
 import { covers, type Window } from "./grant.ts";
 import type { Draft } from "./judge.ts";
@@ -75,6 +75,8 @@ export type GrantDecision = (asked: StepGrantAsked) => { result: "granted"; gran
 export interface StepGiven {
   view: StateView; definition: ValidDefinition; scope: Pick<ScopeState, "at">; self: number;
   intent: Intent; digest: Digest; signer: Signer; clock: Clock;
+  /** This scope's own sealed entries, by position. Absent: the judge was given none, and a rule that needs one refuses. */
+  own?: Own | undefined;
 }
 
 /**
@@ -108,6 +110,8 @@ export interface Steps {
   grant(capability: CapabilityName, step: string, given: Omit<StepGiven, "signer">): { action: string; window: Window } | null;
   /** The capability's guards for the step, over local state, and what the step derives. */
   derive(capability: CapabilityName, step: string, given: StepGiven): StepDerived | { refused: StepRefusal };
+  /** The maxima that this code declares, among them the most that each step derives in its preparation entry (section 6.1). Absent: it declares none. */
+  maxima?: readonly Maximum[];
 }
 
 /**
@@ -122,7 +126,7 @@ export const stepsOf = (capabilities: Capabilities | null | undefined): Steps | 
 };
 
 /** What the judge of a preparation is given beside the state and the definition. */
-export interface PreparationContext extends Pick<Reading, "clock" | "bounds"> {
+export interface PreparationContext extends Pick<Reading, "clock" | "bounds" | "own"> {
   /** The rules of the steps this runtime has code for. Null or absent: none, and no preparation is judged. */
   steps?: Steps | null | undefined;
   /** The decision on the grant: see `GrantDecision`. */
@@ -209,7 +213,7 @@ export function judgePreparation(view: StateView, definition: ValidDefinition, a
   if (!steps?.implements(capability, step)) return { result: "unavailable", reason: "unavailable" };
 
   const self = scope.head.seq + 1;
-  const given = { view, definition, scope, self, intent, digest, clock };
+  const given = { view, definition, scope, self, intent, digest, clock, own: context.own };
   const needs = steps.grant(capability, step, given);
   if (!needs) return refused("unauthorized", "the step names no action of this scope for this request");
   const decided = context.granted({ key: intent.actor, action: needs.action, scope: scope.at, window: needs.window, clock });
@@ -225,6 +229,11 @@ export function judgePreparation(view: StateView, definition: ValidDefinition, a
   // Section 5.3: a preparation judges its `notAfter` and its grant on the commit clock, so none is written while the clock is behind.
   if (clock.behind) return { result: "unavailable", reason: "clock-behind" };
   const effects: Effect[] = [...recordEffects(capability, derived.records), ...derived.opens.flatMap((open, k) => operationOpening(k, open))];
+  // Section 6.1, "In the commit": a step that returns more than it declared has a fault, and the request is not judged. A
+  // preparation entry that would still pass the bound on derived effects is refused, by the bound's name.
+  const most = maximumOf(steps, "step", capability, step);
+  if (most && (effects.length > most.effects || derived.opens.length > most.operations)) throw new Error(`${capability} declares at most ${most.effects} effects for its step ${step}, and it returned ${effects.length}`);
+  if (effects.length > bounds.derivedEffects) return refused("entry-too-large", "the effects that the step derives pass the bound on one entry", "derivedEffects");
   return { result: "write", draft: { input: { type: "preparation", signed, authority: [grant], capability, step }, uses: [], prepared: [], effects, sends: [], judgesTime: true } };
 }
 

@@ -1,7 +1,8 @@
 import { describe, expect, test } from "vitest";
 import type { Entry, FactRef, ScopeRef } from "@generalbusiness/artroom-contract";
 import { factRefOf, intentDigest } from "@generalbusiness/artroom-bytes";
-import { boundLicense, hasWorkspace, judgeDelivery, preparationStatus, recordEffects } from "../src/index.ts";
+import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
+import { boundLicense, counted, hasWorkspace, holdCapability, judgeDelivery, preparationStatus, recordEffects } from "../src/index.ts";
 import type { Fetched } from "../src/index.ts";
 import { arriving, d, decided, forged, keys, laneDefinition, otherLane, t, variant, lane } from "./fixtures.ts";
 import { C, Staging, cap, clean, staging } from "./fixtures-hold.ts";
@@ -38,27 +39,55 @@ describe("the records of `hold@1` (scope contract, section 6.11; authority note,
     // The same two shapes from the holder: a manifest of this lane, and one that is proposed in another lane, each with its root.
     const shapes = new Staging();
     shapes.prepare(una, "instance", { hold: shapes.hold, task, instance: "i1" });
+    // Section 5.7, "Which entry makes a token": the entry that opens an attempt of a staging makes that attempt's two tokens, each
+    // `minting` with its mint. They are for the root and name no hold.
+    const staged = ["root creating", "token minting", "token minting", "opens stage x3", "attempt 1 opened", "opens mint x1", "attempt 1 opened", "opens mint x1", "attempt 1 opened"];
     expect([
       shape(shapes.prepare(una, "stage", manifest, { kind: "propose" })), shape(shapes.prepare(una, "stage", { integration: C("b"), lane: shapes.at, foreignHold: shapes.hold, instance: "i1" }, elsewhere)),
-      shapes.state.record("hold@1", "root", [1])?.values["under"], shapes.state.record("hold@1", "root", [2])?.values["consumer"],
-    ]).toEqual([["root creating", "opens stage x3", "attempt 1 opened"], ["root creating", "opens stage x3", "attempt 1 opened"], shapes.commitment, otherLane]);
+      shapes.state.record("hold@1", "root", [1])?.values["under"], shapes.state.record("hold@1", "root", [2])?.values["consumer"], shapes.record("token", 1), shapes.record("token", 2),
+    ]).toEqual([staged, staged, shapes.commitment, otherLane,
+      { state: "minting", purpose: "fork-read", root: 1, operation: "7:0", attempt: 1, mint: "7:1", id: null, ends: null, revocation: null },
+      { state: "minting", purpose: "staging", root: 1, operation: "7:0", attempt: 1, mint: "7:2", id: null, ends: null, revocation: null }]);
+    // The first token is minted. The attempt is then refused: its entry revokes the live token, opens attempt 2 and makes the two
+    // tokens of that attempt. The second token's mint is answered after its attempt ended: it is revoked in that entry, and is
+    // never live. What is used and reserved together does not rise with any of these outcome entries.
+    const room = () => shapes.head.seq + shapes.reserved();
+    const minted = (operation: string, id: string) => { const before = room(); const entry = shapes.outcome(operation as never, "confirmed", { token: id, ends: t(300) }); return [shape(entry), room() <= before]; };
+    const first = minted("7:1", "tok-1");
+    const before = room();
+    const refused = shapes.outcome("7:0", "refused") as Entry;
+    expect([first, shape(refused), room() <= before, minted("7:2", "tok-2"), shapes.record("token", 2)?.state, shapes.record("token", 5)?.state]).toEqual([
+      [["confirmed", "token live"], true],
+      ["refused", "attempt 2 opened", "token revoking", "token minting", "token minting", "opens revoke x3", "attempt 1 opened", "opens mint x1", "attempt 1 opened", "opens mint x1", "attempt 1 opened"], true,
+      [["confirmed", "token revoking", "opens revoke x3", "attempt 1 opened"], true], "revoking", "minting",
+    ]);
+    // An attempt that is `unknown` leaves its tokens. The end of the hold does not revoke a staging's tokens: they are not the hold's.
+    minted(`${refused.seq}:1`, "tok-5");
+    shapes.outcome("7:0", "unknown", {}, "none", 2);
+    shapes.now = t(700);
+    shapes.drain();
+    expect([shape(shapes.derived()!), shapes.record("token", 5)?.state, shape(shapes.outcome("7:0", "refused", {}, "own-answer", 2)), shapes.record("token", 5)?.state, shapes.replay().snapshot() === shapes.state.snapshot()])
+      .toEqual([["instance past"], "live", ["refused", "token revoking", "opens revoke x3", "attempt 1 opened"], "revoking", true]);
 
     // Section 5.5: the preparation entry is the record, and it comes first. It holds the root, the operation and attempt 1, not sent yet.
-    expect((s.asked(report, "stage") as Entry).effects).toEqual([
+    // The two tokens of that attempt and their mints are in the same entry: the test of the tokens is below.
+    const prepared = (s.asked(report, "stage") as Entry).effects;
+    expect([prepared[0], prepared[3], prepared[4], prepared.length]).toEqual([
       { effect: "record", capability: "hold@1", kind: "root", key: [1], state: "creating", values: { commit: X, hold: s.hold, instance: "i1", under: 2, intent: intentDigest(report.intent), consumer: s.at, operation: "7:0" } },
       { effect: "operation", k: 0, owner: "hold@1", kind: "stage", attempts: 3 },
-      { effect: "attempt", operation: { k: 0 }, attempt: 1, result: "opened", selected: null },
+      { effect: "attempt", operation: { k: 0 }, attempt: 1, result: "opened", selected: null }, 9,
     ]);
     const judged = () => { const j = s.judge(report, { capabilities: cap }); return [j.result, "name" in j ? j.name : ""].join(" ").trim(); };
     // A refused attempt leaves the root `creating`. The read that shows the ref makes it `live`, records the pin and opens the check.
-    expect([judged(), shape(s.outcome("7:0", "refused")), s.record("root", 1)?.state, shape(s.outcome("7:0", "confirmed", {}, "read", 2)), judged()]).toEqual([
+    expect([judged(), shape(s.outcome("7:0", "refused")).slice(0, 2), s.record("root", 1)?.state, shape(s.outcome("7:0", "confirmed", {}, "read", 2)), judged()]).toEqual([
       "refused not-staged", ["refused", "attempt 2 opened"], "creating", ["confirmed", "root live", "pin provisional", "opens check x1", "attempt 1 opened"], "refused not-staged",
     ]);
     // The check entry: the outcome of the one read, by that read's own answer, whose evidence is the ancestry record. Its record is what a presented pin carries.
     expect([shape(s.outcome("9:0", "confirmed", { record: clean(s.at, X, 1) })), s.record("check", intentDigest(report.intent), 1)]).toEqual([["confirmed", "check recorded"], {
       state: "recorded", intent: intentDigest(report.intent), commit: X, consumer: s.at, lane: s.at, hold: s.hold, instance: "i1", root: 1, attribution: [una.member, keys.paul.member], record: clean(s.at, X, 1),
     }]);
-    expect(preparationStatus(s.state, s.own, intentDigest(report.intent))).toEqual([{ entry: s.fact(7), capability: "hold@1", step: "stage", operations: [{ operation: "7:0", kind: "stage", state: "settled" }], records: [{ kind: "root", key: [1], state: "live" }] }]);
+    expect(preparationStatus(s.state, s.own, intentDigest(report.intent))).toEqual([{ entry: s.fact(7), capability: "hold@1", step: "stage", operations: [{ operation: "7:0", kind: "stage", state: "settled" }, { operation: "7:1", kind: "mint", state: "pending" }, { operation: "7:2", kind: "mint", state: "pending" }],
+      records: [{ kind: "root", key: [1], state: "live" }, { kind: "token", key: [1], state: "minting" }, { kind: "token", key: [2], state: "minting" }] }]);
 
     // The act finds its preparation by its own intent's digest, and its entry consumes it: the pin is `held`, with the admitting entry.
     expect(s.submit(report, { capabilities: cap }).result).toBe("write");
@@ -100,6 +129,30 @@ describe("the records of `hold@1` (scope contract, section 6.11; authority note,
     // `admitted` is another entry. Its report is refused, and the pin, which is another intent's by its record, stays `held`.
     s.hand(recordEffects("hold@1", [{ kind: "pin", key: [s.at, intentDigest(other.intent)], state: "held", values: { ...s.state.record("hold@1", "pin", [s.at, intentDigest(other.intent)])!.values, admitted: 11 } }]));
     expect([refuse(reports[0]), s.item(reports[0]).state, pins()[0], s.replay().snapshot() === s.state.snapshot()]).toEqual([["state"], "refused", ["held", 11, null], true]);
+
+    // Section 5.7, the step `retire`: a root is retired by a signed intent that names it, and by nothing else. It is refused
+    // `not-retirable` while a pin on the root is `held`, and before the retention has passed since the entry that made it `live`.
+    const retire = (fields: object) => s.prepare(rita, "retire", fields as never);
+    const pinned = retire({ root: 1 });
+    s.hand(recordEffects("hold@1", [{ kind: "pin", key: [s.at, intentDigest(other.intent)], state: "released", values: s.state.record("hold@1", "pin", [s.at, intentDigest(other.intent)])!.values }]));
+    expect([pinned, retire({ root: 1 }), retire({ root: 1, fork: s.hold }), retire({})]).toEqual(["refused capability-refused not-retirable", "refused capability-refused not-retirable", "refused bad-field", "refused bad-field"]);
+    s.now = t(700);
+    s.drain();                                                                          // the hold ends by its timed rule
+    s.derived();
+    // The entry records `retiring`, and opens the delete with the one staging token of its first attempt. From it on no pin is
+    // accepted on the root: a reuse finds no live root. The read that shows the ref absent makes the root `retired`.
+    const retiring = retire({ root: 1 }) as Entry;
+    const again = s.intent(una, "report", { expected: { commitment: s.item(s.commitment).revision }, fields: source });
+    expect([shape(retiring), s.asked(again, "check"), shape(s.outcome(`${retiring.seq}:0`, "confirmed", {}, "read")), s.record("root", 1)?.state]).toEqual([
+      ["root retiring", "token minting", "opens delete x3", "attempt 1 opened", "opens mint x1", "attempt 1 opened"], "refused capability-refused not-staged", ["confirmed", "root retired"], "retired",
+    ]);
+    // A fork is deleted the same way, by its hold: only after the hold has ended, and only a fork that is `selected`.
+    const unselected = retire({ fork: s.hold });
+    s.hand(recordEffects("hold@1", [{ kind: "fork", key: [s.hold], state: "selected", values: { ...s.state.record("hold@1", "fork", [s.hold])!.values, id: "f1", name: "fork-1" } }]));
+    const deleting = retire({ fork: s.hold }) as Entry;
+    expect([unselected, shape(deleting), shape(s.outcome(`${deleting.seq}:0`, "confirmed")), s.record("fork", s.hold)?.state, s.replay().snapshot() === s.state.snapshot()]).toEqual([
+      "refused capability-refused not-retirable", ["fork deleting", "opens deletion x3", "attempt 1 opened"], ["confirmed", "fork deleted"], "deleted", true,
+    ]);
   });
 
   test("a pin in another lane ends in one state in both orders of `pin-confirm` and `unpin`, and a late confirmation restores nothing (T22)", () => {
@@ -145,7 +198,17 @@ describe("the records of `hold@1` (scope contract, section 6.11; authority note,
     s.outcome("8:0", "unknown");                                                        // entry 9: the mint's reply is lost
     token();                                                                            // entry 10
     // A mint that is answered while its use has not ended makes the token `live`. A hold has at most the stated number at once.
-    expect([shape(s.outcome("10:0", "confirmed", { token: "tok-2", ends: t(300) })), s.record("token", 2)?.state, token()]).toEqual([["confirmed", "token live"], "live", "refused guard-failed"]);
+    expect([shape(s.outcome("10:0", "confirmed", { token: "tok-2", ends: t(300) })), s.record("token", 2)?.state, token(), s.state.recordCount("hold@1", "token")]).toEqual([["confirmed", "token live"], "live", "refused capability-refused tokens-full", 2]);
+    // The bound is the version's, with the floor 2: a value with a lower one is no code of the capability. The count of one
+    // ending entry, 1 + 3 for each token, is declared, and it is counted into every entry of the definition before any is derived:
+    // the fixture lane fits the proposed bound on derived effects, and does not fit one that is below its largest entry.
+    const ending = cap.maxima!.find((m) => m.form === "workspace");
+    expect(() => holdCapability({ tokensPerHold: 1, rootRetentionSeconds: null })).toThrow(/at least 2/);
+    const fits = (derivedEffects: number) => counted(staging, cap, { ...PROPOSED_BOUNDS, derivedEffects });
+    // The fixture lane may hold 2 live holds, so each of its entries is counted with 2 * 7 effects of a workspace, and a row that
+    // writes one capability effect with 1 more: it fits a bound of 15. With a bound of 14 the row `report` does not fit, and the
+    // definition is not run beside this code.
+    expect([ending, fits(PROPOSED_BOUNDS.derivedEffects), fits(15), fits(14)]).toEqual([{ form: "workspace", capability: "hold@1", name: "hold", effects: 7, requests: 0, operations: 2 }, null, null, { entry: "acts.report", effects: 15, requests: 0 }]);
     // A renewal by the holder moves no record.
     s.did(una, "renew", { on: s.hold, expected: { on: s.item(s.hold).revision } });
     expect(s.derived()).toBeNull();

@@ -15,7 +15,7 @@
 
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { Effect, Entry, Evidence, FieldValue, OperationId, ScopeRef } from "@generalbusiness/artroom-contract";
-import { capabilitiesOf, checkpointOf, clockOf, gitRead, holdCapability, judgePreparation, owed, settleOutcome, snapshotOf, stagedRefName, workspaceEffects } from "../src/index.ts";
+import { RETIRE_ACTION, capabilitiesOf, checkpointOf, clockOf, gitRead, holdCapability, judgePreparation, owed, settleOutcome, snapshotOf, stagedRefName, workspaceEffects } from "../src/index.ts";
 import type { AncestryCheck, CapabilityGiven, StagedRef, ValidDefinition } from "../src/index.ts";
 import { Scope, grantOf, keys, lane, variant, type Actor, type Context } from "./fixtures.ts";
 
@@ -67,8 +67,8 @@ export function kept(pairs: readonly StagedRef[]): AncestryCheck["snapshot"] {
   return { digest: snapshot.digest, count: snapshot.count };
 }
 
-/** The code of both capabilities over the fixture lane, with at most two tokens of one hold at once. */
-export const cap = capabilitiesOf(holdCapability({ tokensPerHold: 2 }, () => staging), gitRead({ snapshot: (digest) => snapshots.get(digest) ?? null }));
+/** The code of both capabilities, with at most two tokens of one hold at once, and a root that may be retired ten minutes after it was made live. Both numbers are the fixture's. */
+export const cap = capabilitiesOf(holdCapability({ tokensPerHold: 2, rootRetentionSeconds: 600 }), gitRead({ snapshot: (digest) => snapshots.get(digest) ?? null }));
 
 const said = (j: { result: string; reason?: string; name?: string; detail?: string }): string => [j.result, j.reason ?? "", j.name ?? ""].filter((part) => part !== "").join(" ");
 
@@ -129,9 +129,10 @@ export class Staging extends Scope {
     return this.asked(signed, step);
   }
   asked(signed: ReturnType<Scope["intent"]>, step: string): Entry | string {
-    const actions = Object.values(this.definition.declared.acts).map((a) => a.grant);
+    // Every key holds every action of the lane, and the action of the step `retire`: a stand-in for the grants of membership.
+    const actions = [...Object.values(this.definition.declared.acts).map((a) => a.grant), RETIRE_ACTION];
     const j = judgePreparation(this.state, this.definition, { signed, capability: "hold@1", step }, {
-      clock: clockOf(this.state, this.now), bounds: PROPOSED_BOUNDS, steps: cap,
+      clock: clockOf(this.state, this.now), bounds: PROPOSED_BOUNDS, steps: cap, own: this.own,
       granted: ({ key }) => { const who = Object.values(keys).find((k) => k.key === key); return who ? { result: "granted", grant: grantOf(who, this.at, actions) } : { result: "refused" }; },
     });
     return j.result === "write" ? this.seal(j.draft) : j.result === "repeat" ? `repeat ${j.seq}` : said(j);

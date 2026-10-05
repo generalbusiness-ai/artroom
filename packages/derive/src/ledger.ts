@@ -53,6 +53,21 @@ export interface Opening { owner: Owner; kind: string; attempts: number }
 /** What an owner derives from one outcome beside the ledger's own records: its records, its sends, and the operations it opens, such as a cleanup (item 7). */
 export interface OutcomeDerived { effects: readonly Effect[]; sends: readonly Send[]; opens: readonly Opening[] }
 
+/**
+ * The most that one piece of code returns in one entry (section 6.1, "A
+ * declared maximum for everything that derives"): effects, requests and
+ * operations. Each is a constant of the version, or a constant times a
+ * state bound that the version states.
+ */
+export interface Most { effects: number; requests: number; operations: number }
+
+/**
+ * What an owner's rule is told of the outcome entry that is being derived,
+ * beside the state: `opens`, the number of the attempt that this entry
+ * opens, or null when it opens none; and the pinned definition.
+ */
+export interface OutcomeAt { opens: number | null; definition: ValidDefinition }
+
 /** The owner's rules for one kind of operation. Each is a function of what it is given, and reads nothing else. */
 export interface OperationRules {
   /** Item 7: the kind selects one result, as a founding claim selects one repository. */
@@ -66,7 +81,15 @@ export interface OperationRules {
   /** Item 4: the evidence is well formed for this owner. Absent: any body is. The ledger has checked that the evidence has a basis and a body. */
   wellFormed?(result: Result, evidence: Evidence): boolean;
   /** What the outcome derives beside the ledger's records. Absent: nothing. */
-  derives?(view: StateView, operation: Operation, outcome: OutcomeInput, selected: boolean | null): OutcomeDerived;
+  derives?(view: StateView, operation: Operation, outcome: OutcomeInput, selected: boolean | null, at: OutcomeAt): OutcomeDerived;
+  /**
+   * The most that `derives` returns in one outcome entry of this kind, with
+   * the two effects of each operation that it opens (section 6.1). An
+   * outcome entry cannot be refused, so the count must hold before it is
+   * derived: an outcome that would hold more writes nothing. Absent: the
+   * owner declares none, and nothing is counted.
+   */
+  most?: Most;
   /**
    * Section 17.2, row 5: the owner declares what the outcomes of an
    * operation derive. This is the most entries that the operations which one
@@ -269,7 +292,7 @@ const invalid = (detail: string): OutcomeDerivation => ({ result: "refused", rea
  * is trusted, and a replay reports it as trusted: `own-answer` for an
  * attempt's own answer, `host-read` for a read (section 9.5).
  */
-export function outcomeOf(view: StateView, outcome: OutcomeOffered, owners: Owners | undefined): OutcomeDerivation {
+export function outcomeOf(view: StateView, definition: ValidDefinition, outcome: OutcomeOffered, owners: Owners | undefined): OutcomeDerivation {
   const operation = view.operation(outcome.operation);
   const attempt = operation?.attempts.find((a) => a.attempt === outcome.attempt);
   // Item 5, and rule 1: an outcome is of an attempt that an earlier entry opened. No outcome makes an attempt or an operation.
@@ -312,11 +335,14 @@ export function outcomeOf(view: StateView, outcome: OutcomeOffered, owners: Owne
   // number, and nothing here reads the scope's free room. The room was reserved by the entry that opened the operation.
   const last = attempt.attempt === operation.attempts.length;
   const next = result !== "confirmed" && last && operation.attempts.length < operation.most && operation.selected === null && rules.retries(result, operation);
-  const derived = rules.derives?.(view, operation, input, selected) ?? { effects: [], sends: [], opens: [] };
+  const derived = rules.derives?.(view, operation, input, selected, { opens: next ? attempt.attempt + 1 : null, definition }) ?? { effects: [], sends: [], opens: [] };
   // Section 17.2, row 5: an outcome entry is never asked whether it fits (section 17.3), so what it opens was reserved with its own
   // operation, as the closure that the owner declares. An owner whose outcome would open more has broken its own declaration:
   // fail closed, and nothing is written.
   if (derived.opens.reduce((entries, open) => entries + reservedBy(open, owners), 0) > (rules.closure ?? 0)) return { result: "unavailable", reason: "unavailable" };
+  // Section 6.1, "An entry that cannot be refused": the same for the most that the owner declares for one outcome entry.
+  const { most } = rules;
+  if (most && (derived.effects.length + 2 * derived.opens.length > most.effects || derived.sends.length > most.requests || derived.opens.length > most.operations)) return { result: "unavailable", reason: "unavailable" };
   const effects: Effect[] = [
     { effect: "attempt", operation: operation.id, attempt: attempt.attempt, result, selected },
     ...(next ? [{ effect: "attempt", operation: operation.id, attempt: attempt.attempt + 1, result: "opened", selected: null } as const] : []),
