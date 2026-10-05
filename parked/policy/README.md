@@ -1,3 +1,5 @@
+> **Inactive.** This package is parked source of the earlier model: it is not built, tested, exported, released or deployed. See [`parked/README.md`](../README.md) for what replaces it and when it is removed.
+
 # @generalbusiness/artroom-policy
 
 Artroom's policy runtime (lane C). It evaluates a room's

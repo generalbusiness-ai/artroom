@@ -1,3 +1,5 @@
+> **Inactive.** This package is parked source of the earlier model: it is not built, tested, exported, released or deployed. See [`parked/README.md`](../README.md) for what replaces it and when it is removed.
+
 # @generalbusiness/artroom-mcp
 
 The Artroom MCP server: the contract's sixteen tools (R-API-9), for any

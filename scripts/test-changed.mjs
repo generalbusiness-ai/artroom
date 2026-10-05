@@ -7,7 +7,8 @@
 // The root vitest run covers every active package, and picks the test files
 // that import a changed file. A change to a root file such as package.json or
 // the lock file runs every test. So does a changed file whose name vitest
-// cannot read from git. The last lines say what ran.
+// cannot read from git. The check of the active files (scripts/active-source.test.mjs)
+// always runs. The last lines say what ran.
 import { spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -49,6 +50,8 @@ const unreadable = changed.find((f) => /[^\x21-\x7e]|["\\]/.test(f));
 if (rootFile) run("root vitest run", `every test, because ${rootFile} changed`, "npx", ["vitest", "run"]);
 else if (unreadable) run("root vitest run", `every test, because vitest cannot read the changed name ${JSON.stringify(unreadable)} from git`, "npx", ["vitest", "run"]);
 else run("root vitest run", "the test files that import a changed file", "npx", ["vitest", "run", "--changed", ...(since ? [since] : [])]);
+// It reads every active file and takes a tenth of a second.
+run("active source check", "always: no active file reaches into parked/ or names a removed format", "node", ["--test", "scripts/active-source.test.mjs"]);
 
 console.error(`\nChanged files: ${changed.length}, compared with ${since ?? "HEAD"}.`);
 for (const r of results) console.error(`  ${r.label}: ${r.text}`);

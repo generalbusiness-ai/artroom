@@ -1,3 +1,5 @@
+> **Inactive.** This package is parked source of the earlier model: it is not built, tested, exported, released or deployed. See [`parked/README.md`](../README.md) for what replaces it and when it is removed.
+
 # @generalbusiness/artroom-checkers
 
 Artroom's checkers. A checker is a service that meets a `require` check

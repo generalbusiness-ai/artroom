@@ -1,2 +1,2 @@
 # Licence files of other packages, kept byte for byte: their hashes are recorded.
-release/third-party/licenses/* -whitespace -text
+parked/release/third-party/licenses/* -whitespace -text

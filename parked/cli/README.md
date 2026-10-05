@@ -1,3 +1,5 @@
+> **Inactive.** This package is parked source of the earlier model: it is not built, tested, exported, released or deployed. See [`parked/README.md`](../README.md) for what replaces it and when it is removed.
+
 # artroom
 
 The `artroom` command lets people and agents work in an Artroom with plain

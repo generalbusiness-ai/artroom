@@ -8,7 +8,7 @@
   ],
   "scripts": {
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "test": "vitest run",
+    "test": "vitest run && node --test scripts/active-source.test.mjs",
     "test:changed": "node scripts/test-changed.mjs",
     "gate": "bash scripts/gate.sh"
   },

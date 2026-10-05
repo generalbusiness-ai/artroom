@@ -1,3 +1,5 @@
+> **Inactive.** This page describes the release of the earlier model's six packages. Its scripts and files are parked, unedited, in `parked/release/`; none of them runs. Releasing the new packages is a later delivery (I6). See [`parked/README.md`](../parked/README.md).
+
 # Releasing the installable packages
 
 Six packages can be installed outside this repository:

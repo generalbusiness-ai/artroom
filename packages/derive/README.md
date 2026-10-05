@@ -105,8 +105,10 @@ guard names one.
 ## Review of the earlier evaluator
 
 The rule evaluator is the restricted JSONata evaluator of the earlier
-model (`parked/policy/src`), reviewed for its new role and copied into
-`src/rule/`. It passed. The review asked four questions.
+model, reviewed for its new role and copied into `src/rule/`. It passed.
+The earlier files are deleted with the modules this package replaces;
+they are in Git history at `b6a9c0b6`, under `packages/policy/src`. The
+review asked four questions.
 
 | Question | What was found | Outcome |
 |---|---|---|
@@ -135,8 +137,8 @@ Changes made in the copy:
 - **Vocabulary.** The profile is `restricted@1`. The errors are
   `RuleEvalError` and `RuleRuntimeFailure`.
 
-The earlier package's own test corpus was not run again, because parked
-source is not built or tested. The fingerprint is unchanged, which shows
+The earlier package's own test corpus was not run again: the earlier
+package is not built or tested here. The fingerprint is unchanged, which shows
 that the engine, the budgets and the hooks behave as they did when that
 corpus last passed. Three tests of this package pin the points above.
 

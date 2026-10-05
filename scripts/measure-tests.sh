@@ -7,14 +7,12 @@
 # time comes. steps.tsv has one line per step: name, exit code, elapsed,
 # user, sys, and the one-minute load average when the step began.
 #
-# The first group times each package's suite on its own, as the baseline of
-# request ecbc722a was taken (that baseline's step list is this script at
-# commit ebbde3a0). The last step, `root-test`, is the one command the gate
-# runs. State the machine, the load and whether node_modules was already
-# installed with any figure you quote. The steps run one after another, so a
-# sum of their times is a sum of separate runs, each with a warm file cache
-# from the one before. For the elapsed time of one whole gate, time
-# `npm run gate` itself.
+# The first group times each active package's suite on its own. The last step,
+# `root-test`, is the one command the gate runs. State the machine, the load
+# and whether node_modules was already installed with any figure you quote.
+# The steps run one after another, so a sum of their times is a sum of
+# separate runs, each with a warm file cache from the one before. For the
+# elapsed time of one whole gate, time `npm run gate` itself.
 #
 # With --serial as the second argument, each suite runs with one worker and
 # one file at a time, and the install, the typecheck and `root-test` are left
@@ -39,20 +37,11 @@ step() { # name dir command...
 V() { echo "--reporter=default --reporter=json --outputFile.json=$O/$1.json $SERIAL"; }
 [ -z "$SERIAL" ] && step ci . npm ci
 [ -z "$SERIAL" ] && step typecheck . npm run typecheck
-step checkers packages/checkers npx vitest run --config vitest.config.ts $(V checkers)
-step cli packages/cli npx vitest run $(V cli)
-step client-node packages/client npx vitest run --config vitest.config.ts $(V client-node)
-step client-workerd packages/client npx vitest run --config vitest.workers.config.ts $(V client-workerd)
-step git packages/git npm test
-step log-node packages/log npx vitest run --config vitest.config.ts $(V log-node)
-step log-workerd packages/log npx vitest run --config vitest.workers.config.ts $(V log-workerd)
-step mcp-node packages/mcp npx vitest run --config vitest.config.ts $(V mcp-node)
-step policy-node packages/policy npx vitest run --config vitest.config.ts $(V policy-node)
-step policy-workerd packages/policy npx vitest run --config vitest.workers.config.ts $(V policy-workerd)
-step room-node packages/room npx vitest run --config vitest.node.config.ts $(V room-node)
-step room-workerd packages/room npx vitest run --config vitest.workers.config.ts $(V room-workerd)
-step room-declared packages/room npx vitest run --config vitest.declared.config.ts $(V room-declared)
-step ui packages/ui npx vitest run $(V ui)
+step bytes packages/bytes npx vitest run --config vitest.config.ts $(V bytes)
+step derive packages/derive npx vitest run --config vitest.config.ts $(V derive)
+step replay packages/replay npx vitest run --config vitest.config.ts $(V replay)
+step client packages/client npx vitest run --config vitest.config.ts $(V client)
+step scope packages/scope npx vitest run --config vitest.config.ts $(V scope)
 [ -z "$SERIAL" ] && step root-test . npm test
 uptime >> "$O/machine.txt"
 echo done > "$O/done"

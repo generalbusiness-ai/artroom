@@ -21,14 +21,14 @@ A test does not earn its place when it:
 - exists so that a count is met: one per field, one per condition, one per
   line.
 
-Each acceptance case of [docs/protocol.md](protocol.md) (sections 23,
-29.6, 30.7 and 33.5) is an invariant with a named expected result. Before you remove or
-merge a test, check the cases it witnessed, and name the test that
-witnesses each one afterwards.
+Each witness that the scope contract names, and each row of
+[notes/2026-10-04-i1-contract-deltas.md](../notes/2026-10-04-i1-contract-deltas.md)
+that names one, is an invariant with a stated expected result. Before you
+remove or merge a test, check the cases it witnessed, and name the test
+that witnesses each one afterwards.
 
-Before you add a test, name the invariant in one sentence. If
-[plans/test-invariants.md](../plans/test-invariants.md) already has a
-witness for it, strengthen that witness instead of adding another.
+Before you add a test, name the invariant in one sentence. If a test
+already witnesses it, strengthen that witness instead of adding another.
 
 ## Where a test belongs
 
@@ -36,13 +36,13 @@ Put each test at the cheapest boundary that can show its property.
 
 | The property is about | Test it |
 |---|---|
-| A pure decision: a shape, a bound, a validator's rule, a role table, a title | as a plain function, in a node test |
-| What the Room admits, records, refuses or keeps across a restart | against a real Room, in the workerd tests |
-| The order of two things that race | against a real Room, with the test's gates and clock, never with sleeps |
-| The Workers runtime itself: WebCrypto, limits, no Node APIs | in workerd, once; do not run a whole suite in two runtimes |
-| What a declared vocabulary changes | in the declared witness set (see below), not by running everything twice |
-| What a person sees and can do | in the UI tests; the browser suite for the few flows only a browser shows |
-| A real subprocess or a real repository | in the checkers and git tests, with one shared fixture where tests only read |
+| A pure decision: canonical bytes, a digest, a validator's rule, a judgment, the fold, a bound | as a plain function, in the node tests of `bytes` or `derive`, once |
+| What a scope records, refuses or keeps across a restart; the transaction, the clock, the alarm | against a real scope, in the workerd tests of `scope` |
+| The order of two things that race | against a real scope, with the test's gate and clock, never with sleeps |
+| What passes between scopes: creation, delivery, a diagnosis | against real scopes in one namespace, in the workerd tests of `scope` |
+| The Worker's routes and the service binding | in workerd, once for each; do not run a whole suite over both |
+| What a verifier reports for a history | over histories in memory, in `replay`; that replay agrees with the runtime, once, in `scope` |
+| What a client builds, signs and accepts as an answer | as plain functions in `client`; the handle against the real Worker, in `scope` |
 
 A stand-in proves only the boundary it exposes. A retry, an ordering or a
 restart is shown against the thing that really retries, orders or restarts.
@@ -54,8 +54,9 @@ restart is shown against the thing that really retries, orders or restarts.
   passing.
 - A bound is tested at a small configured limit when the limit is a
   parameter, and at the real limit once.
-- Tests that only read may share one room or one fixture per file. Tests
-  that write get their own.
+- Tests that only read may share one scope or one fixture per file. Tests
+  that write get their own. The packages share one fixture set, exported by
+  `@generalbusiness/artroom-derive/testing`.
 
 ## While you work
 
@@ -64,27 +65,21 @@ Run the tests of what you changed, not the repository.
 ```
 npm run test:changed                 # what you changed and have not committed
 npm run test:changed -- origin/main  # everything that differs from origin/main
-npx vitest run --project room-workerd declared-fd6f00b6   # one project, files whose name matches
-npm test --workspace packages/git    # the git package (Node's test runner)
-npm test --workspace packages/ui     # the ui package (its own vitest)
+npx vitest run --project scope turn   # one project, files whose name matches
+npm test --workspace @generalbusiness/artroom-derive   # one package
 ```
 
-`npm run test:changed` covers every test runner
-([scripts/test-changed.mjs](../scripts/test-changed.mjs)). The root vitest
-run picks the test files that import a changed file, in every package but
-git and ui. Those two have their own runners. Each runs whole, in a few
-seconds, when a changed file is in the package or in a workspace package it
-depends on. The test of the release manifests runs when a package
-manifest, a build configuration or a release script changed. The last
-lines say which ran, and why one did not.
+`npm run test:changed` runs the root vitest run
+([scripts/test-changed.mjs](../scripts/test-changed.mjs)), which picks the
+test files that import a changed file, in every active package. The last
+lines say what ran.
 
 A change to a root file (`package.json`, the lock file, a root
-`tsconfig`, the root `vitest.config.ts`) runs every test of all three.
+`tsconfig`, the root `vitest.config.ts`) runs every test.
 
 A changed file whose name git would quote, such as a name with a space or
 a letter outside ASCII, runs the whole root vitest run, because vitest
-cannot read that name. The git and ui packages are still chosen by where
-the file is.
+cannot read that name.
 
 The selection follows imports. A test that reads a file without importing
 it, such as a fixture or a document, is not selected when only that file
@@ -100,19 +95,18 @@ npm run gate
 
 It installs only if `package-lock.json` changed since the last install,
 typechecks every workspace, and runs every test: one vitest process for
-the repository (`vitest.config.ts` at the root, one project per package
-and runtime), then the git and ui packages, then the test of the release
-manifests. Packing the packages and installing them outside the
-repository is not in the gate: it needs the network, and
-[docs/release.md](release.md) says when to run it. It prints the head, the tree
-and each step's elapsed and CPU time. It also fails on a whitespace error
-in what the branch changed. On an 18-core machine it takes about 30
-seconds. `npm run gate -- --ci` reinstalls first.
+the repository (`vitest.config.ts` at the root, one project for each of
+`bytes`, `derive`, `replay`, `client` and `scope`), then one script that
+checks that no active file imports from `parked/` or names a removed
+format (`scripts/active-source.test.mjs`). It prints the head, the tree and
+each step's elapsed and CPU time. It also fails on a whitespace error in
+what the branch changed. `npm run gate -- --ci` reinstalls first.
 
-The Room's tests run against real Durable Objects. One group of them,
-`packages/room/test/workerd/declared-run.test.ts`, runs chosen tests of
-other files a second time under the code-review `v2` declarations. That is
-the declared witness set. Nothing else runs twice.
+The `scope` project runs in the workerd pool, against real Durable Objects
+with SQLite storage. The others run in Node. Nothing runs twice.
+
+Nothing under `parked/` is installed, typechecked or tested.
+[parked/README.md](../parked/README.md) says what is there.
 
 Do not run it again for a commit that changes only documents; say that the
 source and tests are unchanged, and give the two tree hashes.
@@ -153,10 +147,10 @@ check, and consider deleting the guard.
 
 ## The invariant map
 
-[plans/test-invariants.md](../plans/test-invariants.md) lists, package by
-package, the invariants the tests protect and the test that is each one's
-witness. Keep it in step: add a line when you add an invariant, and remove
-one when you remove its witness. It is by group, not by case.
+[plans/test-invariants.md](../plans/test-invariants.md) maps the earlier
+model's tests, which are removed. It is the proof plan's to replace. Until
+then each test's name states its invariant, and the deltas note names the
+witness of each decision.
 
 ## For reviewers
 
@@ -195,5 +189,4 @@ Other figures help to find where the time is. Say what each one is:
 A sum of separately timed steps is a sum; say so, and do not present it as
 one observed run.
 
-State the machine, the load and the cache state with any figure. The
-current figures are in [plans/README.md](../plans/README.md).
+State the machine, the load and the cache state with any figure.

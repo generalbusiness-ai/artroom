@@ -1,3 +1,5 @@
+> **Inactive.** This package is parked source of the earlier model: it is not built, tested, exported, released or deployed. See [`parked/README.md`](../README.md) for what replaces it and when it is removed.
+
 # @generalbusiness/artroom-git
 
 Artroom's git engine: lane forks and tokens, pinned heads, bounded path
