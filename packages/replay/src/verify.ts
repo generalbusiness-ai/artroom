@@ -34,7 +34,7 @@ import type { Bounds, Digest, Entry, FactRef, Head, PlatformData, PlatformDefini
 import { canonicalize, definitionDigest, digestBytes, isDigest, isEntry, isPlatformDefinition, parseStrict, platformName, scopeIdOf, textDigest, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import {
   MemoryState, applyEntry, clockOf, entryOf, inputTexts, isFactRef, isLocalId, isObject, isScopeRef, judgeAct, judgeCheckpoint, judgeDelivery, judgeDiagnosis, judgeGenesis, judgeOutcome, judgeTimed,
-  nextDue, ruleAt, timeMs, updateOf, validateDefinition,
+  membershipOf, nextDue, ruleAt, timeMs, updateOf, validateDefinition,
 } from "@generalbusiness/artroom-derive";
 import type { ActJudgment, Capabilities, Clock, Fetched, Judgment, PlatformRules, Rules, TimedJudgment, ValidDefinition } from "@generalbusiness/artroom-derive";
 import { RULE_PROFILES, evaluateRules } from "@generalbusiness/artroom-derive/rule";
@@ -171,6 +171,12 @@ interface Run {
   /** Section 9.3: each detached text whose bytes are not at hand, with the entry that names it. A later tombstone of this scope answers for it. */
   owed: { text: Digest; at: FactRef }[];
 }
+
+/** The membership reference that a scope's genesis records (section 6.6), from the entry that the replay checked first. */
+const recordedMembership = (run: Run): ScopeRef | null => {
+  const genesis = run.sealed[0]?.entry.input;
+  return genesis?.type === "genesis" && run.at ? membershipOf(genesis, run.at) : null;
+};
 
 const sameScope = (a: ScopeRef, b: ScopeRef): boolean => a.scope === b.scope && a.inc === b.inc && a.kind === b.kind;
 const named = (ref: ScopeRef): string => `${ref.scope} (incarnation ${ref.inc})`;
@@ -667,7 +673,8 @@ class Verifier {
       case "act":
         // Section 9.3: that a grant was fresh is not checked, beyond its recorded form. The authority port's verdict is trusted.
         this.#trusts.add("authority");
-        judged = judgeAct(state, definition, input.signed, { ...reading, presented: input.presented, grants: input.authority.map((grant) => ({ grant, current: true })) });
+        // Section 16.1, "Replay": that `within` covers the observing scope is checked by the reference that its genesis records.
+        judged = judgeAct(state, definition, input.signed, { ...reading, presented: input.presented, grants: input.authority.map((grant) => ({ grant, current: true })), membership: recordedMembership(run) });
         break;
       case "delivery": {
         this.#trusts.add("delivered");

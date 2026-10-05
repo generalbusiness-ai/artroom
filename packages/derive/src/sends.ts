@@ -34,6 +34,24 @@ export function directoryOf(genesis: Pick<Extract<Input, { type: "genesis" }>, "
   return isScopeRef(named) && named.kind === "directory" ? named : null;
 }
 
+/**
+ * Section 6.6, "`membership` in a `create`": the membership scope that a
+ * scope records, with its incarnation. It is a function of the genesis
+ * entry, as the directory is: the member `membership` in the body of the
+ * creation, which the platform sets. A membership scope is its own. Null:
+ * the genesis names none.
+ *
+ * No source puts that member in a `create` yet, and the scopes that are
+ * created beside their membership scope fix its incarnation later
+ * (authority note, section 3.3, the table of four rows). So this reads
+ * what a genesis holds, and for most scopes of today that is nothing.
+ */
+export function membershipOf(genesis: Pick<Extract<Input, { type: "genesis" }>, "message">, at: ScopeRef): ScopeRef | null {
+  if (at.kind === "membership") return at;
+  const named = isObject(genesis.message?.body) ? genesis.message.body["membership"] : null;
+  return isScopeRef(named) && named.kind === "membership" ? named : null;
+}
+
 /** True when a guard of the list reads the clock, as written at the top of it or nested in a list form. Whether it is evaluated is not asked. */
 export const readsClock = (guards: readonly Guard[] | undefined): boolean => (guards ?? []).some((g) =>
   "before" in g || "after" in g || ("anyOf" in g ? g.anyOf.some(readsClock) : "each" in g ? readsClock(g.each.guards) : "has" in g && readsClock(g.has.guards)));

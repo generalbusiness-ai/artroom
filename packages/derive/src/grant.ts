@@ -18,7 +18,7 @@
  * `run-returned`, which is over the order of entries and is the verifier's.
  */
 
-import type { Grant, Head, KeyId, Observation, ObservationAnswer, ObservationUse, ScopeKind, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
+import type { Grant, Head, KeyId, Observation, ObservationAnswer, ObservationUse, ScopeFilter, ScopeKind, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
 import { isHead, isKeyId, isMemberId, isPlatformDefinition, isRecord, platformName } from "@generalbusiness/artroom-bytes";
 import { timeMs, type Clock } from "./time.ts";
 import type { ValidDefinition } from "./validate/index.ts";
@@ -86,14 +86,23 @@ export const COMMENTS: readonly string[] = ["issue.comment", "change.comment"];
 export type RoleTable = Readonly<Record<string, readonly string[]>>;
 export const actionsOf = (table: RoleTable, role: string): readonly string[] => own(table, role) ?? [];
 
+/** A filter in its one form: exactly the member `membership`, a scope reference. */
+export const isScopeFilter = (within: unknown): within is ScopeFilter => isRecord(within) && Object.keys(within).length === 1 && isScopeRef(within["membership"]);
+
 /**
- * Whether `within` covers that scope. The contract leaves the type of a
- * grant's filter to the authority note, which states no form for it. So
- * only one value covers a scope: that scope's own reference, with its
- * incarnation (I3 deltas, entry ED2). The judge of an act reads a grant's
- * `within` the same way.
+ * Whether `within` covers that scope (section 16.1, "How a scope is
+ * covered"). A grant's `within` is a scope reference or a filter. A scope
+ * reference covers the one scope that it names, with that incarnation. A
+ * filter covers a scope exactly when its `membership` is the reference
+ * that the scope itself records, with the same incarnation.
+ *
+ * `membership`: this scope's own membership reference. The scope reads it
+ * from its own history, where it is a function of the genesis entry
+ * (section 6.6), and from no request, no answer and no intent. Null: it
+ * records none, and then no filter covers it.
  */
-export const covers = (within: unknown, scope: ScopeRef): boolean => isScopeRef(within) && same(within, scope);
+export const covers = (within: unknown, scope: ScopeRef, membership: ScopeRef | null): boolean =>
+  (isScopeRef(within) ? same(within, scope) : isScopeFilter(within) && membership !== null && same(within.membership, membership));
 
 /**
  * The observation that one answer of membership gives, with `at`, the
@@ -107,7 +116,8 @@ export function observationOf(answer: unknown, at: Timestamp): Observation | nul
   if (!isScopeRef(of) || of.kind !== "membership" || !isHead(head) || !isKeyId(key) || !isMemberId(member) || typeof role !== "string") return null;
   if (keyState !== "active" && keyState !== "retired" && keyState !== "compromised" && keyState !== "unknown") return null;
   if (memberState !== "active" && memberState !== "removed") return null;
-  if (!Array.isArray(actions) || !actions.every((action) => typeof action === "string") || within === undefined) return null;
+  // Section 16.1: `within` is a filter, and in an observation of a key its `membership` equals `of`. Another form is no answer.
+  if (!Array.isArray(actions) || !actions.every((action) => typeof action === "string") || !isScopeFilter(within) || !same(within.membership, of)) return null;
   if ((controller !== null && !isMemberId(controller)) || (controllerActive !== null && typeof controllerActive !== "boolean")) return null;
   if ((notAfter !== null && timeMs(notAfter) === null) || !isPlatformDefinition(definition) || platformName(definition) !== "platform:membership") return null;
   return { of, head, key, keyState, member, memberState, role, actions: actions as string[], within, controller, controllerActive, notAfter: notAfter as Timestamp | null, definition, at };
@@ -196,7 +206,8 @@ export type GrantJudgment =
  * 7. Its head is not lower than the head of an observation of this key that
  *    an earlier entry retains.
  * 8. The grant guard: the key is active; the actions include the act's
- *    action; `within` covers this scope; `notAfter`, if set, is later than
+ *    action; `within` covers this scope, by the membership reference that
+ *    the scope itself records; `notAfter`, if set, is later than
  *    the reading; and for an agent the controller is active, or the action
  *    is a comment.
  *
@@ -234,7 +245,7 @@ export function judgeGrant(use: ObservationUse, asked: GrantAsked): GrantJudgmen
 
   if (o.keyState !== "active") return refuse("key-state");
   if (!o.actions.includes(asked.action)) return refuse("action");
-  if (!covers(o.within, asked.scope)) return refuse("within");
+  if (!covers(o.within, asked.scope, asked.membership)) return refuse("within");
   if (o.notAfter !== null && timeMs(clock.asOf)! >= (timeMs(o.notAfter) ?? -Infinity)) return refuse("not-after");
   if ((o.controller !== null || o.controllerActive !== null) && o.controllerActive !== true && !COMMENTS.includes(asked.action)) return refuse("controller");
   return { result: "current", grant: grantFrom(use) };

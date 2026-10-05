@@ -31,7 +31,7 @@ import { intentDigest, isScopeRef, verifySignedIntent } from "@generalbusiness/a
 import type { Signer } from "./attribution.ts";
 import type { Capabilities, Recorded } from "./capability.ts";
 import { isIntent, type Own, type Reading } from "./fields.ts";
-import type { Window } from "./grant.ts";
+import { covers, type Window } from "./grant.ts";
 import type { Draft } from "./judge.ts";
 import { operationId, operationOpening, operationStanding, type Opening } from "./ledger.ts";
 import type { ScopeState, StateView } from "./state.ts";
@@ -125,6 +125,8 @@ export interface PreparationContext extends Pick<Reading, "clock" | "bounds"> {
   steps?: Steps | null | undefined;
   /** The decision on the grant: see `GrantDecision`. */
   granted: GrantDecision;
+  /** This scope's own membership reference, as the scope records it (section 6.6), which a grant's filter is read against (section 16.1). Absent or null: it records none. */
+  membership?: ScopeRef | null | undefined;
 }
 
 /** One request for a step, as it arrives: untrusted until judged. */
@@ -212,7 +214,7 @@ export function judgePreparation(view: StateView, definition: ValidDefinition, a
   if (decided.result === "unavailable") return { result: "unavailable", reason: "authority-unavailable" };
   // The judge keeps its own check of the grant, as the judge of an act does: the key, the action, the scope and its end time.
   const grant = decided.result === "granted" ? decided.grant : null;
-  if (!grant || grant.key !== intent.actor || !grant.actions.includes(needs.action) || !isScopeRef(grant.within) || grant.within.scope !== scope.at.scope || grant.within.inc !== scope.at.inc
+  if (!grant || grant.key !== intent.actor || !grant.actions.includes(needs.action) || !covers(grant.within, scope.at, context.membership ?? null)
     || (grant.notAfter !== null && asOf >= (timeMs(grant.notAfter) ?? -Infinity))) return refused("unauthorized", `no current grant of ${needs.action} to this key in this scope`);
 
   const derived = steps.derive(capability, step, { ...given, signer: { member: grant.subject, principal: grant.principal } });

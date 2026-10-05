@@ -126,6 +126,11 @@ run. What it reads is kept in memory only, so a restart leaves none.
   that fails discards it: the act is answered `authority-unavailable`, and
   the next read is made again. A standing that does not hold the action is
   refused `unauthorized`.
+- A grant's `within` is a scope reference or a filter, `{ membership }`. A
+  filter covers a scope when it names the membership scope that the scope
+  itself records, with that incarnation. The read asks `{ of, key }`, and
+  names no asker. An answer whose `within` is not that filter, with `of`
+  as its `membership`, is no answer.
 - The entry's grant is built from the observation and retains it, with
   the read and how the entry used it: `fresh`, or `reused` with the entry
   before. The commit tells the port which entry used a read last.

@@ -23,7 +23,7 @@ function scripted(s: Lane) {
       const who = [rita, una].find((actor) => actor.key === key);
       if (m.silent || !who) return null;
       return {
-        of, head: { seq: m.head, hash: d("4") }, key, keyState: "active", member: who.member.member, memberState: "active", role: "member", actions, within: s.at,
+        of, head: { seq: m.head, hash: d("4") }, key, keyState: "active", member: who.member.member, memberState: "active", role: "member", actions, within: { membership: of },
         controller: null, controllerActive: null, notAfter: null, definition: "platform:membership@1", ...m.over[key],
       };
     },

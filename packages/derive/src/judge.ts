@@ -16,6 +16,7 @@ import { intentDigest, scopeIdOf, verifySignedIntent } from "@generalbusiness/ar
 import type { Signer } from "./attribution.ts";
 import { deriveEffects } from "./effects.ts";
 import { isIntent, presentedTypes, readFacts, readFields, type Reading } from "./fields.ts";
+import { covers } from "./grant.ts";
 import type { Judging } from "./guards.ts";
 import { alsoItems, derive, giving } from "./handlers.ts";
 import { actionOf, fieldOutsideType, grantByRule, markOf, selectedBy, unjudged, type JudgedInput } from "./marks.ts";
@@ -23,7 +24,7 @@ import type { Item, StateView } from "./state.ts";
 import { nextDue, type Due } from "./timed.ts";
 import { timeMs, type Clock } from "./time.ts";
 import type { ValidDefinition } from "./validate/index.ts";
-import { isScopeRef, own, same } from "./values.ts";
+import { own, same } from "./values.ts";
 
 /**
  * A grant that an act may be judged on, with whether it is current (section
@@ -43,6 +44,16 @@ export interface JudgeContext extends Reading {
    * what was read (section 9.3).
    */
   grants: readonly Presented[] | null;
+  /**
+   * This scope's own membership reference, with its incarnation, as the
+   * scope records it: a function of its genesis entry (section 6.6). A
+   * grant whose `within` is a filter covers this scope exactly when the
+   * filter names this reference (section 16.1). The runtime gives the
+   * reference that its authority port read from. A verifier reads the
+   * genesis (`membershipOf`). Absent or null: the scope records none, and
+   * only a grant that names this scope covers it.
+   */
+  membership?: ScopeRef | null | undefined;
   /** The facts presented beside the intent, by name, as they arrived (section 6.4). They are not signed. */
   presented?: Readonly<Record<string, unknown>> | undefined;
 }
@@ -208,11 +219,10 @@ function actJudged(view: StateView, definition: ValidDefinition, signed: SignedI
   // grant, and the rule is not run.
   const mark = markOf(act.grant) as GrantMark | null;
   const action = actionOf(act);
-  // The first presented grant that qualifies is the one recorded. A grant's `within` covers this scope when it names it.
+  // The first presented grant that qualifies is the one recorded. Section 16.1: a grant's `within` covers this scope when it names
+  // it, or when it is a filter whose `membership` is the membership reference that this scope records.
   const presented = action === null ? undefined : context.grants?.find(({ grant, current }) =>
-    current && grant.key === intent.actor && grant.actions.includes(action)
-    // A grant that names several scopes by a filter is the authority note's; here a grant covers the one scope it names.
-    && isScopeRef(grant.within) && grant.within.scope === scope.at.scope && grant.within.inc === scope.at.inc
+    current && grant.key === intent.actor && grant.actions.includes(action) && covers(grant.within, scope.at, context.membership ?? null)
     && (grant.notAfter === null || asOf < (timeMs(grant.notAfter) ?? -Infinity)));
   let signer: Signer | null;
   if (presented) signer = { member: presented.grant.subject, principal: presented.grant.principal };

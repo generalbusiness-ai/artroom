@@ -425,7 +425,7 @@ export class Scope {
     // Phase two is in the commit: what that read holds at the commit's head, on the commit's one reading. The judge is given the
     // answer and reads nothing.
     const context = (view: StateView, clock: Reading): Omit<JudgeContext, "prepared"> =>
-      ({ clock, bounds, facts, own: ownOf(this.#store), texts: texts.sizes, presented: offered, capabilities: this.#ports.capabilities ?? undefined, platform, grants: standing === null ? null : heldBy(standing, view, clock) });
+      ({ clock, bounds, facts, own: ownOf(this.#store), texts: texts.sizes, presented: offered, capabilities: this.#ports.capabilities ?? undefined, platform, membership: standing?.membership ?? null, grants: standing === null ? null : heldBy(standing, view, clock) });
 
     const end = await this.#turns.run<Answer>({
       // The walk that finds the rules judges nothing (section 5.2, step 4), so what it is given of phase two decides nothing.
@@ -518,7 +518,7 @@ export class Scope {
     const end = await this.#turns.run<Answer>({
       asks: () => [],
       judge: (view, clock) => {
-        const judged = judgePreparation(view, definition, asked, { clock, bounds, steps, granted: granted(view, clock) });
+        const judged = judgePreparation(view, definition, asked, { clock, bounds, steps, granted: granted(view, clock), membership: standing?.membership ?? null });
         switch (judged.result) {
           case "write": {
             const head = view.scope()!.head;

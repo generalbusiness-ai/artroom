@@ -67,6 +67,14 @@ export interface Asked {
  * discard from it: an observation that failed a guard is read again.
  */
 export interface Standing {
+  /**
+   * The membership scope that this read was made of, with its incarnation:
+   * the reference that the scope records (section 6.6). The judge reads a
+   * grant's `within` against it (section 16.1, "How a scope is covered").
+   * Absent or null: the port read no membership scope, and then only a
+   * grant that names the scope itself covers it.
+   */
+  membership?: ScopeRef | null;
   held(view: StateView, clock: Reading): readonly Presented[] | null;
   sealed?(sealed: { entry: Entry; hash: Digest }): void;
 }

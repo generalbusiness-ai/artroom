@@ -23,7 +23,7 @@ export interface Observation {
   memberState: "active" | "removed";
   role: string;
   actions: readonly string[];      // what the role holds, by the role table at that head
-  within: ScopeFilter;             // where: this repository, or one task
+  within: ScopeFilter;             // where: every scope of this repository. Its `membership` equals `of`
   controller: MemberId | null;     // for an agent
   controllerActive: boolean | null;
   notAfter: Timestamp | null;      // an end time on the grant, if it has one
@@ -42,8 +42,10 @@ export interface ObservationUse {
 /**
  * What a scope asks its membership scope, before its turn: the standing of
  * one key (authority note, section 3.3, step 2). `of` is the membership
- * scope as the asking scope records it, with its incarnation. The texts
- * state no other member (I3 deltas, entry ED1).
+ * scope as the asking scope records it, with its incarnation. It states
+ * no other member, and names no asker: membership could not check who
+ * asks, and answers the same for every scope of its repository (section
+ * 16.1, "The form of `within`, and of the read"; I3 deltas, entry ED1).
  */
 export interface ObservationRequest { of: ScopeRef; key: KeyId }
 

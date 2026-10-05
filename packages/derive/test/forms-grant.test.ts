@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import type { Observation, ObservationUse } from "@generalbusiness/artroom-contract";
-import { MISMATCHES, WINDOWS, actionsOf, agrees, judgeGrant, observationOf, prefer, windowOf, type GrantAsked, type GrantJudgment, type RoleTable } from "../src/index.ts";
+import { MISMATCHES, WINDOWS, actionsOf, agrees, covers, judgeGrant, observationOf, prefer, windowOf, type GrantAsked, type GrantJudgment, type RoleTable } from "../src/index.ts";
 import { d, keys, laneDefinition, membership, otherLane, t } from "./fixtures.ts";
 
 const { rita, una } = keys;
@@ -11,8 +11,11 @@ const ROLES: RoleTable = { member: ["issue.comment", "issue.open"], checker: ["c
 /** One fixture: rita's key, active, read at membership's head 40 when the lane's clock read T0, as read 7 of run r1, and used by no entry yet. */
 const standing: Observation = {
   of: membership, head: { seq: 40, hash: d("4") }, key: rita.key, keyState: "active", member: "@rita", memberState: "active", role: "member", actions: actionsOf(ROLES, "member"),
-  within: otherLane, controller: null, controllerActive: null, notAfter: null, definition: "platform:membership@1", at: t(0),
+  within: { membership }, controller: null, controllerActive: null, notAfter: null, definition: "platform:membership@1", at: t(0),
 };
+/** The membership scope of another repository, and the same membership scope in another incarnation. */
+const elsewhere = { ...membership, scope: otherLane.scope };
+const reborn = { ...membership, inc: otherLane.inc };
 const fresh: ObservationUse = { observation: standing, read: { run: "r1", n: 7 }, use: "fresh", prior: null };
 const at = (seconds: number) => ({ reading: t(seconds), behind: false, asOf: t(seconds) });
 const asked: GrantAsked = { scope: otherLane, membership, key: rita.key, action: "issue.comment", window: WINDOWS.ordinary, clock: at(299), last: null, highest: null };
@@ -34,7 +37,14 @@ describe("the grant guard and the commit guards of an observation (authority not
       ["a ten-second kind, at its edge", fresh, { window: WINDOWS.once, clock: at(10) }, "authority-unavailable: age"],
       ["the wrong key: an observation of rita's key is no grant to una's", fresh, { key: una.key }, "unauthorized: key"],
       ["the wrong incarnation of membership", of({ of: { ...membership, inc: otherLane.inc } }), {}, "authority-unavailable: of"],
-      ["`within` names another scope", of({ within: membership }), {}, "unauthorized: within"],
+      // Section 16.1, "How a scope is covered"; witness 18.40. A filter covers a scope exactly when its `membership` is the reference
+      // that the scope itself records, with that incarnation. The lane records `membership`, and the answer above names it.
+      ["`within` names the membership scope of another repository", of({ within: { membership: elsewhere } }), {}, "unauthorized: within"],
+      ["`within` names this membership scope in another incarnation", of({ within: { membership: reborn } }), {}, "unauthorized: within"],
+      ["the same answer, in a scope that records another membership scope: it is no observation of that scope's own", fresh, { membership: elsewhere }, "authority-unavailable: of"],
+      ["`within` is this scope's own reference, which covers the one scope it names", of({ within: otherLane as never }), {}, "current"],
+      ["`within` is the reference of another scope", of({ within: membership as never }), {}, "unauthorized: within"],
+      ["`within` is a filter with a member added: no filter, so it covers nothing", of({ within: { membership, task: 4 } as never }), {}, "unauthorized: within"],
       ["revoked as retired: refused, also long past the window", of({ keyState: "retired" }), { clock: at(9000) }, "unauthorized: revoked"],
       ["the member removed", of({ memberState: "removed" }), {}, "unauthorized: revoked"],
       ["a key that membership does not hold", of({ keyState: "unknown" }), {}, "unauthorized: key-state"],
@@ -56,7 +66,7 @@ describe("the grant guard and the commit guards of an observation (authority not
 
     // The grant is built from the observation, and retains it as its proof. A grant that says more than its observation does not agree.
     const judged = judgeGrant(fresh, asked);
-    const grant = { issued: { at: membership, seq: 40, hash: d("4") }, subject: rita.member, key: rita.key, principal: null, actions: ["issue.comment", "issue.open"], within: otherLane, notAfter: null, fresh };
+    const grant = { issued: { at: membership, seq: 40, hash: d("4") }, subject: rita.member, key: rita.key, principal: null, actions: ["issue.comment", "issue.open"], within: { membership }, notAfter: null, fresh };
     expect(judged).toEqual({ result: "current", grant });
     expect([agrees(grant), agrees({ ...grant, actions: [...grant.actions, "change.merge"] })]).toEqual([true, false]);
     // What a replay calls a history that holds an entry with each failed guard.
@@ -77,5 +87,10 @@ describe("the grant guard and the commit guards of an observation (authority not
 
     const { at: began, ...answer } = standing;
     expect([observationOf(answer, began), observationOf({ ...answer, extra: 1 }, began), observationOf({ ...answer, keyState: "fine" }, began), observationOf({ ...answer, of: otherLane }, began)]).toEqual([standing, null, null, null]);
+    // Section 16.1: in an answer `within` is a filter whose `membership` equals `of`. A scope reference, another membership scope
+    // and a filter with a member added are each no answer. The answer names no asker: one answer serves every scope of the repository.
+    expect([otherLane, { membership: elsewhere }, { membership, task: 4 }].map((within) => observationOf({ ...answer, within }, began))).toEqual([null, null, null]);
+    // A scope with no recorded membership reference is covered by no filter, and by its own reference.
+    expect([covers({ membership }, otherLane, null), covers(otherLane, otherLane, null), covers({ membership }, otherLane, membership), covers({ membership }, membership, membership)]).toEqual([false, true, true, true]);
   });
 });

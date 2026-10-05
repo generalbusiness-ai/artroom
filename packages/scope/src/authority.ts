@@ -118,6 +118,7 @@ export function observing(config: Observing): Authority {
       let offered: Read | null = null;
       let spent = false;
       return {
+        membership: of,
         held(_view, clock) {
           offered = null;
           if (spent) return null;

@@ -64,8 +64,14 @@ export interface ScopeRef { scope: ScopeId; inc: Incarnation; kind: ScopeKind }
 /** Fact: one sealed entry, exactly. Always built after that entry is sealed. */
 export interface FactRef { at: ScopeRef; seq: number; hash: Digest }
 
-/** Which scopes a grant covers when it names more than one. Defined by the authority note. */
-export type ScopeFilter = unknown;
+/**
+ * Where a grant holds when it names more than one scope: every scope of one
+ * repository (section 16.1, "The form of `within`, and of the read";
+ * authority note, section 3.3). `membership` is the membership scope, with
+ * its incarnation. The filter covers that scope itself, and every scope
+ * that records it, with that incarnation, as its membership reference.
+ */
+export interface ScopeFilter { membership: ScopeRef }
 
 /**
  * What shows that a grant is current: one observation of membership, with the
