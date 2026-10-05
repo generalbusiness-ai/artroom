@@ -15,7 +15,7 @@ import { deriveSends } from "./sends.ts";
 import type { Item, OwnRequest, ScopeState, StateView } from "./state.ts";
 import { timeMs, type Clock } from "./time.ts";
 import { keptMessage, type ValidDefinition } from "./validate.ts";
-import { byteOrder, isFactRef, isLocalId, isObject, isScopeRef, isValue, same } from "./values.ts";
+import { byteOrder, isFactRef, isLocalId, isObject, isScopeRef, isValue, own, same } from "./values.ts";
 
 /** What every judge is given: the one reading of the commit, the bounds, and the retained inputs. */
 export interface Reading {
@@ -40,16 +40,17 @@ function leaves(type: FieldType, value: FieldValue): [FieldType, FieldValue][] {
 
 /** Section 6.2: each field is required or optional, an optional field may have a default, and an unknown field is refused. */
 export function readFields(types: ActType["fields"], given: Readonly<Record<string, unknown>>, bounds: Bounds): { ok: true; fields: Record<string, FieldValue> } | { ok: false; detail: string } {
-  const fields: Record<string, FieldValue> = {};
+  // Each name is set as an own property, whatever the name is (`own`, in values.ts).
+  const fields: [string, FieldValue][] = [];
   for (const name of Object.keys(given)) if (!Object.hasOwn(types, name)) return { ok: false, detail: `${name} is not a field of this act` };
   for (const [name, type] of Object.entries(types)) {
     const value = Object.hasOwn(given, name) ? given[name] : type.default;
     if (value === undefined && type.required) return { ok: false, detail: `${name} is required` };
     if (value === undefined) continue;
     if (!isValue(type, value, bounds)) return { ok: false, detail: `${name} is not a value of its type` };
-    fields[name] = value as FieldValue;
+    fields.push([name, value as FieldValue]);
   }
-  return { ok: true, fields };
+  return { ok: true, fields: Object.fromEntries(fields) };
 }
 
 /**
@@ -60,7 +61,9 @@ export function readFields(types: ActType["fields"], given: Readonly<Record<stri
 export function factsNamed(types: ActType["fields"], fields: Readonly<Record<string, FieldValue>>): FactRef[] {
   const named = new Map<Digest, FactRef>();
   for (const name of Object.keys(fields).sort(byteOrder)) {
-    for (const [type, value] of leaves(types[name]!, fields[name]!)) if (type.type === "fact" && !named.has((value as FactRef).hash)) named.set((value as FactRef).hash, value as FactRef);
+    const declared = own(types, name);
+    if (!declared) continue;
+    for (const [type, value] of leaves(declared, fields[name]!)) if (type.type === "fact" && !named.has((value as FactRef).hash)) named.set((value as FactRef).hash, value as FactRef);
   }
   return [...named.values()];
 }
@@ -89,7 +92,10 @@ export function readFacts(view: StateView, types: ActType["fields"], fields: Rea
   const facts = new Map<Digest, Fetched>();
   const uses: FactUse[] = [];
   for (const name of Object.keys(fields).sort(byteOrder)) {
-    for (const [type, value] of leaves(types[name]!, fields[name]!)) {
+    // A field with no declared type, as a handler's message has, names no item and no fact here.
+    const declared = own(types, name);
+    if (!declared) continue;
+    for (const [type, value] of leaves(declared, fields[name]!)) {
       if (type.type === "item" && view.item(value as number)?.type !== type.of) return { result: "no-item", detail: `${name} names no ${type.of}`, uses };
       if (type.type !== "fact") continue;
       const ref = value as FactRef;
@@ -150,7 +156,7 @@ export function bound(definition: ValidDefinition, message: Request | Advisory, 
   const body = message.body;
   let kind: string;
   let fields: Record<string, FieldValue> | null;
-  if (message.class === "advisory") [kind, fields] = [message.type, isObject(body) && "fields" in body ? messageFields(body["fields"], from) : {}];
+  if (message.class === "advisory") [kind, fields] = [message.type, isObject(body) && Object.hasOwn(body, "fields") ? messageFields(body["fields"], from) : {}];
   else if (message.type === "tell") {
     if (!isObject(body) || typeof body["message"] !== "string") return null;
     [kind, fields] = [body["message"], messageFields(body["fields"], from)];
@@ -217,7 +223,7 @@ export function derive(j: Judging, forms: Forms, opens: string | null, cause: Di
 export function runHandler(view: StateView, definition: ValidDefinition, context: Reading, scope: ScopeState, handler: ReceiveType, kind: string, fields: Record<string, FieldValue>, cause: Digest): Ran {
   const subjects = new Map<string, Item>();
   for (const [name, also] of Object.entries(handler.also)) {
-    const item = localItem(view, scope, fields[also.by]);
+    const item = localItem(view, scope, own(fields, also.by));
     if (item?.type !== also.item) return { result: "refused", reason: "no-item", detail: `${also.by} names no ${also.item}`, prepared: [] };
     subjects.set(`also.${name}`, item);
   }
@@ -256,12 +262,12 @@ export function runClause(view: StateView, definition: ValidDefinition, context:
   if (input.type === "act" || input.type === "genesis") {
     const intent = input.type === "act" ? input.signed.intent : input.founding?.intent;
     const kind = input.type === "act" ? input.signed.intent.kind : declared.genesis;
-    const act = declared.acts[kind]!;
+    const act = own(declared.acts, kind)!;
     const given = intent ? intent.fields : input.type === "genesis" && input.source ? creationFields(input.message, input.source) : null;
     const read = readFields(act.fields, given ?? {}, context.bounds);
     if (!read.ok) throw new Error(`entry ${origin.seq} was sealed with fields its act does not take`);
     const on = act.step === "open" ? origin.seq : intent?.on;
-    const subjects: [string, Item | null][] = Object.entries(act.also).map(([name, also]) => [`also.${name}`, view.item(read.fields[also.by] as number)]);
+    const subjects: [string, Item | null][] = Object.entries(act.also).map(([name, also]) => [`also.${name}`, view.item(own(read.fields, also.by) as number)]);
     if (typeof on === "number") subjects.push(["on", view.item(on)]);
     // A child's genesis sends its result at ordinal 0, before the sends its act declares.
     // The clause reads the member who signed the origin, and no principal. The entry that records the clause has no signer, so
@@ -273,7 +279,7 @@ export function runClause(view: StateView, definition: ValidDefinition, context:
     const b = bound(definition, input.message, input.from);
     if (!b?.handler) throw new Error(`entry ${origin.seq} sent a request and ran no handler`);
     const handler = b.handler;
-    frame = { kind: b.kind, fields: b.fields, fieldTypes: {}, subjects: Object.entries(handler.also).map(([name, also]) => [`also.${name}`, localItem(view, scope, b.fields[also.by])]), signer: null, sends: handler.sends, first: 0 };
+    frame = { kind: b.kind, fields: b.fields, fieldTypes: {}, subjects: Object.entries(handler.also).map(([name, also]) => [`also.${name}`, localItem(view, scope, own(b.fields, also.by))]), signer: null, sends: handler.sends, first: 0 };
   } else throw new Error(`entry ${origin.seq} is not one that sends a request`);
 
   const form = frame.sends[request.n - frame.first];

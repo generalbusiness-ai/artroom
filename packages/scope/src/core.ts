@@ -9,7 +9,7 @@
 
 import type { Answer, Bounds, DeclaredDefinition, Digest, DutyId, Entry, FactRef, Founded, Grant, PlatformDefinition, Receipt, RefusalReason, ScopeId, Seed, Settlement, SignedIntent, UnavailableReason } from "@generalbusiness/artroom-contract";
 import { canonicalize, definitionDigest, intentDigest, isDigest, newIncarnation, parseStrict } from "@generalbusiness/artroom-bytes";
-import { checkpointOf, factsNamed, isFactRef, isMemberRef, isObject, judgeAct, judgeCheckpoint, judgeGenesis, prepareRules, readFields, timeMs, validateDefinition } from "@generalbusiness/artroom-derive";
+import { checkpointOf, factsNamed, isFactRef, isMemberRef, isObject, judgeAct, judgeCheckpoint, judgeGenesis, own, prepareRules, readFields, timeMs, validateDefinition } from "@generalbusiness/artroom-derive";
 import type { ActJudgment, Clock as Reading, Draft, Fetched, Founding, JudgeContext, ValidDefinition } from "@generalbusiness/artroom-derive";
 import { RULE_PROFILES } from "@generalbusiness/artroom-derive/rule";
 import { namedBy } from "./definitions.ts";
@@ -171,7 +171,7 @@ export class Scope {
 
     const seed: Seed = { v: 1, kind: "directory", definition: valid.digest, creator: null, cause: intentDigest(founding.intent), ordinal: 0 };
     // Step 1: the facts the founding intent's fields name.
-    const act = valid.declared.acts[valid.declared.genesis]!;
+    const act = own(valid.declared.acts, valid.declared.genesis)!;
     const fields = readFields(act.fields, founding.intent.fields, bounds);
     const named = fields.ok ? factsNamed(act.fields, fields.fields) : [];
     const facts = named.length > bounds.usesPerEntry ? null : await fetchFacts(resolver, bounds, named);
@@ -223,7 +223,7 @@ export class Scope {
     if (!isSigned(signed)) return { answer: "refused", reason: "bad-intent", judgedAt: scope.head };
 
     const intent = signed.intent;
-    const act = Object.hasOwn(definition.declared.acts, intent.kind) ? definition.declared.acts[intent.kind] : undefined;
+    const act = own(definition.declared.acts, intent.kind);
     const fields = act ? readFields(act.fields, intent.fields, bounds) : null;
     // Section 4.2: a key on a sealed entry is answered from history, with the same receipt or a mismatch. That answer reads no
     // foreign entry, so none is fetched for it, and a lost dependency cannot hide it. The turn still drains first, and the

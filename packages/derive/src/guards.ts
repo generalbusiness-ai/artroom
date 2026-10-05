@@ -11,7 +11,7 @@ import type { Signer } from "./attribution.ts";
 import type { Item, Party, ScopeState, StateView } from "./state.ts";
 import { timeMs, type Clock } from "./time.ts";
 import type { ValidDefinition } from "./validate.ts";
-import { same } from "./values.ts";
+import { own, same } from "./values.ts";
 
 /** A foreign entry fetched before the turn, and the name of the definition its scope pins (section 6.2, the `fact` field). */
 export interface Fetched { fact: FactRef; entry: Entry; under: string }
@@ -48,7 +48,7 @@ const ok = (holds: boolean): GuardResult => (holds ? "pass" : "fail");
 
 /** What a slot holds, or null. An empty list is unset. */
 export function slotOf(item: Item, slot: string): FieldValue | null {
-  const v = item.parties[slot] ?? item.refs[slot] ?? item.values[slot] ?? null;
+  const v = own(item.parties, slot) ?? own(item.refs, slot) ?? own(item.values, slot) ?? null;
   return Array.isArray(v) && v.length === 0 ? null : (v as FieldValue | null);
 }
 
@@ -56,7 +56,7 @@ export const members = (party: Party | undefined): readonly MemberRef[] => (part
 
 /** An operand's value. A slot is read from `item`. An absent field and an empty slot are null. */
 export function operand(j: Judging, o: Operand, item: Item | null): unknown {
-  if ("field" in o) return j.fields[o.field] ?? null;
+  if ("field" in o) return own(j.fields, o.field) ?? null;
   if ("slot" in o) return item ? slotOf(item, o.slot) : null;
   if ("signer" in o) return j.signer?.member ?? null;
   return o.const;
@@ -123,10 +123,10 @@ function fieldsNamed(j: Judging, g: Guard): string[] {
 }
 
 export function judgeGuard(j: Judging, g: Guard): GuardResult {
-  if (g.ifPresent && fieldsNamed(j, g).some((f) => j.fields[f] === undefined)) return "pass";
+  if (g.ifPresent && fieldsNamed(j, g).some((f) => own(j.fields, f) === undefined)) return "pass";
   // The validator has shown that a guard which reads its subject has one, and that it is not the item being opened.
   const item = j.subjects.get(g.of ?? "on") ?? null;
-  const inSlots = (slots: readonly string[], member: MemberRef | null | undefined) => !!member && !!item && slots.some((s) => members(item.parties[s]).some((m) => same(m, member)));
+  const inSlots = (slots: readonly string[], member: MemberRef | null | undefined) => !!member && !!item && slots.some((s) => members(own(item.parties, s)).some((m) => same(m, member)));
   if ("state" in g) return ok(!!item && g.state.includes(item.state));
   if ("signer" in g) return ok(inSlots(g.signer, j.signer?.member));
   if ("notIn" in g) return ok(!inSlots(g.notIn, j.signer?.member) && !inSlots(g.notIn, j.signer?.principal));
@@ -140,25 +140,25 @@ export function judgeGuard(j: Judging, g: Guard): GuardResult {
   if ("every" in g) {
     // A field of that name when the act has one; otherwise a slot of the subject. At most 32 point reads.
     const fromField = Object.hasOwn(j.fieldTypes, g.every.list);
-    const list = fromField ? j.fields[g.every.list] : item ? slotOf(item, g.every.list) : null;
+    const list = fromField ? own(j.fields, g.every.list) : item ? slotOf(item, g.every.list) : null;
     if (list === undefined) return "fail";
     return ok((Array.isArray(list) ? list : []).every((id) => g.every.states.includes(j.view.item(id as number)?.state ?? "")));
   }
   if ("fact" in g) {
-    const ref = j.fields[g.fact.field] as FactRef | undefined;
-    const type = j.fieldTypes[g.fact.field];
+    const ref = own(j.fields, g.fact.field) as FactRef | undefined;
+    const type = own(j.fieldTypes, g.fact.field);
     if (!ref || type?.type !== "fact") return "fail";
     const fetched = j.facts.get(ref.hash);
     if (!fetched) return "dependency-unavailable";
     const input = fetched.entry.input;
     if (input.type !== "act" || input.signed.intent.kind !== type.kind || fetched.under !== type.under) return "fail";
     // `a` is a field of the foreign intent; `b` is read in this act.
-    return ok((g.fact.where ?? []).every((w) => same("field" in w.equals.a ? (input.signed.intent.fields[w.equals.a.field] ?? null) : null, operand(j, w.equals.b, item))));
+    return ok((g.fact.where ?? []).every((w) => same("field" in w.equals.a ? (own(input.signed.intent.fields, w.equals.a.field) ?? null) : null, operand(j, w.equals.b, item))));
   }
   if ("before" in g || "after" in g) {
     // Section 5.3: a reading that is behind the history proves nothing about a deadline.
     if (j.clock.behind) return "clock-behind";
-    const deadline = item ? timeMs(item.values["before" in g ? g.before.slot : g.after.slot]) : null;
+    const deadline = item ? timeMs(own(item.values, "before" in g ? g.before.slot : g.after.slot)) : null;
     const now = timeMs(j.clock.reading)!;
     return ok(deadline !== null && ("before" in g ? now < deadline : now > deadline));
   }
@@ -166,7 +166,7 @@ export function judgeGuard(j: Judging, g: Guard): GuardResult {
   const digest = digestBytes(canonicalBytes(input));
   if (j.asked) {
     // Preparation: the result is not known yet, so the guard is passed over and the guards after it are met.
-    if (!j.asked.some((a) => a.rule === g.rule && a.digest === digest)) j.asked.push({ rule: g.rule, source: j.definition.declared.rules[g.rule]!, input, digest });
+    if (!j.asked.some((a) => a.rule === g.rule && a.digest === digest)) j.asked.push({ rule: g.rule, source: own(j.definition.declared.rules, g.rule)!, input, digest });
     return "pass";
   }
   // Section 5.2, step 6.4: a rule's result from preparation is reused only when it was prepared over these inputs.

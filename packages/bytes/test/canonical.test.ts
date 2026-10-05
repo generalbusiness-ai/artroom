@@ -36,9 +36,12 @@ describe("canonical JSON", () => {
   });
 
   test("canonical bytes survive a parse and a rewrite unchanged, with `__proto__` as an ordinary key", () => {
-    const text = '{"__proto__":{"x":1},"a":[[],{}],"b":"\u20ac\\n"}';
+    const text = '{"__proto__":{"x":1},"a":[[],{"__proto__":{"__proto__":null}}],"b":"\u20ac\\n"}';
     const value = parseStrictBytes(utf8(text));
     expect(Object.getPrototypeOf(value)).toBe(Object.prototype);
+    // Nested too: the name is an own key at each depth, and no object's prototype was set.
+    const inner = ((value as { a: unknown[] }).a[1]) as Record<string, unknown>;
+    expect([Object.hasOwn(inner, "__proto__"), Object.getPrototypeOf(inner) === Object.prototype, Object.keys(Object.getOwnPropertyDescriptor(inner, "__proto__")!.value as object)]).toEqual([true, true, ["__proto__"]]);
     expect(canonicalize(value)).toBe(text);
   });
 });

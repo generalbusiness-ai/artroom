@@ -8,7 +8,7 @@ import type { Digest, FactRef, FieldType, Seed, SelfMark, Send, SendForm, SendSo
 import type { Derived } from "./effects.ts";
 import { slotOf, type Judging } from "./guards.ts";
 import type { Item } from "./state.ts";
-import { isLocalId, isScopeRef } from "./values.ts";
+import { isLocalId, isScopeRef, own } from "./values.ts";
 
 /**
  * `cause` is the seed cause of any scope this input creates (section 7.2):
@@ -18,14 +18,14 @@ import { isLocalId, isScopeRef } from "./values.ts";
  */
 export function deriveSends(j: Judging, forms: readonly SendForm[], working: ReadonlyMap<string, Item>, cause: Digest, first = 0): Derived<{ sends: Send[] }> {
   const on = working.get("on") ?? null;
-  const onType = on ? j.definition.declared.items[on.type]! : null;
-  const slotType = (slot: string): FieldType | null => (onType?.refs[slot]?.to ?? onType?.values[slot]?.of ?? null);
+  const onType = on ? own(j.definition.declared.items, on.type)! : null;
+  const slotType = (slot: string): FieldType | null => (own(onType?.refs, slot)?.to ?? own(onType?.values, slot)?.of ?? null);
   let unresolved: string | null = null;
 
   /** A source's value as it is held here, and its type when the definition states one. `self` is the entry being written. */
   const held = (s: SendSource): { value: unknown; type: FieldType | null } => {
     if (s === "self") return { value: j.self, type: { type: "item", of: "" } };
-    if ("field" in s) return { value: j.fields[s.field] ?? null, type: j.fieldTypes[s.field] ?? null };
+    if ("field" in s) return { value: own(j.fields, s.field) ?? null, type: own(j.fieldTypes, s.field) ?? null };
     if ("slot" in s) return { value: on ? slotOf(on, s.slot) : null, type: slotType(s.slot) };
     return { value: "signer" in s ? (j.signer?.member ?? null) : s.const, type: null };
   };

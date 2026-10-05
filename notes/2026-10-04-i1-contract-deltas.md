@@ -32,6 +32,10 @@ place.
 Section 23 is corrections to the client and to replay after two static
 readings of step 5 (events `5fc07d88` and `8b8ed665`), entries 143 to 150.
 
+Section 24 is two corrections after the delivery checkpoint `a9f3cb53`,
+entries 151 and 152. Section 25 is the repairs after the complete review
+`2d706f18`, entries 153 to 155.
+
 Each entry is a place where the contract was silent or needed a concrete
 form, what was implemented, and why. Nothing here is adopted by being
 implemented. An entry stays open until the contract's owner accepts it,
@@ -563,3 +567,12 @@ disposed of in it, and that entries 115 to 150 are owed to its successor
 (request `108ea663`). It counts the two entries of this section. Its section
 6 still names two rows as owned by "revision 10, when adopted"; those rows
 are not changed here.
+
+## 25. Repairs after the complete review 2d706f18
+
+Three findings of the complete review of head `97518f68`. Each row has its
+witness.
+
+| # | Where the contract is silent, or the source was wrong | Implemented | Why, and the witness |
+|---|---|---|---|
+| 153 | Names. The validator accepts any non-empty name, and so `__proto__`, `constructor` and `toString`. Two records were built by assigning `record[name]`: the fields `readFields` returns, and the validator's `deadlines`. For `__proto__` that assignment sets the prototype and adds no name. Many reads were `record[name]`, which for a name the record does not hold returns what every object inherits. | One convention, stated at `own` in derive's `values.ts`. A record keyed by a chosen name is built so that each name is an own property: by a parse, `Object.fromEntries`, a spread or a computed key. It is read with `own(record, name)`, which returns only an own property. Changed: `readFields`, `factsNamed`, `readFacts`, `bound`, `runHandler` and `runClause` in `frame.ts`; every read of a field, a slot, an item type and a state in `effects.ts`, `fold.ts`, `guards.ts`, `sends.ts`, `attribution.ts`, `judge.ts`, `genesis.ts` and `timed.ts`; in `validate.ts` the `deadlines` table, the field-shape table, the profile table, the genesis act, and the checks for a required and an empty key; the guards' exact-key check in `values.ts`; and the act and item type lookups of the scope package's `core.ts`, `delivery.ts` and `reads.ts`. No name is refused. `readFacts` and `factsNamed` now pass over a field that has no declared type, as a handler's message field has none. | Section 6.6: a slot never holds a value outside its type; section 17.2: a deadline reserves its chain. A text field named `__proto__` lost its value and its slot held an object; an item type named `__proto__` reserved nothing for its timed rules. Not changed: a test of a fixed grammar key on a record that came from a parse (`"field" in operand`), which no inherited name satisfies; the replay and client packages, where no such read was found; and the rule profile, which reserves `__proto__`, `constructor` and `prototype` as keys of a rule's input, so a `rule` guard over such a field is false (`reserved_key`). Witness, in derive's timed test, from parsed JSON: an item type, an act, a field, a value slot, a state and a timed rule named `__proto__`, and a second rule named `constructor`. The act is written with the text in the slot. The opening reserves two entries and the closing checkpoint: with the two entries the fixture starts with it fits in 6 entries and not in 5, both transitions are written, and a fold of the entries gives the same state. Without the change the test fails at its first line. The bytes test now reads `__proto__` as an own key at two depths. |

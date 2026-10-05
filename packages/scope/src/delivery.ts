@@ -17,7 +17,7 @@
 
 import type { Bounds, Entry, Incarnation, ScopeId, Seed, UnavailableReason } from "@generalbusiness/artroom-contract";
 import { canonicalize, isDigest, newIncarnation } from "@generalbusiness/artroom-bytes";
-import { creationFields, factsNamed, isEntryOf, isFactRef, isLocalId, isObject, isScopeRef, judgeDelivery, judgeGenesis, prepareRules, readFields } from "@generalbusiness/artroom-derive";
+import { creationFields, factsNamed, isEntryOf, isFactRef, isLocalId, isObject, isScopeRef, judgeDelivery, judgeGenesis, own, prepareRules, readFields } from "@generalbusiness/artroom-derive";
 import type { Clock as Reading, Creation, Delivered, DeliveryContext, Fetched, Judgment, StateView, ValidDefinition } from "@generalbusiness/artroom-derive";
 import { NO_INCARNATION, retainedFacts, used, type Scope } from "./core.ts";
 import { namedBy } from "./definitions.ts";
@@ -102,7 +102,7 @@ export class Deliveries {
     let facts: Fetched[] = [];
     let origin: Entry | null = null;
     if (!pinned && founding) {
-      const act = founding.valid.declared.acts[founding.valid.declared.genesis]!;
+      const act = own(founding.valid.declared.acts, founding.valid.declared.genesis)!;
       const given = creationFields(message.class === "request" ? message : null, from);
       const fields = given ? readFields(act.fields, given, bounds) : null;
       const named = fields?.ok ? factsNamed(act.fields, fields.fields) : [];

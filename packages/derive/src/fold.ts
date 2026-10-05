@@ -13,7 +13,7 @@ import type { Digest, Effect, Entry, ItemType, MemberRef } from "@generalbusines
 import { intentDigest, seedDigest } from "@generalbusiness/artroom-bytes";
 import { UNDER, historyOf, withActing, withMembers, withPrincipal, type Signer } from "./attribution.ts";
 import type { Item, Party, StateWriter, Status } from "./state.ts";
-import { same } from "./values.ts";
+import { own, same } from "./values.ts";
 import type { ValidDefinition } from "./validate.ts";
 
 /** An entry that this state cannot take: out of sequence, or with an effect on nothing. */
@@ -57,18 +57,19 @@ export function changeItem(item: Item, effect: ItemEffect, definition: ValidDefi
   return attributed === changed.attributed ? changed : { ...changed, attributed };
 }
 
+// A slot is set by a spread with a computed key, which defines an own property whatever the slot is named (`own`, in values.ts).
 function changeSlots(item: Item, effect: ItemEffect, definition: ValidDefinition, signer: Signer | null): Item {
-  const type = definition.declared.items[item.type]!;
-  const attributes = (slot: string) => type.parties[slot]?.author === true || (slot === HOLDER && definition.holdTypes.includes(item.type));
+  const type = own(definition.declared.items, item.type)!;
+  const attributes = (slot: string) => own(type.parties, slot)?.author === true || (slot === HOLDER && definition.holdTypes.includes(item.type));
   const noted = (slot: string, member: MemberRef) => (attributes(slot) ? withMembers(item.attributed, withPrincipal(member, signer)) : item.attributed);
   switch (effect.effect) {
     case "state": return { ...item, state: effect.state };
     case "party": {
-      const value: Party = effect.member ?? (type.parties[effect.slot]?.list ? [] : null);
+      const value: Party = effect.member ?? (own(type.parties, effect.slot)?.list ? [] : null);
       return { ...item, parties: { ...item.parties, [effect.slot]: value }, attributed: effect.member ? noted(effect.slot, effect.member) : item.attributed };
     }
     case "list": {
-      const held = item.parties[effect.slot];
+      const held = own(item.parties, effect.slot);
       const list = Array.isArray(held) ? (held as readonly MemberRef[]) : [];
       const next = effect.change === "add" ? withMembers(list, [effect.member]) : list.filter((m) => !same(m, effect.member));
       return { ...item, parties: { ...item.parties, [effect.slot]: next }, attributed: effect.change === "add" ? noted(effect.slot, effect.member) : item.attributed };
@@ -99,7 +100,7 @@ export function applyEntry(writer: StateWriter, definition: ValidDefinition, ent
     if (!held) throw new FoldError(`entry ${entry.seq} has an effect on item ${id}, which does not exist`);
     if (!before.has(id)) {
       // Section 6.6: no effect changes an item that was final before the entry.
-      if (definition.declared.items[held.type]?.states[held.state]?.final) throw new FoldError(`entry ${entry.seq} has an effect on item ${id}, which was ${held.state} before it`);
+      if (own(own(definition.declared.items, held.type)?.states, held.state)?.final) throw new FoldError(`entry ${entry.seq} has an effect on item ${id}, which was ${held.state} before it`);
       before.set(id, held);
     }
     return held;
@@ -107,7 +108,7 @@ export function applyEntry(writer: StateWriter, definition: ValidDefinition, ent
   for (const effect of entry.effects) {
     switch (effect.effect) {
       case "open": {
-        const type = definition.declared.items[effect.type];
+        const type = own(definition.declared.items, effect.type);
         // Section 4.1: an entry opens at most one item, and its ID is the entry's `seq`.
         if (!type || effect.item !== entry.seq || before.has(effect.item)) throw new FoldError(`entry ${entry.seq} opens an item it cannot`);
         before.set(effect.item, null);
@@ -148,7 +149,7 @@ export function applyEntry(writer: StateWriter, definition: ValidDefinition, ent
   // Section 6.7: every holder of a hold is in the attribution of the item the hold is under, and so is the principal of a member of
   // that attribution who changed the hold. That item is read, not changed: its revision stays.
   for (const hold of now.values()) {
-    const under = definition.holdTypes.includes(hold.type) ? hold.refs[UNDER] : null;
+    const under = definition.holdTypes.includes(hold.type) ? own(hold.refs, UNDER) : null;
     const target = typeof under === "number" && under !== hold.id ? writer.item(under) : null;
     if (!target) continue;
     const attributed = historyOf(target, [hold], definition, signer);

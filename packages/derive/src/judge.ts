@@ -21,7 +21,7 @@ import type { Item, StateView } from "./state.ts";
 import { nextDue, type Due } from "./timed.ts";
 import { timeMs, type Clock } from "./time.ts";
 import type { ValidDefinition } from "./validate.ts";
-import { isScopeRef, same } from "./values.ts";
+import { isScopeRef, own, same } from "./values.ts";
 
 /** A grant as presented, with the authority port's verdict on whether it is current (section 5.1, held authority). */
 export interface Presented { grant: Grant; current: boolean }
@@ -103,7 +103,7 @@ export function judgeAct(view: StateView, definition: ValidDefinition, signed: S
   if (scope.status === "provisional") return { result: "unavailable", reason: "scope-provisional" };
   if (scope.status === "refused") return refused("scope-refused", "the scope's genesis was refused");
 
-  const act = Object.hasOwn(declared.acts, intent.kind) ? declared.acts[intent.kind] : undefined;
+  const act = own(declared.acts, intent.kind);
   if (!act || intent.kind === declared.genesis) return refused("unknown-act", intent.kind);
 
   const read = readFields(act.fields, intent.fields, bounds);
@@ -127,7 +127,7 @@ export function judgeAct(view: StateView, definition: ValidDefinition, signed: S
     if (act.step === "transition") expects.push("on");
   }
   for (const [name, also] of Object.entries(act.also)) {
-    const id = fields[also.by];
+    const id = own(fields, also.by);
     const item = typeof id === "number" ? view.item(id) : null;
     if (item?.type !== also.item) return refused("no-item", `${also.by} names no ${also.item}`);
     subjects.set(`also.${name}`, item);
@@ -138,11 +138,11 @@ export function judgeAct(view: StateView, definition: ValidDefinition, signed: S
   if (Object.keys(intent.expected).length !== expects.length || expects.some((k) => !Object.hasOwn(intent.expected, k))) return refused("bad-intent", `expected has one key for each of: ${expects.join(", ")}`);
   for (const key of expects) {
     const item = subjects.get(key === "on" ? "on" : `also.${key}`)!;
-    if (intent.expected[key] !== item.revision) return refused("revision-moved", `${key} is at revision ${item.revision}`);
+    if (own(intent.expected, key) !== item.revision) return refused("revision-moved", `${key} is at revision ${item.revision}`);
   }
   // Section 6.3: an item in a final state refuses every transition. Comments are still allowed.
   const primary = subjects.get("on");
-  if (act.step === "transition" && primary && declared.items[primary.type]!.states[primary.state]?.final) return refused("final", `item ${primary.id} is ${primary.state}`);
+  if (act.step === "transition" && primary && own(own(declared.items, primary.type)!.states, primary.state)?.final) return refused("final", `item ${primary.id} is ${primary.state}`);
 
   // Section 6.4: every act needs a current grant for its `grant` action. The first presented grant that qualifies is the one recorded.
   const presented = context.grants.find(({ grant, current }) =>
@@ -167,9 +167,9 @@ export function judgeAct(view: StateView, definition: ValidDefinition, signed: S
 
   if (act.step === "open" && act.on !== null) {
     // Section 6.3: `max` bounds the live items of a type; an opening that would exceed it is refused.
-    const type = declared.items[act.on]!;
+    const type = own(declared.items, act.on)!;
     const live = Object.entries(type.states).reduce((n, [state, { final }]) => (final ? n : n + view.count(act.on!, state)), 0);
-    if (!type.states[effects.working.get("on")!.state]?.final && live + 1 > type.max) return refused("type-full", `${act.on} has ${live} live items`);
+    if (!own(type.states, effects.working.get("on")!.state)?.final && live + 1 > type.max) return refused("type-full", `${act.on} has ${live} live items`);
   }
 
   // Section 5.3: every act judges its `notAfter` and its grant's expiry on the commit clock, so no act is written while the clock is behind.
@@ -187,9 +187,9 @@ export function judgeAct(view: StateView, definition: ValidDefinition, signed: S
 export function judgeTimed(view: StateView, definition: ValidDefinition, selected: Due, context: Pick<JudgeContext, "clock" | "bounds">): TimedJudgment {
   const { clock, bounds } = context;
   const scope = view.scope();
-  const rule = Object.hasOwn(definition.declared.timed, selected.rule) ? definition.declared.timed[selected.rule] : undefined;
+  const rule = own(definition.declared.timed, selected.rule);
   const item = view.item(selected.item);
-  if (!scope || !rule || !item || item.type !== rule.on || !rule.states.includes(item.state) || item.values[rule.deadline] !== selected.due) return { result: "dropped", failed: "held" };
+  if (!scope || !rule || !item || item.type !== rule.on || !rule.states.includes(item.state) || own(item.values, rule.deadline) !== selected.due) return { result: "dropped", failed: "held" };
   if (clock.behind) return { result: "unavailable", reason: "clock-behind" };
   if (timeMs(clock.reading)! < timeMs(selected.due)!) return { result: "dropped", failed: "reached" };
   const next = nextDue(view, definition, clock.reading);

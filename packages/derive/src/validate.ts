@@ -11,7 +11,7 @@
 import type { Bounds, DeclaredDefinition, Digest, FieldType, TimedRule } from "@generalbusiness/artroom-contract";
 import { canonicalize, definitionDigest, isDigest, isPlatformDefinition, isScopeKind, utf8 } from "@generalbusiness/artroom-bytes";
 import { LAST_MS } from "./time.ts";
-import { isObject, isValue } from "./values.ts";
+import { isObject, isValue, own } from "./values.ts";
 
 export type ProblemCode =
   | "shape"              // not the shape of the form, or a form or field the contract does not define
@@ -141,7 +141,7 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
   const rec = (v: unknown, path: string, required: readonly string[], optional: readonly string[] = []): Rec | null => {
     if (!isObject(v)) return bad("shape", path, "must be an object");
     let ok = true;
-    for (const k of required) if (!(k in v)) ok = bad("shape", at(path, k), "is missing") ?? false;
+    for (const k of required) if (!Object.hasOwn(v, k)) ok = bad("shape", at(path, k), "is missing") ?? false;
     for (const k of Object.keys(v)) if (!required.includes(k) && !optional.includes(k)) ok = bad("shape", at(path, k), "is not a field or form the contract defines") ?? false;
     return ok ? v : null;
   };
@@ -157,7 +157,7 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
     if (!isObject(v)) return bad("shape", path, "must be an object") ?? [];
     const all = Object.entries(v);
     if (max !== null && all.length > max) bad("bound", path, `has ${all.length}; at most ${max}`);
-    if ("" in v) bad("shape", path, "has an empty name");
+    if (Object.hasOwn(v, "")) bad("shape", path, "has an empty name");
     return all;
   };
   const list = (v: unknown, path: string, max: number): unknown[] => {
@@ -181,7 +181,7 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
   if (top["format"] !== "artroom-definition-1") bad("shape", "format", "must be artroom-definition-1");
 
   const profile = rec(top["profile"], "profile", ["name", "version"]);
-  const evaluator = (profile && profiles[`${String(profile["name"])}@${String(profile["version"])}`]) || null;
+  const evaluator = (profile && own(profiles, `${String(profile["name"])}@${String(profile["version"])}`)) || null;
   if (profile && !evaluator) bad("profile", "profile", "is not a profile this runtime implements");
   // Section 6.5: a rule is a named expression in the profile's language.
   const rules = new Set<string>();
@@ -206,7 +206,7 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
 
   const fieldType = (v: unknown, path: string, extra: readonly string[] = [], nested = false): FieldType | null => {
     const before = problems.length;
-    const keys = isObject(v) && typeof v["type"] === "string" ? FIELD_SHAPES[v["type"]] : undefined;
+    const keys = isObject(v) && typeof v["type"] === "string" ? own(FIELD_SHAPES, v["type"]) : undefined;
     if (!keys) return bad("shape", path, "must be a field type");
     const o = rec(v, path, ["type", ...keys], extra);
     if (!o) return null;
@@ -757,7 +757,7 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
   }
 
   // Section 6.4: a genesis opens no timed item.
-  const genesis = typeof top["genesis"] === "string" ? acts[top["genesis"]] : undefined;
+  const genesis = typeof top["genesis"] === "string" ? own(acts, top["genesis"]) : undefined;
   if (!isObject(genesis) || genesis["step"] !== "open") bad("genesis", "genesis", "names no open act");
   else if (timedTypes.has(genesis["on"] as string) || (Array.isArray(genesis["effects"]) && genesis["effects"].some((e) => isObject(e) && "hold" in e))) {
     bad("genesis-timed", "genesis", "the genesis act opens a timed item type or has a hold effect");
@@ -774,8 +774,8 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
   // The chains are finite here: a cycle was refused above. Each rule's chain was computed once, with the cycle check.
   /** The entries a deadline reserves when an item of that type is in that state. */
   const held = (type: string, state: string): number => graph.fromState.get(type)?.get(state) ?? 0;
-  const deadlines: Record<string, Record<string, number>> = {};
-  for (const [type, states] of graph.fromState) deadlines[type] = Object.fromEntries(states);
+  // Built from entries, so each type and each state is an own name of its record, whatever it is called (`own`, in values.ts).
+  const deadlines: Record<string, Record<string, number>> = Object.fromEntries([...graph.fromState].map(([type, states]) => [type, Object.fromEntries(states)]));
   // What one clause can start: for each subject one deadline, by the state the clause sets or by a deadline slot it sets.
   const starts = (set: ClauseSet): number => {
     const bySubject = new Map<string, number>();

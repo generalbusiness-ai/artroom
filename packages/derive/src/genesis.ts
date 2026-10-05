@@ -13,7 +13,7 @@ import type { Judgment } from "./judge.ts";
 import type { StateView } from "./state.ts";
 import { timeMs } from "./time.ts";
 import type { ValidDefinition } from "./validate.ts";
-import { isFactRef, isLocalId, isObject, isScopeRef, same } from "./values.ts";
+import { isFactRef, isLocalId, isObject, isScopeRef, own, same } from "./values.ts";
 
 /**
  * What asks for a directory (section 7.1). `name` is the name of the object
@@ -105,7 +105,7 @@ export function judgeGenesis(view: StateView, definition: ValidDefinition, asked
 
   // The genesis act, with the opener's parties from the creation message, or with the founding intent's fields. It has no signer:
   // nobody signs for a scope that does not exist yet, and the founding rule is the authority note's.
-  const act = definition.declared.acts[definition.declared.genesis]!;
+  const act = own(definition.declared.acts, definition.declared.genesis)!;
   const given = founding ? founding.intent.fields : creationFields(child!.message, child!.from);
   const read = given ? readFields(act.fields, given, bounds) : null;
   if (!read?.ok) return refuse("bad-field");

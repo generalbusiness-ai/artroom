@@ -11,7 +11,7 @@
 import { ENTRY_READ_BYTES, HISTORY_PAGE_BYTES, HISTORY_PAGE_ENTRIES, OUTBOX_PAGE_DUTIES, RETAINED_INPUT_BYTES, RETAINED_ITEMS_PAGE } from "@generalbusiness/artroom-contract";
 import type { Cursor, Digest, DutyId, Entry, LogPage, Read, ReadRefusal, RetainedInput, Summary } from "@generalbusiness/artroom-contract";
 import { isDutyId, positionOf } from "@generalbusiness/artroom-bytes";
-import { byteOrder, type Item, type ScopeState, type ValidDefinition } from "@generalbusiness/artroom-derive";
+import { byteOrder, own, type Item, type ScopeState, type ValidDefinition } from "@generalbusiness/artroom-derive";
 import type { Pinned } from "./core.ts";
 import type { ReadName, Readers } from "./ports.ts";
 import type { Duty, Sealed, Store, Stored } from "./store.ts";
@@ -71,7 +71,7 @@ export class Reads {
     for (const [name, type] of Object.entries(definition.declared.items).sort(([a], [b]) => byteOrder(a, b))) {
       const states = Object.keys(type.states).sort(byteOrder);
       for (const state of states) counts.push([name, state, this.#store.count(name, state)]);
-      const live = this.#store.page(name, states.filter((s) => !type.states[s]!.final), null, type.max);
+      const live = this.#store.page(name, states.filter((s) => !own(type.states, s)!.final), null, type.max);
       items.push(...live.items);
       if (live.more) complete = false;
     }
@@ -83,10 +83,10 @@ export class Reads {
   items(reader: unknown, type: string, cursor?: Cursor): Read<readonly Item[]> {
     const open = this.#defined(reader, "items");
     if (!("scope" in open)) return open;
-    const declared = Object.hasOwn(open.definition.declared.items, type) ? open.definition.declared.items[type] : undefined;
+    const declared = own(open.definition.declared.items, type);
     const after = position(cursor, null);
     if (!declared || after === undefined) return no("not-found");
-    const final = Object.keys(declared.states).filter((s) => declared.states[s]!.final);
+    const final = Object.keys(declared.states).filter((s) => own(declared.states, s)!.final);
     const page = this.#store.page(type, final, after, this.#bounds.retainedItems);
     return { ok: true, at: open.scope.head, value: page.items, complete: !page.more, ...(page.more ? { next: String(page.items.at(-1)!.id) } : {}) };
   }

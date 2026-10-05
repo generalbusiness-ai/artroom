@@ -7,8 +7,22 @@ import { timeMs } from "./time.ts";
 /** The scope kinds, from the bytes package, which holds the one guard of each identifier. */
 export { SCOPE_KINDS };
 
+/**
+ * What a record holds under a name, or undefined. For every record keyed by
+ * a name that a definition, an intent or a message chose: a field, a slot,
+ * an item type, a state, an act, a rule, a handler, a relationship. Only an
+ * own property is a member of such a record, so `__proto__`, `constructor`
+ * and `toString` are names like any other, and a name the record does not
+ * hold resolves to nothing. Such a record is built so that each name is an
+ * own property: by `JSON.parse`, the strict parser, `Object.fromEntries`,
+ * a spread, or a computed key in a literal. It is never built by assigning
+ * to `record[name]`, which for `__proto__` sets the prototype instead.
+ */
+export const own = <T>(record: Readonly<Record<string, T>> | null | undefined, name: string): T | undefined =>
+  (record !== null && record !== undefined && Object.hasOwn(record, name) ? record[name] : undefined);
+
 export const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
-const hasOnly = (v: Record<string, unknown>, keys: readonly string[]) => Object.keys(v).length === keys.length && keys.every((k) => k in v);
+const hasOnly = (v: Record<string, unknown>, keys: readonly string[]) => Object.keys(v).length === keys.length && keys.every((k) => Object.hasOwn(v, k));
 
 export function isScopeRef(v: unknown): v is ScopeRef {
   return isObject(v) && hasOnly(v, ["scope", "inc", "kind"]) && isScopeId(v["scope"]) && isIncarnation(v["inc"]) && isScopeKind(v["kind"]);

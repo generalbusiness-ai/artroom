@@ -3,7 +3,7 @@
 import type { MemberRef } from "@generalbusiness/artroom-contract";
 import type { Item } from "./state.ts";
 import type { ValidDefinition } from "./validate.ts";
-import { same } from "./values.ts";
+import { own, same } from "./values.ts";
 
 /** The reference slot of a hold type that names the item the hold is under. */
 export const UNDER = "under";
@@ -42,7 +42,7 @@ export function withActing(attributed: readonly MemberRef[], signer: Signer | nu
 export function historyOf(item: Item, changed: Iterable<Item>, definition: ValidDefinition, signer: Signer | null): readonly MemberRef[] {
   let history = item.attributed;
   for (const hold of changed) {
-    if (hold.id === item.id || !definition.holdTypes.includes(hold.type) || hold.refs[UNDER] !== item.id) continue;
+    if (hold.id === item.id || !definition.holdTypes.includes(hold.type) || own(hold.refs, UNDER) !== item.id) continue;
     history = withActing(withMembers(history, hold.attributed), signer);
   }
   return history;

@@ -12,7 +12,7 @@ import { HOLDER, changeItem, newItem, type ItemEffect } from "./fold.ts";
 import { members, slotOf, type Judging } from "./guards.ts";
 import type { Item } from "./state.ts";
 import { LAST_MS, timeMs, timeOf } from "./time.ts";
-import { isMemberRef, isValue, memberFits, same } from "./values.ts";
+import { isMemberRef, isValue, memberFits, own, same } from "./values.ts";
 
 export type Derived<T> = ({ ok: true } & T) | { ok: false; reason: RefusalReason; detail: string };
 
@@ -31,7 +31,7 @@ export function deriveEffects(j: Judging, forms: readonly EffectForm[], attentio
    * value is checked against the slot it would fill.
    */
   const fieldFor = (name: string, fits: (value: FieldValue) => boolean): Derived<{ value: FieldValue | null }> => {
-    const value = j.fields[name] ?? null;
+    const value = own(j.fields, name) ?? null;
     return value === null || Object.hasOwn(j.fieldTypes, name) || fits(value) ? { ok: true, value } : refuse("bad-field", `${name} is not a value of the slot's type`);
   };
   const apply = (subject: string, effect: ItemEffect) => {
@@ -41,23 +41,23 @@ export function deriveEffects(j: Judging, forms: readonly EffectForm[], attentio
 
   if (opens !== null) {
     // Section 6.3, "Opening, exactly": the initial state, each default, then the opening effects in the order written.
-    const open = { effect: "open", item: j.self, type: opens, state: items[opens]!.initial } as const;
+    const open = { effect: "open", item: j.self, type: opens, state: own(items, opens)!.initial } as const;
     effects.push(open);
-    working.set("on", newItem(open, items[opens]!, null));
+    working.set("on", newItem(open, own(items, opens)!, null));
   }
 
   const renewals: { at: number; subject: string }[] = [];
   for (const [i, form] of forms.entries()) {
     const subject = form.of ?? "on";
     const item = working.get(subject)!;
-    const type = items[item.type]!;
+    const type = own(items, item.type)!;
     const id = item.id;
     // Section 6.6: no effect of any kind changes an item that was final before the entry, however the entry orders its effects.
     // An entry that takes a live item to a final state may carry its other effects on that item.
     const was = j.subjects.get(subject);
-    if (was && type.states[was.state]?.final) return refuse("final", `effects.${i}: item ${id} is ${was.state}`);
+    if (was && own(type.states, was.state)?.final) return refuse("final", `effects.${i}: item ${id} is ${was.state}`);
     /** A list may take one more member. */
-    const room = (slot: string) => members(working.get(subject)!.parties[slot]).length < Math.min(type.parties[slot]?.max ?? j.bounds.listElements, j.bounds.listElements);
+    const room = (slot: string) => members(own(working.get(subject)!.parties, slot)).length < Math.min(own(type.parties, slot)?.max ?? j.bounds.listElements, j.bounds.listElements);
 
     if ("state" in form) {
       apply(subject, { effect: "state", item: id, state: form.state });
@@ -67,19 +67,19 @@ export function deriveEffects(j: Judging, forms: readonly EffectForm[], attentio
       if (from === null) member = null;
       else if ("signer" in from) member = j.signer?.member ?? null;
       else if ("fact" in from) {
-        const ref = j.fields[from.fact] as FactRef | undefined;
+        const ref = own(j.fields, from.fact) as FactRef | undefined;
         const input = ref ? j.facts.get(ref.hash)?.entry.input : undefined;
-        const value = input?.type === "act" ? input.signed.intent.fields[from.field] : undefined;
+        const value = input?.type === "act" ? own(input.signed.intent.fields, from.field) : undefined;
         if (value !== undefined && !isMemberRef(value)) return refuse("bad-field", `effects.${i}: the fact's field ${from.field} is not a member`);
         member = value ?? null;
       } else if ("field" in from) {
         const field = fieldFor(from.field, isMemberRef);
         if (!field.ok) return field;
         member = field.value as MemberRef | null;
-      } else member = (item.parties[from.slot] as MemberRef | null | undefined) ?? null;
+      } else member = (own(item.parties, from.slot) as MemberRef | null | undefined) ?? null;
       // Whatever its source, a member put in a slot is within the bound of a handle.
       if (member && !memberFits(member, j.bounds)) return refuse("bad-field", `effects.${i}: the member's handle is longer than a handle may be`);
-      const has = member !== null && members(item.parties[slot]).some((m) => same(m, member));
+      const has = member !== null && members(own(item.parties, slot)).some((m) => same(m, member));
       if (list === undefined) apply(subject, { effect: "party", item: id, slot, member });
       else if (member && list === "add" && !has) {
         if (!room(slot)) return refuse("slot-full", `effects.${i}: ${slot}`);
@@ -88,7 +88,7 @@ export function deriveEffects(j: Judging, forms: readonly EffectForm[], attentio
     } else if ("ref" in form) {
       const { slot, from } = form.ref;
       // Section 6.4: inside a scope, `self` is a local reference to the entry being written, and so to the item it opens.
-      const field = from !== null && from !== "self" && "field" in from ? fieldFor(from.field, (v) => isValue(type.refs[slot]!.to, v, j.bounds)) : null;
+      const field = from !== null && from !== "self" && "field" in from ? fieldFor(from.field, (v) => isValue(own(type.refs, slot)!.to, v, j.bounds)) : null;
       if (field && !field.ok) return field;
       // Section 6.6: a copy preserves its source. A slot source is the slot of that name, of whatever kind.
       const to: FieldValue | null = from === null ? null : from === "self" ? j.self : field ? field.value : "slot" in from ? slotOf(item, from.slot) : null;
@@ -96,7 +96,7 @@ export function deriveEffects(j: Judging, forms: readonly EffectForm[], attentio
     } else if ("value" in form) {
       const { slot, from } = form.value;
       // The commit time plus a constant: a derived deadline, such as a new hold's end (section 5.2, step 6.4).
-      const field = "field" in from ? fieldFor(from.field, (v) => isValue(type.values[slot]!.of, v, j.bounds)) : null;
+      const field = "field" in from ? fieldFor(from.field, (v) => isValue(own(type.values, slot)!.of, v, j.bounds)) : null;
       if (field && !field.ok) return field;
       // The validator bounds the offset, so the sum is a safe integer. A time past the last timestamp is not a value of the slot.
       const derived = "time" in from ? timeMs(j.clock.reading)! + from.time.plusSeconds * 1000 : null;
@@ -108,7 +108,7 @@ export function deriveEffects(j: Judging, forms: readonly EffectForm[], attentio
       // written before this one: a member whom an earlier effect of this entry made the holder of a hold under the subject is in it.
       const { slot } = form.attribute;
       for (const member of attribution(historyOf(working.get(form.attribute.of)!, working.values(), j.definition, j.signer), j.signer)) {
-        if (members(working.get(subject)!.parties[slot]).some((m) => same(m, member))) continue;
+        if (members(own(working.get(subject)!.parties, slot)).some((m) => same(m, member))) continue;
         if (!memberFits(member, j.bounds)) return refuse("bad-field", `effects.${i}: a member's handle is longer than a handle may be`);
         if (!room(slot)) return refuse("slot-full", `effects.${i}: ${slot}`);
         apply(subject, { effect: "list", item: id, slot, change: "add", member });
@@ -124,7 +124,7 @@ export function deriveEffects(j: Judging, forms: readonly EffectForm[], attentio
   for (const { at, subject } of renewals) {
     const item = working.get(subject)!;
     // Section 6.8: the epoch rises when the hold is renewed by another holder.
-    const other = !same(j.subjects.get(subject)?.parties[HOLDER] ?? null, item.parties[HOLDER] ?? null);
+    const other = !same(own(j.subjects.get(subject)?.parties, HOLDER) ?? null, own(item.parties, HOLDER) ?? null);
     const effect: ItemEffect = { effect: "hold", item: item.id, change: "renew", epoch: (item.epoch ?? 0) + (other ? 1 : 0) };
     effects[at] = effect;
     working.set(subject, changeItem(item, effect, j.definition, j.signer));
@@ -133,7 +133,7 @@ export function deriveEffects(j: Judging, forms: readonly EffectForm[], attentio
   if (opens !== null) {
     // Section 6.3: after the opening effects every required slot must hold a value.
     const opened = working.get("on")!;
-    const type = items[opens]!;
+    const type = own(items, opens)!;
     for (const [slot, rule] of [...Object.entries(type.parties), ...Object.entries(type.refs), ...Object.entries(type.values)]) {
       if (rule.required && slotOf(opened, slot) === null) return refuse("required-unset", slot);
     }
@@ -141,7 +141,7 @@ export function deriveEffects(j: Judging, forms: readonly EffectForm[], attentio
 
   for (const { notify } of attention) {
     // Section 6.6: the members in that slot as it was before the effects, or as it is after.
-    const told = members((notify.when === "before" ? j.subjects : working).get(notify.of)?.parties[notify.slot]);
+    const told = members(own((notify.when === "before" ? j.subjects : working).get(notify.of)?.parties, notify.slot));
     if (told.length > 0) effects.push({ effect: "attention", item: working.get(notify.of)!.id, members: told, reason: notify.reason });
   }
   return { ok: true, effects, working };

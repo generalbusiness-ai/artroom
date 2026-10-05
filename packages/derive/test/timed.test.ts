@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import { clockOf, judgeTimed, nextDue, validateDefinition } from "../src/index.ts";
+import { clockOf, fits, judgeTimed, nextDue, owed, validateDefinition } from "../src/index.ts";
 import { Scope, fields, keys, lane, laneDefinition, on, t, valid } from "./fixtures.ts";
 
 const { rita, una, vic, sam } = keys;
@@ -101,5 +101,43 @@ describe("the clock (section 5.3)", () => {
     expect(s.drain().map((j) => j.result)).toEqual(["write"]);
     expect(remark(s, t(10))).toEqual({ result: "unavailable", reason: "clock-behind" });
     expect(remark(s, t(600)).result).toBe("write");
+  });
+});
+
+describe("a name is whatever its definition chose (sections 6.1 and 17.2)", () => {
+  // Parsed JSON, as a definition and an intent arrive: `__proto__` and `constructor` are own names of their records.
+  const named = valid(validateDefinition(JSON.parse(`{
+    "format": "artroom-definition-1", "profile": { "name": "restricted", "version": 1 }, "capabilities": [], "genesis": "start", "receives": {}, "rules": {},
+    "items": {
+      "root": { "many": false, "max": 1, "states": { "open": { "final": false } }, "initial": "open", "parties": { "owner": { "fixed": true, "required": true, "list": false, "author": false } }, "refs": {}, "values": {} },
+      "__proto__": {
+        "many": true, "max": 4, "states": { "__proto__": { "final": false }, "constructor": { "final": false }, "done": { "final": true } }, "initial": "__proto__", "parties": {}, "refs": {},
+        "values": { "__proto__": { "fixed": false, "required": true, "of": { "type": "text", "max": 20 } }, "until": { "fixed": false, "required": true, "of": { "type": "time" } } }
+      }
+    },
+    "acts": {
+      "start": { "step": "open", "on": "root", "grant": "start", "also": {}, "fields": { "opener": { "type": "member", "required": true } }, "guards": [], "effects": [{ "party": { "slot": "owner", "from": { "field": "opener" } } }], "sends": [], "attention": [] },
+      "__proto__": {
+        "step": "open", "on": "__proto__", "grant": "note", "also": {}, "fields": { "__proto__": { "type": "text", "max": 20, "required": true }, "until": { "type": "time", "required": true } }, "guards": [],
+        "effects": [{ "value": { "slot": "__proto__", "from": { "field": "__proto__" } } }, { "value": { "slot": "until", "from": { "field": "until" } } }], "sends": [], "attention": []
+      }
+    },
+    "timed": {
+      "__proto__": { "on": "__proto__", "states": ["__proto__"], "deadline": "until", "effects": [{ "state": "constructor" }], "attention": [] },
+      "constructor": { "on": "__proto__", "states": ["constructor"], "deadline": "until", "effects": [{ "state": "done" }], "attention": [] }
+    }
+  }`), PROPOSED_BOUNDS));
+
+  test("a required text field named `__proto__` is admitted with its text in the slot, and an item type of that name reserves an entry for each rule of its chain", () => {
+    const s = new Scope(named);                                // entries 0 and 1: the genesis and its confirmation
+    const opened = s.did(sam, "__proto__", { fields: JSON.parse(`{ "__proto__": "kept", "until": "${t(-60)}" }`) });
+    expect(opened.effects).toContainEqual({ effect: "value", item: 2, slot: "__proto__", value: "kept" });
+    expect([Object.hasOwn(s.item(2).values, "__proto__"), Object.getOwnPropertyDescriptor(s.item(2).values, "__proto__")?.value]).toEqual([true, "kept"]);
+    // The opening holds a deadline whose chain is two rules: 3 written, 2 reserved, and the closing checkpoint. It fits in 6 entries and not in 5.
+    expect(JSON.stringify(named.deadlines)).toBe('{"__proto__":{"__proto__":2,"constructor":1}}');
+    expect([owed(s.state, named, opened.input), fits(s.state, named, { scopeEntries: 6 }, opened.input), fits(s.state, named, { scopeEntries: 5 }, opened.input)]).toEqual([3, true, false]);
+    // Both transitions are written from that reservation, and a fold of the entries gives the same state.
+    expect([s.drain().map((j) => j.result), s.item(2).state, s.entries.length + owed(s.state, named, s.last.input)]).toEqual([["write", "write"], "done", 6]);
+    expect(s.replay().snapshot()).toBe(s.state.snapshot());
   });
 });

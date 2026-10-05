@@ -7,7 +7,7 @@ import type { Timestamp } from "@generalbusiness/artroom-contract";
 import type { StateView } from "./state.ts";
 import { timeMs } from "./time.ts";
 import type { ValidDefinition } from "./validate.ts";
-import { byteOrder } from "./values.ts";
+import { byteOrder, own } from "./values.ts";
 
 /** One transition: the item that holds the deadline `due` under the timed rule `rule`. */
 export interface Due { item: number; rule: string; due: Timestamp }
@@ -25,8 +25,8 @@ export function nextDue(view: StateView, definition: ValidDefinition, asOf: Time
   let best: { due: Due; ms: number } | null = null;
   for (const [name, rule] of Object.entries(definition.declared.timed)) {
     // A rule's states are live, and a type's `max` bounds its live items, so this one page is all of them.
-    for (const item of view.page(rule.on, rule.states, null, definition.declared.items[rule.on]!.max).items) {
-      const due = item.values[rule.deadline];
+    for (const item of view.page(rule.on, rule.states, null, own(definition.declared.items, rule.on)!.max).items) {
+      const due = own(item.values, rule.deadline);
       const ms = timeMs(due);
       if (ms === null || ms > limit) continue;
       if (best === null || ms < best.ms || (ms === best.ms && (item.id < best.due.item || (item.id === best.due.item && byteOrder(name, best.due.rule) < 0)))) {
