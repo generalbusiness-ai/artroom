@@ -154,17 +154,20 @@ export function operationOpening(k: number, open: Opening, held = false): Effect
 
 /**
  * Item 1: attempt 1 of each operation that a provisional scope's genesis
- * holds, opened by the entry that records the confirmation. `genesis` is the
- * scope's entry 0.
+ * holds, opened by the entry that records the confirmation. The operations
+ * of the genesis, entry 0, are numbered from 0 in the order of its records,
+ * so they are read from the folded state by their IDs. One that has an
+ * attempt already is not held, and is left as it is.
  */
-// I3 merge: the judge of a confirmation does not call this yet. No genesis can declare an operation until an owner's rules exist,
-// so the call has no witness. It comes with the first definition whose genesis opens one (plan step 9b; I3 deltas, entry EB12).
-export function heldOpenings(view: StateView, genesis: Entry): Effect[] {
-  return genesis.effects.flatMap((effect): Effect[] => {
-    if (effect.effect !== "operation") return [];
-    const operation = operationId(genesis.seq, effect.k);
-    return view.operation(operation)?.attempts.length === 0 ? [{ effect: "attempt", operation, attempt: 1, result: "opened", selected: null }] : [];
-  });
+// The judge of a confirmation calls this (`delivery.ts`). The first genesis that holds an operation is the destination's, by its
+// rule `declare-first-head` (plan step 9b; I3 deltas, entries EB12 and ER12).
+export function heldOpenings(view: StateView): Effect[] {
+  const effects: Effect[] = [];
+  for (let k = 0; ; k++) {
+    const operation = view.operation(operationId(0, k));
+    if (!operation) return effects;
+    if (operation.attempts.length === 0) effects.push({ effect: "attempt", operation: operation.id, attempt: 1, result: "opened", selected: null });
+  }
 }
 
 /** The digest of an outcome's evidence, which the folded state keeps so that a second copy of an answer is told from another answer (item 6). */
