@@ -31,8 +31,9 @@ export function directoryOf(genesis: Pick<Extract<Input, { type: "genesis" }>, "
   return isScopeRef(named) && named.kind === "directory" ? named : null;
 }
 
-/** True when a guard of the list, as written at the top of it, reads the clock. */
-export const readsClock = (guards: readonly Guard[] | undefined): boolean => (guards ?? []).some((g) => "before" in g || "after" in g);
+/** True when a guard of the list reads the clock, as written at the top of it or nested in a list form. Whether it is evaluated is not asked. */
+export const readsClock = (guards: readonly Guard[] | undefined): boolean => (guards ?? []).some((g) =>
+  "before" in g || "after" in g || ("anyOf" in g ? g.anyOf.some(readsClock) : "each" in g ? readsClock(g.each.guards) : "has" in g && readsClock(g.has.guards)));
 
 /** True when the condition of a send or of a notice reads the clock: the entry then judges time (section 5.3). */
 export const conditionsReadClock = (sends: readonly SendForm[], attention: readonly Notify[]): boolean =>

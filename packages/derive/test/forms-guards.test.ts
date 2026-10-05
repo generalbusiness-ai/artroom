@@ -3,7 +3,7 @@ import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { ActType, Bounds, DeclaredDefinition, FieldValue, Guard, Operand, Range, Send } from "@generalbusiness/artroom-contract";
 import { factRefOf } from "@generalbusiness/artroom-bytes";
 import { judgeDelivery, validateDefinition, type ActJudgment, type Fetched, type ProblemCode } from "../src/index.ts";
-import { Scope, arriving, desk, fields, forged, founded, keys, on, ticketDefinition, valid, variant } from "./fixtures.ts";
+import { Scope, arriving, desk, fields, forged, founded, keys, on, t, ticketDefinition, valid, variant } from "./fixtures.ts";
 
 const { rita } = keys;
 
@@ -196,6 +196,21 @@ describe("the list forms (section 6.5)", () => {
     expect([said(foreign), foreign.result === "write" && foreign.draft.uses.map((u) => u.fact)]).toEqual(["passes", [m.fact(4)]]);
     // Entry 5 is this scope's own, and is a `request`: a value of the field's type, and not an entry of the kind that the type states.
     expect(said(probe([s.fact(4), s.fact(5)]))).toBe("not-a-pass");
+  });
+
+  test("an entry whose guards read the clock, also inside a list form, is not written while the clock is behind", () => {
+    // A delivery may be written clamped when it judges no time (section 5.3). The first alternative holds, so the second is not evaluated.
+    const timed = (second: Guard) => variant(desk, (d) => {
+      d.items.repo.values.due = { fixed: false, required: false, of: { type: "time" } };
+      d.receives.audit = { message: "audit", class: "tell", from: { kind: "lane" }, fields: {}, opens: null, also: { repo: { item: "repo", one: true } }, guards: [{ of: "also.repo", anyOf: [[{ set: "source" }], [second]] }], effects: [], sends: [], attention: [] };
+    });
+    const D = founded();
+    const tell: Send = { n: 0, to: D.at, message: { class: "request", type: "tell", body: { message: "audit", fields: {} } } };
+    const source = forged(new Scope(ticketDefinition).at, 1, D.entries[0]!.entry.input, [tell]);
+    const arrival = { ...tell, from: factRefOf(source.entry) };
+    D.now = t(-10);
+    const judged = (second: Guard) => { const j = judgeDelivery(D.state, timed(second), arrival, arriving(D, arrival, source)); return j.result === "unavailable" ? j.reason : j.result; };
+    expect([judged({ unset: "due" }), judged({ before: { slot: "due" } })]).toEqual(["write", "clock-behind"]);
   });
 
   test("a handler reads the members of a record element of a list in its message", () => {

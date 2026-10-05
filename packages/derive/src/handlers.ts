@@ -163,14 +163,14 @@ export type Ran =
 /** Section 4.2: when a failed guard declares a `reason`, that is the refusal's name. */
 export const refusalName = (guard: Guard): { name?: string } => (guard.reason === undefined ? {} : { name: guard.reason });
 
-/** True when an effect sets a slot from the commit time. */
-const timesEffect = (e: EffectForm): boolean => "value" in e && e.value.from !== null && "time" in e.value.from;
+/** True when an effect sets a slot from the commit time, or its condition reads the clock. */
+const timesEffect = (e: EffectForm): boolean => ("value" in e && e.value.from !== null && "time" in e.value.from) || readsClock(e.if) || readsClock(e.unless);
 
 /**
  * Guards, then effects, then sends, for one input whose subjects are
- * resolved (section 5.2, step 6.4). `judgesTime`: a guard read the clock, or
- * an effect derived a time from it, so the entry is not written while the
- * clock is behind (section 5.3). `directory`: the directory the scope
+ * resolved (section 5.2, step 6.4). `judgesTime`: a guard or a condition of
+ * the forms reads the clock, at any depth, or an effect derives a time from
+ * it, so the entry is not written while the clock is behind (section 5.3). `directory`: the directory the scope
  * records, when the entry is its genesis.
  */
 export function derive(j: Judging, forms: Forms, opens: string | null, cause: Digest, first = 0, directory?: ScopeRef | null): Ran {
