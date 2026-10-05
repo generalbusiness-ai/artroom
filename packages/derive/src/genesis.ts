@@ -104,7 +104,7 @@ export function judgeGenesis(view: StateView, definition: ValidDefinition, asked
   // The genesis act, with the opener's parties from the creation message, or with the founding intent's fields. It has no signer:
   // nobody signs for a scope that does not exist yet, and the founding rule is the authority note's.
   const act = own(definition.declared.acts, definition.declared.genesis)!;
-  const given = founding ? founding.intent.fields : creationFields(child!.message, child!.from);
+  const given = founding ? founding.intent.fields : creationFields(child!.message, child!.from, act.fields);
   const read = given ? readFields(act.fields, given, bounds) : null;
   if (!read?.ok) return refuse({ code: "bad-field" });
   // A scope has no entry before its genesis, so a fact that names it names nothing: `fact-mismatch`.

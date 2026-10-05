@@ -138,7 +138,7 @@ export class Deliveries {
     const known = store.decided(from.at, from.seq, delivered.n) !== null;
     if (!pinned && founding) {
       const act = own(founding.valid.declared.acts, founding.valid.declared.genesis)!;
-      const given = creationFields(message.class === "request" ? message : null, from);
+      const given = creationFields(message.class === "request" ? message : null, from, act.fields);
       carried = textsNamed(act.fields, given);
       const fields = given ? readFields(act.fields, given, bounds) : null;
       // The scope has no genesis yet, so no fact can name it: every fact a creation names is foreign.

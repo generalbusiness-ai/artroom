@@ -9,7 +9,8 @@
 
 import type { Entry, EntryPart, FactRef, FieldValue, Operand, Part, ScopeRef } from "@generalbusiness/artroom-contract";
 import { intentDigest } from "@generalbusiness/artroom-bytes";
-import { creationFields, isEntryOf, isLocalFact, messageFields, updateOf } from "./fields.ts";
+import { creationFields, isEntryOf, isLocalFact } from "./fields.ts";
+import { bound } from "./handlers.ts";
 import type { Judging } from "./guards.ts";
 import type { Item } from "./state.ts";
 import { isFactRef, isLocalId, isObject, memberOf, own, same } from "./values.ts";
@@ -107,13 +108,12 @@ function given(entry: Entry, item: unknown, slot: string): unknown {
 }
 
 /** A field of the entry's intent, or of the message it delivered. A genesis has the fields of its founding intent, or of its creation request. */
-function fieldOf(entry: Entry, name: string): unknown {
+function fieldOf(j: Judging, entry: Entry, name: string): unknown {
   const input = entry.input;
   if (input.type === "act") return own(input.signed.intent.fields, name) ?? null;
-  if (input.type === "genesis") return own(input.founding ? input.founding.intent.fields : input.source ? creationFields(input.message, input.source) : null, name) ?? null;
+  if (input.type === "genesis") return own(input.founding ? input.founding.intent.fields : input.source ? creationFields(input.message, input.source, own(j.definition.declared.acts, j.definition.declared.genesis)!.fields) : null, name) ?? null;
   if (input.type !== "delivery" || input.message.class !== "request" || !isObject(input.message.body)) return null;
-  const fields = input.message.type === "tell" ? messageFields(input.message.body["fields"], input.from) : input.message.type === "relate" ? (updateOf(input.message, input.from)?.detail ?? null) : null;
-  return own(fields, name) ?? null;
+  return own(bound(j.definition, input.message, input.from)?.fields ?? null, name) ?? null;
 }
 
 /** One part of the entry that `ref` names. `at` is that entry's scope. */
@@ -131,7 +131,7 @@ function entryPart(j: Judging, ref: Held, at: ScopeRef, part: EntryPart, item: I
   if (part === "intent") return input.type === "act" ? intentDigest(input.signed.intent) : input.type === "genesis" && input.founding ? intentDigest(input.founding.intent) : null;
   // The primary item: the item the entry opens, by the entry's own `seq`, or the item an act or a timed entry is on.
   if (part === "on") return entry.effects.some((e) => e.effect === "open") ? entry.seq : input.type === "act" ? input.signed.intent.on : input.type === "timed" ? input.item : null;
-  if ("field" in part) return fieldOf(entry, part.field);
+  if ("field" in part) return fieldOf(j, entry, part.field);
   if ("opened" in part) return entry.effects.some((e) => e.effect === "open") ? given(entry, entry.seq, part.opened) : null;
   if ("set" in part) {
     const id = operand(j, part.set.item, item);

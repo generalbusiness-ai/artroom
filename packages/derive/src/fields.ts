@@ -198,30 +198,34 @@ export function readFacts(view: StateView, types: ActType["fields"], fields: Rea
 
 const isSelf = (v: unknown): boolean => isObject(v) && Object.keys(v).length === 1 && v["self"] === true;
 
-/** Section 6.4: in a message `self` is not expanded by the sender. The receiver reads it as the envelope's `from`. */
-function unmarked(value: unknown, from: FactRef): unknown {
-  return isSelf(value) ? from : Array.isArray(value) ? value.map((v) => unmarked(v, from)) : value;
+/**
+ * Section 6.4: in a message `self` is not expanded by the sender. The receiver reads it as the envelope's `from`.
+ * Section 6.6: the mark is not a value of any field type. It stands for a fact, so it is read only where the declared
+ * type is a fact or a list of them. A record that holds a member named `self` is a record, and a field with no declared type reads none.
+ */
+function unmarked(value: unknown, from: FactRef, type: FieldType | undefined): unknown {
+  if (type?.type === "list" && Array.isArray(value)) return value.map((v) => unmarked(v, from, type.of));
+  return type?.type === "fact" && isSelf(value) ? from : value;
 }
 
-/** The fields of a delivered message, with each `self` read. Null when they are not a set of named values. */
-export function messageFields(sent: unknown, from: FactRef): Record<string, FieldValue> | null {
-  return isObject(sent) ? Object.fromEntries(Object.entries(sent).map(([name, v]) => [name, unmarked(v, from) as FieldValue])) : null;
+/** The fields of a delivered message, with each `self` read against the declared `types` of its handler. Null when they are not a set of named values. */
+export function messageFields(sent: unknown, from: FactRef, types: ActType["fields"]): Record<string, FieldValue> | null {
+  return isObject(sent) ? Object.fromEntries(Object.entries(sent).map(([name, v]) => [name, unmarked(v, from, own(types, name)) as FieldValue])) : null;
 }
 
-/** The fields a creation request gives the child's genesis act (section 7.2). */
-export function creationFields(message: Request | null, from: FactRef): Record<string, FieldValue> | null {
-  return message && isObject(message.body) ? messageFields(message.body["fields"], from) : null;
+/** The fields a creation request gives the child's genesis act (section 7.2), read against the fields `types` of that act. */
+export function creationFields(message: Request | null, from: FactRef, types: ActType["fields"]): Record<string, FieldValue> | null {
+  return message && isObject(message.body) ? messageFields(message.body["fields"], from, types) : null;
 }
 
-/** A relationship update as its receiver reads it (section 7.3). `item` is the owner's item, by the fact of the entry that opened it. */
-export interface Update { name: string; item: FactRef; state: string; detail: Record<string, FieldValue> }
+/** A relationship update as its receiver reads it (section 7.3). `item` is the owner's item, by the fact of the entry that opened it. Its detail is read by `messageFields`, against the types of its handler. */
+export interface Update { name: string; item: FactRef; state: string }
 
 export function updateOf(message: Request, from: FactRef): Update | null {
   const body = message.body;
   if (message.type !== "relate" || !isObject(body) || typeof body["name"] !== "string" || typeof body["state"] !== "string") return null;
-  const item = unmarked(body["item"], from);
-  const detail = messageFields(body["detail"], from);
+  const item = isSelf(body["item"]) ? from : body["item"];
   // The owner names its own item: the entry it is writing, or an earlier entry of its own history.
-  if (!detail || !isFactRef(item) || !same(item.at, from.at)) return null;
-  return { name: body["name"], item, state: body["state"], detail };
+  if (!isObject(body["detail"]) || !isFactRef(item) || !same(item.at, from.at)) return null;
+  return { name: body["name"], item, state: body["state"] };
 }

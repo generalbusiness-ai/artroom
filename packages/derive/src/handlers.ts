@@ -34,17 +34,20 @@ import { isFactRef, isLocalId, isObject, own } from "./values.ts";
 export function bound(definition: ValidDefinition, message: Request | Advisory, from: FactRef): { kind: string; handler: ReceiveType | null; fields: Record<string, FieldValue> | null } | null {
   const body = message.body;
   let kind: string;
-  let fields: Record<string, FieldValue> | null;
-  if (message.class === "advisory") [kind, fields] = [message.type, isObject(body) && Object.hasOwn(body, "fields") ? messageFields(body["fields"], from) : {}];
-  else if (message.type === "tell") {
-    if (!isObject(body) || typeof body["message"] !== "string") return null;
-    [kind, fields] = [body["message"], messageFields(body["fields"], from)];
-  } else if (message.type === "relate") {
-    if (!isObject(body) || typeof body["name"] !== "string") return null;
-    [kind, fields] = [body["name"], updateOf(message, from)?.detail ?? null];
+  if (message.class === "advisory") kind = message.type;
+  else if (message.type === "tell" || message.type === "relate") {
+    const named = isObject(body) ? body[message.type === "tell" ? "message" : "name"] : undefined;
+    if (typeof named !== "string") return null;
+    kind = named;
   } else return null;
   const cls = message.class === "advisory" ? "advisory" : message.type;
   const handler = Object.values(definition.declared.receives).find((h) => h.class === cls && h.message === kind && h.from.kind === from.at.kind) ?? null;
+  // The mark `self` is read by the type that the handler declares for the field.
+  const types = handler?.fields ?? {};
+  let fields: Record<string, FieldValue> | null;
+  if (message.class === "advisory") fields = isObject(body) && Object.hasOwn(body, "fields") ? messageFields(body["fields"], from, types) : {};
+  else if (message.type === "tell") fields = messageFields((body as Record<string, unknown>)["fields"], from, types);
+  else fields = updateOf(message, from) ? messageFields((body as Record<string, unknown>)["detail"], from, types) : null;
   return { kind, handler, fields };
 }
 
@@ -90,7 +93,7 @@ export function messageFacts(view: StateView, definition: ValidDefinition, messa
 export function inputTexts(definition: ValidDefinition, input: Input): Digest[] {
   const { acts, genesis } = definition.declared;
   if (input.type === "act") return textsNamed(own(acts, input.signed.intent.kind)?.fields ?? {}, input.signed.intent.fields);
-  if (input.type === "genesis") return textsNamed(own(acts, genesis)!.fields, input.founding ? input.founding.intent.fields : input.source ? creationFields(input.message, input.source) : null);
+  if (input.type === "genesis") return textsNamed(own(acts, genesis)!.fields, input.founding ? input.founding.intent.fields : input.source ? creationFields(input.message, input.source, own(acts, genesis)!.fields) : null);
   return input.type === "delivery" && (input.message.class === "request" || input.message.class === "advisory") ? messageTexts(definition, input.message, input.from) : [];
 }
 
@@ -312,7 +315,7 @@ export function runClause(view: StateView, definition: ValidDefinition, context:
     const intent = input.type === "act" ? input.signed.intent : input.founding?.intent;
     const kind = input.type === "act" ? input.signed.intent.kind : declared.genesis;
     const act = own(declared.acts, kind)!;
-    const given = intent ? intent.fields : input.type === "genesis" && input.source ? creationFields(input.message, input.source) : null;
+    const given = intent ? intent.fields : input.type === "genesis" && input.source ? creationFields(input.message, input.source, act.fields) : null;
     const read = readFields(act.fields, given ?? {}, context.bounds);
     if (!read.ok) throw new Error(`entry ${origin.seq} was sealed with fields its act does not take`);
     const on = act.step === "open" ? origin.seq : intent?.on;

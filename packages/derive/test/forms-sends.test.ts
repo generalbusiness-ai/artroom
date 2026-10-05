@@ -199,6 +199,7 @@ describe("sends (section 6.6)", () => {
         sends: [{ tell: { to: { slot: "staging" }, message: "evidence", fields: { evidence: { field: "evidence" } }, result: {} } }],
       });
       d.receives.evidence = { message: "evidence", class: "tell", from: { kind: "lane" }, opens: null, fields: { evidence: { ...evidence, required: true } }, also: {}, guards: [], effects: [], sends: [], attention: [] };
+      d.receives.flag = { ...d.receives.evidence, message: "flag", fields: { tag: { type: "record", of: { self: { type: "bool", required: true } }, required: true } } };
       return d as DeclaredDefinition;
     })(), tight));
     const R = new Scope(cited, rita.member, true, 5);
@@ -213,6 +214,9 @@ describe("sends (section 6.6)", () => {
     // The receiver still refuses a number in the record: its shape check is as it was.
     arrive(R, P, { class: "request", type: "tell", body: { message: "evidence", fields: { evidence: { proof: q } } } });
     expect(decided(R)).toEqual(["refused", "bad-field"]);
+    // Section 6.6: the mark is not a value of any field type. A record with a member named `self` is a record, and is not read as the sender's fact.
+    arrive(R, P, { class: "request", type: "tell", body: { message: "flag", fields: { tag: { self: true } } } });
+    expect(decided(R)).toEqual(["applied"]);
   });
 
   test("a scope created under `self` pins its creator's definition, and its index row goes to the directory that its creator recorded; a scope with no directory sends none", () => {
