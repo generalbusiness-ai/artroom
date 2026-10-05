@@ -312,11 +312,20 @@ production runtime has the code of each, so it can pin both definitions.
 A runtime or a verifier that lacks the code answers
 `unsupported-definition`, at the genesis.
 
-As deployed, a scope under either definition records its genesis and
-nothing more by an act. The production authority reads no grant, so every
-act and every step is refused `unauthorized`. No hold is opened, and so no
-operation. Nothing is sent outside the service, and no reader may read.
-A delivery from another scope is judged by its handler.
+With only the production defaults (`production()`, in
+`packages/scope/src/ports.ts`), a scope under either definition records
+its genesis and nothing more by an act. That authority reads no grant, so
+every act and every step is refused `unauthorized`. No hold is opened, and
+so no operation. Nothing is sent outside the service, and no reader may
+read. A delivery from another scope is judged by its handler.
+
+The deployed class, `DeployedScope`, has a real authority: a lane reads
+the membership scope that its genesis records. A lane records one only
+when its creator does. The directory that will create lanes with that
+reference cannot be created yet (three of its marks have no rule), so no
+test runs a lane under that authority. A lane that records none reads
+nothing, and an act that needs a grant is answered
+`authority-unavailable`. Nothing is deployed.
 
 The rule of the contract's section 6.1 is of the whole scope, and not only
 of the rows that use a
