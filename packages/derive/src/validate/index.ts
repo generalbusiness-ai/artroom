@@ -28,7 +28,6 @@ import { at, shapes, type Problem } from "./shape.ts";
 import { timedEntryBytes, timedGraph, timedRules } from "./timed.ts";
 
 export type { RangeIndex } from "./context.ts";
-export { keptMessage } from "./sends.ts";
 export type { Problem, ProblemCode } from "./shape.ts";
 export { timedGraph, type TimedGraph, type TimedMove } from "./timed.ts";
 
@@ -117,8 +116,8 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
   const timed = isObject(top["timed"]) ? top["timed"] : {};
   // The hold types are needed before any effect is read: a `hold: open` effect on the primary item of an `open` act.
   for (const name of holdTypesOf(written)) d.holdTypes.add(name);
-  acts(d, top["acts"], timed);
-  receives(d, top["receives"]);
+  acts(d, top["acts"], timed, top);
+  receives(d, top["receives"], top);
   const timedTypes = new Set<string>(d.holdTypes);
   /** Each timed rule that was read whole: its type, the states it applies in, and the state it leaves its item in. */
   const moves = timedRules(d, top["timed"], timedTypes);

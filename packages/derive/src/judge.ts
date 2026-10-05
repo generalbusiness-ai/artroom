@@ -16,12 +16,11 @@ import { intentDigest, scopeIdOf, verifySignedIntent } from "@generalbusiness/ar
 import { deriveEffects } from "./effects.ts";
 import { isIntent, readFacts, readFields, type Reading } from "./fields.ts";
 import { judgeGuard, type Judging } from "./guards.ts";
-import { refusalName } from "./handlers.ts";
+import { alsoItems, overMax, refusalName, unbound } from "./handlers.ts";
 import { deriveSends } from "./sends.ts";
 import type { Item, StateView } from "./state.ts";
 import { nextDue, type Due } from "./timed.ts";
 import { timeMs, type Clock } from "./time.ts";
-import { namedBy } from "./unsupported.ts";
 import type { ValidDefinition } from "./validate/index.ts";
 import { isScopeRef, own, same } from "./values.ts";
 
@@ -129,10 +128,11 @@ export function judgeAct(view: StateView, definition: ValidDefinition, signed: S
     subjects.set("on", item);
     if (act.step === "transition") expects.push("on");
   }
-  for (const [name, also] of Object.entries(act.also)) {
-    const id = own(fields, namedBy(also));
-    const item = typeof id === "number" ? view.item(id) : null;
-    if (item?.type !== also.item) return refused("no-item", `${namedBy(also)} names no ${also.item}`);
+  // An `also` name is unbound when its field is absent, its slot is empty or its type has no item yet. It is then no subject, and
+  // `expected` has no key for it. A transition's primary item exists before the entry, so a `via` may read its slots.
+  const also = alsoItems(view, definition, act.also, fields, act.step === "transition" ? (subjects.get("on") ?? null) : null);
+  if (!also.ok) return refused("no-item", also.detail);
+  for (const [name, item] of also.items) {
     subjects.set(`also.${name}`, item);
     expects.push(name);
   }
@@ -159,20 +159,21 @@ export function judgeAct(view: StateView, definition: ValidDefinition, signed: S
   const j: Judging = { view, definition, bounds, clock, scope, self: scope.head.seq + 1, kind: intent.kind, fields, fieldTypes: act.fields, subjects, signer, facts, prepared: context.prepared, used: [], asked: context.asked, own: context.own, intent: digest };
 
   for (const [i, guard] of act.guards.entries()) {
+    // Section 6.4: a guard whose subject is unbound is not evaluated, and an effect whose subject is unbound is not applied.
+    if (unbound(j, guard.of)) continue;
     const result = judgeGuard(j, guard);
     if (result === "fail") return { ...refused("guard-failed", `guards.${i}`), ...refusalName(guard) };
     if (result !== "pass") return { result: "unavailable", reason: result };
   }
-  const effects = deriveEffects(j, act.effects, act.attention, act.step === "open" ? act.on : null);
+  const effects = deriveEffects(j, act.effects.filter((e) => !unbound(j, e.of)), act.attention, act.step === "open" ? act.on : null);
   if (!effects.ok) return refused(effects.reason, effects.detail);
   const sends = deriveSends(j, act.sends, effects.working, digest);
   if (!sends.ok) return refused(sends.reason, sends.detail);
 
   if (act.step === "open" && act.on !== null) {
     // Section 6.3: `max` bounds the live items of a type; an opening that would exceed it is refused.
-    const type = own(declared.items, act.on)!;
-    const live = Object.entries(type.states).reduce((n, [state, { final }]) => (final ? n : n + view.count(act.on!, state)), 0);
-    if (!own(type.states, effects.working.get("on")!.state)?.final && live + 1 > type.max) return refused("type-full", `${act.on} has ${live} live items`);
+    const full = overMax(view, definition, act.on, effects.working.get("on")!.state);
+    if (full !== null) return refused("type-full", full);
   }
 
   // Section 5.3: every act judges its `notAfter` and its grant's expiry on the commit clock, so no act is written while the clock is behind.

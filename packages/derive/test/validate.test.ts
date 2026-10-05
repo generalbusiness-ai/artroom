@@ -27,8 +27,7 @@ const rows: readonly (readonly [string, DeclaredDefinition, Change, ProblemCode 
   ["the desk passes", desk, () => {}, null],
   ["the ticket passes, with a rule guard that names a rule it declares", ticket, () => {}, null],
   ["a rule guard that names no declared rule", ticket, (d) => { d.rules = {}; }, "rule"],
-  ["two handlers for one message from one kind of scope", desk, (d) => { d.receives.again = clone(d.receives.spawn); }, "handler"],
-  ["a tell under a name the platform keeps for a relate", ticket, (d) => { d.acts.ask.sends[0].tell.message = "relate:closes"; }, "handler"],
+  ["two handlers for one class and message from one kind of scope", desk, (d) => { d.receives.again = clone(d.receives.spawn); }, "handler"],
   ["a time value set by a genesis, with no timed rule on its type, passes", small, (d) => d.acts.start.effects.push({ value: { slot: "due", from: { time: { plusSeconds: 60 } } } }), null],
 
   // Section 6.4, the table of X1 and X2.

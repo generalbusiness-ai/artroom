@@ -7,7 +7,7 @@
 import type { Advisory, Control, Effect, Entry, FactRef, FactUse, Message, Prepared, Reason, Request, Result, RoutingRefusal, ScopeRef, Seed, Send } from "@generalbusiness/artroom-contract";
 import { deliveryCauseDigest, messageDigest, scopeIdOf, seedDigest } from "@generalbusiness/artroom-bytes";
 import { isEntryOf, updateOf, useOf, type Reading } from "./fields.ts";
-import { bound, runClause, runHandler, type Clause, type Ran, type Sent } from "./handlers.ts";
+import { bound, runClause, runHandler, type Clause, type Handled, type Sent } from "./handlers.ts";
 import type { Judgment } from "./judge.ts";
 import type { ScopeState, StateView } from "./state.ts";
 import { nextDue } from "./timed.ts";
@@ -113,11 +113,12 @@ export function judgeDelivery(view: StateView, definition: ValidDefinition, deli
   if (message.class === "advisory") {
     // As the receiver's own definition says: a handler for its type, or a record with no effect. An advisory has no decision.
     const b = bound(definition, message, from);
-    const ran: Ran | null = b?.handler && under(b.handler, context.source) ? runHandler(view, definition, context, scope, b.handler, b.kind, b.fields, cause(), sent) : null;
+    const ran: Handled | null = b?.handler && under(b.handler, context.source) ? runHandler(view, definition, context, scope, b.handler, b.kind, b.fields, cause(), sent) : null;
     if (ran?.result === "unavailable") return ran;
-    // A handler that refuses leaves the entry with no effect. The entry still records each rule result its guards read.
+    // A handler that refuses leaves the entry with no effect. The entry still records each rule result its guards read, and each
+    // foreign entry its fields named.
     const done = ran?.result === "ran" ? ran : { effects: [], sends: [], prepared: ran?.prepared ?? [], judgesTime: false };
-    return write({ type: "delivery", from, n, message: message as Advisory }, done.effects, done.sends, done.prepared, done.judgesTime);
+    return write({ type: "delivery", from, n, message: message as Advisory }, done.effects, done.sends, done.prepared, done.judgesTime, ran?.uses);
   }
   if (message.class !== "request" || !isScopeRef(delivered.to)) return unverified("not a message of a class the contract defines");
 
@@ -126,15 +127,19 @@ export function judgeDelivery(view: StateView, definition: ValidDefinition, deli
    * entry sends exactly one result, which names the request by its source
    * fact and ordinal. The result follows the sends the handler declares.
    */
-  const decide = (decision: "applied" | "refused" | "superseded", reason: Reason | undefined, effects: readonly Effect[] = [], sends: readonly Send[] = [], prepared: readonly Prepared[] = [], judgesTime = false): Judgment => {
+  const decide = (decision: "applied" | "refused" | "superseded", reason: Reason | undefined, effects: readonly Effect[] = [], sends: readonly Send[] = [], prepared: readonly Prepared[] = [], judgesTime = false, read: readonly FactUse[] = []): Judgment => {
     const answer: Result = { class: "result", of: { from, n }, outcome: decision, ...(reason ? { reason } : {}) };
-    return write({ type: "delivery", from, n, message: message as Request, decision, ...(reason ? { reason } : {}) }, effects, [...sends, { n: sends.length, to: from.at, message: answer }], prepared, judgesTime);
+    return write({ type: "delivery", from, n, message: message as Request, decision, ...(reason ? { reason } : {}) }, effects, [...sends, { n: sends.length, to: from.at, message: answer }], prepared, judgesTime, read);
   };
   const b = bound(definition, message, from);
   if (!b) return decide("refused", { code: "bad-field" });
+  // Section 4.2: a request that names no handler of the definition, for a scope of the sender's kind and definition, is decided
+  // `refused`. That holds for a relationship update too: a scope keeps a copy only for a relationship it declares a handler for.
   const handler = b.handler && under(b.handler, context.source) ? b.handler : null;
+  if (!handler) return decide("refused", { code: "unknown-message" });
 
   const platform: Effect[] = [];
+  let first = false;
   if (message.type === "relate") {
     const update = updateOf(message, from)!;
     if (!oneUpdateForKey(source, from, delivered.to, update.name, update.item.seq)) return unverified("the source entry has two relate sends for one key");
@@ -142,16 +147,19 @@ export function judgeDelivery(view: StateView, definition: ValidDefinition, deli
     // and an update is applied only if its revision is higher than the one held.
     const held = view.relation(from.at, update.name, update.item.seq);
     if (held && from.seq <= held.revision) return decide("superseded", undefined);
+    first = !held;
     platform.push({ effect: "relation", owner: from.at, item: update.item.seq, name: update.name, state: update.state, revision: from.seq });
-    if (!handler) return decide("applied", undefined, platform);
-  } else if (!handler) return decide("refused", { code: "unknown-message" });
+  }
 
   const ran = runHandler(view, definition, context, scope, handler, b.kind, b.fields, cause(), sent);
   if (ran.result === "unavailable") return ran;
   // A refusal, among them `duplicate-relation` for a handler whose sends hold two for one key: no effect and no send but the result.
-  // The deciding entry records each rule result a guard read before the refusal (section 9.2).
-  if (ran.result === "refused") return decide("refused", reasonOf(ran), [], [], ran.prepared);
-  return decide("applied", undefined, [...platform, ...ran.effects], ran.sends, ran.prepared, ran.judgesTime);
+  // The deciding entry records each rule result a guard read before the refusal, and each foreign entry the fields named (section 9.2).
+  if (ran.result === "refused") return decide("refused", reasonOf(ran), [], [], ran.prepared, false, ran.uses);
+  // Section 7.3: copies are bounded. The first update for a key beyond the number its handler states is refused, like an opening
+  // past a type's `max`. An update for a key that is already held is never refused for that reason.
+  if (first && view.copies(b.kind, from.at.kind) >= (handler.copies ?? 0)) return decide("refused", { code: "type-full" }, [], [], ran.prepared, false, ran.uses);
+  return decide("applied", undefined, [...platform, ...ran.effects], ran.sends, ran.prepared, ran.judgesTime, ran.uses);
 }
 
 /** The reason an entry records for a refusal: the code, and the name when the failed guard declares one (section 4.2). */

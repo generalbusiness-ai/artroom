@@ -25,7 +25,8 @@ export type ProblemCode =
   | "timed-partial"      // a timed rule with an effect that its commit could refuse (section 6.4)
   | "reserve-unbounded"  // what a duty can start is not finite: timed rules of one type that lead to one another in a cycle (section 17.2)
   | "hold"               // the hold capability used without what it needs (section 6.8)
-  | "handler"            // two handlers for one message from one kind of scope, or a name the platform keeps
+  | "handler"            // two handlers for one class and message from one kind of scope
+  | "advisory-sends"     // a handler of class `advisory` declares a send or a notice (section 6.4)
   | "capability" | "profile" | "rule";
 
 export interface Problem { code: ProblemCode; path: string; message: string }

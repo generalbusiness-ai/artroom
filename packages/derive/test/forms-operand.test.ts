@@ -199,6 +199,7 @@ describe("operands, parts and a local fact (sections 6.2 and 6.5; witness 18.1)"
       d.acts.link.fields.because = { type: "fact", kind: ["file"], under: "ticket", required: true };
       d.acts.link.effects.push({ ref: { slot: "madeAt", from: "self" } });
       Object.assign(d.acts.link.sends[0].relate.detail, { madeAt: { slot: "madeAt" }, because: { field: "because" } });
+      Object.assign(d.receives.closes.fields, { madeAt: { type: "fact", kind: ["link"], under: "ticket", required: false }, because: { type: "fact", kind: ["file"], under: "ticket", required: false } });
       d.receives.closes.guards.push(equals({ field: "madeAt" }, { source: "ref" }, "made at"));
     });
     const P = new Scope(definition);
@@ -241,7 +242,7 @@ describe("operands, parts and a local fact (sections 6.2 and 6.5; witness 18.1)"
       ["a result outside a result clause", inHandler(about({ result: "reason" })), "name"],
       ["a signer in a handler", inHandler(about({ signer: true })), "name"],
       ["an intent in a handler", inHandler(about({ intent: true })), "name"],
-      ["an update in a handler of a tell", refusal(variant(ticket, () => {}).declared, (d) => { d.receives.closes.message = "closes"; d.receives.closes.guards.push(about({ update: "state" })); }), "name"],
+      ["an update in a handler of a tell", refusal(variant(ticket, () => {}).declared, (d) => { d.receives.closes.class = "tell"; delete d.receives.closes.copies; d.receives.closes.guards.push(about({ update: "state" })); }), "name"],
       ["a presented fact that the act does not present", inAct(about({ presented: "pin" })), "name"],
       ["an element with no form that binds it", inAct(about({ element: "e" })), "name"],
       ["a slot of each item with no fan-out", inAct(about({ slot: "text", of: "each" })), "name"],

@@ -142,7 +142,7 @@ describe("a relationship update (section 7.3)", () => {
     expect(results).toEqual(expected);
     // The copy is keyed by the owner's scope, incarnation, name and item; its revision is the owner entry's seq.
     expect(I.state.relation(P.at, "closes", 2)).toEqual({ owner: P.at, name: "closes", item: 2, state: "removed", revision: 3 });
-    // The handler for `relate:closes` ran for each applied update, and not for a superseded one.
+    // The handler for the relationship `closes` ran for each applied update, and not for a superseded one.
     expect(I.item(0).values["linked"]).toBe("removed");
     expect(deliver(I, P, order[1]!)).toEqual({ result: "repeat", seq: I.head.seq });
     expect(I.replay().snapshot()).toBe(I.state.snapshot());

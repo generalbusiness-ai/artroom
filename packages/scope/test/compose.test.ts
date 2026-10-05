@@ -79,7 +79,9 @@ describe("a relationship update (section 7.3) between two real objects", () => {
     const I = await ticket(D, "I");
     // P.2 sets the link and a later entry removes it. Out of order: the first update is held back until the second has arrived.
     net.hold = late ? (e) => e.message.class === "request" && (e.message.body as { state?: string }).state === "set" : null;
-    const set = await P.did(rita, "link", { fields: { target: await I.at(), about: 0 } });
+    // The link names the entry that filed P as its cause. To P that is a local fact. To I it is a foreign entry, fetched before the turn.
+    const filed = (await P.sealed())[0]!;
+    const set = await P.did(rita, "link", { fields: { target: await I.at(), about: 0, because: { at: filed.entry.at, seq: 0, hash: filed.hash } } });
     await settle(P, I);
     const removed = await P.did(rita, "unlink", { on: set.fact.seq, expected: { on: 1 } });
     await settle(P, I);
@@ -94,6 +96,15 @@ describe("a relationship update (section 7.3) between two real objects", () => {
     // In the owner: one result recorded for each request, by the request it names.
     const recorded = results(await P.entries()).filter((r) => r.message.of.from.seq >= set.fact.seq).sort((a, b) => a.message.of.from.seq - b.message.of.from.seq);
     expect(recorded.map((r) => [r.message.of.from.seq, r.clause])).toEqual([[set.fact.seq, clauses[0]], [removed.fact.seq, clauses[1]]]);
+    if (late) return;
+    // The entry that applied the link used the source entry and the entry its field named. The removal named none.
+    expect(copies.map((x) => x.entry.uses.map((u) => u.fact.seq))).toEqual([[set.fact.seq, 0], [removed.fact.seq]]);
+    // A ticket keeps a copy for two keys, and the store counts the copies it holds: a second link is kept, and a third is refused.
+    for (const _ of [2, 3]) {
+      await P.did(rita, "link", { fields: { target: await I.at(), about: 0 } });
+      await settle(P, I);
+    }
+    expect(decided(await I.entries()).slice(-2).map((x) => [x.input.decision, x.input.reason?.code])).toEqual([["applied", undefined], ["refused", "type-full"]]);
   });
 });
 

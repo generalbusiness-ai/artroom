@@ -88,14 +88,8 @@ export interface ActType {
   attention: readonly Notify[];            // at most 8
 }
 
-/**
- * A handler, in the adopted form or the landed one. A new definition writes
- * `AdoptedReceiveType`. When the source reads only that form, the landed
- * form is removed and this name is the adopted form alone.
- */
-export type ReceiveType = AdoptedReceiveType | LandedReceiveType;
-
-export interface AdoptedReceiveType {
+/** A handler: what a delivered message of one class and name does, from a scope of one kind (section 6.4). */
+export interface ReceiveType {
   message: string;                         // a `tell` message's name, or a relationship's name
   class: "tell" | "relate" | "advisory";   // for an advisory, `message` is its type: `index` or `notify`
   from: { kind: ScopeKind; under?: string };
@@ -110,20 +104,8 @@ export interface AdoptedReceiveType {
   attention: readonly Notify[];            // empty when `class` is `advisory`
 }
 
-/**
- * Landed form. A handler with no class, no declared fields and no item to
- * open. Its message is the name a `tell` declares, `relate:` and a
- * relationship's name, or an advisory's type.
- */
-export interface LandedReceiveType {
-  message: string;
-  from: { kind: ScopeKind; under?: string };
-  also: Record<string, AlsoRule>;
-  guards: readonly Guard[];
-  effects: readonly EffectForm[];
-  sends: readonly SendForm[];
-  attention: readonly Notify[];
-}
+/** The name a definition used for the adopted form while the landed form of a handler was also a `ReceiveType`. It is the same type. */
+export type AdoptedReceiveType = ReceiveType;
 
 /** How an act or handler selects one other local item. */
 export type AlsoRule =

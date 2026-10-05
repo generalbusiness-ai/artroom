@@ -10,9 +10,6 @@ import { fieldOf, landedOperand } from "./operands.ts";
 import { at, type Rec } from "./shape.ts";
 import { RECORD_BYTES, stated } from "./sizes.ts";
 
-/** The message names a `tell` may not use: the platform runs a handler of that name for a `relate` or an advisory. */
-export const keptMessage = (name: string): boolean => name.startsWith("relate:") || name === "index" || name === "notify";
-
 /** A send's source: `self`, or an operand whose slot is a slot of the primary item. Returns its type when the definition states it. */
 function source(d: Defining, v: unknown, path: string, ctx: Ctx): FieldType | null {
   if (v === "self") return null;
@@ -27,7 +24,10 @@ function clauses(d: Defining, v: unknown, path: string, ctx: Ctx, conflict: bool
   for (const [name, e] of Object.entries(r ?? {})) {
     // Section 17.2: a `conflict` is not reserved. Its entry is new work, and what its clause starts is counted when it is admitted.
     d.clause = name === "conflict" ? null : [];
-    effects(d, e, at(path, name), { ...ctx, clause: true }, true);
+    // Section 6.6: a clause's subjects are those of the entry that made the send, as that entry resolved them. A name that was
+    // selected through a slot that is not fixed cannot be selected again when the clause runs, so a clause names none.
+    const settled = new Map([...ctx.also].filter(([also]) => !ctx.unsettled?.has(also)));
+    effects(d, e, at(path, name), { ...ctx, also: settled, clause: true }, true);
     if (d.clause) d.clauseSets.push(d.clause);
     d.clause = null;
   }
@@ -54,7 +54,7 @@ export function sends(d: Defining, v: unknown, path: string, ctx: Ctx): void {
       const r = rec(x, p, ["to", "message", "fields", "result"]);
       if (!r) return;
       if (source(d, { slot: r["to"] }, at(p, "to"), ctx)?.type !== "scope") bad("name", at(p, "to"), "names no slot of the primary item that holds a scope");
-      if (str(r["message"], at(p, "message")) !== null && keptMessage(r["message"] as string)) bad("handler", at(p, "message"), "is a name the platform keeps for a relate or an advisory");
+      str(r["message"], at(p, "message"));
       sources(d, r["fields"], at(p, "fields"), ctx);
       clauses(d, r["result"], at(p, "result"), ctx, false);
     } else if (k === "relate") {
