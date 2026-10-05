@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:d565cd55db546598c8aebadd7bd9770cdb0e07ac","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-05-i2-contract-deltas.md."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:d5c7c63699e23950adb0d31bcbf029c03af212e8","text":"Merge retired a covered predecessor; the successor is at packages/lanes/vitest.config.ts."}
