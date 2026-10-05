@@ -6,8 +6,9 @@
  * A timestamp's one guard is `timeMs`, below; the clock rules are derive's.
  */
 
-import type { DutyId, KeyId, MemberId, OperationId, PlatformDefinition, ScopeKind, Timestamp } from "@generalbusiness/artroom-contract";
+import type { Base64Url, DutyId, KeyId, MemberId, OperationId, PlatformDefinition, ScopeKind, Timestamp } from "@generalbusiness/artroom-contract";
 import { wellFormed } from "./canonical.ts";
+import { unb64url } from "./encode.ts";
 import { publicKeyOf } from "./sign.ts";
 
 export const SCOPE_KINDS: readonly ScopeKind[] = ["directory", "membership", "rules", "destination", "inbox", "task", "lane"];
@@ -19,6 +20,11 @@ export function isScopeKind(value: unknown): value is ScopeKind {
 /** `key_` + the unpadded base64url of 32 bytes. Whether the bytes are a point is the signature check's question. */
 export function isKeyId(value: unknown): value is KeyId {
   return publicKeyOf(value)?.length === 32;
+}
+
+/** A signature as text: the unpadded base64url of 64 bytes, in its one form. Whether it is some key's over some bytes is `verify`'s question. */
+export function isSignature(value: unknown): value is Base64Url {
+  return typeof value === "string" && /^[A-Za-z0-9_-]{86}$/.test(value) && unb64url(value)?.length === 64;
 }
 
 /** `@` and at least one more character, well formed. How long a handle may be is a bound of the scope (`memberBytes`), not of the form. */

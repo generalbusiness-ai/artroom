@@ -10,7 +10,13 @@
  *
  * A guard is of shape only. A record passes when it is one of the variants
  * the contract names, has every member that variant requires, each of its
- * kind, and has no other member. It says nothing about whether a signature
+ * kind, and has no other member. A member the contract types as an
+ * identifier or a fixed form is read by that form's one guard: a digest, a
+ * scope ID, an incarnation, a scope kind, a key ID, a member ID, an
+ * operation ID, a duty ID, a definition's name, a timestamp, a signature,
+ * and a position or count as a safe integer that is not negative. A member
+ * the contract types as text (a name an application chose, an idempotency
+ * key, a cursor, stored bytes, a retained entry's `under`) is read as text. It says nothing about whether a signature
  * holds, whether an entry is of some history, or whether a judgment was
  * right: those are the questions of the signature check, of a hash and of
  * the judges.
@@ -31,7 +37,7 @@ import type {
 import { wellFormed } from "./canonical.ts";
 import { isIncarnation, isScopeId } from "./domains.ts";
 import { isDigest } from "./hash.ts";
-import { isDutyId, isKeyId, isMemberId, isOperationId, isPlatformDefinition, isScopeKind, timeMs } from "./ids.ts";
+import { isDutyId, isKeyId, isMemberId, isOperationId, isPlatformDefinition, isScopeKind, isSignature, timeMs } from "./ids.ts";
 
 type Rec = Record<string, unknown>;
 type Check = (v: unknown) => boolean;
@@ -105,11 +111,11 @@ export const isParty = (v: unknown): v is Party => party(v);
 /** A record by chosen names, each value passing `check`. */
 const named = (check: Check): Check => (v) => isRecord(v) && Object.values(v).every(check);
 
-/** The shape of section 2.1. A valid signature over some other shape is not an intent. What each field holds is the act's to say. */
-const intent = record({ v: is(1), to: orNull(scopeRef), actor: text, kind: text, on: orNull(isLocalId), expected: named(isLocalId), fields: isRecord, idempotencyKey: text, notAfter: isTime });
+/** The shape of section 2.1. A valid signature over some other shape is not an intent. The actor is a key ID, as the contract types it. What each field holds is the act's to say. */
+const intent = record({ v: is(1), to: orNull(scopeRef), actor: isKeyId, kind: text, on: orNull(isLocalId), expected: named(isLocalId), fields: isRecord, idempotencyKey: text, notAfter: isTime });
 export const isIntent = (v: unknown): v is Intent => intent(v);
-/** An intent beside a signature. Whether the signature is the actor's over these bytes is `verifySignedIntent`'s question. */
-const signedIntent = record({ intent, sig: text });
+/** An intent beside a signature of the one form a signature has. Whether the signature is the actor's over these bytes is `verifySignedIntent`'s question. */
+const signedIntent = record({ intent, sig: isSignature });
 export const isSignedIntentShape = (v: unknown): v is SignedIntent => signedIntent(v);
 /** A grant, as far as the judge and an entry read it. `within` and `fresh` are the authority note's. */
 const grant = record({ issued: factRef, subject: memberRef, key: isKeyId, principal: orNull(memberRef), actions: listOf(text), within: any, notAfter: orNull(isTime), fresh: any });

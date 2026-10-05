@@ -49,6 +49,9 @@ test("on both transports, each operation of the handle returns a reply only when
   const item = { id: 1, type: "note", state: "draft", revision: 1, opened: d, parties: {}, refs: {}, values: {}, attributed: [] };
   const entry = { v: 1, at: scope, seq: 1, prev: d, time: "2026-10-04T12:00:00Z", clamped: false, epoch: 0, input: { type: "checkpoint", through: 0, state: d }, uses: [], prepared: [], effects: [], sends: [] };
   const sealed = { entry, hash: d };
+  // An act's input, with an actor and a signature of the forms the contract fixes: a key ID of 32 bytes, a signature of 64.
+  const intent = { v: 1, to: scope, actor: `key_${"A".repeat(43)}`, kind: "offer", on: null, expected: {}, fields: {}, idempotencyKey: "k", notAfter: entry.time };
+  const act = (over: object, sig = "A".repeat(86)) => read({ entry: { ...entry, input: { type: "act", signed: { intent: { ...intent, ...over }, sig }, authority: [] } }, hash: d });
   const duty = { duty: "1.0", to: scope, class: "request", held: false, attempts: [{ at: entry.time, answer: "none" }], acknowledged: null, result: null, diagnosis: null };
   const summary = { scope, status: "active", definition: "platform:directory@1", time: entry.time, items: [item], counts: [["note", "draft", 1]] };
   const read = (value: unknown, more: object = {}) => ({ ok: true, at: head, value, complete: true, ...more });
@@ -72,9 +75,11 @@ test("on both transports, each operation of the handle returns a reply only when
     ["summary", (t) => handle(t).summary(), [read(summary)], [...each(summary).map((v) => read(v)), read({ ...summary, status: "open" }), read({ ...summary, counts: [["note", "draft"]] }), read({ ...summary, items: [less(item, "opened")] })]],
     ["items", (t) => handle(t).items("note", "c"), [read([item], { next: "c2" }), read([{ ...item, opened: null, epoch: 2 }])], [...each(item).map((v) => read([v])), read(item), read([item], { next: 2 }), read([{ ...item, attributed: [{}] }]), read([{ ...item, parties: { owner: {} } }])]],
     ["history", (t) => handle(t).history("c"), [read([sealed], { complete: false, next: "c2" })], [...each(sealed).map((v) => read([v])), ...each(entry).map((e) => read([{ entry: e, hash: d }])), read(sealed)]],
-    ["entry", (t) => handle(t).entry(1), [read(sealed)], [...each(sealed).map((v) => read(v)), ...each(entry).map((e) => read({ entry: e, hash: d })), read({ entry: { ...entry, at: { ...scope, kind: "room" } }, hash: d }),
+    ["entry", (t) => handle(t).entry(1), [read(sealed), act({})], [...each(sealed).map((v) => read(v)), ...each(entry).map((e) => read({ entry: e, hash: d })), read({ entry: { ...entry, at: { ...scope, kind: "room" } }, hash: d }),
       // The fixed records inside an entry: an input is one of the contract's with its members, and so is each use, prepared result and send.
-      ...[{ input: { type: "act" } }, { input: { type: "mystery" } }, { uses: [{}] }, { prepared: [{}] }, { sends: [{}] }].map((part) => read({ entry: { ...entry, ...part }, hash: d }))]],
+      ...[{ input: { type: "act" } }, { input: { type: "mystery" } }, { uses: [{}] }, { prepared: [{}] }, { sends: [{}] }].map((part) => read({ entry: { ...entry, ...part }, hash: d })),
+      // A member the contract types as an identifier is one: an actor that is text and no key ID, and a signature that is base64url and not 64 bytes.
+      act({ actor: "alice" }), act({}, "c2ln")]],
     ["outbox", (t) => handle(t).outbox("c"), [read([duty], { next: "c2" })], [...each(duty).map((v) => read([v])), read(duty)]],
     ["followDuty", (t) => handle(t).followDuty("1.0"),
       [read(duty), read({ ...duty, acknowledged: fact, result: { seq: 2, clause: "applied" }, diagnosis: { seq: 3, finding: "undelivered" } }), refused],
