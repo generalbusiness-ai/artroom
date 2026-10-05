@@ -77,7 +77,7 @@ describe("the kind of a timed entry (sections 6.2 and 6.4)", () => {
 });
 
 describe("what the validator refuses of these forms", () => {
-  const handler = (message: string) => ({ message, from: { kind: "lane" }, also: {}, guards: [], effects: [], sends: [], attention: [] });
+  const handler = (message: string, form: object = { class: "tell" }) => ({ message, ...form, from: { kind: "lane" }, fields: {}, opens: null, also: {}, guards: [], effects: [], sends: [], attention: [] });
   const large = { type: "record", of: { a: { type: "text", max: PROPOSED_BOUNDS.textBytes, required: true } } };
   const rows: readonly (readonly [string, DeclaredDefinition, Change, ProblemCode | null])[] = [
     ["the board passes", board, () => {}, null],
@@ -96,7 +96,7 @@ describe("what the validator refuses of these forms", () => {
     ["a timed rule that sets from self a slot whose kinds do not include its own", board, (b) => { b.items.job.refs.decidedBy.to.kind = ["cite"]; }, "name"],
     ["an act kind that begins timed:", board, (b) => { b.acts["timed:job-deadline"] = clone(b.acts.stamp); }, "shape"],
     ["a handler of a message whose name begins timed:", board, (b) => { b.receives.late = handler("timed:job-deadline"); }, "handler"],
-    ["a handler of a relationship whose name begins timed:", board, (b) => { b.receives.late = handler("relate:timed:job-deadline"); }, "handler"],
+    ["a handler of a relationship whose name begins timed:", board, (b) => { b.receives.late = handler("timed:job-deadline", { class: "relate", copies: 1 }); }, "handler"],
     ["a tell of a message whose name begins timed:", ticket, (b) => { b.acts.ask.sends[0].tell.message = "timed:spawn"; }, "handler"],
     ["a relate under a name that begins timed:", ticket, (b) => { b.acts.link.sends[0].relate.name = "timed:closes"; }, "handler"],
   ];

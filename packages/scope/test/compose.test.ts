@@ -41,6 +41,19 @@ describe("creating a child (section 7.2), in two real objects, by the dispatcher
     expect(await I.act(una, "approve", approve)).toMatchObject({ answer: "accepted", receipt: { fact: { seq: 2 } } });
   });
 
+  test("a lane creates a lane under its own definition: the child reads that definition from the lane, and sends its index row to the desk, which is its creator's directory", async () => {
+    const D = await desk();
+    const C = await ticket(D, "whole");
+    const split = await C.did(rita, "split", { fields: { title: "part" } });
+    const K = await C.created(split.fact.seq);
+    await settle(D, C, K);
+    // K ran its genesis under the definition that C pins, which no digest in that definition names. C recorded its result and confirmed it.
+    expect([(await K.summary()).value.status, (await C.duties()).find((duty) => duty.duty === `${split.fact.seq}.0`)?.result?.clause]).toEqual(["active", "applied"]);
+    // The desk recorded an index row from each lane. K's creator is C, and C recorded none.
+    const rows = async (node: Node) => (await node.entries()).flatMap((e) => (e.input.type === "delivery" && e.input.message.class === "advisory" ? [e.input.from.at.scope] : []));
+    expect([await rows(D), await rows(C)]).toEqual([[C.name, K.name], []]);
+  });
+
   test("two requests with identical message bytes create two children with different scope IDs; an exact repeated delivery adds no entry and is answered with the first fact", async () => {
     const D = await desk();
     const S = await ticket(D, "S");
@@ -79,7 +92,9 @@ describe("a relationship update (section 7.3) between two real objects", () => {
     const I = await ticket(D, "I");
     // P.2 sets the link and a later entry removes it. Out of order: the first update is held back until the second has arrived.
     net.hold = late ? (e) => e.message.class === "request" && (e.message.body as { state?: string }).state === "set" : null;
-    const set = await P.did(rita, "link", { fields: { target: await I.at(), about: 0 } });
+    // The link names the entry that filed P as its cause. To P that is a local fact. To I it is a foreign entry, fetched before the turn.
+    const filed = (await P.sealed())[0]!;
+    const set = await P.did(rita, "link", { fields: { target: await I.at(), about: 0, because: { at: filed.entry.at, seq: 0, hash: filed.hash } } });
     await settle(P, I);
     const removed = await P.did(rita, "unlink", { on: set.fact.seq, expected: { on: 1 } });
     await settle(P, I);
@@ -94,6 +109,15 @@ describe("a relationship update (section 7.3) between two real objects", () => {
     // In the owner: one result recorded for each request, by the request it names.
     const recorded = results(await P.entries()).filter((r) => r.message.of.from.seq >= set.fact.seq).sort((a, b) => a.message.of.from.seq - b.message.of.from.seq);
     expect(recorded.map((r) => [r.message.of.from.seq, r.clause])).toEqual([[set.fact.seq, clauses[0]], [removed.fact.seq, clauses[1]]]);
+    if (late) return;
+    // The entry that applied the link used the source entry and the entry its field named. The removal named none.
+    expect(copies.map((x) => x.entry.uses.map((u) => u.fact.seq))).toEqual([[set.fact.seq, 0], [removed.fact.seq]]);
+    // A ticket keeps a copy for two keys, and the store counts the copies it holds: a second link is kept, and a third is refused.
+    for (const _ of [2, 3]) {
+      await P.did(rita, "link", { fields: { target: await I.at(), about: 0 } });
+      await settle(P, I);
+    }
+    expect(decided(await I.entries()).slice(-2).map((x) => [x.input.decision, x.input.reason?.code])).toEqual([["applied", undefined], ["refused", "type-full"]]);
   });
 });
 

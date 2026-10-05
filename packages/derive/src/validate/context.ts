@@ -27,6 +27,7 @@ export interface Ctx {
   presented: Map<string, FieldType>;      // an act: the facts presented beside the intent, by name
   elements: Map<string, FieldType | null>;// inside a list form: each element it binds, by its `as` name, with its type when the definition states it
   each: Type | null;                      // a fan-out send: the type of the items its range covers
+  unsettled?: ReadonlySet<string>;        // the `also` names that a later entry cannot select again: selected through a slot that is not fixed
 }
 
 /** Forms that name nothing yet. Each act, handler and timed rule starts from this and says what it has. */

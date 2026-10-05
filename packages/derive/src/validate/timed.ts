@@ -20,11 +20,10 @@ const TIMED = "timed:";
  * Section 6.2: no act kind and no message name begins with `timed:`, so the
  * kind of a timed entry is the kind of no act and of no delivery. A message
  * is named where a handler receives it, and where a `tell` or a `relate`
- * sends it. A handler of the first delivery names a relationship after
- * `relate:`.
+ * sends it. A relationship's name is the message of its handler.
  */
 export function timedKinds(d: Defining, acts: unknown, receives: unknown): void {
-  const kept = (name: unknown) => typeof name === "string" && (name.startsWith(TIMED) || name.startsWith(`relate:${TIMED}`));
+  const kept = (name: unknown) => typeof name === "string" && name.startsWith(TIMED);
   const sent = (sends: unknown, path: string) => {
     if (Array.isArray(sends)) sends.forEach((s, i) => {
       const [tell, relate] = isObject(s) ? [s["tell"], s["relate"]] : [];

@@ -120,8 +120,7 @@ describe("what the validator requires of a hold type (section 6.8)", () => {
     ["an end time that is not required", (d) => { d.items.hold.values.until.required = false; }, "hold"],
     ["two grants among the acts that open a hold", (d) => { d.acts["take-again"] = { ...clone(d.acts["take-hold"]), grant: "other" }; }, "hold"],
     ["an act that opens a hold type with no hold: open", (d) => { d.acts.sneak = clone(d.acts["take-hold"]); d.acts.sneak.effects.pop(); }, "hold"],
-    // I2 merge: when step 7 lets a handler state `opens`, this row reports `hold` alone.
-    ["a handler that opens a hold type", (d) => { d.receives.late = { message: "late", from: { kind: "lane" }, opens: "hold", also: {}, guards: [], effects: [], sends: [], attention: [] }; }, ["shape", "hold"]],
+    ["a handler that opens a hold type", (d) => { d.receives.late = { message: "late", class: "tell", from: { kind: "lane" }, fields: clone(d.acts["take-hold"].fields), opens: "hold", also: {}, guards: [], effects: clone(d.acts["take-hold"].effects), sends: [], attention: [] }; }, "hold"],
     ["a state effect on a hold", (d) => { d.acts.stop = onHold([{ state: "ended" }]); }, "hold"],
     ["a party effect on a hold's holder", (d) => { d.acts.hand = onHold([{ party: { slot: "holder", from: { signer: true } } }]); }, "hold"],
     ["a value effect on a hold's epoch", (d) => { d.acts.reset = onHold([{ value: { slot: "epoch", from: { const: 1 } } }]); }, "hold"],
@@ -129,7 +128,7 @@ describe("what the validator requires of a hold type (section 6.8)", () => {
     ["two hold effects on one hold", (d) => d.acts.renew.effects.push({ hold: { do: "end" } }), "conflict"],
     ["a renewal that sets no end", (d) => d.acts.renew.effects.shift(), "hold"],
     ["a renewal by a handler, which has no signer", (d) => {
-      d.receives.late = { message: "late", from: { kind: "lane" }, also: { hold: { item: "hold", by: "hold" } }, guards: [], effects: [{ of: "also.hold", hold: { do: "renew" } }], sends: [], attention: [] };
+      d.receives.late = { message: "late", class: "tell", from: { kind: "lane" }, fields: { hold: { type: "item", of: "hold", required: true } }, opens: null, also: { hold: { item: "hold", by: "hold" } }, guards: [], effects: [{ of: "also.hold", hold: { do: "renew" } }], sends: [], attention: [] };
     }, "hold"],
     ["hold: end with no guard that its hold is live", (d) => d.acts.release.guards.shift(), "final"],
     // A result clause runs in a later entry, which has no signer. It may end a hold, and its hold is checked when it runs.

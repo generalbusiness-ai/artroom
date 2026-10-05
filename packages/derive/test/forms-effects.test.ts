@@ -255,7 +255,7 @@ describe("effects in a handler and in a result clause (sections 6.6 and 7.4)", (
   test("a handler copies the source entry into a fact slot only when that entry is of a kind and a definition the slot states", () => {
     const audited = (kind: string, under: string) => variant(desk, (d) => {
       d.items.repo.refs.asked = { fixed: false, required: false, to: { type: "fact", kind: [kind], under } };
-      d.receives.audit = { message: "audit", from: { kind: "lane" }, also: { repo: { item: "repo", by: "repo" } }, guards: [], effects: [{ of: "also.repo", ref: { slot: "asked", from: { source: "ref" } } }], sends: [], attention: [] };
+      d.receives.audit = { message: "audit", class: "tell", from: { kind: "lane" }, fields: { repo: { type: "item", of: "repo", required: true } }, opens: null, also: { repo: { item: "repo", by: "repo" } }, guards: [], effects: [{ of: "also.repo", ref: { slot: "asked", from: { source: "ref" } } }], sends: [], attention: [] };
     });
     const D = founded();
     const X = new Scope(ticketDefinition);
@@ -276,6 +276,7 @@ describe("effects in a handler and in a result clause (sections 6.6 and 7.4)", (
       d.acts.link.fields.why = { type: "int", min: 0, max: 9, required: true };
       d.acts.link.sends[0].relate.detail.why = { field: "why" };
       d.acts.link.sends[0].relate.result = { refused: [{ state: "removed", if: [{ equals: { a: { result: "reason" }, b: { const: "one" } } }] }] };
+      d.receives.closes.fields.why = { type: "int", min: 0, max: 9, required: true };
       d.receives.closes.guards = [{ differs: { a: { field: "why" }, b: { const: 1 } }, reason: "one" }, { differs: { a: { field: "why" }, b: { const: 2 } }, reason: "two" }];
     });
     const P = new Scope(refusing);

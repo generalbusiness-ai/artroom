@@ -3,7 +3,7 @@ import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { Effect, MemberRef, RefusalReason } from "@generalbusiness/artroom-contract";
 import { canonicalBytes, digestBytes, intentDigest } from "@generalbusiness/artroom-bytes";
 import { LAST_MS, type ActJudgment } from "../src/index.ts";
-import { Scope, d, fields, grantOf, keys, lane, laneDefinition, on, otherLane, small, smallDefinition, t, variant, type Actor } from "./fixtures.ts";
+import { Scope, d, directory, fields, grantOf, keys, lane, laneDefinition, on, otherLane, small, smallDefinition, t, variant, type Actor } from "./fixtures.ts";
 
 const { rita, una, vic, paul, sam } = keys;
 const names = (list: unknown) => (list as readonly MemberRef[]).map((m) => m.member);
@@ -46,13 +46,14 @@ describe("an accepted act", () => {
       { effect: "attention", item: 2, members: [una.member], reason: "replaced" }, { effect: "attention", item: 2, members: [vic.member], reason: "assigned" },
     ]);
 
-    // Sends take ordinals in written order. `self` is not expanded; an earlier local item is sent as its fact; a creation is addressed by a seed.
+    // Sends take ordinals in written order. `self` is not expanded; an earlier local item is sent as its fact; a creation is addressed by a seed,
+    // and the creation of a lane carries the directory that this scope records: here, its creator.
     const signed = s.intent(rita, "link", fields({ target: otherLane, about: 0 }));
     s.submit(signed);
     const link = s.entries.at(-1)!.entry;
     expect(link.sends).toEqual([
       { n: 0, to: otherLane, message: { class: "request", type: "relate", body: { name: "closes", item: { self: true }, state: "set", detail: { about: { at: s.at, seq: 0, hash: s.entries[0]!.hash } } } } },
-      { n: 1, to: { v: 1, kind: "lane", definition: d("e"), creator: s.at, cause: intentDigest(signed.intent), ordinal: 0 }, message: { class: "request", type: "create", body: { fields: { parent: { self: true }, by: rita.member } } } },
+      { n: 1, to: { v: 1, kind: "lane", definition: d("e"), creator: s.at, cause: intentDigest(signed.intent), ordinal: 0 }, message: { class: "request", type: "create", body: { fields: { parent: { self: true }, by: rita.member }, directory } } },
     ]);
     // Each request is outstanding until its one result.
     expect([s.state.request(link.seq, 0), s.state.request(link.seq, 1)].map((r) => r && [r.type, r.result, r.diagnosis])).toEqual([["relate", null, null], ["create", null, null]]);

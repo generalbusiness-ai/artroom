@@ -17,7 +17,7 @@
 
 import type { Bounds, Entry, Incarnation, ScopeId, Seed, UnavailableReason } from "@generalbusiness/artroom-contract";
 import { canonicalize, isDigest, newIncarnation } from "@generalbusiness/artroom-bytes";
-import { creationFields, factsNamed, isEntryOf, isFactRef, isLocalId, isObject, isScopeRef, judgeDelivery, judgeGenesis, own, prepareRules, readFields } from "@generalbusiness/artroom-derive";
+import { creationFields, factsNamed, isEntryOf, isFactRef, isLocalId, isObject, isScopeRef, judgeDelivery, judgeGenesis, messageFacts, own, prepareRules, readFields } from "@generalbusiness/artroom-derive";
 import type { Clock as Reading, Creation, Delivered, DeliveryContext, Fetched, Judgment, StateView, ValidDefinition } from "@generalbusiness/artroom-derive";
 import { NO_INCARNATION, ownOf, retainedFacts, used, type Scope } from "./core.ts";
 import { namedBy } from "./definitions.ts";
@@ -99,6 +99,7 @@ export class Deliveries {
 
     // What the judgment reads beside the source entry. For a genesis: the foreign entries its fields name (section 5.2, step 1).
     // For a result: this scope's own entry that sent the request, and the foreign entries that entry read, from its retained inputs.
+    // For a request or an advisory that a handler receives: the foreign entries that the message's declared fields name.
     let facts: Fetched[] = [];
     let origin: Entry | null = null;
     if (!pinned && founding) {
@@ -114,6 +115,13 @@ export class Deliveries {
       const kept = store.stored(message.of.from.seq);
       origin = kept ? JSON.parse(kept.bytes) as Entry : null;
       facts = origin ? retainedFacts(store, origin) : [];
+    } else if (pinned?.definition && (message.class === "request" || message.class === "advisory")) {
+      // Section 6.4: the foreign entries that the declared fields of the message name. More than one entry may use are not fetched:
+      // the judge refuses that message, `bad-field`, before it reads any.
+      const named = messageFacts(store, pinned.definition, message, from, bounds);
+      const fetched = named.length >= bounds.usesPerEntry ? [] : await fetchFacts(this.#ports.resolver, bounds, named);
+      if (!fetched) return retry("dependency-unavailable");
+      facts = fetched;
     }
 
     const context = (clock: Reading): Omit<DeliveryContext, "prepared"> => ({ clock, bounds, facts, own: ownOf(store), source: { entry: source.entry, under: source.under }, origin });

@@ -290,7 +290,22 @@ relationship tells another scope its state. The receiver keeps a copy,
 keyed by the owner, the owner's item and a name. The copy's revision is
 the position of the owner's entry. An update is applied only if it is
 newer than the copy; an older one is answered `superseded`. So the two
-arrival orders end the same.
+arrival orders end the same. The receiver's definition declares a handler
+for the relationship, by its name, and says how many keys it keeps a copy
+for. An update for one key more is refused `type-full`, and an update of a
+relationship with no handler is refused `unknown-message`. Neither keeps a
+copy.
+
+**Handlers.** A handler states its class (`tell`, `relate` or `advisory`),
+its message, the kind of scope it receives from, and the fields of the
+message. A field the handler does not declare, or a value that is not of
+its type, refuses the request `bad-field`. A handler may open one item.
+
+**Other items.** An act or handler names its other items in `also`. A name
+selects its item by a field (`by`), through a slot of another subject
+(`via`), or as the one item of a type that is not `many` (`one`). A name
+that selects nothing is unbound: its guards are not evaluated and its
+effects are not applied.
 
 **Delivery.** Each scope has a dispatcher. It records each attempt before
 it dispatches and the answer after, retries with a growing delay, and is
@@ -303,6 +318,18 @@ arrives twice is answered with the entry that recorded it the first time.
 A send's **result clauses** say what the sender does when the result
 arrives: one list of effects for each of `applied`, `refused`,
 `superseded`, `undelivered`, and for a creation `conflict`.
+
+**What a send may say.** A field of a message is read from any operand:
+a field, a slot of any subject, the signer, a constant, and in a handler
+the sender and the source entry. A `collect` lists one record for each
+item of a range. A `tell` is addressed by a slot that holds a scope. A
+`tell` or a `relate` with `if` is made only when its guards hold; one that
+is not made takes no ordinal. A `relate` with `each` is a fan-out: one
+update for each live item of a type, in order of item ID. A `create` may
+name `self`, the creating scope's own definition. An `index` row goes to
+the scope's directory: its creator, when that is a directory, or the
+directory that its creator recorded. The validator bounds what one entry
+can send and whom it can tell.
 
 **Diagnoses.** When a request cannot be delivered, the sender stops and
 writes a `diagnosis` entry with its attempt log. There are two findings.

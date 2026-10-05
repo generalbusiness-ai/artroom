@@ -10,6 +10,7 @@ import { judgeDelivery, reasonOf, sentBy, type DeliveryContext } from "./deliver
 import { creationFields, isIntent, readFacts, readFields, useOf } from "./fields.ts";
 import type { Fetched, Judging } from "./guards.ts";
 import { derive } from "./handlers.ts";
+import { directoryOf } from "./sends.ts";
 import type { Judgment } from "./judge.ts";
 import type { StateView } from "./state.ts";
 import { timeMs } from "./time.ts";
@@ -118,7 +119,8 @@ export function judgeGenesis(view: StateView, definition: ValidDefinition, asked
     subjects: new Map(), signer: null, facts: named.facts, prepared: context.prepared, used: [], asked: context.asked,
   };
   // A child's result is at ordinal 0; the sends its act declares follow. Each scope a genesis creates has that genesis's own seed digest as its cause.
-  const ran = derive(j, act, act.on, seedDigest(seed), child ? 1 : 0);
+  // Section 6.6: the scope records its directory with this entry: its creator, or the directory that its creator put in the creation.
+  const ran = derive(j, act, act.on, seedDigest(seed), child ? 1 : 0, directoryOf({ seed, message: child?.message ?? null }));
   if (ran.result === "unavailable") return ran;
   if (ran.result === "refused") return refuse(reasonOf(ran), uses, ran.prepared);
   // No item exists before a genesis, so no transition is due (section 5.2, step 6.3), and no entry precedes it, so the clock is not behind.

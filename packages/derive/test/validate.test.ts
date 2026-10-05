@@ -27,8 +27,7 @@ const rows: readonly (readonly [string, DeclaredDefinition, Change, ProblemCode 
   ["the desk passes", desk, () => {}, null],
   ["the ticket passes, with a rule guard that names a rule it declares", ticket, () => {}, null],
   ["a rule guard that names no declared rule", ticket, (d) => { d.rules = {}; }, "rule"],
-  ["two handlers for one message from one kind of scope", desk, (d) => { d.receives.again = clone(d.receives.spawn); }, "handler"],
-  ["a tell under a name the platform keeps for a relate", ticket, (d) => { d.acts.ask.sends[0].tell.message = "relate:closes"; }, "handler"],
+  ["two handlers for one class and message from one kind of scope", desk, (d) => { d.receives.again = clone(d.receives.spawn); }, "handler"],
   ["a time value set by a genesis, with no timed rule on its type, passes", small, (d) => d.acts.start.effects.push({ value: { slot: "due", from: { time: { plusSeconds: 60 } } } }), null],
 
   // Section 6.4, the table of X1 and X2.
@@ -147,10 +146,11 @@ describe("the definition validator", () => {
     expect(refusal(() => {}, { ...PROPOSED_BOUNDS, timedRules: 0 })).toEqual([["bound", "timed"]]);
     expect(refusal((d) => { d.rules = { a: "true", b: "true" }; }, { ...PROPOSED_BOUNDS, rules: 1 })).toEqual([["bound", "rules"]]);
     expect(refusal(() => {}, { ...PROPOSED_BOUNDS, definitionBytes: 1000 })).toEqual([["bound", ""]]);
-    // A party list holds at most 64 members, which is more than a list value holds.
+    // A party list holds at most 64 members, which is more than a list value holds. The rule tells that list and nobody else:
+    // one entry tells at most 64 members.
     const watched = (max: number): Change => (d) => {
       d.items.hold.parties.watchers = { fixed: false, required: false, list: true, max, author: false };
-      d.timed["hold-end"].attention.push({ notify: { slot: "watchers", of: "on", when: "after", reason: "hold ended" } });
+      d.timed["hold-end"].attention = [{ notify: { slot: "watchers", of: "on", when: "after", reason: "hold ended" } }];
     };
     expect(refusal(watched(PROPOSED_BOUNDS.partyMembers))).toBeNull();
     expect(refusal(watched(PROPOSED_BOUNDS.partyMembers + 1))).toEqual([["bound", "items.hold.parties.watchers.max"]]);

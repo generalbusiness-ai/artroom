@@ -26,7 +26,7 @@ export type RefusalReason =
   | "unauthorized"      // no presented grant is current and covers the action, the key and the scope
   | "guard-failed"      // a guard does not hold on a completed evaluation. When the guard declares a `reason`, the refusal carries it as its name
   | "slot-full"         // a party list would pass its `max`
-  | "type-full"         // an opening would pass the type's `max` of live items
+  | "type-full"         // an opening would pass the type's `max` of live items, or a first relationship update the `copies` of its handler
   | "send-unresolved"   // a send's target or item resolves to nothing
   | "unknown-message"   // a delivered request names no handler of the definition for a scope of that kind
   | "bad-input";        // a diagnosis, outcome or checkpoint that does not follow from the scope's state

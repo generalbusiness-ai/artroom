@@ -198,7 +198,13 @@ describe("the list forms (section 6.5)", () => {
 
   test("a handler reads the members of a record element of a list in its message", () => {
     const checked = (name: Operand): Guard => ({ each: { list: { field: "checks" }, as: "k", where: [{ equals: { a: { element: "k.required" }, b: { const: true } } }], guards: [{ differs: { a: { element: "k.name" }, b: name } }] }, reason: "required" });
-    const auditing = variant(desk, (d) => { d.receives.audit = { message: "audit", from: { kind: "lane" }, also: {}, guards: [checked({ field: "barred" })], effects: [], sends: [], attention: [] }; });
+    const auditing = variant(desk, (d) => {
+      const check = { type: "record", of: { name: { type: "text", max: 16, required: true }, required: { type: "bool", required: true } } };
+      d.receives.audit = {
+        message: "audit", class: "tell", from: { kind: "lane" }, fields: { barred: { type: "text", max: 16, required: true }, checks: { type: "list", of: check, max: 4, required: true } }, opens: null,
+        also: {}, guards: [checked({ field: "barred" })], effects: [], sends: [], attention: [],
+      };
+    });
     const D = founded();
     const X = new Scope(ticketDefinition);
     const decision = (barred: string, checks: unknown = [{ name: "lint", required: true }, { name: "docs", required: false }]) => {
@@ -206,12 +212,12 @@ describe("the list forms (section 6.5)", () => {
       const source = forged(X.at, 1, X.entries[1]!.entry.input, [tell]);
       const arrival = { ...tell, from: factRefOf(source.entry) };
       const j = judgeDelivery(D.state, auditing, arrival, arriving(D, arrival, source));
-      return j.result === "write" && j.draft.input.type === "delivery" && "decision" in j.draft.input ? [j.draft.input.decision, j.draft.input.reason?.name] : j.result;
+      return j.result === "write" && j.draft.input.type === "delivery" && "decision" in j.draft.input ? [j.draft.input.decision, j.draft.input.reason] : j.result;
     };
     // `docs` is not required, so the `where` leaves it out. `lint` is required, and is judged.
-    expect([decision("docs"), decision("lint")]).toEqual([["applied", undefined], ["refused", "required"]]);
-    // A message declares no types, so a value that is no list can arrive. It has no elements to judge, and the form fails closed.
-    expect(decision("docs", "lint")).toEqual(["refused", "required"]);
+    expect([decision("docs"), decision("lint")]).toEqual([["applied", undefined], ["refused", { code: "guard-failed", name: "required" }]]);
+    // A handler declares the fields of its message, so a value that is no list of such records is no value of the field.
+    expect(decision("docs", "lint")).toEqual(["refused", { code: "bad-field" }]);
   });
 
   test("the validator refuses a list form that names what it does not have, and a nesting past the bounds", () => {

@@ -60,8 +60,8 @@ export function holdEffect(d: Defining, x: unknown, p: string, s: Type, sk: stri
   const what = r["do"];
   if (!d.holds) bad("capability", p, "the definition does not list hold@1");
   // Section 4.1: a hold is opened by an `open` act whose primary item is the hold. Any other opening would be a second item.
-  // I2 merge: no handler opens an item until step 7. From then on a handler's `hold: open` is refused here, because a handler has no signer.
-  if (what === "open") { if (!nascent || !ctx.signer) bad("one-item", p, "a hold is opened only as the primary item of an open act"); }
+  // A handler has no signer to be the holder: `receives` refuses, as `hold`, a handler that opens a hold type or has `hold: open`.
+  if (what === "open") { if (!nascent) bad("one-item", p, "a hold is opened only as the primary item of an open act"); }
   else if (what !== "renew" && what !== "end") bad("shape", at(p, "do"), "is open, renew or end");
   else if (!d.holdTypes.has(s.name)) bad("hold", p, `${s.name} is not a type that a hold: open effect targets`);
   // The holder is the signer of the entry that renews. A timed rule, a handler and the entry that runs a result clause have none.
@@ -142,12 +142,9 @@ export function holdForms(d: Defining, top: Rec): void {
   }
   if (d.holdTypes.size === 0) return;
 
-  // The opening act: exactly one grant is used by the acts that have `hold: open`. A handler has no signer to be the holder.
+  // The opening act: exactly one grant is used by the acts that have `hold: open`.
   const acts = isObject(top["acts"]) ? Object.values(top["acts"]) : [];
   if (new Set(acts.filter((a) => isObject(a) && a["step"] === "open" && holdDoes(a["effects"], "open")).map((a) => (a as Rec)["grant"])).size > 1) bad("hold", "acts", "exactly one grant is used by the acts that open a hold");
-  for (const [name, h] of isObject(top["receives"]) ? Object.entries(top["receives"]) : []) {
-    if (isObject(h) && typeof h["opens"] === "string" && d.holdTypes.has(h["opens"])) bad("hold", at(at("receives", name), "opens"), "a hold is opened by an act, whose signer is its holder");
-  }
 
   // What only the capability sets, and how an end time is set.
   for (const { list, path, typeOf, act } of effectLists(top)) {

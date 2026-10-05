@@ -13,7 +13,7 @@
  * the canonical bytes.
  */
 
-import type { Digest, Entry, FactRef, KeyId, OperationId, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
+import type { Digest, Entry, FactRef, KeyId, OperationId, ScopeKind, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
 import { canonicalize } from "@generalbusiness/artroom-bytes";
 import { MemoryState, slotOf, timeMs } from "@generalbusiness/artroom-derive";
 import type { Accepted, Decided, HeldCreation, Item, Operation, Outstanding, OwnRequest, Page, RangeIndex, Relation, ScopeState, StateSnapshot } from "@generalbusiness/artroom-derive";
@@ -118,6 +118,10 @@ export class SqliteStore implements Store {
   }
 
   relation(owner: ScopeRef, name: string, item: number): Relation | null { return this.#folded("relation", canonicalize([owner.scope, owner.inc, name, item])); }
+  /** Counted from the copies themselves. A `relate` handler bounds how many its scope keeps, so the rows read are bounded by the definition. */
+  copies(name: string, kind: ScopeKind): number {
+    return this.#one("SELECT COUNT(*) AS n FROM folded WHERE kind = 'relation' AND json_extract(value, '$.name') = ? AND json_extract(value, '$.owner.kind') = ?", name, kind)!["n"] as number;
+  }
   accepted(actor: KeyId, idempotencyKey: string): Accepted | null {
     const row = this.#one("SELECT seq, intent FROM entry WHERE actor = ? AND idem = ?", actor, idempotencyKey);
     return row && { seq: row["seq"] as number, intent: row["intent"] as Digest };

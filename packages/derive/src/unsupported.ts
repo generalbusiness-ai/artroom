@@ -8,12 +8,7 @@
  * Nothing here is exported from the package.
  */
 
-import type { AlsoRule } from "@generalbusiness/artroom-contract";
-
 /** Ends a branch that no pinned definition reaches. */
 export function unsupported(form: string): never {
   throw new Error(`${form} is a form the validator refuses, and no judge derives it`);
 }
-
-/** The field that names an `also` item: the one way to name one that this package derives. */
-export const namedBy = (also: AlsoRule): string => ("by" in also ? also.by : unsupported("an also name with no by"));

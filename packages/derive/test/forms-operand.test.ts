@@ -199,6 +199,7 @@ describe("operands, parts and a local fact (sections 6.2 and 6.5; witness 18.1)"
       d.acts.link.fields.because = { type: "fact", kind: ["file"], under: "ticket", required: true };
       d.acts.link.effects.push({ ref: { slot: "madeAt", from: "self" } });
       Object.assign(d.acts.link.sends[0].relate.detail, { madeAt: { slot: "madeAt" }, because: { field: "because" } });
+      Object.assign(d.receives.closes.fields, { madeAt: { type: "fact", kind: ["link"], under: "ticket", required: false }, because: { type: "fact", kind: ["file"], under: "ticket", required: false } });
       d.receives.closes.guards.push(equals({ field: "madeAt" }, { source: "ref" }, "made at"));
     });
     const P = new Scope(definition);
@@ -241,7 +242,7 @@ describe("operands, parts and a local fact (sections 6.2 and 6.5; witness 18.1)"
       ["a result outside a result clause", inHandler(about({ result: "reason" })), "name"],
       ["a signer in a handler", inHandler(about({ signer: true })), "name"],
       ["an intent in a handler", inHandler(about({ intent: true })), "name"],
-      ["an update in a handler of a tell", refusal(variant(ticket, () => {}).declared, (d) => { d.receives.closes.message = "closes"; d.receives.closes.guards.push(about({ update: "state" })); }), "name"],
+      ["an update in a handler of a tell", refusal(variant(ticket, () => {}).declared, (d) => { d.receives.closes.class = "tell"; delete d.receives.closes.copies; d.receives.closes.guards.push(about({ update: "state" })); }), "name"],
       ["a presented fact that the act does not present", inAct(about({ presented: "pin" })), "name"],
       ["an element with no form that binds it", inAct(about({ element: "e" })), "name"],
       ["a slot of each item with no fan-out", inAct(about({ slot: "text", of: "each" })), "name"],
@@ -256,7 +257,6 @@ describe("operands, parts and a local fact (sections 6.2 and 6.5; witness 18.1)"
       ["a reason that is not a text", refusal(asks, (d) => { d.acts.accept.guards[1].reason = 7; }), "shape"],
       ["`self` in a fact slot whose kinds do not include the act's kind", refusal(asks, (d) => { d.items.ask.refs.termsAt.to.kind = ["ask"]; }), "name"],
       ["`self` in a fact slot under another definition's name", refusal(asks, (d) => { d.items.ask.refs.termsAt.to.under = "others"; d.acts.accept.fields.terms.under = "others"; }), "name"],
-      ["a send that takes an operand its derivation does not read yet", refusal(ticket, (d) => { d.acts.link.sends[0].relate.detail.about = { field: "about", part: "seq" }; }), "shape"],
     ];
     expect(rows.filter(([, found, code]) => found?.length !== 1 || found[0] !== code).map(([name, found]) => [name, found])).toEqual([]);
   });
