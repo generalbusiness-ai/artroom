@@ -12,11 +12,12 @@
 
 import type { PlatformData } from "@generalbusiness/artroom-contract";
 import { inbox } from "./inbox.ts";
-import { RULES, type Rules } from "./rules.ts";
+import type { Rules } from "@generalbusiness/artroom-derive";
+import { RULES } from "./rules.ts";
 
 export { inbox };
 export { RULES };
-export type { PlatformName, PlatformRule, RuleGiven, RuleResult, RuleTable, Rules } from "./rules.ts";
+export type { PlatformName, RuleTable } from "./rules.ts";
 
 /** The platform definitions delivered so far, by name without the version. */
 export const definitions: Readonly<Record<string, PlatformData>> = { "platform:inbox": inbox };

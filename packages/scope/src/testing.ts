@@ -11,8 +11,9 @@
 
 import { CAPABILITIES, PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { Bounds, Capability, CapabilityName, Digest, Entry, ObservationRequest, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
-import type { Capabilities, Delivered, Recorded, Steps, Window } from "@generalbusiness/artroom-derive";
-import { platform, type Platform, type PlatformRule } from "@generalbusiness/artroom-platform";
+import { PROFILES, validateDefinition } from "@generalbusiness/artroom-derive";
+import type { Capabilities, Delivered, MarkKind, PlatformRule, Recorded, Steps, Window } from "@generalbusiness/artroom-derive";
+import { platform, type Platform } from "@generalbusiness/artroom-platform";
 import { observing } from "./authority.ts";
 import type { Authority, Clock, Definitions, Ports, Readers, Resolver, Rules, Transport } from "./ports.ts";
 import { production } from "./ports.ts";
@@ -92,29 +93,34 @@ export function scriptedCapability(script: () => CapabilityScript | null): Capab
 }
 
 /**
- * A stand-in for a platform rule: it adds nothing to its entry. It is not
- * the rule of any row, and no judge runs it. It shows only what a scope
- * does once every row that is code has a rule supplied.
+ * A stand-in for a platform rule of each kind of place: it passes, selects
+ * nothing, accepts every value and adds nothing. It is not the rule of any
+ * mark, and no judge runs it. It shows only what a scope does once every
+ * mark has a rule supplied.
  */
-const STAND_IN_RULE: PlatformRule = () => ({ result: "applied", effects: [], sends: [] });
-
-/** The name of each rule that a value of platform data marks: every record of it that has the two texts `code` and `row`. */
-function marked(value: unknown): string[] {
-  if (typeof value !== "object" || value === null) return [];
-  const here = "code" in value && "row" in value && typeof value.code === "string" && typeof value.row === "string" ? [value.code] : [];
-  return [...here, ...Object.values(value).flatMap(marked)];
-}
+const STAND_IN_RULES: { readonly [kind in MarkKind]: PlatformRule } = {
+  grant: { place: "grant", run: () => ({ pass: true, member: null }), refusals: [] },
+  also: { place: "also", run: () => null },
+  type: { place: "type", run: () => true },
+  guard: { place: "guard", run: () => ({ holds: true }), refusals: [] },
+  effect: { place: "effect", run: () => [], most: 0 },
+  send: { place: "send", run: () => null },
+  outcome: { place: "outcome", rules: { selects: false, read: false, retries: () => false } },
+};
 
 /**
  * A stand-in for the platform package's table of rules: the platform
- * definition of that name as the package supplies it, with `STAND_IN_RULE`
- * for every mark of its data. So it proves nothing about the real rule of
- * any mark, such as `notice-source` of the inbox, which a later step writes.
+ * definition of that name as the package supplies it, with a stand-in rule
+ * of the right kind for every mark of its data. So it proves nothing about
+ * the real rule of any mark, such as `notice-source` of the inbox, which a
+ * later step writes. The marks are read as the runtime reads them, by the
+ * validator with its platform option.
  */
 export function standInPlatform(named: string): Platform | null {
   const supplied = platform(named);
-  if (!supplied) return null;
-  return { ...supplied, rules: Object.fromEntries(marked(supplied.data).map((code): [string, PlatformRule] => [code, STAND_IN_RULE])) };
+  const checked = supplied && validateDefinition(supplied.data, PROPOSED_BOUNDS, PROFILES, { platform: true });
+  if (!supplied || !checked?.ok) return null;
+  return { ...supplied, rules: Object.fromEntries(checked.definition.marks.map((mark): [string, PlatformRule] => [mark.code, STAND_IN_RULES[mark.kind]])) };
 }
 
 /** A scripted clock. Each reading is the next of `script`, or `now` when the script is empty. */

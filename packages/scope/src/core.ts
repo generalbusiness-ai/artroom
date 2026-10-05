@@ -9,7 +9,7 @@
 
 import type { ActType, Answer, Beside, Bounds, CapabilityName, DeclaredDefinition, Digest, DutyId, Entry, FactRef, Founded, Grant, PlatformDefinition, Receipt, RefusalReason, ScopeId, Seed, Settlement, SignedIntent, UnavailableReason } from "@generalbusiness/artroom-contract";
 import { canonicalize, definitionDigest, intentDigest, isDigest, isGrant, isPlatformDefinition, newIncarnation, parseStrict, platformName, textDigest, utf8 } from "@generalbusiness/artroom-bytes";
-import { checkpointOf, derivable, factsNamed, inputTexts, isObject, judgeAct, judgeCheckpoint, judgeGenesis, judgePreparation, own, prepareRules, presentedTypes, readFields, stepsOf, validateDefinition, windowOf } from "@generalbusiness/artroom-derive";
+import { checkpointOf, derivable, factsNamed, inputTexts, isObject, judgeAct, judgeCheckpoint, judgeGenesis, judgePreparation, own, prepareRules, presentedTypes, readFields, runnable, stepsOf, validateDefinition, windowOf } from "@generalbusiness/artroom-derive";
 import type { ActJudgment, Clock as Reading, Draft, Fetched, Founding, GrantDecision, JudgeContext, Own, Presented, StateView, Texts, ValidDefinition, Window } from "@generalbusiness/artroom-derive";
 import { RULE_PROFILES } from "@generalbusiness/artroom-derive/rule";
 import { namedBy } from "./definitions.ts";
@@ -217,7 +217,8 @@ export class Scope {
       if (!checked.ok || checked.definition.declared.name !== platformName(named) || !derivable(checked.definition, this.#ports.capabilities)) return null;
       // The marks are in the data, and the validator lists them: no table beside the data says which entries are code.
       const { marks, declared } = checked.definition;
-      if (marks.some((mark) => typeof own(supplied.rules, mark.code) !== "function")) return null;
+      // Section 6.1, "A mark with no rule: the whole scope": every mark needs a rule of that name, of the kind of the mark's place.
+      if (!runnable(checked.definition, supplied.rules)) return null;
       // I3 merge: no judge runs a platform rule yet. So an entry of a row that holds a mark is not derived, though every rule of it
       // is supplied: `lacks`. The step that makes the judges run the rules removes `lacking`, `lacks` and each place that asks it.
       const kinds = marks.flatMap((mark): string[] => {
