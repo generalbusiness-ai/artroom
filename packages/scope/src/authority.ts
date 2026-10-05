@@ -131,8 +131,9 @@ export function observing(config: Observing): Authority {
           if (spent) return null;
           // A revocation that any read of this run has seen takes effect at once: it is judged in place of an answer that shows the key
           // active, also one that was read for this act.
-          // I3 merge: the authority note's revision 19, under review, reads this rule as of the member too: a read that shows a member
-          // removed stops every key of that member for the run. Revision 18 states it of one key, and that is what is kept here.
+          // I3 merge: the authority note's revision 20, adopted since this was written, reads this rule as of the member too: a read that
+          // shows a member removed stops every key of that member for the run. Revision 18 states it of one key, and that is what is
+          // kept here. The member's rule is owed.
           const seen = kept.get(key);
           const judged = seen && revoked(seen.observation) ? seen : read;
           const result = judge(judged, clock, view);

@@ -246,6 +246,12 @@ can be merged after adoption with whatever the review changes. Until then
 nothing here is in force. Section numbers are those of the two texts. The
 rows are those of revision 15's section 11.13.
 
+Added 2026-10-05, with the repairs of section 12: both revisions are
+adopted since, at those two commits. The paragraph above and the entries
+below stay as they were written. The adoption is of the two designs. It is
+no review and no acceptance of this source, and each question below stays
+with its owner.
+
 Each entry is a place where a proposed text is silent, cannot be built as
 it stands, or differs from the other, with what the source holds. Each
 ends with the question for its owner. No entry's bytes, no state digest and

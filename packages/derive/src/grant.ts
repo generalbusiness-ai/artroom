@@ -46,9 +46,9 @@ export function windowOf(definition: ValidDefinition, kind: ScopeKind, act: stri
   const row = own(definition.declared.acts, act);
   if (!row) return null;
   if (row.effects.some((effect) => "hold" in effect && effect.hold.do !== "end")) return WINDOWS.once;
-  // I3 merge: the authority note's revision 19, under review, restates this as a table of entries. It adds the 300 seconds of an act in
-  // membership and in the rules scope, and the 60 seconds and the named acts of a task scope. Revision 18 states a window for none of
-  // them, so each is null here (I3 deltas, entry ED4).
+  // I3 merge: the authority note's revision 20, adopted since this was written, restates this as a table of entries. It adds the 300
+  // seconds of an act in membership and in the rules scope, and the 60 seconds and the named acts of a task scope. Revision 18 states
+  // a window for none of them, so each is still null here (I3 deltas, entry ED4). Those windows are owed.
   return kind === "lane" || kind === "directory" || kind === "inbox" ? WINDOWS.ordinary : null;
 }
 

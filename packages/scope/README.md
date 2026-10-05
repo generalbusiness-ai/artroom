@@ -150,9 +150,10 @@ A platform definition is code of the runtime. It is pinned by its name and
 version, such as `platform:inbox@1`, and no scope retains bytes for it.
 One version is its data and its rules, and the platform package supplies
 both. The data holds a mark, `{ code, row }`, at each place where a rule is
-run, and `code` names the rule. What follows builds a design that is filed
-for review and is not adopted yet: the scope contract's revision 15 and
-the authority note's revision 20.
+run, and `code` names the rule. What follows builds the scope contract's
+revision 15 and the authority note's revision 20. It was written while
+both were filed for review. Both are adopted since. The adoption is of
+the designs, and is no review of this source.
 
 - A founding that names a platform definition is run under the platform
   package's data. That data alone is validated with the validator's

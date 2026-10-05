@@ -23,7 +23,14 @@ export interface SendRow {
   basis: "read" | "own-answer" | "none";
   /** What the read of the ref shows afterwards. */
   shows: "commit" | "base" | "other";
-  /** How many updates reached the host. */
+  /**
+   * How many updates left the gateway for the host: the count of forwards
+   * in the grant's record. It is not a count of what the host received. In
+   * the row `lost-before` the one request left the gateway and was lost on
+   * its way, so the count is 1 and the host holds the base. For the rows
+   * that the real repository runs, the host stand-in counted the same
+   * number of arrivals.
+   */
   reached: 0 | 1;
 }
 
