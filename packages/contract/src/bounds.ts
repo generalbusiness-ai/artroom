@@ -24,7 +24,7 @@ export interface Bounds {
   definitionBytes: number;         // the canonical bytes of one definition
   textBytes: number;               // one text field
   memberBytes: number;             // one member handle. The contract states none; temporary, and the authority note's to set
-  listElements: number;            // one list field or slot; also what one `every` guard reads
+  listElements: number;            // the most that the `max` of one list type may state, for every list field and list value slot (section 6.1, revision 19). A count reads the type's `max` or this, and never the length of a value
   partyMembers: number;            // one party list. The fold enforces it, and the size of a timed entry is counted at it
   states: number;                  // of one item type
   parties: number;                 // party slots of one item type
@@ -79,7 +79,7 @@ export const PROPOSED_BOUNDS: Bounds = {
   definitionBytes: 256 * 1024,
   textBytes: 64 * 1024,
   memberBytes: 256,
-  listElements: 32,
+  listElements: 64,
   partyMembers: 64,
   states: 16,
   parties: 8,

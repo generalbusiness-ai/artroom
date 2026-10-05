@@ -155,6 +155,11 @@ describe("the definition validator", () => {
     expect(refusal(() => {}, { ...PROPOSED_BOUNDS, timedRules: 0 })).toEqual([["bound", "timed"]]);
     expect(refusal((d) => { d.rules = { a: "true", b: "true" }; }, { ...PROPOSED_BOUNDS, rules: 1 })).toEqual([["bound", "rules"]]);
     expect(refusal(() => {}, { ...PROPOSED_BOUNDS, definitionBytes: 1000 })).toEqual([["bound", ""]]);
+    // Section 6.1, "The bound on the elements of a list" (witness 18.44, cases 1 to 3): each list type states its own `max`, and the
+    // configured bound is the most that it may state. 64 validates at the bound 64; 65 does not; and 64 does not at a bound of 32.
+    const listed = (max: number): Change => (d) => { d.items.hold.values.tags = { fixed: false, required: false, of: { type: "list", of: { type: "text", max: 64 }, max } }; };
+    expect([PROPOSED_BOUNDS.listElements, refusal(listed(64)), refusal(listed(65)), refusal(listed(64), { ...PROPOSED_BOUNDS, listElements: 32 })])
+      .toEqual([64, null, [["bound", "items.hold.values.tags.of.max"]], [["bound", "items.hold.values.tags.of.max"]]]);
     // A party list holds at most 64 members, which is more than a list value holds. The rule tells that list and nobody else:
     // one entry tells at most 64 members.
     const watched = (max: number): Change => (d) => {
