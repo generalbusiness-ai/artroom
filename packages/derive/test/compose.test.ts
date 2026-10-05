@@ -506,6 +506,33 @@ describe("room to settle (section 17.2)", () => {
     expect(S.replay().snapshot()).toBe(S.state.snapshot());
   });
 
+  test("an item type named __proto__ reserves like any other: the pending table holds it as an own name, its pending item is reserved, a note at a full budget is refused, and Object.prototype is as it was", () => {
+    const form = { also: {}, fields: {}, guards: [], effects: [], sends: [], attention: [] };
+    const x = variant(ticket, (d) => {
+      // Defined, not assigned: an assignment to `__proto__` would set the prototype.
+      const proto = { many: true, max: 4, states: { open: { final: false }, done: { final: true } }, initial: "open", parties: {}, refs: {}, values: {} };
+      Object.defineProperty(d.items, "__proto__", { value: proto, enumerable: true, writable: true, configurable: true });
+      Object.assign(d.acts, {
+        start: { ...form, step: "open", on: "__proto__", grant: "start" },
+        finish: { ...form, step: "transition", on: "__proto__", grant: "finish", settles: { of: "on", in: ["open"] }, guards: [{ state: ["open"] }], effects: [{ state: "done" }] },
+        note: { ...form, step: "comment", on: null, grant: "note" },
+      });
+    });
+    expect(Object.hasOwn(x.pending, "__proto__")).toBe(true);
+    expect(Object.keys(Object.prototype)).toEqual([]);
+    expect(({} as Record<string, unknown>)["open"]).toBeUndefined();
+    const S = new Scope(x);
+    S.did(una, "start");
+    // Written 3, and reserved: the item's closing entry and the closing checkpoint. Without the item's reservation it would be 1.
+    expect(owed(S.state, x, S.last.input)).toBe(2);
+    // At 5 entries a note makes 4 written and 2 reserved: refused. With one reserved it would have been kept.
+    const note = S.judge(S.intent(una, "note", {}));
+    if (note.result !== "write") throw new Error("the note was not judged");
+    const [copy, entry] = [S.replay(), entryOf(S.state, note.draft, clockOf(S.state, S.now))];
+    applyEntry(copy, x, entry, entryHash(entry));
+    expect(fits(copy, x, { scopeEntries: 5 }, entry.input, note.draft.settles)).toBe(false);
+  });
+
   test("a chain of timed rules (the table of section 17.3a): a deadline reserves one entry for each rule its rule leads to", () => {
     // Rule A, `asked` to `paused`; rule B, `paused` to `failed`, which is final. Both read one deadline.
     const x11 = variant(ticket, (d) => { pausing(d); d.timed.lapse = { ...d.timed.pause, states: ["paused"], effects: [{ state: "failed" }] }; });

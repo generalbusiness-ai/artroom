@@ -91,14 +91,17 @@ export function capacityOf(d: Pick<Defining, "bad" | "duties" | "clauseSets">, g
     return 1 + starts(form.sets, settled) + form.requests.reduce((n, request) => n + request.most * (2 + Math.max(0, ...request.clauses.map((c) => starts(c)))), 0);
   };
 
-  const pending: Record<string, Record<string, number>> = {};
+  // Collected by type and state in maps, so no write reaches a prototype: a name is an own name of the record built from them.
+  const waiting = new Map<string, Map<string, number>>();
+  const wait = (type: string, state: string) => waiting.set(type, (waiting.get(type) ?? new Map<string, number>()).set(state, awaits(type, state)));
   for (const form of d.duties) {
     if (!form.settles || !("subject" in form.settles)) continue;
     const { type, states } = form.settles;
-    for (const state of states) (pending[type] ??= {})[state] = awaits(type, state);
+    for (const state of states) wait(type, state);
   }
   // A state that a timed rule can take to one that awaits a settlement reserves it too.
-  for (const rule of moves) for (const state of rule.states) if (awaits(rule.type, state) > 0) (pending[rule.type] ??= {})[state] = awaits(rule.type, state);
+  for (const rule of moves) for (const state of rule.states) if (awaits(rule.type, state) > 0) wait(rule.type, state);
+  const pending: Record<string, Record<string, number>> = Object.fromEntries([...waiting].map(([type, states]) => [type, Object.fromEntries(states)]));
   // Row 4: a copy in a listed state reserves what the handler that settles it reserves.
   const pendingCopies = d.duties.flatMap((form): PendingCopy[] => (form.settles && "copy" in form.settles ? [{ name: form.settles.name, kind: form.settles.kind as ScopeKind, states: form.settles.copy, entries: entriesOf(form) }] : []));
   // A request reserves, beside its two entries, the most that one of its clauses can start. The runtime holds the largest over
