@@ -11,3 +11,6 @@ export * from "./operations.ts";
 export * from "./namespace.ts";
 export * from "./authority.ts";
 export * from "./definitions.ts";
+export * from "./sessions.ts";
+export * from "./limits.ts";
+export * from "./operator.ts";

@@ -136,8 +136,8 @@ export async function repository(): Promise<Repository> {
   const { O, M } = await office();
   const seat = await M.did(rita, "seat", { expected: { roster: 1 } });
   const ritasKey = await M.did(rita, "first-key", { fields: { member: seat }, expected: await M.expected({ roster: 0, member: seat }) });
-  const invitation = await M.did(rita, "invite-member", { fields: { handle: "@una", role: "member", inviteHash: textDigest("the secret of una's invitation"), inviteEnds: soon(3600) } });
-  const unasKey = await M.did(una, "join", { fields: { invitation, secret: "the secret of una's invitation" } });
+  const invitation = await M.did(rita, "invite-member", { fields: { handle: "@una", role: "member", inviteHash: textDigest("the secret of una's invitation, of 32 bytes or more"), inviteEnds: soon(3600) } });
+  const unasKey = await M.did(una, "join", { fields: { invitation, secret: "the secret of una's invitation, of 32 bytes or more" } });
   const [ritasInbox, unasInbox] = [await M.created(seat), await M.created(unasKey)];
   await settle(O, M, ritasInbox, unasInbox);
   return { O, M, ritasInbox, unasInbox, ritasKey, una: invitation, unasKey };

@@ -77,6 +77,7 @@ export const REFUSAL_REASONS: Record<RefusalReason, true> = {
 };
 export const READ_REFUSALS: Record<ReadRefusal, true> = {
   "not-found": true, "wrong-incarnation": true, forbidden: true, "scope-provisional": true, "unsupported-definition": true, "history-unavailable": true, "too-large": true, unavailable: true,
+  "sessions-unavailable": true, "clock-behind": true,
 };
 const STATUS: Record<Status, true> = { provisional: true, active: true, refused: true };
 const ATTEMPTED: Record<Attempt["answer"], true> = { none: true, "wrong-incarnation": true, "not-found": true, retry: true };
