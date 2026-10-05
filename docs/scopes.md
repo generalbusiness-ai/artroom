@@ -20,7 +20,7 @@ why. Nothing in either note is adopted by being built.
 | `@generalbusiness/artroom-contract` | Types and constant tables. No logic. | Nothing |
 | `@generalbusiness/artroom-bytes` | Canonical JSON, SHA-256, encodings, Ed25519, the seven byte domains, and the guard of each identifier. | contract |
 | `@generalbusiness/artroom-derive` | The definition validator, the fold, the judges and the rule evaluator. Pure functions. | contract, bytes |
-| `@generalbusiness/artroom-platform` | The platform definitions as data, with the rules that no form can say. Today: `platform:inbox@1`. | contract, bytes, derive |
+| `@generalbusiness/artroom-platform` | The platform definitions as data, with the rules that no form can say. Today: six, listed under what is built below. | contract, bytes, derive |
 | `@generalbusiness/artroom-git` | Everything that touches a Git repository or a Git host: the object reader, the commands, the outcome of a push, and the gateway. It is not part of a scope's commit and no other package imports it. | contract, bytes |
 | `@generalbusiness/artroom-scope` | The runtime of a scope on a Cloudflare Durable Object with SQLite storage, and the Worker's routes. | contract, bytes, derive, platform |
 | `@generalbusiness/artroom-replay` | An independent check of a history, its report, and the command `artroom-replay`. | contract, bytes, derive |
