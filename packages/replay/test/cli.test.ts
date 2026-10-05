@@ -1,4 +1,4 @@
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
 import type { Digest, ScopeId } from "@generalbusiness/artroom-contract";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -49,7 +49,7 @@ test("the command exits 1 for a history that is not consistent, and with --json 
   expect(JSON.parse(bad.out)).toMatchObject({ report: { mode: "replay", result: "mismatch", at: { at: w.I.scope, seq: 2 } }, why: "the recorded effects are not the ones derived again" });
 });
 
-test("a reply from a service is taken in as raw bytes, only as far as the read allows, and within a deadline; a deadline passed is a read error and no report", async () => {
+test("a reply from a service is taken in as raw bytes, only as far as the read allows; a budget that does not allow the first read leaves nothing to report on", async () => {
   const w = world();
   const id = w.I.scope.scope;
   // A body with no end: it is cancelled at the chunk that passes what the read allows, and nothing of it is parsed or kept.
@@ -58,19 +58,34 @@ test("a reply from a service is taken in as raw bytes, only as far as the read a
   expect([await httpSource("https://scopes.test", { fetch: endless }).page(id, 0, { bytes: 4096, entries: 10 }), sent]).toEqual([{ ok: false, reason: "too-large" }, 5120]);
   // A page with more entries than the read allows is not kept either.
   expect(await httpSource("https://scopes.test", { fetch: service(sourceOf(w, 3)) }).page(id, 0, { bytes: 1e6, entries: 2 })).toEqual({ ok: false, reason: "too-large" });
-  // A service that never answers: the read is given up after its deadline, here 10 milliseconds.
-  const silent: Fetch = () => new Promise(() => undefined);
-  await expect(verify(httpSource("https://scopes.test", { fetch: silent, seconds: 0.01 }), { mode: "integrity", scope: id })).rejects.toThrow(SourceError);
-  // A fetch that ignores the abort signal, with a read that answers after the deadline: the read is `timeout`, what came late is not taken, decoded or parsed, and no other read follows.
-  let reads = 0;
-  let answer = (_chunk: { done: boolean; value?: Uint8Array }): void => undefined;
-  const deaf: Fetch = () => Promise.resolve({ status: 200, body: { getReader: () => ({ read: () => { reads++; return new Promise((resolve) => { answer = resolve; }); }, cancel: () => new Promise(() => undefined) }) } });
-  expect(await httpSource("https://scopes.test", { fetch: deaf, seconds: 0.01 }).page(id, 0, { bytes: 4096, entries: 10 })).toEqual({ ok: false, reason: "timeout" });
-  answer({ done: false, value: new TextEncoder().encode("{") });
-  await new Promise((resolve) => { setTimeout(resolve, 5); });
-  expect(reads).toBe(1);
-  // A budget that does not allow the first read leaves nothing to report on.
   await expect(verify(sourceOf(w), { mode: "integrity", scope: id, limits: { scopes: 0 } })).rejects.toThrow(SourceError);
+});
+
+// The deadline is driven with fake timers: the test advances it by hand and resolves the pending read itself, and nothing waits on the clock.
+test("a read of a service is given up at its deadline: it is a read error and no report, and what a read answers after the deadline is not taken, decoded or parsed, and no other read follows", async () => {
+  vi.useFakeTimers();
+  try {
+    const w = world();
+    const id = w.I.scope.scope;
+    // A service that never answers: the read is given up after its deadline, here 10 milliseconds.
+    const silent: Fetch = () => new Promise(() => undefined);
+    const verifying = expect(verify(httpSource("https://scopes.test", { fetch: silent, seconds: 0.01 }), { mode: "integrity", scope: id })).rejects.toThrow(SourceError);
+    await vi.advanceTimersByTimeAsync(10);
+    await verifying;
+    // A fetch that ignores the abort signal, with a read that answers after the deadline: the read is `timeout`, what came late is not taken, and no other read follows.
+    let reads = 0;
+    let cancels = 0;
+    let answer = (_chunk: { done: boolean; value?: Uint8Array }): void => undefined;
+    const deaf: Fetch = () => Promise.resolve({ status: 200, body: { getReader: () => ({ read: () => { reads++; return new Promise((resolve) => { answer = resolve; }); }, cancel: () => { cancels++; return new Promise(() => undefined); } }) } });
+    const paging = httpSource("https://scopes.test", { fetch: deaf, seconds: 0.01 }).page(id, 0, { bytes: 4096, entries: 10 });
+    await vi.advanceTimersByTimeAsync(10);
+    expect(await paging).toEqual({ ok: false, reason: "timeout" });
+    answer({ done: false, value: new TextEncoder().encode("{") });
+    await vi.advanceTimersByTimeAsync(0);
+    expect([reads, cancels]).toEqual([1, 1]);
+  } finally {
+    vi.useRealTimers();
+  }
 });
 
 test("the executable runs under the Node that runs these tests: with no argument it prints the usage and exits 2", () => {
