@@ -8,17 +8,20 @@
  *   read it: its roots under the source commitment, and its prior checks.
  * - `gitRead`: the guard, as a `Capabilities` value.
  *
- * What the guard judges in the commit, and what it leaves to a replay. In
- * the commit it has the folded state, this scope's own entries and the
- * retained snapshot. It has no commit object: none is retained, and a
- * commit is read by its ID from the repository. So it judges guards 1 to 6
- * of section 6.2 as far as they read the lane's state and the snapshot, and
- * guard 7, the row. That `published` is recorded exactly when the commit is
- * reachable from the recorded head, that no stop is reachable from it, and
- * that every commit of a prior check's F is carried unless it is, are
- * derived from commits. The runtime's `walk` derived them when it built the
- * record, and a replay derives them again (section 9.3, "An ancestry
- * record").
+ * What the guard judges in the commit, and what the walk and a replay judge
+ * (authority note, section 6.2, "How the guard finds a selected input, and
+ * where reachability is judged", decided in revision 21). In the commit it
+ * has the folded state, this scope's own entries and the retained snapshot.
+ * It has no commit object: none is retained, and a commit is read by its ID
+ * from the repository. So it judges the left column of that section's
+ * table: guards 1, 2, 6 and 7 in full, and guards 3 to 5 as far as they
+ * read the lane's state and the snapshot. That `published` is recorded
+ * exactly when the commit is reachable from the recorded head, that no
+ * stop is reachable from it, that every commit of a prior check's F is
+ * carried unless it is, and that a `selected-report` stop's commit is the
+ * commit of its input's report, are derived from commits. The runtime's
+ * `walk` derived them when it built the record, and a replay derives them
+ * again (section 9.3, "An ancestry record").
  *
  * The step `job-read` is not built here (plan step 24).
  */
@@ -26,9 +29,9 @@
 import type { Digest, FactRef, FieldValue, ScopeRef } from "@generalbusiness/artroom-contract";
 import { isDigest, isFactRef, isLocalId } from "@generalbusiness/artroom-bytes";
 import type { Capabilities, CapabilityGiven } from "../capability.ts";
-import type { Own } from "../fields.ts";
+import { isLocalFact, type Own } from "../fields.ts";
 import type { RecordState, StateView } from "../state.ts";
-import { same } from "../values.ts";
+import { own as slotOf, same } from "../values.ts";
 import { foreignOn, isAncestryCheck, snapshotOf, type AncestryCheck, type OwnRoot, type PriorCheck, type StagedRef } from "./ancestry.ts";
 import { HOLD } from "./hold.ts";
 
@@ -85,16 +88,32 @@ function checked(args: Readonly<Record<string, unknown>>, given: CapabilityGiven
   return pin && root && check ? { state: check.state, values: check.values, local: { pin, root } } : null;
 }
 
+/** The state and the reference slot that version 1 of `git-read` reads of a selected input, as `hold@1` reads `holder` and `under` of a hold. */
+const SELECTED = "selected";
+const FOR = "for";
+
+/**
+ * Whether a fact names a selected input of the source commitment at this
+ * commit (authority note, section 6.2, "By which names the guard finds an
+ * input"). The fact is a local fact of the staging lane: it names this
+ * scope, with its incarnation, and the hash of this scope's entry at that
+ * position. The input is the item that this entry opened, whose ID is the
+ * fact's position. It holds when the item exists, its state is the state
+ * named `selected`, and its reference slot named `for` holds the source
+ * commitment. The item's type is not named. A fact of another scope fails,
+ * and so does every fact in a definition with no such state or slot.
+ */
+function selectedInput(given: CapabilityGiven, fact: FactRef, under: unknown): boolean {
+  if (!isLocalFact(fact, given.scope.at)) return false;
+  const item = given.view.item(fact.seq);
+  return item !== null && item.opened === fact.hash && item.state === SELECTED && isLocalId(under) && slotOf(item.refs, FOR) === under;
+}
+
 /**
  * Guards 2 to 6 of section 6.2, for a record that is this scope's own,
- * against this scope's records at this commit. False: what was read no
- * longer fits the lane's state, and the act is refused `ancestry-stale`.
- *
- * A `selected-report` stop and an `input` basis name an input that must be
- * `selected` under the source commitment at this commit. No argument of the
- * guard, as either lane row writes it, names that input or its item, so the
- * commit cannot judge it, and such a record is refused (I3 deltas, entry
- * EF10).
+ * against this scope's records and items at this commit: the left column of
+ * the table of that section. False: what was read no longer fits the lane's
+ * state, and the act is refused `ancestry-stale`.
  */
 function fits(record: AncestryCheck, { pin, root }: { pin: RecordState; root: RecordState }, given: CapabilityGiven, options: GitReadOptions): boolean {
   // Guard 2: the root is the one that the entry relies on, and it is `live`.
@@ -109,14 +128,20 @@ function fits(record: AncestryCheck, { pin, root }: { pin: RecordState; root: Re
   if (foreignOn(snapshot.pairs, record.commit, given.scope.at, roots) !== start.foreign) return false;
   const row = record.F.some((f) => "start" in f);
   if ("basis" in start) {
-    if (start.basis.kind === "input" || (start.basis.kind === "own-check" && prior(record.commit, start.basis.checked)?.foreign !== null)) return false;
+    if (start.basis.kind === "input" && !selectedInput(given, start.basis.input, root.values["under"])) return false;
+    if (start.basis.kind === "own-check" && prior(record.commit, start.basis.checked)?.foreign !== null) return false;
     if (start.basis.kind === "row" && !record.F.some((f) => "start" in f && f.commit === record.commit && f.ref === start.foreign)) return false;
   }
   if (row !== ("basis" in start && start.basis.kind === "row")) return false;
   for (const stop of record.stops) {
-    // Guard 6: see above. Guard 4: the root, with that number and state, under the source commitment; an earlier prior check of
-    // that commit; and the stop is not the act's commit.
-    if (stop.kind !== "own-root" || stop.commit === record.commit || !prior(stop.commit, stop.checked)) return false;
+    // Guard 6, in full: the stop names an input that is `selected` under the source commitment at this commit.
+    if (stop.kind === "selected-report") {
+      if (!selectedInput(given, stop.input, root.values["under"])) return false;
+      continue;
+    }
+    // Guard 4: the root, with that number and state, under the source commitment; an earlier prior check of that commit; and the
+    // stop is not the act's commit.
+    if (stop.commit === record.commit || !prior(stop.commit, stop.checked)) return false;
     if (!roots.some((r) => r.number === stop.root && r.commit === stop.commit && r.state === stop.state)) return false;
   }
   // Guard 5: each carried commit is in the F of the prior check that its `via` stop names.

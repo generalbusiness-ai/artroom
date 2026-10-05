@@ -37,6 +37,12 @@ export const staging: ValidDefinition = variant(lane, (def: any) => {
     step: "transition", on: "report", grant: "review", also: {}, fields: {}, guards: [{ state: ["reported"] }], sends: [], attention: [],
     effects: [{ state: "refused" }, { capability: { name: "hold", do: "pin-release", with: { commit: { slot: "commit" } } } }],
   };
+  // A selected input of a commitment, with the state and the slot that `git-read@1` reads by name, as `use-input` of `issue` opens it.
+  def.items.input = { many: true, max: 4, states: { selected: { final: false }, replaced: { final: true } }, initial: "selected", parties: {}, refs: { for: { fixed: true, required: true, to: { type: "item", of: "commitment" } } }, values: {} };
+  def.acts["use-input"] = {
+    step: "open", on: "input", grant: "report", also: { commitment: { item: "commitment", by: "commitment" } }, fields: { commitment: { type: "item", of: "commitment", required: true } },
+    guards: [], effects: [{ ref: { slot: "for", from: { item: "also.commitment" } } }], sends: [], attention: [],
+  };
   def.acts.authorize = {
     step: "open", on: "export", grant: "export", also: { hold: { item: "hold", by: "hold" } }, fields: { hold: { type: "item", of: "hold", required: true } },
     guards: [{ of: "also.hold", state: ["ended"] }], effects: [{ ref: { slot: "hold", from: { field: "hold" } } }], sends: [], attention: [],
