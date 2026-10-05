@@ -18,7 +18,7 @@ its section "Client".
 |---|---|
 | `intent` | `signedIntent(signer, asked, signing?)`: an intent with a fresh idempotency key and a `notAfter` within the lifetime bound, signed. The intent is a detached copy of what was asked, taken before the signer is awaited, so the value returned is the value signed. `Signer`; `secretSigner(secret)`; `webCryptoSigner()`, over a key that cannot be read; `newIdempotencyKey()`. |
 | `handle` | `ScopeHandle`: `submit`, `settle`, the reads `summary`, `items`, `history`, `entry` and `outbox`, `definition`, `followReceipt` and `followDuty`. `found(transport, founding, definition, definitions?)`. `Transport`, `TransportError`. |
-| `http` | `httpTransport(service, options?)`: the transport over the service's HTTP routes. |
+| `http` | `httpTransport(service, options?)`: the transport over the service's HTTP routes. `options`: `fetch`, `bytes` and `seconds`. `REPLY_BYTES`, `REPLY_SECONDS`. |
 | `binding` | `bindingTransport(service)`: the transport over a service binding to the Worker's entrypoint. |
 | `answers` | Not exported. For each operation, whether a reply is one of its answers, and which refusals that operation has. Both transports use it. The guards of the records inside a reply are the bytes package's `records`. |
 
@@ -61,6 +61,22 @@ the application:
 
 The check is of shape. It does not verify a signature, and it does not
 show that a receipt is of this history: `followReceipt` does that.
+
+## What the HTTP transport takes in, and how long it waits
+
+| Limit | Value | When it is reached |
+|---|---|---|
+| Raw bytes of one reply | 4 MiB (`REPLY_BYTES`), or `options.bytes` | The body is cancelled at the chunk that passes the limit. Nothing of it is joined, decoded or parsed. |
+| One request with its whole reply | 30 seconds (`REPLY_SECONDS`), or `options.seconds` | The request is aborted. |
+
+Both values are temporary. Each case is a `TransportError`. For `found` and
+`submit` its message ends: "The outcome of the submitted intent is unknown:
+it may have been recorded. The same signed intent may be sent again." For a
+read it says that nothing was read. The reader is the bytes package's
+`takeBytes` and `within`, which the replay package's source uses too.
+
+The transport over a service binding has no such limit and no deadline: a
+call there is a call of the runtime, and its bounds are not set here.
 
 ## Retrying
 

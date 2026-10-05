@@ -5,3 +5,4 @@ export * from "./sign.ts";
 export * from "./domains.ts";
 export * from "./ids.ts";
 export * from "./records.ts";
+export * from "./take.ts";

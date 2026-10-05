@@ -407,8 +407,11 @@ if (answer.answer === "accepted") await scope.followReceipt(answer.receipt);
   `followReceipt` and `followDuty`. `found` founds a directory.
 - A **transport** is the contract's `ScopeApi`. `httpTransport` uses the
   HTTP routes; `bindingTransport` uses a service binding. Each returns a
-  reply only when it is an answer of its operation. A lost or malformed
-  reply is a `TransportError`: submit the same signed intent again.
+  reply only when it is an answer of its operation, with every fixed
+  record in it as the contract defines it. Over HTTP a reply is read up to
+  4 MiB and for at most 30 seconds; both values are temporary. A lost,
+  malformed, oversized or late reply is a `TransportError`: the outcome is
+  unknown, so submit the same signed intent again.
 - `followReceipt` reads the entry a receipt names, checks it against the
   whole fact, and computes the hash itself.
 

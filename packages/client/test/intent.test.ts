@@ -25,7 +25,7 @@ test("a reply is an outcome only when it is an answer of its operation: a discri
   const d = `sha256:${"a".repeat(64)}`;
   const fact = { at: { scope: `sc_${"a".repeat(52)}`, inc: `in_${"a".repeat(26)}`, kind: "lane" }, seq: 1, hash: d };
   const receipt = { fact, definition: d, intent: d, effects: [], sends: ["1.0"], epoch: 0 };
-  const replying = (reply: unknown) => httpTransport("https://scopes.test", { fetch: () => Promise.resolve({ status: 200, text: () => Promise.resolve(JSON.stringify(reply)) }) });
+  const replying = (reply: unknown) => httpTransport("https://scopes.test", { fetch: () => Promise.resolve({ status: 200, body: new Response(JSON.stringify(reply)).body }) });
   const submit = (reply: unknown) => replying(reply).submit(fact.at.scope, {} as never, []);
   const settle = (reply: unknown) => replying(reply).settle(fact.at.scope, {} as never);
   // Each has the member its route's answers have, and is not one of them.
@@ -81,7 +81,7 @@ test("on both transports, each operation of the handle returns a reply only when
       [...each(duty).map((v) => read(v)), read({ ...duty, class: "letter" }), read({ ...duty, result: { seq: 2 } }), read({ ...duty, diagnosis: { seq: 3, finding: "lost" } }), read({ ...duty, attempts: [{ at: entry.time }] })]],
   ];
   const transports: [string, (reply: unknown) => Transport][] = [
-    ["HTTP", (reply) => httpTransport("https://scopes.test", { fetch: () => Promise.resolve({ status: 200, text: () => Promise.resolve(JSON.stringify(reply)) }) })],
+    ["HTTP", (reply) => httpTransport("https://scopes.test", { fetch: () => Promise.resolve({ status: 200, body: new Response(JSON.stringify(reply)).body }) })],
     ["a service binding", (reply) => bindingTransport(new Proxy({}, { get: () => () => Promise.resolve(reply) }) as ServiceBinding)],
   ];
   let checked = 0;
@@ -117,4 +117,28 @@ test("the intent that is signed is a detached copy: what the caller changes whil
   release();
   const signed = await pending;
   expect([verifySignedIntent(signed), signed.intent.fields, signed.intent.expected]).toEqual([true, { source: "a repository", tags: ["a"] }, { on: 1 }]);
+});
+
+test("a reply over HTTP is taken in as raw bytes only as far as the limit, and within a deadline; past either the outcome of a submitted intent is unknown, and the error says so", async () => {
+  const unknown = /The outcome of the submitted intent is unknown: it may have been recorded\. The same signed intent may be sent again\.$/;
+  // A body with no end: it is cancelled at the chunk that passes the limit, and nothing of it is parsed or kept.
+  let sent = 0;
+  const endless = () => Promise.resolve({ status: 200, body: new ReadableStream<Uint8Array>({ pull(c) { sent += 1024; c.enqueue(new Uint8Array(1024).fill(32)); } }, { highWaterMark: 0 }) });
+  const over = await httpTransport("https://scopes.test", { fetch: endless, bytes: 4096 }).submit("sc_a", {} as never, []).catch((error: unknown) => error);
+  expect([over instanceof TransportError, sent]).toEqual([true, 5120]);
+  expect((over as Error).message).toMatch(/^the reply, status 200, is longer than 4096 bytes and was not read\. /);
+  expect((over as Error).message).toMatch(unknown);
+  // A reply whose body starts and never ends, and a service that never answers: each is given up at the deadline, here 10 milliseconds, and the request is aborted.
+  const aborted: boolean[] = [];
+  const stalled = (_url: string, init?: { signal?: AbortSignal }) => { init!.signal!.addEventListener("abort", () => aborted.push(true)); return Promise.resolve({ status: 200, body: new ReadableStream<Uint8Array>({ start(c) { c.enqueue(new Uint8Array(1)); } }) }); };
+  const silent = (_url: string, init?: { signal?: AbortSignal }) => { init!.signal!.addEventListener("abort", () => aborted.push(true)); return new Promise<never>(() => undefined); };
+  for (const fetch of [stalled, silent]) {
+    const late = await httpTransport("https://scopes.test", { fetch: fetch as never, seconds: 0.01 }).submit("sc_a", {} as never, []).catch((error: unknown) => error);
+    expect(late).toBeInstanceOf(TransportError);
+    expect((late as Error).message).toMatch(/^no whole reply within 0\.01 seconds; the request was aborted\. /);
+    expect((late as Error).message).toMatch(unknown);
+  }
+  expect(aborted).toEqual([true, true]);
+  // A read that fails changed nothing, and says that instead.
+  await expect(httpTransport("https://scopes.test", { fetch: endless, bytes: 4096 }).summary("sc_a", null)).rejects.toThrow(/was not read\. Nothing was read; the read may be made again\.$/);
 });

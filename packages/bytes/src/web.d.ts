@@ -12,3 +12,13 @@ declare class TextDecoder {
   constructor(label?: string, options?: { fatal?: boolean; ignoreBOM?: boolean });
   decode(input?: Uint8Array): string;
 }
+
+// The timer and the abort signal of a deadline (`take.ts`).
+
+declare function setTimeout(run: () => void, ms: number): unknown;
+declare function clearTimeout(timer: ReturnType<typeof setTimeout> | undefined): void;
+
+declare class AbortController {
+  readonly signal: unknown;
+  abort(): void;
+}
