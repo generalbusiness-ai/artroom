@@ -211,8 +211,6 @@ export class Turns {
       const due = scope && nextDue(this.#store, definition, clock.asOf);
       if (!scope || !due) return null;
       if (turn.attempts >= this.#bounds.timedAttemptsPerTurn) return { end: "busy" };
-      // A timed rule whose row is code is not derived while no judge runs a platform rule. The transition stays due and is never
-      // passed over, so the turn ends and no input is written ahead of it.
       // Section 9.2: room for this entry was counted when its item was opened. A scope with no room at all writes nothing.
       if (scope.head.seq + 1 >= this.#bounds.scopeEntries) return { end: "unavailable" };
       turn.attempts++;
