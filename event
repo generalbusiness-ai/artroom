@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at .gitignore","body":{"commit":"bd9c604f53ee0ab4eb1cbd709401120888ead4cb","path":".gitignore"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:536045b6d5c62be1ef57ae7d33ec91183ea704fb","text":"Merge retired a covered predecessor; the successor is at .gitignore."}
