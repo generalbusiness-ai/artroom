@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:82d1cbb7569ad7b61cd0c63d4324c1bebd802f26","text":"Merge retired a covered predecessor with no successor at its old path."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:82d8214305fb57263ea43845245368d97ff8c6f6","text":"Merge retired a covered predecessor; the successor is at scripts/gate.sh."}
