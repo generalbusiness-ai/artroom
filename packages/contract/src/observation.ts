@@ -38,3 +38,18 @@ export interface ObservationUse {
   use: "fresh" | "reused";
   prior: Head | null;                      // for "reused": the latest earlier entry of this scope that retains this read
 }
+
+/**
+ * What a scope asks its membership scope, before its turn: the standing of
+ * one key (authority note, section 3.3, step 2). `of` is the membership
+ * scope as the asking scope records it, with its incarnation. The texts
+ * state no other member (I3 deltas, entry ED1).
+ */
+export interface ObservationRequest { of: ScopeRef; key: KeyId }
+
+/**
+ * What membership answers, from its head (authority note, section 3.3, step
+ * 3): the observation without `at`. That member is the asking scope's own
+ * clock when its read began, which membership does not know.
+ */
+export type ObservationAnswer = Omit<Observation, "at">;
