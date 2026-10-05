@@ -1,7 +1,19 @@
 # I3 implementation plan: platform definitions, authority, effects and publication
 
+## Corrected 2026-10-05 after the checker's review 52cad0fc and the planner's answers bf020684
+
+- Bootstrap: steps 9a to 9c are new. The rules and destination definitions, their genesis and their confirmation are in M1 (sections 8.2 and 9.3). Check and publication behaviour stays in tracks C and D.
+- E1: section 6.2 has one list of retained paths. Every removal step is bound to it. Step 25 and the removal summary keep `parked/checkers/wrangler.spike.jsonc`.
+- Authority handoff: the contract's revision 13 is adopted (planner act 42c39a7d). P20 and P23 are available. P19 and P21 wait on revision 14, filed and not adopted. Q1 to Q4 and Q12 are refreshed (sections 1, 2, 4 and 9.1).
+- P25 is not a gap. The "would refuse" wording is limited to declared handlers.
+- I2: its base milestone is landed on main at b57e8774. The plan says what stays owed under request efb4e323 (section 2).
+- Q9, Q5 and Q8 are recorded as answered (planner act bf020684).
+- Economy: the 49 rows are coverage mappings. The "55 to 75 tests" target, the quarter-range stopping rule and the control for every new guard are removed (section 7). The full-path comparison is owed.
+- Section 2 records steps 1 and 2 as built on this branch. The inbox needs one platform rule, P22 (finding E10), so "inbox needs no rule" is corrected.
+
 Written 2026-10-05, before any source change. Branch
-`request/i3-authority-effects`, cut at `50bba45c`.
+`request/i3-authority-effects`, cut at `50bba45c`. It has since merged main,
+which holds I2's base milestone (landed at `b57e8774`).
 
 This plan says what I3 builds, what stands under it, which parts can run
 now, what waits and on whom, what is removed, how each part is shown to
@@ -14,17 +26,17 @@ The texts it reads, and the short names used below:
 | Short name | Text | Standing, as the commission gives it |
 |---|---|---|
 | The commission | The I3 source commission, read whole | Binding |
-| The authority note | Authority, effects and publication, revision 16, at `7bc60cf6` | Adopted |
-| The contract | Scope and replay contract, revision 12 as amended, at `53f0e183` | Adopted |
-| Revision 13 | The contract's revision 13, at `7efb0f7f` | Under review, changes requested. Proposed, not adopted. Request `c75205df` owns it. |
+| The authority note | Authority, effects and publication, revision 16, at `7bc60cf6` | Adopted. Its revisions 17 and 18 are filed and not adopted (see the last row but one). |
+| The contract | Scope and replay contract, revision 13 as corrected at `86c6aabde`, on revision 12 as amended at `53f0e183` | Adopted. Revision 13 was adopted by planner act `42c39a7d`. It makes a lane's membership in `create` (P20) and a member-addressed attention send (P23) available forms. |
+| What revision 13 left open | An observation in an entry that is no act (P19, R1-53) and non-text retained bytes (P21, R1-54) | Left open by revision 13. Decided by the contract's revision 14 at `fa6417e6`, which is filed and under review, not adopted. |
 | The proof plan | Proof and test economy, revision 9, at `85be9f0b` | Adopted |
 | The recovery design | Recovery successor, revision 4, at `16777d97` | Adopted. Its interfaces are shared with IA. |
 | The demo contract | Demo contract, revision 4, at `3b6e1ad7` | Adopted |
-| The four asks | What the contract's revision 12 asks of the authority note and revision 15 did not answer (the note's opening, lines 363 to 370) | Owed by the successor of request `406983fe` |
+| The four asks | What the contract's revision 12 asks of the authority note and revision 15 did not answer (the note's opening, lines 363 to 370) | Assigned to the authority note's follow-through, request `f1142e84`. Its revision 18 at `99bc48e8` is filed and under review, not adopted. |
 
 Section numbers with no name are the authority note's. A source path that
 begins with a package's name, such as `scope/src/ports.ts`, is under
-`packages/`. Line numbers are those of `50bba45c`.
+`packages/`. Line numbers of source are those of `50bba45c`, read before main was merged. I2's repairs may have moved them.
 
 How this plan was made is stated in section 10, with what was read in
 full, in part, by a delegated reader, or not at all.
@@ -81,36 +93,57 @@ the limits on items and on reserved completions, with request
 `cc570904`. This plan drops none. Where one cannot be built yet, section
 4 says why and who decides.
 
-**One limit decides the shape of the delivery.** Four rules of the six
+**One limit decides the shape of the delivery.** Two rules of the six
 definitions need bytes that the adopted `Entry` and `Send` types have no
-member for (P19, P20, P21 and P23 of section 4). Until an owner rules on
-each, a real directory cannot create a lane under an activated
-definition, and a real lane cannot find its membership. Everything else
-can be built and shown. So the plan ends in milestones that each stand
-alone (section 9.3), and the full I3 is not claimed until those four
-rules have an owner's answer.
+member for: P19 and P21 of section 4. Revision 13 left both open.
+Revision 14 at `fa6417e6` decides them. It is filed and under review, and
+is not adopted. Until it is, a real directory cannot create a lane under
+an activated definition. A lane's membership in `create` (P20) and a
+member-addressed attention send (P23) are adopted forms, and I3 builds
+them. Everything else can be built and shown. So the plan ends in
+milestones that each stand alone (section 9.3). No milestone is called
+the full I3, and the full I3 is not claimed until P19 and P21 have an
+adopted answer.
 
 ## 2. What stands under it
 
 | Base | Head | Standing | What this plan assumes of it |
 |---|---|---|---|
-| Main | `3dc8492b`, as this worktree last fetched `origin/main` | Landed. Holds I1. | The substrate: the commit protocol, the fold, delivery, timed rules, replay of one scope, and ports whose production defaults refuse. |
-| I2, second head | `50bba45c` | Filed for review. Not landed. Not accepted. | The 38 forms of the I2 delivery note, the two lane definitions as pinned data, the capabilities port, the scripted test capability and scripted peers, and the genesis `kind`. |
+| Main | `b57e8774`, the landing of I2's base milestone, merged into this branch | Landed. Holds I1 and I2's base milestone. | The substrate: the commit protocol, the fold, delivery, timed rules, replay of one scope, and ports whose production defaults refuse. Also the 38 forms of the I2 delivery note, the two lane definitions as pinned data, the capabilities port, the scripted test capability and scripted peers, and the genesis `kind`. |
+| I2, base milestone | Head `77555943`, approval `d73281e6`, landed at `b57e8774` | Approved and landed on main. A milestone, not the whole of I2. | As above. Under the production wiring nothing of the lanes runs until I3 supplies the capability code. |
 
-This plan claims nothing about I2's review. It prepares beside it. The
-gate was run once at `50bba45c` for this plan: it passed, with 282 tests
-of vitest and 3 of Node's runner (observed, one run, section 7.5).
+The gate was run once at `50bba45c` for this plan, before main was
+merged: it passed, with 282 tests of vitest and 3 of Node's runner
+(observed, one run, section 7.5). No gate has been run since the merge.
 
-**If I2's review changes its head.**
+**What stays owed under I2's open request `efb4e323`.**
 
-| Change in I2 | Effect on this plan |
+| Owed | What this plan does |
 |---|---|
-| A repair that changes no form and no bytes | Rebase. No step changes. |
-| A lane row or a form changes | The two pinned digests change. Steps 16 and 30 read the definitions by digest from the lanes package, so they follow. No platform definition names a lane digest. |
-| The scripted capability or the scripted peers are refused by an owner | Steps 16 and 30 remove them in any case. Until then the I2 scenarios that use them go with them, as the I2 delivery note says. I3's own tests use neither. |
-| The rule `unsupported-definition` for a whole scope is changed | Step 3 changes: the platform's capability code is supplied through the same port, so one predicate moves. |
-| The genesis `kind` (the contract's section 11.10, row 10) is not adopted | The register's `genesis` slot names a fact of kind `establish` (section 13.7). It then cannot be checked by a reader under another definition. Step 9 holds that one slot and reports it. |
-| I2 does not land before I3 is ready for review | I3 is reviewed as a branch on top of I2's head, and lands after it. No I3 milestone is filed as landable before I2 lands. |
+| W1: the capability code | Step 16 supplies it and removes the scripted capability. |
+| W2: real peers for the rules scope, the destination and the directory | Step 30. |
+| W3: the publication entry at 35 sends and 33 results | Step 30, after W2. |
+| W4: capacity beyond entries | Request `cc570904`. |
+| W5: the checker's dispatch (G22) | Step 25. |
+| The scope contract's must-change rows for I2: 23 rows, of which 20 are owed at the contract's revision 14, under review | Not I3's to close. If a row changes a lane form, the two pinned digests change. Steps 16 and 30 read the definitions by digest from the lanes package, so they follow. No platform definition names a lane digest. |
+
+If the scripted capability or the scripted peers are later refused by an
+owner, steps 16 and 30 remove them in any case. I3's own tests use
+neither.
+
+### 2.1 What is already built on this branch
+
+| Step | What | Commits |
+|---|---|---|
+| 1 | Types only (section 8.1). | `bfa06084d` and `79ed29239` |
+| 2 | The platform package, with the definition of `platform:inbox@1`. | `0a05d6dd1` |
+
+Finding E10, recorded in `notes/2026-10-05-i3-contract-deltas.md`: the
+inbox needs one platform rule, P22, for a notice's `source`. The note
+gives that field as a record of four values, and the commit would refuse
+the fact reference that the row writes. The plan's earlier statement that
+the inbox needs no rule is therefore corrected. Step 2's test asserts only
+that the definition validates.
 
 ## 3. The scope table
 
@@ -164,12 +197,12 @@ kept, this way:
 | # | Element | Section | Lives in | Boundary | Build and test now |
 |---|---|---|---|---|---|
 | 1 | The register | 12.1.1; 3.8 | `platform/src/register.ts` and its rules; `contract` for the kind and the name; `derive/src/genesis.ts` for the fourth cause | Scope storage. Another scope: the directory. A Git host: `create-repository`. | Now, with a labelled host stand-in for the creation. The real creation is the host session's. |
-| 2 | The directory | 12.1.2 | `platform/src/directory.ts` and its rules | Scope storage. Other scopes: its three children, each lane, the rules scope. A Git host: `import`. | Part. Founding, the three creations, `index`, numbers and `compromised`: now. `open-issue` and `open-pr` under an activated digest: wait on P19 and P21. `open-task`: the row is built, and its scope is IA's. |
+| 2 | The directory | 12.1.2 | `platform/src/directory.ts` and its rules | Scope storage. Other scopes: its three children, each lane, the rules scope. A Git host: `import`. | Part. Founding, the three creations, `index`, numbers and `compromised`: now. `open-issue` and `open-pr` under an activated digest: wait on P19 and P21, which revision 14 decides and which is not adopted. `open-task`: the row is built, and its scope is IA's. |
 | 3 | Membership | 12.1.3; 3.1; 3.2 | `platform/src/membership.ts` and its rules | Scope storage. Another scope: an inbox, the directory. A device key. | Now. Test keys are real Ed25519 keys. A key that a device holds is I5's. |
 | 4 | The rules | 12.1.4; 3.11 | `platform/src/rules.ts` and its rules | Scope storage. Another scope: a lane, membership. | Part. `publish`, `rules-wanted`, `retire-definition`: now, less the `not-a-checker` check (P19). `activate` and `keep-configuration`: wait on P21. |
 | 5 | The destination | 12.1.5; 6.4 to 6.10; 12.2 | `platform/src/destination.ts` and its rules; `git` for the writes | Scope storage. Another scope: a change lane, the directory, membership, the rules. A Git host. A container. | Now for the scope and its judgments, on a real local repository. The real host and the real container are the host session's. |
-| 6 | The inbox | 12.1.6 | `platform/src/inbox.ts` | Scope storage. Another scope: a lane. | Part. The definition and its handler: now. The address of a notice from a lane: waits on P23. |
-| 7 | The authority port, the observation and the grant guard | 3.3; 3.12 | `derive/src/grant.ts`; `scope/src/authority.ts`; `contract` for the types | Another scope: membership, read before the turn. The clock. | Now for a platform scope. For a lane, part: its membership reference waits on P20. |
+| 6 | The inbox | 12.1.6 | `platform/src/inbox.ts` | Scope storage. Another scope: a lane. | Now. The definition, its handler and the rule P22 (finding E10). The member-addressed send from a lane is the adopted form of P23. |
+| 7 | The authority port, the observation and the grant guard | 3.3; 3.12 | `derive/src/grant.ts`; `scope/src/authority.ts`; `contract` for the types | Another scope: membership, read before the turn. The clock. | Now for a platform scope. For a lane, now, on the adopted form of P20. |
 | 8 | Retained observations and freshness | 3.3; the contract's 16.1 | The same, with `replay/src/verify.ts` | Scope storage: the entry retains the observation. | Now. |
 | 9 | The read port and read sessions bound to one repository | 3.9 | `scope/src/sessions.ts`; `client/src/session.ts` | A deployment secret. Two clocks. | Now, with a test secret. The secret's custody is the operator's. |
 | 10 | Device enrolment, revocation and recovery | 3.5; 3.6 | `platform/src/membership.ts`; the serving limits in `scope/src/limits.ts`, after review of the parked rate limiter | Scope storage. A device key. A caller's address. | Now. |
@@ -196,13 +229,15 @@ kept, this way:
 | 31 | An abandoned reader of a stream, the service's side | 11.1; 3.9 | `scope/src/sessions.ts` | A transport. | Now. |
 | 32 | The grant in a replay | 11.2, G18 | `replay/src/verify.ts` | Membership's history, as read. | Now. |
 
-Counts, made by hand over the last column: 32 elements. 23 can be built
-and tested whole now, in-process, on the adopted texts. 7 are part. Five
-of those wait on the contract's owner, request `c75205df`: rows 2, 4, 6,
-7 and 18. One waits on the successor of `406983fe`: row 11. One waits on
+Counts, made by hand over the last column, before revision 13 was adopted:
+32 elements. 23 could be built and tested whole, in-process, on the adopted texts. 7 are part. Five
+of those waited on the contract's owner: rows 2, 4, 6, 7 and 18. With
+revision 13 adopted, rows 6 and 7 no longer wait. Rows 2, 4 and 18 wait on
+P19 and P21 under revision 14, which is not adopted. One waits on the authority note's follow-through, request `f1142e84`
+(question Q3): row 11. One waits on
 `cc570904`: row 26. Two more, rows 19 and 28, can be built now, and their
 evidence on a real runner needs a separate commission. No row waits on
-IA. A full run from a founding to a merge crosses rows 2, 4 and 7, so it
+IA. A full run from a founding to a merge crosses rows 2 and 4, so it
 waits with them.
 
 **The interfaces shared with IA.** I3 builds and owns each. IA uses them.
@@ -219,14 +254,14 @@ waits with them.
 ## 4. The gap table
 
 Section 12.1.8 lists 25 forms, P1 to P25. This table sets each against
-the source at `50bba45c`, the adopted contract, and revision 13 as a
-proposal.
+the source at `50bba45c`, the adopted contract (revision 13 as corrected at
+`86c6aabde`, adopted by act `42c39a7d`), and revision 14 as a proposal.
 
 ### 4.1 The four statuses
 
 | Status | Means |
 |---|---|
-| Built | The form is in the source at `50bba45c`. That source is under review and is not accepted. |
+| Built | The form is in the source at `50bba45c`. That source has since landed, as I2's base milestone at `b57e8774`. |
 | Agreed, I3 builds | The adopted contract has the form. I3 implements it as the contract states it. |
 | Platform code | No adopted form says the rule. The authority note says that it is "platform code in the delivery named". Section 4.2 says exactly what that allows. |
 | Blocked | The rule needs bytes that no adopted type holds. An owner must rule before it can run. |
@@ -261,7 +296,7 @@ is blocked.
 
 ### 4.3 The table
 
-| # | Form | At `50bba45c`, checked | Adopted contract | Revision 13, proposed | Status |
+| # | Form | At `50bba45c`, checked | Adopted contract | Revision 13, adopted | Status |
 |---|---|---|---|---|---|
 | P1 | `name` in a definition; `under` compared with it | Present: `derive/src/validate/index.ts:91`; `scope/src/namespace.ts:83`. A name that begins `platform:` is refused: `index.ts:101`. | 6.1 | Nothing asked | Built. Step 2 adds the platform option. |
 | P2 | The kind `register`; `platform:register@1`; a scope with no creator that is not a directory; the fourth cause | Absent. Seven kinds and six names: `contract/src/scope.ts:16` and `:34`; `bytes/src/ids.ts:53`. A founding makes a directory with `creator: null`: `derive/src/genesis.ts:71`. Three causes: `genesis.ts:34` to `:40`. | 2.1, 7.1, 7.2; the row "The `register` kind" of 11.8 | "I3's" | Agreed, I3 builds |
@@ -281,13 +316,13 @@ is blocked.
 | P16 | An operation that a platform entry opens, and what its outcomes derive and send | The contract leaves it to "its definition or a capability" | 4.3 | Platform code | Platform code. The `operation` effect and the `outcome` input are adopted. The evidence of an outcome is the authority note's to define, in the table of 5.7. It is the largest row. |
 | P17 | A counter | No form | None | Platform code | Platform code. One adopted `value` effect. |
 | P18 | A digest computed in a guard | No form | None | Platform code | Platform code for the invitation's secret, which is a field. For a configuration's bytes it needs P21. |
-| P19 | An observation retained by an entry that is no act; an observation of another key or member; an observation of the rules | The record exists as a type only | 16.1: an act's grant holds one. Which other inputs may carry one is not stated. | Open: its point R1-53 | **Split.** An outcome entry: platform code, because the outcome's evidence is the authority note's to define, and holds them (the `judge` of the destination). An act entry that must retain a second observation: **blocked**. `publish` (`not-a-checker`), `open-issue` and `open-pr` (`not-activated`), `open-task`. The adopted `act` input has one grant with one `fresh`, and no member for another. |
-| P20 | The membership reference of a scope created beside membership; `membership` in the body of a lane's `create` | The body of a `create` is `{ fields, directory }` | 6.6 | A form: `{ fields, directory, membership }`. It changes the bytes of every creation. | **Split.** The rules scope and the destination: platform code, as 12.1 states it. The ID is derived from the directory's seed, and the incarnation is fixed by the first entry that retains an observation. A lane: **blocked**. Question Q1. |
-| P21 | Bytes beside an intent that are not a detached text; a `create` whose definition an input names | `Beside` is `{ texts, presented }`. A text is at most 64 KiB; a definition may be 256 KiB. | 6.2, 6.4, 7.2 | The bytes: open, its point R1-54. The `create`: platform code. | **Split.** The `create` under a named digest: platform code (7.2 allows it, and G16 says where the bytes are read). The bytes of `activate` and `keep-configuration`: **blocked**. Question Q2. |
+| P19 | An observation retained by an entry that is no act; an observation of another key or member; an observation of the rules | The record exists as a type only | 16.1: an act's grant holds one. Which other inputs may carry one is not stated. | Left open by revision 13 (R1-53). Decided by revision 14, filed and not adopted. | **Split.** An outcome entry: platform code, because the outcome's evidence is the authority note's to define, and holds them (the `judge` of the destination). An act entry that must retain a second observation: **blocked** until revision 14 is adopted. `publish` (`not-a-checker`), `open-issue` and `open-pr` (`not-activated`), `open-task`. The adopted `act` input has one grant with one `fresh`, and no member for another. |
+| P20 | The membership reference of a scope created beside membership; `membership` in the body of a lane's `create` | The body of a `create` is `{ fields, directory }` | 6.6 | Adopted: a form `{ fields, directory, membership }`. It changes the bytes of every creation. | **Split.** The rules scope and the destination: platform code, as 12.1 states it. The ID is derived from the directory's seed, and the incarnation is fixed by the first entry that retains an observation. A lane: agreed, I3 builds, on the adopted form (question Q1, answered by the adoption). |
+| P21 | Bytes beside an intent that are not a detached text; a `create` whose definition an input names | `Beside` is `{ texts, presented }`. A text is at most 64 KiB; a definition may be 256 KiB. | 6.2, 6.4, 7.2 | The bytes: left open by revision 13 (R1-54). Revision 14 decides them. It is filed and not adopted. The `create`: platform code. | **Split.** The `create` under a named digest: platform code (7.2 allows it, and G16 says where the bytes are read). The bytes of `activate` and `keep-configuration`: **blocked** until revision 14 is adopted. Question Q2. |
 | P22 | A `fact` type that names more than one definition | No form | 6.2 | Platform code | Platform code in I3's one use: a notice's `source` is a record of four values, which is data today. The other uses are IA's. |
-| P23 | The address of an attention send | Not stated. No lane derives the send: the I2 plan's row 59. | 6.6 | A form: `to: { member }` on a `notify` | **Blocked** for the send from a lane. The inbox and its handler are built. Question Q2. |
+| P23 | The address of an attention send | Not stated. No lane derives the send: the I2 plan's row 59. | 6.6 | Adopted: a form `to: { member }` on a `notify` | Agreed, I3 builds, for the send from a lane. The inbox and its handler are built. |
 | P24 | A change to one element of a list value; an effect over a range of items | No form | None | Platform code | Platform code. `rotate-recovery` sets the list whole, with one adopted `value` effect. `remove-member` changes no key item: membership's answer to an observation reads the member's state. |
-| P25 | The declared type of a field that receives a `collect` list of more than 32 records | Not stated | 6.6 | Platform code, with one rule: a declared field is bound by 32, and a longer list is `bad-field` | Platform code. The destination reads `verdicts` and `jobs` from the message itself, and G5 bounds them. Revision 13's rule would refuse a list the lane may send today, and is not built. |
+| P25 | The declared type of a field that receives a `collect` list of more than 32 records | Not stated | 6.6. Revision 13 (main note, about line 7846) allows a destination field typed by platform code up to the sender's maximum. Declared handlers remain at 32. | Nothing further asked | Platform code. Not a gap. The destination reads `verdicts` and `jobs` from the message itself, and G5 bounds them. A declared handler is bound by 32, and a longer list would be refused `bad-field` there. That is the only case that wording covers. |
 
 ### 4.4 Summary
 
@@ -300,8 +335,7 @@ Counted by hand over the status column.
   count of decisions and the records dimension of P11.
 - **Platform code: 9 whole.** P13, P14, P15, P16, P17, P18 (for a field),
   P22, P24, P25.
-- **Split, with a blocked part: 3.** P19, P20, P21.
-- **Blocked whole: 1.** P23, for the send.
+- **Split, with a blocked part: 2.** P19 and P21. Their blocked parts wait on revision 14, which is not adopted. P20 and P23 are agreed since revision 13 was adopted, and I3 builds them.
 - **With another owner: the rest of P11.**
 
 **What the table decides.**
@@ -314,9 +348,9 @@ Counted by hand over the status column.
   definitions in a test that founds lanes from a made-up directory, as
   I2's fixture does, and supplies their membership by hand, with a label.
 - **A run from a real founding to a real merge cannot be made yet.** It
-  needs an activated definition (P21), a directory that judges activation
-  (P19), and a lane that knows its membership (P20). Each is one ruling
-  from the contract's owner. Section 8 puts the work that those rulings
+  needs an activated definition (P21) and a directory that judges
+  activation (P19). Revision 14 decides both and is not adopted. The lane's
+  membership (P20) is available. Section 8 puts the work that those rulings
   unlock last, in steps that are prepared ahead and filed only on
   adoption, as I2 did for the genesis `kind`.
 - The four asks touch four narrow places. The bound-but-malformed license
@@ -392,9 +426,10 @@ Paths are under `parked/`. The section's table names them under
 | The lane and lease keys in workspaces, fork tokens, fork names and pinned refs | Remove | Names made from the lane's scope ID, its incarnation, the hold and the attempt | 18. The demo contract's test: no fork name or ref holds a lane identifier of the earlier log. |
 
 When step 31 ends, `parked/contract`, `parked/log`, `parked/policy`,
-`parked/git` and `parked/checkers` are gone, less their `measure/`
-directories. `parked/room` keeps only what the ledger gives to others:
-`mcp.ts` (I5), `measure/` (I4), and the spike configuration and
+`parked/git` and `parked/checkers` are gone, less the retained paths of
+section 6.2: their `measure/` directories, and, in `parked/checkers`,
+`wrangler.spike.jsonc`. `parked/room` keeps only what the ledger gives to
+others: `mcp.ts` (I5), `measure/` (I4), and the spike configuration and
 `scripts/` (E1). `parked/README.md` is reconciled in the same step, row
 by row, by reading the tree.
 
@@ -403,6 +438,21 @@ by row, by reading the tree.
 them. No file moves with such a line.
 
 ### 6.2 What stays under E1
+
+**Retained paths.** Every removal step in section 8, and the removal
+summary in section 6.1, is bound to this list. No step deletes, moves or
+reads the body of a path on it.
+
+- `parked/room/wrangler.spike.jsonc`
+- `parked/checkers/wrangler.spike.jsonc` (it exists on this branch)
+- `parked/room/scripts/`
+- `parked/room/src/mcp.ts` (I5)
+- every `measure/` directory under `parked/` (I4 for the room's)
+- `.github/workflows/row-writes.yml`
+
+Where a step says it removes a parked directory "but `measure/`", it means
+"but the retained paths". A broader deletion rule anywhere in this plan is
+read as limited by this list.
 
 Nothing below is deleted, listed, read live or settled by I3.
 
@@ -450,17 +500,17 @@ earlier code does not meet. They are parts 2 and 3 of review row L13.
 |---|---|---|---|
 | `scriptedCapability`, `CapabilityScript`, `Controls.capability`, `Net.capability`, in `scope/src/testing.ts` | The rules of `hold@1` and `git-read@1` derive the records | 16 | I2's W1: `report`, `refuse-report`, `propose-manifest`, and the pin and export handlers, with real records. T3, T4, T5b and T8 of the lanes run on them. |
 | `Net.peers` and the fixture's `Peer`, a scripted rules scope and destination | A real rules scope and a real destination exist in the graph | 30 | I2's W2: `rules` and `publication` from real peers, a `merge` that reaches a destination, an index row that reaches a directory. |
-| `testAuthority` and `testReaders` | The authority and readers ports are filled | 12 for platform scopes. For the lanes' graph: 30, and only with question Q1 answered. | Every act's `grant`, on an observation. |
-| The made-up directory `office` of the lanes' fixture | The real directory creates lanes | 30, and only with Q2 answered | Lanes under an activated digest. |
+| `testAuthority` and `testReaders` | The authority and readers ports are filled | 12 for platform scopes. For the lanes' graph: 30. | Every act's `grant`, on an observation. |
+| The made-up directory `office` of the lanes' fixture | The real directory creates lanes | 30, and only when revision 14 is adopted (P19 and P21) | Lanes under an activated digest. |
 
 I2's W3 (the publication entry at 35 sends and 33 results, the proof
 plan's F23) runs in step 30, after W2. W4 (capacity beyond entries) is
 `cc570904`'s. W5 (the checker's dispatch, G22) is answered by G4 and
-runs in step 25. A notice that reaches an inbox waits on P23.
+runs in step 25. A notice that reaches an inbox does so on the adopted form of P23, in step 29.
 
-If Q1 or Q2 is not answered when step 30 is reached, the lanes' graph
-keeps `office` and a hand-supplied membership reference, each with its
-label, and the delivery note says that W2 ran with those two stand-ins.
+If revision 14 is not adopted when step 30 is reached, the lanes' graph
+keeps `office`, with its label, and the delivery note says that W2 ran with
+that stand-in.
 
 ## 7. Evidence
 
@@ -474,7 +524,7 @@ head sent for review.
 
 | Fixture | File | Used by |
 |---|---|---|
-| `repository` | `packages/platform/test/support/repository.ts` | One founded repository on real scopes: a register, a directory, membership, the rules, a destination, a seated founder with a first key, `MemoryHost`, and the shared scripted clock. Each test that writes gets its own. It is the proof plan's fixture of that name. |
+| `repository` | `packages/platform/test/support/repository.ts` | One founded repository on real scopes: a register, a directory, membership, the rules, a destination, a seated founder with a first key, `MemoryHost`, and the shared scripted clock. It has five scopes from step 9c, and its inbox from step 11. Each test that writes gets its own. It is the proof plan's fixture of that name. |
 | `git` | `packages/git/test/support/repo.ts` | A local bare repository in a temporary directory, made once for a file whose tests only read, and once for each test that writes. |
 | `graph` | `packages/lanes/test/support/graph.ts`, as I2 left it | The two lane definitions. Step 30 puts it on `repository`. |
 
@@ -489,7 +539,10 @@ head sent for review.
 
 ### 7.2 The invariants that the commission names
 
-One test for each. The command runs that one file.
+Each row is a coverage mapping: an invariant, the cheapest boundary that
+shows it, and the command that runs that file. A row is not one test, and
+the 49 rows are not a count target. Duplicate evidence is merged. Distinct
+failure controls are kept.
 
 | # | Invariant | Key | Boundary | Test file | Command |
 |---|---|---|---|---|---|
@@ -556,13 +609,17 @@ Tests that the last steps add, when their forms are adopted:
 
 | # | Invariant | Waits on | Command |
 |---|---|---|---|
-| T47 | A lane is created only under a digest that the rules scope holds as `active`, by an observation that the entry retains. A retired definition creates no new lane. | Q2 (P19, P21) | `npx vitest run --project scope directory` |
+| T47 | A lane is created only under a digest that the rules scope holds as `active`, by an observation that the entry retains. A retired definition creates no new lane. | Revision 14 (P19, P21) | `npx vitest run --project scope directory` |
 | T48 | The publication entry has 35 sends and 33 results, with its size measured. | Step 30; the proof plan's F23 | `npx vitest run --project scope links` |
-| T49 | A full journey on real scopes with no stand-in for a scope: found, enrol, activate, open, hold, stage, check, merge, publish, receipt. | Q1 and Q2 | `npx vitest run --project scope journey` |
+| T49 | A full journey on real scopes with no stand-in for a scope: found, enrol, activate, open, hold, stage, check, merge, publish, receipt. | Revision 14 adopted (P19, P21) | `npx vitest run --project scope journey` |
 
-For each new guard, one control with `scripts/control.mjs`, run by hand
-and recorded in the delivery note. A control that survives is reported
-with its reason.
+Independent failure controls (`scripts/control.mjs`) are chosen for useful
+invariants, at the cheapest boundary. Duplicate evidence is merged, and
+distinct failure controls are kept. Each is recorded in the delivery note.
+A control that survives is reported with its reason. Each step runs the
+focused test command of the files it changed. One gate runs for each
+milestone, with its reason stated, and retained results for an exact head
+may be reused instead of repeated.
 
 ### 7.4 What these tests do not show
 
@@ -573,7 +630,7 @@ with its reason.
 - Capacity in items, bytes and pending requests, until `cc570904`.
 - The proof plan's rows at its boundaries B5 to B8.
 
-### 7.5 Counts and time: an estimate
+### 7.5 Time: an estimate
 
 Observed for this plan, one run, at `50bba45c`, on a shared machine
 (18 cores, other sessions active), with a warm package cache.
@@ -588,17 +645,17 @@ Estimated after I3, and labelled as an estimate until it is observed:
 
 | Figure | Estimate |
 |---|---|
-| Tests added | 55 to 75. The tables above name 49 tests. The form tables in `derive` and the rows in `replay` add the rest. |
-| Tests in the gate | About 350 |
 | Typecheck, elapsed | 3.5 to 4.5 s, with three more packages |
 | Tests, elapsed | 12 to 16 s. The two Node projects that run the `git` program are the largest unknown. |
 | The whole gate | Under 25 s elapsed on this machine, warm |
 
-I2's plan estimated 27 to 32 added tests, and I2 added 71. Most of the
-difference was form tables in `derive`. The same error is likely here,
-and the range above allows for half of it. If a milestone's count passes
-its share of the range by a quarter, the builder stops and merges tests
-before going on. The budget is a ceiling to explain, not a target.
+The warm-gate estimate proves no saving. It is a warm figure on one
+machine, with an untimed install. No count of tests is a target, and no
+count stops the work.
+
+**The full-path comparison is owed, and is labelled as owed.** It covers
+the cold install, setup, an edit, review, and a comparable baseline and
+candidate. This plan does not make it.
 
 **How the full-path cost is measured.** The delivery note reports it
 apart from any warm figure.
@@ -618,10 +675,12 @@ apart from any warm figure.
   steps, a reconstruction or a proxy. The machine, the load and the cache
   state are stated with it.
 - No gain is claimed against an earlier gate.
+- The full-path comparison above stays owed until it is taken.
 
 ## 8. Steps
 
-Each step is one commit, or a few that end at its milestone. Each ends
+Each step is one commit, or a few that end at its milestone. Every step
+that removes a parked path is bound to the retained paths of section 6.2. Each ends
 with its own witness passing and the tests of what it changed. The gate
 runs once, at each milestone's head that is sent for review.
 
@@ -638,14 +697,14 @@ These steps come first because every later step reads them.
 
 | Step | Delivers | Owns | Witness | Model |
 |---|---|---|---|---|
-| 1 | Types only. The kind `register` and the seventh platform name. The `preparation` input. `Observation` and `ObservationUse` as `FreshnessProof`. The evidence of an outcome, by basis. The records `fork`, `token`, `instance` and the steps `instance`, `token`, `job-read`, `retry` in `CAPABILITIES`. No behaviour changes. | `contract/src/scope.ts`, `entry.ts`, `capability.ts`, `evidence.ts` (new), `observation.ts` (new); `bytes/src/ids.ts`, `records.ts` | Typecheck. The existing tests pass. | Small |
-| 2 | The platform package, empty of rules: its manifest, the platform option of the validator, the table of rules as a type, and `inbox` as the first definition, which needs no rule. | `packages/platform/*`; `derive/src/validate/index.ts`, one option; root `vitest.config.ts`, `package-lock.json`, `scripts/active-source.test.mjs`, `scripts/measure-tests.sh` | T43 for one definition. | Small |
+| 1 | Built, commits `bfa06084d` and `79ed29239`. Types only. The kind `register` and the seventh platform name. The `preparation` input. `Observation` and `ObservationUse` as `FreshnessProof`. The evidence of an outcome, by basis. The records `fork`, `token`, `instance` and the steps `instance`, `token`, `job-read`, `retry` in `CAPABILITIES`. No behaviour changes. | `contract/src/scope.ts`, `entry.ts`, `capability.ts`, `evidence.ts` (new), `observation.ts` (new); `bytes/src/ids.ts`, `records.ts` | Typecheck. The existing tests pass. | Small |
+| 2 | Built, commit `0a05d6dd1`. The platform package, empty of rules: its manifest, the platform option of the validator, the table of rules as a type, and `inbox` as the first definition. It needs one platform rule, P22, for a notice's `source` (finding E10, section 2.1). Built: commit `0a05d6dd1`. | `packages/platform/*`; `derive/src/validate/index.ts`, one option; root `vitest.config.ts`, `package-lock.json`, `scripts/active-source.test.mjs`, `scripts/measure-tests.sh` | T43 for one definition. | Small |
 | 3 | The ports, re-shaped. The authority port takes an observation that was read before the turn, and answers in the commit. The definitions port supplies a platform definition with its rules. The capabilities port takes real rules and state. Test support keeps its stand-ins, each over the new shape. | `scope/src/ports.ts`, `core.ts`, `turn.ts`, `testing.ts`; `derive/src/judge.ts`, `capability.ts` | The existing tests pass unchanged in meaning. One test: a platform scope is founded under `platform:inbox@1` by the production wiring. | Care |
 | 4 | Operations. An entry opens an operation. An attempt is recorded before it is sent. An outcome is `confirmed`, `refused` or `unknown`. A late answer adds one more outcome. A selection is made once. The driver sits beside the outbox, on the alarm. The ledger rules 1 to 7. | `derive/src/ledger.ts` (new), `settle.ts`, `fold.ts`; `scope/src/operations.ts` (new), `sqlite.ts`, `store.ts` | `derive/test/forms-ledger.test.ts`; T19, T20. | Care |
 
 ### 8.2 Track A: authority and the first four definitions
 
-It unblocks the grant of every act. Steps 7 to 9 can run beside steps 5
+It unblocks the grant of every act. Steps 7 to 9c can run beside steps 5
 and 6 once step 3 has landed, because they own different modules.
 
 | Step | Delivers | Owns | Witness | Model |
@@ -654,16 +713,23 @@ and 6 once step 3 has landed, because they own different modules.
 | 6 | The observation read: before the turn, bounded, counted by run and number, never kept across a restart, at most one per key, a revoked answer kept for the run. | `scope/src/authority.ts` (new), `namespace.ts` | T6, T46 | Care |
 | 7 | Membership: the definition as data, and its rules (P13, P14, P18, P24). Its answer to an observation. | `platform/src/membership.ts`, `membership.rules.ts` | T10, T13 | Care |
 | 8 | The fourth cause, and a genesis by a register's outcome. | `derive/src/genesis.ts` | One row in `derive/test/compose.test.ts` | Care |
-| 9 | The register and the directory: the definitions, and the rules for founding, the three creations, numbers, `index` and `compromised` (P13 to P17, P20 for the two children). `MemoryHost`. | `platform/src/register.ts`, `register.rules.ts`, `directory.ts`, `directory.rules.ts`; `platform/test/support/repository.ts`, `host.ts` | T18, T38. From here the `repository` fixture exists. | Care |
+| 9 | The register and the directory: the definitions, and the rules for founding, the three creations as held sends, numbers, `index` and `compromised` (P13 to P17, P20 for the two children). `MemoryHost`. | `platform/src/register.ts`, `register.rules.ts`, `directory.ts`, `directory.rules.ts`; `platform/test/support/host.ts` | T38, and the register's rows of T18 (the claim, the creation, the provisional state). | Care |
+| 9a | The rules scope as data, whole: the definition of `platform:rules@1` with every row of the tables of section 12.1.4 declared, no row reduced. Its genesis: `establish` by the directory's `create`, which opens `rules` with `branch`, `directory` and membership's scope ID, and the other values at their defaults. The rule table has its row for each Code rule of the definition. The behaviours (`publish`, `rules-wanted`, `retire-definition`, the checks) stay in step 23. | `platform/src/rules.ts` (definition and genesis only) | T43, with the rules definition; the rules scope's row of T18: it is created by the directory, and is provisional until the register's `confirm`. | Care |
+| 9b | The destination as data, whole: the definition of `platform:destination@1` with every row of the tables of section 12.1.5 declared, no row reduced. Its genesis: `establish` by the directory's `create`, which opens `branch` as `empty`. The declaration of the operation `first-head`, and the attempt that the `confirm` opens, are declared as data. The behaviours (reservation, compare-and-set, readback, receipts, the first head's push) stay in steps 26 to 28. | `platform/src/destination.ts` (definition and genesis only) | T43, with the destination definition; the destination's row of T18. | Care |
+| 9c | Founding complete and the fixture. The directory's genesis creates membership, rules and destination in that order, each held until the register's `confirm`. The `confirm` makes all of them take effect, and each `applied` result sets its reference in the directory. Before the `confirm` each admits nothing (`scope-provisional`). The `repository` fixture is made from the real scopes of steps 7, 9, 9a and 9b, with the seated founder and a first key. No scripted peer stands for a scope. | `platform/test/support/repository.ts` | T18 whole, including the provisional gating and the order of two `created` answers. From here the `repository` fixture exists, with five scopes. Step 11 adds the sixth, the inbox. | Care |
 | 10 | Remove the earlier founding and registry. | `parked/room/src/founding.ts`, `registry.ts`; `parked/README.md` | The check of active files passes. | Small |
-| 11 | The inbox on the fixture: membership creates one for a member. | `platform/src/inbox.ts`; `membership.rules.ts`, one send | T40 | Small |
+| 11 | The inbox on the fixture: membership creates one for a member. The rule P22 for a notice's `source`. | `platform/src/inbox.ts`; `membership.rules.ts`, one send | T40 | Small |
 | 12 | The production wiring of authority and readers for a platform scope. | `scope/src/worker.ts`, `object.ts` | T11 | Care |
 | 13 | Remove the earlier authority, roster and admin code. | `parked/room/src/authority.ts`, `roster.ts`; `parked/contract/src/roster.ts`; `parked/policy/` | The check of active files passes. | Small |
 | 14 | The grant in a replay. | `replay/src/verify.ts`, `source.ts` | T44 | Care |
 | 15 | Read sessions, the serving limits after review of the parked limiter, and the operator's record with its two lists. Remove the earlier requests code. | `scope/src/sessions.ts`, `limits.ts`, `operator.ts`, `reads.ts` (all new but the last); `client/src/session.ts`; `parked/room/src/requests.ts`, `ratelimit.ts` | T15, T39, T41, T42 | Care for sessions. Small for the lists. |
 
-**Milestone M1, authority.** Six scopes can be founded. An act at a
-platform scope is judged on a real observation. A device can join, be
+**Milestone M1, authority.** Six scopes can be founded, with real
+definitions for all six: the register, the directory, membership, the
+rules, the destination (steps 9 to 9c) and the inbox (step 11). The
+rules and destination definitions, their genesis and their confirmation
+are in M1. Their check and publication behaviours are in M3 and M4. An act
+at a platform scope is judged on a real observation. A device can join, be
 revoked and be recovered.
 
 ### 8.3 Track B: the capabilities and Git
@@ -698,9 +764,9 @@ After M1. It needs step 16a for `job-read`.
 
 | Step | Delivers | Owns | Witness | Model |
 |---|---|---|---|---|
-| 23 | The rules: the definition, `publish`, `rules-wanted`, `retire-definition`, and an observation of the rules. | `platform/src/rules.ts`, `rules.rules.ts` | T37 | Small, from the table of 12.1.4 |
+| 23 | The rules' behaviour: `publish`, `rules-wanted`, `retire-definition`, and an observation of the rules. The definition and its genesis are step 9a's. | `platform/src/rules.ts`, `rules.rules.ts` | T37 | Small, from the table of 12.1.4 |
 | 24 | The step `job-read`, the read token and the snapshot repository. The snapshot commit, written again. | `derive/src/capability/gitread.ts`; `packages/git/src/snapshot.ts`; the three parked snapshot files | A row of `forms-prepare` | Care |
-| 25 | The checker service: the origin read, the outcome store, one run for a job, the signer, the runner after its review. Remove the earlier jobs and checker code. | `packages/checkers/*`; `parked/checkers/` but `measure/`; `parked/room/src/jobs.ts`; `parked/contract/src/checker.ts` | T34, T35, T36 | Care |
+| 25 | The checker service: the origin read, the outcome store, one run for a job, the signer, the runner after its review. Remove the earlier jobs and checker code. | `packages/checkers/*`; `parked/checkers/` but its retained paths (`measure/` and `wrangler.spike.jsonc`, section 6.2); `parked/room/src/jobs.ts`; `parked/contract/src/checker.ts` | T34, T35, T36 | Care |
 
 **Milestone M3, checks.**
 
@@ -711,7 +777,7 @@ the delivery and are not split across workers.
 
 | Step | Delivers | Owns | Witness | Model |
 |---|---|---|---|---|
-| 26 | The destination: the definition, `reserve`, the queue, the operation `judge` with its retained observations and fetched entries, `withdraw` with its mark, and the updates to the lane. | `platform/src/destination.ts`, `destination.rules.ts` | T1, T2, T3, T4, T29 | Care |
+| 26 | The destination's behaviour, on the definition of step 9b: `reserve`, the queue, the operation `judge` with its retained observations and fetched entries, `withdraw` with its mark, and the updates to the lane. | `platform/src/destination.ts`, `destination.rules.ts` | T1, T2, T3, T4, T29 | Care |
 | 27 | Publishing: attempts, the mint and its revocation, the three classes of evidence, the deciding read, the slot, the first head, the receipt, `resend`. Remove the earlier log push. | `platform/src/destination.rules.ts`, the second half; `parked/git/src/publisher/log-push.ts`, `parked/room/src/logremote.ts` | T7, T8, T30, T31, T32 | Care |
 | 28 | A publication that does not publish: the host keeps refusing, a compromised key, another writer, `adopt-head`. The fence of section 6.8 is not built: it is proposed and not adopted (U2). Remove the earlier landing machine. | The same file; `parked/git/src/landing/`; `parked/contract/src/landing.ts`, `guards.ts` | T5, T33 | Care |
 
@@ -722,8 +788,8 @@ orders of each race, with a lost push reply settled by a read.
 
 | Step | Delivers | Owns | Witness | Model |
 |---|---|---|---|---|
-| 29 | **Prepared ahead, filed only on adoption.** Activation and bytes: `activate`, `keep-configuration`, `open-issue`, `open-pr`, the membership reference of a lane, the address of a notice. Each on the form that its owner adopts. | `platform/src/rules.rules.ts`, `directory.rules.ts`; `scope/src/core.ts`, `outbox.ts` | T47 | Care |
-| 30 | The lanes on the real repository: the fixture `graph` uses the real directory, rules scope and destination. The scripted peers and the test authority leave it. | `packages/lanes/test/support/graph.ts`; `scope/src/testing.ts` | The lanes' scenarios; T48; T49 if Q1 and Q2 are answered | Care |
+| 29 | The membership reference of a lane and the address of a notice, on the adopted forms of revision 13 (P20, P23). **Prepared ahead, filed only on adoption:** activation and bytes (`activate`, `keep-configuration`, `open-issue`, `open-pr`), on the forms that revision 14 decides (P19, P21). | `platform/src/rules.rules.ts`, `directory.rules.ts`; `scope/src/core.ts`, `outbox.ts` | T47 | Care |
+| 30 | The lanes on the real repository: the fixture `graph` uses the real directory, rules scope and destination. The scripted peers and the test authority leave it. | `packages/lanes/test/support/graph.ts`; `scope/src/testing.ts` | The lanes' scenarios; T48; T49 if revision 14 is adopted | Care |
 | 31 | Removal, completed: what is left of the parked packages that section 6.1 names, and the ledger. | `parked/*`; `parked/README.md` | The check of active files; a listing of `parked/` against section 6.1. | Small |
 | 32 | Guides: `docs/scopes.md`, `docs/testing.md`, a new `docs/platform.md`, the READMEs. Measurement. The deltas note and the delivery note. The gate, once. | `docs/*`; `notes/2026-10-0x-i3-*.md`; `scripts/measure-tests.sh` | `npm run gate`; `scripts/measure-tests.sh` | Small for the guides. The builder writes the delivery note. |
 
@@ -733,16 +799,16 @@ orders of each race, with a lost push reply settled by a read.
 |---|---|---|
 | Base | 1, 2, then 3 and 4 | 3 and 4 own different files and run together after 1. |
 | A1 | 5, 6 | After 3. One worker. |
-| A2 | 7, 8, 9 | After 3. Beside A1. 7 and 8 are independent; 9 follows both. |
+| A2 | 7, 8, 9, 9a, 9b, 9c | After 3. Beside A1. 7 and 8 are independent; 9 follows both; 9a and 9b follow 9 and are independent; 9c follows them. |
 | B1 | 16a, 16b, 16c | After 4. Three workers. |
 | B2 | 17, 21 | After 1. Two workers. They touch only `packages/git`, in different files. |
-| C | 23 | After 9. Beside everything. |
+| C | 23 | After 9a. Beside everything. |
 | D | 26, 27, 28 | One worker, in order. |
 
 Steps 3, 4, 12, 16, 30 and 32 are integration points. Each is one
 worker's, with no other step open on the files it owns.
 
-Counted by hand over the "Model" column of 35 steps: 8 are small, 24
+Counted by hand over the "Model" column of 38 steps: 8 are small, 27
 need care, and 3 are mixed (15, 17 and 32).
 
 ## 9. Open questions, and risks
@@ -751,18 +817,18 @@ need care, and 3 are mixed (15, 17 and 32).
 
 | # | Question | Owner | The smallest decision |
 |---|---|---|---|
-| Q1 | How does a lane know its membership (P20)? The adopted body of a `create` is `{ fields, directory }`. The note says a lane gets the reference "in its creation's fields", and the pinned lane definitions declare no such field. | Request `c75205df`, with the lane forms | One of three. Adopt revision 13's form `{ fields, directory, membership }`. Or rule that a lane uses the note's rule for the rules scope: the ID from the directory's seed, the incarnation fixed by the first retained observation. Or add a genesis field to both lane definitions. This plan builds none until one is chosen. |
-| Q2 | Three rules need bytes that no adopted type holds. Where an act entry retains a second observation (P19). How bytes that are not a detached text travel beside an intent (P21). How a notice is addressed (P23). | Request `c75205df` | For each: adopt a form, or name the adopted member that carries it. Revision 13 proposes forms for P21 and P23 and leaves P19 open. Until then no lane is created under an activated definition by a real directory. |
-| Q3 | What makes a hold have a workspace? Section 13.7 says no source may derive the `fork`, `token` and `instance` records from the `hold` effect alone, and that the form is owed. | The successor of `406983fe`, with the contract and the lane forms | One predicate. This plan would propose: a definition whose rows write any capability guard or effect of `hold@1`. Step 18 waits for the answer. |
-| Q4 | The four asks: the binding of a license request (R1-44); the reading of `not-owner` and `malformed` on a `withdraw`; activation with a platform creator's read; the task's reservations. | The successor of `406983fe` | An answer to each, or a statement that each stays as the note has it. No step waits. The delivery note reports each as an owned gap. |
-| Q5 | Who builds capacity in items, bytes and pending requests, and when? The commission keeps all five dimensions "with `cc570904`". Three witnesses of section 5.8 say "no free room", and are shown in entries. | The planner, with `cc570904` | Say whether I3 builds the four dimensions, or declares its reservations in all five and builds entries and records. This plan assumes the second. |
+| Q1 | How does a lane know its membership (P20)? | Answered by adoption | The contract's revision 13, adopted by planner act `42c39a7d`, makes a lane's membership in `create` an available form: `{ fields, directory, membership }`. I3 builds it. No question remains. |
+| Q2 | Two rules need bytes that no adopted type holds: where an act entry retains a second observation (P19, R1-53), and how bytes that are not a detached text travel beside an intent (P21, R1-54). Revision 13 left both open. It proposes no form for P21. The member-addressed attention send (P23) is adopted, so it is no longer a question. | The contract's revision 14 at `fa6417e6`, filed and under review, not adopted | Adopt revision 14's decisions, or name the adopted member that carries each. Until then no lane is created under an activated definition by a real directory, and I3 builds none of it. |
+| Q3 | What makes a hold have a workspace? Section 13.7 says no source may derive the `fork`, `token` and `instance` records from the `hold` effect alone, and that the form is owed. | The authority note's follow-through, request `f1142e84`. Its revision 18 at `99bc48e8` is filed and under review, not adopted. | Revision 18 proposes one sentence: a definition's holds have a workspace exactly when the definition lists `hold@1` and uses at least one hold capability guard or effect. I3 does not build on it until it is adopted. Step 18 waits. |
+| Q4 | The four asks: the binding of a license request (R1-44); the reading of `not-owner` and `malformed` on a `withdraw`; activation with a platform creator's read; the task's reservations. | The authority note's follow-through, request `f1142e84`, with revision 18 as above | An answer to each, or a statement that each stays as the note has it. No step waits. The delivery note reports each as an owned gap. |
+| Q5 | Who builds capacity in items, bytes and pending requests, and when? | The planner, with `cc570904` | Answered (planner act `bf020684`). `cc570904` stays the common owner of all five capacity dimensions. I3 implements its new capability and platform records. It declares each duty's bounded whole closure in every dimension, and coordinates with `cc570904`. It creates no second mechanism. Evidence in entries only, or in records only, is labelled partial. |
 | Q6 | Which Git host does the new model use? The earlier code used a Cloudflare Git service. Two retained files hold that host's refusal codes and its token's scheme. | The operator, under the installation design | Name the host. Until then the host port is abstract, and every host call is shown against `MemoryHost` only. |
 | Q7 | Every number: the windows, the attempts, the ancestry bounds, the serving limits, the session's length. | The proof plan | None now. Each is a configured value with the note's proposed number. |
-| Q8 | The note says that I3 owes a checker job on the real runner for each row of "What the checker signs", and that I3 runs the host session "when it is commissioned". Both need a deployment or a provider session. | The planner | Commission each separately, or say that I3 is filed without them and they follow. This plan launches neither. |
-| Q9 | May each milestone of section 9.3 be reviewed and land while the request stays open, as I2's base did? | The planner | Yes or no. The plan assumes yes, and reports no milestone as I3. |
+| Q8 | The note says that I3 owes a checker job on the real runner for each row of "What the checker signs", and that I3 runs the host session "when it is commissioned". Both need a deployment or a provider session. | The planner | Answered (planner act `bf020684`). Source milestones can be filed without the separately commissioned real host and container sessions. They explicitly owe the host cases HS1 to HS7, the checker on a real runner, and the provider assumptions. This is no authorization to run any. This plan launches none. |
+| Q9 | May each milestone of section 9.3 be reviewed and land while the request stays open, as I2's base did? | The planner | Answered yes (planner act `bf020684`). A coherent milestone may be reviewed and land while the I3 request stays open. No milestone is called the full I3. |
 | Q10 | May the validator take a platform option, so that a platform definition's data is checked by the same validator under a name that begins `platform:`? I2 built the refusal as its own decision (its entries D5 and D14). | Request `c75205df`, with the successor of `406983fe` | Yes or no. If no, the six values are validated under a made-up name in the test, and the plan is otherwise unchanged. |
 | Q11 | The serving limits' form for an IPv6 address, and the total request rate. The note says that I3 chooses the first and shares the second with the installation design. | The builder; the installation design | The builder proposes in step 15, and records it as a delta. |
-| Q12 | Is the fence of section 6.8 adopted? | The authority note's review (U2) | Until it is, step 28 builds "hold" only, and the proof plan's F16 is not run. |
+| Q12 | Is the fence of section 6.8 adopted? | The authority note's revisions 17 and 18 | No. Those revisions state it as not adopted. I3 builds the hold only, and the proof plan's F16 is not run. |
 
 ### 9.2 Risks, the largest first
 
@@ -774,7 +840,8 @@ need care, and 3 are mixed (15, 17 and 32).
    is perhaps three times that, and most of its steps are judgments, not
    tables. One review of the whole would be shallow. Section 9.3 proposes
    four milestones that each stand alone.
-2. **A full run is blocked on four rulings** (Q1 and Q2). Without them
+2. **A full run is blocked on two rulings** (P19 and P21, question Q2,
+   under revision 14, not adopted). Without them
    the most visible result, a merge from a real founding, cannot be shown.
    The plan orders the work so that nothing waits on them until step 29,
    but the final milestone does.
@@ -800,14 +867,16 @@ need care, and 3 are mixed (15, 17 and 32).
    checked nothing about the commit, and the runner never read parents.
    A move without the review of section 6.3 would carry both faults into
    the new model.
-8. **The estimate of tests is likely low**, as I2's was by more than two
-   times. The gate's time may pass 25 s once two projects run the `git`
-   program.
+8. **The estimate of gate time is a warm estimate and proves no saving.**
+   The gate's time may pass 25 s once two projects run the `git`
+   program. The full-path comparison is owed (section 7.5).
 9. **Capacity is half built.** Records arrive with I3, and the other
    three dimensions do not. A witness "at no free room" in entries alone
    is honest only if it says so.
-10. **I2 is not landed.** A change to a lane row moves two digests and
-    the lanes' scenarios. The cost is small, and it lands on step 30.
+10. **I2's base milestone is landed, and I2 is not whole.** Its rows W1 to
+    W5 and the scope contract's must-change rows stay owed under request
+    `efb4e323`. A change to a lane row moves two digests and the lanes'
+    scenarios. The cost is small, and it lands on step 30.
 11. **Bytes change again.** The `preparation` input, the register's
     seed, records in the folded state and `Observation` in a grant
     change the bytes of entries and of state digests. Nothing is
@@ -827,11 +896,11 @@ replaces, and can land. None is reported as I3.
 
 | Milestone | Steps | What a reviewer can judge | Removes | Runs after it |
 |---|---|---|---|---|
-| M1 Authority | 1 to 15 | Founding, membership, the observation and the grant guard, sessions, enrolment, revocation and recovery, incidents. V6 and V9; V7's entries; the authority rows of A6. | The earlier founding, registry, authority, roster, admin and requests code. | Every act of a platform scope, on a real grant. |
+| M1 Authority | 1 to 15, with 9a to 9c | Founding of six scopes with real definitions, membership, the observation and the grant guard, sessions, enrolment, revocation and recovery, incidents. V6 and V9; V7's entries; the authority rows of A6. | The earlier founding, registry, authority, roster, admin and requests code. | Every act of a platform scope, on a real grant. |
 | M2 Capabilities | 16a to 22 | Preparation, the records, staging, pins, ancestry, the token ledger, the gateway, the retained Git code after review. O3 and O15; V8's entries. | The scripted capability. The earlier workspaces, mint ledger, publisher and Git reader. | I2's W1. |
 | M3 Checks | 23 to 25 | The rules, the checker service and the runner after review. | The earlier jobs and checker code. | A check from a request to its deciding entry. |
 | M4 Publication | 26 to 28 | The destination: reservation, compare-and-set, readback, receipt, abort. A6 and A7 in both orders, with the lost push reply. | The earlier landing machine and log push. | A merge that a real destination decides, from a test's `reserve`. |
-| M5 Assembly | 29 to 32 | The forms that owners adopt in the meantime; the lanes on the real repository; the last removal; the guides; the measured cost. | The scripted peers and the test authority, where Q1 and Q2 allow. What is left of the parked packages. | I2's W2 and W3. The full I3 is filed here, and accounts for every row of sections 3 and 4. |
+| M5 Assembly | 29 to 32 | The adopted forms of revision 13, and the forms that owners adopt in the meantime; the lanes on the real repository; the last removal; the guides; the measured cost. | The scripted peers and the test authority, where the adoption of revision 14 allows. What is left of the parked packages. | I2's W2 and W3. The full I3 is filed here, and accounts for every row of sections 3 and 4. |
 
 M1 and M2 can be built side by side and reviewed in either order. M3 and
 M4 each need both. If the planner prefers fewer reviews, M3 can join M4.
