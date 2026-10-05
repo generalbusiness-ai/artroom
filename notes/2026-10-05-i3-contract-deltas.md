@@ -957,3 +957,73 @@ is in memory only.
 clock. The two clocks of a session are one scripted clock in the tests:
 they show each scope's comparison, and nothing about the difference
 between two real clocks.
+
+## 22. Request `42de9e34`: extents
+
+Written 2026-10-05, by the worker of that request. Entries have the
+prefix EV. The design is the authority note's revision 24 at `d5616522b`,
+section 12.1.4a, with the scope contract's revision 18 at `be90ff05`.
+Later revisions were not used: the contract's revision 19, which states
+`RulesContent.singleControllerException`, is under review and nothing
+here builds on it. Three later answers of the planner were given to the
+worker by the builder, and are applied as they were given: on when the
+exception may be declared (entry EV11), on the grant of an effect class
+(entry EV9) and on symbolic links (entry EV7). Neither lane digest
+changes, no file under `packages/lanes` changes, and no entry that an
+earlier source wrote has other bytes. `platform:rules@1` is not changed:
+its data, its three marks and its digest are as section 17 left them.
+
+**What is built.** `packages/platform/src/extents.ts`: judgments over
+data, and nothing else.
+
+- `Extent`, member for member as the note lists it, and `firstExtents`:
+  the three extents of the first definition, from a repository's
+  `approvals` and `checks`.
+- `holdsRulesExtent`: the fixed minimum of the `rules` extent.
+- `matches`, a pattern against a path, and `classify`: the extents that a
+  changed set touches under one rules content, with the planner's decision
+  on symbolic links.
+- `judgeExtents`: which touched extents are met, from the reviews, the
+  passed checks, the authors, the landing actor and the controllers as
+  they are given, with the rule of the `rules` extent and its one
+  exception.
+
+**What is not built.** The note says that the rows of the rules scope
+change only when its missing forms 1 to 3 exist, and that until then I3
+builds the rules scope with one bar for a repository. So:
+
+- No rules content holds an extent. `publish` has no field for one, the
+  item `rules` has no slot, and no observation of the rules returns one.
+- Nothing calls these functions. The destination's reservation, which
+  will, is the plan's steps 22 and 26.
+- No changed set is computed. `classify` is given the paths and the links.
+- No activation records what it checked, beyond what `activate` already
+  retains: entry EV16.
+
+The note lists 14 missing forms. Three are answered by the planner (5, 6
+and 7). Eleven are owed, and each is an entry here: EV1 to EV11.
+
+Witnesses: `packages/platform/test/extents.test.ts`, six tests. They are
+judgments over data written by hand. A member's actions are those of the
+role table of section 3.2. No scope ran, and nothing is shown about a
+reservation, a read of a repository or a replay.
+
+| # | Where the texts differ or are silent | Implemented | Owner, and the question |
+|---|---|---|---|
+| EV1 | The missing form 1: the typed body of the evidence of `judge`, with the touched extents and a path for each, and the bound on the trees that one changed set may read. | Not built. `classify` is given the changed paths, and answers the touched extents in the order of the rules, each with the first changed path in byte order that shows it. That is a function's result and no form of an entry. No source computes a changed set: `packages/git/src/reader.ts` parses a commit and a tree, and no source compares two trees. | The authority note's next revision, with the proof plan for the bound and IA for the reader. |
+| EV2 | The missing form 2: the value `extents` of the item `rules`, the field of `publish`, and `extents` in a `RulesContent` that was asked as "rules". | Not built. `Extent` is a type in source, and `firstExtents` is a function. The bounds of the listing (8 extents, a name of 64 bytes that is unique, 32 patterns of 256 bytes) are those of a typed field, and nothing checks them here but the constant `EXTENTS_MOST`, which nothing reads. `judgeExtents` takes the extents as an input. | The authority note, for the rows. The contract, for the type and for the size of `content` (its point R1-61). |
+| EV3 | The missing form 3: the mark of `publish` for the fixed minimum, and the part of the rule `judge` that checks each extent. | The two judgments exist as functions: `holdsRulesExtent` and `judgeExtents`. No mark names either, no rule of a version runs either, and `publish` is not refused `rules-extent-required`. | The authority note, in its table of marks, when the rows change. |
+| EV4 | The missing form 4: the `change` lane cannot read an obligation of an extent. | Not built, and not this request's: no file under `packages/lanes` changes. | R2, in the lane forms' successor (the request `fdc3d7e2`). |
+| EV5 | The missing form 8: a path that differs only by a Unicode form. | A pattern folds the 26 ASCII letters and nothing else, as the note states. | The proof plan, with IA. |
+| EV6 | The missing form 9: whether the controller of the rules scope is a role of its own. | The controller is a member who holds `rules.publish` (`CONTROLLER`). | N5. |
+| EV7 | The missing form 10, a symbolic link. The note says "its target is not followed". The planner's later decision, as the builder gave it: a path's extent is judged by the path and every path that a link at it resolves to within the tree; a target change is a change in every extent that the old and the new target fall in; a link that resolves outside the tree, or cannot be resolved, is refused as a rules-extent change. The decision does not say who resolves a link, in which trees, or what a change to a link's target file is. | `classify` is given the links of the trees as rows of a path and the paths that it resolves to, or null. The caller resolves them, and that caller is not built. Four readings are the worker's. (a) The other direction: a changed path that a link resolves to, or that is below it, is also judged at the link's path with the rest. So a change to the file that `AGENTS.md` links to touches `rules`. The decision does not state it, and without it the note's own example of form 10 stays open. (b) "Refused" is read as not met, with `rules` named, whatever the reviews, and the class `authority`. (c) That holds for a link of any tree that was given, so a change that removes such a link is refused too, and a repository that already holds one cannot change that path. (d) Links below links are followed for as many passes as there are links, and a change that still gives new paths is refused. Not closed: where a link resolves to a directory, the paths below that directory which the change does not touch are not judged at the link, because no tree is read here. | The planner, with IA: to confirm (a) and (b), and to say how a repository removes a link that leaves the tree (c). The authority note, for the form of the links in the evidence, with form 1. |
+| EV8 | The missing form 11: an observation that says how many active members with an active key hold one action. | Not built. `judgeExtents` takes `controllers`, the members, or null. With null no exception is judged. | The authority note's next revision, with the contract for the form of the observation. |
+| EV9 | The missing form 12: a destination for an effect that is not a branch, with a grant on it, an entry for the effect and a witness of a preview. And the planner's later answer, as the builder gave it: a grant for an effect class is a grant that covers the one destination, which a repository-wide grant satisfies until a grant can name a destination. | For a touched extent of the class `deployment` or `authority`, `judgeExtents` asks that the landing actor holds `change.merge` (`LANDING`), as the second row of the note's table has it. The declared destination, the witness of a preview and the replayable entry are records of the destination itself, and nothing here judges them. No effect beyond the branch is modelled. | The planner, with N5 and IA. |
+| EV10 | The missing form 13: an act of membership that gives one action to one member. | Not built. A reviewer is given with the actions that the member holds, and an extent's `approver` is one of them. No extent names a member. | The authority note's next revision, with its section 3.4. |
+| EV11 | The missing form 14: the declaration of the single-controller exception. And the planner's later answer, as the builder gave it: it may be declared while more than one controller exists, and takes effect only while membership shows exactly one controller who is the author. | Not built as a value. `judgeExtents` takes `singleControllerException`, a boolean. Nothing sets it, and nothing here refuses a declaration. The three conditions are judged as the note states them. | The authority note's next revision, for the rows. The contract, for the type of `RulesContent`. |
+| EV12 | "The first definition": "the numbers are examples". The `rules` row says "at least 1". The rows of `rules` and `infrastructure` give the checks as "those that the repository names", and the patterns as these "and what a repository adds". | `rules` asks 1 approval. `rules` and `infrastructure` name no check. No pattern is added. `infrastructure` and `source` take the repository's `approvals`, and `source` names the checks that the rules mark `required`. | The proof plan, for each number. |
+| EV13 | "A pattern". The note does not say what `**` means inside a name, as in `a**b`, or what an empty name of a pattern matches. A path is "as bytes", and the functions take strings. | `**` matches any number of names only when it is a whole name of the pattern. In any other name each `*` matches any bytes of one name. An empty name matches an empty name alone. The match is by the code units of two strings, which is the match by bytes for well-formed text. A path whose bytes are no text has no string: the caller must refuse it, and that caller is not built. | The authority note, to state the two cases. IA, for a path that is no text, with form 1. |
+| EV14 | "One extent, `source`, has no pattern: it holds every changed path that no other extent matches." The note does not say whether that is by the name or by the empty list, what holds when a repository's rules have no such extent, or what holds when they have two. Plan 016 proposes that an unclassified resource blocks. | By the empty list: every extent with no pattern holds each judged path that no pattern of the rules matches. With no such extent that path is unclassified, and the change is not met. `unmet` names no extent for it. | The authority note. Whether `publish` must refuse rules with no such extent, and the reason that a publication then gives. |
+| EV15 | The rule of the `rules` extent, in its details. | The extent is known by its name, `rules` (`RULES_EXTENT`). A review counts for it only from a member who holds its `approver` and `rules.publish`: the fixed minimum makes them one. The exception is used only where the counted reviews do not meet the extent. It stands for the reviews alone: the extent's own checks are still asked ("its checks", in the note's list of what stands). The answer names the one controller. The record of the landing, with the two heads, the revision and the words "single-controller", is the destination's and is not built. A refused path makes `rules` unmet also where the rules name no extent `rules`. | The authority note, to confirm that the checks of the `rules` extent stand under the exception. |
+| EV16 | Condition (4) of the request: "Activation of a rules definition records what it checked, as the proof plan's O9 row asks". The note says of O9 that it "is accepted as R4's catalogue states it, for the rules definition that is still owed" (its section 13). No text states a form for the record of an activation's checks. Plan 016 asks that an activation "retain what was checked and the observed head". | Nothing new. What exists is section 17's: the entry of `activate` retains each value that its guard read, which is the definition's bytes and those of its named closure, each under its digest (`packages/platform/test/rules-scope.test.ts`, the cases of `activate`). The grant's observation is retained by the scope as for any act. No record names a check of an extent, or a judgment of the definition against the extents. | The proof plan, for what O9 asks an activation to record. The authority note, with the contract, for its form. |
+| EV17 | `packages/platform/src/rules-scope.ts` was built against the authority note's revision 21 and the contract's revision 16. Revisions 24 and 18 are adopted. | Compared, by a diff of the two texts of each: section 12.1.4, section 3.10 and the rows 27 to 29 of the table of marks are the same in revisions 21 and 24, and the type `RulesContent` is the same in revisions 16 and 18. Revision 24 adds section 12.1.4a, which changes no row. So `rules-scope.ts` is not changed, and its header still names revision 21. No other section was compared. | The builder: whether the header's revision is to be updated at the merge. |
