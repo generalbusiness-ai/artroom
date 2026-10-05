@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:5019cff428257ad2428cbe495e03d6f4a92e821e"}
+{"kind":"promise","text":"I will prepare the next scope contract revision as d56d7f65 asks: reconcile the I1 choices 153 to 157 at a3e5a77e by reading the changed interfaces, read and declare the adopted lane forms (4b3bf5da), proof plan (85be9f0b) and recovery design (dafb5b0c), dispose the named seams, and keep all four subjects. Design only.","body":{"branch":"request/scope-contract"}}
