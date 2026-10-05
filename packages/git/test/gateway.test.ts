@@ -1,0 +1,132 @@
+import { inspect } from "node:util";
+import { expect, test } from "vitest";
+import { Gateway, GatewayRefusal, type GatewayReason, type GrantRequest } from "../src/index.ts";
+import { MemoryRecords } from "./support/host.ts";
+
+const TOKEN = "tok_plaintext_9c2e7b";
+const REPO = "https://git.example/space/repo.git";
+const [OLD, NEW, OTHER, ZERO] = ["a".repeat(40), "b".repeat(40), "c".repeat(40), "0".repeat(40)];
+const REF = "refs/heads/main";
+
+const enc = new TextEncoder();
+const pkt = (line: string) => `${(line.length + 4).toString(16).padStart(4, "0")}${line}`;
+/** A receive-pack body: the commands, a flush, and bytes that stand for the pack. */
+const push = (...commands: string[]) => enc.encode(`${commands.map((c, i) => pkt(i === 0 ? `${c}\0report-status agent=git/2\n` : `${c}\n`)).join("")}0000PACK-bytes`);
+const post = (body: Uint8Array | string, path = "/git-receive-pack", headers: Record<string, string> = {}) =>
+  new Request(`${REPO}${path}`, { method: "POST", headers: { "content-type": "application/x-git-receive-pack-request", authorization: "Bearer the-client's-own", ...headers }, body: typeof body === "string" ? enc.encode(body) : body });
+const get = (service: string, repo = REPO) => new Request(`${repo}/info/refs?service=${service}`);
+
+/** The reason of a refusal by `open`, or "opened". */
+const opening = (run: Promise<unknown>): Promise<string> => run.then(() => "opened", (e: unknown) => (e instanceof GatewayRefusal ? e.reason : String(e)));
+
+// The plan's T27 (authority note, sections 5.3, 5.7, 6.1 and 6.6, step 3). Pure: the host is a function in the test, a stand-in that
+// records what reached it. It shows the gateway's side only.
+test("the gateway holds one grant for an attempt, records that it is forwarding before it forwards, forwards one update and closes; the plaintext is in the one header and in no record, log, error, URL or response", async () => {
+  const order: string[] = [];
+  const reached: { url: string; headers: [string, string][]; body: string }[] = [];
+  const logged: string[] = [];
+  const records = new MemoryRecords();
+  const write = records.write.bind(records);
+  records.write = (record) => { order.push(`record ${(record as { state: string }).state}`); return write(record); };
+  let fail = false;
+  const gateway = new Gateway({
+    records,
+    credential: (t) => ["authorization", `Bearer ${t}`],
+    log: (e) => logged.push(JSON.stringify(e)),
+    upstream: async (request) => {
+      order.push(`host ${new URL(request.url).pathname.slice("/space/repo.git".length)}`);
+      reached.push({ url: request.url, headers: [...request.headers], body: await request.text() });
+      // A provider's error that repeats the request it was given, with its header (the proof plan's key O3).
+      if (fail) throw new Error(`upstream 500 for ${request.url} with Authorization: Bearer ${TOKEN}`);
+      return new Response("ok");
+    },
+  });
+  const grant = (attempt: string, more: Partial<GrantRequest> = {}): GrantRequest =>
+    ({ attempt, repository: REPO, update: { ref: REF, old: OLD, new: NEW }, token: { id: "token-1", state: "live", plaintext: TOKEN }, ...more });
+  /** Whatever a forward ends with, as text: the status and the body, or a thrown error's text. */
+  const forwarded = (request: Request): Promise<string> => gateway.forward(request).then(async (r) => `${r.status} ${(await r.text()).trim()}`, (e: unknown) => `threw ${String(e)}`);
+  const refused = (reason: GatewayReason) => `403 Refused by the gateway: ${reason}`;
+
+  // Opening. The plaintext is taken only for a token that its sealed outcome entry made `live` (section 5.7).
+  expect(await Promise.all([
+    opening(gateway.open(grant("d:7:1#1", { token: { id: "token-0", state: "minting", plaintext: TOKEN } }))),
+    opening(gateway.open(grant("d:7:1#1", { token: { id: "token-0", state: "revoking", plaintext: TOKEN } }))),
+    opening(gateway.open(grant("d:7:1#1", { repository: `https://user:${TOKEN}@git.example/space/repo.git` }))),
+    opening(gateway.open(grant("d:7:1#1", { repository: `${REPO}?token=${TOKEN}` }))),
+    opening(gateway.open(grant("d:7:1#1", { update: { ref: "--receive-pack=x", old: OLD, new: NEW } }))),
+    opening(gateway.open(grant("d:7:1#1", { update: { ref: REF, old: OLD, new: "f".repeat(64) } }))),
+  ])).toEqual(["token-not-live", "token-not-live", "credential-in-url", "bad-grant", "bad-grant", "bad-grant"]);
+  expect([records.written.length, await forwarded(get("git-receive-pack"))]).toEqual([0, refused("no-grant")]);
+
+  expect(await gateway.open(grant("d:7:1#1"))).toEqual({ attempt: "d:7:1#1", repository: REPO, update: { ref: REF, old: OLD, new: NEW }, token: "token-1", state: "open", forwarded: 0, reads: 0 });
+  // One grant for a repository at a time, and one grant for an attempt in the gateway's life.
+  expect(await Promise.all([opening(gateway.open(grant("d:7:1#2"))), opening(gateway.open(grant("d:7:1#1")))])).toEqual(["grant-open", "attempt-used"]);
+
+  // What is refused before anything reaches the host. Only the three smart-HTTP paths pass, and only the one granted update.
+  const update = `${OLD} ${NEW} ${REF}`;
+  expect(await Promise.all([
+    forwarded(new Request(`${REPO}/objects/info/packs`)),
+    forwarded(new Request(`${REPO}/info/refs?service=git-receive-pack&token=${TOKEN}`)),
+    forwarded(get("git-upload-pack", "https://git.example/space/other.git")),
+    forwarded(post(push(`${OLD} ${OTHER} ${REF}`))),                                   // another new value
+    forwarded(post(push(`${OTHER} ${NEW} ${REF}`))),                                   // another old value
+    forwarded(post(push(`${OLD} ${NEW} refs/heads/other`))),                           // another ref
+    forwarded(post(push(update, `${ZERO} ${NEW} refs/heads/second`))),                 // a second update beside the granted one
+    forwarded(post(push(`${OLD} ${ZERO} ${REF}`))),                                    // a delete, which this grant does not allow
+    forwarded(post(push(update).fill(0x41, 2, 3))),                                    // a length in upper-case hex
+    forwarded(post(`0x${pkt(`${update}\n`).slice(2)}0000`)),                           // a length that `parseInt` would read
+    forwarded(post(`${pkt(`${"f".repeat(64)} ${"e".repeat(64)} ${REF}\0object-format=sha256\n`)}0000`)),   // SHA-256 object IDs
+    forwarded(post(`${pkt("push-cert\0report-status\n")}0000`)),
+    forwarded(post(pkt(`${update}\n`))),                                               // the body ends inside the commands
+    forwarded(post(push(update), "/git-receive-pack", { "content-encoding": "gzip" })),
+  ])).toEqual([
+    refused("not-git"), refused("not-git"), refused("no-grant"),
+    refused("not-granted"), refused("not-granted"), refused("not-granted"), refused("not-granted"), refused("not-granted"),
+    refused("bad-commands"), refused("bad-commands"), refused("bad-commands"), refused("bad-commands"), refused("bad-commands"), refused("compressed"),
+  ]);
+  expect(reached).toEqual([]);
+
+  // Reads pass with the credential and are not counted as the update: discovery, a fetch, and Git's empty probe before a large push.
+  expect(await Promise.all([forwarded(get("git-receive-pack")), forwarded(post("0000", "/git-upload-pack")), forwarded(post("0000"))])).toEqual(["200 ok", "200 ok", "200 ok"]);
+
+  // The one update. "Forwarding" is recorded before the host is called. The body reaches the host unchanged. Then the grant is closed.
+  order.length = 0;
+  expect(await forwarded(post(push(update)))).toBe("200 ok");
+  expect(order).toEqual(["record forwarding", "host /git-receive-pack", "record closed"]);
+  expect(reached.at(-1)!.body).toBe(new TextDecoder().decode(push(update)));
+  // A second copy of the same update, and anything else, is refused: a closed grant forwards nothing, whatever asks.
+  const calls = reached.length;
+  expect(await Promise.all([forwarded(post(push(update))), forwarded(get("git-receive-pack"))])).toEqual([refused("no-grant"), refused("no-grant")]);
+  expect(reached.length).toBe(calls);
+  const closed = { attempt: "d:7:1#1", repository: REPO, update: { ref: REF, old: OLD, new: NEW }, token: "token-1", state: "closed", forwarded: 1, reads: 3 };
+  expect([await gateway.close("d:7:1#1"), await gateway.close("d:7:1#1"), await gateway.close("d:7:9#9")]).toEqual([closed, closed, null]);
+
+  // The host fails, and its error repeats the request with its header. What comes back to the client holds none of it, and the
+  // record still shows one forward: the send is unknown, and not "not sent".
+  fail = true;
+  await gateway.open(grant("d:7:2#1", { token: { id: "token-2", state: "live", plaintext: TOKEN } }));
+  const failed = await forwarded(post(push(update)));
+  expect(failed).not.toContain(TOKEN);
+  expect(failed).toBe("502 The gateway had no answer from the host");
+  expect(await gateway.close("d:7:2#1")).toMatchObject({ state: "closed", forwarded: 1 });
+  fail = false;
+
+  // The token's use ends (section 5.7: the entry that makes it `revoking`): its grants close with nothing forwarded, and the plaintext is dropped.
+  await gateway.open(grant("d:7:3#1", { token: { id: "token-3", state: "live", plaintext: TOKEN } }));
+  expect(await gateway.ended("token-3")).toMatchObject([{ attempt: "d:7:3#1", state: "closed", forwarded: 0 }]);
+  expect(await forwarded(post(push(update)))).toBe(refused("no-grant"));
+
+  // A record that cannot be written stops the forward: nothing reaches the host, and the grant is closed with nothing forwarded.
+  await gateway.open(grant("d:7:4#1", { token: { id: "token-4", state: "live", plaintext: TOKEN } }));
+  records.write = () => Promise.reject(new Error(`storage failed while writing ${TOKEN}`));
+  const before = reached.length;
+  expect([await forwarded(post(push(update))), reached.length - before, await gateway.close("d:7:4#1")]).toEqual([refused("record-failed"), 0, expect.objectContaining({ state: "closed", forwarded: 0 })]);
+
+  // Custody (section 5.3). At the host the plaintext was in the one header of each request, the client's own header was not passed
+  // on, and no URL held it. Nowhere else does the plaintext appear: no record, no log line, no rendering of the gateway itself.
+  expect(reached.length).toBeGreaterThan(3);
+  expect(reached.map((r) => r.headers.filter(([, value]) => value.includes(TOKEN)))).toEqual(reached.map(() => [["authorization", `Bearer ${TOKEN}`]]));
+  expect(reached.some((r) => r.url.includes(TOKEN) || r.headers.some(([, value]) => value.includes("the-client's-own")))).toBe(false);
+  expect([records.written.join("\n"), logged.join("\n"), JSON.stringify(gateway), inspect(gateway, { depth: 8, showHidden: true })].map((kept) => kept.includes(TOKEN))).toEqual([false, false, false, false]);
+  expect(records.written.length).toBeGreaterThan(5);
+});

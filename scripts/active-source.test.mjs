@@ -53,3 +53,15 @@ test("the platform package depends only on contract, bytes and derive, and only 
   const named = files.filter((f) => source(f) && !/^packages\/(platform|scope|replay|lanes)\//.test(f));
   assert.deepEqual(named.filter((f) => /artroom-platform/.test(text(f))), []);
 });
+
+// The git package is the one place that touches a Git repository or a Git host (I3 plan, section 3.1). It depends only on contract and
+// bytes. The runtime and the checker service name it. The platform package may name it in its tests only, where the host stand-in runs
+// the same table of sends as the real repository does: no rule of a platform definition reads a repository.
+test("the git package depends only on contract and bytes, and only scope, checkers and the platform's tests name it", () => {
+  assert.ok(files.includes("packages/git/package.json"), "the git package was listed");
+  const source = (f) => f.startsWith("packages/") && !f.endsWith(".md");
+  const inside = files.filter((f) => source(f) && f.startsWith("packages/git/"));
+  assert.deepEqual(inside.filter((f) => /artroom-(derive|platform|scope|replay|client|lanes|checkers)/.test(text(f))), []);
+  const named = files.filter((f) => source(f) && !/^packages\/(git|scope|checkers)\/|^packages\/platform\/test\//.test(f));
+  assert.deepEqual(named.filter((f) => /artroom-git/.test(text(f))), []);
+});
