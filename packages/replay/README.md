@@ -7,7 +7,8 @@ states its mode, its target, what it covered and what it took on trust.
 The scope and replay contract is the authority, in its sections 9.3 to 9.5.
 Where the contract was silent,
 `notes/2026-10-04-i1-contract-deltas.md` records what was implemented, in
-its section "Replay".
+its section "Replay", and `notes/2026-10-05-i2-contract-deltas.md` in its
+entries DJ10 and DJ14.
 
 This package does not import the scope runtime. A replay derives each entry
 again with the judges and the fold of `@generalbusiness/artroom-derive`,
@@ -19,7 +20,7 @@ The library runs under Node and under Workers.
 | Module | Holds |
 |---|---|
 | `source` | `HistorySource`: what a verifier reads. `page(scope, from, allow)`: a page of a scope's entries, each as its canonical bytes with the hash the source gives for it. `retained(scope, kind, digest, allow)`: one retained input. `allow` is the most the read may take in, and each result says how many raw bytes it read. `httpSource(service, options?)`: a source over a scope service's read routes. `MemorySource`: a source over histories in memory. `hashOfBytes`. `PAGE_REPLY_BYTES`, `RETAINED_REPLY_BYTES`, `PAGE_ENTRIES`, `READ_SECONDS`. |
-| `verify` | `verify(source, options)`: a `Verification`, which is the report and, in words, what was found. `Options`: the mode, the target scope ID, a known head, anchors, limits and bounds. `LIMITS`, `TRUSTS`, `SourceError`. |
+| `verify` | `verify(source, options)`: a `Verification`, which is the report and, in words, what was found. `Options`: the mode, the target scope ID, a known head, anchors, limits, bounds, and `capabilities`: the rules of the capability versions the caller has code for. This package has none of its own. `LIMITS`, `TRUSTS`, `SourceError`. |
 | `report` | `Report`, the contract's type, and `render(report, why?)`: the report in plain English. |
 | `cli` | `main(argv, io)`: the command, with no process state. `src/bin.ts` runs it under Node. |
 
@@ -64,6 +65,15 @@ this mode.
 A checkpoint is checked against the fold. It is never used as a place to
 start.
 
+A detached text is a retained input. The verifier asks for each text that
+an entry's input names and checks it against its digest. A text whose
+bytes are gone is owed. A later entry of the same scope answers for it
+when one of its `redact` effects lists that digest: that entry is the
+tombstone, and the report's `redacted` holds one row for the effect, with
+the tombstone, the item and the slot. The text is not derived again. A
+scope that still owes a text at the end is read on to its head, and a text
+that no tombstone answers for makes the result `incomplete`.
+
 ## Foreign facts
 
 A retained copy of a foreign entry lets a judgment be derived again. It
@@ -101,8 +111,8 @@ service being checked.
 | `consistent` | Everything the mode checks holds, through the head, for the coverage and trusts stated. |
 | `mismatch` | An entry is not what its bytes, its chain, its signature or its replay say; or a reference names another entry, incarnation or kind than its source scope has; or the history does not reach or match the known head. `at` names the entry. |
 | `missing-dependency` | A source history cannot be read, or does not reach the entry a reference names, and no anchor names it. `at` names the entry that used it. |
-| `incomplete` | A retained input is missing or is not the bytes its digest names; or a limit was reached. |
-| `unsupported-definition` | The scope pins a platform definition, or a declaration that does not pass validation under the bounds given. |
+| `incomplete` | A retained input is missing or is not the bytes its digest names; or a detached text is gone and no later entry redacts it; or a limit was reached. |
+| `unsupported-definition` | The scope pins a platform definition, or a declaration that does not pass validation under the bounds given, or a declaration that needs a capability version the caller gave no rules for. `at` names the genesis. |
 
 The check stops at the first finding. The report's coverage lists, for each
 scope, the entries that were checked to their end, with every fact they
@@ -150,7 +160,9 @@ A report lists these under `trusts`, each only when it applies:
 - each diagnosis's attempt log;
 - each outcome's evidence, and that the outside write happened;
 - each anchor, and the definition name retained with an anchored entry;
-- that each scope runs under the bounds the replay was given.
+- that each scope runs under the bounds the replay was given;
+- for each redacted text, that its bytes were the text its digest names
+  and were within the bound of their field.
 
 It also does not derive again whether an entry left room in the scope's
 entry budget.

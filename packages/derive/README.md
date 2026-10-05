@@ -189,3 +189,13 @@ does, and helpers that pass the entries of one scope to another. It is not
 exported from the package's main entry. The export
 `@generalbusiness/artroom-derive/testing` gives it to the tests of the
 packages that build on derive, and to nothing else.
+
+`test/fixtures-f.ts` adds two definitions for the tests of fields and of
+the hold type: `board`, and `works`, which is the fixture lane with the
+acts that end a commitment and a hold. It is not exported.
+
+Each family of forms has one test file, `test/forms-*.test.ts`: operands,
+guards, effects, sends, handlers, fields, the hold type, what travels
+beside an intent, and capability forms. Each shows on a small made-up
+definition what the validator accepts and refuses and what the judges
+derive. The two real lane definitions are validated in the lanes package.
