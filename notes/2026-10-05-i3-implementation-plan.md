@@ -140,6 +140,16 @@ neither.
 | 3 | The ports, re-shaped: authority in two phases, the definitions port with a platform definition and its rules, capability rules given the state and the input. | `c3b72a698`; the whole-scope rule below, `1741cec2b` |
 | 4 | Operations and the ledger of unknown duties. Built on `request/i3-operations`. | `2623fe141` |
 | 3 and 4 | The merge, and its seams closed: the outside port and the owners' rules in `Ports`, the read name `operations`, an operation's closure in the reserve, and a replay that answers `unsupported-definition` at an outcome entry. | `05cc4f098`, `51b2956e0`, `2bd298d4e` |
+| 5 | The grant guard and the commit guards of an observation, as pure functions. | `c4e235045` |
+| 6 | The observation read: the authority port over reads of membership. | `ae3ea555e` |
+| 16a | Preparation: a step of a capability is asked for with a signed intent and sealed as a `preparation` entry. Built on `request/i3-capabilities`. | `7bdd600fa` |
+| 16b | The rules of `hold@1` over its records. Built on `request/i3-capabilities`. | `49c7b01b9` |
+| 16c | The ancestry walk and the guard `ancestry` of `git-read@1`. Built on `request/i3-capabilities`. | `8192dcc6b`; the deltas, `e74791378` |
+| 17 | The Git package, part one: the reader. The parked log package is removed. | `346ff97d0`, `8b4f541b1` |
+| 21 | The Git package, part two: the commands, the push outcome and the gateway. The parked publisher is removed, but its log push. | `7f51a6646`, `b70702730`; fixtures, `7b17d5bb1` |
+| 5, 6, 17 and 21 | Their merge. | `10f9afc13` |
+| 16a to 16c, with the above | Their merge, and the seams that needed no owner's decision: a preparation is judged by the grant guard on the observation read; a preparation entry has its kind; the judges derive a hold's workspace records and decide a bound license request when they are given the code; `prepare` is in `ScopeApi`. | `6681ce18e`, `2962403ff`, `f29ecfb84`, `8aa8b55b7`, `95ba2f5ac`, `4e5ce053e`, `ac68e5017` |
+| 16 | **Waiting.** The production capabilities port is null, and the scripted capability stays. Entries EH6 to EH11 of the deltas note list what an owner must decide first, and EH12 what the step then builds. | `64f06de26`, the list |
 
 Finding E10, recorded in `notes/2026-10-05-i3-contract-deltas.md`: the
 inbox needs one platform rule, P22, for a notice's `source`. The note
@@ -153,9 +163,24 @@ each in full.
 
 - **The texts.** The contract's revision 14 at `fa6417e6` and the
   authority note's revision 18 at `99bc48e8` are adopted since this plan
-  was written. Where this plan calls either "not adopted", read it as
-  adopted. The rows that waited on them (P19, P21, Q2 to Q4) are not
+  was written. Where this plan calls either "not adopted", "filed" or
+  "under review", read it as adopted: in the opening corrections, in
+  sections 1 and 2, in the rows P19 and P21 and their summary in section
+  4, in section 6.4, in step 29 and step 30, and in the questions Q2 to
+  Q4 and the risks of section 9. The rows that waited on them are not
   reworked here.
+- **Step 16 waits, and steps 16a to 16c did not.** The rules of the two
+  capabilities are built and tested as pure functions, and the judges use
+  them when a test gives them the code. Wiring them into the production
+  ports needs six decisions of owners first. In short: how a step reads
+  its request from an intent, and where a `report` names its hold (EH6);
+  which pin `pin-release` with `commit` alone names (EH7); how the guard
+  `ancestry` finds a selected input, and where reachability is judged
+  (EH8); from which bytes a check entry has its kind (EH9, the scope
+  contract's); the bound on the tokens of one hold (EH10, the proof
+  plan's); and which entries make a staging's tokens, a root `retiring`
+  and a fork `deleting` (EH11). None is a fault of a lane row, and no
+  lane data is changed. W1 of the table above stays owed until then.
 - **Step 3's witness is changed** (entry EC4). The contract's section 6.1
   is a rule of the whole scope for a platform definition too. The
   production wiring founds no scope under `platform:inbox@1` until step 11
