@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import { textDigest } from "@generalbusiness/artroom-bytes";
-import { PROFILES, validateDefinition, type ActJudgment, type PlatformRule } from "../src/index.ts";
+import { PROFILES, validateDefinition, type ActJudgment, type PlatformRule, type RuleGiven } from "../src/index.ts";
 import { Scope, keys, small, type Actor } from "./fixtures.ts";
 import { gate, gateRules, gateWith } from "./fixtures-marks.ts";
 
@@ -132,7 +132,7 @@ describe("a rule is run at the check of its mark's place (sections 4.2 and 6.1)"
       .toEqual([["unavailable", "authority-unavailable", null, null], ["refused", "unauthorized", "no-ticket", "the rule by-ticket does not pass this key"]]);
   });
 
-  test("a fault of a rule leaves the act not judged, and nothing is written: an effect outside the eight forms, an effect that conflicts with a written one, a refusal that is not stated, a rule that throws, and a mark with no rule", () => {
+  test("a fault of a rule leaves the act not judged, and nothing is written: an effect outside the eight forms, an effect that conflicts with a written one, an effect on a fixed slot of an item that the entry does not open, a refusal that is not stated, a rule that throws, and a mark with no rule", () => {
     const s = gated();
     const effect = (run: () => unknown): PlatformRule => ({ place: "effect", most: 2, run: run as never });
     const faults: Record<string, Partial<Record<string, PlatformRule>>> = {
@@ -141,6 +141,8 @@ describe("a rule is run at the check of its mark's place (sections 4.2 and 6.1)"
       redact: { "key-id": effect(() => [{ effect: "redact", item: 2, slot: "key", texts: [] }]) },
       // The written effect sets the ticket's state, so a second `state` effect on it conflicts.
       conflict: { "key-id": effect(() => [{ effect: "state", item: 2, state: "used" }]) },
+      // Section 6.3: the ticket's hash is fixed, and ticket 2 existed before the entry. Another digest is a value of the slot's type.
+      "a fixed slot of an item that existed before the entry": { "key-id": effect(() => [{ effect: "value", item: 2, slot: "hash", value: textDigest("other") }]) },
       "more than it states": { "key-id": { place: "effect", most: 0, run: () => [{ effect: "value", item: 2, slot: "key", value: "k" }] } },
       "a refusal that is not stated": { fresh: { place: "guard", refusals: ["seated"], run: () => ({ holds: false, name: "tired" }) } },
       throws: { find: { place: "also", run: () => { throw new Error("no"); } } },
@@ -153,5 +155,10 @@ describe("a rule is run at the check of its mark's place (sections 4.2 and 6.1)"
     expect([s.entries.length, said(enter(s, una, "one"))]).toEqual([4, ["write", null, null, null]]);
     // A check on effects refuses, as for a written effect: a value outside its slot's type is `bad-field`, and is no fault.
     expect(said(enter(s, vic, "two", gateRules({ "key-id": effect(() => [{ effect: "value", item: 3, slot: "key", value: 7 }]) })))).toEqual(["refused", "bad-field", null, "effects.2: the rule key-id gives key a value outside the slot's type"]);
+    // The same fixed slot, of a ticket that the rule opens in the same entry, is set: that entry is the opening of its item.
+    const opened = ({ resolved }: RuleGiven) => [{ effect: "open", item: resolved.self, type: "ticket", state: "open" }, { effect: "value", item: resolved.self, slot: "hash", value: textDigest("three") }];
+    expect([said(enter(s, vic, "two", gateRules({ "key-id": effect(opened as never) }))), s.last.effects]).toEqual([["write", null, null, null], [
+      { effect: "state", item: 3, state: "used" }, { effect: "open", item: 5, type: "ticket", state: "open" }, { effect: "value", item: 5, slot: "hash", value: textDigest("three") },
+    ]]);
   });
 });

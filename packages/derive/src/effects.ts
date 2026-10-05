@@ -157,8 +157,9 @@ export function deriveEffects(j: Judging, forms: readonly EffectForm[], attentio
   /**
    * The effects of one rule, at its mark's position (section 6.1, place 5).
    * Each is a member of the allowed list, in the contract's form, on a local
-   * item, in a slot and a state that its type declares. Anything else is a
-   * fault of the rule. The checks on effects are the ones that a written
+   * item, in a slot and a state that its type declares, and on a fixed slot
+   * only of the item that the entry opens. Anything else is a fault of the
+   * rule. The checks on effects are the ones that a written
    * effect meets, and refuse as they do: `final`, `bad-field` for a value
    * outside its slot's type, and `slot-full`.
    */
@@ -198,6 +199,11 @@ export function deriveEffects(j: Judging, forms: readonly EffectForm[], attentio
       const item = subject !== undefined ? working.get(subject)! : (others.get(effect.item) ?? j.view.item(effect.item));
       if (!item) throw outside(mark, `an effect on item ${effect.item}, which does not exist`);
       const type = own(items, item.type)!;
+      // Section 6.3: only an effect of the entry that opens an item sets one of its fixed slots, or empties one. The validator
+      // refuses a written effect that could do otherwise, so no input makes one: from a rule it is a fault, and no refusal. An
+      // item's ID is the `seq` of the entry that opened it, so the item that this entry opens is the one whose ID is `self`.
+      const declared = effect.effect === "state" ? undefined : effect.effect === "ref" ? own(type.refs, effect.slot) : effect.effect === "value" ? own(type.values, effect.slot) : own(type.parties, effect.slot);
+      if (declared?.fixed && item.id !== j.self) throw outside(mark, `an effect on a fixed slot of item ${item.id}, which its entry does not open`);
       // Section 6.6: no effect changes an item that was final before the entry.
       const was = subject !== undefined ? j.subjects.get(subject) : effect.item === j.self ? undefined : j.view.item(effect.item);
       if (was && own(type.states, was.state)?.final) return refuse("final", `effects.${at}: item ${item.id} is ${was.state}`);
