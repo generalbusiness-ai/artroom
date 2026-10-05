@@ -13,7 +13,9 @@
  *   began, from 1, also those that got no answer.
  * - **Never kept across a restart.** Everything here is in memory. Nothing
  *   is stored, so after a restart the scope holds no observation and reads
- *   again.
+ *   again. The order of heads holds across runs all the same: the folded
+ *   state holds the highest head that an entry retained for each subject,
+ *   and the commit refuses a read from a lower head.
  * - **At most one for each key.** An observation is kept for reuse by a
  *   later act of the same key, inside its window: the one from the highest
  *   head of membership. The observation of a ten-second kind serves the one
@@ -32,7 +34,7 @@
 
 import type { Digest, Entry, KeyId, Observation, ObservationRequest, ObservationUse, RunId, ScopeRef } from "@generalbusiness/artroom-contract";
 import { hex } from "@generalbusiness/artroom-bytes";
-import { judgeGrant, observationOf, prefer, revoked, same, type Clock as Reading, type GrantJudgment, type Retains } from "@generalbusiness/artroom-derive";
+import { highestHead, judgeGrant, observationOf, prefer, revoked, same, type Clock as Reading, type GrantJudgment, type Retains, type StateView } from "@generalbusiness/artroom-derive";
 import type { Asked, Authority, Clock, Random, Standing } from "./ports.ts";
 
 /**
@@ -85,8 +87,13 @@ export function observing(config: Observing): Authority {
       const of = action === null || window === null ? null : config.membership(scope);
       if (action === null || window === null || !of) return null;
       const key = asked.signed.intent.actor;
-      const judge = (read: Read, clock: Reading): GrantJudgment =>
-        judgeGrant(useOf(read), { scope, membership: of, key, action, window, clock, last: read.last, highest: retained.get(key) ?? null });
+      /**
+       * In the commit the order of heads is judged against the folded state, which holds the highest head of each subject over
+       * every run (section 16.1, "The fold holds the highest head"). Before the turn there is no state at hand: the heads that
+       * this run's entries retain are enough to decide whether to read again, and the commit decides.
+       */
+      const judge = (read: Read, clock: Reading, view?: StateView): GrantJudgment =>
+        judgeGrant(useOf(read), { scope, membership: of, key, action, window, clock, last: read.last, highest: view ? highestHead(view, read.observation) : (retained.get(key) ?? null) });
       /** An observation that failed a guard is not used again: the next act of the key reads again. A revoked answer fails none. */
       const discard = (read: Read): void => { if (kept.get(key) === read) kept.delete(key); };
 
@@ -119,7 +126,7 @@ export function observing(config: Observing): Authority {
       let spent = false;
       return {
         membership: of,
-        held(_view, clock) {
+        held(view, clock) {
           offered = null;
           if (spent) return null;
           // A revocation that any read of this run has seen takes effect at once: it is judged in place of an answer that shows the key
@@ -128,7 +135,7 @@ export function observing(config: Observing): Authority {
           // removed stops every key of that member for the run. Revision 18 states it of one key, and that is what is kept here.
           const seen = kept.get(key);
           const judged = seen && revoked(seen.observation) ? seen : read;
-          const result = judge(judged, clock);
+          const result = judge(judged, clock, view);
           if (result.result === "unauthorized") return [];
           // A clock that is behind judged no age: the act is answered `clock-behind`, and its observation is read again before a retry.
           if (result.result === "authority-unavailable" || clock.behind) discard(judged);

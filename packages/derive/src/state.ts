@@ -117,6 +117,18 @@ export interface RecordState {
   values: Readonly<Record<string, unknown>>; seq: number;
 }
 
+/**
+ * The highest head that the entries of this scope retain for one subject of
+ * an observation (section 16.1, "The fold holds the highest head"): the
+ * observed scope, with its incarnation; the subject, which is a key, a
+ * member, or `rules`; and the highest position `head.seq` that an entry
+ * retained for it. An observation of a key counts under its key and under
+ * its member. It is derived from the entries alone, as the index of
+ * accepted keys is. The commit judges the order of heads against it, so a
+ * lower head is refused in every run, also after a restart.
+ */
+export interface ObservedHead { of: Pick<ScopeRef, "scope" | "inc">; subject: string; seq: number }
+
 /** Which records of one kind a read asks for: those in one of `states`, and those whose value `member` equals `value`. Absent: every one. */
 export interface RecordsWhere { states?: readonly string[]; member?: string; value?: unknown }
 
@@ -148,6 +160,13 @@ export interface StateSnapshot {
   prepared?: readonly PreparedStep[];
   /** The capability records, by capability, kind and the canonical bytes of the key (section 6.11). Absent: the scope has none. */
   records?: readonly RecordState[];
+  /**
+   * The highest head for each subject of a retained observation, by observed
+   * scope, incarnation and subject (section 16.1). Absent: no entry of the
+   * scope retains an observation. A state with none has no member, so its
+   * digest is the one it had before the fold held this.
+   */
+  observed?: readonly ObservedHead[];
 }
 
 /** The digest a checkpoint entry carries: SHA-256 of the snapshot's canonical JSON. */
@@ -207,6 +226,8 @@ export interface StateView {
   records(capability: CapabilityName, kind: string, where?: RecordsWhere): readonly RecordState[];
   /** The exact number of records of that kind: in that state, or in any state when none is named. A key is never reused, so the second is the capability's counter. */
   recordCount(capability: CapabilityName, kind: string, state?: string): number;
+  /** The highest head that an entry of this scope retains for that subject of that observed scope, with that incarnation (section 16.1). Null: no entry retains an observation of it. */
+  observed(of: Pick<ScopeRef, "scope" | "inc">, subject: string): number | null;
   /** How many duties are open, for the room they need to settle (section 9.2); see `Outstanding`. */
   outstanding(): Outstanding;
   /** Everything, for a checkpoint. This is the one read that is not bounded. */
@@ -228,6 +249,8 @@ export interface StateWriter extends StateView {
   putTexts(item: number, slot: string, texts: readonly Digest[]): void;
   putPrepared(prepared: PreparedStep): void;
   putRecord(record: RecordState): void;
+  /** The highest head of one subject. The fold calls it only with a head that is higher than the one held. */
+  putObserved(head: ObservedHead): void;
 }
 
 type Key = readonly (string | number)[];
@@ -274,6 +297,7 @@ export class MemoryState implements StateWriter {
   readonly #texts = new Map<string, readonly [number, string, readonly Digest[]]>();
   readonly #prepared = new Map<string, PreparedStep>();
   readonly #records = new Map<string, RecordState>();
+  readonly #observed = new Map<string, ObservedHead>();
 
   scope() { return this.#scope; }
   item(id: number) { return this.#items.get(id) ?? null; }
@@ -310,6 +334,7 @@ export class MemoryState implements StateWriter {
   }
   recordCount(capability: CapabilityName, kind: string, state?: string) { return this.records(capability, kind, state === undefined ? {} : { states: [state] }).length; }
   #kept() { return [...this.#records.values()].sort((a, b) => keyOrder([a.capability, a.kind, canonicalize(a.key)], [b.capability, b.kind, canonicalize(b.key)])); }
+  observed(of: Pick<ScopeRef, "scope" | "inc">, subject: string) { return this.#observed.get(key(of.scope, of.inc, subject))?.seq ?? null; }
   outstanding(): Outstanding {
     const open = [...this.#requests.values()].filter((r) => r.result === null);
     const operations = [...this.#operations.values()];
@@ -355,6 +380,7 @@ export class MemoryState implements StateWriter {
   }
   putPrepared(p: PreparedStep) { this.#prepared.set(key(p.intent, p.capability, p.step), p); }
   putRecord(r: RecordState) { this.#records.set(key(r.capability, r.kind, canonicalize(r.key)), r); }
+  putObserved(h: ObservedHead) { this.#observed.set(key(h.of.scope, h.of.inc, h.subject), { of: { scope: h.of.scope, inc: h.of.inc }, subject: h.subject, seq: h.seq }); }
 
   all(): StateSnapshot {
     const sorted = <T>(values: Iterable<T>, of: (value: T) => Key) => [...values].sort((a, b) => keyOrder(of(a), of(b)));
@@ -372,6 +398,7 @@ export class MemoryState implements StateWriter {
       // A member that would be empty is left out, so a state that holds none has the digest it had before these members existed.
       ...(this.#prepared.size === 0 ? {} : { prepared: this.#steps() }),
       ...(this.#records.size === 0 ? {} : { records: this.#kept() }),
+      ...(this.#observed.size === 0 ? {} : { observed: sorted(this.#observed.values(), (h) => [h.of.scope, h.of.inc, h.subject]) }),
     };
   }
   /** The snapshot as one canonical text, to compare two states. */

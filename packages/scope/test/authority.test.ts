@@ -111,6 +111,35 @@ describe("the observation read, with a scripted membership, a stand-in (authorit
     expect([again, again!.read.run === run]).toMatchObject([{ observation: { at: at(307) }, read: { n: 2 }, use: "fresh", prior: null }, false]);
   });
 
+  test("the order of heads holds across a restart: the folded state holds the highest head that an entry retained for a key and for its member, and a read that is answered from a lower head is discarded in the commit, in a new run too", async () => {
+    const s = await found();
+    const m = scripted(s);
+    // Entry 1 retains rita's key at head 44 of membership. The fold keeps that head for the key and for its member.
+    m.head = 44;
+    await s.did(rita, "remark", remark("at 44"));
+    const kept = () => s.inside((state) => state.storage.sql.exec("SELECT value FROM folded WHERE kind = 'observed' ORDER BY key").toArray().map((row) => JSON.parse(row["value"] as string) as { subject: string; seq: number }).map(({ subject, seq }) => [subject, seq] as const));
+    expect(new Map(await kept())).toEqual(new Map<string, number>([["@rita", 44], [rita.key, 44]]));
+
+    // A restart: the new run holds no observation and no memory of the head. The scripted membership, a stand-in, now answers from
+    // head 40, as a read that an older replica served would. The commit finds the lower head in the folded state: the observation
+    // is discarded, the act is not judged, and nothing is written on head 40 (the contract's witness 18.40, case 5).
+    await s.restart();
+    s.c.clock.now = at(1);
+    m.head = 40;
+    const lower = s.intent(rita, "remark", remark("at 40"));
+    expect([await s.submit(lower), (await s.head()).seq, m.reads]).toEqual([UNAVAILABLE, 1, 2]);
+    // An observation of a key is also of its member. Another key of rita's member, read at head 40, is discarded as well.
+    m.over[una.key] = { member: "@rita" };
+    expect([await s.submit(s.intent(una, "remark", remark("another key of that member"))), (await s.head()).seq]).toEqual([UNAVAILABLE, 1]);
+    // A read from the head that was retained, or from a later one, is judged: heads do not go back, and they need not move.
+    m.head = 44;
+    expect(await s.submit(lower)).toMatchObject({ answer: "accepted", receipt: { fact: { seq: 2 } } });
+    m.head = 45;
+    s.c.clock.now = at(2);
+    await s.did(una, "remark", remark("at 45"));
+    expect(new Map(await kept())).toEqual(new Map<string, number>([["@rita", 45], [rita.key, 44], [una.key, 45]]));
+  });
+
   test("a revocation that one read has seen takes effect at once: the held observation that shows the key active is discarded, and the revoked answer stays for the run, whatever its window", async () => {
     const s = await found();
     const m = scripted(s);

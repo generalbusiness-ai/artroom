@@ -20,6 +20,7 @@
 
 import type { Grant, Head, KeyId, Observation, ObservationAnswer, ObservationUse, ScopeFilter, ScopeKind, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
 import { isHead, isKeyId, isMemberId, isPlatformDefinition, isRecord, platformName } from "@generalbusiness/artroom-bytes";
+import type { StateView } from "./state.ts";
 import { timeMs, type Clock } from "./time.ts";
 import type { ValidDefinition } from "./validate/index.ts";
 import { isScopeRef, own, same } from "./values.ts";
@@ -144,6 +145,18 @@ export function agrees(grant: Grant): boolean {
   }
 }
 
+/**
+ * The highest head that the entries of the scope retain for the subjects of
+ * that observation, from the folded state (section 16.1, "The fold holds
+ * the highest head"): for its key and for its member. Null: no entry
+ * retains an observation of either. It is `GrantAsked.highest` in a commit,
+ * so a lower head is discarded in every run, also after a restart.
+ */
+export function highestHead(view: Pick<StateView, "observed">, observation: Observation): number | null {
+  const held = [view.observed(observation.of, observation.key), view.observed(observation.of, observation.member)].filter((seq) => seq !== null);
+  return held.length === 0 ? null : Math.max(...held);
+}
+
 /** An earlier entry of the scope that retains a read: the entry, its time, and the observation as it retains it. */
 export interface Retains { entry: Head; time: Timestamp; observation: Observation }
 
@@ -162,7 +175,10 @@ export interface GrantAsked {
   clock: Clock;
   /** The latest earlier entry of this scope that retains this read, in a grant or in `observed`. Null: none does. */
   last: Retains | null;
-  /** The highest position `head.seq` of the observations of this key, of the same membership scope, that the earlier entries of this scope retain. Null: none retains one. */
+  /**
+   * The highest position `head.seq` of the observations of this key and of its member, of the same membership scope, that the
+   * earlier entries of this scope retain: `highestHead`, over the folded state. Null: none retains one.
+   */
   highest: number | null;
 }
 

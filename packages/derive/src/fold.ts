@@ -14,8 +14,8 @@ import { intentDigest, seedDigest } from "@generalbusiness/artroom-bytes";
 import { UNDER, historyOf, withActing, withMembers, withPrincipal, type Signer } from "./attribution.ts";
 import { HOLDER, changeHold } from "./hold.ts";
 import { attemptedBy, openedBy, operationId } from "./ledger.ts";
-import type { Item, Party, StateWriter, Status } from "./state.ts";
-import { own, same } from "./values.ts";
+import type { Item, ObservedHead, Party, StateWriter, Status } from "./state.ts";
+import { isLocalId, isObject, isScopeRef, own, same } from "./values.ts";
 import type { ValidDefinition } from "./validate/index.ts";
 
 /** An entry that this state cannot take: out of sequence, or with an effect on nothing. */
@@ -80,6 +80,20 @@ function changeSlots(item: Item, effect: ItemEffect, definition: ValidDefinition
     case "value": return { ...item, values: { ...item.values, [effect.slot]: effect.value } };
     case "hold": return changeHold(item, effect, definition, signer);
   }
+}
+
+/**
+ * The heads that one retained observation states, by subject (section 16.1,
+ * "How one observation follows another", rule 3, and "A key's observation
+ * is also of its member"): an observation of a key counts under its key and
+ * under its member, of its observed scope. None: the value is no
+ * observation of a key, as a grant with no proof has.
+ */
+export function headsOf(proof: unknown): ObservedHead[] {
+  const o = isObject(proof) ? proof["observation"] : null;
+  if (!isObject(o) || !isScopeRef(o["of"]) || !isObject(o["head"]) || !isLocalId(o["head"]["seq"])) return [];
+  const [of, seq] = [{ scope: o["of"].scope, inc: o["of"].inc }, o["head"]["seq"]];
+  return [o["key"], o["member"]].flatMap((subject) => (typeof subject === "string" ? [{ of, subject, seq }] : []));
 }
 
 export function applyEntry(writer: StateWriter, definition: ValidDefinition, entry: Entry, hash: Digest): void {
@@ -218,6 +232,15 @@ export function applyEntry(writer: StateWriter, definition: ValidDefinition, ent
     if (!request) throw new FoldError(`entry ${entry.seq} diagnoses a request this scope did not send`);
     writer.putRequest({ ...request, diagnosis: { seq: entry.seq, finding: input.finding } });
   }
+  // Section 16.1, "The fold holds the highest head": for each subject of an observation that this entry retains, the highest
+  // `head.seq` that an entry of the scope retained for it. An act and a preparation retain one in the grant that was judged.
+  if (input.type === "act" || input.type === "preparation") {
+    for (const head of headsOf(input.authority[0]?.fresh)) {
+      const held = writer.observed(head.of, head.subject);
+      if (held === null || head.seq > held) writer.putObserved(head);
+    }
+  }
+
   // Section 4.3, item 5: an outcome entry records the result of its own attempt, once, and no other entry records a result.
   if (outcomes !== (input.type === "outcome" ? 1 : 0)) throw new FoldError(`entry ${entry.seq} records ${outcomes} results of attempts`);
 

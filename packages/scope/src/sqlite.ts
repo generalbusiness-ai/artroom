@@ -16,7 +16,7 @@
 import type { CapabilityName, Digest, Entry, FactRef, FieldValue, KeyId, OperationId, ScopeKind, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
 import { canonicalize } from "@generalbusiness/artroom-bytes";
 import { MemoryState, operationId, operationStanding, pendingOf, slotOf, timeMs } from "@generalbusiness/artroom-derive";
-import type { Accepted, Decided, HeldCreation, Item, Operation, Outstanding, OwnRequest, Page, PreparedStep, RangeIndex, RecordState, RecordsWhere, Relation, ScopeState, StateSnapshot } from "@generalbusiness/artroom-derive";
+import type { Accepted, Decided, HeldCreation, Item, ObservedHead, Operation, Outstanding, OwnRequest, Page, PreparedStep, RangeIndex, RecordState, RecordsWhere, Relation, ScopeState, StateSnapshot } from "@generalbusiness/artroom-derive";
 import type { Dispatched, Duty, OperationStatus, Outgoing, Retained, Sending, Store, Stored } from "./store.ts";
 
 export type SqlValue = string | number | null | ArrayBuffer;
@@ -44,7 +44,7 @@ export interface Sql {
  * - `inbox`: each incoming delivery this scope recorded, by source scope,
  *   incarnation, entry and ordinal.
  * - `folded`: folded records that are not items: relationship copies, held
- *   creations, and for each slot that holds a detached text the digests it
+ *   creations, the highest head of each observed subject, and for each slot that holds a detached text the digests it
  *   has held.
  * - `operation`: the outside operations, folded, by the entry that opened
  *   each and its ordinal there (section 4.3). `opened`, `unknown` and
@@ -168,6 +168,7 @@ export class SqliteStore implements Store {
     const [seq, k] = partsOf(id);
     return orNull<Operation>(this.#one("SELECT value FROM operation WHERE seq = ? AND k = ?", seq, k)?.["value"]);
   }
+  observed(of: Pick<ScopeRef, "scope" | "inc">, subject: string): number | null { return this.#folded<ObservedHead>("observed", canonicalize([of.scope, of.inc, subject]))?.seq ?? null; }
   texts(item: number, slot: string): readonly Digest[] { return this.#folded<[number, string, Digest[]]>("texts", canonicalize([item, slot]))?.[2] ?? []; }
   prepared(intent: Digest, capability: CapabilityName, step: string): PreparedStep | null {
     const row = this.#one("SELECT seq FROM prepared WHERE intent = ? AND capability = ? AND step = ?", intent, capability, step);
@@ -222,6 +223,7 @@ export class SqliteStore implements Store {
     for (const row of this.#all("SELECT kind, key, value FROM folded")) {
       if (row["kind"] === "relation") memory.putRelation(json(row["value"]));
       else if (row["kind"] === "creation") memory.putCreation(row["key"] as Digest, json(row["value"]));
+      else if (row["kind"] === "observed") memory.putObserved(json(row["value"]));
       else memory.putTexts(...json<[number, string, Digest[]]>(row["value"]));
     }
     for (const row of this.#all("SELECT value FROM operation ORDER BY seq, k")) memory.putOperation(json(row["value"]));
@@ -270,6 +272,7 @@ export class SqliteStore implements Store {
     this.#run("INSERT INTO inbox (scope, inc, seq, n, hash, by) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (scope, inc, seq, n) DO UPDATE SET hash = excluded.hash, by = excluded.by", from.at.scope, from.at.inc, from.seq, n, from.hash, by);
   }
   putCreation(seed: Digest, held: HeldCreation): void { this.#fold("creation", seed, held); }
+  putObserved(head: ObservedHead): void { this.#fold("observed", canonicalize([head.of.scope, head.of.inc, head.subject]), { of: { scope: head.of.scope, inc: head.of.inc }, subject: head.subject, seq: head.seq }); }
   putOperation(operation: Operation): void {
     const [seq, k] = partsOf(operation.id);
     const { opened, unknown, unopened } = pendingOf(operation);

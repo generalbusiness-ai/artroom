@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import type { Observation, ObservationUse } from "@generalbusiness/artroom-contract";
-import { MISMATCHES, WINDOWS, actionsOf, agrees, covers, judgeGrant, observationOf, prefer, windowOf, type GrantAsked, type GrantJudgment, type RoleTable } from "../src/index.ts";
+import { MISMATCHES, MemoryState, WINDOWS, actionsOf, agrees, covers, headsOf, highestHead, judgeGrant, observationOf, prefer, windowOf, type GrantAsked, type GrantJudgment, type RoleTable } from "../src/index.ts";
 import { d, keys, laneDefinition, membership, otherLane, t } from "./fixtures.ts";
 
 const { rita, una } = keys;
@@ -90,6 +90,13 @@ describe("the grant guard and the commit guards of an observation (authority not
     // Section 16.1: in an answer `within` is a filter whose `membership` equals `of`. A scope reference, another membership scope
     // and a filter with a member added are each no answer. The answer names no asker: one answer serves every scope of the repository.
     expect([otherLane, { membership: elsewhere }, { membership, task: 4 }].map((within) => observationOf({ ...answer, within }, began))).toEqual([null, null, null]);
+    // Section 16.1, "The fold holds the highest head": a retained observation of a key counts under its key and under its member,
+    // of its observed scope. Another key of that member meets the same head, and a key of another member meets none. A grant with
+    // no proof retains nothing, and a state that holds no head has no member for them.
+    const state = new MemoryState();
+    for (const head of headsOf(fresh)) state.putObserved(head);
+    expect([highestHead(state, standing), highestHead(state, { ...standing, key: una.key }), highestHead(state, { ...standing, key: una.key, member: "@una" }), highestHead(state, { ...standing, of: reborn })]).toEqual([40, 40, null, null]);
+    expect([Object.keys(state.all()).at(-1), "observed" in new MemoryState().all(), headsOf(null)]).toEqual(["observed", false, []]);
     // A scope with no recorded membership reference is covered by no filter, and by its own reference.
     expect([covers({ membership }, otherLane, null), covers(otherLane, otherLane, null), covers({ membership }, otherLane, membership), covers({ membership }, membership, membership)]).toEqual([false, true, true, true]);
   });

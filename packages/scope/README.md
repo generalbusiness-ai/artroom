@@ -126,6 +126,11 @@ run. What it reads is kept in memory only, so a restart leaves none.
   that fails discards it: the act is answered `authority-unavailable`, and
   the next read is made again. A standing that does not hold the action is
   refused `unauthorized`.
+- Heads do not go back, also across a restart. The folded state holds,
+  for each key and each member that an entry retained an observation of,
+  the highest head of membership. The commit discards a read that was
+  answered from a lower head. A state that holds none has no member for
+  them, so its digest is unchanged.
 - A grant's `within` is a scope reference or a filter, `{ membership }`. A
   filter covers a scope when it names the membership scope that the scope
   itself records, with that incarnation. The read asks `{ of, key }`, and
