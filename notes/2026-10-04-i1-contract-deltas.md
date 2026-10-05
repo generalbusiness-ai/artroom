@@ -24,6 +24,9 @@ rule evaluator. Section 17, "Composition and transport", has entries 96 to
 136, both from step 5.
 Section 21 is three corrections after the static report `a8a34b4d`,
 entries 137 to 139.
+Section 22 is two capacity seams closed ahead of the contract's decision
+(event `cc570904`), entries 140 to 142; section 15's table and limits are
+corrected in place.
 
 Each entry is a place where the contract was silent or needed a concrete
 form, what was implemented, and why. Nothing here is adopted by being
@@ -307,10 +310,11 @@ nothing that transport keeps outside the history.
 | A request this scope sent, with no result and no `undelivered` diagnosis | Two before any diagnosis: a `delivery-unavailable` diagnosis may be followed by a late result. One after that diagnosis. |
 | A provisional scope | One: the confirmation. |
 | An opened attempt of an outside operation | Two before any outcome: `unknown` may be followed by the same attempt's outcome. One after `unknown`. |
-| A checkpoint | One, always. A checkpoint is written only into that entry. |
+| A checkpoint | One, always. Corrected by entry 140: a checkpoint is written into free room, and this entry is used only by the scope's last entry. |
 
 Entries that are checked, because they admit duties or are new work: a
-genesis, an act, a delivery of a request and a delivery of an advisory.
+genesis, an act, a delivery of a request, a delivery of an advisory and,
+since entry 140, a checkpoint.
 Entries that are not checked, because their duty was counted when it was
 admitted: a timed entry, a delivery of a result or of a control, a
 diagnosis and an outcome. Those are refused only at `scopeEntries` itself,
@@ -337,9 +341,10 @@ What the count does not cover. The code guarantees nothing for these:
 - **A second result.** A `conflict`, the answer of a second incarnation to
   a creation, is an entry that no count foresaw.
 - **Chains of timed rules.** A timed rule that moves its item into the
-  states of another timed rule is counted once for each rule, not once for
-  each time a rule could apply. A definition whose timed rules form a cycle
-  is not bounded by this count, or by anything else in this step.
+  states of another timed rule is counted once for each rule. Since entry
+  142 the validator refuses timed rules of one type that lead back to one
+  another, so no rule applies twice without an act between and the count
+  holds.
 - **Cost.** The count reads one number for each state of each timed type,
   one aggregate over the requests with no result, and the operations, which
   no form opens yet. Requests diagnosed `undelivered` stay among the rows
@@ -503,4 +508,22 @@ repository; export of sealed segments; replay of a platform definition.
 | 137 | The size of a timed entry that copies a party list (section 15, "A timed entry always fits"). The estimate read every party slot as one member. A timed rule may copy a party list into a reference slot of a matching list type, and the entry then holds every member of the list. | The estimate reads each slot with the type the validator gave it: a party list is a list of members with its declared `max`, or `listElements` when it declares none. A copy of it, and a notice to it, are counted at every member it can hold. | A definition passed whose due transition could become an entry over `entryBytes`, which the turn can never write. Witness, in derive's validator test: the fixture lane with a list of four watchers that the hold's end copies. At `entryBytes` 6,000 it is refused `bound`; before, it passed there. Under the proposed bounds it passes, and its real entry, with the list full of the longest handles, is over 6,000 bytes and within the bound the validator states. |
 | 138 | The size of a request body (entry 111). The route read the whole body as text and compared its length in UTF-16 units with the limit. | The budget is 1 MiB of raw bytes, counted while the body is read. A body that declares more in `Content-Length` is not read. One that sends more is cancelled at the chunk that passes the budget. Bytes that are not UTF-8 are no JSON. Each is answered 400 `bad-request`, as before, and no operation is called. | A body of three-byte characters passed at nearly three times the limit, and any oversized body was held whole before it was refused. Witness, in the route test: a founding padded with 400,000 three-byte characters is 400, and is accepted without the padding; a body with no end is cancelled after 1 MiB and one chunk. |
 | 139 | A path that is not percent-encoded UTF-8, such as `/v1/scopes/%`. Decoding it threw before any response. | 400 `bad-request`, before any operation. | A request must get a stable answer. Witness: the same route test. |
+
+## 22. Two capacity seams, implemented ahead of the contract's decision
+
+Event `cc570904` names two places where the count of section 15 did not
+keep its own promise. Both are closed here in source. Neither is adopted:
+the contract's owner decides the checkpoint policy and whether these
+refusals stay. Each entry says what a different decision would change.
+
+| # | Where the contract is silent | Implemented, ahead of the decision | Why |
+|---|---|---|---|
+| 140 | **For review.** The checkpoint that is counted (section 9.2). `owed` always counted one checkpoint, and `fits` took one off for every checkpoint written. So a checkpoint written while duties were open used the entry kept for a checkpoint, the count went on saying one was kept, and after the duties settled there could be no entry for a closing checkpoint: with six entries, a founding, a hold, a checkpoint and the hold's end leave none. | One policy. One entry is kept for a checkpoint at all times. A checkpoint is new work, asked like an act: it is written when the entries written and owed, the kept one among them, fit the budget, and the kept entry stays kept. The kept entry is used once, by the scope's last entry: a checkpoint that fills the budget when nothing else is owed. Any other checkpoint that does not fit is answered `unavailable` and nothing is written. | No checkpoint takes the room of a duty, and a scope whose duties have settled can always write its closing checkpoint. Witness, in the scope's turn test with 12 entries: a checkpoint asked while two ends are owed and no room is free is `unavailable`; after both ends the closing checkpoint is entry 11; a second is `unavailable`. With 3 entries: two checkpoints, the second the last entry. A decision that the kept entry may be spent earlier would bring back the first formula. |
+| 141 | **For review.** A duty started by an entry that is not asked. The count gives a live item of a timed type one entry for each timed rule, and is asked only of entries that admit duties. A result clause could move an item back into a state a timed rule names: after a `delivery-unavailable` diagnosis and a late result, the rule applied again in an entry nothing had counted. | The validator refuses the definition, as `clause-timed`: no state effect of a result clause, in any of `applied`, `refused`, `superseded`, `undelivered` and `conflict`, may set a state that a timed rule on that item's type names in its `states`. A clause has effects only, so it starts no send. A clause may still set a deadline slot, set other slots, and move its item to any other state. | Chosen over counting the follow-on entries with each open request, because it can be made exact: what a clause can start is read from the definition alone. Counting would need, for each open request, the clause its result will run, and a `conflict` clause may run any number of times. Witness: three validator rows on the fixture ticket and desk, one each for `applied`, `undelivered` and `conflict`, and a control row that passes. What is lost: a definition in which a result starts a timer on the same item; it can do so with an act, or on a handler's side. |
+| 142 | The same seam, from a timed entry. Section 15 disclosed that timed rules forming a cycle are not bounded. | The validator refuses them, as `timed-cycle`: for each timed rule, the rules of the same type whose `states` hold the state it sets, and those after them, must not include the rule itself. | With entry 141, no entry that is not asked starts a timed duty again, so a timed rule applies to an item at most once between two entries that are asked, which is what one entry for each rule assumes. A cycle of rules with deadlines already passed would also never let a drain end. Witness: one validator row. |
+
+What stays open. A `conflict` result is still an entry that no count
+foresaw: each further incarnation that answers a creation writes one. It
+starts no timed duty now, but it uses an entry. Bytes, sends that are not
+requests, and the duties of other scopes are as section 15 lists them.
 

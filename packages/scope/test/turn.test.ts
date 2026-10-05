@@ -148,17 +148,26 @@ describe("the clock behind the history (section 5.3)", () => {
 });
 
 describe("the scope's budget (section 9.2), here 12 entries", () => {
-  test("an act is refused scope-full when the duties it would admit have no room to settle; every admitted hold's end and a checkpoint are then written", async () => {
+  test("an act is refused scope-full when the duties it would admit have no room to settle; no checkpoint takes a duty's room; every admitted hold's end and one closing checkpoint are then written", async () => {
     const s = await found({ scopeEntries: 12 });
     const holds = await s.holds(2);                           // entries 1 to 6: two holds, each owed one entry for its end
     const commitment = await s.commitment();                  // entries 7 and 8: nine entries, and three owed with the checkpoint
     const head = await s.head();
     // A third hold would be entry 9 and would owe a fourth entry: ten and four do not fit in twelve. Nothing is written.
     expect(await s.act(una, "take-hold", { fields: { commitment }, expected: { commitment: 2 } })).toEqual({ answer: "refused", reason: "scope-full", judgedAt: head });
-    // Both admitted ends are written, and the checkpoint that was counted from the start.
+    // A checkpoint now would be entry 9, with both ends still owed and the kept entry: no room is free, and it is not the last entry.
+    // Written here, it would leave the scope no closing checkpoint after the two ends.
+    expect([await s.stub.checkpoint(), await s.head()]).toEqual([{ answer: "unavailable", reason: "unavailable" }, head]);
+    // Both admitted ends are written. The closing checkpoint is the last entry and uses the entry kept for it; there is no second.
     s.c.clock.now = at(HOLD);
     expect([await s.alarm(), (await s.entries(9)).map((e) => e.input.type), await s.count("hold", "ended")]).toEqual([true, ["timed", "timed"], holds.length]);
     expect(await s.stub.checkpoint()).toMatchObject({ answer: "written", fact: { seq: 11 } });
+    expect(await s.stub.checkpoint()).toEqual({ answer: "unavailable", reason: "unavailable" });
     expect(await s.submit(s.remark())).toMatchObject({ answer: "refused", reason: "scope-full", judgedAt: { seq: 11 } });
+  });
+
+  test("with room free, a checkpoint is written like any other entry and the kept entry stays: a second checkpoint closes the scope", async () => {
+    const s = await found({ scopeEntries: 3 });
+    expect([await s.stub.checkpoint(), await s.stub.checkpoint(), await s.stub.checkpoint()]).toMatchObject([{ answer: "written", fact: { seq: 1 } }, { answer: "written", fact: { seq: 2 } }, { answer: "unavailable" }]);
   });
 });

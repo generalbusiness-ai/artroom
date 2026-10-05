@@ -127,8 +127,11 @@ budget and the alarm's retry delay are temporary values there.
 An entry that admits duties (a genesis, an act, a delivered request or
 advisory) is kept only if every admitted duty still has an entry to settle
 in. Derive's `owed` counts those entries from the folded state, inside the
-commit. An act that does not fit is refused `scope-full`. The deltas note,
-section 15, lists what is counted and what is not.
+commit. An act that does not fit is refused `scope-full`. A checkpoint is
+written into free room like an act; the one entry kept for a checkpoint is
+used only by the scope's last entry, when nothing else is owed, and a
+checkpoint that does not fit is `unavailable`. The deltas note, sections 15
+and 22, lists what is counted and what is not.
 
 ## Between scopes
 

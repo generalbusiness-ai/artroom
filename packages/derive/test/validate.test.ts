@@ -9,6 +9,13 @@ import { Scope, desk, fields, keys, lane, laneDefinition, member, on, small, sma
 type Change = (d: any) => void;
 const overdue = { on: "note", states: ["draft"], deadline: "due", effects: [{ state: "kept" }], attention: [] };
 const clone = <T>(v: T): T => structuredClone(v);
+/** The ticket, with a request that a timed rule pauses: `asked` to `paused` at its `until`. */
+const pausing = (change: Change): Change => (d) => {
+  d.items.request.states.paused = { final: false };
+  d.items.request.values.until = { fixed: false, required: false, of: { type: "time" } };
+  d.timed.pause = { on: "request", states: ["asked"], deadline: "until", effects: [{ state: "paused" }], attention: [] };
+  change(d);
+};
 
 /**
  * Each row is one definition: a fixture with one change. `null` passes; a
@@ -62,6 +69,12 @@ const rows: readonly (readonly [string, DeclaredDefinition, Change, ProblemCode 
   }, "timed-partial"],
   ["a timed rule that sets a time from the commit clock, which a commit could refuse", lane, (d) => d.timed["hold-end"].effects.push({ value: { slot: "until", from: { time: { plusSeconds: 60 } } } }), "timed-partial"],
   ["a timed rule whose entry, with its attention reason, could pass the entry size bound: its due item could never be written", lane, (d) => { d.timed["hold-end"].attention[0].notify.reason = "r".repeat(PROPOSED_BOUNDS.entryBytes); }, "bound"],
+  // Section 9.2: an entry that settles a duty starts no timed duty that was not counted.
+  ["a timed rule on a type whose result clauses leave its states: passes", ticket, pausing(() => {}), null],
+  ["a result clause that moves its item into a state a timed rule names", ticket, pausing((d) => { d.acts.ask.sends[0].tell.result.applied = [{ state: "asked" }]; }), "clause-timed"],
+  ["an undelivered clause that does", ticket, pausing((d) => { d.acts.ask.sends[0].tell.result.undelivered = [{ state: "asked" }]; }), "clause-timed"],
+  ["a conflict clause that does", desk, (d) => { d.items.issue.values.until = { fixed: false, required: false, of: { type: "time" } }; d.timed.lapse = { on: "issue", states: ["created"], deadline: "until", effects: [{ state: "refused" }], attention: [] }; d.acts["open-issue"].sends[0].create.result = { conflict: [{ state: "created" }] }; }, "clause-timed"],
+  ["timed rules of one type that lead back to one another", ticket, pausing((d) => { d.timed.resume = { ...d.timed.pause, states: ["paused"], effects: [{ state: "asked" }] }; }), "timed-cycle"],
   ["a time offset longer than the span a timestamp can name", lane, (d) => { d.acts["take-hold"].effects[2].value.from.time.plusSeconds = Number.MAX_SAFE_INTEGER; }, "bound"],
   ["a timed rule over a final state", lane, (d) => d.timed["hold-end"].states.push("ended"), "timed"],
   ["a profile this runtime does not implement", small, (d) => { d.profile.version = 2; }, "profile"],

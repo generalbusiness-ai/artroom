@@ -291,7 +291,10 @@ export class Scope {
 
   /**
    * Write a checkpoint through the head (section 9.2). It judges no time, so
-   * it may be written clamped (section 5.3), and it may use the reserve.
+   * it may be written clamped (section 5.3). It is written into free room;
+   * the entry kept for a checkpoint is used only by the scope's last entry,
+   * when nothing else is owed (derive's `fits`). Otherwise it is
+   * `unavailable` and nothing is written.
    * Reading the whole state is the one read that is not bounded.
    */
   async checkpoint(): Promise<Checkpointed> {

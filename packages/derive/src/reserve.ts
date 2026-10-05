@@ -18,7 +18,15 @@
  * - each opened attempt of an outside operation: one entry for its outcome,
  *   and before any outcome one more, because `unknown` may be followed by
  *   the same attempt's outcome;
- * - one checkpoint.
+ * - one checkpoint, always: the entry a scope keeps for its closing
+ *   checkpoint.
+ *
+ * No entry that settles a duty starts another that was not counted. The
+ * validator refuses the two ways a definition could: a result clause that
+ * moves an item into a state a timed rule names (`clause-timed`), and timed
+ * rules of one type that could apply again without an act (`timed-cycle`).
+ * So a timed rule applies to an item at most once between two entries that
+ * are asked, which is what the count of a live timed item assumes.
  *
  * What is not counted is in the deltas note. The count is of entries, never
  * of bytes.
@@ -46,15 +54,25 @@ export function owed(view: StateView, definition: ValidDefinition): number {
 
 /**
  * Whether the state, as the entry just folded left it, has room for every
- * duty it has admitted. An entry that admits new duties is written only when
- * this holds: an act, a genesis, and a delivery of a request or an advisory.
- * A checkpoint uses the one entry counted for it. Every other entry settles
- * a duty that was counted when it was admitted, and is not asked.
+ * duty it has admitted. An entry that admits new duties or is new work is
+ * written only when this holds: an act, a genesis, a delivery of a request
+ * or an advisory, and a checkpoint. Every other entry settles a duty that
+ * was counted when it was admitted, and is not asked.
+ *
+ * A checkpoint is new work like an act: it is written into free room, and
+ * the one entry kept for a checkpoint stays kept after it. The kept entry is
+ * used once, by the scope's last entry: a checkpoint that fills the budget
+ * when nothing else is owed. So no checkpoint takes the room of a duty, and
+ * a scope whose duties have all settled can always write its closing
+ * checkpoint.
  */
 export function fits(view: StateView, definition: ValidDefinition, bounds: Pick<Bounds, "scopeEntries">, input: Input): boolean {
   const scope = view.scope();
   if (!scope) return true;
   const settles = input.type === "timed" || input.type === "diagnosis" || input.type === "outcome" || (input.type === "delivery" && (input.message.class === "result" || input.message.class === "control"));
   if (settles) return true;
-  return scope.head.seq + 1 + owed(view, definition) - (input.type === "checkpoint" ? 1 : 0) <= bounds.scopeEntries;
+  const written = scope.head.seq + 1;
+  const need = owed(view, definition);
+  if (written + need <= bounds.scopeEntries) return true;
+  return input.type === "checkpoint" && written === bounds.scopeEntries && need === 1;
 }

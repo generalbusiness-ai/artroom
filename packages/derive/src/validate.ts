@@ -28,6 +28,8 @@ export type ProblemCode =
   | "genesis-timed"      // the genesis act opens a timed item type or has a `hold` effect (section 6.4)
   | "timed"              // a timed rule that is not about its own live item, or that would stay due
   | "timed-partial"      // a timed rule with an effect that its commit could refuse (section 6.4)
+  | "timed-cycle"        // timed rules of one type that could apply to one item again with no act between (section 9.2)
+  | "clause-timed"       // a result clause that moves an item into a state a timed rule names (section 9.2)
   | "hold"               // the hold capability used without what it needs (section 6.8)
   | "handler"            // two handlers for one message from one kind of scope, or a name the platform keeps
   | "capability" | "profile" | "rule";
@@ -411,6 +413,9 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
 
   // ------------------------------------------------------------ effects (section 6.6)
 
+  /** Each state effect of a result clause: where it is written, the item type, and the state it sets. Checked once the timed rules are read. */
+  const clauseStates: { path: string; type: string; state: string }[] = [];
+
   /** One effect. `later`: it runs in a later entry, as a result clause does. Returns what it sets, for the conflict check. */
   const effect = (v: unknown, path: string, ctx: Ctx, later: boolean): string | null => {
     const f = form(v, path, EFFECTS, ["of"]);
@@ -433,6 +438,7 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
         if (typeof x !== "string" || !s.states.has(x)) return bad("name", p, `names no state of ${s.name}`);
         // Section 6.3: an item in a final state refuses every transition. A later clause is checked when it runs.
         if (nascent ? s.states.get(s.initial) : !later && !ctx.live.has(sk)) bad("final", p, "a state effect needs a `state` guard on its subject that lists no final state");
+        if (later) clauseStates.push({ path: p, type: s.name, state: x });
         return `the state of ${sk}`;
       case "party": {
         const r = rec(x, p, ["slot", "from"], ["list"]);
@@ -685,6 +691,8 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
   }
 
   const timedTypes = new Set<string>(holdTypes);
+  /** Each timed rule that was read whole: its type, the states it applies in, and the state it leaves its item in. */
+  const moves: { name: string; type: string; states: readonly string[]; to: string }[] = [];
   for (const [name, v] of entries(top["timed"], "timed", null)) {
     const path = at("timed", name);
     const o = rec(v, path, ["on", "states", "deadline", "effects", "attention"]);
@@ -703,8 +711,28 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
     // each as `timed-partial`.
     effects(o["effects"], at(path, "effects"), ctx, false);
     // Otherwise the transition would be due again as soon as it was applied, and the drain would never end.
-    if (!(Array.isArray(o["effects"]) && o["effects"].some((e) => isObject(e) && typeof e["state"] === "string" && !states.includes(e["state"])))) bad("timed", at(path, "effects"), "a timed rule takes its item out of the rule's states");
+    const to = Array.isArray(o["effects"]) ? o["effects"].find((e) => isObject(e) && typeof e["state"] === "string" && !states.includes(e["state"])) : undefined;
+    if (!isObject(to)) bad("timed", at(path, "effects"), "a timed rule takes its item out of the rule's states");
+    else moves.push({ name, type: t.name, states, to: to["state"] as string });
     attention(o["attention"], at(path, "attention"), ctx);
+  }
+
+  // Section 9.2: an admitted duty always has an entry to settle in. The count of those entries gives a live item of a timed type one
+  // entry for each timed rule on its type, and is asked only of an entry that admits duties. So no entry that is not asked may start
+  // a timed duty again. Two kinds of entry could. A timed entry, when the rules of one type lead back to a rule that has applied:
+  // then each rule could apply more than once with no act between. And the entry of a result or a diagnosis, when its clause moves
+  // an item into a state a timed rule names. A clause has effects only, so it starts no send.
+  for (const rule of moves) {
+    const reached = new Set<string>();
+    for (let next = [rule]; next.length > 0;) {
+      const after = next.flatMap((r) => moves.filter((m) => m.type === r.type && m.states.includes(r.to) && !reached.has(m.name)));
+      for (const m of after) reached.add(m.name);
+      next = after;
+    }
+    if (reached.has(rule.name)) bad("timed-cycle", at("timed", rule.name), "after this rule, the timed rules of its type could apply it again with no act between");
+  }
+  for (const c of clauseStates) {
+    if (moves.some((m) => m.type === c.type && m.states.includes(c.state))) bad("clause-timed", c.path, `a result clause moves no item into a state a timed rule names: ${c.state}`);
   }
 
   for (const name of holdTypes) {
