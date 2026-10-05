@@ -30,13 +30,13 @@
  */
 
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { Bounds, Digest, Entry, FactRef, Head, PlatformData, PlatformDefinition, Report, RetainedInput, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
-import { canonicalize, definitionDigest, digestBytes, isDigest, isEntry, isPlatformDefinition, parseStrict, platformName, scopeIdOf, textDigest, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
+import type { Bounds, Digest, Entry, FactRef, Grant, Head, Observation, ObservationRequest, ObservationUse, PlatformData, PlatformDefinition, Report, RetainedInput, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
+import { canonicalize, definitionDigest, digestBytes, isDigest, isEntry, isObservationUse, isPlatformDefinition, parseStrict, platformName, scopeIdOf, textDigest, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import {
-  MemoryState, applyEntry, clockOf, entryOf, inputTexts, isFactRef, isLocalId, isObject, isScopeRef, judgeAct, judgeCheckpoint, judgeDelivery, judgeDiagnosis, judgeGenesis, judgeOutcome, judgeTimed,
-  membershipOf, nextDue, ruleAt, timeMs, updateOf, validateDefinition,
+  MISMATCHES, MemoryState, WINDOWS, actionOf, agrees, applyEntry, clockOf, entryOf, headsOf, highestHead, inputTexts, isFactRef, isLocalId, isObject, isScopeRef, judgeAct, judgeCheckpoint, judgeDelivery, judgeDiagnosis, judgeGenesis,
+  judgeGrant, judgeOutcome, judgeTimed, membershipOf, nextDue, own, ruleAt, timeMs, updateOf, validateDefinition, windowOf,
 } from "@generalbusiness/artroom-derive";
-import type { ActJudgment, Capabilities, Clock, Fetched, Judgment, PlatformRules, Rules, TimedJudgment, ValidDefinition } from "@generalbusiness/artroom-derive";
+import type { ActJudgment, Capabilities, Clock, Fetched, Judgment, PlatformRules, Retains, Rules, StateView, TimedJudgment, ValidDefinition } from "@generalbusiness/artroom-derive";
 import { RULE_PROFILES, evaluateRules } from "@generalbusiness/artroom-derive/rule";
 import { PAGE_ENTRIES, PAGE_REPLY_BYTES, RETAINED_REPLY_BYTES, hashOfBytes, type HistorySource, type Stored } from "./source.ts";
 
@@ -83,8 +83,35 @@ export interface Options {
    * its data, such a scope is `unsupported-definition` at its genesis. The
    * package itself has none.
    */
-  platform?: ((named: PlatformDefinition) => { data: PlatformData; rules: Rules } | null) | undefined;
+  platform?: ((named: PlatformDefinition) => Coded | null) | undefined;
+  /**
+   * How a recorded grant that holds no freshness proof is read. Such a
+   * grant is no grant, and an entry that holds one is no entry (section
+   * 15.6n, on the I3 delta E8): `proven`, a `mismatch` at that entry. The
+   * command line always asks for that. `as-recorded` is for the histories
+   * of tests that were written under the test authority of the scope
+   * package's test support, a STAND-IN whose grants hold `fresh: null`:
+   * each such grant is taken as current, as recorded, and the report lists
+   * `authority` under `trusts`. A result with it proves nothing about
+   * authority. A grant that holds a proof is derived again in either case.
+   *
+   * I3 merge: the default is `as-recorded` only while a caller that this
+   * step does not own replays such a history without saying so: the lane
+   * scenario `packages/lanes/test/plan.scope.test.ts`. When that call
+   * states `grants: "as-recorded"`, the default becomes `proven`, in the
+   * one line of the constructor below. It ends with the test authority.
+   */
+  grants?: "proven" | "as-recorded" | undefined;
 }
+
+/**
+ * One version of a platform definition, as a replay is supplied it: its
+ * data, its rules, and what a scope under it answers to an observation
+ * read, from its folded state at one head. With `observed`, the value of a
+ * retained observation of such a scope is derived again from that scope's
+ * history (section 16.1, "Replay").
+ */
+export interface Coded { data: PlatformData; rules: Rules; observed?: ((state: StateView, asked: ObservationRequest) => unknown) | undefined }
 
 /** A report, and in words why its result is not `consistent`. */
 export interface Verification { report: Report; why: string | null }
@@ -104,7 +131,8 @@ export const TRUSTS = {
   minted: "that each incarnation was minted once",
   held: "that a provisional scope dispatched no held send before its confirmation",
   delivered: "delivery times: when each message was delivered",
-  authority: "authority: that each recorded grant was current, and the fact that issued it",
+  authority: "authority: that each recorded grant with no freshness proof was current, and the fact that issued it. Such a grant is a stand-in's, and this result proves nothing about authority",
+  observed: "observation-read: that each read behind a retained observation was made as recorded, that it began at the stated time, that a fresh value was not held from an earlier read under a new number, and that no restart came between two entries of one run",
   attempts: "each diagnosis's attempt log, which is the sender's own record",
   outcomes: "each outcome's evidence, and that the outside write happened",
   anchors: "each anchor as the caller supplied it, and the definition name retained with each anchored entry",
@@ -170,6 +198,14 @@ interface Run {
   depth: number;
   /** Section 9.3: each detached text whose bytes are not at hand, with the entry that names it. A later tombstone of this scope answers for it. */
   owed: { text: Digest; at: FactRef }[];
+  /** Section 16.1: the latest checked entry that retains each read, by its run and its number, with the observation as that entry retains it. */
+  reads: Map<string, Retains>;
+  /** The runs of the retained observations, in the order of the history: each run once, at its first entry. */
+  runs: string[];
+  /** The answer of the pinned platform definition to an observation read, when the replay was given one. */
+  observed: Coded["observed"];
+  /** This scope's state folded through one earlier position, for the value of an observation that another scope retains of it. */
+  viewed: { state: MemoryState; through: number } | null;
 }
 
 /** The membership reference that a scope's genesis records (section 6.6), from the entry that the replay checked first. */
@@ -191,6 +227,7 @@ class Verifier {
   readonly #bounds: Bounds;
   readonly #capabilities: Capabilities | undefined;
   readonly #platform: Options["platform"];
+  readonly #grants: "proven" | "as-recorded";
   readonly #runs = new Map<ScopeId, Run>();
   readonly #trusts = new Set<Trust>();
   /** Each platform definition whose rules this replay ran, by name and version. */
@@ -214,6 +251,8 @@ class Verifier {
     this.#bounds = { ...(options.bounds ?? PROPOSED_BOUNDS), guardScan: Number.MAX_SAFE_INTEGER };
     this.#capabilities = options.capabilities;
     this.#platform = options.platform;
+    // I3 merge: `"proven"`, when every replay of a history of the test authority states `grants: "as-recorded"` (see `Options.grants`).
+    this.#grants = options.grants ?? "as-recorded";
   }
 
   async run(): Promise<Verification> {
@@ -276,7 +315,7 @@ class Verifier {
     if (this.#runs.size >= this.#limits.scopes) throw new Stop("incomplete", `the limit of ${this.#limits.scopes} scopes was reached`);
     const got = await this.#page(id, 0);
     if (!got.ok) return null;
-    const run: Run = { id, said: got.page.scope, head: got.page.head, at: null, named: null, definition: null, platform: null, state: new MemoryState(), sealed: [], read: new Map(), next: 0, busy: false, depth: Number.POSITIVE_INFINITY, owed: [] };
+    const run: Run = { id, said: got.page.scope, head: got.page.head, at: null, named: null, definition: null, platform: null, state: new MemoryState(), sealed: [], read: new Map(), next: 0, busy: false, depth: Number.POSITIVE_INFINITY, owed: [], reads: new Map(), runs: [], observed: undefined, viewed: null };
     if (!this.#take(run, 0, got.page.entries, got.page.next)) return null;
     this.#runs.set(id, run);
     return run;
@@ -538,6 +577,7 @@ class Verifier {
     const lacks = checked.definition.marks.find((mark) => ruleAt(supplied.rules, mark.code, mark.kind) === null);
     if (lacks) throw new Stop("unsupported-definition", `the pinned definition ${named} has the mark ${lacks.code} at ${lacks.path}, and this replay has no rule of that name for that place`, where);
     run.platform = { named, rules: supplied.rules };
+    run.observed = supplied.observed;
     // Section 9.3, "What it trusts": that the rules which it ran are the rules of that name and version.
     this.#coded.add(named);
     return checked.definition;
@@ -574,6 +614,145 @@ class Verifier {
     this.#proven.set(key, "replayed");
     this.#trusts.add("sources");
     return "replayed";
+  }
+
+  /**
+   * The state of a checked scope folded through one earlier position: what
+   * it would answer an observation from at that head. The entries are the
+   * checked ones, folded again. A later position goes on from the last one.
+   */
+  #viewAt(source: Run, seq: number): MemoryState {
+    if (!source.viewed || source.viewed.through > seq) source.viewed = { state: new MemoryState(), through: -1 };
+    const view = source.viewed;
+    for (; view.through < seq; view.through++) {
+      const next = source.sealed[view.through + 1]!;
+      applyEntry(view.state, source.definition!, next.entry, next.hash);
+    }
+    return view.state;
+  }
+
+  /**
+   * Section 16.1, "How one observation follows another", rules 1 and 2, for
+   * one retained observation of one entry: the entries that retain an
+   * observation of one run are not separated by an entry of another run. A
+   * history where a run returns is a `mismatch`, `run-returned`.
+   */
+  #inRun(run: Run, use: ObservationUse, where: FactRef): void {
+    const id = use.read.run;
+    if (run.runs.at(-1) === id) return;
+    if (run.runs.includes(id)) throw new Stop("mismatch", `run-returned: the entry retains an observation of the run ${id}, and an entry of another run lies between it and that run's earlier entries`, where);
+    run.runs.push(id);
+  }
+
+  /** After an entry is checked: it is the latest entry that retains each of its reads. */
+  #retains(run: Run, entry: Entry, hash: Digest, uses: readonly ObservationUse[]): void {
+    for (const use of uses) run.reads.set(`${use.read.run}:${use.read.n}`, { entry: { seq: entry.seq, hash }, time: entry.time, observation: use.observation as Observation });
+  }
+
+  /**
+   * The value of an observation of a key, against the history of the
+   * membership scope that it is of, at the recorded head (section 16.1,
+   * "Replay"): what that scope's pinned definition answers for the key from
+   * its state folded through that entry. An observation that a membership
+   * scope retains of itself is of the head before the entry, and is derived
+   * from the state that this replay holds there. Any other is proved as a
+   * foreign fact is: by replay of the membership scope up to that head, or
+   * by an anchor, which covers the entry and leaves the value on trust.
+   * Without the history and with no anchor the report is
+   * `missing-dependency`.
+   */
+  async #standing(run: Run, entry: Entry, o: Observation, where: FactRef, depth: number): Promise<void> {
+    const mismatch = (why: string): Stop => new Stop("mismatch", why, where);
+    let view: StateView;
+    let answers: Coded["observed"];
+    if (o.of.scope === run.id) {
+      if (o.head.seq !== entry.seq - 1 || o.head.hash !== entry.prev || o.at !== entry.time) throw mismatch("a membership scope judges its own act on the head before the entry, at the entry's time, and the retained observation states another");
+      [view, answers] = [run.state, run.observed];
+    } else {
+      const fact: FactRef = { at: o.of, seq: o.head.seq, hash: o.head.hash };
+      if (await this.#prove(fact, where, depth) === "anchored") return;
+      const source = this.#runs.get(o.of.scope)!;
+      [view, answers] = [this.#viewAt(source, o.head.seq), source.observed];
+    }
+    if (!answers) throw new Stop("unsupported-definition", `the observed scope ${o.of.scope} pins a definition for which this replay has no answer to an observation`, where);
+    const derived = answers(view, { of: o.of, key: o.key });
+    if (!isObject(derived) || canonicalize({ ...derived, at: o.at }) !== canonicalize(o)) throw mismatch(`the retained observation is not what the history of ${o.of.scope} gives that key at its entry ${o.head.seq}`);
+  }
+
+  /**
+   * The one grant that an act records, derived again from the observation
+   * that it retains (section 9.3, the rows "Act" and "An observation";
+   * section 16.1, the row "Replay path"), with derive's own functions:
+   * that the grant agrees with the observation; the guards of the
+   * observation and the grant guard, on the entry's time, with the window
+   * of this kind of commit, the latest earlier entry that retains the read
+   * and the highest head that the earlier entries retain; and the value,
+   * against membership's history at the recorded head. What it cannot
+   * derive is that the read was made: `trusted: observation-read`.
+   *
+   * A grant with no freshness proof is no grant (section 15.6n, on E8). It
+   * is a `mismatch`, unless the caller said that the history was written
+   * under the test authority, a stand-in: then it is taken as recorded.
+   */
+  async #granted(run: Run, entry: Entry, definition: ValidDefinition, grant: Grant, where: FactRef, depth: number): Promise<void> {
+    const mismatch = (why: string): Stop => new Stop("mismatch", why, where);
+    const input = entry.input as Extract<Entry["input"], { type: "act" }>;
+    const use: unknown = grant.fresh;
+    if (use === null && this.#grants === "as-recorded") {
+      this.#trusts.add("authority");
+      return;
+    }
+    if (!isObservationUse(use) || "subject" in use.observation) throw mismatch("the recorded grant holds no freshness proof of a key's standing: it is no grant");
+    const o = use.observation;
+    if (!agrees(grant)) throw mismatch("the recorded grant is not the grant that the observation it retains gives");
+    if (entry.clamped) throw mismatch("an entry that retains an observation judges time, and is never clamped");
+    const row = own(definition.declared.acts, input.signed.intent.kind);
+    const action = row ? actionOf(row) : null;
+    const membership = recordedMembership(run);
+    // Authority note, section 3.3: a membership scope judges its own act on an observation that serves that one commit.
+    const window = run.at!.kind === "membership" ? WINDOWS.once : windowOf(definition, run.at!.kind, input.signed.intent.kind);
+    if (action === null || membership === null || window === null) throw mismatch("the act records a grant, and its row names no action, its scope records no membership scope, or no window is stated for it");
+    this.#inRun(run, use, where);
+    const judged = judgeGrant(use, {
+      scope: run.at!, membership, key: input.signed.intent.actor, action, window, clock: { reading: entry.time, behind: false, asOf: entry.time },
+      last: run.reads.get(`${use.read.run}:${use.read.n}`) ?? null, highest: highestHead(run.state, o),
+    });
+    if (judged.result !== "current") {
+      const name = judged.result === "authority-unavailable" ? MISMATCHES[judged.failed] : undefined;
+      throw mismatch(`${name ? `${name}: ` : ""}derived again on the entry's time, the retained observation does not give the grant: ${judged.failed}`);
+    }
+    await this.#standing(run, entry, o, where, depth);
+    this.#trusts.add("observed");
+  }
+
+  /**
+   * The further observations that an entry retains in `observed` (sections
+   * 4.1 and 16.1): each is of the scope's own membership scope, no read is
+   * retained twice by one entry or as `fresh` by two, the runs do not
+   * return, and no head goes back. That the entry holds exactly those that
+   * its judgment reads is the judge's derivation.
+   *
+   * I3 merge: the window of each, and the value of an observation of a
+   * member or of the rules against the observed scope's history, are owed
+   * with the first rule that reads one (I3 deltas, entry EM2). No source
+   * writes such an entry yet.
+   */
+  #observed(run: Run, entry: Entry, uses: readonly ObservationUse[], where: FactRef): void {
+    const mismatch = (why: string): Stop => new Stop("mismatch", why, where);
+    if (entry.clamped) throw mismatch("an entry that retains an observation judges time, and is never clamped");
+    for (const use of uses) {
+      this.#inRun(run, use, where);
+      const last = run.reads.get(`${use.read.run}:${use.read.n}`) ?? null;
+      if (last === null ? use.use !== "fresh" || use.prior !== null : use.use !== "reused" || canonicalize(use.prior) !== canonicalize(last.entry) || canonicalize(use.observation) !== canonicalize(last.observation)) {
+        throw mismatch("a retained observation is `fresh` only when no earlier entry retains its read, and `reused` only with the latest such entry and the same bytes");
+      }
+      if (last !== null && timeMs(entry.time)! <= timeMs(last.time)!) throw mismatch("observation-not-moved: the entry reuses a read, and its time is not later than the time of the latest entry that retains it");
+      for (const head of headsOf(use)) {
+        const held = run.state.observed(head.of, head.subject);
+        if (held !== null && head.seq < held) throw mismatch(`observation-older: the entry retains an observation of ${head.subject} from a lower head than an earlier entry retains`);
+      }
+      this.#trusts.add("observed");
+    }
   }
 
   async #replay(run: Run, entry: Entry, hash: Digest, bytes: string, where: FactRef, depth: number): Promise<void> {
@@ -671,8 +850,11 @@ class Verifier {
         break;
       }
       case "act":
-        // Section 9.3: that a grant was fresh is not checked, beyond its recorded form. The authority port's verdict is trusted.
-        this.#trusts.add("authority");
+        // Section 9.3, the row "Act": the one grant judged, against the observation that it retains. It is derived again here, and
+        // the judge is then given it as current. An act that a rule at `grant` passed records none, and the judge runs that rule.
+        if (input.authority.length > 1) throw mismatch("an act records the one grant that was judged");
+        for (const grant of input.authority) await this.#granted(run, entry, definition, grant, where, depth);
+        if (input.observed) this.#observed(run, entry, input.observed, where);
         // Section 16.1, "Replay": that `within` covers the observing scope is checked by the reference that its genesis records.
         // Section 16.1, "Replay": the entry holds exactly the observations that its judgment reads. The judge is given the recorded
         // ones, and derives an input with those that a rule read: one that no rule reads, and one that a rule reads and the entry
@@ -734,6 +916,8 @@ class Verifier {
     }
     if (canonicalize(derived) !== bytes) throw mismatch("the recorded entry is not the one derived again");
     applyEntry(state, definition, entry, hash);
+    // Section 16.1: this entry is now the latest that retains each of its reads, in its grant and in `observed`.
+    if (input.type === "act") this.#retains(run, entry, hash, [...input.authority.map((grant) => grant.fresh as ObservationUse | null).filter((use): use is ObservationUse => use !== null), ...(input.observed ?? [])]);
     // Section 9.3: this entry is the tombstone of each text that its `redact` effects list. The judge derived the list again from
     // what the slot had held. A text that an earlier entry names, and whose bytes are gone, is reported as redacted.
     for (const effect of entry.effects) {

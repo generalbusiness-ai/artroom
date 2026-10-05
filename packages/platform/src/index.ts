@@ -10,10 +10,10 @@
  * it.
  */
 
-import type { PlatformData } from "@generalbusiness/artroom-contract";
+import type { ObservationRequest, PlatformData } from "@generalbusiness/artroom-contract";
 import { inbox } from "./inbox.ts";
-import { membership } from "./membership.ts";
-import type { Rules } from "@generalbusiness/artroom-derive";
+import { membership, standingOf } from "./membership.ts";
+import type { Rules, StateView } from "@generalbusiness/artroom-derive";
 import { RULES } from "./rules.ts";
 
 export { inbox, membership };
@@ -33,6 +33,16 @@ export const definitions: Readonly<Record<string, PlatformData>> = { "platform:i
 export interface Platform {
   readonly data: PlatformData;
   readonly rules: Rules;
+  /**
+   * What a scope under this version answers to an observation read, from
+   * its folded state at one head (authority note, section 3.3): a pure
+   * function of the state and the request. It is code of the version, as
+   * its rules are, so a replay derives the value of a retained observation
+   * with it, from the observed scope's history at the recorded head (the
+   * contract's section 16.1, "Replay"). Absent: a scope under this version
+   * answers no observation.
+   */
+  readonly observed?: (state: StateView, asked: ObservationRequest) => unknown;
 }
 
 /**
@@ -45,5 +55,5 @@ export function platform(named: string): Platform | null {
   const name = named.slice(0, cut);
   const data = cut > 0 && named.slice(cut) === "@1" && Object.hasOwn(definitions, name) ? definitions[name] : undefined;
   if (!data) return null;
-  return { data, rules: Object.hasOwn(RULES, name) ? (RULES as Record<string, Rules>)[name]! : {} };
+  return { data, rules: Object.hasOwn(RULES, name) ? (RULES as Record<string, Rules>)[name]! : {}, ...(data === membership ? { observed: standingOf } : {}) };
 }

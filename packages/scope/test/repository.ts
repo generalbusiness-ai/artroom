@@ -18,8 +18,9 @@
 
 import { env } from "cloudflare:workers";
 import { evictDurableObject } from "cloudflare:test";
-import type { Answer, Entry, FactRef, FieldValue, Grant, Intent, Read, ScopeId, ScopeRef, Seed, SignedIntent } from "@generalbusiness/artroom-contract";
-import { entryHash, intentDigest, newIncarnation, scopeIdOf, signIntent, textDigest } from "@generalbusiness/artroom-bytes";
+import type { Answer, Digest, Entry, FactRef, FieldValue, Grant, Intent, Read, RetainedInput, ScopeId, ScopeRef, Seed, SignedIntent } from "@generalbusiness/artroom-contract";
+import { canonicalize, entryHash, intentDigest, isDigest, newIncarnation, scopeIdOf, signIntent, textDigest } from "@generalbusiness/artroom-bytes";
+import { hashOfBytes, type MemoryScope } from "@generalbusiness/artroom-replay";
 import type { Delivered, Item } from "@generalbusiness/artroom-derive";
 import { d, keys, type Actor } from "@generalbusiness/artroom-derive/testing";
 import { officeDefinition } from "@generalbusiness/artroom-platform/testing";
@@ -37,6 +38,7 @@ interface Surface {
   summary(reader: unknown): Promise<Read<Summary>>;
   history(reader: unknown, cursor?: string): Promise<Read<readonly Sealed[]>>;
   outbox(reader: unknown): Promise<Read<readonly Duty[]>>;
+  retained(reader: unknown, kind: RetainedInput["kind"], digest: Digest): Promise<Read<RetainedInput>>;
   deliver(envelope: Delivered): Promise<Delivery>;
   dispatch(): Promise<number>;
   observe(asked: unknown): Promise<unknown>;
@@ -156,4 +158,41 @@ export async function notify(inbox: Platform, fields: Record<string, FieldValue>
   net.peers.set(from.hash, { entry, under: "issue" });
   const envelope: Delivered = { to: send.to, from, n: 0, message: send.message };
   return { envelope, answer: await inbox.stub.deliver(envelope) };
+}
+
+/**
+ * What a scope's object serves a verifier, copied into memory: each entry's
+ * canonical bytes and hash, the declaration that its seed names by digest,
+ * and the bytes of each foreign entry that it used. A test changes the copy
+ * and never the scope.
+ */
+export async function copied(node: Platform): Promise<MemoryScope> {
+  const sealed = await node.sealed();
+  const kept = async (kind: RetainedInput["kind"], digest: Digest): Promise<RetainedInput[]> => {
+    const read = await node.stub.retained(reader, kind, digest);
+    return read.ok ? [read.value] : [];
+  };
+  const genesis = sealed[0]!.entry.input as Extract<Entry["input"], { type: "genesis" }>;
+  const retained = isDigest(genesis.seed.definition) ? await kept("definition", genesis.seed.definition) : [];
+  for (const { entry } of sealed) for (const use of entry.uses) retained.push(...await kept("entry", use.content));
+  return { scope: await node.at(), entries: sealed.map(({ entry, hash }) => ({ seq: entry.seq, hash, bytes: canonicalize(entry) })), retained };
+}
+
+/**
+ * Change entry `seq` of a copied history and seal the history again from
+ * there: each later entry takes the new hash of the one before it. The
+ * chain is then intact, and only what the entries say has changed.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function rewritten(scope: MemoryScope, seq: number, change: (entry: any) => void): MemoryScope {
+  let prev: string | null = null;
+  for (let i = seq; i < scope.entries.length; i++) {
+    const entry = JSON.parse(scope.entries[i]!.bytes) as { prev: string | null };
+    if (i === seq) change(entry);
+    else entry.prev = prev;
+    const bytes = canonicalize(entry);
+    prev = hashOfBytes(bytes);
+    scope.entries[i] = { ...scope.entries[i]!, hash: prev as Digest, bytes };
+  }
+  return scope;
 }
