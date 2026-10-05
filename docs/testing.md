@@ -58,6 +58,14 @@ delivered. A test that uses it says so in its name or its first comment.
 It shows what a definition does once a capability has answered, and
 nothing about a real hold, a Git read or a provider.
 
+A scripted membership, `Controls.membership` of the same module, is a
+stand-in for the membership scope and for the reference to it that a
+scope's genesis will record. The test writes each answer, and no history
+stands behind the head it names. With one, the scope's authority is the
+real observation read, with the real guards and windows. A test that uses
+it says so in its name or its first comment. It shows the observing
+scope's side of a read, and nothing about membership.
+
 `standInPlatform`, of the same module, supplies a rule that adds nothing
 for each row that a platform definition marks as code. It is a stand-in
 for the platform rules, which are not delivered, and no judge runs it. A

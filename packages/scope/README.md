@@ -33,14 +33,16 @@ what a judge drafts, in one storage transaction for each entry.
 | `delivery` | `Deliveries.deliver(envelope)`: receiving. It reads the source entry through the resolver, checks it against the fact's hash, and runs derive's delivery judge, or its genesis judge for a `create` that reaches an empty store, in the scope's turn. It answers as transport does: `recorded` with a fact, `retry`, `routing` or `source-unverified`. |
 | `outbox` | `Dispatcher.run()`: sending. One pass at a time over the sends that are due: a durable record before each dispatch and after its answer, a retry delay that doubles, and a `diagnosis` input through the turn when a request is given up. `Wakes`: one alarm for the earliest deadline, the next dispatch and the next attempt of an outside operation. |
 | `operations` | `Operations.run()`: the driver of outside effects, beside the dispatcher. An attempt is recorded by its entry, marked durably before its one request leaves, and never sent twice: one that is found marked with no outcome is recorded `unknown`. An answer becomes an `outcome` input through the turn. `Operations.answered()` takes an answer at any later time. `Outside` is the port, and `NO_OUTSIDE`, the default of `production()`, sends nothing. |
-| `namespace` | `namespace(binding)`: the production `Resolver`, `Transport`, `Definitions` and `SentTexts`, each one RPC call on the object a scope ID names. `routed`: the resolver of a name, which refuses a wrong address before any judgment. `sourced`: the answer to a read of one entry. `declaredBy`: the answer to a read of one retained declaration. `sentText`: the answer to a read of one detached text that a send of this scope names. |
+| `authority` | `observing(config)`: the authority port over reads of a membership scope. The read is made before the turn, is counted by run and number, and is kept only in memory: at most one observation for each key, and a revoked answer for the run. `Membership` is the port that reads a membership scope. The production wiring does not use it yet. |
+| `namespace` | `namespace(binding)`: the production `Resolver`, `Transport`, `Definitions` and `SentTexts`, each one RPC call on the object a scope ID names. `membershipIn(binding)`: the read of a membership scope, which no object answers yet. `routed`: the resolver of a name, which refuses a wrong address before any judgment. `sourced`: the answer to a read of one entry. `declaredBy`: the answer to a read of one retained declaration. `sentText`: the answer to a read of one detached text that a send of this scope names. |
 | `object` | `ScopeObject`: the Durable Object class. It wires the store, the ports, the core, receiving, the dispatcher and the reads, and exposes them over RPC: `found`, `submit`, `settle`, `checkpoint`, the reads, `deliver`, `source`, `declared`, `text`, `dispatch` and `effect`. Its `alarm()` runs the alarm's turn, then a dispatch pass, then a pass of the operations driver. With no transport, which is its default, nothing is dispatched. With the outside port of `production()`, which sends nothing, and no owner rules, nothing is sent outside the service. |
 | `worker` (its own entry, `@generalbusiness/artroom-scope/worker`) | `route(request, binding)`: the HTTP routes. `ScopeService`: the same operations over a service binding; it implements the contract's `ScopeApi`, which a client's transport also is. `DeployedScope`: the object class with the namespace as its resolver, its transport and its source of declarations. `api(binding)`: what both call. The default export is the deployed Worker. |
 
 `@generalbusiness/artroom-scope/testing` is for tests only: a test
 authority, which is a stand-in that reads no membership scope and calls
-every presented grant current, a test readers port, a scripted
-clock, a gate that pauses preparation, a resolver over entries a test
+every presented grant current, a scripted membership, which is a stand-in
+for the membership scope under the real observation read, a test readers
+port, a scripted clock, a gate that pauses preparation, a resolver over entries a test
 supplies, and, for several scopes in one namespace, a transport that a test
 can hold back or make lose an answer. It also has `scriptedCapability`, a
 stand-in for the code of `hold@1` and `git-read@1`: it answers each
@@ -71,7 +73,7 @@ for a few acts
 |---|---|---|
 | `Clock` | One reading for each call. | The runtime's clock. |
 | `Random` | The bytes of a new incarnation. | The runtime's random source. |
-| `Authority` | Two phases. `read`, before the turn: what the judgment of one act's signer needs, within the fetch time limit. `held`, a method of what was read, in the commit: each grant the act may be judged on, and whether it is current at the commit's reading. It is a pure function of the folded state, that reading and what was read. | The read finds no grant, so none is current. Every act that needs one is refused `unauthorized`. |
+| `Authority` | Two phases. `read`, before the turn: what the judgment of one act's signer needs, within the fetch time limit. `held`, a method of what was read, in the commit: each grant the act may be judged on, and whether it is current at the commit's reading. It is a function of the folded state, that reading and what was read. `sealed`, optional: the commit tells the port the entry that it wrote on that answer. | The read finds no grant, so none is current. Every act that needs one is refused `unauthorized`. |
 | `Resolver` | One foreign entry by fact reference, within the fetch time limit: the entry, `absent` when the object at that name does not hold it, or nothing when it cannot be read now. | Nothing can be read. An act that names a foreign entry is answered `dependency-unavailable`. `DeployedScope` supplies the namespace. |
 | `Transport` | One dispatch of one send to the object its address names, answered or not. | None: the sends stay in the outbox. `DeployedScope` supplies the namespace. |
 | `Rules` | The results of prepared rule inputs. | Derive's evaluator, `evaluateRules`. |
@@ -110,8 +112,27 @@ An act's authority is read before the turn and decided in the commit.
 - The entry records the one grant that was judged. A replay gives the
   judge that grant and derives the same decision.
 
-The production port reads no membership scope yet. Its read finds no
-grant, and every act that needs one is refused `unauthorized`.
+`observing`, in `authority.ts`, is the port for a scope whose grants are
+judged on membership. Its read is made before the turn, with the scope's
+own clock noted first. It is counted by the run and by its number in the
+run. What it reads is kept in memory only, so a restart leaves none.
+
+- It keeps at most one observation for each key, for a later act of that
+  key inside the window. The observation of a ten-second kind, such as
+  taking a hold, serves the one commit that it was read for.
+- A read that shows a key revoked, or its member removed, is kept for the
+  run. From then on the key is refused at once, whatever a window says.
+- In the commit, derive's `judgeGrant` decides. A guard of the observation
+  that fails discards it: the act is answered `authority-unavailable`, and
+  the next read is made again. A standing that does not hold the action is
+  refused `unauthorized`.
+- The entry's grant is built from the observation and retains it, with
+  the read and how the entry used it: `fresh`, or `reused` with the entry
+  before. The commit tells the port which entry used a read last.
+
+The production port does not use it yet: no scope records its membership
+scope, and no membership scope answers a read. Its read finds no grant,
+and every act that needs one is refused `unauthorized`.
 
 ## A platform definition
 

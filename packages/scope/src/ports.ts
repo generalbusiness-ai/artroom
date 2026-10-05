@@ -10,7 +10,7 @@
  */
 
 import type { Digest, Entry, FactRef, Grant, PlatformDefinition, Prepared, RoutingRefusal, ScopeRef, SignedIntent, Timestamp, UnavailableReason } from "@generalbusiness/artroom-contract";
-import { timeOf, type Capabilities, type Clock as Reading, type Delivered, type Owners, type Presented, type RuleInput, type StateView } from "@generalbusiness/artroom-derive";
+import { timeOf, type Capabilities, type Clock as Reading, type Delivered, type Owners, type Presented, type RuleInput, type StateView, type Window } from "@generalbusiness/artroom-derive";
 import { evaluateRules } from "@generalbusiness/artroom-derive/rule";
 import { platform, type Platform } from "@generalbusiness/artroom-platform";
 import { NO_OUTSIDE, type Outside } from "./operations.ts";
@@ -34,6 +34,8 @@ export interface Asked {
   action: string | null;
   /** The grants presented beside the intent, each of a grant's form. Nothing signs them. */
   grants: readonly Grant[];
+  /** The freshness window of this kind of commit, which the pinned definition and the scope's kind give (derive's `windowOf`). Null: none is stated for it. */
+  window: Window | null;
 }
 
 /**
@@ -47,7 +49,7 @@ export interface Asked {
  * check 9). Null: what was read cannot serve this commit, as when its window
  * has passed or it must be read again: `authority-unavailable`.
  *
- * It is a pure function of those two and of what was read. It is
+ * It is a function of those two and of what was read. It is
  * synchronous, so it cannot wait on a read. The judge of a replay does not
  * call it: it derives the same decision from the grant that the entry
  * records (section 9.3).
@@ -56,8 +58,18 @@ export interface Asked {
  * The core holds it in the call that read it and nowhere else. It is never
  * stored, so none outlives the process (authority note, section 3.3), and no
  * other input is judged on it.
+ *
+ * `sealed`: the commit tells the port, inside its transaction, the entry
+ * that it wrote on an answer of `held`. A port that keeps a read for a later
+ * commit learns here which entry used it last (authority note, section 3.3,
+ * guard 3). A commit that wrote nothing tells nothing: it is not a use.
+ * `held` changes nothing but what the port holds for reuse, and only to
+ * discard from it: an observation that failed a guard is read again.
  */
-export interface Standing { held(view: StateView, clock: Reading): readonly Presented[] | null }
+export interface Standing {
+  held(view: StateView, clock: Reading): readonly Presented[] | null;
+  sealed?(sealed: { entry: Entry; hash: Digest }): void;
+}
 
 /**
  * Held authority, in two phases (section 5.1, the rows "Held authority" and

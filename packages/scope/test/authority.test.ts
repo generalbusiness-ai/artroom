@@ -1,0 +1,166 @@
+import { describe, expect, test } from "vitest";
+import type { Entry, KeyId, ObservationAnswer, ObservationUse } from "@generalbusiness/artroom-contract";
+import { agrees } from "@generalbusiness/artroom-derive";
+import { d, membership } from "@generalbusiness/artroom-derive/testing";
+import { HOLD, at, definition, found, rita, una, type Lane } from "./support.ts";
+
+const actions = Object.values(definition.declared.acts).map((a) => a.grant);
+const UNAVAILABLE = { answer: "unavailable", reason: "authority-unavailable" };
+
+/**
+ * A scripted membership for that scope: a stand-in for the membership scope
+ * (`MembershipScript` of test support). It answers every key of the fixture
+ * set as an active member that holds every action in that scope, at `head`,
+ * with the members of `over` in place of those. `reads` counts the reads
+ * that reached it. While `silent`, it gives no answer.
+ */
+function scripted(s: Lane) {
+  const m = { reads: 0, silent: false, head: 40, over: {} as Record<KeyId, Partial<ObservationAnswer>> };
+  s.c.membership = {
+    at: membership,
+    answers: ({ of, key }): ObservationAnswer | null => {
+      m.reads++;
+      const who = [rita, una].find((actor) => actor.key === key);
+      if (m.silent || !who) return null;
+      return {
+        of, head: { seq: m.head, hash: d("4") }, key, keyState: "active", member: who.member.member, memberState: "active", role: "member", actions, within: s.at,
+        controller: null, controllerActive: null, notAfter: null, definition: "platform:membership@1", ...m.over[key],
+      };
+    },
+  };
+  return m;
+}
+
+/** The freshness proof that each entry from `seq` on retains in its grant, or null for an entry that is no act. */
+const proofs = async (s: Lane, seq: number): Promise<(ObservationUse | null)[]> => (await s.entries(seq)).map((entry) => (entry.input.type === "act" ? entry.input.authority[0]!.fresh : null));
+const remark = (text: string) => ({ on: 0, fields: { text } });
+
+describe("the observation read, with a scripted membership, a stand-in (authority note, sections 3.3 and 3.12; section 16.1)", () => {
+  test("an observation admits inside its window and is reused there; at its window it is outside, and with membership silent the act is not judged and uses no key; a ten-second kind is read for its one commit; after a restart nothing read is used", async () => {
+    const s = await found();
+    const m = scripted(s);
+
+    // Read 1 of the run, begun when the scope's clock read the start. The entry retains the whole observation, in a grant built from it.
+    const first = await s.did(rita, "remark", remark("one"));
+    const [one] = await proofs(s, 1);
+    expect(one).toMatchObject({ observation: { of: membership, head: { seq: 40 }, key: rita.key, member: "@rita", at: at(0) }, read: { n: 1 }, use: "fresh", prior: null });
+    const run = one!.read.run;
+    const grant = ((await s.entries(1))[0]!.input as Extract<Entry["input"], { type: "act" }>).authority[0]!;
+    expect([agrees(grant), grant.subject, grant.principal]).toEqual([true, rita.member, null]);
+
+    // One second inside the window: the same read serves, with no new read, and the entry names the entry that retains it.
+    s.c.clock.now = at(299);
+    await s.did(rita, "remark", remark("two"));
+    expect([await proofs(s, 2), m.reads]).toEqual([[{ ...one, use: "reused", prior: { seq: 1, hash: first.fact.hash } }], 1]);
+
+    // At the window the observation is outside it. It is read again, and membership does not answer: the act is not judged.
+    s.c.clock.now = at(300);
+    m.silent = true;
+    const late = s.intent(rita, "remark", remark("three"));
+    expect([await s.submit(late), (await s.head()).seq, m.reads]).toEqual([UNAVAILABLE, 2, 2]);
+    // Nothing was written and the key was not used: with an answer, the same signed intent is accepted, on the third read of the run.
+    m.silent = false;
+    expect(await s.submit(late)).toMatchObject({ answer: "accepted", receipt: { fact: { seq: 3 } } });
+    expect(await proofs(s, 3)).toMatchObject([{ observation: { at: at(300) }, read: { run, n: 3 }, use: "fresh", prior: null }]);
+
+    // A commitment for una, on rita's held observation, each on a later reading.
+    s.c.clock.now = at(301);
+    const commitment = (await s.did(rita, "offer", { fields: { intent: 0 }, expected: { intent: 1 } })).fact.seq;
+    s.c.clock.now = at(302);
+    await s.did(rita, "assign", { on: commitment, expected: { on: 1 }, fields: { performer: una.member } });
+    expect(m.reads).toBe(3);
+
+    // A ten-second kind: una holds an observation that is one second old, and taking a hold still reads for its own commit.
+    s.c.clock.now = at(303);
+    const held = await s.did(una, "remark", remark("four"));
+    s.c.clock.now = at(304);
+    await s.did(una, "take-hold", { fields: { commitment }, expected: { commitment: 2 } });
+    // That read served its one commit. Una's next ordinary act reuses the observation of the remark, and reads nothing.
+    s.c.clock.now = at(305);
+    await s.did(una, "remark", remark("five"));
+    expect([await proofs(s, 6), m.reads]).toMatchObject([[
+      { observation: { key: una.key, at: at(303) }, read: { run, n: 4 }, use: "fresh" },
+      { observation: { key: una.key, at: at(304) }, read: { run, n: 5 }, use: "fresh", prior: null },
+      { observation: { key: una.key, at: at(303) }, read: { run, n: 4 }, use: "reused", prior: { seq: 6, hash: held.fact.hash } },
+    ], 5]);
+
+    // A restart. Una's observation was three seconds old, inside its window, and the new run holds none: with membership silent the
+    // act is not judged. With an answer it is read again, in another run: its read 2, after the one that got no answer.
+    await s.restart();
+    s.c.clock.now = at(306);
+    m.silent = true;
+    const after = s.intent(una, "remark", remark("six"));
+    expect([await s.submit(after), (await s.head()).seq]).toEqual([UNAVAILABLE, 8]);
+    m.silent = false;
+    expect(await s.submit(after)).toMatchObject({ answer: "accepted", receipt: { fact: { seq: 9 } } });
+    const [again] = await proofs(s, 9);
+    expect([again, again!.read.run === run]).toMatchObject([{ observation: { at: at(306) }, read: { n: 2 }, use: "fresh", prior: null }, false]);
+  });
+
+  test("a revocation that one read has seen takes effect at once: the held observation that shows the key active is discarded, and the revoked answer stays for the run, whatever its window", async () => {
+    const s = await found();
+    const m = scripted(s);
+    const commitment = (await s.did(rita, "offer", { fields: { intent: 0 }, expected: { intent: 1 } })).fact.seq;
+    s.c.clock.now = at(1);
+    await s.did(rita, "assign", { on: commitment, expected: { on: 1 }, fields: { performer: una.member } });
+    s.c.clock.now = at(2);
+    await s.did(una, "remark", remark("before"));
+    expect(m.reads).toBe(2);
+
+    // Membership records that una's key is retired. Nothing is sent to this scope.
+    m.over[una.key] = { keyState: "retired" };
+    m.head = 44;
+    // The stated grace: an ordinary act inside the window is admitted on the observation that the scope holds.
+    s.c.clock.now = at(3);
+    expect(await s.act(una, "remark", remark("grace"))).toMatchObject({ answer: "accepted", receipt: { fact: { seq: 4 } } });
+    const head = await s.head();
+    const refused = { answer: "refused", reason: "unauthorized", judgedAt: head };
+
+    // A ten-second kind reads for its commit, and sees the revocation.
+    s.c.clock.now = at(4);
+    expect([await s.act(una, "take-hold", { fields: { commitment }, expected: { commitment: 2 } }), m.reads]).toEqual([refused, 3]);
+    // From that read on the held observation is not used, though it is three seconds old: an ordinary act is refused, with no read.
+    s.c.clock.now = at(5);
+    expect([await s.act(una, "remark", remark("after")), m.reads]).toEqual([refused, 3]);
+    // Long past every window, and with membership answering as it did before the revocation: the revoked answer is still the one used.
+    m.over = {};
+    m.head = 40;
+    s.c.clock.now = at(400);
+    expect([await s.act(una, "remark", remark("later")), m.reads, await s.head()]).toEqual([refused, 3, head]);
+    // Another key is judged on its own observation.
+    expect(await s.act(rita, "remark", remark("rita"))).toMatchObject({ answer: "accepted", receipt: { fact: { seq: 5 } } });
+  });
+
+  test("the clock table: an act judges time, so a clock that is behind stops it, and its observation is read again before a retry; a checkpoint and a timed entry read no observation, and are written with membership silent", async () => {
+    const s = await found();
+    const m = scripted(s);
+    s.c.clock.now = at(100);
+    const commitment = (await s.did(rita, "offer", { fields: { intent: 0 }, expected: { intent: 1 } })).fact.seq;
+    s.c.clock.now = at(101);
+    await s.did(rita, "assign", { on: commitment, expected: { on: 1 }, fields: { performer: una.member } });
+    s.c.clock.now = at(102);
+    await s.did(una, "take-hold", { fields: { commitment }, expected: { commitment: 2 } });
+    expect(m.reads).toBe(2);
+
+    // The clock reads earlier than the previous entry's time. The act is answered `clock-behind`, and nothing is written.
+    s.c.clock.now = at(90);
+    const behind = s.intent(rita, "remark", remark("behind"));
+    expect([await s.submit(behind), (await s.head()).seq]).toEqual([{ answer: "unavailable", reason: "clock-behind" }, 3]);
+    // On a later reading the same intent is judged on an observation that was read again, and not on one from before.
+    s.c.clock.now = at(103);
+    expect(await s.submit(behind)).toMatchObject({ answer: "accepted", receipt: { fact: { seq: 4 } } });
+    expect([await proofs(s, 4), m.reads]).toMatchObject([[{ observation: { at: at(103) }, read: { n: 4 }, use: "fresh", prior: null }], 4]);
+
+    // Membership is silent from here on. A checkpoint judges no time and reads no observation: it is written clamped on a clock that is behind.
+    m.silent = true;
+    s.c.clock.now = at(95);
+    expect(await s.stub.checkpoint()).toMatchObject({ answer: "written", fact: { seq: 5 } });
+    // The hold's end is a timed entry. It judges time and no grant: it is written at its deadline, and never clamped.
+    s.c.clock.now = at(102 + HOLD);
+    await s.alarm();
+    expect([(await s.entries(1)).map((entry) => [entry.input.type, entry.clamped]), await s.count("hold", "ended"), m.reads])
+      .toEqual([[["act", false], ["act", false], ["act", false], ["act", false], ["checkpoint", true], ["timed", false]], 1, 4]);
+    // An act still needs a grant. Rita's observation is past its window and cannot be read again: the act is not judged.
+    expect([await s.act(rita, "remark", remark("silent")), (await s.head()).seq]).toEqual([UNAVAILABLE, 6]);
+  });
+});

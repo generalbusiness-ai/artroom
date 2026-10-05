@@ -9,7 +9,7 @@
 
 import type { ActType, Answer, Beside, Bounds, DeclaredDefinition, Digest, DutyId, Entry, FactRef, Founded, Grant, PlatformDefinition, Receipt, RefusalReason, ScopeId, Seed, Settlement, SignedIntent, UnavailableReason } from "@generalbusiness/artroom-contract";
 import { canonicalize, definitionDigest, intentDigest, isDigest, isGrant, isPlatformDefinition, newIncarnation, parseStrict, platformName, textDigest, utf8 } from "@generalbusiness/artroom-bytes";
-import { checkpointOf, derivable, factsNamed, inputTexts, isObject, judgeAct, judgeCheckpoint, judgeGenesis, own, prepareRules, presentedTypes, readFields, validateDefinition } from "@generalbusiness/artroom-derive";
+import { checkpointOf, derivable, factsNamed, inputTexts, isObject, judgeAct, judgeCheckpoint, judgeGenesis, own, prepareRules, presentedTypes, readFields, validateDefinition, windowOf } from "@generalbusiness/artroom-derive";
 import type { ActJudgment, Clock as Reading, Draft, Fetched, Founding, JudgeContext, Own, Presented, StateView, Texts, ValidDefinition } from "@generalbusiness/artroom-derive";
 import { RULE_PROFILES } from "@generalbusiness/artroom-derive/rule";
 import { namedBy } from "./definitions.ts";
@@ -140,6 +140,15 @@ function heldBy(standing: Standing, view: StateView, clock: Reading): readonly P
     return Array.isArray(held) ? held as readonly Presented[] : null;
   } catch {
     return null;
+  }
+}
+
+/** The entry that was written on what `held` answered, for a port that keeps its read. A port that fails here has changed nothing in the entry. */
+function told(standing: Standing, sealed: Sealed): void {
+  try {
+    standing.sealed?.(sealed);
+  } catch {
+    // The entry stands. What the port then holds of this read is its own to judge at the next read.
   }
 }
 
@@ -426,7 +435,7 @@ export class Scope {
     // An accepted key is answered from history at check 3, so nothing is read for it (section 5.2, step 1). A read that fails or
     // is late leaves nothing: the act is then not judged at check 9, `authority-unavailable`, and no earlier check is hidden.
     const given = (Array.isArray(grants) ? grants : []).filter(isGrant);
-    const standing = known ? null : await this.#standing({ scope: scope.at, signed, action: act?.grant ?? null, grants: given });
+    const standing = known ? null : await this.#standing({ scope: scope.at, signed, action: act?.grant ?? null, grants: given, window: windowOf(definition, scope.at.kind, intent.kind) });
     // Phase two is in the commit: what that read holds at the commit's head, on the commit's one reading. The judge is given the
     // answer and reads nothing.
     const context = (view: StateView, clock: Reading): Omit<JudgeContext, "prepared"> =>
@@ -442,9 +451,13 @@ export class Scope {
             const head = view.scope()!.head;
             return {
               verdict: "write", draft: judged.draft, retain: [...used(judged.draft, facts), ...texts.retain(definition, judged.draft)],
-              // I3 merge: the entry now retains the grant that was judged. A port that keeps a read for a later commit learns here
-              // which entry used it last (authority note, section 3.3, guard 3). No read is kept yet, so nothing is told.
-              sealed: (sealed) => ({ answer: "accepted", receipt: receiptOf(sealed, named) }),
+              // The entry now retains the grant that was judged. A port that keeps a read for a later commit learns here, inside the
+              // transaction, which entry used it last (authority note, section 3.3, guard 3). A transaction that then does not commit
+              // breaks the object, and what the port holds in memory is gone with it.
+              sealed: (sealed) => {
+                if (standing) told(standing, sealed);
+                return { answer: "accepted", receipt: receiptOf(sealed, named) };
+              },
               // An entry over the size bound, or a grant that is not canonical values, is never written.
               unfit: (why) => ({ answer: "refused", reason: why === "size" ? "bad-field" : "unauthorized", judgedAt: head }),
               // Section 9.2: an act is refused when the duties it would admit, with those already admitted, have no room to settle.

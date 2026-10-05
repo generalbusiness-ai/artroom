@@ -10,9 +10,10 @@
  */
 
 import { CAPABILITIES, PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { Bounds, Capability, CapabilityName, Digest, Entry, Timestamp } from "@generalbusiness/artroom-contract";
+import type { Bounds, Capability, CapabilityName, Digest, Entry, ObservationRequest, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
 import type { Capabilities, Delivered, Recorded } from "@generalbusiness/artroom-derive";
 import { platform, type EntryRules, type Platform, type PlatformRule } from "@generalbusiness/artroom-platform";
+import { observing } from "./authority.ts";
 import type { Authority, Clock, Definitions, Ports, Readers, Resolver, Rules, Transport } from "./ports.ts";
 import { production } from "./ports.ts";
 import { READ_BOUNDS, type ReadBounds } from "./reads.ts";
@@ -30,6 +31,17 @@ import { READ_BOUNDS, type ReadBounds } from "./reads.ts";
 export function testAuthority(answers: () => boolean = () => true): Authority {
   return { read: (asked) => Promise.resolve(answers() ? { held: () => asked.grants.map((grant) => ({ grant, current: true })) } : null) };
 }
+
+/**
+ * A scripted membership: a stand-in for the membership scope and for what
+ * the scope's genesis records of it. `at` is the reference that the scope is
+ * said to record, which no genesis holds yet. `answers` is what that scope
+ * is said to answer for a key: nothing judged it, and no history stands
+ * behind its head. Null or a failure: membership does not answer. So a test
+ * that uses it shows the observing scope's side of a read, with the real
+ * read, guards and windows, and nothing about membership.
+ */
+export interface MembershipScript { at: ScopeRef; answers(asked: ObservationRequest): unknown }
 
 /** A test reader port: every reader may read everything. */
 export const testReaders: Readers = { allows: () => true };
@@ -140,6 +152,12 @@ export interface Controls {
   authority: boolean;
   /** True: a platform definition is supplied with the stand-in rules of `standInPlatform`. False: as the platform package supplies it, as in production. */
   platformRules: boolean;
+  /**
+   * The scripted membership, a stand-in. With one, the scope's authority is
+   * the real observation read of `authority.ts` over it, and the grants
+   * presented beside an intent are not read. Null: the test authority.
+   */
+  membership: MembershipScript | null;
 }
 
 const all = new Map<string, Controls>();
@@ -147,13 +165,14 @@ const all = new Map<string, Controls>();
 /** The controls of the scope with that name, made on first use with a clock at `start`. They outlive a restart of the object. */
 export function controls(name: string, start: Timestamp = "2099-01-01T00:00:00Z"): Controls {
   let made = all.get(name);
-  if (!made) all.set(name, (made = { clock: new ScriptedClock(start), gate: new Gate(), foreign: new Map(), bounds: PROPOSED_BOUNDS, reads: READ_BOUNDS, capability: null, authority: true, platformRules: false }));
+  if (!made) all.set(name, (made = { clock: new ScriptedClock(start), gate: new Gate(), foreign: new Map(), bounds: PROPOSED_BOUNDS, reads: READ_BOUNDS, capability: null, authority: true, platformRules: false, membership: null }));
   return made;
 }
 
 /**
  * Test ports over those controls: the test authority, a stand-in that the
- * controls can silence, the test readers, the
+ * controls can silence, or, while the controls hold a scripted membership,
+ * the real observation read over that stand-in; the test readers, the
  * scripted clock, a resolver that reads from `foreign`, derive's rule
  * evaluator behind the gate, and the scripted test capability over the
  * controls' table, which is none until a test sets one. The platform
@@ -162,11 +181,15 @@ export function controls(name: string, start: Timestamp = "2099-01-01T00:00:00Z"
  * runtime's and the object's.
  */
 export function testPorts(c: Controls): Partial<Ports> {
-  const { rules, definitions: given } = production();
+  const { rules, definitions: given, random } = production();
   const definitions: Definitions = { read: given.read, platform: (named) => (c.platformRules ? standInPlatform(named) : given.platform(named)) };
   const resolver: Resolver = { read: (fact) => Promise.resolve(c.foreign.get(fact.hash) ?? null) };
   const gated: Rules = { evaluate: async (asked) => { await c.gate.pass(); return rules.evaluate(asked); } };
-  return { clock: c.clock, authority: testAuthority(() => c.authority), readers: testReaders, resolver, rules: gated, definitions, capabilities: scriptedCapability(() => c.capability) };
+  // One run for the life of these ports, which is the life of the object: a restart makes new ports, and so a new run that holds nothing.
+  const observed = observing({ clock: c.clock, random, membership: () => c.membership?.at ?? null, reader: { observe: (asked) => Promise.resolve(c.membership?.answers(asked) ?? null) } });
+  const standIn = testAuthority(() => c.authority);
+  const authority: Authority = { read: (asked, seconds) => (c.membership ? observed : standIn).read(asked, seconds) };
+  return { clock: c.clock, authority, readers: testReaders, resolver, rules: gated, definitions, capabilities: scriptedCapability(() => c.capability) };
 }
 
 // ---------------------------------------------------------------- several scopes in one namespace
