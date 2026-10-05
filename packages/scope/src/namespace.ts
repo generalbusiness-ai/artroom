@@ -13,14 +13,15 @@
  * scope's judgment: `routed`, the resolver of the name, which refuses an
  * address that is not this scope and incarnation; `sourced`, which answers
  * a read of one entry; `declaredBy`, which answers a read of one retained
- * declaration; and `sentText`, which answers a read of one detached text
- * that a send of this scope names.
+ * declaration; `sentText`, which answers a read of one detached text that a
+ * send of this scope names; and `observedAt`, which answers an observation
+ * read of a membership scope.
  */
 
 import type { Digest, Entry, ObservationRequest, RoutingRefusal, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
-import { canonicalize, isDigest, isPlatformDefinition, parseStrict, platformName, scopeIdOf } from "@generalbusiness/artroom-bytes";
+import { canonicalize, isDigest, isKeyId, isMemberId, isPlatformDefinition, parseStrict, platformName, scopeIdOf } from "@generalbusiness/artroom-bytes";
 import { isObject, isScopeRef, type Delivered, type ScopeState } from "@generalbusiness/artroom-derive";
-import { platform } from "@generalbusiness/artroom-platform";
+import { MEMBERSHIP, platform, standingOf } from "@generalbusiness/artroom-platform";
 import type { Membership } from "./authority.ts";
 import type { Pinned } from "./core.ts";
 import type { Definitions, Delivery, Resolver, SentTexts, Transport } from "./ports.ts";
@@ -127,6 +128,28 @@ export function sentText(store: Store, seq: number, digest: Digest): string | nu
 }
 
 /**
+ * What a membership scope answers to an observation read (authority note,
+ * section 3.3, step 3; section 12.1.3, "Two things that are answers and no
+ * entries"): the standing of one key or of one member, from its folded
+ * state at its head. It is the platform package's `standingOf`. Membership
+ * writes no entry for a read, and the answer names the scope, the
+ * incarnation and the head that gave it.
+ *
+ * Null: no answer. The scope is not one under `platform:membership@1` that
+ * this runtime can run; it is provisional or refused; it is asked as
+ * another scope or incarnation; or the request is none of the forms that
+ * the contract's section 16.1 gives, with exactly its members. The request
+ * names no asker, and the answer is the same for every scope that asks.
+ */
+export function observedAt(store: Store, pinned: Pinned | null, asked: unknown): unknown {
+  if (!pinned?.definition || pinned.named !== MEMBERSHIP) return null;
+  if (!isObject(asked) || Object.keys(asked).length !== 2 || !isScopeRef(asked["of"])) return null;
+  const of = asked["of"];
+  if (isKeyId(asked["key"])) return standingOf(store, { of, key: asked["key"] });
+  return isMemberId(asked["member"]) ? standingOf(store, { of, member: asked["member"] }) : null;
+}
+
+/**
  * The resolver, the transport, the definitions and the sent texts over one
  * namespace binding. A call that fails is no answer: the entry cannot be
  * read now, or the attempt is unanswered.
@@ -203,8 +226,8 @@ export function membershipIn(binding: Binding): Membership {
   return {
     async observe(asked) {
       try {
-        // I3 merge: the answering side is membership's (plan step 7): the object's method `observe`, which answers from its head and
-        // answers nothing while provisional. No object has it yet, so this call fails and nothing is read.
+        // The answering side is the object's method `observe` (`observedAt`): a membership scope answers from its head, and answers
+        // nothing while it is provisional. An object of another kind answers null.
         return await (binding.get(binding.idFromName(asked.of.scope)) as Peer).observe(asked);
       } catch {
         return null;

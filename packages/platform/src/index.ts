@@ -12,15 +12,17 @@
 
 import type { PlatformData } from "@generalbusiness/artroom-contract";
 import { inbox } from "./inbox.ts";
+import { membership } from "./membership.ts";
 import type { Rules } from "@generalbusiness/artroom-derive";
 import { RULES } from "./rules.ts";
 
-export { inbox };
+export { inbox, membership };
+export { MEMBERSHIP, NO_MEMBER, ROLE_LISTS, ROLE_TABLE, actionsIn, standingOf, type Role } from "./membership.ts";
 export { RULES };
 export type { PlatformName, RuleTable } from "./rules.ts";
 
 /** The platform definitions delivered so far, by name without the version. */
-export const definitions: Readonly<Record<string, PlatformData>> = { "platform:inbox": inbox };
+export const definitions: Readonly<Record<string, PlatformData>> = { "platform:inbox": inbox, "platform:membership": membership };
 
 /**
  * One version of a platform definition, as a runtime or a verifier is

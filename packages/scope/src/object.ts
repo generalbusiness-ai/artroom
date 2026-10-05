@@ -26,7 +26,7 @@ import { timeMs, type Item } from "@generalbusiness/artroom-derive";
 import type { Delivered } from "@generalbusiness/artroom-derive";
 import { Scope, type Checkpointed, type Founded } from "./core.ts";
 import { Deliveries } from "./delivery.ts";
-import { declaredBy, routed, sentText, sourced, type Sourced } from "./namespace.ts";
+import { declaredBy, observedAt, routed, sentText, sourced, type Sourced } from "./namespace.ts";
 import { Operations } from "./operations.ts";
 import { Dispatcher, Wakes } from "./outbox.ts";
 import { production, type Alarm, type Delivery, type Ports } from "./ports.ts";
@@ -116,6 +116,12 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
   declared(digest: Digest): string | null { return declaredBy(this.#store, digest); }
   /** A detached text that a send of this scope's entry at `seq` names, for the scope that received that send (section 6.2). */
   text(seq: number, digest: Digest): string | null { return sentText(this.#store, seq, digest); }
+
+  /**
+   * The standing of one key or of one member, for a scope of this repository that reads it before its turn (authority note,
+   * section 3.3). Only a membership scope that is active answers. Nothing is written, and no caller is named or checked.
+   */
+  observe(asked: unknown): unknown { return observedAt(this.#store, this.#scope.pinned(), asked); }
 
   /** A dispatch pass now, or the one in flight. Resolves when it ends, with the number of dispatches and diagnoses it made. */
   dispatch(): Promise<number> { return this.#dispatcher ? this.#dispatcher.run() : Promise.resolve(0); }
