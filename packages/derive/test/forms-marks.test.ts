@@ -1,9 +1,9 @@
 import { describe, expect, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { PlatformDefinition } from "@generalbusiness/artroom-contract";
-import { textDigest } from "@generalbusiness/artroom-bytes";
-import { PROFILES, validateDefinition, type ActJudgment, type PlatformRule, type RuleGiven } from "../src/index.ts";
-import { Scope, keys, otherLane, small, t, type Actor } from "./fixtures.ts";
+import type { Bounds, OperationId, PlatformDefinition, Request, Send } from "@generalbusiness/artroom-contract";
+import { factRefOf, textDigest } from "@generalbusiness/artroom-bytes";
+import { PROFILES, clockOf, judgeDelivery, settleOutcome, validateDefinition, type ActJudgment, type OutcomeRule, type PlatformRule, type RuleGiven } from "../src/index.ts";
+import { Scope, arriving, forged, keys, otherLane, small, t, type Actor } from "./fixtures.ts";
 import { gate, gateRules, gateWith } from "./fixtures-marks.ts";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -218,5 +218,37 @@ describe("a rule is run at the check of its mark's place (sections 4.2 and 6.1)"
     expect([said(enter(s, vic, "three", gateRules({ "key-id": some(ticketOf), refer: relate() }))), s.last.sends]).toEqual([["write", null, null, null], [
       { n: 0, to: otherLane, message: { class: "request", type: "relate", body: { name: "seat", item: { self: true }, state: "taken", detail: {} } } },
     ]]);
+  });
+
+  test("an item that a rule opens counts against its type's `max` in every entry: an outcome's rule that would pass it has a fault, and a clause's rule that would pass it changes nothing; an outcome's rule sends no more than one entry may", () => {
+    // The row `enter` tells another scope, by its rule `refer`, and opens an operation, by its rule `key-id`. The clause of the tell is the mark `noted`.
+    const s = new Scope(gateWith((d) => { d.acts.enter.grant = "gate.enter"; d.acts.enter.sends[0].result.applied = [{ code: "noted", row: "P16" }]; }));
+    for (const secret of ["one", "two"]) s.did(rita, "issue", { fields: { hash: textDigest(secret) } });
+    const tell = { to: otherLane, message: { class: "request", type: "tell", body: { message: "hello", fields: {} } } } as const;
+    const opens = some(() => [{ effect: "operation", k: 0, owner: OWNER, kind: "probe", attempts: 1 }, { effect: "attempt", operation: { k: 0 }, attempt: 1, result: "opened", selected: null }]);
+    expect(said(enter(s, una, "one", owned({ "key-id": opens, refer: { place: "send", run: () => tell } })))).toEqual(["write", null, null, null]);
+    const asked = s.last.seq;
+    // A second gate: the type is not `many`, so one more would pass its `max` of 1.
+    const gateOf = ({ resolved }: RuleGiven) => [{ effect: "open", item: resolved.self, type: "gate", state: "open" }, { effect: "party", item: resolved.self, slot: "opener", member: rita.member }];
+
+    type Derives = NonNullable<OutcomeRule["derives"]>;
+    // Place 7. An outcome entry is never refused, so what a check on effects would refuse is a fault of its rule.
+    const settle = (derives: Derives, bounds: Bounds = PROPOSED_BOUNDS) => settleOutcome(s.state, s.definition, { type: "outcome", operation: `${asked}:0` as OperationId, attempt: 1, result: "confirmed", evidence: { basis: "own-answer", body: {} } },
+      { clock: clockOf(s.state, s.now), bounds, own: s.own, platform: owned({ probe: { place: "outcome", rules: { selects: false, read: false, retries: () => false, derives } } }) });
+    const gives = (effects: (given: RuleGiven) => unknown, sends: readonly unknown[] = []): Derives => (given) => ({ effects: effects(given), sends, opens: [] }) as never;
+    expect([settle(gives(gateOf)).result, settle(gives(() => [], [tell, tell]), { ...PROPOSED_BOUNDS, sendsPerEntry: 1 }).result]).toEqual(["unavailable", "unavailable"]);
+    const settled = settle(gives(ticketOf, [tell, tell]));
+    expect(settled.result === "write" && [settled.draft.effects.slice(1), settled.draft.sends.length]).toEqual([ticketOf({ resolved: { self: asked + 1 } } as RuleGiven), 2]);
+
+    // The result of the tell comes back, from an entry made by hand, and the clause runs its rule. The result is recorded either way.
+    const request = { from: s.fact(asked), n: 0 };
+    const send: Send = { n: 0, to: s.at, message: { class: "result", of: request, outcome: "applied" } };
+    const source = forged(otherLane, 40, { type: "delivery", ...request, message: s.entries[asked]!.entry.sends[0]!.message as Request, decision: "applied" }, [send]);
+    const arrival = { ...send, from: factRefOf(source.entry) };
+    const clause = (noted: (given: RuleGiven) => unknown) => {
+      const judged = judgeDelivery(s.state, s.definition, arrival, { ...arriving(s, arrival, source), platform: gateRules({ noted: some(noted) }) });
+      return judged.result === "write" ? judged.draft.effects : judged.result;
+    };
+    expect([clause(gateOf), clause(ticketOf)]).toEqual([[], ticketOf({ resolved: { self: asked + 1 } } as RuleGiven)]);
   });
 });

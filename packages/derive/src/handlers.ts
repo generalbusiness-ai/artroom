@@ -429,5 +429,8 @@ export function runClause(view: StateView, definition: ValidDefinition, context:
   const effects = deriveEffects(j, forms, [], null);
   // Section 6.6: a clause's condition that is not completed leaves the result not recorded now. It is offered again.
   if (!effects.ok && "unavailable" in effects) return { result: "unavailable", reason: effects.unavailable };
-  return { result: "ran", effects: effects.ok ? effects.effects : [], uses: [...facts.uses, ...beside.uses.filter((use) => !facts.facts.has(use.fact.hash))], judgesTime: forms.some(timesEffect) || j.ran?.clock === true };
+  // Section 6.3: `max` bounds the live items of a type, whatever opens the item. In platform data a rule of the clause may open
+  // one. Past the bound the clause's effects cannot apply now, and it changes nothing, as above.
+  const applies = effects.ok && (effects.opened === null || overMax(view, definition, effects.opened.type, effects.opened.state) === null);
+  return { result: "ran", effects: applies ? effects.effects : [], uses: [...facts.uses, ...beside.uses.filter((use) => !facts.facts.has(use.fact.hash))], judgesTime: forms.some(timesEffect) || j.ran?.clock === true };
 }
