@@ -36,16 +36,17 @@ const isList = (from: unknown): from is readonly Operand[] => Array.isArray(from
 /**
  * True when the definition states the type of what the operand reads. The
  * validator has then shown that the slot can hold it (section 6.6). It is
- * the validator's own rule: a part that is read from a reference has a
- * stated type, and a part that is read from an entry's bytes has none.
+ * the validator's own rule: a part that is read from an entry's bytes has
+ * no stated type, and a position, the `seq` of an entry or the revision of
+ * an update, has a type and no stated bounds. The commit checks both.
  */
 function stated(j: Judging, o: Operand): boolean {
   const part = "part" in o ? o.part : undefined;
-  if (part !== undefined && part !== "ref") return part === "seq" || part === "intent" || (typeof part === "object" && "of" in part && part.then === "seq");
+  if (part !== undefined && part !== "ref") return part === "intent";
   if ("field" in o) return Object.hasOwn(j.fieldTypes, o.field);
   if ("element" in o) return typeOfElement(j, o.element) !== null;
-  if ("update" in o) return o.update === "revision";
-  if ("source" in o) return o.source === "seq" || o.source === "intent";
+  if ("update" in o) return false;
+  if ("source" in o) return o.source === "intent";
   return "slot" in o || "presented" in o || "item" in o || "signer" in o || "intent" in o;
 }
 

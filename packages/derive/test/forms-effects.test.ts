@@ -72,6 +72,8 @@ const cards: DeclaredDefinition = {
       ],
     }),
     misread: change({ fields: { proof: { ...fact("add"), required: true } }, effects: [{ value: { slot: "size", from: { field: "proof", part: { field: "text" } } } }] }),
+    // A position is an integer, and no text states its most. The slot holds 0 to 9.
+    rank: change({ fields: { proof: { ...fact("add"), required: true } }, effects: [{ value: { slot: "size", from: { field: "proof", part: "seq" } } }] }),
     sum: act({
       step: "open", on: "summary", grant: "write", ...parent, fields: { ...parent.fields, earlier: { type: "list", of: fact("sum"), max: 4, required: false }, staffed: { ...fact("staff"), required: false } },
       effects: [owner, { ref: { slot: "of", from: { item: "also.parent" } } }, {
@@ -154,6 +156,9 @@ describe("effects: sources, conditions and what is not applied (section 6.6)", (
     expect([borrow(first).result, s.last.effects]).toEqual(["write", [listed(b, "add", una), listed(b, "add", vic)]]);
     // A text is not a value of a slot that holds a size. The commit checks it, because the validator could not.
     expect(s.judge(s.intent(rita, "misread", at(s, b, { proof: s.fact(p) })))).toMatchObject({ result: "refused", reason: "bad-field" });
+    // A position goes in an integer slot of any range. The commit checks the value: entry 2 is within the slot's range, and this one is not.
+    const rank = (seq: number) => s.judge(s.intent(rita, "rank", at(s, b, { proof: s.fact(seq) })));
+    expect([p, b > 9, rank(p).result, rank(b)]).toMatchObject([2, true, "write", { result: "refused", reason: "bad-field" }]);
     expect(s.replay().snapshot()).toBe(s.state.snapshot());
   });
 });
@@ -349,6 +354,7 @@ describe("the validator: effect forms (section 6.6)", () => {
       ["an opening whose only effect on a required slot empties it", refusal((d) => { d.acts.found.effects[0].value.from = null; }, desk), "required-unset"],
       ["a source that is none", edit({ value: { slot: "text", from: { none: true } } }), "shape"],
       ["a constant that is not a value of the slot", edit({ value: { slot: "size", from: { const: "big" } } }), "shape"],
+      ["a position into a slot that is no integer", refusal((d) => { d.acts.rank.effects[0].value.slot = "text"; }), "name"],
       ["a source of another type: the signer into a text", edit({ value: { slot: "text", from: { signer: true } } }), "name"],
       ["the first delivery's form of a member from a fetched fact", refusal((d) => { d.acts.borrow.effects[1].party.from = { fact: "proof", field: "owner" }; }), "shape"],
       ["a list of operands into a slot that holds one member", staffing({ party: { slot: "helper", from: [who] } }), "shape"],

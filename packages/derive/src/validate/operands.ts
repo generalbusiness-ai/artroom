@@ -19,17 +19,24 @@ import { at, type Rec } from "./shape.ts";
 /**
  * One operand as the validator read it. `type`: the type of its value when
  * the definition states it; null when only the commit knows, as for a
- * constant or a part of a fetched entry. `fields`: every field it names,
+ * constant or a part of a fetched entry. `open`: the value is of that type,
+ * and nothing states its bounds: a position. `fields`: every field it names,
  * also inside a part. `slot`: the name of the slot, when it is a slot of the
  * form's own subject with no part.
  */
-export interface Read { form: string; type: FieldType | null; fields: readonly string[]; slot: string | null }
+export interface Read { form: string; type: FieldType | null; open: boolean; fields: readonly string[]; slot: string | null }
 
 const OPERANDS = ["field", "presented", "slot", "element", "item", "signer", "sender", "source", "update", "result", "scope", "intent", "none", "const"];
 /** The operands that hold a value a part may read inside. */
 const WITH_PART = ["field", "presented", "slot", "element"];
 /** The parts that are one word. The first three are read from the reference, and the others from the entry's bytes. */
 const WORDS = ["ref", "scope", "seq", "kind", "intent", "on"];
+/**
+ * A position: the `seq` of an entry, and the revision of an update. It is an
+ * integer of at least 0. The contract states no most for it, so the
+ * validator cannot show that a slot of a narrower range holds it, and the
+ * commit checks the value (section 6.6).
+ */
 const POSITION: FieldType = { type: "int", min: 0, max: Number.MAX_SAFE_INTEGER };
 
 /**
@@ -163,7 +170,7 @@ export function operand(d: Defining, v: unknown, path: string, ctx: Ctx, owner: 
     if (read === undefined) return null;
     type = read;
   }
-  return { form: k, type, fields, slot };
+  return { form: k, type, open: type === POSITION, fields, slot };
 }
 
 /** The declared type of the field that a field operand names, when the definition states it. */

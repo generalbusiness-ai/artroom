@@ -68,12 +68,14 @@ export function effect(d: Defining, v: unknown, path: string, ctx: Ctx, later: b
     if (!read) return;
     if (read.form === "none") bad("shape", fp, "a source that is none is never applied; null empties a slot");
     else if (read.form === "const") { if (!isValue(to, (from as Rec)["const"], bounds)) bad("shape", fp, "is not a value of the slot's type"); }
+    // A position is an integer whose most the contract does not state. It goes in a slot of that type, and the commit checks its range.
+    else if (read.open) { if (read.type?.type !== to.type) bad("name", fp, "names no source of the slot's type"); }
     else if (read.type !== null) copy(d, read.type, to, fp, "source");
     // Section 6.6: the source entry is a fact under the definition that the handler's `from.under` names, of a kind that only the
     // commit knows. So it is no copy into a slot whose `under` is another name. When `from` names none, the commit checks both.
     else if (read.form === "source" && (from as Rec)["source"] === "ref" && to.type === "fact" && ctx.handler?.under != null && ctx.handler.under !== to.under) bad("name", fp, "the source entry is under the definition that the handler's `from` names, and the slot is under another");
     // Section 6.4: a timed rule's effects are total, so each source is one whose value the validator has shown the slot can hold.
-    if (ctx.timed && read.type === null && !(read.form === "const" && k === "value")) bad("timed-partial", fp, "a timed rule copies only what the validator can show the slot holds");
+    if (ctx.timed && (read.type === null || read.open) && !(read.form === "const" && k === "value")) bad("timed-partial", fp, "a timed rule copies only what the validator can show the slot holds");
   };
   switch (k) {
     case "state":
