@@ -99,6 +99,20 @@ lane's entry are made by hand. A test that uses one says so. It shows the
 rows and the written rules of the two definitions, and nothing about a
 founding.
 
+The rules scope has four stand-ins, in
+`packages/platform/test/support-rules.ts`. `registrar` is a made-up
+directory that creates one rules scope. `asker` is a made-up lane that
+tells it `rules-wanted`. `Rulebook` is a rules scope in memory below such
+a registrar, whose acts are judged on the test authority of derive's
+fixture set. `standing` is an observation of a member that the test
+writes by hand: no membership scope answered it. A test that uses one
+says so. The data and the three rules of `platform:rules@1` are the
+platform package's, and none of them is a stand-in. Such a test shows
+the rows and the rules as judgments in memory. It shows nothing about a
+founding, about a read of membership, or about how a scope receives and
+keeps a value beside an intent
+(`notes/2026-10-05-i3-contract-deltas.md`, entry EQ9).
+
 A replay of a history that the test authority wrote says so:
 `grants: "as-recorded"`. Its grants hold no freshness proof, and the
 report lists them as trusted. The replay command never takes that option.
