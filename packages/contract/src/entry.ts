@@ -8,6 +8,7 @@ import type { Digest, FactRef, Incarnation, MemberRef, OperationId, PlatformDefi
 import type { FieldValue, SignedIntent } from "./intent.ts";
 import type { RefusalReason } from "./result.ts";
 import type { CapabilityName } from "./capability.ts";
+import type { Evidence } from "./evidence.ts";
 
 export interface Entry {
   v: 1;
@@ -52,9 +53,23 @@ export type Input =
       attempts: readonly Attempt[] }            // section 7.4
   | { type: "timed"; item: number; rule: string; due: Timestamp }
   | { type: "outcome"; operation: OperationId; attempt: number;
-      result: "confirmed" | "refused" | "unknown";
-      evidence: unknown }                       // defined by the authority note
+      result: "confirmed" | "refused" | "unknown"; evidence: Evidence }   // section 4.3
   | { type: "checkpoint"; through: number; state: Digest };
+
+/**
+ * A preparation entry (section 4.1; 5.5): the signed intent that asks for a
+ * capability's step, the one grant judged, the capability and the step. It is
+ * not yet a member of `Input`: a replay's switch over the input's type
+ * (`replay/src/verify.ts`) has no case for it, and the step that adds one
+ * joins this type to `Input` (I3 deltas, entry E5).
+ */
+export interface PreparationInput {
+  type: "preparation";
+  signed: SignedIntent;
+  authority: readonly Grant[];   // the one grant judged
+  capability: CapabilityName;
+  step: string;
+}
 
 /** The four classes of message (section 7.4). Only a request has a result. */
 export type Message = Request | Result | Control | Advisory;

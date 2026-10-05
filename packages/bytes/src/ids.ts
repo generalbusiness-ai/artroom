@@ -11,7 +11,7 @@ import { wellFormed } from "./canonical.ts";
 import { unb64url } from "./encode.ts";
 import { publicKeyOf } from "./sign.ts";
 
-export const SCOPE_KINDS: readonly ScopeKind[] = ["directory", "membership", "rules", "destination", "inbox", "task", "lane"];
+export const SCOPE_KINDS: readonly ScopeKind[] = ["register", "directory", "membership", "rules", "destination", "inbox", "task", "lane"];
 
 export function isScopeKind(value: unknown): value is ScopeKind {
   return SCOPE_KINDS.includes(value as ScopeKind);
@@ -50,7 +50,7 @@ export function isDutyId(value: unknown): value is DutyId {
 
 /** A definition the platform supplies in code: `platform:<name>@<version>`. */
 export function isPlatformDefinition(value: unknown): value is PlatformDefinition {
-  return typeof value === "string" && /^platform:(directory|membership|rules|destination|inbox|task)@(0|[1-9][0-9]*)$/.test(value);
+  return typeof value === "string" && /^platform:(register|directory|membership|rules|destination|inbox|task)@(0|[1-9][0-9]*)$/.test(value);
 }
 
 /** The name of a platform definition, which `under` is compared with: its platform name without the version, such as `platform:task` (section 6.1). */

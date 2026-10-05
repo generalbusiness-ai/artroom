@@ -358,7 +358,7 @@ describe("outcomes and checkpoints (sections 4.3 and 9.2)", () => {
       effects: [1, 2].map((attempt) => ({ effect: "operation", operation, attempt })), sends: [],
     });
     const outcome = (attempt: number, result: "confirmed" | "refused" | "unknown") => {
-      const j = judgeOutcome(s.state, ticketDefinition, { type: "outcome", operation, attempt, result, evidence: { read: "nothing" } }, reading(s));
+      const j = judgeOutcome(s.state, ticketDefinition, { type: "outcome", operation, attempt, result, evidence: { basis: "own-answer", body: { read: "nothing" } } }, reading(s));
       if (j.result === "write") s.seal(j.draft);
       return j.result;
     };

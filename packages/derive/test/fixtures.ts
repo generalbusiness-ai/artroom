@@ -12,7 +12,7 @@
  */
 
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { ActType, Bounds, DeclaredDefinition, Digest, Entry, FactRef, FieldValue, Grant, Guard, Input, Intent, KeyId, MemberId, MemberRef, ScopeKind, ScopeRef, Seed, Send, SignedIntent, Timestamp } from "@generalbusiness/artroom-contract";
+import type { ActType, Bounds, DeclaredDefinition, Digest, Entry, FactRef, FieldValue, Grant, Guard, Input, Intent, KeyId, MemberId, MemberRef, ObservationUse, ScopeKind, ScopeRef, Seed, Send, SignedIntent, Timestamp } from "@generalbusiness/artroom-contract";
 import { entryHash, factRefOf, intentDigest, keyIdOfSecret, newIncarnation, scopeIdOf, signIntent } from "@generalbusiness/artroom-bytes";
 import { MemoryState, applyEntry, clockOf, entryOf, judgeAct, judgeDelivery, judgeGenesis, judgeTimed, messageFacts, nextDue, timeMs, timeOf, validateDefinition } from "../src/index.ts";
 import type { ActJudgment, Creation, Delivered, DeliveryContext, Draft, Fetched, JudgeContext, Judgment, Presented, Source, TimedJudgment, ValidDefinition, Validation } from "../src/index.ts";
@@ -359,9 +359,12 @@ export const deskDefinition = valid(validateDefinition(desk, PROPOSED_BOUNDS));
 
 // ---------------------------------------------------------------- a scope in memory
 
+/** A stand-in: these grants carry no freshness proof, as the first delivery's judges take every recorded grant as current. Its bytes are `null`, so no digest here moves. */
+const NO_PROOF = null as unknown as ObservationUse;
+
 /** A grant of every action of the definition to that actor's key, in that scope. A test authority, and named as one. */
 export function grantOf(who: Actor, within: ScopeRef, actions: readonly string[], notAfter: Timestamp | null = null): Grant {
-  return { issued: { at: membership, seq: 3, hash: d("3") }, subject: who.member, key: who.key, principal: who.principal, actions, within, notAfter, fresh: null };
+  return { issued: { at: membership, seq: 3, hash: d("3") }, subject: who.member, key: who.key, principal: who.principal, actions, within, notAfter, fresh: NO_PROOF };
 }
 
 export type Over = Partial<Pick<Intent, "on" | "expected" | "fields" | "idempotencyKey" | "notAfter" | "to" | "kind">>;

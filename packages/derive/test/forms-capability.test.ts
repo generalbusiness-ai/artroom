@@ -114,7 +114,7 @@ describe("capability forms (section 6.11), with a stand-in for the capability's 
       ["an argument from a slot that the range's type does not have", (def) => { stage(def).guards[2].capability.with.earlier.slot = "none"; }, "name"],
       ["an effect that the version does not declare", (def) => { stage(def).effects[0].capability.do = "pin"; }, "capability"],
       ["arguments from two of the sets that the effect takes", (def) => { stage(def).effects[0].capability.with.consumer = { scope: true }; }, "capability"],
-      ["a carried part that names no record kind of a listed capability", (def) => { def.acts.check.guards[0].equals.a.part.carried = "token.commit"; }, "capability"],
+      ["a carried part that names no record kind of a listed capability", (def) => { def.acts.check.guards[0].equals.a.part.carried = "ledger.commit"; }, "capability"],
       ["a carried part with no member", (def) => { def.acts.check.guards[0].equals.a.part.carried = "pin"; }, "shape"],
       ["a capability listed twice", (def) => { def.capabilities = [{ name: "hold", version: 1 }, { name: "hold", version: 1 }]; stage(def).guards.pop(); }, "capability"],
     ];
