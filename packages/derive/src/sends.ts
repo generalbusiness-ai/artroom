@@ -85,9 +85,11 @@ function holds(j: Judging, guards: readonly Guard[] | undefined): boolean | Unav
  * no request, or one, at its position. The request takes the ordinal that a
  * written send would take there. It is a `create`, a `tell` or a `relate`
  * in the contract's form, and the checks on sends are made on it as on a
- * written one.
+ * written one. `opening`: the entry opens an item, by its row or by a rule.
+ * A relationship is of an item, so only such an entry may name `self` as
+ * the item of a `relate`, as the validator has it for a written send.
  */
-export function deriveSends(j: Judging, forms: readonly SendForm[], working: ReadonlyMap<string, Item>, cause: Digest, first = 0, recorded?: ScopeRef | null): Sends {
+export function deriveSends(j: Judging, forms: readonly SendForm[], working: ReadonlyMap<string, Item>, cause: Digest, first = 0, recorded?: ScopeRef | null, opening = false): Sends {
   const items = j.definition.declared.items;
   const on = working.get("on") ?? null;
   let unresolved: string | null = null;
@@ -200,9 +202,9 @@ export function deriveSends(j: Judging, forms: readonly SendForm[], working: Rea
         if (!isScopeRef(to) || typeof body["message"] !== "string" || !isObject(body["fields"])) throw outside(mark, "a tell that is not in the contract's form");
       } else {
         // Section 6.4: the key is the target by its scope ID, the item by its local ID, and the name as written. The item is this
-        // scope's own: the entry being written, or an earlier one.
+        // scope's own: the one that the entry being written opens, or one that an earlier entry opened.
         const named = body["item"];
-        const item = isObject(named) && named["self"] === true && Object.keys(named).length === 1 ? j.self : isFactRef(named) && isLocalFact(named, j.scope.at) && j.view.item(named.seq)?.opened === named.hash ? named.seq : null;
+        const item = isObject(named) && named["self"] === true && Object.keys(named).length === 1 ? (opening ? j.self : null) : isFactRef(named) && isLocalFact(named, j.scope.at) && j.view.item(named.seq)?.opened === named.hash ? named.seq : null;
         if (!isScopeRef(to) || typeof body["name"] !== "string" || typeof body["state"] !== "string" || !isObject(body["detail"]) || item === null) throw outside(mark, "a relate that is not in the contract's form");
         const key = JSON.stringify([to.scope, item, body["name"]]);
         if (relations.has(key)) return { ok: false, reason: "duplicate-relation", detail: `sends.${i}` };

@@ -96,7 +96,7 @@ function given(mark: Mark, j: Judging, kinds: Readonly<Record<string, Mark>>, gi
   const joining: Judging = { ...j, platform: { named: j.platform!.named, rules: Object.fromEntries(rules) } };
   const joined = deriveEffects(joining, [{ code: "effects", row: mark.row } as unknown as EffectForm], [], null);
   if (!joined.ok) throw outside(mark, `effects that the entry cannot hold: ${"reason" in joined ? joined.reason : joined.unavailable}`);
-  const requests = deriveSends(joining, sends.map((_, n) => ({ code: `send.${n}`, row: mark.row }) as unknown as SendForm), joined.working, "sha256:" as never);
+  const requests = deriveSends(joining, sends.map((_, n) => ({ code: `send.${n}`, row: mark.row }) as unknown as SendForm), joined.working, "sha256:" as never, 0, undefined, joined.opened !== null);
   if (!requests.ok) throw outside(mark, `requests that the entry cannot hold: ${"reason" in requests ? requests.reason : requests.unavailable}`);
   return { effects: joined.effects, sends: requests.sends satisfies Send[], opens };
 }

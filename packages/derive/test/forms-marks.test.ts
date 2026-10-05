@@ -1,8 +1,9 @@
 import { describe, expect, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
+import type { PlatformDefinition } from "@generalbusiness/artroom-contract";
 import { textDigest } from "@generalbusiness/artroom-bytes";
 import { PROFILES, validateDefinition, type ActJudgment, type PlatformRule, type RuleGiven } from "../src/index.ts";
-import { Scope, keys, small, type Actor } from "./fixtures.ts";
+import { Scope, keys, otherLane, small, t, type Actor } from "./fixtures.ts";
 import { gate, gateRules, gateWith } from "./fixtures-marks.ts";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -159,6 +160,63 @@ describe("a rule is run at the check of its mark's place (sections 4.2 and 6.1)"
     const opened = ({ resolved }: RuleGiven) => [{ effect: "open", item: resolved.self, type: "ticket", state: "open" }, { effect: "value", item: resolved.self, slot: "hash", value: textDigest("three") }];
     expect([said(enter(s, vic, "two", gateRules({ "key-id": effect(opened as never) }))), s.last.effects]).toEqual([["write", null, null, null], [
       { effect: "state", item: 3, state: "used" }, { effect: "open", item: 5, type: "ticket", state: "open" }, { effect: "value", item: 5, slot: "hash", value: textDigest("three") },
+    ]]);
+  });
+
+  /** The effects of a stand-in rule that opens a ticket in its entry, with the hash that a ticket must hold. */
+  const ticketOf = ({ resolved }: RuleGiven) => [{ effect: "open", item: resolved.self, type: "ticket", state: "open" }, { effect: "value", item: resolved.self, slot: "hash", value: textDigest("made") }] as const;
+  const some = (run: (given: RuleGiven) => unknown): PlatformRule => ({ place: "effect", most: 4, run: run as never });
+  /**
+   * The owner of an operation is a platform definition by its name and version, and the made-up name is not of that form. So
+   * the made-up rules are given here under a name that has the form. No data and no rule of that definition is used.
+   */
+  const OWNER = "platform:task@1" as PlatformDefinition;
+  const owned = (over: Partial<Record<string, PlatformRule>>) => ({ ...gateRules(over), named: OWNER });
+
+  test("what a rule returns meets what the validator asks of a written effect or send: nothing that only the hold capability sets, no operation without its first attempt, no relationship of an item that the entry does not open; a list change that changes nothing is not recorded, and a hold ends with an item that a rule ends", () => {
+    // The gate with a pass: a hold under a ticket, with the forms that a hold type must have. A ticket also has a list of members.
+    const s = new Scope(gateWith((d) => {
+      d.acts.enter.grant = "gate.enter";
+      d.capabilities.push({ name: "hold", version: 1 });
+      d.items.ticket.parties = { seen: { fixed: false, required: false, list: true, max: 2, author: false } };
+      d.items.pass = {
+        many: true, max: 2, initial: "held", states: { held: { final: false }, ended: { final: true } },
+        parties: { holder: { fixed: false, required: true, list: false, author: false } }, refs: { under: { fixed: true, required: true, to: { type: "item", of: "ticket" } } },
+        values: { until: { fixed: false, required: true, of: { type: "time" } }, epoch: { fixed: false, required: true, of: { type: "int", min: 1, max: 9 } } },
+      };
+      d.acts.take = {
+        step: "open", on: "pass", grant: "gate.take", also: {}, fields: { ticket: { type: "item", of: "ticket", required: true } }, guards: [], sends: [], attention: [],
+        effects: [{ ref: { slot: "under", from: { field: "ticket" } } }, { value: { slot: "until", from: { time: { plusSeconds: 600 } } } }, { hold: { do: "open" } }],
+      };
+      d.timed["pass-end"] = { on: "pass", states: ["held"], deadline: "until", effects: [{ hold: { do: "end" } }], attention: [] };
+    }));
+    // Tickets 2, 3 and 4, and pass 5, which rita holds under ticket 3.
+    for (const secret of ["one", "two", "three"]) s.did(rita, "issue", { fields: { hash: textDigest(secret) } });
+    s.did(rita, "take", { fields: { ticket: 3 } });
+    const relate = (): PlatformRule => ({ place: "send", run: () => ({ to: otherLane, message: { class: "request", type: "relate", body: { name: "seat", item: { self: true }, state: "taken", detail: {} } } }) });
+    const faults: Record<string, Partial<Record<string, PlatformRule>>> = {
+      // Section 6.8: only a `hold` record changes these, and no rule returns one.
+      "the state of a hold": { "key-id": some(() => [{ effect: "state", item: 5, state: "ended" }]) },
+      "the holder of a hold": { "key-id": some(() => [{ effect: "party", item: 5, slot: "holder", member: vic.member }]) },
+      "the epoch of a hold": { "key-id": some(() => [{ effect: "value", item: 5, slot: "epoch", value: 7 }]) },
+      "the end of a hold": { "key-id": some(() => [{ effect: "value", item: 5, slot: "until", value: t(9000) }]) },
+      "the opening of a hold": { "key-id": some(({ resolved }) => [{ effect: "open", item: resolved.self, type: "pass", state: "held" }]) },
+      // Section 4.3, item 2: the entry that opens an operation opens its attempt 1.
+      "an operation with no first attempt": { "key-id": some(() => [{ effect: "operation", k: 0, owner: OWNER, kind: "probe", attempts: 1 }]) },
+      // Section 6.6: `self` is the item of a relationship only in an entry that opens one.
+      "a relationship of `self` in an entry that opens no item": { refer: relate() },
+    };
+    for (const [name, over] of Object.entries(faults)) expect([name, said(enter(s, una, "one", owned(over)))]).toEqual([name, ["unavailable", "unavailable", null, null]]);
+
+    // The rule adds vic to the list of ticket 2 twice, and takes ticket 3, which is no subject of the row, to its final state. The
+    // second addition records nothing. Pass 5 is under ticket 3, so it ends in the same entry, as under an item that a written effect ends.
+    const seen = { effect: "list", item: 2, slot: "seen", change: "add", member: vic.member };
+    expect([said(enter(s, una, "one", gateRules({ "key-id": some(() => [seen, seen, { effect: "state", item: 3, state: "used" }]) }))), s.last.effects]).toEqual([["write", null, null, null], [
+      { effect: "state", item: 2, state: "used" }, seen, { effect: "state", item: 3, state: "used" }, { effect: "hold", item: 5, change: "end", epoch: 2 },
+    ]]);
+    // In an entry in which the rule opens a ticket, `self` names that ticket, and the relationship is sent.
+    expect([said(enter(s, vic, "three", gateRules({ "key-id": some(ticketOf), refer: relate() }))), s.last.sends]).toEqual([["write", null, null, null], [
+      { n: 0, to: otherLane, message: { class: "request", type: "relate", body: { name: "seat", item: { self: true }, state: "taken", detail: {} } } },
     ]]);
   });
 });

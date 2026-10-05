@@ -16,11 +16,12 @@ import { capabilityEffect } from "./capability.ts";
 import { isEntryOf, isLocalFact } from "./fields.ts";
 import { changeItem, newItem, type ItemEffect } from "./fold.ts";
 import { judgeGuards, members, readsUnbound, slotOf, type Judging } from "./guards.ts";
-import { deriveHold, endsUnder, type HoldEffect } from "./hold.ts";
+import { EPOCH, HOLDER, deriveHold, endsUnder, type HoldEffect } from "./hold.ts";
 import { bindEach, covered, typeOfElement } from "./lists.ts";
 import { givenTo, markOf, ofCodedType, outside, ruleFor, run, type RuleEffect } from "./marks.ts";
 import { kindOf, operand } from "./operand.ts";
 import type { Item } from "./state.ts";
+import type { ValidDefinition } from "./validate/index.ts";
 import { LAST_MS, timeMs, timeOf } from "./time.ts";
 import { unsupported } from "./unsupported.ts";
 import { isFactRef, isLocalId, isMemberRef, isObject, isValue, memberFits, own, same } from "./values.ts";
@@ -101,6 +102,10 @@ function held(j: Judging, type: FieldType, value: unknown): FieldValue | undefin
   }
   return isValue(type, value, j.bounds) ? (value as FieldValue) : undefined;
 }
+
+/** The slot that holds the end of a hold of that type: the deadline of the timed rule that ends it, of which a hold type has one (section 6.8). */
+const endOf = (definition: ValidDefinition, type: string): string | undefined =>
+  Object.values(definition.declared.timed).find((rule) => rule.on === type && rule.effects.some((e) => "hold" in e && e.hold.do === "end"))?.deadline;
 
 /** The members of `Effect` that a rule returns (section 6.1). Every other member is a fault of the rule. */
 const BY_RULE: readonly string[] = ["open", "state", "party", "list", "ref", "value", "operation", "attempt"];
@@ -188,8 +193,9 @@ export function deriveEffects(j: Judging, forms: readonly EffectForm[], attentio
       }
       if (effect.effect === "open") {
         // Section 4.1: an entry opens at most one item, whatever opens it, and its ID is the entry's `seq`. Section 6.3: in its initial state.
+        // Section 6.8: a hold is opened by `hold: open`, as the primary item of an act. No rule returns that record, so none opens a hold.
         const type = own(items, effect.type);
-        if (opens !== null || byRule || !type || effect.item !== j.self || effect.state !== type.initial) throw outside(mark, "an opening that its entry cannot make");
+        if (opens !== null || byRule || !type || effect.item !== j.self || effect.state !== type.initial || j.definition.holdTypes.includes(effect.type)) throw outside(mark, "an opening that its entry cannot make");
         byRule = newItem(effect, type, null);
         others.set(effect.item, byRule);
         effects.push(effect);
@@ -204,6 +210,9 @@ export function deriveEffects(j: Judging, forms: readonly EffectForm[], attentio
       // item's ID is the `seq` of the entry that opened it, so the item that this entry opens is the one whose ID is `self`.
       const declared = effect.effect === "state" ? undefined : effect.effect === "ref" ? own(type.refs, effect.slot) : effect.effect === "value" ? own(type.values, effect.slot) : own(type.parties, effect.slot);
       if (declared?.fixed && item.id !== j.self) throw outside(mark, `an effect on a fixed slot of item ${item.id}, which its entry does not open`);
+      // Section 6.8: only a `hold` record changes the state, the holder or the epoch of a hold, and its end is set from the commit
+      // time. The validator refuses a written effect that sets one of the four. No rule returns a `hold` record, so a rule sets none.
+      if (j.definition.holdTypes.includes(item.type) && (effect.effect === "state" || [HOLDER, EPOCH, endOf(j.definition, item.type)].includes(effect.slot))) throw outside(mark, `an effect on what only the hold capability sets, of hold ${item.id}`);
       // Section 6.6: no effect changes an item that was final before the entry.
       const was = subject !== undefined ? j.subjects.get(subject) : effect.item === j.self ? undefined : j.view.item(effect.item);
       if (was && own(type.states, was.state)?.final) return refuse("final", `effects.${at}: item ${item.id} is ${was.state}`);
@@ -221,7 +230,9 @@ export function deriveEffects(j: Judging, forms: readonly EffectForm[], attentio
         if (!slot || (effect.effect === "list" ? !slot.list : slot.list && effect.member !== null)) throw outside(mark, `an effect on a party slot that ${item.type} does not declare so`);
         if (effect.member !== null && !memberFits(effect.member, j.bounds)) return bad("gives a member whose handle is longer than a handle may be");
         const listed = members(own(item.parties, effect.slot));
-        if (effect.effect === "list" && effect.change === "add" && !listed.some((m) => same(m, effect.member)) && listed.length >= Math.min(slot.max ?? j.bounds.partyMembers, j.bounds.partyMembers)) return refuse("slot-full", `effects.${at}: ${effect.slot}`);
+        // Section 6.3: adding a member who is already in a list, or removing one who is not, records no effect.
+        if (effect.effect === "list" && listed.some((m) => same(m, effect.member)) === (effect.change === "add")) continue;
+        if (effect.effect === "list" && effect.change === "add" && listed.length >= Math.min(slot.max ?? j.bounds.partyMembers, j.bounds.partyMembers)) return refuse("slot-full", `effects.${at}: ${effect.slot}`);
       } else {
         const to = effect.effect === "ref" ? own(type.refs, effect.slot)?.to : own(type.values, effect.slot)?.of;
         if (!to) throw outside(mark, `an effect on a slot that ${item.type} does not declare`);
@@ -239,6 +250,10 @@ export function deriveEffects(j: Judging, forms: readonly EffectForm[], attentio
       else others.set(item.id, changed);
       if (byRule && changed.id === byRule.id) byRule = changed;
     }
+    // Section 4.3, item 2: the entry that opens an operation opens its attempt 1. Item 1: a genesis may seal an operation as a held
+    // duty, with no attempt. Which genesis does is not built yet (I3 deltas, entry EB12), so a genesis is not asked here.
+    const first = (k: number) => effects.some((e) => e.effect === "attempt" && typeof e.operation === "object" && e.operation.k === k);
+    if (j.self !== 0 && (given as readonly RuleEffect[]).some((effect) => effect.effect === "operation" && !first(effect.k))) throw outside(mark, "an operation with no first attempt");
     return null;
   };
   /**
@@ -423,8 +438,11 @@ export function deriveEffects(j: Judging, forms: readonly EffectForm[], attentio
   // Section 6.8: a hold ends with what it is under. These are the capability's own effects, after the written ones (section 4.1):
   // first the records of each written capability effect, then the ends.
   effects.push(...records);
-  for (const { subject, effect } of endsUnder(j, working)) {
-    if (subject === null) effects.push(effect);
+  // An item that a rule changed and that is no subject of the row is read as the rule left it, under a name that no subject has:
+  // a hold ends with such an item too, when a rule took it to a final state.
+  const left = new Map<string, Item>([...[...others].map(([id, item]) => [`item ${id}`, item] as const), ...working]);
+  for (const { subject, effect } of endsUnder(j, left)) {
+    if (subject === null || !working.has(subject)) effects.push(effect);
     else apply(subject, effect);
   }
   // Authority note, section 5.7, "What is derived, and at which entry": when the definition's holds have a workspace, the code of

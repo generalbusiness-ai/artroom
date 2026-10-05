@@ -252,7 +252,7 @@ export function derive(j: Judging, forms: Forms, opens: string | null, cause: Di
   // Sections 6.6 and 6.7: a condition, or a range that a source or a send reads, that is not completed leaves the input not judged.
   const effects = deriveEffects(j, forms.effects, forms.attention, opens);
   if (!effects.ok) return "unavailable" in effects ? { result: "unavailable", reason: effects.unavailable } : { result: "refused", reason: effects.reason, detail: effects.detail, prepared: j.used };
-  const sends = deriveSends(j, forms.sends, effects.working, cause, first, directory);
+  const sends = deriveSends(j, forms.sends, effects.working, cause, first, directory, effects.opened !== null);
   if (!sends.ok) return "unavailable" in sends ? { result: "unavailable", reason: sends.unavailable } : { result: "refused", reason: sends.reason, detail: sends.detail, prepared: j.used };
   // Section 6.3: `max` bounds the live items of a type, whatever opens the item: the row, or in platform data a rule.
   const full = effects.opened === null ? null : overMax(j.view, j.definition, effects.opened.type, effects.opened.state);
