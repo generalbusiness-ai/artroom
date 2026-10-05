@@ -1104,6 +1104,44 @@ reservation, a read of a repository or a replay.
 | EV16 | Condition (4) of the request: "Activation of a rules definition records what it checked, as the proof plan's O9 row asks". The note says of O9 that it "is accepted as R4's catalogue states it, for the rules definition that is still owed" (its section 13). No text states a form for the record of an activation's checks. Plan 016 asks that an activation "retain what was checked and the observed head". | Nothing new. What exists is section 17's: the entry of `activate` retains each value that its guard read, which is the definition's bytes and those of its named closure, each under its digest (`packages/platform/test/rules-scope.test.ts`, the cases of `activate`). The grant's observation is retained by the scope as for any act. No record names a check of an extent, or a judgment of the definition against the extents. | The proof plan, for what O9 asks an activation to record. The authority note, with the contract, for its form. |
 | EV17 | `packages/platform/src/rules-scope.ts` was built against the authority note's revision 21 and the contract's revision 16. Revisions 24 and 18 are adopted. | Compared, by a diff of the two texts of each: section 12.1.4, section 3.10 and the rows 27 to 29 of the table of marks are the same in revisions 21 and 24, and the type `RulesContent` is the same in revisions 16 and 18. Revision 24 adds section 12.1.4a, which changes no row. So `rules-scope.ts` is not changed, and its header still names revision 21. No other section was compared. | The builder: whether the header's revision is to be updated at the merge. |
 
+**Added on 2026-10-05: EV7, parts (a) and (c), are decided.** The planner
+decided both, by an assertion of that date that rests on request
+`42de9e34`, as the builder gave it to the worker. The table above is as it
+was written.
+
+- **EV7 (a), confirmed as built.** A change to a file is judged at its own
+  path and at the path of every link in the tree that resolves to it,
+  through links below links. No source changed for it.
+- **EV7 (c), changed.** Only two things are refused: creating a link that
+  leaves the tree or cannot be resolved, and giving a link a target that
+  does. Removing such a link is allowed, and is judged as a change in the
+  `rules` extent and in the extents of the link's own path. Replacing it
+  with a regular file or with a link inside the tree is allowed, and is
+  judged in the `rules` extent, in the extents of the path and, for a link,
+  in those of the new target. A tree that already holds such a link blocks
+  no other change: the link is never followed.
+- **What changed in source.** `classify` could not tell a link of the old
+  tree from one of the new. `TreeLink` gains the member `tree`: `old`,
+  `new` or `both`. The caller states it, and that caller is still not
+  built. `classify` stays a pure function.
+- **Two readings are the worker's.** A removal and a replacement with a
+  regular file give `classify` the same rows, one `old` row, so it judges
+  them alike. Rules that name no extent `rules` hold no such removal: the
+  path is unclassified, and the change is not met.
+- **Witness and controls.** `packages/platform/test/extents.test.ts`, the
+  test "a link that leaves the tree is refused only where the change
+  creates it", with one case for each of create, retarget to outside,
+  remove, replace with a file, replace with a link inside the tree, and an
+  unrelated change. Three controls by `scripts/control.mjs`, and each
+  distinguishes: the refusal for a link of either tree, the `rules` extent
+  not shown for a removal, and the path not unclassified where no extent
+  `rules` exists. The unrelated change was not blocked before this change
+  either, so no control distinguishes that case.
+- **Still open.** Reading (b), that "refused" is not met with `rules`
+  named and the class `authority`, was not part of this decision. Who
+  resolves a link, and in which form the evidence carries the rows, stay
+  with entry EV1.
+
 ## 24. Step 24: the step `job-read`, the read token and the snapshot
 
 Written 2026-10-05, on `request/i3-checkers`. "The authority note" is
