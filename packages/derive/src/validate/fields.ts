@@ -8,7 +8,7 @@ import type { FieldType } from "@generalbusiness/artroom-contract";
 import { isScopeKind } from "@generalbusiness/artroom-bytes";
 import { isObject, isValue, own } from "../values.ts";
 import { stepKind } from "./capability.ts";
-import type { Defining } from "./context.ts";
+import { mark, marked, type Defining } from "./context.ts";
 import { at, type Rec } from "./shape.ts";
 
 const FIELD_SHAPES: Readonly<Record<string, readonly string[]>> = {
@@ -24,6 +24,9 @@ const FIELD_SHAPES: Readonly<Record<string, readonly string[]>> = {
  * needs this; a comparison does not.
  */
 export function assignable(from: FieldType, to: FieldType): boolean {
+  // Section 6.1: a value of a type that is a mark is assignable to that type only: the type that the same rule checks.
+  const [a, b] = [codeOf(from), codeOf(to)];
+  if (a !== null || b !== null) return a === b;
   switch (from.type) {
     // A detached text is held as its digest, and a plain one as its bytes: neither is a value of the other.
     case "text": return to.type === "text" && from.max <= to.max && (from.detached === true) === (to.detached === true);
@@ -43,15 +46,27 @@ export function assignable(from: FieldType, to: FieldType): boolean {
   }
 }
 
+/** The rule that checks a type which is a mark, in platform data (section 6.1, place 3). Null: the type is one that the forms write. */
+export const codeOf = (type: FieldType | null | undefined): string | null => (marked(type) ? String((type as Record<string, unknown>)["code"]) : null);
+
 /**
- * One field type. `extra`: the members a field or a slot may carry beside
+ * One field type. `markable`: the type is that of a field of an act or of a
+ * handler, or of a slot, where platform data may write a mark in place of a
+ * type (section 6.1, place 3). `extra`: the members a field or a slot may carry beside
  * its type. `detachable`: the type is that of a field of an act or of a
  * message, or of a value slot, which are the places a detached text is held
  * (section 6.2). Null: it is not one, which is reported.
  */
-export function fieldType(d: Defining, v: unknown, path: string, extra: readonly string[] = [], nested = false, detachable = false): FieldType | null {
+export function fieldType(d: Defining, v: unknown, path: string, extra: readonly string[] = [], nested = false, detachable = false, markable = false): FieldType | null {
   const { bounds, problems, bad, rec, str, int } = d;
   const before = problems.length;
+  if (d.platform && markable && marked(v)) {
+    // The data states no shape for the value. The rule checks each value, so nothing of the type is checked here, and a default,
+    // which only the rule could check, is not written.
+    const o = mark(d, v, path, "type", ["type"], extra.filter((member) => member !== "default"));
+    if (o && o["type"] !== "code") bad("shape", at(path, "type"), "the type of a mark is code");
+    return o && problems.length === before ? (v as unknown as FieldType) : null;
+  }
   const keys = isObject(v) && typeof v["type"] === "string" ? own(FIELD_SHAPES, v["type"]) : undefined;
   if (!keys) return bad("shape", path, "must be a field type");
   const o = rec(v, path, ["type", ...keys], (v as Rec)["type"] === "text" ? [...extra, "detached"] : extra);
@@ -136,12 +151,12 @@ export function declaredFields(d: Defining, v: unknown, path: string): Map<strin
   const fields = new Map<string, FieldType>();
   for (const [f, fv] of entries(v, path, null)) {
     const p = at(path, f);
-    const type = fieldType(d, fv, p, ["required", "default"], false, true);
+    const type = fieldType(d, fv, p, ["required", "default"], false, true, true);
     if (!type) continue;
     const fo = fv as Rec;
     if (bool(fo["required"], at(p, "required")) === null) continue;
     // Section 6.2: an optional field may have a default.
-    if ("default" in fo && (fo["required"] === true || !isValue(type, fo["default"], bounds))) bad("shape", at(p, "default"), "is a value of the field's type, on an optional field");
+    if ("default" in fo && (fo["required"] === true || codeOf(type) !== null || !isValue(type, fo["default"], bounds))) bad("shape", at(p, "default"), "is a value of the field's type, on an optional field");
     fields.set(f, type);
   }
   return fields;

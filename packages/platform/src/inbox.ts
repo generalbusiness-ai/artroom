@@ -15,7 +15,7 @@
 
 import type { DeclaredDefinition } from "@generalbusiness/artroom-contract";
 
-export const inbox: DeclaredDefinition = {
+export const inbox: DeclaredDefinition & { outcomes: Record<string, never> } = {
   format: "artroom-definition-1",
   name: "platform:inbox",
   profile: { name: "restricted", version: 1 },
@@ -100,6 +100,9 @@ export const inbox: DeclaredDefinition = {
   },
   timed: {},
   rules: {},
+  // The validator's platform option reads the data of a platform definition, which states the operation kinds that it owns (the
+  // contract's revision 15, section 6.1). The inbox opens no operation.
+  outcomes: {},
 };
 
 function notify(kind: "lane" | "task"): DeclaredDefinition["receives"][string] {

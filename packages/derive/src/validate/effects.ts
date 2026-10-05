@@ -5,7 +5,7 @@ import { canonicalize } from "@generalbusiness/artroom-bytes";
 import { LAST_MS } from "../time.ts";
 import { isObject, isValue } from "../values.ts";
 import { capabilityEffect } from "./capability.ts";
-import { onSubject, subject, type Ctx, type Defining, type Slot, type Type } from "./context.ts";
+import { mark, marked, onSubject, subject, type Ctx, type Defining, type Slot, type Type } from "./context.ts";
 import { assignable } from "./fields.ts";
 import { guards, range } from "./guards.ts";
 import { holdEffect } from "./hold.ts";
@@ -244,6 +244,15 @@ export function effects(d: Defining, v: unknown, path: string, ctx: Ctx, later: 
   const { bounds, bad, list } = d;
   const set: (Sets & { written: Rec })[] = [];
   list(v, path, bounds.effects).forEach((e, i) => {
+    if (d.platform && marked(e)) {
+      // Section 6.1, place 5: a mark is one effect of the written list of an act, a handler or a result clause. It has no `of`,
+      // `if` or `unless`. A timed rule's effects are total (section 6.4), and no rule is shown to be total, so a timed rule holds
+      // none. Nothing is derived from a mark: it conflicts with no written effect, and what it can set is not counted here (the
+      // contract's point R1-59).
+      if (ctx.timed) bad("timed-partial", at(path, i), "a timed rule's effects are total, so none is a mark");
+      else mark(d, e, at(path, i), "effect");
+      return;
+    }
     const sets = effect(d, e, at(path, i), ctx, later);
     if (sets === null) return;
     if (ctx.timed && isObject(e) && !onSubject(e["of"])) bad("timed", at(path, i), "a timed rule changes its own item only");

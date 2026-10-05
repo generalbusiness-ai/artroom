@@ -3,7 +3,7 @@
 import type { FieldType } from "@generalbusiness/artroom-contract";
 import { isObject } from "../values.ts";
 import { capabilityGuard } from "./capability.ts";
-import { onSubject, subject, type Ctx, type Defining, type Type } from "./context.ts";
+import { mark, marked, onSubject, subject, type Ctx, type Defining, type Type } from "./context.ts";
 import { fieldOf, isDetached, operand, type Read } from "./operands.ts";
 import { at, type Rec } from "./shape.ts";
 
@@ -238,10 +238,19 @@ export function guard(d: Defining, v: unknown, path: string, ctx: Ctx, nesting: 
   if ("ifPresent" in o && (bool(o["ifPresent"], at(path, "ifPresent")) === null || !namesField)) bad("shape", at(path, "ifPresent"), "is for a guard that names a field or a presented fact");
 }
 
-/** The guards of one act or handler, or of one condition, in the order written. */
-export function guards(d: Defining, v: unknown, path: string, ctx: Ctx): void {
+/**
+ * The guards of one act or handler, or of one condition, in the order
+ * written. `written`: the list is the written list of an act or of a
+ * handler, where platform data may hold a mark as one guard (section 6.1,
+ * place 4). A mark is counted as one guard, and nothing of it is checked: it
+ * names no subject. Inside a list form, and in a condition, a mark is read
+ * as a guard, which it is not.
+ */
+export function guards(d: Defining, v: unknown, path: string, ctx: Ctx, written = false): void {
   const nesting: Nesting = { count: 0 };
-  d.list(v, path, d.bounds.guards).forEach((g, i) => guard(d, g, at(path, i), ctx, nesting));
+  d.list(v, path, d.bounds.guards).forEach((g, i) => {
+    if (d.platform && written && marked(g)) { nesting.count++; mark(d, g, at(path, i), "guard"); } else guard(d, g, at(path, i), ctx, nesting);
+  });
   // Section 6.1: the guards of one act or handler, counting those nested in `each`, `has` and `anyOf`.
   if (nesting.count > d.bounds.nestedGuards) d.bad("bound", path, `has ${nesting.count} guards, counting those nested; at most ${d.bounds.nestedGuards}`);
 }

@@ -3,7 +3,7 @@
 import type { FieldType } from "@generalbusiness/artroom-contract";
 import { isValue } from "../values.ts";
 import type { Defining, Slot } from "./context.ts";
-import { fieldType } from "./fields.ts";
+import { codeOf, fieldType } from "./fields.ts";
 import { at } from "./shape.ts";
 
 /** Reads every item type into `d.types`. One with a problem is reported and left out. */
@@ -36,11 +36,12 @@ export function itemTypes(d: Defining, v: unknown): void {
           // Section 6.3: a party list holds at most 64 members. One that declares no `max` holds the bound itself.
           if ("max" in so && (!so["list"] || (int(so["max"], at(p, "max"), 1) ?? 0) > bounds.partyMembers)) bad("bound", at(p, "max"), `only a list has a max, of at most ${bounds.partyMembers}`);
           type = so["list"] ? { type: "list", of: { type: "member" }, max: (so["max"] as number | undefined) ?? bounds.partyMembers } : { type: "member" };
-        } else type = fieldType(d, so[kind === "ref" ? "to" : "of"], at(p, kind === "ref" ? "to" : "of"), [], false, kind === "value");
+        } else type = fieldType(d, so[kind === "ref" ? "to" : "of"], at(p, kind === "ref" ? "to" : "of"), [], false, kind === "value", true);
         if (!type) continue;
         // Section 6.2: a detached text is kept under its digest for the slot that names it. A default would name bytes that nothing holds.
         if (type.type === "text" && type.detached && "default" in so) bad("shape", at(p, "default"), "a detached text has no default: no bytes would come with it");
-        if ("default" in so && !isValue(type, so["default"], bounds)) bad("shape", at(p, "default"), "is not a value of the slot's type");
+        // Section 6.1: only its rule says whether a value is of a type that is a mark, so such a slot has no default.
+        if ("default" in so && (codeOf(type) !== null || !isValue(type, so["default"], bounds))) bad("shape", at(p, "default"), "is not a value of the slot's type");
         slots.set(s, { kind, fixed: so["fixed"] as boolean, required: so["required"] as boolean, list: so["list"] === true, type, hasDefault: "default" in so });
       }
     };
