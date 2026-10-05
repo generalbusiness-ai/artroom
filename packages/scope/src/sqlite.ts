@@ -354,10 +354,12 @@ export class SqliteStore implements Store {
 
   // ---------------------------------------------------------------- the operations driver's bookkeeping
 
-  unsent(now: number, limit: number, parked: boolean): Sending[] {
-    const rows = this.#all(`SELECT ${SENDING} FROM attempt WHERE outcome IS NULL AND next <= ? ORDER BY next, seq, k, attempt LIMIT ?`, now, limit).map(sendingOf);
-    const more = parked && rows.length < limit ? this.#all(`SELECT ${SENDING} FROM attempt WHERE outcome IS NULL AND next IS NULL ORDER BY seq, k, attempt LIMIT ?`, limit - rows.length).map(sendingOf) : [];
-    return [...rows, ...more];
+  unsent(now: number, limit: number): Sending[] {
+    return this.#all(`SELECT ${SENDING} FROM attempt WHERE outcome IS NULL AND next <= ? ORDER BY next, seq, k, attempt LIMIT ?`, now, limit).map(sendingOf);
+  }
+  parked(after: Pick<Sending, "operation" | "attempt"> | null, limit: number): Sending[] {
+    const from = after ? [...partsOf(after.operation), after.attempt] : [-1, -1, -1];
+    return this.#all(`SELECT ${SENDING} FROM attempt WHERE outcome IS NULL AND next IS NULL AND (seq, k, attempt) > (?, ?, ?) ORDER BY seq, k, attempt LIMIT ?`, ...from, limit).map(sendingOf);
   }
   nextSend(): number | null { return (this.#one("SELECT MIN(next) AS next FROM attempt WHERE outcome IS NULL")?.["next"] as number | null | undefined) ?? null; }
   sending(operation: OperationId, attempt: number): Sending | null {

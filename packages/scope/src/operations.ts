@@ -122,8 +122,14 @@ export class Operations {
   readonly #bounds: Bounds;
   /** Answers in hand that the scope could not record yet, by attempt. They are in memory only: one that is lost with the process leaves its attempt `unknown`. */
   readonly #held = new Map<string, Outcome>();
-  /** The first pass of this object's life also looks at the attempts that nothing could send before. */
-  #first = true;
+  /**
+   * The walk of this object's life over the attempts that nothing could send
+   * before: those with no time to look at them next. Each pass takes one
+   * page of them, after the row that the walk reached, beside the batch of
+   * what is due. Null: the walk has ended. So every such attempt is looked
+   * at once after a restart, whatever stands before it and whatever is due.
+   */
+  #walk: { after: Sending | null } | null = { after: null };
   #running: Promise<number> | null = null;
   #again = false;
 
@@ -161,21 +167,32 @@ export class Operations {
   }
 
   /**
-   * One pass over the attempts that have no outcome and are due. Rule 7: a
-   * pass is bounded; with nothing due it writes nothing and asks for no
-   * wake-up; and it opens no attempt, which only an entry does.
+   * One pass over the attempts that have no outcome and are due, and over
+   * one page of the walk. Rule 7: a pass is bounded, by two batches; with
+   * nothing due it writes nothing and asks for no wake-up; and it opens no
+   * attempt, which only an entry does.
    */
   async #pass(): Promise<number> {
     const store = this.#store;
     const now = timeMs(this.#clock.read())!;
-    const due = store.unsent(now, this.#bounds.deliveryBatch, this.#first);
-    this.#first = false;
-    if (due.length === 0) return 0;
-    const scope = store.scope()!;
+    const batch = this.#bounds.deliveryBatch;
     // Section 6.1: a scope whose pinned definition this runtime cannot run admits nothing, so no outcome can be written. Nothing
     // is sent and nothing is offered. Each attempt stays as it is recorded, with no wake-up, until a runtime that can run the
-    // definition restarts the object.
+    // definition restarts the object. The walk ends at once: it could do nothing for any row.
     const runs = Boolean(this.#scope.pinned()?.definition);
+    const walked = this.#walk;
+    // The page has its own batch, so what is due never uses it up. A page that is not full is the last. The walk goes on by the
+    // row it reached, so a row that stays as it is recorded is passed, and holds back no row after it.
+    const page = walked && runs ? store.parked(walked.after, batch) : [];
+    this.#walk = page.length < batch ? null : { after: page.at(-1)! };
+    // While pages remain, the driver asks to be woken at once. The wake-up is in memory, as the walk is: a restart begins the walk again.
+    this.#wakes.driver(this.#walk ? now : null);
+    const due = [...store.unsent(now, batch), ...page];
+    if (due.length === 0) {
+      if (walked) await this.#wakes.set();
+      return 0;
+    }
+    const scope = store.scope()!;
     const work: (() => Promise<void>)[] = [];
     for (const row of due) {
       const { operation: id, attempt } = row;
@@ -193,7 +210,7 @@ export class Operations {
       const operation = store.operation(id);
       const origin = store.stored(Number(id.split(":")[0]));
       // Nothing is sent that this runtime cannot send, or whose outcome it could not judge. The attempt stays recorded and not sent,
-      // and no wake-up is asked for it (rule 7). The first pass after a restart looks at it once more.
+      // and no wake-up is asked for it (rule 7). The walk after a restart looks at it once more.
       if (!operation || !origin || !this.#outside.accepts(operation.owner, operation.kind) || !this.#scope.owners()?.rules(operation.owner, operation.kind)) {
         if (row.next !== null) store.postpone(id, attempt, null);
         continue;

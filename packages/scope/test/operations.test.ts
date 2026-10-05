@@ -6,7 +6,7 @@ import { checkpointOf, operationId, operationOpening, timeMs, type Opening } fro
 import { SqliteStore, Turns, Wakes, production, type EffectAnswer, type OperationStatus, type OutcomeRecorded } from "../src/index.ts";
 import { variant } from "@generalbusiness/artroom-derive/testing";
 import { controls } from "../src/testing.ts";
-import { outsideOf, owners, pushOf, type OutsideDouble } from "./outside.ts";
+import { FENCE, outsideOf, owners, pushOf, type OutsideDouble } from "./outside.ts";
 import { Lane, START, at, definition, found, founding, reader, rita, stubOf } from "./support.ts";
 
 /** The delay before the second attempt of an operation. */
@@ -137,6 +137,28 @@ describe("outside operations at a real scope (scope contract, section 4.3; autho
     out.answer(retry, 1, { result: "confirmed", evidence: { basis: "read", body: { commit: "c1" } } });
     expect(await s.alarm()).toBe(true);
     expect([retry, out.attempts.at(-1), (await seen(s, retry)).state, (await seen(s, op)).state, outcomes(await seen(s, op))]).toEqual(["4:0", "4:0#1", "settled", "unknown", [["refused at 2"], ["unknown at 3"]]]);
+  });
+
+  test("after a restart the driver walks every attempt that nothing could send, one page at a pass: an attempt that still cannot be sent holds back none after it, and what is due does not use the page up", async () => {
+    const s = await found({ deliveryBatch: 1 });
+    const out = outsideOf(s.name);
+    // Three attempts that the port does not send. A pass looks at one, and leaves it recorded with no wake-up.
+    out.accepting = false;
+    const [fence, first, second] = await open(s, FENCE, pushOf(1), pushOf(1)) as [OperationId, OperationId, OperationId];
+    expect([await s.alarm(), await s.alarm(), await s.alarm(), out.sent.length, await s.alarmAt()]).toEqual([true, true, true, 0, null]);
+
+    // A runtime that sends a push, and has no rules for the fence. After its restart a new attempt is due.
+    out.accepting = true;
+    await s.restart();
+    const [due] = await open(s, pushOf(1)) as [OperationId];
+    for (const id of [first, second, due]) out.answer(id, 1, own("c1"));
+    // The first pass sends what is due, and looks at the first page: the fence, which stays as it is. Pages remain, so it asks to be woken at once.
+    expect([await surface(s).effect(), out.attempts, await s.alarmAt()]).toEqual([1, [`${due}#1`], timeMs(START)]);
+    // Each wake-up takes the next page. The walk ends at a page that is not full, and asks for nothing more.
+    expect([await s.alarm(), await s.alarm(), await s.alarmAt(), await s.alarm(), await s.alarmAt()]).toEqual([true, true, timeMs(START), true, null]);
+    expect([out.attempts, await seen(s, fence), (await seen(s, second)).state, await s.alarm(), await surface(s).effect()]).toMatchObject([
+      [`${due}#1`, `${first}#1`, `${second}#1`], { state: "pending", sends: [{ attempt: 1, next: null, sent: null }] }, "settled", false, 0,
+    ]);
   });
 
   test("a scope whose pinned definition the runtime cannot run sends nothing outside the service: the attempt stays recorded, with no wake-up, and is sent once the runtime can run the definition. The capability is the scripted stand-in", async () => {

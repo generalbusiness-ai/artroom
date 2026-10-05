@@ -42,6 +42,10 @@ import { LATE, within } from "./turn.ts";
  * without another being lost, also after a restart. The alarm is always the
  * earliest of them, so a stored wake-up is never replaced by a later one
  * (authority note, section 5.4, rule 7).
+ *
+ * The driver has one more wake that is in no row: for work it holds in
+ * memory only. It is kept here in memory, so no other wake replaces it, and
+ * it is gone with the process, as that work is.
  */
 export class Wakes {
   readonly #store: Store;
@@ -51,6 +55,7 @@ export class Wakes {
 
   /** False: this scope has no transport, nothing dispatches its sends, and no wake is asked for them. */
   readonly #dispatches: boolean;
+  #driver: number | null = null;
 
   constructor(store: Store, alarm: Alarm, dispatches = true) {
     this.#store = store;
@@ -59,11 +64,14 @@ export class Wakes {
     this.deadline = { set: (at) => { store.setDeadline(at); return this.set(); } };
   }
 
+  /** When the operations driver next has work that is in memory only, in milliseconds, or null. The next `set` uses it. */
+  driver(at: number | null): void { this.#driver = at; }
+
   /** Set the alarm at the earliest of the wakes, or clear it when there is none. */
   set(): void | Promise<void> {
     const deadline = this.#store.deadline();
     const dispatch = this.#dispatches ? this.#store.nextDispatch() : null;
-    const at = [deadline === null ? null : timeMs(deadline), dispatch, this.#store.nextSend()].filter((ms): ms is number => ms !== null);
+    const at = [deadline === null ? null : timeMs(deadline), dispatch, this.#store.nextSend(), this.#driver].filter((ms): ms is number => ms !== null);
     return this.#alarm.set(at.length === 0 ? null : timeOf(Math.min(...at)));
   }
 }

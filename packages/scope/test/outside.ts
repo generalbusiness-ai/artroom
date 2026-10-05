@@ -56,7 +56,9 @@ export function outsideOf(name: string): OutsideDouble {
   return made;
 }
 
-/** A made-up owner's rules: a push is decided by a read, selects nothing, and its rule always asks for another attempt. */
+/** A made-up owner's rules: a push is decided by a read, selects nothing, and its rule always asks for another attempt. No other kind has rules. */
 const push: OperationRules = { selects: false, read: true, retries: () => true };
 export const owners: Owners = { rules: (_owner, kind) => (kind === "push" ? push : null) };
 export const pushOf = (attempts: number): Opening => ({ owner: "platform:destination@1", kind: "push", attempts });
+/** An operation of a kind that the made-up owner has no rules for: no runtime of these tests sends it. */
+export const FENCE: Opening = { owner: "platform:destination@1", kind: "fence", attempts: 1 };

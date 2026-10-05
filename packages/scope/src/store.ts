@@ -105,10 +105,16 @@ export interface Store extends StateWriter {
 
   /**
    * At most `limit` attempts that have no outcome and are due at `now`, in
-   * milliseconds, earliest first. `parked`: also those with no time to look
-   * at them next.
+   * milliseconds, earliest first.
    */
-  unsent(now: number, limit: number, parked: boolean): Sending[];
+  unsent(now: number, limit: number): Sending[];
+  /**
+   * At most `limit` attempts that have no outcome and no time to look at
+   * them next, after the one at `after`, in the order of their operations
+   * and numbers. No wake-up is kept for these: the driver walks them once
+   * after a restart.
+   */
+  parked(after: Pick<Sending, "operation" | "attempt"> | null, limit: number): Sending[];
   /** When the driver next has an attempt to look at, in milliseconds, or null. */
   nextSend(): number | null;
   /** The driver's row of one attempt, or null: no entry opened it. */

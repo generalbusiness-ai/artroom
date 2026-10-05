@@ -272,3 +272,17 @@ neither lane digest changes.
 The text contradicts itself in one place that matters to a reader of the
 rows. Revision 15's section 11.13 says "Its rows are numbered I3-1 to
 I3-9", and then lists eleven and counts eleven.
+
+## 12. Repairs after the reviewer's two static readings
+
+Written 2026-10-05, by the worker of the repairs. Entries have the prefix
+EK. The readings are the reviewer's finished reports `92fa170a` (at
+`ae3ea555`) and `f55ad7d0` (at `5d05de6f`). The adopted designs are now
+the scope contract's revision 15 at `7f1ea903c` and the authority note's
+revision 20 at `4ef1a5e37`. Each entry is a source choice that a repair
+made where the texts state no form. No entry's bytes, no state digest and
+neither lane digest changes.
+
+| # | Where the texts are silent | Implemented | Owner |
+|---|---|---|---|
+| EK1 | The authority note's section 5.4, rule 7, bounds a pass and keeps no wake-up for an attempt that cannot be sent. No text says how such attempts are found again after a restart. The driver looked at one batch of them, once, and what was due could use that batch up. | A walk, in memory, for each life of the object. Each pass takes what is due, at most one batch, and one page of the attempts with no time to look at them next, at most one batch, after the row that the walk reached. A page that is not full ends the walk. While pages remain the driver asks to be woken at once, by a wake that `Wakes` keeps in memory beside the three stored ones. An attempt that still cannot be sent stays as it is recorded, and the durable mark of a send is as before. A restart begins the walk again. A scope whose definition cannot be run ends the walk at once. Witness: `operations.test.ts`, "after a restart the driver walks". | The builder |
