@@ -80,6 +80,12 @@ export interface OperationRules {
   holds?(view: StateView, operation: Operation, outcome: OutcomeInput): boolean;
   /** Item 4: the evidence is well formed for this owner. Absent: any body is. The ledger has checked that the evidence has a basis and a body. */
   wellFormed?(result: Result, evidence: Evidence): boolean;
+  /**
+   * The snapshots that the evidence names by digest (section 16.4): each is
+   * a retained input, and the scope stores its bytes before the entry that
+   * names the digest. Absent: the evidence of this kind names none.
+   */
+  retains?(evidence: Evidence): readonly Digest[];
   /** What the outcome derives beside the ledger's records. Absent: nothing. */
   derives?(view: StateView, operation: Operation, outcome: OutcomeInput, selected: boolean | null, at: OutcomeAt): OutcomeDerived;
   /**
@@ -137,8 +143,9 @@ export const reservedBy = (open: Opening, owners: Owners | null | undefined): nu
  * Section 5.8: the entry that opens an operation reserves for every attempt
  * it states, so the number is fixed here and never raised.
  */
-// I3 merge: no judge calls this yet, but the one of an outcome, for what its owner opens. The capability rules, a preparation and
-// the platform rules open their operations with it, each in its own step.
+// The judge of an outcome calls this for what its owner opens, the judge of a preparation for what its step opens, and the code of
+// a hold's workspace for a fork's creation and a revocation.
+// I3 merge: the platform rules open their operations with it, in their own step.
 export function operationOpening(k: number, open: Opening, held = false): Effect[] {
   if (!Number.isSafeInteger(open.attempts) || open.attempts < 1) throw new Error("an operation states at least one attempt");
   const operation: Effect = { effect: "operation", k, owner: open.owner, kind: open.kind, attempts: open.attempts };

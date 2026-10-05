@@ -119,7 +119,8 @@ export interface Steps {
  * port carries one value for the guards, the effects and the steps of a
  * capability, and a value with no step rules has none.
  */
-// I3 merge: the port's type, `Capabilities`, states no steps (plan step 3). Step 16 gives the port its member, and this goes.
+// I3 merge: the port's type, `Capabilities`, states no steps (plan step 3; I3 deltas, entry EH12). Step 16 wired the code and left
+// this narrowing: the two interfaces each have an `implements`, and one port type for both is owed with the replay's rules (step 22).
 export const stepsOf = (capabilities: Capabilities | null | undefined): Steps | null => {
   const steps = capabilities as Partial<Steps> | null | undefined;
   return steps && typeof steps.derive === "function" && typeof steps.grant === "function" ? (steps as Steps) : null;

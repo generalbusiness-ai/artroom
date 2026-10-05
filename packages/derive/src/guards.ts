@@ -9,7 +9,7 @@ import type { Bounds, Entry, FactRef, FieldType, FieldValue, Guard, MemberRef, O
 import { canonicalBytes, digestBytes } from "@generalbusiness/artroom-bytes";
 import type { Signer } from "./attribution.ts";
 import { capabilityGuard, type Capabilities } from "./capability.ts";
-import type { Own } from "./fields.ts";
+import type { Own, Snapshots } from "./fields.ts";
 import { all, excepted, listGuard, scan, typeOfElement } from "./lists.ts";
 import { guardByRule, markOf, type Declined, type JudgedInput, type PlatformRules } from "./marks.ts";
 import { equal, kindOf, operand, slotOf } from "./operand.ts";
@@ -48,6 +48,7 @@ export interface Judging {
   asked?: RuleInput[] | undefined;                     // set by `prepareRules` only: collect each rule's input and judge nothing on it
   // What the operands of section 6.5 read beside the above. Each is absent where the input has none, and its operand is then none.
   own?: Own | undefined;                               // this scope's own history: a local fact, and a part of one
+  snapshot?: Snapshots | undefined;                    // the snapshots of staged refs that this scope retains, by digest (section 16.4)
   intent?: Digest | undefined;                         // an act: the digest of the intent being judged
   sender?: ScopeRef | undefined;                       // a handler and a result clause: the envelope's source scope, as verified
   source?: Fetched | undefined;                        // a handler: the verified source entry

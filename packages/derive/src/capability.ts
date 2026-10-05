@@ -47,13 +47,15 @@ export interface Recorded { kind: string; key: readonly FieldValue[]; state: str
  * - `facts` and `source`: the entries in `uses` that the input names, and
  *   for a handler the verified source entry.
  * - `clock`: the one reading of the commit.
+ * - `snapshot`: the snapshots of staged refs that this scope retains, by
+ *   digest (section 16.4), which the guard `ancestry` reads.
  * - `from`, for an effect: for each argument that the definition writes as
  *   a slot of an item, with no part, the ID of that item: the subject of
  *   the slot operand. An argument that is read from anything else has no
  *   member. The effect `pin-release` finds its pin by it (authority note,
  *   section 5.7, "Which pin a commit alone releases").
  */
-export type CapabilityGiven = Pick<Judging, "view" | "definition" | "scope" | "self" | "kind" | "fields" | "signer" | "intent" | "facts" | "source" | "own" | "clock"> & { from?: Readonly<Record<string, number>> };
+export type CapabilityGiven = Pick<Judging, "view" | "definition" | "scope" | "self" | "kind" | "fields" | "signer" | "intent" | "facts" | "source" | "own" | "snapshot" | "clock"> & { from?: Readonly<Record<string, number>> };
 
 /**
  * One declared maximum of a capability version's code (section 6.1, "A
@@ -169,7 +171,7 @@ export function counted(definition: ValidDefinition, capabilities: Capabilities 
   return null;
 }
 
-const given = ({ view, definition, scope, self, kind, fields, signer, intent, facts, source, own, clock }: Judging): CapabilityGiven => ({ view, definition, scope, self, kind, fields, signer, intent, facts, source, own, clock });
+const given = ({ view, definition, scope, self, kind, fields, signer, intent, facts, source, own, snapshot, clock }: Judging): CapabilityGiven => ({ view, definition, scope, self, kind, fields, signer, intent, facts, source, own, snapshot, clock });
 
 /** What a capability version declares, or undefined for a version that the contract's tables do not have. */
 export const declaredBy = (capability: string): Capability | undefined => own(CAPABILITIES as Readonly<Record<string, Capability>>, capability);

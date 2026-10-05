@@ -7,7 +7,7 @@ import { timeOf, type Delivered } from "@generalbusiness/artroom-derive";
 import { Scope, forged, grantOf, laneDefinition, variant } from "@generalbusiness/artroom-derive/testing";
 import { inbox, platform } from "@generalbusiness/artroom-platform";
 import { httpSource, platformCode, verify } from "@generalbusiness/artroom-replay";
-import { controls, scriptedCapability } from "../src/testing.ts";
+import { controls, scriptedCapability, type CapabilityScript } from "../src/testing.ts";
 import { Node, founding as foundingIn, net, routed, soon } from "./net.ts";
 import { HOLD, START, at, definition, found, founding, reader, rita, stubOf, una } from "./support.ts";
 
@@ -181,7 +181,7 @@ describe("founding a directory (sections 2.2, 2.3 and 7.1)", () => {
     }
   });
 
-  test("a definition that needs a capability record: the production wiring founds no scope under it; the scripted test capability, a stand-in that shows nothing about a real hold, runs it in a test; a replay with no code for the capability answers unsupported-definition", async () => {
+  test("a definition that needs a capability record: the production wiring has the capability's code and founds a scope under it, which admits no act and no step and sends nothing; a runtime that lacks the code founds none; the scripted test capability, a stand-in that shows nothing about a real hold, runs it in a test; a replay with no code for the capability answers unsupported-definition", async () => {
     // The lane of the other tests, whose `report` now asks the hold capability whether the commit is staged, and pins it.
     const staged = variant(definition.declared, (def) => {
       def.acts.report.fields.commit = { type: "commit", required: true };
@@ -191,14 +191,29 @@ describe("founding a directory (sections 2.2, 2.3 and 7.1)", () => {
     const fields = { title: "A lane", opener: rita.member };
     const commit = "c".repeat(40);
 
-    // As deployed, there is no code for a capability record. The founding is refused before anything is written, whatever else
-    // it holds: the same class founds a scope under the definition without the capability forms, in the test above.
+    // As deployed, the runtime has the code of `hold@1` and of `git-read@1`, so the definition is one that it can pin (section 6.1):
+    // the rule is on the code of the forms that a definition uses, and asks for no peer. The founding is written. That is all the
+    // scope does as deployed. No grant is read, so its acts and its steps are refused `unauthorized`: no hold is opened, and so no
+    // operation, and nothing is sent outside. No reader may read it.
     const asked: Intent = { v: 1, to: null, actor: rita.key, kind: "found", on: null, expected: {}, fields, idempotencyKey: crypto.randomUUID(), notAfter: timeOf(Date.now() + 60_000) };
     const seed: Seed = { v: 1, kind: "directory", definition: staged.digest, creator: null, cause: intentDigest(asked), ordinal: 0 };
     const deployed = stubOf(scopeIdOf(seed), env.AS_DEPLOYED);
-    expect(await deployed.found(signIntent(asked, rita.secret), staged.declared)).toEqual({ answer: "refused", reason: "unsupported-definition" });
-    const entries = await runInDurableObject(env.AS_DEPLOYED.get(env.AS_DEPLOYED.idFromName(scopeIdOf(seed))), (_instance, state) => state.storage.sql.exec("SELECT COUNT(*) AS n FROM entry").toArray());
-    expect(entries).toEqual([{ n: 0 }]);
+    const founded = await deployed.found(signIntent(asked, rita.secret), staged.declared);
+    if (founded.answer !== "accepted") throw new Error(`not founded: ${JSON.stringify(founded)}`);
+    const at = founded.receipt.fact.at;
+    const intent = (kind: string, more: Partial<Intent>): Intent => ({ v: 1, to: at, actor: rita.key, kind, on: null, expected: {}, fields: {}, idempotencyKey: crypto.randomUUID(), notAfter: timeOf(Date.now() + 60_000), ...more });
+    const offer = signIntent(intent("offer", { expected: { intent: 1 }, fields: { intent: 0 } }), rita.secret);
+    const step = signIntent(intent("hold@1:instance", { fields: { hold: 2, task: { ...at, kind: "task" }, instance: "i1" } }), rita.secret);
+    const all = [grantOf(rita, at, [...new Set(Object.values(staged.declared.acts).map((act) => act.grant as string))])];
+    const entries = () => runInDurableObject(env.AS_DEPLOYED.get(env.AS_DEPLOYED.idFromName(scopeIdOf(seed))), (_instance, state) => state.storage.sql.exec("SELECT (SELECT COUNT(*) FROM entry) AS entries, (SELECT COUNT(*) FROM operation) AS operations").toArray());
+    expect([await deployed.submit(offer, all), await deployed.prepare(step, all, "hold@1", "instance"), await (deployed as unknown as { effect(): Promise<number> }).effect(), await deployed.summary(reader), await entries()]).toMatchObject([
+      { answer: "refused", reason: "unauthorized" }, { answer: "refused", reason: "unauthorized" }, 0, { ok: false, reason: "forbidden" }, [{ entries: 1, operations: 0 }],
+    ]);
+
+    // A runtime that lacks the code founds no scope under the definition, and writes nothing: the namespace `NET` with no capability.
+    net.capability = null;
+    const lacking = foundingIn(staged, fields);
+    expect(await new Node(lacking.name, staged.declared).stub.found(lacking.signed, staged.declared)).toEqual({ answer: "refused", reason: "unsupported-definition" });
 
     // A STAND-IN from here on: the scripted test capability answers from the table below. It reads no hold and no repository.
     try {
@@ -222,7 +237,7 @@ describe("founding a directory (sections 2.2, 2.3 and 7.1)", () => {
       // A verifier derives the entry again only with the same rules. With none, it cannot derive under the definition at all.
       const source = httpSource("https://scopes.test", { fetch: routed });
       const replayed = async (capabilities?: ReturnType<typeof scriptedCapability>) => (await verify(source, { mode: "replay", scope: name, capabilities })).report;
-      expect([await replayed(scriptedCapability(() => net.capability)), await replayed()]).toMatchObject([{ result: "consistent" }, { result: "unsupported-definition", at: { seq: 0 } }]);
+      expect([await replayed(scriptedCapability(() => net.capability as CapabilityScript)), await replayed()]).toMatchObject([{ result: "consistent" }, { result: "unsupported-definition", at: { seq: 0 } }]);
 
       // The scope's own runtime answers the same once it has no capability: it reads its pinned definition again after a restart.
       net.capability = null;

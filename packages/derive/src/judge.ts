@@ -248,7 +248,7 @@ function actJudged(view: StateView, definition: ValidDefinition, signed: SignedI
 
   const j: Judging = {
     view, definition, bounds, clock, scope, self: scope.head.seq + 1, kind: intent.kind, fields, fieldTypes: act.fields, subjects, signer, facts, prepared: context.prepared, used: [], asked: context.asked,
-    own: context.own, intent: digest, presented: beside.fields, capabilities: context.capabilities,
+    own: context.own, snapshot: context.snapshot, intent: digest, presented: beside.fields, capabilities: context.capabilities,
     platform: context.platform, judged: { ...judged, grant: granted }, ran: clocked,
   };
 

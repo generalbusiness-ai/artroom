@@ -15,7 +15,7 @@
 
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { Effect, Entry, Evidence, FieldValue, OperationId, ScopeRef } from "@generalbusiness/artroom-contract";
-import { RETIRE_ACTION, capabilitiesOf, checkpointOf, clockOf, gitRead, holdCapability, judgePreparation, owed, settleOutcome, snapshotOf, stagedRefName, workspaceEffects } from "../src/index.ts";
+import { RETIRE_ACTION, capabilitiesOf, checkpointOf, clockOf, gitRead, holdCapability, judgePreparation, owed, settleOutcome, snapshotInput, snapshotOf, stagedRefName, workspaceEffects } from "../src/index.ts";
 import type { AncestryCheck, CapabilityGiven, StagedRef, ValidDefinition } from "../src/index.ts";
 import { Scope, grantOf, keys, lane, variant, type Actor, type Context } from "./fixtures.ts";
 
@@ -58,17 +58,17 @@ export const staging: ValidDefinition = variant(lane, (def: any) => {
   };
 });
 
-/** The snapshots of staged refs that the fixture's scopes retain, by digest: what a scope's store keeps for the guard `ancestry`. */
-export const snapshots = new Map<string, readonly StagedRef[]>();
+/** The snapshots of staged refs that the fixture's scopes retain, by digest: what a scope's store keeps for the guard `ancestry`, as retained bytes. */
+export const snapshots = new Map<string, string>();
 /** Keep one snapshot, as a scope does before the check entry that names its digest. */
 export function kept(pairs: readonly StagedRef[]): AncestryCheck["snapshot"] {
-  const snapshot = snapshotOf(pairs)!;
-  snapshots.set(snapshot.digest, snapshot.pairs);
+  const [snapshot, input] = [snapshotOf(pairs)!, snapshotInput(pairs)!];
+  snapshots.set(input.digest, input.bytes);
   return { digest: snapshot.digest, count: snapshot.count };
 }
 
 /** The code of both capabilities, with at most two tokens of one hold at once, and a root that may be retired ten minutes after it was made live. Both numbers are the fixture's. */
-export const cap = capabilitiesOf(holdCapability({ tokensPerHold: 2, rootRetentionSeconds: 600 }), gitRead({ snapshot: (digest) => snapshots.get(digest) ?? null }));
+export const cap = capabilitiesOf(holdCapability({ tokensPerHold: 2, rootRetentionSeconds: 600 }), gitRead());
 
 const said = (j: { result: string; reason?: string; name?: string; detail?: string }): string => [j.result, j.reason ?? "", j.name ?? ""].filter((part) => part !== "").join(" ");
 
@@ -90,7 +90,7 @@ export class Staging extends Scope {
     this.take(keys.una);
   }
 
-  override context(over: Context = {}) { return super.context(this.judged ? { capabilities: cap, ...over } : over); }
+  override context(over: Context = {}) { return super.context({ snapshot: (digest) => snapshots.get(digest) ?? null, ...(this.judged ? { capabilities: cap } : {}), ...over }); }
 
   /** `who` takes a hold under the commitment, and the capability's own effects for that entry are folded. Returns the hold's ID. */
   take(who: Actor): number {
@@ -151,7 +151,7 @@ export class Staging extends Scope {
   }
   /** What a capability rule is given for an input of this scope, with that intent digest. */
   given(over: Partial<CapabilityGiven> = {}): CapabilityGiven {
-    return { view: this.state, definition: this.definition, scope: { at: this.at, creator: null }, self: this.head.seq + 1, kind: "", fields: {}, signer: null, facts: new Map(), own: this.own, clock: clockOf(this.state, this.now), ...over };
+    return { view: this.state, definition: this.definition, scope: { at: this.at, creator: null }, self: this.head.seq + 1, kind: "", fields: {}, signer: null, facts: new Map(), own: this.own, snapshot: (digest) => snapshots.get(digest) ?? null, clock: clockOf(this.state, this.now), ...over };
   }
   /** The entries that the pending duties reserve, with what the capability declares. */
   reserved(): number { return owed(this.state, this.definition, this.last.input, cap); }

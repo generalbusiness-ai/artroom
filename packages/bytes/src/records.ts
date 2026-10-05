@@ -85,7 +85,7 @@ const CLASS: Record<Message["class"], true> = { request: true, result: true, con
 const DECISION: Record<Extract<Input, { decision: unknown; type: "delivery" }>["decision"], true> = { applied: true, refused: true, superseded: true };
 const CLAUSE: Record<NonNullable<Duty["result"]>["clause"], true> = { applied: true, refused: true, superseded: true, conflict: true };
 const FINDING: Record<NonNullable<Duty["diagnosis"]>["finding"], true> = { undelivered: true, "delivery-unavailable": true };
-const RETAINED: Record<RetainedInput["kind"], true> = { definition: true, entry: true, rule: true, text: true };
+const RETAINED: Record<RetainedInput["kind"], true> = { definition: true, entry: true, rule: true, text: true, snapshot: true };
 /** Why a delivery was refused: a code the contract names and, where one exists, the name the failed guard declares. */
 const reason = record({ code: among(REFUSAL_REASONS) }, { name: text });
 

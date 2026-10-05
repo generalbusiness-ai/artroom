@@ -115,6 +115,12 @@ export interface LogPage { scope: ScopeRef; definition: Digest | PlatformDefinit
  * recorded it. `rule`: the input of one rule evaluation, under its digest.
  * `text`: a detached text, as one JSON string, under its digest in the
  * domain `artroom-text-1`, until a `redact` effect removes it (section 6.6).
+ * `snapshot`: the list of staged refs that an ancestry record names, as the
+ * host returned it and in byte order of `ref`, under its digest in the
+ * domain `artroom-snapshot-1` (sections 9.2 and 16.4). It is stored before
+ * the entry that names the digest. The contract states the bytes and the
+ * domain, and no name for the kind: `snapshot` is its own word for it (I3
+ * deltas, entry EL7).
  * `bytes` is canonical JSON text.
  */
-export interface RetainedInput { kind: "definition" | "entry" | "rule" | "text"; digest: Digest; bytes: string; under?: string }
+export interface RetainedInput { kind: "definition" | "entry" | "rule" | "text" | "snapshot"; digest: Digest; bytes: string; under?: string }

@@ -806,6 +806,8 @@ const OPERATION_RULES: Readonly<Record<string, OperationRules>> = {
   [HOLD_KINDS.check]: {
     selects: false, read: false, retries: () => false, wellFormed: (result, evidence) => basis("own-answer")(result, evidence) && (result !== "confirmed" || isCheckEvidence(evidence.body)),
     most: { effects: 1, requests: 0, operations: 0 },
+    // Section 16.4: the record names its snapshot by digest, and the bytes are stored before the check entry.
+    retains: (evidence) => (isCheckEvidence(evidence.body) && isAncestryCheck(evidence.body.record) ? [evidence.body.record.snapshot.digest] : []),
     derives: (view, operation, outcome) => {
       const pin = outcome.result === "confirmed" ? namedBy(view, "pin", ["provisional"], "check", operation) : null;
       const root = pin ? record(view, "root", [pin.values["root"] as number]) : null;

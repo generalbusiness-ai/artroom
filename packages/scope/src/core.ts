@@ -10,7 +10,7 @@
 import type { ActType, Answer, Beside, Bounds, CapabilityName, DeclaredDefinition, Digest, DutyId, Entry, FactRef, Founded, Grant, PlatformDefinition, Receipt, RefusalReason, ScopeId, Seed, Settlement, SignedIntent, UnavailableReason } from "@generalbusiness/artroom-contract";
 import { canonicalize, definitionDigest, intentDigest, isDigest, isGrant, isPlatformDefinition, newIncarnation, parseStrict, platformName, textDigest, utf8 } from "@generalbusiness/artroom-bytes";
 import { actionOf, checkpointOf, counted, derivable, factsNamed, ownersOf, inputTexts, isObject, judgeAct, judgeCheckpoint, judgeGenesis, judgePreparation, own, prepareRules, presentedTypes, readFields, runnable, stepsOf, validateDefinition, windowOf } from "@generalbusiness/artroom-derive";
-import type { ActJudgment, Clock as Reading, Draft, Fetched, Founding, GrantDecision, JudgeContext, Own, Owners, PlatformRules, Presented, StateView, Texts, ValidDefinition, Window } from "@generalbusiness/artroom-derive";
+import type { ActJudgment, Clock as Reading, Draft, Fetched, Founding, GrantDecision, JudgeContext, Own, Owners, PlatformRules, Presented, Snapshots, StateView, Texts, ValidDefinition, Window } from "@generalbusiness/artroom-derive";
 import { RULE_PROFILES } from "@generalbusiness/artroom-derive/rule";
 import { namedBy } from "./definitions.ts";
 import type { Asked, DefinitionRead, Ports, Standing } from "./ports.ts";
@@ -46,6 +46,9 @@ export function receiptOf({ entry, hash }: Sealed, definition: Digest | Platform
 }
 
 /** This scope's own sealed entry at a position, from its stored history, for the judges (section 6.2, a local fact). */
+/** The snapshots of staged refs that the scope retains, by digest, as the guard `ancestry` reads them (section 16.4). */
+export const snapshotsOf = (store: Store): Snapshots => (digest) => store.retained("snapshot", digest)?.bytes ?? null;
+
 export const ownOf = (store: Store): Own => (seq) => {
   const kept = store.stored(seq);
   return kept ? { entry: JSON.parse(kept.bytes) as Entry, hash: kept.hash } : null;
@@ -434,7 +437,7 @@ export class Scope {
     // Phase two is in the commit: what that read holds at the commit's head, on the commit's one reading. The judge is given the
     // answer and reads nothing.
     const context = (view: StateView, clock: Reading): Omit<JudgeContext, "prepared"> =>
-      ({ clock, bounds, facts, own: ownOf(this.#store), texts: texts.sizes, presented: offered, capabilities: this.#ports.capabilities ?? undefined, platform, membership: standing?.membership ?? null, grants: standing === null ? null : heldBy(standing, view, clock) });
+      ({ clock, bounds, facts, own: ownOf(this.#store), snapshot: snapshotsOf(this.#store), texts: texts.sizes, presented: offered, capabilities: this.#ports.capabilities ?? undefined, platform, membership: standing?.membership ?? null, grants: standing === null ? null : heldBy(standing, view, clock) });
 
     const end = await this.#turns.run<Answer>({
       // The walk that finds the rules judges nothing (section 5.2, step 4), so what it is given of phase two decides nothing.

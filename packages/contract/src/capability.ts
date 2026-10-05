@@ -11,10 +11,9 @@
  * kind of a preparation entry against. It holds no rule: the rules behind
  * each record, guard, effect and step are the authority note's. The derive
  * package derives them, in `src/capability/` and `src/prepare.ts`, as far
- * as I3 steps 16a to 16c built them. They are not wired in production: the
- * production capabilities port has none (plan step 16). A runtime that has
- * no code for them answers `unsupported-definition` for a definition that
- * needs one.
+ * as I3 steps 16 and 16a to 16c built them, and the production ports of
+ * the scope package hold that code. A runtime that has no code for them
+ * answers `unsupported-definition` for a definition that needs one.
  */
 
 export type CapabilityName = `${"hold" | "git-read"}@${number}`;

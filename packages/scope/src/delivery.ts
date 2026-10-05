@@ -26,7 +26,7 @@ import type { Bounds, Digest, Entry, FactRef, Incarnation, ScopeId, Seed, Unavai
 import { canonicalize, isDigest, newIncarnation, parseStrict } from "@generalbusiness/artroom-bytes";
 import { creationFields, factsNamed, isEntryOf, isFactRef, isLocalId, isObject, isScopeRef, judgeDelivery, judgeGenesis, messageFacts, messageTexts, own, prepareRules, readFields, textsNamed } from "@generalbusiness/artroom-derive";
 import type { Clock as Reading, Creation, Delivered, DeliveryContext, Fetched, Judgment, StateView, ValidDefinition } from "@generalbusiness/artroom-derive";
-import { NO_INCARNATION, Received, ownOf, retainedFacts, used, type Scope } from "./core.ts";
+import { NO_INCARNATION, Received, ownOf, retainedFacts, snapshotsOf, used, type Scope } from "./core.ts";
 import { namedBy } from "./definitions.ts";
 import type { DefinitionRead, Delivery, Ports } from "./ports.ts";
 import type { Retained, Store } from "./store.ts";
@@ -167,7 +167,7 @@ export class Deliveries {
     if (!texts) return retry("dependency-unavailable");
 
     const context = (clock: Reading): Omit<DeliveryContext, "prepared"> =>
-      ({ clock, bounds, facts, own: ownOf(store), texts: texts.sizes, capabilities: this.#ports.capabilities ?? undefined, platform: this.#scope.pinned()?.platform ?? undefined, source: { entry: source.entry, under: source.under }, origin });
+      ({ clock, bounds, facts, own: ownOf(store), snapshot: snapshotsOf(store), texts: texts.sizes, capabilities: this.#ports.capabilities ?? undefined, platform: this.#scope.pinned()?.platform ?? undefined, source: { entry: source.entry, under: source.under }, origin });
     /** The definition a section of the turn runs under: the pinned one, or before the genesis the one the seed names. */
     const definition = (): ValidDefinition => this.#scope.pinned()?.definition ?? founding!.valid;
     /** A `create` goes to the genesis judge, which answers a repeat from the genesis when the scope exists. */

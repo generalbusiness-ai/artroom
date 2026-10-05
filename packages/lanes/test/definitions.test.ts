@@ -3,7 +3,7 @@ import { describe, expect, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { Bounds, DeclaredDefinition } from "@generalbusiness/artroom-contract";
 import { canonicalize, definitionDigest, parseStrict } from "@generalbusiness/artroom-bytes";
-import { derivable, validateDefinition, type ValidDefinition } from "@generalbusiness/artroom-derive";
+import { capabilitiesOf, counted, derivable, gitRead, holdCapability, validateDefinition, type ValidDefinition } from "@generalbusiness/artroom-derive";
 import { reference } from "../scripts/reference.mjs";
 import { DIGESTS, LANE_FORMS, change, definitions, issue } from "../src/index.ts";
 
@@ -63,6 +63,13 @@ describe("the two lane definitions, as data (lane forms, revision 14)", () => {
       expect([...new Set(valid[name].underived.map((u) => u.capability))].sort(), name).toEqual(["git-read@1", "hold@1"]);
       expect(derivable(valid[name], null), name).toBe(false);
     }
+    // With the code of the two versions, as the production ports hold it, each form of both definitions has its code, the type
+    // that names a check entry among them. Each entry of both, counted with the most that this code declares for a hold that may
+    // have 2 tokens, fits the bound on derived effects, which is a temporary number.
+    const code = capabilitiesOf(holdCapability({ tokensPerHold: 2, rootRetentionSeconds: null }), gitRead());
+    expect(names.map((name) => [derivable(valid[name], code), counted(valid[name], code, PROPOSED_BOUNDS)])).toEqual([[true, null], [true, null]]);
+    // Both lanes may hold 16 live holds, and an entry is counted with all of them: 16 times 7, and the capability effects of its row, which are at most 1 in `issue` and 2 in `change`.
+    expect(names.map((name) => counted(valid[name], code, { ...PROPOSED_BOUNDS, derivedEffects: 112 })?.effects)).toEqual([113, 114]);
 
     // Section 6.4: a genesis opens no timed item. The genesis acts open `intent` and `proposal`, and the timed types are others.
     expect([[issue.genesis, issue.acts[issue.genesis].on, valid.issue.timedTypes], [change.genesis, change.acts[change.genesis].on, valid.change.timedTypes]])

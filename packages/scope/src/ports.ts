@@ -10,7 +10,7 @@
  */
 
 import type { Digest, Entry, FactRef, Grant, PlatformDefinition, Prepared, RoutingRefusal, ScopeRef, SignedIntent, Timestamp, UnavailableReason } from "@generalbusiness/artroom-contract";
-import { timeOf, type Capabilities, type Clock as Reading, type Delivered, type Owners, type Presented, type RuleInput, type StateView, type Window } from "@generalbusiness/artroom-derive";
+import { TOKENS_FLOOR, capabilitiesOf, gitRead, holdCapability, timeOf, type Capabilities, type HoldOptions, type Clock as Reading, type Delivered, type Owners, type Presented, type RuleInput, type StateView, type Window } from "@generalbusiness/artroom-derive";
 import { evaluateRules } from "@generalbusiness/artroom-derive/rule";
 import { platform, type Platform } from "@generalbusiness/artroom-platform";
 import { NO_OUTSIDE, type Outside } from "./operations.ts";
@@ -187,9 +187,11 @@ export interface Ports {
    * capability's records, and the input being judged: derive's
    * `Capabilities`. A value may also hold the rules of a capability's steps
    * (derive's `Steps`), what a hold's entries derive for its workspace, and
-   * the binding of a reserved request. Null: it has none. A scope is not
-   * founded or created under a definition that uses a form with no rule
-   * here: `unsupported-definition`.
+   * the binding of a reserved request, and the most that each piece of the
+   * code derives in one entry. Null: it has none. A scope is not founded or
+   * created under a definition that uses a form with no rule here, or whose
+   * entries, counted with this code, pass the bound on derived effects:
+   * `unsupported-definition`.
    */
   capabilities: Capabilities | null;
   /** The port for effects outside the service: one request of one attempt of an operation (`operations.ts`; section 4.3). */
@@ -211,19 +213,51 @@ export interface Ports {
 const NO_GRANT: Standing = { held: () => [] };
 
 /**
+ * The two numbers of `hold@1` as this runtime runs the version (authority
+ * note, section 5.7, "The bound on the tokens of one hold"; section 6.2,
+ * "Retiring a root"). Both are the proof plan's, and no text proposes one.
+ * So each is the narrowest value that the texts allow: the floor of the
+ * bound on a hold's tokens, and no retention, under which no root is
+ * retired. They are values of the capability's version and no bound of the
+ * contract's section 7.5, so they are stated here and are no member of
+ * `Bounds` (I3 deltas, entry EL5).
+ */
+export const HOLD_VERSION: HoldOptions = { tokensPerHold: TOKENS_FLOOR, rootRetentionSeconds: null };
+
+/**
+ * The code of the two capability versions, as one value for the two ports
+ * that ask it: the forms and the steps (`capabilities`), and the rules of
+ * the operations that `hold@1` owns (`owners`). It is derive's code: pure
+ * functions that hold no state and read no port.
+ */
+export const CAPABILITY_CODE = capabilitiesOf(holdCapability(HOLD_VERSION), gitRead());
+
+/**
  * The production defaults. The clock and the random source are the
  * runtime's. The rules are derive's evaluator. The alarm does nothing until
  * the object supplies its own. There is no transport until a namespace
  * supplies one, and no declaration and no sent text can be read until a
  * namespace supplies the scope that retains it. The platform definitions
- * are the platform package's. No code for a capability form is wired here.
- * Derive has the rules of `hold@1` over its records and the guard
- * `ancestry` of `git-read@1` (`holdCapability` and `gitRead`), and this
- * port does not hold them until plan step 16: the I3 deltas note, entries
- * EH6 to EH12, lists what an owner must decide first. Nothing is sent
- * outside the service, and no owner of an
- * outside operation has rules: a host port and the owners' rules replace
- * them (plan steps 19 and 16). Every other port refuses.
+ * are the platform package's.
+ *
+ * The capability code is derive's: `hold@1` over its records, with its
+ * steps and the rules of its operations, and the guard `ancestry` of
+ * `git-read@1`. So a definition that uses those forms is one that this
+ * runtime can pin (section 6.1): the contract's rule is on the code of the
+ * forms that a definition uses, and asks for no peer. What a scope under
+ * such a definition can then do here is little, and each limit is another
+ * port's default:
+ *
+ * - No grant is read, so every act and every step is refused
+ *   `unauthorized`. No hold is opened, and so no operation.
+ * - Nothing is sent outside the service (`NO_OUTSIDE`): an attempt that an
+ *   entry opened would stay recorded and never sent. No Git host is read,
+ *   so no check entry is written and no snapshot is retained.
+ * - A delivery from another scope is judged by its handler, whose
+ *   capability guards read this scope's records, of which there are none.
+ * - No reader may read.
+ *
+ * Every other port refuses.
  */
 export function production(): Ports {
   return {
@@ -239,8 +273,8 @@ export function production(): Ports {
     texts: { read: () => Promise.resolve({ ok: false, reason: "unavailable" }) },
     readers: { allows: () => false },
     transport: null,
-    capabilities: null,
+    capabilities: CAPABILITY_CODE,
     outside: NO_OUTSIDE,
-    owners: null,
+    owners: CAPABILITY_CODE,
   };
 }

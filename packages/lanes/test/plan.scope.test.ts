@@ -2,7 +2,7 @@ import { describe, expect, onTestFinished, test } from "vitest";
 import type { Entry, ScopeId, Seed } from "@generalbusiness/artroom-contract";
 import { intentDigest, messageDigest, scopeIdOf, textDigest } from "@generalbusiness/artroom-bytes";
 import { TRUSTS, httpSource, verify } from "@generalbusiness/artroom-replay";
-import { scriptedCapability } from "@generalbusiness/artroom-scope/testing";
+import { scriptedCapability, type CapabilityScript } from "@generalbusiness/artroom-scope/testing";
 import { README, answered, graph, net, rita, routed, type Graph, type Node } from "./support/graph.ts";
 import type { issue } from "../src/index.ts";
 
@@ -66,7 +66,7 @@ describe("a plan's concerns are lanes of their own (lane forms, sections 3.5 and
     net.capability = {};
     onTestFinished(() => { net.capability = null; });
     const source = httpSource("https://scopes.test", { fetch: routed });
-    const replayed = async (node: { name: ScopeId }, rules = true) => (await verify(source, { mode: "replay", scope: node.name, ...(rules ? { capabilities: scriptedCapability(() => net.capability) } : {}) })).report;
+    const replayed = async (node: { name: ScopeId }, rules = true) => (await verify(source, { mode: "replay", scope: node.name, ...(rules ? { capabilities: scriptedCapability(() => net.capability as CapabilityScript) } : {}) })).report;
     const [office, goal, child] = [await replayed(g.office), await replayed(G), await replayed(K[0]!)];
     expect([office.result, goal.result, child.result]).toEqual(["consistent", "consistent", "consistent"]);
     // Each replay covers its own history whole, and every scope it used as far as it used it: the goal used its creator and both children.

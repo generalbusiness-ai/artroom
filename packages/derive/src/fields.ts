@@ -32,6 +32,13 @@ export type Own = (seq: number) => Sealed | null;
  */
 export type Texts = (digest: Digest) => number | null | undefined;
 
+/**
+ * The bytes of a snapshot of staged refs that this scope retains under that
+ * digest (sections 9.2 and 16.4), or null when it retains none. The reader
+ * checks the bytes against the digest itself.
+ */
+export type Snapshots = (digest: Digest) => string | null;
+
 /** What every judge is given: the one reading of the commit, the bounds, and the retained inputs. */
 export interface Reading {
   clock: Clock;                         // the one reading of this commit (section 5.3); see `clockOf`
@@ -41,6 +48,7 @@ export interface Reading {
   asked?: RuleInput[] | undefined;      // set by `prepareRules` only
   own?: Own | undefined;                // this scope's own history. Without it an input that names a local fact is not judged
   texts?: Texts | undefined;            // the detached texts that came with the input. Without it an input that names one is not judged
+  snapshot?: Snapshots | undefined;     // the snapshots of staged refs that this scope retains (section 16.4). Without it an ancestry record of this scope's own is not judged to fit
   capabilities?: Capabilities | undefined;   // the rules of the capabilities this runtime has code for (section 6.11). Without them a capability form is not judged
   platform?: PlatformRules | undefined;      // the rules of the platform definition that the scope pins (section 6.1). Without them an input of a row with a mark is not judged
 }

@@ -32,15 +32,10 @@ import type { Capabilities, CapabilityGiven } from "../capability.ts";
 import { isLocalFact, type Own } from "../fields.ts";
 import type { RecordState, StateView } from "../state.ts";
 import { own as slotOf, same } from "../values.ts";
-import { foreignOn, isAncestryCheck, snapshotOf, type AncestryCheck, type OwnRoot, type PriorCheck, type StagedRef } from "./ancestry.ts";
+import { foreignOn, isAncestryCheck, snapshotOf, snapshotRead, type AncestryCheck, type OwnRoot, type PriorCheck } from "./ancestry.ts";
 import { HOLD } from "./hold.ts";
 
 export const GIT_READ = "git-read@1" as const;
-
-/** What the commit retains for the guard beside the state: the bytes of a snapshot of staged refs, by its digest (section 16.4). Null: they are not at hand. */
-// I3 merge: the contract's `RetainedInput` has no kind for a snapshot yet. Step 16 adds the kind, stores the bytes before the check
-// entry that names their digest, and gives this reader over the scope's store.
-export interface GitReadOptions { snapshot(digest: Digest): readonly StagedRef[] | null }
 
 /**
  * The staging lane's history, as the ancestry check reads it (section 6.2):
@@ -115,13 +110,15 @@ function selectedInput(given: CapabilityGiven, fact: FactRef, under: unknown): b
  * the table of that section. False: what was read no longer fits the lane's
  * state, and the act is refused `ancestry-stale`.
  */
-function fits(record: AncestryCheck, { pin, root }: { pin: RecordState; root: RecordState }, given: CapabilityGiven, options: GitReadOptions): boolean {
+function fits(record: AncestryCheck, { pin, root }: { pin: RecordState; root: RecordState }, given: CapabilityGiven): boolean {
   // Guard 2: the root is the one that the entry relies on, and it is `live`.
   if (record.root.number !== root.key[0] || pin.values["root"] !== root.key[0] || root.state !== "live") return false;
   const { roots, checks } = ledgerOf(given.view, given.own, given.scope.at, root.values["under"], given.self);
   const prior = (commit: string, fact: FactRef): PriorCheck | undefined => checks.find((c) => c.commit === commit && same(c.checked, fact));
   // Guard 3: sorted at this commit, the staged refs of the snapshot on the commit give the same `foreign`, and the basis stands.
-  const pairs = options.snapshot(record.snapshot.digest);
+  // The snapshot's bytes are a retained input of this scope, stored before the check entry that names their digest (section 16.4).
+  const kept = given.snapshot?.(record.snapshot.digest) ?? null;
+  const pairs = kept === null ? null : snapshotRead(record.snapshot.digest, kept);
   const snapshot = pairs ? snapshotOf(pairs) : null;
   if (!snapshot || snapshot.digest !== record.snapshot.digest || snapshot.count !== record.snapshot.count) return false;
   const { start } = record;
@@ -170,13 +167,13 @@ const commits = (list: unknown): string[] => (Array.isArray(list) ? list.filter(
  * answers with a name alone, so the commit is not carried (I3 deltas, entry
  * EF13).
  */
-function ancestry(args: Readonly<Record<string, unknown>>, given: CapabilityGiven, options: GitReadOptions): true | string {
+function ancestry(args: Readonly<Record<string, unknown>>, given: CapabilityGiven): true | string {
   const check = checked(args, given);
   if (!check) return "ancestry-stale";
   if (check.state === "too-large") return "ancestry-too-large";
   const record = check.values["record"];
   if (check.state !== "recorded" || !isAncestryCheck(record) || record.commit !== args["commit"] || check.values["commit"] !== args["commit"]) return "ancestry-stale";
-  if (check.local && !fits(record, check.local, given, options)) return "ancestry-stale";
+  if (check.local && !fits(record, check.local, given)) return "ancestry-stale";
   const named = new Set([...commits(args["selected"]), ...commits(args["earlier"])]);
   const passes = args["row"] === "report" ? record.F.length === 0 : args["row"] === "manifest" && record.F.every((f) => named.has(f.commit) || ("via" in f && named.has(f.via)));
   return passes ? true : "unnamed-work";
@@ -184,14 +181,17 @@ function ancestry(args: Readonly<Record<string, unknown>>, given: CapabilityGive
 
 /**
  * The code of `git-read@1`: the guard `ancestry`. The version declares no
- * effect and no record of its own.
+ * effect and no record of its own, and its guard derives no effect, so it
+ * declares no maximum above zero. The value holds no state and reads no
+ * port: the judge gives the guard the snapshots that the scope retains.
  */
-export function gitRead(options: GitReadOptions): Capabilities {
+export function gitRead(): Capabilities {
   return {
+    maxima: [],
     implements: (form) => form.capability === GIT_READ && (form.form === "listed" || (form.form === "guard" && form.name === "ancestry")),
     guard: (capability, guard, args, given) => {
       if (capability !== GIT_READ || guard !== "ancestry") throw new Error(`${capability} has no code for the guard ${guard}`);
-      return ancestry(args, given, options);
+      return ancestry(args, given);
     },
     effect: (capability, effect) => { throw new Error(`${capability} has no code for the effect ${effect}`); },
   };
@@ -209,6 +209,8 @@ export function capabilitiesOf<T extends Capabilities>(first: T, ...others: read
   const implemented = first.implements.bind(first) as (...asked: unknown[]) => boolean;
   return {
     ...first,
+    // The declared maxima of every part. A part that declares none leaves the whole value with none, and nothing is counted.
+    ...(parts.every((p) => p.maxima) ? { maxima: parts.flatMap((p) => p.maxima!) } : { maxima: undefined }),
     // A step is asked of `first` with two arguments: a capability and a step. A form is asked of every part.
     implements: ((...asked: unknown[]) => implemented(...asked) || (asked.length === 1 && others.some((p) => p.implements(asked[0] as never)))) as T["implements"],
     guard: (capability, guard, args, given) => by(capability, "guard", guard).guard(capability, guard, args, given),
