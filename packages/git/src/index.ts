@@ -15,3 +15,9 @@ export { MODES, READ_BOUNDS, Reader, idOf, parseCommit, parseTree } from "./read
 export type { Closure, Commit, GitSource, Mode, ObjectType, ReadBounds, RefTarget, StoredObject, TreeEntry } from "./reader.ts";
 export { COMMAND_MS, GitFailure, GitProgram, HARDENING, repositorySource } from "./program.ts";
 export type { Exec, ExecResult, ProgramOptions } from "./program.ts";
+export { Git, SEND_OBJECTS } from "./gitops.ts";
+export type { GitOptions, Publication, RefUpdate, SendRequest } from "./gitops.ts";
+export { attemptOutcome, classifySend, readAnswer } from "./push-outcome.ts";
+export type { AttemptOutcome, Forwarding, PushAnswer, ReadBack, Reported, SendEvidence } from "./push-outcome.ts";
+export { Gateway, GatewayRefusal, MAX_COMMAND_BYTES, readCommands } from "./gateway.ts";
+export type { GatewayOptions, GatewayReason, GrantRecord, GrantRecords, GrantRequest, GrantedUpdate } from "./gateway.ts";
