@@ -1,8 +1,10 @@
 import { describe, expect, test } from "vitest";
 import { PROPOSED_BOUNDS, type Report } from "@generalbusiness/artroom-contract";
 import { textDigest } from "@generalbusiness/artroom-bytes";
-import { founded, keys, notesDefinition, on, type Ledger } from "@generalbusiness/artroom-derive/testing";
-import { MemorySource, TRUSTS, render, verify, type Options } from "../src/index.ts";
+import { founded, keys, notesDefinition, on, otherLane, t, type Ledger } from "@generalbusiness/artroom-derive/testing";
+import { C, cap, clean } from "../../derive/test/fixtures-hold.ts";
+import { MemorySource, TRUSTS, platformCode, render, verify, type MemoryScope, type Options } from "../src/index.ts";
+import { Gate, Lane, OWNER } from "./staging.ts";
 import { entryOf, rewrite, served, sourceOf, world, type World } from "./world.ts";
 
 /**
@@ -103,10 +105,10 @@ describe("a history that is not consistent is reported with the right result, at
       change: (w) => { rewrite(w.I, 0, (entry) => { entry.input.kind = "link"; }); return { scope: w.P.scope.scope }; }, result: "mismatch", at: ["I", 0], why: /^genesis-kind: / },
     // The member is always present, and is never the empty text (section 4.1). Without it, the bytes are no entry of the contract.
     { name: "a genesis whose kind is the empty text: its bytes are not an entry", change: (w) => rewrite(w.I, 0, (entry) => { entry.input.kind = ""; }), result: "mismatch", at: ["I", 0], why: /bytes are not an entry/ },
-    // Section 9.3: the preparation entry has rules that this verifier lacks (I3 step 16a), so it says so and never reports `consistent`. The same entry without its step is no entry.
-    { name: "a well-formed preparation entry in a history, for a verifier with no preparation rules: `unsupported-definition`, at that entry",
+    // Section 9.3, point E13: a verifier that is given no code for the step of a preparation entry says so, and never reports `consistent`. The same entry without its step is no entry.
+    { name: "a well-formed preparation entry in a history, for a verifier with no rules for its step: `unsupported-definition`, at that entry",
       change: (w) => rewrite(w.I, 2, (entry) => { entry.input = { ...preparing(w), step: "check" }; }), result: "unsupported-definition", at: ["I", 2], why: /a preparation, and this replay has no rules/ },
-    // Section 9.3, point E13: the same for an outcome entry. This verifier has the rules of no owner of an operation (I3 step 22).
+    // Section 9.3, point E13: the same for an outcome entry, for a verifier that is given the rules of no owner of an operation.
     { name: "a well-formed outcome entry in a history, for a verifier with no owner rules: `unsupported-definition`, at that entry",
       change: (w) => rewrite(w.I, 2, (entry) => { entry.input = { type: "outcome", operation: "1:0", attempt: 1, owner: "hold@1", kind: "mint", result: "unknown", evidence: { basis: "none", body: null } }; }), result: "unsupported-definition", at: ["I", 2], why: /an outcome, and this replay has no rules/ },
     { name: "a preparation entry with no step: its bytes are not an entry",
@@ -160,5 +162,130 @@ describe("integrity mode (section 9.5)", () => {
     const k = world();
     rewrite(k.I, 0, (entry) => { entry.input.kind = "link"; });
     expect((await replay(k, { mode: "integrity" })).report.result).toBe("consistent");
+  });
+});
+
+/**
+ * The histories of `staging.ts`: a staging lane and a scope under made-up platform data, each written by derive's judges with
+ * the capability code or with made-up rules. Their creator, their membership and every outside answer are STAND-INS, which
+ * that file labels. The grants hold a freshness proof, so each replay here reads them as `proven`, the default.
+ */
+describe("a preparation, its outcomes and an ancestry record are derived again (sections 5.5, 9.3 and 16.4)", () => {
+  const { rita, una } = keys;
+  const X = C("a");
+  /**
+   * A lane that stages the commit X for a report, checks it, admits the report, refuses it, and retires the root.
+   *
+   *   5 preparation `instance`   6 preparation `stage`   7 outcome of the staging: the root is live, and the check is opened
+   *   8 outcome of the check: the check entry, with the ancestry record   9 act `report`, admitted on the guard `ancestry`
+   *   10 act `refuse-report`: the pin is released   11 timed: the hold ends   12 preparation `retire`   13 outcome of the delete: the root is retired
+   */
+  function staged(checked = true) {
+    const s = new Lane();
+    s.prepare(una, "instance", { hold: s.hold, task: { ...otherLane, kind: "task" }, instance: "i1" });
+    const report = s.intent(una, "report", { expected: { commitment: s.item(s.commitment).revision }, fields: { commitment: s.commitment, commit: X } });
+    const stage = s.asked(report, "stage");
+    const live = s.outcome(s.opened(stage.seq, "stage"), "confirmed", {}, "read");
+    if (!checked) return s;
+    s.outcome(s.opened(live.seq, "check"), "confirmed", { record: clean(s.at, X, 1) }, "own-answer");
+    if (s.submit(report).result !== "write") throw new Error("the report was not admitted");
+    s.did(rita, "refuse-report", { on: s.last.seq, expected: { on: 1 } });
+    s.now = t(700);
+    s.drain();
+    const retiring = s.prepare(rita, "retire", { root: 1 });
+    s.outcome(s.opened(retiring.seq, "delete"), "confirmed", {}, "read");
+    return s;
+  }
+  const replayed = (s: Lane, history: MemoryScope, over: Partial<Options> = {}) => verify(new MemorySource([history]), { mode: "replay", scope: s.at.scope, anchors: s.anchors(), capabilities: cap, owners: cap, ...over });
+
+  test("a lane's history with preparations and their outcomes, and no ancestry record, is consistent, and the report lists what of the outside is trusted (witness 18.4)", async () => {
+    const s = staged(false);
+    const { report, why } = await replayed(s, s.served());
+    expect([s.last.input.type, report.result, why, report.coverage]).toEqual(["outcome", "consistent", null, [{ scope: s.at, from: 0, through: 7 }]]);
+    // The stand-ins are anchored: the directory's two entries and the one head of membership.
+    expect(report.trusts).toEqual([TRUSTS.clock, TRUSTS.head, TRUSTS.minted, TRUSTS.held, TRUSTS.delivered, TRUSTS.observed, TRUSTS.outcomes, TRUSTS.dispatched, TRUSTS.anchors, TRUSTS.bounds]);
+  });
+
+  test("a lane's history with a check entry, after the root is retired: every entry is derived, the act that the guard `ancestry` admitted among them, from the record and the retained snapshot; the walk is not derived, so the result is `incomplete` at the check entry and never `consistent` (T24; witness 18.10; I3 deltas, entry EU2)", async () => {
+    const s = staged();
+    expect([s.entries.map(({ entry }) => entry.input.type).slice(5), s.state.record("hold@1", "root", [1])?.state]).toEqual([["preparation", "preparation", "outcome", "outcome", "act", "act", "timed", "preparation", "outcome"], "retired"]);
+    const { report, why } = await replayed(s, s.served());
+    // No entry is a mismatch through the head, entry 13, which follows the retirement. The one thing not shown is the walk of the record in entry 8.
+    expect([report.result, report.at, report.coverage]).toEqual(["incomplete", s.fact(8), [{ scope: s.at, from: 0, through: 13 }]]);
+    expect(why).toBe(`the walk of the ancestry record in entry 8 of ${s.at.scope} was not derived: this replay reads no commit, so the stops, the basis of the start, \`published\`, the list F and the count of visited commits are not shown`);
+    // Nothing of the Git host is read: that it returned the snapshot and the head is listed as trusted.
+    expect(report.trusts).toEqual([TRUSTS.clock, TRUSTS.head, TRUSTS.minted, TRUSTS.held, TRUSTS.delivered, TRUSTS.observed, TRUSTS.outcomes, TRUSTS.dispatched, TRUSTS.staged, TRUSTS.anchors, TRUSTS.bounds]);
+  });
+
+  /** Both copies of the ancestry record that the check entry holds: in its evidence, and in the `check` record that its rule derives. */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const records = (entry: any) => [entry.input.evidence.body.record, entry.effects[1].values.record];
+  const cases: { name: string; change: (history: MemoryScope) => Partial<Options> | void; result: Report["result"]; at: number; why: RegExp }[] = [
+    { name: "a record that a preparation entry did not derive", change: (h) => rewrite(h, 5, (entry) => { entry.effects[0].state = "past"; }), result: "mismatch", at: 5, why: /recorded effects are not the ones derived/ },
+    // The step `instance` asks its grant on an observation of ten seconds. This one began fifteen seconds before the entry.
+    { name: "a preparation whose grant rests on an observation outside the window of its step",
+      change: (h) => rewrite(h, 5, (entry) => { entry.input.authority[0].fresh.observation.at = "2026-10-04T11:59:45Z"; }), result: "mismatch", at: 5, why: /the retained observation does not give the grant: age/ },
+    { name: "a preparation whose grant is of another key than the one that signed", change: (h) => rewrite(h, 5, (entry) => { entry.input.authority = (entryOf(h, 2).input as { authority?: unknown }).authority; }), result: "mismatch", at: 5, why: /does not give the grant: (key|use)/ },
+    { name: "a preparation whose signed intent was changed, in integrity mode too",
+      change: (h) => { rewrite(h, 5, (entry) => { entry.input.signed.intent.fields.instance = "i2"; }); return { mode: "integrity" }; }, result: "mismatch", at: 5, why: /the preparation's signature is not its actor's/ },
+    { name: "an effect that the owner's rule does not derive from an outcome", change: (h) => rewrite(h, 7, (entry) => { entry.effects[1].state = "creating"; }), result: "mismatch", at: 7, why: /recorded effects are not the ones derived/ },
+    // Witness 18.41, case 7.
+    { name: "an outcome whose input names another owner than its operation has", change: (h) => rewrite(h, 8, (entry) => { entry.input.owner = "git-read@1"; }), result: "mismatch", at: 8, why: /names another owner or kind than its operation has/ },
+    { name: "an outcome that the rules of its owner are not given for: `unsupported-definition`", change: () => ({ owners: undefined }), result: "unsupported-definition", at: 7, why: /an outcome, and this replay has no rules/ },
+    // Witness 18.10: with the snapshot's bytes gone the replay makes no claim for that check.
+    { name: "a check entry whose snapshot is no longer retained: `incomplete`", change: (h) => { h.retained = h.retained.filter((r) => r.kind !== "snapshot"); }, result: "incomplete", at: 8, why: /retained input is missing: the snapshot of staged refs/ },
+    { name: "an ancestry record that states another count than its snapshot holds", change: (h) => rewrite(h, 8, (entry) => { for (const record of records(entry)) record.snapshot.count = 2; }), result: "mismatch", at: 8, why: /states 2 staged refs, and the snapshot that it names holds 1/ },
+    // The check entry still derives: its rule records what the answer says. The report names nothing, so the guard refuses the act that the entry says was admitted.
+    { name: "an ancestry record that lists a staged commit of other work: the act that it admitted is not derived",
+      change: (h) => rewrite(h, 8, (entry) => { for (const record of records(entry)) record.F = [{ commit: C("1"), ref: "refs/artroom/staged/other" }]; }), result: "mismatch", at: 9, why: /writes no entry: refused, capability-refused/ },
+  ];
+  test.each(cases.map((row) => [row.name, row] as const))("a history changed in one place: %s", async (_name, { change, result, at, why }) => {
+    const s = staged();
+    const history = s.served();
+    const found = await replayed(s, history, change(history) ?? {});
+    expect([found.report.result, found.report.at?.seq, found.report.coverage[0]?.through ?? -1]).toEqual([result, at, at - 1]);
+    expect(found.why).toMatch(why);
+  });
+});
+
+describe("an outcome entry of a platform definition, and where a scope records its membership reference", () => {
+  /** What the made-up rule `probe` derives for the outcome: a ticket that the outcome entry opens, with the hash that a ticket must hold. */
+  const opens = ({ resolved }: { resolved: { self: number } }) => ({ effects: [{ effect: "open", item: resolved.self, type: "ticket", state: "open" }, { effect: "value", item: resolved.self, slot: "hash", value: textDigest("made") }], sends: [], opens: [] });
+  const replayed = (g: Gate, history: MemoryScope, platform: Options["platform"]) => verify(new MemorySource([history]), { mode: "replay", scope: g.at.scope, anchors: g.anchors(), platform });
+
+  test("the outcome is derived with the rule that the data names for its kind; a rule whose output the commit refuses as a fault writes no entry in a replay either, also when the history holds that output (I3 deltas, entries EN2 and EJ11)", async () => {
+    const g = new Gate(opens as never);
+    const good = await replayed(g, g.served(), g.coded());
+    expect([good.report.result, good.why, good.report.trusts.includes(TRUSTS.outcomes), good.report.trusts.includes(platformCode(OWNER))]).toEqual(["consistent", null, true, true]);
+
+    // The same rule, but it sets a fixed slot of the gate, an item that an earlier entry opened. The history holds exactly what it returns.
+    const fault = { effect: "party", item: 0, slot: "opener", member: keys.una.member };
+    const history = g.served();
+    rewrite(history, 3, (entry) => { entry.effects = [entry.effects[0], fault]; });
+    const found = await replayed(g, history, g.coded(Gate.rulesWith((() => ({ effects: [fault], sends: [], opens: [] })) as never)));
+    expect([found.report.result, found.report.at?.seq, found.why]).toEqual(["mismatch", 3, "derived again, this input writes no entry: unavailable, unavailable"]);
+  });
+
+  test("each observation that an act retains in `observed` is derived again: it is of the membership scope that the scope records, and inside the window of the act (section 16.1, guards 1 and 5; I3 deltas, entries EM26 and EU4)", async () => {
+    // The guard rule of `enter` reads an observation of a member, so entry 2 retains it. Its value is taken on the anchor of that head.
+    const g = new Gate(opens as never, true);
+    const good = await replayed(g, g.served(), g.coded());
+    expect([entryOf(g.served(), 2).input, good.report.result, good.why]).toMatchObject([{ observed: [{ observation: { subject: "member" }, use: "fresh" }] }, "consistent", null]);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const changed = async (change: (observation: any) => void) => {
+      const history = g.served();
+      rewrite(history, 2, (entry) => change(entry.input.observed[0].observation));
+      const found = await replayed(g, history, g.coded());
+      return [found.report.result, found.report.at?.seq, found.why];
+    };
+    expect(await changed((o) => { o.at = "2026-10-04T11:55:00Z"; })).toEqual(["mismatch", 2, "derived again on the entry's time, a retained observation is outside its window of 300 seconds"]);
+    expect(await changed((o) => { o.of.inc = otherLane.inc; })).toEqual(["mismatch", 2, "a retained observation is not of the membership scope that the scope records, with that incarnation"]);
+  });
+
+  test("a scope whose platform version records its membership reference in its state is replayed on that reference, as a directory's slot is read; with no such reference its grant covers nothing (I3 deltas, entry EP14)", async () => {
+    // The scope was founded, so its genesis records no membership scope. Its grants are filters on the membership scope.
+    const g = new Gate(opens as never);
+    const [recorded, none] = [await replayed(g, g.served(), g.coded()), await replayed(g, g.served(), g.coded(g.rules, null))];
+    expect([recorded.report.result, none.report.result, none.report.at?.seq, none.why]).toEqual(["consistent", "mismatch", 1, "the entry records a grant, and its row or its step names no action, its scope records no membership scope, or no window is stated for it"]);
   });
 });

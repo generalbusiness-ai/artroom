@@ -781,3 +781,72 @@ to e of section 12.1.5). Its stand-ins are in
 **What was not run.** No Git command, no host, no gateway and no provider.
 The stand-in rules of test support let a test reach a `ready` branch and a
 `reserved` publication. They show nothing about rows 33, 35 and e.
+
+## 19. Step 22: replay of preparation, outcomes and an ancestry record
+
+Written 2026-10-05, by the worker of step 22. Entries have the prefix EU.
+"The contract" is the scope contract's revision 16 at `54420b41`, and "the
+authority note" is revision 21 at `f9ec25e4`. Both are adopted, and section
+numbers are their own. The code is in `packages/replay/src/verify.ts`.
+
+No entry's bytes change, no state digest changes and neither lane digest
+changes: the step writes no entry. It changes only what a verifier reports
+for a history.
+
+**What a replay now proves.** For a preparation entry: the signature, in
+both modes; the action and the window that the step asks of its grant;
+the grant, from the observation that it retains, by the same guards as an
+act's; the step's guards over the folded state; that no earlier entry
+prepared the same intent, capability and step; and the records and
+operations that it derives. For an outcome entry: that its owner and kind
+are those of its operation; the checks of the contract's section 4.3 on
+the attempt, the basis and the evidence's form; `selected`; the next
+attempt; and every effect, request and operation that the owner's rule
+derives, with the guards of section 13 above on a platform rule's output
+(entries EN2 to EN8, and EJ11): an output that the commit refuses as a
+fault writes no entry in a replay, so a history that holds it is a
+`mismatch`. For an ancestry record: that the scope retains the snapshot
+that the record names, under its digest, and that the count is the
+snapshot's; and, at the act whose guard `ancestry` reads the record, the
+guard's verdict, from the record, that snapshot and the lane's earlier
+entries. For each record of `observed` of an act: guards 1 and 3 to 6 of
+the contract's section 16.1, and the value. This closes entries E13 and
+EC3 for a verifier that is given the code, the replay's part of EM26, and
+the replay's part of EP14 for a directory. The default of `grants` is
+`proven` (entry EM24), and every test of this step replays under it.
+
+**What a replay still trusts.** The report lists each under `trusts`.
+What an outcome entry says the outside system answered: that an answer
+was that attempt's own, and that a read returned what was recorded. That
+the Git host returned the snapshot and the head of an ancestry record.
+That the outside
+effects of a preparation were dispatched only after its entry was
+sealed. That each read behind an observation was made, and when. That
+the rules which the replay ran for a platform definition are the rules
+of that name and version. With an anchor for an observed head, the value
+of the observation.
+
+**What a replay does not claim.** The walk of an ancestry record. A
+history that holds one is `incomplete`, and never `consistent` (entry
+EU2).
+
+**What was not run, and the limits of the witnesses.** No real scope
+wrote a history of this step: the two histories are written in memory by
+derive's judges (`packages/replay/test/staging.ts`), and their creator,
+their membership and every outside answer are labelled stand-ins. The
+value of an observation in a preparation's grant and in `observed` is
+witnessed only on the anchor's path: the derivation from a history is the
+code that derives an act's grant, which T44 witnesses. No history under
+`platform:directory@1` was replayed: the reader of its slot is witnessed
+on a made-up version, and that the directory's version supplies its own
+reader is one assertion in `packages/platform/test/directory.test.ts`.
+
+| # | Where the texts differ or are silent | Implemented | Owner, and the question |
+|---|---|---|---|
+| EU1 | The contract's section 9.3 has a verifier derive a preparation with the capability's rules for the step, and an outcome with its owner's rules. No text says how a verifier is given either, and entry EL9 left one port type for the forms and the steps to this step. | `Options.capabilities` carries the steps when the value has them, read by derive's `stepsOf`, as the runtime reads its port. `Options.owners` is new, and carries the rules of the owners that are capabilities. The rules of a pinned platform definition come with `Options.platform`, as before. A preparation of a step with no code, and an outcome of an owner and kind with no rules, are `unsupported-definition` at that entry, before any other check of it. An outcome that names no opened operation is asked by the owner and kind that its input states. The one port type is not built: `stepsOf` stays, with its seam. The replay command supplies no code, so from the command line every such history is `unsupported-definition`. | The builder: the command's code, with step 30; the one port type, in `derive/src/prepare.ts` and `scope/src/ports.ts`. |
+| EU2 | The contract's sections 9.3 and 16.4 say a verifier derives the walk of an ancestry record again, "from the commit's parents", and answers `incomplete` when "a commit that the walk needs can no longer be read". A verifier's source serves entries and retained inputs, and no commit. No text says from where a replay reads a commit by its ID. `walk` also takes the selected inputs of the commitment, each with its report's commit, and no source builds that list (entry EF10). No source calls `walk` outside a test. | Decided by the builder on 2026-10-05: the contract is followed. The walk is not derived, so a replay of a history that holds an ancestry record is `incomplete`, at the check entry, with words that name the walk. It is never `consistent`, and no trust is listed in its place. Every other check runs first and gives its mismatch first: the snapshot is read by its digest, `incomplete` at once when the bytes are gone; its digest and count are checked; and at the act that reads the record the guard `ancestry` is derived with that snapshot. The answer for the walk is given last, after the whole history is read, so the coverage lists the check entry although its walk was not derived. `staged-ref-read` is still listed. The verifier has no port for commits: one that only refused would change nothing, and none is added before the texts say what it serves. Witness: T24, in `replay/test/verify.test.ts`, with a history without a check entry that is `consistent`. Control: the last answer removed. It distinguishes. So T24 as the plan words it, "gives the same judgment", holds for every entry and not for the result. | Owed, by the scope contract with the authority note: from where a verifier reads a commit by its ID, and how it finds the selected inputs with their commits. Owed, by the builder, once that is stated: a source of commits (the Git package's reader) and the walk in the replay. Until then no lane history with a check entry replays as `consistent`. |
+| EU3 | The contract's section 9.3 has the verifier check "the snapshot's digest and count". The commit of a check entry checks the snapshot's bytes against its digest (`scope/src/operations.ts`) and does not compare the count: the guard `ancestry` does, at the act. | The replay compares the count at the check entry, and a difference is a `mismatch` there. So a check entry that the service wrote with a wrong count is a `mismatch` in a replay, and the act that it would have served is refused by the service. Witness: one row of `replay/test/verify.test.ts`. Control: the check removed. It distinguishes. | The builder, for `hold@1`: should the evidence of a check be refused as not well formed when its count is not its snapshot's? |
+| EU4 | Entries EM2 and EM26: no form states the window of an entry and a subject, for a record of `observed`. The table of the authority note's section 3.3, with its four added rows, states each window in prose. Every row that states a window for an observation that an act retains states the window of that act's own grant: `publish` at the rules scope, and `open-issue`, `open-pr` and `open-task` at the directory. | For an act, the window of each record of `observed` is `windowOf` for that act. With none stated the entry is a `mismatch`. Guard 1 is the scope's own membership reference, guard 3 that a ten-second kind is `fresh`, guard 5 the age, and the value is derived as a grant's is, for a key and for a member. The judges of an outcome and of a delivery are given no `observed` and derive none, so such an entry that holds the member is a `mismatch` at the comparison of its input. Witness: `replay/test/verify.test.ts`, "each observation that an act retains". Controls: guard 1 removed, and guard 5 removed. Both distinguish. | The scope contract, with the authority note: the form of EM2. The builder, with the first rule that reads `observed` in an outcome (step 9f, the reservation, at ten seconds) and in a delivery of a result. |
+| EU5 | Guard 1 of the contract's section 16.1 lets a record of `observed` be of the scope's "rules reference". No text says where each kind of scope records that reference, and no platform version has an answer to a read of the rules. | An entry that retains an observation of the rules is `unsupported-definition` at that entry. It is never `consistent`. | The authority note. Where does a scope record its rules reference? The builder, with the read of the rules scope (step 9d; entry EJ15). |
+| EU6 | Entry EP14, and EM21. The authority note's section 3.3 has four rows for where a scope records its membership reference. The replay read every scope's from its genesis. | A platform version may state where its scopes record the reference: `Coded.membership`, a function of the folded state before the entry, which the platform package supplies for `platform:directory@1` as `directoryMembership`. The replay reads it there, as `repositoryAuthority` does, and from the genesis otherwise. Before the slot is set a directory records none, and a grant there is a `mismatch`. Not built: the rules scope and the destination, whose reference is an ID in the creation's fields with the incarnation fixed by the first entry that retains an observation. The production authority reads nothing for them either, so no history holds a grant there. `derive/src/sends.ts` is not changed. Witness: `replay/test/verify.test.ts`, on a made-up version. Control: the read of the version's reader removed. It distinguishes. | The builder, at steps 9a and 9b, for the two kinds; at the merge, for `derive/src/sends.ts`. The scope contract, to confirm that where a version records the reference is code of the version, reported under `platform-code`. |
+| EU7 | The contract's section 9.5 fixes labels for `trusts`, among them `own-answer`, `host-read` and `staged-ref-read`. The package's `trusts` are sentences, and one sentence stood for every outcome. Section 9.3 also lists, for a preparation, that its outside effects were dispatched only after it was sealed, and gives it no label. | The sentence for outcomes names the two labels and is listed once for any outcome, whatever its basis. Two sentences are added: for a preparation's dispatch, and `staged-ref-read`. | The scope contract: a label for a preparation's dispatch. The builder: whether `trusts` should list the labels alone. |

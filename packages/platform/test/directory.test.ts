@@ -202,6 +202,8 @@ test("a directory's genesis, by an outcome entry of its register, opens the repo
   expect([d.state.scope()!.status, d.state.scope()!.held, d.item(0).refs["membership"], d.item(0).refs["rules"], d.item(0).refs["destination"], directoryMembership(d.state)])
     .toEqual(["active", [], d.children.membership, d.children.rules, null, d.children.membership]);
   expect(sends(d.last)).toEqual([[0, "control", "confirm"]]);
+  // A replay is supplied the same reader with the version, and no other version has one: every other scope records the reference in its genesis.
+  expect([platform(DIRECTORY)!.membership?.(d.state), platform(DIRECTORY)!.membership?.(p.state), platform("platform:membership@1")!.membership]).toEqual([d.children.membership, null, undefined]);
   // Case b: `open-pr` before the destination's applied result is recorded. No destination.
   const pull = { expected: { repository: d.item(0).revision }, fields: { definition: ticketDefinition.digest, title: "A change", draft: false } };
   expect(said(d.act(rita, "open-pr", pull, active(d)))).toEqual(["refused", "guard-failed", null]);

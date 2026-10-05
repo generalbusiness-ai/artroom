@@ -129,6 +129,17 @@ A replay of a history that the test authority wrote says so:
 `grants: "as-recorded"`. Its grants hold no freshness proof, and the
 report lists them as trusted. The replay command never takes that option.
 
+The replay package has two histories with stand-ins of their own, in
+`packages/replay/test/staging.ts`. `Lane` is a staging lane and `Gate` a
+scope under made-up platform data. Derive's judges wrote every entry of
+both, with the code of `hold@1` and `git-read@1` or with made-up rules.
+Three things are stand-ins, and the file labels each: the two entries of
+the lane's creator, each observation of membership, and every answer of
+the outside system. A replay of them is given an anchor for each of the
+first two. Their grants hold a freshness proof, so they are replayed as
+`proven`. Such a test shows what a verifier derives from a history. It
+shows nothing about a creation, about membership or about a Git host.
+
 `codeLost`, of the same module, supplies each platform definition with
 its data and with no rule, while a test's control says so
 (`platformCode`). It stands for a runtime that lacks the rules of a

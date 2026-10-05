@@ -40,7 +40,8 @@ The library runs under Node and under Workers.
   every entry is at one scope and incarnation, times do not go back, and a
   clamped entry has the time of the entry before it;
 - the scope ID is the digest of the genesis's seed;
-- the signature of each act and of a founding.
+- the signature of each act, of a founding and of the signed intent of a
+  preparation entry.
 
 No judgment is derived again, and the report says so in words. A history
 whose recorded effects were altered and whose chain was sealed again passes
@@ -68,6 +69,61 @@ every entry, from the genesis:
 
 A checkpoint is checked against the fold. It is never used as a place to
 start.
+
+## Preparation, outcomes and an ancestry record
+
+Three kinds of entry are derived only when the caller supplies code for
+them. The package itself has none.
+
+- **A preparation entry** records one step of a capability. It is derived
+  with the rules of that step (`capabilities`, when the value holds the
+  steps, as the code of `hold@1` does): the action and the window that the
+  step asks of its grant, the grant again from the observation that it
+  retains, the step's guards over the folded state, and the records and
+  operations that it derives. The same intent, capability and step a second
+  time is a mismatch.
+- **An outcome entry** is derived with the rules of the owner of its
+  operation: the rule that the pinned platform definition names for the
+  operation's kind (`platform`), or a capability's (`owners`). The owner and
+  the kind are read from the entry that opened the operation. The replay
+  derives whether the result selects, whether another attempt is opened,
+  and every effect, request and operation that the owner's rule gives. A
+  rule's output that the commit would refuse as a fault writes no entry in
+  a replay either, so a history that holds such an entry is a mismatch.
+- **An ancestry record** is the evidence of a check entry, an outcome of an
+  operation `check` of `hold@1`. The replay reads the snapshot of staged
+  refs that the record names, by its digest, and checks its bytes and its
+  count. A later act whose guard `ancestry` reads the record is derived
+  from the record, that snapshot and the lane's own earlier entries. The
+  staged refs and the branch as they are now are never read. With the
+  snapshot's bytes gone the result is `incomplete`.
+
+The walk of an ancestry record is not derived. The verifier reads no
+commit, so it cannot show the record's stops, the basis of its start,
+`published`, its list F or its count of visited commits. A history that
+holds an ancestry record is therefore never `consistent`. Every other
+check runs first, so a mismatch in the history is still reported as a
+mismatch. If there is none, the result is `incomplete`, `at` names the
+check entry, and the words name the walk. Here `incomplete` means: no
+entry was found wrong, and the replay makes no claim for that check. The
+coverage then lists the entries that were derived, the check entry among
+them, although its walk was not.
+
+Without the code for a step, or for an owner, the result is
+`unsupported-definition` at that entry.
+
+A replay reads a scope's membership reference where the production
+authority reads it: in the genesis entry, or, for a scope whose platform
+version says so, in its folded state before the entry. A directory holds it
+in its slot `repository.membership`.
+
+Each observation that an act retains in `observed` is derived as a grant's
+is: it is of the scope's own membership reference, `fresh` or `reused` as
+the earlier entries make it, inside the window of the act, from a head that
+is not lower than an earlier one, and its value is what the observed
+scope's history gives at that head. An observation of the rules is
+`unsupported-definition`: nothing states yet where a scope records its
+rules reference.
 
 A detached text is a retained input. The verifier asks for each text that
 an entry's input names and checks it against its digest. A text whose
@@ -115,8 +171,8 @@ service being checked.
 | `consistent` | Everything the mode checks holds, through the head, for the coverage and trusts stated. |
 | `mismatch` | An entry is not what its bytes, its chain, its signature or its replay say; or a reference names another entry, incarnation or kind than its source scope has; or the history does not reach or match the known head. `at` names the entry. |
 | `missing-dependency` | A source history cannot be read, or does not reach the entry a reference names, and no anchor names it. `at` names the entry that used it. |
-| `incomplete` | A retained input is missing or is not the bytes its digest names; or a detached text is gone and no later entry redacts it; or a limit was reached. |
-| `unsupported-definition` | The scope pins a platform definition for which the caller gave no data and rules (`platform`), or gave them without a rule for one mark of the data; or a declaration that does not pass validation under the bounds given, or a declaration that needs a capability version the caller gave no rules for. `at` names the genesis. Also a `preparation` entry or an `outcome` entry: this replay has no rules for either yet, and `at` names that entry. |
+| `incomplete` | A retained input is missing or is not the bytes its digest names; or a detached text is gone and no later entry redacts it; or the history holds an ancestry record, whose walk the replay does not derive; or a limit was reached. |
+| `unsupported-definition` | The scope pins a platform definition for which the caller gave no data and rules (`platform`), or gave them without a rule for one mark of the data; or a declaration that does not pass validation under the bounds given, or a declaration that needs a capability version the caller gave no rules for. `at` names the genesis. Also a `preparation` entry of a step, or an `outcome` entry of an owner, that the caller gave no rules for, and an observation of the rules: `at` names that entry. |
 
 The check stops at the first finding. The report's coverage lists, for each
 scope, the entries that were checked to their end, with every fact they
@@ -173,7 +229,18 @@ A report lists these under `trusts`, each only when it applies:
   the result then proves nothing about authority. The command line never
   does: there such an entry is a mismatch;
 - each diagnosis's attempt log;
-- each outcome's evidence, and that the outside write happened;
+- each outcome's evidence, and that the outside write happened. What an
+  outcome entry says the outside system answered is never derived: that an
+  answer was that attempt's own (`own-answer`), and that a read returned
+  what was recorded (`host-read`). The replay derives only what follows
+  from the answer;
+- that the outside effects which a preparation entry opened were
+  dispatched only after that entry was sealed;
+- `staged-ref-read`: that the Git host returned the snapshot of staged
+  refs and the head that an ancestry record names, and that the lane kept
+  what was returned;
+- `platform-code`, for each platform definition whose rules the replay
+  ran: that those rules are the rules of that name and version;
 - each anchor, and the definition name retained with an anchored entry;
 - that each scope runs under the bounds the replay was given;
 - for each redacted text, that its bytes were the text its digest names
@@ -181,6 +248,13 @@ A report lists these under `trusts`, each only when it applies:
 
 It also does not derive again whether an entry left room in the scope's
 entry budget.
+
+Three things are not derived and are not yet listed by a label of their
+own. With an anchor for an observed head, the value of the observation is
+taken with the anchor. A value beside an intent is not given to the judge,
+so an entry whose rule reads one is not derived. And an outcome entry or a
+delivery that retains an observation in `observed` is a mismatch, because
+no judge derives one there yet.
 
 ## The command
 
@@ -218,6 +292,15 @@ npm run typecheck --workspace @generalbusiness/artroom-replay
 scopes: a desk and two tickets, with creation, confirmation and a
 relationship update. `test/verify.test.ts` copies it and changes the copy,
 one row for each way a history can fail.
+
+`test/staging.ts` builds two more histories with derive's judges. `Lane`
+is a staging lane under derive's fixture definition, with the code of
+`hold@1` and `git-read@1`: it stages a commit, checks it, admits a report
+and retires the root. Its replay is `incomplete`, for the walk; without the
+check entry it is `consistent`. `Gate` is a scope under made-up platform data whose
+rule opens an operation and derives its outcome. Their creator, their
+membership and every outside answer are stand-ins, and the file labels
+each. The tests change one place of a history and name the mismatch.
 
 That replay agrees with the runtime is shown in the scope package,
 `packages/scope/test/replay.test.ts`: real scopes write histories in the
