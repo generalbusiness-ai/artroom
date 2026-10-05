@@ -9,9 +9,9 @@
  * |---|---|
  * | Membership and the inboxes | Real scopes under `platform:membership@1` and `platform:inbox@1`, written through the turn, the store and the dispatchers. |
  * | Authority | The production authority (`repositoryAuthority`): membership judges its own acts on its own head, and an inbox reads the membership scope that its genesis records, through the namespace. No test authority, and no scripted membership. |
- * | The office | A STAND-IN for the creator of a membership scope: a made-up directory, of the platform package's test support. The real directory and the register are not built. |
+ * | The office | A STAND-IN for the creator of a membership scope: a made-up directory, of the platform package's test support. The real directory and the register are data in the platform package, and neither can be founded or created yet: the register lacks one rule and the directory three. |
  * | A lane that sends a notice | SCRIPTED: an entry written by hand, read through `net.peers`. It shows the inbox's side of a notice, and nothing about a lane. |
- * | Readers | The test readers, a STAND-IN for read sessions, which are not built. |
+ * | Readers | The test readers, a STAND-IN for read sessions, unless a test sets `platformNet.sessions`: then they are the real read sessions of `sessions.ts`, as `sessions.test.ts` does. |
  * | The clock | The scripted clock of the namespaces. No test waits on the wall clock. |
  */
 
