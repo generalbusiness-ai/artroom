@@ -27,7 +27,7 @@
  * them be written whole, and none is invented. So the version lacks rules,
  * and by the whole-scope rule (the contract's section 6.1) nothing is
  * created under `platform:destination@1` by this package's rules. The I3
- * deltas note, section 16, has each in full.
+ * deltas note, section 18, has each in full.
  *
  * | Mark | Place | At | Why it has no rule (deltas entry) |
  * |---|---|---|---|
