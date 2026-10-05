@@ -10,7 +10,7 @@
 import type { ActType, Answer, Beside, Bounds, CapabilityName, DeclaredDefinition, Digest, DutyId, Entry, FactRef, Founded, Grant, PlatformDefinition, Receipt, RefusalReason, ScopeId, Seed, Settlement, SignedIntent, UnavailableReason } from "@generalbusiness/artroom-contract";
 import { canonicalize, definitionDigest, intentDigest, isDigest, isGrant, isPlatformDefinition, newIncarnation, parseStrict, platformName, textDigest, utf8 } from "@generalbusiness/artroom-bytes";
 import { checkpointOf, derivable, factsNamed, inputTexts, isObject, judgeAct, judgeCheckpoint, judgeGenesis, judgePreparation, own, prepareRules, presentedTypes, readFields, stepsOf, validateDefinition, windowOf } from "@generalbusiness/artroom-derive";
-import type { ActJudgment, Clock as Reading, Draft, Fetched, Founding, GrantDecision, JudgeContext, Own, Presented, StateView, Texts, ValidDefinition } from "@generalbusiness/artroom-derive";
+import type { ActJudgment, Clock as Reading, Draft, Fetched, Founding, GrantDecision, JudgeContext, Own, Presented, StateView, Texts, ValidDefinition, Window } from "@generalbusiness/artroom-derive";
 import { RULE_PROFILES } from "@generalbusiness/artroom-derive/rule";
 import { namedBy } from "./definitions.ts";
 import type { Asked, DefinitionRead, Ports, Standing } from "./ports.ts";
@@ -503,24 +503,27 @@ export class Scope {
     const steps = stepsOf(this.#ports.capabilities);
     const asked = { signed, capability, step };
 
-    // Section 5.1, held authority, phase one: one read for this request, before the turn, as for an act. The action is the one that
-    // the capability names for the step. It is read from the pinned definition and from an item's type, which never change. With
-    // no action nothing is read, and the judge answers.
-    let action: string | null = null;
+    // Section 5.1, held authority, phase one: one read for this request, before the turn, as for an act. The action and the window
+    // are the ones that the capability names for the step: ten seconds for a step that a write outside the service follows, and the
+    // ordinary window for one that writes nothing outside (section 6.11; authority note, section 5.7, the table of steps). They are
+    // read from the pinned definition and from an item's type, which never change. With no action nothing is read, and the judge
+    // answers.
+    let needs: { action: string; window: Window } | null = null;
     try {
-      action = steps && typeof capability === "string" && typeof step === "string" && steps.implements(capability as CapabilityName, step)
-        ? (steps.grant(capability as CapabilityName, step, { view: this.#store, definition, scope, self: scope.head.seq + 1, intent: signed.intent, digest: intentDigest(signed.intent), clock: { reading: scope.time, behind: false, asOf: scope.time } })?.action ?? null)
+      needs = steps && typeof capability === "string" && typeof step === "string" && steps.implements(capability as CapabilityName, step)
+        ? steps.grant(capability as CapabilityName, step, { view: this.#store, definition, scope, self: scope.head.seq + 1, intent: signed.intent, digest: intentDigest(signed.intent), clock: { reading: scope.time, behind: false, asOf: scope.time } })
         : null;
     } catch {
-      action = null;   // a request that the rules cannot read names no action
+      needs = null;   // a request that the rules cannot read names no action
     }
     const given = (Array.isArray(grants) ? grants : []).filter(isGrant);
-    // I3 merge: the read is asked with no window, so the observation read of `authority.ts` (plan step 6) reads nothing for a step, and
-    // a step is not judged on an observation yet. The next commit gives the read the window that the step asks.
-    const standing = action === null ? null : await this.#standing({ scope: scope.at, signed, action, grants: given, window: null });
-    // Phase two, in the commit: the decision on the grant, from what that read holds at the commit's head and reading.
+    const standing = needs === null ? null : await this.#standing({ scope: scope.at, signed, action: needs.action, grants: given, window: needs.window });
+    // Phase two, in the commit: the decision on the grant. It is the grant guard of `derive/src/grant.ts`, which the port's second
+    // phase runs on the observation that the read obtained, at the commit's head and on the commit's one reading (section 16.1, "The
+    // guards, in the commit"). The read was made for one action and one window. A commit that asks another is not judged on it.
     const granted = (view: StateView, clock: Reading): GrantDecision => (wanted) => {
-      const held = standing === null ? null : heldBy(standing, view, clock);
+      if (standing === null || needs === null || wanted.action !== needs.action || wanted.window.seconds !== needs.window.seconds || wanted.window.once !== needs.window.once) return { result: "unavailable" };
+      const held = heldBy(standing, view, clock);
       if (held === null) return { result: "unavailable" };
       const found = held.find(({ grant, current }) => current && grant.key === wanted.key && grant.actions.includes(wanted.action));
       return found ? { result: "granted", grant: found.grant } : { result: "refused" };
@@ -535,7 +538,11 @@ export class Scope {
             const head = view.scope()!.head;
             return {
               verdict: "write", draft: judged.draft, retain: [],
-              sealed: (sealed) => ({ answer: "accepted", receipt: receiptOf(sealed, named) }),
+              // The entry retains the grant that was judged, and the port learns which entry used its read, as for an act.
+              sealed: (sealed) => {
+                if (standing) told(standing, sealed);
+                return { answer: "accepted", receipt: receiptOf(sealed, named) };
+              },
               unfit: (why) => ({ answer: "refused", reason: why === "size" ? "bad-field" : "unauthorized", judgedAt: head }),
               // Section 17.3: a preparation is new work. It is admitted only with the room of what it reserves.
               full: () => ({ answer: "refused", reason: "scope-full", judgedAt: head }),

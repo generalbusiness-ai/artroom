@@ -28,10 +28,11 @@
 import type { CapabilityName, Digest, Effect, Evidence, FieldValue, Intent, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
 import { isDigest, isFactRef, isLocalId, isRecord, isScopeRef } from "@generalbusiness/artroom-bytes";
 import type { Capabilities, CapabilityGiven, Recorded } from "../capability.ts";
+import { WINDOWS, type Window } from "../grant.ts";
 import { EPOCH, HOLDER, holdStates, type HoldEffect } from "../hold.ts";
 import { UNDER } from "../attribution.ts";
 import { operationId, operationOpening, type OperationRules, type Opening, type OutcomeDerived, type OutcomeInput, type Owners } from "../ledger.ts";
-import { recordEffects, type PreparationWindow, type StepDerived, type StepGiven, type StepRefusal, type Steps } from "../prepare.ts";
+import { recordEffects, type StepDerived, type StepGiven, type StepRefusal, type Steps } from "../prepare.ts";
 import type { Item, Operation, RecordState, StateView } from "../state.ts";
 import { timeMs, type Clock } from "../time.ts";
 import type { ValidDefinition } from "../validate/index.ts";
@@ -412,15 +413,15 @@ function openingGrant(definition: ValidDefinition, type: string | undefined): st
   return grants.size === 1 ? [...grants][0]! : null;
 }
 
-function stepGrant(reads: HoldReads, step: string, { view, definition, scope, intent }: Omit<StepGiven, "signer">): { action: string; window: PreparationWindow } | null {
+function stepGrant(reads: HoldReads, step: string, { view, definition, scope, intent }: Omit<StepGiven, "signer">): { action: string; window: Window } | null {
   // The step `check` reuses a root and writes nothing outside: the act's own grant, in its ordinary window (section 6.11; authority
   // note, section 6.2, "A new staging, and the reuse of a completed one"). For an intent that is addressed to another scope the
   // act is not this scope's, and the grant is the one that this scope judges staging on (I3 deltas, entry EF3).
   const act = step === "check" && same(intent.to, scope.at) ? own(definition.declared.acts, intent.kind) : undefined;
-  if (act) return { action: act.grant, window: "ordinary" };
+  if (act) return { action: act.grant, window: WINDOWS.ordinary };
   const hold = step === "instance" ? reads.instance(intent)?.hold : step === "token" ? reads.token(intent)?.hold : reads.staged(intent)?.hold;
   const action = openingGrant(definition, isLocalId(hold) ? view.item(hold)?.type : undefined);
-  return action === null ? null : { action, window: step === "check" ? "ordinary" : "ten-seconds" };
+  return action === null ? null : { action, window: step === "check" ? WINDOWS.ordinary : WINDOWS.once };
 }
 
 /** A hold that the signer's member holds now, or the refusal. */

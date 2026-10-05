@@ -137,7 +137,8 @@ export function observing(config: Observing): Authority {
         },
         sealed({ entry, hash }: { entry: Entry; hash: Digest }) {
           const used = offered;
-          const proof: unknown = entry.input.type === "act" ? entry.input.authority[0]?.fresh : null;
+          // An act and a preparation retain the one grant judged, in the same place (section 16.1, "Where one stands").
+          const proof: unknown = entry.input.type === "act" || entry.input.type === "preparation" ? entry.input.authority[0]?.fresh : null;
           if (!used || !same(proof, useOf(used))) return;
           // The last use of the read is this entry. A later entry retains it only as `reused`, on a reading later than this entry's time.
           used.last = { entry: { seq: entry.seq, hash }, time: entry.time, observation: used.observation };

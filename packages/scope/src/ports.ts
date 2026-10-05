@@ -28,13 +28,13 @@ export interface Random { bytes(length: number): Uint8Array }
 export interface Asked {
   /** The scope that judges, with its incarnation. */
   scope: ScopeRef;
-  /** The act, with its signature and shape checked. Its signer is the intent's `actor`, and its kind says what kind of commit this is. */
+  /** The act, or the intent that a capability's step prepares for, with its signature and shape checked. Its signer is the intent's `actor`. */
   signed: SignedIntent;
-  /** The action that the act's row names in `grant`. Null: the pinned definition has no act of that kind. */
+  /** The action that the act's row names in `grant`, or that the capability names for the step. Null: the pinned definition has no act of that kind. */
   action: string | null;
   /** The grants presented beside the intent, each of a grant's form. Nothing signs them. */
   grants: readonly Grant[];
-  /** The freshness window of this kind of commit, which the pinned definition and the scope's kind give (derive's `windowOf`). Null: none is stated for it. */
+  /** The freshness window of this kind of commit, which the pinned definition and the scope's kind give (derive's `windowOf`), or which the capability names for the step. Null: none is stated for it. */
   window: Window | null;
 }
 

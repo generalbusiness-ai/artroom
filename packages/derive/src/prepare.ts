@@ -31,6 +31,7 @@ import { intentDigest, isScopeRef, verifySignedIntent } from "@generalbusiness/a
 import type { Signer } from "./attribution.ts";
 import type { Capabilities, Recorded } from "./capability.ts";
 import { isIntent, type Own, type Reading } from "./fields.ts";
+import type { Window } from "./grant.ts";
 import type { Draft } from "./judge.ts";
 import { operationId, operationOpening, operationStanding, type Opening } from "./ledger.ts";
 import type { ScopeState, StateView } from "./state.ts";
@@ -40,19 +41,16 @@ import type { ValidDefinition } from "./validate/index.ts";
 import { own, same } from "./values.ts";
 
 /**
- * The window of the observation that a step's grant is judged on (section
- * 16.1; authority note, sections 3.12, row W3, and 5.7). `ten-seconds`: a
- * write outside the service follows, so the observation is read for this
- * commit and is at most ten seconds old. `ordinary`: nothing is written
- * outside, and the act's own window serves.
+ * What the grant guard is asked for one preparation: the signing key, the
+ * action that the capability names for the step, this scope, the window of
+ * the observation and the commit's one reading. The window is one of
+ * `WINDOWS` (section 16.1; authority note, sections 3.12, row W3, and 5.7).
+ * `once`: a write outside the service follows, so the observation is read
+ * for this commit and is less than ten seconds old. `ordinary`: nothing is
+ * written outside, and the ordinary window of an act serves (section 6.11,
+ * the step `check`).
  */
-export type PreparationWindow = "ten-seconds" | "ordinary";
-
-/** The length of the ten-second window, in seconds (authority note, section 3.12, row W3). The number is the proof plan's. */
-export const PREPARATION_WINDOW_SECONDS = 10;
-
-/** What the grant guard is asked for one preparation: the signing key, the action that the capability names for the step, this scope, the window and the commit's one reading. */
-export interface StepGrantAsked { key: KeyId; action: string; scope: ScopeRef; window: PreparationWindow; clock: Clock }
+export interface StepGrantAsked { key: KeyId; action: string; scope: ScopeRef; window: Window; clock: Clock }
 
 /**
  * The decision on the grant of one preparation, in the commit. `granted`:
@@ -60,9 +58,12 @@ export interface StepGrantAsked { key: KeyId; action: string; scope: ScopeRef; w
  * on an observation inside the window. The entry records it. `refused`: no
  * such grant. `unavailable`: nothing was read that this commit can judge
  * on, and the step is not judged (section 16.1).
+ *
+ * The runtime's decision is the grant guard, `judgeGrant` of `grant.ts`,
+ * on the observation that was read before the turn for this request with
+ * this action and this window. A verifier derives the same decision from
+ * the grant that the entry retains. Nothing here reads a window.
  */
-// I3 merge: this is the seam for the grant guard of `derive/src/grant.ts` (plan step 5). The caller builds it from the observation
-// that was read before the turn, in one line: `granted: (asked) => grantGuard(observation, asked)`. Nothing here reads a window.
 export type GrantDecision = (asked: StepGrantAsked) => { result: "granted"; grant: Grant } | { result: "refused" } | { result: "unavailable" };
 
 /**
@@ -102,7 +103,7 @@ export interface Steps {
    * rules can name no action for this request, and it is refused
    * `unauthorized`.
    */
-  grant(capability: CapabilityName, step: string, given: Omit<StepGiven, "signer">): { action: string; window: PreparationWindow } | null;
+  grant(capability: CapabilityName, step: string, given: Omit<StepGiven, "signer">): { action: string; window: Window } | null;
   /** The capability's guards for the step, over local state, and what the step derives. */
   derive(capability: CapabilityName, step: string, given: StepGiven): StepDerived | { refused: StepRefusal };
 }

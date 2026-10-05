@@ -11,7 +11,7 @@
 
 import { CAPABILITIES, PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { Bounds, Capability, CapabilityName, Digest, Entry, ObservationRequest, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
-import type { Capabilities, Delivered, Recorded } from "@generalbusiness/artroom-derive";
+import type { Capabilities, Delivered, Recorded, Steps, Window } from "@generalbusiness/artroom-derive";
 import { platform, type EntryRules, type Platform, type PlatformRule } from "@generalbusiness/artroom-platform";
 import { observing } from "./authority.ts";
 import type { Authority, Clock, Definitions, Ports, Readers, Resolver, Rules, Transport } from "./ports.ts";
@@ -56,6 +56,13 @@ export const testReaders: Readers = { allows: () => true };
 export interface CapabilityScript {
   guards?: Record<string, (args: Readonly<Record<string, unknown>>) => true | string>;
   effects?: Record<string, (args: Readonly<Record<string, unknown>>) => readonly Recorded[]>;
+  /**
+   * Scripted steps, as in `hold@1:instance`: the action whose grant the
+   * step is judged on, and the window of its observation. A scripted step
+   * derives nothing: no record and no operation. So its preparation entry
+   * shows how a step's grant is read and judged, and nothing about the step.
+   */
+  steps?: Record<string, { action: string; window: Window }>;
 }
 
 /**
@@ -72,9 +79,12 @@ export interface CapabilityScript {
  * not script is refused with the first refusal its version declares, and an
  * effect that it does not script changes no record.
  */
-export function scriptedCapability(script: () => CapabilityScript | null): Capabilities {
+export function scriptedCapability(script: () => CapabilityScript | null): Capabilities & Steps {
   return {
-    implements: () => script() !== null,
+    // A form of a definition, or a capability and one of its steps. A step that the table does not script has no code, as in production.
+    implements: (form: unknown, step?: string) => (typeof form === "string" ? script()?.steps?.[`${form}:${step}`] !== undefined : script() !== null),
+    grant: (capability, step) => script()?.steps?.[`${capability}:${step}`] ?? null,
+    derive: () => ({ records: [], opens: [] }),
     guard: (capability: CapabilityName, guard, args) =>
       script()?.guards?.[`${capability}:${guard}`]?.(args) ?? (CAPABILITIES as Record<string, Capability>)[capability]!.guards[guard]!.refusals[0]!,
     effect: (capability, effect, args) => script()?.effects?.[`${capability}:${effect}`]?.(args) ?? [],

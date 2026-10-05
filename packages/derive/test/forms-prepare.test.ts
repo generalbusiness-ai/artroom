@@ -2,8 +2,8 @@ import { describe, expect, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { SignedIntent } from "@generalbusiness/artroom-contract";
 import { intentDigest, isSealed } from "@generalbusiness/artroom-bytes";
-import { clockOf, judgePreparation, preparationStatus } from "../src/index.ts";
-import type { GrantDecision, PreparationWindow, Steps } from "../src/index.ts";
+import { WINDOWS, clockOf, judgePreparation, preparationStatus } from "../src/index.ts";
+import type { GrantDecision, Steps, Window } from "../src/index.ts";
 import { Scope, grantOf, keys, laneDefinition, otherLane, t } from "./fixtures.ts";
 
 const { una, vic } = keys;
@@ -17,7 +17,7 @@ const { una, vic } = keys;
  */
 const steps: Steps = {
   implements: (_capability, step) => step !== "retry",
-  grant: (_capability, step) => (step === "token" ? null : { action: "hold", window: step === "check" ? "ordinary" : "ten-seconds" }),
+  grant: (_capability, step) => (step === "token" ? null : { action: "hold", window: step === "check" ? WINDOWS.ordinary : WINDOWS.once }),
   derive: (_capability, step, given) => (step === "stage"
     ? { refused: { reason: "capability-refused", name: "not-staged" } }
     : { records: [{ kind: "instance", key: [0, "i1"], state: "current", values: { by: given.signer.member } }], opens: [{ owner: "hold@1", kind: "mint", attempts: 1 }] }),
@@ -26,7 +26,7 @@ const steps: Steps = {
 describe("a preparation (scope contract, section 5.5), with stand-in step rules", () => {
   const s = new Scope(laneDefinition);                            // entries 0 and 1
   const grant = grantOf(una, s.at, ["hold"]);
-  const windows: PreparationWindow[] = [];
+  const windows: Window[] = [];
   const granted: GrantDecision = ({ window }) => { windows.push(window); return { result: "granted", grant }; };
   const ask = (signed: SignedIntent, step = "instance", over: { capability?: string; steps?: Steps | null; granted?: GrantDecision; reading?: string } = {}) =>
     judgePreparation(s.state, laneDefinition, { signed, capability: over.capability ?? "hold@1", step }, { clock: clockOf(s.state, over.reading ?? s.now), bounds: PROPOSED_BOUNDS, steps: over.steps === undefined ? steps : over.steps, granted: over.granted ?? granted });
@@ -83,6 +83,6 @@ describe("a preparation (scope contract, section 5.5), with stand-in step rules"
       "unavailable unavailable", "unavailable unavailable", "refused unauthorized", "refused unauthorized", "unavailable authority-unavailable", "refused unauthorized",
       "unavailable clock-behind",
     ]);
-    expect([windows.slice(0, 1), (ask(fresh(), "check"), windows.at(-1)), s.head]).toEqual([["ten-seconds"], "ordinary", head]);
+    expect([windows.slice(0, 1), (ask(fresh(), "check"), windows.at(-1)), s.head]).toEqual([[WINDOWS.once], WINDOWS.ordinary, head]);
   });
 });
