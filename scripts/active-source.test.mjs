@@ -42,3 +42,14 @@ test("no platform package depends on the lanes package or imports from it", () =
   const platform = files.filter((f) => f.startsWith("packages/") && !f.startsWith("packages/lanes/") && !f.endsWith(".md"));
   assert.deepEqual(platform.filter((f) => /artroom-lanes|[.\/]\/lanes\//.test(text(f))), []);
 });
+
+// The platform package is pure data and rules over the contract, the bytes and the derivation (I3 plan, section 3.1). It names no
+// package above them, and only the packages that run or check its definitions name it: the runtime, the verifier and the lanes' tests.
+test("the platform package depends only on contract, bytes and derive, and only scope, replay and lanes name it", () => {
+  assert.ok(files.includes("packages/platform/package.json"), "the platform package was listed");
+  const source = (f) => f.startsWith("packages/") && !f.endsWith(".md");
+  const inside = files.filter((f) => source(f) && f.startsWith("packages/platform/"));
+  assert.deepEqual(inside.filter((f) => /artroom-(scope|replay|client|lanes)/.test(text(f))), []);
+  const named = files.filter((f) => source(f) && !/^packages\/(platform|scope|replay|lanes)\//.test(f));
+  assert.deepEqual(named.filter((f) => /artroom-platform/.test(text(f))), []);
+});

@@ -84,7 +84,13 @@ export interface Profile { admit?: (source: string) => string | null }
 
 export const PROFILES: Readonly<Record<string, Profile>> = { "restricted@1": {} };
 
-export function validateDefinition(input: unknown, bounds: Bounds, profiles: Readonly<Record<string, Profile>> = PROFILES): Validation {
+/**
+ * What only a platform definition may state, and only the platform package passes (section 6.1). `platform`: the definition's name
+ * may begin `platform:`. A definition that came from an input is validated without it.
+ */
+export interface ValidateOptions { readonly platform?: boolean }
+
+export function validateDefinition(input: unknown, bounds: Bounds, profiles: Readonly<Record<string, Profile>> = PROFILES, options: ValidateOptions = {}): Validation {
   const read = shapes(bounds);
   const { problems, bad, rec, entries, str } = read;
 
@@ -97,8 +103,10 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
   if (size !== null && size > bounds.definitionBytes) return { ok: false, problems: [{ code: "bound", path: "", message: `has ${size} canonical bytes; at most ${bounds.definitionBytes}` }] };
   if (top["format"] !== "artroom-definition-1") bad("shape", "format", "must be artroom-definition-1");
   // Section 6.1: a definition states its own name, which `under` is compared with. A name that begins `platform:` is the name of a
-  // platform definition, which the platform supplies in code, so no declared definition takes one.
-  if (str(top["name"], "name")?.startsWith("platform:")) bad("shape", "name", "a declared definition's name does not begin with platform:");
+  // platform definition, which the platform supplies in code, so no declared definition takes one. The platform package alone passes
+  // the option `platform`, for the data of a definition that it supplies.
+  const named = str(top["name"], "name");
+  if (options.platform !== true && named?.startsWith("platform:")) bad("shape", "name", "a declared definition's name does not begin with platform:");
 
   const d: Defining = {
     ...read, bounds, name: typeof top["name"] === "string" ? top["name"] : null, typeNames: new Set(isObject(top["items"]) ? Object.keys(top["items"]) : []), types: new Map(), rules: new Set(), holds: false, holdTypes: new Set(),
