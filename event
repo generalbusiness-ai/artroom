@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:ccd5d54ff0299d3b61861645a272938022956fbd","text":"Merge retired a covered predecessor with no successor at its old path."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:cd3ee9d96bcc92154c26c6c67edb74d409894c81","text":"Merge retired a covered predecessor; the successor is at packages/bytes/test/canonical.test.ts."}
