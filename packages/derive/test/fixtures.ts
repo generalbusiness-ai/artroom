@@ -258,11 +258,11 @@ export const ticket: DeclaredDefinition = {
     link: act({
       step: "open", on: "link", grant: "link", fields: { target: { type: "scope", kind: "lane", required: true }, about: { type: "int", min: 0, max: 1000, required: true }, because: { ...filed, required: false } },
       effects: [{ ref: { slot: "target", from: { field: "target" } } }, { ref: { slot: "me", from: "self" } }],
-      sends: [{ relate: { to: { field: "target" }, name: "closes", item: "self", state: "set", detail: { about: { field: "about" }, as: { const: "set" }, because: { field: "because" } }, result: {} } }],
+      sends: [{ relate: { to: { field: "target" }, name: "closes", item: "self", state: "set", detail: { about: { field: "about" }, because: { field: "because" } }, result: {} } }],
     }),
     unlink: act({
       step: "transition", on: "link", grant: "link", guards: [{ state: ["set"] }], effects: [{ state: "removed" }],
-      sends: [{ relate: { to: { slot: "target" }, name: "closes", item: { slot: "me" }, state: "removed", detail: { about: { const: 0 }, as: { const: "removed" } }, result: {} } }],
+      sends: [{ relate: { to: { slot: "target" }, name: "closes", item: { slot: "me" }, state: "removed", detail: { about: { const: 0 } }, result: {} } }],
     }),
     ask: act({
       step: "open", on: "request", grant: "ask", fields: { desk: { type: "scope", kind: "directory", required: true } },
@@ -277,12 +277,11 @@ export const ticket: DeclaredDefinition = {
     }),
   },
   receives: {
-    // I2 merge: the detail states the update's state again, as `as`, because an effect reads no `update` operand until step 5.
     closes: {
       message: "closes", class: "relate", from: { kind: "lane" }, copies: 2, opens: null,
-      fields: { about: { type: "int", min: 0, max: 1000, required: true }, as: { ...text, required: true }, because: { ...filed, required: false } },
+      fields: { about: { type: "int", min: 0, max: 1000, required: true }, because: { ...filed, required: false } },
       also: { intent: { item: "intent", one: true } }, guards: [],
-      effects: [{ of: "also.intent", value: { slot: "linked", from: { field: "as" } } }], sends: [], attention: [],
+      effects: [{ of: "also.intent", value: { slot: "linked", from: { update: "state" } } }], sends: [], attention: [],
     },
   },
   timed: {},
