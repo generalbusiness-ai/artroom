@@ -6,7 +6,7 @@ import { checkpointOf, operationId, operationOpening, timeMs, type Opening } fro
 import { SqliteStore, Turns, Wakes, production, type EffectAnswer, type OperationStatus, type OutcomeRecorded } from "../src/index.ts";
 import { variant } from "@generalbusiness/artroom-derive/testing";
 import { controls } from "../src/testing.ts";
-import { FENCE, outsideOf, owners, pushOf, type OutsideDouble } from "./outside.ts";
+import { FENCE, MINT, mint, outsideOf, owners, pushOf, type OutsideDouble } from "./outside.ts";
 import { HOLD, Lane, START, at, definition, found, founding, reader, rita, stubOf } from "./support.ts";
 
 /** The delay before the second attempt of an operation. */
@@ -159,6 +159,38 @@ describe("outside operations at a real scope (scope contract, section 4.3; autho
     ]);
     // Nothing is in hand any more: a pass offers nothing, and the same answer again is a copy.
     expect([await surface(s).effect(), await late(s, out, op, 1, own("c1")), (await s.head()).seq]).toEqual([0, { recorded: "repeat", seq: 11 }, 11]);
+  });
+
+  test("an answer in hand that stays unavailable for a reason of its own owner holds back no other: with a batch of 1 the answer behind it is written at the second pass, and the first stays in hand, of its attempt and with its evidence, and its operation stays a duty", async () => {
+    // Three holds end at one time, and a turn writes one timed entry. The owner of a mint declares no cleanup, and a confirmed mint would open one.
+    const s = await found({ timedAttemptsPerTurn: 1, deliveryBatch: 1 });
+    const out = outsideOf(s.name);
+    mint.closure = 0;
+    await s.holds(3);
+    const [older, later] = await open(s, MINT, pushOf(1)) as [OperationId, OperationId];
+    // Neither request gets an answer. Each outcome is `unknown`, and those entries close the driver's rows.
+    for (const id of [older, later]) out.answer(id, 1, null);
+    expect([await s.alarm(), await s.alarm(), outcomes(await seen(s, older)), outcomes(await seen(s, later))]).toEqual([true, true, [["unknown at 11"]], [["unknown at 12"]]]);
+
+    // Both late answers arrive while the turn is spent on the ends of the holds: both are kept in hand, the mint's first.
+    s.c.clock.now = at(HOLD);
+    const minted: EffectAnswer = { result: "confirmed", evidence: { basis: "own-answer", body: { token: "t1" } } };
+    expect([await late(s, out, older, 1, minted), await late(s, out, later, 1, own("c1")), (await s.head()).seq]).toEqual([{ recorded: "unavailable" }, { recorded: "unavailable" }, 14]);
+    // The first pass offers the mint's answer. The turn is free, and the answer is still not written: its owner's fault. It goes behind the other.
+    expect([await s.alarm(), (await s.head()).seq]).toEqual([true, 15]);
+    // The second pass, after the delay, writes the push's answer. The mint's is in hand: the driver asks for the next wake-up, and the operation is a duty with what it reserved.
+    s.c.clock.now = at(HOLD + PROPOSED_BOUNDS.drainRetrySeconds);
+    expect([await s.alarm(), (await s.sealed(16))[0]?.entry.input, (await seen(s, later)).state, await seen(s, older), await s.alarmAt()]).toMatchObject([
+      true, { type: "outcome", operation: later, attempt: 1, result: "confirmed", evidence: { basis: "own-answer", body: { commit: "c1" } } }, "settled",
+      { state: "unknown", operation: { attempts: [{ outcomes: [{ result: "unknown", seq: 11 }] }] } }, timeMs(at(HOLD + 2 * PROPOSED_BOUNDS.drainRetrySeconds)),
+    ]);
+    // Once the owner declares the cleanup, the answer that was kept is written as it arrived, and opens the cleanup. No request was sent again.
+    mint.closure = 2;
+    s.c.clock.now = at(HOLD + 2 * PROPOSED_BOUNDS.drainRetrySeconds);
+    expect([await s.alarm(), (await s.sealed(17))[0]?.entry, out.attempts.slice(0, 2)]).toMatchObject([
+      true, { input: { type: "outcome", operation: older, attempt: 1, result: "confirmed", evidence: minted.evidence }, effects: [{ effect: "attempt", operation: older, attempt: 1, result: "confirmed" }, { effect: "operation", kind: "push" }, { effect: "attempt", attempt: 1, result: "opened" }] },
+      [`${older}#1`, `${later}#1`],
+    ]);
   });
 
   test("after a restart the driver walks every attempt that nothing could send, one page at a pass: an attempt that still cannot be sent holds back none after it, and what is due does not use the page up", async () => {
