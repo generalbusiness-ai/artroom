@@ -7,10 +7,10 @@
  * the answer to a founding, is the contract's, and is exported here again.
  */
 
-import type { ActType, Answer, Beside, Bounds, DeclaredDefinition, Digest, DutyId, Entry, FactRef, Founded, Grant, PlatformDefinition, Receipt, RefusalReason, ScopeId, Seed, Settlement, SignedIntent, UnavailableReason } from "@generalbusiness/artroom-contract";
+import type { ActType, Answer, Beside, Bounds, CapabilityName, DeclaredDefinition, Digest, DutyId, Entry, FactRef, Founded, Grant, PlatformDefinition, Receipt, RefusalReason, ScopeId, Seed, Settlement, SignedIntent, UnavailableReason } from "@generalbusiness/artroom-contract";
 import { canonicalize, definitionDigest, intentDigest, isDigest, isGrant, isPlatformDefinition, newIncarnation, parseStrict, platformName, textDigest, utf8 } from "@generalbusiness/artroom-bytes";
-import { checkpointOf, derivable, factsNamed, inputTexts, isObject, judgeAct, judgeCheckpoint, judgeGenesis, own, prepareRules, presentedTypes, readFields, validateDefinition } from "@generalbusiness/artroom-derive";
-import type { ActJudgment, Clock as Reading, Draft, Fetched, Founding, JudgeContext, Own, Presented, StateView, Texts, ValidDefinition } from "@generalbusiness/artroom-derive";
+import { checkpointOf, derivable, factsNamed, inputTexts, isObject, judgeAct, judgeCheckpoint, judgeGenesis, judgePreparation, own, prepareRules, presentedTypes, readFields, stepsOf, validateDefinition } from "@generalbusiness/artroom-derive";
+import type { ActJudgment, Clock as Reading, Draft, Fetched, Founding, GrantDecision, JudgeContext, Own, Presented, StateView, Texts, ValidDefinition } from "@generalbusiness/artroom-derive";
 import { RULE_PROFILES } from "@generalbusiness/artroom-derive/rule";
 import { namedBy } from "./definitions.ts";
 import type { Asked, DefinitionRead, Ports, Standing } from "./ports.ts";
@@ -456,6 +456,83 @@ export class Scope {
           case "refused": return said<Answer>({ answer: "refused", reason: judged.reason, ...(judged.name === undefined ? {} : { name: judged.name }), judgedAt: judged.judgedAt });
           case "unavailable": return said<Answer>(unavailable(judged.reason));
           case "mismatch": return said<Answer>({ answer: "mismatch", reason: judged.reason });
+        }
+      },
+    });
+    return end.end === "answer" ? end.answer : unavailable(end.end === "idle" ? "unavailable" : end.end);
+  }
+
+  /**
+   * Ask for one step of a capability (section 5.5): the preparation path.
+   * The request is the signed intent that the step prepares for, the
+   * capability and the step. It goes through the same turn as every other
+   * input, and what it writes is a `preparation` entry: the capability's
+   * records and the operations that the step opens. Nothing outside the
+   * service is caused here: the operations driver sends each attempt after
+   * the entry is sealed.
+   *
+   * The answer has the forms of an act's. `accepted`: the entry is sealed,
+   * now or by an earlier call with the same intent, capability and step. A
+   * refusal is an answer and no entry. The act's idempotency key is not
+   * consumed: the intent's own turn is still to come.
+   *
+   * With no code for the step, nothing is judged and nothing is written:
+   * `unavailable`. That is the production wiring, whose capabilities port is
+   * null.
+   */
+  async prepare(signed: SignedIntent, grants: readonly Grant[], capability: string, step: string): Promise<Answer> {
+    const pinned = this.pinned();
+    const scope = this.#store.scope();
+    if (!pinned?.definition || !scope) return unavailable("unavailable");
+    const { definition, named } = pinned;
+    const bounds = this.#bounds;
+    if (!isSigned(signed)) return { answer: "refused", reason: "bad-intent", judgedAt: scope.head };
+    const steps = stepsOf(this.#ports.capabilities);
+    const asked = { signed, capability, step };
+
+    // Section 5.1, held authority, phase one: one read for this request, before the turn, as for an act. The action is the one that
+    // the capability names for the step. It is read from the pinned definition and from an item's type, which never change. With
+    // no action nothing is read, and the judge answers.
+    let action: string | null = null;
+    try {
+      action = steps && typeof capability === "string" && typeof step === "string" && steps.implements(capability as CapabilityName, step)
+        ? (steps.grant(capability as CapabilityName, step, { view: this.#store, definition, scope, self: scope.head.seq + 1, intent: signed.intent, digest: intentDigest(signed.intent), clock: { reading: scope.time, behind: false, asOf: scope.time } })?.action ?? null)
+        : null;
+    } catch {
+      action = null;   // a request that the rules cannot read names no action
+    }
+    const given = (Array.isArray(grants) ? grants : []).filter(isGrant);
+    const standing = action === null ? null : await this.#standing({ scope: scope.at, signed, action, grants: given });
+    // Phase two, in the commit: the decision on the grant, from what that read holds at the commit's head and reading.
+    // I3 merge: the grant guard of `derive/src/grant.ts` (plan step 5) decides here, on the observation that the read obtained and on
+    // the window that the step asks: `granted: (asked) => grantGuard(observation, asked)`. Until then the decision is what the
+    // authority port's second phase holds, and no window is judged: the production port holds no grant.
+    const granted = (view: StateView, clock: Reading): GrantDecision => (wanted) => {
+      const held = standing === null ? null : heldBy(standing, view, clock);
+      if (held === null) return { result: "unavailable" };
+      const found = held.find(({ grant, current }) => current && grant.key === wanted.key && grant.actions.includes(wanted.action));
+      return found ? { result: "granted", grant: found.grant } : { result: "refused" };
+    };
+
+    const end = await this.#turns.run<Answer>({
+      asks: () => [],
+      judge: (view, clock) => {
+        const judged = judgePreparation(view, definition, asked, { clock, bounds, steps, granted: granted(view, clock) });
+        switch (judged.result) {
+          case "write": {
+            const head = view.scope()!.head;
+            return {
+              verdict: "write", draft: judged.draft, retain: [],
+              sealed: (sealed) => ({ answer: "accepted", receipt: receiptOf(sealed, named) }),
+              unfit: (why) => ({ answer: "refused", reason: why === "size" ? "bad-field" : "unauthorized", judgedAt: head }),
+              // Section 17.3: a preparation is new work. It is admitted only with the room of what it reserves.
+              full: () => ({ answer: "refused", reason: "scope-full", judgedAt: head }),
+            };
+          }
+          case "due": return { verdict: "stop" };
+          case "repeat": return said<Answer>({ answer: "accepted", receipt: this.#receipt(judged.seq, named) });
+          case "refused": return said<Answer>({ answer: "refused", reason: judged.reason, ...(judged.name === undefined ? {} : { name: judged.name }), judgedAt: judged.judgedAt });
+          case "unavailable": return said<Answer>(unavailable(judged.reason));
         }
       },
     });

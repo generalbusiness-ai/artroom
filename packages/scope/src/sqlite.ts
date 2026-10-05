@@ -13,10 +13,10 @@
  * the canonical bytes.
  */
 
-import type { Digest, Entry, FactRef, KeyId, OperationId, ScopeKind, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
+import type { CapabilityName, Digest, Entry, FactRef, FieldValue, KeyId, OperationId, ScopeKind, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
 import { canonicalize } from "@generalbusiness/artroom-bytes";
 import { MemoryState, operationId, operationStanding, pendingOf, slotOf, timeMs } from "@generalbusiness/artroom-derive";
-import type { Accepted, Decided, HeldCreation, Item, Operation, Outstanding, OwnRequest, Page, RangeIndex, Relation, ScopeState, StateSnapshot } from "@generalbusiness/artroom-derive";
+import type { Accepted, Decided, HeldCreation, Item, Operation, Outstanding, OwnRequest, Page, PreparedStep, RangeIndex, RecordState, RecordsWhere, Relation, ScopeState, StateSnapshot } from "@generalbusiness/artroom-derive";
 import type { Dispatched, Duty, OperationStatus, Outgoing, Retained, Sending, Store, Stored } from "./store.ts";
 
 export type SqlValue = string | number | null | ArrayBuffer;
@@ -77,6 +77,9 @@ CREATE TABLE IF NOT EXISTS operation (seq INTEGER NOT NULL, k INTEGER NOT NULL, 
 CREATE INDEX IF NOT EXISTS operation_open ON operation (seq, k) WHERE opened + unknown + unopened > 0;
 CREATE TABLE IF NOT EXISTS attempt (seq INTEGER NOT NULL, k INTEGER NOT NULL, attempt INTEGER NOT NULL, opened INTEGER NOT NULL, next INTEGER, sent TEXT, outcome INTEGER, PRIMARY KEY (seq, k, attempt)) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS attempt_due ON attempt (next, seq, k, attempt) WHERE outcome IS NULL;
+CREATE TABLE IF NOT EXISTS record (capability TEXT NOT NULL, kind TEXT NOT NULL, key TEXT NOT NULL, state TEXT NOT NULL, value TEXT NOT NULL, PRIMARY KEY (capability, kind, key)) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS record_by_state ON record (capability, kind, state);
+CREATE TABLE IF NOT EXISTS prepared (intent TEXT NOT NULL, capability TEXT NOT NULL, step TEXT NOT NULL, seq INTEGER NOT NULL, PRIMARY KEY (intent, capability, step)) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS retained_input (kind TEXT NOT NULL, digest TEXT NOT NULL, bytes TEXT NOT NULL, under TEXT, PRIMARY KEY (kind, digest)) WITHOUT ROWID;
 `;
 
@@ -166,6 +169,28 @@ export class SqliteStore implements Store {
     return orNull<Operation>(this.#one("SELECT value FROM operation WHERE seq = ? AND k = ?", seq, k)?.["value"]);
   }
   texts(item: number, slot: string): readonly Digest[] { return this.#folded<[number, string, Digest[]]>("texts", canonicalize([item, slot]))?.[2] ?? []; }
+  prepared(intent: Digest, capability: CapabilityName, step: string): PreparedStep | null {
+    const row = this.#one("SELECT seq FROM prepared WHERE intent = ? AND capability = ? AND step = ?", intent, capability, step);
+    return row && { intent, capability, step, seq: row["seq"] as number };
+  }
+  preparations(intent: Digest): readonly PreparedStep[] {
+    // The order is derive's: by capability, then step, each by its UTF-8 bytes, which is SQLite's order of a text.
+    return this.#all("SELECT capability, step, seq FROM prepared WHERE intent = ? ORDER BY CAST(capability AS BLOB), CAST(step AS BLOB)", intent)
+      .map((row) => ({ intent, capability: row["capability"] as CapabilityName, step: row["step"] as string, seq: row["seq"] as number }));
+  }
+  record(capability: CapabilityName, kind: string, key: readonly FieldValue[]): RecordState | null {
+    return orNull<RecordState>(this.#one("SELECT value FROM record WHERE capability = ? AND kind = ? AND key = ?", capability, kind, canonicalize(key))?.["value"]);
+  }
+  /** Section 6.11: read from the index by kind and state. A value is compared as its canonical bytes, in the rows that the index gives. */
+  records(capability: CapabilityName, kind: string, where: RecordsWhere = {}): readonly RecordState[] {
+    const among = where.states ? ` AND state IN (${where.states.map(() => "?").join(", ")})` : "";
+    const rows = this.#all(`SELECT value FROM record WHERE capability = ? AND kind = ?${among} ORDER BY CAST(key AS BLOB)`, capability, kind, ...(where.states ?? [])).map((row) => json<RecordState>(row["value"]));
+    const { member, value } = where;
+    return member === undefined ? rows : rows.filter((r) => Object.hasOwn(r.values, member) && canonicalize(r.values[member]) === canonicalize(value));
+  }
+  recordCount(capability: CapabilityName, kind: string, state?: string): number {
+    return this.#one(`SELECT COUNT(*) AS n FROM record WHERE capability = ? AND kind = ?${state === undefined ? "" : " AND state = ?"}`, capability, kind, ...(state === undefined ? [] : [state]))!["n"] as number;
+  }
   /**
    * Counted from the rows of requests with no result, which `outbox_open`
    * indexes, and from the operations that are not settled, which
@@ -200,6 +225,8 @@ export class SqliteStore implements Store {
       else memory.putTexts(...json<[number, string, Digest[]]>(row["value"]));
     }
     for (const row of this.#all("SELECT value FROM operation ORDER BY seq, k")) memory.putOperation(json(row["value"]));
+    for (const row of this.#all("SELECT value FROM record")) memory.putRecord(json(row["value"]));
+    for (const row of this.#all("SELECT intent, capability, step, seq FROM prepared")) memory.putPrepared({ intent: row["intent"] as Digest, capability: row["capability"] as CapabilityName, step: row["step"] as string, seq: row["seq"] as number });
     for (const row of this.#all("SELECT seq, actor, idem, intent FROM entry WHERE actor IS NOT NULL")) memory.putAccepted(row["actor"] as KeyId, row["idem"] as string, { seq: row["seq"] as number, intent: row["intent"] as Digest });
     for (const row of this.#all("SELECT o.seq, o.n, o.target, o.request, o.result, o.diagnosis, e.hash FROM outbox o JOIN entry e ON e.seq = o.seq WHERE o.request IS NOT NULL")) memory.putRequest(requestOf(row));
     for (const row of this.#all("SELECT scope, inc, seq, n, hash, by FROM inbox")) {
@@ -252,6 +279,12 @@ export class SqliteStore implements Store {
   putTexts(item: number, slot: string, texts: readonly Digest[]): void {
     if (texts.length === 0) this.#run("DELETE FROM folded WHERE kind = 'texts' AND key = ?", canonicalize([item, slot]));
     else this.#fold("texts", canonicalize([item, slot]), [item, slot, texts]);
+  }
+  putPrepared(p: PreparedStep): void {
+    this.#run("INSERT INTO prepared (intent, capability, step, seq) VALUES (?, ?, ?, ?)", p.intent, p.capability, p.step, p.seq);
+  }
+  putRecord(r: RecordState): void {
+    this.#run("INSERT INTO record (capability, kind, key, state, value) VALUES (?, ?, ?, ?, ?) ON CONFLICT (capability, kind, key) DO UPDATE SET state = excluded.state, value = excluded.value", r.capability, r.kind, canonicalize(r.key), r.state, canonicalize(r));
   }
 
   // ---------------------------------------------------------------- what the fold does not keep

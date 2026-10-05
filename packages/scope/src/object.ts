@@ -95,6 +95,8 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
 
   async found(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions: readonly DeclaredDefinition[] = [], beside: Beside = {}): Promise<Founded> { return this.#sent(await this.#scope.found(founding, definition, definitions, beside)); }
   async submit(signed: SignedIntent, grants: readonly Grant[], beside: Beside = {}): Promise<Answer> { return this.#sent(await this.#scope.submit(signed, grants, beside)); }
+  /** One step of a capability, asked for with the signed intent that it prepares for (section 5.5). */
+  async prepare(signed: SignedIntent, grants: readonly Grant[], capability: string, step: string): Promise<Answer> { return this.#sent(await this.#scope.prepare(signed, grants, capability, step)); }
   settle(signed: SignedIntent): Settlement { return this.#scope.settle(signed); }
   checkpoint(): Promise<Checkpointed> { return this.#scope.checkpoint(); }
 
