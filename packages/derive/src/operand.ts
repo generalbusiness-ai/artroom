@@ -107,13 +107,45 @@ function given(entry: Entry, item: unknown, slot: string): unknown {
   return Array.isArray(value) && value.length === 0 ? null : value;
 }
 
-/** A field of the entry's intent, or of the message it delivered. A genesis has the fields of its founding intent, or of its creation request. */
-function fieldOf(j: Judging, entry: Entry, name: string): unknown {
+/**
+ * A field of the entry's intent, or of the message it delivered. A genesis
+ * has the fields of its founding intent, or of its creation request.
+ *
+ * The rule: a field is read as the scope that wrote the entry holds it, and
+ * never through a declaration of another scope. `local`: the entry is this
+ * scope's own, so this scope's definition is the one that admitted it, and a
+ * message's fields are read by the types of the handler that received them.
+ * A foreign entry was fetched and checked against the hash in its reference.
+ * Its reader knows its bytes, its kind and the name of its definition, and
+ * does not hold that definition. A handler or a genesis act of the reader's
+ * own with the same name says nothing about it. So a field of a foreign
+ * entry is the value that the entry's bytes hold, with no type applied:
+ *
+ * - of an act, and of a founded genesis, the field of the signed intent;
+ * - of a delivered request, the field of the message as it was sent: the
+ *   `fields` of a `tell`, and the `detail` of a `relate`;
+ * - of a created genesis, the field of the creation request as it was sent.
+ *
+ * A message as it was sent holds the mark `{ "self": true }` where its sender
+ * named the entry it was writing (section 6.6). The bytes do not tell that
+ * mark from a record with a member `self`: only the receiver's declared type
+ * does. So the mark is not resolved in a foreign entry. It is read as that
+ * record, which equals no fact reference. A reference to an earlier entry
+ * is whole in the bytes, and is read whole.
+ */
+function fieldOf(j: Judging, entry: Entry, local: boolean, name: string): unknown {
   const input = entry.input;
   if (input.type === "act") return own(input.signed.intent.fields, name) ?? null;
-  if (input.type === "genesis") return own(input.founding ? input.founding.intent.fields : input.source ? creationFields(input.message, input.source, own(j.definition.declared.acts, j.definition.declared.genesis)!.fields) : null, name) ?? null;
-  if (input.type !== "delivery" || input.message.class !== "request" || !isObject(input.message.body)) return null;
-  return own(bound(j.definition, input.message, input.from)?.fields ?? null, name) ?? null;
+  if (input.type === "genesis" && input.founding) return own(input.founding.intent.fields, name) ?? null;
+  const message = input.type === "genesis" ? input.message : input.type === "delivery" && input.message.class === "request" ? input.message : null;
+  const body = message?.body;
+  if (!message || !isObject(body)) return null;
+  if (!local) {
+    const sent = message.type === "relate" ? body["detail"] : body["fields"];
+    return isObject(sent) ? (own(sent, name) ?? null) : null;
+  }
+  if (input.type === "genesis") return own(input.source ? creationFields(message, input.source, own(j.definition.declared.acts, j.definition.declared.genesis)!.fields) : null, name) ?? null;
+  return input.type === "delivery" ? (own(bound(j.definition, message, input.from)?.fields ?? null, name) ?? null) : null;
 }
 
 /** One part of the entry that `ref` names. `at` is that entry's scope. */
@@ -125,13 +157,13 @@ function entryPart(j: Judging, ref: Held, at: ScopeRef, part: EntryPart, item: I
   // Read from the entry's bytes.
   const found = entryOf(j, ref);
   if (!found) return null;
-  const { entry } = found;
+  const { entry, local } = found;
   const input = entry.input;
   if (part === "kind") return kindOf(entry);
   if (part === "intent") return input.type === "act" ? intentDigest(input.signed.intent) : input.type === "genesis" && input.founding ? intentDigest(input.founding.intent) : null;
   // The primary item: the item the entry opens, by the entry's own `seq`, or the item an act or a timed entry is on.
   if (part === "on") return entry.effects.some((e) => e.effect === "open") ? entry.seq : input.type === "act" ? input.signed.intent.on : input.type === "timed" ? input.item : null;
-  if ("field" in part) return fieldOf(j, entry, part.field);
+  if ("field" in part) return fieldOf(j, entry, local, part.field);
   if ("opened" in part) return entry.effects.some((e) => e.effect === "open") ? given(entry, entry.seq, part.opened) : null;
   if ("set" in part) {
     const id = operand(j, part.set.item, item);
