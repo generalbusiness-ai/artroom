@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { ActType, DeclaredDefinition, FieldValue, Request, Result } from "@generalbusiness/artroom-contract";
-import { validateDefinition, type Fetched, type ProblemCode } from "../src/index.ts";
+import { messageFacts, validateDefinition, type Fetched, type ProblemCode } from "../src/index.ts";
 import { Scope, arrive, decided, deliver, fields, keys, on, ticket, ticketDefinition, valid, variant } from "./fixtures.ts";
 
 const { rita } = keys;
@@ -207,6 +207,11 @@ describe("subjects and handlers (sections 6.4 and 7.3)", () => {
     B.bounds = PROPOSED_BOUNDS;
     tell("post", { text: "f", proof: proof.fact }, [proof]);
     expect([decided(B), B.last.uses.map((u) => u.fact).at(-1), B.last.uses.length]).toEqual([["applied"], proof.fact, 2]);
+
+    // A handler for a sender under another definition does not receive the message, so its declared fields name nothing to fetch.
+    const under = variant(board, (d) => { d.receives.post.from.under = "ticket"; });
+    const message = { class: "request", type: "tell", body: { message: "post", fields: { text: "f", proof: proof.fact } } } as const;
+    expect(["ticket", "desk"].map((sender) => messageFacts(B.state, under, message, X.fact(1), B.bounds, sender))).toEqual([[proof.fact], []]);
   });
 
   test("a result clause changes the items that its entry selected, read as they are now, and not an item that the entry did not find", () => {

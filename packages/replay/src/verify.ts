@@ -584,7 +584,8 @@ class Verifier {
     // Section 9.3: each detached text that the input names, against its digest. One whose bytes are gone is not asked for again
     // by the judge: it is owed, and a tombstone must answer for it.
     const texts = new Map<Digest, number | null>();
-    for (const text of inputTexts(definition, input)) {
+    // A message that no handler received names none: a handler whose `from` names another definition than the sender pins did not.
+    for (const text of inputTexts(definition, input, input.type === "delivery" ? facts.find((f) => f.fact.hash === input.from.hash)?.under : undefined)) {
       const size = await this.#text(run, text);
       texts.set(text, size);
       if (size === null) run.owed.push({ text, at: where });

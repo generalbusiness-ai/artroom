@@ -30,8 +30,14 @@ import { isFactRef, isLocalId, isObject, own } from "./values.ts";
  * body is not the shape of its message. `handler` null: the definition
  * declares none. A handler is looked for before the fields are read, so a
  * message that no handler receives is `unknown-message` whatever it holds.
+ *
+ * `under`: the name of the definition that the sender pins, where the
+ * caller has read the source entry. A handler whose `from` names another
+ * definition does not receive the message, and its field types say nothing
+ * of it. The validator allows one handler for a class, a name and a kind,
+ * so no other handler receives it either.
  */
-export function bound(definition: ValidDefinition, message: Request | Advisory, from: FactRef): { kind: string; handler: ReceiveType | null; fields: Record<string, FieldValue> | null } | null {
+export function bound(definition: ValidDefinition, message: Request | Advisory, from: FactRef, under?: string): { kind: string; handler: ReceiveType | null; fields: Record<string, FieldValue> | null } | null {
   const body = message.body;
   let kind: string;
   if (message.class === "advisory") kind = message.type;
@@ -41,7 +47,8 @@ export function bound(definition: ValidDefinition, message: Request | Advisory, 
     kind = named;
   } else return null;
   const cls = message.class === "advisory" ? "advisory" : message.type;
-  const handler = Object.values(definition.declared.receives).find((h) => h.class === cls && h.message === kind && h.from.kind === from.at.kind) ?? null;
+  const found = Object.values(definition.declared.receives).find((h) => h.class === cls && h.message === kind && h.from.kind === from.at.kind) ?? null;
+  const handler = found && (under === undefined || found.from.under === undefined || found.from.under === under) ? found : null;
   // The mark `self` is read by the type that the handler declares for the field.
   const types = handler?.fields ?? {};
   let fields: Record<string, FieldValue> | null;
@@ -76,10 +83,12 @@ function messageRead(view: StateView, at: ScopeRef, handler: ReceiveType, given:
  * beside the source entry: what its receiver fetches before the turn, as it
  * fetches those an act names (section 5.2, step 1). None when the message
  * runs no handler, or its fields are not the ones the handler declares.
+ * `under`: the name of the definition that the sender pins, which the
+ * receiver read with the source entry.
  */
-export function messageFacts(view: StateView, definition: ValidDefinition, message: Request | Advisory, from: FactRef, bounds: Bounds): FactRef[] {
+export function messageFacts(view: StateView, definition: ValidDefinition, message: Request | Advisory, from: FactRef, bounds: Bounds, under: string): FactRef[] {
   const scope = view.scope();
-  const b = scope && bound(definition, message, from);
+  const b = scope && bound(definition, message, from, under);
   if (!scope || !b?.handler || !b.fields) return [];
   const read = messageRead(view, scope.at, b.handler, b.fields, bounds);
   return read.ok ? factsNamed(b.handler.fields, read.fields, scope.at).filter((f) => f.hash !== from.hash) : [];
@@ -92,18 +101,19 @@ export function messageFacts(view: StateView, definition: ValidDefinition, messa
  * each as a retained input with the entry that records the input, and a
  * verifier asks for the same ones. A result, a control, a message that no
  * handler receives, and an input that is not an act of the definition name
- * none.
+ * none. `under`: for a delivery, the name of the definition that its
+ * sender pins, as the receiver read it with the source entry.
  */
-export function inputTexts(definition: ValidDefinition, input: Input): Digest[] {
+export function inputTexts(definition: ValidDefinition, input: Input, under?: string): Digest[] {
   const { acts, genesis } = definition.declared;
   if (input.type === "act") return textsNamed(own(acts, input.signed.intent.kind)?.fields ?? {}, input.signed.intent.fields);
   if (input.type === "genesis") return textsNamed(own(acts, genesis)!.fields, input.founding ? input.founding.intent.fields : input.source ? creationFields(input.message, input.source, own(acts, genesis)!.fields) : null);
-  return input.type === "delivery" && (input.message.class === "request" || input.message.class === "advisory") ? messageTexts(definition, input.message, input.from) : [];
+  return input.type === "delivery" && (input.message.class === "request" || input.message.class === "advisory") ? messageTexts(definition, input.message, input.from, under) : [];
 }
 
-/** The digest of each detached text that the declared fields of a delivered message name. None when no handler receives the message. */
-export function messageTexts(definition: ValidDefinition, message: Request | Advisory, from: FactRef): Digest[] {
-  const b = bound(definition, message, from);
+/** The digest of each detached text that the declared fields of a delivered message name. None when no handler receives the message. `under`: as for `bound`. */
+export function messageTexts(definition: ValidDefinition, message: Request | Advisory, from: FactRef, under: string | undefined): Digest[] {
+  const b = bound(definition, message, from, under);
   return b?.handler ? textsNamed(b.handler.fields, b.fields) : [];
 }
 

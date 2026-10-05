@@ -153,11 +153,11 @@ export class Deliveries {
     } else if (!known && pinned?.definition && (message.class === "request" || message.class === "advisory")) {
       // Section 6.4: the foreign entries that the declared fields of the message name. More than one entry may use are not fetched:
       // the judge refuses that message, `bad-field`, before it reads any.
-      const wanted = messageFacts(store, pinned.definition, message, from, bounds);
+      const wanted = messageFacts(store, pinned.definition, message, from, bounds, source.under);
       const fetched = wanted.length >= bounds.usesPerEntry ? [] : await fetchFacts(this.#ports.resolver, bounds, wanted);
       if (!fetched) return retry("dependency-unavailable");
       facts = fetched;
-      carried = messageTexts(pinned.definition, message, from);
+      carried = messageTexts(pinned.definition, message, from, source.under);
     }
     const texts = await this.#texts(from, carried);
     if (!texts) return retry("dependency-unavailable");
@@ -183,7 +183,7 @@ export class Deliveries {
           case "write": {
             // Section 9.2: an entry that settles nothing is written only while the scope has room; one that settles is counted for.
             if ((view.scope()?.head.seq ?? -1) + 1 >= bounds.scopeEntries) return said(retry("scope-full"));
-            const retain: Retained[] = [...used(judged.draft, [source, ...facts]), ...texts.retain(definition(), judged.draft)];
+            const retain: Retained[] = [...used(judged.draft, [source, ...facts]), ...texts.retain(definition(), judged.draft, source.under)];
             if (genesis && founding) {
               store.cover(founding.valid.indexes);
               retain.push({ kind: "definition", digest: founding.valid.digest, bytes: canonicalize(JSON.parse(founding.bytes)) }, ...founding.children);
