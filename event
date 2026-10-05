@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:3d7ebfa9c57e36bbdd2b7a4b55424c6c1182f1ef","text":"Merge retired a covered predecessor; the successor is at packages/bytes/tsconfig.json."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:3da1f463974f3483df8608c361ef2af913f97157","text":"Merge retired a covered predecessor; the successor is at packages/derive/src/rule/evaluator.ts."}
