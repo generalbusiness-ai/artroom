@@ -29,6 +29,8 @@ export { RULES };
 export { rulesScope };
 export { CONFIGURATION_BYTES, CONFIGURATION_DOMAIN, RULES_SCOPE, membershipId } from "./rules-scope.ts";
 export type { PlatformName, RuleTable } from "./rules.ts";
+export { CONTROLLER, EXTENTS_MOST, EXTENT_CLASSES, LANDING, RULES_EXTENT, RULES_PATTERNS, classify, firstExtents, holdsRulesExtent, judgeExtents, matches } from "./extents.ts";
+export type { Extent, ExtentClass, ExtentJudged, ExtentsAsked, ExtentsJudged, Holder, Lack, Touched, TreeLink } from "./extents.ts";
 
 /** The platform definitions delivered so far, by name without the version. */
 export const definitions: Readonly<Record<string, PlatformData>> = { "platform:inbox": inbox, "platform:membership": membership, "platform:register": register, "platform:directory": directory, "platform:rules": rulesScope, "platform:destination": destination };
