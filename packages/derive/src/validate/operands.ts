@@ -13,7 +13,7 @@ import type { FieldType } from "@generalbusiness/artroom-contract";
 import { canonicalize } from "@generalbusiness/artroom-bytes";
 import { isObject } from "../values.ts";
 import { onSubject, subject, type Ctx, type Defining, type Type } from "./context.ts";
-import { assignable } from "./fields.ts";
+import { assignable, memberType } from "./fields.ts";
 import { at, type Rec } from "./shape.ts";
 
 /**
@@ -110,8 +110,11 @@ export function operand(d: Defining, v: unknown, path: string, ctx: Ctx, owner: 
       break;
     }
     case "element": {
-      if (typeof x !== "string" || !ctx.elements.has(x)) return bad("name", path, "names no element that an enclosing form binds");
-      type = ctx.elements.get(x) ?? null;
+      // Section 6.2: a member of a record element is named after the element, with a dot.
+      // I2 merge: a member of a record field, and of a record slot, is not read yet. `ifPresent` in guards.ts reads a field's name whole.
+      const element = typeof x === "string" ? memberType((name) => (ctx.elements.has(name) ? ctx.elements.get(name) : undefined), x) : undefined;
+      if (element === undefined) return bad("name", path, "names no element that an enclosing form binds, and no member of one");
+      type = element;
       break;
     }
     case "item": {

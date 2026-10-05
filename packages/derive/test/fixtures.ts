@@ -67,7 +67,8 @@ export const lane: DeclaredDefinition = {
     hold: {
       many: true, max: 2, states: { held: { final: false }, ended: { final: true } }, initial: "held",
       parties: { holder: { fixed: false, required: true, list: false, author: false } },
-      refs: { under: { fixed: true, required: true, to: { type: "item", of: "commitment" } } }, values: { until: { fixed: false, required: true, of: { type: "time" } } },
+      refs: { under: { fixed: true, required: true, to: { type: "item", of: "commitment" } } },
+      values: { until: { fixed: false, required: true, of: { type: "time" } }, epoch: { fixed: false, required: true, of: { type: "int", min: 1, max: 1000000 } } },
     },
     report: {
       many: true, max: 8, states: { reported: { final: false }, accepted: { final: true } }, initial: "reported",
@@ -102,12 +103,12 @@ export const lane: DeclaredDefinition = {
         { of: "also.commitment", state: ["accepted"] }, { of: "also.commitment", signer: ["performer"] },
         { none: { type: "hold", states: ["held"], where: [{ equals: { a: { slot: "under" }, b: { field: "commitment" } } }] } },
       ],
-      effects: [{ party: { slot: "holder", from: { signer: true } } }, { ref: { slot: "under", from: { field: "commitment" } } }, { value: { slot: "until", from: { time: { plusSeconds: 600 } } } }, { hold: { do: "open" } }],
+      effects: [{ ref: { slot: "under", from: { field: "commitment" } } }, { value: { slot: "until", from: { time: { plusSeconds: 600 } } } }, { hold: { do: "open" } }],
     }),
     // By its holder, a renewal moves the end. By another member, it is a takeover, and the epoch rises.
     renew: act({
       step: "transition", on: "hold", grant: "hold", guards: [{ state: ["held"] }],
-      effects: [{ party: { slot: "holder", from: { signer: true } } }, { value: { slot: "until", from: { time: { plusSeconds: 600 } } } }, { hold: { do: "renew" } }],
+      effects: [{ value: { slot: "until", from: { time: { plusSeconds: 600 } } } }, { hold: { do: "renew" } }],
     }),
     report: act({
       step: "open", on: "report", grant: "report", ...commitment,
@@ -132,7 +133,7 @@ export const lane: DeclaredDefinition = {
   },
   receives: {},
   timed: {
-    "hold-end": { on: "hold", states: ["held"], deadline: "until", effects: [{ state: "ended" }, { hold: { do: "end" } }], attention: [{ notify: { slot: "holder", of: "on", when: "after", reason: "hold ended" } }] },
+    "hold-end": { on: "hold", states: ["held"], deadline: "until", effects: [{ hold: { do: "end" } }], attention: [{ notify: { slot: "holder", of: "on", when: "after", reason: "hold ended" } }] },
   },
   rules: {},
 };

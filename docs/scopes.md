@@ -199,7 +199,10 @@ items: {
     states: { held: { final: false }, ended: { final: true } }, initial: "held",
     parties: { holder: { fixed: false, required: true, list: false, author: false } },
     refs: { under: { fixed: true, required: true, to: { type: "item", of: "commitment" } } },
-    values: { until: { fixed: false, required: true, of: { type: "time" } } },
+    values: {
+      until: { fixed: false, required: true, of: { type: "time" } },
+      epoch: { fixed: false, required: true, of: { type: "int", min: 1, max: 1000000 } },
+    },
   },
 },
 acts: {
@@ -213,7 +216,6 @@ acts: {
       { none: { type: "hold", states: ["held"], where: [{ equals: { a: { slot: "under" }, b: { field: "commitment" } } }] } },
     ],
     effects: [
-      { party: { slot: "holder", from: { signer: true } } },
       { ref: { slot: "under", from: { field: "commitment" } } },
       { value: { slot: "until", from: { time: { plusSeconds: 600 } } } },
       { hold: { do: "open" } },
@@ -224,7 +226,7 @@ acts: {
 timed: {
   "hold-end": {
     on: "hold", states: ["held"], deadline: "until",
-    effects: [{ state: "ended" }, { hold: { do: "end" } }],
+    effects: [{ hold: { do: "end" } }],
     attention: [{ notify: { slot: "holder", of: "on", when: "after", reason: "hold ended" } }],
   },
 },
@@ -233,10 +235,13 @@ timed: {
 Read it like this. `take-hold` opens a new `hold` item. Its three guards
 say: the commitment named in the field is `accepted`; the signer is that
 commitment's performer; and no other hold that is still `held` is under
-the same commitment. Its effects make the signer the holder, point the
-hold at the commitment, and set its end ten minutes after the commit's
-clock reading. Ten minutes later the timed rule `hold-end` applies: the
-hold becomes `ended`, which is final, and its holder is told.
+the same commitment. Its effects point the hold at the commitment and set
+its end ten minutes after the commit's clock reading. Its `hold: open`
+effect makes the signer the holder and sets the hold's epoch to 1. Only a
+`hold` effect sets a hold's holder, its epoch or its state. Ten minutes
+later the timed rule `hold-end` applies: the hold becomes `ended`, which is
+final, its epoch rises, and its holder is told. A hold also ends, in the
+same entry, when the commitment it is under reaches a final state.
 
 `validateDefinition(definition, bounds)` checks a definition before a
 scope pins it. It refuses a form the contract does not define, a name that

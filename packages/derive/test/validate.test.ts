@@ -62,7 +62,7 @@ const rows: readonly (readonly [string, DeclaredDefinition, Change, ProblemCode 
   // Timed rules and the hold capability, as the deltas note records them.
   ["a hold with no timed rule that ends it", lane, (d) => { d.timed = {}; }, "hold"],
   ["a hold effect in a definition that does not list hold@1", lane, (d) => { d.capabilities = []; }, "capability"],
-  ["a timed rule that leaves its item due", lane, (d) => { d.timed["hold-end"].effects = [{ hold: { do: "end" } }]; }, "timed"],
+  ["a timed rule that leaves its item due", ticket, pausing((d) => { d.timed.pause.effects = []; }), "timed"],
   ["a timed rule with an effect its commit could refuse: an add to a party list that may be full", lane, (d) => {
     d.items.hold.parties.past = { fixed: false, required: false, list: true, max: 1, author: false };
     d.timed["hold-end"].effects.push({ party: { slot: "past", from: { slot: "holder" }, list: "add" } });
@@ -71,8 +71,8 @@ const rows: readonly (readonly [string, DeclaredDefinition, Change, ProblemCode 
   ["a timed rule whose entry, with its attention reason, could pass the entry size bound: its due item could never be written", lane, (d) => { d.timed["hold-end"].attention[0].notify.reason = "r".repeat(PROPOSED_BOUNDS.entryBytes); }, "bound"],
   // Section 17.2: a reservation covers what its duty can start, so that must be finite.
   ["timed rules of one type that lead to one another in a cycle", ticket, pausing((d) => { d.timed.resume = { ...d.timed.pause, states: ["paused"], effects: [{ state: "asked" }] }; }), "reserve-unbounded"],
-  ["a time offset longer than the span a timestamp can name", lane, (d) => { d.acts["take-hold"].effects[2].value.from.time.plusSeconds = Number.MAX_SAFE_INTEGER; }, "bound"],
-  ["a timed rule over a final state", lane, (d) => d.timed["hold-end"].states.push("ended"), "timed"],
+  ["a time offset longer than the span a timestamp can name", lane, (d) => { d.acts["take-hold"].effects[1].value.from.time.plusSeconds = Number.MAX_SAFE_INTEGER; }, "bound"],
+  ["a timed rule over a final state", ticket, pausing((d) => d.timed.pause.states.push("answered")), "timed"],
   ["a profile this runtime does not implement", small, (d) => { d.profile.version = 2; }, "profile"],
   ["a capability this runtime does not implement", small, (d) => d.capabilities.push({ name: "git-read", version: 1 }), "capability"],
 

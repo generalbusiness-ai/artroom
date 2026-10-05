@@ -8,9 +8,39 @@ import type { Bounds, TimedRule } from "@generalbusiness/artroom-contract";
 import { isObject } from "../values.ts";
 import { naming, type Ctx, type Defining, type Type } from "./context.ts";
 import { effectBytes, effects } from "./effects.ts";
+import { endedState, holdDoes } from "./hold.ts";
 import { attention, notifyBytes } from "./sends.ts";
 import { at } from "./shape.ts";
 import { ENTRY_BYTES, RECORD_BYTES, memberBytes, mostBytes, stated } from "./sizes.ts";
+
+/** What the kind of a timed entry begins with (section 6.2). Its rule's key follows. */
+const TIMED = "timed:";
+
+/**
+ * Section 6.2: no act kind and no message name begins with `timed:`, so the
+ * kind of a timed entry is the kind of no act and of no delivery. A message
+ * is named where a handler receives it, and where a `tell` or a `relate`
+ * sends it. A handler of the first delivery names a relationship after
+ * `relate:`.
+ */
+export function timedKinds(d: Defining, acts: unknown, receives: unknown): void {
+  const kept = (name: unknown) => typeof name === "string" && (name.startsWith(TIMED) || name.startsWith(`relate:${TIMED}`));
+  const sent = (sends: unknown, path: string) => {
+    if (Array.isArray(sends)) sends.forEach((s, i) => {
+      const [tell, relate] = isObject(s) ? [s["tell"], s["relate"]] : [];
+      if ((isObject(tell) && kept(tell["message"])) || (isObject(relate) && kept(relate["name"]))) d.bad("handler", at(path, i), "a message's name does not begin with timed:");
+    });
+  };
+  for (const [name, a] of isObject(acts) ? Object.entries(acts) : []) {
+    if (kept(name)) d.bad("shape", at("acts", name), "an act kind does not begin with timed:");
+    if (isObject(a)) sent(a["sends"], at(at("acts", name), "sends"));
+  }
+  for (const [name, h] of isObject(receives) ? Object.entries(receives) : []) {
+    if (!isObject(h)) continue;
+    if (kept(h["message"])) d.bad("handler", at(at("receives", name), "message"), "a message's name does not begin with timed:");
+    sent(h["sends"], at(at("receives", name), "sends"));
+  }
+}
 
 /**
  * Every timed rule. Returns each rule that was read whole, as the graph
@@ -31,15 +61,19 @@ export function timedRules(d: Defining, v: unknown, timedTypes: Set<string>): Ti
     if (states.some((s) => t.states.get(s) === true)) bad("timed", at(path, "states"), "a timed rule applies in live states only");
     const deadline = typeof o["deadline"] === "string" ? t.slots.get(o["deadline"]) : undefined;
     if (!(deadline?.kind === "value" && deadline.type.type === "time")) bad("name", at(path, "deadline"), "names no value slot of type time");
-    const ctx: Ctx = { ...naming(), on: t, fields: new Map(), timed: true, live: new Set(["on"]) };
+    // Section 6.2: the kind of the entry a rule writes is `timed:` and the rule's key. So an effect may set a slot of the rule's
+    // item from `self` when the slot's kinds include that kind (section 6.4). It is then total, like a `state` effect.
+    const ctx: Ctx = { ...naming(), on: t, fields: new Map(), timed: true, live: new Set(["on"]), kind: TIMED + name };
     // Section 6.4: a timed rule's effects are total. With no field, no signer and no other subject, what is left that a commit
     // could refuse is an effect that needs room in a party list, or a time derived from the commit clock, and `effect` refuses
     // each as `timed-partial`.
     effects(d, o["effects"], at(path, "effects"), ctx, false);
     // Otherwise the transition would be due again as soon as it was applied, and the drain would never end.
-    const to = Array.isArray(o["effects"]) ? o["effects"].find((e) => isObject(e) && typeof e["state"] === "string" && !states.includes(e["state"])) : undefined;
-    if (!isObject(to)) bad("timed", at(path, "effects"), "a timed rule takes its item out of the rule's states");
-    else moves.push({ name, type: t.name, states, to: to["state"] as string, deadline: String(o["deadline"]) });
+    // The item leaves by a `state` effect, or, when it is a hold, by `hold: end`, which sets the hold type's final state (section 6.8).
+    const left = Array.isArray(o["effects"]) ? o["effects"].find((e) => isObject(e) && typeof e["state"] === "string" && !states.includes(e["state"])) : undefined;
+    const to = isObject(left) ? (left["state"] as string) : d.holdTypes.has(t.name) && holdDoes(o["effects"], "end") ? endedState(t) : null;
+    if (to === null) bad("timed", at(path, "effects"), "a timed rule takes its item out of the rule's states");
+    else moves.push({ name, type: t.name, states, to, deadline: String(o["deadline"]) });
     attention(d, o["attention"], at(path, "attention"), ctx);
   }
   return moves;

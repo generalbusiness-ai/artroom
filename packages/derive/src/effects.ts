@@ -8,8 +8,9 @@
 
 import type { Effect, EffectForm, FactRef, FieldValue, MemberRef, Notify, RefusalReason } from "@generalbusiness/artroom-contract";
 import { attribution, historyOf } from "./attribution.ts";
-import { HOLDER, changeItem, newItem, type ItemEffect } from "./fold.ts";
+import { changeItem, newItem, type ItemEffect } from "./fold.ts";
 import { members, slotOf, type Judging } from "./guards.ts";
+import { deriveHold, endsUnder } from "./hold.ts";
 import type { Item } from "./state.ts";
 import { LAST_MS, timeMs, timeOf } from "./time.ts";
 import { unsupported } from "./unsupported.ts";
@@ -47,7 +48,6 @@ export function deriveEffects(j: Judging, forms: readonly EffectForm[], attentio
     working.set("on", newItem(open, own(items, opens)!, null));
   }
 
-  const renewals: { at: number; subject: string }[] = [];
   for (const [i, form] of forms.entries()) {
     const subject = form.of ?? "on";
     const item = working.get(subject)!;
@@ -117,21 +117,17 @@ export function deriveEffects(j: Judging, forms: readonly EffectForm[], attentio
         apply(subject, { effect: "list", item: id, slot, change: "add", member });
       }
     } else if (!("hold" in form)) return unsupported("that effect");
-    else if (form.hold.do === "open") apply(subject, { effect: "hold", item: id, change: "open", epoch: 1 });
-    else if (form.hold.do === "end") apply(subject, { effect: "hold", item: id, change: "end", epoch: (item.epoch ?? 0) + 1 });
     else {
-      // Whether a renewal is by another holder is known only when every effect has run. Its place in the order is kept.
-      renewals.push({ at: effects.length, subject });
-      effects.push({ effect: "hold", item: id, change: "renew", epoch: item.epoch ?? 0 });
+      // Section 6.8: the hold capability's effect on the hold item.
+      const hold = deriveHold(j, item, form.hold.do);
+      if (!hold.ok) return refuse(hold.reason, `effects.${i}: ${hold.detail}`);
+      apply(subject, hold.effect);
     }
   }
-  for (const { at, subject } of renewals) {
-    const item = working.get(subject)!;
-    // Section 6.8: the epoch rises when the hold is renewed by another holder.
-    const other = !same(own(j.subjects.get(subject)?.parties, HOLDER) ?? null, own(item.parties, HOLDER) ?? null);
-    const effect: ItemEffect = { effect: "hold", item: item.id, change: "renew", epoch: (item.epoch ?? 0) + (other ? 1 : 0) };
-    effects[at] = effect;
-    working.set(subject, changeItem(item, effect, j.definition, j.signer));
+  // Section 6.8: a hold ends with what it is under. These are the capability's own effects, after the written ones (section 4.1).
+  for (const { subject, effect } of endsUnder(j, working)) {
+    if (subject === null) effects.push(effect);
+    else apply(subject, effect);
   }
 
   if (opens !== null) {

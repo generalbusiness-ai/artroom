@@ -22,9 +22,12 @@ export type DomainTag = (typeof DOMAINS)[keyof typeof DOMAINS];
 
 /**
  * A value of one field type of section 6.2. Text, enum, time, digest, commit
- * and tree values are strings; an `int` and a local `item` are numbers.
+ * and tree values are strings; an `int` and a local `item` are numbers; a
+ * record is its named values.
  */
-export type FieldValue = string | number | boolean | MemberRef | FactRef | ScopeRef | readonly FieldValue[];
+export type FieldValue = string | number | boolean | MemberRef | FactRef | ScopeRef | readonly FieldValue[] | FieldRecord;
+/** A value of a `record` type: each member that is present, by its name. A member that is absent has no key. */
+export interface FieldRecord { readonly [member: string]: FieldValue }
 
 export interface Intent {
   v: 1;

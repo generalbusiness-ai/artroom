@@ -5,7 +5,6 @@
 
 import type { Bounds, FieldType } from "@generalbusiness/artroom-contract";
 import { canonicalize, utf8 } from "@generalbusiness/artroom-bytes";
-import { unsupported } from "../unsupported.ts";
 
 /** The canonical bytes of a value that the definition states. */
 export const stated = (v: unknown): number => utf8(canonicalize(v)).length;
@@ -35,6 +34,7 @@ export function mostBytes(type: FieldType, bounds: Bounds): number {
     case "digest": return 73;
     case "commit": case "tree": return 66;
     case "list": return 2 + Math.min(type.max, bounds.listElements) * (1 + mostBytes(type.of, bounds));
-    case "record": return unsupported("a record type");
+    // Each member at its most, with its name, a colon and a comma.
+    case "record": return 2 + Object.entries(type.of).reduce((bytes, [name, of]) => bytes + stated(name) + 2 + mostBytes(of, bounds), 0);
   }
 }
