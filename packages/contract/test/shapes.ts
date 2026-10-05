@@ -5,7 +5,7 @@
  * compiling. The digests and names are made up.
  */
 
-import type { Answer, DeclaredDefinition, DeliveryCause, Digest, DutyId, Entry, Envelope, FactRef, Grant, Intent, MemberRef, Read, Receipt, Report, ScopeRef, Seed } from "../src/index.ts";
+import type { AdoptedReceiveType, Answer, DeclaredDefinition, DeliveryCause, Digest, DutyId, Entry, Envelope, FactRef, Grant, Intent, MemberRef, Read, Receipt, Report, ScopeRef, Seed } from "../src/index.ts";
 import { DOMAINS, PROPOSED_BOUNDS, type Bounds, type DomainTag } from "../src/index.ts";
 
 const d = (c: string): Digest => `sha256:${c.repeat(64)}`;
@@ -135,7 +135,7 @@ const definition: DeclaredDefinition = {
       guards: [{ equals: { a: { update: "state" }, b: { const: "merged" } } }],
       effects: [{ of: "also.intent", state: "closed", if: [{ of: "also.intent", state: ["open"] }] }, { of: "also.intent", ref: { slot: "titledAt", from: null }, unless: [{ of: "also.intent", state: ["open"] }] }],
       sends: [], attention: [],
-    },
+    } satisfies AdoptedReceiveType,
   },
   timed: {},
   rules: {},

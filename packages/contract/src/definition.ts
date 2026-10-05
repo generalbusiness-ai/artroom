@@ -88,7 +88,14 @@ export interface ActType {
   attention: readonly Notify[];            // at most 8
 }
 
-export type ReceiveType = {
+/**
+ * A handler, in the adopted form or the landed one. A new definition writes
+ * `AdoptedReceiveType`. When the source reads only that form, the landed
+ * form is removed and this name is the adopted form alone.
+ */
+export type ReceiveType = AdoptedReceiveType | LandedReceiveType;
+
+export interface AdoptedReceiveType {
   message: string;                         // a `tell` message's name, or a relationship's name
   class: "tell" | "relate" | "advisory";   // for an advisory, `message` is its type: `index` or `notify`
   from: { kind: ScopeKind; under?: string };
@@ -101,7 +108,7 @@ export type ReceiveType = {
   effects: readonly EffectForm[];
   sends: readonly SendForm[];              // empty when `class` is `advisory`
   attention: readonly Notify[];            // empty when `class` is `advisory`
-} | LandedReceiveType;
+}
 
 /**
  * Landed form. A handler with no class, no declared fields and no item to
