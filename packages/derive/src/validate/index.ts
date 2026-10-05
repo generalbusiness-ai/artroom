@@ -25,7 +25,7 @@ import { acts, receives } from "./handlers.ts";
 import { holdSlots, holdTypesOf } from "./hold.ts";
 import { itemTypes } from "./items.ts";
 import { at, shapes, type Problem } from "./shape.ts";
-import { timedEntryBytes, timedGraph, timedRules } from "./timed.ts";
+import { timedEntryBytes, timedGraph, timedKinds, timedRules } from "./timed.ts";
 
 export type { RangeIndex } from "./context.ts";
 export { keptMessage } from "./sends.ts";
@@ -119,6 +119,7 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
   for (const name of holdTypesOf(written)) d.holdTypes.add(name);
   acts(d, top["acts"], timed);
   receives(d, top["receives"]);
+  timedKinds(d, top["acts"], top["receives"]);
   const timedTypes = new Set<string>(d.holdTypes);
   /** Each timed rule that was read whole: its type, the states it applies in, and the state it leaves its item in. */
   const moves = timedRules(d, top["timed"], timedTypes);

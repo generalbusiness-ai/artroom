@@ -11,14 +11,16 @@ import type { Defining } from "./context.ts";
 import { at, type Rec } from "./shape.ts";
 
 const FIELD_SHAPES: Readonly<Record<string, readonly string[]>> = {
-  text: ["max"], int: ["min", "max"], bool: [], time: [], enum: ["of"], member: [], item: ["of"], fact: ["kind", "under"], scope: ["kind"], digest: [], commit: [], tree: [], list: ["of", "max"],
+  text: ["max"], int: ["min", "max"], bool: [], time: [], enum: ["of"], member: [], item: ["of"], fact: ["kind", "under"], scope: ["kind"], digest: [], commit: [], tree: [], record: ["of"], list: ["of", "max"],
 };
 
 /**
  * Section 6.6: every value of `from` is a value of `to`. The two are the same
  * type, and the bounds of `from` are inside those of `to`: a text's `max`, an
  * integer's range, an enum's values, a reference's kind, a fact's kinds, a
- * list's `max` and its elements. A copy needs this; a comparison does not.
+ * list's `max` and its elements, and a record's members: each member of
+ * `from` is one of `to`, and `to` requires none that `from` may lack. A copy
+ * needs this; a comparison does not.
  */
 export function assignable(from: FieldType, to: FieldType): boolean {
   switch (from.type) {
@@ -29,6 +31,12 @@ export function assignable(from: FieldType, to: FieldType): boolean {
     case "scope": return to.type === "scope" && from.kind === to.kind;
     case "fact": return to.type === "fact" && from.kind.every((k) => to.kind.includes(k)) && from.under === to.under;
     case "list": return to.type === "list" && from.max <= to.max && assignable(from.of, to.of);
+    case "record": {
+      if (to.type !== "record") return false;
+      const members = to.of;
+      return Object.entries(from.of).every(([m, of]) => Object.hasOwn(members, m) && assignable(of, members[m]!))
+        && Object.entries(members).every(([m, of]) => !of.required || own(from.of, m)?.required === true);
+    }
     default: return from.type === to.type;
   }
 }
@@ -63,6 +71,18 @@ export function fieldType(d: Defining, v: unknown, path: string, extra: readonly
     case "scope":
       if (!isScopeKind(o["kind"])) bad("shape", at(path, "kind"), "is not a scope kind");
       break;
+    case "record": {
+      // Section 6.2: a record has named members, each with a type, required or not. A member is named after what holds the
+      // record, with a dot, so its own name has none.
+      const members = d.entries(o["of"], at(path, "of"), null);
+      if (members.length === 0 && isObject(o["of"])) bad("shape", at(path, "of"), "a record has a member");
+      for (const [m, mv] of members) {
+        const p = at(at(path, "of"), m);
+        if (m.includes(".")) bad("shape", p, "a member's name has no dot");
+        if (fieldType(d, mv, p, ["required"]) && isObject(mv)) d.bool(mv["required"], at(p, "required"));
+      }
+      break;
+    }
     case "list":
       if (nested) bad("shape", path, "a list of lists is not a field type");
       else fieldType(d, o["of"], at(path, "of"), [], true);
@@ -70,6 +90,26 @@ export function fieldType(d: Defining, v: unknown, path: string, extra: readonly
       break;
   }
   return problems.length === before ? (v as unknown as FieldType) : null;
+}
+
+/**
+ * Section 6.2: the type that a name leads to, where a member of a record is
+ * named after what holds the record, with a dot. `typed` gives the type of
+ * what a name holds; null when only the commit knows it; undefined when
+ * nothing has that name. A name that holds something is read whole, also
+ * when it has a dot. Undefined: nothing has the name, or what it leads to is
+ * no record that the definition states with that member.
+ */
+export function memberType(typed: (name: string) => FieldType | null | undefined, name: string): FieldType | null | undefined {
+  const whole = typed(name);
+  if (whole !== undefined) return whole;
+  for (let dot = name.indexOf("."); dot !== -1; dot = name.indexOf(".", dot + 1)) {
+    let type = typed(name.slice(0, dot));
+    if (type === undefined) continue;
+    for (const member of name.slice(dot + 1).split(".")) type = type?.type === "record" ? own(type.of, member) : undefined;
+    return type;
+  }
+  return undefined;
 }
 
 /** The fields an act declares, each with its type. A field that is not one is reported and left out. */

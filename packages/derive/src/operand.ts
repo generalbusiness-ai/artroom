@@ -13,7 +13,7 @@ import { creationFields, isEntryOf, isLocalFact, messageFields, updateOf } from 
 import type { Judging } from "./guards.ts";
 import type { Item } from "./state.ts";
 import type { ValidDefinition } from "./validate/index.ts";
-import { isFactRef, isLocalId, isObject, own, same } from "./values.ts";
+import { isFactRef, isLocalId, isObject, memberOf, own, same } from "./values.ts";
 
 /** What a slot holds, or null. An empty list is unset. */
 export function slotOf(item: Item, slot: string): FieldValue | null {
@@ -39,6 +39,7 @@ export function kindOf(entry: Entry, held: ValidDefinition, local: boolean): str
   const input = entry.input;
   if (input.type === "act") return input.signed.intent.kind;
   if (input.type === "genesis") return local || input.seed.definition === held.digest ? held.declared.genesis : null;
+  if (input.type === "timed") return `timed:${input.rule}`;
   if (input.type !== "delivery" || input.message.class !== "request") return null;
   const body = input.message.body;
   if (!isObject(body)) return null;
@@ -165,7 +166,7 @@ export function operand(j: Judging, o: Operand, item: Item | null): unknown {
   let value: unknown;
   if ("field" in o) value = own(j.fields, o.field) ?? null;
   else if ("presented" in o) value = own(j.presented, o.presented) ?? null;
-  else if ("element" in o) value = j.elements?.get(o.element) ?? null;
+  else if ("element" in o) value = memberOf((name) => j.elements?.get(name), o.element);
   else {
     const of = o.of === undefined ? item : o.of === "each" ? (j.each ?? null) : (j.subjects.get(o.of) ?? null);
     value = of ? slotOf(of, o.slot) : null;

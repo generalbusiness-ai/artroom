@@ -6,7 +6,7 @@
  * that every judge is given.
  */
 
-import type { ActType, Bounds, Digest, Entry, FactRef, FactUse, FieldType, FieldValue, Prepared, Request, ScopeRef, Sealed } from "@generalbusiness/artroom-contract";
+import type { ActType, Bounds, Digest, Entry, FactRef, FactUse, FieldRecord, FieldType, FieldValue, Prepared, Request, ScopeRef, Sealed } from "@generalbusiness/artroom-contract";
 import { canonicalBytes, digestBytes, entryHash, isIntent } from "@generalbusiness/artroom-bytes";
 import type { Fetched, RuleInput } from "./guards.ts";
 import type { StateView } from "./state.ts";
@@ -34,9 +34,14 @@ export interface Reading {
 /** The shape of section 2.1, which the bytes package guards beside the contract's other fixed records. */
 export { isIntent };
 
-/** Each value in a field with the type it must have: the field itself, or each element of a list. */
+/** Each value in a field with the type it must have: the field itself, each element of a list, or each member that a record holds. */
 function leaves(type: FieldType, value: FieldValue): [FieldType, FieldValue][] {
-  return type.type === "list" ? (value as readonly FieldValue[]).flatMap((v) => leaves(type.of, v)) : [[type, value]];
+  if (type.type === "list") return (value as readonly FieldValue[]).flatMap((v) => leaves(type.of, v));
+  if (type.type !== "record") return [[type, value]];
+  return Object.entries(type.of).flatMap(([name, of]) => {
+    const member = own(value as FieldRecord, name);
+    return member === undefined ? [] : leaves(of, member);
+  });
 }
 
 /** Section 6.2: each field is required or optional, an optional field may have a default, and an unknown field is refused. */
@@ -136,9 +141,12 @@ export function readFacts(view: StateView, types: ActType["fields"], fields: Rea
       uses.push(useOf(ref, fetched.entry));
     }
   }
-  // Each local fact as its `seq`: every one was checked above. Every other value as it is. Only a declared field of type fact, or a list of them, holds one.
-  const inNormalForm = (type: FieldType | undefined, value: FieldValue): FieldValue =>
-    (type?.type === "list" ? (value as readonly FieldValue[]).map((v) => inNormalForm(type.of, v)) : type?.type === "fact" && isLocalFact(value as FactRef, local.at) ? (value as FactRef).seq : value);
+  // Each local fact as its `seq`: every one was checked above. Every other value as it is. Only a declared field of type fact holds one, or a list or a record with one.
+  const inNormalForm = (type: FieldType | undefined, value: FieldValue): FieldValue => {
+    if (type?.type === "list") return (value as readonly FieldValue[]).map((v) => inNormalForm(type.of, v));
+    if (type?.type === "record") return Object.fromEntries(Object.entries(value as FieldRecord).map(([name, member]) => [name, inNormalForm(own(type.of, name), member)]));
+    return type?.type === "fact" && isLocalFact(value as FactRef, local.at) ? (value as FactRef).seq : value;
+  };
   return { result: "read", fields: Object.fromEntries(Object.entries(fields).map(([name, value]) => [name, inNormalForm(own(types, name), value)])), facts, uses };
 }
 

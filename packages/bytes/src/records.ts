@@ -104,9 +104,13 @@ export const isDefinitionName: Check = (v) => isDigest(v) || isPlatformDefinitio
 const seed = record({ v: is(1), kind: isScopeKind, definition: isDefinitionName, creator: orNull(scopeRef), cause: isDigest, ordinal: isLocalId });
 export const isSeed = (v: unknown): v is Seed => seed(v);
 
-/** One of the forms a field value can have (section 6.2): a text, an integer, a truth value, a reference, or a list of those. A list holds no list. */
+/**
+ * One of the forms a field value can have (section 6.2): a text, an integer, a truth value, a reference, a record of named
+ * values, or a list of those. A list holds no list.
+ */
 const scalar: Check = (v) => text(v) || (typeof v === "number" && Number.isSafeInteger(v) && !Object.is(v, -0)) || flag(v) || memberRef(v) || factRef(v) || scopeRef(v);
-export const isFieldValue = (v: unknown): v is FieldValue => scalar(v) || listOf(scalar)(v);
+const one: Check = (v) => scalar(v) || (isRecord(v) && Object.values(v).every(isFieldValue));
+export const isFieldValue = (v: unknown): v is FieldValue => one(v) || listOf(one)(v);
 const party: Check = (v) => v === null || memberRef(v) || listOf(memberRef)(v);
 export const isParty = (v: unknown): v is Party => party(v);
 /** A record by chosen names, each value passing `check`. */
