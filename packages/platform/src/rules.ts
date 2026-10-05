@@ -34,6 +34,8 @@
 import type { Rules } from "@generalbusiness/artroom-derive";
 import { inboxRules } from "./inbox.ts";
 import { membershipRules } from "./membership.ts";
+import { registerRules } from "./register.ts";
+import { directoryRules } from "./directory.ts";
 
 /** The platform definitions that this package holds, by name without the version (section 12.1). `platform:task` is not here: it is IA's. */
 export type PlatformName = "platform:register" | "platform:directory" | "platform:membership" | "platform:rules" | "platform:destination" | "platform:inbox";
@@ -48,4 +50,9 @@ export type RuleTable = { readonly [name in PlatformName]?: Rules };
  * does not list, and no rule is written for them (`membership.ts`). So this
  * table does not make `platform:membership@1` runnable.
  */
-export const RULES: RuleTable = { "platform:inbox": inboxRules, "platform:membership": membershipRules };
+export const RULES: RuleTable = {
+  "platform:inbox": inboxRules, "platform:membership": membershipRules,
+  // The register lacks the rule of one mark, `create-repository`, and the directory's data holds three marks that the note's table
+  // does not list (`register.ts`, `directory.ts`). So this table makes neither runnable.
+  "platform:register": registerRules, "platform:directory": directoryRules,
+};

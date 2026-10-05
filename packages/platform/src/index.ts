@@ -13,16 +13,20 @@
 import type { ObservationRequest, PlatformData } from "@generalbusiness/artroom-contract";
 import { inbox } from "./inbox.ts";
 import { membership, standingOf } from "./membership.ts";
+import { register } from "./register.ts";
+import { directory } from "./directory.ts";
 import type { Rules, StateView } from "@generalbusiness/artroom-derive";
 import { RULES } from "./rules.ts";
 
-export { inbox, membership };
+export { inbox, membership, register, directory };
 export { MEMBERSHIP, NO_MEMBER, ROLE_LISTS, ROLE_TABLE, actionsIn, standingOf, type Role } from "./membership.ts";
+export { CREATION_ATTEMPTS, DIRECTORY_CLAUSES, REGISTER, REPOSITORY, directorySeed, registerRules } from "./register.ts";
+export { DEFINITION_DOMAIN, DIRECTORY, IMPORT_ATTEMPTS, SEEN, directoryMembership, directoryRules } from "./directory.ts";
 export { RULES };
 export type { PlatformName, RuleTable } from "./rules.ts";
 
 /** The platform definitions delivered so far, by name without the version. */
-export const definitions: Readonly<Record<string, PlatformData>> = { "platform:inbox": inbox, "platform:membership": membership };
+export const definitions: Readonly<Record<string, PlatformData>> = { "platform:inbox": inbox, "platform:membership": membership, "platform:register": register, "platform:directory": directory };
 
 /**
  * One version of a platform definition, as a runtime or a verifier is

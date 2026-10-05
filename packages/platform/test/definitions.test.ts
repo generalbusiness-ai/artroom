@@ -37,9 +37,9 @@ test("the inbox definition validates whole with the platform option, with its ma
   // The table has a rule of the right kind for every mark, so a runtime with this package can run the inbox. Without the rule, or
   // with a rule of another place under that name, it cannot.
   const { rules } = platform("platform:inbox@1")!;
-  expect(Object.keys(RULES)).toEqual(["platform:inbox", "platform:membership"]);
+  expect(Object.keys(RULES)).toEqual(["platform:inbox", "platform:membership", "platform:register", "platform:directory"]);
   expect([runnable(checked.definition, rules), runnable(checked.definition, {}), runnable(checked.definition, { "notice-source": { place: "send", run: () => null } })]).toEqual([true, false, false]);
-  expect(Object.keys(definitions)).toEqual(["platform:inbox", "platform:membership"]);
+  expect(Object.keys(definitions)).toEqual(["platform:inbox", "platform:membership", "platform:register", "platform:directory"]);
 });
 
 // The plan's T43, for `platform:membership@1` (authority note, revision 21, section 12.1.3, and its table of marks, section 12.1.8).

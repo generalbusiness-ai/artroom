@@ -35,7 +35,7 @@
 import type { Digest, Entry, Input, KeyId, Observation, ObservationRequest, ObservationUse, RunId, ScopeRef } from "@generalbusiness/artroom-contract";
 import { hex } from "@generalbusiness/artroom-bytes";
 import { WINDOWS, highestHead, judgeGrant, membershipOf, observationOf, prefer, revoked, same, type Clock as Reading, type GrantJudgment, type Retains, type StateView } from "@generalbusiness/artroom-derive";
-import { standingOf } from "@generalbusiness/artroom-platform";
+import { DIRECTORY, directoryMembership, standingOf } from "@generalbusiness/artroom-platform";
 import type { Asked, Authority, Clock, Random, Standing } from "./ports.ts";
 
 /**
@@ -209,6 +209,8 @@ export interface Repository {
   random: Random;
   /** The input of the scope's genesis entry, from its own history. Null: it has no genesis yet. */
   genesis(): Extract<Input, { type: "genesis" }> | null;
+  /** The scope's folded state at its head, for a scope that records its membership reference in an item: a directory. Absent: such a scope reads nothing. */
+  state?: Pick<StateView, "page">;
   /** How a membership scope is read: one call on the object that the reference names (`membershipIn`). */
   reader: Membership;
 }
@@ -224,22 +226,32 @@ export interface Repository {
  *   is read from the scope's own history, and from no request, no answer
  *   and no intent. A scope whose genesis records none reads nothing, and an
  *   act that needs a grant is then answered `authority-unavailable`.
+ * - A directory under `platform:directory@1` holds it in its slot
+ *   `repository.membership`, which the `applied` clause of its own `create`
+ *   sets (the platform package's `directoryMembership`). It is read from
+ *   the scope's own folded state at its head, before the turn. Before the
+ *   slot is set the directory reads nothing, so it admits no act that needs
+ *   a grant (authority note, section 12.1.2, "What the directory admits").
  *
  * No grant that is presented beside an intent is read: authority is what
  * the membership scope answers, and nothing a caller brings.
  *
- * I3 merge: three kinds of scope record their membership reference in
- * another place, which the steps of their definitions build. A directory
- * holds it in its slot `repository.membership`. The rules scope and the
- * destination hold the membership scope's ID from their creation, and fix
- * the incarnation in the first entry that retains an observation. Until
- * then such a scope reads nothing here.
+ * I3 merge: two kinds of scope record their membership reference in
+ * another place, which the steps of their definitions build. The rules
+ * scope and the destination hold the membership scope's ID from their
+ * creation, and fix the incarnation in the first entry that retains an
+ * observation. Until then such a scope reads nothing here.
  */
 export function repositoryAuthority(config: Repository): Authority {
   const own = ownStanding(config.random);
   const observed = observing({
     clock: config.clock, random: config.random, reader: config.reader,
-    membership: (scope) => { const genesis = config.genesis(); return genesis ? membershipOf(genesis, scope) : null; },
+    membership: (scope) => {
+      const genesis = config.genesis();
+      if (!genesis) return null;
+      if (scope.kind === "directory" && genesis.seed.definition === DIRECTORY) return config.state ? directoryMembership(config.state) : null;
+      return membershipOf(genesis, scope);
+    },
   });
   return { read: (asked, seconds) => (asked.scope.kind === "membership" ? own : observed).read(asked, seconds) };
 }

@@ -185,11 +185,25 @@ the designs, and is no review of this source.
 - An act of a row whose `grant` is a mark is judged by the mark's rule in
   place of the grant check. When the rule passes, the entry records
   `authority: []`.
-- A creation under a platform name is not built: it is answered
-  `unsupported-definition`.
+- A creation under a platform name pins the runtime's own data and
+  rules, as a founding does. Nothing of the definition is read from the
+  creator. A version that the runtime cannot run whole is answered
+  `unsupported-definition`: transport answers `retry`, and nothing is
+  recorded.
+- The platform package holds the data of `platform:register@1` and of
+  `platform:directory@1`, and each rule of the two that can be written.
+  The register lacks the rule of one mark, and the directory's data holds
+  two marks with no rule (`notes/2026-10-05-i3-contract-deltas.md`,
+  entries EJ1, EP6 and EP7). So nothing is founded or created under
+  either by the production wiring.
+- A directory under `platform:directory@1` records its membership
+  reference in its slot `repository.membership`. The production authority
+  reads it there, from the scope's own folded state.
 
 The founding makes a scope of the kind `directory`, as every founding
-does. The kinds of the platform scopes come with their own definitions.
+does. Derive's genesis judge also founds a register, of the kind
+`register`, by an `install` intent under `platform:register`. The scope's
+`found` does not build that seed yet.
 
 ## A child's definition
 
