@@ -458,4 +458,3 @@ row is the finding. No other row needed a change of source.
 | The entries that an opening reserves | After the fold, for an act and a handler, on the whole entry. A result clause is not asked | The entry (section 17.2) | Open as before, and not of this family: entry EJ6 |
 | The effects that one entry derives from rules, as a number | No check. Each rule has its `most`. An outcome's rule has none | The entry (revision 16, "A declared maximum for everything that derives") | Open as before: R4 and request `cc570904`. Until a number exists, two marks cannot pass a bound, because there is none |
 | A mark's own `most`: the kinds of operation that its rule may open, at most one of each in one entry, and the type that it may open | Not built. The rule table states one number for a rule at an effect (entry EJ6) | One mark, counted for the entry | Not of this repair. Owed: the contract's rows I3-21 and I3-22 |
-
