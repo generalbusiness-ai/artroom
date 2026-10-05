@@ -37,12 +37,12 @@
  * under `trusts`, that the head is the service's answer.
  */
 
-import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
+import { DOMAINS, PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { Bounds, CapabilityName, Digest, Entry, FactRef, Grant, Head, KeyId, Observation, ObservationRequest, ObservationUse, PlatformData, PlatformDefinition, Report, RetainedInput, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
 import { canonicalize, definitionDigest, digestBytes, intentDigest, isDigest, isEntry, isObservationUse, isPlatformDefinition, parseStrict, platformName, scopeIdOf, textDigest, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import {
   HOLD, HOLD_KINDS, MISMATCHES, MemoryState, WINDOWS, actionOf, agrees, applyEntry, clockOf, entryOf, headsOf, highestHead, inputTexts, isAncestryCheck, isFactRef, isLocalId, isObject, isScopeRef, judgeAct, judgeCheckpoint, judgeDelivery,
-  judgeDiagnosis, judgeGenesis, judgeGrant, judgeOutcome, judgePreparation, judgeTimed, membershipOf, nextDue, own, ownersOf, ruleAt, same, snapshotRead, stepsOf, timeMs, updateOf, validateDefinition, windowOf,
+  judgeDiagnosis, judgeGenesis, judgeGrant, judgeOutcome, judgePreparation, judgeTimed, membershipOf, nextDue, own, ownersOf, placesOf, ruleAt, same, snapshotRead, stepsOf, timeMs, updateOf, validateDefinition, valueDigest, windowOf,
 } from "@generalbusiness/artroom-derive";
 import type { ActJudgment, AncestryCheck, Capabilities, Clock, Fetched, Judgment, Owners, PlatformRules, PreparationJudgment, Retains, Rules, StateView, TimedJudgment, ValidDefinition, Window } from "@generalbusiness/artroom-derive";
 import { RULE_PROFILES, evaluateRules } from "@generalbusiness/artroom-derive/rule";
@@ -432,9 +432,9 @@ class Verifier {
   }
 
   /** Section 9.2: an input an entry names by digest. One that is missing makes the replay `incomplete`. */
-  async #retained(run: Run, at: FactRef, kind: RetainedInput["kind"], digest: Digest, what: string): Promise<RetainedInput> {
+  async #retained(run: Run, at: FactRef, kind: RetainedInput["kind"], digest: Digest, what: string, domain?: string): Promise<RetainedInput> {
     const left = this.#limits.bytes - this.#bytes;
-    const got = await this.#source.retained(run.id, kind, digest, { bytes: Math.min(left, RETAINED_REPLY_BYTES) });
+    const got = await this.#source.retained(run.id, kind, digest, { bytes: Math.min(left, RETAINED_REPLY_BYTES) }, domain);
     if (!got.ok) {
       this.#unread(got.reason, left < RETAINED_REPLY_BYTES, `a retained input of ${run.id}`);
       throw new Stop("incomplete", `a retained input is missing: ${what}, ${digest} (${got.reason})`, at);
@@ -991,9 +991,21 @@ class Verifier {
         // Section 16.1, "Replay": the entry holds exactly the observations that its judgment reads. The judge is given the recorded
         // ones, and derives an input with those that a rule read: one that no rule reads, and one that a rule reads and the entry
         // lacks, are each a mismatch.
-        // I3 merge: a value beside an intent is kept as a retained input under its domain and digest (section 6.2), and no store keeps
-        // one yet. So this replay gives the judge none, and an entry whose rule reads a value is not derived again.
-        judged = judgeAct(state, definition, input.signed, { ...reading, presented: input.presented, grants: input.authority.map((grant) => ({ grant, current: true })), membership: recordedMembership(run), ...(input.observed ? { observed: input.observed } : {}) });
+        // Sections 6.2 and 9.2, revision 19: each place of the act that the pinned data states names a value, which the scope keeps
+        // under its domain and its digest: the kind `value`, or `definition` for a value in the domain of a definition. A replay
+        // without the bytes is `incomplete`, and not a mismatch. The judge is given the values that the entry retains.
+        // I3 merge: a row whose rule holds the domain and the bound in its own code states no place in its data, so this replay
+        // gives its judge no value, and an entry whose rule read one so is not derived again (I3 deltas, entries EM4 and EX5).
+        const values: string[] = [];
+        for (const place of placesOf(own(definition.declared.acts, input.signed.intent.kind)?.fields, input.signed.intent.fields)) {
+          const what = `the value that the field ${place.field} names, in the domain ${place.domain}`;
+          const kept = place.domain === DOMAINS.definition ? await this.#retained(run, where, "definition", place.digest, what) : await this.#retained(run, where, "value", place.digest, what, place.domain);
+          let named = false;
+          try { named = valueDigest(place.domain, parseStrict(kept.bytes)) === place.digest; } catch { /* not the one named */ }
+          if (!named) throw new Stop("incomplete", `a retained input is not the one named: ${what}, ${place.digest}`, where);
+          values.push(kept.bytes);
+        }
+        judged = judgeAct(state, definition, input.signed, { ...reading, presented: input.presented, grants: input.authority.map((grant) => ({ grant, current: true })), membership: recordedMembership(run), ...(input.observed ? { observed: input.observed } : {}), ...(values.length > 0 ? { values } : {}) });
         break;
       case "delivery": {
         this.#trusts.add("delivered");

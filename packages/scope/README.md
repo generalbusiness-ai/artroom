@@ -198,8 +198,8 @@ the designs, and is no review of this source.
 - The platform package holds the data of `platform:register@1` and of
   `platform:directory@1`, and each rule of the two that can be written.
   The register lacks the rule of one mark, and the directory's data holds
-  two marks with no rule (`notes/2026-10-05-i3-contract-deltas.md`,
-  entries EJ1, EP6 and EP7). So nothing is founded or created under
+  three marks with no rule (`notes/2026-10-05-i3-contract-deltas.md`,
+  entries EJ1, EP6 and EP7, and section 22). So nothing is founded or created under
   either by the production wiring.
 - A directory under `platform:directory@1` records its membership
   reference in its slot `repository.membership`. The production authority

@@ -120,7 +120,13 @@ export interface LogPage { scope: ScopeRef; definition: Digest | PlatformDefinit
  * domain `artroom-snapshot-1` (sections 9.2 and 16.4). It is stored before
  * the entry that names the digest. The contract states the bytes and the
  * domain, and no name for the kind: `snapshot` is its own word for it (I3
- * deltas, entry EL7).
+ * deltas, entry EL7; confirmed in the contract's revision 19).
+ * `value`: a value beside an intent (sections 6.2 and 9.2, revision 19), as
+ * its canonical JSON, under its byte domain and its digest there. The
+ * record states the domain in `domain`, because the kind alone does not
+ * give it, and no other kind states the member. A value in
+ * `artroom-definition-1` is a definition, and is kept under the kind
+ * `definition`. A value is never removed.
  * `bytes` is canonical JSON text.
  */
-export interface RetainedInput { kind: "definition" | "entry" | "rule" | "text" | "snapshot"; digest: Digest; bytes: string; under?: string }
+export interface RetainedInput { kind: "definition" | "entry" | "rule" | "text" | "snapshot" | "value"; digest: Digest; bytes: string; under?: string; domain?: string }

@@ -53,6 +53,15 @@ describe("the two lane definitions, as data (lane forms, revision 14)", () => {
   test("validation: both definitions pass the validator whole at the adopted bounds; the forms that no runtime derives yet are the capability rows; neither genesis opens a timed item", () => {
     const valid = { issue: whole("issue"), change: whole("change") };
     expect([valid.issue.digest, valid.change.digest]).toEqual([DIGESTS.issue, DIGESTS.change]);
+    // The scope contract's revision 19, section 6.1 (witness 18.44, case 7): the bound on a list is 64, and each list type of both
+    // definitions states a `max` of at most 32. So each validates the same at the bound 32 and at 64: the same digest, the same
+    // reservations, and the same static size of each timed entry, which is read here from the refusal at an entry size of 1 byte.
+    const sizes = (name: (typeof names)[number], listElements: number) => { const tight = validated(lanes[name], { listElements, entryBytes: 1 }); return tight.ok ? null : tight.problems.map((p) => p.message); };
+    for (const name of names) {
+      const at32 = validated(lanes[name], { listElements: 32 });
+      expect([PROPOSED_BOUNDS.listElements, at32.ok && at32.definition, sizes(name, 32)], name).toEqual([64, valid[name], sizes(name, 64)]);
+      expect(sizes(name, 64)?.length, name).toBeGreaterThan(0);
+    }
 
     // What the validator reads and derives nothing of: the rows that need the code of `hold@1` or `git-read@1`. They are 3 acts
     // and 7 handlers, with the type that names a check entry. A runtime with no such code runs neither definition.

@@ -86,7 +86,7 @@ const CLASS: Record<Message["class"], true> = { request: true, result: true, con
 const DECISION: Record<Extract<Input, { decision: unknown; type: "delivery" }>["decision"], true> = { applied: true, refused: true, superseded: true };
 const CLAUSE: Record<NonNullable<Duty["result"]>["clause"], true> = { applied: true, refused: true, superseded: true, conflict: true };
 const FINDING: Record<NonNullable<Duty["diagnosis"]>["finding"], true> = { undelivered: true, "delivery-unavailable": true };
-const RETAINED: Record<RetainedInput["kind"], true> = { definition: true, entry: true, rule: true, text: true, snapshot: true };
+const RETAINED: Record<RetainedInput["kind"], true> = { definition: true, entry: true, rule: true, text: true, snapshot: true, value: true };
 /** Why a delivery was refused: a code the contract names and, where one exists, the name the failed guard declares. */
 const reason = record({ code: among(REFUSAL_REASONS) }, { name: text });
 
@@ -288,8 +288,13 @@ export const isDuty = (v: unknown): v is Duty => duty(v);
 const logPage = record({ scope: scopeRef, definition: isDefinitionName, entries: listOf(record({ seq: isLocalId, hash: isDigest, bytes: text })) });
 export const isLogPage = (v: unknown): v is LogPage => logPage(v);
 /** One retained input. Its `bytes` is text a reader checks against the digest itself; it is not read here. */
-const retainedInput = record({ kind: among(RETAINED), digest: isDigest, bytes: text }, { under: text });
-export const isRetainedInput = (v: unknown): v is RetainedInput => retainedInput(v);
+const retainedInput = record({ kind: among(RETAINED), digest: isDigest, bytes: text }, { under: text, domain: text });
+/** Section 9.2, revision 19: `domain` is stated exactly when the kind is `value`, and it is not empty. */
+export const isRetainedInput = (v: unknown): v is RetainedInput => {
+  if (!retainedInput(v)) return false;
+  const { kind, domain } = v as RetainedInput;
+  return (kind === "value") === (domain !== undefined) && domain !== "";
+};
 
 /** A read (section 9.1): a value of the route's shape at a stated head, or a refusal the contract names, with the reference it may carry. */
 export const isRead = <T>(value: (v: unknown) => v is T) => {

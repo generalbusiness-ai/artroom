@@ -17,9 +17,9 @@ test("the register definition validates whole with the platform option; every ma
   // No entry of the register's data sends a request: the one `create` is the selecting outcome's (section 12.1).
   expect(Object.values(register.acts).flatMap((act) => act.sends)).toEqual([]);
 
-  // The marks, by the rows of the note's table: rows 2 to 6, and row c of the further marks, one for each kind of operation.
+  // The marks, by the rows of the note's table: rows 2 to 6, row r of revision 24, and row c of the further marks, one for each kind of operation.
   expect(valid.marks.map((m) => [m.place, m.path, m.code, m.row])).toEqual([
-    [1, "acts.install.grant", "install", "P13"], [1, "acts.found.grant", "founding-policy", "P13"],
+    [1, "acts.install.grant", "install", "P13"], [1, "acts.found.grant", "founding-policy", "P13"], [4, "acts.found.guards.0", "handle-form", "P27"],
     [5, "acts.found.effects.3", "founder-key", "P14"], [5, "acts.found.effects.4", "claim-seed", "P16"], [5, "acts.found.effects.5", "open-create-repository", "P16"],
     [7, "outcomes.create-repository", "create-repository", "P16"], [7, "outcomes.revoke-credential", "revoke-credential", "P16"], [7, "outcomes.delete-repository", "delete-repository", "P16"],
   ]);
@@ -41,7 +41,7 @@ describe("the rules of platform:register@1, each as a plain function (authority 
   /** What a rule is given for a `found` of that signer at that register. */
   const given = (r: Register, who: typeof rita): RuleGiven => ({
     state: r.state, input: { type: "act", signed: r.intent(who, "found"), grant: null, presented: {} }, time: r.now, uses: [], own: r.own,
-    resolved: { at: r.at, self: r.head.seq + 1, fields: {}, subjects: new Map(), signer: null, bounds: PROPOSED_BOUNDS }, observed: () => null, value: () => undefined,
+    resolved: { at: r.at, self: r.head.seq + 1, fields: {}, subjects: new Map(), signer: null, bounds: PROPOSED_BOUNDS }, observed: () => null, value: () => undefined, placed: () => undefined,
   });
   /** What the rule `install` is given: the genesis, with its seed and its founding intent. */
   const installed = (install: SignedIntent, cause = intentDigest(install.intent)): RuleGiven =>
@@ -71,14 +71,14 @@ describe("the rules of platform:register@1, each as a plain function (authority 
   ];
   for (const [row, rule, args, expected] of rows) test(`${rule}, row ${row}`, () => expect(run(rule, ...args)).toEqual(expected));
 
-  test("the table has exactly the rules that are written: five at their places, and the outcomes of the two cleanups, which select nothing, take no read and allow another attempt", () => {
+  test("the table has exactly the rules that are written: six at their places, and the outcomes of the two cleanups, which select nothing, take no read and allow another attempt", () => {
     expect(Object.entries(registerRules).map(([name, rule]) => [name, rule.place, "refusals" in rule ? rule.refusals : "most" in rule ? rule.most : null])).toEqual([
-      ["install", "grant", []], ["founding-policy", "grant", []], ["founder-key", "effect", 1], ["claim-seed", "effect", 1], ["open-create-repository", "effect", 2],
+      ["install", "grant", []], ["founding-policy", "grant", []], ["handle-form", "guard", ["bad-handle"]], ["founder-key", "effect", 1], ["claim-seed", "effect", 1], ["open-create-repository", "effect", 2],
       ["revoke-credential", "outcome", null], ["delete-repository", "outcome", null],
     ]);
     for (const kind of ["revoke-credential", "delete-repository"]) {
       const { rules } = registerRules[kind] as { rules: OutcomeRule };
-      expect([rules.selects, rules.read, rules.retries("refused", null as never), rules.retries("unknown", null as never), rules.derives, rules.closure]).toEqual([false, false, true, true, undefined, undefined]);
+      expect([rules.selects, rules.read, rules.retries("refused", null as never, null as never), rules.retries("unknown", null as never, null as never), rules.derives, rules.closure]).toEqual([false, false, true, true, undefined, undefined]);
     }
     expect(CREATION_ATTEMPTS).toBe(3);
   });
@@ -119,6 +119,10 @@ test("a founding opens one claim and one creation of three attempts; a key outsi
   const r = new Register();
   // Case a: a `found` by a key that is not in `founders`, under the policy `keys`.
   expect([r.found(una), r.state.count("claim", "pending")]).toMatchObject([{ result: "refused", reason: "unauthorized" }, 0]);
+  // Section 12.1.1, the row `found`, and row r of the table of marks: a founding whose `founderHandle` is no handle is refused
+  // `bad-field`, named `bad-handle`, by the register's own rule `handle-form`, and opens no claim.
+  expect([r.found(rita, { founderHandle: "@Rita" }, "no handle"), r.found(rita, { founderHandle: "rita" }, "no at-sign"), r.state.count("claim", "pending")])
+    .toMatchObject([{ result: "refused", reason: "bad-field", name: "bad-handle" }, { result: "refused", reason: "bad-field", name: "bad-handle" }, 0]);
 
   const signed = r.intent(rita, "found", { expected: { register: 1 }, fields: { branch: "main", founderHandle: "@rita", recoveryKey: paul.key } });
   expect(r.submit(signed, { platform: registerPlatform, grants: [] }).result).toBe("write");

@@ -68,26 +68,25 @@ real observation read, with the real guards and windows. A test that uses
 it says so in its name or its first comment. It shows the observing
 scope's side of a read, and nothing about membership.
 
-Membership has three stand-ins of its own, in
-`@generalbusiness/artroom-platform/testing`. `standIns` is a rule for
-each of the three marks of membership's data that the platform package
-has no rule for (`notes/2026-10-05-i3-contract-deltas.md`, entries EM6
-to EM8). Without them nothing is founded under `platform:membership@1`,
-in a test as in production. `office` is a made-up directory that creates
-one membership scope: it stands for the real directory and the register.
-`Roster` is a membership scope in memory below such an office. A test
-that uses one says so. It shows membership's rows and its seven real
-rules, and nothing about a founding or about how the three places will
-be decided. `PlatformScope`, of the scope package's test Worker, is the
-deployed class with the production authority and those stand-ins: a
-test of real authority runs there, in the namespace `PLATFORM`
+Membership has two stand-ins of its own, in
+`@generalbusiness/artroom-platform/testing`. `office` is a made-up
+directory that creates one membership scope: it stands for the real
+directory and the register. `Roster` is a membership scope in memory
+below such an office. A test that uses one says so. It shows
+membership's rows and its ten rules, which are all the platform
+package's, and nothing about a founding. `lacking`, of the same module,
+is a control and no stand-in: membership's version less one rule, for
+the rule that a version with a mark and no rule runs nothing.
+`PlatformScope`, of the scope package's test Worker, is the deployed
+class with the production authority and the platform package's own
+rules: a test of real authority runs there, in the namespace `PLATFORM`
 (`packages/scope/test/repository.ts` lists what is real in it).
 
 The register and the directory have stand-ins of their own, in
 `packages/platform/test/support-founding.ts`. `registerStandIns` is a rule
 for the one mark of the register's data that has no rule,
 `create-repository` (`notes/2026-10-05-i3-contract-deltas.md`, entry EJ1).
-`directoryStandIns` is a rule for each of the two marks of the directory's
+`directoryStandIns` is a rule for each of the three marks of the directory's
 data that the platform package has no rule for (entries EP6 and EP7).
 Without them nothing is founded under `platform:register@1` or created
 under `platform:directory@1`, in a test as in production. `Register` is a

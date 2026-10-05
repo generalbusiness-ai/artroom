@@ -1,14 +1,15 @@
 /**
  * `platform:membership@1`, as data, with its rules and its answer to an
- * observation (authority note, revision 21, sections 3.1 to 3.3, 3.6 and
- * 12.1.3; its table of marks, section 12.1.8, rows 14 to 26 and g to i). One
+ * observation (authority note, revision 24, sections 3.1 to 3.3, 3.6 and
+ * 12.1.3; its table of marks, section 12.1.8, rows 14 to 26, g to i and o
+ * to q). One
  * membership scope for a repository. It holds members, keys, the recovery
  * key and the role table. Every other scope of the repository observes it.
  *
  * One member of the data is one row of the note's tables. A cell of the
  * note that begins "Code" is a mark in this data, at the place where its
  * rule is run (the scope contract, section 6.1), and the rule is in
- * `membershipRules`, below. The table of marks gives membership seven rules:
+ * `membershipRules`, below. The table of marks gives membership ten rules:
  *
  * | Rule | Place | Rows of the table | At |
  * |---|---|---|---|
@@ -23,20 +24,19 @@
  * Row 23 has no mark: what an observation answers after a removal is the
  * rule of the answer, `standingOf`, below.
  *
- * **Three places that the note's rows state and no form can say, and that
- * its table of marks does not list.** Each is a mark in this data, with the
- * entry of the I3 deltas note as its `row`, and with NO rule in
- * `membershipRules`: the note names none, and none is invented here. So
- * the version lacks three rules, and by the whole-scope rule (the
- * contract's section 6.1) nothing is founded or created under
- * `platform:membership@1` by this package's rules alone. Each stays so
- * until the note's owner names the rule.
+ * Three rules are new in the note's revision 24 (rows o, p and q; the I3
+ * deltas EM6 to EM8). With them every mark of this data has its rule, so
+ * the package's rules run `platform:membership@1`.
  *
- * | Mark | Place | At | What the row states (deltas entry) |
+ * | Rule | Place | Rows of the table | At |
  * |---|---|---|---|
- * | `role-table` | 5, effect | `establish` | "the role table of section 3.2 as its five lists". The table gives an admin 34 actions, and a list holds at most 32 (EM6). |
- * | `member-of` | 5, effect | `seat`, `invite-member`, `add-member` | The party `member` of a member item, which is required. No form makes a member reference from a handle (EM7). |
- * | `handle-form` | 4, guard | `invite-member`, `add-member` | "The handle fits section 3.1, or `bad-field`". A text type states a length only (EM8). |
+ * | `role-table` | 5, effect | o (P10) | `establish` |
+ * | `member-of` | 5, effect | p (P26) | `seat`, `invite-member`, `add-member` |
+ * | `handle-form` | 4, guard | q (P27) | `invite-member`, `add-member` |
+ *
+ * The five role lists hold 64 names, as the note's revision 24 has them,
+ * and an admin's first list has 34. That needs the bound on a list of the
+ * scope contract's revision 19 (its section 6.1, 64).
  *
  * The note's `max`, text lengths and ranges are examples that the proof
  * plan owns. They are written as the note has them.
@@ -44,14 +44,15 @@
 
 import type { KeyId, MemberId, MemberObservation, Observation, ObservationRequest, PlatformData, PlatformDefinition, ScopeRef } from "@generalbusiness/artroom-contract";
 import { textDigest } from "@generalbusiness/artroom-bytes";
-import type { Item, RuleGiven, Rules, StateView } from "@generalbusiness/artroom-derive";
+import type { Item, PlatformRule, RuleGiven, Rules, StateView } from "@generalbusiness/artroom-derive";
 
 /** The name and version that this data and these rules are. An observation states it (section 3.3). */
 export const MEMBERSHIP = "platform:membership@1" satisfies PlatformDefinition;
 
 const KEY = { type: "text", max: 64 } as const;
 const HANDLE = { type: "text", max: 256 } as const;
-const ACTIONS = { type: "list", of: { type: "text", max: 64 }, max: 32 } as const;
+/** A list of actions: each of the five lists of the roster, and the field `actions` of `set-actions` (section 3.2, "The table, counted": 64 from revision 24). */
+const ACTIONS = { type: "list", of: { type: "text", max: 64 }, max: 64 } as const;
 const ROLE = { type: "enum", of: ["admin", "maintainer", "member", "agent", "checker"] } as const;
 const INVITATION = { inviteHash: { fixed: true, required: false, of: { type: "digest" } }, inviteEnds: { fixed: true, required: false, of: { type: "time" } } } as const;
 const ROSTER = { roster: { item: "roster", one: true } } as const;
@@ -91,6 +92,50 @@ export const ROLE_TABLE: readonly (readonly [actions: readonly string[], roles: 
 /** The actions that the table of section 3.2 gives one role, in the order of its rows. */
 export const actionsIn = (role: Role): string[] => ROLE_TABLE.flatMap(([actions, roles]) => (roles.includes(role) ? actions : []));
 
+const ISSUE_WORK = ["issue.open", "issue.comment", "issue.edit-own", "issue.close-own", "issue.revise", "issue.judge", "issue.request", "issue.promise", "issue.work"] as const;
+const ISSUE_PLAN = ["issue.plan", "issue.triage", "issue.edit-any"] as const;
+const CHANGE_WORK = ["change.open", "change.propose", "change.comment", "change.edit-own", "change.request", "change.promise", "change.work"] as const;
+const CHANGE_MERGE = ["change.edit-any", "change.dismiss", "change.merge"] as const;
+
+/**
+ * The first list of each role: the authority note's section 3.2, "The
+ * table, counted", row for row, with the names in the order of that table.
+ * An admin has 34 actions, a maintainer 25, a member 22, an agent 18 and a
+ * checker 2. It is a constant of version 1, and part of the rule
+ * `role-table` (section 12.1.8, row o). `ROLE_TABLE`, above, is the table
+ * that the note counts them from, and a test holds the two together.
+ */
+export const FIRST_ACTIONS: { readonly [role in Role]: readonly string[] } = {
+  admin: [
+    ...ISSUE_WORK, ...ISSUE_PLAN, ...CHANGE_WORK, "change.review", ...CHANGE_MERGE, "work.export", "task.control", "task.read-private",
+    "membership.invite", "membership.manage", "rules.publish", "rules.activate", "destination.adopt", "ledger.retry", "task.operate", "inbox.own",
+  ],
+  maintainer: [...ISSUE_WORK, ...ISSUE_PLAN, ...CHANGE_WORK, "change.review", ...CHANGE_MERGE, "task.operate", "inbox.own"],
+  member: [...ISSUE_WORK, ...CHANGE_WORK, "change.review", "work.export", "task.control", "task.read-private", "task.operate", "inbox.own"],
+  agent: [...ISSUE_WORK, ...CHANGE_WORK, "task.operate", "inbox.own"],
+  checker: ["change.check", "inbox.own"],
+};
+
+/**
+ * The form of a handle (section 3.1; section 12.1.8, rows q and r): `@`,
+ * and then at least one character, each a lowercase ASCII letter, a digit
+ * or a hyphen, with no hyphen first or last. The length is the field's own
+ * type, and is not judged here.
+ */
+export const isHandle = (value: unknown): value is MemberId => typeof value === "string" && /^@[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(value);
+
+/**
+ * The rule `handle-form` on one field (section 12.1.8, rows q and r; the
+ * contract's row P27): a guard at place 4. It holds when the field's text
+ * is a handle. Otherwise it refuses `bad-field`, named `bad-handle`. The
+ * register's version has its own rule of this name, with the same check,
+ * on its field `founderHandle`.
+ */
+export const handleForm = (field: string): PlatformRule => ({
+  place: "guard", refusals: ["bad-handle"],
+  run: ({ resolved }) => (isHandle(resolved.fields[field]) ? { holds: true } : { holds: false, name: "bad-handle", code: "bad-field" }),
+});
+
 /**
  * The `create` of a member's inbox (section 12.1, "Messages between scopes": the fields `owner` and `membership`). `of`: the member
  * item, when it is not the item that the entry opens. The note's rows state the send and no clause, so its result is recorded and
@@ -102,10 +147,23 @@ const inboxOf = (of?: "also.member") => ({
 
 /** The handle of a new member is unused (section 12.1.3, the row `invite-member`). */
 const HANDLE_UNUSED = { none: { type: "member", states: HANDLE_HELD, where: [{ equals: { a: { slot: "handle" }, b: { field: "handle" } } }] }, reason: "handle-in-use" } as const;
-/** Checks 7 of section 3.6, on the invitation that a mark of `also` selected: it is unused, and it has not ended. */
+/**
+ * Check 7 of section 3.6, on the invitation that a mark of `also` selected:
+ * it is unused, or `invitation-used`; and it has not ended, or
+ * `invitation-expired`. The timed end moves an ended invitation to `lapsed`
+ * before any act at or after its end time is judged, and it "changes no
+ * answer" (section 12.1.3). So a `lapsed` invitation is one that has ended,
+ * and is answered `invitation-expired` (the note's revision 24, section
+ * 13.14, entry EM16). The first guard passes the two states of an
+ * invitation that nobody used. The second is the row's guard on the end
+ * time. The third names a `lapsed` one, whatever the clock reads. It is
+ * also the guard that lists no final state, which the `state` effect on the
+ * invitation needs.
+ */
 const invitationOpen = (of: "also.member" | "also.key") => [
-  { state: ["invited"], of, reason: "invitation-used" },
+  { state: ["invited", "lapsed"], of, reason: "invitation-used" },
   { before: { slot: "inviteEnds" }, of, reason: "invitation-expired" },
+  { state: ["invited"], of, reason: "invitation-expired" },
 ] as const;
 
 export const membership: PlatformData = {
@@ -184,8 +242,8 @@ export const membership: PlatformData = {
         { value: { slot: "foundingHandle", from: { field: "founderHandle" } } },
         { value: { slot: "recoveryKey", from: { field: "recoveryKey" } } },
         { ref: { slot: "directory", from: { field: "directory" } } },
-        // "The role table of section 3.2 as its five lists." That table gives an admin 34 actions, and a list holds at most 32.
-        { code: "role-table", row: "EM6" },
+        // "The role table of section 3.2 as its five lists": the rule `role-table` sets them (row o).
+        { code: "role-table", row: "P10" },
       ],
       sends: [],
       attention: [],
@@ -202,13 +260,14 @@ export const membership: PlatformData = {
         { value: { slot: "handle", from: { slot: "foundingHandle", of: "also.roster" } } },
         { value: { slot: "kind", from: { const: "person" } } },
         { value: { slot: "role", from: { const: "admin" } } },
-        { code: "member-of", row: "EM7" },
+        { code: "member-of", row: "P26" },
       ],
       sends: [inboxOf()],
       attention: [],
     },
     // `first-key`: an act, signed by the founding key (Code P13 and P14). It opens the founding key as the first key of the seated
-    // member. The intent names that member, and the guard holds it to the founding handle (I3 deltas, entry EM10).
+    // member. The intent names that member, and the two guards hold it to the member that `seat` opened: `active`, with the founding
+    // handle. The note's revision 24 confirms this selection as built (its section 13.14, entry EM10).
     "first-key": {
       step: "open", on: "key", grant: { code: "founding-key", row: "P13" },
       also: { ...ROSTER, member: { item: "member", by: "member" } },
@@ -237,14 +296,14 @@ export const membership: PlatformData = {
         inviteHash: { type: "digest", required: true },
         inviteEnds: { type: "time", required: true },
       },
-      guards: [HANDLE_UNUSED, { code: "handle-form", row: "EM8" }],
+      guards: [HANDLE_UNUSED, { code: "handle-form", row: "P27" }],
       effects: [
         { value: { slot: "handle", from: { field: "handle" } } },
         { value: { slot: "kind", from: { const: "person" } } },
         { value: { slot: "role", from: { field: "role" } } },
         { value: { slot: "inviteHash", from: { field: "inviteHash" } } },
         { value: { slot: "inviteEnds", from: { field: "inviteEnds" } } },
-        { code: "member-of", row: "EM7" },
+        { code: "member-of", row: "P26" },
       ],
       sends: [],
       attention: [],
@@ -315,7 +374,7 @@ export const membership: PlatformData = {
       },
       guards: [
         HANDLE_UNUSED,
-        { code: "handle-form", row: "EM8" },
+        { code: "handle-form", row: "P27" },
         // For an agent, a controller is named and is an active person. A checker names none.
         {
           anyOf: [
@@ -336,7 +395,7 @@ export const membership: PlatformData = {
         { value: { slot: "role", from: { const: "agent" } }, if: [{ equals: { a: { field: "kind" }, b: { const: "agent" } } }] },
         { value: { slot: "role", from: { const: "checker" } }, if: [{ equals: { a: { field: "kind" }, b: { const: "checker" } } }] },
         { party: { slot: "controller", from: { field: "controller" } } },
-        { code: "member-of", row: "EM7" },
+        { code: "member-of", row: "P26" },
       ],
       sends: [inboxOf()],
       attention: [],
@@ -577,6 +636,38 @@ export const membershipRules: Rules = {
    * active. For a key it also holds when the key is not active, or the
    * member has another active key. Otherwise `last-admin`.
    */
+  /**
+   * Row o, among the effects of `establish` (P10). It reads nothing: the
+   * five lists are part of the rule. Five `value` effects on the roster that
+   * the entry opens, each list set whole, in the order of the note's table.
+   */
+  "role-table": {
+    place: "effect", most: 5,
+    run: ({ resolved }) => (Object.keys(ROLE_LISTS) as Role[]).map((role) => ({ effect: "value", item: resolved.self, slot: ROLE_LISTS[role], value: [...FIRST_ACTIONS[role]] })),
+  },
+  /**
+   * Row p, among the effects of `seat`, `invite-member` and `add-member`
+   * (P26). It reads the handle: for `seat`, `roster.foundingHandle`; for the
+   * two other rows, the field `handle`. And this scope's own reference. One
+   * `party` effect on the member that the entry opens: the slot `member` is
+   * the member reference of this scope and the handle, as the member's ID.
+   * It refuses nothing. A text that is no handle was refused before: by
+   * `handle-form` in the same entry, or by the register's at the founding.
+   * So a row with no such text is one that no judged entry reaches, and it
+   * is a fault of the rule: nothing is written.
+   */
+  "member-of": {
+    place: "effect", most: 1,
+    run: (given) => {
+      const { input, resolved, state } = given;
+      if (input.type !== "act") throw new Error("this rule stands in an act that opens a member");
+      const handle = input.signed.intent.kind === "seat" ? rosterOf(state)?.values["foundingHandle"] : resolved.fields["handle"];
+      if (!isHandle(handle)) throw new Error("the member that the entry opens has no handle");
+      return [{ effect: "party", item: resolved.self, slot: "member", member: { membership: resolved.at, member: handle } }];
+    },
+  },
+  /** Row q, among the guards of `invite-member` and `add-member` (P27), on the field `handle`. */
+  "handle-form": handleForm("handle"),
   "last-admin-kept": {
     place: "guard", refusals: ["last-admin"],
     run: (given) => {

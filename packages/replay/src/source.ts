@@ -54,7 +54,8 @@ export interface HistorySource {
   /** A page of the entries of a scope, from `from` on: `from`, `from + 1` and so on. `bytes`: the raw bytes that were read for it. */
   page(scope: ScopeId, from: number, allow: Allow): Promise<{ ok: true; page: Page; bytes: number } | Unread>;
   /** One retained input of a scope, by kind and digest. `bytes`: the raw bytes that were read for it. */
-  retained(scope: ScopeId, kind: RetainedInput["kind"], digest: Digest, allow: Pick<Allow, "bytes">): Promise<{ ok: true; input: RetainedInput; bytes: number } | Unread>;
+  /** `domain`: for the kind `value`, the byte domain that the value is kept under (section 9.2, revision 19). A read of one value asks by the kind, the domain and the digest. */
+  retained(scope: ScopeId, kind: RetainedInput["kind"], digest: Digest, allow: Pick<Allow, "bytes">, domain?: string): Promise<{ ok: true; input: RetainedInput; bytes: number } | Unread>;
 }
 
 /** The hash of an entry, from its stored bytes alone: SHA-256 over the entry domain's tag, a newline, and the bytes (section 2.1). */
@@ -130,6 +131,9 @@ export function httpSource(service: string, options: { fetch?: Fetch; reader?: s
       return { ok: true, page: { scope: value["scope"], head: at, entries, next: complete === false ? positionOf(next) : null }, bytes: got.bytes };
     },
     async retained(scope, kind, digest, allow) {
+      // I3 merge: the service has no route that reads one value by its domain, so a value is not read over HTTP: the replay of an
+      // entry that names one is `incomplete` here (I3 deltas, entry EX6).
+      if (kind === "value") return unread("not-found");
       const got = await get(`/v1/scopes/${scope}/retained/${kind}/${encodeURIComponent(digest)}`, Math.min(allow.bytes, RETAINED_REPLY_BYTES));
       if (!("body" in got)) return got;
       const value = got.body["value"];
@@ -166,8 +170,8 @@ export class MemorySource implements HistorySource {
     return Promise.resolve({ ok: true, page: { scope: held.scope, head: { seq: last.seq, hash: last.hash }, entries, next }, bytes });
   }
 
-  retained(scope: ScopeId, kind: RetainedInput["kind"], digest: Digest, allow: Pick<Allow, "bytes">): Promise<{ ok: true; input: RetainedInput; bytes: number } | Unread> {
-    const input = this.scopes.get(scope)?.retained.find((r) => r.kind === kind && r.digest === digest);
+  retained(scope: ScopeId, kind: RetainedInput["kind"], digest: Digest, allow: Pick<Allow, "bytes">, domain?: string): Promise<{ ok: true; input: RetainedInput; bytes: number } | Unread> {
+    const input = this.scopes.get(scope)?.retained.find((r) => r.kind === kind && r.digest === digest && (kind !== "value" || r.domain === domain));
     if (!input) return Promise.resolve(unread("not-found"));
     const bytes = utf8(input.bytes).length;
     return Promise.resolve(bytes > allow.bytes ? unread("too-large") : { ok: true, input, bytes });

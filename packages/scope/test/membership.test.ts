@@ -2,8 +2,7 @@ import { describe, expect, test } from "vitest";
 import type { Entry, Observation, ObservationUse } from "@generalbusiness/artroom-contract";
 import { textDigest } from "@generalbusiness/artroom-bytes";
 import { grantFrom } from "@generalbusiness/artroom-derive";
-import { MEMBERSHIP, actionsIn } from "@generalbusiness/artroom-platform";
-import { withStandIns } from "@generalbusiness/artroom-platform/testing";
+import { MEMBERSHIP, actionsIn, platform } from "@generalbusiness/artroom-platform";
 import { grantOf } from "@generalbusiness/artroom-derive/testing";
 import { MemorySource, TRUSTS, httpSource, platformCode, verify, type MemoryScope } from "@generalbusiness/artroom-replay";
 import { later, net, soon } from "./net.ts";
@@ -12,8 +11,8 @@ import { reader } from "./support.ts";
 import { platformNet } from "./worker.ts";
 
 // Every scope here is on real Durable Object storage, in the namespace `PLATFORM`, under the PRODUCTION authority: no test authority
-// and no scripted membership. Four things are stand-ins, as `repository.ts` lists them: three rules of membership, the office that
-// creates it, the lane that sends a notice, and the test readers.
+// and no scripted membership, with the platform package's own rules for membership and no other. Three things are stand-ins, as
+// `repository.ts` lists them: the office that creates it, the lane that sends a notice, and the test readers.
 
 /** The freshness proof that an entry retains in its grant: the observation, as the scope recorded it, and how it used it. */
 const proof = (entry: Entry): ObservationUse & { observation: Observation } => {
@@ -88,31 +87,32 @@ describe("authority on real scopes, under the production wiring (authority note,
   });
 
   // The whole-scope rule, on real scopes (the contract's section 6.1; witness 18.39, case 3). The control of the test above.
-  test("a version of membership that lacks a rule founds nothing: with the platform package's rules alone, as in production, and with one rule missing that the genesis does not meet, the creation is not decided, and the office keeps the duty until a runtime has every rule", async () => {
+  test("a version of membership that lacks a rule founds nothing: with one rule missing, of the genesis or of a later act that the genesis does not meet, the creation is not decided, and the office keeps the duty until a runtime has every rule, as the platform package's rules alone do", async () => {
     /** What became of the office's one request, and whether the scope that it asks for exists. */
     const created = async (O: Platform, M: Platform) => {
       const duties = await O.stub.outbox(reader);
       return [(await M.stub.summary(reader)).ok, duties.ok && duties.value.map((duty) => [duty.class, duty.result, duty.attempts.map((attempt) => attempt.answer)])];
     };
     try {
-      // The production wiring: the platform package has no rule for three marks of membership's data. The office is a declared
-      // definition, and is founded. Its `create` reaches the object that the seed names, which has no definition that it can run
-      // whole: transport's answer is `retry`, nothing is recorded, and the scope does not exist.
-      platformNet.standIns = false;
-      const production = await office();
-      expect(await created(production.O, production.M)).toEqual([false, [["request", null, ["retry"]]]]);
+      // A runtime that lacks the rule `role-table`, whose mark stands in the genesis act. The office is a declared definition, and
+      // is founded. Its `create` reaches the object that the seed names, which has no definition that it can run whole: transport's
+      // answer is `retry`, nothing is recorded, and the scope does not exist.
+      platformNet.without = "role-table";
+      const lacks = await office();
+      expect(await created(lacks.O, lacks.M)).toEqual([false, [["request", null, ["retry"]]]]);
       // One rule missing, `handle-form`, whose mark stands in two acts and not in the genesis act. The genesis act could be derived,
       // and the scope would then run under a part of its version. It is not founded either.
-      [platformNet.standIns, platformNet.without] = [true, "handle-form"];
+      platformNet.without = "handle-form";
       const { O, M } = await office();
       expect(await created(O, M)).toEqual([false, [["request", null, ["retry"]]]]);
-      // The same creation, sent again to a runtime that has a rule for every mark, is recorded.
+      // The same creation, sent again to a runtime with the platform package's rules and no other, as in production, is recorded:
+      // the package has a rule for every mark.
       platformNet.without = null;
       net.clock.now = soon(600);
       await settle(O, M);
       expect((await M.summary()).value.status).toBe("active");
     } finally {
-      [platformNet.standIns, platformNet.without] = [true, null];
+      platformNet.without = null;
     }
   });
 
@@ -143,7 +143,7 @@ describe("authority on real scopes, under the production wiring (authority note,
     await later(300);
     const third = await marks("mark-read", two);
     const anchors = [a, b].map(({ envelope }) => ({ scope: envelope.from.at.scope, seq: envelope.from.seq, hash: envelope.from.hash }));
-    const options = { mode: "replay", platform: withStandIns, anchors, grants: "proven" } as const;
+    const options = { mode: "replay", platform, anchors, grants: "proven" } as const;
 
     // The verifier reads each history as bytes, through the Worker's read routes, and derives every entry again. It shares no code
     // with the runtime but the judges, the fold and the platform package's data, rules and answer. No grant is taken as current:

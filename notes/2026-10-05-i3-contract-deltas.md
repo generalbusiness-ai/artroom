@@ -957,3 +957,79 @@ is in memory only.
 clock. The two clocks of a session are one scripted clock in the tests:
 they show each scope's comparison, and nothing about the difference
 between two real clocks.
+
+## 22. The source rows I3-31 to I3-38 of the contract's revision 19, and membership under its own rules
+
+Written 2026-10-05, by the worker of those rows. Entries have the prefix
+EX. The authority note is at revision 24 (`d5616522b`), which is adopted.
+The scope contract is at revision 19 (`1ca8a59bf`), which the checker has
+approved and the planner has **not yet adopted**. This source builds what
+revision 19 states, so that it can be filed after the adoption with
+whatever the adoption changes. Until then nothing of revision 19 is in
+force, and this work is not filed. The parts that rest on the adopted
+revision 24 alone are the three rules of membership, the register's guard
+and the answer to EM16. Everything else here rests on revision 19.
+
+No entry that an earlier source wrote has other bytes. Neither lane digest
+changes: `packages/lanes/test/definitions.test.ts` shows both pinned
+definitions with the same bytes, digest, reservations and static sizes at
+a list bound of 32 and of 64. The data of `platform:membership@1`,
+`platform:register@1` and `platform:directory@1` changes. A platform
+definition is pinned by name and version and no file pins a digest of it,
+and no scope under any of the three was written by a deployed source.
+
+**What is built, by row.**
+
+| Row | Built | Witness |
+|---|---|---|
+| I3-31 | `listElements` is 64: the most that the `max` of a list type may state. Each count reads the type's `max` or the bound. | `derive/test/validate.test.ts` (18.44, cases 1 to 3); `lanes/test/definitions.test.ts` (case 7) |
+| The authority note's rows o to r | `role-table`, `member-of` and `handle-form` are rules of `platform/src/membership.ts`, and the register has `handle-form` on `founderHandle`. The five lists hold 64. No stand-in rule of membership is left: `platform:membership@1` runs on the package's rules. | `platform/test/rules.test.ts`, `definitions.test.ts`, `register.test.ts`; `scope/test/membership.test.ts`, on real scopes under the production wiring |
+| I3-34 | A send mark may state `always`. A list holds several marks when at most one does not state it. The judge finds each form by counting. A rule with `always` that gives none has a fault. The directory's genesis holds the marks `create-rules` and `create-destination`. | `derive/test/forms-marks.test.ts` (18.45, cases 1 to 5); `platform/test/directory.test.ts` |
+| I3-32 | A field of type `digest` of an act may state `value: { domain, max }`, in platform data. The judge matches the value by those members at check 7, and a rule reads it by its field. | `derive/test/forms-marks.test.ts` (18.45, cases 6 and 7) |
+| I3-33 | The retained kind `value` with its member `domain`, in the contract and in the guard of `bytes`. A replay reads each value that a place names, and is `incomplete` without the bytes. **The store, and the scope's read of `values` before the turn, are not built: entry EX6.** | `replay/test/verify.test.ts` (18.45, case 8), in memory |
+| I3-35 | The rule that decides a further attempt is given what every rule is given. The owners' rules of a capability are given the state and the outcome as well. | `derive/test/forms-marks.test.ts` |
+| I3-36 | Not built, as the row says: it waits on the authority note's rows. | None |
+| I3-37 | Nothing to build. Each confirmed entry was read against the source: entry EX9. | None |
+| I3-38 | A request of a rule whose message has more fields than the bound on the fields of one send is a fault. | `derive/test/forms-marks.test.ts` |
+
+**Earlier entries that this work answers.** Each line is dated 2026-10-05.
+The earlier sections stay as they were written.
+
+- **EM6, closed.** The note's revision 24 keeps all 34 names and makes the lists 64. `role-table` is a rule of the package, with the five lists of its section 3.2, "The table, counted". The stand-in list of 30 is deleted.
+- **EM7, closed.** `member-of` is a rule of the package, at place 5, under the row P26.
+- **EM8, closed.** `handle-form` is a rule of the package, at place 4, under the row P27, refused `bad-field` and named `bad-handle`. The register has the same rule on `founderHandle`.
+- **EM10, closed.** The note's revision 24 confirms the selection as built. Nothing changed.
+- **EM16, closed for the answer.** A join on a `lapsed` invitation is answered `invitation-expired`. The written guards are the source's, until the note states them: entry EX3.
+- **EJ4, updated.** A list may hold several marks when at most one does not state `always` (the contract's revision 19, decision D19-7). The rule that every written send of such a list is always made exactly once stands.
+- **EP6, updated.** Decided by the contract's revision 19: several marks, and no operand for a sibling's scope ID. The directory's genesis holds both marks, and the creation of the rules scope carries `membership`. The two rules are still not written: entry EX4.
+- **EM1, updated.** The form is built: `value: { domain, max }` on the field. No platform data of this package states it yet, so the three rules that read a value still hold the domain and the bound in their code: entry EX5.
+- **EM4, updated.** The kind is built, and a replay without the bytes is `incomplete` for a value that a place names. No store keeps one yet: entry EX6.
+- **EM3, unchanged.** The scope still reads no `values` beside an intent: entry EX6.
+- **ER5, closed for its question to the contract, which is its part 3.** A retry rule is given the state. Parts 1, 2 and 4 of the entry are the authority note's, and stay open.
+
+| # | Where the texts differ or are silent | Implemented | Owner, and the question |
+|---|---|---|---|
+| EX1 | The contract's revision 19, section 15.3f, says of each of the three marks what it "states": `most: { effects: 5 }`, `most: { effects: 1 }` and `refusals: ["bad-handle"]`. That is the form of row I3-21, which this base does not have: here a mark is `{ code, row }`, and the rule table states `most` and `refusals` (entry EJ8). | The three marks are `{ code, row }`, with the rows P10, P26 and P27. Each rule states its `most` or its `refusals`, as every rule of this base does. | The I3 delivery, with row I3-21: the three marks gain the members when that row is built. |
+| EX2 | Row p says that `member-of` has no refusal: "A text that is no handle was refused before". It does not say what the rule does when it is given one all the same. A membership scope's `seat` reads the founding handle that its creator sent, and only the register's rule checked that one. | A fault of the rule: the input is not judged, and nothing is written. So no member is opened with an ID that is no handle. A membership scope whose creator sent a founding handle that is no handle can never seat its founder. | The authority note. Is a fault right there, or does `establish` check the founding handle? |
+| EX3 | Revision 24 answers EM16 for the name, and says "The written guard that says it is owed: this note's next revision." So no text states the guards. | Three guards on the invitation, in this order: its state is `invited` or `lapsed`, or `invitation-used`; the commit is before `inviteEnds`, or `invitation-expired`; its state is `invited`, or `invitation-expired`. So an invitation that was used is `invitation-used` also after its end time, and one that ended unused is `invitation-expired`. An invitation of a member that was later removed is `invitation-used`. The same three stand in `enrol`. | The authority note's next revision, to state the guards or to take these. |
+| EX4 | The contract's revision 19 states the form for two send marks in a genesis, and says that "the specification of the rule states the derivation" of a sibling's scope ID. The authority note's table of marks lists no rule for either send, and the contract's section 15.8 lists "`always` on the send marks of a genesis that creates its siblings, and how each rule derives a sibling's scope ID" as owed by that note. The name `create-rules` is in the contract's witness 18.45 only, on made-up data. | The directory's genesis holds a written `create` of membership, and the marks `create-rules` and `create-destination`, both with `always: true` and with the row `EP6`. The package has no rule for either, so `platform:directory@1` is still not runnable: three marks lack rules. The stand-ins of test support give each request, with a sibling's scope ID as the digest of the seed of creation 0 or 1. With them the real rules scope's genesis is written and records the ID. | The authority note's next revision: the two rows, with their names, `always`, and the derivation. |
+| EX5 | The contract's section 6.2 says "Which fields state the member is the specification's", and its section 15.8 lists those rows as owed by the authority note. "A place that requires a value and has none at hand is refused `bad-field`": it does not say which places require one. No text bounds `max`, but for a definition. | No data of the platform package states `value`. `keep-configuration`, `activate` and `definition-active` read a value by the stand-in reader `value(domain, digest, most)`, which stays, labelled. The new reader is `placed(field)`. Every place whose field the intent sets requires its value: with none at hand the act is refused `bad-field` at check 7, before any rule. The entry's draft names the value of each place, whether a rule read it or not. The validator takes the member on a field of an act only, of type `digest`, with a domain that is not empty and a `max` of at least 1, one `max` for one domain, and no `default`. It checks `max` against no bound. A value in `artroom-definition-1` is read as the kind `definition` in a replay. The closure of such a definition is not read as places. | The authority note, for the fields. The contract, to confirm "requires", and whether a place may have a default. R4, for a bound on `max`. |
+| EX6 | Row I3-33: "A scope keeps each value that an entry names." Row I3-32: "The scope bounds what it reads before the turn by those members." Section 9.2: "A read of one value asks by the kind, the domain and the digest." | **Not built.** `scope/src/core.ts` reads no `values` beside an intent and gives the judge none. No store keeps a value: `retained_input` is keyed by kind and digest, and a value needs its domain. No route reads one value, and the replay's HTTP source answers a read of the kind `value` as not found, so a replay over HTTP of an entry that names a value is `incomplete`. The reason it was left: no data of the package states a place, so no real scope could show the store or the read, and code with no witness was not added. The static size of an entry form does not count a place at its `max` either (section 17.2). EM2 is not needed for any of it. | The I3 delivery, when the authority note's rows state the fields: the read before the turn, a table for values, the read route with the domain, and the HTTP source. The capacity work `cc570904`, for the count. |
+| EX7 | Revision 19 says that the configured bound is the most that a list type's `max` may state, and that the `kind` list of a `fact` type holds at most the bound. The source reads the same configured value in two more places: a list of names in a form, such as the states of a guard, and the states of a `copy`. | All four read `listElements`, which is 64. No pinned row is near either number. | The contract's next revision: whether those two lists are this row's, or have a bound of their own. |
+| EX8 | Row I3-35 gives the retry rule "what every rule is given". The owners' rules of a capability are no platform rule, and `retries` of `hold@1` is the same member of the ledger's interface. | A platform rule's `retries` takes the six things as its third argument. The ledger's `retries` takes the state and the outcome as its third and fourth. No rule that exists reads either: each still answers a constant. So the destination's `abort-if-behind` (entry ER5, part 3) can now be written, and is not. | None for the form. The authority note, for the rule. |
+| EX9 | Row I3-37 lists 15 entries as built, by the word of this note, and says that no file was read for them. | Each was read against the source at this head, by a second reader, and six were read again by the worker (EN2, EN3, EN4, EN6, EL1 and EL2, with EL7 and EQ1 in the course of the work). No test was run for the check. 14 are as the contract confirms them. EP5 is confirmed in two parts and not traced in the third: no field type holds a signed intent, and the directory's data declares no field `founding`; that a `create` which carries one is refused was not traced. Two things were seen beside the rows, and neither contradicts one. For EM17: a `create` that a rule of a send mark returns is sent as the rule built it, so the platform adds `membership` to a written `create` only, and a creation that a genesis sends holds none (the contract leaves that one to the builder). For EN8: in a clause, any effect of a rule that a check would refuse leaves the clause with no effect, and the result is recorded; the opening past `max` is one case of that. | The builder, for the two observations: whether a `create` from a send mark's rule should be given `membership` by the judge, as a written one is. |
+| EX10 | The note's section 12.1.8 leaves one check to I3: whether the validator takes a constant list, so that the role table could be data. | Checked, for the validator only: membership's data with the mark replaced by five written `value` effects, each from a constant list, validates (`platform/test/definitions.test.ts`). No entry was derived from that data. The row stays a rule. | The authority note: whether to write the table as data. |
+
+**Lines for the merge.**
+
+- `RuleGiven` has one more member, `placed(field)`. A test that builds a `RuleGiven` by hand needs `placed: () => undefined`.
+- `OutcomeRule.retries` and `OperationRules.retries` take more arguments. A rule that ignores them is unchanged. A test that calls one with two arguments needs a third.
+- `HistorySource.retained` takes an optional fifth argument, `domain`.
+- `packages/platform/src/rules-scope.ts` is not touched. When the authority note states which of its fields name a value, its three reads become `placed(field)`, and the data states `value` on those fields.
+- `@generalbusiness/artroom-platform/testing` no longer exports `standIns`, `withStandIns`, `TASK_ACTIONS` or `isHandle`. It exports `lacking`, a control. The platform package exports `isHandle` and `FIRST_ACTIONS`.
+- `platformNet.standIns` of the scope package's test Worker is gone. `platformNet.without` names one rule of membership to leave out.
+
+**What was not run.** No deployment and no provider. No real scope holds
+data with a value place or with two send marks under the package's own
+rules: both are shown by derive's judges on made-up data, and the
+directory's two marks by stand-in rules. The gate was not run.

@@ -1,7 +1,7 @@
 /**
  * `platform:register@1`, as data, with its rules (authority note, revision
- * 21, sections 3.8 and 12.1.1; its table of marks, section 12.1.8, rows 2 to
- * 6 and c). One register for a deployment. It holds founding claims, and it
+ * 24, sections 3.8 and 12.1.1; its table of marks, section 12.1.8, rows 2 to
+ * 6, c and r). One register for a deployment. It holds founding claims, and it
  * owns one kind of outside effect: creating the repository at the Git host.
  * It is the one scope with no creator (the scope contract, section 7.1).
  *
@@ -17,6 +17,7 @@
  * | `founder-key` | 5, effect | 4 | `found` |
  * | `claim-seed` | 5, effect | 5 | `found` |
  * | `open-create-repository` | 5, effect | 6 | `found` |
+ * | `handle-form` | 4, guard | r (P27) | `found`, on the field `founderHandle` |
  * | `create-repository` | 7, outcome | c | The outcomes of that kind of operation |
  * | `revoke-credential` | 7, outcome | c | The same |
  * | `delete-repository` | 7, outcome | c | The same |
@@ -40,6 +41,7 @@
 import type { PlatformData, PlatformDefinition, PlatformEffect, Seed } from "@generalbusiness/artroom-contract";
 import { intentDigest, seedDigest } from "@generalbusiness/artroom-bytes";
 import type { RuleGiven, Rules, StateView } from "@generalbusiness/artroom-derive";
+import { handleForm } from "./membership.ts";
 
 /** The name and version that this data and these rules are. The `operation` effects of its rules state it as their owner. */
 export const REGISTER = "platform:register@1" satisfies PlatformDefinition;
@@ -147,7 +149,8 @@ export const register: PlatformData = {
         recoveryKey: { ...KEY, required: true },
         import: { type: "text", max: 2048, required: false },
       },
-      guards: [],
+      // The row's one guard (section 12.1.1, stated in revision 24): `founderHandle` is a handle, or `bad-field`, named `bad-handle`.
+      guards: [{ code: "handle-form", row: "P27" }],
       effects: [
         { value: { slot: "intent", from: { intent: true } } },
         { value: { slot: "branch", from: { field: "branch" } } },
@@ -227,6 +230,13 @@ export const registerRules: Rules = {
       return passes ? { pass: true, member: null } : { pass: false };
     },
   },
+  /**
+   * Row r, the guard of `found` (P27), on the field `founderHandle`: the
+   * register's own rule of this name, with the same check as membership's
+   * (section 3.1). A founding whose handle is no handle is refused
+   * `bad-field`, named `bad-handle`, and no claim is opened.
+   */
+  "handle-form": handleForm("founderHandle"),
   /** Row 4, among the effects of `found` (P14). One `value` effect: `founder` of the claim is the signing key. */
   "founder-key": {
     place: "effect", most: 1,

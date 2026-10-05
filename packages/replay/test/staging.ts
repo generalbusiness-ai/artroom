@@ -24,9 +24,9 @@
  */
 
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { Entry, Evidence, FieldValue, Grant, MemberId, MemberObservation, Observation, OperationId, PlatformDefinition, RetainedInput, Seed, SignedIntent, Timestamp } from "@generalbusiness/artroom-contract";
+import type { Digest, Entry, Evidence, FieldValue, Grant, MemberId, MemberObservation, Observation, OperationId, PlatformDefinition, RetainedInput, Seed, SignedIntent, Timestamp } from "@generalbusiness/artroom-contract";
 import { canonicalize, factRefOf, intentDigest, newIncarnation, scopeIdOf, signIntent, textDigest } from "@generalbusiness/artroom-bytes";
-import { RETIRE_ACTION, actionOf, clockOf, grantFrom, judgeDelivery, judgeGenesis, judgePreparation, settleOutcome } from "@generalbusiness/artroom-derive";
+import { RETIRE_ACTION, actionOf, clockOf, grantFrom, judgeDelivery, judgeGenesis, judgePreparation, settleOutcome, valueDigest } from "@generalbusiness/artroom-derive";
 import type { OutcomeRule, PlatformRules, Source } from "@generalbusiness/artroom-derive";
 import { Ledger, T0, d, directory, keys, membership, t, type Actor, type Context } from "@generalbusiness/artroom-derive/testing";
 import { cap, snapshots, staging } from "../../derive/test/fixtures-hold.ts";
@@ -151,6 +151,9 @@ export class Lane extends Ledger {
  */
 export const OWNER = "platform:task@1" as PlatformDefinition;
 
+/** A made-up byte domain, which the made-up data of a gate with a place declares. */
+const PROOF_DOMAIN = "gate-proof-1";
+
 /**
  * A scope under made-up platform data, founded by `rita`: derive's fixture
  * `gate`, whose act `enter` opens one operation `probe` by its rule
@@ -168,15 +171,28 @@ export class Gate extends Ledger {
   readonly rules: PlatformRules;
   #reads = 0;
 
-  /** `watched`: the guard rule of `enter` reads an observation of the member `@paul`, which the entry then retains in `observed`. */
-  constructor(derives: NonNullable<OutcomeRule["derives"]>, readonly watched = false) {
-    super(gateWith((data) => { data.name = "platform:task"; data.acts.enter.grant = "gate.enter"; }));
+  /** The value that the `issue` of a gate with a place names, with its made-up domain, its digest there and its canonical bytes. Null: the gate's data states no place. */
+  readonly proof: { domain: string; digest: Digest; bytes: string } | null;
+
+  /**
+   * `watched`: the guard rule of `enter` reads an observation of the member `@paul`, which the entry then retains in `observed`.
+   * `placed`: the act `issue` has a field `proof` that names a value, in a made-up domain with a bound of 64 bytes (the contract's
+   * revision 19, section 6.2), and the issue of entry 1 names one, which came beside its intent.
+   */
+  constructor(derives: NonNullable<OutcomeRule["derives"]>, readonly watched = false, placed = false) {
+    super(gateWith((data) => {
+      data.name = "platform:task";
+      data.acts.enter.grant = "gate.enter";
+      if (placed) data.acts.issue.fields.proof = { type: "digest", required: false, value: { domain: PROOF_DOMAIN, max: 64 } };
+    }));
+    const proof = { seat: 12 };
+    this.proof = placed ? { domain: PROOF_DOMAIN, digest: valueDigest(PROOF_DOMAIN, proof), bytes: canonicalize(proof) } : null;
     this.rules = Gate.rulesWith(derives, watched);
     const founding = signIntent({ v: 1, to: null, actor: keys.rita.key, kind: "found", on: null, expected: {}, fields: { opener: keys.rita.member }, idempotencyKey: "gate", notAfter: t(60) }, keys.rita.secret);
     const seed: Seed = { v: 1, kind: "directory", definition: OWNER, creator: null, cause: intentDigest(founding.intent), ordinal: 0 };
     const asked = { name: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(1)), seed, founding };
     this.seal(written(judgeGenesis(this.state, this.definition, asked, { clock: clockOf(this.state, T0), bounds: PROPOSED_BOUNDS, facts: [], prepared: [], source: null, platform: this.rules })).draft);
-    this.did(keys.rita, "issue", { fields: { hash: textDigest("one") } });
+    if (this.act(keys.rita, "issue", { fields: { hash: textDigest("one"), ...(this.proof ? { proof: this.proof.digest } : {}) } }, this.proof ? { values: [this.proof.bytes] } : {}).result !== "write") throw new Error("the issue was not written");
     const entered = this.did(keys.una, "enter", { on: 0, expected: { on: this.item(0).revision }, fields: { secret: "one" } });
     const judged = settleOutcome(this.state, this.definition, { type: "outcome", operation: `${entered.seq}:0`, attempt: 1, result: "confirmed", evidence: { basis: "own-answer", body: {} } }, { clock: clockOf(this.state, this.now), bounds: PROPOSED_BOUNDS, own: this.own, platform: this.rules });
     this.seal(written(judged).draft);
@@ -206,8 +222,9 @@ export class Gate extends Ledger {
     return super.context({ platform: this.rules, membership, ...(this.watched ? { observed: [{ observation: paul, read: { run: RUN, n: ++this.#reads }, use: "fresh", prior: null }] } : {}), ...over });
   }
 
+  /** What the scope's object would serve: its entries, and the value that entry 1 names, as one retained input of the kind `value` with its domain. */
   served(): MemoryScope {
-    return { scope: this.at, entries: this.entries.map(({ entry, hash }) => ({ seq: entry.seq, hash, bytes: canonicalize(entry) })), retained: [] };
+    return { scope: this.at, entries: this.entries.map(({ entry, hash }) => ({ seq: entry.seq, hash, bytes: canonicalize(entry) })), retained: this.proof ? [{ kind: "value", domain: this.proof.domain, digest: this.proof.digest, bytes: this.proof.bytes }] : [] };
   }
   anchors(): Anchor[] { return [{ scope: membership.scope, ...STANDING }]; }
 }

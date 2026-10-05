@@ -2,13 +2,14 @@ import { describe, expect, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { Digest, Entry, FieldValue, Grant, Input, MemberObservation, MemberRef, ObservationUse, RulesObservation, ScopeRef, Seed, Send } from "@generalbusiness/artroom-contract";
 import { canonicalize, definitionDigest, factRefOf, intentDigest, newIncarnation, parseStrict, scopeIdOf, seedDigest, signIntent } from "@generalbusiness/artroom-bytes";
-import { derivable, runnable, valueDigest, type Item, type Judgment, type OutcomeRule, type PlatformRule, type RuleGiven } from "@generalbusiness/artroom-derive";
-import { T0, desk, deskDefinition, t, ticket, ticketDefinition } from "@generalbusiness/artroom-derive/testing";
-import { DIRECTORY, directory, directoryMembership, directoryRules, platform } from "../src/index.ts";
+import { clockOf, derivable, judgeGenesis, runnable, valueDigest, type Item, type Judgment, type OutcomeRule, type PlatformRule, type RuleGiven } from "@generalbusiness/artroom-derive";
+import { Ledger, T0, creation, desk, deskDefinition, t, ticket, ticketDefinition } from "@generalbusiness/artroom-derive/testing";
+import { DIRECTORY, directory, directoryMembership, directoryRules, membershipId, platform } from "../src/index.ts";
+import { rules as rulesScopeRules, rulesScopeDefinition } from "./support-rules.ts";
 import { Directory, directoryDefinition, directoryStandIns, rita, sam, scripted, una, vic } from "./support-founding.ts";
 
 // Every directory here is a `Directory` of test support: a directory in memory that a SCRIPTED register created, with STAND-IN rules
-// for the two marks that the authority note's table of marks does not list, and with children and lanes whose entries are made by
+// for the three marks that the authority note's table of marks does not list, and with children and lanes whose entries are made by
 // hand. The rows and the nine rules that are tested are the platform package's. Nothing here shows a founding.
 
 const IMPORT = "https://git.example/elsewhere/repo.git";
@@ -36,7 +37,7 @@ const active = (d: Directory) => ({ observed: [rulesObserved(d.children.rules!, 
 type Row = readonly [seq: number, time: string, fields: Record<string, FieldValue>];
 
 // The plan's T43, for `platform:directory@1` (authority note, revision 21, section 12.1.2, and its table of marks, section 12.1.8).
-test("the directory definition validates whole with the platform option; every mark of the note's table has its rule; two marks that the table does not list have none, so the package's rules do not run it", () => {
+test("the directory definition validates whole with the platform option; every mark of the note's table has its rule; three marks that the table does not list have none, so the package's rules do not run it", () => {
   const valid = directoryDefinition;
   expect([valid.underived, derivable(valid, null), directory.capabilities, directory.rules, directory.timed]).toEqual([[], true, [], {}, {}]);
   // Section 12.1.2: three item types, the genesis `establish` with four acts, two handlers, and one kind of operation.
@@ -54,16 +55,18 @@ test("the directory definition validates whole with the platform option; every m
     [4, "acts.open-task.guards.0", "worker-standing", "P19"], [5, "acts.retry-import.effects.0", "reopen-import", "P16"],
     [5, "receives.index.effects.0", "index-row", "P15"], [5, "receives.index.effects.1", "index-number", "P17"], [7, "outcomes.import", "import", "P16"],
   ];
-  // Two places that the note's rows state, that no form can say, and that its table does not list. Each is a mark whose row is the
-  // entry of the I3 deltas note, and the package has no rule for it.
-  const unlisted = [[6, "acts.establish.sends.2", "create-destination", "EP6"], [4, "acts.retry-import.guards.0", "import-spent", "EP7"]];
+  // Three places that the note's rows state, that no form can say, and that its table does not list. Each is a mark whose row is
+  // the entry of the I3 deltas note, and the package has no rule for it. The genesis holds two send marks, which the contract's
+  // revision 19 lets a list hold when at most one does not state `always`: both state it (its section 6.1; witness 18.45).
+  const unlisted = [[6, "acts.establish.sends.1", "create-rules", "EP6"], [6, "acts.establish.sends.2", "create-destination", "EP6"], [4, "acts.retry-import.guards.0", "import-spent", "EP7"]];
+  expect(directory.acts["establish"]!.sends.map((send) => ("code" in send ? [send.code, send.always ?? false] : Object.keys(send)))).toEqual([["create"], ["create-rules", true], ["create-destination", true]]);
   expect(valid.marks.map((m) => [m.place, m.path, m.code, m.row]).sort()).toEqual([...listed, ...unlisted].sort());
   const { rules } = platform(DIRECTORY)!;
-  expect([rules === directoryRules, valid.marks.filter((mark) => !Object.hasOwn(rules, mark.code)).map((mark) => mark.code).sort()]).toEqual([true, ["create-destination", "import-spent"]]);
+  expect([rules === directoryRules, valid.marks.filter((mark) => !Object.hasOwn(rules, mark.code)).map((mark) => mark.code).sort()]).toEqual([true, ["create-destination", "create-rules", "import-spent"]]);
   // The whole-scope rule (the contract's section 6.1): a version with a mark and no rule runs nothing. With a stand-in for each of
-  // the two, of test support, it can be run, and without either it cannot.
+  // the three, of test support, it can be run, and without any one of them it cannot.
   expect([runnable(valid, rules), runnable(valid, { ...rules, ...directoryStandIns }), ...Object.keys(directoryStandIns).map((lost) => runnable(valid, { ...rules, ...directoryStandIns, [lost]: undefined as never }))])
-    .toEqual([false, true, false, false]);
+    .toEqual([false, true, false, false, false]);
 });
 
 // The plan's T50, the directory's table: each rule of `platform:directory@1` as a plain function, from its row of the note's table
@@ -77,12 +80,13 @@ describe("the rules of platform:directory@1, each as a plain function (authority
   const lane: ScopeRef = { scope: d.at.scope, inc: newIncarnation(new Uint8Array(16).fill(50)), kind: "lane" };
   const next = d.head.seq + 1;
   /** What is at hand: the further observations, and the values, by their canonical bytes. A value is matched by its digest in its domain. */
-  const hand = (observed: readonly ObservationUse[], values: readonly string[]): Pick<RuleGiven, "observed" | "value"> => ({
+  const hand = (observed: readonly ObservationUse[], values: readonly string[]): Pick<RuleGiven, "observed" | "value" | "placed"> => ({
+    placed: () => undefined,
     observed: (subject) => observed.find(({ observation: o }) => "subject" in o && ("asked" in subject ? o.subject === "rules" && o.content.asked === subject.asked : "member" in subject && o.subject === "member" && o.member === subject.member)) ?? null,
     value: (domain, digest) => values.map((bytes) => parseStrict(bytes)).find((value) => valueDigest(domain, value) === digest),
   });
   /** What a rule is given for an act of rita at that directory. */
-  const given = (s: Directory, kind: string, fields: Record<string, FieldValue> = {}, at: Pick<RuleGiven, "observed" | "value"> = hand([], []), grant: Grant | null = null): RuleGiven => ({
+  const given = (s: Directory, kind: string, fields: Record<string, FieldValue> = {}, at: Pick<RuleGiven, "observed" | "value" | "placed"> = hand([], []), grant: Grant | null = null): RuleGiven => ({
     state: s.state, input: { type: "act", signed: s.intent(rita, kind, { fields }), grant, presented: {} }, time: s.now, uses: [], own: s.own,
     resolved: { at: s.at, self: s.head.seq + 1, fields, subjects: new Map<string, Item>([["also.repository", s.item(0)]]), signer: { member: rita.member, principal: null }, bounds: PROPOSED_BOUNDS },
     ...at,
@@ -165,7 +169,7 @@ describe("the rules of platform:directory@1, each as a plain function (authority
     // Row d: basis `own-answer`, so no read is decisive; it selects nothing; another attempt may follow.
     const { rules: outcome } = directoryRules["import"] as { rules: OutcomeRule };
     const formed = (body: unknown) => outcome.wellFormed!("confirmed", { basis: "own-answer", body });
-    expect([outcome.selects, outcome.read, outcome.retries("refused", null as never), outcome.closure]).toEqual([false, false, true, undefined]);
+    expect([outcome.selects, outcome.read, outcome.retries("refused", null as never, null as never), outcome.closure]).toEqual([false, false, true, undefined]);
     expect([formed({ commit: "a".repeat(40) }), formed({ commit: "b".repeat(64) }), formed({ commit: "main" }), formed({ commit: "a".repeat(40), more: 1 }), formed(null), outcome.wellFormed!("refused", { basis: "own-answer", body: null })])
       .toEqual([true, true, false, false, false, true]);
   });
@@ -186,12 +190,26 @@ test("a directory's genesis, by an outcome entry of its register, opens the repo
     { repository: { host: "git.example", namespace: "artroom", name: "repo-1", id: "r-1" }, branch: "main", founder: rita.key, founderHandle: "@rita", recoveryKey: sam.key, import: null, imported: null, lastNumber: 0 },
   ]);
   // Three creations, in the order membership, rules, destination, each with the digest of the directory's seed as its cause. The
-  // result is at ordinal 0, and the three are sealed as duties and held. The third is by the STAND-IN rule.
+  // result is at ordinal 0, and the three are sealed as duties and held. The second and the third are by STAND-IN rules, at two
+  // send marks that both state `always`: each creation is at the position of its form.
   const cause = seedDigest(genesis.seed);
   expect(p.last.sends.slice(1).map((send) => { const to = send.to as Seed; return [send.n, to.kind, to.definition, to.ordinal, to.cause === cause, to.creator]; })).toEqual([
     [1, "membership", "platform:membership@1", 0, true, p.at], [2, "rules", "platform:rules@1", 1, true, p.at], [3, "destination", "platform:destination@1", 2, true, p.at],
   ]);
   expect((p.last.sends[1]!.message as { body: unknown }).body).toEqual({ fields: { founder: rita.key, founderHandle: "@rita", recoveryKey: sam.key, directory: p.at } });
+  // The creation of the rules scope carries its `membership` field: the scope ID of the sibling that creation 0 asks for, which is
+  // the digest of that seed (the contract's revision 19, section 6.1: no operand, the rule of the send mark gives it).
+  expect((p.last.sends[2]!.message as { body: unknown }).body).toEqual({ fields: { branch: "main", directory: p.at, membership: scopeIdOf(p.last.sends[1]!.to as Seed) } });
+  // The real rules scope takes that creation: its genesis is written under `platform:rules@1`, with the package's own rules, and it
+  // records the membership scope's ID, which its data requires.
+  const founds = () => {
+    const child = new Ledger(rulesScopeDefinition, "platform:rules");
+    const { asked, source } = creation(p, 0, 2);
+    const judgment = judgeGenesis(child.state, rulesScopeDefinition, asked, { clock: clockOf(child.state, T0), bounds: PROPOSED_BOUNDS, facts: [], prepared: [], source, platform: rulesScopeRules });
+    if (judgment.result === "write") child.seal(judgment.draft);
+    return [judgment.result, judgment.result === "write" ? membershipId(child.state) : null];
+  };
+  expect(founds()).toEqual(["write", scopeIdOf(p.last.sends[1]!.to as Seed)]);
   expect([p.state.scope()!.status, p.state.scope()!.held, directoryMembership(p.state)]).toEqual(["provisional", [1, 2, 3], null]);
   // Case a: any act before the register's `confirm` is recorded.
   expect(said(p.act(rita, "open-issue", opening(p)))).toEqual(["unavailable", "scope-provisional", null]);

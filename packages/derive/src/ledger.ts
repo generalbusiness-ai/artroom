@@ -74,8 +74,12 @@ export interface OperationRules {
   selects: boolean;
   /** Item 4: a read of the outside system is decisive for this kind. Rule 3: it never is for a create. */
   read: boolean;
-  /** Item 2: the owner's retry rule. Rule 7 and section 17.3: it is not given the scope's free room, so it cannot read it. */
-  retries(result: "refused" | "unknown", operation: Operation): boolean;
+  /**
+   * Item 2: the owner's retry rule. Rule 7 and section 17.3: it is not given the scope's free room, so it cannot read it. From the
+   * scope contract's revision 19 (section 6.1, "A rule that decides a further attempt is given the state"; row I3-35) it is given
+   * the folded state before the outcome entry, and the outcome as the judge sets it, as every rule of the entry is.
+   */
+  retries(result: "refused" | "unknown", operation: Operation, view: StateView, outcome: OutcomeInput): boolean;
   /** Item 7: the owner's local guard for a selection. Absent: it holds. */
   holds?(view: StateView, operation: Operation, outcome: OutcomeInput): boolean;
   /**
@@ -353,7 +357,7 @@ export function outcomeOf(view: StateView, definition: ValidDefinition, outcome:
   // allows another, fewer than the stated number are opened and nothing is selected. Rule 7: none is opened beyond the stated
   // number, and nothing here reads the scope's free room. The room was reserved by the entry that opened the operation.
   const last = attempt.attempt === operation.attempts.length;
-  const next = result !== "confirmed" && last && operation.attempts.length < operation.most && operation.selected === null && rules.retries(result, operation);
+  const next = result !== "confirmed" && last && operation.attempts.length < operation.most && operation.selected === null && rules.retries(result, operation, view, input);
   const derived = rules.derives?.(view, operation, input, selected, { opens: next ? attempt.attempt + 1 : null, definition }) ?? { effects: [], sends: [], opens: [] };
   // Section 17.2, row 5: an outcome entry is never asked whether it fits (section 17.3), so what it opens was reserved with its own
   // operation, as the closure that the owner declares. An owner whose outcome would open more has broken its own declaration:
