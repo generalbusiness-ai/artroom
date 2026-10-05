@@ -63,10 +63,14 @@ export const standIns: Rules = {
   },
 };
 
-/** The platform definitions of this package, with the stand-in rules added to membership's. Every other definition is as the package supplies it. */
-export const withStandIns = (named: PlatformDefinition): Platform | null => {
+/**
+ * The platform definitions of this package, with the stand-in rules added to membership's. Every other definition is as the package
+ * supplies it. `without`: the name of one stand-in rule to leave out, for a version that lacks one rule.
+ */
+export const withStandIns = (named: PlatformDefinition, without: string | null = null): Platform | null => {
   const supplied = platform(named);
-  return supplied && named === MEMBERSHIP ? { ...supplied, rules: { ...supplied.rules, ...standIns } } : supplied;
+  const added = Object.fromEntries(Object.entries(standIns).filter(([name]) => name !== without));
+  return supplied && named === MEMBERSHIP ? { ...supplied, rules: { ...supplied.rules, ...added } } : supplied;
 };
 
 /**

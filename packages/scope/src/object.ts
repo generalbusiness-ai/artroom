@@ -20,7 +20,7 @@
 
 import { DurableObject } from "cloudflare:workers";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { Answer, Beside, Bounds, Cursor, DeclaredDefinition, Digest, DutyId, Grant, LogPage, OperationId, PlatformDefinition, Read, RetainedInput, ScopeId, Settlement, SignedIntent } from "@generalbusiness/artroom-contract";
+import type { Answer, Beside, Bounds, Cursor, DeclaredDefinition, Digest, DutyId, Entry, Grant, Input, LogPage, OperationId, PlatformDefinition, Read, RetainedInput, ScopeId, Settlement, SignedIntent } from "@generalbusiness/artroom-contract";
 import { isScopeId } from "@generalbusiness/artroom-bytes";
 import { timeMs, type Item } from "@generalbusiness/artroom-derive";
 import type { Delivered } from "@generalbusiness/artroom-derive";
@@ -29,13 +29,23 @@ import { Deliveries } from "./delivery.ts";
 import { declaredBy, observedAt, routed, sentText, sourced, type Sourced } from "./namespace.ts";
 import { Operations } from "./operations.ts";
 import { Dispatcher, Wakes } from "./outbox.ts";
-import { production, type Alarm, type Delivery, type Ports } from "./ports.ts";
+import { production, type Alarm, type Authority, type Delivery, type Ports } from "./ports.ts";
 import { READ_BOUNDS, Reads, type ReadBounds, type Summary } from "./reads.ts";
 import { SqliteStore } from "./sqlite.ts";
 import type { Duty, OperationStatus, Sealed } from "./store.ts";
 
-/** What a deployment gives a scope in place of a default. */
-export interface Wiring { ports?: Partial<Ports>; bounds?: Bounds; reads?: ReadBounds }
+/**
+ * What a deployment gives a scope in place of a default. `authority`: the
+ * authority port, made once for the life of the object, which is one run
+ * (authority note, section 3.3). It is made after the store, because a
+ * scope reads its membership reference from its own genesis entry (the
+ * contract's section 6.6). It is given the clock and the random source of
+ * the ports as wired. With it, `ports.authority` is not used.
+ */
+export interface Wiring {
+  ports?: Partial<Ports>; bounds?: Bounds; reads?: ReadBounds;
+  authority?: (given: Pick<Ports, "clock" | "random"> & { genesis(): Extract<Input, { type: "genesis" }> | null }) => Authority;
+}
 
 export class ScopeObject<Env = unknown> extends DurableObject<Env> {
   readonly #name: ScopeId | null;
@@ -63,7 +73,14 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
     const given: Ports = { ...production(), alarm, ...wiring.ports };
     // The one alarm serves the earliest deadline, the next attempt of an outside operation and, with a transport, the next dispatch.
     const wakes = new Wakes(store, given.alarm, given.transport !== null);
-    const ports: Ports = { ...given, alarm: wakes.deadline };
+    // The authority of a deployed scope reads this scope's own genesis entry, for the membership scope that it records.
+    const genesis = (): Extract<Input, { type: "genesis" }> | null => {
+      const kept = store.stored(0);
+      const input = kept ? (JSON.parse(kept.bytes) as Entry).input : null;
+      return input?.type === "genesis" ? input : null;
+    };
+    const authority = wiring.authority?.({ clock: given.clock, random: given.random, genesis });
+    const ports: Ports = { ...given, alarm: wakes.deadline, ...(authority ? { authority } : {}) };
     this.#name = isScopeId(name) ? name : null;
     this.#store = store;
     this.#scope = new Scope(this.#name, store, ports, bounds);

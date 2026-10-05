@@ -32,9 +32,10 @@
  * the same key, which records the reuse and the entry before it.
  */
 
-import type { Digest, Entry, KeyId, Observation, ObservationRequest, ObservationUse, RunId, ScopeRef } from "@generalbusiness/artroom-contract";
+import type { Digest, Entry, Input, KeyId, Observation, ObservationRequest, ObservationUse, RunId, ScopeRef } from "@generalbusiness/artroom-contract";
 import { hex } from "@generalbusiness/artroom-bytes";
-import { highestHead, judgeGrant, observationOf, prefer, revoked, same, type Clock as Reading, type GrantJudgment, type Retains, type StateView } from "@generalbusiness/artroom-derive";
+import { WINDOWS, highestHead, judgeGrant, membershipOf, observationOf, prefer, revoked, same, type Clock as Reading, type GrantJudgment, type Retains, type StateView } from "@generalbusiness/artroom-derive";
+import { standingOf } from "@generalbusiness/artroom-platform";
 import type { Asked, Authority, Clock, Random, Standing } from "./ports.ts";
 
 /**
@@ -161,4 +162,84 @@ export function observing(config: Observing): Authority {
       };
     },
   };
+}
+
+/**
+ * The authority port of a membership scope, for its own acts (authority
+ * note, section 3.1, and section 3.3, the last row of the table of windows).
+ * Membership judges its own acts on its own head. Nothing is read: the
+ * commit builds the observation from the folded state at the head before
+ * the entry, with `at` as the commit's reading and the use `fresh`. Its age
+ * is zero, and it serves that one commit. The value is the one that the
+ * scope answers to any other scope at that head (`standingOf`), so a replay
+ * derives it from the same history.
+ *
+ * Each act takes the next number of the run, as a read does, so no two
+ * entries hold one read as `fresh`. An act whose row names no action is
+ * judged on no grant, and nothing is built for it.
+ */
+export function ownStanding(random: Random): Authority {
+  const run: RunId = hex(random.bytes(16));
+  let count = 0;
+  return {
+    read(asked: Asked): Promise<Standing | null> {
+      const { scope, action } = asked;
+      if (action === null) return Promise.resolve(null);
+      const key = asked.signed.intent.actor;
+      const n = ++count;
+      return Promise.resolve({
+        membership: scope,
+        held(view, clock) {
+          const observation = observationOf(standingOf(view, { of: scope, key }), clock.reading);
+          // No answer: the scope is not an active membership scope at this head, so no grant rests on it (section 12.1.3, case e).
+          if (!observation) return null;
+          const use: ObservationUse = { observation, read: { run, n }, use: "fresh", prior: null };
+          const result = judgeGrant(use, { scope, membership: scope, key, action, window: WINDOWS.once, clock, last: null, highest: highestHead(view, observation) });
+          return result.result === "current" ? [{ grant: result.grant, current: true }] : result.result === "unauthorized" ? [] : null;
+        },
+      });
+    },
+  };
+}
+
+/** What the authority port of a deployed scope is given. */
+export interface Repository {
+  /** The scope's own clock, and the source of the run's random value. */
+  clock: Clock;
+  random: Random;
+  /** The input of the scope's genesis entry, from its own history. Null: it has no genesis yet. */
+  genesis(): Extract<Input, { type: "genesis" }> | null;
+  /** How a membership scope is read: one call on the object that the reference names (`membershipIn`). */
+  reader: Membership;
+}
+
+/**
+ * The production authority of one scope of a repository (authority note,
+ * section 3.3, "Where it records its membership reference").
+ *
+ * - A membership scope judges its own acts on its own head: `ownStanding`.
+ * - Every other scope reads the membership scope that its own genesis
+ *   records, with that incarnation: the member `membership` in the body of
+ *   its `create` (the contract's section 6.6; derive's `membershipOf`). It
+ *   is read from the scope's own history, and from no request, no answer
+ *   and no intent. A scope whose genesis records none reads nothing, and an
+ *   act that needs a grant is then answered `authority-unavailable`.
+ *
+ * No grant that is presented beside an intent is read: authority is what
+ * the membership scope answers, and nothing a caller brings.
+ *
+ * I3 merge: three kinds of scope record their membership reference in
+ * another place, which the steps of their definitions build. A directory
+ * holds it in its slot `repository.membership`. The rules scope and the
+ * destination hold the membership scope's ID from their creation, and fix
+ * the incarnation in the first entry that retains an observation. Until
+ * then such a scope reads nothing here.
+ */
+export function repositoryAuthority(config: Repository): Authority {
+  const own = ownStanding(config.random);
+  const observed = observing({
+    clock: config.clock, random: config.random, reader: config.reader,
+    membership: (scope) => { const genesis = config.genesis(); return genesis ? membershipOf(genesis, scope) : null; },
+  });
+  return { read: (asked, seconds) => (asked.scope.kind === "membership" ? own : observed).read(asked, seconds) };
 }

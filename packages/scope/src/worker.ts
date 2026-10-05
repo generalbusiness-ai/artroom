@@ -12,8 +12,12 @@
  *   which a client's transport also is.
  * - `DeployedScope`: the scope's object class as it is deployed, with the
  *   namespace as its resolver, its transport and its source of
- *   declarations. Its authority and readers ports are the production
- *   defaults, which refuse.
+ *   declarations. Its authority is the production authority of a
+ *   repository: a membership scope judges its own acts on its own head, and
+ *   every other scope reads the membership scope that its genesis records,
+ *   through the namespace. No grant that a caller presents is read. Its
+ *   readers port is the production default, which refuses every reader:
+ *   read sessions are not built (authority note, section 3.9).
  *
  * Nothing here reaches a test port. A test builds its own Worker from
  * `route`, and its own classes from these, in its own files.
@@ -35,6 +39,9 @@
  *
  * A reader presents itself in the `Authorization` header. What it must be is
  * the authority note's; the production readers port lets nobody read.
+ *
+ * An object also answers `observe`, to another object of the namespace: the
+ * observation read of a membership scope. It has no route here.
  */
 
 import { WorkerEntrypoint } from "cloudflare:workers";
@@ -42,7 +49,8 @@ import type { Answer, Beside, Cursor, DeclaredDefinition, Digest, DutyId, Grant,
 import { definitionDigest, intentDigest, isScopeId, positionOf, scopeIdOf } from "@generalbusiness/artroom-bytes";
 import { isObject, type Item } from "@generalbusiness/artroom-derive";
 import type { Founded } from "./core.ts";
-import { namespace, type Binding } from "./namespace.ts";
+import { repositoryAuthority } from "./authority.ts";
+import { membershipIn, namespace, type Binding } from "./namespace.ts";
 import { ScopeObject, type Wiring } from "./object.ts";
 import type { Summary } from "./reads.ts";
 import type { Duty, Sealed } from "./store.ts";
@@ -198,13 +206,18 @@ export async function route(request: Request, binding: Binding): Promise<Respons
 
 /**
  * The scope's object as deployed: the namespace is its resolver, its
- * transport and its source of declarations. Every other port is the
- * production default.
+ * transport and its source of declarations, and how it reads its membership
+ * scope. Its authority is `repositoryAuthority`: a real observation, read
+ * before the turn from the membership scope that the scope's own genesis
+ * records, or for a membership scope its own head. Every other port is the
+ * production default. So no reader may read until read sessions are built.
  */
 export class DeployedScope<E extends Env = Env> extends ScopeObject<E> {
   /** The one scope namespace. */
   protected scopes(): Binding { return this.env.SCOPES; }
-  protected override wiring(_name: string | undefined): Wiring { return { ports: namespace(this.scopes()) }; }
+  protected override wiring(_name: string | undefined): Wiring {
+    return { ports: namespace(this.scopes()), authority: (given) => repositoryAuthority({ ...given, reader: membershipIn(this.scopes()) }) };
+  }
 }
 
 /** The same operations over a service binding. */

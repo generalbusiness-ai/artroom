@@ -20,6 +20,7 @@
 
 import type { Grant, Head, KeyId, Observation, ObservationUse, ScopeFilter, ScopeKind, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
 import { isHead, isKeyId, isMemberId, isPlatformDefinition, isRecord, platformName } from "@generalbusiness/artroom-bytes";
+import { actionOf } from "./marks.ts";
 import type { StateView } from "./state.ts";
 import { timeMs, type Clock } from "./time.ts";
 import type { ValidDefinition } from "./validate/index.ts";
@@ -33,23 +34,28 @@ export const WINDOWS = { ordinary: { seconds: 300, once: false }, once: { second
 
 /**
  * The window of an act of that kind in a scope of that kind, under that
- * definition (authority note, section 3.3, the table of windows). Null: no
- * adopted text states one, and the act is then judged on no observation.
+ * definition (authority note, revision 21, section 3.3: the table of nine
+ * rows, and the four rows that it adds). Null: nothing is read for the act,
+ * or no window is built for it here, and the act is then judged on no
+ * observation of another scope.
  *
- * - Taking or renewing a hold: ten seconds. A declared definition takes or
- *   renews a hold by an act with a `hold` effect that opens or renews
- *   (section 6.8), so the act is known from the definition (I3 deltas,
- *   entry ED3).
- * - Any other act in a lane, the directory or an inbox: 300 seconds.
+ * - A ten-second kind is read from the row's forms, and never from its
+ *   name: the row has a `hold` effect that opens or renews (section 6.8),
+ *   or its `grant` is `work.export` or `change.check` (I3 deltas, entry
+ *   ED3).
+ * - Any other act that is judged on a grant, in a lane, the directory, an
+ *   inbox, the rules scope or the destination: 300 seconds.
+ * - An act of membership: none, and no read. Membership judges its own acts
+ *   on its own head (section 3.1). An act of the register: none.
  */
 export function windowOf(definition: ValidDefinition, kind: ScopeKind, act: string): Window | null {
   const row = own(definition.declared.acts, act);
-  if (!row) return null;
-  if (row.effects.some((effect) => "hold" in effect && effect.hold.do !== "end")) return WINDOWS.once;
-  // I3 merge: the authority note's revision 20, adopted since this was written, restates this as a table of entries. It adds the 300
-  // seconds of an act in membership and in the rules scope, and the 60 seconds and the named acts of a task scope. Revision 18 states
-  // a window for none of them, so each is still null here (I3 deltas, entry ED4). Those windows are owed.
-  return kind === "lane" || kind === "directory" || kind === "inbox" ? WINDOWS.ordinary : null;
+  if (!row || kind === "membership" || kind === "register") return null;
+  const action = actionOf(row);
+  if (row.effects.some((effect) => "hold" in effect && effect.hold.do !== "end") || action === "work.export" || action === "change.check") return WINDOWS.once;
+  // I3 merge: the windows of a task scope are IA's, with its definition: 60 seconds for a control, and 10 for the acts that the table
+  // names. None is stated here, so nothing is read for an act of a task scope.
+  return kind === "task" ? null : WINDOWS.ordinary;
 }
 
 /** True when the answer can never become untrue: the key is revoked, or its member is removed (authority note, section 3.3, G10). */
