@@ -6,8 +6,9 @@
  * `Status`, are the contract's, and are exported here again.
  */
 
-import type { Digest, FactRef, Head, Incarnation, Item, KeyId, OperationId, Party, Request, ScopeKind, ScopeRef, Seed, Status, Timestamp } from "@generalbusiness/artroom-contract";
+import type { CapabilityName, Digest, FactRef, Head, Incarnation, Item, KeyId, OperationId, Party, PlatformDefinition, Request, ScopeKind, ScopeRef, Seed, Status, Timestamp } from "@generalbusiness/artroom-contract";
 import { canonicalBytes, canonicalize, digestBytes } from "@generalbusiness/artroom-bytes";
+import { pendingOf } from "./ledger.ts";
 import { byteOrder } from "./values.ts";
 
 export type { Item, Party, Status };
@@ -53,18 +54,43 @@ export interface HeldCreation { inc: Incarnation; seq: number }
  */
 export interface Decided { from: Pick<ScopeRef, "scope" | "inc">; seq: number; hash: Digest; n: number; by: number }
 
-/** One numbered attempt of an operation that writes outside the service: the entry that opened it and its outcome, if recorded (section 4.3). */
-export interface AttemptState { attempt: number; opened: number; outcome: { seq: number; result: "confirmed" | "refused" | "unknown" } | null }
-export interface Operation { id: OperationId; attempts: readonly AttemptState[] }
+/**
+ * One recorded outcome of an attempt (section 4.3): the entry that holds it,
+ * its result, the digest of its evidence, and `selected` as that entry
+ * derived it. The evidence itself is in the entry.
+ */
+export interface OutcomeState { seq: number; result: "confirmed" | "refused" | "unknown"; evidence: Digest; selected: boolean | null }
+
+/**
+ * One numbered attempt of an operation that writes outside the service: the
+ * entry that opened it, and its outcomes in the order recorded (section 4.3,
+ * item 3). It has at most two. The second is the late answer, and follows
+ * only an `unknown`, which stays as it was written.
+ */
+export interface AttemptState { attempt: number; opened: number; outcomes: readonly OutcomeState[] }
+
+/**
+ * One operation (section 4.3): its ID, which is the entry that opened it and
+ * its ordinal there; its owner and kind; `most`, the most attempts its owner
+ * allows; the attempts opened so far, in order from 1; and `selected`, the
+ * number of the attempt whose result was selected, which is set once and
+ * never moves (item 7). An operation with no attempt is a held duty of a
+ * provisional scope's genesis (item 1).
+ */
+export interface Operation {
+  id: OperationId; owner: CapabilityName | PlatformDefinition; kind: string; most: number;
+  attempts: readonly AttemptState[]; selected: number | null;
+}
 
 /**
  * The duties that are open and are not items (section 9.2). `requests`: sent
  * requests with no result and no diagnosis. `unavailable`: those with a
- * `delivery-unavailable` diagnosis and no result. `opened`: attempts of
- * outside operations with no outcome. `unknown`: attempts whose outcome is
- * `unknown`.
+ * `delivery-unavailable` diagnosis and no result. Of the operations that are
+ * not settled (`pendingOf`, in `ledger.ts`): `opened`, attempts with no
+ * outcome; `unknown`, attempts whose latest outcome is `unknown`; and
+ * `unopened`, attempts that may still be opened.
  */
-export interface Outstanding { requests: number; unavailable: number; opened: number; unknown: number }
+export interface Outstanding { requests: number; unavailable: number; opened: number; unknown: number; unopened: number }
 
 /** Items in ascending ID order. `more`: the page stopped at its limit and at least one further item follows. */
 export interface Page { items: readonly Item[]; more: boolean }
@@ -84,7 +110,7 @@ export interface StateSnapshot {
   requests: readonly OwnRequest[];                                      // by seq, then n
   decided: readonly Decided[];                                          // by source scope, incarnation, seq, n
   creations: readonly (readonly [seed: Digest, held: HeldCreation])[];  // by seed digest
-  operations: readonly Operation[];                                     // by ID
+  operations: readonly Operation[];                                     // by the entry that opened each, then its ordinal there
   texts: readonly (readonly [item: number, slot: string, texts: readonly Digest[]])[];   // by item, then slot; a slot that holds none is left out
 }
 
@@ -221,10 +247,11 @@ export class MemoryState implements StateWriter {
   texts(item: number, slot: string) { return this.#texts.get(key(item, slot))?.[2] ?? []; }
   outstanding(): Outstanding {
     const open = [...this.#requests.values()].filter((r) => r.result === null);
-    const attempts = [...this.#operations.values()].flatMap((o) => o.attempts);
+    const pending = [...this.#operations.values()].map(pendingOf);
+    const sum = (of: (p: ReturnType<typeof pendingOf>) => number) => pending.reduce((n, p) => n + of(p), 0);
     return {
       requests: open.filter((r) => r.diagnosis === null).length, unavailable: open.filter((r) => r.diagnosis?.finding === "delivery-unavailable").length,
-      opened: attempts.filter((a) => a.outcome === null).length, unknown: attempts.filter((a) => a.outcome?.result === "unknown").length,
+      opened: sum((p) => p.opened), unknown: sum((p) => p.unknown), unopened: sum((p) => p.unopened),
     };
   }
 
@@ -265,7 +292,7 @@ export class MemoryState implements StateWriter {
       requests: sorted(this.#requests.values(), (r) => [r.seq, r.n]),
       decided: sorted(this.#decided.values(), (d) => [d.from.scope, d.from.inc, d.seq, d.n]),
       creations: sorted(this.#creations.entries(), ([seed]) => [seed]),
-      operations: sorted(this.#operations.values(), (o) => [o.id]),
+      operations: sorted(this.#operations.values(), (o) => o.id.split(":").map(Number)),
       texts: sorted(this.#texts.values(), ([item, slot]) => [item, slot]),
     };
   }

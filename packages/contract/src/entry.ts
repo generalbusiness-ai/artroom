@@ -99,9 +99,17 @@ export interface Send { n: number; to: ScopeRef | Seed; message: Message }
 /**
  * One derived change. The contract does not spell this union out; it is the
  * smallest set the effect forms of section 6.6 and the platform's own entries
- * can produce, with the record that an attempt of an outside operation was
- * opened, which an outcome needs (section 4.3). `item` is always a local ID: the `seq` of the entry that
+ * can produce, with the two records of an outside operation, which are as
+ * the contract states them (sections 4.1 and 4.3). `item` is always a local ID: the `seq` of the entry that
  * opened the item.
+ *
+ * `operation`: the entry opens an operation, at its ordinal `k` there, with
+ * its owner, its kind and the most attempts the owner allows. `attempt`: one
+ * change of one numbered attempt. `opened` opens it, and the other three are
+ * the result of the outcome entry that holds the record. An operation that
+ * its own entry opens is named `{ k }`, so no entry holds its own position.
+ * `selected` is true or false on a `confirmed` result of an operation whose
+ * kind selects one result, and null on every other record.
  */
 export type Effect =
   | { effect: "open"; item: number; type: string; state: string }
@@ -116,7 +124,9 @@ export type Effect =
   | { effect: "record"; capability: CapabilityName; kind: string; key: readonly FieldValue[];
       state: string; values: Record<string, unknown> }                                  // one change of a capability's record; section 6.11
   | { effect: "activate" }                                                              // section 7.2
-  | { effect: "operation"; operation: OperationId; attempt: number }                    // opens an operation's next numbered attempt; section 4.3
+  | { effect: "operation"; k: number; owner: CapabilityName | PlatformDefinition; kind: string; attempts: number }   // section 4.3
+  | { effect: "attempt"; operation: OperationId | { k: number }; attempt: number;
+      result: "opened" | "confirmed" | "refused" | "unknown"; selected: boolean | null }   // section 4.3
   | { effect: "index"; from: FactRef; fields: Record<string, FieldValue> }              // a projection row in the directory
   | { effect: "attention"; item: number; members: readonly MemberRef[]; reason: string };
 

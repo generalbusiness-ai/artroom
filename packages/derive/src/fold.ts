@@ -9,10 +9,11 @@
  * is the judges' question.
  */
 
-import type { Digest, Effect, Entry, ItemType, MemberRef } from "@generalbusiness/artroom-contract";
+import type { Digest, Effect, Entry, ItemType, MemberRef, OperationId } from "@generalbusiness/artroom-contract";
 import { intentDigest, seedDigest } from "@generalbusiness/artroom-bytes";
 import { UNDER, historyOf, withActing, withMembers, withPrincipal, type Signer } from "./attribution.ts";
 import { HOLDER, changeHold } from "./hold.ts";
+import { attemptedBy, openedBy, operationId } from "./ledger.ts";
 import type { Item, Party, StateWriter, Status } from "./state.ts";
 import { own, same } from "./values.ts";
 import type { ValidDefinition } from "./validate/index.ts";
@@ -106,6 +107,7 @@ export function applyEntry(writer: StateWriter, definition: ValidDefinition, ent
     }
     return held;
   };
+  let outcomes = 0;
   for (const effect of entry.effects) {
     switch (effect.effect) {
       case "open": {
@@ -141,10 +143,20 @@ export function applyEntry(writer: StateWriter, definition: ValidDefinition, ent
         held = [];
         break;
       case "operation": {
-        // Section 4.3: attempts are numbered from 1, each opened by an entry before it is sent.
-        const operation = writer.operation(effect.operation) ?? { id: effect.operation, attempts: [] };
-        if (effect.attempt !== operation.attempts.length + 1) throw new FoldError(`entry ${entry.seq} opens attempt ${effect.attempt} of ${effect.operation} out of order`);
-        writer.putOperation({ ...operation, attempts: [...operation.attempts, { attempt: effect.attempt, opened: entry.seq, outcome: null }] });
+        // Section 4.3, item 1: the operation exists from this entry, under this entry's `seq` and the record's ordinal.
+        const opened = openedBy(entry.seq, effect);
+        if (typeof opened === "string" || writer.operation(opened.id)) throw new FoldError(`entry ${entry.seq} opens operation ${effect.k}, which ${typeof opened === "string" ? opened : "it has opened"}`);
+        writer.putOperation(opened);
+        break;
+      }
+      case "attempt": {
+        // Section 4.3, items 2 to 7: one change of one numbered attempt. The rules are the ledger's (`ledger.ts`).
+        const id: OperationId = typeof effect.operation === "string" ? effect.operation : operationId(entry.seq, effect.operation.k);
+        const operation = writer.operation(id);
+        const changed = operation ? attemptedBy(operation, effect, entry) : "names an operation that no entry opened";
+        if (typeof changed === "string") throw new FoldError(`entry ${entry.seq}, attempt ${effect.attempt} of ${id}: it ${changed}`);
+        writer.putOperation(changed);
+        if (effect.result !== "opened") outcomes++;
         break;
       }
       case "record":
@@ -198,12 +210,9 @@ export function applyEntry(writer: StateWriter, definition: ValidDefinition, ent
     const request = writer.request(input.of.seq, input.of.n);
     if (!request) throw new FoldError(`entry ${entry.seq} diagnoses a request this scope did not send`);
     writer.putRequest({ ...request, diagnosis: { seq: entry.seq, finding: input.finding } });
-  } else if (input.type === "outcome") {
-    // Section 4.3: an outcome settles its own attempt and no other.
-    const operation = writer.operation(input.operation);
-    if (!operation?.attempts.some((a) => a.attempt === input.attempt)) throw new FoldError(`entry ${entry.seq} records an outcome of an attempt that no entry opened`);
-    writer.putOperation({ ...operation, attempts: operation.attempts.map((a) => (a.attempt === input.attempt ? { ...a, outcome: { seq: entry.seq, result: input.result } } : a)) });
   }
+  // Section 4.3, item 5: an outcome entry records the result of its own attempt, once, and no other entry records a result.
+  if (outcomes !== (input.type === "outcome" ? 1 : 0)) throw new FoldError(`entry ${entry.seq} records ${outcomes} results of attempts`);
 
   // Section 7.4: only a request has a result, so only a request is outstanding.
   for (const send of entry.sends) {
