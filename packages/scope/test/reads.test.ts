@@ -1,10 +1,11 @@
 import { describe, expect, test } from "vitest";
 import { otherLane } from "@generalbusiness/artroom-derive/testing";
-import { HOLD, at, found, reader, rita } from "./support.ts";
+import type { Digest, Read, RetainedInput } from "@generalbusiness/artroom-contract";
+import { HOLD, at, definition, found, reader, rita } from "./support.ts";
 
 describe("reads (section 9.1)", () => {
   test("a summary lists live items and counts every item exactly, retained final ones included; a page marked incomplete is not the whole", async () => {
-    const s = await found({}, { retainedItems: 2, historyEntries: 10 });
+    const s = await found({}, { retainedItems: 2, historyEntries: 10, retainedBytes: 100 });
     const holds = await s.holds(3);                           // entries 1 to 9
     s.c.clock.now = at(HOLD);
     await s.alarm();                                          // entries 10 to 12: every hold has ended, and is retained
@@ -37,5 +38,9 @@ describe("reads (section 9.1)", () => {
       value: [{ ...duty, duty: link.sends[0], to: otherLane, class: "request" }, { ...duty, duty: link.sends[1], to: { kind: "lane", creator: s.at, ordinal: 0 }, class: "request" }],
     });
     expect(link.sends).toEqual(["13.0", "13.1"]);
+
+    // A retained input over the bound, here 100 bytes, is refused by its stored size, before it is read.
+    const retained = (digest: Digest) => (s.stub as unknown as { retained(reader: unknown, kind: "definition", digest: Digest): Promise<Read<RetainedInput>> }).retained(reader, "definition", digest);
+    expect([await retained(definition.digest), await retained(`sha256:${"0".repeat(64)}`)]).toEqual([{ ok: false, reason: "too-large" }, { ok: false, reason: "not-found" }]);
   });
 });

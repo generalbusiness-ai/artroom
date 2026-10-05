@@ -14,8 +14,8 @@ const scope = (ref: ScopeRef): string => `${ref.scope}, incarnation ${ref.inc}, 
 const fact = (ref: FactRef): string => `entry ${ref.seq} of ${ref.at.scope} (${ref.hash})`;
 
 const MODES: Record<Report["mode"], string> = {
-  integrity: "integrity. The chain, each entry's canonical bytes and hash, and the actors' signatures were checked. No judgment was derived again.",
-  replay: "replay. The history was folded from its genesis, and every guard, effect and send was derived again and compared with the entry that records it.",
+  integrity: "integrity. Within the coverage stated below, the chain, each entry's canonical bytes and hash, and the actors' signatures were checked. No judgment was derived again.",
+  replay: "replay. Within the coverage stated below, the history was folded from its genesis, and every guard, effect and send was derived again and compared with the entry that records it.",
 };
 
 const RESULTS: Record<Report["result"], string> = {

@@ -42,6 +42,8 @@ export interface Store extends StateWriter {
   /** At most `limit` entries from `seq` on, in order. */
   storedFrom(seq: number, limit: number): Stored[];
   retained(kind: Retained["kind"], digest: Digest): Retained | null;
+  /** The UTF-8 bytes of one retained input, or null, without reading it. */
+  retainedSize(kind: Retained["kind"], digest: Digest): number | null;
   /** The row of one send, or null. */
   duty(seq: number, n: number): Duty | null;
   /** At most `limit` sends after the one at `after`, in the order of `seq` and ordinal. */

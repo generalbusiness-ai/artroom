@@ -10,7 +10,6 @@
 
 import { ENTRY_READ_BYTES, HISTORY_PAGE_BYTES, HISTORY_PAGE_ENTRIES, OUTBOX_PAGE_DUTIES, RETAINED_INPUT_BYTES, RETAINED_ITEMS_PAGE } from "@generalbusiness/artroom-contract";
 import type { Cursor, Digest, DutyId, Entry, LogPage, Read, ReadRefusal, RetainedInput, Summary } from "@generalbusiness/artroom-contract";
-import { utf8 } from "@generalbusiness/artroom-bytes";
 import { byteOrder, type Item, type ScopeState, type ValidDefinition } from "@generalbusiness/artroom-derive";
 import type { Pinned } from "./core.ts";
 import type { ReadName, Readers } from "./ports.ts";
@@ -133,9 +132,13 @@ export class Reads {
   retained(reader: unknown, kind: RetainedInput["kind"], digest: Digest): Read<RetainedInput> {
     const open = this.#open(reader, "retained");
     if (!("scope" in open)) return open;
-    const kept = (kind === "definition" || kind === "entry" || kind === "rule") && typeof digest === "string" ? this.#store.retained(kind, digest) : null;
+    if (!(kind === "definition" || kind === "entry" || kind === "rule") || typeof digest !== "string") return no("not-found");
+    // The size is asked of storage first, so an input over the bound is refused before any of it is read into memory.
+    const size = this.#store.retainedSize(kind, digest);
+    if (size === null) return no("not-found");
+    if (size > this.#bounds.retainedBytes) return no("too-large");
+    const kept = this.#store.retained(kind, digest);
     if (!kept) return no("not-found");
-    if (utf8(kept.bytes).length > this.#bounds.retainedBytes) return no("too-large");
     return { ok: true, at: open.scope.head, value: kept, complete: true };
   }
 

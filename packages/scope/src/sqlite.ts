@@ -227,6 +227,10 @@ export class SqliteStore implements Store {
     const row = this.#one("SELECT bytes, under FROM retained_input WHERE kind = ? AND digest = ?", kind, digest);
     return row && { kind, digest, bytes: row["bytes"] as string, ...(row["under"] === null ? {} : { under: row["under"] as string }) };
   }
+  retainedSize(kind: Retained["kind"], digest: Digest): number | null {
+    const row = this.#one("SELECT length(CAST(bytes AS BLOB)) AS size FROM retained_input WHERE kind = ? AND digest = ?", kind, digest);
+    return row && (row["size"] as number);
+  }
   duty(seq: number, n: number): Duty | null {
     const row = this.#one(`SELECT ${DUTY} FROM outbox WHERE seq = ? AND n = ?`, seq, n);
     return row && dutyOf(row);

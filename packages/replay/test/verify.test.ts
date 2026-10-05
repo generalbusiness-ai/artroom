@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import type { Report } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS, type Report } from "@generalbusiness/artroom-contract";
 import { TRUSTS, render, verify, type Options } from "../src/index.ts";
 import { entryOf, rewrite, sourceOf, world, type World } from "./world.ts";
 
@@ -50,6 +50,10 @@ describe("a history that is not consistent is reported with the right result, at
     { name: "a missing retained input: the bytes of a used foreign entry", change: (w) => { w.I.retained = w.I.retained.filter((r) => r.digest !== entryOf(w.I, 1).uses[0]!.content); }, result: "incomplete", at: ["I", 1], why: /retained input is missing/ },
     // The four entries read were I.0, D.0, D.1 and D.2. D.2 needed P.0, the fifth. Only D.0 and D.1 were checked to their end:
     // I.0 waits on D.4 and D.2 on P.0, and an entry is not covered until every fact it used is shown.
+    // The runtime seals no entry over the entry size bound, so a history with one was not written under these bounds, though it derives.
+    { name: "an entry over the entry size bound the replay was given", change: () => ({ bounds: { ...PROPOSED_BOUNDS, entryBytes: 1000 } }), result: "mismatch", at: ["I", 0], why: /seals none over 1000/ },
+    // The bytes are counted as each reply arrives: the page that would pass the limit is not taken in.
+    { name: "the byte limit reached: the reply that would pass it is not taken in", change: () => ({ limits: { bytes: 12_000 } }), result: "incomplete", why: /limit of 12000 bytes/ },
     { name: "a limit reached: the report states what was covered before it", change: () => ({ limits: { entries: 4 } }), result: "incomplete", why: /limit of 4 entries/, covered: [["D", 1]] },
   ];
   test.each(cases)("$name", async ({ change, result, at, why, covered: stated }) => {

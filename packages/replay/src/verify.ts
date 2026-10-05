@@ -33,13 +33,17 @@ import {
 } from "@generalbusiness/artroom-derive";
 import type { ActJudgment, Clock, Fetched, Judgment, TimedJudgment, ValidDefinition } from "@generalbusiness/artroom-derive";
 import { RULE_PROFILES, evaluateRules } from "@generalbusiness/artroom-derive/rule";
-import { hashOfBytes, type HistorySource, type Stored } from "./source.ts";
+import { PAGE_ENTRIES, PAGE_REPLY_BYTES, RETAINED_REPLY_BYTES, hashOfBytes, type HistorySource, type Stored } from "./source.ts";
 
-/** The bounds of one traversal (section 9.4). A limit reached is `incomplete`, with what was covered. */
+/**
+ * The bounds of one traversal (section 9.4). A limit reached is `incomplete`,
+ * with what was covered. Each is counted as the source's replies arrive,
+ * before anything in them is kept.
+ */
 export interface Limits {
   scopes: number;    // scopes whose history is read
   entries: number;   // entries checked, over all scopes
-  bytes: number;     // bytes read: entries and retained inputs
+  bytes: number;     // raw bytes read from the source: every reply of a page or of a retained input, as it arrived
   depth: number;     // how far a chain of foreign facts is followed from the target
 }
 /** Defaults for a command-line run. They are this package's choice; the contract owes the numbers to the proof plan. */
@@ -180,7 +184,10 @@ class Verifier {
   }
 
   async run(): Promise<Verification> {
-    const target = await this.#open(this.#target);
+    // A limit that stops the first read of the target leaves nothing to report on: it is a read error, like a target that cannot be read.
+    const target = await this.#open(this.#target).catch((error: unknown) => {
+      throw error instanceof Stop ? new SourceError(`the history of ${this.#target} was not read: ${error.why}`) : error;
+    });
     if (!target) throw new SourceError(`the history of ${this.#target} cannot be read`);
     this.#trusts.add("clock");
     if (this.#mode === "integrity") { this.#trusts.add("judgments"); this.#trusts.add("facts"); } else this.#trusts.add("bounds");
@@ -232,17 +239,41 @@ class Verifier {
   /** Start on a scope: its first page. Null: the source holds no such history, or it cannot be read. */
   async #open(id: ScopeId): Promise<Run | null> {
     if (this.#runs.size >= this.#limits.scopes) throw new Stop("incomplete", `the limit of ${this.#limits.scopes} scopes was reached`);
-    const got = await this.#source.page(id, 0);
+    const got = await this.#page(id, 0);
     if (!got.ok) return null;
     const run: Run = { id, said: got.page.scope, head: got.page.head, at: null, named: null, definition: null, state: new MemoryState(), sealed: [], read: new Map(), next: 0, busy: false };
-    this.#take(run, got.page.entries, got.page.next);
+    if (!this.#take(run, 0, got.page.entries, got.page.next)) return null;
     this.#runs.set(id, run);
     return run;
   }
 
-  #take(run: Run, entries: readonly Stored[], next: number | null): void {
+  /**
+   * One page, read within what is left of the byte limit. The bytes are
+   * counted as read whether or not the page is then used. A reply past the
+   * limit is not taken in, and ends the traversal `incomplete`; one past the
+   * bound on a single page is a page that cannot be read. A read that ran
+   * past its deadline is a read error.
+   */
+  async #page(id: ScopeId, from: number) {
+    const left = this.#limits.bytes - this.#bytes;
+    const got = await this.#source.page(id, from, { bytes: Math.min(left, PAGE_REPLY_BYTES), entries: PAGE_ENTRIES });
+    if (got.ok) this.#count(got.bytes);
+    else this.#unread(got.reason, left < PAGE_REPLY_BYTES, `a page of ${id} from entry ${from}`);
+    return got;
+  }
+
+  /** What every failed read meets first: a deadline is a read error, and a reply past what was left of the byte limit is the limit reached. */
+  #unread(reason: string, limited: boolean, what: string): void {
+    if (reason === "timeout") throw new SourceError(`${what} was not read within the deadline`);
+    if (reason === "too-large" && limited) throw new Stop("incomplete", `the limit of ${this.#limits.bytes} bytes was reached`);
+  }
+
+  /** Keep a page's entries until they are checked. A page is the entries from `from` on, in order and no others; any other page is not kept. */
+  #take(run: Run, from: number, entries: readonly Stored[], next: number | null): boolean {
+    if (entries.length > PAGE_ENTRIES || entries.some((stored, i) => stored.seq !== from + i)) return false;
     for (const stored of entries) run.read.set(stored.seq, stored);
     run.next = next;
+    return true;
   }
 
   /** The stored entry at `seq`, read by pages as needed. */
@@ -250,11 +281,11 @@ class Verifier {
     while (!run.read.has(seq)) {
       if (run.next === null || run.next > seq) throw new Gap(`the source holds no entry ${seq} of ${run.id}`);
       const from = run.next;
-      const got = await this.#source.page(run.id, from);
+      const got = await this.#page(run.id, from);
       if (!got.ok) throw new Gap(`entry ${seq} of ${run.id} could not be read: ${got.reason}`);
       // A page that holds nothing, or does not lead on, would be read for ever.
       if (got.page.entries.length === 0 || (got.page.next !== null && got.page.next <= from)) throw new Gap(`the source holds no entry ${seq} of ${run.id}`);
-      this.#take(run, got.page.entries, got.page.next);
+      if (!this.#take(run, from, got.page.entries, got.page.next)) throw new Gap(`the source's page of ${run.id} from entry ${from} is not those entries in order`);
     }
     const stored = run.read.get(seq)!;
     run.read.delete(seq);
@@ -263,9 +294,13 @@ class Verifier {
 
   /** Section 9.2: an input an entry names by digest. One that is missing makes the replay `incomplete`. */
   async #retained(run: Run, at: FactRef, kind: RetainedInput["kind"], digest: Digest, what: string): Promise<RetainedInput> {
-    const got = await this.#source.retained(run.id, kind, digest);
-    if (!got.ok) throw new Stop("incomplete", `a retained input is missing: ${what}, ${digest} (${got.reason})`, at);
-    this.#count(utf8(got.input.bytes).length);
+    const left = this.#limits.bytes - this.#bytes;
+    const got = await this.#source.retained(run.id, kind, digest, { bytes: Math.min(left, RETAINED_REPLY_BYTES) });
+    if (!got.ok) {
+      this.#unread(got.reason, left < RETAINED_REPLY_BYTES, `a retained input of ${run.id}`);
+      throw new Stop("incomplete", `a retained input is missing: ${what}, ${digest} (${got.reason})`, at);
+    }
+    this.#count(got.bytes);
     return got.input;
   }
 
@@ -299,7 +334,6 @@ class Verifier {
     if (this.#entries >= this.#limits.entries) throw new Stop("incomplete", `the limit of ${this.#limits.entries} entries was reached`);
     const stored = await this.#stored(run, seq);
     this.#entries++;
-    this.#count(utf8(stored.bytes).length);
 
     // The bytes and the hash, before anything in them is read (section 9.4).
     const hash = hashOfBytes(stored.bytes);
@@ -315,6 +349,10 @@ class Verifier {
     }
     if (canonicalize(value) !== stored.bytes) throw mismatch("the entry's bytes are not canonical JSON");
     if (!isEntry(value)) throw mismatch("the bytes are not an entry");
+    // Section 7.5: the runtime seals no entry over the entry size bound. A history that holds one is not a history a scope wrote
+    // under these bounds, whatever its derivation gives. This is not the traversal's byte limit, which ends `incomplete`.
+    const size = utf8(stored.bytes).length;
+    if (this.#mode === "replay" && size > this.#bounds.entryBytes) throw mismatch(`the entry has ${size} bytes, and a scope under these bounds seals none over ${this.#bounds.entryBytes}`);
     const entry = value;
     const input = entry.input;
 

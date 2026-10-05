@@ -12,13 +12,13 @@ its section "Replay".
 This package does not import the scope runtime. A replay derives each entry
 again with the judges and the fold of `@generalbusiness/artroom-derive`,
 which are pure functions. The turn, the store and transport are not here.
-It runs under Node and under Workers.
+The library runs under Node and under Workers.
 
 ## What it exports
 
 | Module | Holds |
 |---|---|
-| `source` | `HistorySource`: what a verifier reads. `page(scope, from)`: a page of a scope's entries, each as its canonical bytes with the hash the source gives for it. `retained(scope, kind, digest)`: one retained input. `httpSource(service, options?)`: a source over a scope service's read routes. `MemorySource`: a source over histories in memory. `hashOfBytes`. |
+| `source` | `HistorySource`: what a verifier reads. `page(scope, from, allow)`: a page of a scope's entries, each as its canonical bytes with the hash the source gives for it. `retained(scope, kind, digest, allow)`: one retained input. `allow` is the most the read may take in, and each result says how many raw bytes it read. `httpSource(service, options?)`: a source over a scope service's read routes. `MemorySource`: a source over histories in memory. `hashOfBytes`. `PAGE_REPLY_BYTES`, `RETAINED_REPLY_BYTES`, `PAGE_ENTRIES`, `READ_SECONDS`. |
 | `verify` | `verify(source, options)`: a `Verification`, which is the report and, in words, what was found. `Options`: the mode, the target scope ID, a known head, anchors, limits and bounds. `LIMITS`, `TRUSTS`, `SourceError`. |
 | `report` | `Report`, the contract's type, and `render(report, why?)`: the report in plain English. |
 | `cli` | `main(argv, io)`: the command, with no process state. `src/bin.ts` runs it under Node. |
@@ -102,8 +102,33 @@ The check stops at the first finding. The report's coverage lists, for each
 scope, the entries that were checked to their end, with every fact they
 used shown.
 
-Limits: scopes read, entries read, bytes read and the depth of a chain of
-foreign facts. The defaults are in `LIMITS`.
+## Limits
+
+Everything a source returns is untrusted, so each limit is applied as a
+reply arrives, before anything in it is kept.
+
+| Limit | Unit | Default | When it is passed |
+|---|---|---|---|
+| `bytes` | Raw bytes of the source's replies, as read: pages and retained inputs | 256 MiB | The reply that would pass it is cancelled and not taken in. `incomplete`, with the coverage so far. |
+| `entries` | Entries checked, over all scopes | 100,000 | `incomplete`. |
+| `scopes` | Scopes whose history is read | 64 | `incomplete`. |
+| `depth` | Foreign facts followed in a chain from the target | 16 | `incomplete`. |
+| One page | Raw reply bytes, and entries | 4 MiB (`PAGE_REPLY_BYTES`); 200 (`PAGE_ENTRIES`) | The page is not taken in. The history cannot be read past it: `incomplete` for the target, `missing-dependency` for a source. |
+| One retained input | Raw reply bytes | 4 MiB (`RETAINED_REPLY_BYTES`) | It is not taken in: `incomplete`, as a retained input that is missing. |
+| One read | Seconds | 30 (`READ_SECONDS`) | The request is aborted. A read error: `verify` rejects with `SourceError`, and there is no report. |
+
+A page is kept only if it is the entries from the position asked, in
+order. `httpSource` reads a body chunk by chunk and stops at the chunk that
+passes what the read allows. A limit that stops the first read of the
+target is a read error too: there is nothing to report on.
+
+The first four defaults are in `LIMITS`. All are this package's choice and
+temporary.
+
+In replay mode an entry larger than `entryBytes` of the bounds given is a
+`mismatch`: the runtime seals no such entry, so a history that holds one
+was not written under those bounds. That is the entry size bound, and is
+not the traversal's byte limit.
 
 ## What a replay takes on trust
 
@@ -138,9 +163,16 @@ with `--json` as `{ report, why }`.
 |---|---|
 | 0 | Consistent. |
 | 1 | Not consistent: mismatch, missing dependency, incomplete or unsupported definition. |
-| 2 | The command was not understood, or the target's history could not be read. |
+| 2 | The command was not understood, or the target's history could not be read: it is not there, a read ran past its deadline, or a limit stopped the first read. |
 
 The command sends no reader credential.
+
+`src/bin.ts` is TypeScript, run by Node as it is, with no build step. Node
+does that without a flag from 22.18.0 in the 22 line and from 23.6.0, by
+its documentation, and the package's `engines` says exactly that range. It
+was run here under Node 26.10.0 only; no other version was checked. It runs
+from this workspace: Node does not strip types from a file under
+`node_modules`.
 
 ## How to test
 
