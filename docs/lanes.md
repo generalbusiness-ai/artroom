@@ -304,7 +304,8 @@ children.
 
 **Under the production wiring, nothing runs.** Both definitions list
 `git-read@1`, and both use forms that need the code of `hold@1` or
-`git-read@1`. No runtime in this repository has that code. The validator
+`git-read@1`. The derive package holds that code as pure functions, and no
+production port is given it. The validator
 reads those forms, checks them against the tables in the contract
 package, and lists each in `ValidDefinition.underived`. The production
 runtime then founds and creates no scope under either definition. It

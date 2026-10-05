@@ -130,15 +130,19 @@ npm run gate
 It installs only if `package-lock.json` changed since the last install,
 typechecks every workspace, and runs every test: one vitest process for
 the repository (`vitest.config.ts` at the root, one project for each of
-`bytes`, `derive`, `replay`, `client`, `scope` and `lanes`), then one
-script (`scripts/active-source.test.mjs`). The script checks that no
+`bytes`, `derive`, `platform`, `git`, `replay`, `client`, `scope` and
+`lanes`), then one script (`scripts/active-source.test.mjs`). The script checks that no
 active file imports from `parked/` or names a removed format, and that no
 platform package depends on the lanes package or imports from it. It prints the head, the tree and
 each step's elapsed and CPU time. It also fails on a whitespace error in
 what the branch changed. `npm run gate -- --ci` reinstalls first.
 
 The `scope` project runs in the workerd pool, against real Durable Objects
-with SQLite storage. The others run in Node. Nothing runs twice.
+with SQLite storage. The others run in Node, as one group at the same time,
+and the `scope` project runs after them, by itself: it has one worker, and
+vitest lets projects share a group only when their worker counts agree. The
+`git` project runs the real `git` program, as a client and as a server, on
+local repositories. Nothing runs twice.
 
 The ten lane scenarios, `packages/lanes/test/*.scope.test.ts`, run from
 the root inside the `scope` project: the same test Worker, loaded once.

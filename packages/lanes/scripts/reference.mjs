@@ -129,7 +129,7 @@ export function reference() {
       "- A slot's flags are in brackets: `fixed`, `required`, `list` and `author`. A slot with none has none.",
       "- \"Guards, effects, sends, attention\" gives the number of forms of each kind that the row writes. The forms\n  themselves are in `packages/lanes/src`.",
       "- \"Settles\" is the pending state that the row's entry ends, where the row declares one.",
-      "- \"Needs\" names the capability versions whose code the row needs. The validator reads such a row and derives\n  nothing of it. No runtime in this repository has that code, so a scope under either definition is not founded\n  or created under the production wiring: `unsupported-definition`.",
+      "- \"Needs\" names the capability versions whose code the row needs. The validator reads such a row and derives\n  nothing of it. The derive package holds that code as pure functions, and no production port is given it, so a scope under either definition is not founded\n  or created under the production wiring: `unsupported-definition`.",
     ].join("\n"),
     ...Object.entries(lanes).map(([name, definition]) => section(name, definition)),
   ].join("\n\n") + "\n";

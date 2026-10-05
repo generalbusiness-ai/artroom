@@ -20,7 +20,7 @@ How to read the tables:
   themselves are in `packages/lanes/src`.
 - "Settles" is the pending state that the row's entry ends, where the row declares one.
 - "Needs" names the capability versions whose code the row needs. The validator reads such a row and derives
-  nothing of it. No runtime in this repository has that code, so a scope under either definition is not founded
+  nothing of it. The derive package holds that code as pure functions, and no production port is given it, so a scope under either definition is not founded
   or created under the production wiring: `unsupported-definition`.
 
 ## `issue`
