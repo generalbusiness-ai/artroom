@@ -32,7 +32,7 @@ The package has two entry points:
 | `delivery` | `judgeDelivery(view, definition, delivered, context)` for a request, a result, a control and an advisory. `Delivered`, `Source`, `DeliveryContext`, `sentBy`. |
 | `settle` | `judgeDiagnosis`, `judgeOutcome`, `judgeCheckpoint`, and `checkpointOf(view)`. |
 | `rules` | `prepareRules(view, definition, judged)`: for each `rule` guard an input would meet, the rule, its expression, its input and the input's digest. |
-| `frame` | What the judges share: `Reading`, `readFields`, `readFacts`, `bound` (the handler a message runs), `runHandler`, `runClause`, `derive`. |
+| `frame` | What the judges share: `Reading`, `readFields`, `readFacts`, `factsNamed` (the foreign entries a runtime fetches before the turn), `bound` (the handler a message runs), `runHandler`, `runClause`, `derive`. |
 | `guards`, `effects`, `sends` | `judgeGuard`, `deriveEffects`, `deriveSends`, the `Judging` value they read, and `ruleInput`. |
 | `timed` | `nextDue(view, definition, asOf)`: the next due transition in the contract's order. |
 | `time` | `clockOf(view, reading)`: one commit's reading, whether it is behind, and the time at which a transition is due. `timeMs`, `timeOf`. |
@@ -158,4 +158,6 @@ npm run typecheck --workspace @generalbusiness/artroom-derive
 `test/fixtures.ts` holds the one fixture set: a key set, four small
 definitions, a scope in memory that judges, seals and folds as a commit
 does, and helpers that pass the entries of one scope to another. It is not
-exported from the package's entry.
+exported from the package's main entry. The export
+`@generalbusiness/artroom-derive/testing` gives it to the tests of the
+packages that build on derive, and to nothing else.

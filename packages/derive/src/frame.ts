@@ -52,6 +52,19 @@ export function readFields(types: ActType["fields"], given: Readonly<Record<stri
   return { ok: true, fields };
 }
 
+/**
+ * Every foreign fact the fields name, once each, in the byte order of the
+ * field names: what step 1 of section 5.2 fetches before the turn. `fields`
+ * are values of their types, as `readFields` returns them.
+ */
+export function factsNamed(types: ActType["fields"], fields: Readonly<Record<string, FieldValue>>): FactRef[] {
+  const named = new Map<Digest, FactRef>();
+  for (const name of Object.keys(fields).sort(byteOrder)) {
+    for (const [type, value] of leaves(types[name]!, fields[name]!)) if (type.type === "fact" && !named.has((value as FactRef).hash)) named.set((value as FactRef).hash, value as FactRef);
+  }
+  return [...named.values()];
+}
+
 export type Facts = { result: "read"; facts: Map<Digest, Fetched>; uses: FactUse[] } | { result: "no-item"; detail: string } | { result: "unavailable" };
 
 /** What a use records of a foreign entry: the entry by fact, and the digest of its canonical bytes (section 9.2). */

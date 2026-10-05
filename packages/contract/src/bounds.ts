@@ -41,6 +41,11 @@ export interface Bounds {
   turnRestarts: number;
   timedAttemptsPerTurn: number;
   routingRefusals: number;         // before a sender stops and writes a diagnosis; a retry policy, not a proof
+
+  // Section 9.2: a scope's budget. The contract owes all three to the proof plan (R4). The values are temporary.
+  scopeEntries: number;            // entries one scope may hold
+  settlementReserve: number;       // of those, kept for timed, delivery, outcome and checkpoint entries; an act is refused `scope-full` before it uses them
+  drainRetrySeconds: number;       // section 5.2: the delay before the alarm that follows a turn which left a transition due; a retry policy
 }
 
 export const PROPOSED_BOUNDS: Bounds = {
@@ -71,4 +76,7 @@ export const PROPOSED_BOUNDS: Bounds = {
   turnRestarts: 6,
   timedAttemptsPerTurn: 64,
   routingRefusals: 3,
+  scopeEntries: 100_000,
+  settlementReserve: 10_000,
+  drainRetrySeconds: 1,
 };
