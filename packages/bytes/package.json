@@ -1,0 +1,28 @@
+{
+  "name": "@generalbusiness/artroom-bytes",
+  "version": "0.1.0-dev.1",
+  "description": "Artroom's one implementation of bytes: canonical JSON, SHA-256, encodings, Ed25519, and the six byte domains.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./web": { "types": "./src/web.d.ts" }
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json",
+    "test": "vitest run --config vitest.config.ts"
+  },
+  "dependencies": {
+    "@generalbusiness/artroom-contract": "0.1.0-dev.1",
+    "@noble/curves": "2.4.0",
+    "@noble/hashes": "2.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.3",
+    "vitest": "4.1.11"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

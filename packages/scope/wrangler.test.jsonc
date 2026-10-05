@@ -1,0 +1,19 @@
+// The scope as the workerd test pool runs it (vitest.config.ts): the test
+// worker's object classes, with real Durable Object SQLite storage, and the
+// Worker's own entrypoint bound as a service. Nothing is deployed from this
+// file.
+{
+  "name": "artroom-scope-test",
+  "main": "test/worker.ts",
+  "compatibility_date": "2026-08-15",
+  "compatibility_flags": ["nodejs_compat"],
+  "durable_objects": {
+    "bindings": [
+      { "name": "SCOPES", "class_name": "TestScope" },
+      { "name": "AS_DEPLOYED", "class_name": "ScopeObject" },
+      { "name": "NET", "class_name": "NetScope" }
+    ]
+  },
+  "services": [{ "binding": "API", "service": "artroom-scope-test", "entrypoint": "NetService" }],
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["TestScope", "ScopeObject", "NetScope"] }]
+}

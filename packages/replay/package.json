@@ -1,0 +1,30 @@
+{
+  "name": "@generalbusiness/artroom-replay",
+  "version": "0.1.0-dev.1",
+  "description": "Artroom's independent replay: integrity checks and full replay of a scope's history and of the scopes it used, the report of the result, and one command that prints it. It runs none of the runtime's code.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "bin": {
+    "artroom-replay": "./src/bin.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json",
+    "test": "vitest run --config vitest.config.ts"
+  },
+  "dependencies": {
+    "@generalbusiness/artroom-bytes": "0.1.0-dev.1",
+    "@generalbusiness/artroom-contract": "0.1.0-dev.1",
+    "@generalbusiness/artroom-derive": "0.1.0-dev.1"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.3",
+    "vitest": "4.1.11"
+  },
+  "engines": {
+    "node": "^22.18.0 || >=23.6.0"
+  }
+}

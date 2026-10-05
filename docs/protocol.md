@@ -1,3 +1,5 @@
+> **Inactive.** This is the specification of the earlier model. Nothing in the active packages implements it. It is kept, unedited, as source material for the deliveries that replace its parts (I2, I3 and I5). What is built now is described in [`docs/scopes.md`](scopes.md).
+
 # Artroom protocol, version 1
 
 This document is the normative contract for Artroom. It goes with the

@@ -1,0 +1,11 @@
+{
+  // The target runtime is Cloudflare Workers: a Durable Object with SQLite storage.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "../..",
+    "lib": ["ES2022", "ESNext.Disposable"],
+    "types": ["@cloudflare/workers-types"],
+    "skipLibCheck": true
+  },
+  "include": ["src"]
+}

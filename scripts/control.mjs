@@ -5,13 +5,13 @@
 //   node scripts/control.mjs <source file> <old text> <new text> [--expect <part of a test name>] -- <package dir> <test args...>
 //
 // Example:
-//   node scripts/control.mjs packages/room/src/declared.ts \
-//     'if (bytes > max) break;' 'if (bytes > max + 1) break;' --expect 'refusal wording' \
-//     -- packages/room --config vitest.workers.config.ts test/workerd/declared-fd6f00b6.test.ts
+//   node scripts/control.mjs packages/derive/src/reserve.ts \
+//     'entries === 0 && head.type === "checkpoint"' 'entries === 0' --expect 'closing checkpoint' \
+//     -- packages/scope test/turn.test.ts
 //
 // The test args go to vitest, or to `node --test` in a package whose test
-// script uses Node's runner (packages/git). The change must occur exactly
-// once in the file. The file is restored even if the run is interrupted.
+// script uses Node's runner. The change must occur exactly once in the file.
+// The file is restored even if the run is interrupted.
 //
 // The tests are run twice: first unchanged, which must pass, and then with
 // the change. There are three results, and only the first is evidence:

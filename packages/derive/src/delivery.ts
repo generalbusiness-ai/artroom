@@ -1,0 +1,209 @@
+/**
+ * The judge of a delivery (scope contract, sections 7.2 to 7.4), for each of
+ * the four classes of message: a request, a result, a control and an
+ * advisory.
+ */
+
+import type { Advisory, Control, Effect, Entry, FactRef, FactUse, Message, Prepared, Request, Result, RoutingRefusal, ScopeRef, Seed, Send } from "@generalbusiness/artroom-contract";
+import { deliveryCauseDigest, messageDigest, scopeIdOf, seedDigest } from "@generalbusiness/artroom-bytes";
+import { bound, isEntryOf, runClause, runHandler, updateOf, useOf, type Clause, type Ran, type Reading } from "./frame.ts";
+import type { Judgment } from "./judge.ts";
+import type { ScopeState, StateView } from "./state.ts";
+import { nextDue } from "./timed.ts";
+import type { ValidDefinition } from "./validate.ts";
+import { isFactRef, isLocalId, isObject, isScopeRef, same } from "./values.ts";
+
+/**
+ * One delivery as it arrives: the send's address as the sender wrote it, a
+ * full reference or, for a creation, a seed; the fact of the entry that sent
+ * it; the ordinal of the send; and the message.
+ */
+export interface Delivered { to: ScopeRef | Seed; from: FactRef; n: number; message: Message }
+
+/** The source entry as read from the source scope (section 7.4), and the name of the definition that scope pins. */
+export interface Source { entry: Entry; under: string }
+
+export interface DeliveryContext extends Reading {
+  /** The entry the envelope's `from` names. Null: it could not be read, and the delivery is retried. */
+  source: Source | null;
+  /** For a result: this scope's own entry that sent the request, from its history. */
+  origin?: Entry | null | undefined;
+}
+
+/** How the resolver of this name answers an address that is not this scope and incarnation (sections 2.3 and 7.4), or null. */
+function routing(scope: ScopeState | null, to: unknown): RoutingRefusal | null {
+  if (!scope) return "not-found";
+  if (isScopeRef(to)) return to.scope !== scope.at.scope || to.kind !== scope.at.kind ? "not-found" : to.inc !== scope.at.inc ? "wrong-incarnation" : null;
+  try {
+    // A creation is addressed by a seed and names no incarnation.
+    return scopeIdOf(to as Seed) === scope.at.scope ? null : "not-found";
+  } catch {
+    return "not-found";
+  }
+}
+
+/**
+ * Section 7.4, "What the receiver trusts at run time": the entry is the one
+ * the fact names, and it holds that send, to that address, at that ordinal,
+ * with that message digest.
+ */
+export function sentBy(entry: Entry, delivered: Delivered): boolean {
+  try {
+    const send = isEntryOf(entry, delivered.from) ? entry.sends.find((s) => s.n === delivered.n) : undefined;
+    return !!send && same(send.to, delivered.to) && messageDigest(send.message) === messageDigest(delivered.message);
+  } catch {
+    return false; // Bytes that do not parse to canonical values.
+  }
+}
+
+/** Section 7.3: one owner entry sends at most one update for each key: the target, the owner's item and the name. */
+function oneUpdateForKey(source: Entry, from: FactRef, to: ScopeRef, name: string, item: number): boolean {
+  const forKey = source.sends.filter((s) => {
+    const update = s.message.class === "request" && isScopeRef(s.to) && s.to.scope === to.scope ? updateOf(s.message, from) : null;
+    return update?.name === name && update.item.seq === item;
+  });
+  return forKey.length === 1;
+}
+
+export function judgeDelivery(view: StateView, definition: ValidDefinition, delivered: Delivered, context: DeliveryContext): Judgment {
+  const unverified = (detail: string): Judgment => ({ result: "source-unverified", detail });
+  const { clock } = context;
+  const { from, n, message } = delivered;
+  const scope = view.scope();
+
+  // A wrong address is refused by the resolver of the name, before anything is read or recorded.
+  const refusal = routing(scope, delivered.to);
+  if (refusal || !scope) return { result: "routing", reason: refusal ?? "not-found" };
+
+  // The source checks. They are immutable facts about the input (section 5.1).
+  if (!isFactRef(from) || !isLocalId(n) || !isObject(message)) return unverified("not a delivery");
+  if (!context.source) return { result: "unavailable", reason: "dependency-unavailable" };
+  const source = context.source.entry;
+  if (!sentBy(source, delivered)) return unverified("the source entry does not hold that send with that message");
+
+  // A repeat is answered with the entry that recorded it, in any state of the scope: a creation request from the genesis.
+  // A source scope has one entry at each sequence number, so another entry there is not from a valid history.
+  const before = view.decided(from.at, from.seq, n);
+  if (before) return before.hash === from.hash ? { result: "repeat", seq: before.by } : unverified("another entry of the source was recorded at that sequence number");
+
+  // Section 5.2, step 6.3: an input that is not timed never passes a due transition.
+  const next = nextDue(view, definition, clock.asOf);
+  if (next) return { result: "due", next };
+
+  if (message.class === "control") return confirmation(scope, delivered, message, source);
+  if (message.class === "request" && message.type === "create") return unverified("this scope's genesis answered another creation request");
+  // Section 7.2: a provisional scope admits its confirmation and a repeat of its creation request; a refused one only the repeat.
+  if (scope.status === "provisional") return { result: "unavailable", reason: "scope-provisional" };
+  if (scope.status === "refused") return { result: "refused", reason: "scope-refused", detail: "the scope's genesis was refused" };
+
+  const use = useOf(from, source);
+  /** Section 5.3: an entry that judges no time condition may be written clamped; one that does is `clock-behind`. */
+  /** `read`: the foreign entries a clause read beside the source entry. Each fact is recorded once (section 9.2). */
+  const write = (input: Extract<Judgment, { result: "write" }>["draft"]["input"], effects: readonly Effect[], sends: readonly Send[], prepared: readonly Prepared[], judgesTime: boolean, read: readonly FactUse[] = []): Judgment =>
+    (judgesTime && clock.behind ? { result: "unavailable", reason: "clock-behind" } : { result: "write", draft: { input, uses: [use, ...read.filter((u) => u.fact.hash !== from.hash)], prepared, effects, sends, judgesTime } });
+  /** Section 7.2: the cause of any scope this delivery's handler creates names this one delivery. */
+  const cause = () => deliveryCauseDigest({ v: 1, from, n, message: messageDigest(message) });
+
+  if (message.class === "result") return result(view, definition, context, scope, delivered, message, source, write);
+
+  if (message.class === "advisory") {
+    // As the receiver's own definition says: a handler for its type, or a record with no effect. An advisory has no decision.
+    const b = bound(definition, message, from);
+    const ran: Ran | null = b?.handler && under(b.handler, context.source) ? runHandler(view, definition, context, scope, b.handler, b.kind, b.fields, cause()) : null;
+    if (ran?.result === "unavailable") return ran;
+    // A handler that refuses leaves the entry with no effect. The entry still records each rule result its guards read.
+    const done = ran?.result === "ran" ? ran : { effects: [], sends: [], prepared: ran?.prepared ?? [], judgesTime: false };
+    return write({ type: "delivery", from, n, message: message as Advisory }, done.effects, done.sends, done.prepared, done.judgesTime);
+  }
+  if (message.class !== "request" || !isScopeRef(delivered.to)) return unverified("not a message of a class the contract defines");
+
+  /**
+   * Section 7.4: a verified request gets exactly one deciding entry, and that
+   * entry sends exactly one result, which names the request by its source
+   * fact and ordinal. The result follows the sends the handler declares.
+   */
+  const decide = (decision: "applied" | "refused" | "superseded", reason: Result["reason"] | undefined, effects: readonly Effect[] = [], sends: readonly Send[] = [], prepared: readonly Prepared[] = [], judgesTime = false): Judgment => {
+    const answer: Result = { class: "result", of: { from, n }, outcome: decision, ...(reason ? { reason } : {}) };
+    return write({ type: "delivery", from, n, message: message as Request, decision, ...(reason ? { reason } : {}) }, effects, [...sends, { n: sends.length, to: from.at, message: answer }], prepared, judgesTime);
+  };
+  const b = bound(definition, message, from);
+  if (!b) return decide("refused", "bad-field");
+  const handler = b.handler && under(b.handler, context.source) ? b.handler : null;
+
+  const platform: Effect[] = [];
+  if (message.type === "relate") {
+    const update = updateOf(message, from)!;
+    if (!oneUpdateForKey(source, from, delivered.to, update.name, update.item.seq)) return unverified("the source entry has two relate sends for one key");
+    // Section 7.3: the copy is keyed by owner scope, owner incarnation, name and owner item. Its revision is the `seq` of the owner's entry,
+    // and an update is applied only if its revision is higher than the one held.
+    const held = view.relation(from.at, update.name, update.item.seq);
+    if (held && from.seq <= held.revision) return decide("superseded", undefined);
+    platform.push({ effect: "relation", owner: from.at, item: update.item.seq, name: update.name, state: update.state, revision: from.seq });
+    if (!handler) return decide("applied", undefined, platform);
+  } else if (!handler) return decide("refused", "unknown-message");
+
+  const ran = runHandler(view, definition, context, scope, handler, b.kind, b.fields, cause());
+  if (ran.result === "unavailable") return ran;
+  // A refusal, among them `duplicate-relation` for a handler whose sends hold two for one key: no effect and no send but the result.
+  // The deciding entry records each rule result a guard read before the refusal (section 9.2).
+  if (ran.result === "refused") return decide("refused", ran.reason, [], [], ran.prepared);
+  return decide("applied", undefined, [...platform, ...ran.effects], ran.sends, ran.prepared, ran.judgesTime);
+}
+
+/** A handler may name the definition its sender must pin (section 6.4). */
+const under = (handler: { from: { under?: string } }, source: Source): boolean => handler.from.under === undefined || handler.from.under === source.under;
+
+/**
+ * Section 7.2: a confirmation is admitted only when its envelope's source is
+ * the creator the seed names, the source entry is a delivery of the applied
+ * result of the creation request, sent by this scope's genesis, and the
+ * control names this genesis. Any other is `source-unverified`. The entry
+ * activates the scope and judges no time.
+ */
+function confirmation(scope: ScopeState, { from, n }: Delivered, message: Control, source: Entry): Judgment {
+  const genesis: FactRef = { at: scope.at, seq: 0, hash: scope.genesis.hash };
+  const recorded = source.input;
+  const admitted = message.type === "confirm" && scope.status === "provisional" && scope.creator !== null && scope.genesis.source !== null
+    && from.at.scope === scope.creator.scope && from.at.inc === scope.creator.inc
+    && recorded.type === "delivery" && "clause" in recorded && recorded.clause === "applied"
+    && same(recorded.message.of, { from: scope.genesis.source, n: scope.genesis.n }) && same(recorded.from, genesis)
+    && same(message.genesis, genesis);
+  if (!admitted) return { result: "source-unverified", detail: "not the creator's confirmation of this genesis" };
+  return { result: "write", draft: { input: { type: "delivery", from, n, message }, uses: [useOf(from, source)], prepared: [], effects: [{ effect: "activate" }], sends: [], judgesTime: false } };
+}
+
+/**
+ * Section 7.4, "What the sender does with a result". It is admitted only
+ * when its `of` names one of this scope's own request sends; its envelope's
+ * source is that request's target, or for a creation the scope whose ID is
+ * the seed's digest; and the source entry is the entry that decided that
+ * request. It runs the matching clause of the send.
+ */
+function result(view: StateView, definition: ValidDefinition, context: DeliveryContext, scope: ScopeState, { from, n }: Delivered, message: Result, source: Entry,
+  write: (input: { type: "delivery"; from: FactRef; n: number; message: Result; clause: Exclude<Clause, "undelivered"> }, effects: readonly Effect[], sends: readonly Send[], prepared: readonly Prepared[], judgesTime: boolean, read: readonly FactUse[]) => Judgment): Judgment {
+  const unverified = (detail: string): Judgment => ({ result: "source-unverified", detail });
+  const of = message.of;
+  const request = isObject(of) && isFactRef(of.from) && isLocalId(of.n) && same(of.from.at, scope.at) ? view.request(of.from.seq, of.n) : null;
+  if (!request || request.hash !== of.from.hash) return unverified("the result names no request send of this scope");
+  const target = isScopeRef(request.to) ? from.at.scope === request.to.scope && from.at.inc === request.to.inc : from.at.scope === scopeIdOf(request.to) && from.at.kind === request.to.kind;
+  if (!target) return unverified("the source is not the scope and incarnation the request addressed");
+  const decided = source.input;
+  const deciding = decided.type === "delivery" ? "decision" in decided && decided.decision === message.outcome && same(decided.from, of.from) && decided.n === of.n
+    : decided.type === "genesis" && request.type === "create" && decided.decision === message.outcome && decided.source !== null && same(decided.source, of.from) && decided.n === of.n;
+  if (!deciding) return unverified("the source entry is not the entry that decided the request");
+
+  // An `undelivered` finding is terminal, and a request has one result: a later answer adds nothing.
+  if (request.diagnosis?.finding === "undelivered") return { result: "repeat", seq: request.diagnosis.seq };
+  let clause: Exclude<Clause, "undelivered"> = message.outcome;
+  if (request.result) {
+    // Section 7.2: an applied creation result that carries another incarnation than the one held for that seed is a conflict.
+    const held = isScopeRef(request.to) ? null : view.creation(seedDigest(request.to));
+    if (!held || message.outcome !== "applied" || held.inc === from.at.inc) return { result: "repeat", seq: request.result.seq };
+    clause = "conflict";
+  }
+  const ran = runClause(view, definition, context, scope, request, clause);
+  if (ran.result === "unavailable") return ran;
+  // Section 7.2: the creator confirms the incarnation of the first applied result it records, and no other.
+  const confirm: Send[] = clause === "applied" && request.type === "create" ? [{ n: 0, to: from.at, message: { class: "control", type: "confirm", genesis: from } }] : [];
+  return write({ type: "delivery", from, n, message, clause }, ran.effects, confirm, [], ran.judgesTime, ran.uses);
+}
