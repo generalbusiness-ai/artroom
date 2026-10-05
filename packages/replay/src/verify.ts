@@ -333,10 +333,17 @@ class Verifier {
    * its scope lists it, and is otherwise a missing retained input. A source
    * scope is checked only as far as a reference needs, and its tombstone may
    * come later, so its history is read on to its head before the answer.
+   *
+   * Reading a scope on may prove a fact of a scope that was not read before,
+   * or read an earlier scope further, and either may owe a text. So this
+   * goes on until no scope that was read owes one. It ends: a round that
+   * does not stop the traversal has checked at least one more entry, the
+   * tombstone that left its scope owing nothing, and the entries checked
+   * are within the limit on entries, as the scopes are within theirs.
    */
   async #settle(): Promise<void> {
-    for (const run of [...this.#runs.values()]) {
-      if (run.owed.length === 0) continue;
+    const owing = () => [...this.#runs.values()].find((run) => run.owed.length > 0);
+    for (let run = owing(); run; run = owing()) {
       try {
         await this.#advance(run, run.head.seq, 0);
       } catch (error) {

@@ -1,9 +1,8 @@
 import { describe, expect, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { DeclaredDefinition } from "@generalbusiness/artroom-contract";
 import { isSealed } from "@generalbusiness/artroom-bytes";
 import { isValue, validateDefinition, type Fetched, type ProblemCode } from "../src/index.ts";
-import { Scope, d, keys, laneDefinition, on, small, variant } from "./fixtures.ts";
+import { Scope, d, keys, laneDefinition, notes, on, small, variant } from "./fixtures.ts";
 
 const { rita, una, vic } = keys;
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -61,26 +60,6 @@ describe("facts presented beside an intent (section 6.4)", () => {
 
 describe("what the validator takes beside an intent (sections 6.2, 6.4 and 6.6)", () => {
   const body = { type: "text", max: 40, detached: true } as const;
-  /** One note with a detached body, an act that writes it, one that redacts it, and one that sends it to a lane. */
-  const notes: DeclaredDefinition = {
-    format: "artroom-definition-1", name: "notes", profile: { name: "restricted", version: 1 }, capabilities: [], genesis: "start",
-    items: {
-      note: {
-        many: true, max: 8, states: { kept: { final: false }, struck: { final: true } }, initial: "kept", parties: {},
-        refs: { peer: { fixed: false, required: false, to: { type: "scope", kind: "lane" } } },
-        values: { body: { fixed: false, required: false, of: body }, title: { fixed: false, required: false, of: { type: "text", max: 40 } } },
-      },
-    },
-    acts: {
-      start: act({ step: "open", grant: "start" }),
-      write: act({ step: "transition", grant: "write", fields: { body: { ...body, required: true }, title: { type: "text", max: 40, required: false } }, guards: [{ state: ["kept"] }], effects: [{ value: { slot: "body", from: { field: "body" } } }] }),
-      strike: act({ step: "transition", grant: "strike", guards: [{ state: ["kept"] }], effects: [{ state: "struck" }, { redact: { slot: "body" } }] }),
-      tell: act({ step: "transition", grant: "write", guards: [{ state: ["kept"] }], sends: [{ tell: { to: { slot: "peer" }, message: "noted", fields: { body: { slot: "body" } }, result: {} } }] }),
-      vouch: act({ step: "transition", grant: "write", presents: { proof: { kind: ["write"], under: "notes", required: true } }, guards: [{ state: ["kept"] }, { fact: { presented: "proof" } }] }),
-    } as any,
-    receives: {}, timed: {}, rules: {},
-  };
-
   /** Each row is that definition with one change. `null` passes; a code is the only kind of problem the validator reports for it. */
   const rows: readonly (readonly [string, Change, ProblemCode | null])[] = [
     ["a detached field into a detached slot, a redaction, a send of the text to a lane, and a presented fact pass", () => {}, null],

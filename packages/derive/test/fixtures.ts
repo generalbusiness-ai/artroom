@@ -213,6 +213,29 @@ export function variant(base: DeclaredDefinition, change: (definition: any) => v
 export const laneDefinition = valid(validateDefinition(lane, PROPOSED_BOUNDS));
 export const smallDefinition = valid(validateDefinition(small, PROPOSED_BOUNDS));
 
+const body = { type: "text", max: 40, detached: true } as const;
+const noted = (a: Partial<ActType> & Pick<ActType, "step" | "grant">): ActType => act({ on: "note", ...a });
+/** One note with a detached body, an act that writes it, one that redacts it, one that sends it to a lane, and one that is presented a `write` entry. */
+export const notes: DeclaredDefinition = {
+  format: "artroom-definition-1", name: "notes", profile: { name: "restricted", version: 1 }, capabilities: [], genesis: "start",
+  items: {
+    note: {
+      many: true, max: 8, states: { kept: { final: false }, struck: { final: true } }, initial: "kept", parties: {},
+      refs: { peer: { fixed: false, required: false, to: { type: "scope", kind: "lane" } } },
+      values: { body: { fixed: false, required: false, of: body }, title: { fixed: false, required: false, of: { type: "text", max: 40 } } },
+    },
+  },
+  acts: {
+    start: noted({ step: "open", grant: "start" }),
+    write: noted({ step: "transition", grant: "write", fields: { body: { ...body, required: true }, title: { type: "text", max: 40, required: false } }, guards: [{ state: ["kept"] }], effects: [{ value: { slot: "body", from: { field: "body" } } }] }),
+    strike: noted({ step: "transition", grant: "strike", guards: [{ state: ["kept"] }], effects: [{ state: "struck" }, { redact: { slot: "body" } }] }),
+    tell: noted({ step: "transition", grant: "write", guards: [{ state: ["kept"] }], sends: [{ tell: { to: { slot: "peer" }, message: "noted", fields: { body: { slot: "body" } }, result: {} } }] }),
+    vouch: noted({ step: "transition", grant: "write", presents: { proof: { kind: ["write"], under: "notes", required: true } }, guards: [{ state: ["kept"] }, { fact: { presented: "proof" } }] }),
+  },
+  receives: {}, timed: {}, rules: {},
+};
+export const notesDefinition = valid(validateDefinition(notes, PROPOSED_BOUNDS));
+
 // ---------------------------------------------------------------- a parent and its child
 
 /**
@@ -463,10 +486,13 @@ export class Scope extends Ledger {
 
 // ---------------------------------------------------------------- entries passed between scopes
 
-/** A directory founded by rita's signed intent (section 7.1): its genesis is judged, sealed and folded. `definition`: the desk, or a desk with a change. */
-export function founded(definition: ValidDefinition = deskDefinition): Ledger {
+/**
+ * A directory founded by rita's signed intent (section 7.1): its genesis is judged, sealed and folded. `definition`: the desk, or
+ * a desk with a change, or with `given` another definition and the fields of its genesis act. `key` tells two foundings apart.
+ */
+export function founded(definition: ValidDefinition = deskDefinition, given: Intent["fields"] = { source: "a repository" }, key = "found"): Ledger {
   const ledger = new Ledger(definition);
-  const founding = signIntent({ v: 1, to: null, actor: keys.rita.key, kind: "found", on: null, expected: {}, fields: { source: "a repository" }, idempotencyKey: "found", notAfter: t(60) }, keys.rita.secret);
+  const founding = signIntent({ v: 1, to: null, actor: keys.rita.key, kind: "found", on: null, expected: {}, fields: given, idempotencyKey: key, notAfter: t(60) }, keys.rita.secret);
   const seed: Seed = { v: 1, kind: "directory", definition: definition.digest, creator: null, cause: intentDigest(founding.intent), ordinal: 0 };
   const context = { clock: clockOf(ledger.state, T0), bounds: PROPOSED_BOUNDS, facts: [], prepared: [], source: null };
   const judgment = judgeGenesis(ledger.state, definition, { name: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(1)), seed, founding }, context);
