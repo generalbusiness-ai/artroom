@@ -11,6 +11,7 @@
  */
 
 import type { ObservationRequest, PlatformData } from "@generalbusiness/artroom-contract";
+import { destination } from "./destination.ts";
 import { inbox } from "./inbox.ts";
 import { membership, standingOf } from "./membership.ts";
 import { register } from "./register.ts";
@@ -19,17 +20,18 @@ import type { Rules, StateView } from "@generalbusiness/artroom-derive";
 import { RULES } from "./rules.ts";
 import { rulesScope } from "./rules-scope.ts";
 
-export { inbox, membership, register, directory };
+export { inbox, membership, register, directory, destination };
 export { MEMBERSHIP, NO_MEMBER, ROLE_LISTS, ROLE_TABLE, actionsIn, standingOf, type Role } from "./membership.ts";
 export { CREATION_ATTEMPTS, DIRECTORY_CLAUSES, REGISTER, REPOSITORY, directorySeed, registerRules } from "./register.ts";
 export { DEFINITION_DOMAIN, DIRECTORY, IMPORT_ATTEMPTS, SEEN, directoryMembership, directoryRules } from "./directory.ts";
+export { COLLECT_MOST, DESTINATION, DESTINATION_ATTEMPTS, DESTINATION_KINDS } from "./destination.ts";
 export { RULES };
 export { rulesScope };
 export { CONFIGURATION_BYTES, CONFIGURATION_DOMAIN, RULES_SCOPE, membershipId } from "./rules-scope.ts";
 export type { PlatformName, RuleTable } from "./rules.ts";
 
 /** The platform definitions delivered so far, by name without the version. */
-export const definitions: Readonly<Record<string, PlatformData>> = { "platform:inbox": inbox, "platform:membership": membership, "platform:register": register, "platform:directory": directory, "platform:rules": rulesScope };
+export const definitions: Readonly<Record<string, PlatformData>> = { "platform:inbox": inbox, "platform:membership": membership, "platform:register": register, "platform:directory": directory, "platform:rules": rulesScope, "platform:destination": destination };
 
 /**
  * One version of a platform definition, as a runtime or a verifier is

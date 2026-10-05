@@ -32,6 +32,7 @@
  */
 
 import type { Rules } from "@generalbusiness/artroom-derive";
+import { destinationRules } from "./destination.ts";
 import { inboxRules } from "./inbox.ts";
 import { membershipRules } from "./membership.ts";
 import { registerRules } from "./register.ts";
@@ -59,4 +60,7 @@ export const RULES: RuleTable = {
   "platform:register": registerRules, "platform:directory": directoryRules,
   // The three rules of the rules scope are the whole of its version, so `platform:rules@1` is runnable (`rules-scope.ts`).
   "platform:rules": rulesScopeRules,
+  // The destination's data holds ten marks with no rule: `abort-if-behind`, `resend-due` and the eight rules of its `outcomes`
+  // (`destination.ts`). So this table does not make `platform:destination@1` runnable.
+  "platform:destination": destinationRules,
 };
