@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:e9aa72a16d4599fcd00631a455518904dcd64a38"}
+{"kind":"artifact","text":"Merge published the current artifact at packages/derive/src/validate/fields.ts","body":{"commit":"b57e8774bbdee1205b648bfd856904bb37c6d282","path":"packages/derive/src/validate/fields.ts"}}
