@@ -16,6 +16,43 @@ The form follows `notes/2026-10-04-i1-contract-deltas.md`. Entries are
 numbered D1, D2 and so on. The plan named D1 to D6 before any source
 changed. Each entry has the date it was written.
 
+Steps 4 to 18 were written by several workers, and each numbered its
+entries with a prefix of its own: DL, DF, DG, DH, DI, DJ, DK, DM and DN.
+The prefixes are kept. Sections 7, 8 and 10 say that the builder renumbers
+the entries at the merge. That was not done, because later entries, the
+guides and the source comments cite the entries by these names.
+
+The note holds 165 entries: 26 numbered D, 5 DL, 14 DF, 29 DG, 21 DH, 23
+DI, 25 DJ, 11 DK, 5 DM and 6 DN. The count was made by a script over the
+first cell of each table row of this file. Section 23 lists, by owner, the
+entries that need an owner's decision.
+
+| Section | Holds | Entries |
+|---|---|---|
+| 1 | The silences the plan named | D1 to D6 |
+| 2 | Step 1: the contract's types, the capability tables and the bounds | D7 to D12 |
+| 3 | Step 2: the validator and the shared frame, split by family | None |
+| 4 | Step 3: the base forms every family reads | D13 to D26 |
+| 5 | Read and not changed | None |
+| 6 | Step 12: the lane definitions as data (track L) | DL1 to DL5 |
+| 7 | Step 8: fields, the timed kind and the hold type (track F) | DF1 to DF14 |
+| 8 | Step 4: list guards and ranges (track G) | DG1 to DG10 |
+| 9 | Step 5: effects (track G) | DG11 to DG29 |
+| 10 | Step 7: subjects and handlers (track H) | DH1 to DH12 |
+| 11 | Step 6: sends (track H) | DH13 to DH21 |
+| 12 | The merge of steps 4 to 8: seams and defects (integration) | DI1 to DI16 |
+| 13 | Step 10: capacity, `settles` in entries | DI17 to DI23 |
+| 14 | The two lane definitions, read by the validator | None |
+| 15 | Step 9: beside the intent | DJ1 to DJ13 |
+| 16 | Step 11: capability forms as the validator reads them | DJ14 to DJ19 |
+| 17 | Step 13: the two lane definitions, validated and pinned | DJ20 to DJ22 |
+| 18 | Step 14: the declared client handle | DJ23 to DJ25 |
+| 19 | Step 15: the shared graph, the scripted peers and the test Worker | DK1 to DK4 |
+| 20 | Step 16: the scenarios on the two pinned definitions | DK5 to DK11 |
+| 21 | Step 17: removal and guides | DM1 to DM5 |
+| 22 | Step 18: the assembly | DN1 to DN6 |
+| 23 | For owners | None: a list by owner |
+
 ## 1. The silences the plan named
 
 Written 2026-10-05 with the plan. None is implemented by steps 1 to 3.
@@ -607,3 +644,98 @@ differed.
 | `packages/bytes/package.json`, `description` | It says "the six byte domains". There are seven. | Not changed: a manifest, outside this step's files. Owner: the builder. |
 | `packages/lanes/package.json`, `scripts` | It has `pin` and no entry for the reference. | Not changed. Proposed: `"reference": "node scripts/reference.mjs"`. Owner: the builder. |
 | `packages/scope/package.json`, `exports` | The plan's section 5 says that `scope` exports its test Worker classes for the lane package's tests. At this head it exports `.`, `./worker` and `./testing` only. | Not changed: step 15's. |
+
+## 22. Step 18: the assembly
+
+Written 2026-10-05, by the worker of step 18. The entries are numbered DN1
+and so on. None is a choice about the contract. Each closes something that
+an earlier entry left for the assembly, or corrects what an earlier
+section says.
+
+| # | What an earlier entry left, or says | Done | Why |
+|---|---|---|---|
+| DN1 | Entry DM3: no test reads `docs/lanes-reference.md`, so its stamp can go stale without a failure. | The pins test of `packages/lanes/test/definitions.test.ts` compares the whole file with `reference()`, which `packages/lanes/scripts/reference.mjs` exports. `scripts/reference.d.mts` gives the test's import a type. Control by hand: one row of the file was changed, the test failed by that assertion, and the file was restored. | The stronger of the two assertions that entry DM3 names. A changed row with an old reference now fails the gate. |
+| DN2 | Entry DM4, and the last three rows of "Found in the tree and the guides" in section 21: the guides do not name the lane scenarios, and three manifests were left as they were. | `docs/testing.md`, `docs/lanes.md`, `docs/scopes.md`, `packages/scope/README.md` and `packages/lanes/README.md` say how the scenarios run (entries DK1 to DK4 and DK11). `packages/bytes/package.json` says seven byte domains. `packages/lanes/package.json` has the script `reference`. `packages/scope/package.json` already exports `./testing/worker`, since step 15. | Each was the builder's, at the merge. |
+| DN3 | Sections 7 and 12 have tables headed "Found in the landed source" and "Defects found in the landed source". | Not changed there. Three of their rows are about code that I2's own steps wrote, and not about I1 as landed at `f1c456ce`: `kindOf` (entry DI12) is step 3's function; the reading of nested guards for time (entry DI13) became wrong only when step 4 added list forms; the type of a position (entry DI16) is step 3's. The delivery note lists them apart from the defects of I1. | Main at `c9a16778` has no `kindOf` and no list form (read with `git grep`). A reader of the delivery note must not take I2's own repairs for faults of the landed source. |
+| DN4 | Step 16's commit message counts 21 controls by hand, of which 4 survived, "each explained in the deltas note or the report". This note explains one, in entry DK7. The report is not in the tree. | At the assembly, 12 controls were run by hand with `scripts/control.mjs`, at least one for each of the ten scenarios. 10 distinguished. 1 was inconclusive: the change made the fixture throw, and it was replaced by one that distinguished. 1 survived: with the count check of `sameSet` removed (`derive/src/lists.ts`, "as many keys as items"), T3 still passes. | The survivor has a reason. `sameSet` is written in two rows of `issue` only, and no scenario seals a plan with a concern left out. The same change makes `derive/test/forms-guards.test.ts` fail by its assertion, so the rule has its witness at the cheaper boundary. The three survivors of step 16 that this note does not name stay unnamed here. |
+| DN5 | Section 20 counts the rows that the scenarios reach, by a script that was not kept. | Counted again at the assembly, by a line added to the fixture for one run and then removed: the same numbers. `issue`: 21 of 50 act kinds, 2 of 7 handlers, 1 of 1 timed rule. `change`: 12 of 52, 2 of 4, 0 of 2. | The delivery note states the numbers, so they were observed once more at the head it describes. |
+| DN6 | The plan's section 2 counts 38 forms that I2 implements, and 5 that it reads and does not derive. | Counted again from the two pinned definitions, by a script over `packages/lanes/definitions/*.json`: each of the 38 forms that is a written form occurs in the data, which the validator passes whole. Rows 17, 40, 48 and 58 are behaviours and not written forms; each has a test in `derive`. Of the 5 rows that wait, the validator reads 4 (rows 4, 11, 31 and 44). Row 59, an advisory send to each told member's inbox, has no form to read and nothing is built for it. | The plan's own text says that I2 "reads the shape of 5 more". For row 59 there is no shape. Owner of the row: the authority note's successor, with the inbox definition. |
+
+## 23. For owners
+
+Written 2026-10-05, at the assembly. One line for each entry that needs an
+owner's decision, by owner. An entry that two owners share is under each.
+The entry itself is the statement: this list adds nothing to it. An entry
+that is not listed made a source choice that its section explains and
+that no owner was asked about by name.
+
+### The scope contract's successor, request `d56d7f65`
+
+- D1, DG11: how an entry records a party list that is set whole. Built: `list` records, removals and then additions.
+- D3, DJ14: a runtime with no capability code answers `unsupported-definition` for the whole scope, and a test may script a capability. The builder's decision, to confirm. With `406983fe`.
+- D4: rows 8 and 9 of the plan have no row in the source map of section 11.8.
+- D5, D14: whether a declared definition may state a name that begins `platform:`. Built: refused. With `406983fe`.
+- D13: a bound on the length of a definition's name.
+- D17: which member of an answer carries the path of the failed guard.
+- D21, DK5: how a reader learns the kind of a genesis entry under another definition. Until then `propose-manifest` cannot name an issue's `file` entry as its goal.
+- DF8: the wording that only a `hold` effect changes a hold's holder, epoch and state.
+- DG26: the base of `attribute` when its subject is unbound (gap G27). Built: fails closed.
+- DH6, DH10: what `on` or `one` selects when a type that is not `many` holds more than one item. Built: `no-item`.
+- DH8: the sentence that `also` names are resolved "in the order written", which canonical bytes do not keep.
+- DH12: whether an entry records its subjects, or how a result clause selects them again.
+- DH19: whether an entry records which form made each send.
+- DH20: a notice of a timed rule with a condition. Built: refused.
+- DH21, DI15: `decompositionDepth` has a number and no rule that reads it.
+- DI6: what an unbound subject is inside a list form and in an `unless`.
+- DI10: a result clause of a fan-out that reads `each` when the update is for another item. Built: refused.
+- DI12: the wording of section 6.2 for a delivered request that no handler received.
+- DI14: whether a `reason` on a nested guard names a refusal.
+- DJ3: what ends the duty of a send whose detached text can no longer be had.
+- DJ5: whether `redactable-read` may be narrower than built.
+- DJ7: which texts a scope retains, and that a text in no slot can never be redacted. With the proof plan.
+- DJ9: whether a redaction spares a text that another slot still names.
+- DJ17: whether an act kind or a message name may have the form `name@version:step`.
+- DJ21: the example of `propose-manifest` in section 6.1 states 23, 70 and 7; the pinned row has 24, 73 and 8. With the lane forms.
+
+### The authority note's successor, request `406983fe`
+
+- D3, DJ14: the scripted test capability, with `d56d7f65`.
+- D5, D14: the prefix `platform:`, with `d56d7f65`.
+- D11, DJ15, DJ16: which arguments of a capability guard or effect are required, and the key and the value names of each record.
+- DJ2: who may ask a scope for a detached text that it sent.
+- DL5, DJ22: the names `platform:task`, `platform:rules` and `platform:destination`, and the kind `publish` (gap G26).
+- DJ17, DK6: the preparation entry of the kind `hold@1:check`. No source writes one, so a manifest staged in another lane cannot be proposed.
+- DN6: the advisory send to a told member's inbox (the plan's row 59).
+
+### The lane forms
+
+- DL1: confirm the reading of the notation of section 3 as members.
+- DI17: whether a `settles` declaration should list a final state (the plan's question Q6).
+- DJ21: restate the counts of `propose-manifest`, which sits exactly at three bounds.
+- DK5: section 5.1's common case, a goal that is an issue's `file` entry, cannot run until the contract decides entry D21.
+- DK6: the form of `propose-manifest` that is staged in another lane waits for I3. Nothing to decide.
+
+### The proof plan
+
+- D8: every number of `PROPOSED_BOUNDS` is a proposal or a temporary value.
+- DJ7: retention of a detached text that is in no slot, with `d56d7f65`.
+- DJ21: a definition that sits exactly at three bounds.
+- DK7: the rule "a settling entry is written whatever is held" cannot be shown on either lane definition. Its storage witness is on a variant of the scope package's fixture lane.
+
+### Capacity, request `cc570904`
+
+- D6, DI17 to DI23: `settles` is counted in entries only. Items, records, bytes and pending requests are not counted.
+- DI22: after a settling entry that sends a request, written and reserved together may pass the budget by a stated difference until that request settles.
+
+### The planner
+
+- DM2: the three files of the generation history stay in `parked/ui` for I5. This records the planner's decision. Nothing new is asked.
+- No other entry asks the planner. The plan's question Q8 is answered by the commission of the base milestone, which the delivery note cites.
+
+### The builder
+
+- D22: a foreign fact that is not the entry its reference names is still answered `dependency-unavailable`. The row of section 11.8 is owed.
+- DF4, DF9, DI15: `equal` does not look for a local fact inside a record, and a part does not read a `hold` record. Each fails closed. To build when a row reads one.
+- DF14, DI11: two seams stay marked `// I2 merge:` in the source: the records of `hold@1`, and a member of a record field or slot.
+- DJ24: the client's reader of shapes is a second reading of field types.
+- DK11: a call through the Worker's entrypoint slows with the number made, in the workerd test pool. To report to the pool's maintainers, or not.
