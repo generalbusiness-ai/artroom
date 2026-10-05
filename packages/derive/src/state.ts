@@ -6,7 +6,7 @@
  * `Status`, are the contract's, and are exported here again.
  */
 
-import type { CapabilityName, Digest, FactRef, Head, Incarnation, Item, KeyId, OperationId, Party, PlatformDefinition, Request, ScopeKind, ScopeRef, Seed, Status, Timestamp } from "@generalbusiness/artroom-contract";
+import type { CapabilityName, Digest, FactRef, FieldValue, Head, Incarnation, Item, KeyId, OperationId, Party, PlatformDefinition, Request, ScopeKind, ScopeRef, Seed, Status, Timestamp } from "@generalbusiness/artroom-contract";
 import { canonicalBytes, canonicalize, digestBytes } from "@generalbusiness/artroom-bytes";
 import { pendingOf } from "./ledger.ts";
 import { byteOrder } from "./values.ts";
@@ -98,6 +98,28 @@ export interface Outstanding {
   outcomes: readonly { owner: CapabilityName | PlatformDefinition; kind: string; entries: number }[];
 }
 
+/**
+ * One preparation entry, as the scope indexes it (section 5.5, "A repeat"):
+ * by the digest of the signed intent, the capability and the step. `seq` is
+ * the entry. The same three again are answered with it and write nothing.
+ */
+export interface PreparedStep { intent: Digest; capability: CapabilityName; step: string; seq: number }
+
+/**
+ * One capability record, as the fold keeps it (section 6.11, "Records"):
+ * local state that is not an item. It changes only by a `record` effect of
+ * a sealed entry, which states the record's state and its values whole
+ * (I3 deltas, entry EF5). `seq` is the entry that last recorded it. A key is
+ * never reused, and a record is never removed.
+ */
+export interface RecordState {
+  capability: CapabilityName; kind: string; key: readonly FieldValue[]; state: string;
+  values: Readonly<Record<string, unknown>>; seq: number;
+}
+
+/** Which records of one kind a read asks for: those in one of `states`, and those whose value `member` equals `value`. Absent: every one. */
+export interface RecordsWhere { states?: readonly string[]; member?: string; value?: unknown }
+
 /** Items in ascending ID order. `more`: the page stopped at its limit and at least one further item follows. */
 export interface Page { items: readonly Item[]; more: boolean }
 
@@ -118,6 +140,14 @@ export interface StateSnapshot {
   creations: readonly (readonly [seed: Digest, held: HeldCreation])[];  // by seed digest
   operations: readonly Operation[];                                     // by the entry that opened each, then its ordinal there
   texts: readonly (readonly [item: number, slot: string, texts: readonly Digest[]])[];   // by item, then slot; a slot that holds none is left out
+  /**
+   * The index of preparation entries, by intent digest, capability and step
+   * (section 5.5). Absent: the scope has none. A state with none has no
+   * member, so its digest is the one it had before a scope could prepare.
+   */
+  prepared?: readonly PreparedStep[];
+  /** The capability records, by capability, kind and the canonical bytes of the key (section 6.11). Absent: the scope has none. */
+  records?: readonly RecordState[];
 }
 
 /** The digest a checkpoint entry carries: SHA-256 of the snapshot's canonical JSON. */
@@ -162,6 +192,21 @@ export interface StateView {
    * held them (section 6.6). A `redact` effect lists exactly these.
    */
   texts(item: number, slot: string): readonly Digest[];
+  /** The preparation entry with that intent digest, capability and step, if one is sealed (section 5.5). */
+  prepared(intent: Digest, capability: CapabilityName, step: string): PreparedStep | null;
+  /** This scope's preparation entries for one intent: at most one for each capability step (section 9.1), in the order of capability, then step. */
+  preparations(intent: Digest): readonly PreparedStep[];
+  /** One capability record, by its kind and key (section 6.11). */
+  record(capability: CapabilityName, kind: string, key: readonly FieldValue[]): RecordState | null;
+  /**
+   * The records of one kind, in the order of the canonical bytes of their
+   * keys. The scope indexes records by kind and state (section 6.11). No
+   * adopted text bounds the records of one kind, so this read is bounded
+   * only by what the scope holds (I3 deltas, entry EF6).
+   */
+  records(capability: CapabilityName, kind: string, where?: RecordsWhere): readonly RecordState[];
+  /** The exact number of records of that kind: in that state, or in any state when none is named. A key is never reused, so the second is the capability's counter. */
+  recordCount(capability: CapabilityName, kind: string, state?: string): number;
   /** How many duties are open, for the room they need to settle (section 9.2); see `Outstanding`. */
   outstanding(): Outstanding;
   /** Everything, for a checkpoint. This is the one read that is not bounded. */
@@ -181,6 +226,8 @@ export interface StateWriter extends StateView {
   putOperation(operation: Operation): void;
   /** The texts that a slot has held and that are not redacted. An empty list holds none. */
   putTexts(item: number, slot: string, texts: readonly Digest[]): void;
+  putPrepared(prepared: PreparedStep): void;
+  putRecord(record: RecordState): void;
 }
 
 type Key = readonly (string | number)[];
@@ -225,6 +272,8 @@ export class MemoryState implements StateWriter {
   readonly #creations = new Map<Digest, HeldCreation>();
   readonly #operations = new Map<OperationId, Operation>();
   readonly #texts = new Map<string, readonly [number, string, readonly Digest[]]>();
+  readonly #prepared = new Map<string, PreparedStep>();
+  readonly #records = new Map<string, RecordState>();
 
   scope() { return this.#scope; }
   item(id: number) { return this.#items.get(id) ?? null; }
@@ -251,6 +300,16 @@ export class MemoryState implements StateWriter {
   creation(seed: Digest) { return this.#creations.get(seed) ?? null; }
   operation(id: OperationId) { return this.#operations.get(id) ?? null; }
   texts(item: number, slot: string) { return this.#texts.get(key(item, slot))?.[2] ?? []; }
+  prepared(intent: Digest, capability: CapabilityName, step: string) { return this.#prepared.get(key(intent, capability, step)) ?? null; }
+  preparations(intent: Digest) { return this.#steps().filter((p) => p.intent === intent); }
+  #steps() { return [...this.#prepared.values()].sort((a, b) => keyOrder([a.intent, a.capability, a.step], [b.intent, b.capability, b.step])); }
+  record(capability: CapabilityName, kind: string, at: readonly FieldValue[]) { return this.#records.get(key(capability, kind, canonicalize(at))) ?? null; }
+  records(capability: CapabilityName, kind: string, where: RecordsWhere = {}) {
+    return this.#kept().filter((r) => r.capability === capability && r.kind === kind && (!where.states || where.states.includes(r.state))
+      && (where.member === undefined || (Object.hasOwn(r.values, where.member) && canonicalize(r.values[where.member]) === canonicalize(where.value))));
+  }
+  recordCount(capability: CapabilityName, kind: string, state?: string) { return this.records(capability, kind, state === undefined ? {} : { states: [state] }).length; }
+  #kept() { return [...this.#records.values()].sort((a, b) => keyOrder([a.capability, a.kind, canonicalize(a.key)], [b.capability, b.kind, canonicalize(b.key)])); }
   outstanding(): Outstanding {
     const open = [...this.#requests.values()].filter((r) => r.result === null);
     const operations = [...this.#operations.values()];
@@ -294,6 +353,8 @@ export class MemoryState implements StateWriter {
     if (texts.length === 0) this.#texts.delete(key(item, slot));
     else this.#texts.set(key(item, slot), [item, slot, texts]);
   }
+  putPrepared(p: PreparedStep) { this.#prepared.set(key(p.intent, p.capability, p.step), p); }
+  putRecord(r: RecordState) { this.#records.set(key(r.capability, r.kind, canonicalize(r.key)), r); }
 
   all(): StateSnapshot {
     const sorted = <T>(values: Iterable<T>, of: (value: T) => Key) => [...values].sort((a, b) => keyOrder(of(a), of(b)));
@@ -308,6 +369,9 @@ export class MemoryState implements StateWriter {
       creations: sorted(this.#creations.entries(), ([seed]) => [seed]),
       operations: sorted(this.#operations.values(), (o) => o.id.split(":").map(Number)),
       texts: sorted(this.#texts.values(), ([item, slot]) => [item, slot]),
+      // A member that would be empty is left out, so a state that holds none has the digest it had before these members existed.
+      ...(this.#prepared.size === 0 ? {} : { prepared: this.#steps() }),
+      ...(this.#records.size === 0 ? {} : { records: this.#kept() }),
     };
   }
   /** The snapshot as one canonical text, to compare two states. */

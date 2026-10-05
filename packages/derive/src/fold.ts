@@ -160,7 +160,10 @@ export function applyEntry(writer: StateWriter, definition: ValidDefinition, ent
         break;
       }
       case "record":
-        break; // Section 6.11: a capability's record is the capability's own state. No source keeps one yet; the entry holds the change.
+        // Section 6.11: a record changes only by a `record` effect of a sealed entry, which states its state and its values whole.
+        // Whether the change is the right one is the capability's rule, which the judges derive: the fold judges nothing.
+        writer.putRecord({ capability: effect.capability, kind: effect.kind, key: effect.key, state: effect.state, values: effect.values, seq: entry.seq });
+        break;
       case "index": case "attention":
         break; // Rows and notices that no guard of this scope reads.
     }
@@ -186,9 +189,13 @@ export function applyEntry(writer: StateWriter, definition: ValidDefinition, ent
   }
 
   // Bookkeeping that the input implies.
-  // A preparation is judged by no code yet (I3 step 16a, delta E5): the fold refuses a history that holds one, as for any entry it cannot derive.
-  if (input.type === "preparation") throw new FoldError(`entry ${entry.seq} is a preparation, and this fold has no rules for one`);
-  if (input.type === "genesis") {
+  if (input.type === "preparation") {
+    // Section 5.5, "A repeat": the scope indexes a preparation entry by its intent digest, its capability and its step. The same
+    // three are sealed once. The act's idempotency key is not consumed: the intent is not admitted by this entry.
+    const intent = intentDigest(input.signed.intent);
+    if (writer.prepared(intent, input.capability, input.step)) throw new FoldError(`entry ${entry.seq} prepares a step that an earlier entry prepared for the same intent`);
+    writer.putPrepared({ intent, capability: input.capability, step: input.step, seq: entry.seq });
+  } else if (input.type === "genesis") {
     // Section 7.2: a repeat of the creation request is answered from the genesis, as a repeat of any delivery is from its entry.
     if (input.source && input.n !== null) writer.putDecided(input.source, input.n, entry.seq);
   } else if (input.type === "act") {

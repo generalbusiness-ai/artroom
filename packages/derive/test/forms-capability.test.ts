@@ -72,12 +72,12 @@ describe("capability forms (section 6.11), with a stand-in for the capability's 
       ["hold@1", "staged", { commit: C1, under: 0 }],
       ["git-read@1", "ancestry", { commit: C1, row: "report", selected: [C2], earlier: [null] }],
     ]);
-    // The capability's own effect is recorded after the written ones, and the fold keeps no record: the entry holds the change.
+    // The capability's own effect is recorded after the written ones, and the fold keeps the record as that entry states it.
     expect(s.last.effects).toEqual([
       { effect: "value", item: 0, slot: "text", value: "staged" },
       { effect: "record", capability: "hold@1", kind: "pin", key: [C1], state: "held", values: { commit: C1 } },
     ]);
-    expect([isSealed(s.entries.at(-1)), s.replay().snapshot() === s.state.snapshot()]).toEqual([true, true]);
+    expect([isSealed(s.entries.at(-1)), s.replay().snapshot() === s.state.snapshot(), s.state.record("hold@1", "pin", [C1])]).toEqual([true, true, { capability: "hold@1", kind: "pin", key: [C1], state: "held", values: { commit: C1 }, seq: s.last.seq }]);
 
     // `carried` reads a member of the one record of that kind that the named entry's effects hold. An entry with no such record has none.
     const reads = (seq: number) => {
