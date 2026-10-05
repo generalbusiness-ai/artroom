@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:41e41fa431e6e522c4276131e1fce437f9c6935e","text":"Merge retired a covered predecessor; the successor is at packages/derive/src/lists.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:424c0181d825274623245134c085fa3db5cb873c","text":"Merge retired a covered predecessor; the successor is at docs/lanes-reference.md."}
