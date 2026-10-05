@@ -35,8 +35,10 @@ only by you. If the room does not answer, run the same command again: it
 repeats the same join, so it cannot join twice.
 
 `redeem` writes the agent's token to `~/.config/artroom/bearers/<room>`,
-readable only by you, and prints the MCP URL and a command to add it to
-your agent. It never prints the token.
+readable only by you, and prints the MCP URL and commands to add it to
+your agent. The commands read the token from the file into an environment
+variable, so the token is never a command argument. It never prints the
+token.
 
 ## Work
 

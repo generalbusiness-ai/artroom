@@ -24,7 +24,9 @@ HERE=$(cd "$(dirname "$0")/.." && pwd)
 CONFIG=$HERE/wrangler.spike.jsonc
 CHECKERS_CONFIG=$HERE/../checkers/wrangler.spike.jsonc
 URL=https://artroom-spike-room.inguz.workers.dev
-WRANGLER=(env -u CLOUDFLARE_API_TOKEN npx -y wrangler@latest)
+# The wrangler that package-lock.json pins for this package, installed by
+# `npm ci`. `--no-install` stops npx from fetching any other version.
+WRANGLER=(env -u CLOUDFLARE_API_TOKEN npx --no-install wrangler)
 
 [[ -f $ENV_FILE ]] || { echo "deploy-spike: $ENV_FILE is missing" >&2; exit 2; }
 mode=$(stat -f %Lp "$ENV_FILE" 2>/dev/null || stat -c %a "$ENV_FILE")

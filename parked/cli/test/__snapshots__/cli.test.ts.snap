@@ -5,7 +5,7 @@ exports[`joining > a lost login response is finished by running the same command
   Nothing is lost. Run the same artroom login command again to finish; it reuses the same key and request."
 `;
 
-exports[`joining > a lost redemption says what to do, and saves no token > redeem lost 1`] = `"Error (unavailable): The redemption may have succeeded, but its response was lost, and the bearer token cannot be shown again. Do not retry this invitation. Ask an admin for a new MCP (room-custody) invitation for the same member, and ask them to revoke the unused delegation."`;
+exports[`joining > a lost redemption says what to do, and saves no token > redeem lost 1`] = `"Error (unavailable): The redemption may have succeeded, but its response was lost, and the bearer token cannot be shown again. Do not retry this invitation. Ask an admin for a new MCP (room-custody) invitation for the same member, and ask them to revoke the key the room made for the lost token, with the roster act \`revoke-key\`."`;
 
 exports[`joining > a refused login leaves no key behind > login refused 1`] = `
 "Refused: invitation-invalid
@@ -16,8 +16,10 @@ exports[`joining > redeem saves the bearer 0600, never prints it, and the agent 
 "Redeemed an MCP invitation for @builder (agent), valid until TIME.
 The bearer token is in TMP/agent/bearers/room_ID, readable only by you. It is not shown anywhere else.
 MCP URL: http://ROOM/v1/rooms/room_ID/mcp
-Next: give your agent that URL with the header "Authorization: Bearer <token from the file>", for example:
-  claude mcp add --transport http artroom http://ROOM/v1/rooms/room_ID/mcp --header "Authorization: Bearer $(cat TMP/agent/bearers/room_ID)""
+Next: give your agent that URL with the header "Authorization: Bearer <token from the file>".
+Keep the token out of command arguments: read the file into the agent's environment, and name the variable in its configuration, for example:
+  export ARTROOM_BEARER="$(cat TMP/agent/bearers/room_ID)"
+  claude mcp add-json --scope project artroom '{"type":"http","url":"http://ROOM/v1/rooms/room_ID/mcp","headers":{"Authorization":"Bearer \${ARTROOM_BEARER}"}}'"
 `;
 
 exports[`the loop, as a person types it > a refusal prints rule, reason and fix on stderr with exit code 3 > generation-moved 1`] = `

@@ -30,15 +30,18 @@ The 13 files of that batch, by package: `packages/cli` (`README.md`,
 (`scripts/deploy-spike.sh`, `src/schema.ts`, `test/workerd/roster.cases.ts`);
 and one new script, `scripts/deploy-scripts.test.mjs`.
 
-**A reconciliation is owed at landing.** This branch was cut before that
-batch, and main was not merged into it. So the copies here of `cli`, `mcp`
-and `room/scripts/deploy-spike.sh` are older than main's. Of the other
-files of the batch, `client/src/connect.ts`, `client/test/redeem.test.ts`,
-`room/src/schema.ts` and `room/test/workerd/roster.cases.ts` are deleted
-here with the modules I1 replaces. When this branch lands, whoever lands it
-carries the batch's changes to the kept files into `parked/`, places or
-parks `scripts/deploy-scripts.test.mjs`, and records that the changes to
-the four deleted files have no successor here.
+**The reconciliation was made on this branch.** Main at
+`b2a0bb12dc3900b1cc71e5884683f0e121c6af66` was merged into it. The batch's
+changes to the kept files are carried into `parked/` as main made them:
+`cli` (`README.md`, `src/git.ts`, `src/main.ts`, one test snapshot), `mcp`
+(`src/tools.ts`, `test/schema.test.ts`, `test/stage0.test.ts`) and
+`room/scripts/deploy-spike.sh`. Those are main's changes, not edits made
+here. Four files of the batch are deleted here with the modules I1 replaces,
+so their changes have no successor in this tree: `client/src/connect.ts`,
+`client/test/redeem.test.ts`, `room/src/schema.ts` and
+`room/test/workerd/roster.cases.ts`. The batch's script check is parked,
+unedited, at `parked/scripts/deploy-scripts.test.mjs`: it reads deploy
+scripts under `packages/`, and none is active now. No command runs it.
 
 The exact earlier source of any file, deleted or kept, is in Git history
 at the two heads above.

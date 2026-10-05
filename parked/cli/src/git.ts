@@ -86,7 +86,7 @@ function normal(u: unknown): boolean {
 }
 
 /**
- * An MCP URL the CLI prints inside a shell command (`claude mcp add ...`):
+ * An MCP URL the CLI prints inside a shell command (`claude mcp add-json ...`):
  * `http` or `https`, in normal form, with only characters a shell takes
  * literally. A room that is not on https is the room's choice; what is
  * checked here is that the printed command is the command it appears to be.
