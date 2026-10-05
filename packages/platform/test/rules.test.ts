@@ -4,11 +4,11 @@ import type { Grant, SignedIntent } from "@generalbusiness/artroom-contract";
 import { keyIdOfSecret, textDigest } from "@generalbusiness/artroom-bytes";
 import type { ActJudgment, Item, PlatformRule, RuleGiven } from "@generalbusiness/artroom-derive";
 import { d, t } from "@generalbusiness/artroom-derive/testing";
-import { MEMBERSHIP, NO_MEMBER, ROLE_TABLE, actionsIn, membershipRules, standingOf } from "../src/membership.ts";
-import { Roster, TASK_ACTIONS, paul, rita, sam, una, vic } from "./support.ts";
+import { FIRST_ACTIONS, MEMBERSHIP, NO_MEMBER, ROLE_LISTS, actionsIn, membershipRules, standingOf, type Role } from "../src/membership.ts";
+import { Roster, paul, rita, sam, una, vic } from "./support.ts";
 
-// Every scope here is a `Roster` of test support: a membership scope in memory, below a made-up office, with STAND-IN rules for the
-// three marks that the authority note's table of marks does not list. The seven rules that are tested are the platform package's.
+// Every scope here is a `Roster` of test support: a membership scope in memory, below a made-up office, which is a STAND-IN for the
+// directory. Every rule of membership is the platform package's: the ten of the authority note's table of marks, at its revision 24.
 
 /** What a judgment answered: the result, with the reason and the refusal's name where it has them. */
 const said = (j: ActJudgment) => [j.result, "reason" in j ? j.reason : null, "name" in j ? (j.name ?? null) : null];
@@ -39,8 +39,8 @@ describe("the rules of platform:membership@1, each as a plain function (authorit
   const m = new Roster().seated();
   const [invitation, keyInvitation] = [invited(m), keyInvited(m, 2)];
   /** What a rule is given for an act of that signer: the state, the act, and what the judge resolved before the rule's place. */
-  const given = (who: typeof rita, fields: Record<string, string | number> = {}, subjects: Record<string, number> = {}, grant: Grant | null = null): RuleGiven => {
-    const signed: SignedIntent = m.intent(who, "an-act", { fields });
+  const given = (who: typeof rita, fields: Record<string, string | number> = {}, subjects: Record<string, number> = {}, grant: Grant | null = null, kind = "an-act"): RuleGiven => {
+    const signed: SignedIntent = m.intent(who, kind, { fields });
     return {
       state: m.state, input: { type: "act", signed, grant, presented: {} }, time: m.now, uses: [], own: m.own,
       resolved: { at: m.at, self: m.head.seq + 1, fields, subjects: new Map(Object.entries(subjects).map(([name, id]): [string, Item] => [name, m.item(id)])), signer: null, bounds: PROPOSED_BOUNDS },
@@ -82,14 +82,32 @@ describe("the rules of platform:membership@1, each as a plain function (authorit
     ["h: a member that is no admin is removed on a grant", "last-admin-kept", [given(rita, {}, { on: invitation }, aGrant)], { holds: true }],
     ["i: the last active key of the last admin is not revoked on a grant", "last-admin-kept", [given(rita, {}, { on: 3, "also.member": 2 }, aGrant)], { holds: false, name: "last-admin" }],
     ["i: the recovery key revokes it", "last-admin-kept", [given(sam, {}, { on: 3, "also.member": 2 })], { holds: true }],
+    // Row o: the five lists, each set whole on the roster that the entry opens, in the order of the note's table.
+    ["o: five `value` effects on the roster that the entry opens", "role-table", [given(rita)], (Object.keys(ROLE_LISTS) as Role[]).map((role) => ({ effect: "value", item: m.head.seq + 1, slot: ROLE_LISTS[role], value: FIRST_ACTIONS[role] }))],
+    // Row p: the member reference of this scope and the handle, on the member that the entry opens. `seat` reads the founding handle.
+    ["p: for `invite-member` and `add-member`, the field `handle`", "member-of", [given(rita, { handle: "@quinn" }, {}, null, "add-member")], [{ effect: "party", item: m.head.seq + 1, slot: "member", member: { membership: m.at, member: "@quinn" } }]],
+    ["p: for `seat`, the founding handle of the roster, whatever the act's fields hold", "member-of", [given(rita, { handle: "@quinn" }, {}, null, "seat")], [{ effect: "party", item: m.head.seq + 1, slot: "member", member: { membership: m.at, member: "@rita" } }]],
+    // Row q: `@`, then lowercase ASCII letters, digits and hyphens, with no hyphen first or last.
+    ["q: a handle holds", "handle-form", [given(rita, { handle: "@a-1b" })], { holds: true }],
+    ["q: one character after the `@` is enough", "handle-form", [given(rita, { handle: "@7" })], { holds: true }],
   ];
   for (const [row, rule, args, expected] of rows) test(`${rule}, row ${row}`, () => expect(run(rule, ...args)).toEqual(expected));
 
-  test("the table has exactly the seven rules that the note's table of marks names for membership, each of the kind of its place", () => {
+  test("the table has exactly the ten rules that the note's table of marks names for membership, each of the kind of its place; a text that is no handle is refused `bad-field`, named `bad-handle`, and is no member", () => {
     expect(Object.entries(membershipRules).map(([name, rule]) => [name, rule.place, "refusals" in rule ? rule.refusals : "most" in rule ? rule.most : null])).toEqual([
       ["founding-key", "grant", []], ["recovery-key", "grant", []], ["by-invitation", "grant", ["recovery-key", "key-in-use", "invitation-refused"]],
-      ["invitation", "also", null], ["key-id", "effect", 1], ["former-recovery", "effect", 1], ["last-admin-kept", "guard", ["last-admin"]],
+      ["invitation", "also", null], ["key-id", "effect", 1], ["former-recovery", "effect", 1],
+      ["role-table", "effect", 5], ["member-of", "effect", 1], ["handle-form", "guard", ["bad-handle"]], ["last-admin-kept", "guard", ["last-admin"]],
     ]);
+    // Row q, each way that a text is no handle: nothing after the `@`, a hyphen first or last, an uppercase letter, another
+    // character, no `@`, and no text. The length is the field's own type, and the rule does not judge it.
+    const BAD = { holds: false, name: "bad-handle", code: "bad-field" };
+    const texts = ["@", "@-a", "@a-", "@Una", "@a_b", "@a b", "una", "@é"];
+    expect(texts.map((handle) => run("handle-form", given(rita, { handle })))).toEqual(texts.map(() => BAD));
+    expect([run("handle-form", given(rita)), run("handle-form", given(rita, { handle: `@${"a".repeat(1000)}` }))]).toEqual([BAD, { holds: true }]);
+    // Row p refuses nothing: `handle-form` refused such a text before it in the same entry. Met all the same, it is a fault of the
+    // rule, and no member is opened with an ID that is no handle (I3 deltas, entry EX2).
+    expect(() => run("member-of", given(rita, { handle: "@Una" }, {}, null, "add-member"))).toThrow();
   });
 });
 
@@ -121,13 +139,13 @@ test("a join with a valid invitation admits the key; a used one and none are eac
   expect(said(join(m, vic, invitation))).toEqual(["refused", "guard-failed", "invitation-used"]);
 
   // An invitation that has reached its end time (section 3.3, "At the bound"; W9). No act passes a transition that is due (the
-  // contract's section 5.2, step 6.3), so the timed end is written first and the invitation is `lapsed`. The join is then refused by
-  // the guard on the invitation's state, with that guard's name: the row's guard `invitation-expired` is never the one that fails
-  // (I3 deltas, entry EM16). A lost timer admits nothing either way.
+  // contract's section 5.2, step 6.3), so the timed end is written first and the invitation is `lapsed`. The timed end changes no
+  // answer: an invitation that has ended is answered `invitation-expired`, and one that was used is answered `invitation-used`, also
+  // after its end time (section 3.6, check 7; the note's revision 24 on the I3 delta EM16). A lost timer admits nothing either way.
   const late = invited(m, rita, "@vic", "another secret");
   m.now = ENDS;
-  expect([said(join(m, vic, late, "another secret")), m.drain().map((done) => done.result), m.item(late).state, said(join(m, vic, late, "another secret"))])
-    .toEqual([["due", null, null], ["write"], "lapsed", ["refused", "guard-failed", "invitation-used"]]);
+  expect([said(join(m, vic, late, "another secret")), m.drain().map((done) => done.result), m.item(late).state, said(join(m, vic, late, "another secret")), said(join(m, vic, invitation))])
+    .toEqual([["due", null, null], ["write"], "lapsed", ["refused", "guard-failed", "invitation-expired"], ["refused", "guard-failed", "invitation-used"]]);
 });
 
 // The plan's T13 (the proof plan's V9), with the cases of section 3.1 and of section 12.1.3.
@@ -177,9 +195,16 @@ test("membership answers an observation from its head: the key's state, its memb
   const m = new Roster().seated();
   const of = m.at;
   const common = { of, head: m.head, definition: MEMBERSHIP, within: { membership: of }, controller: null, controllerActive: null, notAfter: null };
-  // The first table: an admin's list is the table's row for an admin, less the four actions on one task, by the STAND-IN rule.
-  const admin = actionsIn("admin").filter((action) => !TASK_ACTIONS.includes(action));
-  expect([actionsIn("admin").length, ROLE_TABLE.flat(2).length > 0, admin.length]).toEqual([34, true, 30]);
+  // The first table (section 3.2, "The table, counted"): an admin has 34 actions, a maintainer 25, a member 22, an agent 18 and a
+  // checker 2. The lists of the rule `role-table` are the note's counted lists, and each is what the note's table gives the role,
+  // row for row, in its order. No name is left out, so an admin holds `task.control`.
+  const roles = Object.keys(ROLE_LISTS) as Role[];
+  expect(roles.map((role) => [role, FIRST_ACTIONS[role].length])).toEqual([["admin", 34], ["maintainer", 25], ["member", 22], ["agent", 18], ["checker", 2]]);
+  expect(roles.map((role) => FIRST_ACTIONS[role])).toEqual(roles.map(actionsIn));
+  // The roster that `establish` opened holds exactly those five lists, set by the rule.
+  expect(roles.map((role) => m.item(0).values[ROLE_LISTS[role]])).toEqual(roles.map((role) => FIRST_ACTIONS[role]));
+  const admin = [...FIRST_ACTIONS.admin];
+  expect(admin.includes("task.control")).toBe(true);
   expect(standingOf(m.state, { of, key: rita.key })).toEqual({ ...common, key: rita.key, keyState: "active", member: "@rita", memberState: "active", role: "admin", actions: admin });
   // A key that no item holds: `unknown`, with no member and no action. An invited member is no member yet.
   const member = invited(m);
@@ -196,7 +221,7 @@ test("membership answers an observation from its head: the key's state, its memb
   m.did(rita, "add-member", { fields: { handle: "@bot", kind: "agent", controller: { membership: of, member: "@una" } } });
   expect(standingOf(m.state, { of, member: "@bot" })).toMatchObject({ role: "agent", activeKey: false, controller: "@una", controllerActive: true });
   expect([said(m.act(rita, "add-member", { fields: { handle: "@bot2", kind: "agent" } })), said(m.act(rita, "add-member", { fields: { handle: "@Bad", kind: "checker" } }))])
-    .toEqual([["refused", "guard-failed", "no-controller"], ["refused", "bad-field", "handle-form"]]);
+    .toEqual([["refused", "guard-failed", "no-controller"], ["refused", "bad-field", "bad-handle"]]);
 
   // Row 23: after a removal an observation of any key of that member answers that the member is removed. The key item does not change.
   const key = m.item(member + 1);

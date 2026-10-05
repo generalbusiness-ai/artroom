@@ -46,12 +46,11 @@ export type PlatformName = "platform:register" | "platform:directory" | "platfor
 export type RuleTable = { readonly [name in PlatformName]?: Rules };
 
 /**
- * The rules that are written: those of the inbox, and those of membership
- * that the authority note's table of marks names. Membership's data holds
- * three more marks, for places that the note's rows state and its table
- * does not list, and no rule is written for them (`membership.ts`). So this
- * table does not make `platform:membership@1` runnable. The three rules of
- * the rules scope are the whole of its version (`rules-scope.ts`).
+ * The rules that are written: those of the inbox, and the ten of membership
+ * that the authority note's table of marks names (revision 24). They are
+ * the whole of membership's version, so `platform:membership@1` is
+ * runnable (`membership.ts`). The three rules of the rules scope are the
+ * whole of its version (`rules-scope.ts`).
  */
 export const RULES: RuleTable = {
   "platform:inbox": inboxRules, "platform:membership": membershipRules,

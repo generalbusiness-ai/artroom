@@ -2,8 +2,7 @@ import { expect, test } from "vitest";
 import { PROPOSED_BOUNDS, type DeclaredDefinition } from "@generalbusiness/artroom-contract";
 import { definitionDigest } from "@generalbusiness/artroom-bytes";
 import { PROFILES, derivable, runnable, validateDefinition } from "@generalbusiness/artroom-derive";
-import { RULES, definitions, inbox, membership, platform } from "../src/index.ts";
-import { standIns } from "./support.ts";
+import { ROLE_LISTS, RULES, definitions, inbox, membership, platform } from "../src/index.ts";
 
 // The plan's T43, for the one definition that exists: `platform:inbox@1` (authority note, revision 16, section 12.1.6).
 test("the inbox definition validates whole with the platform option, with its marks listed, and is refused without it", () => {
@@ -42,8 +41,8 @@ test("the inbox definition validates whole with the platform option, with its ma
   expect(Object.keys(definitions)).toEqual(["platform:inbox", "platform:membership", "platform:register", "platform:directory", "platform:rules", "platform:destination"]);
 });
 
-// The plan's T43, for `platform:membership@1` (authority note, revision 21, section 12.1.3, and its table of marks, section 12.1.8).
-test("the membership definition validates whole with the platform option; every mark of the note's table has its rule; three marks that the table does not list have none, so the package's rules do not run it", () => {
+// The plan's T43, for `platform:membership@1` (authority note, revision 24, section 12.1.3, and its table of marks, section 12.1.8).
+test("the membership definition validates whole with the platform option; every mark has its rule, the three of revision 24 among them, so the package's rules run it, and with any one of the ten missing they do not", () => {
   const checked = validateDefinition(JSON.parse(JSON.stringify(membership)), PROPOSED_BOUNDS, PROFILES, { platform: true });
   if (!checked.ok) throw new Error(`membership is refused: ${JSON.stringify(checked.problems)}`);
   expect([checked.definition.underived, derivable(checked.definition, null), membership.capabilities, membership.rules, membership.outcomes, membership.receives]).toEqual([[], true, [], {}, {}, {}]);
@@ -68,18 +67,24 @@ test("the membership definition validates whole with the platform option; every 
     [1, "acts.revoke-key.grant", "recovery-key", "P13"], [4, "acts.revoke-key.guards.1", "last-admin-kept", "P13"],
     [1, "acts.rotate-recovery.grant", "recovery-key", "P13"], [5, "acts.rotate-recovery.effects.1", "former-recovery", "P24"],
   ];
-  // Three places that the note's rows state, that no form can say, and that its table does not list. Each is a mark whose row is the
-  // entry of the I3 deltas note, and the package has no rule for it.
-  const unlisted = [
-    [5, "acts.establish.effects.4", "role-table", "EM6"], [5, "acts.seat.effects.4", "member-of", "EM7"],
-    [4, "acts.invite-member.guards.1", "handle-form", "EM8"], [5, "acts.invite-member.effects.5", "member-of", "EM7"],
-    [4, "acts.add-member.guards.1", "handle-form", "EM8"], [5, "acts.add-member.effects.6", "member-of", "EM7"],
+  // Rows o, p and q of the note's revision 24: the role table, a member from a handle, and the form of a handle, each under its row
+  // of the table of forms (P10, P26 and P27).
+  const later = [
+    [5, "acts.establish.effects.4", "role-table", "P10"], [5, "acts.seat.effects.4", "member-of", "P26"],
+    [4, "acts.invite-member.guards.1", "handle-form", "P27"], [5, "acts.invite-member.effects.5", "member-of", "P26"],
+    [4, "acts.add-member.guards.1", "handle-form", "P27"], [5, "acts.add-member.effects.6", "member-of", "P26"],
   ];
-  expect([...marks].sort()).toEqual([...listed, ...unlisted].sort());
+  expect([...marks].sort()).toEqual([...listed, ...later].sort());
+  // The five lists of the roster, and the field of `set-actions`, hold 64 (section 3.2, "The table, counted"), which is the contract's
+  // bound on a list from its revision 19. At a bound of 32 the data does not validate: no scope is founded under it there.
+  const at32 = validateDefinition(JSON.parse(JSON.stringify(membership)), { ...PROPOSED_BOUNDS, listElements: 32 }, PROFILES, { platform: true });
+  expect(at32.ok ? null : at32.problems.map((p) => [p.code, p.path])).toEqual(Object.values(ROLE_LISTS).map((slot) => ["bound", `items.roster.values.${slot}.of.max`]));
+  // The whole-scope rule (the contract's section 6.1): a version with a mark and no rule runs nothing. The package has the ten rules
+  // of the note's table, each of the kind of its mark's place, and no other. Without any one of them the version is not runnable.
   const { rules } = platform("platform:membership@1")!;
-  expect(checked.definition.marks.filter((mark) => !Object.hasOwn(rules, mark.code)).map((mark) => mark.code).sort()).toEqual(unlisted.map(([, , code]) => code).sort());
-  // The whole-scope rule (the contract's section 6.1): a version with a mark and no rule runs nothing. With a stand-in for each of the
-  // three, of test support, it can be run, and without any one of them it cannot.
-  expect([runnable(checked.definition, rules), runnable(checked.definition, { ...rules, ...standIns }), ...Object.keys(standIns).map((lost) => runnable(checked.definition, { ...rules, ...standIns, [lost]: undefined as never }))])
-    .toEqual([false, true, false, false, false]);
+  expect(Object.entries(rules).map(([name, rule]) => [name, rule.place])).toEqual([
+    ["founding-key", "grant"], ["recovery-key", "grant"], ["by-invitation", "grant"], ["invitation", "also"], ["key-id", "effect"], ["former-recovery", "effect"],
+    ["role-table", "effect"], ["member-of", "effect"], ["handle-form", "guard"], ["last-admin-kept", "guard"],
+  ]);
+  expect([runnable(checked.definition, rules), ...Object.keys(rules).map((lost) => runnable(checked.definition, { ...rules, [lost]: undefined as never }))]).toEqual([true, ...Object.keys(rules).map(() => false)]);
 });

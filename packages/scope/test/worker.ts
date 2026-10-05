@@ -14,20 +14,21 @@
  * with the production authority: no test authority and no scripted
  * membership. A membership scope there judges its own acts on its own head,
  * and every other scope reads the membership scope that its genesis
- * records, through the namespace. Five of its ports are not the production
+ * records, through the namespace. Four of its ports are not the production
  * ones, and each is labelled: the shared scripted clock, and transport that
  * a test can hold; the test readers,
- * a stand-in for read sessions, until a test sets `platformNet.sessions`, and from then the real read sessions; the scripted peers,
- * a stand-in for a lane that sends a notice; and, while `platformNet.standIns`
- * is set, the platform package's STAND-IN rules for the three marks of
- * membership that have no rule yet.
+ * a stand-in for read sessions, until a test sets `platformNet.sessions`, and from then the real read sessions; and the scripted peers,
+ * a stand-in for a lane that sends a notice. The platform definitions are
+ * the platform package's, with every rule of membership, as deployed. A
+ * test may take one rule of membership away, `platformNet.without`, as a
+ * control of the whole-scope rule.
  *
  * The package exports this file as `./testing/worker`, for the test Worker
  * of a package that runs its own definitions on real scopes.
  */
 
 import { platform } from "@generalbusiness/artroom-platform";
-import { withStandIns } from "@generalbusiness/artroom-platform/testing";
+import { lacking } from "@generalbusiness/artroom-platform/testing";
 import { ScopeObject, type Wiring } from "../src/index.ts";
 import { sessionsOf, type LimitConfig } from "../src/index.ts";
 import { codeLost, controls, net, netPorts, testPorts } from "../src/testing.ts";
@@ -56,13 +57,11 @@ export class NetScope extends DeployedScope<NetEnv> {
 }
 
 /**
- * What a test holds of the namespace `PLATFORM`. `standIns`: true, a scope
- * there is given the STAND-IN rules of the platform package's test support
- * for the three marks of membership that the package has no rule for.
- * False: the platform definitions are exactly the platform package's, as
- * under the production wiring. `without`: the name of one stand-in rule
- * that is left out, for a version of membership that lacks one rule. Both
- * are read at each use.
+ * What a test holds of the namespace `PLATFORM`. `without`: null, the
+ * platform definitions are exactly the platform package's, as under the
+ * production wiring. Otherwise the name of one rule of membership that is
+ * left out, a CONTROL for a runtime whose version of membership lacks one
+ * rule. It is read at each use.
  *
  * `sessions`: false, the readers port is the test readers, a STAND-IN that
  * lets every reader read, so that a fixture can be built and looked at.
@@ -73,7 +72,7 @@ export class NetScope extends DeployedScope<NetEnv> {
  * Both are read at each use. `limits`: the serving limits of a join, read
  * when a scope's object starts. Null: the proposed ones.
  */
-export const platformNet: { standIns: boolean; without: string | null; sessions: boolean; secret: string | null; limits: LimitConfig | null } = { standIns: true, without: null, sessions: false, secret: null, limits: null };
+export const platformNet: { without: string | null; sessions: boolean; secret: string | null; limits: LimitConfig | null } = { without: null, sessions: false, secret: null, limits: null };
 /** The name of the test deployment, which a session's token names. */
 export const TEST_DEPLOYMENT = "artroom-scope-test";
 
@@ -100,7 +99,7 @@ export class PlatformScope extends DeployedScope<PlatformEnv> {
         transport: { send: (envelope) => (net.hold?.(envelope) ? Promise.resolve(null) : transport!.send(envelope)) },
         // A scripted peer: an entry that a test wrote by hand, for a lane that sends a notice. Every other entry is read from the real object.
         resolver: { read: (fact, seconds) => { const peer = net.peers.get(fact.hash); return peer ? Promise.resolve(peer) : resolver.read(fact, seconds); } },
-        definitions: { read: (named, holder) => definitions.read(named, holder), platform: (named) => (platformNet.standIns ? withStandIns(named, platformNet.without) : platform(named)) },
+        definitions: { read: (named, holder) => definitions.read(named, holder), platform: (named) => (platformNet.without === null ? platform(named) : lacking(named, platformNet.without)) },
       },
     };
   }
