@@ -31,8 +31,10 @@ else
   echo "install    skipped: node_modules was installed from this package-lock.json"
 fi
 # Whitespace errors in what this branch changed, if the base is known.
+# -B: a path that holds a new file, while the file it held at the base moved elsewhere unchanged, is read as a rewrite and a
+# move. Without it the moved file is read as new, and its old lines are reported as this branch's.
 base=$(git merge-base HEAD origin/main 2>/dev/null)
-if [ -n "$base" ]; then step whitespace git diff --check "$base"; fi
+if [ -n "$base" ]; then step whitespace git diff --check -B "$base"; fi
 [ "$failed" = 0 ] && step typecheck npm run typecheck
 [ "$failed" = 0 ] && step test npm test
 if [ "$failed" = 0 ]; then
