@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:edef315ddf528f9483d50569be8b907c2c97f870","text":"Republished at 34d3b65664072b147c3967d3fd7620c841743985; the successor stands at packages/replay/src/verify.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:e08069f51e8a05c6072566be1149910b20ba8df7","text":"Republished at 34d3b65664072b147c3967d3fd7620c841743985, which no longer changes packages/replay/src/web.d.ts: the pointer is withdrawn with no successor."}
