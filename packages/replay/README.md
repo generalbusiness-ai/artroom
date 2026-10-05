@@ -132,7 +132,7 @@ reply arrives, before anything in it is kept.
 | `bytes` | Raw bytes of the source's replies, as read: pages and retained inputs | 256 MiB | The reply that would pass it is cancelled and not taken in. `incomplete`, with the coverage so far. |
 | `entries` | Entries checked, over all scopes | 100,000 | `incomplete`. |
 | `scopes` | Scopes whose history is read | 64 | `incomplete`. |
-| `depth` | Foreign facts followed in a chain from the target | 16 | `incomplete`. |
+| `depth` | Foreign facts followed in a chain from the target, also while owed texts are settled | 16 | `incomplete`. |
 | One page | Raw reply bytes, and entries | 4 MiB (`PAGE_REPLY_BYTES`); 200 (`PAGE_ENTRIES`) | The page is not taken in. The history cannot be read past it: `incomplete` for the target, `missing-dependency` for a source. |
 | One retained input | Raw reply bytes | 4 MiB (`RETAINED_REPLY_BYTES`) | It is not taken in: `incomplete`, as a retained input that is missing. |
 | One read | Seconds | 30 (`READ_SECONDS`) | The request is aborted, and the reader starts no read and keeps no chunk after that. A `fetch` that ignores the abort signal may keep its own buffers and its connection. A read error: `verify` rejects with `SourceError`, and there is no report. |

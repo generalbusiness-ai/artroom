@@ -292,8 +292,8 @@ and its `under` is that definition's name. The kind and the name are two
 checks, and one does not excuse the other. A reader that does not hold the
 other definition cannot check the recorded kind itself. It relies on the
 other scope's judge, as it does for every member of a fetched entry. This
-follows a proposed revision of the scope contract, which is not adopted
-yet (`notes/2026-10-05-i2-contract-deltas.md`, section 24).
+follows revision 12 of the scope contract, which is adopted
+(`notes/2026-10-05-i2-contract-deltas.md`, section 24).
 
 **Operands.** An operand is what a guard, an effect or a send reads.
 
@@ -320,6 +320,13 @@ fetched. `kind`, `intent`, `on`, `{ field }`, `{ opened }` and `{ set }`
 are read from the entry's bytes. `{ of, then }` reads a fact that the
 entry holds, and then that fact's scope or position. A part that is not
 there reads as nothing. It is never an error.
+
+A `{ field }` of this scope's own entry is read by this scope's types. A
+`{ field }` of an entry of another scope is the value in that entry's
+bytes, with no type applied: the reader does not hold the other
+definition, and its own handlers say nothing of that entry. So where a
+sender wrote the `self` mark in a message, a reader in another scope reads
+the record `{ "self": true }`, and not the sender's entry.
 
 **Local facts.** A fact that names this scope's own entry is not fetched.
 It is checked against the scope's own history, and a wrong hash is refused

@@ -17,7 +17,7 @@ The texts it reads, and the short names used below:
 | The lane forms | Lane forms and browser flow, revision 14, at `4b3bf5da` | Adopted |
 | The proof plan | Proof and test economy, revision 9, at `85be9f0b` | Adopted |
 | The demo contract | Demo contract, revision 4, at `3b6e1ad7` | Adopted |
-| Revision 12 | The contract's revision 12, at `aeda54f7` | Under review. Proposed, not adopted. Request `d56d7f65` owns it. |
+| Revision 12 | The contract's revision 12, at `aeda54f7` | Under review when this plan was written. Adopted since, as amended at `53f0e183` (act `b2833098`). Request `d56d7f65` owns it. |
 | The authority note | Authority, effects and publication, revision 13, at `2709006c` | A historical input. Its successor is request `406983fe`. This plan takes no new authority from it. |
 
 Section numbers with no name are the contract's. A source path that
