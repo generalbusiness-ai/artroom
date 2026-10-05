@@ -47,6 +47,7 @@ describe("the token ledger at a real scope, through the host port (authority not
     // Both tokens are `live`, so the staging is sent, once. Its confirmed read ends the use of both: each is `revoking`, with a
     // revocation by its own ID. The host revokes both. The reply for token 1 is lost: `unknown`, and the token stays `revoking`.
     await h.drain();
+    expect(stager.sent).toEqual([`${stage}#1`]);
     const ended = (await s.entries(head + 3))[0]!;
     const revocations = ended.effects.flatMap((e) => (e.effect === "operation" && e.kind === "revoke" ? [`${ended.seq}:${e.k}` as OperationId] : []));
     expect([stager.sent, revocations.length, host.asked.slice(2).map((a) => `${a.call} ${a.token} ${"id" in a ? a.id : ""}`).sort(), host.listing(), await h.tokens()]).toEqual([
