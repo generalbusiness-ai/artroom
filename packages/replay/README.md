@@ -98,6 +98,17 @@ them. The package itself has none.
   staged refs and the branch as they are now are never read. With the
   snapshot's bytes gone the result is `incomplete`.
 
+The walk of an ancestry record is not derived. The verifier reads no
+commit, so it cannot show the record's stops, the basis of its start,
+`published`, its list F or its count of visited commits. A history that
+holds an ancestry record is therefore never `consistent`. Every other
+check runs first, so a mismatch in the history is still reported as a
+mismatch. If there is none, the result is `incomplete`, `at` names the
+check entry, and the words name the walk. Here `incomplete` means: no
+entry was found wrong, and the replay makes no claim for that check. The
+coverage then lists the entries that were derived, the check entry among
+them, although its walk was not.
+
 Without the code for a step, or for an owner, the result is
 `unsupported-definition` at that entry.
 
@@ -160,7 +171,7 @@ service being checked.
 | `consistent` | Everything the mode checks holds, through the head, for the coverage and trusts stated. |
 | `mismatch` | An entry is not what its bytes, its chain, its signature or its replay say; or a reference names another entry, incarnation or kind than its source scope has; or the history does not reach or match the known head. `at` names the entry. |
 | `missing-dependency` | A source history cannot be read, or does not reach the entry a reference names, and no anchor names it. `at` names the entry that used it. |
-| `incomplete` | A retained input is missing or is not the bytes its digest names; or a detached text is gone and no later entry redacts it; or a limit was reached. |
+| `incomplete` | A retained input is missing or is not the bytes its digest names; or a detached text is gone and no later entry redacts it; or the history holds an ancestry record, whose walk the replay does not derive; or a limit was reached. |
 | `unsupported-definition` | The scope pins a platform definition for which the caller gave no data and rules (`platform`), or gave them without a rule for one mark of the data; or a declaration that does not pass validation under the bounds given, or a declaration that needs a capability version the caller gave no rules for. `at` names the genesis. Also a `preparation` entry of a step, or an `outcome` entry of an owner, that the caller gave no rules for, and an observation of the rules: `at` names that entry. |
 
 The check stops at the first finding. The report's coverage lists, for each
@@ -228,11 +239,6 @@ A report lists these under `trusts`, each only when it applies:
 - `staged-ref-read`: that the Git host returned the snapshot of staged
   refs and the head that an ancestry record names, and that the lane kept
   what was returned;
-- the walk of each ancestry record. The replay reads no commit. So the
-  stops, the basis of the start, `published`, the list F and the count of
-  visited commits are taken as the check entry records them. What is
-  derived of a record is its snapshot's digest and count, and, at the act
-  that reads it, the guard's verdict against the lane's records;
 - `platform-code`, for each platform definition whose rules the replay
   ran: that those rules are the rules of that name and version;
 - each anchor, and the definition name retained with an anchored entry;
@@ -290,7 +296,8 @@ one row for each way a history can fail.
 `test/staging.ts` builds two more histories with derive's judges. `Lane`
 is a staging lane under derive's fixture definition, with the code of
 `hold@1` and `git-read@1`: it stages a commit, checks it, admits a report
-and retires the root. `Gate` is a scope under made-up platform data whose
+and retires the root. Its replay is `incomplete`, for the walk; without the
+check entry it is `consistent`. `Gate` is a scope under made-up platform data whose
 rule opens an operation and derives its outcome. Their creator, their
 membership and every outside answer are stand-ins, and the file labels
 each. The tests change one place of a history and name the mismatch.

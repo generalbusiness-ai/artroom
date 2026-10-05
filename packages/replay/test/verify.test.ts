@@ -180,12 +180,13 @@ describe("a preparation, its outcomes and an ancestry record are derived again (
    *   8 outcome of the check: the check entry, with the ancestry record   9 act `report`, admitted on the guard `ancestry`
    *   10 act `refuse-report`: the pin is released   11 timed: the hold ends   12 preparation `retire`   13 outcome of the delete: the root is retired
    */
-  function staged() {
+  function staged(checked = true) {
     const s = new Lane();
     s.prepare(una, "instance", { hold: s.hold, task: { ...otherLane, kind: "task" }, instance: "i1" });
     const report = s.intent(una, "report", { expected: { commitment: s.item(s.commitment).revision }, fields: { commitment: s.commitment, commit: X } });
     const stage = s.asked(report, "stage");
     const live = s.outcome(s.opened(stage.seq, "stage"), "confirmed", {}, "read");
+    if (!checked) return s;
     s.outcome(s.opened(live.seq, "check"), "confirmed", { record: clean(s.at, X, 1) }, "own-answer");
     if (s.submit(report).result !== "write") throw new Error("the report was not admitted");
     s.did(rita, "refuse-report", { on: s.last.seq, expected: { on: 1 } });
@@ -197,13 +198,23 @@ describe("a preparation, its outcomes and an ancestry record are derived again (
   }
   const replayed = (s: Lane, history: MemoryScope, over: Partial<Options> = {}) => verify(new MemorySource([history]), { mode: "replay", scope: s.at.scope, anchors: s.anchors(), capabilities: cap, owners: cap, ...over });
 
-  test("a lane's history with three preparations, their outcomes and a check entry is consistent after the root is retired: the act that the guard `ancestry` admitted is derived from the record and the retained snapshot, and the report lists what of the outside is trusted (T24; witnesses 18.4 and 18.10)", async () => {
+  test("a lane's history with preparations and their outcomes, and no ancestry record, is consistent, and the report lists what of the outside is trusted (witness 18.4)", async () => {
+    const s = staged(false);
+    const { report, why } = await replayed(s, s.served());
+    expect([s.last.input.type, report.result, why, report.coverage]).toEqual(["outcome", "consistent", null, [{ scope: s.at, from: 0, through: 7 }]]);
+    // The stand-ins are anchored: the directory's two entries and the one head of membership.
+    expect(report.trusts).toEqual([TRUSTS.clock, TRUSTS.head, TRUSTS.minted, TRUSTS.held, TRUSTS.delivered, TRUSTS.observed, TRUSTS.outcomes, TRUSTS.dispatched, TRUSTS.anchors, TRUSTS.bounds]);
+  });
+
+  test("a lane's history with a check entry, after the root is retired: every entry is derived, the act that the guard `ancestry` admitted among them, from the record and the retained snapshot; the walk is not derived, so the result is `incomplete` at the check entry and never `consistent` (T24; witness 18.10; I3 deltas, entry EU2)", async () => {
     const s = staged();
     expect([s.entries.map(({ entry }) => entry.input.type).slice(5), s.state.record("hold@1", "root", [1])?.state]).toEqual([["preparation", "preparation", "outcome", "outcome", "act", "act", "timed", "preparation", "outcome"], "retired"]);
     const { report, why } = await replayed(s, s.served());
-    expect([report.result, why, report.coverage]).toEqual(["consistent", null, [{ scope: s.at, from: 0, through: 13 }]]);
-    // The stand-ins are anchored: the directory's two entries and the one head of membership. Nothing of the Git host is read.
-    expect(report.trusts).toEqual([TRUSTS.clock, TRUSTS.head, TRUSTS.minted, TRUSTS.held, TRUSTS.delivered, TRUSTS.observed, TRUSTS.outcomes, TRUSTS.dispatched, TRUSTS.staged, TRUSTS.walked, TRUSTS.anchors, TRUSTS.bounds]);
+    // No entry is a mismatch through the head, entry 13, which follows the retirement. The one thing not shown is the walk of the record in entry 8.
+    expect([report.result, report.at, report.coverage]).toEqual(["incomplete", s.fact(8), [{ scope: s.at, from: 0, through: 13 }]]);
+    expect(why).toBe(`the walk of the ancestry record in entry 8 of ${s.at.scope} was not derived: this replay reads no commit, so the stops, the basis of the start, \`published\`, the list F and the count of visited commits are not shown`);
+    // Nothing of the Git host is read: that it returned the snapshot and the head is listed as trusted.
+    expect(report.trusts).toEqual([TRUSTS.clock, TRUSTS.head, TRUSTS.minted, TRUSTS.held, TRUSTS.delivered, TRUSTS.observed, TRUSTS.outcomes, TRUSTS.dispatched, TRUSTS.staged, TRUSTS.anchors, TRUSTS.bounds]);
   });
 
   /** Both copies of the ancestry record that the check entry holds: in its evidence, and in the `check` record that its rule derives. */

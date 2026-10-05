@@ -18,7 +18,9 @@
  * an outcome entry with the rules of the owner of its operation, when the
  * caller supplies that code. Without it either entry is
  * `unsupported-definition`. What an outcome's evidence says of the world
- * outside the service is never derived: it is listed under `trusts`.
+ * outside the service is never derived: it is listed under `trusts`. The
+ * walk of an ancestry record is not derived either, because the verifier
+ * reads no commit: a history that holds such a record is `incomplete`.
  *
  * A detached text is checked against the digest that names it. A text whose
  * bytes are gone is reported as redacted when a later entry of the same
@@ -163,7 +165,6 @@ export const TRUSTS = {
   outcomes: "each outcome's evidence, and that the outside write happened: the answer of the outside system is taken as the entry records it. `own-answer`: that an answer was that attempt's own. `host-read`: that a read returned what was recorded",
   dispatched: "that the outside effects which a preparation entry opened were dispatched only after that entry was sealed",
   staged: "staged-ref-read: that the Git host returned the snapshot of staged refs and the head that each ancestry record names, when the staging lane read them, and that the lane kept what was returned",
-  walked: "each ancestry record's walk: the commits are not read, so the stops, the start's basis, `published`, the list F and the count of visited commits are taken as the check entry records them",
   anchors: "each anchor as the caller supplied it, and the definition name retained with each anchored entry",
   bounds: "the bounds: each scope is taken to run under the bounds this replay was given",
   redacted: "each redacted text: its bytes are gone, so nothing shows that they were the text its digest names, or that they were within the bound of their field",
@@ -292,6 +293,11 @@ class Verifier {
   readonly #anchored: FactRef[] = [];
   /** Each tombstone that answered for a text whose bytes are gone, with the slot that held the text. */
   readonly #redacted: Report["redacted"][number][] = [];
+  /**
+   * Sections 9.3 and 16.4: each check entry whose ancestry record was read and whose walk was not derived. The verifier has no
+   * source of commits, so it makes no claim for such a check: once every other check has run, the result is `incomplete`.
+   */
+  readonly #unwalked: FactRef[] = [];
   #entries = 0;
   #bytes = 0;
 
@@ -336,6 +342,10 @@ class Verifier {
       const last = target.sealed[target.head.seq]!;
       if (last.hash !== target.head.hash) throw new Stop("mismatch", "the head the source states is not the hash of its last entry", { at: target.at!, seq: last.entry.seq, hash: last.hash });
       await this.#settle();
+      // Section 16.4: a check whose walk cannot be derived gets no claim. It is said last, so that every mismatch that the history
+      // shows is reported first: of the record's snapshot, and of the act that the guard `ancestry` admitted on the record.
+      const unwalked = this.#unwalked[0];
+      if (unwalked) throw new Stop("incomplete", `the walk of the ancestry record in entry ${unwalked.seq} of ${unwalked.at.scope} was not derived: this replay reads no commit, so the stops, the basis of the start, \`published\`, the list F and the count of visited commits are not shown`, unwalked);
     } catch (error) {
       if (!(error instanceof Stop)) throw error;
       stop = error;
@@ -842,7 +852,10 @@ class Verifier {
    * Of an ancestry record this derives what the bytes alone give: the
    * snapshot's digest and its count. The staged refs and the branch as
    * they are now are never read. The commits are not read either, so the
-   * walk is not derived again: `walked`, under `trusts`.
+   * walk is not derived again. The contract asks for the walk, or for
+   * `incomplete` (sections 9.3 and 16.4): the entry is noted, and the
+   * replay ends `incomplete` for it once every other check has run (I3
+   * deltas, entry EU2).
    */
   async #snapshots(run: Run, input: Extract<Entry["input"], { type: "outcome" }>, owners: Owners | undefined, owner: unknown, kind: unknown, where: FactRef): Promise<void> {
     let named: readonly Digest[] = [];
@@ -861,7 +874,7 @@ class Verifier {
     const pairs = snapshotRead(record.snapshot.digest, run.snapshots.get(record.snapshot.digest)!);
     if (pairs && pairs.length !== record.snapshot.count) throw new Stop("mismatch", `the ancestry record states ${record.snapshot.count} staged refs, and the snapshot that it names holds ${pairs.length}`, where);
     this.#trusts.add("staged");
-    this.#trusts.add("walked");
+    this.#unwalked.push(where);
   }
 
   async #replay(run: Run, entry: Entry, hash: Digest, bytes: string, where: FactRef, depth: number): Promise<void> {
