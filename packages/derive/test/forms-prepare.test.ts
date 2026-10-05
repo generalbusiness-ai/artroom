@@ -4,6 +4,7 @@ import type { SignedIntent } from "@generalbusiness/artroom-contract";
 import { intentDigest, isSealed } from "@generalbusiness/artroom-bytes";
 import { WINDOWS, clockOf, judgePreparation, preparationStatus } from "../src/index.ts";
 import type { GrantDecision, Steps, Window } from "../src/index.ts";
+import { kindOf } from "../src/operand.ts";
 import { Scope, grantOf, keys, laneDefinition, otherLane, t } from "./fixtures.ts";
 
 const { una, vic } = keys;
@@ -46,6 +47,8 @@ describe("a preparation (scope contract, section 5.5), with stand-in step rules"
       ],
       [], [], true,
     ]);
+    // Section 6.2: the entry's kind is its capability and its step, read from its own bytes. No act kind has that form.
+    expect(kindOf(entry)).toBe("hold@1:instance");
     // Section 5.5, "A repeat": the index answers the same intent, capability and step with the first entry, also after `notAfter`.
     // Another step of the same intent is another entry's to prepare, and the intent's own turn is still to come.
     expect([ask(signed), ask(signed, "instance", { reading: t(3600) }), said(ask(signed, "stage")), s.state.accepted(una.key, signed.intent.idempotencyKey)])

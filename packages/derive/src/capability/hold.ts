@@ -637,8 +637,11 @@ export function holdReserves(view: StateView, definition: ValidDefinition): numb
  * pins.
  *
  * `implements` answers for each form (section 6.1). The four guards, the
- * four effects and a `carried` part are derived. The kind of a preparation
- * step's entries is not: no judge gives an outcome entry a kind yet.
+ * four effects and a `carried` part are derived. The kind of a step's
+ * entries is not. `kindOf` gives a preparation entry its kind, and gives an
+ * outcome entry none: the kind is not in an outcome entry's bytes (I3
+ * deltas, entry EH3). A definition that names such a kind names a check
+ * entry, which is an outcome entry, so the form stays without code.
  * The steps `retry` and `job-read`, and the operations of a fork, are not
  * built here: with no rules for them, nothing of them is judged or sent.
  */
