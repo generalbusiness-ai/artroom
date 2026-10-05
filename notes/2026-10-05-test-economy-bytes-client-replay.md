@@ -18,6 +18,9 @@ changed, which test now witnesses each invariant, and what was left.
   about that transport.
 - `Gate` in `packages/scope/src/testing.ts` was a poll with a 1 ms timer. It
   is now two promises, one resolved by `pass()` and one by `release()`.
+- The preparation limit test in `packages/scope/test/turn.test.ts` waited 10 ms
+  of real time. It now runs under fake timers inside the workerd pool, which
+  do reach the turn's own `setTimeout`. No port was added.
 - `packages/bytes/test/domains.test.ts` is unchanged. Step 2 of the I1 work
   (commit `2ecfbb0ba`) had already removed the every-field digest sweep and
   the signature sweep. See the audit below.
@@ -55,6 +58,13 @@ Replay, `packages/replay/test/cli.test.ts`, test 3.
 | A late read is `timeout`, and what it answers is not taken, no other read follows | `setTimeout(5)` | deadline test, `answer(...)` then `[reads, cancels]` is `[1, 1]` |
 | A budget of zero scopes leaves nothing to report | test 3 | test 3, unchanged |
 
+Scope, `packages/scope/test/turn.test.ts`, "preparation has a time limit".
+
+| Invariant | Before | After |
+|---|---|---|
+| A preparation that outlasts its limit ends the attempt: answer `unavailable`, head unchanged | real 10 ms timer, rule held at the Gate | same test, the limit passed by `advanceTimersByTimeAsync(10)` |
+| A preparation that finishes within its limit is not cut off | not witnessed by this test (the Gate tests of the head check use the default limit) | same test, second act released after 5 fake ms is `accepted` |
+
 Bytes, `packages/bytes/test/domains.test.ts`: nothing removed. The six domain
 mappings are one test, each with its tag, newline and canonical payload, and
 six distinct digests. Two tests hold expected values written out by hand and
@@ -78,7 +88,9 @@ All with `scripts/control.mjs`, one change each.
 | `takeBytes`: replace the empty-chunk timer turn with a microtask | distinguishes. The deadline test fails: the reply was read as an answer, not a deadline |
 | `source.ts`: a timed-out read answers `unavailable` | distinguishes. The replay deadline test expects `timeout` |
 | `Gate.pass()` does not wait | distinguishes. Two tests of `turn.test.ts` fail by assertion |
-| `source.ts`: remove `if (all === LATE) return unread("timeout")` | survives. `within` has already answered `timeout`, so the line cannot change a result. Left alone |
+| `turn.ts`: the preparation limit is `seconds * 0` | distinguishes. The in-time act is cut off and the test fails at `accepted`; the head-check test fails too |
+| `turn.ts`: the preparation limit is 6 ms longer (a second control) | inconclusive. The late act never ended, the run hung, and I stopped it. The test with 9 fake ms instead of 10 also hung, which shows the fake timer is the one in force |
+| `source.ts`: remove `if (all === LATE) return unread("timeout")` | survives. `within` has already answered `timeout`, so the line cannot change a result |
 | `takeBytes`: drop `Promise.race` with `expired` | survives in the replay test, for the same reason. In the client reader test it would hang, and was not run |
 
 ## Measured
@@ -101,9 +113,14 @@ added at most about 90 ms, and the figures are within the noise of one run.
 
 - `tick` is gone, not kept: it had no comment giving a reason for a real
   millisecond, and promises do the same job.
-- `packages/scope/test/turn.test.ts`, "preparation has a time limit, here 10
-  milliseconds", still waits 10 ms of real time. The scope's own timer
-  makes the limit. Making it injectable changes `packages/scope/src/turn.ts`,
-  so it is left for a decision.
-- The unreachable guard in `source.ts` noted in the controls could be
-  deleted. That is a production change and is not made here.
+- The line `if (all === LATE) return unread("timeout")` in
+  `packages/replay/src/source.ts` is dead. The reader answers `LATE` only
+  once its exchange is aborted. `within` aborts only after it has resolved its
+  own `LATE`, which decides the race first. Nothing else holds the signal. The
+  line is kept all the same: `takeBytes` returns `Uint8Array | null | LATE`,
+  and without a branch for `LATE` the next line does not typecheck. A
+  deletion would need a cast or a branch with an invented answer. The mirror
+  condition `got.bytes === LATE` in `packages/client/src/http.ts` is the
+  same: its other half, `got === LATE`, is reachable and decides first. Both
+  are left as they are, with no production change. The fix, if wanted, is
+  for `takeBytes` not to return `LATE` to a caller that has a `within`.
