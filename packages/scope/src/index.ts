@@ -11,3 +11,4 @@ export * from "./operations.ts";
 export * from "./namespace.ts";
 export * from "./authority.ts";
 export * from "./definitions.ts";
+export * from "./diag.ts";

@@ -13,6 +13,7 @@ import type { Digest, Entry, FactRef, Grant, PlatformDefinition, Prepared, Routi
 import { TOKENS_FLOOR, capabilitiesOf, gitRead, holdCapability, timeOf, type Capabilities, type HoldOptions, type Clock as Reading, type Delivered, type Owners, type Presented, type RuleInput, type StateView, type Window } from "@generalbusiness/artroom-derive";
 import { evaluateRules } from "@generalbusiness/artroom-derive/rule";
 import { platform, type Platform } from "@generalbusiness/artroom-platform";
+import { toConsole, type DiagnosisSink } from "./diag.ts";
 import { NO_OUTSIDE, type Outside } from "./operations.ts";
 
 /** One reading for each call (section 5.3). The core calls it once in a step 3 and once in a commit. */
@@ -203,6 +204,12 @@ export interface Ports {
    * no outcome is judged, and no attempt is sent.
    */
   owners: Owners | null;
+  /**
+   * Where a diagnosis goes (`diag.ts`): one line for a failure at a port
+   * that no entry and no answer describes. It holds fixed words and an
+   * error's name from a fixed list, and never an error's message.
+   */
+  diagnoses: DiagnosisSink;
 }
 
 /**
@@ -278,5 +285,6 @@ export function production(): Ports {
     capabilities: CAPABILITY_CODE,
     outside: NO_OUTSIDE,
     owners: CAPABILITY_CODE,
+    diagnoses: toConsole,
   };
 }

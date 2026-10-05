@@ -766,13 +766,27 @@ function tokensAt(view: StateView, operation: Operation, root: number, outcome: 
   return { made: [...ended.made, ...next.made], opens: [...ended.opens, ...next.opens] };
 }
 
+/**
+ * Authority note, section 5.7, "Which entry makes a token": the request of an
+ * attempt of a staging is sent only when both of its tokens are `live`, and
+ * each attempt of a staged ref's delete has one staging token, "made as the
+ * tokens of a staging are". So the driver sends the request of an attempt
+ * only while every token that the attempt's opening made is `live`. A token
+ * whose mint was refused or is not answered leaves the attempt recorded and
+ * not sent: no text says what then ends it (I3 deltas, entry ET7).
+ */
+const tokensLive = (view: StateView, operation: Operation, attempt: number): boolean => {
+  const made = records(view, "token", ["minting", "live", "revoking", "ended"], "operation", operation.id).filter((token) => token.values["attempt"] === attempt);
+  return made.length === (own(ATTEMPT_TOKENS, operation.kind) ?? []).length && made.every((token) => token.state === "live");
+};
+
 const OPERATION_RULES: Readonly<Record<string, OperationRules>> = {
   // Section 6.11, the step `stage`: its outcome `confirmed`, on a read that shows the ref, makes the root `live`, records the
   // `provisional` pin and opens the operation `check`. An attempt that is refused or unknown leaves the root `creating`.
   // Authority note, section 5.7, "Which entry makes a token": the entry that records an attempt `confirmed` or `refused` ends
   // that attempt's two tokens, and the entry that opens the next attempt makes its two.
   [HOLD_KINDS.stage]: {
-    selects: false, read: true, retries: () => true, wellFormed: basis("read"),
+    selects: false, read: true, retries: () => true, wellFormed: basis("read"), ready: tokensLive,
     // The most that one outcome entry opens: two revocations, and the check or the two mints of the next attempt.
     closure: 2 * REVOKED + Math.max(2 * HOLD_ATTEMPTS.check, 2 * MINTED),
     // A confirmed attempt: the root, the pin, the check and two revocations, 2 + 2 + 2 * 3. A refused one: two revocations and the two tokens of the next attempt, 2 * 3 + 2 * 3.
@@ -851,7 +865,7 @@ const OPERATION_RULES: Readonly<Record<string, OperationRules>> = {
   // `retiring`). A read that shows the ref absent makes the root `retired`. A delete whose answer was lost stays `unknown`,
   // whatever a read shows later. Each attempt has one staging token, made and ended as the tokens of a staging are.
   [HOLD_KINDS.delete]: {
-    selects: false, read: true, retries: () => true, wellFormed: basis("read"), closure: REVOKED + MINTED, most: { effects: 6, requests: 0, operations: 2 },
+    selects: false, read: true, retries: () => true, wellFormed: basis("read"), ready: tokensLive, closure: REVOKED + MINTED, most: { effects: 6, requests: 0, operations: 2 },
     derives: (view, operation, outcome, _selected, at) => {
       const root = records(view, "root", ["retiring", "retired"], "retirement", operation.id)[0];
       if (!root) return NOTHING;
@@ -919,8 +933,8 @@ export function holdReserves(view: StateView, definition: ValidDefinition): numb
  * read of a head, are not built here: with no rules for them, nothing of
  * them is judged or sent.
  */
-// I3 merge: step 18 adds the rules of the fork's creation and of the head's read, and step 19 the driver's rule that the request of
-// an attempt is sent only when its tokens are `live`. The step `retry` and the step `job-read` have no code here.
+// I3 merge: step 18 adds the rules of the fork's creation and of the head's read. The step `retry` and the step `job-read` have no
+// code here. The driver's rule that the request of an attempt is sent only when its tokens are `live` is `tokensLive`, above.
 export function holdCapability(options: HoldOptions): Capabilities & Steps & Owners {
   const { tokensPerHold: tokens, rootRetentionSeconds: retention } = options;
   if (!Number.isSafeInteger(tokens) || tokens < TOKENS_FLOOR) throw new Error(`a hold may have at least ${TOKENS_FLOOR} tokens at once`);

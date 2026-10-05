@@ -16,7 +16,7 @@
 
 import type { OperationId } from "@generalbusiness/artroom-contract";
 import type { Opening, OperationRules, Owners } from "@generalbusiness/artroom-derive";
-import type { EffectAnswer, EffectRequest, LateAnswers, Outside } from "../src/index.ts";
+import type { EffectAnswer, EffectRequest, LateAnswers, Outside, Ports } from "../src/index.ts";
 
 const tick = () => new Promise<void>((resolve) => { setTimeout(resolve, 1); });
 const keyOf = (operation: OperationId, attempt: number) => `${operation}#${attempt}`;
@@ -71,3 +71,12 @@ export const MINT: Opening = { owner: "platform:destination@1", kind: "mint", at
 export const owners: Owners = { rules: (_owner, kind) => (kind === "push" ? push : kind === "mint" ? mint : null) };
 /** An operation of a kind that the made-up owner has no rules for, as it has for no kind but a push and a mint: no runtime of these tests sends it. */
 export const FENCE: Opening = { owner: "platform:destination@1", kind: "fence", attempts: 1 };
+
+/**
+ * Ports that one test gives the scope with that name, in place of the test
+ * ports and the two stand-ins above. The function is called once for each
+ * life of the object, so what it makes lives as long as the object's memory.
+ * `hosted.ts` uses it to run a scope on the capability's code with the token
+ * driver of the git package.
+ */
+export const wired = new Map<string, () => Partial<Ports>>();

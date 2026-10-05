@@ -125,6 +125,21 @@ memory below such a bureau. A test that uses one says so. It shows the
 destination's rows and its eight real rules, and nothing about an outcome
 entry, a push or a founding.
 
+The token ledger has three stand-ins. `TokenHost` and `Vault`, in
+`packages/git/test/support/tokens.ts`, stand for a Git host's token
+interface and for the gateway's side of the handoff of a plaintext.
+`TokenHost` mints and revokes in memory, with a fault for one request: a
+refusal, a lost request, a lost reply, or a reply out of form. `Stager`,
+in `packages/scope/test/hosted.ts`, answers the one request of an attempt
+of a staging as the test wrote it. The fixture `hosted` of that file runs a
+real scope on the capability's code, with the git package's real
+`TokenDriver` as its port for outside effects. A test that uses one says
+so. Such a test shows what the driver and a scope do with a host's
+answers, and where a plaintext is. It shows nothing about a real host, a
+gateway, a fork or a push. The sealed entries of
+`packages/git/test/host.test.ts` are made by hand, and no scope judged
+them (`notes/2026-10-05-i3-contract-deltas.md`, entry ET12).
+
 A replay of a history that the test authority wrote says so:
 `grants: "as-recorded"`. Its grants hold no freshness proof, and the
 report lists them as trusted. The replay command never takes that option.

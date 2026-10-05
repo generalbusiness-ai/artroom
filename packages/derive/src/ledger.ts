@@ -78,6 +78,15 @@ export interface OperationRules {
   retries(result: "refused" | "unknown", operation: Operation): boolean;
   /** Item 7: the owner's local guard for a selection. Absent: it holds. */
   holds?(view: StateView, operation: Operation, outcome: OutcomeInput): boolean;
+  /**
+   * Whether the request of that attempt may be sent now (authority note,
+   * section 5.7, "Which entry makes a token": the request of an attempt of a
+   * staging "is sent only when both are `live`"). The runtime's driver asks
+   * it before the attempt is marked as sent. False: the attempt stays
+   * recorded and not sent, and the driver looks at it again after a later
+   * outcome entry. It derives nothing and settles nothing. Absent: it may.
+   */
+  ready?(view: StateView, operation: Operation, attempt: number): boolean;
   /** Item 4: the evidence is well formed for this owner. Absent: any body is. The ledger has checked that the evidence has a basis and a body. */
   wellFormed?(result: Result, evidence: Evidence): boolean;
   /**
