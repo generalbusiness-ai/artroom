@@ -37,6 +37,7 @@ import type { Bounds, CapabilityName, DecisiveEvidence, Entry, Evidence, FactRef
 import { isEvidence, isOperationId, isRetainedInput } from "@generalbusiness/artroom-bytes";
 import { settleOutcome, snapshotRead, timeMs, timeOf, type OutcomeOffered, type Owners } from "@generalbusiness/artroom-derive";
 import { ownOf, type Scope } from "./core.ts";
+import { report } from "./diag.ts";
 import type { Wakes } from "./outbox.ts";
 import type { Clock, Ports } from "./ports.ts";
 import type { Sealed, Sending, Store } from "./store.ts";
@@ -96,11 +97,21 @@ export type LateAnswers = (operation: OperationId, attempt: number, answer: Effe
  * fails, each leave the attempt `unknown`. `late`: the driver gives the port
  * the function that takes an answer which arrives after its request was
  * recorded `unknown`, when the driver is made.
+ *
+ * `judged`: the driver tells the port that the scope has judged a decisive
+ * answer of that attempt. `sealed` is the outcome entry that the answer
+ * wrote, and the port is told after that entry's commit. Null: the answer
+ * wrote no entry, because it was a copy, a contradiction or no answer. An
+ * answer that cannot be written yet is not judged, and the port is not told
+ * until it is. A port that holds something beside an answer, as the token
+ * driver holds a plaintext (authority note, section 5.7, "The plaintext"),
+ * releases or drops it here, on what the sealed entry says.
  */
 export interface Outside {
   accepts(owner: CapabilityName | PlatformDefinition, kind: string): boolean;
   send(request: EffectRequest): Promise<EffectAnswer | null>;
   late?(deliver: LateAnswers): void;
+  judged?(at: { scope: ScopeRef; operation: OperationId; attempt: number }, sealed: Sealed | null): void;
 }
 
 /**
@@ -136,6 +147,17 @@ export class Operations {
   readonly #clock: Clock;
   readonly #wakes: Wakes;
   readonly #bounds: Bounds;
+  readonly #diagnoses: Ports["diagnoses"];
+  /**
+   * True while an attempt is recorded and not sent because its owner's rule
+   * says that it is not ready (`OperationRules.ready`): the request of an
+   * attempt of a staging waits for its tokens (authority note, section 5.7).
+   * It has no time to be looked at next, so it costs no wake-up (rule 7).
+   * The next outcome entry that this driver writes may be what it waits
+   * for, so that entry starts the walk again, which looks at every such
+   * attempt once more. In memory only: a restart begins the walk in any case.
+   */
+  #waiting = false;
   /**
    * Answers in hand that the scope could not record yet, by attempt, in the
    * order in which they are offered next (`#replies`): at most one for each
@@ -164,7 +186,7 @@ export class Operations {
   #again = false;
 
   /** `owners`: the rules of the owners this runtime has code for. With none, no outcome can be judged, so nothing is sent. */
-  constructor(scope: Scope, store: Store, ports: Pick<Ports, "outside" | "clock" | "owners">, wakes: Wakes, bounds: Bounds) {
+  constructor(scope: Scope, store: Store, ports: Pick<Ports, "outside" | "clock" | "owners" | "diagnoses">, wakes: Wakes, bounds: Bounds) {
     this.#scope = scope;
     this.#store = store;
     this.#outside = ports.outside;
@@ -172,6 +194,7 @@ export class Operations {
     this.#clock = ports.clock;
     this.#wakes = wakes;
     this.#bounds = bounds;
+    this.#diagnoses = ports.diagnoses;
     ports.outside.late?.((operation, attempt, answer) => this.answered(operation, attempt, answer));
   }
 
@@ -241,8 +264,16 @@ export class Operations {
       const origin = store.stored(Number(id.split(":")[0]));
       // Nothing is sent that this runtime cannot send, or whose outcome it could not judge. The attempt stays recorded and not sent,
       // and no wake-up is asked for it (rule 7). The walk after a restart looks at it once more.
-      if (!operation || !origin || !this.#outside.accepts(operation.owner, operation.kind) || !this.#scope.owners()?.rules(operation.owner, operation.kind)) {
+      const rules = operation ? this.#scope.owners()?.rules(operation.owner, operation.kind) : null;
+      if (!operation || !origin || !this.#outside.accepts(operation.owner, operation.kind) || !rules) {
         if (row.next !== null) store.postpone(id, attempt, null);
+        continue;
+      }
+      // The owner's rule on when the request may leave, such as the tokens of an attempt of a staging. Not ready: recorded and not
+      // sent, with no wake-up, until an outcome entry is written and the walk looks again.
+      if (rules.ready && !rules.ready(store, operation, attempt)) {
+        if (row.next !== null) store.postpone(id, attempt, null);
+        this.#waiting = true;
         continue;
       }
       // Durable before the send: from here on the request may have left. A scope that stops here is woken, by the alarm set below,
@@ -310,13 +341,17 @@ export class Operations {
   /** The one request of one attempt, and the outcome that its answer gives. */
   async #send(row: Sending, request: EffectRequest, now: number): Promise<void> {
     const { operation, attempt } = row;
-    const sent = (async () => this.#outside.send(request))();
+    // A port that fails gave no answer. What it threw is diagnosed by its name alone, and is passed on to nobody: its text may
+    // hold a credential (`diag.ts`).
+    const sent = (async () => this.#outside.send(request))().catch((failure: unknown) => { report(this.#diagnoses, "outside-call-failed", `${request.owner}:${request.kind}`, failure); return null; });
     const answer = await within(() => sent, this.#bounds.dispatchSeconds);
     if (isAnswer(answer)) return this.#offer(row, { type: "outcome", operation, attempt, result: answer.result, evidence: answer.evidence, retain: answer.retain }, now);
     // No answer in time, none at all, or one that is no answer: the outcome is `unknown`. If the request's own answer still
     // comes, it is the late answer, and adds one more outcome.
     // `answered` keeps it in hand if the scope cannot write it then.
     if (answer === LATE) void sent.then((late) => (isAnswer(late) ? this.answered(operation, attempt, late) : null)).catch(() => null);
+    // An answer that is no answer was judged by nobody: the port is told so, and keeps nothing for it.
+    else if (answer !== null && !isAnswer(answer)) this.#judged(operation, attempt, null);
     return this.#offer(row, { type: "outcome", operation, attempt, result: "unknown", evidence: UNKNOWN }, now);
   }
 
@@ -377,7 +412,11 @@ export class Operations {
     const operation = this.#store.operation(input.operation);
     const retain = input.retain ?? [];
     const named = (operation && this.#scope.owners()?.rules(operation.owner, operation.kind)?.retains?.(input.evidence)) ?? [];
-    if (named.some((digest) => !retain.some((given) => given.digest === digest) && this.#store.retained("snapshot", digest) === null)) return { recorded: "refused", detail: "the evidence names a snapshot whose bytes were not given" };
+    if (named.some((digest) => !retain.some((given) => given.digest === digest) && this.#store.retained("snapshot", digest) === null)) {
+      if (input.result !== "unknown") this.#judged(input.operation, input.attempt, null);
+      return { recorded: "refused", detail: "the evidence names a snapshot whose bytes were not given" };
+    }
+    const wrote: { sealed: Sealed | null } = { sealed: null };
     const end = await this.#scope.turns.run<OutcomeRecorded>({
       asks: () => [],
       judge: (view, clock) => {
@@ -387,7 +426,8 @@ export class Operations {
             // Room for this entry was reserved when its operation was opened (sections 17.2, row 5, and 17.3). A scope with no room at all writes nothing.
             if (view.scope()!.head.seq + 1 >= bounds.scopeEntries) return said({ recorded: "unavailable" });
             return {
-              verdict: "write", draft: judged.draft, retain: retain.filter((given) => named.includes(given.digest)), sealed: ({ entry, hash }) => ({ recorded: "written", fact: { at: entry.at, seq: entry.seq, hash } }),
+              verdict: "write", draft: judged.draft, retain: retain.filter((given) => named.includes(given.digest)),
+              sealed: (sealed) => { wrote.sealed = sealed; return { recorded: "written", fact: { at: sealed.entry.at, seq: sealed.entry.seq, hash: sealed.hash } }; },
               unfit: () => ({ recorded: "refused", detail: "the outcome cannot be an entry" }), full: () => ({ recorded: "unavailable" }),
             };
           case "repeat": return said({ recorded: "repeat", seq: judged.seq });
@@ -398,6 +438,27 @@ export class Operations {
         }
       },
     });
-    return end.end === "answer" ? end.answer : { recorded: "unavailable" };
+    const recorded: OutcomeRecorded = end.end === "answer" ? end.answer : { recorded: "unavailable" };
+    // The turn has ended, so an entry that it wrote is committed. An outcome entry may be what an attempt that is not ready waits
+    // for: the walk looks at each of them again.
+    if (recorded.recorded === "written" && this.#waiting) {
+      this.#waiting = false;
+      this.#walk = { after: null };
+      this.#again = true;
+    }
+    // The port is told of each decisive answer that the scope has judged, with the entry that it wrote, if it wrote one.
+    if (input.result !== "unknown" && recorded.recorded !== "unavailable") this.#judged(input.operation, input.attempt, recorded.recorded === "written" ? wrote.sealed : null);
+    return recorded;
+  }
+
+  /** Tell the port what became of an answer. A port that fails here changes nothing: the entry is as it was sealed. */
+  #judged(operation: OperationId, attempt: number, sealed: Sealed | null): void {
+    const scope = this.#store.scope();
+    if (!scope || !this.#outside.judged) return;
+    try {
+      this.#outside.judged({ scope: scope.at, operation, attempt }, sealed);
+    } catch (failure) {
+      report(this.#diagnoses, "outside-call-failed", "judged", failure);
+    }
   }
 }
