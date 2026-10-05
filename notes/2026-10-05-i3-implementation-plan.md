@@ -137,6 +137,9 @@ neither.
 |---|---|---|
 | 1 | Types only (section 8.1). | `bfa06084d` and `79ed29239` |
 | 2 | The platform package, with the definition of `platform:inbox@1`. | `0a05d6dd1` |
+| 3 | The ports, re-shaped: authority in two phases, the definitions port with a platform definition and its rules, capability rules given the state and the input. | `c3b72a698`; the whole-scope rule below, `1741cec2b` |
+| 4 | Operations and the ledger of unknown duties. Built on `request/i3-operations`. | `2623fe141` |
+| 3 and 4 | The merge, and its seams closed: the outside port and the owners' rules in `Ports`, the read name `operations`, an operation's closure in the reserve, and a replay that answers `unsupported-definition` at an outcome entry. | `05cc4f098`, `51b2956e0`, `2bd298d4e` |
 
 Finding E10, recorded in `notes/2026-10-05-i3-contract-deltas.md`: the
 inbox needs one platform rule, P22, for a notice's `source`. The note
@@ -144,6 +147,37 @@ gives that field as a record of four values, and the commit would refuse
 the fact reference that the row writes. The plan's earlier statement that
 the inbox needs no rule is therefore corrected. Step 2's test asserts only
 that the definition validates.
+
+Corrections that steps 3 and 4 and their merge showed. The deltas note has
+each in full.
+
+- **The texts.** The contract's revision 14 at `fa6417e6` and the
+  authority note's revision 18 at `99bc48e8` are adopted since this plan
+  was written. Where this plan calls either "not adopted", read it as
+  adopted. The rows that waited on them (P19, P21, Q2 to Q4) are not
+  reworked here.
+- **Step 3's witness is changed** (entry EC4). The contract's section 6.1
+  is a rule of the whole scope for a platform definition too. The
+  production wiring founds no scope under `platform:inbox@1` until step 11
+  writes the rule P22. The witness is now: the production wiring answers
+  `unsupported-definition`, and the same definition with a stand-in rule
+  for every marked row is founded.
+- **No step owns the judges for running a platform rule**, and no adopted
+  text says how a rule's result joins its row (entry EC6). Steps 7, 9 to
+  9c and 11 each need it. It is a step of its own, before step 7, once
+  EC6 is decided: it owns `derive/src/judge.ts` and `handlers.ts`, the
+  marked entries in `scope/src/core.ts`, and the same rules in
+  `replay/src/verify.ts`.
+- **No step owns `scope/src/delivery.ts` for a creation under a platform
+  name** (entry EA9). Steps 9 and 9c need it: the directory is created by
+  the register, and creates three children. It goes with step 9.
+- **Step 4 owned more than its row lists**: the two effects and the
+  operation ID in `contract` and `bytes` (entry EB1), `derive/src/state.ts`
+  and `reserve.ts`, and `scope/src/reads.ts`, `outbox.ts` and `object.ts`.
+- **T19's sentence about a token** cannot be an outcome under the adopted
+  contract, which has no basis for an outcome by an end time (entry EB4).
+  It is witnessed as the pure judgment `tokenPast`, in
+  `derive/test/forms-ledger.test.ts`, and settles no attempt.
 
 ## 3. The scope table
 
@@ -576,7 +610,7 @@ witness that section 13.7 lists as real evidence.
 | # | Invariant | Section | Test file | Command |
 |---|---|---|---|---|
 | T18 | Founding in order. Two `created` answers in both orders: the first recorded is selected, and the other is recorded as not selected and opens its own deletion by ID. A provisional scope admits nothing. A second incarnation is a conflict. | 3.8; the contract's 18.3 and 18.8; R11, F26 | `platform/test/founding.scope.test.ts` | `npx vitest run --project scope founding` |
-| T19 | An unknown outcome keeps its identity. After a lost answer: a restart, a listing, elapsed time, a later attempt that succeeds and a new ref each settle nothing. That request's own late answer settles it. A token whose ID and end time are known is settled past its end time by the margin, and no mint is. | 5.4; 11.1 | `scope/test/operations.test.ts` | `npx vitest run --project scope operations` |
+| T19 | An unknown outcome keeps its identity. After a lost answer: a restart, a listing, elapsed time, a later attempt that succeeds and a new ref each settle nothing. That request's own late answer settles it. A token whose ID and end time are known is judged past its end time by the margin, and no mint is: a pure judgment that settles no attempt (section 2.1; entry EB4). | 5.4; 11.1 | `scope/test/operations.test.ts` | `npx vitest run --project scope operations` |
 | T20 | An idle ledger writes nothing. An operation opens at most its stated attempts and then opens none by itself. A retry is a new operation. | 5.4, rule 7; G3; O5 | The same file, second test | The same |
 | T21 | A preparation is sealed before any outside write. `stage` makes a root `creating`, then `live` with a provisional pin, and `check` writes the check entry. A refusal writes no entry and uses no key. | 6.2; the contract's 18.4 | `platform/test/stage.scope.test.ts` | `npx vitest run --project scope stage` |
 | T22 | A pin ends in one state in both orders of `pin-confirm` and `unpin`, and a late confirmation restores nothing. | 6.2; the contract's 18.7 | The same file, second test | The same |
@@ -699,8 +733,8 @@ These steps come first because every later step reads them.
 |---|---|---|---|---|
 | 1 | Built, commits `bfa06084d` and `79ed29239`. Types only. The kind `register` and the seventh platform name. The `preparation` input. `Observation` and `ObservationUse` as `FreshnessProof`. The evidence of an outcome, by basis. The records `fork`, `token`, `instance` and the steps `instance`, `token`, `job-read`, `retry` in `CAPABILITIES`. No behaviour changes. | `contract/src/scope.ts`, `entry.ts`, `capability.ts`, `evidence.ts` (new), `observation.ts` (new); `bytes/src/ids.ts`, `records.ts` | Typecheck. The existing tests pass. | Small |
 | 2 | Built, commit `0a05d6dd1`. The platform package, empty of rules: its manifest, the platform option of the validator, the table of rules as a type, and `inbox` as the first definition. It needs one platform rule, P22, for a notice's `source` (finding E10, section 2.1). Built: commit `0a05d6dd1`. | `packages/platform/*`; `derive/src/validate/index.ts`, one option; root `vitest.config.ts`, `package-lock.json`, `scripts/active-source.test.mjs`, `scripts/measure-tests.sh` | T43 for one definition. | Small |
-| 3 | The ports, re-shaped. The authority port takes an observation that was read before the turn, and answers in the commit. The definitions port supplies a platform definition with its rules. The capabilities port takes real rules and state. Test support keeps its stand-ins, each over the new shape. | `scope/src/ports.ts`, `core.ts`, `turn.ts`, `testing.ts`; `derive/src/judge.ts`, `capability.ts` | The existing tests pass unchanged in meaning. One test: a platform scope is founded under `platform:inbox@1` by the production wiring. | Care |
-| 4 | Operations. An entry opens an operation. An attempt is recorded before it is sent. An outcome is `confirmed`, `refused` or `unknown`. A late answer adds one more outcome. A selection is made once. The driver sits beside the outbox, on the alarm. The ledger rules 1 to 7. | `derive/src/ledger.ts` (new), `settle.ts`, `fold.ts`; `scope/src/operations.ts` (new), `sqlite.ts`, `store.ts` | `derive/test/forms-ledger.test.ts`; T19, T20. | Care |
+| 3 | Built, commits `c3b72a698` and `1741cec2b`. The ports, re-shaped. The authority port takes an observation that was read before the turn, and answers in the commit. The definitions port supplies a platform definition with its rules. The capabilities port takes real rules and state. Test support keeps its stand-ins, each over the new shape. | `scope/src/ports.ts`, `core.ts`, `turn.ts`, `testing.ts`; `derive/src/judge.ts`, `capability.ts` | The existing tests pass unchanged in meaning. One test, as corrected in section 2.1: the production wiring founds nothing under `platform:inbox@1`, and a stand-in rule for its marked row founds it. | Care |
+| 4 | Built, commit `2623fe141`. Operations. An entry opens an operation. An attempt is recorded before it is sent. An outcome is `confirmed`, `refused` or `unknown`. A late answer adds one more outcome. A selection is made once. The driver sits beside the outbox, on the alarm. The ledger rules 1 to 7. | `derive/src/ledger.ts` (new), `settle.ts`, `fold.ts`; `scope/src/operations.ts` (new), `sqlite.ts`, `store.ts` | `derive/test/forms-ledger.test.ts`; T19, T20. | Care |
 
 ### 8.2 Track A: authority and the first four definitions
 
