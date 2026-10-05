@@ -553,10 +553,13 @@ function operationRules(definition: (view: StateView) => ValidDefinition | null)
         return recorded([moved(root, "live"), pin ? moved(pin, "provisional", values) : { kind: "pin", key, state: "provisional", values }], [{ owner: HOLD, kind: HOLD_KINDS.check, attempts: HOLD_ATTEMPTS.check }]);
       },
     },
-    // Section 6.11, the step `check`: its outcome entry is the check entry. Its evidence is the ancestry record. It records the
-    // `check` record, `recorded`, or `too-large` when the walk passed a bound (`gitread.ts` has the evidence's form).
+    // Section 6.11, the step `check`: its outcome entry is the check entry. It records the `check` record, `recorded`, or
+    // `too-large` when the walk passed a bound (`gitread.ts` has the evidence's form). Authority note, section 5.7, "Evidence of
+    // each outside effect", the row of the ancestry read: it is shown by that read's own answer, and the evidence is the ancestry
+    // record. So the basis is `own-answer`, as a first outcome and as the late answer after an `unknown` (section 5.4, rule 2). No
+    // other read is decisive for it. The operation has one attempt: a check that stays `unknown` is read again as a new operation.
     [HOLD_KINDS.check]: {
-      selects: false, read: true, retries: () => false, wellFormed: (result, evidence) => basis("read")(result, evidence) && (result !== "confirmed" || isCheckEvidence(evidence.body)),
+      selects: false, read: false, retries: () => false, wellFormed: (result, evidence) => basis("own-answer")(result, evidence) && (result !== "confirmed" || isCheckEvidence(evidence.body)),
       derives: (view, operation, outcome) => {
         const pin = outcome.result === "confirmed" ? namedBy(view, "pin", ["provisional"], "check", operation) : null;
         const root = pin ? record(view, "root", [pin.values["root"] as number]) : null;

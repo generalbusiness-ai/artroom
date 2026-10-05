@@ -82,7 +82,7 @@ describe("the ancestry walk and the guard `ancestry` (authority note, section 6.
       s.asked(report, "stage");                                                // entry 7
       const before = cap.guard("git-read@1", "ancestry", { commit: X, row: "report" }, s.given({ intent: intentDigest(report.intent) }));
       s.outcome("7:0", "confirmed", {}, "read");                               // entry 8: the root is live
-      const entry = s.outcome("8:0", "confirmed", { record: record(s) }, "read") as Entry;   // entry 9: the check entry
+      const entry = s.outcome("8:0", "confirmed", { record: record(s) }) as Entry;   // entry 9: the check entry
       const asks = (args: object = {}, given: object = {}) => cap.guard("git-read@1", "ancestry", { commit: X, row: "report", ...args }, s.given({ intent: intentDigest(report.intent), ...given }));
       return { s, before, asks, entry };
     }

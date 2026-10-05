@@ -36,8 +36,8 @@ describe("the records of `hold@1` (scope contract, section 6.11; authority note,
     expect([judged(), shape(s.outcome("7:0", "refused")), s.record("root", 1)?.state, shape(s.outcome("7:0", "confirmed", {}, "read", 2)), judged()]).toEqual([
       "refused not-staged", ["refused", "attempt 2 opened"], "creating", ["confirmed", "root live", "pin provisional", "opens check x1", "attempt 1 opened"], "refused not-staged",
     ]);
-    // The check entry: the outcome of the one read, whose evidence is the ancestry record. Its record is what a presented pin carries.
-    expect([shape(s.outcome("9:0", "confirmed", { record: clean(s.at, X, 1) }, "read")), s.record("check", intentDigest(report.intent), 1)]).toEqual([["confirmed", "check recorded"], {
+    // The check entry: the outcome of the one read, by that read's own answer, whose evidence is the ancestry record. Its record is what a presented pin carries.
+    expect([shape(s.outcome("9:0", "confirmed", { record: clean(s.at, X, 1) })), s.record("check", intentDigest(report.intent), 1)]).toEqual([["confirmed", "check recorded"], {
       state: "recorded", intent: intentDigest(report.intent), commit: X, consumer: s.at, lane: s.at, hold: s.hold, instance: "i1", root: 1, attribution: [una.member, keys.paul.member], record: clean(s.at, X, 1),
     }]);
     expect(preparationStatus(s.state, s.own, intentDigest(report.intent))).toEqual([{ entry: s.fact(7), capability: "hold@1", step: "stage", operations: [{ operation: "7:0", kind: "stage", state: "settled" }], records: [{ kind: "root", key: [1], state: "live" }] }]);
@@ -57,6 +57,14 @@ describe("the records of `hold@1` (scope contract, section 6.11; authority note,
     // The entry that refuses the report releases its pin, by the commit that the report's slot holds.
     expect(s.act(rita, "refuse-report", { on: 11, expected: { on: 1 } }, { capabilities: cap }).result).toBe("write");
     expect([s.record("pin", s.at, intentDigest(report.intent)), s.replay().snapshot() === s.state.snapshot()]).toEqual([{ state: "released", root: 1, commit: X, admitted: 11, released: "unpinned", by: 13, check: "9:0" }, true]);
+
+    // The other intent's check gets no answer: `unknown`, and its one attempt opens no other. Another read in its place settles
+    // nothing. The read's own answer, when it arrives late, is recorded, and writes the check record (section 5.7, the evidence
+    // table; section 5.4, rule 2).
+    const found = { record: clean(s.at, X, 1) };
+    expect([shape(s.outcome("12:0", "unknown")), s.outcome("12:0", "confirmed", found, "read"), shape(s.outcome("12:0", "confirmed", found)), s.record("check", intentDigest(other.intent), 1)?.state]).toEqual([
+      ["unknown"], "refused bad-input", ["confirmed", "check recorded"], "recorded",
+    ]);
   });
 
   test("a pin in another lane ends in one state in both orders of `pin-confirm` and `unpin`, and a late confirmation restores nothing (T22)", () => {
