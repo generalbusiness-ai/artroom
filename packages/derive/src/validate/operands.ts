@@ -11,7 +11,7 @@
 
 import type { FieldType } from "@generalbusiness/artroom-contract";
 import { canonicalize } from "@generalbusiness/artroom-bytes";
-import { isObject } from "../values.ts";
+import { isObject, own } from "../values.ts";
 import { onSubject, subject, type Ctx, type Defining, type Type } from "./context.ts";
 import { assignable } from "./fields.ts";
 import { at, type Rec } from "./shape.ts";
@@ -110,8 +110,17 @@ export function operand(d: Defining, v: unknown, path: string, ctx: Ctx, owner: 
       break;
     }
     case "element": {
-      if (typeof x !== "string" || !ctx.elements.has(x)) return bad("name", path, "names no element that an enclosing form binds");
-      type = ctx.elements.get(x) ?? null;
+      // A member of a record element is named with a dot, after the name that the form binds.
+      const [as, ...members] = typeof x === "string" ? x.split(".") : [];
+      if (as === undefined || !ctx.elements.has(as)) return bad("name", path, "names no element that an enclosing form binds");
+      type = ctx.elements.get(as) ?? null;
+      for (const m of members) {
+        // An element whose type only the commit knows may hold any member.
+        if (type === null) break;
+        const member: FieldType | undefined = type.type === "record" ? own(type.of, m) : undefined;
+        if (!member) return bad("name", path, "names no member of the element");
+        type = member;
+      }
       break;
     }
     case "item": {

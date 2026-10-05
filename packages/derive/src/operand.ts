@@ -165,7 +165,12 @@ export function operand(j: Judging, o: Operand, item: Item | null): unknown {
   let value: unknown;
   if ("field" in o) value = own(j.fields, o.field) ?? null;
   else if ("presented" in o) value = own(j.presented, o.presented) ?? null;
-  else if ("element" in o) value = j.elements?.get(o.element) ?? null;
+  else if ("element" in o) {
+    // A member of a record element is named with a dot, after the name that the form binds.
+    const [as, ...members] = o.element.split(".");
+    value = j.elements?.get(as!) ?? null;
+    for (const m of members) value = isObject(value) ? (own(value, m) ?? null) : null;
+  }
   else {
     const of = o.of === undefined ? item : o.of === "each" ? (j.each ?? null) : (j.subjects.get(o.of) ?? null);
     value = of ? slotOf(of, o.slot) : null;
