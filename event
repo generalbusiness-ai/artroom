@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:d7a6953ae7071f8623ad8e557758242f7e21a527","text":"Merge retired a covered predecessor with no successor at its old path."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:d7cb023ddaf117a9dad7da2d8375974470f439f0","text":"Merge retired a covered predecessor; the successor is at scripts/test-changed.mjs."}
