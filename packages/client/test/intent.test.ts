@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import { publicKeyOf, verifySignedIntent } from "@generalbusiness/artroom-bytes";
-import { TransportError, httpTransport, signedIntent, webCryptoSigner } from "../src/index.ts";
+import { ScopeHandle, TransportError, bindingTransport, found, httpTransport, signedIntent, webCryptoSigner, type ServiceBinding, type Transport } from "../src/index.ts";
 
 test("an intent signed by a WebCrypto key that cannot be read is one the bytes package verifies; each intent has a fresh idempotency key and a notAfter within the lifetime bound", async () => {
   const signer = await webCryptoSigner();
@@ -38,6 +38,64 @@ test("a reply is an outcome only when it is an answer of its operation: a discri
   for (const answer of answers) expect(await submit(answer)).toEqual(answer);
   expect(await settle({ ok: true, at: { seq: 1, hash: d }, value: receipt, complete: true })).toMatchObject({ ok: true, value: receipt });
   expect(await settle({ ok: false, reason: "not-found" })).toEqual({ ok: false, reason: "not-found" });
+});
+
+test("on both transports, each operation of the handle returns a reply only when it has every member the contract requires of that operation's result; with one member missing or of another kind it is a TransportError", async () => {
+  const d = `sha256:${"a".repeat(64)}`;
+  const scope = { scope: `sc_${"a".repeat(52)}`, inc: `in_${"a".repeat(26)}`, kind: "lane" };
+  const head = { seq: 1, hash: d };
+  const fact = { at: scope, ...head };
+  const receipt = { fact, definition: d, intent: d, effects: [{ effect: "activate" }], sends: ["1.0"], epoch: 0 };
+  const item = { id: 1, type: "note", state: "draft", revision: 1, opened: d, parties: {}, refs: {}, values: {}, attributed: [] };
+  const entry = { v: 1, at: scope, seq: 1, prev: d, time: "2026-10-04T12:00:00Z", clamped: false, epoch: 0, input: { type: "checkpoint", through: 0, state: d }, uses: [], prepared: [], effects: [], sends: [] };
+  const sealed = { entry, hash: d };
+  const duty = { duty: "1.0", to: scope, class: "request", held: false, attempts: [{ at: entry.time, answer: "none" }], acknowledged: null, result: null, diagnosis: null };
+  const summary = { scope, status: "active", definition: "platform:directory@1", time: entry.time, items: [item], counts: [["note", "draft", 1]] };
+  const read = (value: unknown, more: object = {}) => ({ ok: true, at: head, value, complete: true, ...more });
+  const less = (whole: Record<string, unknown>, member: string) => Object.fromEntries(Object.entries(whole).filter(([name]) => name !== member));
+  /** Every reply that is `whole` without one of its members. */
+  const each = (whole: Record<string, unknown>) => Object.keys(whole).map((member) => less(whole, member));
+
+  // For each operation as the handle calls it: replies that are its result, then replies that are not.
+  type Row = [name: string, call: (t: Transport) => Promise<unknown>, good: unknown[], bad: unknown[]];
+  const handle = (t: Transport) => new ScopeHandle(t, scope.scope as never);
+  const refused = { ok: false, reason: "not-found" };
+  const rows: Row[] = [
+    ["found", (t) => found(t, {} as never, d as never).then((f) => f.answer),
+      [{ answer: "accepted", receipt }, { answer: "refused", reason: "unsupported-definition" }, { answer: "unavailable", reason: "busy" }],
+      [{ answer: "mismatch", reason: "idempotency-mismatch" }, { answer: "refused", reason: "not-found" }, ...each(receipt).map((r) => ({ answer: "accepted", receipt: r }))]],
+    ["submit", (t) => handle(t).submit({} as never), [{ answer: "accepted", receipt }], [...each(receipt).map((r) => ({ answer: "accepted", receipt: r })), { answer: "accepted", receipt: { ...receipt, sends: ["first"] } }]],
+    ["settle", (t) => handle(t).settle({} as never), [read(receipt), refused, { ...refused, detail: fact }], [...each(read(receipt)), ...each(receipt).map((r) => read(r)), { ...refused, detail: "elsewhere" }]],
+    ["summary", (t) => handle(t).summary(), [read(summary)], [...each(summary).map((v) => read(v)), read({ ...summary, status: "open" }), read({ ...summary, counts: [["note", "draft"]] }), read({ ...summary, items: [less(item, "opened")] })]],
+    ["items", (t) => handle(t).items("note", "c"), [read([item], { next: "c2" }), read([{ ...item, opened: null, epoch: 2 }])], [...each(item).map((v) => read([v])), read(item), read([item], { next: 2 })]],
+    ["history", (t) => handle(t).history("c"), [read([sealed], { complete: false, next: "c2" })], [...each(sealed).map((v) => read([v])), ...each(entry).map((e) => read([{ entry: e, hash: d }])), read(sealed)]],
+    ["entry", (t) => handle(t).entry(1), [read(sealed)], [...each(sealed).map((v) => read(v)), ...each(entry).map((e) => read({ entry: e, hash: d })), read({ entry: { ...entry, at: { ...scope, kind: "room" } }, hash: d })]],
+    ["outbox", (t) => handle(t).outbox("c"), [read([duty], { next: "c2" })], [...each(duty).map((v) => read([v])), read(duty)]],
+    ["followDuty", (t) => handle(t).followDuty("1.0"),
+      [read(duty), read({ ...duty, acknowledged: fact, result: { seq: 2, clause: "applied" }, diagnosis: { seq: 3, finding: "undelivered" } }), refused],
+      [...each(duty).map((v) => read(v)), read({ ...duty, class: "letter" }), read({ ...duty, result: { seq: 2 } }), read({ ...duty, diagnosis: { seq: 3, finding: "lost" } }), read({ ...duty, attempts: [{ at: entry.time }] })]],
+  ];
+  const transports: [string, (reply: unknown) => Transport][] = [
+    ["HTTP", (reply) => httpTransport("https://scopes.test", { fetch: () => Promise.resolve({ status: 200, text: () => Promise.resolve(JSON.stringify(reply)) }) })],
+    ["a service binding", (reply) => bindingTransport(new Proxy({}, { get: () => () => Promise.resolve(reply) }) as ServiceBinding)],
+  ];
+  let checked = 0;
+  for (const [over, transport] of transports) for (const [name, call, good, bad] of rows) {
+    for (const reply of good) expect(await call(transport(reply)), `${name} over ${over}`).toEqual(reply);
+    for (const reply of bad) await expect(call(transport(reply)), `${name} over ${over}: ${JSON.stringify(reply)}`).rejects.toThrow(TransportError);
+    checked += good.length + bad.length;
+  }
+  // The same rows on each transport: none is skipped by a table that came out empty.
+  expect(checked).toBe(2 * rows.reduce((n, [, , good, bad]) => n + good.length + bad.length, 0));
+  expect(rows.every(([, , good, bad]) => good.length > 0 && bad.length > 0)).toBe(true);
+
+  // Following a receipt reads the entry it names, so a reply that is no entry is no outcome of it either; a refusal the contract names is.
+  for (const [, transport] of transports) {
+    await expect(handle(transport(read({ entry: less(entry, "at"), hash: d }))).followReceipt(receipt as never)).rejects.toThrow(TransportError);
+    expect(await handle(transport({ ok: false, reason: "forbidden" })).followReceipt(receipt as never)).toEqual({ ok: false, reason: "forbidden" });
+    // An entry of the right shape and other bytes is the handle's own finding, not the transport's.
+    expect(await handle(transport(read(sealed))).followReceipt(receipt as never)).toEqual({ ok: false, reason: "hash-mismatch" });
+  }
 });
 
 test("the intent that is signed is a detached copy: what the caller changes while the signer works, or afterwards, is not in the returned intent, which still verifies", async () => {

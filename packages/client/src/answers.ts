@@ -9,8 +9,8 @@
  * `followReceipt`'s question, and it computes the hash itself.
  */
 
-import type { DeliveryRefusal, MismatchReason, ReadRefusal, RefusalReason, ScopeApi, UnavailableReason } from "@generalbusiness/artroom-contract";
-import { isDigest, isIncarnation, isScopeId } from "@generalbusiness/artroom-bytes";
+import type { DeliveryRefusal, Dispatched, Duty, Message, MismatchReason, ReadRefusal, RefusalReason, RetainedInput, ScopeApi, Status, UnavailableReason } from "@generalbusiness/artroom-contract";
+import { isDigest, isDutyId, isIncarnation, isPlatformDefinition, isScopeId, isScopeKind } from "@generalbusiness/artroom-bytes";
 
 type Rec = Record<string, unknown>;
 const isObject = (v: unknown): v is Rec => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -29,15 +29,44 @@ const MISMATCH: Record<MismatchReason, true> = { "idempotency-mismatch": true };
 const UNREAD: Record<ReadRefusal, true> = {
   "not-found": true, "wrong-incarnation": true, forbidden: true, "scope-provisional": true, "unsupported-definition": true, "history-unavailable": true, "too-large": true, unavailable: true,
 };
+const STATUS: Record<Status, true> = { provisional: true, active: true, refused: true };
+const CLASS: Record<Message["class"], true> = { request: true, result: true, control: true, advisory: true };
+const DISPATCHED: Record<Dispatched["answer"], true> = { none: true, "wrong-incarnation": true, "not-found": true, retry: true, acknowledged: true };
+const CLAUSE: Record<NonNullable<Duty["result"]>["clause"], true> = { applied: true, refused: true, superseded: true, conflict: true };
+const FINDING: Record<NonNullable<Duty["diagnosis"]>["finding"], true> = { undelivered: true, "delivery-unavailable": true };
+const RETAINED: Record<RetainedInput["kind"], true> = { definition: true, entry: true, rule: true };
 
-const isScope = (v: unknown): boolean => isObject(v) && isScopeId(v["scope"]) && isIncarnation(v["inc"]) && typeof v["kind"] === "string";
+// Each shape below is the contract's, to the depth of its own members: every member the contract requires is there and of its
+// kind. What an effect, an input or a slot holds is the scope's to say, and is read no deeper here.
+const isScope = (v: unknown): boolean => isObject(v) && isScopeId(v["scope"]) && isIncarnation(v["inc"]) && isScopeKind(v["kind"]);
 const isHead = (v: unknown): boolean => isObject(v) && isSeq(v["seq"]) && isDigest(v["hash"]);
 const isFact = (v: unknown): boolean => isHead(v) && isScope((v as Rec)["at"]);
+const isDefinition = (v: unknown): boolean => isDigest(v) || isPlatformDefinition(v);
+const isSeed = (v: unknown): boolean =>
+  isObject(v) && v["v"] === 1 && isScopeKind(v["kind"]) && isDefinition(v["definition"]) && (v["creator"] === null || isScope(v["creator"])) && isDigest(v["cause"]) && isSeq(v["ordinal"]);
+const isEffect = (v: unknown): boolean => isObject(v) && typeof v["effect"] === "string";
 const isReceipt = (v: unknown): boolean =>
-  isObject(v) && isFact(v["fact"]) && typeof v["definition"] === "string" && (v["intent"] === null || isDigest(v["intent"])) && listOf(v["effects"], isObject) && listOf(v["sends"], (d) => typeof d === "string");
-const isSealed = (v: unknown): boolean => isObject(v) && isObject(v["entry"]) && isDigest(v["hash"]);
-const isItem = (v: unknown): boolean => isObject(v) && isSeq(v["id"]) && typeof v["type"] === "string" && typeof v["state"] === "string" && isSeq(v["revision"]);
-const isDuty = (v: unknown): boolean => isObject(v) && typeof v["duty"] === "string" && isObject(v["to"]) && typeof v["class"] === "string" && typeof v["held"] === "boolean" && listOf(v["attempts"], isObject);
+  isObject(v) && isFact(v["fact"]) && isDefinition(v["definition"]) && (v["intent"] === null || isDigest(v["intent"])) && listOf(v["effects"], isEffect) && listOf(v["sends"], isDutyId) && v["epoch"] === 0;
+const isEntry = (v: unknown): boolean =>
+  isObject(v) && v["v"] === 1 && isScope(v["at"]) && isSeq(v["seq"]) && (v["prev"] === null || isDigest(v["prev"])) && typeof v["time"] === "string" && typeof v["clamped"] === "boolean" && v["epoch"] === 0
+  && isObject(v["input"]) && typeof v["input"]["type"] === "string" && listOf(v["uses"], isObject) && listOf(v["prepared"], isObject) && listOf(v["effects"], isEffect) && listOf(v["sends"], isObject);
+const isSealed = (v: unknown): boolean => isObject(v) && isEntry(v["entry"]) && isDigest(v["hash"]);
+const isItem = (v: unknown): boolean =>
+  isObject(v) && isSeq(v["id"]) && typeof v["type"] === "string" && typeof v["state"] === "string" && isSeq(v["revision"]) && (v["opened"] === null || isDigest(v["opened"]))
+  && isObject(v["parties"]) && isObject(v["refs"]) && isObject(v["values"]) && listOf(v["attributed"], isObject) && (v["epoch"] === undefined || isSeq(v["epoch"]));
+const isSummary = (v: unknown): boolean =>
+  isObject(v) && isScope(v["scope"]) && among(STATUS)(v["status"]) && isDefinition(v["definition"]) && typeof v["time"] === "string" && listOf(v["items"], isItem)
+  && listOf(v["counts"], (c) => Array.isArray(c) && c.length === 3 && typeof c[0] === "string" && typeof c[1] === "string" && isSeq(c[2]));
+const isDuty = (v: unknown): boolean =>
+  isObject(v) && isDutyId(v["duty"]) && (isScope(v["to"]) || isSeed(v["to"])) && among(CLASS)(v["class"]) && typeof v["held"] === "boolean"
+  && listOf(v["attempts"], (a) => isObject(a) && typeof a["at"] === "string" && among(DISPATCHED)(a["answer"]))
+  && (v["acknowledged"] === null || isFact(v["acknowledged"]))
+  && (v["result"] === null || (isObject(v["result"]) && isSeq(v["result"]["seq"]) && among(CLAUSE)(v["result"]["clause"])))
+  && (v["diagnosis"] === null || (isObject(v["diagnosis"]) && isSeq(v["diagnosis"]["seq"]) && among(FINDING)(v["diagnosis"]["finding"])));
+const isLogPage = (v: unknown): boolean =>
+  isObject(v) && isScope(v["scope"]) && isDefinition(v["definition"]) && listOf(v["entries"], (e) => isObject(e) && isSeq(e["seq"]) && isDigest(e["hash"]) && typeof e["bytes"] === "string");
+const isRetained = (v: unknown): boolean =>
+  isObject(v) && among(RETAINED)(v["kind"]) && isDigest(v["digest"]) && typeof v["bytes"] === "string" && (v["under"] === undefined || typeof v["under"] === "string");
 
 /** The answer to a founding or an act (section 4.2). A founding has no `mismatch`, and only an act's refusal names the head it was judged at. */
 function isAnswer(v: unknown, act: boolean): boolean {
@@ -51,10 +80,10 @@ function isAnswer(v: unknown, act: boolean): boolean {
   }
 }
 
-/** A read (section 9.1): a value of the route's shape at a stated head, or a refusal the contract names. */
+/** A read (section 9.1): a value of the route's shape at a stated head, or a refusal the contract names, with the reference it may carry. */
 const isRead = (value: (v: unknown) => boolean) => (v: unknown): boolean => {
   if (!isObject(v)) return false;
-  if (v["ok"] === false) return among(UNREAD)(v["reason"]);
+  if (v["ok"] === false) return among(UNREAD)(v["reason"]) && (v["detail"] === undefined || isScope(v["detail"]) || isFact(v["detail"]));
   return v["ok"] === true && isHead(v["at"]) && typeof v["complete"] === "boolean" && (v["next"] === undefined || typeof v["next"] === "string") && value(v["value"]);
 };
 
@@ -63,12 +92,12 @@ export const ANSWERS: { [K in keyof ScopeApi]: (reply: unknown) => boolean } = {
   found: (v) => isAnswer(v, false),
   submit: (v) => isAnswer(v, true),
   settle: isRead(isReceipt),
-  summary: isRead((v) => isObject(v) && isScope(v["scope"]) && typeof v["status"] === "string" && typeof v["definition"] === "string" && listOf(v["items"], isItem) && listOf(v["counts"], Array.isArray)),
+  summary: isRead(isSummary),
   items: isRead((v) => listOf(v, isItem)),
   history: isRead((v) => listOf(v, isSealed)),
   entry: isRead(isSealed),
   outbox: isRead((v) => listOf(v, isDuty)),
   duty: isRead(isDuty),
-  log: isRead((v) => isObject(v) && isScope(v["scope"]) && typeof v["definition"] === "string" && listOf(v["entries"], (e) => isObject(e) && isSeq(e["seq"]) && isDigest(e["hash"]) && typeof e["bytes"] === "string")),
-  retained: isRead((v) => isObject(v) && typeof v["kind"] === "string" && isDigest(v["digest"]) && typeof v["bytes"] === "string"),
+  log: isRead(isLogPage),
+  retained: isRead(isRetained),
 };
