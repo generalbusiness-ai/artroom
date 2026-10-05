@@ -191,8 +191,11 @@ the contract's own answer.
 | `GET /v1/scopes/:scope/log?cursor=` | A page of the history as stored: each entry's canonical bytes and hash, for a verifier | as above |
 | `GET /v1/scopes/:scope/retained/:kind/:digest` | One retained input: a `definition`, an `entry` or a `rule` input, by digest | as above; 413 past 1 MiB |
 
-A body that is not a JSON object is 400. A reader is the `Authorization`
-header, passed to the readers port as it is.
+A body is at most 1 MiB of bytes, counted while it is read: a larger body
+is cancelled and is not held. A body over that, or one that is not a JSON
+object in UTF-8, is 400. A path that is not percent-encoded UTF-8 is 400.
+A reader is the `Authorization` header, passed to the readers port as it
+is.
 
 ## How to test
 

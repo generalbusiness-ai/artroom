@@ -119,11 +119,30 @@ const READ_STATUS: Record<ReadRefusal, number> = {
 };
 const read = (result: Read<unknown>): Response => json(result.ok ? 200 : READ_STATUS[result.reason], result);
 
-/** The JSON object of a request body, or null. */
+/**
+ * The JSON object of a request body, or null. The budget is of raw bytes and
+ * is counted while the body is read: a body that declares more is not read,
+ * and one that sends more is cancelled at the chunk that passes the budget.
+ * Bytes that are not UTF-8 are no JSON.
+ */
 async function body(request: Request): Promise<Record<string, unknown> | null> {
   try {
-    const text = await request.text();
-    const value: unknown = text.length > BODY_BYTES ? null : JSON.parse(text);
+    if (!request.body || Number(request.headers.get("content-length") ?? 0) > BODY_BYTES) return null;
+    const reader = request.body.getReader();
+    const decoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: false });
+    let text = "";
+    let size = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > BODY_BYTES) {
+        await reader.cancel();
+        return null;
+      }
+      text += decoder.decode(value, { stream: true });
+    }
+    const value: unknown = JSON.parse(text + decoder.decode());
     return isObject(value) ? value : null;
   } catch {
     return null;
@@ -134,7 +153,13 @@ async function body(request: Request): Promise<Record<string, unknown> | null> {
 export async function route(request: Request, binding: Binding): Promise<Response> {
   const scopes = api(binding);
   const url = new URL(request.url);
-  const [v, root, scope, what, which, last, ...more] = url.pathname.split("/").slice(1).map(decodeURIComponent);
+  let parts: string[];
+  try {
+    parts = url.pathname.split("/").slice(1).map(decodeURIComponent);
+  } catch {
+    return json(400, { error: "bad-request" });   // a path part that is not percent-encoded UTF-8 names nothing
+  }
+  const [v, root, scope, what, which, last, ...more] = parts;
   if (v !== "v1" || root !== "scopes" || more.length > 0) return json(404, { error: "not-found" });
   // Only a retained input is named by two parts: its kind and its digest.
   if (what === "retained" ? which === undefined || last === undefined : last !== undefined) return json(404, { error: "not-found" });
