@@ -60,8 +60,10 @@ export type Input =
 /**
  * A preparation entry (section 4.1; 5.5): the signed intent that asks for a
  * capability's step, the one grant judged, the capability and the step. It is
- * a member of `Input`. Until I3 step 16a, nothing writes, folds or derives it
- * (I3 deltas, entry E5).
+ * a member of `Input`. Derive's `judgePreparation` writes it, and the fold
+ * keeps its index. The production runtime writes none, because its
+ * capabilities port has no code for a step, and a replay has no rules for
+ * one yet (I3 deltas, entries E5 and E13).
  */
 export interface PreparationInput {
   type: "preparation";

@@ -67,7 +67,7 @@ export interface CapabilityScript {
 
 /**
  * A scripted test capability: a stand-in for the code of `hold@1` and
- * `git-read@1`, which is not delivered. It answers every guard and every
+ * `git-read@1`, which derive has and no production port holds. It answers every guard and every
  * effect from the table that the test supplies. The port also gives a rule
  * the folded state and the input, and this stand-in reads neither: no
  * record, no hold, no Git repository and no provider. So it proves nothing about

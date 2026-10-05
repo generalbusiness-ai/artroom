@@ -53,8 +53,8 @@ A stand-in proves only the boundary it exposes. A retry, an ordering or a
 restart is shown against the thing that really retries, orders or restarts.
 
 The scripted capability of `@generalbusiness/artroom-scope/testing` is a
-stand-in for the code of `hold@1` and `git-read@1`, which is not
-delivered. A test that uses it says so in its name or its first comment.
+stand-in for the code of `hold@1` and `git-read@1`. The derive package
+has that code, and the production runtime is not given it. A test that uses it says so in its name or its first comment.
 It shows what a definition does once a capability has answered, and
 nothing about a real hold, a Git read or a provider. A step that a test
 scripts in it names an action and a window, and derives nothing. It

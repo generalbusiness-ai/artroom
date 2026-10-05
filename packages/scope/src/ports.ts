@@ -176,9 +176,11 @@ export interface Ports {
    * 6.11), which derive a `capability` guard and effect. Each rule is a pure
    * function of its arguments, the folded state, which holds the
    * capability's records, and the input being judged: derive's
-   * `Capabilities`. Null: it has none. A scope is not founded or created
-   * under a definition that uses a form with no rule here:
-   * `unsupported-definition`.
+   * `Capabilities`. A value may also hold the rules of a capability's steps
+   * (derive's `Steps`), what a hold's entries derive for its workspace, and
+   * the binding of a reserved request. Null: it has none. A scope is not
+   * founded or created under a definition that uses a form with no rule
+   * here: `unsupported-definition`.
    */
   capabilities: Capabilities | null;
   /** The port for effects outside the service: one request of one attempt of an operation (`operations.ts`; section 4.3). */
@@ -205,9 +207,12 @@ const NO_GRANT: Standing = { held: () => [] };
  * the object supplies its own. There is no transport until a namespace
  * supplies one, and no declaration and no sent text can be read until a
  * namespace supplies the scope that retains it. The platform definitions
- * are the platform package's. There is no code for any capability form:
- * the records, guards and effects of `hold@1`, and `git-read@1`, are not
- * delivered yet. Nothing is sent outside the service, and no owner of an
+ * are the platform package's. No code for a capability form is wired here.
+ * Derive has the rules of `hold@1` over its records and the guard
+ * `ancestry` of `git-read@1` (`holdCapability` and `gitRead`), and this
+ * port does not hold them until plan step 16: the I3 deltas note, entries
+ * EH6 to EH12, lists what an owner must decide first. Nothing is sent
+ * outside the service, and no owner of an
  * outside operation has rules: a host port and the owners' rules replace
  * them (plan steps 19 and 16). Every other port refuses.
  */

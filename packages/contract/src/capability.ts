@@ -9,9 +9,12 @@
  * and steps that the authority note's section 5.7 lists. It is what a
  * validator checks a `capability` guard or effect, a `carried` part and the
  * kind of a preparation entry against. It holds no rule: the rules behind
- * each record, guard, effect and step are the authority note's, and no
- * source derives them yet. A runtime that has no code for them answers
- * `unsupported-definition` for a definition that needs one.
+ * each record, guard, effect and step are the authority note's. The derive
+ * package derives them, in `src/capability/` and `src/prepare.ts`, as far
+ * as I3 steps 16a to 16c built them. They are not wired in production: the
+ * production capabilities port has none (plan step 16). A runtime that has
+ * no code for them answers `unsupported-definition` for a definition that
+ * needs one.
  */
 
 export type CapabilityName = `${"hold" | "git-read"}@${number}`;

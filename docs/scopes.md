@@ -411,12 +411,16 @@ the entry records it in its input.
 
 **Capability forms.** A definition may list the capabilities `hold@1` and
 `git-read@1`, and may write a `capability` guard, a `capability` effect,
-the part `{ carried }`, and a fact kind such as `hold@1:check`. No source
-writes an entry of such a kind, so a `fact` guard over one does not hold.
+the part `{ carried }`, and a fact kind such as `hold@1:check`. A
+preparation entry has such a kind. An outcome entry has none, because its
+bytes hold neither the capability nor the step, so a `fact` guard over a
+check entry does not hold.
 The validator checks each form against what the listed version declares,
 in the contract package's `CAPABILITIES`. It derives none of them: a definition
-that passes lists each such form in `ValidDefinition.underived`. This
-repository has no code for a capability's rules. So the production runtime
+that passes lists each such form in `ValidDefinition.underived`. The derive
+package has the rules of `hold@1` over its records and the guard
+`ancestry` of `git-read@1`, with the judge of a preparation. The
+production runtime is not given them. So it
 founds and creates no scope under a definition whose list is not empty,
 and answers `unsupported-definition`. The verifier answers the same. The
 item form of `hold@1`, with its `hold` effect, needs no such code and
@@ -686,7 +690,7 @@ and nothing here guesses at it.
 | Who may read, and sessions | The same | The `Readers` port, whose production default lets nobody read. |
 | Platform definitions: register, directory, membership, rules, destination, inbox, task | The same | The data of `platform:inbox@1`, in `packages/platform`. Its row `notify` is code whose rule is not written, so no scope is founded under it: `unsupported-definition`, for the whole scope. A test may supply stand-in rules, which no judge runs. Every other platform name is answered `unsupported-definition`. |
 | Hold tokens, workspaces and their export | The same | The hold item, its epoch, and its timed end. |
-| Git reads, and the rules of the `hold@1` and `git-read@1` capabilities: their records, guards, effects and steps | The same | The validator reads the capability forms against the contract package's tables, and derives none. The production runtime and the verifier answer `unsupported-definition` for a definition that uses one. The tests have a scripted stand-in, which is named as one. |
+| The rules of the `hold@1` and `git-read@1` capabilities in a running scope: their records, guards, effects and steps | The same | The rules are pure functions in `packages/derive` (`src/capability/`, `src/prepare.ts`), with tests on made-up definitions, and the Git reader is `packages/git`. No production port holds them. The production runtime and the verifier answer `unsupported-definition` for a definition that uses a capability form. The tests of a scope have a scripted stand-in, which is named as one. |
 | Publication to a destination, and the evidence of an outside write | The same | The `outcome` input and the numbering of operations and attempts. No form opens an operation. |
 | Running the two lane definitions, `issue` and `change` | The authority and publication delivery, for the capability rules and the platform scopes that the rows read | The two definitions as data, in `packages/lanes`, validated whole and pinned by digest. Both use capability forms, so under the production wiring a scope is not founded or created under either: `unsupported-definition`. Ten test scenarios run them on real scopes with stand-ins that each test names. [lanes.md](lanes.md) says which rows wait and on whom. The fixtures' lane and ticket are made up for tests. |
 | The application: browser pages, the command line, tools for agents | The application delivery | The client handle. |
