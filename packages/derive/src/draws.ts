@@ -1,8 +1,8 @@
 /**
  * The counts of a holder, as the entries move them (scope contract,
  * revision 23, section 17.2a: "The words", "A draw", "`for`", "Past a
- * count" and "Release"). One function says what one entry does to the
- * counts, on the state before it. The judges ask it of the entry that they
+ * count", "Release" and section 17.3's final holder limit). One function
+ * says what one entry does to the counts, on the state before it. The judges ask it of the entry that they
  * derived, and a fault leaves the input not judged. The fold asks it of the
  * entry that it applies, and writes what it gives. A verifier asks it of a
  * recorded entry, and reports a fault as a mismatch. So the three cannot
@@ -15,7 +15,7 @@
  * | An outcome entry | The holder that its operation is `for`, or none | Draws. |
  * | A delivery of a result, and a diagnosis | The account of the entry that sent the request | Draws. |
  * | A bound delivery of a request | Its bound item | Draws 1 decision of that message, then draws for what it sends. |
- * | Every other entry | None | Nothing of an account. An `operation` effect still draws on the holder that it is `for`. |
+ * | Every other entry | None | Nothing of an account. An `operation` effect may draw on a holder that is not final. |
  *
  * A draw is 1 from a count: of its kind, for an `operation` effect whose
  * `for` names the holder; of `requests`, for a request among the sends of
@@ -37,7 +37,8 @@ import { isLocalId, own } from "./values.ts";
 /**
  * Section 17.2a, "Past a count": the entry would open an operation of a held
  * kind with no `for`, for an item that is no holder, or for a kind that no
- * item holds: `no-holder`. Or it would draw when the count is 0:
+ * item holds, or for a final holder outside this entry's own account:
+ * `no-holder`. Or it would draw when the count is 0:
  * `past-count`. Nothing is written.
  */
 export interface DrawFault { fault: "past-count" | "no-holder"; detail: string }
@@ -126,7 +127,8 @@ export function drawsOf(view: StateView, definition: ValidDefinition, entry: Dra
   else if (input.type === "delivery" && "clause" in input) account = view.account(input.message.of.from.seq, input.message.of.n);
   else if (input.type === "diagnosis") account = view.account(input.of.seq, input.of.n);
 
-  // Each `operation` effect of a held kind draws on the holder that it is `for`, whatever the account of the entry is.
+  // Each held operation draws on the holder that it is for. A final holder's counts serve its own account's duties only:
+  // another entry cannot draw on them, even when one of its own unfinished duties keeps a positive count alive.
   const holders = new Map<number, number>();
   for (const effect of operations) {
     const held = isPlatformDefinition(effect.owner) && own(r?.kinds, effect.kind)?.held === true;
@@ -137,6 +139,8 @@ export function drawsOf(view: StateView, definition: ValidDefinition, entry: Dra
     if (!held) return fault("no-holder", `operation ${effect.k} states a holder, and no item holds its kind ${effect.kind}`);
     if (effect.for === "self" && (opening?.effect !== "open" || opening.item !== entry.seq)) return fault("no-holder", `operation ${effect.k} is for the item that its entry opens, and the entry opens none`);
     const item = effect.for === "self" ? entry.seq : effect.for;
+    const target = view.item(item);
+    if (account !== item && target && own(own(definition.declared.items, target.type)?.states, target.state)?.final) return fault("no-holder", `operation ${effect.k} is for final item ${item}, which is not the entry's account`);
     const of = counts(item);
     if (!of) return fault("no-holder", `operation ${effect.k} is for item ${item}, which is no holder`);
     const left = of.operations.get(effect.kind) ?? 0;
