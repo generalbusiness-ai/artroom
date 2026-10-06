@@ -91,9 +91,10 @@ for a few acts
 | `diagnoses` | Where a diagnosis goes. | `toConsole`: one JSON line in the runtime's log. |
 
 So a scope with only these defaults can be founded, and then admits no
-act and answers no read. The deployed class, `DeployedScope`, replaces
-two of them: its authority reads the membership scope that a scope
-records, and its readers port is read sessions. Nothing in this
+act and answers no read. The deployed class, `DeployedScope`, supplies the
+namespace where the table says so, and replaces two more: its authority
+reads the membership scope that a scope records, and its readers port is
+read sessions. Nothing in this
 repository deploys it.
 
 ## Authority, in two phases
@@ -147,9 +148,15 @@ run. What it reads is kept in memory only, so a restart leaves none.
   the read and how the entry used it: `fresh`, or `reused` with the entry
   before. The commit tells the port which entry used a read last.
 
-The production port does not use it yet: no scope records its membership
-scope, and no membership scope answers a read. Its read finds no grant,
-and every act that needs one is refused `unauthorized`.
+The production default does not use it: the `authority` of `production()`
+reads no grant, and every act that needs one is refused `unauthorized`.
+The deployed class, `DeployedScope`, uses it, in `repositoryAuthority`: a
+membership scope answers the read (`observe`), and a scope whose genesis
+records a membership scope, such as an inbox, is judged on it. A rules
+scope and a destination record theirs in a way that the authority does
+not read yet, and an act there that needs a grant is answered
+`authority-unavailable` (I3 deltas, entry EM21). Nothing in this
+repository deploys the class.
 
 ## A platform definition
 
@@ -352,7 +359,7 @@ the contract's own answer.
 | `GET /v1/scopes/:scope/outbox?cursor=` | A page of the outbox | as above |
 | `GET /v1/scopes/:scope/outbox/:duty` | The outbox status of one send, by its duty ID | as above |
 | `GET /v1/scopes/:scope/log?cursor=` | A page of the history as stored: each entry's canonical bytes and hash, for a verifier | as above |
-| `GET /v1/scopes/:scope/retained/:kind/:digest` | One retained input: a `definition`, an `entry`, a `rule` input or a detached `text`, by digest. A text that was redacted is `not-found` | as above; 413 past 1 MiB |
+| `GET /v1/scopes/:scope/retained/:kind/:digest` | One retained input: a `definition`, an `entry`, a `rule` input, a detached `text` or a `snapshot` of staged refs, by digest. A text that was redacted is `not-found`. A `value` is not served: it is kept by its domain and its digest, and no route names a domain (I3 deltas, entry EX6) | as above; 413 past 1 MiB |
 
 A body is at most 1 MiB of bytes, counted while it is read: a larger body
 is cancelled and is not held. A body over that, or one that is not a JSON
@@ -408,9 +415,11 @@ npm run typecheck --workspace @generalbusiness/artroom-scope
 ```
 
 The tests run in the workerd test pool, against the real Durable Object
-class and real SQLite storage. `test/worker.ts` binds two classes:
-`TestScope`, which is `ScopeObject` with the test ports, and `ScopeObject`
-as deployed. `test/support.ts` holds the one fixture: derive's fixture lane
+class and real SQLite storage. `test/worker.ts` binds four object classes, each in a namespace of its own:
+`TestScope`, which is `ScopeObject` with the test ports; `ScopeObject`
+with every production default; and `NetScope` and `PlatformScope`, which
+are `DeployedScope` with test ports and are described below and in the
+file's header. `test/support.ts` holds the one fixture: derive's fixture lane
 with three small changes, founded as a directory. A restart is the pool's
 `evictDurableObject`.
 

@@ -18,7 +18,7 @@ why. Nothing in either note is adopted by being built.
 | Package | Holds | Imports |
 |---|---|---|
 | `@generalbusiness/artroom-contract` | Types and constant tables. No logic. | Nothing |
-| `@generalbusiness/artroom-bytes` | Canonical JSON, SHA-256, encodings, Ed25519, the seven byte domains, and the guard of each identifier. | contract |
+| `@generalbusiness/artroom-bytes` | Canonical JSON, SHA-256, encodings, Ed25519, the eight byte domains, and the guard of each identifier. | contract |
 | `@generalbusiness/artroom-derive` | The definition validator, the fold, the judges and the rule evaluator. Pure functions. | contract, bytes |
 | `@generalbusiness/artroom-platform` | The platform definitions as data, with the rules that no form can say. Today: six. The inbox is runnable under the package's own rules. The rules scope is runnable, as data and rules. Membership is runnable under the package's own ten rules. The register is not: one rule waits. The directory is not: three marks lack rules. The destination is not: ten marks lack rules. | contract, bytes, derive |
 | `@generalbusiness/artroom-git` | Everything that touches a Git repository or a Git host: the object reader, the commands, the outcome of a push, the gateway, the host port with the token driver, and the files and the commit of a snapshot. It is not part of a scope's commit. The checkers package imports it, and two test files of the scope package import its test support by path. | contract, bytes |
@@ -98,7 +98,7 @@ An entry (`Entry`) records exactly one input and what followed from it:
 | `effects` | The changes to items, derived from the input. |
 | `sends` | The messages to other scopes, derived from the input. |
 
-There are seven inputs:
+There are eight inputs (`Input`, in `packages/contract/src/entry.ts`):
 
 | Input | What it is |
 |---|---|
@@ -107,8 +107,20 @@ There are seven inputs:
 | `delivery` | A message from another scope. |
 | `timed` | A deadline that an item held and that has passed. |
 | `diagnosis` | The scope's finding that a request it sent could not be delivered. |
+| `preparation` | A request for one step of a capability, such as a step of `hold@1`: the signed intent that the step prepares for, the one grant that was judged, the capability and the step (`PreparationInput`). Its entry holds what the step's code derives: records, and the operations that it opens outside the service. |
 | `outcome` | The result of an attempt to write outside the service. A preparation entry opens such an operation under a capability's code. The production ports hold that code. A scope with only the production defaults admits no step, so it opens none. |
 | `checkpoint` | The digest of the whole folded state through a position. |
+
+A preparation input is not the evaluation of rules before a commit. In
+every turn the runtime evaluates the `rule` guards that an input would
+meet, over a snapshot, before the commit (the turn's step 5). That writes
+no entry of its own: the results are the list `prepared` of the entry that
+the input then writes. A preparation input is an input in its own right.
+A caller asks for it by name, `judgePreparation` judges it in its own
+commit, and it writes its own entry, which may open operations whose
+outcomes are later entries. The production ports hold the code of the
+steps. A scope with only the production defaults reads no grant, so it
+refuses each request for a step.
 
 ## Acts and the four answers
 
@@ -184,8 +196,9 @@ entries only. Items, records, bytes and pending requests are not counted
 yet.
 
 The judging is not in the runtime. `judgeAct`, `judgeGenesis`,
-`judgeDelivery`, `judgeTimed`, `judgeDiagnosis`, `judgeOutcome` and
-`judgeCheckpoint` are pure functions of `derive`: from the folded state,
+`judgeDelivery`, `judgeTimed`, `judgeDiagnosis`, `judgePreparation`,
+`judgeOutcome` and `judgeCheckpoint` are pure functions of `derive`, one
+for each input: from the folded state,
 one input, its retained inputs and one clock reading, to the entry that
 input writes or the answer it gets. `applyEntry` is the only code that
 changes state. The runtime calls them inside the commit. A verifier calls
@@ -415,10 +428,15 @@ the entry records it in its input.
 
 **Capability forms.** A definition may list the capabilities `hold@1` and
 `git-read@1`, and may write a `capability` guard, a `capability` effect,
-the part `{ carried }`, and a fact kind such as `hold@1:check`. A
-preparation entry has such a kind. An outcome entry has none, because its
-bytes hold neither the capability nor the step, so a `fact` guard over a
-check entry does not hold.
+the part `{ carried }`, and a fact kind such as `hold@1:check`. Two
+kinds of entry have such a kind. A preparation entry has the kind of its
+capability and its step, which its input holds. An outcome entry has the
+kind of its operation's owner and kind, which its input also holds:
+`hold@1:check` for the outcome of a check, whatever the result is
+(`kindOf`, in `packages/derive/src/operand.ts`). So the kind `hold@1:check` in a `fact` guard matches a check's outcome
+entry that is `confirmed`, `refused` or `unknown` alike. Matching the kind does not
+show a completed check. A row that needs one must also read the record
+that the entry carries, with the part `{ carried }`, and check it.
 The validator checks each form against what the listed version declares,
 in the contract package's `CAPABILITIES`. It derives none of them: a definition
 that passes lists each such form in `ValidDefinition.underived`. The derive
