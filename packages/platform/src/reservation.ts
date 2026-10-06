@@ -40,8 +40,8 @@
  * | `controllersOfAuthors` | Form 15, the controller of an authoring agent | Null. No exception is shown by its second clause. And no review is shown to be independent by the second point of section 3.10: where that point is asked, which is when `ownerMayReview` is false and for the extent `rules` always, no review counts. |
  */
 
-import type { FactRef, MemberId, MemberRef, Observation, RulesObservation, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
-import { canonicalize, timeMs } from "@generalbusiness/artroom-bytes";
+import type { Digest, FactRef, MemberId, MemberRef, Observation, RulesObservation, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
+import { canonicalize, isDigest, timeMs } from "@generalbusiness/artroom-bytes";
 import { byteOrder } from "@generalbusiness/artroom-derive";
 import { LANDING, RULES_EXTENT, classify, judgeExtents, type Extent, type ExtentsAsked, type Review, type TreeLink } from "./extents.ts";
 
@@ -67,6 +67,25 @@ export interface JudgeEvidence {
   firstParent: string | null;             // its first parent; null when it has none, or when `present` is false
   ancestors: readonly string[];           // those of the selected reports' commits that the host showed to be its ancestors, and no other commit
   changes: JudgeChanges | { over: "paths" | "links" | "bytes" } | null;   // null when `present` is false
+}
+
+/** The host's changed set is retained separately; the outcome records only its digest (authority revision 28). */
+export const DESTINATION_CHANGED_SET = { domain: "artroom-changed-set-1", max: 262144, paths: 2048, links: 256 } as const;
+export type RecordedJudgeEvidence = Omit<JudgeEvidence, "changes"> & { changes: Digest | { over: "paths" | "links" | "bytes" } | null };
+
+/** The recorded body is checked before the separate bytes are read. A present integration names a digest or an explicit bound failure. */
+export function isRecordedJudgeEvidence(value: unknown): value is RecordedJudgeEvidence {
+  if (!isRecord(value)) return false;
+  const changes = value["changes"];
+  if (isDigest(changes)) return isJudgeEvidence({ ...value, changes: { paths: [], links: [], unreadable: 0 } });
+  return (changes === null || (isRecord(changes) && Object.hasOwn(changes, "over"))) && isJudgeEvidence(value);
+}
+
+/** The resolved changed set, within the domain's path and link bounds. Byte size and digest are checked by the generic value read. */
+export function isJudgeChanges(changes: unknown): changes is JudgeChanges {
+  if (!isRecord(changes) || Object.hasOwn(changes, "over")) return false;
+  return isJudgeEvidence({ head: null, present: true, tree: "a".repeat(40), firstParent: null, ancestors: [], changes })
+    && (changes["paths"] as unknown[]).length <= DESTINATION_CHANGED_SET.paths && (changes["links"] as unknown[]).length <= DESTINATION_CHANGED_SET.links;
 }
 
 /**

@@ -1,8 +1,8 @@
 import { expect, test } from "vitest";
 import { PROPOSED_BOUNDS, type DeclaredDefinition } from "@generalbusiness/artroom-contract";
 import { definitionDigest } from "@generalbusiness/artroom-bytes";
-import { MemoryState, PROFILES, derivable, fits, owed, ownersOf, reservedBy, ruleAt, runnable, validateDefinition, type Opening } from "@generalbusiness/artroom-derive";
-import { ACTIONS_MOST, DESTINATION, DESTINATION_ATTEMPTS, DESTINATION_KINDS, DESTINATION_NOT_FINITE, FIRST_ACTIONS, ROLE_LISTS, RULES, definitions, destinationMembership, destinationRulesScope, inbox, membership, platform, publicationRoom, rulesMembership } from "../src/index.ts";
+import { PROFILES, derivable, ruleAt, runnable, validateDefinition } from "@generalbusiness/artroom-derive";
+import { ACTIONS_MOST, FIRST_ACTIONS, ROLE_LISTS, RULES, definitions, destinationMembership, destinationRulesScope, inbox, membership, platform, rulesMembership } from "../src/index.ts";
 
 // The plan's T43, for `platform:inbox@1` (authority note, revision 16, section 12.1.6). The package holds six definitions: the two
 // lists at the end of this test name them. T43 for each of the other five is in this file or in the test file of its definition.
@@ -113,7 +113,7 @@ test("the membership definition validates whole with the platform option; every 
 // The plan's steps 9 and 9c, as the authority note's revision 25 decides them (its "What revision 25 lets the I3 source do next"):
 // "Then `platform:directory@1` lacks no rule", and the register's one rule that every founding waited on is written.
 // Steps 9b, 9e and 9f, on the note's revision 26 (I3 deltas, section 29): the destination lacks exactly two rules.
-test("the register and the directory each lack no rule, so a runtime with this package runs both; the destination lacks exactly two, first-head and receipt, so it is not run", () => {
+test("every platform definition supplies the rules of its whole pinned data, including destination first-head and receipt", () => {
   /** The marks of one definition's data that the package's table has no rule of the right kind for, by name, once each. */
   const lacks = (named: string): string[] | null => {
     const supplied = platform(named)!;
@@ -127,7 +127,7 @@ test("the register and the directory each lack no rule, so a runtime with this p
   expect([lacks("platform:register@1"), lacks("platform:directory@1")]).toEqual([[], []]);
   // The two rules of the destination's outcomes that wait on two details asked of the contract (authority note, section 12.1.5,
   // "The founding commit, and the receipt"; entry ER9). Every other mark of `platform:destination@1` has its rule.
-  expect([lacks("platform:destination@1"), lacks("platform:membership@1"), lacks("platform:rules@1"), lacks("platform:inbox@1")]).toEqual([["first-head", "receipt"], [], [], []]);
+  expect([lacks("platform:destination@1"), lacks("platform:membership@1"), lacks("platform:rules@1"), lacks("platform:inbox@1")]).toEqual([[], [], [], []]);
 });
 
 // Authority note, revision 25, section 12.1, "Where the rules scope and the destination record their membership reference" (I3 deltas
@@ -156,38 +156,14 @@ test("a rules scope and a destination record the scope ID of membership as a val
 // (I3 deltas, entries FA3, FC1 and GB7). This test holds what stands in for them, so that it does not grow unseen: exactly five
 // kinds of the destination declare a closure that is not finite, which fails closed, and the entries of the note's own table that
 // no admission reserves for a publication that was admitted while queued.
-test("no rule is exempt from a reservation: exactly five kinds of the destination declare a closure that is not finite, so a destination admits no new work while one of them is open; no data states holds yet, and by the note's table a queued publication may still write 71 entries that no admission reserved", () => {
-  const outcomeRules = Object.entries(RULES).flatMap(([name, rules]) => Object.entries(rules).flatMap(([code, rule]) => (rule.place === "outcome" ? [{ at: `${name}:${code}`, rules: rule.rules }] : [])));
-  // The one named declaration, and no other rule of any definition states it. No rule states the member `covered`: no code reads it.
-  expect(outcomeRules.filter((rule) => rule.rules.closure === DESTINATION_NOT_FINITE).map((rule) => rule.at)).toEqual(["mint", "push", "deciding-read", "adopt-read", "judge"].map((code) => `platform:destination:${code}`));
-  expect(outcomeRules.filter((rule) => "covered" in rule.rules || (rule.rules.closure !== undefined && !Number.isFinite(rule.rules.closure) && !rule.at.startsWith("platform:destination:")))).toEqual([]);
-  // No item type of the package holds a reservation, no act adds to one, and no kind states its attempts in its data: each kind is
-  // counted as its rule declares. The form is built and witnessed on made-up data, in derive.
-  const stated = Object.values(definitions).flatMap((data) => [...Object.values(data.items).map((type) => type.holds), ...Object.values(data.acts).map((act) => act.adds), ...Object.values(data.outcomes).map((kind) => kind.attempts ?? kind.most)]);
-  expect(stated.filter((member) => member !== undefined)).toEqual([]);
-
-  // The table, in entries: 1 + 2 + 1, and 30 + 1 + 4 + 1 + 1 + 31. The 30 is 6 for the push, 6 for the three mints and 18 for the
-  // three revocations. A new `reserve` needs 73 with its own entry (the witness "a destination at its budget", step 1).
-  const room = publicationRoom();
-  expect([room.queued, room.reserved, 1 + room.queued + room.reserved, room.asked]).toEqual([4, 68, 73, 2]);
-
-  // What the generic code does with the declaration. The `judge` that a `reserve` opens reserves no finite number of entries.
-  const destination = validateDefinition(platform(DESTINATION)!.data, PROPOSED_BOUNDS, PROFILES, { platform: true });
-  if (!destination.ok) throw new Error("the destination validates");
-  const owners = ownersOf(destination.definition, { named: DESTINATION, rules: platform(DESTINATION)!.rules }, null)!;
-  const judge: Opening = { owner: DESTINATION, kind: DESTINATION_KINDS.judge, attempts: DESTINATION_ATTEMPTS.judge };
-  expect([reservedBy(judge, owners), reservedBy({ owner: DESTINATION, kind: DESTINATION_KINDS.revoke, attempts: DESTINATION_ATTEMPTS.revoke }, owners)]).toEqual([Number.POSITIVE_INFINITY, 6]);
-  // So while a `judge` is open no entry that is new work fits, at any budget, and a settling entry is still written.
-  const at = { scope: "sc_destination", inc: "in_a", kind: "destination" } as never;
-  const state = new MemoryState();
-  state.setScope({ at, creator: null, status: "active", head: { seq: 4, hash: definitionDigest(inbox as unknown as DeclaredDefinition) }, time: "2026-10-06T00:00:00Z" as never, genesis: { hash: definitionDigest(inbox as unknown as DeclaredDefinition), source: null, n: null }, held: [] });
-  state.putOperation({ id: "4:0", owner: DESTINATION, kind: judge.kind, most: 1, attempts: [{ attempt: 1, opened: 4, outcomes: [] }], selected: null });
-  const budget = { scopeEntries: Number.MAX_SAFE_INTEGER };
-  const newWork = { type: "delivery", from: { at, seq: 0, hash: definitionDigest(inbox as unknown as DeclaredDefinition) }, n: 0, message: { class: "request", type: "tell", body: {} }, decision: "applied" } as const;
-  const settling = { type: "outcome", operation: "4:0", attempt: 1, owner: DESTINATION, kind: judge.kind, result: "confirmed", evidence: { basis: "own-answer", body: {} } } as const;
-  expect([owed(state, destination.definition, newWork, owners), fits(state, destination.definition, budget, newWork, false, owners), fits(state, destination.definition, budget, settling, false, owners)]).toEqual([Number.POSITIVE_INFINITY, false, true]);
-
-  // What it does not do: it reserves no room. A publication that was admitted while `queued` took 1 entry, and by the note's table
-  // the outcome entries that open and settle its operations may write 71 more, which no admission was asked for.
-  expect(room.unreserved).toBe(71);
+test("destination data validates whole with finite reservations, a bound indexed withdraw and the five adopted judge observation rows", () => {
+  const destination = platform("platform:destination@1")!;
+  const checked = validateDefinition(destination.data, PROPOSED_BOUNDS, PROFILES, { platform: true });
+  if (!checked.ok) throw new Error(JSON.stringify(checked.problems));
+  expect([checked.definition.observing, checked.definition.keyed, runnable(checked.definition, destination.rules)]).toEqual([true, { publication: ["operation"] }, true]);
+  expect(Object.keys(checked.definition.reserving!.kinds).sort()).toEqual(["adopt-read", "first-head", "judge", "mint", "push", "read", "receipt", "revoke"]);
+  const rules = Object.values(destination.rules).filter((rule) => rule.place === "outcome");
+  expect(rules.filter((rule) => rule.rules.closure !== undefined && !Number.isFinite(rule.rules.closure))).toEqual([]);
+  expect(checked.definition.reserving!.holders["publication"]?.holds).toEqual({ operations: { judge: 1, push: 1, mint: 6, revoke: 6, read: 3, receipt: 1 }, requests: 3, items: 1, decisions: { withdraw: 1 } });
+  expect(destination.data.outcomes["judge"]!.observes!.map((row) => [row.of, "max" in row ? row.max : 1])).toEqual([["rules", 1], ["key", 1], ["holders", 1], ["member", 65], ["key", 8]]);
 });

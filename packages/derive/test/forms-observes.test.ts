@@ -68,7 +68,7 @@ describe("the rows of `observes` in a definition (section 16.1, the ten checks)"
       // The three rows of `weigh` give 5 subjects at most: under a ceiling of 4 they do not validate, and under 5 they do.
       "6": [4, 5].map((usesPerEntry) => { const v = validateDefinition(weigher, { ...PROPOSED_BOUNDS, usesPerEntry }, PROFILES, { platform: true }); return v.ok ? null : v.problems.map((p) => `${p.code} ${p.path}`); }),
       // Check 7: each row at its `max`, each observation at the largest size of its kind, fits the entry size. An act may pass it.
-      "7": kind([kindRow({ max: 40 })]),
+      "7": kind([kindRow({ max: 48 })]),
       "7 act": act({ max: 120 }),
       // Check 8: `retains` only on a row of the rules; no two records of one domain; a `max` within one retained read (18.50, case 9).
       "8 place": kind([{ of: "definitions", window: 10, use: "once", without: "wait", retains: [] }]),
@@ -113,7 +113,19 @@ describe("the rows of `observes` in a definition (section 16.1, the ten checks)"
     // 48,931 bytes of the content of the rules. The rows of `weigh` take about a third of an entry.
     const { entryBytes } = PROPOSED_BOUNDS;
     const sizes = (["key", "member", "rules", "holders"] as const).map((of) => observationBytes(of, PROPOSED_BOUNDS, 2));
-    expect([sizes.every((size) => size < entryBytes), sizes[2]! > 48_931, 40 * sizes[0]! > entryBytes]).toEqual([true, true, true]);
+    expect([sizes.every((size) => size < entryBytes), sizes[2]! > 48_931, 48 * sizes[0]! > entryBytes]).toEqual([true, true, true]);
+  });
+
+  test("the adopted observation counts fit: 65 authors, a merger and eight other keys, the rules and one holder; exceeding the key budget still refuses the data", () => {
+    const rows = [
+      { of: "rules", window: 10, use: "once", without: "write" },
+      { of: "key", from: "rule", max: 1, window: 10, use: "once", without: "write" },
+      { of: "holders", action: "rules.publish", most: 1, window: 10, use: "once", without: "write" },
+      { of: "member", from: "rule", max: 65, second: true, window: 10, use: "once", without: "write" },
+      { of: "key", from: "rule", max: 8, second: true, window: 10, use: "once", without: "write" },
+    ];
+    expect(problems((data) => { data.outcomes.weigh.observes = rows; })).toBeNull();
+    expect(problems((data) => { data.outcomes.weigh.observes = rows.map((row, n) => n === 4 ? { ...row, max: 64 } : row); })).toContain("bound outcomes.weigh.observes");
   });
 
   test("18.50 cases 1 and 2, the part that is a function of the rows: what an entry of a form may newly retain is each value of `retains` at its `max`, and for a request the largest over its clauses that can still run", () => {
