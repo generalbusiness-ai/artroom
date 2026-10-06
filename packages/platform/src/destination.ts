@@ -44,8 +44,8 @@
  */
 
 import type { FactRef, FieldValue, OperationId, PlatformData, PlatformDefinition, ScopeId } from "@generalbusiness/artroom-contract";
-import { canonicalize, isFactRef, isMemberRef, isScopeRef, utf8 } from "@generalbusiness/artroom-bytes";
-import type { Item, Operation, Own, RecordedRef, RuleEffect, RuleGiven, Rules, StateView } from "@generalbusiness/artroom-derive";
+import { canonicalize, isFactRef, isMemberRef, isScopeRef, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
+import type { Item, Opening, Operation, Own, RecordedRef, RuleEffect, RuleGiven, Rules, StateView } from "@generalbusiness/artroom-derive";
 import { referenceOf } from "./rules-scope.ts";
 
 /** The name and version that this data and these rules are. An operation that the destination opens states it as its owner (the contract's section 4.3). */
@@ -483,6 +483,43 @@ const COLLECTED_RECORD: Readonly<Record<keyof typeof COLLECT_MOST, (value: unkno
   links: (value) => record(value, { link: isFactRef, issue: (issue) => isScopeRef(issue) && issue.kind === "lane" }),
 };
 
+// ---------------------------------------------------------------- what an operation is for
+
+/** A write: an operation of the kind `first-head`, `push` or `receipt` (section 12.1.5, "The kinds of operation"). */
+const WRITES: readonly string[] = [DESTINATION_KINDS.firstHead, DESTINATION_KINDS.push, DESTINATION_KINDS.receipt];
+const ours = (operation: Operation, ...kinds: readonly string[]): boolean => operation.owner === DESTINATION && kinds.includes(operation.kind);
+/** An operation that the outcome entry opens. The ledger numbers it and opens its attempt 1. */
+const opening = (kind: string, attempts: number): Opening => ({ owner: DESTINATION, kind, attempts });
+/** The body of an outcome's evidence, when it is a record with exactly those members. */
+const bodyOf = (body: unknown, names: readonly string[]): Record<string, FieldValue> | null =>
+  (isObject(body) && Object.keys(body).length === names.length && names.every((name) => Object.hasOwn(body, name)) ? body : null);
+
+/** The attempt of a write that a `mint` serves: the same row, read from the mint. Null: the entry that opened the mint opened no attempt of a write. */
+function servedBy(state: Pick<StateView, "operation">, own: Own, mint: Operation): { write: Operation; attempt: number } | null {
+  const seq = seqOf(mint.id);
+  const here = openedIn(state, seq).find((operation) => ours(operation, ...WRITES));
+  if (here) return { write: here, attempt: 1 };
+  const input = ownEntry(own, seq).input;
+  const write = input.type === "outcome" ? state.operation(input.operation) : null;
+  return input.type === "outcome" && write && ours(write, ...WRITES) && write.attempts[input.attempt]?.opened === seq ? { write, attempt: input.attempt + 1 } : null;
+}
+
+/**
+ * The item that a write is for (the rows `first-head`, `push` and
+ * `receipt` of the same table): the branch, for a first head; the
+ * publication that the opening entry made `reserved`, or `published`, or
+ * that the act `resend` is on. Null: the receipt of the first head, which
+ * is for no item.
+ */
+function subjectOf(state: Pick<StateView, "item" | "page">, own: Own, write: Operation): Item | null {
+  if (write.kind === DESTINATION_KINDS.firstHead) return branchOf(state);
+  const { input, effects } = ownEntry(own, seqOf(write.id));
+  if (input.type === "act") return publicationAt(state, input.signed.intent.on);
+  const made = write.kind === DESTINATION_KINDS.push ? "reserved" : "published";
+  const change = effects.find((effect) => effect.effect === "state" && effect.state === made);
+  return change?.effect === "state" ? publicationAt(state, change.item) : null;
+}
+
 // ---------------------------------------------------------------- the rules
 
 /**
@@ -688,6 +725,60 @@ export const destinationRules: Rules = {
     run: (_given: RuleGiven, value, of) => {
       const list = "field" in of && Object.hasOwn(COLLECT_MOST, of.field) ? (of.field as keyof typeof COLLECT_MOST) : null;
       return list !== null && Array.isArray(value) && value.length <= COLLECT_MOST[list] && value.every(COLLECTED_RECORD[list]);
+    },
+  },
+  /**
+   * Row e, the outcome entries of a `mint` (P16; section 12.1.5, "Who opens
+   * the mint, the revocation and the deciding read of each attempt", and the
+   * row `mint` of "What each rule of an outcome yields"; entry ER7). It
+   * reads the opening entry; the attempt that it serves; `aborting`; and
+   * the slot `token`.
+   *
+   * - `confirmed`, and the attempt has no outcome, and the publication is
+   *   not `aborting`: the slot `token` is this operation's ID, and a
+   *   publication that is `reserved` becomes `publishing`.
+   * - `confirmed` otherwise: the token's `revoke` operation and its attempt
+   *   1. That is a token that arrived too late to be used.
+   * - `refused` or `unknown`: nothing. The request of the write attempt is
+   *   then not sent (the rule `push`, `ready`).
+   *
+   * The body of a `confirmed` outcome is `{ token, ends }`: the host's ID of
+   * the credential, a text of at most 256 bytes, and the time at which it
+   * ends. Never the secret. Of a `refused` or an `unknown` one it is an
+   * empty record. A mint has 1 attempt.
+   *
+   * **A mint of a receipt's attempt is never live** (I3 deltas, entry FA6).
+   * The slot `token` of a receipt's attempt is `publication.token`, and the
+   * publication is `published`, which is final: no effect changes an item
+   * that was final before the entry (the contract's section 6.6). The
+   * receipt of the first head has no slot at all. So no slot can name such
+   * a token, and the rule opens its revocation at once. The rule `receipt`
+   * is not written, and waits on that too.
+   */
+  mint: {
+    place: "outcome",
+    rules: {
+      selects: false, read: false, covered: true, most: { effects: 2, requests: 0, operations: 1 },
+      retries: () => false,
+      wellFormed: (result, evidence) => {
+        const body = bodyOf(evidence.body, result === "confirmed" ? ["token", "ends"] : []);
+        return body !== null && (result !== "confirmed" || (typeof body["token"] === "string" && body["token"].length > 0 && utf8(body["token"]).length <= 256 && timeMs(body["ends"]) !== null));
+      },
+      unknown: () => ({}),
+      derives: ({ state, own, input }, mint) => {
+        if (input.type !== "outcome" || input.result !== "confirmed") return { effects: [], sends: [], opens: [] };
+        const served = servedBy(state, own, mint);
+        if (!served) throw new Error("a mint is of one attempt of a write");
+        const item = served.write.kind === DESTINATION_KINDS.receipt ? null : subjectOf(state, own, served.write);
+        const attempt = served.write.attempts.find((opened) => opened.attempt === served.attempt);
+        const live = item !== null && (attempt?.outcomes.length ?? 0) === 0 && (item.values["token"] ?? null) === null && item.values["aborting"] !== true
+          && (item.type === "branch" || HELD.includes(item.state));
+        if (!live) return { effects: [], sends: [], opens: [opening(DESTINATION_KINDS.revoke, DESTINATION_ATTEMPTS.revoke)] };
+        return {
+          effects: [{ effect: "value", item: item.id, slot: "token", value: mint.id }, ...(item.state === "reserved" ? [{ effect: "state", item: item.id, state: "publishing" } as const] : [])],
+          sends: [], opens: [],
+        };
+      },
     },
   },
 };
