@@ -50,6 +50,8 @@ test("judge evidence names its changed set by digest and refuses an inline or ov
   expect(isRecordedJudgeEvidence(evidence)).toBe(true);
   expect(isRecordedJudgeEvidence({ ...evidence, changes: { paths: [], links: [], unreadable: 0 } })).toBe(false);
   expect(isJudgeChanges({ paths: ["src/a.ts"], links: [], unreadable: 0 })).toBe(true);
+  expect(isJudgeChanges({ paths: ["b", "a"], links: [], unreadable: 0 })).toBe(false);
+  expect(isJudgeChanges({ paths: ["a", "a"], links: [], unreadable: 0 })).toBe(false);
   expect(isJudgeChanges({ paths: Array(DESTINATION_CHANGED_SET.paths + 1).fill("a"), links: [], unreadable: 0 })).toBe(false);
   expect(isRecordedJudgeEvidence({ ...evidence, present: false, changes: d("f") })).toBe(false);
 });
