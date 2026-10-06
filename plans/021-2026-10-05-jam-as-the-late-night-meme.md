@@ -65,9 +65,51 @@ Either way, the `interpret` act is the synth's: it fixes the bar grid and
 the key for everyone else, which is the part a human band leader does by
 counting in.
 
+## The reference clip, as measured
+
+Both links hugh gave are the same 18-second clip: a comedy sketch of a
+singer at a keyboard with a comedian who cannot sing, one captioned "Me
+and claude every night / Prompting my AI agents at 3am", the other with
+the faces swapped for two AI company founders. Read from the frames and
+the audio on 2026-10-05 (frames, loudness per second, a spectrogram and
+an onset autocorrelation; no listening).
+
+What it looks like:
+
+- A white seamless studio, hard white floor and wall, no set. Two people
+  standing. A white table with a small two-octave keyboard controller and
+  an open laptop. Nothing else in frame.
+- The singer stands at the left in a cardigan, hums with a straight face
+  and big hand gestures, then bops: shoulders, head, a fist pump, arms up
+  at the end. The keyboard player watches him, then plays with one hand
+  while nodding, then laughs out loud when the track hits.
+- One take, no cuts, no graphics but two caption bars in a plain white
+  sans-serif: one above the picture, one across the middle. Portrait
+  9:16 on one site, landscape on the other.
+
+What it sounds like:
+
+- 0 to 3.3 s: a voiced hum, about eight syllables at roughly three a
+  second, with strong harmonics and large leaps: the dominant pitch sits
+  around G sharp 3 for a second, drops to G sharp 2 and E 2, jumps to D
+  sharp 4, falls back. It is a tune, but a silly one, sung badly on
+  purpose.
+- 3.3 to 7.5 s: mouth percussion, dry and regular, about four hits a
+  second: the singer "drums" the rhythm.
+- 7.5 s to the end: the keyboard player's track, at about 120 beats per
+  minute by onset autocorrelation, bass under 1 kHz with a synth lead
+  above it, loudness rising from about minus 20 to minus 14 dBFS across
+  the last ten seconds. The last beat lands under a laugh.
+
+So the clip's own shape is: tune, then rhythm, then the band, in under
+twenty seconds, with the joke being that the hum was bad and the track is
+good. The demo should keep that shape and that duration for its first
+phrase.
+
 ## Visuals
 
-Meme style, and funny first. A stage, not a dashboard: instruments drawn
+Meme style, and funny first: a white room, a table, instruments, people
+who bop. The reference is above. A stage, not a dashboard: instruments drawn
 to look like instruments, a player figure on each that nods and bops on
 the beat the interpretation set, arrivals that walk in and pick an
 instrument up, and the banter as captions. Each agent is named by its
