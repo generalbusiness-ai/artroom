@@ -1,0 +1,18 @@
+Normal gs merge exit0, resulting42e73eb7ff22c050c05709ab64649d48031120ec with parents138cc05dbe92c03f2e53b0be7c42d9825c28b29d andb12419603ebaf7422757319c3be19750c60be6a7.
+gs: verifying the durable log; this may take a while
+{
+  "remote": "origin",
+  "ref": "refs/heads/main",
+  "head": "138cc05dbe92c03f2e53b0be7c42d9825c28b29d",
+  "basis": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:f28a24bc09830763174cf53f60e9d72fc2bbf215"
+}
+gs: read tracked .gitseq at published head 138cc05dbe92c03f2e53b0be7c42d9825c28b29d: git show 138cc05dbe92c03f2e53b0be7c42d9825c28b29d:.gitseq: exit status 128: fatal: path '.gitseq' does not exist in '138cc05dbe92c03f2e53b0be7c42d9825c28b29d'
+
+Already-authorized fallback nativegitpush exit0: 138cc05db..42e73eb7f ->main.
+Remoteverification exit0:
+42e73eb7ff22c050c05709ab64649d48031120ec	refs/heads/main
+
+Status exit0:
+## main
+
+Sourcepackagesb41af33fe7f3d4b78b9879f6080e718babcfcfb4 match approvedcandidate. Plansb462d9c9285072c955e7e9f14fffb380108ecb13 match receiving138. Only4approvedpathschanged. No gate repeat.
