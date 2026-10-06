@@ -64,7 +64,7 @@
  */
 
 import type { Answer, Digest, PlatformDefinition, ScopeRef, Sealed, SignedIntent } from "@generalbusiness/artroom-contract";
-import { b64url } from "@generalbusiness/artroom-bytes";
+import { b64url, isRecord } from "@generalbusiness/artroom-bytes";
 import { readConfiguration, type Configuration } from "./configuration.ts";
 import { manifestOf, originOf, type Job, type NotAJob, type Notice } from "./job.ts";
 import { judge, provenanceOf, readReport, type Details, type Outcome } from "./outcome.ts";
@@ -242,7 +242,9 @@ export class CheckerService {
       } catch {
         this.#log("job-read", "no-answer");
       }
-      if (token?.answer === "accepted") {
+      // The lane's answer is read as data: a value that is no answer is no token, and the log holds one of four fixed words.
+      const answered = isRecord(token) ? token["answer"] : null;
+      if (answered === "accepted") {
         ran = true;
         try {
           // 5. The one run of this job.
@@ -252,7 +254,7 @@ export class CheckerService {
           this.#log("run", "lost");
           report = null;
         }
-      } else if (token !== null) this.#log("job-read", token.answer);
+      } else if (token !== null) this.#log("job-read", answered === "refused" || answered === "unavailable" || answered === "mismatch" ? answered : "no-answer");
     }
     await this.#conclude(job, run, configuration, report);
     return this.#submit(job, ran);

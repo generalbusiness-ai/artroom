@@ -99,6 +99,13 @@ describe("the checker service (authority note, section 3.11; I3 plan, T35). The 
     const none = made();
     none.scopes.token = refusedFor("");
     expect([await none.deliver(), none.runner.asked.length]).toEqual(["check-error run-lost, admitted", 0]);
+    // The lane's answer to that request is data too. A value that is no answer is no token: the delivery does not fail between the record
+    // of the run and the kept outcome, no runner starts, and the log holds a fixed word and nothing of the value.
+    for (const value of [undefined, "accepted", { answer: "a token: ghp_0123456789" }]) {
+      const odd = made();
+      odd.scopes.prepare = () => Promise.resolve(value as never);
+      expect([await odd.deliver().catch(() => "the delivery failed"), odd.runner.asked.length, odd.log]).toEqual(["check-error run-lost, admitted", 0, ["job-read no-answer"]]);
+    }
   });
 
   test("the result is signed outside the runner, by the checker's key, after the outcome is kept: the runner is given the job and the configuration and no key or token; the signed intent names the job, its tree, its configuration and the digest of what ran", async () => {
