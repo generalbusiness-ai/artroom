@@ -198,19 +198,28 @@ the designs, and is no review of this source.
   `unsupported-definition`: transport answers `retry`, and nothing is
   recorded.
 - The platform package holds the data of `platform:register@1` and of
-  `platform:directory@1`, and each rule of the two that can be written.
-  The register lacks the rule of one mark, and the directory's data holds
-  three marks with no rule (`notes/2026-10-05-i3-contract-deltas.md`,
-  entries EJ1, EP6 and EP7, and section 22). So nothing is founded or created under
-  either by the production wiring.
+  `platform:directory@1`, with a rule for every mark of each
+  (`notes/2026-10-05-i3-contract-deltas.md`, section 26). A founding
+  under `platform:register@1` founds a register, by an `install` intent.
+  Its selecting outcome creates the directory, whose genesis creates
+  membership and the rules scope. The creation of the destination is
+  answered `unsupported-definition`: `platform:destination@1` lacks
+  rules. `test/founding-real.test.ts` shows it on real scopes. The
+  production outside port sends nothing, so under the production wiring
+  no repository is created at a host and a claim stays `pending`.
 - A directory under `platform:directory@1` records its membership
   reference in its slot `repository.membership`. The production authority
-  reads it there, from the scope's own folded state.
+  reads it there, from the scope's own folded state. A rules scope and a
+  destination hold membership's scope ID, and the incarnation of the
+  observations of it that their entries retain: before the first, the
+  authority asks by the ID alone.
 
-The founding makes a scope of the kind `directory`, as every founding
-does. Derive's genesis judge also founds a register, of the kind
-`register`, by an `install` intent under `platform:register`. The scope's
-`found` does not build that seed yet.
+A founding under `platform:register@1` makes a scope of the kind
+`register`, by an `install` intent: the scope's `found` and the Worker
+build the seed's kind from the definition that is named. A founding under
+any other definition makes a directory with no creator, by a `found`
+intent. That earlier founding stays until a repository's founding by its
+register is whole.
 
 ## A child's definition
 

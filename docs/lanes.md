@@ -322,7 +322,9 @@ read. A delivery from another scope is judged by its handler.
 The deployed class, `DeployedScope`, has a real authority: a lane reads
 the membership scope that its genesis records. A lane records one only
 when its creator does. The directory that will create lanes with that
-reference cannot be created yet (three of its marks have no rule), so no
+reference can be created, by a register's founding. Its guard
+`definition-active` reads an observation of the rules scope, which no
+runtime reads before a turn yet, so it creates no lane, and no
 test runs a lane under that authority. A lane that records none reads
 nothing, and an act that needs a grant is answered
 `authority-unavailable`. Nothing is deployed.

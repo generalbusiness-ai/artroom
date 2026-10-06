@@ -82,21 +82,20 @@ class with the production authority and the platform package's own
 rules: a test of real authority runs there, in the namespace `PLATFORM`
 (`packages/scope/test/repository.ts` lists what is real in it).
 
-The register and the directory have stand-ins of their own, in
-`packages/platform/test/support-founding.ts`. `registerStandIns` is a rule
-for the one mark of the register's data that has no rule,
-`create-repository` (`notes/2026-10-05-i3-contract-deltas.md`, entry EJ1).
-`directoryStandIns` is a rule for each of the three marks of the directory's
-data that the platform package has no rule for (entries EP6 and EP7).
-Without them nothing is founded under `platform:register@1` or created
-under `platform:directory@1`, in a test as in production. `Register` is a
-register in memory, founded by an install intent. `Directory` is a
-directory in memory that a scripted register created: the `create` that
-the register's unwritten rule will send is added to its outcome entry by
-hand, and the register's confirmation, the genesis of each child and each
-lane's entry are made by hand. A test that uses one says so. It shows the
-rows and the written rules of the two definitions, and nothing about a
-founding.
+The register and the directory have no stand-in rule: every mark of the
+data of each has its rule in the platform package. Two fixtures are in
+`packages/platform/test/support-founding.ts`. `Register` is a register in
+memory, founded by an install intent. `Directory` is a directory in memory
+that such a register created by its own rules: the claim, the selecting
+outcome with its `create`, the directory's genesis and the register's
+record of the result are all judged. The genesis of each child and each
+lane's entry are scripted, made by hand. A test that uses one says so. It
+shows the rows and the rules of the two definitions as judgments in
+memory. A founding on scope objects is
+`packages/scope/test/founding-real.test.ts`, in the namespace `PLATFORM`:
+the deployed class, the production authority and the package's own rules,
+with a labelled stand-in for the Git host. It runs as far as the creation
+of the destination, which `platform:destination@1` cannot yet answer.
 
 The rules scope has four stand-ins, in
 `packages/platform/test/support-rules.ts`. `registrar` is a made-up
