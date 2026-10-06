@@ -283,6 +283,7 @@ export const fixedMembership = (config: Pick<Repository, "genesis" | "state">, s
  *   then on the read states it, and an observation that names another is
  *   discarded (authority note, section 12.1, decided in revision 25, which
  *   was not adopted when this was written; I3 deltas, section 26).
+ *   Revision 26 is adopted since, at `f7175296`.
  *
  * No grant that is presented beside an intent is read: authority is what
  * the membership scope answers, and nothing a caller brings.

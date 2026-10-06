@@ -5,8 +5,9 @@
  * destination scope for each published branch. It is the only writer of
  * that branch.
  *
- * Revision 26 is approved by the checker, and its adoption was not
- * recorded when this was built (I3 deltas, section 29). Section 12.1.5,
+ * Revision 26 was approved by the checker, and its adoption was not
+ * recorded when this was built (I3 deltas, section 29). It is adopted
+ * since, at `f7175296`. Section 12.1.5,
  * "The destination, decided in revision 25", is the rule wherever a row of
  * its tables differs.
  *

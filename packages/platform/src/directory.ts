@@ -33,7 +33,7 @@
  * `worker-standing` and the second refusal of `definition-active` are of
  * the note's revision 25 ("The directory, decided in revision 25"), which
  * was filed for review, and not adopted, when they were written (I3
- * deltas, section 26).
+ * deltas, section 26). Revision 26 is adopted since, at `f7175296`.
  *
  * The data holds no mark that the table does not list, and every mark has
  * its rule here. So a runtime with this package can run

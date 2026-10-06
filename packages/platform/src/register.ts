@@ -11,7 +11,7 @@
  * `claim-active` are as the note's revision 25 states them** ("The rule
  * `create-repository`, whole", and the three blocks after it). That
  * revision was filed for review, and not adopted, when this was written
- * (I3 deltas, section 26).
+ * (I3 deltas, section 26). Revision 26 is adopted since, at `f7175296`.
  *
  * One member of the data is one row of the note's tables. A cell of the
  * note that begins "Code" is a mark in this data, at the place where its

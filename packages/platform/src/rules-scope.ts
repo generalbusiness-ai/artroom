@@ -6,9 +6,9 @@
  * extents and the declaration of the single-controller exception, the
  * labels, the check configurations and the active definitions.
  *
- * Revision 26 is approved by its checker. The planner's adoption of it was
- * not recorded when the rows of revision 25 were built here (I3 deltas,
- * the section of the entries FB).
+ * Revision 26 was approved by its checker. The planner's adoption of it
+ * was not recorded when its rows were built here (I3 deltas, section 28,
+ * the entries FB). It is adopted since, at `f7175296`.
  *
  * This file is named `rules-scope.ts` because `rules.ts` is the package's
  * table of rules.
