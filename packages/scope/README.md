@@ -273,6 +273,7 @@ whose stored bytes are the canonical bytes.
 | `operation` | The outside operations, folded, by the entry that opened each and its ordinal there, with what each still reserves. |
 | `attempt` | One row for each attempt that an entry opened, written with that entry. The driver's bookkeeping is in three columns: `next`, when it looks at the attempt next; `sent`, the time written before its one request left; and `outcome`, the entry that recorded its first outcome. |
 | `retained_input` | What an entry names by digest and does not carry: the definition's declaration, the bytes of each foreign entry in a `uses`, and the input of each rule evaluation. A delivered message, a rule's result and an outcome's evidence are inside the entry that records them. |
+| `retained_value` | Each value that an entry names and that came beside its intent, by its domain and its digest. It is written in the commit of that entry. No route reads it (I3 deltas, entry FC7). |
 
 An entry's row, the fold's changes, its sends and its retained inputs are
 written in one transaction. A transaction that does not commit leaves
