@@ -1162,4 +1162,35 @@ export const destinationRules: Rules = {
       derives: (given, read) => { const { effects, opens } = readDecides(given, read); return { effects, sends: [], opens }; },
     },
   },
+  /**
+   * Row e, the outcome of the read that `adopt-head` opens (P16; the row
+   * `adopt-read`). It reads the opening entry, with the field `commit` of
+   * its act. `seen` is that commit: `branch.head` is the commit, the branch
+   * is `ready`, and the next `judge`. Otherwise nothing.
+   *
+   * The act is admitted only while no publication holds the slot. Its read
+   * is answered later. Where a publication holds the slot by then, the
+   * outcome changes nothing: a head that is adopted under a reserved
+   * publication would move the base of its push. The note does not state
+   * that order (I3 deltas, entry FA12).
+   */
+  "adopt-read": {
+    place: "outcome",
+    rules: {
+      selects: false, read: false, covered: true, most: { effects: 5, requests: 0, operations: 1 },
+      retries: () => false,
+      wellFormed: (result, evidence) => { const seen = bodyOf(evidence.body, ["seen"])?.["seen"]; return result === "confirmed" && (seen === "absent" || isObjectId(seen)); },
+      derives: ({ state, own, input }, read) => {
+        const [branch, act] = [branchOf(state), ownEntry(own, seqOf(read.id)).input];
+        if (!branch || input.type !== "outcome" || act.type !== "act") throw new Error("an adopt-read is of the act adopt-head on the branch");
+        const [seen, commit] = [bodyOf(input.evidence.body, ["seen"])?.["seen"], act.signed.intent.fields["commit"]];
+        if (!isObjectId(seen) || seen !== commit || (branch.refs["slot"] ?? null) !== null) return { effects: [], sends: [], opens: [] };
+        const next = andNext(state, { ready: true });
+        return {
+          effects: [{ effect: "value", item: branch.id, slot: "head", value: seen }, ...(branch.state === "ready" ? [] : [{ effect: "state", item: branch.id, state: "ready" } as const]), ...next.effects],
+          sends: [], opens: next.opens,
+        };
+      },
+    },
+  },
 };
