@@ -8,9 +8,13 @@ It is prepared in `capacity-form-openings`, branch
 `request/capacity-form-openings`, from fixed S2 candidate
 `1b71985348f1e78cd955156870f495e7a78584a5`. That isolated preparation was
 authorized while S2 acceptance was pending. This note grants no acceptance
-of S2 or S3. Root must reconcile the actual receiving main containing S1,
-S2, the task map, reports and separately reviewed guide changes before the
-sole final gate and delivery. No competing merge was started.
+of S2 or S3. Root reconciled the branch with receiving main
+`6be14650db44d24339f2ed91ed4eddf272d4199e` after S2's normal approval
+`0077a079609085f6583a614f712769534b6643d8` and terminal landing receipt
+`f0db523e4819ecbb8b37568803e519dfcfcca5ec`. That main retains S1, S2,
+the task map and their reports. The separate guide work remains protected;
+no guide content is rolled back. The rebase changes no tested source bytes.
+No competing merge was started.
 
 ## Source change
 
