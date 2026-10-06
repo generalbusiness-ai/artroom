@@ -190,11 +190,12 @@ export const isEvidence = (v: unknown): v is Evidence => evidence(v);
 
 /**
  * A retained observation (section 16.1): an observation, the read it came
- * from and how the entry used it. An observation is one of three fixed
+ * from and how the entry used it. An observation is one of four fixed
  * records, each with exactly its members: the standing of one key, which
- * has no member `subject`; the standing of one member; and what the rules
- * scope holds. Whether a value is true of the observed scope's history, and
- * every guard of freshness, are the judges' and the verifier's questions.
+ * has no member `subject`; the standing of one member; what the rules
+ * scope holds; and the holders of one action. Whether a value is true of
+ * the observed scope's history, and every guard of freshness, are the
+ * judges' and the verifier's questions.
  */
 const observedFrom = { of: scopeRef, head, definition: isPlatformDefinition, at: isTime };
 const controlled = { controller: orNull(isMemberId), controllerActive: orNull(flag) };
@@ -208,10 +209,16 @@ const furtherObservation = variant("subject", {
     ...observedFrom, subject: any, revision: isLocalId,
     content: variant("asked", {
       // Revision 19 (row I3-36): under a rules definition whose data states the value, the record also holds `singleControllerException`.
-      rules: record({ asked: any, approvals: isLocalId, ownerMayReview: flag, checks: listOf(record({ name: text, configuration: isDigest, required: flag, checker: isMemberId })), labels: listOf(text) }, { singleControllerException: flag }),
+      // Revision 20 (row I3-43): and `extents`, a digest, under one whose data states that slot. Which of the two a definition states
+      // is not known here: derive's `contentStates` makes that check, with the data of the observation's `definition`.
+      rules: record({ asked: any, approvals: isLocalId, ownerMayReview: flag, checks: listOf(record({ name: text, configuration: isDigest, required: flag, checker: isMemberId })), labels: listOf(text) }, { singleControllerException: flag, extents: isDigest }),
       definitions: record({ asked: any, active: listOf(record({ digest: isDigest, name: text })) }),
     }),
   }),
+  // Revision 20 (row I3-42): the holders of one action. `holders` lists distinct member IDs, and no more than `count`. Their order,
+  // and whether they are the first, are questions of the observed scope's history.
+  holders: (v) => record({ ...observedFrom, subject: any, action: text, count: isLocalId, holders: listOf(isMemberId) })(v)
+    && new Set((v as { holders: string[] }).holders).size === (v as { holders: string[] }).holders.length && (v as { holders: string[]; count: number }).holders.length <= (v as { count: number }).count,
 });
 const observationUse = record({
   observation: (v) => (isRecord(v) && Object.hasOwn(v, "subject") ? furtherObservation(v) : keyObservation(v)),

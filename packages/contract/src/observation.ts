@@ -64,14 +64,25 @@ export interface MemberObservation {
  * states its `definition`, so a reader knows which to expect. A reader
  * takes anything but `true` as no declaration.
  *
- * The record holds no member `extents`: the authority note asks the
- * contract for it, and no revision of the contract states it.
+ * `extents` (revision 20, "The extents, in an observation of the rules";
+ * source row I3-43): under a rules definition whose item `rules` states a
+ * slot of that name, the record that was asked as "rules" holds the digest
+ * of the list as that slot holds it, in a byte domain that the rules
+ * definition declares. The list itself is a retained input of the kind
+ * `value`, which the rules scope gives beside its answer. Under a rules
+ * definition whose data states no such slot the record has no such member.
+ *
+ * The two members are optional in this one type, which writes two fixed
+ * records. The check of the record is exact: each is present exactly when
+ * the data of the observation's `definition` states it (derive's
+ * `contentStates`).
  */
 export type RulesContent =
   | { asked: "rules"; approvals: number; ownerMayReview: boolean;
       checks: readonly { name: string; configuration: Digest; required: boolean; checker: MemberId }[];
       labels: readonly string[];
-      singleControllerException?: boolean }
+      singleControllerException?: boolean;
+      extents?: Digest }
   | { asked: "definitions"; active: readonly { digest: Digest; name: string }[] };
 
 /** An observation of the rules scope (section 16.1). It stands only in the member `observed` of an input. */
@@ -86,15 +97,37 @@ export interface RulesObservation {
 }
 
 /**
+ * The members who hold one action, at one head of membership (revision 20,
+ * section 16.1, "An observation of the holders of one action"; source row
+ * I3-42). A fixed record, with exactly its members. A member holds an
+ * action when it is active, has an active key, and an `Observation` of that
+ * key at that head would list the action. `count` is how many hold it.
+ * `holders` is the first of them, in byte order of member ID: all of them,
+ * or as many as the request's `most` when `count` is higher. Its subject,
+ * for the order of heads, is the action, of the observed scope. The count
+ * permits nothing. It stands only in the member `observed` of an input.
+ */
+export interface HoldersObservation {
+  subject: "holders";
+  of: ScopeRef;                    // the membership scope, with its incarnation
+  head: Head;                      // the membership head that was read
+  action: string;
+  count: number;
+  holders: readonly MemberId[];
+  definition: PlatformDefinition;
+  at: Timestamp;
+}
+
+/**
  * An observation with the read it came from and how the entry used it
  * (section 16.1). It is `Grant.fresh`, where its observation is an
  * `Observation`, of the signing key. It is also a record of the member
  * `observed` of an act, of an outcome and of a delivery of a result
  * (section 4.1), where its observation is of another key, of a member or of
- * the rules.
+ * the rules, or of the holders of an action.
  */
 export interface ObservationUse {
-  observation: Observation | MemberObservation | RulesObservation;
+  observation: Observation | MemberObservation | RulesObservation | HoldersObservation;
   read: { run: RunId; n: number };         // the scope's run, and the read's number in that run
   use: "fresh" | "reused";
   prior: Head | null;                      // for "reused": the latest earlier entry of this scope that retains this read
@@ -120,7 +153,8 @@ export type ObservedScope = ScopeRef | Pick<ScopeRef, "scope" | "kind">;
 export type ObservationRequest =
   | { of: ObservedScope; key: KeyId }
   | { of: ObservedScope; member: MemberId }
-  | { of: ObservedScope; asked: "rules" | "definitions" };
+  | { of: ObservedScope; asked: "rules" | "definitions" }
+  | { of: ObservedScope; holders: string; most: number };   // revision 20: the holders of one action, and how many IDs the answer may list
 
 /**
  * What the observed scope answers, from its head (authority note, section
@@ -128,4 +162,4 @@ export type ObservationRequest =
  * scope's own clock when its read began, which the observed scope does not
  * know.
  */
-export type ObservationAnswer = Omit<Observation, "at"> | Omit<MemberObservation, "at"> | Omit<RulesObservation, "at">;
+export type ObservationAnswer = Omit<Observation, "at"> | Omit<MemberObservation, "at"> | Omit<RulesObservation, "at"> | Omit<HoldersObservation, "at">;

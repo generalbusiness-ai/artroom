@@ -5,6 +5,7 @@ export type * from "./evidence.ts";
 export type * from "./observation.ts";
 export type * from "./definition.ts";
 export type * from "./platform.ts";
+export type * from "./observes.ts";
 export * from "./capability.ts";
 export * from "./read.ts";
 export type * from "./report.ts";
