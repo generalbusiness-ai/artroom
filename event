@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:8c04dec0fb187178b3d6e33facce3b22c52f414e","text":"Merge retired a covered predecessor with no successor at its old path."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:8c151b21f4a5044de8f190b08b55de763b2bbd31","text":"Merge retired a covered predecessor; the successor is at packages/lanes/scripts/reference.mjs."}
