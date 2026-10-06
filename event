@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:27e8aece7592468bc2329a5fbfa62672954e97e9","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-05-i3-contract-deltas.md."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:29349f302b2f02101eb52504d88c9baa1bd33fec","text":"Merge retired a covered predecessor; the successor is at packages/derive/test/forms-sends.test.ts."}
