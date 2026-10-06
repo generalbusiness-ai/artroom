@@ -16,6 +16,12 @@ exact candidate, artifacts and review will be named by the filing.
 | Authority, effects and publication | 28 | `8b1c3c9d7987fba6ac5f5b31fbe329d50a3f568b` |
 | Lane forms and browser flow | 15 | `f4889d470920cabff693b29b3279ed075e5109da` |
 
+Two later owner dispositions bind the amended source: `335ef3ea`
+clarifies clause identity for R1 revision 24, and `4157eaa2` clarifies
+redacted binding evidence. Their contract-text follow-through remains
+with the existing R1/R2 owners. This does not claim adoption of a new
+complete contract revision.
+
 The four inherited branches are included: holds `a2c96e913`, smaller
 forms `c5fe50eb6`, observations `202d93e51`, and authority rows
 `d9718ac2f`. The last two workers committed their remaining changes
@@ -30,8 +36,18 @@ The deltas note describes the three inherited groups in sections 32,
 now uses the destination's holds, additions, operation holders, origins,
 observations and indexed bound withdrawal. Neither lane digest changes.
 The pinned change lane's source update to send the new `reports` field
-is still owed. The observed story uses two explicitly scripted source
+is still owed. The observed story uses four explicitly scripted source
 entries and does not credit that lane update.
+
+The pinned byte files and `digests.ts` still stamp source revision 14,
+at `4b3bf5da`; design revision 15 is the adopted follow-through. The
+issue digest stays
+`sha256:325cb4f33da9deb1a31d85ba0f1456068d4d9d08009978b779aed70cb08e00ad`,
+and change stays
+`sha256:4ff0c7f681c664a3c2dae22bd0df4a9a1bb239e19bc185db41f7f140d4dfca45`.
+Both definitions validate whole under the clause amendment. Neither has
+the offending conditional same-name sends with differing results. Their
+byte files and pins are unchanged from `f09de095d` (Git diff, exit 0).
 
 ## 2. What the source now does
 
@@ -127,6 +143,12 @@ production token delivery, browser session or cloud deployment.
 | Decision counts were separate from the actual holder ledger | Bound refusal, additions, outgoing accounts, release, history fold and full-scope replay witnesses. Removing a draw or decision reservation fails the count or admission assertion. |
 | Evidence values had no runtime/retention/read/replay path | Real SQLite value retention across restart and HTTP replay; wrong digest, missing bytes and oversized new evidence write nothing. Lost retention and omitted maxima controls fail storage and accounting assertions. Missing owner declarations and recorded-outcome idempotency have additional controls. |
 | First-head equality, undeciding read, directory reference and extents bytes | Focused controls for each fail the corresponding publication/founding assertion. |
+| Checker `a50c4655`: outcome callbacks lost the data's change/opening limits | `7cb0c7e8a` enforces joined changes, opening type and absence, and prohibits taking a holder in an outcome. Four callback witnesses pass; removing the holder-opening guard distinguishes. |
+| Checker `395b4241`: observation-only clauses were recovered from the wrong conditional send | Owner ruling `335ef3ea` and source `78766933d` compare both effects and observation rows. A forbidden definition is refused `ambiguous-send`; identical conditional results, distinct names and unconditional forms keep executable result witnesses. Two controls distinguish. |
+| Checker `b11774c0`: actual rules observations name checkers by member ID | `bea9a8820` binds that ID to the currently observed membership scope and incarnation, preserving historical grant/key checks. The actual required-check story `59c4b906f` fails its SQLite reservation assertion when the former comparison is restored. |
+| Checker `ce5512a3`: nominal agent actions could outlive controller eligibility | `6b7fee625` observes actual membership before and after controller removal or last-key loss. Current merger is refused; historical noncompromised approvals and checks still count. Removing the guard distinguishes. |
+| Checker `0f963cd0`: late coded `bad-field` lost its bound draw | `0427af924` shares the original field/subject checks with the fold through retained sidecars. Early failures keep counts; later guard/effect refusals draw one. Counters prove no guard/effect reruns; the old shortcut fails two count assertions. |
+| Checker `5255923a`: a no-account clause could use a final holder's retained cleanup count | `7b674fa8f` faults before an unrelated draw. The result stays offered and the state/head unchanged; nonfinal draws and final own-account cleanup remain valid. The guard-removal control distinguishes. |
 
 The worker reports and the integration logs record these controls as
 `DISTINGUISHES`, by assertions. The tests label their scripted histories,
