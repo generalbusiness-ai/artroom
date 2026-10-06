@@ -1,16 +1,20 @@
 import { expect, test } from "vitest";
 import type { MemberId } from "@generalbusiness/artroom-contract";
-import { RULES_PATTERNS, actionsIn, classify, firstExtents, holdsRulesExtent, judgeExtents, matches } from "../src/index.ts";
+import { RULES_PATTERNS, actionsIn, classify as touchedBy, firstExtents, holdsRulesExtent, judgeExtents, matches } from "../src/index.ts";
 import type { Extent, ExtentsAsked, Holder, Review, Role, TreeLink } from "../src/index.ts";
 
-// Judgments over data that each test writes by hand (authority note, revision 24, section 12.1.4a; the planner's request `42de9e34`).
+// Judgments over data that each test writes by hand (authority note, revision 26, section 12.1.4a; the planner's request `42de9e34`).
 // No scope ran here, and no destination called these functions: the reservation that will is not built. A member's actions are those
 // that the role table of section 3.2 gives the role, so "who holds what" is the platform package's own table and no stand-in.
+// The changed set, the link rows, the count of controllers and the controllers of the authoring agents are each written by hand:
+// no retained form holds one yet (the missing forms 1, 11 and 15).
 
 const holder = (handle: string, role: Role): Holder => ({ member: handle as MemberId, holds: actionsIn(role) });
 // Two admins, who are the controllers of the rules scope; a maintainer; two members; and an agent, whose controller is `ada`.
 const [ada, ann, max, mel, art] = [holder("@ada", "admin"), holder("@ann", "admin"), holder("@max", "maintainer"), holder("@mel", "member"), holder("@art", "member")];
 const bot = "@bot" as MemberId;
+/** `classify`, for a changed set whose every path is a text: the count of paths that are no text is stated, and is 0. */
+const classify = (extents: readonly Extent[], changed: readonly string[], links: readonly TreeLink[]) => touchedBy(extents, changed, links, 0);
 /** One approving verdict of a member for each extent that is named: a reviewer who covers two extents signs two verdicts. */
 const on = (who: Holder, ...extents: (string | null)[]): Review[] => extents.map((extent) => ({ ...who, extent }));
 /** A verdict of each member for every extent of the rules that these tests use. What each then meets is the extent's `approver` to say. */
@@ -47,6 +51,8 @@ test("the first definition names rules, infrastructure and source; an agent inst
   // A pattern: an ASCII letter matches in either case and nothing else is folded; `*` stays inside one name; `**` is any number of names, also none.
   expect([matches("**/AGENTS.md", "docs/agents.MD"), matches("**/AGENTS.md", "docs/ÄGENTS.md"), matches("**/ÄGENTS.md", "docs/äGENTS.md"), matches("src/*.ts", "src/a.ts"), matches("src/*.ts", "src/lib/a.ts"), matches(".github/**", ".github"), matches("a/**/b", "a/x/y/b"), matches("*", "a/b")])
     .toEqual([true, false, false, true, false, true, true, false]);
+  // `**` is any number of names only as a whole name of the pattern: inside a name each `*` stays in one name, so `a**b` is `a*b`.
+  expect([matches("a**b", "axyb"), matches("a**b", "a/x/b"), matches("a*b", "axyb"), matches("**", "a/b/c")]).toEqual([true, false, true, true]);
 
   // The fixed minimum of the rules extent: a repository may add a pattern. It may not remove one, lower the approvals, or change the approver or the class.
   const [rules, ...rest] = FIRST as [Extent, ...Extent[]];
@@ -105,8 +111,10 @@ test("the single-controller exception holds only when it is declared, membership
   expect([exception({ controllers: [ada.member, ann.member] }), exception({ controllers: null }), exception({ controllers: [] })]).toEqual([[false, ["rules"], null], [false, ["rules"], null], [false, ["rules"], null]]);
   // 3. The one controller is independent of the authors: that member's review is asked, and no exception is used with or without it.
   expect([exception({ authors: [art.member] }), exception({ authors: [art.member], reviews: each(max, ada) })]).toEqual([[false, ["rules"], null], [true, [], null]]);
-  // All three hold, for an author and for the controller of an agent among the authors.
+  // All three hold, for an author and for the controller of an agent among the authors (the clause that revision 26 restores).
   expect([exception({}), exception({ authors: [bot], controllersOfAuthors: [ada.member] })]).toEqual([[true, [], "@ada"], [true, [], "@ada"]]);
+  // The agent clause fails: the agent among the authors is controlled by another member, or by none.
+  expect([exception({ authors: [bot], controllersOfAuthors: [ann.member] }), exception({ authors: [bot], controllersOfAuthors: [] })]).toEqual([[false, ["rules"], null], [false, ["rules"], null]]);
   // Another member signed the `merge`.
   expect(exception({ merger: max })).toEqual([false, ["rules"], null]);
   // It meets the reviews of the rules extent and nothing else: the other extents' reviews, and each check, stand.
@@ -191,4 +199,42 @@ test("the extents are a repository's own: a second rules content with other patt
   const closed = SECOND.slice(0, 3);
   const touched = classify(closed, ["docs/guide.md", "src/app.ts"], []);
   expect([touched.touched, touched.unclassified, said({ extents: closed, touched, reviews: each(ada) }).slice(0, 2)]).toEqual([[{ extent: "docs", path: "docs/guide.md" }], ["src/app.ts"], [false, []]]);
+});
+
+// The inputs that no retained form supplies yet (the missing forms 1, 11 and 15). Each is an explicit input, and without it the
+// judgment fails closed.
+test("without the controllers of the authoring agents no agent's change gets the exception and no review counts where a controller's would be refused; a changed path that is no text, and a changed set that is not stated whole, make the rules extent unmet, which no review and no exception meets", () => {
+  // The missing form 15. `ada` is the one controller and signs the `merge` of her agent's change, under a declared exception.
+  const agent = { singleControllerException: true, authors: [bot], reviews: each(max), merger: ada, controllers: [ada.member], ownerMayReview: true };
+  const judged = (over: Partial<ExtentsAsked>) => { const j = judgeExtents(asked({ ...agent, ...over })); return [j.met, j.unmet, j.extents[0]!.exception]; };
+  // With the relation given, the second clause holds. With none given it is shown for nobody: `rules-not-met:rules`.
+  expect([judged({ controllersOfAuthors: [ada.member] }), judged({ controllersOfAuthors: null }), judged({ controllersOfAuthors: undefined as never })]).toEqual([[true, [], "@ada"], [false, ["rules"], null], [false, ["rules"], null]]);
+  // The first clause reads the authors and the merger alone, and holds without the relation.
+  expect(judged({ authors: [ada.member], controllersOfAuthors: null })).toEqual([true, [], "@ada"]);
+  // A review. Nothing says that `ada` or `ann` is not the controller of the authoring agent, so neither review counts for the rules
+  // extent; and with `ownerMayReview` false no review counts for any extent. With the relation given, the independent controller's does.
+  const reviewed = { authors: [bot], reviews: each(ada, ann, max), controllers: [ada.member, ann.member] };
+  expect([said({ ...reviewed, controllersOfAuthors: [ada.member] })[1], said({ ...reviewed, controllersOfAuthors: null, ownerMayReview: true })[1], said({ ...reviewed, controllersOfAuthors: null })[1]])
+    .toEqual([[], ["rules"], ["rules", "infrastructure", "source"]]);
+  // The missing form 11: with no count of controllers no exception is judged. And a declaration that is not `true` is none.
+  expect([judged({ controllersOfAuthors: [ada.member], controllers: null }), judged({ controllersOfAuthors: [ada.member], singleControllerException: undefined as never })]).toEqual([[false, ["rules"], null], [false, ["rules"], null]]);
+
+  // The missing form 1. A changed path that is no text: not met, with `rules` named and the class `authority`, though only a source
+  // path is touched. Two independent controllers do not meet it, and the exception does not either.
+  const unread = touchedBy(FIRST, ["src/app.ts"], [], 1);
+  expect([unread.touched, unread.unreadable, unread.class]).toEqual([[{ extent: "source", path: "src/app.ts" }], 1, "authority"]);
+  expect(said({ touched: unread, reviews: each(ada, ann) })).toEqual([false, ["rules"], { source: [["@ada", "@ann"], []] }]);
+  const own = { singleControllerException: true, authors: [ada.member], reviews: each(max), merger: ada, controllers: [ada.member] };
+  const withRules = (touched: ReturnType<typeof touchedBy>) => { const j = judgeExtents(asked({ ...own, touched })); return [j.met, j.unmet, j.extents[0]!.extent, j.extents[0]!.exception]; };
+  expect([withRules(touchedBy(FIRST, ["AGENTS.md"], [], 0)), withRules(touchedBy(FIRST, ["AGENTS.md"], [], 1)), withRules(touchedBy(FIRST, ["AGENTS.md", "docs/out"], [{ path: "docs/out", tree: "new", resolves: null }], 0))])
+    .toEqual([[true, [], "rules", "@ada"], [false, ["rules"], "rules", null], [false, ["rules"], "rules", null]]);
+  // `rules` stands in the order of the rules among the unmet extents, also where no path of it is touched.
+  expect(said({ touched: touchedBy(FIRST, [".gitignore"], [], 1), reviews: each(mel) })[1]).toEqual(["rules", "infrastructure"]);
+  // Not stated whole: no count, no changed set, no link rows, a count that is no count, or a `Touched` that has no such member.
+  const unstated = [touchedBy(FIRST, ["src/app.ts"], []), touchedBy(FIRST, null, [], 0), touchedBy(FIRST, ["src/app.ts"], null, 0), touchedBy(FIRST, ["src/app.ts"], [], -1), touchedBy(FIRST, undefined, undefined)];
+  expect(unstated.map((touched) => [touched.unreadable, touched.class, said({ touched, reviews: each(ada, ann) }).slice(0, 2)])).toEqual(Array(5).fill([null, "authority", [false, ["rules"]]]));
+  const { unreadable: _, ...bare } = classify(FIRST, ["src/app.ts"], []);
+  expect([said({ touched: bare as never, reviews: each(ada) }).slice(0, 2), said({ touched: classify(FIRST, ["src/app.ts"], []), reviews: each(ada) }).slice(0, 2)]).toEqual([[false, ["rules"]], [true, []]]);
+  // A changed set that is given and is empty says that the change touches no path: nothing is asked.
+  expect([classify(FIRST, [], []).class, said({ touched: classify(FIRST, [], []) }).slice(0, 2)]).toEqual([null, [true, []]]);
 });

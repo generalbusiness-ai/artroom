@@ -1,24 +1,25 @@
 /**
  * Extents: the named parts of a repository's tree, with what a change to
- * each must meet (authority note, revision 24, section 12.1.4a; the
+ * each must meet (authority note, revision 26, section 12.1.4a; the
  * planner's request `42de9e34`). The functions here are judgments over data
  * that their caller gives. They read no repository, no scope and no clock.
  *
- * The scope that judges is the destination, in the outcome of `judge`
- * ("How a change is judged"), under the rules that it observes for the
- * reservation. That caller is not built. Nothing in this package calls
- * these functions, no row of `platform:rules@1` holds an extent, and no mark
- * names one: the note says that the rows change only when its missing
- * forms 1 to 3 exist. So each datum that a missing form would carry is an
- * input here, and what gives it is the caller's (I3 deltas, entries EV1 to
- * EV17).
+ * The rules scope holds a repository's extents (`rules-scope.ts`): its
+ * rule `extents-hold` runs `holdsRulesExtent`, and before a first `publish`
+ * its extents are `firstExtents`. The scope that judges a change is the
+ * destination, in the outcome of `judge` ("How the rule `judge` judges
+ * extents"), under the rules that it observes for the reservation. That
+ * caller is the destination's (`destination.ts`). Each datum that no
+ * retained form supplies yet is an explicit input here, and each fails
+ * closed when it is not given (I3 deltas, section 23 and entries FB5 to
+ * FB8).
  *
- * | What | From the note | Its caller's side, not built |
+ * | What | From the note | The input that no retained form supplies |
  * |---|---|---|
- * | `Extent`, `firstExtents` | "An extent", "The first definition" | The slot, the field of `publish` and the member of `RulesContent`: form 2 |
- * | `holdsRulesExtent` | "Its fixed minimum" | The mark of `publish`: form 3 |
- * | `matches`, `classify` | "A pattern", "What it matches", and the planner's decision on symbolic links | The changed set and the links of the trees: form 1 |
- * | `judgeExtents` | "How a change is judged", steps 2 to 5, and "What the planner decided" | The rule of `judge`: form 3. The count of controllers: form 11. The declaration: form 14 |
+ * | `Extent`, `firstExtents` | "An extent", "The first definition", and section 12.1.4, "Before the first `publish`" | None |
+ * | `holdsRulesExtent` | "Its fixed minimum" | None: the rule `extents-hold` of `publish` runs it |
+ * | `matches`, `classify` | "A pattern", "A pattern, in two cases", "A symbolic link" | The changed set, the link rows and the count of paths that are no text: the missing form 1. Null, or none: `rules` is unmet |
+ * | `judgeExtents` | "How the rule `judge` judges extents", steps 2 to 7; "Which reviews count for an extent"; "The exception, in the planner's words" | The extents of the observed rules: the contract owes `RulesContent.extents`. The count of controllers: the missing form 11; null, no exception. The controllers of the authoring agents: the missing form 15; null, no exception by the second clause, and no review where a controller's is refused |
  */
 
 import type { MemberId } from "@generalbusiness/artroom-contract";
@@ -146,6 +147,14 @@ export interface Touched {
   unclassified: readonly string[];
   /** The changed paths that are refused as a change to the `rules` extent, by a link. A change with one is not met. */
   refused: readonly string[];
+  /**
+   * The changed paths that are no text, by their count ("A path that is no
+   * text"; the member `unreadable` of the evidence of `judge`). Null: the
+   * caller did not state the count, the changed set or the links, so
+   * nothing says that the whole change was judged. Any value but 0 makes
+   * `rules` unmet, as a refused link does.
+   */
+  unreadable: number | null;
   /** The highest class that the change touches: `authority`, then `deployment`, then `content`. Null: nothing is touched. */
   class: ExtentClass | null;
 }
@@ -192,12 +201,34 @@ export interface Touched {
  * An extent with patterns holds a judged path that one of them matches. A
  * path may match several, and then the change touches each. An extent with
  * no pattern holds every judged path that no pattern of the rules matches.
- * A judged path that no extent holds makes its changed path unclassified
- * (entry EV14).
+ *
+ * *What is assumed of the extents.* Exactly one has no pattern, and one is
+ * named `rules`: `publish` refuses every other list (the rule
+ * `extents-hold` of `rules-scope.ts`), and the first definition is such a
+ * list. So under the rules of a rules scope every judged path is in an
+ * extent. For a list that is no such list this function still fails
+ * closed: with no extent without a pattern, a judged path that no extent
+ * holds makes its changed path unclassified, and the change is not met.
+ *
+ * *The three inputs of the missing form 1.* No retained input holds a
+ * changed set yet, so the caller gives each datum, as the member `changes`
+ * of the evidence of `judge` will ("The evidence of `judge`, for extents").
+ *
+ * | Input | What a caller gives | With null, or with none |
+ * |---|---|---|
+ * | `changed` | The changed set, each path that is a text | Nothing is touched, and `unreadable` is null: `rules` is unmet |
+ * | `links` | Each link row that the rule needs. An empty list says that no link is at, or resolves to, a changed path | No link is followed, and `unreadable` is null: `rules` is unmet |
+ * | `unreadable` | The count of changed paths that are no text: 0 when every path is a text | `unreadable` is null: `rules` is unmet |
+ *
+ * So a caller that has no changed set gives null and the change is not
+ * met. An empty changed set that is given says that the change touches no
+ * path, and then nothing is asked.
  */
-export function classify(extents: readonly Extent[], changed: readonly string[], links: readonly TreeLink[]): Touched {
+export function classify(extents: readonly Extent[], changed: readonly string[] | null | undefined, links: readonly TreeLink[] | null | undefined, unreadable?: number | null): Touched {
   const shown = new Map<string, string>();
   const [unclassified, refused] = [new Set<string>(), new Set<string>()];
+  const stated = Array.isArray(changed) && Array.isArray(links) && typeof unreadable === "number" && Number.isSafeInteger(unreadable) && unreadable >= 0;
+  [changed, links] = [changed ?? [], links ?? []];
   const patterned = extents.filter((extent) => extent.patterns.length > 0);
   const open = extents.filter((extent) => extent.patterns.length === 0);
   for (const path of [...new Set(changed)].sort(byteOrder)) {
@@ -232,9 +263,10 @@ export function classify(extents: readonly Extent[], changed: readonly string[],
   }
   const touched = extents.filter((extent) => shown.has(extent.name)).map((extent) => ({ extent: extent.name, path: shown.get(extent.name)! }));
   const classes = extents.filter((extent) => shown.has(extent.name)).map((extent) => EXTENT_CLASSES.indexOf(extent.class));
-  // A refused path is a change to the `rules` extent, whose class is `authority`.
-  if (refused.size > 0) classes.push(EXTENT_CLASSES.indexOf("authority"));
-  return { touched, unclassified: [...unclassified], refused: [...refused], class: classes.length > 0 ? EXTENT_CLASSES[Math.max(...classes)]! : null };
+  // A refused path, and a path that is no text or was not stated, is a change to the `rules` extent, whose class is `authority`.
+  const unread = stated ? unreadable! : null;
+  if (refused.size > 0 || unread !== 0) classes.push(EXTENT_CLASSES.indexOf("authority"));
+  return { touched, unclassified: [...unclassified], refused: [...refused], unreadable: unread, class: classes.length > 0 ? EXTENT_CLASSES[Math.max(...classes)]! : null };
 }
 
 // ---------------------------------------------------------------- the obligations
@@ -258,21 +290,28 @@ export interface ExtentsAsked {
   extents: readonly Extent[];
   /** The rules' `ownerMayReview`, from the same observation. */
   ownerMayReview: boolean;
-  /** The rules' declaration of the single-controller exception, from the same observation. False where the rules hold none (the missing form 14). */
+  /** The rules' declaration of the single-controller exception, from the same observation: `content.singleControllerException` (the contract's revision 19, section 16.1). Anything but true is no declaration. */
   singleControllerException: boolean;
   /** What the change touches under those extents: `classify`, of the changed set that the runtime computed (the missing form 1). */
   touched: Touched;
   /** The manifest's authors, as section 3.10 lists them. */
   authors: readonly MemberId[];
-  /** The controller of each agent among the authors. */
-  controllersOfAuthors: readonly MemberId[];
+  /**
+   * The controller of each agent among the authors, from an observation of
+   * each authoring agent that the reservation's entry retains. No row
+   * retains one yet (the missing form 15), so until it does the caller
+   * gives null: nothing says who controls an author. An empty list is a
+   * statement that no author is an agent with a controller, and only a
+   * caller that holds those observations may make it.
+   */
+  controllersOfAuthors: readonly MemberId[] | null;
   /** The approving verdicts that count for the manifest by the first three rules of section 3.10, each by its reviewer, with the extent that it states. Independence is judged here. */
   reviews: readonly Review[];
   /** The names of the checks with a passed job on the manifest, as section 6.5 counts a required check. */
   passed: readonly string[];
   /** The member who signed the `merge`: the landing actor. */
   merger: Holder;
-  /** Every active member with an active key who holds `rules.publish`, at the head of membership that was observed. Null: no observation says (the missing form 11), and then no exception is judged. */
+  /** Every active member with an active key who holds `rules.publish`, at the head of membership that was observed. No observation counts the holders of an action yet (the missing form 11), so until one does the caller gives null, and then no exception is judged. */
   controllers: readonly MemberId[] | null;
 }
 
@@ -291,9 +330,9 @@ export interface ExtentJudged {
 }
 
 export interface ExtentsJudged {
-  /** Every touched extent is met, and no path is unclassified or refused. Otherwise the publication is `not-reserved`, `rules-not-met`. */
+  /** Every touched extent is met, no path is unclassified or refused, and every changed path was a text that was judged. Otherwise the publication is `not-reserved`, `rules-not-met`. */
   met: boolean;
-  /** The names of the extents that are not met, in the order of the rules, for the publication's `reason`. `rules` is among them when a path was refused. */
+  /** The names of the extents that are not met, in the order of the rules, for the publication's `reason`. `rules` is among them when a path was refused, was no text or was not stated. */
   unmet: readonly string[];
   /** The class that is recorded for the change. */
   class: ExtentClass | null;
@@ -316,47 +355,69 @@ export interface ExtentsJudged {
  * - *The `rules` extent.* A review counts only from a holder of
  *   `rules.publish`, and `ownerMayReview` is read as false, whatever the
  *   repository set (I3 deltas, entry EV15).
- * - *Its one exception.* Three things must all hold: the observed rules
- *   declare it; exactly one member is a controller; and that member is
- *   among the authors, or controls an agent among them. Then the reviews of
- *   the `rules` extent are met when that member signed the `merge`. Its
- *   checks stand, as every other obligation does. Where the one controller
- *   is independent of the authors no exception is used: that member's
- *   review is asked.
+ * - *Its one exception* ("The exception, in the planner's words", as
+ *   revision 26 restores it). Three things must all hold: the observed
+ *   rules declare it; exactly one member is a controller; and that member
+ *   is among the authors, or controls an agent among them. Then the
+ *   reviews of the `rules` extent are met when that member signed the
+ *   `merge`. Its checks stand, as every other obligation does. Where the
+ *   one controller is independent of the authors no exception is used:
+ *   that member's review is asked.
+ * - *With no controllers of the authors* (`controllersOfAuthors` is null:
+ *   the missing form 15). Nothing shows the second clause of the third
+ *   condition, so an agent's change gets no exception. And nothing shows
+ *   that a reviewer is not the controller of an authoring agent, so no
+ *   review counts where that relation would refuse one: for the `rules`
+ *   extent always, and for every other extent unless `ownerMayReview` is
+ *   true. The first clause needs no such input: it reads the authors and
+ *   the merger. Revision 26 lists as open from which retained record the
+ *   relation is read for a review (its section 13.16); this is the side
+ *   that fails closed (I3 deltas, entry FB6).
+ * - *With no count of controllers* (`controllers` is null: the missing
+ *   form 11). No exception is judged.
  * - *A class beyond `content`.* The landing actor holds `change.merge`: the
  *   standing grant on the destination, which a grant over the whole
  *   repository satisfies until a grant can name one destination. The three
  *   other obligations of the planner's second decision are records of the
  *   destination itself, and nothing here judges them (I3 deltas, entry
  *   EV9).
- * - *A path that no extent holds, and a path that a link refused.* The
- *   change is not met. A refused path makes `rules` unmet, also where the
- *   rules name no such extent.
+ * - *A path that no extent holds, a path that a link refused, and a path
+ *   that is no text.* The change is not met. A refused path and a path
+ *   that is no text each make `rules` unmet, also where the change touches
+ *   no path of that extent. Neither a review nor the exception meets it:
+ *   the way forward is to change the link or the path (decided by the
+ *   planner, revision 26). The same holds where `touched.unreadable` is
+ *   null, or is no member: the caller did not state the whole changed set.
  */
 export function judgeExtents(asked: ExtentsAsked): ExtentsJudged {
   const authors = new Set(asked.authors);
-  const owners = new Set(asked.controllersOfAuthors);
+  // Null: nothing says who controls an agent among the authors (the missing form 15).
+  const owners = Array.isArray(asked.controllersOfAuthors) ? new Set(asked.controllersOfAuthors) : null;
   const passed = new Set(asked.passed);
-  const refused = asked.touched.refused.length > 0;
-  const controllers = asked.controllers === null ? null : [...new Set(asked.controllers)];
-  const one = asked.singleControllerException && controllers?.length === 1 ? controllers[0]! : null;
-  const excepted = one !== null && (authors.has(one) || owners.has(one)) && asked.merger.member === one ? one : null;
+  const refused = asked.touched.refused.length > 0 || asked.touched.unreadable !== 0;
+  const controllers = Array.isArray(asked.controllers) ? [...new Set(asked.controllers)] : null;
+  const one = asked.singleControllerException === true && controllers?.length === 1 ? controllers[0]! : null;
+  const excepted = one !== null && (authors.has(one) || owners?.has(one) === true) && asked.merger.member === one ? one : null;
   const touched = new Set(asked.touched.touched.map((row) => row.extent));
 
   const extents = asked.extents.filter((extent) => touched.has(extent.name)).map((extent): ExtentJudged => {
     const rules = extent.name === RULES_EXTENT;
     const counts = (review: Review) =>
       review.extent === extent.name && review.holds.includes(extent.approver) && (!rules || review.holds.includes(CONTROLLER))
-      && !authors.has(review.member) && ((asked.ownerMayReview && !rules) || !owners.has(review.member));
+      && !authors.has(review.member) && ((asked.ownerMayReview === true && !rules) || (owners !== null && !owners.has(review.member)));
     const counted = [...new Set(asked.reviews.filter(counts).map((review) => review.member))].sort(byteOrder);
-    const exception = rules && counted.length < extent.approvals ? excepted : null;
+    // A refused path is never met, by a review or by the exception.
+    const exception = rules && !refused && counted.length < extent.approvals ? excepted : null;
     const lacks: Lack[] = [];
     if (counted.length < extent.approvals && exception === null) lacks.push("approvals");
     if (!extent.checks.every((check) => passed.has(check))) lacks.push("checks");
     if (extent.class !== "content" && !asked.merger.holds.includes(LANDING)) lacks.push("grant");
     return { extent: extent.name, class: extent.class, met: lacks.length === 0 && !(rules && refused), counted, lacks, exception };
   });
-  const unmet = extents.filter((extent) => !extent.met).map((extent) => extent.extent);
-  if (refused && !unmet.includes(RULES_EXTENT)) unmet.push(RULES_EXTENT);
+  // In the order of the rules ("The exact text of `reason`"). `rules` is unmet for a refused path also where no path of it is touched.
+  const lacking = new Set(extents.filter((extent) => !extent.met).map((extent) => extent.extent));
+  if (refused) lacking.add(RULES_EXTENT);
+  const unmet = asked.extents.map((extent) => extent.name).filter((name) => lacking.delete(name));
+  unmet.push(...lacking);
   return { met: unmet.length === 0 && asked.touched.unclassified.length === 0, unmet, class: asked.touched.class, extents };
 }
