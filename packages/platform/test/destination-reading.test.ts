@@ -1,9 +1,11 @@
 import { expect, test } from "vitest";
 import type { Entry, FactRef, Grant, RulesObservation } from "@generalbusiness/artroom-contract";
 import { factRefOf, isFactRef } from "@generalbusiness/artroom-bytes";
+import type { RuleGiven, StateView } from "@generalbusiness/artroom-derive";
 import { d, keys, otherLane, t } from "@generalbusiness/artroom-derive/testing";
 import { decidingKeys, manifestAuthors, readLane } from "../src/destination-reading.ts";
 import { DESTINATION_CHANGED_SET, isJudgeChanges, isRecordedJudgeEvidence, type Statement } from "../src/reservation.ts";
+import { rulesAnswer } from "../src/rules-scope.ts";
 
 // STAND-INS: recorded lane facts, authority and observations made by hand. These tests show the destination's pure reader,
 // rather than a lane's admission or a membership read. Every subject and provenance check is derived from the records below.
@@ -20,14 +22,18 @@ const review = made(4, "review-verdict", { manifest: 2, verdict: "approve" }, []
 const job = made(5, "request-check", { manifest: 2, name: "verify", configuration: d("d") }, [{ effect: "value", item: 5, slot: "tree", value: "c".repeat(40) }]);
 const check = made(6, "check", { job: 5, tree: "c".repeat(40), configuration: d("d"), outcome: "passed" }, [{ effect: "state", item: 5, state: "passed" }]);
 const statement: Statement = { operation: factRefOf(merge), manifest: factRefOf(manifest), verdicts: [{ review: factRefOf(review), reviewer: keys.una.member, verdict: "approve" }], jobs: [{ job: factRefOf(job), name: "verify", state: "passed", decidedBy: factRefOf(check) }], reports: [], links: [] };
-const rules = { subject: "rules", content: { asked: "rules", approvals: 1, ownerMayReview: false, labels: [], checks: [{ name: "verify", configuration: d("d"), checker: member, required: false }] } } as unknown as RulesObservation;
-const given = (entries: readonly Entry[]) => ({ uses: entries.map((entry) => ({ fact: factRefOf(entry), entry, under: "change" })) });
+// The state is made by hand; its answer is the platform's actual projection of the stored checker MemberRef to a MemberId.
+const rulebook = { ...lane, kind: "rules" as const };
+const rulesState = { scope: () => ({ at: rulebook, status: "active", head: { seq: 0, hash: d("a") } }), page: () => ({ items: [{ type: "rules", state: "current", refs: { published: null }, values: { approvals: 1, ownerMayReview: false, labels: [], singleControllerException: false, checks: [{ name: "verify", configuration: d("d"), checker: member, required: true }] } }], more: false }) } as unknown as Pick<StateView, "scope" | "page">;
+const rules: RulesObservation = { ...rulesAnswer(rulesState, { of: rulebook, asked: "rules" })!, at: t(0) };
+const given = (entries: readonly Entry[]): Pick<RuleGiven, "uses" | "observed"> => ({ uses: entries.map((entry) => ({ fact: factRefOf(entry), entry, under: "change" })), observed: (asked) => "key" in asked ? grant(asked.key === keys.una.key ? keys.una : keys.rita).fresh : null });
 const records = [manifest, merge, review, job, check];
 
-// Invariant: the rule reads the lane's recorded attribution and provenance; a listed but non-required check contributes its
+// Invariant: the rule reads the lane's recorded attribution and provenance; a required configured check contributes its
 // passed deciding key, and another job, checker, configuration, extra passed target or wrong reference cannot substitute.
 test("the destination derives authors and second-step keys from retained entries and verifies each passed check against the observed configuration and checker", () => {
   const read = readLane(given(records), statement, rules)!;
+  expect(rules.content.asked === "rules" && rules.content.checks[0]!.checker).toBe(member.member);
   expect(manifestAuthors(manifest)).toEqual([keys.una.member.member, member.member]);
   expect([read.sound, read.verdicts, read.checks["verify"]]).toEqual([true, [{ sound: true, key: keys.una.key }], { opening: "sound", deciding: true, key: keys.rita.key }]);
   expect(decidingKeys(given(records), statement, rules)).toEqual([keys.una.key, keys.rita.key]);
@@ -39,9 +45,23 @@ test("the destination derives authors and second-step keys from retained entries
   expect(changed(check, (entry) => field(entry, "job", 99)).checks["verify"]?.deciding).toBe(false);
   expect(changed(check, (entry) => { (entry.effects as Entry["effects"][number][]).push({ effect: "state", item: 99, state: "passed" }); }).checks["verify"]?.deciding).toBe(false);
   expect(changed(check, (entry) => { if (entry.input.type === "act") (entry.input.authority as Grant[])[0] = grant(keys.una); }).checks["verify"]?.deciding).toBe(false);
+  // The member ID alone never binds the signer: the membership scope and its incarnation must match the current read.
+  for (const membership of [{ ...member.membership, scope: lane.scope }, { ...member.membership, inc: lane.inc }]) {
+    expect(changed(check, (entry) => {
+      if (entry.input.type !== "act") return;
+      const authority = entry.input.authority[0]!;
+      (authority.subject as { membership: typeof membership }).membership = membership;
+      (authority.fresh!.observation as { of: typeof membership }).of = membership;
+    }).checks["verify"]?.deciding).toBe(false);
+  }
+  expect(changed(check, (entry) => { if (entry.input.type === "act") (entry.input.authority[0]! as { key: typeof keys.una.key }).key = keys.una.key; }).checks["verify"]?.deciding).toBe(false);
+  expect(changed(check, (entry) => { if (entry.input.type === "act") (entry.input.authority[0]! as { fresh: Grant["fresh"] | null }).fresh = null; }).checks["verify"]?.deciding).toBe(false);
   const altered = { ...statement, manifest: { ...statement.manifest, seq: 99 } as FactRef };
   expect(readLane(given(records), altered, rules)).toBeNull();
   expect(decidingKeys(given(records), { ...statement, jobs: [statement.jobs[0]!, statement.jobs[0]!] }, rules)).toEqual([keys.una.key]);
+  const noCheckRead = { ...given(records), observed: (): never => { expect.fail("an uncounted check's key is no subject of the row"); } };
+  expect(readLane(noCheckRead, { ...statement, jobs: [{ ...statement.jobs[0]!, state: "failed" }] }, rules)!.checks["verify"]?.deciding).toBe(false);
+  expect(readLane(noCheckRead, { ...statement, jobs: [statement.jobs[0]!, statement.jobs[0]!] }, rules)!.checks["verify"]?.deciding).toBe(false);
 });
 
 // Invariant: the outcome records a digest for the changed set; the retained domain bounds its contents separately.
