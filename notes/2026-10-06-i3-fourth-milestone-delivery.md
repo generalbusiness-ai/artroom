@@ -177,6 +177,17 @@ observations and outside answers. No mutation sweep was run.
 - Marker settlements are implemented generically and witnessed on
   made-up data. The destination's remaining marker-duty design questions
   are not settled by the generic tests or by this publication story.
+- Redaction preserves ordinary replay credit. An ambiguous bare
+  `bad-field` refusal may require the erased text's original size to
+  distinguish an early unbound failure from a later bound refusal.
+  Owner disposition `4157eaa2` requires incomplete verification before
+  any uncertain draw, with no verified state or capacity suffix. A
+  definite early failure or a derivable binding remains ordinary replay.
+  Live admission uses the available bytes before deletion, and SQLite
+  preserves actual holder/account rows across an ordinary restart.
+  Reconstructing counts solely from an erased, ambiguous history still
+  needs missing evidence or an explicitly trusted anchor. This milestone
+  does not credit cold reconstruction or a new size/phase wire record.
 
 ## 6. Verification
 
