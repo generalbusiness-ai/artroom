@@ -147,4 +147,23 @@ describe("the token ledger's driver (authority note, sections 5.3, 5.4 and 5.7).
     for (const text of [leaked, "host.example", "HostError", "Bearer"]) expect(written).not.toContain(text);
     expect(log).toEqual(["mint host-failed", "mint host-failed", "mint no-answer", "mint no-answer", "mint no-answer", "revoke host-failed"]);
   });
+
+  test("what is checked of a host's reply is what the answer holds: each member is read once, so a reply whose ID or end time gives another value at a later read puts no unchecked value in an answer; and a reply whose member fails when it is read is no answer", async () => {
+    const { host, log, driver } = made();
+    const leaked = secret();
+    // A reply whose members give one value at the first read and another afterwards: an ID and then another, an end time and then text that is none and that holds a credential.
+    const turning = (first: Record<string, unknown>, later: Record<string, unknown>) => {
+      const reply = { minted: true, plaintext: leaked };
+      for (const name of Object.keys(first)) { let reads = 0; Object.defineProperty(reply, name, { enumerable: true, get: () => (reads++ === 0 ? first[name] : later[name]) }); }
+      return reply;
+    };
+    host.fault("mint", 1, { fault: "replies", reply: turning({ id: "tok-1", ends: host.ends }, { id: "tok-other", ends: `a lone surrogate \ud800 ${leaked}` }) });
+    // A member that fails when it is read, of a mint and of a revocation.
+    const failing = (name: string) => Object.defineProperty({}, name, { enumerable: true, get() { throw new Error(`the reply failed: ${leaked}`); } });
+    host.fault("mint", 2, { fault: "replies", reply: failing("minted") });
+    host.fault("revoke", 3, { fault: "replies", reply: failing("revoked") });
+    const sent = async (request: TokenRequest) => driver.send(request).catch(() => "the call failed");
+    const answers = [await sent(minting("7:1", 1)), await sent(minting("7:2", 2)), await sent(request("revoke", "8:0", [token("revoking", { ...staging, mint: "7:3", id: "tok-9", ends: host.ends, revocation: "8:0" }, 3)]))];
+    expect([answers, log, JSON.stringify([answers, log]).includes(leaked)]).toEqual([[{ result: "confirmed", evidence: { basis: "own-answer", body: { token: "tok-1", ends: host.ends } } }, null, null], ["mint no-answer", "revoke no-answer"], false]);
+  });
 });
