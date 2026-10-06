@@ -210,12 +210,12 @@ export const destination: PlatformData = {
     },
     // `resend`: an act. Grant `ledger.retry`. The publication is `unresolved`, or it is `published` with a receipt that is not
     // written; and the stated attempts of that operation are used. The state is a written guard. The rest reads the operations
-    // of the publication, which no form reads and no rule of the note's table is listed for: a mark with no rule (entry ER4).
+    // of the publication, which no form reads: the rule `resend-due`, refused `resend-not-due` (row z, P29; entry ER4).
     resend: {
       step: "transition", on: "publication", grant: "ledger.retry",
       also: {},
       fields: {},
-      guards: [{ state: ["unresolved", "published"] }, { code: "resend-due", row: "ER4" }],
+      guards: [{ state: ["unresolved", "published"] }, { code: "resend-due", row: "P29" }],
       // Code P16: opens one new operation, the same compare-and-swap, with 1 attempt (G3).
       effects: [{ code: "reopen-publish", row: "P16" }],
       sends: [],
@@ -424,6 +424,31 @@ const ownEntry = (own: Own, seq: number) => {
   return kept.entry;
 };
 
+/**
+ * The operations of one kind of write that were opened for a publication,
+ * in the order of their opening (section 12.1.5, "What an operation is
+ * for"; entry ER6). No slot lists them, and the folded state gives an
+ * operation by its ID alone. So they are found from the entries that open
+ * one: the entry at `reservedAt`, whose outcome of `judge` opened the first
+ * push; an act `resend` on the publication; and the entry that made it
+ * `published`, which opened the first receipt. The search reads this
+ * scope's own entries from `reservedAt` to the entry that is written (I3
+ * deltas, entry FA5).
+ */
+function writesOf(state: Pick<StateView, "operation">, own: Own, publication: Item, kind: "push" | "receipt", before: number): Operation[] {
+  const from = publication.values["reservedAt"];
+  if (typeof from !== "number") return [];
+  const found: Operation[] = [];
+  for (let seq = from; seq < before; seq += 1) {
+    const { input, effects } = ownEntry(own, seq);
+    const about = seq === from
+      || (input.type === "act" && input.signed.intent.kind === "resend" && input.signed.intent.on === publication.id)
+      || effects.some((effect) => effect.effect === "state" && effect.item === publication.id && effect.state === "published");
+    if (about) found.push(...openedIn(state, seq).filter((operation) => operation.owner === DESTINATION && operation.kind === kind));
+  }
+  return found;
+}
+
 /** An operation that this entry opens, at its ordinal among the operations of the entry, with its attempt 1 (the contract's section 4.3, items 1 and 2). */
 const opened = (k: number, kind: string, attempts: number): RuleEffect[] => [
   { effect: "operation", k, owner: DESTINATION, kind, attempts },
@@ -591,6 +616,33 @@ export const destinationRules: Rules = {
   "open-branch-read": {
     place: "effect", most: 2,
     run: () => opened(0, DESTINATION_KINDS.adoptRead, DESTINATION_ATTEMPTS.adoptRead),
+  },
+  /**
+   * Row z, the second guard of `resend` (P29; section 12.1.5, "The guard and
+   * the effect of `resend`"; entry ER4). It stands after the written guard
+   * on the state. It reads the publication that the act is on; its push or
+   * receipt operations and their attempts, in the folded state; `aborting`;
+   * and `receipt`.
+   *
+   * It holds for an `unresolved` publication when `aborting` is not set, and
+   * every attempt that each of its push operations states is opened and has
+   * an outcome. It holds for a `published` one when `receipt` is `owed`, and
+   * every attempt that each of its receipt operations states is opened and
+   * has an outcome. An attempt whose outcome is `unknown` has an outcome.
+   * Otherwise the act is refused `resend-not-due`, under `guard-failed`.
+   */
+  "resend-due": {
+    place: "guard", refusals: ["resend-not-due"],
+    run: ({ state, own, resolved }) => {
+      const publication = resolved.subjects.get("on");
+      if (publication?.type !== "publication") throw new Error("resend-due stands in a row whose primary item is a publication");
+      const used = (kind: "push" | "receipt"): boolean => {
+        const writes = writesOf(state, own, publication, kind, resolved.self);
+        return writes.length > 0 && writes.every((write) => write.attempts.length === write.most && write.attempts.every((attempt) => attempt.outcomes.length > 0));
+      };
+      const due = publication.state === "unresolved" ? publication.values["aborting"] !== true && used("push") : publication.state === "published" && publication.values["receipt"] === "owed" && used("receipt");
+      return due ? { holds: true } : { holds: false, name: "resend-not-due" };
+    },
   },
   /**
    * Row 37, among the effects of `resend` (P16). An `operation` effect: the
