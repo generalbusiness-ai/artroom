@@ -21,7 +21,7 @@ import { canonicalize, digestBytes, domainBytes, isDigest, isFieldValue, isMembe
 import type { Signer } from "./attribution.ts";
 import type { Own } from "./fields.ts";
 import type { Fetched, GuardResult, Judging } from "./guards.ts";
-import type { Opening } from "./ledger.ts";
+import type { Most, Opening } from "./ledger.ts";
 import type { Item, Operation, StateView } from "./state.ts";
 import { valuePlaces } from "./validate/fields.ts";
 import type { MarkKind, ValidDefinition } from "./validate/index.ts";
@@ -284,12 +284,16 @@ export interface OutcomeGives { effects: readonly RuleEffect[]; sends: readonly 
  * guard for a selection; absent, it holds. `wellFormed`: the evidence is
  * well formed; absent, any body is. `derives`: the entry's effects and
  * requests; absent, none. `closure`: the most entries that the operations
- * which one outcome entry opens reserve (section 17.2, row 5).
+ * which one outcome entry opens reserve (section 17.2, row 5). `most`: the
+ * most that `derives` returns in one outcome entry, with the two effects
+ * of each operation that it opens, where the specification states it. An
+ * outcome that would hold more writes nothing.
  */
 export interface OutcomeRule {
   selects: boolean;
   read: boolean;
   closure?: number;
+  most?: Most;
   retries(result: "refused" | "unknown", operation: Operation, given: RuleGiven): boolean;
   holds?(given: RuleGiven, operation: Operation): boolean;
   wellFormed?(result: "confirmed" | "refused" | "unknown", evidence: Evidence): boolean;

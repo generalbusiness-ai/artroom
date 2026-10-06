@@ -267,7 +267,7 @@ function result(view: StateView, definition: ValidDefinition, context: DeliveryC
     if (!held || message.outcome !== "applied" || held.inc === from.at.inc) return { result: "repeat", seq: request.result.seq };
     clause = "conflict";
   }
-  const ran = runClause(view, definition, context, scope, request, clause, { sender: from.at, ...(message.reason ? { reason: message.reason } : {}) }, judged);
+  const ran = runClause(view, definition, context, scope, request, clause, { sender: from.at, ...(message.reason ? { reason: message.reason } : {}), source: { fact: from, entry: source, under: context.source!.under } }, judged);
   if (ran.result === "unavailable") return ran;
   // Section 7.2: the creator confirms the incarnation of the first applied result it records, and no other.
   const confirm: Send[] = clause === "applied" && request.type === "create" ? [{ n: 0, to: from.at, message: { class: "control", type: "confirm", genesis: from } }] : [];

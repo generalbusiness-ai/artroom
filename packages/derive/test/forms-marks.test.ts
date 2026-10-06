@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { Bounds, MemberId, ObservationUse, OperationId, PlatformDefinition, Request, Send } from "@generalbusiness/artroom-contract";
-import { canonicalize, entryHash, factRefOf, isEntry, textDigest } from "@generalbusiness/artroom-bytes";
+import type { Bounds, MemberId, ObservationUse, OperationId, PlatformDefinition, Request, ScopeRef, Seed, Send } from "@generalbusiness/artroom-contract";
+import { canonicalize, entryHash, factRefOf, intentDigest, isEntry, newIncarnation, scopeIdOf, textDigest } from "@generalbusiness/artroom-bytes";
 import { PROFILES, clockOf, judgeDelivery, settleOutcome, validateDefinition, valueDigest, type ActJudgment, type OutcomeRule, type PlatformRule, type RuleGiven } from "../src/index.ts";
 import { Scope, T0, arriving, d, forged, keys, membership, otherLane, small, t, type Actor } from "./fixtures.ts";
 import { gate, gateRules, gateWith } from "./fixtures-marks.ts";
@@ -88,6 +88,13 @@ describe("a mark in a definition (section 6.1)", () => {
     // A written effect on a name that a mark selects, a required slot that only an effect mark could set, and a clause of the mark's own request all pass.
     ["a required slot that no written effect sets, in a row with an effect mark, passes", gate, (d) => { d.acts.issue.effects = [{ code: "hash-of", row: "P18" }]; }, true, null],
     ["an effect mark in a clause of the send mark passes", gate, (d) => { d.acts.enter.sends[0].result.applied = [{ code: "noted", row: "P16" }]; }, true, null],
+    // Revision 17, section 6.1, "A request of an outcome's rule, and its clauses" (witness 18.43, case 6; row I3-23): the mark of a
+    // kind of `outcomes` may hold one `send`, which is a mark, and each effect of its clauses is an effect mark.
+    ["an outcome's mark with a send mark, whose clause holds an effect mark, passes", gate, (d) => { d.outcomes.probe.send = { code: "create-child", row: "P16", result: { applied: [{ code: "noted", row: "P16" }], refused: [] } }; }, true, null],
+    ["an outcome's mark with a written send", gate, (d) => { d.outcomes.probe.send = { tell: { to: { slot: "x" }, message: "hello", fields: {}, result: {} } }; }, true, [["shape", "outcomes.probe.send"]]],
+    ["an outcome's mark with two sends", gate, (d) => { d.outcomes.probe.send = [{ code: "a", row: "P16", result: {} }, { code: "b", row: "P16", result: {} }]; }, true, [["shape", "outcomes.probe.send"]]],
+    ["a written effect in a clause of an outcome's send", gate, (d) => { d.outcomes.probe.send = { code: "create-child", row: "P16", result: { applied: [{ state: "used" }] } }; }, true, [["shape", "outcomes.probe.send.result.applied.0"]]],
+    ["an outcome's send that states `always`", gate, (d) => { d.outcomes.probe.send = { code: "create-child", row: "P16", result: {}, always: true }; }, true, [["shape", "outcomes.probe.send.always"]]],
   ];
   for (const [name, base, change, platform, expected] of rows) test(name, () => expect(problems(base, change, platform)).toEqual(expected));
 });
@@ -430,5 +437,60 @@ describe("a rule is run at the check of its mark's place (sections 4.2 and 6.1)"
       return judged.result === "write" ? judged.draft.effects : judged.result;
     };
     expect([clause(gateOf), clause(ticketOf)]).toEqual([[], ticketOf({ resolved: { self: asked + 1 } } as RuleGiven)]);
+  });
+
+  // Scope contract, revision 17, sections 6.1 and 7.2, with revision 19's "How the child reads the entry that opened the operation";
+  // witness 18.43 (rows I3-23 and EP1). The rules are STAND-INS: this shows where a request, a clause and a cause stand, and proves
+  // nothing about a rule of the register.
+  test("the send of an outcome's mark: its rule gives one request at ordinal 0, and a `create` among them has the fourth cause and names the opening entry by a fact; the clause of its result is found by the outcome's kind and runs an effect mark", () => {
+    const s = new Scope(gateWith((d) => { d.acts.enter.grant = "gate.enter"; const send = { code: "create-child", row: "P16", result: { applied: [{ code: "noted", row: "P16" }] } }; d.outcomes.probe.send = send; d.outcomes.later = { code: "later", row: "P16", send }; }));
+    s.did(rita, "issue", { fields: { hash: textDigest("one") } });
+    const opens = some(() => [{ effect: "operation", k: 0, owner: OWNER, kind: "probe", attempts: 1 }, { effect: "attempt", operation: { k: 0 }, attempt: 1, result: "opened", selected: null }]);
+    expect(said(enter(s, una, "one", owned({ "key-id": opens })))).toEqual(["write", null, null, null]);
+    const opened = s.last.seq;
+    const act = s.last.input;
+    if (act.type !== "act") throw new Error("the entry that opened the operation is an act");
+    const cause = intentDigest(act.signed.intent);
+    const seedOf = (over: Partial<Seed> = {}): Seed => ({ v: 1, kind: "lane", definition: d("e"), creator: s.at, cause, ordinal: 0, ...over });
+    const create = (fields: Record<string, unknown>, seed = seedOf()) => ({ to: seed, message: { class: "request", type: "create", body: { fields } } }) as const;
+    const tell = { to: otherLane, message: { class: "request", type: "tell", body: { message: "hello", fields: {} } } } as const;
+    type Derives = NonNullable<OutcomeRule["derives"]>;
+    const settle = (operation: string, child: () => unknown, derives?: Derives) => settleOutcome(s.state, s.definition, { type: "outcome", operation: operation as OperationId, attempt: 1, result: "confirmed", evidence: { basis: "own-answer", body: {} } },
+      { clock: clockOf(s.state, s.now), bounds: PROPOSED_BOUNDS, own: s.own, platform: owned({ probe: { place: "outcome", rules: { selects: false, read: false, retries: () => false, closure: 2, ...(derives ? { derives } : {}) } }, later: { place: "outcome", rules: { selects: false, read: false, retries: () => false } }, "create-child": { place: "send", run: child as never } }) });
+    const operation = `${opened}:0`;
+
+    // Case 1: the rule of the send gives one `create`, at ordinal 0. Its seed's cause is the digest of the intent of the act that
+    // opened the operation, and a field names that act's entry by its fact.
+    const named = settle(operation, () => create({ opened: s.fact(opened) }));
+    expect(named.result === "write" && named.draft.sends).toEqual([{ n: 0, ...create({ opened: s.fact(opened) }) }]);
+    // What the child could not verify is a fault of the rule, and nothing is written: no fact among the fields; a fact of another
+    // entry; a seed with another cause; a creation that is not the entry's first; and a request of the rule's own beside the send.
+    // Case 4: a rule that gives no request leaves the entry with no send.
+    const none = settle(operation, () => null);
+    expect([
+      settle(operation, () => create({})).result, settle(operation, () => create({ opened: s.fact(opened - 1) })).result, settle(operation, () => create({ opened: s.fact(opened) }, seedOf({ cause: d("c") }))).result,
+      settle(operation, () => create({ opened: s.fact(opened) }, seedOf({ ordinal: 1 }))).result, settle(operation, () => null, () => ({ effects: [], sends: [tell], opens: [] })).result,
+      none.result === "write" && none.draft.sends,
+    ]).toEqual(["unavailable", "unavailable", "unavailable", "unavailable", "unavailable", []]);
+
+    // The outcome entry is written with its creation, and with one more operation, of the kind `later`, which the outcome itself opens.
+    const sent = settle(operation, () => create({ opened: s.fact(opened) }), () => ({ effects: [], sends: [], opens: [{ owner: OWNER, kind: "later", attempts: 1 }] }));
+    if (sent.result !== "write") throw new Error(`the outcome was not written: ${JSON.stringify(sent)}`);
+    const outcome = s.seal(sent.draft).seq;
+    // Case 5: an outcome of an operation that no act opened gives a `create` no cause. A fault, whatever the seed states.
+    expect([settle(`${outcome}:0`, () => create({ opened: s.fact(outcome) })).result, settle(`${outcome}:0`, () => create({ opened: s.fact(opened) })).result, settle(`${outcome}:0`, () => tell).result]).toEqual(["unavailable", "unavailable", "write"]);
+
+    // Case 3: the result `applied` comes back from the child's genesis, an entry made by hand. The clause is found in `outcomes` by
+    // the kind of the outcome entry, and its rule is given the delivery and the verified source entry. The creation is confirmed.
+    const request = { from: s.fact(outcome), n: 0 };
+    const child: ScopeRef = { scope: scopeIdOf(seedOf()), inc: newIncarnation(new Uint8Array(16).fill(4)), kind: "lane" };
+    const answer: Send = { n: 0, to: s.at, message: { class: "result", of: request, outcome: "applied" } };
+    const source = forged(child, 0, { type: "genesis", seed: seedOf(), inc: child.inc, kind: "establish", founding: null, source: request.from, n: 0, message: s.entries[outcome]!.entry.sends[0]!.message as Request, decision: "applied" }, [answer]);
+    const arrival = { ...answer, from: factRefOf(source.entry) };
+    const read: unknown[] = [];
+    const noted = some((given) => { read.push([given.input.type, given.uses.map((use) => use.fact.hash), given.resolved.subjects.size, given.resolved.signer]); return ticketOf(given); });
+    const recorded = judgeDelivery(s.state, s.definition, arrival, { ...arriving(s, arrival, source), platform: owned({ noted }) });
+    expect(recorded.result === "write" && [recorded.draft.effects, recorded.draft.sends]).toEqual([ticketOf({ resolved: { self: outcome + 1 } } as RuleGiven), [{ n: 0, to: child, message: { class: "control", type: "confirm", genesis: arrival.from } }]]);
+    expect(read).toEqual([["delivery", [arrival.from.hash], 0, null]]);
   });
 });

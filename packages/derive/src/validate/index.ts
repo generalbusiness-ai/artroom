@@ -21,7 +21,7 @@ import { canonicalize, definitionDigest, utf8 } from "@generalbusiness/artroom-b
 import { isObject, own } from "../values.ts";
 import { capabilities, type Underived } from "./capability.ts";
 import { capacityOf, type PendingCopy } from "./capacity.ts";
-import { mark, type Defining, type MarkPlace, type RangeIndex } from "./context.ts";
+import { mark, marked, type Defining, type MarkPlace, type RangeIndex } from "./context.ts";
 import { acts, receives } from "./handlers.ts";
 import { heldUnderBytes, holdForms, holdTypes } from "./hold.ts";
 import { itemTypes } from "./items.ts";
@@ -168,7 +168,24 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
   holdForms(d, top);
 
   // Section 6.1, place 7: the mark of the rule for the outcome entries of each kind of operation that this definition owns.
-  if (platform) for (const [kind, m] of entries(top["outcomes"], "outcomes", null)) mark(d, m, at("outcomes", kind), "outcome");
+  // "A request of an outcome's rule, and its clauses" (revision 17; row I3-23): the mark may hold one `send`. It is a send mark,
+  // because an outcome has no subject and no field for a written send to read, and each effect of its clauses is an effect mark.
+  if (platform) {
+    for (const [kind, m] of entries(top["outcomes"], "outcomes", null)) {
+      const o = mark(d, m, at("outcomes", kind), "outcome", [], ["send"]);
+      if (!o || !("send" in o)) continue;
+      const p = at(at("outcomes", kind), "send");
+      const send = marked(o["send"]) ? mark(d, o["send"], p, "send", ["result"]) : bad("shape", p, "an outcome's mark holds at most one send, and it is a mark: an outcome's row writes no send");
+      const clauses = send ? rec(send["result"], at(p, "result"), [], ["applied", "refused", "superseded", "undelivered", "conflict"]) : null;
+      for (const [clause, effects] of Object.entries(clauses ?? {})) {
+        d.list(effects, at(at(p, "result"), clause), bounds.effects).forEach((e, i) => {
+          const q = at(at(at(p, "result"), clause), i);
+          if (marked(e)) mark(d, e, q, "effect");
+          else bad("shape", q, "a clause of an outcome's send holds effect marks only: an outcome has no subject and no field");
+        });
+      }
+    }
+  }
 
   // Section 6.4: a genesis opens no timed item.
   const genesis = typeof top["genesis"] === "string" ? own(written, top["genesis"]) : undefined;

@@ -6,6 +6,9 @@
  * section 4.3 leaves to the owner: whether the kind selects, the owner's
  * local guard, whether another attempt is allowed, whether the evidence is
  * well formed, and the entry's effects and requests, as places 5 and 6.
+ * The mark of a kind may hold one `send`, a send mark: its rule gives the
+ * one request that has clauses, and it may give a `create` (revision 17,
+ * section 6.1; row I3-23).
  *
  * The ledger (`ledger.ts`) asks an owner's rules as `Owners`, for a
  * capability and for a platform definition alike. `ownersOf` answers for
@@ -13,7 +16,8 @@
  * and for every other owner as the given owners do.
  */
 
-import type { EffectForm, Mark, PlatformData, Send, SendForm } from "@generalbusiness/artroom-contract";
+import type { Digest, EffectForm, OutcomeMark, PlatformData, Send, SendForm } from "@generalbusiness/artroom-contract";
+import { intentDigest } from "@generalbusiness/artroom-bytes";
 import { deriveEffects } from "./effects.ts";
 import type { Reading } from "./fields.ts";
 import type { Judging } from "./guards.ts";
@@ -23,7 +27,7 @@ import { RuleFault, givenTo, outside, ruleAt, run, type OutcomeGives, type Platf
 import { deriveSends } from "./sends.ts";
 import type { Operation, StateView } from "./state.ts";
 import type { ValidDefinition } from "./validate/index.ts";
-import { isObject, own } from "./values.ts";
+import { isFactRef, isObject, own, same } from "./values.ts";
 
 /** What the judge of an outcome reads beside the state: the one reading, the bounds, the scope's own history, and whether a rule that reads the clock was run. */
 export type OutcomeReading = Pick<Reading, "clock" | "bounds" | "own"> & { ran: { clock: boolean } };
@@ -36,7 +40,7 @@ export type OutcomeReading = Pick<Reading, "clock" | "bounds" | "own"> & { ran: 
  */
 export function ownersOf(definition: ValidDefinition, platform: PlatformRules | null | undefined, owners: Owners | null | undefined, reading?: OutcomeReading): Owners | undefined {
   if (!platform) return owners ?? undefined;
-  const kinds: Readonly<Record<string, Mark>> = (definition.declared as unknown as PlatformData).outcomes ?? {};
+  const kinds: Readonly<Record<string, OutcomeMark>> = (definition.declared as unknown as PlatformData).outcomes ?? {};
   return {
     rules(owner: Owner, kind: string): OperationRules | null {
       if (owner !== platform.named) return owners?.rules(owner, kind) ?? null;
@@ -59,12 +63,13 @@ export function ownersOf(definition: ValidDefinition, platform: PlatformRules | 
         return given;
       };
       return {
-        selects: r.selects === true, read: r.read === true, ...(r.closure === undefined ? {} : { closure: r.closure }),
+        selects: r.selects === true, read: r.read === true, ...(r.closure === undefined ? {} : { closure: r.closure }), ...(r.most === undefined ? {} : { most: r.most }),
         // Revision 19, section 6.1 (row I3-35): the rule that decides a further attempt is given what every rule is given.
         retries: (result, operation, view, outcome) => answer(run(mark, () => r.retries(result, operation, givenTo(judging(view, outcome))))),
         ...(r.holds ? { holds: (view: StateView, operation: Operation, outcome: OutcomeInput) => answer(run(mark, () => r.holds!(givenTo(judging(view, outcome)), operation))) } : {}),
         ...(r.wellFormed ? { wellFormed: (result, evidence) => answer(run(mark, () => r.wellFormed!(result, evidence))) } : {}),
-        ...(r.derives ? { derives: (view: StateView, operation: Operation, outcome: OutcomeInput, selected: boolean | null) => given(mark, judging(view, outcome), kinds, run(mark, () => r.derives!(givenTo(judging(view, outcome)), operation, selected))) } : {}),
+        // The send of the mark is derived with the entry, whether the rule of the kind derives anything beside it or not.
+        ...(r.derives || mark.send ? { derives: (view: StateView, operation: Operation, outcome: OutcomeInput, selected: boolean | null) => given(mark, judging(view, outcome), kinds, r.derives ? run(mark, () => r.derives!(givenTo(judging(view, outcome)), operation, selected)) : { effects: [], sends: [], opens: [] }) } : {}),
       };
     },
     ...(owners?.reserves ? { reserves: (view: StateView, pinned: ValidDefinition) => owners.reserves!(view, pinned) } : {}),
@@ -80,17 +85,39 @@ export function ownersOf(definition: ValidDefinition, platform: PlatformRules | 
  *
  * An operation that the outcome opens is stated in `opens`, with an owner
  * and a kind that `outcomes` lists. The ledger numbers it, so the effects
- * hold no `operation` and no `attempt`. A creation is not among the
- * requests: this judge lets no rule send a creation yet. The fourth cause,
- * for a scope that an outcome entry creates (the authority note's row P2),
- * is built: a child's genesis checks it (`genesis.ts`, `openerOf`). Only the
- * sending side waits (I3 deltas note, entry EP1).
+ * hold no `operation` and no `attempt`.
+ *
+ * **The one request of the mark's `send`** (revision 17, section 6.1, "A
+ * request of an outcome's rule, and its clauses"; the authority note's
+ * section 12.1.1, "The rule `create-repository`, whole"). When the mark of
+ * the kind holds a `send`, its rule is run after the effects, as a send
+ * mark of a written list is, and gives no request or one, at ordinal 0. It
+ * may give a `create`. The rule of the kind then returns no request of its
+ * own: an outcome entry sends at most one request, and the clause of its
+ * result is found by that. A creation among the requests that `derives`
+ * returns is still a fault: they have no clause and no cause.
+ *
+ * **The cause of a scope that an outcome entry creates** is the fourth row
+ * of section 7.2's table: the digest of the intent of the act that opened
+ * the outcome's operation. An operation that no act opened gives no cause,
+ * so a `create` from its outcome is a fault of the rule. The child reads
+ * the opening entry as a fetched fact that a field of the `create` names,
+ * and checks four things of it (section 7.2, "How the child reads the entry
+ * that opened the operation", revision 19; I3 delta EP1). The sending side
+ * makes the same four checks here, on this scope's own history, so that no
+ * creation is sealed which its child would answer `source-unverified`: the
+ * entry is of this scope; it is at the position that the operation's ID
+ * states, before this entry; its input is an act whose intent has the
+ * digest that is the seed's cause; and it holds the `operation` effect of
+ * that ordinal. And a fact among the fields of the `create` names it. A
+ * creation that fails one of them is a fault, and nothing is written.
  */
-function given(mark: Mark, j: Judging, kinds: Readonly<Record<string, Mark>>, gives: OutcomeGives): OutcomeDerived {
+function given(mark: OutcomeMark, j: Judging, kinds: Readonly<Record<string, OutcomeMark>>, gives: OutcomeGives): OutcomeDerived {
   if (!isObject(gives) || !Array.isArray(gives.effects) || !Array.isArray(gives.sends) || !Array.isArray(gives.opens)) throw outside(mark, "no effects, requests and openings");
   const { effects, sends, opens } = gives;
   if (effects.some((effect) => isObject(effect) && (effect["effect"] === "operation" || effect["effect"] === "attempt"))) throw outside(mark, "an operation among its effects: an outcome states the operations that it opens");
-  if (sends.some((request) => isObject(request) && isObject(request["message"]) && request["message"]["type"] === "create")) throw outside(mark, "a creation, for which an outcome entry has no cause");
+  if (sends.some((request) => isObject(request) && isObject(request["message"]) && request["message"]["type"] === "create")) throw outside(mark, "a creation, which only the send of its mark gives");
+  if (mark.send && sends.length > 0) throw outside(mark, "a request of its own, where its mark holds a send: an outcome entry sends at most one request");
   // Section 7.5: the bound on every send of one entry. The validator counts it for a row. An outcome entry has no row, and none of its rule's requests is cut off.
   if (sends.length > j.bounds.sendsPerEntry) throw outside(mark, "more requests than one entry sends");
   for (const open of opens) {
@@ -104,7 +131,39 @@ function given(mark: Mark, j: Judging, kinds: Readonly<Record<string, Mark>>, gi
   if (!joined.ok) throw outside(mark, `effects that the entry cannot hold: ${"reason" in joined ? joined.reason : joined.unavailable}`);
   // Section 6.3: `max` bounds the live items of a type, whatever opens the item. An act or a handler is refused `type-full`.
   if (joined.opened && overMax(j.view, j.definition, joined.opened.type, joined.opened.state) !== null) throw outside(mark, "effects that the entry cannot hold: type-full");
-  const requests = deriveSends(joining, sends.map((_, n) => ({ code: `send.${n}`, row: mark.row }) as unknown as SendForm), joined.working, "sha256:" as never, 0, undefined, joined.opened !== null);
+  const requests = deriveSends(joining, sends.map((_, n) => ({ code: `send.${n}`, row: mark.row }) as unknown as SendForm), joined.working, NO_CAUSE, 0, undefined, joined.opened !== null);
   if (!requests.ok) throw outside(mark, `requests that the entry cannot hold: ${"reason" in requests ? requests.reason : requests.unavailable}`);
-  return { effects: joined.effects, sends: requests.sends satisfies Send[], opens };
+  if (!mark.send) return { effects: joined.effects, sends: requests.sends satisfies Send[], opens };
+
+  // The send of the mark: its own rule, of the scope's pinned version, at ordinal 0. It reads the state before the entry, as every rule does.
+  const opener = openerOf(j);
+  const made = deriveSends(j, [mark.send as unknown as SendForm], joined.working, opener?.cause ?? NO_CAUSE, 0, undefined, joined.opened !== null);
+  if (!made.ok) throw outside(mark.send, `a request that the entry cannot hold: ${"reason" in made ? made.reason : made.unavailable}`);
+  for (const { message } of made.sends) {
+    if (message.class !== "request" || message.type !== "create") continue;
+    const fields = isObject(message.body) && isObject(message.body["fields"]) ? Object.values(message.body["fields"]) : [];
+    if (!opener) throw outside(mark.send, "a creation from the outcome of an operation that no act opened: no cause is stated for it");
+    if (!fields.some((value) => isFactRef(value) && same(value, opener.fact))) throw outside(mark.send, "a creation that names no fact of the entry that opened its operation: its child could not verify its cause");
+  }
+  return { effects: joined.effects, sends: made.sends satisfies Send[], opens };
+}
+
+/** No cause: the cause that is given where an entry may create nothing. No seed states it, so a creation there is a fault of its rule. */
+const NO_CAUSE = "sha256:" as Digest;
+
+/**
+ * The entry that opened the operation of the outcome that is judged, when
+ * it gives a cause to what the outcome creates (section 7.2, the fourth
+ * cause, with the four checks of revision 19): this scope's own entry at
+ * the position that the operation's ID states, before the entry being
+ * written, whose input is an act and which holds the `operation` effect of
+ * the ID's ordinal. `cause`: the digest of that act's intent. `fact`: the
+ * fact that a creation names it by. Null: no such entry, and so no cause.
+ */
+function openerOf(j: Judging): { cause: Digest; fact: { at: Judging["scope"]["at"]; seq: number; hash: Digest } } | null {
+  if (j.judged?.type !== "outcome") return null;
+  const [seq, k] = j.judged.operation.split(":").map(Number);
+  const kept = seq !== undefined && Number.isSafeInteger(seq) && seq < j.self ? j.own?.(seq) : null;
+  if (!kept || kept.entry.input.type !== "act" || !kept.entry.effects.some((effect) => effect.effect === "operation" && effect.k === k)) return null;
+  return { cause: intentDigest(kept.entry.input.signed.intent), fact: { at: j.scope.at, seq: kept.entry.seq, hash: kept.hash } };
 }

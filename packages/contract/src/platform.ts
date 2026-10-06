@@ -22,7 +22,7 @@
  * | 4 | A guard of a written list | `Guard \| Mark` |
  * | 5 | An effect of a written list, also of a result clause | `EffectForm \| Mark` |
  * | 6 | A send of a written list | `SendForm \| SendMark` |
- * | 7 | `outcomes`, by the kind of each operation that the definition owns | `Mark` |
+ * | 7 | `outcomes`, by the kind of each operation that the definition owns | `OutcomeMark` |
  */
 
 import type { ActType, AlsoRule, DeclaredDefinition, EffectForm, FieldType, Guard, ItemType, ReceiveType, ResultClauses, SendForm, SlotRule } from "./definition.ts";
@@ -51,6 +51,18 @@ export type TypeMark = Mark & { type: "code" };
  * state it.
  */
 export type SendMark = Mark & { result: PlatformClauses; always?: true };
+
+/**
+ * Place 7, with the one request that an outcome entry may send (revision
+ * 17, section 6.1, "A request of an outcome's rule, and its clauses"; row
+ * I3-23). An outcome has no subject and no field, so its row writes no
+ * send: the mark of its kind may hold one `send`, a send mark whose rule
+ * gives no request or one, and it may give a `create`. Each effect of a
+ * clause of that send is an effect mark, whose rule names its items by
+ * their IDs.
+ */
+export type OutcomeSend = Mark & { result: { [clause in keyof ResultClauses]?: readonly Mark[] } };
+export type OutcomeMark = Mark & { send?: OutcomeSend };
 
 /**
  * A place of an act that names a value beside the intent (revision 19,
@@ -99,11 +111,12 @@ export type PlatformItem = Omit<ItemType, "refs" | "values"> & {
  * where a mark may stand. Places 1 to 6 are in the forms of an act, a
  * handler and an item type. Place 7 is `outcomes`: the mark of the rule for
  * the outcome entries of each kind of operation that this definition owns
- * (section 4.3). A timed rule holds no mark: its effects are total.
+ * (section 4.3), with the one send that such an entry may make. A timed
+ * rule holds no mark: its effects are total.
  */
 export interface PlatformData extends Omit<DeclaredDefinition, "items" | "acts" | "receives"> {
   items: Record<string, PlatformItem>;
   acts: Record<string, PlatformAct>;
   receives: Record<string, PlatformReceive>;
-  outcomes: Record<string, Mark>;
+  outcomes: Record<string, OutcomeMark>;
 }

@@ -6,7 +6,7 @@
  * send is run again from the entry that sent it.
  */
 
-import type { ActType, Advisory, AlsoMark, AlsoRule, Bounds, Digest, Effect, EffectForm, Entry, FactRef, FactUse, FieldType, FieldValue, Guard, Input, Notify, Prepared, Reason, ReceiveType, RefusalReason, Request, ResultClauses, ScopeRef, Send, SendForm, SendMark, Settles, UnavailableReason } from "@generalbusiness/artroom-contract";
+import type { ActType, Advisory, AlsoMark, AlsoRule, Bounds, Digest, Effect, EffectForm, Entry, FactRef, FactUse, FieldType, FieldValue, Guard, Input, Notify, PlatformData, Prepared, Reason, ReceiveType, RefusalReason, Request, ResultClauses, ScopeRef, Send, SendForm, SendMark, Settles, UnavailableReason } from "@generalbusiness/artroom-contract";
 import { entryHash } from "@generalbusiness/artroom-bytes";
 import type { Signer } from "./attribution.ts";
 import { deriveEffects } from "./effects.ts";
@@ -346,14 +346,14 @@ export type Clause = keyof ResultClauses | "conflict";
  * records them again (section 9.2). The origin entry recorded them first.
  *
  * `answered`: for a result, the scope that answered and the reason on the
- * result, which a clause may read as `sender` and `result` (section 6.6). A
- * diagnosis has neither.
+ * result, which a clause may read as `sender` and `result` (section 6.6),
+ * and the verified source entry of the result. A diagnosis has none.
  *
  * `judged`: the input of the entry that runs the clause, the delivery of
  * the result or the diagnosis, for a mark among the clause's effects, in
  * platform data. Its rule is run when the clause runs (section 4.2).
  */
-export function runClause(view: StateView, definition: ValidDefinition, context: Reading & { origin?: Entry | null | undefined }, scope: ScopeState, request: OwnRequest, clause: Clause, answered?: { sender: ScopeRef; reason?: Reason }, judged?: JudgedInput):
+export function runClause(view: StateView, definition: ValidDefinition, context: Reading & { origin?: Entry | null | undefined }, scope: ScopeState, request: OwnRequest, clause: Clause, answered?: { sender: ScopeRef; reason?: Reason; source?: Fetched }, judged?: JudgedInput):
   { result: "ran"; effects: Effect[]; uses: FactUse[]; judgesTime: boolean } | { result: "unavailable"; reason: UnavailableReason } {
   const origin = context.origin;
   if (!origin || origin.seq !== request.seq || entryHash(origin) !== request.hash) return { result: "unavailable", reason: "unavailable" };
@@ -361,7 +361,9 @@ export function runClause(view: StateView, definition: ValidDefinition, context:
   const input = origin.input;
   /** What the origin gives its clauses: its fields, how it selects its items, its primary item by ID, and its signer. */
   let frame: { kind: string; fields: Record<string, FieldValue>; fieldTypes: ActType["fields"]; also: Readonly<Record<string, AlsoRule>>; on: number | null; signer: Signer | null; sends: readonly SendForm[];
-               presents?: ActType["presents"]; presented?: Readonly<Record<string, FieldValue>> };
+               presents?: ActType["presents"]; presented?: Readonly<Record<string, FieldValue>>;
+               /** The send of an outcome's mark, which made the request: an outcome entry has no written list to find it in. */
+               sent?: SendMark };
   if (input.type === "act" || input.type === "genesis") {
     const intent = input.type === "act" ? input.signed.intent : input.founding?.intent;
     const kind = input.type === "act" ? input.signed.intent.kind : declared.genesis;
@@ -387,13 +389,18 @@ export function runClause(view: StateView, definition: ValidDefinition, context:
     const on = handler.opens === null ? null : origin.effects.some((e) => e.effect === "open") ? origin.seq : (ones(view, definition, handler.opens, origin.seq)[0]?.id ?? null);
     frame = { kind: b.kind, fields: read.fields, fieldTypes: handler.fields, also: handler.also, on, signer: null, sends: handler.sends };
   } else if (input.type === "outcome") {
-    // Platform data, section 6.1, place 7: an outcome entry has no row in the data, so a request that its rule sends has no clause
-    // written anywhere. Its result is recorded, and changes nothing.
-    return { result: "ran", effects: [], uses: [], judgesTime: false };
+    // Platform data, section 6.1, place 7: an outcome entry has no row in the data. The mark of its kind may hold one `send`, whose
+    // clauses are the mark's own (revision 17, "A request of an outcome's rule, and its clauses"). Such an entry sends that one
+    // request and no other, at ordinal 0. A request of a kind whose mark holds no send has no clause written anywhere: its result
+    // is recorded, and changes nothing. The clause is found by the kind of the outcome, which its input holds, and by nothing else.
+    const marked = input.owner === context.platform?.named ? own((declared as unknown as PlatformData).outcomes, input.kind)?.send : undefined;
+    if (!marked || request.n !== 0) return { result: "ran", effects: [], uses: [], judgesTime: false };
+    // An outcome has no field, no subject and no signer: each effect of the clause is an effect mark, whose rule finds its items.
+    frame = { kind: input.kind, fields: {}, fieldTypes: {}, also: {}, on: null, signer: null, sends: [], sent: marked as unknown as SendMark };
   } else throw new Error(`entry ${origin.seq} is not one that sends a request`);
 
   // A send that was not made took no ordinal, and a fan-out made several: the form is found from the send the entry recorded.
-  const form = formOf(definition, frame.sends, origin, request.n);
+  const form = frame.sent ?? formOf(definition, frame.sends, origin, request.n);
   if (!form || "index" in form) throw new Error(`entry ${origin.seq} declares no request at ordinal ${request.n}`);
   // The clauses of a request that a rule gave are its mark's own, as data (section 6.1, place 6).
   const marked = markOf(form) as SendMark | null;
@@ -425,6 +432,9 @@ export function runClause(view: StateView, definition: ValidDefinition, context:
     view, definition, bounds: context.bounds, clock: context.clock, scope, self: scope.head.seq + 1, kind: frame.kind, fields: facts.fields, fieldTypes: frame.fieldTypes, subjects, signer: frame.signer,
     facts: new Map([...facts.facts, ...beside.facts]), prepared: [], used: [], own: context.own, sender: answered?.sender, result: answered?.reason, each: (update && view.item(update.item.seq)) ?? undefined,
     presented: beside.fields, capabilities: context.capabilities, platform: context.platform, judged, ran: { clock: false },
+    // The clause of an outcome's send has no field that names a fact. Its rule may give the fact of the entry that answered, which
+    // is at hand as the verified source entry of the result, and which the entry that records the result retains.
+    ...(frame.sent && answered?.source ? { source: answered.source } : {}),
   };
   const effects = deriveEffects(j, forms, [], null);
   // Section 6.6: a clause's condition that is not completed leaves the result not recorded now. It is offered again.
