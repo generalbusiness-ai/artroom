@@ -163,6 +163,36 @@ export function highestHead(view: Pick<StateView, "observed">, observation: Obse
   return held.length === 0 ? null : Math.max(...held);
 }
 
+/**
+ * A membership reference as a scope records it (authority note, section
+ * 3.3, "Where it records its membership reference"): the scope, with its
+ * incarnation. `inc` null: the scope records the ID and no incarnation. That
+ * is a rules scope or a destination, which is created beside membership and
+ * holds its scope ID alone, before any entry of it retains an observation
+ * of that ID (section 12.1, "Where the rules scope and the destination
+ * record their membership reference", decided in revision 25).
+ */
+export type RecordedRef = Omit<ScopeRef, "inc"> & { inc: ScopeRef["inc"] | null };
+
+/**
+ * Guard 1 of an observation, "for these two scopes" too: the observation
+ * is of the scope's own recorded reference. With an incarnation recorded,
+ * `of` is that scope with that incarnation. While none is recorded, `of` is
+ * the recorded scope ID, of the recorded kind, whatever incarnation
+ * answered: the entry that retains the observation fixes it.
+ */
+export const observedOf = (of: ScopeRef, recorded: RecordedRef): boolean =>
+  of.scope === recorded.scope && of.kind === recorded.kind && (recorded.inc === null || of.inc === recorded.inc);
+
+/**
+ * The reference with its incarnation, for one entry: the one recorded, or
+ * while none is recorded the `of` of the observation that the entry
+ * retains, which fixes it. Null: the scope records none; or it records no
+ * incarnation and the entry retains no observation of the recorded ID.
+ */
+export const fixedBy = (recorded: RecordedRef | null, of: ScopeRef | null | undefined): ScopeRef | null =>
+  (recorded === null ? null : recorded.inc !== null ? (recorded as ScopeRef) : of && observedOf(of, recorded) ? of : null);
+
 /** An earlier entry of the scope that retains a read: the entry, its time, and the observation as it retains it. */
 export interface Retains { entry: Head; time: Timestamp; observation: Observation }
 
@@ -170,8 +200,11 @@ export interface Retains { entry: Head; time: Timestamp; observation: Observatio
 export interface GrantAsked {
   /** The scope that judges, with its incarnation. */
   scope: ScopeRef;
-  /** That scope's own membership reference, with its incarnation: a function of its genesis entry (section 6.6). */
-  membership: ScopeRef;
+  /**
+   * That scope's own membership reference, as it records it: with its incarnation, or for a rules scope and a destination before
+   * the first retained observation with none (`RecordedRef`).
+   */
+  membership: RecordedRef;
   /** The signing key, and the action that the act's row names in `grant`. */
   key: KeyId;
   action: string;
@@ -214,7 +247,9 @@ export type GrantJudgment =
  * of the value is read, but for two things that say whose answer it is.
  *
  * 1. The observation is of this scope's own membership reference, with that
- *    incarnation. One of another scope or incarnation is discarded.
+ *    incarnation. One of another scope or incarnation is discarded. A scope
+ *    that records the ID and no incarnation yet takes an observation of
+ *    that ID, of the kind `membership` (`observedOf`).
  * 2. It is of the signing key. One of another key is no grant to the signer.
  * 3. A revoked answer refuses, whatever its age: a key is never restored
  *    and a removed member is never restored, so it cannot become untrue
@@ -247,7 +282,9 @@ export function judgeGrant(use: ObservationUse, asked: GrantAsked): GrantJudgmen
   const discard = (failed: Discarded): GrantJudgment => ({ result: "authority-unavailable", failed });
   const refuse = (failed: Unheld): GrantJudgment => ({ result: "unauthorized", failed });
 
-  if (!same(o.of, asked.membership)) return discard("of");
+  if (!observedOf(o.of, asked.membership)) return discard("of");
+  // Where the scope records no incarnation yet, the entry that retains this observation fixes it: the reference is `of`.
+  const membership = fixedBy(asked.membership, o.of)!;
   if (o.key !== asked.key) return refuse("key");
   if (revoked(o)) return refuse("revoked");
 
@@ -267,7 +304,7 @@ export function judgeGrant(use: ObservationUse, asked: GrantAsked): GrantJudgmen
 
   if (o.keyState !== "active") return refuse("key-state");
   if (!o.actions.includes(asked.action)) return refuse("action");
-  if (!covers(o.within, asked.scope, asked.membership)) return refuse("within");
+  if (!covers(o.within, asked.scope, membership)) return refuse("within");
   if (o.notAfter !== null && timeMs(clock.asOf)! >= (timeMs(o.notAfter) ?? -Infinity)) return refuse("not-after");
   if ((o.controller !== null || o.controllerActive !== null) && o.controllerActive !== true && !COMMENTS.includes(asked.action)) return refuse("controller");
   return { result: "current", grant: grantFrom(use) };

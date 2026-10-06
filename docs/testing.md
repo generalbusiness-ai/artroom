@@ -82,21 +82,20 @@ class with the production authority and the platform package's own
 rules: a test of real authority runs there, in the namespace `PLATFORM`
 (`packages/scope/test/repository.ts` lists what is real in it).
 
-The register and the directory have stand-ins of their own, in
-`packages/platform/test/support-founding.ts`. `registerStandIns` is a rule
-for the one mark of the register's data that has no rule,
-`create-repository` (`notes/2026-10-05-i3-contract-deltas.md`, entry EJ1).
-`directoryStandIns` is a rule for each of the three marks of the directory's
-data that the platform package has no rule for (entries EP6 and EP7).
-Without them nothing is founded under `platform:register@1` or created
-under `platform:directory@1`, in a test as in production. `Register` is a
-register in memory, founded by an install intent. `Directory` is a
-directory in memory that a scripted register created: the `create` that
-the register's unwritten rule will send is added to its outcome entry by
-hand, and the register's confirmation, the genesis of each child and each
-lane's entry are made by hand. A test that uses one says so. It shows the
-rows and the written rules of the two definitions, and nothing about a
-founding.
+The register and the directory have no stand-in rule: every mark of the
+data of each has its rule in the platform package. Two fixtures are in
+`packages/platform/test/support-founding.ts`. `Register` is a register in
+memory, founded by an install intent. `Directory` is a directory in memory
+that such a register created by its own rules: the claim, the selecting
+outcome with its `create`, the directory's genesis and the register's
+record of the result are all judged. The genesis of each child and each
+lane's entry are scripted, made by hand. A test that uses one says so. It
+shows the rows and the rules of the two definitions as judgments in
+memory. A founding on scope objects is
+`packages/scope/test/founding-real.test.ts`, in the namespace `PLATFORM`:
+the deployed class, the production authority and the package's own rules,
+with a labelled stand-in for the Git host. It runs as far as the creation
+of the destination, which `platform:destination@1` cannot yet answer.
 
 The rules scope has four stand-ins, in
 `packages/platform/test/support-rules.ts`. `registrar` is a made-up
@@ -105,24 +104,41 @@ tells it `rules-wanted`. `Rulebook` is a rules scope in memory below such
 a registrar, whose acts are judged on the test authority of derive's
 fixture set. `standing` is an observation of a member that the test
 writes by hand: no membership scope answered it. A test that uses one
-says so. The data and the three rules of `platform:rules@1` are the
+says so. The data and the six rules of `platform:rules@1` are the
 platform package's, and none of them is a stand-in. Such a test shows
 the rows and the rules as judgments in memory. It shows nothing about a
 founding, about a read of membership, or about how a scope receives and
 keeps a value beside an intent
-(`notes/2026-10-05-i3-contract-deltas.md`, entry EQ9).
+(`notes/2026-10-05-i3-contract-deltas.md`, entry EQ9). That a scope reads
+a value for a place of its pinned data, and keeps it under its domain, is
+`packages/scope/test/values.test.ts`, on real storage, with derive's
+made-up platform data `gate` in place of a definition of Artroom: no data
+of the platform package states a place yet.
 
 The destination has stand-ins of its own, in
 `packages/platform/test/support-destination.ts`. `standInRules` is a rule
-for each of the ten marks of the destination's data that the platform
-package has no rule for (`notes/2026-10-05-i3-contract-deltas.md`,
-entries ER4 to ER9): without them nothing is created under
-`platform:destination@1`, in a test as in production. `bureau` is a
+for each of the two marks of the destination's data that the platform
+package has no rule for, `first-head` and `receipt`
+(`notes/2026-10-05-i3-contract-deltas.md`, entries ER9 and FA6): without
+them nothing is created under `platform:destination@1`, in a test as in
+production. `Branch.read` is what is at hand for one reservation, written
+by hand: the observations that a runtime would read before the turn of
+the outcome of `judge`, and what the lane's entries say. The judge of the
+outcome is given the observations and the entries, and writes the entry's
+`observed` and `uses` itself. The rule `judge`, its judgment and its
+reading of each observation are the package's own. Only the reader of a
+lane's entries is a stand-in: the package has none
+(`notes/2026-10-05-i3-contract-deltas.md`, entries FA9 and FC5), and no
+runtime reads an observation for an outcome (entry FC6). `bureau` is a
 made-up directory that creates one destination scope. The lane's and the
-register's entries are made by hand. `Branch` is a destination scope in
-memory below such a bureau. A test that uses one says so. It shows the
-destination's rows and its eight real rules, and nothing about an outcome
-entry, a push or a founding.
+register's entries, each observation and every answer of the Git host are
+made by hand.
+`Branch` is a destination scope in memory below such a bureau. A test
+that uses one says so. It shows the destination's rows and its 17 real
+rules as judgments in memory: what an outcome entry derives from an
+answer that the test wrote. It shows nothing about a host, a gateway, a
+push, an observation of membership or of the rules, a lane's entry, or a
+founding.
 
 The token ledger has three stand-ins. `TokenHost` and `Vault`, in
 `packages/git/test/support/tokens.ts`, stand for a Git host's token

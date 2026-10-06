@@ -23,7 +23,9 @@ export interface Stored { seq: number; hash: Digest; bytes: string; size: number
  * delivered message, a rule's result and an outcome's evidence are whole
  * inside the entry that records them, so the entry row retains them. A
  * detached text is kept as one JSON string under its digest, until a
- * `redact` effect removes it (section 6.6).
+ * `redact` effect removes it (section 6.6). A value beside an intent is
+ * kept under its byte domain and its digest there, and is never removed
+ * (section 6.2, revision 19).
  */
 export type Retained = RetainedInput;
 
@@ -77,9 +79,10 @@ export interface Store extends StateWriter {
   stored(seq: number): Stored | null;
   /** At most `limit` entries from `seq` on, in order. */
   storedFrom(seq: number, limit: number): Stored[];
-  retained(kind: Retained["kind"], digest: Digest): Retained | null;
+  /** One retained input, or null. `domain`: for the kind `value`, the byte domain that the value is kept under (sections 6.2 and 9.2). A value that is asked for with no domain is none. */
+  retained(kind: Retained["kind"], digest: Digest, domain?: string): Retained | null;
   /** The UTF-8 bytes of one retained input, or null, without reading it. */
-  retainedSize(kind: Retained["kind"], digest: Digest): number | null;
+  retainedSize(kind: Retained["kind"], digest: Digest, domain?: string): number | null;
   /** The row of one send, or null. */
   duty(seq: number, n: number): Duty | null;
   /** At most `limit` sends after the one at `after`, in the order of `seq` and ordinal. */

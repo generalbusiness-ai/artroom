@@ -23,7 +23,7 @@
  */
 
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { DeclaredDefinition, MemberId, MemberRef, ObservationUse, ScopeRef } from "@generalbusiness/artroom-contract";
+import type { DeclaredDefinition, MemberId, MemberRef, ObservationUse, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
 import { PROFILES, clockOf, judgeDelivery, judgeGenesis, validateDefinition } from "@generalbusiness/artroom-derive";
 import type { Judgment, PlatformRules, ValidDefinition } from "@generalbusiness/artroom-derive";
 import { Ledger, Scope, T0, arriving, creation, d, founded, keys, membership, sent } from "@generalbusiness/artroom-derive/testing";
@@ -107,16 +107,17 @@ export const BRANCH = "refs/heads/main";
  * A rules scope in memory, below a stand-in registrar that rita founded:
  * its genesis, by the registrar's `create`, and the registrar's
  * confirmation. The membership scope that it records is the made-up
- * reference `membership` of derive's fixture set, by its ID. Each act is
- * judged by derive's judge of an act, with the rules scope's own rules, on
- * the test authority of that fixture set.
+ * reference `membership` of derive's fixture set, by its ID, unless the
+ * test names another (`of`). Each act is judged by derive's judge of an
+ * act, with the rules scope's own rules, on the test authority of that
+ * fixture set, unless the test presents other grants.
  */
 export class Rulebook extends Ledger {
   readonly registrar: Ledger;
 
-  constructor(confirmed = true) {
+  constructor(confirmed = true, of: ScopeId = membership.scope) {
     super(rulesScopeDefinition, "platform:rules");
-    this.registrar = founded(registrarDefinition, { branch: BRANCH, membership: membership.scope });
+    this.registrar = founded(registrarDefinition, { branch: BRANCH, membership: of });
     const { asked, source } = creation(this.registrar, 0);
     this.take(judgeGenesis(this.state, rulesScopeDefinition, asked, { clock: clockOf(this.state, T0), bounds: PROPOSED_BOUNDS, facts: [], prepared: [], source, platform: rules }));
     if (!confirmed) return;

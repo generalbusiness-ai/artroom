@@ -1,17 +1,25 @@
 import { createHash } from "node:crypto";
 import { expect, test } from "vitest";
 import type { MemberId } from "@generalbusiness/artroom-contract";
-import { RULES_PATTERNS, actionsIn, classify, firstExtents, holdsRulesExtent, judgeExtents, matches } from "../src/index.ts";
-import type { Extent, ExtentsAsked, Holder, Role, TreeLink } from "../src/index.ts";
+import { RULES_PATTERNS, actionsIn, classify as touchedBy, firstExtents, holdsRulesExtent, isExtents, judgeExtents, matches } from "../src/index.ts";
+import type { Extent, ExtentsAsked, Holder, Review, Role, TreeLink } from "../src/index.ts";
 
-// Judgments over data that each test writes by hand (authority note, revision 24, section 12.1.4a; the planner's request `42de9e34`).
+// Judgments over data that each test writes by hand (authority note, revision 26, section 12.1.4a; the planner's request `42de9e34`).
 // No scope ran here, and no destination called these functions: the reservation that will is not built. A member's actions are those
 // that the role table of section 3.2 gives the role, so "who holds what" is the platform package's own table and no stand-in.
+// The changed set, the link rows, the count of controllers and the controllers of the authoring agents are each written by hand:
+// no retained form holds one yet (the missing forms 1, 11 and 15).
 
 const holder = (handle: string, role: Role): Holder => ({ member: handle as MemberId, holds: actionsIn(role) });
 // Two admins, who are the controllers of the rules scope; a maintainer; two members; and an agent, whose controller is `ada`.
 const [ada, ann, max, mel, art] = [holder("@ada", "admin"), holder("@ann", "admin"), holder("@max", "maintainer"), holder("@mel", "member"), holder("@art", "member")];
 const bot = "@bot" as MemberId;
+/** `classify`, for a changed set whose every path is a text: the count of paths that are no text is stated, and is 0. */
+const classify = (extents: readonly Extent[], changed: readonly string[], links: readonly TreeLink[]) => touchedBy(extents, changed, links, 0);
+/** One approving verdict of a member for each extent that is named: a reviewer who covers two extents signs two verdicts. */
+const on = (who: Holder, ...extents: (string | null)[]): Review[] => extents.map((extent) => ({ ...who, extent }));
+/** A verdict of each member for every extent of the rules that these tests use. What each then meets is the extent's `approver` to say. */
+const each = (...who: Holder[]): Review[] => who.flatMap((member) => on(member, "rules", "infrastructure", "docs", "source"));
 
 /** The first definition, for a repository whose rules ask 1 approval and one required check. */
 const FIRST = firstExtents({ approvals: 1, checks: [{ name: "unit", required: true }, { name: "lint", required: false }] });
@@ -22,7 +30,7 @@ const names = (extents: readonly Extent[], paths: readonly string[], links: read
 /** A reservation of the mixed change by `art`, which `max` merges, with the check passed. Each test states what it changes. */
 const asked = (over: Partial<ExtentsAsked> = {}): ExtentsAsked => ({
   extents: FIRST, ownerMayReview: false, singleControllerException: false, touched: classify(FIRST, MIXED, []),
-  authors: [art.member], controllersOfAuthors: [], reviews: [], passed: ["unit"], merger: max, controllers: [ada.member, ann.member], ...over,
+  authors: [art.member], controllersOfAuthors: [], reviews: each(), passed: ["unit"], merger: max, controllers: [ada.member, ann.member], ...over,
 });
 /** What a judgment says: whether it is met, the unmet extents, and for each touched extent who counted and what it lacks. */
 const said = (over: Partial<ExtentsAsked> = {}) => {
@@ -44,6 +52,8 @@ test("the first definition names rules, infrastructure and source; an agent inst
   // A pattern: an ASCII letter matches in either case and nothing else is folded; `*` stays inside one name; `**` is any number of names, also none.
   expect([matches("**/AGENTS.md", "docs/agents.MD"), matches("**/AGENTS.md", "docs/ÄGENTS.md"), matches("**/ÄGENTS.md", "docs/äGENTS.md"), matches("src/*.ts", "src/a.ts"), matches("src/*.ts", "src/lib/a.ts"), matches(".github/**", ".github"), matches("a/**/b", "a/x/y/b"), matches("*", "a/b")])
     .toEqual([true, false, false, true, false, true, true, false]);
+  // `**` is any number of names only as a whole name of the pattern: inside a name each `*` stays in one name, so `a**b` is `a*b`.
+  expect([matches("a**b", "axyb"), matches("a**b", "a/x/b"), matches("a*b", "axyb"), matches("**", "a/b/c")]).toEqual([true, false, true, true]);
 
   // The fixed minimum of the rules extent: a repository may add a pattern. It may not remove one, lower the approvals, or change the approver or the class.
   const [rules, ...rest] = FIRST as [Extent, ...Extent[]];
@@ -52,7 +62,7 @@ test("the first definition names rules, infrastructure and source; an agent inst
     .toEqual([true, true, false, false, false, false, false]);
 });
 
-test("plan 016's mixed change touches three extents and needs each obligation; a reviewer outside an extent does not meet it, and nothing is averaged", () => {
+test("plan 016's mixed change touches three extents and needs each obligation; a reviewer outside an extent does not meet it, a verdict counts only for the extent that it states, and nothing is averaged", () => {
   const touched = classify(FIRST, MIXED, []);
   expect([touched.touched, touched.class, touched.unclassified, touched.refused]).toEqual([
     [{ extent: "rules", path: "AGENTS.md" }, { extent: "infrastructure", path: ".gitignore" }, { extent: "source", path: "src/app.ts" }], "authority", [], [],
@@ -60,49 +70,56 @@ test("plan 016's mixed change touches three extents and needs each obligation; a
   expect([classify(FIRST, ["src/app.ts"], []).class, classify(FIRST, ["src/app.ts", ".gitignore"], []).class, classify(FIRST, [], []).class]).toEqual(["content", "deployment", null]);
 
   // A source reviewer meets source alone. Two of them are still no infrastructure reviewer.
-  expect(said({ reviews: [mel] })).toEqual([false, ["rules", "infrastructure"], { rules: [[], ["approvals"]], infrastructure: [[], ["approvals"]], source: [["@mel"], []] }]);
-  expect(said({ reviews: [mel, holder("@moe", "member")] })[1]).toEqual(["rules", "infrastructure"]);
+  expect(said({ reviews: each(mel) })).toEqual([false, ["rules", "infrastructure"], { rules: [[], ["approvals"]], infrastructure: [[], ["approvals"]], source: [["@mel"], []] }]);
+  expect(said({ reviews: each(mel, holder("@moe", "member")) })[1]).toEqual(["rules", "infrastructure"]);
   // A maintainer meets infrastructure and source. A feature reviewer never meets rules.
-  expect(said({ reviews: [mel, max] })).toEqual([false, ["rules"], { rules: [[], ["approvals"]], infrastructure: [["@max"], []], source: [["@max", "@mel"], []] }]);
-  // The rules scope's controller meets rules, and one review may count for several extents.
-  expect(said({ reviews: [mel, max, ada] })[0]).toBe(true);
-  expect(said({ reviews: [ada] })).toEqual([true, [], { rules: [["@ada"], []], infrastructure: [["@ada"], []], source: [["@ada"], []] }]);
+  expect(said({ reviews: each(mel, max) })).toEqual([false, ["rules"], { rules: [[], ["approvals"]], infrastructure: [["@max"], []], source: [["@max", "@mel"], []] }]);
+  // The rules scope's controller meets rules. A reviewer who covers three extents signs three verdicts.
+  expect(said({ reviews: each(mel, max, ada) })[0]).toBe(true);
+  expect(said({ reviews: each(ada) })).toEqual([true, [], { rules: [["@ada"], []], infrastructure: [["@ada"], []], source: [["@ada"], []] }]);
+  // A verdict counts for the one extent that it states (the lane forms' revision 15, ask 4), whatever its reviewer holds: an admin's
+  // verdict on `source` meets source alone, a verdict that states no extent meets none, and so does one that states an unknown name.
+  expect(said({ reviews: on(ada, "source") })).toEqual([false, ["rules", "infrastructure"], { rules: [[], ["approvals"]], infrastructure: [[], ["approvals"]], source: [["@ada"], []] }]);
+  expect([said({ reviews: on(ada, null) })[1], said({ reviews: on(ada, "all") })[1], said({ reviews: [{ member: ada.member, holds: ada.holds } as Review] })[1]]).toEqual(Array(3).fill(["rules", "infrastructure", "source"]));
+  expect(said({ reviews: [...on(ada, "rules"), ...on(max, "infrastructure"), ...on(mel, "source")] })).toEqual([true, [], { rules: [["@ada"], []], infrastructure: [["@max"], []], source: [["@mel"], []] }]);
   // Two reviews of one member are one reviewer.
-  expect(said({ extents: FIRST.map((extent) => ({ ...extent, approvals: 2 })), reviews: [ada, ada] })[1]).toEqual(["rules", "infrastructure", "source"]);
+  expect(said({ extents: FIRST.map((extent) => ({ ...extent, approvals: 2 })), reviews: each(ada, ada) })[1]).toEqual(["rules", "infrastructure", "source"]);
 
   // Each extent asks its own checks, and a class beyond `content` asks the landing actor's standing grant.
-  expect(said({ reviews: [ada], passed: [] })).toEqual([false, ["source"], { rules: [["@ada"], []], infrastructure: [["@ada"], []], source: [["@ada"], ["checks"]] }]);
-  expect(said({ reviews: [ada], merger: mel })[1]).toEqual(["rules", "infrastructure"]);
-  expect(said({ reviews: [ada], merger: mel, touched: classify(FIRST, ["src/app.ts"], []) })[0]).toBe(true);
+  expect(said({ reviews: each(ada), passed: [] })).toEqual([false, ["source"], { rules: [["@ada"], []], infrastructure: [["@ada"], []], source: [["@ada"], ["checks"]] }]);
+  expect(said({ reviews: each(ada), merger: mel })[1]).toEqual(["rules", "infrastructure"]);
+  expect(said({ reviews: each(ada), merger: mel, touched: classify(FIRST, ["src/app.ts"], []) })[0]).toBe(true);
 });
 
 test("a change to the rules extent is not met by its author's review, whatever `ownerMayReview` says, and with no declared exception one controller alone changes nothing", () => {
   // The author is the only controller, and the only reviewer.
-  const own = { authors: [ada.member], reviews: [ada], merger: ada, controllers: [ada.member] };
+  const own = { authors: [ada.member], reviews: each(ada), merger: ada, controllers: [ada.member] };
   expect(said(own)).toEqual([false, ["rules", "infrastructure", "source"], { rules: [[], ["approvals"]], infrastructure: [[], ["approvals"]], source: [[], ["approvals"]] }]);
   // The controller of an agent among the authors: `ownerMayReview` lets that review count for the other extents, and never for rules.
-  const agent = { authors: [bot], controllersOfAuthors: [ada.member], reviews: [ada], controllers: [ada.member] };
+  const agent = { authors: [bot], controllersOfAuthors: [ada.member], reviews: each(ada), controllers: [ada.member] };
   expect([said({ ...agent, ownerMayReview: true })[1], said({ ...agent, ownerMayReview: false })[1]]).toEqual([["rules"], ["rules", "infrastructure", "source"]]);
   // A second controller, independent of the authors, meets it.
-  expect(said({ ...own, reviews: [ada, ann], controllers: [ada.member, ann.member] })[0]).toBe(true);
+  expect(said({ ...own, reviews: each(ada, ann), controllers: [ada.member, ann.member] })[0]).toBe(true);
 });
 
 test("the single-controller exception holds only when it is declared, membership shows one controller, and that controller is an author or controls one; then the controller's `merge` meets the rules extent and every other obligation stands", () => {
   // `ada` wrote the change, is the one controller, and signs the `merge`. `max` reviews the other extents.
-  const use = { singleControllerException: true, authors: [ada.member], reviews: [max], merger: ada, controllers: [ada.member] };
+  const use = { singleControllerException: true, authors: [ada.member], reviews: each(max), merger: ada, controllers: [ada.member] };
   const exception = (over: Partial<ExtentsAsked>) => { const judged = judgeExtents(asked({ ...use, ...over })); return [judged.met, judged.unmet, judged.extents[0]!.exception]; };
   // 1. Not declared.
   expect(exception({ singleControllerException: false })).toEqual([false, ["rules"], null]);
   // 2. Two controllers, and no count at all (the observation that gives it is not built).
   expect([exception({ controllers: [ada.member, ann.member] }), exception({ controllers: null }), exception({ controllers: [] })]).toEqual([[false, ["rules"], null], [false, ["rules"], null], [false, ["rules"], null]]);
   // 3. The one controller is independent of the authors: that member's review is asked, and no exception is used with or without it.
-  expect([exception({ authors: [art.member] }), exception({ authors: [art.member], reviews: [max, ada] })]).toEqual([[false, ["rules"], null], [true, [], null]]);
-  // All three hold, for an author and for the controller of an agent among the authors.
+  expect([exception({ authors: [art.member] }), exception({ authors: [art.member], reviews: each(max, ada) })]).toEqual([[false, ["rules"], null], [true, [], null]]);
+  // All three hold, for an author and for the controller of an agent among the authors (the clause that revision 26 restores).
   expect([exception({}), exception({ authors: [bot], controllersOfAuthors: [ada.member] })]).toEqual([[true, [], "@ada"], [true, [], "@ada"]]);
+  // The agent clause fails: the agent among the authors is controlled by another member, or by none.
+  expect([exception({ authors: [bot], controllersOfAuthors: [ann.member] }), exception({ authors: [bot], controllersOfAuthors: [] })]).toEqual([[false, ["rules"], null], [false, ["rules"], null]]);
   // Another member signed the `merge`.
   expect(exception({ merger: max })).toEqual([false, ["rules"], null]);
   // It meets the reviews of the rules extent and nothing else: the other extents' reviews, and each check, stand.
-  expect([exception({ reviews: [] })[1], exception({ reviews: [ada] })[1]]).toEqual([["infrastructure", "source"], ["infrastructure", "source"]]);
+  expect([exception({ reviews: each() })[1], exception({ reviews: each(ada) })[1]]).toEqual([["infrastructure", "source"], ["infrastructure", "source"]]);
   const checked = FIRST.map((extent) => (extent.name === "rules" ? { ...extent, checks: ["policy"] } : extent));
   expect([exception({ extents: checked })[1], exception({ extents: checked, passed: ["unit", "policy"] })[1]]).toEqual([["rules"], []]);
 });
@@ -126,9 +143,9 @@ test("a symbolic link is judged at its path and at every path that it resolves t
   // A link that the change creates, outside the tree or not resolvable: refused. No review meets it, and the class is `authority`.
   const outside = classify(FIRST, ["src/app.ts", "docs/secrets"], [{ path: "docs/secrets", tree: "new", resolves: null }]);
   expect([outside.touched, outside.refused, outside.class]).toEqual([[{ extent: "source", path: "docs/secrets" }], ["docs/secrets"], "authority"]);
-  expect(said({ touched: outside, reviews: [ada, ann] })).toEqual([false, ["rules"], { source: [["@ada", "@ann"], []] }]);
+  expect(said({ touched: outside, reviews: each(ada, ann) })).toEqual([false, ["rules"], { source: [["@ada", "@ann"], []] }]);
   // Where the change also touches the rules extent, that extent is the one that is not met.
-  const both = judgeExtents(asked({ touched: classify(FIRST, ["AGENTS.md", "docs/secrets"], [{ path: "docs/secrets", tree: "new", resolves: null }]), reviews: [ada] }));
+  const both = judgeExtents(asked({ touched: classify(FIRST, ["AGENTS.md", "docs/secrets"], [{ path: "docs/secrets", tree: "new", resolves: null }]), reviews: each(ada) }));
   expect([both.met, both.unmet, both.extents[0]!.met, both.extents[0]!.lacks]).toEqual([false, ["rules"], false, []]);
 });
 
@@ -150,7 +167,7 @@ test("a link that leaves the tree is refused only where the change creates it or
   expect(judged(["docs/secrets"], [bad("old"), { path: "docs/secrets", tree: "new", resolves: [".gitignore"] }])).toEqual([["rules", "infrastructure", "source"], [], "authority"]);
   // The reviews that the rules extent asks then meet it: an allowed change is judged, and not refused.
   const removal = classify(FIRST, ["docs/secrets"], [bad("old")]);
-  expect([said({ touched: removal, reviews: [max] }).slice(0, 2), said({ touched: removal, reviews: [ada, max] }).slice(0, 2)]).toEqual([[false, ["rules"]], [true, []]]);
+  expect([said({ touched: removal, reviews: each(max) }).slice(0, 2), said({ touched: removal, reviews: each(ada, max) }).slice(0, 2)]).toEqual([[false, ["rules"]], [true, []]]);
   // An unrelated change in a tree that already holds such a link: not blocked, and the link is not followed. Nothing is judged at it.
   expect(judged(["src/app.ts"], [bad("both")])).toEqual([["source"], [], "content"]);
   expect(judged(["docs/guide.md"], [bad("both"), { path: "docs/latest", tree: "both", resolves: ["docs/guide.md"] }])).toEqual([["source"], [], "content"]);
@@ -173,7 +190,7 @@ test("the extents are a repository's own: a second rules content with other patt
   ]);
   // The same change under the two contents: the second asks two infrastructure reviewers and its own check.
   const change = ["deploy/prod.toml", "src/app.ts"];
-  const under = (extents: readonly Extent[]) => said({ extents, touched: classify(extents, change, []), reviews: [max] });
+  const under = (extents: readonly Extent[]) => said({ extents, touched: classify(extents, change, []), reviews: each(max) });
   expect([under(FIRST), under(SECOND)]).toEqual([
     [true, [], { source: [["@max"], []] }],
     [false, ["infrastructure"], { infrastructure: [["@max"], ["approvals", "checks"]], source: [["@max"], []] }],
@@ -182,7 +199,72 @@ test("the extents are a repository's own: a second rules content with other patt
   // With no extent that has no pattern, a path that no pattern matches is held by nothing, and the change is not met.
   const closed = SECOND.slice(0, 3);
   const touched = classify(closed, ["docs/guide.md", "src/app.ts"], []);
-  expect([touched.touched, touched.unclassified, said({ extents: closed, touched, reviews: [ada] }).slice(0, 2)]).toEqual([[{ extent: "docs", path: "docs/guide.md" }], ["src/app.ts"], [false, []]]);
+  expect([touched.touched, touched.unclassified, said({ extents: closed, touched, reviews: each(ada) }).slice(0, 2)]).toEqual([[{ extent: "docs", path: "docs/guide.md" }], ["src/app.ts"], [false, []]]);
+});
+
+// The inputs that no retained form supplies yet (the missing forms 1, 11 and 15). Each is an explicit input, and without it the
+// judgment fails closed.
+test("without the controllers of the authoring agents no agent's change gets the exception and no review counts where a controller's would be refused; a changed path that is no text, and a changed set that is not stated whole, make the rules extent unmet, which no review and no exception meets", () => {
+  // The missing form 15. `ada` is the one controller and signs the `merge` of her agent's change, under a declared exception.
+  const agent = { singleControllerException: true, authors: [bot], reviews: each(max), merger: ada, controllers: [ada.member], ownerMayReview: true };
+  const judged = (over: Partial<ExtentsAsked>) => { const j = judgeExtents(asked({ ...agent, ...over })); return [j.met, j.unmet, j.extents[0]!.exception]; };
+  // With the relation given, the second clause holds. With none given it is shown for nobody: `rules-not-met:rules`.
+  expect([judged({ controllersOfAuthors: [ada.member] }), judged({ controllersOfAuthors: null }), judged({ controllersOfAuthors: undefined as never })]).toEqual([[true, [], "@ada"], [false, ["rules"], null], [false, ["rules"], null]]);
+  // The first clause reads the authors and the merger alone, and holds without the relation.
+  expect(judged({ authors: [ada.member], controllersOfAuthors: null })).toEqual([true, [], "@ada"]);
+  // A review. Nothing says that `ada` or `ann` is not the controller of the authoring agent, so neither review counts for the rules
+  // extent; and with `ownerMayReview` false no review counts for any extent. With the relation given, the independent controller's does.
+  const reviewed = { authors: [bot], reviews: each(ada, ann, max), controllers: [ada.member, ann.member] };
+  expect([said({ ...reviewed, controllersOfAuthors: [ada.member] })[1], said({ ...reviewed, controllersOfAuthors: null, ownerMayReview: true })[1], said({ ...reviewed, controllersOfAuthors: null })[1]])
+    .toEqual([[], ["rules"], ["rules", "infrastructure", "source"]]);
+  // The missing form 11: with no count of controllers no exception is judged. And a declaration that is not `true` is none.
+  expect([judged({ controllersOfAuthors: [ada.member], controllers: null }), judged({ controllersOfAuthors: [ada.member], singleControllerException: undefined as never })]).toEqual([[false, ["rules"], null], [false, ["rules"], null]]);
+
+  // The missing form 1. A changed path that is no text: not met, with `rules` named and the class `authority`, though only a source
+  // path is touched. Two independent controllers do not meet it, and the exception does not either.
+  const unread = touchedBy(FIRST, ["src/app.ts"], [], 1);
+  expect([unread.touched, unread.unreadable, unread.class]).toEqual([[{ extent: "source", path: "src/app.ts" }], 1, "authority"]);
+  expect(said({ touched: unread, reviews: each(ada, ann) })).toEqual([false, ["rules"], { source: [["@ada", "@ann"], []] }]);
+  const own = { singleControllerException: true, authors: [ada.member], reviews: each(max), merger: ada, controllers: [ada.member] };
+  const withRules = (touched: ReturnType<typeof touchedBy>) => { const j = judgeExtents(asked({ ...own, touched })); return [j.met, j.unmet, j.extents[0]!.extent, j.extents[0]!.exception]; };
+  expect([withRules(touchedBy(FIRST, ["AGENTS.md"], [], 0)), withRules(touchedBy(FIRST, ["AGENTS.md"], [], 1)), withRules(touchedBy(FIRST, ["AGENTS.md", "docs/out"], [{ path: "docs/out", tree: "new", resolves: null }], 0))])
+    .toEqual([[true, [], "rules", "@ada"], [false, ["rules"], "rules", null], [false, ["rules"], "rules", null]]);
+  // `rules` stands in the order of the rules among the unmet extents, also where no path of it is touched.
+  expect(said({ touched: touchedBy(FIRST, [".gitignore"], [], 1), reviews: each(mel) })[1]).toEqual(["rules", "infrastructure"]);
+  // Not stated whole: no count, no changed set, no link rows, a count that is no count, or a `Touched` that has no such member.
+  const unstated = [touchedBy(FIRST, ["src/app.ts"], []), touchedBy(FIRST, null, [], 0), touchedBy(FIRST, ["src/app.ts"], null, 0), touchedBy(FIRST, ["src/app.ts"], [], -1), touchedBy(FIRST, undefined, undefined)];
+  expect(unstated.map((touched) => [touched.unreadable, touched.class, said({ touched, reviews: each(ada, ann) }).slice(0, 2)])).toEqual(Array(5).fill([null, "authority", [false, ["rules"]]]));
+  const { unreadable: _, ...bare } = classify(FIRST, ["src/app.ts"], []);
+  expect([said({ touched: bare as never, reviews: each(ada) }).slice(0, 2), said({ touched: classify(FIRST, ["src/app.ts"], []), reviews: each(ada) }).slice(0, 2)]).toEqual([[false, ["rules"]], [true, []]]);
+  // A changed set that is given and is empty says that the change touches no path: nothing is asked.
+  expect([classify(FIRST, [], []).class, said({ touched: classify(FIRST, [], []) }).slice(0, 2)]).toEqual([null, [true, []]]);
+});
+
+// Section 12.1.4, "An extent, with its bounds": what the rule `extent-list` of `platform:rules@1` asks of a value. The rule at
+// `publish` is witnessed in `rules-scope.test.ts`.
+test("a list of extents is 1 to 8 records of exactly six members, inside the bounds of each: a name of lowercase letters, digits and hyphens, a pattern with no empty name and no control byte, and bounds that count bytes", () => {
+  const [rules, infrastructure, source] = FIRST as [Extent, Extent, Extent];
+  const withSource = (over: Record<string, unknown>) => isExtents([rules, infrastructure, { ...source, ...over }]);
+  const { class: _, ...five } = source;
+  expect([isExtents(FIRST), isExtents([source]), withSource({ name: "a-1" }), withSource({ approver: "rules.publish-2" }), withSource({ patterns: ["a b/**/*.TS"] }), withSource({ approvals: 0 })]).toEqual(Array(6).fill(true));
+  expect([
+    // The list: none, nine, no list, a record that is no extent, a member too many or too few, and a name twice.
+    isExtents([]), isExtents(Array.from({ length: 9 }, (_, n) => ({ ...source, name: `e${n}` }))), isExtents({ 0: source }), isExtents([rules, null]), withSource({ owner: "@ada" }), isExtents([five]), withSource({ name: "rules" }),
+    // A name: an uppercase letter, a full stop, a separator of the `reason` text, and none.
+    withSource({ name: "Source" }), withSource({ name: "a.b" }), withSource({ name: "a,b" }), withSource({ name: "" }),
+    // A pattern: an empty name at either end or within, a control byte, the byte 0x7F, and no text.
+    withSource({ patterns: ["/a"] }), withSource({ patterns: ["a/"] }), withSource({ patterns: ["a//b"] }), withSource({ patterns: ["a\tb"] }), withSource({ patterns: ["a\u007fb"] }), withSource({ patterns: [""] }), withSource({ patterns: "**" }),
+    // The other members.
+    withSource({ approvals: 65 }), withSource({ approvals: 1.5 }), withSource({ approvals: -1 }), withSource({ approver: "Change.review" }), withSource({ approver: "" }),
+    withSource({ checks: ["unit", "unit"] }), withSource({ checks: [""] }), withSource({ class: "secret" }),
+  ].filter((ok) => ok)).toEqual([]);
+  // Each bound is in bytes, at its edge: a name of 64, a pattern of 256 in two-byte letters, a check of 128, and the lists of 32.
+  const many = (n: number) => Array.from({ length: n }, (_, i) => `p${i}`);
+  expect([
+    [withSource({ name: "n".repeat(64) }), withSource({ name: "n".repeat(65) })], [withSource({ patterns: ["é".repeat(128)] }), withSource({ patterns: ["é".repeat(129)] })],
+    [withSource({ checks: ["c".repeat(128)] }), withSource({ checks: ["c".repeat(129)] })], [withSource({ patterns: many(32) }), withSource({ patterns: many(33) })], [withSource({ checks: many(32) }), withSource({ checks: many(33) })],
+    [withSource({ approver: "a".repeat(64) }), withSource({ approver: "a".repeat(65) })],
+  ]).toEqual(Array(6).fill([true, false]));
 });
 
 test("the work of a match and of a classification is bounded by its inputs, counted in steps and never timed: a `**` reaches the rest of a path in one pass, and a changed path looks at the links that are at it or that resolve to a path above it, and at no other; the answers are those of the earlier code", () => {
@@ -206,10 +288,15 @@ test("the work of a match and of a classification is bounded by its inputs, coun
     { name: "deploy", patterns: ["links/**", "**/sub3/**"], approvals: 1, approver: "change.merge", checks: [], class: "deployment" },
   ];
   const loop: TreeLink[] = [{ path: "up/again", tree: "both", resolves: ["up"] }];
+  // `classify` here states that no changed path is unreadable (the fourth argument is 0), as the earlier code assumed of every call.
   const classified = [classify(FIRST, changed, links), classify(OWN, changed, links), classify(FIRST, ["up/x", "src/a.ts"], loop), classify(FIRST, changed, [])];
   // The generated change is no empty case: it has refused paths and unclassified paths, and a link that leads up into its own directory is refused.
   expect([classified[0]!.touched.map((row) => row.extent), classified[0]!.refused.length > 0, classified[1]!.unclassified.length > 0, classified[2]!.refused]).toEqual([["rules", "source"], true, true, ["up/x"]]);
-  expect([digest(answers), digest(classified)]).toEqual(["b630ee547e933452", "d97cb9f671ed7b8c"]);
+  // The earlier code's answer had no member `unreadable` (it came with commit `3b03f8381`). The digest is of the four members that
+  // the earlier code answered, in its order, so the pin is the earlier code's and is not taken again.
+  const earlier = classified.map(({ touched, unclassified, refused, unreadable, class: highest }) => [{ touched, unclassified, refused, class: highest }, unreadable] as const);
+  expect(earlier.map(([, unreadable]) => unreadable)).toEqual([0, 0, 0, 0]);
+  expect([digest(answers), digest(earlier.map(([answer]) => answer))]).toEqual(["b630ee547e933452", "d97cb9f671ed7b8c"]);
 
   // The work. A path of 2,000 names against six `**`: each `**` reaches each later name once.
   const long = Array.from({ length: 2000 }, () => "a").join("/");
@@ -219,7 +306,7 @@ test("the work of a match and of a classification is bounded by its inputs, coun
   const many = Array.from({ length: 2000 }, (_, k) => `src/pkg${k % 50}/file${k}.ts`);
   const apart: TreeLink[] = Array.from({ length: 2000 }, (_, k) => ({ path: `vendor/link${k}`, tree: "both", resolves: [`vendor/real${k}`] }));
   const classifying = { steps: 0 };
-  const touched = classify(FIRST, many, apart, classifying);
+  const touched = touchedBy(FIRST, many, apart, 0, classifying);
   // Two lookups for each changed path: the links at it, and the links to a path above it of the one length that any link resolves to here or of none.
   expect([touched.touched, touched.unclassified, touched.refused, classifying.steps <= 4 * many.length]).toEqual([[{ extent: "source", path: "src/pkg0/file0.ts" }], [], [], true]);
 });

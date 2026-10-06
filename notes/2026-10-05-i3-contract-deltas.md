@@ -1232,7 +1232,145 @@ The service was run on stand-ins for the lane, the rules scope, the storage
 and the runner. The lane's side of a result was run on a real change lane,
 with a scripted rules peer and the scripted test capability.
 
-## 26. Repairs after review 25e00e2a of the second milestone
+## 26. Steps 9 and 9c: the register and the directory whole, the membership reference of two scopes, and a founding on real scopes
+
+Written 2026-10-05, on `request/i3-founding`, by the worker of those
+steps. Entries have the prefix EY. The scope contract is at revision 19
+(`1ca8a59bf`), which is adopted. The authority note's adopted revision is
+24 (`d5616522b`).
+
+**The basis of this work was not adopted when it was built.** It builds
+the authority note's revision 25, at
+`a1d18e51745b26beb85ba00ea12af5cbafde1e7e`, Part A of its section 13.15.
+That revision was filed for review and was neither approved nor adopted.
+Nothing of it is in force for a source until it is adopted, and a review
+may change a row. This work is prepared ahead and is to be filed only
+after that adoption, with whatever the adoption changes. So each rule is
+a commit of its own, whose message names the row that it implements.
+Section numbers below are those of revision 25. The parts that rest on
+adopted texts alone are named so.
+
+No entry that an earlier source wrote has other bytes. Neither lane
+digest changes, and `packages/lanes` is not touched but for one comment
+of its test support. The data of `platform:register@1` and of
+`platform:directory@1` changes. A platform definition is pinned by name
+and version, no file pins a digest of either, and no scope under either
+was written by a deployed source.
+
+**What is built.**
+
+| Part | Built | Rests on | Witness |
+|---|---|---|---|
+| The outcome's send | The mark of a kind of `outcomes` may hold one `send`, a send mark with clauses of effect marks. The judge of an outcome runs its rule after the effects. A `create` among them has the fourth cause, and the sending side makes the four checks of the opening entry. The clause of the result is found by the kind of the outcome entry. | The contract's revision 19, adopted: section 6.1, "A request of an outcome's rule, and its clauses"; section 7.2; row I3-23 | `derive/test/forms-marks.test.ts`, the contract's 18.43 |
+| The register | `create-repository`, its send `create-directory`, the effect mark `claim-active`, and the bodies of the outcomes of the two cleanups. Every mark has its rule. | Revision 25, section 12.1.1 | `platform/test/register.test.ts`, `definitions.test.ts` |
+| The directory | `create-rules`, `create-destination`, `import-spent`, the selection of `import` with its send `import-update`, `activeKey` in `worker-standing`, and the refusal `unsupported-definition` of `definition-active`. Every mark has its rule. No stand-in rule is left. | Revision 25, section 12.1.2 | `platform/test/directory.test.ts`, `definitions.test.ts` |
+| The membership reference of a rules scope and of a destination | The ID is the fixed value. The incarnation is read from the folded state. The first read asks by the ID alone. Guard 1, the production authority and the replay's reader follow. | Revision 25, section 12.1, "Where the rules scope and the destination record their membership reference" | `derive/test/forms-grant.test.ts`; `platform/test/definitions.test.ts`; `scope/test/founding-real.test.ts` |
+| A founding on real scopes | A founding under `platform:register@1` founds a register. The whole path from the `install` to the rules scope runs on the deployed class. | The adopted texts for the seed's kind (entry EP2). Revision 25 for every rule that the path runs. | `scope/test/founding-real.test.ts` |
+
+**How far a founding runs, exactly.** On Durable Objects of the namespace
+`PLATFORM`, which is the deployed class with the production authority and
+the platform package's own data and rules:
+
+1. An `install` founds a register under `platform:register@1`.
+2. A founder's `found` opens a claim and the operation
+   `create-repository`.
+3. The operations driver sends the one request of attempt 1 to the host.
+   No answer comes. The outcome is `unknown`, with the body `{ name }`,
+   and opens attempt 2.
+4. The own answer of attempt 2 is `confirmed` and selected. It sets the
+   claim's `repository` and sends the `create` of the directory.
+5. The directory's genesis is written under the fourth cause, provisional.
+   The register records its `applied` result, makes the claim `active`
+   and confirms the directory.
+6. The directory, now active, sends its three creations. Membership and
+   the rules scope write their genesis, the directory records each result
+   and sets each reference, and confirms each.
+7. **The creation of the destination is not decided.** The object that
+   its seed names records nothing, and transport answers `retry`,
+   `unsupported-definition`. A runtime with this package lacks a rule for
+   ten marks of `platform:destination@1`: `resend-due`,
+   `abort-if-behind`, `first-head`, `judge`, `push`, `mint`, `revoke`,
+   `deciding-read`, `receipt` and `adopt-read`. Those are the plan's
+   steps 9e and 9f.
+
+So a founding is not whole, and **step 10, the removal of the earlier
+founding, is not built.** A directory with no creator is still founded by
+a `found` intent under a declared definition, as every other test of the
+scope package does.
+
+The Git host of that witness is a STAND-IN: `OutsideDouble`, of
+`packages/scope/test/outside.ts`, wired as the register's outside port.
+It answers an attempt with what the test wrote. The production outside
+port sends nothing, so under the production wiring a claim stays
+`pending` and no repository is created (entry EY10).
+
+**Earlier entries that this work answers.** Each line is dated 2026-10-05.
+The earlier sections stay as they were written. "Revision 25" is the
+unadopted revision named above.
+
+- **EJ1, closed for the source, on revision 25.** The contract's revision 17 decided the form. Revision 25 states the rule `create-repository` whole. Both are built. The stand-in rule is deleted.
+- **EP1, the sending side, closed.** The judge of an outcome lets the rule of the mark's `send` give a `create`. It makes the same four checks as the child, on the scope's own history, and requires a fact of the opening entry among the fields. A creation that fails one is a fault, and nothing is written (entry EY5).
+- **EP2, closed.** `Scope.found` and the Worker build the seed's kind from the definition that is named: `register` under the register's platform definition, and `directory` under any other.
+- **EP4, closed, on revision 25.** No read is decisive, as built. The body of every outcome of `revoke-credential` is `{ credential }` and of `delete-repository` is `{ id }`, each the one that the opening entry's body holds, and the source checks it.
+- **EP6, closed, on revision 25.** The two rules are written, under the key P20. A sibling's scope ID is `scopeIdOf` of the sibling's seed. The body of each creation is in entry EY3.
+- **EP7, closed, on revision 25.** `import-spent` is a rule of the package, under the key P29, refused `import-not-spent`. An `unknown` attempt counts as used. The stand-in, which waited for every attempt to be `confirmed` or `refused`, is deleted.
+- **EP9, closed, on revision 25.** The kind `import` selects one result, guarded by `repository.imported`. The body of a `refused` or an `unknown` outcome is an empty record. The update is the request of the send `import-update`. One case is in entry EY11.
+- **EP11, closed, on revision 25.** `worker-standing` reads `activeKey`. A worker whose observation does not show `activeKey: true` is refused `worker-not-active`. The row says "its `activeKey` is false": a null there is refused too, which is the narrower reading.
+- **EP15, closed, on revision 25.** `definition-active` states two refusals. Bytes that hash to their digest and do not validate, and a closure of more definitions than the bound, are refused `unsupported-definition`, with that name and that code.
+- **EX4, closed, on revision 25.** As EP6. `platform:directory@1` lacks no rule, and `platform/test/definitions.test.ts` asserts it for the register and the directory.
+- **EM21, closed for the rules scope and the destination, on revision 25.** The production authority reads where a platform version records the reference from the platform table. The first read of the two kinds asks by the ID alone, and the entry that retains the answer fixes the incarnation.
+- **EQ7, closed, on revision 25.** `rulesMembership` reads the ID with the incarnation of the retained observations, from the folded state. The rule `checkers` is confirmed as built, and is not changed.
+- **EU6, closed for the reader, on revision 25.** The replay reads the reference of a rules scope and of a destination with the same two functions. An entry that retains the first observation fixes the incarnation for itself. The check against the directory's history is not built (entry EY8). The contract is still asked to confirm that this function is reported under `platform-code`.
+
+| # | Where the texts differ or are silent | Implemented | Owner, and the question |
+|---|---|---|---|
+| EY1 | The contract's row I3-23: "An outcome's mark holds `attempts`, and may hold one `send`". Its `Mark` also holds `most`, `refusals` and `clock` (rows I3-21 and I3-22), which this base does not have: a mark is `{ code, row }`, and the rule table states the rest (entries EJ8 and EX1). The note's table of marks gives the send "7, the send" as its place. | The mark of a kind holds `send`, and no `attempts`. The rule that opens the operation states its attempts, as before. An `OutcomeRule` may state `most`, as the ledger's rules do, and `create-repository` and `import` state the note's numbers. The validator lists the send as a mark of the kind `send`, place 6, at `outcomes.<kind>.send`, and the mark of its clause as an effect. A send of an outcome's mark that states `always` is refused: the row says "no request or one". | The I3 delivery, with rows I3-21 and I3-22: `attempts` joins the mark with the other members. |
+| EY2 | The contract says that an outcome's row writes no send and that its mark holds "at most one request". Place 7 of its table of places still says that the rule gives "the entry's effects and sends". The stand-in rules of the destination's outcomes, in test support, return requests from `derives`. | Both stand. Where the mark holds a `send`, `derives` returns no request, or it has a fault, and the entry's one request is at ordinal 0. Where it holds none, `derives` may return requests with no clause, and never a creation, as before. Marked `I3 merge:` in `derive/src/outcomes.ts`. | The builder, at step 9f: when every kind of the destination has its send mark, `derives` returns no request at all. |
+| EY3 | Revision 25, section 12.1.2, "No member `membership` in these two creations": "the body of each of these two creations holds `{ fields, directory }`". The contract's section 6.6 has the platform put `directory` in a `create` of a lane. The source's judge gives the written `create` of membership, in the same entry, the body `{ fields }`. Each of the two creations carries `directory` as a field. | The body of each of the two creations is `{ fields }`, as the judge builds the first creation of the same genesis. A child of a directory reads its directory from its seed's creator, so no reader misses the member. | The authority note, with the contract. Does the body of a creation that a genesis sends hold the member `directory`, for all three? |
+| EY4 | Revision 25 states a body for every result of the register's and the directory's operations, an `unknown` one too: `{ name }`, `{ credential }`, `{ id }`, an empty record. A body names what the scope's records hold. The contract's place 7 says that the rule decides "whether the evidence is well formed", and not what it is given. The runtime's driver offered every `unknown` outcome with the body null, so such an outcome could never be written, and no further attempt would be opened. | `wellFormed` is given what the retry rule is given (the contract's row I3-35, for that rule). An owner's rules may state `unknown`: the body of an outcome that is not known, as a function of the state and of the scope's own entries. The driver asks it in place of null, and the judge checks the body like every other. An owner that states none is as before. | The scope contract. Is the evidence check given the state, and where does the body of an `unknown` outcome come from? |
+| EY5 | The contract's section 7.2 says what the child answers when a creation names no opening entry: `source-unverified`. It does not say what the creator does with a rule that returns such a creation. | A fault of the rule: the outcome is not judged, and nothing is written. The fact among the fields is compared whole: this scope, the position that the operation's ID states, and the hash of that entry. The same for a creation from the outcome of an operation that no act opened. | The scope contract, to confirm. |
+| EY6 | Revision 25: the send `create-directory` gives a request "on the selecting outcome, and on no other", and `import-update` "when `selected`". A rule at a send is given the six things, and `selected` is none of them: the ledger derives it. | Each send rule makes the ledger's judgment again on the same state: the result is `confirmed`, the operation has selected nothing, and the owner's guard holds. The guard is the same expression as the outcome rule's `holds`. | The scope contract. Is the rule of an outcome's send given `selected`? |
+| EY7 | Revision 25, "The first read": "It asks membership by its scope ID alone", and cites the contract's row I3-18, which is about the scope part of a read route. The contract's `ObservationRequest` has `of: ScopeRef`, with an incarnation. | A request's `of` may be a reference with no member `inc`: the scope ID and the kind. Membership answers it as it answers a full reference of its own, and the answer's `of` holds its incarnation. The request is no part of any entry. | The scope contract. The form of a request that names no incarnation. |
+| EY8 | Revision 25: "A replay checks it against the directory's history: the `applied` clause of the directory's `create` recorded the same reference". | **Not built.** The replay derives the value of each retained observation from the history of the scope that its `of` names, at the recorded head, as before. It does not read the directory of a rules scope to compare the incarnation with `repository.membership`. | The builder, with the replay's coverage. How does a replay of a rules scope reach its directory's entry that recorded the result? |
+| EY9 | Revision 25 takes the incarnation "from the first such entry on", and says that the folded state holds a head for each subject with its `of`. The folded state holds no order of entries. Guard 1 lets an entry retain one incarnation only, so a valid history holds one. | `StateView.incarnations(scope)`: the incarnations of the retained observations of one scope ID. One: the reference has it. None: the reference has no incarnation. More than one: the scope records no reference, and an act that needs a grant is answered `authority-unavailable`. | The authority note, to confirm the last case. |
+| EY10 | The outside port for the register's operations. The plan's host port (step 19) serves the token ledger. No text gives the request of `create-repository`, `revoke-credential` or `delete-repository` at a host. | No production port accepts an operation of `platform:register@1`. The driver gives a port the entry that opened the operation and the attempt's number, and `repositoryName` gives the attempt's own name from the claim's `seed`. The witness uses the labelled stand-in host. The incident for a `refused` creation or a name that is taken is not built: it is no effect of an entry. | The builder, with the installation design (N5): the host adapter of the register, and the operators' record. |
+| EY11 | Revision 25, "The last `refused`": the `refused` outcome after which every attempt that the operation states is opened and refused sends `failed`. It does not say what follows when another `import` operation was selected before. | As the row states. So when a retried import was `confirmed` and told the destination `done`, and the late answer of an attempt of the first operation then makes that operation's last `refused`, the destination is told `failed` after `done`. Seen while the witness was written, and not run as a test. | The authority note. Is `failed` sent when `repository.imported` is set? |
+| EY12 | Revision 25, section 3.9 with this block: a scope accepts a read session that names the membership reference which the scope records, with its incarnation. A rules scope records no incarnation before its first retained observation. | Such a scope accepts no read session until an entry of it retains an observation of membership. The witness shows the refusal and then the acceptance. | The authority note. Is that right, or is a session checked by the scope ID alone there? |
+| EY13 | The earlier founding. A directory with no creator is founded by a `found` intent under any definition that is not the register's, `platform:directory@1` too. | Not removed (step 10). By reading, and not run: a founding under `platform:directory@1` with no creator passes the seed check, and its genesis is then written `refused`, `bad-field`, because the intent holds no `claim`. It makes no repository. | The builder, at step 10. |
+
+**Lines for the merge.**
+
+- `PlatformData.outcomes` is a record of `OutcomeMark`, which may hold `send`.
+- `OutcomeRule.wellFormed` takes a third argument, and `OperationRules.wellFormed` a third and a fourth. A rule that ignores them is unchanged. A test that calls one with two arguments needs more. Both may state `unknown`.
+- `StateView` has one more method, `incarnations`. `MemoryState` and `SqliteStore` have it. A view that a test builds by hand needs it.
+- `GrantAsked.membership`, `Platform.membership`, `Coded.membership` and `recordedMembership` use `RecordedRef`, which may hold no incarnation. `fixedMembership` is the reference with its incarnation, for read sessions.
+- `ObservationRequest.of` is an `ObservedScope`.
+- `rules-scope.ts` gains `referenceOf` and `rulesMembership`, and `destination.ts` gains `destinationMembership` and `destinationRulesScope`. The workers of steps 9a, 9b, 9d and 9e were also told to read the membership reference as section 12.1 states it. One pair of functions must stay.
+- The platform package no longer exports `DIRECTORY_CLAUSES`. It exports `repositoryName` and `directoryIdOf`. `support-founding.ts` holds no rule: `registerStandIns` and `directoryStandIns` are gone.
+- `PlatformScope`, of the scope package's test Worker, takes the ports that a test wired for a name (`wired`, of `outside.ts`).
+- `scope/test/founding-real.test.ts` names the ten marks of the destination that have no rule. Each step that writes one shortens the list, and the test then fails by that assertion until the list is edited. Marked `I3 merge:` there.
+- `scope/test/founding.test.ts` no longer expects `unsupported-definition` for a founding under `platform:directory@1`, which is runnable. It asks for `platform:task@1`.
+
+**What is not built.** Step 10. The destination's rules (steps 9e and
+9f), so no founding is whole. The replay's check of an incarnation
+against the directory's history (entry EY8). A read of the rules scope
+before a turn, so `destinationRulesScope` has no caller, and the
+directory's guard `definition-active` is still never completed on a
+deployed scope (entries EM3 and EX6). The member `attempts` of an
+outcome's mark (entry EY1). A production host for the register (entry
+EY10). The capacity of an outcome entry that sends a request, and of the
+entry that records its result: request `cc570904`.
+
+**What was not run.** No deployment and no provider. No host: the Git
+host of the witness is a stand-in. The gate was not run.
+
+## 27. Repairs after review 25e00e2a of the second milestone
+
+Numbered 2026-10-06, at the merge of the third milestone: the second
+milestone's delivery note,
+`notes/2026-10-05-i3-second-milestone-delivery.md`, cites these entries
+as section 26 of its own branch, where section 26 here (entries EY) was
+not present.
 
 Written 2026-10-05, on `request/i3-m2`, after the review at head
 `d0354e266`. The repairs and their witnesses are in
@@ -1258,3 +1396,618 @@ pinned digest moves.
 **What was not run.** Nothing was run on a deployment, a host, a
 container or a real runner. The streams of finding 2 were read inside the
 object's own isolate, and not over a network.
+
+## 28. Request `42de9e34`, the data side: the rules scope holds extents
+
+Written 2026-10-05, on `request/i3-extdata`, by the worker of that part.
+Entries have the prefix FB. The scope contract is at revision 19
+(`1ca8a59bf`), which is adopted. The lane forms note is at revision 15
+(`f4889d47`), which is adopted.
+
+**The basis of this work is approved, and its adoption was not recorded
+when it was built.** It builds the authority note's revision 26, at
+`f7175296`: sections 12.1.4 and 12.1.4a, rows w, x and y of the table of
+further marks, and the rows of steps 9a and 9d in "What revision 25 lets
+the I3 source do next" as revision 26 corrects them. The checker approved
+that revision. The planner's adoption of it is expected and was not
+recorded when this was written. So each row is a commit of its own, whose
+message names the row that it implements. Section numbers below are those
+of revision 26.
+
+No entry that an earlier source wrote has other bytes. Neither lane digest
+changes, and no file under `packages/lanes` changes: the lane side of
+extents is a later change with its own digest. The data of
+`platform:rules@1` changes: entry FB11.
+
+**What is built.**
+
+| Part | Built | Row of revision 26 | Witness |
+|---|---|---|---|
+| The slot and the field `extents`, and the type rule `extent-list` | `rules-scope.ts`; `isExtents` in `extents.ts` | Section 12.1.4, "Two more value slots", "Two more fields", "An extent, with its bounds"; row w; the missing form 2 | `rules-scope.test.ts`, the test of the extents, with case i; `extents.test.ts`, the test of a list of extents |
+| The guard `extents-hold`, with its three refusals | `rules-scope.ts` | Section 12.1.4, "The three checks of `extents-hold`"; row x; the missing form 3 | `rules-scope.test.ts`, the test of the extents, cases f, g and h |
+| The slot and the field `singleControllerException`, and the member of `RulesContent` | `rules-scope.ts`; `packages/contract/src/observation.ts`; `packages/bytes/src/records.ts` | Section 12.1.4, the same two tables; the missing form 14; the contract's row I3-36 | `rules-scope.test.ts`, the test of the declaration, with case j |
+| The send mark `rules-update` | `rules-scope.ts` | Section 12.1.4, "The `rules` update"; row y | `rules-scope.test.ts`, the test of `rules-wanted`, cases d and k |
+| The first definition before a first `publish` | `extentsOf` in `rules-scope.ts`, with `firstExtents` | Section 12.1.4, "Before the first `publish`" | The same test, case k |
+| A review counts for the extent that it states | `judgeExtents` | Section 12.1.4a, "Which reviews count for an extent" | `extents.test.ts`, the test of the mixed change |
+| The inputs that no retained form supplies fail closed; a path that is no text | `classify`, `judgeExtents` | Section 12.1.4a, "A path that is no text", "What makes the relation replayable", and the missing forms 1, 11 and 15 | `extents.test.ts`, the test of the inputs |
+
+`firstExtents` and `holdsRulesExtent` were compared with the note's row
+"The first definition" and with "Its fixed minimum", member for member,
+and are not changed. `matches` was compared with "A pattern, in two
+cases" and is not changed; one more assertion shows `a**b`.
+
+**What is not built.**
+
+- No rules scope answers an observation of the rules: entry FB10. So no
+  `publish` is "observed back" by an observation. What is shown is the
+  scope's own state and the `rules` update.
+- `RulesContent` has no member `extents`: entry FB2.
+- Nothing here calls `classify` or `judgeExtents`. The destination's rule
+  `judge` will, and it is another worker's.
+- No changed set is computed, no link is resolved, no observation counts
+  the holders of an action, and no entry retains an observation of an
+  authoring agent. Each is an input: entries FB6 and FB7.
+- The pinned `change` lane does not take the update: entry FB5.
+
+Controls, each by `scripts/control.mjs` and each distinguishes: 18 in
+all. One for the stated extent of a review; six for the inputs that fail
+closed; one for the rule `extent-list` and one for a bound of `isExtents`;
+three for `extents-hold`, one for each check; two for the declaration, of
+which one shows that the record check takes no member `extents`; four for
+`rules-update` and `extentsOf`.
+
+| # | Where the texts differ or are silent | Implemented | Owner, and the question |
+|---|---|---|---|
+| FB1 | The rule `extent-list`. The note bounds each text in bytes and each list by a count. It does not say how a value that is no list, a record with a seventh member, or a number that is no integer is answered. | `isExtents`: a list of 1 to 8 records, each with exactly the six members. A text is counted in the bytes of its UTF-8 form. `approvals` is a safe integer from 0 to 64. Anything else is not of the type, and the act is `bad-field`, with no name. A `publish` with no field `extents` is `bad-field` too: the field is required. The bound "a `publish` that would not fit an entry is refused by that limit" is the scope's and is not witnessed here. | The authority note, to confirm. The proof plan, for the numbers. |
+| FB2 | The member `extents` of a `RulesContent` that was asked as "rules". The note asks the contract for it (its ask 1), and the contract's revision 19 does not state it. | Not added. The type has no such member, and the record check of an observation refuses a content that holds one, so no entry retains an observation of the rules with extents. What a reader of the rules gets meanwhile: from an observation, nothing of the extents, and today no observation at all (entry FB10); from the rules scope's own state, the extents whole, by `extentsOf`, which is code of the version for the answer to use when the member exists; and for a lane, the `rules` update, with five members of each extent and no pattern. So the destination judges no extent from an observation, as the note says. | The contract, for the type and for the size of `content` (its point R1-61). |
+| FB3 | The contract says that the record which was asked as "rules" holds `singleControllerException` "under a rules definition whose item `rules` states a value of that name", and has no such member under another. The source has one type `RulesContent` for every definition. | The member is optional in the type and in the record check, and is a truth value where it is present. `platform:rules@1` states the value from its genesis, so an answer under it always holds the member; no answer exists yet (entry FB10). `judgeExtents` takes anything but `true` as no declaration. | The contract, to confirm that one type with an optional member is its "two fixed records". |
+| FB4 | The rule `extents-hold`. The note says that it reads the fields `extents` and `checks`, "as read", and that the first check that fails gives its name. | As written. Check 3 compares each name of an extent's `checks` with the member `name` of each record of the field `checks`. The guard stands third, after the written guard and `checkers`. Where `checkers` is not completed and `extents-hold` would refuse, the judge answered the refusal: that is the judge's order of a refusal and a guard that is not completed, it was seen once while the witness was written, and no test here states it. | None. |
+| FB5 | The mark `rules-update`. The note says "the mark `rules-update`, with empty clauses" and "one request, in every entry of the row". It says that `checks` is left out before the first `publish`, and gives `labels` as "the slot". The slot `labels` is unset before the first `publish` too, and a message holds no absent value. | The mark is `{ code: "rules-update", row: "P28", result: {}, always: true }`: `always` is the contract's form for "exactly one request in every entry of its row". The rule gives one `relate` to the scope of the delivery's `from`, named `rules`, of the item `rules`, in the state `current`. `labels` and `checks` are each left out while unset, as the written `relate` of the earlier row left them out. `extents` is five members of each extent of `extentsOf`. The pinned `change` lane still takes none of this: its handler declares three fields, and no pinned lane sends `rules-wanted` (entry EQ10 stands until the lane rows of the lane forms' section 18.4 are built, with their digest). | The authority note, to confirm `always` and `labels`. The I3 source, for the lane side. |
+| FB6 | The missing form 1. No retained input holds the changed set, the link rows or the count of paths that are no text. "A path that is no text" says that such a change is not met, with `rules` named. | Three explicit inputs of `classify`: `changed`, `links` and, new, `unreadable`. `Touched` has one more member, `unreadable`. A count that is not 0 makes `rules` unmet, with the class `authority`, and no review and no exception meets it. A caller that gives null for the changed set or the links, or gives no count, gets `unreadable: null`, which `judgeExtents` reads as not met too; so does a `Touched` with no such member. To fail closed a caller gives null. A changed set that is given and is empty says that the change touches no path, and nothing is asked. | The authority note's next revision, with the proof plan and IA, for the form. The builder, at the merge: a call of `classify` with three arguments is now judged as not stated. |
+| FB7 | The missing form 15, and the open row of section 13.16: from which retained record the destination reads the controller of an authoring agent, for the exception's second clause and where it refuses a review. | `controllersOfAuthors` is a list or null. Null says that nothing shows the relation. Then the exception is not passed by the second clause: an agent's change under the one controller is not met, `rules`. The first clause still holds from the authors and the merger. And no review counts where a controller's would be refused: for the `rules` extent always, and for every other extent unless `ownerMayReview` is true. That is the side that fails closed, and it is wide: under the default `ownerMayReview: false` a caller that gives null counts no review at all. An empty list is a statement that no author is an agent with a controller. Only a caller that holds an observation of each author may make it. | The authority note's next revision, with R2, for the retained record. The builder, for what the destination's rule gives meanwhile. |
+| FB8 | "Which reviews count for an extent": a verdict states one extent, or none. | `ExtentsAsked.reviews` is a list of `Review`: a `Holder` with the member `extent`. A review counts for an extent only when it states that extent's name. One with null, with no member, or with a name that no extent has counts for none. | None. The builder, at the merge: the type of `reviews` has one more required member. |
+| FB9 | "A link that leaves the tree is never met, by a review or by the exception", and the order of the names in `reason`. | Where a path is refused or is no text, `rules` is not met and its `exception` is null, whatever the three conditions say. `unmet` is in the order of the rules, and holds `rules` at its place also where the change touches no path of that extent. For rules with no extent named `rules`, which no rules scope can hold, the name is last. A path that no extent holds still names no extent, as section 23 has it: under a rules scope none can arise. | The authority note, to confirm the place of `rules` in the text where the change touches no path of it. |
+| FB10 | Entry EQ8: the answer of a rules scope to an observation needs the position of the last `publish`, which no slot holds. Revision 26 lists EQ8 among the entries that it carries with nothing decided. | Not built, as before. `platform("platform:rules@1")` has no `observed`. The declaration and the extents are in the folded state for that answer to read: the value `singleControllerException`, and `extentsOf`. | The authority note, for the source of the revision. |
+| FB11 | The rows of `platform:rules@1` change under one name and version. The note says that no deployed scope runs under it, so no second version is named. | The data's digest changes. The folded state of a rules scope has two more values from its genesis: `extents`, unset, and `singleControllerException`, false. The entry of `rules-wanted` sends an update with more members. A `publish` with the four older fields alone is refused `bad-field`. No file pins a digest of this data, and no source wrote a rules scope's history that a replay must read again. The one caller that changed is the real founding's `publish`, in `packages/scope/test/founding-real.test.ts`, which states the extents of the first definition. | None. |
+
+**Earlier entries that this work answers, each dated 2026-10-05.** The
+tables of sections 17 and 23 are as they were written.
+
+- **EV2** (the missing form 2). Built as rows: the slot, the field and
+  the bounds, by the rule `extent-list`. The member of `RulesContent`
+  stays owed by the contract: entry FB2.
+- **EV3** (the missing form 3). Built for `publish`: the marks
+  `extent-list` and `extents-hold`, and the refusal
+  `rules-extent-required` with two more. The part of `judge` is the
+  destination's.
+- **EV11** (the missing form 14). Built: the slot, the field and the
+  member of `RulesContent`. `publish` has no guard on the number of
+  controllers.
+- **EV12**. `firstExtents` is the default before a first `publish`, by
+  `extentsOf`.
+- **EV13**. Confirmed as built. The rule `extent-list` refuses a pattern
+  with an empty name. A path that is no text is an input: entry FB6.
+- **EV14**. `publish` refuses a list that has not exactly one extent with
+  no pattern, named `catch-all-required`. `classify` assumes it and still
+  fails closed for a list that is no such list.
+- **EV15**. Confirmed: the checks of the `rules` extent stand under the
+  exception. A refused path is not met by the exception: entry FB9.
+- **EV7**, reading (b). Decided by the planner as the stricter reading,
+  and `judgeExtents` holds it: entry FB9.
+- **EV1**. The type `Changes` of the note has the three inputs of
+  `classify`, of which `unreadable` is new here: entry FB6. Nothing
+  computes them.
+- **EV17**. The header of `rules-scope.ts` names revision 26.
+- **EQ5**. `publish` has six fields. Five are required, and the
+  declaration is optional with the default false.
+- **EQ8**. Carried by revision 26, and not built: entry FB10.
+- **EQ10**. The update's detail has up to six members. The lane's side is
+  not built: entry FB5.
+
+## 29. Steps 9b, 9e and 9f: the destination, on the authority note's revision 26
+
+Added 2026-10-06, at the merge of the third milestone with section 28.
+`packages/platform/src/reservation.ts` now gives `classify` the count
+`changes.unreadable` of the evidence as its fourth argument, gives
+`judgeExtents` each review with the extent that it states, and gives
+`controllersOfAuthors` as it was read, null where no form supplies it
+(entries FB6 to FB8). `judgeExtents` is still called once for each
+touched extent. The answers of entries FA9 and FA10 do not change, and
+the witnesses of `destination.test.ts` pass unchanged.
+
+Written 2026-10-06, on `request/i3-dest2`, by the worker of those steps.
+Entries have the prefix FA. The scope contract is at revision 19
+(`1ca8a59bf`), which is adopted.
+
+**The basis of this work was approved, and its adoption was not recorded
+when it was built.** It builds the authority note's revision 26, at
+`f7175296`: its section 12.1.5, "The destination, decided in revision
+25", which revision 26 keeps unchanged (Part B of its section 13.15).
+The checker approved revision 26. The planner's adoption was expected
+and was not recorded. Nothing of it is in force for a source until it
+is adopted, and an adoption may change a row. So each rule is a commit
+of its own, whose message names the row that it implements. Section
+numbers below are those of revision 26.
+
+No entry that an earlier source wrote has other bytes. Neither lane
+digest changes, and `packages/lanes` is not touched. The data of
+`platform:destination@1` changes. A platform definition is pinned by
+name and version, no file pins a digest of it, and no scope under it was
+ever written: the version has never been runnable.
+
+**What is built.**
+
+| Part | Built | From | Witness |
+|---|---|---|---|
+| Step 9b | The six slots. `open-judge` opens one `judge` at a time, by `branch.judging`. `collect-list` checks three lists, and a verdict may state `extent`. `adopt-head` has the fields `commit` and `why`. The guards `not-importing` and `not-the-directory`. A refused `withdraw` sets nothing, as built before. | Section 12.1.5: "Six more slots", "The rule `open-judge`", "The three lists of `reserve`", "Small places" | `platform/test/destination.test.ts` |
+| Step 9e | `abort-if-behind`. `resend-due`, refused `resend-not-due`. `reopen-publish` opens the mint of its attempt. | "The rule `abort-if-behind`", "The guard and the effect of `resend`" | The same |
+| Step 9f | The rules `mint`, `revoke`, `push`, `deciding-read` and `adopt-read`. The send `publication-update`. An entry that opens the first head opens its attempt's mint. The judgment of a reservation, `judgeReservation`, and the rule `judge` around it. | "Who opens the mint, the revocation and the deciding read", "The evidence of a write", "What each rule of an outcome yields", "What `seen` decides for a push"; section 6.5 | The same |
+
+**What is not built.**
+
+- The rules `first-head` and `receipt`. They wait on the two details that
+  the note asks of the contract (entry ER9; section 12.1.5, "The founding
+  commit, and the receipt"). They are marks with no rule. So
+  `platform:destination@1` lacks two rules, and nothing is created under
+  it.
+- The reading of `observed` and of the entries in `uses` for the rule
+  `judge` (entry FA9). So in a runtime the rule `judge` reserves nothing.
+- A port that sends a request of the destination. No host, no gateway
+  and no Git command is reached by any test of this work.
+- The reservation of room by a publication (entry FA3).
+
+**How far a founding runs now.** As far as before: steps 1 to 6 of
+section 26, on real scope objects. Step 7 is unchanged in what happens:
+the creation of the destination is not decided, and transport answers
+`retry`, `unsupported-definition`. What changed is why. The runtime
+lacks a rule for two marks of `platform:destination@1`, `first-head` and
+`receipt`, where it lacked ten. `scope/test/founding-real.test.ts` names
+the two. Step 10 is still not built.
+
+**Earlier entries that this work answers.** Each line is dated
+2026-10-06. The earlier sections stay as they were written.
+
+- **ER1, closed.** Revision 26 confirms the eight kinds and the eight rule names, as built.
+- **ER2, closed, on revision 26.** `open-judge` reads `branch.judging`, opens none while a `judge` is open, and sets it. `judge` has 1 attempt, and its one outcome is `confirmed`.
+- **ER3, closed, on revision 26.** Three lists with the mark `collect-list`. The numbers and the members are constants of the rule. A verdict may state `extent`.
+- **ER4, closed for a push, on revision 26.** `resend-due` is written, under the key P29, refused `resend-not-due`. `reopen-publish` opens the mint. The half for a `published` publication cannot run (entry FA6).
+- **ER5, closed, on revision 26.** The four answers are built: the abort is the entry of `compromised`; the live token is the slot `token`; the rule for a further attempt reads `aborting`; the reservation entry is at `reservedAt`.
+- **ER6, closed, on revision 26.** Each rule finds what its operation is for from the opening entry and the six slots. Two searches read more than one entry (entry FA5).
+- **ER7, closed for this note's half, on revision 26.** Who opens the mint, the revocation and the deciding read is built. A read is evidence in a body and settles no attempt. The witness that section 18 could not write is written: the unknown outcome of a push of the destination leaves only its own answer able to follow.
+- **ER8, built in part.** The body of the evidence is checked member for member. The judgment of each check is written. The reading of `observed` and `uses` is not (entry FA9).
+- **ER9, open.** The two rules wait. One more thing stands against `receipt` (entry FA6).
+- **ER10, confirmed.** Nothing changed in the source. Case d is witnessed with free room: written, `refused`, `reserved`, and the mark not set.
+- **ER13, closed, on revision 26.** The two names and the two fields are built. The other four places are confirmed as built.
+- **EX8, closed.** The rule for a further attempt of a push is given the state and reads `aborting`.
+- **EY2, answered.** No rule of this package returns a request from `derives`: each kind that sends has the send mark `publication-update`. The line of `derive/src/outcomes.ts` that still lets a kind with no send mark return requests is left, because no kind needs it and none uses it. The builder may remove it.
+- **EY4, built for the destination.** `revoke` states the body of an outcome that is not known, from the context of its request, and checks every body against the same function. `push` states `{ send: "unknown", seen: "failed" }` (entry FA7).
+- **EM3 and EU4, still owed.** What now waits on them: the rule `judge`, and the key behind a publication, which `abort-if-behind` reads from the `observed` of the reservation entry.
+
+| # | Where the texts differ or are silent | Implemented | Owner, and the question |
+|---|---|---|---|
+| FA1 | Revision 26 was approved and not adopted when this was built. | Built on it, with each rule in its own commit. The header of `platform/src/destination.ts` says so. | The builder: file after the adoption, with whatever it changes. |
+| FA2 | Section 12.1.5, "The send waits for the mint". The ledger's `OperationRules` has `ready`, which the driver asks before it marks an attempt as sent. A platform rule of an outcome had no such member. | `OutcomeRule.ready`, passed through by `ownersOf`. It reads the folded state alone. For a push: the mint of that attempt has an outcome, of any result. Where the mint is `refused` or not known, the port has no token and answers `refused`, `not-sent`. | The builder, to confirm. The port is not built. |
+| FA3 | An outcome entry is never refused for room, so the ledger refuses an outcome whose openings reserve more than the `closure` that its owner declares for the kind. `closure` is one number for a kind, and the count is taken again for each operation that is opened. The kinds of the destination open each other in a circle: a `judge` opens a push, whose outcome opens the next `judge`; a `read` opens a receipt, whose outcome opens a `read`. No finite number is the closure of one, so every such outcome would be left not written. The note reserves by another duty: a publication reserves 4 entries when it is `queued` and 68 when it is `reserved` (section 5.8, the two rows of the destination). | `OperationRules.covered` and `OutcomeRule.covered`: the operations that an outcome of the kind opens are reserved by another duty, and the ledger makes no closure check for it. `mint`, `push`, `deciding-read`, `adopt-read` and `judge` state it. **The count by the publication is not built.** A destination reserves, for each open operation, its own outcome entries and nothing for what they open. So a destination could pass its budget of entries by the operations that outcomes open. Witness: control 13, which removes the exemption, leaves the outcome of `judge` not written. | The builder, with request `cc570904`: the reservation of the two rows of section 5.8, counted from the folded state. Until then the exemption is weaker than the note. No scope runs under the version. |
+| FA4 | Section 12.1.5: `branch.judging` is "set to the `queued` publication with the lowest item ID. That may be the one that the entry itself opens". The effects of a rule are checked against the state before the entry, which does not hold that item, so the reference was refused `bad-field`. | `derive/src/effects.ts`: a rule's value for a slot of the type `item` may be the entry's own position, when the item that the entry opens is of the slot's type. A written effect is checked as before. Witness: the `reserve` that opens `judge`; control 14. | The scope contract, to confirm that a reference may name the item that its own entry opens. |
+| FA5 | Section 12.1.5, "What an operation is for": the push and receipt operations of a publication are read "in the folded state". The folded state gives an operation by its ID alone, and no slot lists a publication's operations. The note asks the proof plan for "a read of operations by kind". The token that `compromised` revokes is "the mint that the slot `token` named before the entry", and the entry holds only the emptying. | Two searches over this scope's own entries. `writesOf` reads from `reservedAt` to the entry that is written, and takes the operations of the reservation entry, of each `resend` on the publication, and of the entry that made it `published`. `mintRevoked` reads back from the entry of `compromised` to `reservedAt` for the last entry that set the slot. Each is as long as the publication's life in entries. As entry ER11. | The proof plan, with request `cc570904`: a read of operations by kind, or a slot. |
+| FA6 | The contract's section 6.6: no effect changes an item that was final before the entry, and an act on a final item is refused `final`. `published` is a final state of `publication`. Section 12.1.5 has three things change a `published` publication, or act on it: the slot `token`, "for an attempt of its push or of its receipt"; the slot `receipt`, which becomes `written` or `conflict`; and `resend` on a `published` publication. It also says that the receipt of the first head changes no slot, so no slot names the token of its attempts. | A mint of a receipt's attempt is never live: its `confirmed` outcome opens the token's revocation at once. Where the first outcome of a push attempt comes for a publication that is already final, the revocation is opened and the slot is not emptied. No other entry opens one for that token. A `resend` on a `published` publication is refused `final`, before its guards: witnessed. `receipt: "owed"` is set in the entry that publishes, which is allowed. | The authority note, with the contract. Where do the receipt's records live, when the publication is final? |
+| FA7 | The evidence of an `unknown` outcome of a write is `{ send: "unknown", seen }`, where `seen` is what the read back saw. The driver offers an `unknown` outcome when its port gives no answer, with the body that the owner's rule states from the scope's own records (entry EY4). A port's answer is `confirmed` or `refused` only, so a port that has a read back and no answer of the send cannot give it. Revision 26 records the duty: the driver must supply deterministic evidence of the request's context. | The rule `push` states `{ send: "unknown", seen: "failed" }`: the send is not known, and no read back is at hand. Nothing is then decided, and the deciding read follows. The pairing is built where a rule compares a body with its request: `revokedToken` gives the token ID of a revocation from this scope's own entries, and the evidence check, the body of an outcome that is not known, and a port all read it. | The builder: an answer of a port that is not known and still holds a body. |
+| FA8 | "The send `publication-update`": the detail is `operation`, `outcome`, `commit`, `reason` and `rules`. Three things are not stated. The relationship state of the update. Which member holds `seen`, for the update `unknown`, "with `seen`". And where `rules`, "the revision of the rules that the destination observed for the reservation", is read after the reservation: no slot holds it. | The state is the publication's state, as the written update of a `withdraw` has it. `seen` is in no member, and is not sent. `rules` is read from the rules observation that the reservation entry retains, at `reservedAt`, and is left out where the entry retains none. The pinned `change` lane has no field `rules` in its handler, so an update with it would be refused there: the lane rows of the lane forms' section 18.4 are owed with it. | The authority note, for the first two. I3, with the lane forms, for the lane rows. |
+| FA9 | "The evidence of `judge`, and what the rule reads": the rule reads `observed`, and the entries in `uses` "each by its bytes". The judge of an outcome gives a rule neither (entries EM3 and EU4). And the note names no member of a lane's entry: which field of a `propose-manifest` intent is the base, how the authors of section 3.10 and the completeness of R2's section 5.2 are read. The evidence also names no commit: the rule trusts that the runtime read the manifest's integration commit. | `judgeReservation`, in `platform/src/reservation.ts`: the judgment of every check from one explicit input, `ReservationRead`, which is what the two would say. The rule `judge` takes a reader of it. **The package's own rule is given none.** It judges what the evidence and this scope's own records decide: a publication that is no longer `queued`, `evidence-too-large`, a head that is not the recorded head, and an integration commit that is not in the repository. For any other outcome it has a fault: nothing is written and the publication stays `queued`. Four inputs that no form supplies are filled with the value that fails closed: `extents`, null; `singleControllerException`, false; `controllers`, null (form 11); `controllersOfAuthors`, null (form 15), under which no review counts where the second point of independence is asked. | The builder, for `observed` and `uses` in the judge of an outcome. The authority note, with R2, for how each fact is read from a lane's entry. |
+| FA10 | Section 6.5, the first table. Five places where it does not say which reason, or what follows. | (1) The head just read is not the recorded head: `out-of-date`. The row says "or section 6.9 when the two differ", and section 6.9 states no outcome for a publication that is not reserved. (2) Within the fourth row, `evidence-invalid` is said before `rules-not-met`. (3) An approval by a key that is compromised, or that is not observed, is not counted. A verdict whose entry is not what the statement says is `evidence-invalid`. (4) With extents, a live request for changes, and a path that no extent holds, are `rules-not-met`, alone. (5) A review counts for the extent that it states: `judgeExtents` is called once for each touched extent, with the reviews that state it, so that file is not changed. | The authority note, to confirm each. |
+| FA11 | "`most`": "the largest is the outcome of `judge` that reserves: 10 effects". By the same table the first outcome of a push attempt that publishes holds more: the revocation and the emptied slot, four effects of `published`, the receipt and its mint, and the next `judge` with `judging`. That is 14. The note also says that the counts beyond the three that it states are owed before each rule is built. | Each rule states what the table gives: `judge` 10, `push` 14, `deciding-read` 11, `adopt-read` 5, `mint` 2, `revoke` 0; `open-judge` 3, `declare-first-head` 2, `open-first-head` 4. | The authority note: the counts, and the sentence on the largest. |
+| FA12 | The row `adopt-read`: "`seen` is that commit: `branch.head` is the commit". The act is admitted only while no publication holds the slot. Its read is answered later, and a `judge` may reserve in between. | Where a publication holds the slot when the read is answered, the outcome changes nothing. Witnessed. | The authority note. Is that the wanted order? |
+| FA13 | "What `seen` decides", the last row: after a commit of another writer, "an admin's `resend` or `adopt-head` is the way forward". `resend-due` holds only when "every attempt that each of its push operations states is opened and has an outcome". After another writer's commit the ledger opens no further attempt, so two of three are never opened. | As the row of `resend-due` states. So a `resend` is not due there, and `adopt-head` is the one way forward. Witnessed. An outcome of a push whose `seen` is `absent` is taken as that last row too. | The authority note. Is a `resend` due when no further attempt can be opened? |
+| FA14 | "The deciding read", and its row. | A read is opened by an outcome of a push only where no attempt of that push is open after the entry. No count is kept of the reads of one publication, so a late answer after the last attempt opens another. Each yields nothing once the publication is final. The rule's evidence check reads the state: a `seen` that is the base, while not every attempt is refused, does not follow. The read of a first head, and of a receipt's ref, is not judged: it waits with `first-head` and `receipt`. The send mark stands at `mint`, `revoke` and `receipt`, as row n lists them, and its rule gives no request there. | The authority note, to confirm. |
+| FA15 | The witnesses of this work run in memory. | `destination.test.ts` uses three labelled stand-ins beside the bureau and the lane: the rules `first-head` and `receipt`; the reader of a reservation; and the `observed` of the reservation entry, which the test seals by hand. Nothing ran on scope objects: the version is not runnable there. | The builder, at the merge with entries EM3 and EU4. |
+
+**Controls.** One for each guard, through `scripts/control.mjs`, on
+`packages/platform test/destination.test.ts`. 24 were run. Each
+distinguishes: a test failed by an assertion with the one change
+applied. Three were run a second time, after their witness was
+strengthened or their text was corrected: 2, 3 and 24. Control 23
+survived once, and distinguishes since the witness of an accepted send
+was added.
+
+**Lines for the merge.**
+
+- `OutcomeRule` gains `ready` and `covered`, and `OperationRules` gains `covered`. A rule that states neither is unchanged.
+- `derive/src/effects.ts`: one line in the check of a rule's effect (entry FA4).
+- `platform/src/destination.ts` exports `destinationRulesWith`, `Reads` and `revokedToken`. `destinationRules` is `destinationRulesWith` with no reader. The package's index exports `revokedToken`, and the judgment and the types of the new file `reservation.ts`.
+- `platform/src/reservation.ts` imports `classify`, `judgeExtents` and four constants from `extents.ts`, and changes nothing there. If `judgeExtents` comes to read a verdict's extent itself, the one call for each touched extent in `judgeReservation` stays right, and may become one call.
+- `support-destination.ts`: `standInRules` holds two rules. `Branch` holds its own rules, with its reader, in place of the exported `rules`.
+- `scope/test/founding-real.test.ts` names the two marks that lack rules. Marked `I3 merge:` there.
+- Between the first commit of this work and the commit of its witnesses, `destination.test.ts` is stale. The commit of `abort-if-behind` holds one helper that nothing reads until the next commit, so the typecheck fails at that one commit.
+
+**What was not run.** No deployment, no provider, no host, no gateway
+and no Git command. The gate was not run.
+
+## 30. The reservation by a publication, and what an outcome's rule reads
+
+Written 2026-10-06, on `request/i3-m3`, by the worker of these two
+parts. Entries have the prefix FC. The authority note is at revision 26
+(`f7175296`), the scope contract at revision 19 (`1ca8a59bf`) and the
+lane forms at revision 15. All three are adopted.
+
+No entry that an earlier source wrote has other bytes. Neither lane
+digest changes, and `packages/lanes` is not touched. No data of a
+platform definition changes. Two things are new in what a scope may
+write, and one in what it stores:
+
+- An outcome entry, and the entry of a result's delivery, may now hold
+  the member `observed`, written by the judge. It is the contract's
+  form of revision 14 (section 4.1), and no judge wrote it before. It
+  is written only where a rule read an observation, and no deployed
+  rule can: nothing gives one at hand (entry FC6). An outcome entry may
+  now name foreign entries in `uses`, where its judge was given some.
+  An entry whose rules read nothing has the bytes it had: witnessed.
+- The store has one more table, `retained_value`. It is made empty when
+  an object starts, beside the tables that exist. No row of another
+  table changes.
+
+### 30.1 Part 1: the reservation by a publication is not built
+
+**Reported first.** The adopted texts do not state enough to build it
+whole, so it is not built, and nothing was invented in its place.
+`covered` is kept as it was: an exemption. It is now counted and held.
+
+What the note states, and is enough for a count: the two rows of the
+destination in section 5.8, 4 entries while `queued` and 68 from the
+reservation on, both reserved "when" the `reserve` is delivered, which
+"is admitted only with the room of this row and the next"; that a
+`reserve` to a full destination "waits", and transport answers "retry";
+that what is not used is released.
+
+What no adopted text states, each needed before a count can be held:
+
+| # | Missing | Why the count cannot be built without it | Owner |
+|---|---|---|---|
+| 1 | How the amount is derived from the folded state. The contract's section 17.1 makes both amounts "functions of the folded state", with one exception for a request's origin entry. What a publication has left of its 68 depends on which of its operations are opened and answered. The folded state gives an operation by its ID, and no slot and no index lists a publication's operations (entry FA5). | Without it a publication's reservation cannot fall as its entries are written, and cannot be released when its last duty ends: the end of that duty is not readable from its item. A count that cannot be released would fill a destination. | The proof plan, with request `cc570904`: "a read of operations by kind, or a slot", as entry FA5 asks. |
+| 2 | The form in which a platform definition declares a reservation of its own. The contract's section 17.5 leaves "the reservations of platform definitions" to the authority note, "in the same form". That note's row P11 says of the form: "No form says it." | `settles` is the one written form, and it reserves for an act that takes its subject out of the listed states in its own entry. A publication's entries are outcomes. | The capacity work under `cc570904`, with the authority note (row P11). |
+| 3 | When a publication's last duty has ended, for one that is final. Its receipt's records are on an item that takes no effect (entry FA6), a mint that is answered late opens a revocation after the publication is final, and an attempt that is `unknown` keeps its operation unsettled (the contract's point R1-38). | The release. | The authority note, with the contract: entries FA6 and ER7. |
+| 4 | The count of reads. The table reserves "1 entry for the read that decides". The rule as built opens a read after each outcome of a push that decides nothing while no attempt is open, and one more by `abort-if-behind` (entry FA14, which asks the note to confirm). The ledger also counts 2 entries for a `judge`, where the table counts 1. | The amount: the table is not an upper bound of what the built rules write. | The authority note: entry FA14. |
+| 5 | What a `resend` reserves. It is new work, and section 5.8 has no row for it. Its push or receipt has one attempt, with a mint, a revocation and perhaps a read. | The amount for an act that the table does not name. | The authority note. |
+| 6 | The rule `receipt`, whose 31 entries are nearly half of the 68. It is not written (entry ER9). | What draws on that part. | The authority note, with the contract: entry ER9. |
+
+The contract's own rule points the same way: its validator refuses, as
+`reserve-unbounded`, a definition in which "settling forms create each
+other's pending states in a cycle" (section 17.2). The destination's
+kinds do, by kind: a `judge` opens a push whose outcome opens the next
+`judge`, and a `read` opens a receipt whose outcome opens a `read`. So
+no closure by kind exists, and only a count by publication can be
+finite.
+
+**What is built instead: the number, held by a test.**
+
+- `publicationRoom`, in `platform/src/destination.ts`, computes the two
+  rows from the stated attempts, as section 5.8 counts them: 4 and 68.
+- The one entry of a publication that is new work is the delivery of
+  its `reserve`. The ledger asks it for the 2 outcome entries of the
+  `judge` that it opens, of which the table counts 1, and for nothing
+  that the outcome opens. So, by the note's own table, **one
+  publication may write 71 entries that no admission reserved**, and 72
+  where its `reserve` opened no `judge`. Each is written by an outcome
+  entry, which is never asked whether it fits. That is beside what
+  rows 4 and 5 above add, which the table does not count.
+- `platform/test/definitions.test.ts` asserts the 4, the 68, the 73 of
+  a new `reserve`, the 71, and that exactly five kinds of the
+  destination state `covered` and no other definition's rule does. So
+  neither the exemption nor the number grows unseen.
+- `OperationRules.covered`, in `derive/src/ledger.ts`, says in capitals
+  that it reserves nothing.
+
+| # | Where the texts differ or are silent | Implemented | Owner, and the question |
+|---|---|---|---|
+| FC1 | The six rows above. | Not built. `covered` is an exemption, counted: 71 entries of each publication, by the note's table. No scope runs under `platform:destination@1`, which lacks two rules. | Request `cc570904`, with the authority note and the proof plan, for rows 1 to 3. The authority note for rows 4 to 6. Until then a destination must not be deployed with a budget that its publications could pass. |
+| FC2 | The sweep of this family, below. Two findings are not a flag. | Not changed. | The builder, with `cc570904`. |
+
+**The sweep: every place where a capacity check is not made, and what
+stands behind it.** Read in `derive/src/reserve.ts`, `ledger.ts`,
+`delivery.ts`, `handlers.ts`, and `scope/src/turn.ts`, `operations.ts`,
+`outbox.ts`, `delivery.ts` and `core.ts`. No test of mine witnesses a
+row but the first of `covered`.
+
+| Where | What is not asked | By | What stands behind it |
+|---|---|---|---|
+| `fits`: a timed entry | Whether it fits | The input's type | Counted in `owed`: the chain of each live item in a timed state. A checked reservation. |
+| `fits`: a diagnosis, and a result's delivery that is no `conflict` | Whether it fits | The input's type | Counted: 2 entries for each pending request, and the largest clause. An effect mark in a clause counts nothing there (entry EJ6; the contract's row on what a mark in a clause reserves, which is open). |
+| `fits`: a delivery of a control | Whether it fits | The input's type | Counted: 1 entry for a provisional scope. The attempt 1 that it opens for each held operation was counted from the genesis. |
+| `fits`: an outcome | Whether it fits | The input's type | Its own entry is counted with its operation. What it opens: the closure that its owner declares, checked in `outcomeOf`; or `covered`, which checks nothing (entry FC1). |
+| `fits`: the judge's `settles` | Whether it fits | A flag of the draft | Derived, and counted: the form declares `settles`, its subject was in a listed state and leaves them; or a pending record of `hold@1` binds the request, and `Owners.reserves` counts that record. A checked reservation. |
+| **A request that an outcome entry sends** | Its 2 entries, and what its clause starts | Nothing: no check exists | **Not reserved by anyone.** `closure` counts the operations that an outcome opens, and no request. The pending request is counted only from the entry that sent it, which was not asked. This holds for the register's `create` of the directory, which section 5.8 puts in the claim's row, and for the three updates of a publication, which are inside the 71. |
+| **The rows of section 5.8 for membership, the register and the directory** | What an active key, an active member, an unused invitation and a claim reserve | Nothing: no form | **Not reserved.** No platform data declares `settles`, and `ownersOf` passes a capability's `reserves` only. It is row 2 of the table above, for every platform definition. |
+| The driver, the outbox, a delivery and a checkpoint, at `scopeEntries` | Nothing is exempt | A floor | An entry that settles is not written at the last position either. It is a stop, and no exemption. |
+
+### 30.2 Part 2: what an outcome's rule reads, and a value beside an intent
+
+**What is built.**
+
+| Part | Built | From | Witness |
+|---|---|---|---|
+| The judge of an outcome | It takes `observed` and `facts`. Each rule of the outcome is given both, as items 2 and 4 of what a rule is given. The entry's input holds each observation that a rule read, in the order of `read.n`, and no member when none was read. Its `uses` names each foreign entry at hand. It is not written clamped when it retains an observation. | The contract's sections 4.1, 6.1 and 16.1 | `derive/test/forms-marks.test.ts`, the test of an outcome's rule and of a result's clause |
+| The judge of a result's delivery | It takes `observed`, the rule of the clause that runs reads it, and the entry holds what was read. | The same | The same test |
+| The replay of both | Each record of `observed` is derived again: guards 1 and 3 to 6, the runs, and the value. The judge is given the recorded observations and the retained copy of each entry in `uses`. | Section 16.1, "Replay" | `replay/test/verify.test.ts`, the test of an outcome's observations. The branch for a result's delivery has no replay witness: entry FC8. |
+| The rules reference | A version may state where its scopes record it: `Platform.rulesScope` and `Coded.rulesScope`. The destination states `branch.rules`, with the incarnation of its retained observations. | The authority note's section 12.1, the table of where the destination records its references | The same replay test, on made-up data |
+| The destination's rule `judge` | It reads its observations itself, through the judge: the key that signed the `merge` entry in `uses`, the rules, the key behind each approval, and the key behind the result of each required check. | Section 12.1.5, the table "The rule reads" | `platform/test/destination.test.ts` |
+| A value beside an intent | The scope reads `values` before the turn, for the places that its pinned data states and the intent sets. It keeps each value that the entry names under its domain and its digest. The acts route passes `values`. | The contract's section 6.2, "What the member bounds, before the turn"; section 9.2; rows I3-32 and I3-33 | `scope/test/values.test.ts`, on real storage, with made-up platform data |
+
+**What it buys, in the witnesses in memory.** `Branch` of test support
+gives the judge of the outcome what is at hand, as a runtime would. The
+reservation entry's `observed` is the judge's, and no test seals one by
+hand. `abort-if-behind` finds the merger's key in it. The update's
+`rules` is read from it. One stand-in of entry FA15 is gone, and one is
+narrower.
+
+**What is not built, exactly.**
+
+- No runtime reads an observation before the turn of an outcome, of a
+  result's delivery or, beyond the signer's own, of an act: entry FC6.
+  So in a deployed scope the rule `judge` still writes only what the
+  evidence and the scope's own records decide.
+- The package has no reader of a lane's entries: entry FC5.
+- No route reads a value, and the replay's HTTP source asks for none:
+  entry FC7.
+- No data of the platform package states a place, so no real act of
+  Artroom reads a value yet: entry EX5 stands.
+
+**The fills that remain in the destination's `judge`.** Each fails
+closed, and each is exactly one missing form.
+
+| Input of the judgment | Filled with | The missing form | Owner |
+|---|---|---|---|
+| `extents` | Null: the rules hold no extent, so no extent is judged from an observation | The member `extents` of a `RulesContent`: the contract's part of form 2 (entry FB2) | The contract |
+| `controllers` | Null: no exception is judged | Form 11, the count of the holders of `rules.publish` | The authority note, with the contract |
+| `controllersOfAuthors` | Null: the exception is not shown by its second clause, and where `ownerMayReview` is false no review counts | Form 15, the observation of an author | The authority note, with R2 |
+
+`singleControllerException` is no longer a fill: the rule reads it from
+the observed rules (form 14, given). It decides nothing while `extents`
+is null. The changed set of form 1 is no fill of the rule: it is the
+member `changes` of the evidence, which no port produces yet. Beside
+the three fills, the manifest, the soundness of each verdict and the
+two entries of each check are read by the stand-in reader of a lane's
+entries, and by nothing in production (entry FC5).
+
+**How far a founding runs.** As far as before: steps 1 to 6 of section
+26, on real scope objects. The creation of the destination is answered
+`retry`, `unsupported-definition`, because `platform:destination@1`
+lacks the rules `first-head` and `receipt`. Nothing of this section
+moves that stop. `scope/test/founding-real.test.ts` says what would
+still stand between a destination that exists and a reservation.
+
+**Every judge, against what a rule may read and what the entry
+retains.** Read in `derive/src/judge.ts`, `genesis.ts`, `delivery.ts`,
+`handlers.ts`, `settle.ts`, `outcomes.ts`, `prepare.ts` and
+`replay/src/verify.ts`.
+
+| Judge | Runs platform rules | Passes `observed` | Passes `values` | Retains what was read | A replay derives it | A runtime supplies it |
+|---|---|---|---|---|---|---|
+| Act | Yes | Yes | Yes | `observed` in the input; the values in the draft, for the scope | Yes: the guards, the window of the act's grant, the value; each placed value | `values`: yes, from this section. `observed`: no (entry FC6) |
+| Outcome | Yes | Yes, from this section | No: none travels beside an outcome | `observed` in the input; `uses` | Yes, from this section: the ten-second window | No (entry FC6) |
+| Delivery of a result | Yes, in the clause | Yes, from this section | No | `observed` in the input | Yes, in source; not witnessed (entry FC8) | No |
+| Delivery of a request or an advisory | Yes, in the handler | No: the input may hold none (section 4.1). A rule that reads one is given none. | No: no value travels beside a message | Nothing | The bytes guard refuses such an entry | Nothing to supply |
+| Delivery of a control | No | No | No | Nothing | Nothing | Nothing |
+| Diagnosis | Yes, in the `undelivered` clause | No: the input may hold none | No | Nothing | Nothing | Nothing |
+| Genesis | Yes | No: the input may hold none | No: a founding takes texts only | Nothing | Nothing | Nothing |
+| Preparation | No: a step is a capability's code | No. Its grant holds the one observation. | No | The grant | Yes, as before | The signer's read, as before |
+| Timed | No: the validator takes no mark in a timed rule | No | No | Nothing | Nothing | Nothing |
+| Checkpoint, settlement | No | No | No | Nothing | Nothing | Nothing |
+
+**Earlier entries that this work answers.** Each line is dated
+2026-10-06. The earlier sections stay as they were written.
+
+- **FA3, still open, and now counted.** The reservation by a publication is not built: entry FC1 says what no text states. The exemption is held to 71 entries of the note's table by a test.
+- **FA9, built for the builder's half.** The judge of an outcome gives a rule `observed` and the entries in `uses`, and writes both. The rule `judge` reads its observations itself. The other half stands: how an entry of a lane is read by its bytes (entry FC5).
+- **FA15, answered in part.** The `observed` of the reservation entry is the judge's. The reader that a test writes is of a lane's entries alone. The rules `first-head` and `receipt` are still stand-ins, and nothing ran on scope objects.
+- **EM3, closed for derive; the runtime half is entry FC6.** The judges of an outcome and of a result's delivery build what is at hand and write `observed`. The scope reads `values` and keeps them. The scope makes no further read of an observation.
+- **EM2, unchanged.** The form is still open, as the contract's point R1-67. Entry FC6 says what waits on it.
+- **EU4, closed for the window of an outcome and of a result's delivery.** Entry FC4 states the rule taken from the texts. The form of EM2 is still asked.
+- **EU5, closed for the destination.** Its version states where it records its rules reference. For any other version an observation of the rules is still `unsupported-definition`.
+- **EM26, closed for `observed` outside an act.** The same checks are made for an outcome and for a result's delivery.
+- **EX6, built in part.** The read before the turn and the table for values are built. The read route and the HTTP source are not: entry FC7.
+- **EZ11, updated.** The scope stores a value, in a table of its own. The read route still serves five kinds.
+- **EQ9, updated.** A rules scope's three marked acts are still not completed or refused on a real scope: no data of `platform:rules@1` states a place, and no observation is read.
+
+| # | Where the texts differ or are silent | Implemented | Owner, and the question |
+|---|---|---|---|
+| FC3 | What the `uses` of an outcome holds. Section 17.2 says "An outcome retains what its owner declares", and no form lets an owner declare a foreign entry. For an act the entry names every foreign entry that a declared field names, read or not. An outcome has no field. | The judge names every foreign entry that it was given, in the order given, and a rule is given each. More than the bound on the foreign entries of one entry leaves the outcome not written. A replay gives the judge the retained copy of each entry that the recorded `uses` name, so it cannot tell an entry that no rule read from one that a rule read. For `observed` it can, and does. | The contract. Does an outcome's `uses` hold exactly the entries that its rules read, as `observed` does, or those that its owner declares, and by which form? |
+| FC4 | The window of a record of `observed` in an outcome and in a result's delivery (entry EU4). No form states it (point R1-67). The authority note's section 3.3 states windows in a table of entries. | Ten seconds, and `fresh`, for both: `WINDOWS.once`. The reason: both rows of that table that are of such an entry state it, "10 seconds (W3), each. `fresh`." for the outcome of `judge` and for the delivery of a license result, and the contract's own table of section 16.1 states the same of both. A replay judges guard 3 and guard 5 so. The value of an observation of the rules needs the rules scope's answer to a read, which no version has (entry FB10): with an anchor for that head it is taken on trust, and without one the replay ends `unsupported-definition`. | The contract, with the authority note: the form of R1-67. Until it exists, a later row with another window would be judged wrongly here. |
+| FC5 | Section 12.1.5, "The rule reads": the entries in `uses`, "each by its bytes", for "the manifest's entry, each verdict's entry, and the opening and the deciding entry of each required check". It names no member of a lane's entry. It also says of the three lists that "nothing in the three lists is a fact that the destination fetches", while section 6.5 counts "each verdict's entry, and two entries for each required check" among what one reservation fetches, and the source's `collect-list` takes `review`, `job`, `decidedBy` and `link` as facts. | The rule reads the signer of the `merge` entry itself: the entry that `publication.operation` names, whose input is an act. Everything else of a lane's entries comes from a reader, `LaneRead`, which the package does not write: the manifest's base, integration commit, tree, reports, authors and completeness; whether each verdict's entry is that verdict, and which key signed it; and what the two entries of each check show. A key is read only for an approval and for a required check. | The authority note, with R2. Which member of which entry holds each fact? Is a verdict's entry the entry that the fact in `review` names, and is it fetched at the reservation? |
+| FC6 | Section 16.1: the scope reads each observation "before its turn", for "the entries that its specification names". The subjects are not operands: "The reservation reads each key behind a counted verdict", which an entry in `uses` gives. The contract leaves the form open (point R1-67): a member of the row, "one more place, for a rule that names the subjects before the turn", or prose alone. | Not built in `scope/src`. `Operations` gives the judge of an outcome no `observed` and no `facts`, and `Scope.submit` gives the judge of an act no `observed`. Each is marked `I3 merge:`. A rule that needs one has a fault or is not completed, which fails closed. Nothing was invented: any reader here would be the undecided place. | The contract, with the authority note: point R1-67. The builder, after it: the read, its numbers in the run, the six guards before the judge, and the answer of a rules scope (entries FB10 and EQ8). |
+| FC7 | Entry EX6. The contract says that a read of one value "asks by the kind, the domain and the digest", and states no form of the route for a domain. No row of the authority note states a field with `value`. | Built: `valuesBeside` and `valuesOf` in `scope/src/core.ts`, the table `retained_value`, and `values` on the acts route. At most as many values are read as the intent sets places, in the order given, and none past the largest `max` among them. A value in the domain of a definition is kept as a `definition`. Not built: the read route, and the replay's HTTP source, so a replay over HTTP of an entry that names a value is still `incomplete`. Not counted: the bytes of a value against a budget, which no source counts (the contract's section 17.5). | The contract, for the route's form. The authority note, for the fields. `cc570904`, for the bytes. |
+| FC8 | A result's delivery that retains an observation. The one row that needs it is the task scope's license result, which is IA's. | Built in derive and in the replay, with the ten-second window. Witnessed in derive. The replay's branch has no witness: no fixture history holds such a delivery, and one was not built for a row that no delivered definition has. | The builder, with the first definition that has such a row. |
+
+**Controls.** One for each new guard, through `scripts/control.mjs`.
+18 were run, and each distinguishes: a test failed by an assertion with
+the one change applied.
+
+| # | The change | Witness |
+|---|---|---|
+| 1 | `covered: true` on the rule `revoke` | `platform test/definitions.test.ts` |
+| 2 | The read of the receipt left out of the 68 | The same |
+| 3 | The outcome's input without `observed` | `derive test/forms-marks.test.ts` |
+| 4 | The outcome's `uses` empty | The same |
+| 5 | An outcome that retains an observation written clamped | The same |
+| 6 | A rule of an outcome given nothing at hand | The same |
+| 7 | A result's delivery without `observed` | The same |
+| 8 | A result's delivery that retains one written clamped | The same |
+| 9 | The replay without the guards of an outcome's `observed` | `replay test/verify.test.ts` |
+| 10 | The replay's judge given no `observed` | The same |
+| 11 | Guard 1 of an observation of the rules | The same |
+| 12 | The incarnation fixed by the entry's own observation | The same |
+| 13 | `controllersOfAuthors` as an empty list | `platform test/destination.test.ts` |
+| 14 | No key read for an approval | The same |
+| 15 | No observation of the merger | The same |
+| 16 | The judge of an act given no `values` | `scope test/values.test.ts` |
+| 17 | The value not kept | The same |
+| 18 | No bound on how many values are read | The same |
+
+**Lines for the merge.**
+
+- `OutcomeContext` gains `observed` and `facts`, and `DeliveryContext` gains `observed`. `runClause` has one more optional argument. A caller that gives none is unchanged.
+- `platform/src/destination.ts`: `Reads` now returns a `LaneRead`, and the rule builds the `ReservationRead`. `publicationRoom` is new. The index exports `publicationRoom` and the type `LaneRead`.
+- `Platform` and the replay's `Coded` gain `rulesScope`. `platform("platform:destination@1")` states it.
+- `Store.retained` and `Store.retainedSize` take an optional `domain`. `SqliteStore` has the table `retained_value`.
+- `support-destination.ts`: `Branch.read` is a `Hand`, and `Branch.outcome` and `answered` take no `observed`.
+- Marked `I3 merge:`: `scope/src/operations.ts`, at the call of `settleOutcome`; `scope/src/core.ts`, in `submit`; `derive/src/marks.ts`, at `AtHand`; `derive/src/ledger.ts`, at `covered`; `platform/src/destination.ts`, at `NOT_AT_HAND`.
+
+**What was not run.** No deployment, no provider, no host, no gateway
+and no Git command. The gate was not run.
+
+## 31. Review finding e2d4e074: the value of an observation is derived once, and a sweep of the replay's repeated work
+
+Written 2026-10-06, on `request/i3-m3`, by the worker of this finding.
+Entries have the prefix FD. The disposition is the planner's, in event
+`752a2725`: derive each historical observation value once, by the exact
+source scope, incarnation, head, definition and subject, or by an
+equivalent bounded strategy, and keep every check and every valid
+history.
+
+No entry has other bytes. No history that was valid has another answer,
+and a history that was a mismatch is the same mismatch at the same
+entry: the order of the checks is as it was. Neither lane digest
+changes, and no data of a platform definition changes. The branch was
+brought up to `origin/main` first (`48a2b2851`, the landing of the
+second milestone): the merge changed no file, because the branch held
+that milestone's tree already.
+
+### 31.1 The finding, against the source
+
+The source agrees with the finding. `#viewAt` of `replay/src/verify.ts`
+kept one folded state for a source, and began again from the genesis
+whenever an observation named a lower head than the last one. Two
+admins who publish in turn, one on a cached observation of head L and
+one on a cached observation of head H, are legal: guard 7 of an
+observation holds the head of each key and member, and not of the
+scope. So each pair cost L + 1 fold applications and then H - L more.
+The value was also answered again for each grant, though a reused read
+has the bytes of the one before it.
+
+### 31.2 What changed
+
+| # | What | Where |
+|---|---|---|
+| FD1 | The value that a source's history gives is derived once for each source scope, incarnation, head (position and hash), definition and subject, and kept. The head is proved for every entry, as before. Every retained observation is compared with the value, whether it was derived for that entry or for an earlier one: what is kept is what the history gives, and never that an entry agreed. An observation that a membership scope retains of itself is answered from the state that the replay holds, with no fold, as before: each entry names another head. | `Verifier.#standing`, `#values` |
+| FD2 | Each entry of a source is folded once into a view of that scope, in order, as far as the highest head that an observation names. The view keeps a log: every write of the fold, by record, with the position of the entry that made it. The state at the head folded last is the view. The state at an earlier head is built from the log, as the last write of each record at or before that head, and the state built last is kept. The disposition says to keep the states at the heads that the history names. A copy of a state for each named head costs a copy of the source's state for each, and a head may be named for the first time after the fold has passed it, so the log is kept instead: it is the equivalent bounded strategy, and it serves any head in any order. | `replay/src/view.ts`, `Verifier.#viewAt` |
+| FD3 | The run of a retained observation is looked up in a set, once for each observation that is not of the run of the entry before it. The earlier code searched a list of every run. | `Verifier.#inRun` |
+| FD4 | The texts that a scope owes are kept by digest, each with the first entry that names it, in the order of the history. A tombstone looks up each text that it lists. The earlier code searched the list of every owed text for each `redact` effect, twice. | `Run.owed`, `Verifier.#replay` |
+| FD5 | The state in memory keeps, for each observed scope ID, the incarnations of the heads that it holds. A rules scope and a destination read them for each entry that is judged on a grant. The earlier code read every observed head. | `MemoryState.incarnations` |
+| FD6 | The state in memory keeps the number of copies of each relationship name and kind of owner. The first update for each key reads it. The earlier code read every copy. A count by state, which only the reserve asks, still reads every copy. | `MemoryState.copies` |
+
+`verify` takes an optional third argument, a `Tally`, and `MemoryState`
+an optional tally. Each counts steps for a test, as `matches` and
+`classify` of the platform package do. No test times anything.
+
+### 31.3 The counts on the witness history
+
+The history is of the platform package's own membership and rules
+definitions, written by derive's judges: a membership scope with two
+admins, whose head is 5 (L) when the second has joined and 45 (H) after
+40 more entries; and a rules scope with 41 acts `publish`, 20 by each
+admin in turn on a cached read of H and of L, and one more on a new
+read of H. The office, the registrar and the reads are stand-ins of the
+platform package's test support: no scope read membership, and each
+observation is membership's own answer from its state at the head
+named.
+
+| | Fold applications for the source | Values answered | How taken |
+|---|---|---|---|
+| The earlier code | 966 | 41 | Observed, with a counter at each of the two places in the code of `441727709`, in one run of the witness history. The counter was not committed. |
+| This code | 46 | 2 | Observed, by the tally, in the witness. One state was built from the log. |
+
+The witness asserts that the folds are at most the entries of the
+source, 46, and the values at most the distinct heads and keys that the
+grants name, 2, and states both counts. The answer for the history, and
+the mismatch for the same history changed at one entry, are those that
+the earlier code gave, taken from it before the change.
+
+For entry FD3, on 40 acts each on a read of a run of its own: 40
+lookups for the rules scope, where the earlier code made 780
+comparisons (observed, with a counter, in the same way). For FD4, FD5
+and FD6 the earlier count is by reading the code: 930 comparisons for
+30 owed texts and their one tombstone, now 30 lookups; 1,000 heads read
+for one answer, now 3 steps; 1,000 copies read for one count, now 1
+step.
+
+### 31.4 The sweep: work for one replayed entry that grows with a history
+
+By reading `replay/src` and `derive/src`, at this head. N is the number
+of entries of a history. "Changed" names the entry above. Every other
+row is recorded and not changed, with its owner. The worst count is by
+reading, and none was run.
+
+| # | The loop | Its bound | Worst count over N entries | Changed, or the owner |
+|---|---|---|---|---|
+| 1 | `verify.ts`, `#viewAt`: the fold of a source for a head | Was: the head's position, for each head lower than the last. Now: each entry of the source once. | Was N times the source's length. Now the source's length. | Changed: FD2 |
+| 2 | `verify.ts`, `#standing`: the answer of the source's definition | Was: one for each retained observation. Now: one for each distinct key of FD1. | One answer for each distinct key. | Changed: FD1 |
+| 3 | The answer itself, `standingOf` of the platform package: it reads every key item, or every member item, of the source's state | The items of the type that the source holds, retained final ones too | Distinct keys times the source's items | Entry EM12: the proof plan, with request `cc570904`. A bound, or an index of key items by `id`. |
+| 4 | `view.ts`, `View.at`: a state built from the log, for a head before the one folded last | The records that the fold wrote. One build for each run of questions about one earlier head. | Distinct keys times the source's records, when new keys alternate among earlier heads. Of the order of row 3, which each such key pays in any case. | The builder, with row 3: an index for the answer would let it read the log directly. |
+| 5 | `verify.ts`, `#inRun`: the run among the runs seen | Was: the runs so far. Now: one lookup. | Was N squared over 2. Now N. | Changed: FD3 |
+| 6 | `verify.ts`, the tombstone of owed texts | Was: the owed texts, for each `redact` effect. Now: the texts that the effect lists. | Was the square of the texts. Now the texts listed. | Changed: FD4 |
+| 7 | `verify.ts`, `#prove`: the caller's anchors, searched for each distinct fact | The anchors that the caller gave | Distinct facts times anchors. No history sets the number of anchors. | The builder, when a limit on anchors is stated: an index by scope, position and hash. |
+| 8 | `source.ts`, `MemorySource.retained`: a search of one scope's retained inputs | The retained inputs that the caller holds for the scope | Reads times retained inputs, for a source in memory. The HTTP source searches nothing. | The builder. It is the source of tests and of a caller that holds the histories. |
+| 9 | `verify.ts`: the copies of used entries against the foreign facts of one entry | 128 foreign entries for one entry (`usesPerEntry`) | N times a constant | None needed. |
+| 10 | `state.ts`, `MemoryState.incarnations`, read through `rulesMembership`, `destinationMembership` and `destinationRulesScope` for each act and preparation | Was: every observed head. Now: the incarnations of one scope ID, which a valid history holds one of. | Was N times the subjects observed. Now N. | Changed: FD5 |
+| 11 | `state.ts`, `MemoryState.copies`, at `delivery.ts`, the first update for a key | Was: every copy. Now: one number. | Was N times the copies kept. Now N. | Changed: FD6 |
+| 12 | `timed.ts`, `nextDue`: the live items of each timed rule's type. The replay asks before every entry that is not timed, and each judge asks once more. | Eight timed rules times the type's `max`. The validator states no upper limit on `max`. | N times `max` | The proof plan, with request `cc570904`: a limit on `max`, or an index by deadline, which the runtime's commit would use too. |
+| 13 | `hold.ts`, `endsUnder`, and `capability/hold.ts`, `heldUnder`: the live holds of each hold type | The type's `max` | N times `max` | As row 12. |
+| 14 | `lists.ts`, `scan`: the items that a range guard covers | For an entry that a runtime wrote: 1,000 items (`guardScan`), because the same scan finished there. The replay sets no limit (section 9.3), so for a history that no runtime wrote: the items of the type. | N times 1,000 for a valid history. N times the items for one that is not. | The contract's section 9.3, with the proof plan: whether a replay may stop at the bound and report. |
+| 15 | `state.ts`, `MemoryState.records` and `recordCount`: every capability record is sorted for each read. The code of `hold@1` and `git-read@1` reads them at a step, at an outcome and at a `hold` effect that ends or changes a hold. | The records that the scope holds, which no text bounds | N times the records, times a logarithm | Entry EF6: request `cc570904`, the proof plan. An index by kind would leave the read of one kind unbounded, so nothing was changed here. |
+| 16 | `fold.ts`, the texts that a detached-text slot has held: searched and copied for each `value` effect on the slot | The texts held and not redacted. No text bounds them. | The square of the writes to one slot | The contract, with the proof plan: a bound on the texts that a slot holds before a redaction. The fold is the runtime's too. |
+| 17 | `attribution.ts`, the attribution history of an item: copied and searched for each effect that adds to it | The members of the history. No text bounds them. | N times the members | As row 16: a bound on an item's attribution history. |
+| 18 | `state.ts`, `MemoryState.putItem`: the index of a type and state is an array, and an item that changes state is moved in it | The items in that state | N times the items, as moved array elements | The builder: measure before a change. |
+| 19 | `settle.ts`, `judgeCheckpoint`: the digest of the whole folded state | The state | Checkpoints times the state | The contract (a checkpoint carries the digest of the state), with the proof plan. |
+| 20 | `directory.ts`, `rowOf`, and `destination.ts`, `publications`: a search of every item of a type by a value | The items of the type | N times the items | Entries EP10 and ER11. They are the platform package's, and are listed because a judge runs them. |
+
+Not on a replay's path, by reading: `MemoryState.outstanding` and a
+count of copies by state, which only `fits` asks, and a replay does not
+ask it; `MemoryState.preparations`, which only a read asks.
+
+### 31.5 What a replay now keeps
+
+| Record | How many | Its size |
+|---|---|---|
+| A value, in `#values` | One for each distinct key of FD1: at most the observations that the checked entries retain | The answer of the source's definition: an observation without `at` |
+| A write, in a view's log | One for each write of the fold, for each entry of a source up to the highest head that an observation names. Only a scope that another scope observes has a view. | A reference to the record that the fold wrote. The checked entries were already kept whole. |
+| A built state, in a view | One for each view: the one built last | The records of the source at that head |
+| A run, in `Run.runs` | One for each run that an entry names, as before | Its name |
+| An owed text, in `Run.owed` | One for each distinct owed text, where the list held one for each naming | A digest and a fact reference |
+| An incarnation list and a copy count, in `MemoryState` | One for each observed scope ID, and one for each relationship name and kind of owner | A short list, and a number |
+
+All are within the replay's limit on entries and on bytes read. None is
+written anywhere.
+
+### 31.6 Witnesses and controls
+
+- `replay test/verify.test.ts`: the alternating history, with the earlier code's answer and the counts; the same history changed at one entry whose head and key are already derived; 40 runs; a view against a fold from the genesis, at every head of seven histories, asked from the last head down; and 30 owed texts with one tombstone.
+- `derive test/forms-grant.test.ts`, for FD5, and `derive test/forms-handlers.test.ts`, for FD6.
+- Every earlier case of the replay package passes unchanged.
+
+Five controls, through `scripts/control.mjs`. Each distinguishes: a
+test failed by an assertion with the one change applied.
+
+| # | The change | The witness that failed |
+|---|---|---|
+| 1 | A kept value is never found, so each grant derives its own | The alternating history: 41 values where at most 2 are allowed |
+| 2 | An entry whose value is already kept is not compared | The changed history: `consistent` where the earlier code said `mismatch` at entry 42 |
+| 3 | A view reads the last write before the head, and not at it | The view against the fold, and both histories |
+| 4 | An incarnation is noted only for the first head of a scope ID | `forms-grant.test.ts` |
+| 5 | A copy is counted at each update, and not once for a key | `forms-handlers.test.ts` |
+
+### 31.7 Lines for the merge
+
+- `verify(source, options, tally?)`, and the type `Tally`. A caller that gives none is unchanged.
+- `MemoryState` takes an optional tally. `View`, of the replay package, extends it and is not exported from the package's index.
+- `Rulebook`, of the platform package's test support, takes the membership scope ID as an optional second argument. `histories` of the replay's `test/world.ts` is exported.
+- `Run.owed` is a map, `Run.runs` a set with the last run, and `Run.viewed` a `View`.
+
+**Documents.** No sentence of `docs/` or of a package README says that
+the second milestone is not landed or is under review, so none was
+changed. `packages/replay/README.md` says what FD1 and FD2 do.
+
+**What was run.** The replay, derive and platform projects while
+working; every workspace's typecheck; `git diff --check`;
+`scripts/active-source.test.mjs`; and the root vitest run once, at
+`f9a5ae91c`: 69 files and 537 tests passed in 9.9 seconds elapsed and
+25.5 CPU seconds, one observed run, on an Apple M5 Max with 18 cores, a
+load average of 4 from other sessions, and warm caches. The gate was
+not run. No deployment, no provider, no host and no gateway.

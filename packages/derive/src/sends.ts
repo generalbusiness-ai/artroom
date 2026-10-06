@@ -113,9 +113,10 @@ export function deriveSends(j: Judging, forms: readonly SendForm[], working: Rea
    */
   const recordedMembership = (): ScopeRef | null | undefined => {
     if (j.scope.at.kind === "membership") return j.scope.at;
-    // I3 merge: a genesis that creates a scope reads its own membership reference from the creation that it is recording, which
-    // the step of the real directory builds with the scopes that are created beside membership (authority note, section 12.1,
-    // "The membership reference"). Until then a creation that a genesis sends holds no such member.
+    // A genesis records no membership reference while it is written: a directory's slot `repository.membership` is set later, by
+    // the clause `applied` of its own `create`. So a creation that a genesis sends holds no such member, and the scopes that are
+    // created beside membership get its scope ID in a field (authority note, revision 25, section 12.1.2, "No member `membership`
+    // in these two creations").
     if (j.self === 0) return null;
     const genesis = j.own?.(0)?.entry.input;
     return genesis?.type === "genesis" ? membershipOf(genesis, j.scope.at) : undefined;

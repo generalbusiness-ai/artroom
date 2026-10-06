@@ -34,8 +34,9 @@
 
 import type { Digest, Entry, Input, KeyId, Observation, ObservationRequest, ObservationUse, RunId, ScopeRef } from "@generalbusiness/artroom-contract";
 import { hex } from "@generalbusiness/artroom-bytes";
-import { WINDOWS, highestHead, judgeGrant, membershipOf, observationOf, prefer, revoked, same, type Clock as Reading, type GrantJudgment, type Retains, type StateView } from "@generalbusiness/artroom-derive";
-import { DIRECTORY, directoryMembership, standingOf } from "@generalbusiness/artroom-platform";
+import { WINDOWS, fixedBy, highestHead, judgeGrant, membershipOf, observationOf, observedOf, prefer, revoked, same, type Clock as Reading, type GrantJudgment, type RecordedRef, type Retains, type StateView } from "@generalbusiness/artroom-derive";
+import { isPlatformDefinition } from "@generalbusiness/artroom-bytes";
+import { platform, standingOf } from "@generalbusiness/artroom-platform";
 import type { Asked, Authority, Clock, Random, Standing } from "./ports.ts";
 
 /**
@@ -53,11 +54,17 @@ export interface Observing {
   /** The source of the run's random value. */
   random: Random;
   /**
-   * The membership scope that this scope records, with its incarnation: a
-   * function of its genesis entry (section 6.6). Null: it records none, or
-   * its incarnation is not fixed yet. Nothing is then read.
+   * The membership scope that this scope records: a function of its genesis
+   * entry (section 6.6), or of its folded state where its version says so.
+   * It is asked before each read and again in each commit. With an
+   * incarnation: the read asks that incarnation, and guard 1 takes no
+   * other. With none, as for a rules scope or a destination before its
+   * first retained observation: the read asks by the scope ID alone, and
+   * the entry that retains the answer fixes the incarnation (authority
+   * note, section 12.1, decided in revision 25). Null: it records none.
+   * Nothing is then read.
    */
-  membership(scope: ScopeRef): ScopeRef | null;
+  membership(scope: ScopeRef): RecordedRef | null;
   /** How the membership scope is read. */
   reader: Membership;
 }
@@ -93,8 +100,8 @@ export function observing(config: Observing): Authority {
        * every run (section 16.1, "The fold holds the highest head"). Before the turn there is no state at hand: the heads that
        * this run's entries retain are enough to decide whether to read again, and the commit decides.
        */
-      const judge = (read: Read, clock: Reading, view?: StateView): GrantJudgment =>
-        judgeGrant(useOf(read), { scope, membership: of, key, action, window, clock, last: read.last, highest: view ? highestHead(view, read.observation) : (retained.get(key) ?? null) });
+      const judge = (read: Read, clock: Reading, view?: StateView, recorded: RecordedRef = of): GrantJudgment =>
+        judgeGrant(useOf(read), { scope, membership: recorded, key, action, window, clock, last: read.last, highest: view ? highestHead(view, read.observation) : (retained.get(key) ?? null) });
       /** An observation that failed a guard is not used again: the next act of the key reads again. A revoked answer fails none. */
       const discard = (read: Read): void => { if (kept.get(key) === read) kept.delete(key); };
 
@@ -107,13 +114,14 @@ export function observing(config: Observing): Authority {
         const n = ++count;
         let answer: unknown = null;
         try {
-          answer = await config.reader.observe({ of, key }, seconds);
+          // The first read of a scope that records no incarnation asks by the scope ID alone. The answer's `of` holds the incarnation.
+          answer = await config.reader.observe({ of: of.inc === null ? { scope: of.scope, kind: of.kind } : (of as ScopeRef), key }, seconds);
         } catch {
           answer = null;
         }
         // An answer that is not the whole standing of this key in that membership scope is no answer (section 16.0, rule 4).
         const observation = observationOf(answer, began);
-        const arrived: Read | null = observation && same(observation.of, of) && observation.key === key ? { observation, n, last: null } : null;
+        const arrived: Read | null = observation && observedOf(observation.of, of) && observation.key === key ? { observation, n, last: null } : null;
         // A ten-second observation is not kept, unless it shows a revocation: that answer stays for the run and discards what was held.
         if (arrived && (!window.once || revoked(arrived.observation))) kept.set(key, prefer(kept.get(key) ?? null, arrived));
         // With no answer, the scope uses the observation that it holds, until its age reaches the window. A ten-second kind has none.
@@ -126,10 +134,14 @@ export function observing(config: Observing): Authority {
       let offered: Read | null = null;
       let spent = false;
       return {
-        membership: of,
+        // The reference with its incarnation: the one recorded, or the one that answered, which the entry that retains it fixes.
+        membership: fixedBy(of, read.observation.of),
         held(view, clock) {
           offered = null;
           if (spent) return null;
+          // Guard 1 is judged on what the scope records at this commit. An entry written since the read may have fixed an incarnation.
+          const recorded = config.membership(scope);
+          if (!recorded) return null;
           // A revocation that any read of this run has seen takes effect at once: it is judged in place of an answer that shows the key
           // active, also one that was read for this act.
           // I3 merge: the authority note's revision 20, adopted since this was written, reads this rule as of the member too: a read that
@@ -137,7 +149,7 @@ export function observing(config: Observing): Authority {
           // kept here. The member's rule is owed.
           const seen = kept.get(key);
           const judged = seen && revoked(seen.observation) ? seen : read;
-          const result = judge(judged, clock, view);
+          const result = judge(judged, clock, view, recorded);
           if (result.result === "unauthorized") return [];
           // A clock that is behind judged no age: the act is answered `clock-behind`, and its observation is read again before a retry.
           if (result.result === "authority-unavailable" || clock.behind) discard(judged);
@@ -209,25 +221,39 @@ export interface Repository {
   random: Random;
   /** The input of the scope's genesis entry, from its own history. Null: it has no genesis yet. */
   genesis(): Extract<Input, { type: "genesis" }> | null;
-  /** The scope's folded state at its head, for a scope that records its membership reference in an item: a directory. Absent: such a scope reads nothing. */
-  state?: Pick<StateView, "page">;
+  /**
+   * The scope's folded state at its head, for a scope whose version records its membership reference there: a directory, in a slot;
+   * a rules scope and a destination, as a scope ID with the incarnation of their retained observations. Absent: such a scope reads nothing.
+   */
+  state?: StateView;
   /** How a membership scope is read: one call on the object that the reference names (`membershipIn`). */
   reader: Membership;
 }
 
 /**
- * The membership scope that a scope records, with its incarnation, as the
- * list below states it: from its own genesis entry, or for a directory
- * under `platform:directory@1` from its slot. Null: it records none. The
- * authority reads that scope for an observation, and a read session is
- * accepted only when it names that scope (section 3.9; `sessions.ts`).
+ * The membership scope that a scope records, as the list below states it:
+ * from its own genesis entry, or from its folded state where its platform
+ * version says where (`Platform.membership`, of the platform package). Null:
+ * it records none. The authority reads that scope for an observation.
  */
-export function recordedMembership(config: Pick<Repository, "genesis" | "state">, scope: ScopeRef): ScopeRef | null {
+export function recordedMembership(config: Pick<Repository, "genesis" | "state">, scope: ScopeRef): RecordedRef | null {
   const genesis = config.genesis();
   if (!genesis) return null;
-  if (scope.kind === "directory" && genesis.seed.definition === DIRECTORY) return config.state ? directoryMembership(config.state) : null;
+  const named = genesis.seed.definition;
+  // Where a version's scopes record the reference is code of the version, beside its rules (authority note, section 12.1).
+  const coded = isPlatformDefinition(named) ? platform(named)?.membership : undefined;
+  if (coded) return config.state ? coded(config.state) : null;
   return membershipOf(genesis, scope);
 }
+
+/**
+ * The same reference, when the scope records it with its incarnation. A
+ * read session is accepted only when it names that scope and incarnation
+ * (section 3.9; `sessions.ts`). Null also for a rules scope or a
+ * destination that records no incarnation yet: no session is accepted
+ * there before its first retained observation.
+ */
+export const fixedMembership = (config: Pick<Repository, "genesis" | "state">, scope: ScopeRef): ScopeRef | null => fixedBy(recordedMembership(config, scope), null);
 
 /**
  * The production authority of one scope of a repository (authority note,
@@ -246,15 +272,21 @@ export function recordedMembership(config: Pick<Repository, "genesis" | "state">
  *   the scope's own folded state at its head, before the turn. Before the
  *   slot is set the directory reads nothing, so it admits no act that needs
  *   a grant (authority note, section 12.1.2, "What the directory admits").
+ * - A rules scope under `platform:rules@1` and a destination under
+ *   `platform:destination@1` hold the membership scope's ID, as a fixed
+ *   value that their genesis set from the creation's fields
+ *   (`rulesMembership`, `destinationMembership`). The incarnation is the
+ *   one of the observations of that ID that their entries retain, read
+ *   from the folded state. Before any entry retains one, the read asks by
+ *   the ID alone, guard 1 takes an observation of that ID of the kind
+ *   `membership`, and the entry that retains it fixes the incarnation. From
+ *   then on the read states it, and an observation that names another is
+ *   discarded (authority note, section 12.1, decided in revision 25, which
+ *   was not adopted when this was written; I3 deltas, section 26).
+ *   Revision 26 is adopted since, at `f7175296`.
  *
  * No grant that is presented beside an intent is read: authority is what
  * the membership scope answers, and nothing a caller brings.
- *
- * I3 merge: two kinds of scope record their membership reference in
- * another place, which the steps of their definitions build. The rules
- * scope and the destination hold the membership scope's ID from their
- * creation, and fix the incarnation in the first entry that retains an
- * observation. Until then such a scope reads nothing here.
  */
 export function repositoryAuthority(config: Repository): Authority {
   const own = ownStanding(config.random);

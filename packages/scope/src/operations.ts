@@ -123,7 +123,6 @@ export interface Outside {
  */
 export const NO_OUTSIDE: Outside = { accepts: () => false, send: () => Promise.resolve(null) };
 
-const UNKNOWN: Evidence = { basis: "none", body: null };
 const keyOf = (operation: OperationId, attempt: number) => `${operation}#${attempt}`;
 /**
  * An answer as the contract's outcome can hold it: a decisive result, and evidence with a basis and a body (`isEvidence`). Anything
@@ -268,7 +267,7 @@ export class Operations {
       if (row.sent !== null) {
         // The request may have left: the mark was written and no outcome followed. The answer in hand is offered if there is one.
         // Otherwise the process stopped between the send and the outcome, and the outcome is `unknown`. It is never sent again.
-        const input = this.#held.get(keyOf(id, attempt)) ?? { type: "outcome", operation: id, attempt, result: "unknown", evidence: UNKNOWN };
+        const input = this.#held.get(keyOf(id, attempt)) ?? this.#unknown(id, attempt);
         offered.add(keyOf(id, attempt));
         work.push(() => this.#offer(row, input, now));
         continue;
@@ -365,7 +364,23 @@ export class Operations {
     if (answer === LATE) void sent.then((late) => (isAnswer(late) ? this.answered(operation, attempt, late) : null)).catch(() => null);
     // An answer that is no answer was judged by nobody: the port is told so, and keeps nothing for it.
     else if (answer !== null && !isAnswer(answer)) this.#judged(operation, attempt, null);
-    return this.#offer(row, { type: "outcome", operation, attempt, result: "unknown", evidence: UNKNOWN }, now);
+    return this.#offer(row, this.#unknown(operation, attempt), now);
+  }
+
+  /**
+   * The `unknown` outcome of an attempt: no answer came. Its basis is `none`. Its body is the one that the owner of the operation
+   * states for an outcome that is not known, read from the scope's own records, or null where the owner states none. A rule that
+   * fails here gives null, and the judge then decides whether that body is well formed.
+   */
+  #unknown(operation: OperationId, attempt: number): Outcome {
+    let body: unknown = null;
+    try {
+      const of = this.#store.operation(operation);
+      body = (of && this.#scope.owners()?.rules(of.owner, of.kind)?.unknown?.(this.#store, of, attempt, ownOf(this.#store))) ?? null;
+    } catch {
+      body = null;
+    }
+    return { type: "outcome", operation, attempt, result: "unknown", evidence: { basis: "none", body } as Evidence };
   }
 
   /**
@@ -377,7 +392,7 @@ export class Operations {
     const { operation, attempt } = row;
     const key = keyOf(operation, attempt);
     let recorded = await this.#record(input);
-    if (recorded.recorded === "refused" && input.result !== "unknown") recorded = await this.#record({ ...input, result: "unknown", evidence: UNKNOWN, retain: undefined });
+    if (recorded.recorded === "refused" && input.result !== "unknown") recorded = await this.#record({ ...this.#unknown(operation, attempt), retain: undefined });
     if (recorded.recorded === "unavailable") {
       if (input.result !== "unknown") this.#held.set(key, input);
       return this.#store.postpone(operation, attempt, now + this.#bounds.drainRetrySeconds * 1000);
@@ -433,6 +448,10 @@ export class Operations {
     const end = await this.#scope.turns.run<OutcomeRecorded>({
       asks: () => [],
       judge: (view, clock) => {
+        // I3 merge: derive's judge of an outcome takes `observed` and `facts`, gives both to a rule of the outcome, and writes what was
+        // read (`settleOutcome`). This driver gives neither. No form of platform data states the subjects that an outcome observes, or
+        // the foreign entries that it fetches, so nothing here could say what to read before this turn (the contract's point R1-67;
+        // I3 deltas, entry FC6). A rule that needs one then has a fault, and its outcome stays offered: the destination's `judge`.
         const judged = settleOutcome(view, definition, input, { clock, bounds, owners: this.#owners, platform: this.#scope.pinned()?.platform ?? undefined, own: ownOf(this.#store) });
         switch (judged.result) {
           case "write":

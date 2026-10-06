@@ -33,15 +33,20 @@ The acts of this story, each a declared act of the jam's own definition:
 | `sing` | the person | A theme: a MIDI-equivalent encoding of pitch and timing, transcribed from the microphone, with the audio digest beside it. Nothing of the audio itself is authoritative |
 | `interpret` | the first agent (synth) | The interpretation of the latest theme: key, tempo, time signature, the bar grid, and the quantized theme. Others come in on this, not on the raw transcription. One interpretation per theme; the synth's is the one in force until the next `sing` |
 | `take` | an arriving agent | Claims an instrument. The rule for which instrument is by arrival order: synth, bass, drums, then a lead (guitar or saxophone). An instrument is an exclusive commitment |
-| `pattern` | any player | A pattern per bar or per phrase, bound to the interpretation it follows and the bar it starts at. This is what the live layer renders |
+| `pattern` | any player | A pattern of a stated length in bars, bound to the interpretation it follows. It takes effect at the first bar boundary at least one lookahead after the room records it, as the timing rule derives; it never names its start bar. This is what the live layer renders |
 | `solo` | a lead | A claimed stretch of bars; one solo at a time |
 | `say` | anyone | Banter. Bounded, as the lane forms bound comments |
 | `release` | a player | Gives the instrument up |
 
 The rules are the room's own and customizable, as in the coding demo: the
-instrument order, who may `interpret`, how long a solo may run. A drummer
-whose grant covers drums and tries to `interpret` is refused, and the
-refusal is recorded; the demo should show that once.
+instrument order, who may `interpret`, how long a solo may run, and the
+lookahead, which is a value of the jam definition's rules item, set at
+founding and changed by a rules act. A drummer whose grant covers drums
+and tries to `interpret` is refused; the refusal is the lane's answer to
+that act, shown on the page and in the agents' banter, and nothing is
+written (a refused act writes nothing). The demo should show that once.
+A rhythm phrase is a second `sing` with a kind field, tune or rhythm; an
+`interpret` after a rhythm sing sets tempo and grid and keeps the key.
 
 ## Where the tune is understood
 
@@ -137,3 +142,14 @@ the theme and the interpretation are facts; a player is an agent joined
 by invitation with a grant limited to its instrument; the room's rules are
 the jam's own definition. The jam still lives in its own repository and
 waits for a room it can be hosted in.
+
+## Amended 2026-10-06
+
+After the jam room note's revision 8 was adopted (planner decisions
+`dff56797` and `7fbe7c43`), this plan follows the note's record and
+timing design where the two differed: a pattern takes effect at the
+derived bar and names no start bar; a refused act is answered and shown,
+not recorded; a rhythm phrase is a second `sing`; the lookahead is a
+value of the rules item; and an entry's effect bar is never before the
+effect bar of the entry before it in sequence. The note is the design in
+force; this plan is the story.

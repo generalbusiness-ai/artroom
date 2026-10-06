@@ -29,8 +29,10 @@ describe("founding a directory (sections 2.2, 2.3 and 7.1)", () => {
     const unverified = { answer: "refused", reason: "source-unverified" };
     expect([await s.stub.found(other.signed, definition.declared), await empty.found(other.signed, definition.declared)]).toEqual([unverified, unverified]);
     expect(await empty.summary(reader)).toEqual({ ok: false, reason: "not-found" });
-    // A platform definition is supplied in code. The package holds the data of this one and no rule for three of its marks, so it runs nothing.
-    expect(await stubOf(other.name).found(other.signed, "platform:directory@1")).toEqual({ answer: "refused", reason: "unsupported-definition" });
+    // A platform definition is supplied in code, by its name and version. This runtime holds none of that name, so it founds nothing
+    // under it. The whole-scope rule for a version that lacks one rule is shown on real scopes in `membership.test.ts`, by a control,
+    // and where a founding stops in `founding-real.test.ts`.
+    expect(await stubOf(other.name).found(other.signed, "platform:task@1")).toEqual({ answer: "refused", reason: "unsupported-definition" });
   });
 
   test("once a scope has a genesis it runs under its pinned definition and no other", async () => {

@@ -21,6 +21,7 @@
 
 import type { CapabilityName, Digest, Effect, Entry, Evidence, Input, OperationId, PlatformDefinition, Send, Timestamp } from "@generalbusiness/artroom-contract";
 import { canonicalBytes, digestBytes, isEvidence } from "@generalbusiness/artroom-bytes";
+import type { Own } from "./fields.ts";
 import type { Draft } from "./judge.ts";
 import type { AttemptState, Operation, OutcomeState, StateView } from "./state.ts";
 import { timeMs, type Clock } from "./time.ts";
@@ -91,8 +92,19 @@ export interface OperationRules {
    * outcome entry. It derives nothing and settles nothing. Absent: it may.
    */
   ready?(view: StateView, operation: Operation, attempt: number): boolean;
-  /** Item 4: the evidence is well formed for this owner. Absent: any body is. The ledger has checked that the evidence has a basis and a body. */
-  wellFormed?(result: Result, evidence: Evidence): boolean;
+  /**
+   * Item 4: the evidence is well formed for this owner. Absent: any body is. The ledger has checked that the evidence has a basis and
+   * a body. It is given the folded state before the outcome entry and the outcome as the judge sets it, as the retry rule is: an
+   * owner may state a body that names what its own records hold, such as the name of the attempt (authority note, section 12.1.1).
+   */
+  wellFormed?(result: Result, evidence: Evidence, view: StateView, outcome: OutcomeInput): boolean;
+  /**
+   * The body of the evidence of an `unknown` outcome of that attempt, where the owner states one (authority note, sections 12.1.1
+   * and 12.1.2: `{ name }`, `{ credential }`, `{ id }` or an empty record). The runtime's driver asks it when no answer came, and
+   * offers the outcome with that body and the basis `none`. It derives nothing: the judge checks the body, as it checks every
+   * other, by `wellFormed`. `own`: the scope's own earlier entries, by position. Absent: the body is null.
+   */
+  unknown?(view: StateView, operation: Operation, attempt: number, own: Own): unknown;
   /**
    * The snapshots that the evidence names by digest (section 16.4): each is
    * a retained input, and the scope stores its bytes before the entry that
@@ -120,6 +132,23 @@ export interface OperationRules {
    * `cc570904`'s.
    */
   closure?: number;
+  /**
+   * The operations that an outcome entry of this kind opens are reserved by
+   * another duty than the operation itself, which the owner's specification
+   * counts: a publication of the destination reserves, at its `reserve`,
+   * every operation of its judgment, its push and its receipt (authority
+   * note, section 5.8, the two rows of the destination). The kinds of such
+   * an owner open each other in a circle, as a `judge` opens a push whose
+   * outcome opens the next `judge`, so no number is a closure of one. The
+   * ledger then makes no closure check for an outcome of this kind, and
+   * `closure` counts nothing for it. Absent: the closure is the check.
+   */
+  // I3 merge: THE COUNT OF THAT OTHER DUTY IS NOT BUILT FOR ANY OWNER, so this member exempts and reserves nothing. A destination
+  // reserves for an open operation only its own outcome entries. By the note's own table one publication may write 71 entries that
+  // no admission reserved (the platform package's `publicationRoom`, whose test holds the number and the kinds that state this
+  // member). What the adopted texts do not state, so that the count could be derived from the folded state, is in the I3 deltas,
+  // entry FC1, with entry FA3; the owner is request `cc570904`.
+  covered?: boolean;
 }
 
 /**
@@ -346,12 +375,12 @@ export function outcomeOf(view: StateView, definition: ValidDefinition, outcome:
   if (!rules) return { result: "unavailable", reason: "unavailable" };
   // Rule 3 and item 4: a read counts only where the owner defines it as decisive. A listing, an inventory or an occupied name never is for a create.
   if (evidence.basis === "read" && !rules.read) return invalid("a read is not decisive for that kind of operation");
-  if (rules.wellFormed && !rules.wellFormed(result, evidence)) return invalid("the evidence is not well formed for its owner");
+  // What an owner's rule and the entry are given: the input as the judge sets it, with the operation's owner and kind.
+  const input: OutcomeInput = { type: "outcome", operation: operation.id, attempt: attempt.attempt, owner: operation.owner, kind: operation.kind, result, evidence };
+  if (rules.wellFormed && !rules.wellFormed(result, evidence, view, input)) return invalid("the evidence is not well formed for its owner");
 
   // Item 7: `selected` is true when the result is `confirmed`, the slot is empty at this commit and the owner's guard holds. Every
   // other `confirmed` outcome of a selecting operation is recorded as not selected. The order of the outcome entries decides.
-  // What an owner's rule and the entry are given: the input as the judge sets it, with the operation's owner and kind.
-  const input: OutcomeInput = { type: "outcome", operation: operation.id, attempt: attempt.attempt, owner: operation.owner, kind: operation.kind, result, evidence };
   const selected = rules.selects && result === "confirmed" ? operation.selected === null && (rules.holds?.(view, operation, input) ?? true) : null;
   // Item 2: the outcome entry of attempt n opens attempt n + 1 when its result is `refused` or `unknown`, the owner's retry rule
   // allows another, fewer than the stated number are opened and nothing is selected. Rule 7: none is opened beyond the stated
@@ -362,7 +391,8 @@ export function outcomeOf(view: StateView, definition: ValidDefinition, outcome:
   // Section 17.2, row 5: an outcome entry is never asked whether it fits (section 17.3), so what it opens was reserved with its own
   // operation, as the closure that the owner declares. An owner whose outcome would open more has broken its own declaration:
   // fail closed, and nothing is written.
-  if (derived.opens.reduce((entries, open) => entries + reservedBy(open, owners), 0) > (rules.closure ?? 0)) return { result: "unavailable", reason: "unavailable" };
+  // An owner whose specification reserves them by another duty states `covered`, and is not asked here.
+  if (rules.covered !== true && derived.opens.reduce((entries, open) => entries + reservedBy(open, owners), 0) > (rules.closure ?? 0)) return { result: "unavailable", reason: "unavailable" };
   // Section 6.1, "An entry that cannot be refused": the same for the most that the owner declares for one outcome entry.
   const { most } = rules;
   if (most && (derived.effects.length + 2 * derived.opens.length > most.effects || derived.sends.length > most.requests || derived.opens.length > most.operations)) return { result: "unavailable", reason: "unavailable" };

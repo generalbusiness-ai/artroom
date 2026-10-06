@@ -226,6 +226,10 @@ export function deriveEffects(j: Judging, forms: readonly EffectForm[], attentio
       /** The value as the slot holds it, or undefined when it is not a value of the slot's type: by the type's rule when the type is a mark, and else as data. */
       const fits = (to: FieldType, value: FieldValue): FieldValue | undefined => {
         const coded = ofCodedType(j, to, value, of);
+        // Section 4.1: an item's ID is the `seq` of the entry that opened it. So a rule may name the item that this entry opens, which
+        // the state before the entry does not hold yet: the destination's `branch.judging` "may be the one that the entry itself
+        // opens" (authority note, section 12.1.5; I3 deltas, entry FA4). It is a value of the slot when it is of the slot's type.
+        if (coded === null && to.type === "item" && value === j.self) return ([...working.values()].find((opened) => opened.id === j.self) ?? byRule)?.type === to.of ? value : undefined;
         return coded === null ? held(j, to, value) : coded ? value : undefined;
       };
       let applied: ItemEffect = effect;

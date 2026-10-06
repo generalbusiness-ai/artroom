@@ -18,8 +18,8 @@
  * read of a membership scope.
  */
 
-import type { Digest, Entry, ObservationRequest, RoutingRefusal, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
-import { canonicalize, isDigest, isKeyId, isMemberId, isPlatformDefinition, parseStrict, platformName, scopeIdOf } from "@generalbusiness/artroom-bytes";
+import type { Digest, Entry, ObservationRequest, ObservedScope, RoutingRefusal, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
+import { canonicalize, isDigest, isKeyId, isMemberId, isPlatformDefinition, isScopeId, parseStrict, platformName, scopeIdOf } from "@generalbusiness/artroom-bytes";
 import { isObject, isScopeRef, type Delivered, type ScopeState } from "@generalbusiness/artroom-derive";
 import { MEMBERSHIP, platform, standingOf } from "@generalbusiness/artroom-platform";
 import type { Membership } from "./authority.ts";
@@ -143,8 +143,13 @@ export function sentText(store: Store, seq: number, digest: Digest): string | nu
  */
 export function observedAt(store: Store, pinned: Pinned | null, asked: unknown): unknown {
   if (!pinned?.definition || pinned.named !== MEMBERSHIP) return null;
-  if (!isObject(asked) || Object.keys(asked).length !== 2 || !isScopeRef(asked["of"])) return null;
-  const of = asked["of"];
+  if (!isObject(asked) || Object.keys(asked).length !== 2) return null;
+  // `of` is a full reference, or the scope ID and the kind alone: the first read of a scope that records no incarnation yet
+  // (authority note, section 12.1, "The first read").
+  const named: unknown = asked["of"];
+  const byId = isObject(named) && Object.keys(named).length === 2 && isScopeId(named["scope"]) && named["kind"] === "membership";
+  if (!isScopeRef(named) && !byId) return null;
+  const of = named as ObservedScope;
   if (isKeyId(asked["key"])) return standingOf(store, { of, key: asked["key"] });
   return isMemberId(asked["member"]) ? standingOf(store, { of, member: asked["member"] }) : null;
 }

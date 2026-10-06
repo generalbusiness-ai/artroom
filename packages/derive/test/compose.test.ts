@@ -119,8 +119,9 @@ describe("founding a directory and creating a child (sections 7.1 and 7.2)", () 
   });
 
   // Section 7.2, "The kinds of cause", the fourth row; witness 18.8, "D.0 checks that R.6 is an outcome whose operation was opened by
-  // an act with that intent digest". The creator's two entries are MADE BY HAND: no rule of a platform definition sends a creation
-  // from an outcome entry yet (I3 deltas, entry EJ1), so nothing judged them. The child's judge is the real one.
+  // an act with that intent digest". The creator's two entries are MADE BY HAND, so that the child meets what no judge would
+  // write. The sending side, where the judge of an outcome derives such a creation, is in `forms-marks.test.ts`. The child's judge
+  // is the real one.
   test("a child that an outcome entry creates: its cause is the intent of the act that opened the outcome's operation, which the creation names by a fact", () => {
     const D = founded();
     // D.1 is an act. The copy of it at hand also holds the `operation` record of ordinal 0, as a `found` of a register does.

@@ -1,9 +1,17 @@
 /**
- * `platform:register@1`, as data, with its rules (authority note, revision
- * 24, sections 3.8 and 12.1.1; its table of marks, section 12.1.8, rows 2 to
- * 6, c and r). One register for a deployment. It holds founding claims, and it
+ * `platform:register@1`, as data, with its rules (authority note, sections
+ * 3.8 and 12.1.1; its table of marks, section 12.1.8, rows 2 to 6, c, k, r
+ * and v). One register for a deployment. It holds founding claims, and it
  * owns one kind of outside effect: creating the repository at the Git host.
  * It is the one scope with no creator (the scope contract, section 7.1).
+ *
+ * The rows of `install`, `found` and `handle-form` are as the note's
+ * adopted revision 24 has them. **The outcomes of the three kinds of
+ * operation, the send `create-directory` and the effect mark
+ * `claim-active` are as the note's revision 25 states them** ("The rule
+ * `create-repository`, whole", and the three blocks after it). That
+ * revision was filed for review, and not adopted, when this was written
+ * (I3 deltas, section 26). Revision 26 is adopted since, at `f7175296`.
  *
  * One member of the data is one row of the note's tables. A cell of the
  * note that begins "Code" is a mark in this data, at the place where its
@@ -19,28 +27,22 @@
  * | `open-create-repository` | 5, effect | 6 | `found` |
  * | `handle-form` | 4, guard | r (P27) | `found`, on the field `founderHandle` |
  * | `create-repository` | 7, outcome | c | The outcomes of that kind of operation |
- * | `revoke-credential` | 7, outcome | c | The same |
+ * | `create-directory` | 7, the send | k | The send of the mark of `create-repository` |
+ * | `claim-active` | 5, effect, in a clause | v | The clause `applied` of that send |
+ * | `revoke-credential` | 7, outcome | c | The outcomes of that kind of operation |
  * | `delete-repository` | 7, outcome | c | The same |
  *
- * **One rule is not written: `create-repository`.** Its selecting outcome
- * sends the `create` of the directory, and the result of that `create`
- * runs clauses (section 12.1.1, the last row of the table of entries). The
- * adopted texts give an outcome's mark no clauses, and the judge of an
- * outcome lets its rule send no creation (I3 deltas, entry EJ1). The mark
- * stands in `outcomes`, and `registerRules` has no rule of that name: none
- * is invented. So the version lacks one rule, and by the whole-scope rule
- * (the contract's section 6.1) no register is founded under
- * `platform:register@1`. The clauses of that `create` are data all the
- * same, and they are kept here as `DIRECTORY_CLAUSES`, for the rule that
- * will send it.
+ * The data holds no mark that the table does not list, and every mark has
+ * its rule here. So a runtime with this package can run
+ * `platform:register@1`.
  *
  * The note's `max`, text lengths and ranges are examples that the proof
  * plan owns. They are written as the note has them.
  */
 
-import type { PlatformData, PlatformDefinition, PlatformEffect, Seed } from "@generalbusiness/artroom-contract";
-import { intentDigest, seedDigest } from "@generalbusiness/artroom-bytes";
-import type { RuleGiven, Rules, StateView } from "@generalbusiness/artroom-derive";
+import type { Digest, FieldValue, OperationId, PlatformData, PlatformDefinition, ScopeId, Seed } from "@generalbusiness/artroom-contract";
+import { base32, intentDigest, isDigest, seedDigest, utf8 } from "@generalbusiness/artroom-bytes";
+import { isObject, type Item, type Opening, type OutcomeRule, type Own, type RuleGiven, type Rules, type StateView } from "@generalbusiness/artroom-derive";
 import { handleForm } from "./membership.ts";
 
 /** The name and version that this data and these rules are. The `operation` effects of its rules state it as their owner. */
@@ -61,20 +63,6 @@ export const REPOSITORY = {
   type: "record",
   of: { host: { ...NAME, required: true }, namespace: { ...NAME, required: true }, name: { ...NAME, required: true }, id: { ...NAME, required: true } },
 } as const;
-
-/**
- * The clauses of the `create` of a directory (section 12.1.1, the row "The
- * result of the `create`"). `applied`: the claim is `active`, with the
- * directory's reference and its genesis. `conflict` and `refused`: no
- * effect. The incident that the row states for `refused` is no effect of
- * an entry. No row of this data holds them yet: the request is sent by the
- * rule of `create-repository`, which is not written (entry EJ1).
- */
-export const DIRECTORY_CLAUSES: { readonly [clause in "applied" | "refused" | "conflict"]: readonly PlatformEffect[] } = {
-  applied: [{ state: "active" }, { ref: { slot: "directory", from: { sender: true } } }, { ref: { slot: "genesis", from: { source: "ref" } } }],
-  refused: [],
-  conflict: [],
-};
 
 export const register: PlatformData = {
   format: "artroom-definition-1",
@@ -172,8 +160,9 @@ export const register: PlatformData = {
   rules: {},
   // The operation kinds that this definition owns, each with the mark of the rule for its outcome entries (row c of the further marks).
   outcomes: {
-    // I3 merge: this mark has no rule. It is written when the I3 deltas' entry EJ1 is answered, with `DIRECTORY_CLAUSES`.
-    "create-repository": { code: "create-repository", row: "P16" },
+    // Its `send` is the one request of the selecting outcome: the `create` of the directory (row k). The clause `applied` holds one
+    // effect mark, `claim-active` (row v). `refused` and `conflict`: no effect. Each is an incident, which is no effect of an entry.
+    "create-repository": { code: "create-repository", row: "P16", send: { code: "create-directory", row: "P16", result: { applied: [{ code: "claim-active", row: "P16" }], refused: [], conflict: [] } } },
     "revoke-credential": { code: "revoke-credential", row: "P16" },
     "delete-repository": { code: "delete-repository", row: "P16" },
   },
@@ -198,11 +187,79 @@ const signed = ({ input }: RuleGiven) => {
 export const directorySeed = (given: RuleGiven): Seed =>
   ({ v: 1, kind: "directory", definition: DIRECTORY, creator: given.resolved.at, cause: intentDigest(signed(given).intent), ordinal: 0 });
 
+// ---------------------------------------------------------------- the outcomes of the register's operations
+
+/** The bound on each text of the evidence of the register's operations (section 12.1.1: "each a text of at most 256 bytes"). */
+const EVIDENCE_TEXT = 256;
+const isText = (value: unknown): value is string => typeof value === "string" && utf8(value).length <= EVIDENCE_TEXT;
+/** The body of an outcome's evidence, when it is a record with each of `needs`, and with no member outside `needs` and `may`. Null: "a body with another member or a missing one". */
+const bodyOf = (body: unknown, needs: readonly string[], may: readonly string[] = []): Readonly<Record<string, unknown>> | null =>
+  (isObject(body) && needs.every((name) => Object.hasOwn(body, name)) && Object.keys(body).every((name) => needs.includes(name) || may.includes(name)) ? body : null);
+
+/** The position of the entry that opened an operation, which its ID states (the contract's section 4.1). */
+const openedAt = (operation: OperationId): number => Number(operation.split(":")[0]);
+
+/**
+ * The claim that an operation `create-repository` is for (section 12.1.1,
+ * "The owner's local guard"): the item that the opening entry opened, the
+ * `found` entry at the position that the operation's ID states. An item's
+ * ID is the position of the entry that opened it. Null: no claim is there.
+ */
+const claimOf = (state: Pick<StateView, "item">, operation: OperationId): Item | null => {
+  const item = state.item(openedAt(operation));
+  return item?.type === "claim" ? item : null;
+};
+
+/**
+ * The attempt's own name (section 12.1.1): the 52 characters of the
+ * directory's scope ID after its prefix `sc_`, a hyphen, and the attempt's
+ * number in decimal. The scope ID is that of the seed whose digest the
+ * claim holds as `seed`: a scope ID is `sc_` and the 52 base32 characters
+ * of the 32 bytes of its seed's digest. So the name is a function of the
+ * claim and the number, and a replay derives it.
+ */
+export const repositoryName = (seed: Digest, attempt: number): string =>
+  `${base32(Uint8Array.from(seed.slice(seed.indexOf(":") + 1).match(/../g) ?? [], (byte) => Number.parseInt(byte, 16)))}-${attempt}`;
+
+/** The scope ID of the directory whose seed has that digest, which a claim holds as `seed`. */
+export const directoryIdOf = (seed: Digest): ScopeId => `sc_${repositoryName(seed, 0).slice(0, 52)}` as ScopeId;
+
+/** The own name of the attempt of an outcome of `create-repository`, from the claim of its operation. Null: the operation has no claim. */
+const ownName = (state: Pick<StateView, "item">, operation: OperationId, attempt: number): string | null => {
+  const seed = claimOf(state, operation)?.values["seed"];
+  return isDigest(seed) ? repositoryName(seed, attempt) : null;
+};
+
+/** One cleanup that an outcome of `create-repository` opens: 3 attempts (section 12.1.1; U9). */
+const cleanup = (kind: "revoke-credential" | "delete-repository"): Opening => ({ owner: REGISTER, kind, attempts: CREATION_ATTEMPTS });
+/** The entries that the two cleanups of one outcome entry reserve: two operations of three attempts each, with a first outcome and a late answer for each attempt (the contract's section 17.2, row 5). */
+const CLEANUPS = 2 * (2 * CREATION_ATTEMPTS);
+
+/** The body of the evidence of the outcome entry that opened a cleanup: a `confirmed` outcome of `create-repository`, at the position that the cleanup's ID states. */
+const openingBody = (own: Own, operation: OperationId): Readonly<Record<string, unknown>> | null => {
+  const input = own(openedAt(operation))?.entry.input;
+  return input?.type === "outcome" && input.kind === "create-repository" && isObject(input.evidence.body) ? input.evidence.body : null;
+};
+
+/**
+ * The rule of the outcomes of one cleanup (section 12.1.1, the table of
+ * the two kinds): every body is one member, which is the one that the
+ * opening entry's body holds under that name.
+ */
+const ofCleanup = (member: "credential" | "id"): OutcomeRule => ({
+  selects: false, read: false,
+  retries: () => true,
+  wellFormed: (_result, evidence, given) => {
+    const named = given.input.type === "outcome" ? openingBody(given.own, given.input.operation)?.[member] : undefined;
+    return typeof named === "string" && bodyOf(evidence.body, [member])?.[member] === named;
+  },
+  unknown: (_state, operation, _attempt, own) => ({ [member]: openingBody(own, operation.id)?.[member] ?? null }),
+});
+
 /**
  * The rules of `platform:register@1`, by the name that a mark states
  * (section 12.1.8, the table of marks). Each is a pure function of what a
- * rule is given. None reads the clock. `create-repository` is not here: see
- * the head of this file.
+ * rule is given. None reads the clock.
  */
 export const registerRules: Rules = {
   /**
@@ -260,19 +317,160 @@ export const registerRules: Rules = {
     ],
   },
   /**
+   * Row c, for the outcomes of `create-repository` (P16), as the note's
+   * revision 25 states it whole (section 12.1.1, "The rule
+   * `create-repository`, whole").
+   *
+   * - The kind selects one result. The owner's local guard: the claim's
+   *   `repository` is unset. The claim is the item that the opening entry
+   *   opened.
+   * - A read is never decisive: only the request's own answer settles an
+   *   attempt. A listing of the namespace decides nothing (section 3.8).
+   * - Another attempt follows a `refused` or an `unknown`. The ledger checks
+   *   that fewer than 3 are opened and that nothing is selected.
+   * - The evidence. `confirmed`, basis `own-answer`: `{ name, id }`, or
+   *   `{ name, id, credential }`, each a text of at most 256 bytes.
+   *   `credential` is the host's ID of a credential, and never its secret.
+   *   `refused`, basis `own-answer`: `{ name, nameExists }`, with a truth
+   *   value. `unknown`, basis `none`: `{ name }`. In each, `name` is the
+   *   attempt's own name (`repositoryName`). Any other body is `bad-input`.
+   * - On the selecting outcome: one `value` effect, the claim's
+   *   `repository`, with `host` and `namespace` from the register item and
+   *   `name` and `id` from the body. The `create` of the directory is the
+   *   request of the mark's `send`, the rule `create-directory`.
+   * - On each `confirmed` outcome whose body holds `credential`: the
+   *   operation `revoke-credential`, with 3 attempts. On each `confirmed`
+   *   outcome that is not selected: the operation `delete-repository`, with
+   *   3 attempts. The ledger numbers each and opens its attempt 1.
+   * - A `refused` outcome with `nameExists` derives nothing of an entry: the
+   *   incident of section 3.8 is the operators' record.
+   * - `most`: 5 effects, one `value` and two operations with one attempt
+   *   each; one request; two operations.
+   */
+  "create-repository": {
+    place: "outcome",
+    rules: {
+      selects: true, read: false, closure: CLEANUPS, most: { effects: 5, requests: 1, operations: 2 },
+      retries: () => true,
+      holds: (given, operation) => { const claim = claimOf(given.state, operation.id); return claim !== null && (claim.values["repository"] ?? null) === null; },
+      wellFormed: (result, evidence, given) => {
+        if (given.input.type !== "outcome") return false;
+        const name = ownName(given.state, given.input.operation, given.input.attempt);
+        const body = result === "confirmed" ? bodyOf(evidence.body, ["name", "id"], ["credential"]) : result === "refused" ? bodyOf(evidence.body, ["name", "nameExists"]) : bodyOf(evidence.body, ["name"]);
+        if (name === null || !body || body["name"] !== name) return false;
+        return result === "confirmed" ? isText(body["id"]) && (body["credential"] === undefined || isText(body["credential"])) : result !== "refused" || typeof body["nameExists"] === "boolean";
+      },
+      unknown: (state, operation, attempt) => ({ name: ownName(state, operation.id, attempt) }),
+      derives: (given, operation, selected) => {
+        const body = given.input.type === "outcome" && isObject(given.input.evidence.body) ? given.input.evidence.body : {};
+        const claim = claimOf(given.state, operation.id);
+        const held = registerOf(given.state);
+        if (!claim || !held) throw new Error("an operation create-repository is of a claim of a register");
+        const repository = { host: held.values["host"]!, namespace: held.values["namespace"]!, name: body["name"] as string, id: body["id"] as string };
+        return {
+          effects: selected === true ? [{ effect: "value", item: claim.id, slot: "repository", value: repository }] : [],
+          sends: [],
+          // `selected` is null for an outcome that is not `confirmed`, which opens neither.
+          opens: [...(selected !== null && body["credential"] !== undefined ? [cleanup("revoke-credential")] : []), ...(selected === false ? [cleanup("delete-repository")] : [])],
+        };
+      },
+    },
+  },
+  /**
+   * Row k, the `send` of the mark of `create-repository` (P16), as the
+   * note's revision 25 makes it exact (section 12.1.1, "The send
+   * `create-directory`, and its clause"). It gives a request on the
+   * selecting outcome, and on no other: a `confirmed` outcome of an
+   * operation that has selected nothing, for a claim whose `repository` is
+   * unset. That is the judgment that the ledger makes of `selected`, on the
+   * same state.
+   *
+   * The request is the `create` of the directory. Its seed names this
+   * register as creator, and its cause is the digest of the founder's
+   * `found` intent, which the opening entry holds: the contract's fourth
+   * cause. It is the seed whose digest the rule `claim-seed` gave the claim.
+   * The fields: `claim`, the fact of the `found` entry, which is the opening
+   * entry; `repository`, the record that the same outcome sets; and
+   * `branch`, `founderHandle`, `recoveryKey` and, when the intent holds it,
+   * `import`, from the fields of the `found` intent. It carries no signed
+   * intent: the claim's entry holds it, and the directory retains that
+   * entry from its genesis on.
+   */
+  "create-directory": {
+    place: "send",
+    run: (given) => {
+      const input = given.input;
+      if (input.type !== "outcome" || input.result !== "confirmed") return null;
+      const operation = given.state.operation(input.operation);
+      const claim = claimOf(given.state, input.operation);
+      if (!operation || operation.selected !== null || !claim || (claim.values["repository"] ?? null) !== null) return null;
+      const opening = given.own(openedAt(input.operation));
+      const held = registerOf(given.state);
+      const body = isObject(input.evidence.body) ? input.evidence.body : {};
+      if (!opening || opening.entry.input.type !== "act" || !held) throw new Error("the operation create-repository was opened by a found entry of a register");
+      const { intent } = opening.entry.input.signed;
+      const seed: Seed = { v: 1, kind: "directory", definition: DIRECTORY, creator: given.resolved.at, cause: intentDigest(intent), ordinal: 0 };
+      const { branch, founderHandle, recoveryKey } = intent.fields;
+      const fields = {
+        claim: { at: given.resolved.at, seq: opening.entry.seq, hash: opening.hash },
+        repository: { host: held.values["host"]!, namespace: held.values["namespace"]!, name: body["name"] as string, id: body["id"] as string },
+        branch, founderHandle, recoveryKey, ...(intent.fields["import"] === undefined ? {} : { import: intent.fields["import"] }),
+      };
+      return { to: seed, message: { class: "request", type: "create", body: { fields } } };
+    },
+  },
+  /**
+   * Row v, the effect mark in the clause `applied` of the send
+   * `create-directory` (P16), as the note's revision 25 states it (section
+   * 12.1.1, "The effect mark `claim-active`"). A clause of a request that an
+   * outcome sent has no subject, so the rule finds the item. It reads the
+   * result's `of`, which names the request by the outcome entry that sent
+   * it; that outcome entry, by its position, for the operation that it
+   * belongs to; and the claim that the operation's opening entry opened.
+   *
+   * Three effects on that claim: `active`; the reference `directory`, which
+   * is the result's sender; and the reference `genesis`, which is the
+   * result's source entry. It names no refusal. Where the claim is not
+   * `pending` the state effect is one that the checks on effects refuse, so
+   * the clause changes nothing, and the result is recorded.
+   */
+  "claim-active": {
+    place: "effect", most: 3,
+    run: (given) => {
+      const input = given.input;
+      if (input.type !== "delivery" || input.message.class !== "result") throw new Error("claim-active stands in the clause of a result");
+      const sent = given.own(input.message.of.from.seq)?.entry.input;
+      const claim = sent?.type === "outcome" ? claimOf(given.state, sent.operation) : null;
+      if (!claim) throw new Error("the request was sent by an outcome of an operation create-repository, which is of a claim");
+      return [
+        { effect: "state", item: claim.id, state: "active" },
+        { effect: "ref", item: claim.id, slot: "directory", to: input.from.at as unknown as FieldValue },
+        { effect: "ref", item: claim.id, slot: "genesis", to: input.from as unknown as FieldValue },
+      ];
+    },
+  },
+  /**
    * Row c, for the outcomes of `revoke-credential`: the revocation of a
    * credential that the host returned with a repository, by its ID (section
-   * 3.8). The tables of section 12.1.1 state its attempts, and nothing that
-   * its outcome derives. So it selects nothing and derives nothing, and
-   * another attempt follows a `refused` or an `unknown` while the stated
-   * number allows. No text makes a read decisive for it, so only the
-   * request's own answer settles an attempt (I3 deltas, entry EP4).
+   * 3.8), as the note's revision 25 decides it (section 12.1.1, "The
+   * outcomes of `revoke-credential` and `delete-repository`"; I3 delta EP4).
+   *
+   * The operation is for the credential that the body of its opening entry
+   * names. The opening entry is a `confirmed` outcome of
+   * `create-repository`. A read is not decisive: only the request's own
+   * answer settles an attempt. The body of every result is
+   * `{ credential }`: for `confirmed`, the ID that the host answered as
+   * revoked. A body with another member, or a `credential` that is not the
+   * opening entry's, is `bad-input`. The rule selects nothing and derives
+   * nothing. Another attempt follows a `refused` or an `unknown`, to 3.
    */
-  "revoke-credential": { place: "outcome", rules: { selects: false, read: false, retries: () => true } },
+  "revoke-credential": { place: "outcome", rules: ofCleanup("credential") },
   /**
    * Row c, for the outcomes of `delete-repository`: the deletion of a
    * repository that was not selected, by the ID that its own answer gave
-   * (section 3.8, "What stays owed"). As `revoke-credential`.
+   * (section 3.8, "What stays owed"). As `revoke-credential`, with the body
+   * `{ id }`: the repository that the body of its opening entry names by
+   * `id`.
    */
-  "delete-repository": { place: "outcome", rules: { selects: false, read: false, retries: () => true } },
+  "delete-repository": { place: "outcome", rules: ofCleanup("id") },
 };

@@ -27,8 +27,8 @@
  *
  * | Route | Operation |
  * |---|---|
- * | `POST /v1/scopes` | Found a directory. Body `{ founding, definition, definitions?, texts? }`. |
- * | `POST /v1/scopes/:scope/acts` | Submit an act. Body `{ signed, grants, texts?, presented? }`. `texts`: each detached text that a field names by digest. `presented`: the facts presented beside the intent, by name. |
+ * | `POST /v1/scopes` | Found a scope with no creator: under `platform:register@1` the founding register, by an `install` intent; under another definition a directory. Body `{ founding, definition, definitions?, texts? }`. |
+ * | `POST /v1/scopes/:scope/acts` | Submit an act. Body `{ signed, grants, texts?, presented?, values? }`. `texts`: each detached text that a field names by digest. `presented`: the facts presented beside the intent, by name. `values`: each value that a place of the act names by digest, as its canonical bytes; only an act of a platform definition has a place. |
  * | `POST /v1/scopes/:scope/preparations` | Ask for one step of a capability. Body `{ signed, grants, capability, step }`. `signed`: the signed intent that the step prepares for. |
  * | `POST /v1/scopes/:scope/settle` | The receipt of an accepted act. Body `{ signed }`. |
  * | `GET /v1/scopes/:scope` | The summary. |
@@ -66,8 +66,8 @@ import { WorkerEntrypoint } from "cloudflare:workers";
 import type { Answer, Beside, Cursor, DeclaredDefinition, Digest, DutyId, Grant, LogPage, PlatformDefinition, Read, ReadRefusal, RetainedInput, ScopeApi, ScopeId, Seed, SessionAnswer, SessionRefusal, Settlement, SignedIntent } from "@generalbusiness/artroom-contract";
 import { definitionDigest, intentDigest, isScopeId, positionOf, scopeIdOf } from "@generalbusiness/artroom-bytes";
 import { isObject, type Item } from "@generalbusiness/artroom-derive";
-import type { Founded } from "./core.ts";
-import { recordedMembership, repositoryAuthority } from "./authority.ts";
+import { foundedKind, type Founded } from "./core.ts";
+import { fixedMembership, repositoryAuthority } from "./authority.ts";
 import { membershipIn, namespace, type Binding } from "./namespace.ts";
 import { ScopeObject, type Wiring } from "./object.ts";
 import type { Incident } from "./operator.ts";
@@ -136,7 +136,9 @@ export function api(binding: Binding, address: string | null = null): Api {
     async found(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions: readonly DeclaredDefinition[] = [], beside: Beside = {}): Promise<Founded> {
       let name: ScopeId;
       try {
-        const seed: Seed = { v: 1, kind: "directory", definition: typeof definition === "string" ? definition : definitionDigest(definition), creator: null, cause: intentDigest(founding.intent), ordinal: 0 };
+        const names = typeof definition === "string" ? definition : definitionDigest(definition);
+        // Under the register's platform definition the scope is the founding register, of the kind `register` (I3 delta EP2).
+        const seed: Seed = { v: 1, kind: foundedKind(names), definition: names, creator: null, cause: intentDigest(founding.intent), ordinal: 0 };
         name = scopeIdOf(seed);
       } catch {
         return { answer: "refused", reason: "source-unverified" };   // not values that have canonical bytes
@@ -242,7 +244,7 @@ export async function route(request: Request, binding: Binding): Promise<Respons
     const given = await body(request);
     if (!given) return json(400, { error: "bad-request" });
     // What travels beside the intent is untrusted, like the rest of the body: the scope reads each text and each presented fact itself.
-    const beside = { ...("texts" in given ? { texts: given["texts"] } : {}), ...("presented" in given ? { presented: given["presented"] } : {}) } as Beside;
+    const beside = { ...("texts" in given ? { texts: given["texts"] } : {}), ...("presented" in given ? { presented: given["presented"] } : {}), ...("values" in given ? { values: given["values"] } : {}) } as Beside;
     if (scope === undefined) return answered(await scopes.found(given["founding"] as SignedIntent, given["definition"] as DeclaredDefinition, (given["definitions"] ?? []) as DeclaredDefinition[], beside), 201);
     if (what === "acts") return answered(await scopes.submit(scope, given["signed"] as SignedIntent, (given["grants"] ?? []) as Grant[], beside), 200);
     if (what === "sessions") {
@@ -278,10 +280,10 @@ export async function route(request: Request, binding: Binding): Promise<Respons
  * The two parts of a wiring that read sessions need, over one source of the
  * session configuration, which is asked at every use. The readers port
  * accepts a session only for the membership scope that the scope itself
- * records: the reference that its authority reads (`recordedMembership`).
+ * records: the reference that its authority reads, with its incarnation (`fixedMembership`).
  */
 export function sessionWiring(sessions: () => Sessions | null): Required<Pick<Wiring, "readers" | "sessions">> {
-  return { readers: (given) => sessionReaders({ sessions, clock: given.clock, scope: given.scope, membership: (scope) => recordedMembership(given, scope) }), sessions };
+  return { readers: (given) => sessionReaders({ sessions, clock: given.clock, scope: given.scope, membership: (scope) => fixedMembership(given, scope) }), sessions };
 }
 
 /**

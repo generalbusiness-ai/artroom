@@ -15,7 +15,9 @@
  * membership. A membership scope there judges its own acts on its own head,
  * and every other scope reads the membership scope that its genesis
  * records, through the namespace. Four of its ports are not the production
- * ones, and each is labelled: the shared scripted clock, and transport that
+ * ones, and each is labelled, and a fifth where a test wires it: the
+ * STAND-IN host of `outside.ts`, as the outside port of a register. The
+ * four: the shared scripted clock, and transport that
  * a test can hold; the test readers,
  * a stand-in for read sessions, until a test sets `platformNet.sessions`, and from then the real read sessions; and the scripted peers,
  * a stand-in for a lane that sends a notice. The platform definitions are
@@ -84,12 +86,12 @@ export class PlatformScope extends DeployedScope<PlatformEnv> {
     const deployed = super.wiring(name);
     const { resolver, definitions, transport } = deployed.ports as Required<NonNullable<Wiring["ports"]>>;
     // With a test secret the session configuration is the test's. With none it is the deployed one, from this Worker's bindings.
-    const wired = sessionWiring(() => (platformNet.secret === null ? deployed.sessions!() : sessionsOf(platformNet.secret, TEST_DEPLOYMENT)));
+    const session = sessionWiring(() => (platformNet.secret === null ? deployed.sessions!() : sessionsOf(platformNet.secret, TEST_DEPLOYMENT)));
     return {
       ...deployed,
-      sessions: wired.sessions,
+      sessions: session.sessions,
       readers: (given) => {
-        const real = wired.readers(given);
+        const real = session.readers(given);
         return { allows: (reader, read) => (platformNet.sessions ? real.allows(reader, read) : true) };
       },
       ...(platformNet.limits ? { limits: platformNet.limits } : {}),
@@ -100,6 +102,9 @@ export class PlatformScope extends DeployedScope<PlatformEnv> {
         // A scripted peer: an entry that a test wrote by hand, for a lane that sends a notice. Every other entry is read from the real object.
         resolver: { read: (fact, seconds) => { const peer = net.peers.get(fact.hash); return peer ? Promise.resolve(peer) : resolver.read(fact, seconds); } },
         definitions: { read: (named, holder) => definitions.read(named, holder), platform: (named) => (platformNet.without === null ? platform(named) : lacking(named, platformNet.without)) },
+        // The ports that one test wired for this name: the STAND-IN host of `outside.ts`, for a register, whose one outside effect is
+        // the creation of a repository at the Git host. With none wired the outside port is the production one, which sends nothing.
+        ...wired.get(name ?? "")?.(),
       },
     };
   }

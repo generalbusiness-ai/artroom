@@ -1,8 +1,8 @@
 import { expect, test } from "vitest";
 import { PROPOSED_BOUNDS, type DeclaredDefinition } from "@generalbusiness/artroom-contract";
 import { definitionDigest } from "@generalbusiness/artroom-bytes";
-import { PROFILES, derivable, runnable, validateDefinition } from "@generalbusiness/artroom-derive";
-import { FIRST_ACTIONS, ROLE_LISTS, RULES, definitions, inbox, membership, platform } from "../src/index.ts";
+import { PROFILES, derivable, reservedBy, ruleAt, runnable, validateDefinition } from "@generalbusiness/artroom-derive";
+import { DESTINATION, DESTINATION_ATTEMPTS, DESTINATION_KINDS, FIRST_ACTIONS, ROLE_LISTS, RULES, definitions, destinationMembership, destinationRulesScope, inbox, membership, platform, publicationRoom, rulesMembership } from "../src/index.ts";
 
 // The plan's T43, for `platform:inbox@1` (authority note, revision 16, section 12.1.6). The package holds six definitions: the two
 // lists at the end of this test name them. T43 for each of the other five is in this file or in the test file of its definition.
@@ -95,4 +95,69 @@ test("the membership definition validates whole with the platform option; every 
     ["role-table", "effect"], ["member-of", "effect"], ["handle-form", "guard"], ["last-admin-kept", "guard"],
   ]);
   expect([runnable(checked.definition, rules), ...Object.keys(rules).map((lost) => runnable(checked.definition, { ...rules, [lost]: undefined as never }))]).toEqual([true, ...Object.keys(rules).map(() => false)]);
+});
+
+// The plan's steps 9 and 9c, as the authority note's revision 25 decides them (its "What revision 25 lets the I3 source do next"):
+// "Then `platform:directory@1` lacks no rule", and the register's one rule that every founding waited on is written.
+// Steps 9b, 9e and 9f, on the note's revision 26 (I3 deltas, section 29): the destination lacks exactly two rules.
+test("the register and the directory each lack no rule, so a runtime with this package runs both; the destination lacks exactly two, first-head and receipt, so it is not run", () => {
+  /** The marks of one definition's data that the package's table has no rule of the right kind for, by name, once each. */
+  const lacks = (named: string): string[] | null => {
+    const supplied = platform(named)!;
+    const checked = validateDefinition(JSON.parse(JSON.stringify(supplied.data)), PROPOSED_BOUNDS, PROFILES, { platform: true });
+    if (!checked.ok) return null;
+    const missing = checked.definition.marks.filter((mark) => ruleAt(supplied.rules, mark.code, mark.kind) === null).map((mark) => mark.code);
+    // `runnable` is the whole-scope rule that a scope's runtime asks before it founds or creates anything under the definition.
+    expect(runnable(checked.definition, supplied.rules)).toBe(missing.length === 0);
+    return [...new Set(missing)];
+  };
+  expect([lacks("platform:register@1"), lacks("platform:directory@1")]).toEqual([[], []]);
+  // The two rules of the destination's outcomes that wait on two details asked of the contract (authority note, section 12.1.5,
+  // "The founding commit, and the receipt"; entry ER9). Every other mark of `platform:destination@1` has its rule.
+  expect([lacks("platform:destination@1"), lacks("platform:membership@1"), lacks("platform:rules@1"), lacks("platform:inbox@1")]).toEqual([["first-head", "receipt"], [], [], []]);
+});
+
+// Authority note, revision 25, section 12.1, "Where the rules scope and the destination record their membership reference" (I3 deltas
+// EM21, EQ7 and EU6). The states are MADE BY HAND: one item with the value, and the incarnations that the fold would hold.
+test("a rules scope and a destination record the scope ID of membership as a value, and the incarnation is that of the observations of that ID which their entries retain: none before the first, and no reference from a state that holds two", () => {
+  const [id, other] = ["sc_membership", "sc_rules"];
+  const holding = (type: string, values: Record<string, string>, fixed: Record<string, readonly string[]>) =>
+    ({ page: (asked: string) => ({ items: asked === type ? [{ values }] : [], more: false }), incarnations: (scope: string) => fixed[scope] ?? [] }) as never;
+  const { membership: ofRules } = platform("platform:rules@1")!;
+  const { membership: ofDestination } = platform("platform:destination@1")!;
+  expect([ofRules, ofDestination, platform("platform:membership@1")!.membership, platform("platform:inbox@1")!.membership]).toEqual([rulesMembership, destinationMembership, undefined, undefined]);
+  expect([
+    ofRules!(holding("rules", { membership: id }, {})), ofRules!(holding("rules", { membership: id }, { [id]: ["in_a"], [other]: ["in_z"] })), ofRules!(holding("rules", { membership: id }, { [id]: ["in_a", "in_b"] })), ofRules!(holding("rules", {}, {})),
+    ofDestination!(holding("branch", { membership: id, rules: other }, { [other]: ["in_z"] })), ofDestination!(holding("branch", { membership: id, rules: other }, { [id]: ["in_a"] })),
+    destinationRulesScope(holding("branch", { membership: id, rules: other }, { [other]: ["in_z"] })),
+  ]).toEqual([
+    { scope: id, kind: "membership", inc: null }, { scope: id, kind: "membership", inc: "in_a" }, null, null,
+    { scope: id, kind: "membership", inc: null }, { scope: id, kind: "membership", inc: "in_a" },
+    { scope: other, kind: "rules", inc: "in_z" },
+  ]);
+});
+
+// Authority note, revision 26, section 5.8, the two rows of the destination; the contract's section 17.2, row 5. The reservation by a
+// publication is NOT BUILT (I3 deltas, entries FA3 and FC1). This test holds what is exempt meanwhile, and by how much, so that neither
+// grows unseen: the kinds that state `covered`, and the entries of the note's own table that no admission reserves.
+test("only five kinds of the destination state that what their outcomes open is covered by another duty; by the note's table a publication reserves 4 and 68 entries, its admission is asked for the 2 of its judge, and 71 are reserved by no admission", () => {
+  /** Each rule of an outcome, of every definition of the package, that states `covered`; and each that declares a closure. */
+  const stating = (member: "covered" | "closure") => Object.entries(RULES).flatMap(([name, rules]) =>
+    Object.entries(rules).flatMap(([code, rule]) => (rule.place === "outcome" && rule.rules[member] !== undefined ? [`${name}:${code}`] : [])));
+  expect(stating("covered")).toEqual(["mint", "push", "deciding-read", "adopt-read", "judge"].map((code) => `platform:destination:${code}`));
+  // A kind that states `covered` declares no closure: the ledger then counts nothing for what an outcome of it opens.
+  expect(stating("closure").filter((rule) => rule.startsWith("platform:destination:"))).toEqual([]);
+
+  // The table, in entries: 1 + 2 + 1, and 30 + 1 + 4 + 1 + 1 + 31. The 30 is 6 for the push, 6 for the three mints and 18 for the
+  // three revocations. A new `reserve` needs 73 with its own entry (the witness "a destination at its budget", step 1).
+  const room = publicationRoom();
+  expect([room.queued, room.reserved, 1 + room.queued + room.reserved]).toEqual([4, 68, 73]);
+  // What the ledger asks of the delivery of `reserve`, the one entry of a publication that is new work: the two outcome entries of
+  // the `judge` that it opens, and nothing for what that outcome opens. The table counts one of the two, the decision.
+  const { rules } = platform(DESTINATION)!;
+  const kindRule = rules["judge"]!;
+  const owners = { rules: () => (kindRule.place === "outcome" ? { ...kindRule.rules, retries: () => false } : null) } as never;
+  expect([reservedBy({ owner: DESTINATION, kind: DESTINATION_KINDS.judge, attempts: DESTINATION_ATTEMPTS.judge }, owners), room.asked]).toEqual([2, 2]);
+  // So of the table's 72, 71 are written or reserved by entries that are never asked whether they fit: outcome entries.
+  expect(room.unreserved).toBe(71);
 });
