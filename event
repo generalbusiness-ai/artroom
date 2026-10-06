@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:e2808173af88bbb2c9aca9056458322e578c8af2","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-05-i3-implementation-plan.md."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:e2a1d9944be65a9e9955ed6489fb9922e5903567","text":"Merge retired a covered predecessor; the successor is at packages/scope/test/worker.ts."}
