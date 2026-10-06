@@ -4,7 +4,7 @@ import type { Digest, Entry, FieldValue, Grant, Input, MemberObservation, Member
 import { canonicalize, definitionDigest, factRefOf, intentDigest, newIncarnation, parseStrict, scopeIdOf, seedDigest, signIntent } from "@generalbusiness/artroom-bytes";
 import { clockOf, derivable, judgeGenesis, runnable, valueDigest, type Item, type Judgment, type OutcomeRule, type PlatformRule, type RuleGiven } from "@generalbusiness/artroom-derive";
 import { Ledger, T0, creation, desk, deskDefinition, t, ticket, ticketDefinition } from "@generalbusiness/artroom-derive/testing";
-import { DIRECTORY, directory, directoryMembership, directoryRules, membershipId, platform } from "../src/index.ts";
+import { DIRECTORY, directory, directoryMembership, directoryRules, membershipId, platform, repositoryName } from "../src/index.ts";
 import { rules as rulesScopeRules, rulesScopeDefinition } from "./support-rules.ts";
 import { Directory, directoryDefinition, directoryStandIns, rita, sam, scripted, una, vic } from "./support-founding.ts";
 
@@ -168,9 +168,9 @@ describe("the rules of platform:directory@1, each as a plain function (authority
     ]);
     // Row d: basis `own-answer`, so no read is decisive; it selects nothing; another attempt may follow.
     const { rules: outcome } = directoryRules["import"] as { rules: OutcomeRule };
-    const formed = (body: unknown) => outcome.wellFormed!("confirmed", { basis: "own-answer", body });
+    const formed = (body: unknown) => outcome.wellFormed!("confirmed", { basis: "own-answer", body }, null as never);
     expect([outcome.selects, outcome.read, outcome.retries("refused", null as never, null as never), outcome.closure]).toEqual([false, false, true, undefined]);
-    expect([formed({ commit: "a".repeat(40) }), formed({ commit: "b".repeat(64) }), formed({ commit: "main" }), formed({ commit: "a".repeat(40), more: 1 }), formed(null), outcome.wellFormed!("refused", { basis: "own-answer", body: null })])
+    expect([formed({ commit: "a".repeat(40) }), formed({ commit: "b".repeat(64) }), formed({ commit: "main" }), formed({ commit: "a".repeat(40), more: 1 }), formed(null), outcome.wellFormed!("refused", { basis: "own-answer", body: null }, null as never)])
       .toEqual([true, true, false, false, false, true]);
   });
 });
@@ -187,7 +187,7 @@ test("a directory's genesis, by an outcome entry of its register, opens the repo
   // The fixed slots, from the creation's fields. The register is the scope of the claim, and the founder is the key that signed it.
   expect([p.item(0).refs, p.item(0).values]).toEqual([
     { register: p.register.at, claim: p.claim, membership: null, rules: null, destination: null },
-    { repository: { host: "git.example", namespace: "artroom", name: "repo-1", id: "r-1" }, branch: "main", founder: rita.key, founderHandle: "@rita", recoveryKey: sam.key, import: null, imported: null, lastNumber: 0 },
+    { repository: { host: "git.example", namespace: "artroom", name: repositoryName(seedDigest(genesis.seed), 1), id: "r-1" }, branch: "main", founder: rita.key, founderHandle: "@rita", recoveryKey: sam.key, import: null, imported: null, lastNumber: 0 },
   ]);
   // Three creations, in the order membership, rules, destination, each with the digest of the directory's seed as its cause. The
   // result is at ordinal 0, and the three are sealed as duties and held. The second and the third are by STAND-IN rules, at two

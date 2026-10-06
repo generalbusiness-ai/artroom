@@ -22,7 +22,7 @@ import { rulesScope } from "./rules-scope.ts";
 
 export { inbox, membership, register, directory, destination };
 export { FIRST_ACTIONS, MEMBERSHIP, NO_MEMBER, ROLE_LISTS, ROLE_TABLE, actionsIn, isHandle, standingOf, type Role } from "./membership.ts";
-export { CREATION_ATTEMPTS, DIRECTORY_CLAUSES, REGISTER, REPOSITORY, directorySeed, registerRules } from "./register.ts";
+export { CREATION_ATTEMPTS, REGISTER, REPOSITORY, directoryIdOf, directorySeed, registerRules, repositoryName } from "./register.ts";
 export { DEFINITION_DOMAIN, DIRECTORY, IMPORT_ATTEMPTS, SEEN, directoryMembership, directoryRules } from "./directory.ts";
 export { COLLECT_MOST, DESTINATION, DESTINATION_ATTEMPTS, DESTINATION_KINDS } from "./destination.ts";
 export { RULES };

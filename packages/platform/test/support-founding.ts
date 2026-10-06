@@ -6,12 +6,8 @@
  * Everything that is not the platform package's own data and rules is a
  * STAND-IN, and each is labelled where it is used.
  *
- * - `registerStandIns`: a rule for the one mark of the register's data that
- *   has no rule, `create-repository` (I3 deltas, entry EJ1). It selects the
- *   first repository, sets the claim's `repository`, and opens the two
- *   cleanups. It sends nothing: the judge of an outcome lets a rule send no
- *   creation. It shows the register's other rules, and nothing about how
- *   the selecting outcome will create a directory.
+ * The register's rules are all the platform package's: it has none here.
+ *
  * - `directoryStandIns`: a rule for each of the three marks of the
  *   directory's data that the authority note's table of marks does not
  *   list (`create-rules`, `create-destination` and `import-spent`; entries
@@ -28,10 +24,10 @@
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { Entry, FactRef, PlatformData, Request, Result, ScopeKind, ScopeRef, Seed, Send, SignedIntent } from "@generalbusiness/artroom-contract";
 import { factRefOf, intentDigest, newIncarnation, scopeIdOf, seedDigest, signIntent } from "@generalbusiness/artroom-bytes";
-import { PROFILES, clockOf, isObject, judgeDelivery, judgeGenesis, judgeOutcome, operationSettled, validateDefinition } from "@generalbusiness/artroom-derive";
-import type { ActJudgment, Judgment, Opening, PlatformRules, Rules, Source, ValidDefinition } from "@generalbusiness/artroom-derive";
+import { PROFILES, clockOf, judgeDelivery, judgeGenesis, judgeOutcome, operationSettled, ownersOf, validateDefinition } from "@generalbusiness/artroom-derive";
+import type { ActJudgment, Judgment, PlatformRules, Rules, Source, ValidDefinition } from "@generalbusiness/artroom-derive";
 import { Ledger, T0, forged, keys, t, type Actor, type Context, type Over } from "@generalbusiness/artroom-derive/testing";
-import { CREATION_ATTEMPTS, DIRECTORY, REGISTER, directory, directoryRules, directorySeed, register, registerRules } from "../src/index.ts";
+import { DIRECTORY, REGISTER, directory, directoryRules, directorySeed, register, registerRules, repositoryName } from "../src/index.ts";
 
 export const { rita, una, vic, paul, sam } = keys;
 
@@ -44,42 +40,8 @@ const checked = (data: PlatformData): ValidDefinition => {
 export const registerDefinition = checked(register);
 export const directoryDefinition = checked(directory);
 
-/** The cleanups that one outcome entry of `create-repository` may open, in entries: two operations of three attempts each, with a first outcome and a late answer for each attempt. */
-const CLEANUPS = 2 * (2 * CREATION_ATTEMPTS);
-
-/**
- * STAND-IN for the rule of `create-repository` (section 12.1.1, the row "An
- * outcome of `create-repository`"; section 3.8, "First selection"). The
- * evidence of a `confirmed` outcome is `{ name, id }`, with `credential`
- * when the host returned one. This body is made up.
- */
-export const registerStandIns: Rules = {
-  "create-repository": {
-    place: "outcome",
-    rules: {
-      selects: true, read: false, closure: CLEANUPS,
-      retries: () => true,
-      // First selection: the claim has no repository in this commit. The claim is the item that the entry of the operation opened.
-      holds: (given, operation) => (given.state.item(Number(operation.id.split(":")[0]))?.values["repository"] ?? null) === null,
-      wellFormed: (result, evidence) => result !== "confirmed" || (isObject(evidence.body) && typeof evidence.body["name"] === "string" && typeof evidence.body["id"] === "string"),
-      derives: (given, operation, selected) => {
-        const body = given.input.type === "outcome" && isObject(given.input.evidence.body) ? given.input.evidence.body : {};
-        const held = given.state.page("register", ["open"], null, 1).items[0]!;
-        const claim = Number(operation.id.split(":")[0]);
-        const repository = { host: held.values["host"]!, namespace: held.values["namespace"]!, name: body["name"] as string, id: body["id"] as string };
-        const cleanup = (kind: string): Opening => ({ owner: REGISTER, kind, attempts: CREATION_ATTEMPTS });
-        return {
-          effects: selected === true ? [{ effect: "value", item: claim, slot: "repository", value: repository }] : [],
-          sends: [],
-          opens: [...(selected !== null && body["credential"] !== undefined ? [cleanup("revoke-credential")] : []), ...(selected === false ? [cleanup("delete-repository")] : [])],
-        };
-      },
-    },
-  },
-};
-
-/** The register's rules with the stand-in: what a judge of these tests is given. */
-export const registerPlatform: PlatformRules = { named: REGISTER, rules: { ...registerRules, ...registerStandIns } };
+/** The register's rules, as the package supplies them: what a judge of these tests is given. */
+export const registerPlatform: PlatformRules = { named: REGISTER, rules: registerRules };
 
 /**
  * STAND-INS: a rule for each mark of the directory's data that the note's
@@ -159,8 +121,8 @@ export const registerSeed = (install: SignedIntent, over: Partial<Seed> = {}): S
 /**
  * A register in memory, founded by paul's `install` intent, with the policy
  * `keys` and rita's key as the one founder. Its genesis and its `found`
- * acts are judged by derive's judges with the register's own rules. An
- * outcome of `create-repository` is judged with the STAND-IN rule.
+ * acts and the outcomes of its operations are judged by derive's judges
+ * with the register's own rules.
  */
 export class Register extends Ledger {
   constructor(policy: "keys" | "open" = "keys", founders: readonly string[] | undefined = [rita.key]) {
@@ -180,12 +142,22 @@ export class Register extends Ledger {
     return this.act(who, "found", { expected: { register: this.item(0).revision }, fields: { branch: "main", founderHandle: "@rita", recoveryKey: sam.key, ...more }, idempotencyKey: key });
   }
 
-  /** The outcome of one attempt, as the operations driver offers it, judged with the register's rules and the STAND-IN for `create-repository`. Written when the judgment is to write. */
-  outcome(operation: `${number}:${number}`, attempt: number, result: "confirmed" | "refused" | "unknown", body: unknown = null, basis: "own-answer" | "read" | "none" = result === "unknown" ? "none" : "own-answer", sends: readonly Send[] = []): Judgment {
-    const judgment = judgeOutcome(this.state, registerDefinition, { type: "outcome", operation, attempt, result, evidence: { basis, body } }, { clock: clockOf(this.state, this.now), bounds: this.bounds, platform: registerPlatform, own: this.own });
+  /**
+   * The outcome of one attempt, as the operations driver offers it, judged with the register's rules. Written when the judgment is
+   * to write. `body` undefined: for an `unknown`, the body that the owner's rule states for it, as the driver asks; for another
+   * result, null.
+   */
+  outcome(operation: `${number}:${number}`, attempt: number, result: "confirmed" | "refused" | "unknown", body?: unknown, basis: "own-answer" | "read" | "none" = result === "unknown" ? "none" : "own-answer", sends: readonly Send[] = []): Judgment {
+    const judgment = judgeOutcome(this.state, registerDefinition, { type: "outcome", operation, attempt, result, evidence: { basis, body: body === undefined ? unknownBody(this, registerDefinition, registerPlatform, operation, attempt, result) : body } }, { clock: clockOf(this.state, this.now), bounds: this.bounds, platform: registerPlatform, own: this.own });
     if (judgment.result === "write") this.seal({ ...judgment.draft, sends: [...judgment.draft.sends, ...sends] });
     return judgment;
   }
+}
+
+/** The body that the runtime's driver offers for an outcome with no answer: the one that the owner's rule states for an `unknown`, or null (`scope/src/operations.ts`). */
+function unknownBody(ledger: Ledger, definition: ValidDefinition, platform: PlatformRules, operation: `${number}:${number}`, attempt: number, result: string): unknown {
+  const of = ledger.state.operation(operation);
+  return (result === "unknown" && of && ownersOf(definition, platform, null)?.rules(of.owner, of.kind)?.unknown?.(ledger.state, of, attempt, ledger.own)) ?? null;
 }
 
 /** An entry of a scope that no judge wrote: MADE BY HAND, under that definition's name, at that time. */
@@ -219,9 +191,9 @@ export class Directory extends Ledger {
     this.claim = R.fact(found);
     // SCRIPTED: the selecting outcome, with the `create` that the unwritten rule of `create-repository` will send, added by hand.
     const seed: Seed = { v: 1, kind: "directory", definition: DIRECTORY, creator: R.at, cause: intentDigest(founding.intent), ordinal: 0 };
-    const repository = { host: "git.example", namespace: "artroom", name: "repo-1", id: "r-1" };
+    const repository = { host: "git.example", namespace: "artroom", name: repositoryName(seedDigest(seed), 1), id: "r-1" };
     const create: Request = { class: "request", type: "create", body: { fields: { claim: this.claim, repository, branch: "main", founderHandle: "@rita", recoveryKey: sam.key, ...(over.import === undefined ? {} : { import: over.import }) } } };
-    written(R.outcome(`${found}:0`, 1, "confirmed", { name: "repo-1", id: "r-1" }, "own-answer", [{ n: 0, to: seed, message: create }]));
+    written(R.outcome(`${found}:0`, 1, "confirmed", { name: repository.name, id: "r-1" }, "own-answer", [{ n: 0, to: seed, message: create }]));
     const sent = R.head.seq;
     // The directory's genesis: the real judge, with the fourth cause. The claim's entry is at hand, as a fetched fact.
     const context = () => ({ clock: clockOf(this.state, this.now), bounds: this.bounds, prepared: [], own: this.own, platform: directoryPlatform });
