@@ -1,6 +1,7 @@
 # Connected browser coding current tasks
 
-2026-10-06. Planner task map for the three connected browser stories.
+2026-10-06. Planner task map for the three connected browser stories,
+updated after S3 publication and the capacity design adoption.
 
 A person must be able to start coding work in a browser, close their
 laptop, and continue watching, steering and reviewing that work on another
@@ -19,7 +20,7 @@ and amendments determine which source each owner delivers.
 |---|---|---|
 | Durable coding workspace | Task, commitment, hold, fork and environment stages; commands and their last durable boundary; acknowledged checkpoint coverage; pending effects and recovery choices. | Real repository edits, dependency installation, commands, results and prepared Git objects survive interruption at their acknowledged boundary. Uncertain effects are reconciled rather than blindly repeated. The exact contribution reaches normal proposal, review and publication. |
 | Complete browser workflow | Create or join, import, task input, progress, steering, attention, pause, resume, cancellation, real artifact review and publication. Activity stays beside recorded scope outcomes. | A new person completes a useful change through the browser. Waiting, refusal, disconnection, failed saves and uncertain publication have distinct recovery paths. An agent's statement that work is finished changes no recorded result. |
-| Device continuity | Each device has its own enrolled key for the same member. The person can observe, steer and review ongoing work, manage devices and use authorized recovery. | B continues after A closes. Unauthorized and read-only devices cannot control work or read private resources. One revoked device with another active key differs from last-key loss, member removal and agent-key revocation. |
+| Device continuity | Each device has its own enrolled key for the same member. The person can observe, steer and review ongoing work, manage devices and use authorized recovery. | B continues after A closes. Unauthorized devices cannot control work or read private resources. Read-only sessions grant no control; private reads require their own current owner/admin authority. One revoked device with another active key differs from last-key loss, member removal and agent-key revocation. |
 
 ## Current implementation owners
 
@@ -29,10 +30,13 @@ amendment together before making a source promise.
 | Work | Request and amendment | Delivery boundary |
 |---|---|---|
 | I3 platform | `bcf5ec17` | Complete register, directory, membership, rules, destination and inbox definitions; actual authority, reads, Git gateways, checks, custody, incidents and owned effects. Published M4 does not close this full request. |
-| C1 and IA hosted runtime | `b538c5ea`, amended by `d55da8ef` | Current task definition, durable conversation and command records, autonomous work, real filesystem and command tools, save and restore, private reads and export, retention and cleanup. Select and review the undecided production host and supervisor mechanism before implementing it. Use I3's interfaces. |
+| C1 and IA hosted runtime | `b538c5ea`, amended by `d55da8ef`; design milestone `b01321d3` | Current task definition, durable conversation and command records, autonomous work, real filesystem and command tools, save and restore, private reads and export, retention and cleanup. The production supervisor proposal is under review; its real-host premises remain unproved. Use I3's interfaces. |
 | C4 and I5 browser and public tools | `18815307`, amended by `20dd4a48` | Identity, enrollment, recovery, onboarding and import; browser progress, steering, attention, artifact review and publication; public client, CLI and MCP discovery, preparation, settlement and replay. Use actual I3 and IA outcomes. |
 | I6 integrated acceptance | `7c67653c` | One real deployed A-to-B journey, abrupt host interruption, acknowledged recovery, uncertain-effect reconciliation, qualified review and publication, plus a fresh-person walkthrough and matching journey documentation. |
-| Capacity | `cc570904` and promise `a1bd8c18`; source milestone S1 `f28a24bc` | cc570 is the full NoGit duty and design follow-through. S1 is a separate Git-bound delivery for initial marker closure and timed settlement-bridge repairs. All five runtime dimensions, owner decisions, measured values, physical resources and whole-workflow cost remain owed. |
+| Shared version-2 forms | `7df6a805` | Contract, bytes, derive, scope, client and replay move together. Preserve exact v1 lifetime meaning and implement the adopted selectors, authority alternatives and retained decisions. Exact R3 confirmation precedes dependent authority code; public refusals and strict readers preserve branch authorization. |
+| Compiler and closed profiles | Full owner `dce6864d`; manifest-interface design `c62fdd2b` | Deliver exact code-owner and peer dependency interfaces, the compiler, the whole commitment fragment, full definitions and an actually smaller closed profile with validated executable pins. Design counts and raw hashes do not satisfy this work. |
+| Capacity | `cc570904` and promise `a1bd8c18`; S1 `f28a24bc`, S2 `7b9e535f`, S3 `b1593dc7` | The three partial source milestones are published. The four owner choices are adopted as design. Full coverage of the 114 dispositions, five-axis runtime admission, complete producer and retained-duty accounting, measured values, physical resources and whole-workflow cost remain owed. |
+| Public-package starter | `f3299ab4`, amended by `d0682f8e` | Revise the existing design for current scope APIs and actual public release support. Preserve independent source/log reads, deliberate two-actor conflict, durable context-qualified retry, coding and actual Jam interaction, and cold outsider acceptance. Implementation follows review and adoption. |
 | Complete manual | `db2fd146` | The full approved 67-page inventory and additional troubleshooting, examples, agent guidance and cold-reader/cold-agent acceptance. I6 journey pages do not replace it. |
 
 C1 and C4 remain live requests. Their original Room, roster, UI and lease
@@ -50,66 +54,83 @@ expired retries, and the ratified unfamiliar-act browser witness
 
 ## Decisions in force and proposed changes
 
-The adopted design basis is R1 revision 23 (`78b6d129`), R2 revision 15
-(`37a482c9`), R3 revision 28 (`e93b737b`) and recovery revision 9
-(`6e89447e`). R16's mapping, questions and conservative fallback are an
-adopted partial stage (`0e67135e`). The actual smaller closed profile and
-its executable pins remain required under `dce6864d`.
+R1 revision 24 at `dffa9c90` is adopted by `09e58be0`, alongside R2
+revision 15 (`37a482c9`) and R3 revision 28 (`e93b737b`). It chooses
+ordered existing-action authority alternatives, a signed verb/noun selector
+and immutable whole build imports. Source task `7df6a805` owes the shared
+form implementation; it does not deliver the separate compiler or closed
+profiles. The design requires one current observation for all alternatives
+and preservation of the selected branch and grant in storage and replay.
+Public refusals must keep the required selected,
+attempted or null authorization. Existing v1 scopes retain their exact
+lifetime meaning and pins; menus and raw design hashes activate nothing.
+The narrow normalized-result-work wording successor `101b209b` remains
+under independent review; it changes no signed canonical bytes.
 
-R1 revision 24 is proposed under `8f0d575b` / `64c3f000`. It chooses
-ordered alternative-action authority branches, a signed verb/noun
-selector and digest-addressed build imports that produce one complete
-pinned definition. Independent design review and explicit adoption come
-before implementation. Existing scopes retain their exact lifetime pins;
-menus and raw design hashes activate nothing.
+Recovery R10 at `9bea347e` is adopted by `cf5ecc64`. Uploaded manifest
+bytes remain separate from the guarded recorded checkpoint receipt and
+pointer. Without local commit certainty, the save stays pending. The R3/IA
+decisive-read join and final-cut agreement remain explicit dependencies.
+No save or commit ends a host before the recorded agreement and required
+premises hold. The current production proposal `7b69cea8` is under DESIGN
+review `d92812e4`; its selected nested supervisor arrangement and all 14
+actual-host obligations remain unproved. A controlled-command probe does
+not establish a production environment for agent-selected commands.
 
-Corrected recovery R10 is proposed under `853e8264`. Its manifest bytes
-are separate from the guarded recorded checkpoint commit. Without local
-commit certainty, the save stays pending. The R3/IA decisive-read join,
-production supervisor separation and final-cut agreement remain explicit
-dependencies. No save or commit ends a host until the recorded agreement
-and its required premises hold. A first-stage controlled-command probe
-does not establish the production environment for agent-selected commands.
+R17 at `f674acb6`, adopted by `7a8a6698`, corrects R16's checkpoint
+page wording. Hold expiry and pause create no save. Name the valid
+acknowledged checkpoint and its exact coverage, or show unsaved, failed,
+pending or uncertain work. No acknowledged checkpoint means no promised
+restore. An older checkpoint covers no later edits or unknown effects.
+Restore and private export retain their authority and
+lifecycle guards. The original `dce6864d` smaller-profile obligation remains
+mandatory and incomplete.
 
-The saved-state page correction `4e71cbef` covers hold expiry and pause:
-name the acknowledged checkpoint and its coverage, or show the actual
-unsaved, failed, pending or uncertain state. Restoring an older checkpoint
-does not silently recover later edits.
-
-The capacity owner routing `f45f1111` and proposal `e67a930c` cover explicit
-five-axis configuration, failed-dimension reporting, exact redaction
-accounting, finite retained-evidence bounds and branch-release rules.
-These are not adopted numeric budgets or public wire fields. Valid
-redacted replay retains its existing treatment; the ratified irreducible
-binding/count ambiguity in `4157eaa2` stops verification before the
-uncertain draw. It does not permit guessed historical sizes or a blanket
-redaction failure.
+The four capacity choices at `73a8f987` are adopted by `2cf4a7d2`:
+explicit separate five-axis configuration, exact arithmetic and original-head
+failed-dimension reporting; live versus qualified historical byte accounting;
+finite producer bounds; retention of spare nonfinal-branch reservations.
+These are design choices, not implemented interfaces or measured budgets.
+The default v1 answer stays exact; the chosen opt-in capacity format cannot
+discard v2 branch authorization. Actual producer maxima and cardinalities,
+reachable branch evidence, runtime admission and measured costs remain owed.
+Valid redacted replay retains its treatment; `4157eaa2` still stops before an
+irreducibly uncertain binding/count draw. No historical length is guessed.
 
 ## Evidence and next steps
 
-M4 is recorded landed and published at
-`68ffd6371e908880b38c2c2c62d5fca9cbdeb57e`, with receipt `031ace29`
-for milestone `8eb14bd1`. This proves publication of that source
-milestone. Actual coding-host, provider, browser and cross-device
-acceptance remain with the owners above.
+M4 remains a partial I3 milestone. Capacity S1, S2 and S3 are now
+independently reviewed, sealed and published. S3's receiving main is
+`cd665d9d31ed4e0a9ba447dfe2a2ec73cf277026`, receipt `870c6472`.
+It preserves the separately reviewed guide correction, newer derive guide
+and task map. These are source publication facts; actual coding-host,
+provider, browser and cross-device acceptance remain with their owners.
 
-Next source work is capacity S1. Its partial result must pass normal
-exact-head source review and landing. R1 forms and recovery corrections
-can proceed through their independent design reviews alongside it.
-Complete capacity, I3, IA, I5 and I6 claims require their own full evidence.
+The next assigned shared-form source task is `7df6a805`. Its exact R3
+authority confirmation belongs to that handoff; it does not require reopening
+all R3 or waiting for the separate compiler-manifest design. Other capacity
+work remains with `cc570904`. The manifest interface, normalized wording and
+production runtime proposals follow their own design reviews. Complete
+capacity, I3, IA, I5 and I6 claims require their full evidence.
 Source promises name exact adopted decisions, affected interfaces and
 focused commands. Real operational runs also identify their test resources,
 authority, limits and cleanup owners; a tracking request alone is not a run.
 
 Test economy remains a priority. Reuse compact distinguishing cases and
 retained exact evidence; run affected checks and one source gate before
-review, without mutation sweeps or repeated whole suites. An unchanged
-existing late-result witness can accompany S1's new cycle and marker
-controls. Historical speed measurements do not prove the current whole
-workflow meets the 10-fold target.
+review, without mutation sweeps or repeated whole suites. S1 reused the
+existing late-result witness; S2 and S3 strengthened the same canonical
+fixture. Their retained gates do not prove a current whole-workflow
+10-fold saving. Documents-only changes with unchanged source and tests
+reuse their exact tree evidence and run no project gate.
 
 These stories add no blanket Jam readiness gate. The builder judges when
 Artroom is sufficient to build Jam, may evolve the work vocabulary during
 self-hosting, and continues the authorized Jam work and
 [full manual](../notes/2026-10-01-docs-plan.md) in parallel. Hugh retains
-the documentation-host and cold-reader choices.
+the documentation-host and cold-reader choices. Jam R9's timing direction
+is adopted by `2b3d0946`: actual hosted development needs a real deployment
+and destination publication, with plain-Git continuation after a recorded
+block of more than eight elapsed hours. The accepted J0 amendment needs
+one singer; its completed local-seed recommendation is not hosted or
+complete musical acceptance.
