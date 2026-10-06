@@ -21,6 +21,7 @@
  * | `index-number` | 5, effect | 13 | `index` |
  * | `create-lane` | 6, send | a | `open-issue`, `open-pr` |
  * | `import` | 7, outcome | d | The outcomes of an `import` |
+ * | `import-update` | 7, the send | l | The send of the mark of `import` |
  * | `create-rules` | 6, send, with `always` | s (P20) | `establish`: the second send |
  * | `create-destination` | 6, send, with `always` | t (P20) | `establish`: the third send |
  * | `import-spent` | 4, guard | u (P29) | `retry-import` |
@@ -335,8 +336,9 @@ export const directory: PlatformData = {
   },
   timed: {},
   rules: {},
-  // The operation kind that this definition owns, with the mark of the rule for its outcome entries (row d of the further marks).
-  outcomes: { import: { code: "import", row: "P16" } },
+  // The operation kind that this definition owns, with the mark of the rule for its outcome entries (row d of the further marks),
+  // and its `send`: the update `import` to the destination (row l). Its clauses are empty.
+  outcomes: { import: { code: "import", row: "P16", send: { code: "import-update", row: "P16", result: {} } } },
 };
 
 // ---------------------------------------------------------------- reading the directory's state
@@ -718,39 +720,65 @@ export const directoryRules: Rules = {
     },
   },
   /**
-   * Row d, for the outcomes of `import` (P16). Basis `own-answer`: the
-   * copy's own answer, with the imported head. No read is decisive, and it
-   * selects nothing. Another attempt follows a `refused` or an `unknown`
-   * while the stated number allows.
+   * Row d, for the outcomes of `import` (P16), as the note's revision 25
+   * decides them (section 12.1.2, "The outcomes of `import`"; I3 delta EP9).
    *
-   * `confirmed`: sets `imported`, and sends the destination the update
-   * `import`, state `done`, with `commit`. The last `refused`: the same
-   * update, state `failed`. "The last" is the one after which every stated
-   * attempt is opened and refused, so that no answer can still confirm the
-   * import (I3 deltas, entry EP9). The update is of the `repository` item,
-   * to the scope that `repository.destination` names. Its result runs no
-   * clause: the row states none (entry EJ1).
+   * - The kind selects one result. The owner's local guard:
+   *   `repository.imported` is unset. So one import is used, also when a
+   *   late answer or a retried operation is `confirmed` after another.
+   * - A read is never decisive. Another attempt follows a `refused` or an
+   *   `unknown`, while the stated number allows and nothing is selected.
+   * - The evidence. `confirmed`, basis `own-answer`: `{ commit }`, a commit
+   *   ID of 40 or 64 hexadecimal characters, the imported head. `refused`
+   *   and `unknown`: an empty record. Any other body is `bad-input`.
+   * - When `selected`: one `value` effect, `repository.imported` is the
+   *   commit. The update to the destination is the request of the mark's
+   *   `send`, the rule `import-update`.
+   * - A `confirmed` outcome that is not selected derives nothing and sends
+   *   nothing.
+   * - `most`: 1 effect, and the one request.
    */
   import: {
     place: "outcome",
     rules: {
-      selects: false, read: false,
+      selects: true, read: false, most: { effects: 1, requests: 1, operations: 0 },
       retries: () => true,
-      wellFormed: (result, evidence) => result !== "confirmed" || importedHead(evidence.body) !== null,
-      derives: (given, operation) => {
-        const input = given.input;
+      holds: (given) => { const repository = repositoryOf(given.state); return repository !== null && (repository.values["imported"] ?? null) === null; },
+      wellFormed: (result, evidence) => (result === "confirmed" ? importedHead(evidence.body) !== null : isObject(evidence.body) && Object.keys(evidence.body).length === 0),
+      unknown: () => ({}),
+      derives: (given, _operation, selected) => {
         const repository = repositoryOf(given.state);
-        const destination: unknown = repository?.refs["destination"];
-        if (input.type !== "outcome" || !repository || !isScopeRef(destination)) throw new Error("an import is of a directory that holds its destination");
-        const update = (state: "done" | "failed", detail: Record<string, FieldValue>) =>
-          ({ to: destination, message: { class: "request", type: "relate", body: { name: "import", item: { at: given.resolved.at, seq: repository.id, hash: repository.opened }, state, detail } } }) as const;
-        if (input.result === "confirmed") {
-          const commit = importedHead(input.evidence.body)!;
-          return { effects: [{ effect: "value", item: repository.id, slot: "imported", value: commit }], sends: [update("done", { commit })], opens: [] };
-        }
-        const last = input.result === "refused" && spent(operation, { attempt: input.attempt });
-        return { effects: [], sends: last ? [update("failed", {})] : [], opens: [] };
+        if (given.input.type !== "outcome" || !repository) throw new Error("an import is of a directory that holds its repository item");
+        return { effects: selected === true ? [{ effect: "value", item: repository.id, slot: "imported", value: importedHead(given.input.evidence.body)! }] : [], sends: [], opens: [] };
       },
+    },
+  },
+  /**
+   * Row l, the `send` of the mark of `import` (P16): the `relate`, `import`,
+   * of the `repository` item, to the scope that `repository.destination`
+   * names. Its clauses are empty.
+   *
+   * On the selecting outcome: state `done`, with the detail `commit`. That
+   * is a `confirmed` outcome of an operation that has selected nothing,
+   * while `repository.imported` is unset: the judgment that the ledger makes
+   * of `selected`, on the same state. On the last `refused`: state `failed`,
+   * with no detail. "The last" is the `refused` outcome after which every
+   * attempt that the operation states is opened and each has a `refused`
+   * outcome. An `unknown` attempt keeps the operation open, and no `failed`
+   * is sent for it. Otherwise no request.
+   */
+  "import-update": {
+    place: "send",
+    run: (given) => {
+      const input = given.input;
+      const repository = repositoryOf(given.state);
+      const destination: unknown = repository?.refs["destination"];
+      const operation = input.type === "outcome" ? given.state.operation(input.operation) : null;
+      if (input.type !== "outcome" || !operation || !repository || !isScopeRef(destination)) throw new Error("an import is of a directory that holds its destination");
+      const update = (state: "done" | "failed", detail: Record<string, FieldValue>) =>
+        ({ to: destination, message: { class: "request", type: "relate", body: { name: "import", item: { at: given.resolved.at, seq: repository.id, hash: repository.opened }, state, detail } } }) as const;
+      if (input.result === "confirmed") return operation.selected === null && (repository.values["imported"] ?? null) === null ? update("done", { commit: importedHead(input.evidence.body)! }) : null;
+      return input.result === "refused" && spent(operation, { attempt: input.attempt }) ? update("failed", {}) : null;
     },
   },
 };

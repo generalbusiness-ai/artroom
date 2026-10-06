@@ -183,9 +183,9 @@ export class Directory extends Ledger {
     return super.act(who, kind, over, { platform: directoryPlatform, ...context });
   }
 
-  /** The outcome of one attempt of an operation of the directory, judged with its rules. Written when the judgment is to write. */
-  outcome(operation: `${number}:${number}`, attempt: number, result: "confirmed" | "refused" | "unknown", body: unknown = null, basis: "own-answer" | "read" | "none" = result === "unknown" ? "none" : "own-answer"): Judgment {
-    const judgment = judgeOutcome(this.state, directoryDefinition, { type: "outcome", operation, attempt, result, evidence: { basis, body } }, { clock: clockOf(this.state, this.now), bounds: this.bounds, platform: directoryPlatform, own: this.own });
+  /** The outcome of one attempt of an operation of the directory, judged with its rules. Written when the judgment is to write. `body` undefined: as for `Register.outcome`. */
+  outcome(operation: `${number}:${number}`, attempt: number, result: "confirmed" | "refused" | "unknown", body?: unknown, basis: "own-answer" | "read" | "none" = result === "unknown" ? "none" : "own-answer"): Judgment {
+    const judgment = judgeOutcome(this.state, directoryDefinition, { type: "outcome", operation, attempt, result, evidence: { basis, body: body === undefined ? unknownBody(this, directoryDefinition, directoryPlatform, operation, attempt, result) : body } }, { clock: clockOf(this.state, this.now), bounds: this.bounds, platform: directoryPlatform, own: this.own });
     if (judgment.result === "write") this.seal(judgment.draft);
     return judgment;
   }
