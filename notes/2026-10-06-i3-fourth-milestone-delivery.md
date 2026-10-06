@@ -297,5 +297,19 @@ replay and scope guides now name all four scripted lane anchors, as
 documentation follow-through `3bb1fd41` asks. The named-definition
 root-count countercheck was closed by supported counterevidence; no
 directory change is included. The gate at `47bc3a5be` remains historical
-after this actual source repair. The amended integrated gate will be
-recorded after it completes. All existing limits above remain open.
+after this actual source repair. All existing limits above remain open.
+
+The amended integrated gate at
+`a15cad6c70580c9e7f58c3ba8ed4b043f76064d5`, tree
+`acbf91dfeae1c7d999bacdc0e6b23c1021b901e6`, passed whitespace,
+all workspace typechecks, 718 Vitest tests and six Node tests. The
+checkout was clean; installation was skipped against the unchanged
+lockfile. Whitespace took 0.1 seconds elapsed; typecheck took 3.4
+seconds elapsed and 9.5 CPU; tests took 11.8 seconds elapsed and 32.4
+CPU. The whole command took 15.46 seconds elapsed, 35.46 user CPU and
+6.63 system CPU. Logs are
+`/tmp/artroom-i3-m4-clause-corrected-gate.log` and
+`/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.QiYwk2AKJk`.
+This annotation changes this note only; the gated packages tree remains
+`19562fc840cc9941672eaed12765189a1d4faec9`. The unknown membership
+failure and all its retained outputs remain separately owned.
