@@ -8,7 +8,8 @@
  */
 
 import { isObject, own } from "../values.ts";
-import { markerAmounts, type MarkedType, type MarkerForm, type Markers } from "../markers.ts";
+import { NOTHING, sum, type Amount } from "../held.ts";
+import { markerReservations, type MarkedType, type MarkerForm, type Markers } from "../markers.ts";
 import type { ClauseSet, Defining, Duties, Type } from "./context.ts";
 import { at, type Rec } from "./shape.ts";
 import type { TimedGraph, TimedMove } from "./timed.ts";
@@ -60,8 +61,10 @@ export function setOnce(d: Defining): void {
 export interface Counting {
   graph: TimedGraph;
   moves: readonly TimedMove[];
-  starts(set: ClauseSet): number;
-  requests(form: Duties): number;
+  entry: Amount;
+  deadline(entries: number): Amount;
+  starts(set: ClauseSet): Amount;
+  requests(form: Duties): Amount;
 }
 
 /**
@@ -82,10 +85,11 @@ export function markerCapacity(d: Pick<Defining, "duties" | "types">, count: Cou
       const settled = form.settles && "subject" in form.settles && form.settles.type === name ? form.settles : null;
       if (!settled) return [];
       const own = form.sets.filter((e) => e.subject === settled.subject);
+      const chain = Math.max(0, ...own.map((e) => (e.slot === undefined ? 0 : (count.graph.fromSlot.get(name)?.get(e.slot) ?? 0))));
       const read: MarkerForm = {
-        path: form.path, slot: settled.slot ?? null, in: [...new Set(settled.states)], base: 0,
+        path: form.path, slot: settled.slot ?? null, in: [...new Set(settled.states)], base: 0, amount: NOTHING,
         sets: [...new Set(own.flatMap((e) => (e.state === undefined ? [] : [e.state])))],
-        chain: Math.max(0, ...own.map((e) => (e.slot === undefined ? 0 : (count.graph.fromSlot.get(name)?.get(e.slot) ?? 0)))),
+        chain, chainAmount: count.deadline(chain),
       };
       origin.set(read, form);
       return [read];
@@ -94,31 +98,32 @@ export function markerCapacity(d: Pick<Defining, "duties" | "types">, count: Cou
       marks: [...slots].sort(), forms,
       moves: count.moves.filter((move) => move.type === name).map((move) => ({ from: move.states, to: move.to })),
       held: Object.fromEntries(count.graph.fromState.get(name) ?? []),
+      heldAmounts: Object.fromEntries([...(count.graph.fromState.get(name) ?? [])].map(([state, entries]) => [state, count.deadline(entries)])),
     });
   }
   // Built from entries, so each type is an own name of the record, whatever it is called.
   const markers: Markers = Object.fromEntries(types);
   /** Rule 7: the entry of a form, what its requests reserve, and what its effects can start on its other subjects and in an item that it opens. */
-  const base = (form: MarkerForm): number => {
+  const base = (form: MarkerForm): Amount => {
     const from = origin.get(form)!;
     const subject = from.settles && "subject" in from.settles ? from.settles.subject : null;
-    return 1 + count.starts(from.sets.filter((e) => e.subject !== subject)) + count.requests(from);
+    return sum(count.entry, count.starts(from.sets.filter((e) => e.subject !== subject)), count.requests(from));
   };
-  const amounts = markerAmounts(markers, (_, form) => base(form), (name, state) => {
+  const amounts = markerReservations(markers, (_, form) => base(form), (name, state) => {
     const forms = markers[name]!.forms;
     const here = forms.filter((form) => form.in.includes(state));
     for (const form of here.length > 0 ? here : forms) unbounded.add(origin.get(form)!);
   });
   return {
     marked: (type: string): boolean => marks.has(type),
-    awaits: (type: string, state: string): number => amounts.awaits(type, state, []),
+    awaits: (type: string, state: string): Amount => amounts.awaits(type, state, []),
     /** Every type in every state is counted, so a closure that is not finite is found whatever reads it. */
     check(): void {
       for (const name of marks.keys()) for (const state of d.types.get(name)?.states.keys() ?? []) amounts.awaits(name, state, []);
     },
     data(): Markers | null {
       if (marks.size === 0) return null;
-      for (const type of types.values()) for (const form of type.forms) form.base = base(form);
+      for (const type of types.values()) for (const form of type.forms) { form.amount = base(form); form.base = form.amount.entries; }
       return markers;
     },
   };
