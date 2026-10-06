@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { ActType, DeclaredDefinition, FieldValue, Request, Result } from "@generalbusiness/artroom-contract";
-import { messageFacts, validateDefinition, type Fetched, type ProblemCode } from "../src/index.ts";
+import { MemoryState, messageFacts, validateDefinition, type Fetched, type ProblemCode } from "../src/index.ts";
 import { Scope, arrive, decided, deliver, fields, keys, on, ticket, ticketDefinition, valid, variant } from "./fixtures.ts";
 
 const { rita } = keys;
@@ -146,6 +146,14 @@ describe("subjects and handlers (sections 6.4 and 7.3)", () => {
     // The first key is held, so its next update is applied.
     deliver(I, P, P.did(rita, "unlink", on(P, first)).seq);
     expect([decided(I), I.state.relation(P.at, "closes", first)?.state]).toEqual([["applied"], "removed"]);
+    // I3 deltas, section 31, entry FD6: the copies of one name and kind of owner are read as one number, whatever the scope keeps.
+    // 1,000 copies of two names, and an update of a key that is held: one step for each count, counted. The earlier code read
+    // all 1,000 copies for each, by reading it, as a count by state still does.
+    const counted = { steps: 0 };
+    const many = new MemoryState(counted);
+    for (let item = 0; item < 1000; item++) many.putRelation({ owner: P.at, name: item % 2 === 0 ? "follows" : "closes", item, state: "set", revision: 1 });
+    many.putRelation({ owner: P.at, name: "closes", item: 1, state: "removed", revision: 2 });
+    expect([many.copies("closes", "lane"), many.copies("closes", "directory"), counted.steps, many.copies("closes", "lane", ["set"]), counted.steps]).toEqual([500, 0, 2, 499, 1002]);
 
     // No handler is for the relationship `follows`. And one whose `from` names another definition is not for this sender.
     deliver(I, P, link("follow"));

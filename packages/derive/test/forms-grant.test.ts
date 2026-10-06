@@ -109,6 +109,13 @@ describe("the grant guard and the commit guards of an observation (authority not
     for (const head of headsOf(fresh)) state.putObserved(head);
     expect([highestHead(state, standing), highestHead(state, { ...standing, key: una.key }), highestHead(state, { ...standing, key: una.key, member: "@una" }), highestHead(state, { ...standing, of: reborn })]).toEqual([40, 40, null, null]);
     expect([Object.keys(state.all()).at(-1), "observed" in new MemoryState().all(), headsOf(null)]).toEqual(["observed", false, []]);
+    // I3 deltas, section 31, entry FD5: the incarnations of an observed scope ID are read from one list, whatever the number of
+    // subjects. 1,000 subjects of two incarnations of one ID, and an ID that none is of: three steps and one, counted. The earlier code read all
+    // 1,000 heads for each, by reading it.
+    const counted = { steps: 0 };
+    const many = new MemoryState(counted);
+    for (let i = 0; i < 1000; i++) many.putObserved({ of: i % 2 === 0 ? membership : reborn, subject: `@m${i}`, seq: i });
+    expect([many.incarnations(membership.scope), many.incarnations(otherLane.scope), counted.steps]).toEqual([[membership.inc, reborn.inc].sort(), [], 4]);
     // A scope with no recorded membership reference is covered by no filter, and by its own reference.
     expect([covers({ membership }, otherLane, null), covers(otherLane, otherLane, null), covers({ membership }, otherLane, membership), covers({ membership }, membership, membership)]).toEqual([false, true, true, true]);
   });

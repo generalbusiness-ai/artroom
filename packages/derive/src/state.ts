@@ -304,6 +304,23 @@ export class MemoryState implements StateWriter {
   readonly #prepared = new Map<string, PreparedStep>();
   readonly #records = new Map<string, RecordState>();
   readonly #observed = new Map<string, ObservedHead>();
+  /**
+   * For each observed scope ID, the incarnations of the observed heads that are held, once each, in byte order. `putObserved`
+   * keeps it, and no head is ever removed. So `incarnations` reads one list, and not every head that the scope holds: a scope
+   * reads it for each entry that it judges on its membership reference (I3 deltas, section 31, entry FD5).
+   */
+  readonly #incarnations = new Map<ScopeId, readonly Incarnation[]>();
+
+  /**
+   * For each relationship name and kind of owner, the number of keys that this scope keeps a copy for. `putRelation` keeps it,
+   * and no copy is ever removed. So `copies` with no states reads one number, and not every copy that the scope holds: a scope
+   * reads it at the first update for each key (I3 deltas, section 31, entry FD6).
+   */
+  readonly #copies = new Map<string, number>();
+
+  /** `tally`, when it is given, counts what `incarnations` and `copies` read, for a test of their bounds. Nothing else is counted. */
+  readonly tally: { steps: number } | undefined;
+  constructor(tally?: { steps: number }) { this.tally = tally; }
 
   scope() { return this.#scope; }
   item(id: number) { return this.#items.get(id) ?? null; }
@@ -323,7 +340,11 @@ export class MemoryState implements StateWriter {
     }
   }
   relation(owner: ScopeRef, name: string, item: number) { return this.#relations.get(key(owner.scope, owner.inc, name, item)) ?? null; }
-  copies(name: string, kind: ScopeKind, states?: readonly string[]) { return [...this.#relations.values()].filter((r) => r.name === name && r.owner.kind === kind && (!states || states.includes(r.state))).length; }
+  copies(name: string, kind: ScopeKind, states?: readonly string[]) {
+    if (this.tally) this.tally.steps += states ? this.#relations.size : 1;
+    if (!states) return this.#copies.get(key(name, kind)) ?? 0;
+    return [...this.#relations.values()].filter((r) => r.name === name && r.owner.kind === kind && states.includes(r.state)).length;
+  }
   accepted(actor: KeyId, idempotencyKey: string) { return this.#accepted.get(key(actor, idempotencyKey))?.[2] ?? null; }
   request(seq: number, n: number) { return this.#requests.get(key(seq, n)) ?? null; }
   decided(from: ScopeRef, seq: number, n: number) { return this.#decided.get(key(from.scope, from.inc, seq, n)) ?? null; }
@@ -341,7 +362,11 @@ export class MemoryState implements StateWriter {
   recordCount(capability: CapabilityName, kind: string, state?: string) { return this.records(capability, kind, state === undefined ? {} : { states: [state] }).length; }
   #kept() { return [...this.#records.values()].sort((a, b) => keyOrder([a.capability, a.kind, canonicalize(a.key)], [b.capability, b.kind, canonicalize(b.key)])); }
   observed(of: Pick<ScopeRef, "scope" | "inc">, subject: string) { return this.#observed.get(key(of.scope, of.inc, subject))?.seq ?? null; }
-  incarnations(scope: ScopeId) { return [...new Set([...this.#observed.values()].filter((head) => head.of.scope === scope).map((head) => head.of.inc))].sort(byteOrder); }
+  incarnations(scope: ScopeId) {
+    const held = this.#incarnations.get(scope) ?? [];
+    if (this.tally) this.tally.steps += 1 + held.length;
+    return held;
+  }
   outstanding(): Outstanding {
     const open = [...this.#requests.values()].filter((r) => r.result === null);
     const operations = [...this.#operations.values()];
@@ -375,7 +400,11 @@ export class MemoryState implements StateWriter {
     ids.splice(firstAbove(ids, item.id), 0, item.id);
   }
   addCount(type: string, state: string, by: number) { this.#counts.set(key(type, state), [type, state, this.count(type, state) + by]); }
-  putRelation(r: Relation) { this.#relations.set(key(r.owner.scope, r.owner.inc, r.name, r.item), r); }
+  putRelation(r: Relation) {
+    const at = key(r.owner.scope, r.owner.inc, r.name, r.item);
+    if (!this.#relations.has(at)) this.#copies.set(key(r.name, r.owner.kind), (this.#copies.get(key(r.name, r.owner.kind)) ?? 0) + 1);
+    this.#relations.set(at, r);
+  }
   putAccepted(actor: KeyId, idempotencyKey: string, accepted: Accepted) { this.#accepted.set(key(actor, idempotencyKey), [actor, idempotencyKey, accepted]); }
   putRequest(r: OwnRequest) { this.#requests.set(key(r.seq, r.n), r); }
   putDecided(from: FactRef, n: number, by: number) { this.#decided.set(key(from.at.scope, from.at.inc, from.seq, n), { from: { scope: from.at.scope, inc: from.at.inc }, seq: from.seq, hash: from.hash, n, by }); }
@@ -387,7 +416,11 @@ export class MemoryState implements StateWriter {
   }
   putPrepared(p: PreparedStep) { this.#prepared.set(key(p.intent, p.capability, p.step), p); }
   putRecord(r: RecordState) { this.#records.set(key(r.capability, r.kind, canonicalize(r.key)), r); }
-  putObserved(h: ObservedHead) { this.#observed.set(key(h.of.scope, h.of.inc, h.subject), { of: { scope: h.of.scope, inc: h.of.inc }, subject: h.subject, seq: h.seq }); }
+  putObserved(h: ObservedHead) {
+    this.#observed.set(key(h.of.scope, h.of.inc, h.subject), { of: { scope: h.of.scope, inc: h.of.inc }, subject: h.subject, seq: h.seq });
+    const held = this.#incarnations.get(h.of.scope) ?? [];
+    if (!held.includes(h.of.inc)) this.#incarnations.set(h.of.scope, [...held, h.of.inc].sort(byteOrder));
+  }
 
   all(): StateSnapshot {
     const sorted = <T>(values: Iterable<T>, of: (value: T) => Key) => [...values].sort((a, b) => keyOrder(of(a), of(b)));
