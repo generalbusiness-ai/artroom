@@ -10,6 +10,7 @@ import type { ActType, Bounds, Digest, Entry, FactRef, FactUse, FieldRecord, Fie
 import { canonicalBytes, digestBytes, entryHash, isDigest, isIntent } from "@generalbusiness/artroom-bytes";
 import type { Capabilities } from "./capability.ts";
 import type { Fetched, RuleInput } from "./guards.ts";
+import { markOf, type PlatformRules } from "./marks.ts";
 import type { StateView } from "./state.ts";
 import type { Clock } from "./time.ts";
 import { byteOrder, isFactRef, isObject, isValue, own, same } from "./values.ts";
@@ -41,6 +42,7 @@ export interface Reading {
   own?: Own | undefined;                // this scope's own history. Without it an input that names a local fact is not judged
   texts?: Texts | undefined;            // the detached texts that came with the input. Without it an input that names one is not judged
   capabilities?: Capabilities | undefined;   // the rules of the capabilities this runtime has code for (section 6.11). Without them a capability form is not judged
+  platform?: PlatformRules | undefined;      // the rules of the platform definition that the scope pins (section 6.1). Without them an input of a row with a mark is not judged
 }
 
 /** The shape of section 2.1, which the bytes package guards beside the contract's other fixed records. */
@@ -65,7 +67,8 @@ export function readFields(types: ActType["fields"], given: Readonly<Record<stri
     const value = Object.hasOwn(given, name) ? given[name] : type.default;
     if (value === undefined && type.required) return { ok: false, detail: `${name} is required` };
     if (value === undefined) continue;
-    if (!isValue(type, value, bounds)) return { ok: false, detail: `${name} is not a value of its type` };
+    // Section 6.1, place 3: a type that is a mark, in platform data, states no shape. Its rule checks the value, at check 7.
+    if (!markOf(type) && !isValue(type, value, bounds)) return { ok: false, detail: `${name} is not a value of its type` };
     fields.push([name, value as FieldValue]);
   }
   return { ok: true, fields: Object.fromEntries(fields) };

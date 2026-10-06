@@ -6,18 +6,23 @@
  * arguments that the definition writes.
  *
  * This package holds no rule of a capability. A judge is given the rules as
- * `Capabilities`, with its reading. A runtime that has none answers
- * `unsupported-definition` for a definition that needs one (`derivable`),
- * so no judge of such a runtime meets a capability form. A judge that is
- * given a definition it cannot derive does not judge the input.
+ * `Capabilities`, with its reading. Each rule is a pure function of its
+ * arguments and of what the judge gives it: the folded state before the
+ * entry, where the capability's records are, and the input being judged. A
+ * runtime that lacks the rule of a form that a definition uses answers
+ * `unsupported-definition` for that definition (`derivable`), so no judge of
+ * such a runtime meets that form. A judge that is given a definition it
+ * cannot derive does not judge the input.
  */
 
 import { CAPABILITIES } from "@generalbusiness/artroom-contract";
-import type { Capability, CapabilityArg, CapabilityName, DeclaredDefinition, Effect, FieldValue, Guard, Operand, UnavailableReason } from "@generalbusiness/artroom-contract";
+import type { Capability, CapabilityArg, CapabilityName, DeclaredDefinition, Effect, FieldValue, Guard, Operand, ScopeRef, UnavailableReason } from "@generalbusiness/artroom-contract";
 import type { GuardResult, Judging } from "./guards.ts";
+import type { Underived } from "./validate/capability.ts";
 import { bindEach, covered } from "./lists.ts";
 import { operand, slotOf } from "./operand.ts";
-import type { Item } from "./state.ts";
+import type { HoldEffect } from "./hold.ts";
+import type { Item, StateView } from "./state.ts";
 import type { ValidDefinition } from "./validate/index.ts";
 import { own } from "./values.ts";
 
@@ -25,18 +30,68 @@ import { own } from "./values.ts";
 export interface Recorded { kind: string; key: readonly FieldValue[]; state: string; values: Readonly<Record<string, unknown>> }
 
 /**
- * The rules of the capability versions that a runtime or a verifier has
- * code for. Each is a function of the arguments, which the judge reads from
- * the input, this scope's state and the entries in `uses`.
+ * What a capability's rule is given beside its arguments (sections 6.11 and
+ * 9.3, "A capability guard or effect"): the folded state before the entry,
+ * which holds the capability's records, and the input being judged. They
+ * are the judge's own, so a runtime and a verifier give a rule the same.
+ * A rule reads nothing else: no clock but this reading, no storage and no
+ * network.
+ *
+ * - `view`: the folded state before the entry.
+ * - `definition`: the pinned definition, which says which item types are
+ *   holds (authority note, section 5.7, "Who derives them").
+ * - `scope` and `self`: this scope, and the `seq` of the entry being written.
+ * - `own`: this scope's own sealed entries, by position.
+ * - `kind`, `fields`, `signer` and `intent`: the input, as the judge read it.
+ * - `facts` and `source`: the entries in `uses` that the input names, and
+ *   for a handler the verified source entry.
+ * - `clock`: the one reading of the commit.
+ */
+export type CapabilityGiven = Pick<Judging, "view" | "definition" | "scope" | "self" | "kind" | "fields" | "signer" | "intent" | "facts" | "source" | "own" | "clock">;
+
+/** One form that needs a capability's own code, as the validator lists it (section 6.1): the version, the kind of form and its name. */
+export type CapabilityForm = Pick<Underived, "capability" | "form" | "name">;
+
+/**
+ * The rules of the capability forms that a runtime or a verifier has code
+ * for. Each is a pure function of the arguments, which the judge reads from
+ * the input, this scope's state and the entries in `uses`, and of `given`.
  */
 export interface Capabilities {
-  /** True when this value derives the guards and effects of that version. */
-  implements(capability: CapabilityName): boolean;
+  /**
+   * True when this value has the code of that form (section 6.1, "A
+   * capability form with no code"). The rule is on each form that a
+   * definition uses, and not on the name of a version alone.
+   */
+  implements(form: CapabilityForm): boolean;
   /** One guard: true when it holds, or the name of the refusal that the version declares for it. */
-  guard(capability: CapabilityName, guard: string, args: Readonly<Record<string, unknown>>): true | string;
+  guard(capability: CapabilityName, guard: string, args: Readonly<Record<string, unknown>>, given: CapabilityGiven): true | string;
   /** One effect: the records it changes, in order. */
-  effect(capability: CapabilityName, effect: string, args: Readonly<Record<string, unknown>>): readonly Recorded[];
+  effect(capability: CapabilityName, effect: string, args: Readonly<Record<string, unknown>>, given: CapabilityGiven): readonly Recorded[];
+  /**
+   * What an entry with `hold` effects also derives when the definition's
+   * holds have a workspace (authority note, section 5.7, "What is derived,
+   * and at which entry"): `workspaceEffects` of `capability/hold.ts`.
+   * `holds` are the entry's `hold` effects, `working` gives an item as the
+   * entry's effects left it, and `k` is the ordinal of the first operation
+   * that the entry has not opened. Absent: these rules have no such code,
+   * and an entry holds the item form only.
+   */
+  workspace?(view: StateView, definition: ValidDefinition, self: number, k: number, holds: readonly HoldEffect[], working: (id: number) => Item | null): readonly Effect[];
+  /**
+   * Whether a request is bound to a pending record that reserved an entry
+   * for it (section 6.11, "Reserved requests"; authority note, section 4.2,
+   * "A reserved license decision"). `from` is the envelope's source scope,
+   * as verified, and `fields` the message's own fields, read by themselves.
+   * The answer is the one record that the deciding entry holds when it
+   * refuses the request. Null: the request is not bound, and its deciding
+   * entry is new work. Absent: these rules have no such code, and no
+   * request is bound.
+   */
+  bound?(capability: CapabilityName, view: StateView, at: ScopeRef, from: ScopeRef, fields: unknown): Recorded | null;
 }
+
+const given = ({ view, definition, scope, self, kind, fields, signer, intent, facts, source, own, clock }: Judging): CapabilityGiven => ({ view, definition, scope, self, kind, fields, signer, intent, facts, source, own, clock });
 
 /** What a capability version declares, or undefined for a version that the contract's tables do not have. */
 export const declaredBy = (capability: string): Capability | undefined => own(CAPABILITIES as Readonly<Record<string, Capability>>, capability);
@@ -49,17 +104,17 @@ export function versionOf(declared: DeclaredDefinition, name: string): Capabilit
 
 /**
  * True when every form of the definition can be derived with these rules:
- * each capability version that one of its forms needs a record of is one
- * the rules implement. With no rules, that is a definition that needs none.
+ * each form that needs a capability's own code is one the rules implement.
+ * With no rules, that is a definition that needs none.
  */
 export const derivable = (definition: ValidDefinition, capabilities: Capabilities | null | undefined): boolean =>
-  definition.underived.every((u) => capabilities?.implements(u.capability) === true);
+  definition.underived.every((u) => capabilities?.implements(u) === true);
 
-/** The rules for the capability a form names. Null: the judge was given none for it, and the input is not judged. */
-function rulesFor(j: Judging, name: string): { version: CapabilityName; rules: Capabilities; declared: Capability } | null {
+/** The rules for one guard or effect of the capability a form names. Null: the judge was given none for it, and the input is not judged. */
+function rulesFor(j: Judging, name: string, form: "guard" | "effect", of: string): { version: CapabilityName; rules: Capabilities; declared: Capability } | null {
   const version = versionOf(j.definition.declared, name);
   const declared = version ? declaredBy(version) : undefined;
-  return version && declared && j.capabilities?.implements(version) ? { version, rules: j.capabilities, declared } : null;
+  return version && declared && j.capabilities?.implements({ capability: version, form, name: of }) ? { version, rules: j.capabilities, declared } : null;
 }
 
 /**
@@ -71,7 +126,7 @@ function rulesFor(j: Judging, name: string): { version: CapabilityName; rules: C
  */
 export function capabilityGuard(j: Judging, g: Extract<Guard, { capability: unknown }>, item: Item | null): GuardResult {
   const { name, guard, with: written } = g.capability;
-  const found = rulesFor(j, name);
+  const found = rulesFor(j, name, "guard", guard);
   if (!found) return "unavailable";
   const args: [string, unknown][] = [];
   for (const [arg, from] of Object.entries(written) as [string, CapabilityArg][]) {
@@ -86,7 +141,7 @@ export function capabilityGuard(j: Judging, g: Extract<Guard, { capability: unkn
       args.push([arg, range.map((i) => slotOf(i, from.slot))]);
     } else args.push([arg, operand(j, from, item)]);
   }
-  const answer = found.rules.guard(found.version, guard, Object.fromEntries(args));
+  const answer = found.rules.guard(found.version, guard, Object.fromEntries(args), given(j));
   if (answer === true) return "pass";
   if (!own(found.declared.guards, guard)?.refusals.includes(answer)) throw new Error(`${found.version} declares no refusal ${answer} for its guard ${guard}`);
   (j.declined ??= new Map()).set(g, answer);
@@ -99,10 +154,10 @@ export function capabilityGuard(j: Judging, g: Extract<Guard, { capability: unkn
  * no rules for that capability.
  */
 export function capabilityEffect(j: Judging, form: { name: string; do: string; with: Readonly<Record<string, Operand>> }, item: Item | null): Extract<Effect, { effect: "record" }>[] | UnavailableReason {
-  const found = rulesFor(j, form.name);
+  const found = rulesFor(j, form.name, "effect", form.do);
   if (!found) return "unavailable";
   const args = Object.fromEntries(Object.entries(form.with).map(([arg, from]) => [arg, operand(j, from, item)]));
-  return found.rules.effect(found.version, form.do, args).map((r) => {
+  return found.rules.effect(found.version, form.do, args, given(j)).map((r) => {
     const kind = own(found.declared.records, r.kind);
     if (!kind?.states.includes(r.state)) throw new Error(`${found.version} declares no record ${r.kind} with the state ${r.state}`);
     return { effect: "record", capability: found.version, kind: r.kind, key: r.key, state: r.state, values: r.values };

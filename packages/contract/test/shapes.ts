@@ -5,7 +5,7 @@
  * compiling. The digests and names are made up.
  */
 
-import type { AdoptedReceiveType, Answer, DeclaredDefinition, DeliveryCause, Digest, DutyId, Entry, Envelope, FactRef, Grant, Intent, MemberRef, Read, Receipt, Report, ScopeRef, Seed } from "../src/index.ts";
+import type { AdoptedReceiveType, Answer, DeclaredDefinition, DeliveryCause, Digest, DutyId, Entry, Envelope, FactRef, Grant, Intent, MemberRef, ObservationUse, Read, Receipt, Report, ScopeRef, Seed } from "../src/index.ts";
 import { DOMAINS, PROPOSED_BOUNDS, type Bounds, type DomainTag } from "../src/index.ts";
 
 const d = (c: string): Digest => `sha256:${c.repeat(64)}`;
@@ -19,9 +19,11 @@ const intent: Intent = {
   v: 1, to: directory, actor: "key_alice", kind: "open-issue", on: null, expected: {},
   fields: { title: "A flaky test" }, idempotencyKey: "k1", notAfter: "2026-10-04T12:15:00Z",
 };
+/** A stand-in: these grants carry no freshness proof, as the first delivery's judges take every recorded grant as current. Its bytes are `null`, so no digest here moves. */
+const NO_PROOF = null as unknown as ObservationUse;
 const grant: Grant = {
   issued: { at: membership, seq: 3, hash: d("3") }, subject: opener, key: "key_alice", principal: null,
-  actions: ["open-issue"], within: directory, notAfter: null, fresh: null,
+  actions: ["open-issue"], within: directory, notAfter: null, fresh: NO_PROOF,
 };
 
 // Step 1. D.17, an act. It sends a creation, addressed by a seed.

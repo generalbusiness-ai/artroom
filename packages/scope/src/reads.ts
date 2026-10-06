@@ -9,12 +9,12 @@
  */
 
 import { ENTRY_READ_BYTES, HISTORY_PAGE_BYTES, HISTORY_PAGE_ENTRIES, OUTBOX_PAGE_DUTIES, RETAINED_INPUT_BYTES, RETAINED_ITEMS_PAGE } from "@generalbusiness/artroom-contract";
-import type { Cursor, Digest, DutyId, Entry, LogPage, Read, ReadRefusal, RetainedInput, Summary } from "@generalbusiness/artroom-contract";
-import { isDutyId, positionOf } from "@generalbusiness/artroom-bytes";
+import type { Cursor, Digest, DutyId, Entry, LogPage, OperationId, Read, ReadRefusal, RetainedInput, Summary } from "@generalbusiness/artroom-contract";
+import { isDutyId, isOperationId, positionOf } from "@generalbusiness/artroom-bytes";
 import { byteOrder, own, type Item, type ScopeState, type ValidDefinition } from "@generalbusiness/artroom-derive";
 import type { Pinned } from "./core.ts";
 import type { ReadName, Readers } from "./ports.ts";
-import type { Duty, Sealed, Store, Stored } from "./store.ts";
+import type { Duty, OperationStatus, Sealed, Store, Stored } from "./store.ts";
 
 /** The bound of each read. The defaults are the contract's table, and for a retained input the history page's byte bound. */
 export interface ReadBounds { retainedItems: number; historyEntries: number; historyBytes: number; entryBytes: number; outboxDuties: number; retainedBytes: number }
@@ -32,6 +32,9 @@ const position = (cursor: Cursor | undefined, first: number | null): number | nu
 /** A duty ID: the `seq` of an entry and the ordinal of one of its sends. */
 /** The entry and the ordinal a duty ID names, or null. The form is the bytes package's to judge. */
 const dutyOf = (duty: unknown): [seq: number, n: number] | null => (isDutyId(duty) ? (duty.split(".").map(Number) as [number, number]) : null);
+
+/** The entry that opened an operation and its ordinal there, from its ID, or null. The form is the bytes package's to judge. */
+const operationOf = (id: unknown): [seq: number, k: number] | null => (isOperationId(id) ? (id.split(":").map(Number) as [number, number]) : null);
 
 export class Reads {
   readonly #store: Store;
@@ -171,5 +174,30 @@ export class Reads {
     const at = dutyOf(duty);
     const row = at ? this.#store.duty(at[0], at[1]) : null;
     return row ? { ok: true, at: open.scope.head, value: row, complete: true } : no("not-found");
+  }
+
+  /**
+   * A page of the outside operations (section 4.3), in the order of the
+   * entry that opened each and its ordinal there: each with its attempts,
+   * their outcomes, its state as a preparation status gives it, and the
+   * driver's bookkeeping, which is no history. `open`: only the operations
+   * that are not settled, which are the duties this scope still holds. The
+   * cursor is the ID of the last operation of the page before.
+   */
+  operations(reader: unknown, cursor?: Cursor, open = false): Read<readonly OperationStatus[]> {
+    const read = this.#open(reader, "operations");
+    if (!("scope" in read)) return read;
+    const at = cursor === undefined ? null : operationOf(cursor);
+    if (cursor !== undefined && !at) return no("not-found");
+    const page = this.#store.operations(at ? { seq: at[0], k: at[1] } : null, this.#bounds.outboxDuties, open === true);
+    return { ok: true, at: read.scope.head, value: page.operations, complete: !page.more, ...(page.more ? { next: page.operations.at(-1)!.operation.id } : {}) };
+  }
+
+  /** One operation, by its ID. */
+  operation(reader: unknown, operation: OperationId): Read<OperationStatus> {
+    const read = this.#open(reader, "operations");
+    if (!("scope" in read)) return read;
+    const found = operationOf(operation) ? this.#store.operationStatus(operation) : null;
+    return found ? { ok: true, at: read.scope.head, value: found, complete: true } : no("not-found");
   }
 }

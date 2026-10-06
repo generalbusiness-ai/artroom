@@ -6,8 +6,9 @@
  * `Status`, are the contract's, and are exported here again.
  */
 
-import type { Digest, FactRef, Head, Incarnation, Item, KeyId, OperationId, Party, Request, ScopeKind, ScopeRef, Seed, Status, Timestamp } from "@generalbusiness/artroom-contract";
+import type { CapabilityName, Digest, FactRef, FieldValue, Head, Incarnation, Item, KeyId, OperationId, Party, PlatformDefinition, Request, ScopeKind, ScopeRef, Seed, Status, Timestamp } from "@generalbusiness/artroom-contract";
 import { canonicalBytes, canonicalize, digestBytes } from "@generalbusiness/artroom-bytes";
+import { pendingOf } from "./ledger.ts";
 import { byteOrder } from "./values.ts";
 
 export type { Item, Party, Status };
@@ -53,18 +54,83 @@ export interface HeldCreation { inc: Incarnation; seq: number }
  */
 export interface Decided { from: Pick<ScopeRef, "scope" | "inc">; seq: number; hash: Digest; n: number; by: number }
 
-/** One numbered attempt of an operation that writes outside the service: the entry that opened it and its outcome, if recorded (section 4.3). */
-export interface AttemptState { attempt: number; opened: number; outcome: { seq: number; result: "confirmed" | "refused" | "unknown" } | null }
-export interface Operation { id: OperationId; attempts: readonly AttemptState[] }
+/**
+ * One recorded outcome of an attempt (section 4.3): the entry that holds it,
+ * its result, the digest of its evidence, and `selected` as that entry
+ * derived it. The evidence itself is in the entry.
+ */
+export interface OutcomeState { seq: number; result: "confirmed" | "refused" | "unknown"; evidence: Digest; selected: boolean | null }
+
+/**
+ * One numbered attempt of an operation that writes outside the service: the
+ * entry that opened it, and its outcomes in the order recorded (section 4.3,
+ * item 3). It has at most two. The second is the late answer, and follows
+ * only an `unknown`, which stays as it was written.
+ */
+export interface AttemptState { attempt: number; opened: number; outcomes: readonly OutcomeState[] }
+
+/**
+ * One operation (section 4.3): its ID, which is the entry that opened it and
+ * its ordinal there; its owner and kind; `most`, the most attempts its owner
+ * allows; the attempts opened so far, in order from 1; and `selected`, the
+ * number of the attempt whose result was selected, which is set once and
+ * never moves (item 7). An operation with no attempt is a held duty of a
+ * provisional scope's genesis (item 1).
+ */
+export interface Operation {
+  id: OperationId; owner: CapabilityName | PlatformDefinition; kind: string; most: number;
+  attempts: readonly AttemptState[]; selected: number | null;
+}
 
 /**
  * The duties that are open and are not items (section 9.2). `requests`: sent
  * requests with no result and no diagnosis. `unavailable`: those with a
- * `delivery-unavailable` diagnosis and no result. `opened`: attempts of
- * outside operations with no outcome. `unknown`: attempts whose outcome is
- * `unknown`.
+ * `delivery-unavailable` diagnosis and no result. Of the operations that are
+ * not settled (`pendingOf`, in `ledger.ts`): `opened`, attempts with no
+ * outcome; `unknown`, attempts whose latest outcome is `unknown`; and
+ * `unopened`, attempts that may still be opened. `outcomes`: for each owner
+ * and kind of those operations, in no stated order, the outcome entries
+ * that they may still write: 2 for each attempt that is opened or may be,
+ * and 1 for each that is `unknown`.
  */
-export interface Outstanding { requests: number; unavailable: number; opened: number; unknown: number }
+export interface Outstanding {
+  requests: number; unavailable: number; opened: number; unknown: number; unopened: number;
+  outcomes: readonly { owner: CapabilityName | PlatformDefinition; kind: string; entries: number }[];
+}
+
+/**
+ * One preparation entry, as the scope indexes it (section 5.5, "A repeat"):
+ * by the digest of the signed intent, the capability and the step. `seq` is
+ * the entry. The same three again are answered with it and write nothing.
+ */
+export interface PreparedStep { intent: Digest; capability: CapabilityName; step: string; seq: number }
+
+/**
+ * One capability record, as the fold keeps it (section 6.11, "Records"):
+ * local state that is not an item. It changes only by a `record` effect of
+ * a sealed entry, which states the record's state and its values whole
+ * (I3 deltas, entry EF5). `seq` is the entry that last recorded it. A key is
+ * never reused, and a record is never removed.
+ */
+export interface RecordState {
+  capability: CapabilityName; kind: string; key: readonly FieldValue[]; state: string;
+  values: Readonly<Record<string, unknown>>; seq: number;
+}
+
+/**
+ * The highest head that the entries of this scope retain for one subject of
+ * an observation (section 16.1, "The fold holds the highest head"): the
+ * observed scope, with its incarnation; the subject, which is a key, a
+ * member, or `rules`; and the highest position `head.seq` that an entry
+ * retained for it. An observation of a key counts under its key and under
+ * its member. It is derived from the entries alone, as the index of
+ * accepted keys is. The commit judges the order of heads against it, so a
+ * lower head is refused in every run, also after a restart.
+ */
+export interface ObservedHead { of: Pick<ScopeRef, "scope" | "inc">; subject: string; seq: number }
+
+/** Which records of one kind a read asks for: those in one of `states`, and those whose value `member` equals `value`. Absent: every one. */
+export interface RecordsWhere { states?: readonly string[]; member?: string; value?: unknown }
 
 /** Items in ascending ID order. `more`: the page stopped at its limit and at least one further item follows. */
 export interface Page { items: readonly Item[]; more: boolean }
@@ -84,8 +150,23 @@ export interface StateSnapshot {
   requests: readonly OwnRequest[];                                      // by seq, then n
   decided: readonly Decided[];                                          // by source scope, incarnation, seq, n
   creations: readonly (readonly [seed: Digest, held: HeldCreation])[];  // by seed digest
-  operations: readonly Operation[];                                     // by ID
+  operations: readonly Operation[];                                     // by the entry that opened each, then its ordinal there
   texts: readonly (readonly [item: number, slot: string, texts: readonly Digest[]])[];   // by item, then slot; a slot that holds none is left out
+  /**
+   * The index of preparation entries, by intent digest, capability and step
+   * (section 5.5). Absent: the scope has none. A state with none has no
+   * member, so its digest is the one it had before a scope could prepare.
+   */
+  prepared?: readonly PreparedStep[];
+  /** The capability records, by capability, kind and the canonical bytes of the key (section 6.11). Absent: the scope has none. */
+  records?: readonly RecordState[];
+  /**
+   * The highest head for each subject of a retained observation, by observed
+   * scope, incarnation and subject (section 16.1). Absent: no entry of the
+   * scope retains an observation. A state with none has no member, so its
+   * digest is the one it had before the fold held this.
+   */
+  observed?: readonly ObservedHead[];
 }
 
 /** The digest a checkpoint entry carries: SHA-256 of the snapshot's canonical JSON. */
@@ -130,6 +211,23 @@ export interface StateView {
    * held them (section 6.6). A `redact` effect lists exactly these.
    */
   texts(item: number, slot: string): readonly Digest[];
+  /** The preparation entry with that intent digest, capability and step, if one is sealed (section 5.5). */
+  prepared(intent: Digest, capability: CapabilityName, step: string): PreparedStep | null;
+  /** This scope's preparation entries for one intent: at most one for each capability step (section 9.1), in the order of capability, then step. */
+  preparations(intent: Digest): readonly PreparedStep[];
+  /** One capability record, by its kind and key (section 6.11). */
+  record(capability: CapabilityName, kind: string, key: readonly FieldValue[]): RecordState | null;
+  /**
+   * The records of one kind, in the order of the canonical bytes of their
+   * keys. The scope indexes records by kind and state (section 6.11). No
+   * adopted text bounds the records of one kind, so this read is bounded
+   * only by what the scope holds (I3 deltas, entry EF6).
+   */
+  records(capability: CapabilityName, kind: string, where?: RecordsWhere): readonly RecordState[];
+  /** The exact number of records of that kind: in that state, or in any state when none is named. A key is never reused, so the second is the capability's counter. */
+  recordCount(capability: CapabilityName, kind: string, state?: string): number;
+  /** The highest head that an entry of this scope retains for that subject of that observed scope, with that incarnation (section 16.1). Null: no entry retains an observation of it. */
+  observed(of: Pick<ScopeRef, "scope" | "inc">, subject: string): number | null;
   /** How many duties are open, for the room they need to settle (section 9.2); see `Outstanding`. */
   outstanding(): Outstanding;
   /** Everything, for a checkpoint. This is the one read that is not bounded. */
@@ -149,6 +247,10 @@ export interface StateWriter extends StateView {
   putOperation(operation: Operation): void;
   /** The texts that a slot has held and that are not redacted. An empty list holds none. */
   putTexts(item: number, slot: string, texts: readonly Digest[]): void;
+  putPrepared(prepared: PreparedStep): void;
+  putRecord(record: RecordState): void;
+  /** The highest head of one subject. The fold calls it only with a head that is higher than the one held. */
+  putObserved(head: ObservedHead): void;
 }
 
 type Key = readonly (string | number)[];
@@ -193,6 +295,9 @@ export class MemoryState implements StateWriter {
   readonly #creations = new Map<Digest, HeldCreation>();
   readonly #operations = new Map<OperationId, Operation>();
   readonly #texts = new Map<string, readonly [number, string, readonly Digest[]]>();
+  readonly #prepared = new Map<string, PreparedStep>();
+  readonly #records = new Map<string, RecordState>();
+  readonly #observed = new Map<string, ObservedHead>();
 
   scope() { return this.#scope; }
   item(id: number) { return this.#items.get(id) ?? null; }
@@ -219,12 +324,32 @@ export class MemoryState implements StateWriter {
   creation(seed: Digest) { return this.#creations.get(seed) ?? null; }
   operation(id: OperationId) { return this.#operations.get(id) ?? null; }
   texts(item: number, slot: string) { return this.#texts.get(key(item, slot))?.[2] ?? []; }
+  prepared(intent: Digest, capability: CapabilityName, step: string) { return this.#prepared.get(key(intent, capability, step)) ?? null; }
+  preparations(intent: Digest) { return this.#steps().filter((p) => p.intent === intent); }
+  #steps() { return [...this.#prepared.values()].sort((a, b) => keyOrder([a.intent, a.capability, a.step], [b.intent, b.capability, b.step])); }
+  record(capability: CapabilityName, kind: string, at: readonly FieldValue[]) { return this.#records.get(key(capability, kind, canonicalize(at))) ?? null; }
+  records(capability: CapabilityName, kind: string, where: RecordsWhere = {}) {
+    return this.#kept().filter((r) => r.capability === capability && r.kind === kind && (!where.states || where.states.includes(r.state))
+      && (where.member === undefined || (Object.hasOwn(r.values, where.member) && canonicalize(r.values[where.member]) === canonicalize(where.value))));
+  }
+  recordCount(capability: CapabilityName, kind: string, state?: string) { return this.records(capability, kind, state === undefined ? {} : { states: [state] }).length; }
+  #kept() { return [...this.#records.values()].sort((a, b) => keyOrder([a.capability, a.kind, canonicalize(a.key)], [b.capability, b.kind, canonicalize(b.key)])); }
+  observed(of: Pick<ScopeRef, "scope" | "inc">, subject: string) { return this.#observed.get(key(of.scope, of.inc, subject))?.seq ?? null; }
   outstanding(): Outstanding {
     const open = [...this.#requests.values()].filter((r) => r.result === null);
-    const attempts = [...this.#operations.values()].flatMap((o) => o.attempts);
+    const operations = [...this.#operations.values()];
+    const pending = operations.map(pendingOf);
+    const sum = (of: (p: ReturnType<typeof pendingOf>) => number) => pending.reduce((n, p) => n + of(p), 0);
+    const outcomes = new Map<string, Outstanding["outcomes"][number]>();
+    operations.forEach(({ owner, kind }, i) => {
+      const entries = 2 * (pending[i]!.opened + pending[i]!.unopened) + pending[i]!.unknown;
+      const at = key(owner, kind);
+      if (entries > 0) outcomes.set(at, { owner, kind, entries: (outcomes.get(at)?.entries ?? 0) + entries });
+    });
     return {
       requests: open.filter((r) => r.diagnosis === null).length, unavailable: open.filter((r) => r.diagnosis?.finding === "delivery-unavailable").length,
-      opened: attempts.filter((a) => a.outcome === null).length, unknown: attempts.filter((a) => a.outcome?.result === "unknown").length,
+      opened: sum((p) => p.opened), unknown: sum((p) => p.unknown), unopened: sum((p) => p.unopened),
+      outcomes: [...outcomes.values()],
     };
   }
 
@@ -253,6 +378,9 @@ export class MemoryState implements StateWriter {
     if (texts.length === 0) this.#texts.delete(key(item, slot));
     else this.#texts.set(key(item, slot), [item, slot, texts]);
   }
+  putPrepared(p: PreparedStep) { this.#prepared.set(key(p.intent, p.capability, p.step), p); }
+  putRecord(r: RecordState) { this.#records.set(key(r.capability, r.kind, canonicalize(r.key)), r); }
+  putObserved(h: ObservedHead) { this.#observed.set(key(h.of.scope, h.of.inc, h.subject), { of: { scope: h.of.scope, inc: h.of.inc }, subject: h.subject, seq: h.seq }); }
 
   all(): StateSnapshot {
     const sorted = <T>(values: Iterable<T>, of: (value: T) => Key) => [...values].sort((a, b) => keyOrder(of(a), of(b)));
@@ -265,8 +393,12 @@ export class MemoryState implements StateWriter {
       requests: sorted(this.#requests.values(), (r) => [r.seq, r.n]),
       decided: sorted(this.#decided.values(), (d) => [d.from.scope, d.from.inc, d.seq, d.n]),
       creations: sorted(this.#creations.entries(), ([seed]) => [seed]),
-      operations: sorted(this.#operations.values(), (o) => [o.id]),
+      operations: sorted(this.#operations.values(), (o) => o.id.split(":").map(Number)),
       texts: sorted(this.#texts.values(), ([item, slot]) => [item, slot]),
+      // A member that would be empty is left out, so a state that holds none has the digest it had before these members existed.
+      ...(this.#prepared.size === 0 ? {} : { prepared: this.#steps() }),
+      ...(this.#records.size === 0 ? {} : { records: this.#kept() }),
+      ...(this.#observed.size === 0 ? {} : { observed: sorted(this.#observed.values(), (h) => [h.of.scope, h.of.inc, h.subject]) }),
     };
   }
   /** The snapshot as one canonical text, to compare two states. */

@@ -13,11 +13,11 @@
  * the canonical bytes.
  */
 
-import type { Digest, Entry, FactRef, KeyId, OperationId, ScopeKind, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
+import type { CapabilityName, Digest, Entry, FactRef, FieldValue, KeyId, OperationId, ScopeKind, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
 import { canonicalize } from "@generalbusiness/artroom-bytes";
-import { MemoryState, slotOf, timeMs } from "@generalbusiness/artroom-derive";
-import type { Accepted, Decided, HeldCreation, Item, Operation, Outstanding, OwnRequest, Page, RangeIndex, Relation, ScopeState, StateSnapshot } from "@generalbusiness/artroom-derive";
-import type { Dispatched, Duty, Outgoing, Retained, Store, Stored } from "./store.ts";
+import { MemoryState, operationId, operationStanding, pendingOf, slotOf, timeMs } from "@generalbusiness/artroom-derive";
+import type { Accepted, Decided, HeldCreation, Item, ObservedHead, Operation, Outstanding, OwnRequest, Page, PreparedStep, RangeIndex, RecordState, RecordsWhere, Relation, ScopeState, StateSnapshot } from "@generalbusiness/artroom-derive";
+import type { Dispatched, Duty, OperationStatus, Outgoing, Retained, Sending, Store, Stored } from "./store.ts";
 
 export type SqlValue = string | number | null | ArrayBuffer;
 export interface Sql {
@@ -44,8 +44,18 @@ export interface Sql {
  * - `inbox`: each incoming delivery this scope recorded, by source scope,
  *   incarnation, entry and ordinal.
  * - `folded`: folded records that are not items: relationship copies, held
- *   creations, outside operations, and for each slot that holds a detached
- *   text the digests it has held.
+ *   creations, the highest head of each observed subject, and for each slot that holds a detached text the digests it
+ *   has held.
+ * - `operation`: the outside operations, folded, by the entry that opened
+ *   each and its ordinal there (section 4.3). `opened`, `unknown` and
+ *   `unopened` are what the operation still reserves (`pendingOf`), so that
+ *   the room to settle is one sum over `operation_open`, the operations that
+ *   are not settled.
+ * - `attempt`: one row for each attempt that an entry opened, written with
+ *   that entry. `next`, `sent` and `outcome` are the driver's: when it looks
+ *   at the attempt next, the time written before its one request left, and
+ *   the entry that recorded its first outcome. `attempt_due` indexes the
+ *   attempts with no outcome.
  * - `retained_input`: section 9.2; see `Retained`.
  */
 const SCHEMA = `
@@ -63,13 +73,25 @@ CREATE INDEX IF NOT EXISTS outbox_due ON outbox (next, seq, n) WHERE held = 0 AN
 CREATE INDEX IF NOT EXISTS outbox_open ON outbox (seq, n) WHERE request IS NOT NULL AND result IS NULL;
 CREATE TABLE IF NOT EXISTS inbox (scope TEXT NOT NULL, inc TEXT NOT NULL, seq INTEGER NOT NULL, n INTEGER NOT NULL, hash TEXT NOT NULL, by INTEGER NOT NULL, PRIMARY KEY (scope, inc, seq, n)) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS folded (kind TEXT NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL, PRIMARY KEY (kind, key)) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS operation (seq INTEGER NOT NULL, k INTEGER NOT NULL, value TEXT NOT NULL, opened INTEGER NOT NULL, unknown INTEGER NOT NULL, unopened INTEGER NOT NULL, PRIMARY KEY (seq, k)) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS operation_open ON operation (seq, k) WHERE opened + unknown + unopened > 0;
+CREATE TABLE IF NOT EXISTS attempt (seq INTEGER NOT NULL, k INTEGER NOT NULL, attempt INTEGER NOT NULL, opened INTEGER NOT NULL, next INTEGER, sent TEXT, outcome INTEGER, PRIMARY KEY (seq, k, attempt)) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS attempt_due ON attempt (next, seq, k, attempt) WHERE outcome IS NULL;
+CREATE TABLE IF NOT EXISTS record (capability TEXT NOT NULL, kind TEXT NOT NULL, key TEXT NOT NULL, state TEXT NOT NULL, value TEXT NOT NULL, PRIMARY KEY (capability, kind, key)) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS record_by_state ON record (capability, kind, state);
+CREATE TABLE IF NOT EXISTS prepared (intent TEXT NOT NULL, capability TEXT NOT NULL, step TEXT NOT NULL, seq INTEGER NOT NULL, PRIMARY KEY (intent, capability, step)) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS retained_input (kind TEXT NOT NULL, digest TEXT NOT NULL, bytes TEXT NOT NULL, under TEXT, PRIMARY KEY (kind, digest)) WITHOUT ROWID;
 `;
 
 /** A send that is still to be dispatched: not held, not acknowledged, and for a request with no result and no diagnosis. */
 const DUE = "o.held = 0 AND o.ack IS NULL AND o.result IS NULL AND o.diagnosis IS NULL";
 
+/** An operation that is not settled: it still reserves room (derive's `pendingOf`). */
+const OPEN = "opened + unknown + unopened > 0";
+
 type Row = Record<string, SqlValue>;
+/** The entry that opened an operation and its ordinal there, from its ID. */
+const partsOf = (id: OperationId): [seq: number, k: number] => id.split(":").map(Number) as [number, number];
 const json = <T>(text: SqlValue | undefined): T => JSON.parse(text as string) as T;
 const orNull = <T>(text: SqlValue | undefined): T | null => (text === null || text === undefined ? null : json<T>(text));
 
@@ -78,8 +100,13 @@ export class SqliteStore implements Store {
   /** For each item type, the slots a `where` reads. */
   #covered = new Map<string, readonly string[]>();
 
-  constructor(sql: Sql) {
+  /** How long after the entry that opens an attempt the driver first looks at it, in milliseconds, by the attempt's number. */
+  readonly #spacing: (attempt: number) => number;
+
+  /** `spacing`: the backoff between the attempts of one operation (authority note, section 5.4, rule 7). By default there is none. */
+  constructor(sql: Sql, spacing: (attempt: number) => number = () => 0) {
     this.#sql = sql;
+    this.#spacing = spacing;
     this.#run(SCHEMA);
   }
 
@@ -137,18 +164,48 @@ export class SqliteStore implements Store {
     return row && { from: { scope: from.scope, inc: from.inc }, seq, hash: row["hash"] as Digest, n, by: row["by"] as number };
   }
   creation(seed: Digest): HeldCreation | null { return this.#folded("creation", seed); }
-  operation(id: OperationId): Operation | null { return this.#folded("operation", id); }
+  operation(id: OperationId): Operation | null {
+    const [seq, k] = partsOf(id);
+    return orNull<Operation>(this.#one("SELECT value FROM operation WHERE seq = ? AND k = ?", seq, k)?.["value"]);
+  }
+  observed(of: Pick<ScopeRef, "scope" | "inc">, subject: string): number | null { return this.#folded<ObservedHead>("observed", canonicalize([of.scope, of.inc, subject]))?.seq ?? null; }
   texts(item: number, slot: string): readonly Digest[] { return this.#folded<[number, string, Digest[]]>("texts", canonicalize([item, slot]))?.[2] ?? []; }
+  prepared(intent: Digest, capability: CapabilityName, step: string): PreparedStep | null {
+    const row = this.#one("SELECT seq FROM prepared WHERE intent = ? AND capability = ? AND step = ?", intent, capability, step);
+    return row && { intent, capability, step, seq: row["seq"] as number };
+  }
+  preparations(intent: Digest): readonly PreparedStep[] {
+    // The order is derive's: by capability, then step, each by its UTF-8 bytes, which is SQLite's order of a text.
+    return this.#all("SELECT capability, step, seq FROM prepared WHERE intent = ? ORDER BY CAST(capability AS BLOB), CAST(step AS BLOB)", intent)
+      .map((row) => ({ intent, capability: row["capability"] as CapabilityName, step: row["step"] as string, seq: row["seq"] as number }));
+  }
+  record(capability: CapabilityName, kind: string, key: readonly FieldValue[]): RecordState | null {
+    return orNull<RecordState>(this.#one("SELECT value FROM record WHERE capability = ? AND kind = ? AND key = ?", capability, kind, canonicalize(key))?.["value"]);
+  }
+  /** Section 6.11: read from the index by kind and state. A value is compared as its canonical bytes, in the rows that the index gives. */
+  records(capability: CapabilityName, kind: string, where: RecordsWhere = {}): readonly RecordState[] {
+    const among = where.states ? ` AND state IN (${where.states.map(() => "?").join(", ")})` : "";
+    const rows = this.#all(`SELECT value FROM record WHERE capability = ? AND kind = ?${among} ORDER BY CAST(key AS BLOB)`, capability, kind, ...(where.states ?? [])).map((row) => json<RecordState>(row["value"]));
+    const { member, value } = where;
+    return member === undefined ? rows : rows.filter((r) => Object.hasOwn(r.values, member) && canonicalize(r.values[member]) === canonicalize(value));
+  }
+  recordCount(capability: CapabilityName, kind: string, state?: string): number {
+    return this.#one(`SELECT COUNT(*) AS n FROM record WHERE capability = ? AND kind = ?${state === undefined ? "" : " AND state = ?"}`, capability, kind, ...(state === undefined ? [] : [state]))!["n"] as number;
+  }
   /**
    * Counted from the rows of requests with no result, which `outbox_open`
-   * indexes, and from the operations, which no form opens yet.
+   * indexes, and from the operations that are not settled, which
+   * `operation_open` indexes.
    */
   outstanding(): Outstanding {
     const open = this.#one("SELECT COALESCE(SUM(diagnosis IS NULL), 0) AS requests, COALESCE(SUM(diagnosis LIKE '%\"delivery-unavailable\"%'), 0) AS unavailable FROM outbox WHERE request IS NOT NULL AND result IS NULL")!;
-    const attempts = this.#all("SELECT value FROM folded WHERE kind = 'operation'").flatMap((row) => json<Operation>(row["value"]).attempts);
+    const pending = this.#one(`SELECT COALESCE(SUM(opened), 0) AS opened, COALESCE(SUM(unknown), 0) AS unknown, COALESCE(SUM(unopened), 0) AS unopened FROM operation WHERE ${OPEN}`)!;
+    // The outcome entries that the open operations may still write, by owner and kind: an owner declares a closure for each (derive's `owed`).
+    const outcomes = this.#all(`SELECT json_extract(value, '$.owner') AS owner, json_extract(value, '$.kind') AS kind, SUM(2 * (opened + unopened) + unknown) AS entries FROM operation WHERE ${OPEN} GROUP BY 1, 2`)
+      .map((row) => ({ owner: row["owner"] as Outstanding["outcomes"][number]["owner"], kind: row["kind"] as string, entries: row["entries"] as number }));
     return {
       requests: open["requests"] as number, unavailable: open["unavailable"] as number,
-      opened: attempts.filter((a) => a.outcome === null).length, unknown: attempts.filter((a) => a.outcome?.result === "unknown").length,
+      opened: pending["opened"] as number, unknown: pending["unknown"] as number, unopened: pending["unopened"] as number, outcomes,
     };
   }
 
@@ -166,9 +223,12 @@ export class SqliteStore implements Store {
     for (const row of this.#all("SELECT kind, key, value FROM folded")) {
       if (row["kind"] === "relation") memory.putRelation(json(row["value"]));
       else if (row["kind"] === "creation") memory.putCreation(row["key"] as Digest, json(row["value"]));
-      else if (row["kind"] === "texts") memory.putTexts(...json<[number, string, Digest[]]>(row["value"]));
-      else memory.putOperation(json(row["value"]));
+      else if (row["kind"] === "observed") memory.putObserved(json(row["value"]));
+      else memory.putTexts(...json<[number, string, Digest[]]>(row["value"]));
     }
+    for (const row of this.#all("SELECT value FROM operation ORDER BY seq, k")) memory.putOperation(json(row["value"]));
+    for (const row of this.#all("SELECT value FROM record")) memory.putRecord(json(row["value"]));
+    for (const row of this.#all("SELECT intent, capability, step, seq FROM prepared")) memory.putPrepared({ intent: row["intent"] as Digest, capability: row["capability"] as CapabilityName, step: row["step"] as string, seq: row["seq"] as number });
     for (const row of this.#all("SELECT seq, actor, idem, intent FROM entry WHERE actor IS NOT NULL")) memory.putAccepted(row["actor"] as KeyId, row["idem"] as string, { seq: row["seq"] as number, intent: row["intent"] as Digest });
     for (const row of this.#all("SELECT o.seq, o.n, o.target, o.request, o.result, o.diagnosis, e.hash FROM outbox o JOIN entry e ON e.seq = o.seq WHERE o.request IS NOT NULL")) memory.putRequest(requestOf(row));
     for (const row of this.#all("SELECT scope, inc, seq, n, hash, by FROM inbox")) {
@@ -212,10 +272,22 @@ export class SqliteStore implements Store {
     this.#run("INSERT INTO inbox (scope, inc, seq, n, hash, by) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (scope, inc, seq, n) DO UPDATE SET hash = excluded.hash, by = excluded.by", from.at.scope, from.at.inc, from.seq, n, from.hash, by);
   }
   putCreation(seed: Digest, held: HeldCreation): void { this.#fold("creation", seed, held); }
-  putOperation(operation: Operation): void { this.#fold("operation", operation.id, operation); }
+  putObserved(head: ObservedHead): void { this.#fold("observed", canonicalize([head.of.scope, head.of.inc, head.subject]), { of: { scope: head.of.scope, inc: head.of.inc }, subject: head.subject, seq: head.seq }); }
+  putOperation(operation: Operation): void {
+    const [seq, k] = partsOf(operation.id);
+    const { opened, unknown, unopened } = pendingOf(operation);
+    this.#run("INSERT INTO operation (seq, k, value, opened, unknown, unopened) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (seq, k) DO UPDATE SET value = excluded.value, opened = excluded.opened, unknown = excluded.unknown, unopened = excluded.unopened",
+      seq, k, canonicalize(operation), opened, unknown, unopened);
+  }
   putTexts(item: number, slot: string, texts: readonly Digest[]): void {
     if (texts.length === 0) this.#run("DELETE FROM folded WHERE kind = 'texts' AND key = ?", canonicalize([item, slot]));
     else this.#fold("texts", canonicalize([item, slot]), [item, slot, texts]);
+  }
+  putPrepared(p: PreparedStep): void {
+    this.#run("INSERT INTO prepared (intent, capability, step, seq) VALUES (?, ?, ?, ?)", p.intent, p.capability, p.step, p.seq);
+  }
+  putRecord(r: RecordState): void {
+    this.#run("INSERT INTO record (capability, kind, key, state, value) VALUES (?, ?, ?, ?, ?) ON CONFLICT (capability, kind, key) DO UPDATE SET state = excluded.state, value = excluded.value", r.capability, r.kind, canonicalize(r.key), r.state, canonicalize(r));
   }
 
   // ---------------------------------------------------------------- what the fold does not keep
@@ -225,6 +297,18 @@ export class SqliteStore implements Store {
     for (const send of entry.sends) {
       // A new send is due at once: its first attempt may start at its entry's time.
       this.#run("INSERT INTO outbox (seq, n, target, class, message, next) VALUES (?, ?, ?, ?, ?, ?)", entry.seq, send.n, canonicalize(send.to), send.message.class, canonicalize(send.message), timeMs(entry.time)!);
+    }
+    // Authority note, section 5.4, rule 1: the duty is written before the request that could cause the effect is sent, with a
+    // wake-up. The row of an attempt is written here, in the commit of the entry that opens it, and the driver sends from rows only.
+    for (const effect of entry.effects) {
+      if (effect.effect !== "attempt" || effect.result !== "opened") continue;
+      const [seq, k] = typeof effect.operation === "string" ? partsOf(effect.operation) : partsOf(operationId(entry.seq, effect.operation.k));
+      this.#run("INSERT INTO attempt (seq, k, attempt, opened, next) VALUES (?, ?, ?, ?, ?)", seq, k, effect.attempt, entry.seq, timeMs(entry.time)! + this.#spacing(effect.attempt));
+    }
+    // The first outcome entry of an attempt ends the driver's work on it. A late answer finds the row closed and changes nothing here.
+    if (entry.input.type === "outcome") {
+      const [seq, k] = partsOf(entry.input.operation);
+      this.#run("UPDATE attempt SET outcome = ? WHERE seq = ? AND k = ? AND attempt = ? AND outcome IS NULL", entry.seq, seq, k, entry.input.attempt);
     }
   }
   retain(input: Retained): void {
@@ -267,11 +351,55 @@ export class SqliteStore implements Store {
   acknowledge(seq: number, n: number, attempts: readonly Dispatched[], fact: FactRef): void {
     this.#run("UPDATE outbox SET attempts = ?, ack = ? WHERE seq = ? AND n = ?", canonicalize(attempts), canonicalize(fact), seq, n);
   }
+
+  // ---------------------------------------------------------------- the operations driver's bookkeeping
+
+  unsent(now: number, limit: number): Sending[] {
+    return this.#all(`SELECT ${SENDING} FROM attempt WHERE outcome IS NULL AND next <= ? ORDER BY next, seq, k, attempt LIMIT ?`, now, limit).map(sendingOf);
+  }
+  parked(after: Pick<Sending, "operation" | "attempt"> | null, limit: number): Sending[] {
+    const from = after ? [...partsOf(after.operation), after.attempt] : [-1, -1, -1];
+    return this.#all(`SELECT ${SENDING} FROM attempt WHERE outcome IS NULL AND next IS NULL AND (seq, k, attempt) > (?, ?, ?) ORDER BY seq, k, attempt LIMIT ?`, ...from, limit).map(sendingOf);
+  }
+  nextSend(): number | null { return (this.#one("SELECT MIN(next) AS next FROM attempt WHERE outcome IS NULL")?.["next"] as number | null | undefined) ?? null; }
+  sending(operation: OperationId, attempt: number): Sending | null {
+    const row = this.#one(`SELECT ${SENDING} FROM attempt WHERE seq = ? AND k = ? AND attempt = ?`, ...partsOf(operation), attempt);
+    return row && sendingOf(row);
+  }
+  markSent(operation: OperationId, attempt: number, at: Timestamp, next: number): void {
+    // `sent` is written once. A second write would be a second send of one recorded attempt, which nothing here makes.
+    const [seq, k] = partsOf(operation);
+    this.#run("UPDATE attempt SET sent = ?, next = ? WHERE seq = ? AND k = ? AND attempt = ? AND sent IS NULL", at, next, seq, k, attempt);
+    if (this.sending(operation, attempt)?.sent !== at) throw new Error(`attempt ${attempt} of ${operation} is not one that is recorded and not sent`);
+  }
+  postpone(operation: OperationId, attempt: number, next: number | null): void {
+    this.#run("UPDATE attempt SET next = ? WHERE seq = ? AND k = ? AND attempt = ?", next, ...partsOf(operation), attempt);
+  }
+  operations(after: { seq: number; k: number } | null, limit: number, open: boolean): { operations: OperationStatus[]; more: boolean } {
+    const rows = this.#all(`SELECT value FROM operation WHERE (seq, k) > (?, ?)${open ? ` AND ${OPEN}` : ""} ORDER BY seq, k LIMIT ?`, after?.seq ?? -1, after?.k ?? -1, limit + 1);
+    return { operations: rows.slice(0, limit).map((row) => this.#status(json<Operation>(row["value"]))), more: rows.length > limit };
+  }
+  operationStatus(id: OperationId): OperationStatus | null {
+    const operation = this.operation(id);
+    return operation && this.#status(operation);
+  }
+  #status(operation: Operation): OperationStatus {
+    const sends = this.#all(`SELECT ${SENDING} FROM attempt WHERE seq = ? AND k = ? ORDER BY attempt`, ...partsOf(operation.id)).map(sendingOf);
+    return { operation, state: operationStanding(operation), sends: sends.map(({ attempt, next, sent }) => ({ attempt, next, sent })) };
+  }
+
   deadline(): Timestamp | null { return (this.#one("SELECT v FROM meta WHERE k = 'deadline'")?.["v"] as Timestamp | undefined) ?? null; }
   setDeadline(at: Timestamp | null): void {
     if (at === null) this.#run("DELETE FROM meta WHERE k = 'deadline'");
     else this.#run("INSERT INTO meta (k, v) VALUES ('deadline', ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v", at);
   }
+}
+
+/** The columns of a driver row. */
+const SENDING = "seq, k, attempt, opened, next, sent";
+
+function sendingOf(row: Row): Sending {
+  return { operation: operationId(row["seq"] as number, row["k"] as number), attempt: row["attempt"] as number, opened: row["opened"] as number, next: row["next"] as number | null, sent: row["sent"] as Timestamp | null };
 }
 
 /** The columns of an outbox row that a read of its duty returns. */

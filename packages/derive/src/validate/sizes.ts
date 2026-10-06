@@ -38,4 +38,7 @@ export function mostBytes(type: FieldType, bounds: Bounds): number {
     // Each member at its most, with its name, a colon and a comma.
     case "record": return 2 + Object.entries(type.of).reduce((bytes, [name, of]) => bytes + stated(name) + 2 + mostBytes(of, bounds), 0);
   }
+  // Section 6.1, place 3: a type that is a mark, in platform data, states no shape and so no bound. A timed entry that would carry
+  // such a value is not shown to fit.
+  return Number.POSITIVE_INFINITY;
 }

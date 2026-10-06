@@ -127,7 +127,7 @@ describe("identifiers", () => {
     const forms: [(v: unknown) => boolean, unknown[], unknown[]][] = [
       [isKeyId, [key], [key.slice(0, -1), `${key}A`, key.replace("key_", "KEY_"), 7]],
       [isMemberId, ["@a", "@Alice Smith"], ["@", "a", "@\ud800", null]],
-      [isOperationId, ["op_1"], ["op_", "1", null]],
+      [isOperationId, ["0:0", "17:2"], ["op_1", "17", "17:02", "1:2:3", "-1:0", null]],
       [isDutyId, ["0.0", "17.2"], ["17", "17.02", "1.2.3", "-1.0", 17.2]],
       [isPlatformDefinition, ["platform:directory@1"], ["platform:lane@1", "platform:directory@01", "directory@1"]],
       [isScopeKind, ["lane", "directory"], ["room", "", null]],

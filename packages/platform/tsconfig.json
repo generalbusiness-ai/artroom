@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "../..",
+    // The text coders of the Web platform, as the bytes package declares them: the narrowest lib these sources need.
+    "types": ["@generalbusiness/artroom-bytes/web"]
+  },
+  "include": ["src"]
+}

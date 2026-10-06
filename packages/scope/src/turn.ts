@@ -20,7 +20,7 @@
 import type { Bounds, FactRef, Head, Prepared, SignedIntent } from "@generalbusiness/artroom-contract";
 import { CanonicalError, canonicalize, entryHash, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import { applyEntry, clockOf, entryOf, fits, isEntryOf, isIntent, judgeTimed, nextDue, timeMs, timeOf } from "@generalbusiness/artroom-derive";
-import type { Clock as Reading, Draft, Due, Fetched, RuleInput, StateView, ValidDefinition } from "@generalbusiness/artroom-derive";
+import type { Clock as Reading, Draft, Due, Fetched, Owners, RuleInput, StateView, ValidDefinition } from "@generalbusiness/artroom-derive";
 import type { Ports, Resolver } from "./ports.ts";
 import type { Retained, Sealed, Store } from "./store.ts";
 
@@ -130,15 +130,18 @@ const FOREVER = "9999-12-31T23:59:59Z";
 export class Turns {
   readonly #queue = new Queue();
   readonly #store: Store;
-  readonly #ports: Pick<Ports, "clock" | "rules" | "alarm">;
+  readonly #ports: Pick<Ports, "clock" | "rules" | "alarm" | "capabilities">;
   readonly #bounds: Bounds;
   readonly #pinned: PinnedDefinition;
+  readonly #owners: () => Owners | undefined;
 
-  constructor(store: Store, ports: Pick<Ports, "clock" | "rules" | "alarm">, bounds: Bounds, pinned: PinnedDefinition) {
+  /** `owners`: the rules of the owners of outside operations for this scope, with those of its platform definition (`Scope.owners`). */
+  constructor(store: Store, ports: Pick<Ports, "clock" | "rules" | "alarm" | "capabilities">, bounds: Bounds, pinned: PinnedDefinition, owners: () => Owners | undefined) {
     this.#store = store;
     this.#ports = ports;
     this.#bounds = bounds;
     this.#pinned = pinned;
+    this.#owners = owners;
   }
 
   /**
@@ -240,7 +243,7 @@ export class Turns {
       turn.last = clock;
       const head = this.#store.scope()?.head;
       if (head?.seq !== snapshot.seq || head.hash !== snapshot.hash) return "dropped";   // 6.2
-      const judged = judgeTimed(this.#store, definition, selected, { clock, bounds: this.#bounds });   // 6.3 and 6.4
+      const judged = judgeTimed(this.#store, definition, selected, { clock, bounds: this.#bounds, capabilities: this.#ports.capabilities ?? undefined });   // 6.3 and 6.4
       if (judged.result === "unavailable") return "clock-behind";
       if (judged.result === "dropped") return "dropped";
       this.#seal(definition, judged.draft, clock, []);                 // 6.5
@@ -281,7 +284,7 @@ export class Turns {
         // Section 9.2: an entry that admits duties is kept only if every admitted duty still has room to settle. The count is of
         // the state the fold just wrote, so it is under the head check, and a verifier derives the same number. Section 17.3: an
         // entry that settles what its form declares is written against its own duty's reservation, and is not asked.
-        if (!fits(this.#store, definition, this.#bounds, sealed.entry.input, verdict.draft.settles)) {
+        if (!fits(this.#store, definition, this.#bounds, sealed.entry.input, verdict.draft.settles, this.#owners())) {
           refuse(() => verdict.full(head ?? { seq: sealed.entry.seq, hash: sealed.hash }));
           throw new Full();
         }

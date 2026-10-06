@@ -4,6 +4,8 @@
  * identifiers.
  */
 
+import type { ObservationUse } from "./observation.ts";
+
 /** A SHA-256 digest: `sha256:` + 64 lowercase hex characters (section 2.1). */
 export type Digest = `sha256:${string}`;
 
@@ -13,7 +15,8 @@ export type ScopeId = `sc_${string}`;
 /** A scope's incarnation: `in_` + 26 base32 characters, random, minted with the first entry (section 2.2). */
 export type Incarnation = `in_${string}`;
 
-export type ScopeKind = "directory" | "membership" | "rules" | "destination" | "inbox" | "task" | "lane";
+/** The kinds of scope (section 2.1). `register` is new: the one scope of a deployment that has no creator (section 7.1). */
+export type ScopeKind = "register" | "directory" | "membership" | "rules" | "destination" | "inbox" | "task" | "lane";
 
 /** An Ed25519 public key: `key_` + unpadded base64url of its 32 raw bytes. */
 export type KeyId = `key_${string}`;
@@ -27,18 +30,22 @@ export type Timestamp = string;
 /** Unpadded base64url (RFC 4648 section 5). Used for keys and signatures. */
 export type Base64Url = string;
 
-/** An operation that writes outside the service. Stable across its attempts (section 4.3). */
-export type OperationId = `op_${string}`;
+/**
+ * An operation that writes outside the service: the `seq` of the entry that
+ * opened it, and its ordinal there. Stable across its attempts (sections 4.1
+ * and 4.3).
+ */
+export type OperationId = `${number}:${number}`;
 
 /** A definition the platform supplies in code, by name and version (section 6.1). */
-export type PlatformDefinition = `platform:${"directory" | "membership" | "rules" | "destination" | "inbox" | "task"}@${number}`;
+export type PlatformDefinition = `platform:${"register" | "directory" | "membership" | "rules" | "destination" | "inbox" | "task"}@${number}`;
 
 /** What a scope ID is the digest of. It holds no sequence number and no hash of the creating entry (section 2.1). */
 export interface Seed {
   v: 1;
   kind: ScopeKind;
   definition: Digest | PlatformDefinition;
-  creator: ScopeRef | null;     // null for a repository's directory
+  creator: ScopeRef | null;     // null for a scope with no creator: a repository's directory in the first delivery, a register in section 7.1
   cause: Digest;                // identifies the one input that asked for this scope; section 7.2
   ordinal: number;              // which creation of that input, from 0
 }
@@ -57,11 +64,21 @@ export interface ScopeRef { scope: ScopeId; inc: Incarnation; kind: ScopeKind }
 /** Fact: one sealed entry, exactly. Always built after that entry is sealed. */
 export interface FactRef { at: ScopeRef; seq: number; hash: Digest }
 
-/** Which scopes a grant covers when it names more than one. Defined by the authority note. */
-export type ScopeFilter = unknown;
+/**
+ * Where a grant holds when it names more than one scope: every scope of one
+ * repository (section 16.1, "The form of `within`, and of the read";
+ * authority note, section 3.3). `membership` is the membership scope, with
+ * its incarnation. The filter covers that scope itself, and every scope
+ * that records it, with that incarnation, as its membership reference.
+ */
+export interface ScopeFilter { membership: ScopeRef }
 
-/** What shows that a grant is current. Defined by the authority note. */
-export type FreshnessProof = unknown;
+/**
+ * What shows that a grant is current: one observation of membership, with the
+ * read it came from and how the entry used it (section 16.1; authority note,
+ * section 3.3). The member `fresh` of a grant has this type.
+ */
+export type FreshnessProof = ObservationUse;
 
 /** Grant: permission issued by a fact in an authority scope. */
 export interface Grant {

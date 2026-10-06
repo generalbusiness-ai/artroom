@@ -9,7 +9,10 @@
 import type { Attempt, Digest, Entry, Input } from "@generalbusiness/artroom-contract";
 import type { Reading } from "./fields.ts";
 import { runClause } from "./handlers.ts";
+import { outcomeOf, recordedOutcome, type Owners } from "./ledger.ts";
+import { ownersOf } from "./outcomes.ts";
 import type { Judgment } from "./judge.ts";
+import { unjudged, type PlatformRules } from "./marks.ts";
 import { stateDigest, type ScopeState, type StateView } from "./state.ts";
 import { nextDue } from "./timed.ts";
 import { timeMs } from "./time.ts";
@@ -57,31 +60,54 @@ export function judgeDiagnosis(view: StateView, definition: ValidDefinition, dia
   if (attempts.length === 0 || attempts.some((a) => timeMs(a.at) === null || !ANSWERS.includes(a.answer))) return invalid("the log holds at least one attempt, each with a time and an answer");
 
   const finding = attempts.every((a) => ROUTING.includes(a.answer)) ? "undelivered" : "delivery-unavailable";
-  const ran = finding === "undelivered" ? runClause(view, definition, context, admit.scope, request, "undelivered") : { result: "ran", effects: [], uses: [], judgesTime: false } as const;
+  // Platform data: a mark among the effects of the `undelivered` clause is run when the clause runs, and a fault of its rule leaves
+  // the diagnosis not written now (section 6.1).
+  const ran = finding === "undelivered" ? unjudged(() => runClause(view, definition, context, admit.scope, request, "undelivered", undefined, { type: "diagnosis", of: { seq: of.seq, n: of.n }, attempts })) : { result: "ran", effects: [], uses: [], judgesTime: false } as const;
   if (ran.result === "unavailable") return ran;
   if (ran.judgesTime && context.clock.behind) return { result: "unavailable", reason: "clock-behind" };
   return { result: "write", draft: { input: { type: "diagnosis", of: { seq: of.seq, n: of.n }, finding, attempts }, uses: ran.uses, prepared: [], effects: ran.effects, sends: [], judgesTime: ran.judgesTime } };
 }
 
 /**
- * Section 4.3: the operation and the attempt were opened by an earlier
- * entry, and an outcome settles its own numbered attempt and no other, so a
- * later attempt cannot settle an earlier unknown one. `confirmed` and
- * `refused` are final. `unknown` may be followed by the same attempt's
- * outcome when evidence of it is read. The evidence is the authority note's;
- * here it is carried and not read. An outcome judges no time, so it may be
- * written clamped (section 5.3).
+ * What the judge of an outcome is given beside the reading: the rules of
+ * the owners this runtime has code for (`ledger.ts`); and, in a scope under
+ * a platform definition, that definition's rules and the scope's own
+ * history, which a rule of an outcome entry is given (section 6.1, place 7).
  */
-export function judgeOutcome(view: StateView, definition: ValidDefinition, outcome: Extract<Input, { type: "outcome" }>, context: Settling): Judgment {
-  const attempt = view.operation(outcome.operation)?.attempts.find((a) => a.attempt === outcome.attempt);
-  if (attempt?.outcome?.result === outcome.result) return { result: "repeat", seq: attempt.outcome.seq };
+export type OutcomeContext = Settling & { owners?: Owners | undefined; platform?: PlatformRules | undefined; own?: Reading["own"] };
+
+/** `conflict`: the outcome contradicts a recorded `confirmed` or `refused` of the same attempt. It writes nothing, and is answered `outcome-conflict` with the entry it contradicts (section 4.3, item 6). */
+export type OutcomeJudgment = Judgment | { result: "conflict"; seq: number };
+
+/**
+ * The outcome of one attempt of an outside operation (section 4.3). The
+ * rules are the ledger's (`ledger.ts`), in this order. A second copy of a
+ * recorded answer, and an answer that contradicts a recorded one, are
+ * answered from the history and write nothing. Then the outcome meets what
+ * every input of this file meets. Then the ledger derives its entry: the
+ * attempt's record with `selected`, the next attempt when one follows, and
+ * what the owner derives. The evidence is carried, and its truth is not
+ * judged. An outcome judges no time, so it may be written clamped (section
+ * 5.3).
+ */
+export function settleOutcome(view: StateView, definition: ValidDefinition, outcome: Extract<Input, { type: "outcome" }>, context: OutcomeContext): OutcomeJudgment {
+  const known = recordedOutcome(view, outcome);
+  if (known) return known;
   const admit = admitted(view, definition, context);
   if (!("scope" in admit)) return admit;
-  if (!attempt) return invalid("no entry opened that attempt of that operation");
-  if (attempt.outcome && attempt.outcome.result !== "unknown") return invalid(`the attempt is settled: ${attempt.outcome.result}`);
-  if (!["confirmed", "refused", "unknown"].includes(outcome.result)) return invalid("the result is confirmed, refused or unknown");
-  const input: Input = { type: "outcome", operation: outcome.operation, attempt: outcome.attempt, result: outcome.result, evidence: outcome.evidence };
-  return { result: "write", draft: { input, uses: [], prepared: [], effects: [], sends: [], judgesTime: false } };
+  // The owner of the operation may be the platform definition that this scope pins. Its rule for outcome entries of this kind is
+  // the one that `outcomes` names. A fault of the rule leaves the outcome not judged, and nothing is written (section 6.1).
+  const ran = { clock: false };
+  const judged = unjudged(() => outcomeOf(view, outcome, ownersOf(definition, context.platform, context.owners, { clock: context.clock, bounds: context.bounds, own: context.own, ran })));
+  // An outcome judges no time. An entry for which a rule read the clock does, and is never written clamped (section 6.1).
+  if (judged.result !== "write" || !ran.clock) return judged;
+  return context.clock.behind ? { result: "unavailable", reason: "clock-behind" } : { result: "write", draft: { ...judged.draft, judgesTime: true } };
+}
+
+/** `settleOutcome`, for a caller that only asks whether the outcome writes an entry: a contradiction is an input that the scope never writes. */
+export function judgeOutcome(view: StateView, definition: ValidDefinition, outcome: Extract<Input, { type: "outcome" }>, context: OutcomeContext): Judgment {
+  const judged = settleOutcome(view, definition, outcome, context);
+  return judged.result === "conflict" ? invalid(`outcome-conflict: entry ${judged.seq} records another answer of that attempt`) : judged;
 }
 
 /** The checkpoint a scope may write now: through its head, with the digest of its folded state (section 9.2). */

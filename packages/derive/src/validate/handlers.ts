@@ -7,7 +7,7 @@
 import type { FieldType } from "@generalbusiness/artroom-contract";
 import { canonicalize, isScopeKind } from "@generalbusiness/artroom-bytes";
 import { isObject, own } from "../values.ts";
-import { naming, onSubject, subject, type ClauseSet, type Ctx, type Defining, type Duties, type Type } from "./context.ts";
+import { mark, marked, naming, onSubject, subject, type ClauseSet, type Ctx, type Defining, type Duties, type Type } from "./context.ts";
 import { effects, setsSlot } from "./effects.ts";
 import { declaredFields, fieldType } from "./fields.ts";
 import { guards } from "./guards.ts";
@@ -41,12 +41,17 @@ function opens(top: Rec, kind: string, type: string): boolean {
  *
  * `unsettled`: the names that are selected through a slot that is not
  * fixed. The slot may hold another item by the time a result clause runs,
- * so a clause cannot select the same item again, and may not name one.
+ * so a clause cannot select the same item again, and may not name one. A
+ * name that a mark selects, in platform data (section 6.1, place 2), is one
+ * of them: its rule reads the input and the state of the entry that it is
+ * run in, and no text says how a later entry would select the item again.
  */
 function also(d: Defining, v: unknown, path: string, fields: Map<string, FieldType>, on: Type | null, top: Rec): { types: Map<string, Type>; unsettled: Set<string> } {
   const { bounds, types, bad, rec, form, entries } = d;
   const out = new Map<string, Type>();
   const via = new Map<string, { of: string; slot: unknown; path: string }>();
+  /** The names that a mark selects. */
+  const selected = new Set<string>();
   /** A value of that type names one item of type `t`: a local item of that type, or an entry of this definition that opened one. */
   const selects = (type: FieldType | undefined, t: Type): boolean =>
     (type?.type === "item" ? type.of === t.name : type?.type === "fact" && type.under === d.name && type.kind.every((k) => opens(top, k, t.name)));
@@ -54,6 +59,14 @@ function also(d: Defining, v: unknown, path: string, fields: Map<string, FieldTy
     const p = at(path, name);
     // The intent's `expected` has the key `on` for the primary item, so no other item may take that name.
     if (name === "on") bad("shape", p, "an also entry is not named on");
+    if (d.platform && marked(a)) {
+      // Section 6.1, place 2: the rule gives one local item of the type that the mark states, or none.
+      const o = mark(d, a, p, "also", ["item"]);
+      const t = o && typeof o["item"] === "string" ? types.get(o["item"]) : undefined;
+      if (o && !t) bad("name", p, "names no item type");
+      if (t) { out.set(name, t); selected.add(name); }
+      continue;
+    }
     const f = form(a, p, ["by", "via", "one"], ["item"]);
     if (!f) continue;
     const item = (a as Rec)["item"];
@@ -73,7 +86,7 @@ function also(d: Defining, v: unknown, path: string, fields: Map<string, FieldTy
   }
   // A canonical definition keeps no order of its names. So a `via` is resolved after the subject it reads, whatever the order, and
   // no chain of them may lead back to itself.
-  const unsettled = new Set<string>();
+  const unsettled = new Set<string>(selected);
   for (const [name, { of, slot, path: p }] of via) {
     const from = of === "on" ? on : out.get(of.slice(5));
     const read = typeof slot === "string" ? from?.slots.get(slot) : undefined;
@@ -89,11 +102,16 @@ function also(d: Defining, v: unknown, path: string, fields: Map<string, FieldTy
       const source = read.of === "on" ? on : out.get(read.of.slice(5));
       if (typeof read.slot !== "string" || source?.slots.get(read.slot)?.fixed !== true) settled = false;
       link = read.of === "on" ? null : read.of.slice(5);
+      // A chain that ends at a name which a mark selects cannot be followed again by a later entry.
+      if (link !== null && selected.has(link)) settled = false;
     }
     if (!settled) unsettled.add(name);
   }
   return { types: out, unsettled };
 }
+
+/** True when a written list of effects of platform data holds a mark, whose rule may set a slot (section 6.1, place 5). */
+const coded = (d: Defining, effects: unknown): boolean => d.platform && Array.isArray(effects) && effects.some(marked);
 
 /**
  * Section 7.5: every send of one entry is counted: those its forms declare,
@@ -154,7 +172,11 @@ export function acts(d: Defining, v: unknown, timed: Readonly<Record<string, unk
     const on = typeof o["on"] === "string" ? (types.get(o["on"]) ?? null) : null;
     if (o["on"] !== null && !on) bad("name", at(path, "on"), "names no item type");
     if (o["on"] === null && step !== "comment") bad("shape", at(path, "on"), "an open or a transition has a primary item type");
-    str(o["grant"], at(path, "grant"));
+    // Section 6.1, place 1: in platform data the `grant` of an act may be a mark, which may state an action as well.
+    if (d.platform && marked(o["grant"])) {
+      const g = mark(d, o["grant"], at(path, "grant"), "grant", [], ["grant"]);
+      if (g && "grant" in g) str(g["grant"], at(at(path, "grant"), "grant"));
+    } else str(o["grant"], at(path, "grant"));
     const fields = declaredFields(d, o["fields"], at(path, "fields"));
     // A transition's primary item exists before the entry, so a `via` may read its slots. The item an `open` act opens does not.
     const named = also(d, o["also"], at(path, "also"), fields, step === "transition" ? on : null, top);
@@ -175,7 +197,7 @@ export function acts(d: Defining, v: unknown, timed: Readonly<Record<string, unk
     // Section 6.4: a comment changes no item and meets no guard.
     if (step === "comment") for (const k of ["guards", "effects", "sends"]) if (!Array.isArray(o[k]) || o[k].length > 0) bad("shape", at(path, k), "a comment has none");
     if (step === "comment" && ctx.also.size > 0) bad("shape", at(path, "also"), "a comment names no other item");
-    guards(d, o["guards"], at(path, "guards"), ctx);
+    guards(d, o["guards"], at(path, "guards"), ctx, true);
     const duties: Duties = { path, settles: "settles" in o ? settling(d, o["settles"], at(path, "settles"), ctx, null) : null, sets: [], requests: [] };
     duties.sets = setsOf(d, step === "open" ? on : null, () => effects(d, o["effects"], at(path, "effects"), ctx, false));
     // A child's genesis sends the platform's one result beside what its act declares.
@@ -183,8 +205,9 @@ export function acts(d: Defining, v: unknown, timed: Readonly<Record<string, unk
     d.duties.push(duties);
     if (step === "open" && on) {
       const set = new Set(Array.isArray(o["effects"]) ? o["effects"].map(setsSlot) : []);
-      // Section 6.3: an opening sets every required slot.
-      for (const [s, slot] of on.slots) if (slot.required && !slot.hasDefault && !set.has(s)) bad("required-unset", at(path, "effects"), `no effect sets the required slot ${s}`);
+      // Section 6.3: an opening sets every required slot. Section 6.1: a required slot may be set by an effect mark of the row, so
+      // with one the check is the commit's alone.
+      if (!coded(d, o["effects"])) for (const [s, slot] of on.slots) if (slot.required && !slot.hasDefault && !set.has(s)) bad("required-unset", at(path, "effects"), `no effect sets the required slot ${s}`);
       opensHold(d, o["effects"], on, set, timed, at(path, "effects"));
     }
   }
@@ -230,7 +253,7 @@ export function receives(d: Defining, v: unknown, top: Rec): void {
     // message's name (section 6.2); the entry of an advisory has none.
     const named = also(d, o["also"], at(path, "also"), fields, null, top);
     const ctx: Ctx = { ...naming(), on, also: named.types, nascent: on !== null, fields, kind: cls === "advisory" ? null : message, handler: { update: cls === "relate", under: typeof from?.["under"] === "string" ? from["under"] : null }, unsettled: named.unsettled };
-    guards(d, o["guards"], at(path, "guards"), ctx);
+    guards(d, o["guards"], at(path, "guards"), ctx, true);
     const copy = cls === "relate" && message !== null && isScopeKind(from?.["kind"]) ? { name: message, kind: from["kind"] } : null;
     const duties: Duties = { path, settles: "settles" in o ? settling(d, o["settles"], at(path, "settles"), ctx, copy) : null, sets: [], requests: [] };
     duties.sets = setsOf(d, on, () => effects(d, o["effects"], at(path, "effects"), ctx, false));
@@ -242,8 +265,8 @@ export function receives(d: Defining, v: unknown, top: Rec): void {
     if (!on) continue;
     const written = Array.isArray(o["effects"]) ? o["effects"] : [];
     const set = new Set(written.map(setsSlot));
-    // Section 6.3: an opening sets every required slot.
-    for (const [s, slot] of on.slots) if (slot.required && !slot.hasDefault && !set.has(s)) bad("required-unset", at(path, "effects"), `no effect sets the required slot ${s}`);
+    // Section 6.3: an opening sets every required slot. With an effect mark in the row the check is the commit's alone (section 6.1).
+    if (!coded(d, written)) for (const [s, slot] of on.slots) if (slot.required && !slot.hasDefault && !set.has(s)) bad("required-unset", at(path, "effects"), `no effect sets the required slot ${s}`);
     if (many(top, on.name) === true) continue;
     // Section 6.4: a type that is not `many` is opened only if the scope has none. Otherwise `on` is the one that exists, which
     // this entry did not open: its fixed slots are set, and nothing shows that its state is not final.

@@ -6,6 +6,7 @@
  */
 
 import type { Bounds, CapabilityName, FieldType } from "@generalbusiness/artroom-contract";
+import { isObject } from "../values.ts";
 import type { Underived } from "./capability.ts";
 import type { Shapes } from "./shape.ts";
 
@@ -59,6 +60,38 @@ export interface Duties {
 }
 
 /**
+ * One mark that the validator found in the data of a platform definition,
+ * with its place (section 6.1, "Platform code: a mark, and its rule"). The
+ * place is one of seven kinds: the `grant` of an act, a name of `also`, the
+ * type of a field or of a slot, a guard, an effect or a send of a written
+ * list, and an operation kind of `outcomes`. `path` is where the mark stands
+ * in the data. A runtime or a verifier runs the definition only with a rule
+ * of the name `code` whose kind is `kind`, for every mark of this list.
+ */
+export interface MarkPlace { place: 1 | 2 | 3 | 4 | 5 | 6 | 7; kind: MarkKind; path: string; code: string; row: string }
+export type MarkKind = "grant" | "also" | "type" | "guard" | "effect" | "send" | "outcome";
+const PLACES: Readonly<Record<MarkKind, MarkPlace["place"]>> = { grant: 1, also: 2, type: 3, guard: 4, effect: 5, send: 6, outcome: 7 };
+
+/** True when a value of a definition is written as a mark: a record with the member `code`. No form of a declared definition has that member. */
+export const marked = (v: unknown): v is Record<string, unknown> => isObject(v) && Object.hasOwn(v, "code");
+
+/**
+ * A mark at one of the seven places, read with the platform option (section
+ * 6.1): a record of two texts, `code` and `row`, neither empty, beside the
+ * members `more` that its place gives it. It is listed with its place, and
+ * nothing is derived from it. Null: it is not a well-formed mark, which is
+ * reported. A caller asks this only where a mark may stand, and only with
+ * the option: anywhere else the record is read as the form of its place,
+ * and is refused as a form that the contract does not define.
+ */
+export function mark(d: Defining, v: unknown, path: string, kind: MarkKind, more: readonly string[] = [], optional: readonly string[] = []): Record<string, unknown> | null {
+  const o = d.rec(v, path, ["code", "row", ...more], optional);
+  if (!o || d.str(o["code"], `${path}.code`) === null || d.str(o["row"], `${path}.row`) === null) return null;
+  d.marks.push({ place: PLACES[kind], kind, path, code: o["code"] as string, row: o["row"] as string });
+  return o;
+}
+
+/**
  * One definition while it is validated: the readers and their problems, the
  * bounds, and what each family leaves for the others. The item types are
  * read first, so every later form resolves its names against `types`.
@@ -77,6 +110,8 @@ export interface Defining extends Shapes {
   readonly clauseSets: ClauseSet[];         // one for each result clause that is reserved for (section 17.2)
   clause: ClauseSet | null;                 // the list of effects being read, when what it can set is asked: a reserved clause, or the effects of an act or handler
   readonly duties: Duties[];                // one for each act and handler that was read
+  readonly platform: boolean;               // the platform option: the data of a platform definition, which may hold a mark at seven places (section 6.1)
+  readonly marks: MarkPlace[];              // each mark that was read, with its place
 }
 
 export const onSubject = (of: unknown) => of === undefined || of === "on";

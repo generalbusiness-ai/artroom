@@ -50,7 +50,7 @@ export function founding(notAfter: Timestamp = at(60), under: ValidDefinition = 
 }
 
 /** The object's surface as a caller over RPC has it: each method, answered in a promise. */
-type Surface = Pick<TestScope, "found" | "submit" | "settle" | "checkpoint" | "summary" | "items" | "history" | "entry" | "outbox">;
+type Surface = Pick<TestScope, "found" | "submit" | "prepare" | "settle" | "checkpoint" | "summary" | "items" | "history" | "entry" | "outbox">;
 export type Remote = { [K in keyof Surface]: (...args: Parameters<Surface[K]>) => Promise<Awaited<ReturnType<Surface[K]>>> };
 
 /** The object with that name, for the pool's own functions: eviction, the alarm, a look at its storage. */

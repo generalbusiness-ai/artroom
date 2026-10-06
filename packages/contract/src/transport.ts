@@ -49,6 +49,14 @@ export interface ScopeApi {
    * one, sends the same signed intent again, with the same `beside`.
    */
   submit(scope: string, signed: SignedIntent, grants: readonly Grant[], beside?: Beside): Promise<Answer>;
+  /**
+   * Ask for one step of a capability (section 5.5), with the signed intent
+   * that the step prepares for. The answer has the forms of an act's. A
+   * caller with no answer, or an unavailable one, sends the same request
+   * again: the same intent, capability and step are answered with the first
+   * entry.
+   */
+  prepare(scope: string, signed: SignedIntent, grants: readonly Grant[], capability: string, step: string): Promise<Answer>;
   /** The receipt of an accepted act, for its exact signed intent (section 4.2). */
   settle(scope: string, signed: SignedIntent): Promise<Settlement>;
 

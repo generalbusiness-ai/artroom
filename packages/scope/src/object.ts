@@ -12,22 +12,27 @@
  * With a transport, the object dispatches its outbox: after each call that
  * may have committed, without making the caller wait, and from its alarm.
  * With none, as this class is by default, its sends stay in the outbox.
+ *
+ * The operations driver runs at the same two moments (`operations.ts`). By
+ * default nothing is sent outside the service: the outside port of
+ * `production()` sends nothing, and there are no owner rules.
  */
 
 import { DurableObject } from "cloudflare:workers";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { Answer, Beside, Bounds, Cursor, DeclaredDefinition, Digest, DutyId, Grant, LogPage, PlatformDefinition, Read, RetainedInput, ScopeId, Settlement, SignedIntent } from "@generalbusiness/artroom-contract";
+import type { Answer, Beside, Bounds, Cursor, DeclaredDefinition, Digest, DutyId, Grant, LogPage, OperationId, PlatformDefinition, Read, RetainedInput, ScopeId, Settlement, SignedIntent } from "@generalbusiness/artroom-contract";
 import { isScopeId } from "@generalbusiness/artroom-bytes";
 import { timeMs, type Item } from "@generalbusiness/artroom-derive";
 import type { Delivered } from "@generalbusiness/artroom-derive";
 import { Scope, type Checkpointed, type Founded } from "./core.ts";
 import { Deliveries } from "./delivery.ts";
 import { declaredBy, routed, sentText, sourced, type Sourced } from "./namespace.ts";
+import { Operations } from "./operations.ts";
 import { Dispatcher, Wakes } from "./outbox.ts";
 import { production, type Alarm, type Delivery, type Ports } from "./ports.ts";
 import { READ_BOUNDS, Reads, type ReadBounds, type Summary } from "./reads.ts";
 import { SqliteStore } from "./sqlite.ts";
-import type { Duty, Sealed } from "./store.ts";
+import type { Duty, OperationStatus, Sealed } from "./store.ts";
 
 /** What a deployment gives a scope in place of a default. */
 export interface Wiring { ports?: Partial<Ports>; bounds?: Bounds; reads?: ReadBounds }
@@ -39,28 +44,33 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
   readonly #reads: Reads;
   readonly #deliveries: Deliveries;
   readonly #dispatcher: Dispatcher | null;
+  readonly #operations: Operations;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     const name = ctx.id.name;
     const wiring = this.wiring(name);
     const bounds = wiring.bounds ?? PROPOSED_BOUNDS;
+    // Authority note, section 5.4, rule 7: the attempts of one operation are spaced by a backoff, to a cap. The first is due at its
+    // entry's time. The texts state no numbers for it: the delays are the dispatcher's (I3 deltas, entry EB8).
+    const spacing = (attempt: number) => (attempt < 2 ? 0 : Math.min(bounds.dispatchRetrySeconds * 2 ** Math.min(attempt - 2, 30), bounds.dispatchRetryMaxSeconds) * 1000);
     const store = new SqliteStore({
       exec: (query, ...bindings) => ctx.storage.sql.exec(query, ...bindings),
       transaction: (closure) => ctx.storage.transactionSync(closure),
-    });
+    }, spacing);
     // This object's one alarm. Its handler below starts the alarm's turn and a dispatch pass.
     const alarm: Alarm = { set: (at) => (at === null ? ctx.storage.deleteAlarm() : ctx.storage.setAlarm(timeMs(at)!)) };
     const given: Ports = { ...production(), alarm, ...wiring.ports };
-    // With a transport, the one alarm serves the earliest deadline and the next dispatch. Without one it serves the deadline alone.
-    const wakes = given.transport ? new Wakes(store, given.alarm) : null;
-    const ports: Ports = wakes ? { ...given, alarm: wakes.deadline } : given;
+    // The one alarm serves the earliest deadline, the next attempt of an outside operation and, with a transport, the next dispatch.
+    const wakes = new Wakes(store, given.alarm, given.transport !== null);
+    const ports: Ports = { ...given, alarm: wakes.deadline };
     this.#name = isScopeId(name) ? name : null;
     this.#store = store;
     this.#scope = new Scope(this.#name, store, ports, bounds);
     this.#reads = new Reads(store, () => this.#scope.pinned(), ports.readers, wiring.reads ?? READ_BOUNDS);
     this.#deliveries = new Deliveries(this.#name, this.#scope, store, ports, bounds);
-    this.#dispatcher = wakes && given.transport ? new Dispatcher(this.#scope, store, { transport: given.transport, clock: ports.clock, capabilities: ports.capabilities }, wakes, bounds) : null;
+    this.#dispatcher = given.transport ? new Dispatcher(this.#scope, store, { transport: given.transport, clock: ports.clock, capabilities: ports.capabilities }, wakes, bounds) : null;
+    this.#operations = new Operations(this.#scope, store, ports, wakes, bounds);
   }
 
   /**
@@ -79,11 +89,14 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
    */
   #sent<A>(answer: A): A {
     if (this.#dispatcher) this.ctx.waitUntil(this.#dispatcher.run().catch(() => 0));
+    this.ctx.waitUntil(this.#operations.run().catch(() => 0));
     return answer;
   }
 
   async found(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions: readonly DeclaredDefinition[] = [], beside: Beside = {}): Promise<Founded> { return this.#sent(await this.#scope.found(founding, definition, definitions, beside)); }
   async submit(signed: SignedIntent, grants: readonly Grant[], beside: Beside = {}): Promise<Answer> { return this.#sent(await this.#scope.submit(signed, grants, beside)); }
+  /** One step of a capability, asked for with the signed intent that it prepares for (section 5.5). */
+  async prepare(signed: SignedIntent, grants: readonly Grant[], capability: string, step: string): Promise<Answer> { return this.#sent(await this.#scope.prepare(signed, grants, capability, step)); }
   settle(signed: SignedIntent): Settlement { return this.#scope.settle(signed); }
   checkpoint(): Promise<Checkpointed> { return this.#scope.checkpoint(); }
 
@@ -106,10 +119,13 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
 
   /** A dispatch pass now, or the one in flight. Resolves when it ends, with the number of dispatches and diagnoses it made. */
   dispatch(): Promise<number> { return this.#dispatcher ? this.#dispatcher.run() : Promise.resolve(0); }
-  /** The alarm: a turn with no waiting input, at the earliest deadline (section 5.2), and then a dispatch pass. */
+  /** A pass of the operations driver now, or the one in flight. Resolves when it ends, with the number of requests it sent and outcomes it offered. */
+  effect(): Promise<number> { return this.#operations.run(); }
+  /** The alarm: a turn with no waiting input, at the earliest deadline (section 5.2), then a dispatch pass, then a pass of the operations driver. */
   override async alarm(): Promise<void> {
     await this.#scope.alarm();
     await this.dispatch();
+    await this.effect();
   }
 
   summary(reader: unknown): Read<Summary> { return this.#reads.summary(reader); }
@@ -118,6 +134,8 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
   entry(reader: unknown, seq: number): Read<Sealed> { return this.#reads.entry(reader, seq); }
   outbox(reader: unknown, cursor?: Cursor): Read<readonly Duty[]> { return this.#reads.outbox(reader, cursor); }
   duty(reader: unknown, duty: DutyId): Read<Duty> { return this.#reads.duty(reader, duty); }
+  operations(reader: unknown, cursor?: Cursor, open = false): Read<readonly OperationStatus[]> { return this.#reads.operations(reader, cursor, open); }
+  operation(reader: unknown, operation: OperationId): Read<OperationStatus> { return this.#reads.operation(reader, operation); }
   log(reader: unknown, cursor?: Cursor): Read<LogPage> { return this.#reads.log(reader, cursor); }
   retained(reader: unknown, kind: RetainedInput["kind"], digest: Digest): Read<RetainedInput> { return this.#reads.retained(reader, kind, digest); }
 }

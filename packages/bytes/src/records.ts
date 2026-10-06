@@ -22,8 +22,8 @@
  * the judges.
  *
  * What stays opaque, because the contract leaves it to another owner or to
- * the application: the body of a request or an advisory; the evidence of an
- * outcome; a grant's `within`, when it is not one scope, and its `fresh`;
+ * the application: the body of a request or an advisory; the body of the
+ * evidence of an outcome; a grant's `within`, when it is not one scope, and its `fresh`;
  * the value of each field of an intent and of an `index` effect; and
  * whether a slot's value is a value of the type its definition declares.
  * A slot's value is checked as far as `isFieldValue` goes: one of the forms
@@ -31,7 +31,7 @@
  */
 
 import type {
-  Attempt, Dispatched, Duty, Effect, Entry, FactRef, FactUse, FieldValue, Grant, Head, Input, Intent, Item, LogPage, MemberRef, Message, Party, Prepared, Read, ReadRefusal, Receipt, RefusalReason,
+  Attempt, Dispatched, Duty, Effect, Entry, Evidence, FactRef, FactUse, FieldValue, Grant, Head, Input, Intent, Item, LogPage, MemberRef, Message, Party, Prepared, Read, ReadRefusal, Receipt, RefusalReason,
   RetainedInput, ScopeRef, Sealed, Seed, Send, SignedIntent, Status, Summary,
 } from "@generalbusiness/artroom-contract";
 import { MAX_DEPTH, wellFormed } from "./canonical.ts";
@@ -73,7 +73,7 @@ const variant = (by: string, variants: Record<string, Check>): Check => (v) => {
 export const REFUSAL_REASONS: Record<RefusalReason, true> = {
   "revision-moved": true, alias: true, "duplicate-relation": true, "required-unset": true, "scope-full": true, "bad-intent": true, misaddressed: true, expired: true, "scope-refused": true,
   "unknown-act": true, "bad-field": true, "no-item": true, final: true, "fact-mismatch": true, unauthorized: true, "guard-failed": true, "capability-refused": true, "slot-full": true, "type-full": true, "send-unresolved": true,
-  "unknown-message": true, "bad-input": true,
+  "unknown-message": true, "unsupported-definition": true, "bad-input": true,
 };
 export const READ_REFUSALS: Record<ReadRefusal, true> = {
   "not-found": true, "wrong-incarnation": true, forbidden: true, "scope-provisional": true, "unsupported-definition": true, "history-unavailable": true, "too-large": true, unavailable: true,
@@ -149,6 +149,9 @@ export const isPrepared = (v: unknown): v is Prepared => prepared(v);
 const send = record({ n: isLocalId, to: (v) => scopeRef(v) || seed(v), message });
 export const isSend = (v: unknown): v is Send => send(v);
 
+/** A capability's name and version, of the one form `name@version`. */
+const capabilityName: Check = (v) => typeof v === "string" && /^(hold|git-read)@(0|[1-9][0-9]*)$/.test(v);
+
 const effect = variant("effect", {
   open: record({ effect: any, item: isLocalId, type: text, state: text }),
   state: record({ effect: any, item: isLocalId, state: text }),
@@ -160,13 +163,29 @@ const effect = variant("effect", {
   redact: record({ effect: any, item: isLocalId, slot: text, texts: listOf(isDigest) }),
   relation: record({ effect: any, owner: scopeRef, item: isLocalId, name: text, state: text, revision: isLocalId }),
   // A capability's record: its name and version are of the one form `name@version`. What its key and its values hold is the capability's to say.
-  record: record({ effect: any, capability: (v) => typeof v === "string" && /^(hold|git-read)@(0|[1-9][0-9]*)$/.test(v), kind: text, key: listOf(isFieldValue), state: text, values: isRecord }),
+  record: record({ effect: any, capability: capabilityName, kind: text, key: listOf(isFieldValue), state: text, values: isRecord }),
   activate: record({ effect: any }),
-  operation: record({ effect: any, operation: isOperationId, attempt: isLocalId }),
+  // Section 4.3: an operation's opening, and one change of one numbered attempt. An operation of the entry itself is named by its ordinal.
+  operation: record({ effect: any, k: isLocalId, owner: (v) => capabilityName(v) || isPlatformDefinition(v), kind: text, attempts: isLocalId }),
+  attempt: record({
+    effect: any, operation: (v) => isOperationId(v) || record({ k: isLocalId })(v), attempt: isLocalId,
+    result: among({ opened: true, confirmed: true, refused: true, unknown: true }), selected: (v) => v === null || typeof v === "boolean",
+  }),
   index: record({ effect: any, from: factRef, fields: isRecord }),
   attention: record({ effect: any, item: isLocalId, members: listOf(memberRef), reason: text }),
 } satisfies Record<Effect["effect"], Check>);
 export const isEffect = (v: unknown): v is Effect => effect(v);
+
+/**
+ * The evidence of an outcome (sections 4.1 and 4.3, item 4): a basis the
+ * contract names and a body, both its own members, and nothing else. The
+ * body is its owner's to type, so any value is one, and it is never absent.
+ * Which result may have which basis, and what a body means, are the
+ * ledger's and the owner's checks.
+ */
+const BASIS: Record<Evidence["basis"], true> = { "own-answer": true, read: true, none: true };
+const evidence = record({ basis: among(BASIS), body: (v) => v !== undefined });
+export const isEvidence = (v: unknown): v is Evidence => evidence(v);
 
 /** A delivery records what its message's class requires beside it: a request its decision, a result the clause that ran, a control or an advisory nothing more. */
 const delivered = { type: any, from: factRef, n: isLocalId, message };
@@ -186,8 +205,10 @@ const input = variant("type", {
     return among(CLASS)(of) && deliveryOf[of](v);
   },
   diagnosis: record({ type: any, of: record({ seq: isLocalId, n: isLocalId }), finding: among(FINDING), attempts: listOf(attempt) }),
+  // Section 4.1 and 5.5: the signed intent, the one grant judged, the capability and its step. Depth is bounded as for an act.
+  preparation: record({ type: any, signed: signedIntent, authority: listOf(grant), capability: capabilityName, step: text }),
   timed: record({ type: any, item: isLocalId, rule: text, due: isTime }),
-  outcome: record({ type: any, operation: isOperationId, attempt: isLocalId, result: among({ confirmed: true, refused: true, unknown: true }), evidence: any }),
+  outcome: record({ type: any, operation: isOperationId, attempt: isLocalId, result: among({ confirmed: true, refused: true, unknown: true }), evidence }),
   checkpoint: record({ type: any, through: isLocalId, state: isDigest }),
 } satisfies Record<Input["type"], Check>);
 export const isInput = (v: unknown): v is Input => input(v);

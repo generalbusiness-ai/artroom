@@ -21,14 +21,14 @@ import { canonicalize, definitionDigest, utf8 } from "@generalbusiness/artroom-b
 import { isObject, own } from "../values.ts";
 import { capabilities, type Underived } from "./capability.ts";
 import { capacityOf, type PendingCopy } from "./capacity.ts";
-import type { Defining, RangeIndex } from "./context.ts";
+import { mark, type Defining, type MarkPlace, type RangeIndex } from "./context.ts";
 import { acts, receives } from "./handlers.ts";
 import { heldUnderBytes, holdForms, holdTypes } from "./hold.ts";
 import { itemTypes } from "./items.ts";
 import { at, shapes, type Problem } from "./shape.ts";
 import { timedEntryBytes, timedGraph, timedKinds, timedRules } from "./timed.ts";
 
-export type { RangeIndex } from "./context.ts";
+export type { MarkKind, MarkPlace, RangeIndex } from "./context.ts";
 export type { Problem, ProblemCode } from "./shape.ts";
 export type { Underived } from "./capability.ts";
 export { timedGraph, type TimedGraph, type TimedMove } from "./timed.ts";
@@ -69,6 +69,14 @@ export interface ValidDefinition {
    * the whole definition (`derivable`). Empty: every form is derived here.
    */
   readonly underived: readonly Underived[];
+  /**
+   * Section 6.1, "Platform code: a mark, and its rule": each mark of the
+   * data of a platform definition, with its place. A runtime or a verifier
+   * that lacks the rule of one, of the kind of its place, answers
+   * `unsupported-definition` for the whole definition (`runnable`, in
+   * `marks.ts`). Empty: a declared definition, which holds no mark.
+   */
+  readonly marks: readonly MarkPlace[];
 }
 
 export type Validation = { ok: true; definition: ValidDefinition } | { ok: false; problems: readonly Problem[] };
@@ -84,11 +92,21 @@ export interface Profile { admit?: (source: string) => string | null }
 
 export const PROFILES: Readonly<Record<string, Profile>> = { "restricted@1": {} };
 
-export function validateDefinition(input: unknown, bounds: Bounds, profiles: Readonly<Record<string, Profile>> = PROFILES): Validation {
+/**
+ * What only a platform definition may state, and only the platform package passes (section 6.1). `platform`: the value is the data
+ * of a platform definition. Its name may begin `platform:`. It has the member `outcomes`, and it may hold a mark at each of the seven
+ * places. The validator checks that each mark is well formed and stands at one of them, lists it, and derives nothing from it. It
+ * does not read the table of rules. A definition that came from an input is validated without the option: a mark in it is a form
+ * that the contract does not define, and is refused as any such form is.
+ */
+export interface ValidateOptions { readonly platform?: boolean }
+
+export function validateDefinition(input: unknown, bounds: Bounds, profiles: Readonly<Record<string, Profile>> = PROFILES, options: ValidateOptions = {}): Validation {
   const read = shapes(bounds);
   const { problems, bad, rec, entries, str } = read;
 
-  const top = rec(input, "", ["format", "name", "profile", "capabilities", "genesis", "items", "acts", "receives", "timed", "rules"]);
+  const platform = options.platform === true;
+  const top = rec(input, "", ["format", "name", "profile", "capabilities", "genesis", "items", "acts", "receives", "timed", "rules", ...(platform ? ["outcomes"] : [])]);
   if (!top) return { ok: false, problems };
   // Section 6.1: the bound on a definition's canonical bytes limits the validator's work, so it is checked before anything is read.
   // A value with no canonical bytes is refused at the end, as before.
@@ -97,13 +115,15 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
   if (size !== null && size > bounds.definitionBytes) return { ok: false, problems: [{ code: "bound", path: "", message: `has ${size} canonical bytes; at most ${bounds.definitionBytes}` }] };
   if (top["format"] !== "artroom-definition-1") bad("shape", "format", "must be artroom-definition-1");
   // Section 6.1: a definition states its own name, which `under` is compared with. A name that begins `platform:` is the name of a
-  // platform definition, which the platform supplies in code, so no declared definition takes one.
-  if (str(top["name"], "name")?.startsWith("platform:")) bad("shape", "name", "a declared definition's name does not begin with platform:");
+  // platform definition, which the platform supplies in code, so no declared definition takes one. The platform package alone passes
+  // the option `platform`, for the data of a definition that it supplies.
+  const named = str(top["name"], "name");
+  if (!platform && named?.startsWith("platform:")) bad("shape", "name", "a declared definition's name does not begin with platform:");
 
   const d: Defining = {
     ...read, bounds, name: typeof top["name"] === "string" ? top["name"] : null, typeNames: new Set(isObject(top["items"]) ? Object.keys(top["items"]) : []), types: new Map(), rules: new Set(), holds: false, holdTypes: new Set(),
     capabilities: new Map(), underived: [],
-    indexes: [], clauseSets: [], clause: null, duties: [],
+    indexes: [], clauseSets: [], clause: null, duties: [], platform, marks: [],
   };
 
   const profile = rec(top["profile"], "profile", ["name", "version"]);
@@ -147,6 +167,9 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
 
   holdForms(d, top);
 
+  // Section 6.1, place 7: the mark of the rule for the outcome entries of each kind of operation that this definition owns.
+  if (platform) for (const [kind, m] of entries(top["outcomes"], "outcomes", null)) mark(d, m, at("outcomes", kind), "outcome");
+
   // Section 6.4: a genesis opens no timed item.
   const genesis = typeof top["genesis"] === "string" ? own(written, top["genesis"]) : undefined;
   if (!isObject(genesis) || genesis["step"] !== "open") bad("genesis", "genesis", "names no open act");
@@ -166,7 +189,7 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
   const capacity = capacityOf(d, graph, moves);
   if (problems.length > 0) return { ok: false, problems };
   try {
-    return { ok: true, definition: { declared, digest: definitionDigest(declared), timedTypes: [...timedTypes].sort(), holdTypes: [...d.holdTypes].sort(), indexes: d.indexes, ...capacity, underived: d.underived } };
+    return { ok: true, definition: { declared, digest: definitionDigest(declared), timedTypes: [...timedTypes].sort(), holdTypes: [...d.holdTypes].sort(), indexes: d.indexes, ...capacity, underived: d.underived, marks: d.marks } };
   } catch {
     return { ok: false, problems: [{ code: "shape", path: "", message: "has no canonical bytes" }] };
   }

@@ -9,7 +9,7 @@ import { route, type Api } from "../src/worker.ts";
 import { definition } from "./support.ts";
 import { founding, rita, soon } from "./net.ts";
 
-test("one real route: a founding and an act through the Worker's fetch; the exact retry through the service binding returns the same receipt; a read states its position", async () => {
+test("one real route: a founding, an act and a request for a step through the Worker's fetch; the exact retry through the service binding returns the same receipt; a read states its position", async () => {
   const post = (path: string, body: unknown) => SELF.fetch(`https://scopes.test${path}`, { method: "POST", body: JSON.stringify(body) });
   const { signed, name } = founding(definition, { title: "A lane", opener: rita.member });
   const founded = await post("/v1/scopes", { founding: signed, definition: definition.declared });
@@ -25,6 +25,12 @@ test("one real route: a founding and an act through the Worker's fetch; the exac
   const accepted = await first.json<Answer>();
   expect([first.status, accepted]).toMatchObject([200, { answer: "accepted", receipt: { fact: { at, seq: 1 } } }]);
   expect(await (env.API as unknown as Api).submit(name, body.signed, body.grants)).toEqual(accepted);
+
+  // The preparation route reaches the same turn and its judge. This runtime has no code for a step of `hold@1`, as in production,
+  // so the request is not judged and nothing is written: the summary below is still at entry 1.
+  const prepared = await post(`/v1/scopes/${name}/preparations`, { ...body, capability: "hold@1", step: "stage" });
+  const unjudged = { answer: "unavailable", reason: "unavailable" };
+  expect([prepared.status, await prepared.json(), await (env.API as unknown as Api).prepare(name, body.signed, body.grants, "hold@1", "stage")]).toEqual([503, unjudged, unjudged]);
 
   const summary = await SELF.fetch(`https://scopes.test/v1/scopes/${name}`);
   expect([summary.status, await summary.json()]).toMatchObject([200, { ok: true, complete: true, at: { seq: 1, hash: accepted.answer === "accepted" && accepted.receipt.fact.hash }, value: { scope: at, status: "active" } }]);

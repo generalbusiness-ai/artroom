@@ -11,23 +11,49 @@
  * or `deriveEffects`, and returns a `Draft`.
  */
 
-import type { Effect, Entry, FactRef, FactUse, Grant, Head, Input, MismatchReason, Prepared, RefusalReason, RoutingRefusal, ScopeRef, Send, SignedIntent, UnavailableReason } from "@generalbusiness/artroom-contract";
+import type { Effect, Entry, FactRef, FactUse, Grant, GrantMark, Head, Input, MismatchReason, Prepared, RefusalReason, RoutingRefusal, ScopeRef, Send, SignedIntent, UnavailableReason } from "@generalbusiness/artroom-contract";
 import { intentDigest, scopeIdOf, verifySignedIntent } from "@generalbusiness/artroom-bytes";
+import type { Signer } from "./attribution.ts";
 import { deriveEffects } from "./effects.ts";
 import { isIntent, presentedTypes, readFacts, readFields, type Reading } from "./fields.ts";
+import { covers } from "./grant.ts";
 import type { Judging } from "./guards.ts";
-import { alsoItems, derive } from "./handlers.ts";
+import { alsoItems, derive, giving } from "./handlers.ts";
+import { actionOf, fieldOutsideType, grantByRule, markOf, selectedBy, unjudged, type JudgedInput } from "./marks.ts";
 import type { Item, StateView } from "./state.ts";
 import { nextDue, type Due } from "./timed.ts";
 import { timeMs, type Clock } from "./time.ts";
 import type { ValidDefinition } from "./validate/index.ts";
-import { isScopeRef, own, same } from "./values.ts";
+import { own, same } from "./values.ts";
 
-/** A grant as presented, with the authority port's verdict on whether it is current (section 5.1, held authority). */
+/**
+ * A grant that an act may be judged on, with whether it is current (section
+ * 5.1, held authority). `current` is decided in the commit, on the commit's
+ * reading, from what was read about the signer before the turn. The judge
+ * is given the answer. It reads nothing, and it asks no port.
+ */
 export interface Presented { grant: Grant; current: boolean }
 
 export interface JudgeContext extends Reading {
-  grants: readonly Presented[];
+  /**
+   * What was read about the signer's authority before the turn, as the
+   * commit decided it: each grant the act may be judged on. Null: nothing
+   * was read that this commit can judge on. An act that reaches check 9 of
+   * section 4.2 is then not judged: `authority-unavailable` (section 16.1).
+   * A verifier gives the one grant that the entry records, which retains
+   * what was read (section 9.3).
+   */
+  grants: readonly Presented[] | null;
+  /**
+   * This scope's own membership reference, with its incarnation, as the
+   * scope records it: a function of its genesis entry (section 6.6). A
+   * grant whose `within` is a filter covers this scope exactly when the
+   * filter names this reference (section 16.1). The runtime gives the
+   * reference that its authority port read from. A verifier reads the
+   * genesis (`membershipOf`). Absent or null: the scope records none, and
+   * only a grant that names this scope covers it.
+   */
+  membership?: ScopeRef | null | undefined;
   /** The facts presented beside the intent, by name, as they arrived (section 6.4). They are not signed. */
   presented?: Readonly<Record<string, unknown>> | undefined;
 }
@@ -79,7 +105,19 @@ export type Judgment =
   | { result: "routing"; reason: RoutingRefusal }                 // a delivery addressed to another scope or incarnation (section 7.4)
   | { result: "refused"; reason: RefusalReason; detail: string }; // not an input this scope can ever write
 
+/**
+ * The judge of an act, by the checks of section 4.2 in their order. In a
+ * scope under a platform definition a row may hold marks, and each rule is
+ * run at the check of its mark's place: a field's type at 7, a name of
+ * `also` at 8, the grant at 9, a guard at 10, an effect and a slot's type
+ * at 11, a send at 12. No rule is run before check 7. A fault of a rule leaves the act not
+ * judged: `unavailable`, and nothing is written (section 6.1).
+ */
 export function judgeAct(view: StateView, definition: ValidDefinition, signed: SignedIntent, context: JudgeContext): ActJudgment {
+  return unjudged(() => actJudged(view, definition, signed, context));
+}
+
+function actJudged(view: StateView, definition: ValidDefinition, signed: SignedIntent, context: JudgeContext): ActJudgment {
   const scope = view.scope();
   if (!scope) return { result: "unavailable", reason: "unavailable" };
   const refused = (reason: RefusalReason, detail: string): Refused => ({ result: "refused", reason, detail, judgedAt: scope.head });
@@ -135,6 +173,13 @@ export function judgeAct(view: StateView, definition: ValidDefinition, signed: S
   const facts = new Map([...named.facts, ...beside.facts]);
   const uses = [...named.uses, ...beside.uses.filter((use) => !named.facts.has(use.fact.hash))];
   if (uses.length > bounds.usesPerEntry) return refused("bad-field", `more than ${bounds.usesPerEntry} foreign entries`);
+  // Platform data: what a rule of this row is given (section 6.1). The input is the act as it arrived. No grant is judged yet.
+  const clocked = { clock: false };
+  const judged: JudgedInput = { type: "act", signed, grant: null, presented: context.presented ?? {} };
+  const g = giving(view, context, scope, scope.head.seq + 1, judged, clocked, fields, facts);
+  // Check 7: a field whose type is a mark is checked by the mark's rule.
+  const outside = fieldOutsideType(g, act.fields);
+  if (outside) return refused("bad-field", `${outside} is not a value of its type`);
 
   // Section 6.4: `on` and each `also` name are resolved to local items before any guard or effect.
   const subjects = new Map<string, Item>();
@@ -149,11 +194,13 @@ export function judgeAct(view: StateView, definition: ValidDefinition, signed: S
   }
   // An `also` name is unbound when its field is absent, its slot is empty or its type has no item yet. It is then no subject, and
   // `expected` has no key for it. A transition's primary item exists before the entry, so a `via` may read its slots.
-  const also = alsoItems(view, definition, act.also, fields, act.step === "transition" ? (subjects.get("on") ?? null) : null);
+  // Check 8: a name of `also` that a mark selects is resolved by the mark's rule, which gives one item or none. The signer named
+  // no item, so such a name has no key in `expected`. The rule on aliases holds for it.
+  const also = alsoItems(view, definition, act.also, fields, act.step === "transition" ? (subjects.get("on") ?? null) : null, undefined, (mark, bound) => selectedBy({ ...g, subjects: bound }, mark));
   if (!also.ok) return refused("no-item", also.detail);
   for (const [name, item] of also.items) {
     subjects.set(`also.${name}`, item);
-    expects.push(name);
+    if (!also.marked.has(name)) expects.push(name);
   }
   // No aliases: each subject is one distinct item, so its expected revision is checked once and it rises once.
   if (new Set([...subjects.values()].map((i) => i.id)).size !== subjects.size) return refused("alias", "two names resolve to one item");
@@ -166,18 +213,43 @@ export function judgeAct(view: StateView, definition: ValidDefinition, signed: S
   const primary = subjects.get("on");
   if (act.step === "transition" && primary && own(own(declared.items, primary.type)!.states, primary.state)?.final) return refused("final", `item ${primary.id} is ${primary.state}`);
 
-  // Section 6.4: every act needs a current grant for its `grant` action. The first presented grant that qualifies is the one recorded.
-  const presented = context.grants.find(({ grant, current }) =>
-    current && grant.key === intent.actor && grant.actions.includes(act.grant)
-    // A grant that names several scopes by a filter is the authority note's; here a grant covers the one scope it names.
-    && isScopeRef(grant.within) && grant.within.scope === scope.at.scope && grant.within.inc === scope.at.inc
+  // Section 4.2, check 9. Section 6.4: every act of a declared definition needs a current grant for its `grant` action. In platform data the `grant` of a
+  // row may be a mark: its rule stands in place of the grant check. A mark may state an action as well, and then check 9 is made
+  // as written first: when a current grant of that action is held for the signing key the check holds, the entry records that
+  // grant, and the rule is not run.
+  const mark = markOf(act.grant) as GrantMark | null;
+  const action = actionOf(act);
+  // The first presented grant that qualifies is the one recorded. Section 16.1: a grant's `within` covers this scope when it names
+  // it, or when it is a filter whose `membership` is the membership reference that this scope records.
+  const presented = action === null ? undefined : context.grants?.find(({ grant, current }) =>
+    current && grant.key === intent.actor && grant.actions.includes(action) && covers(grant.within, scope.at, context.membership ?? null)
     && (grant.notAfter === null || asOf < (timeMs(grant.notAfter) ?? -Infinity)));
-  if (!presented) return refused("unauthorized", `no current grant of ${act.grant} to this key in this scope`);
-  const signer = { member: presented.grant.subject, principal: presented.grant.principal };
+  let signer: Signer | null;
+  if (presented) signer = { member: presented.grant.subject, principal: presented.grant.principal };
+  else if (!mark) {
+    // Nothing was read about this signer that the commit can judge on: the act is not judged, and nothing above this line was hidden
+    // by that. Section 16.1: no judgment rests on a read that was not made, or on one that was discarded.
+    if (context.grants === null) return { result: "unavailable", reason: "authority-unavailable" };
+    return refused("unauthorized", `no current grant of ${act.grant} to this key in this scope`);
+  } else {
+    // The rule checks the authority that the specification of its version names, and nothing less. It passes the signing key, with
+    // the member that the act's forms read as the signer, or none: the entry then records an empty `authority`. Or it does not,
+    // and the act is refused `unauthorized`, with the name that the rule states.
+    const answer = grantByRule({ ...g, subjects }, mark);
+    if (!answer.pass) {
+      // A mark that states an action: with nothing read about the signer, an act that the rule does not pass is not judged. A row
+      // whose mark states none reads no observation, so it is never answered so.
+      if (action !== null && context.grants === null) return { result: "unavailable", reason: "authority-unavailable" };
+      return { ...refused("unauthorized", `the rule ${mark.code} does not pass this key`), ...(answer.name === undefined ? {} : { name: answer.name }) };
+    }
+    signer = answer.member && { member: answer.member, principal: null };
+  }
+  const granted = presented?.grant ?? null;
 
   const j: Judging = {
     view, definition, bounds, clock, scope, self: scope.head.seq + 1, kind: intent.kind, fields, fieldTypes: act.fields, subjects, signer, facts, prepared: context.prepared, used: [], asked: context.asked,
     own: context.own, intent: digest, presented: beside.fields, capabilities: context.capabilities,
+    platform: context.platform, judged: { ...judged, grant: granted }, ran: clocked,
   };
 
   // Guards, then effects, then sends, then the bound on the type it opens, as for a handler. The cause of a scope it creates is the intent's digest.
@@ -188,7 +260,8 @@ export function judgeAct(view: StateView, definition: ValidDefinition, signed: S
   // Section 5.3: every act judges its `notAfter` and its grant's expiry on the commit clock, so no act is written while the clock is behind.
   if (clock.behind) return { result: "unavailable", reason: "clock-behind" };
   // The entry records each presented fact as it arrived: a whole fact reference, also for an entry of this scope.
-  const input = { type: "act", signed, authority: [presented.grant], presented: shown.fields as Record<string, FactRef> } as const;
+  // Section 4.2: the entry records the one grant judged. An act that the rule of a mark at `grant` passed records none.
+  const input = { type: "act", signed, authority: granted ? [granted] : [], presented: shown.fields as Record<string, FactRef> } as const;
   return { result: "write", draft: { input, uses, prepared: ran.prepared, effects: ran.effects, sends: ran.sends, judgesTime: true, settles: ran.settles } };
 }
 
@@ -198,8 +271,13 @@ export function judgeAct(view: StateView, definition: ValidDefinition, signed: S
  * rule; the reading is not earlier than the deadline; and no transition
  * earlier in the order is due. Others may be due later in the order; they
  * stay due. A timed entry judges time, so it is never clamped (section 5.3).
+ *
+ * `capabilities`: the rules that derive what a hold's expiry does to its
+ * workspace (authority note, section 5.7, the row "Expiry"). A timed entry
+ * has no signer, and these effects need none. A timed rule writes no
+ * capability form, so nothing else of the rules is asked.
  */
-export function judgeTimed(view: StateView, definition: ValidDefinition, selected: Due, context: Pick<JudgeContext, "clock" | "bounds">): TimedJudgment {
+export function judgeTimed(view: StateView, definition: ValidDefinition, selected: Due, context: Pick<JudgeContext, "clock" | "bounds" | "capabilities">): TimedJudgment {
   const { clock, bounds } = context;
   const scope = view.scope();
   const rule = own(definition.declared.timed, selected.rule);
@@ -210,7 +288,7 @@ export function judgeTimed(view: StateView, definition: ValidDefinition, selecte
   const next = nextDue(view, definition, clock.reading);
   if (next?.item !== selected.item || next.rule !== selected.rule) return { result: "dropped", failed: "next" };
 
-  const j: Judging = { view, definition, bounds, clock, scope, self: scope.head.seq + 1, kind: selected.rule, fields: {}, fieldTypes: {}, subjects: new Map([["on", item]]), signer: null, facts: new Map(), prepared: [], used: [] };
+  const j: Judging = { view, definition, bounds, clock, scope, self: scope.head.seq + 1, kind: selected.rule, fields: {}, fieldTypes: {}, subjects: new Map([["on", item]]), signer: null, facts: new Map(), prepared: [], used: [], capabilities: context.capabilities };
   const effects = deriveEffects(j, rule.effects, rule.attention, null);
   // Section 6.4: a timed rule's effects are total. The validator refuses, as `timed-partial`, a rule with an effect that could be
   // refused here, and requires one that takes the item out of the rule's states. So a selection that passes its three checks is

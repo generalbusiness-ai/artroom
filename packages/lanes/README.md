@@ -65,8 +65,8 @@ return it to the owner of the lane forms.
 ## What does not run
 
 Both definitions use forms that need the code of the capabilities `hold@1`
-and `git-read@1`. No runtime in this repository has that code. The
-validator lists those forms in `ValidDefinition.underived`, and the test
+and `git-read@1`. The derive package holds that code as pure functions,
+and no production port is given it. The validator lists those forms in `ValidDefinition.underived`, and the test
 asserts the list. Under the production wiring a scope is not founded or
 created under either digest: `unsupported-definition`. The scenarios run
 only because their test Worker supplies a scripted capability, which is a

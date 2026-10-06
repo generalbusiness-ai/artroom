@@ -61,8 +61,12 @@ export class Deliveries {
    *
    * `dependency-unavailable`: the creator cannot be read now, or does not
    * hold the bytes. `unsupported-definition`: the seed names a platform
-   * definition, which no code supplies yet, or the bytes are not a valid
-   * declaration with that digest. Either way nothing is recorded.
+   * definition, or the bytes are not a valid declaration with that digest.
+   * Either way nothing is recorded.
+   *
+   * I3 merge: a creation under a platform name is not built. The code
+   * supplies that definition, as `Scope.platform` reads it for a founding,
+   * and the step that makes a platform scope create another asks it here.
    */
   async #declared(seed: Seed): Promise<{ valid: ValidDefinition; bytes: string; children: Retained[] } | "dependency-unavailable" | "unsupported-definition"> {
     if (!isObject(seed) || !isDigest(seed.definition) || !isScopeRef(seed.creator)) return "unsupported-definition";
@@ -108,7 +112,6 @@ export class Deliveries {
     const store = this.#store;
     if (!name || !isObject(delivered) || !isFactRef(delivered.from) || !isLocalId(delivered.n) || !isObject(delivered.message)) return UNVERIFIED;
     const { from, message } = delivered;
-
     // Section 7.4, "What the receiver trusts at run time". The source scope is reached by its scope ID in the one namespace, the
     // answer's incarnation is checked against the envelope, and the entry's bytes against the hash. Nothing has been recorded.
     const read = await within(() => this.#ports.resolver.read(from, bounds.fetchSeconds), bounds.fetchSeconds);
@@ -164,7 +167,7 @@ export class Deliveries {
     if (!texts) return retry("dependency-unavailable");
 
     const context = (clock: Reading): Omit<DeliveryContext, "prepared"> =>
-      ({ clock, bounds, facts, own: ownOf(store), texts: texts.sizes, capabilities: this.#ports.capabilities ?? undefined, source: { entry: source.entry, under: source.under }, origin });
+      ({ clock, bounds, facts, own: ownOf(store), texts: texts.sizes, capabilities: this.#ports.capabilities ?? undefined, platform: this.#scope.pinned()?.platform ?? undefined, source: { entry: source.entry, under: source.under }, origin });
     /** The definition a section of the turn runs under: the pinned one, or before the genesis the one the seed names. */
     const definition = (): ValidDefinition => this.#scope.pinned()?.definition ?? founding!.valid;
     /** A `create` goes to the genesis judge, which answers a repeat from the genesis when the scope exists. */

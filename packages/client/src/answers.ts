@@ -22,7 +22,7 @@ import { REFUSAL_REASONS, among, isDuty, isHead, isItem, isListOf, isLogPage, is
 const ACT_REFUSED: Record<RefusalReason, true> = REFUSAL_REASONS;
 /** Why a founding is refused (`Founded`). */
 const FOUNDING_REFUSED: Record<RefusalReason | DeliveryRefusal | "unsupported-definition", true> = { ...REFUSAL_REASONS, "source-unverified": true, "unsupported-definition": true };
-const UNAVAILABLE: Record<UnavailableReason, true> = { "dependency-unavailable": true, busy: true, "clock-behind": true, "scope-provisional": true, "guard-incomplete": true, unavailable: true };
+const UNAVAILABLE: Record<UnavailableReason, true> = { "dependency-unavailable": true, busy: true, "clock-behind": true, "scope-provisional": true, "guard-incomplete": true, "authority-unavailable": true, unavailable: true };
 const MISMATCH: Record<MismatchReason, true> = { "idempotency-mismatch": true };
 
 /** A record with exactly these members. */
@@ -56,6 +56,7 @@ function isAnswer(v: unknown): v is Answer {
 export const ANSWERS: { [K in keyof ScopeApi]: (reply: unknown) => reply is Awaited<ReturnType<ScopeApi[K]>> } = {
   found: isFounded,
   submit: isAnswer,
+  prepare: isAnswer,
   settle: isRead(isReceipt),
   summary: isRead(isSummary),
   items: isRead(isListOf(isItem)),

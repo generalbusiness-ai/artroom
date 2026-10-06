@@ -8,6 +8,7 @@ import type { Digest, FactRef, Incarnation, MemberRef, OperationId, PlatformDefi
 import type { FieldValue, SignedIntent } from "./intent.ts";
 import type { RefusalReason } from "./result.ts";
 import type { CapabilityName } from "./capability.ts";
+import type { Evidence } from "./evidence.ts";
 
 export interface Entry {
   v: 1;
@@ -51,10 +52,26 @@ export type Input =
       finding: "undelivered" | "delivery-unavailable";
       attempts: readonly Attempt[] }            // section 7.4
   | { type: "timed"; item: number; rule: string; due: Timestamp }
+  | PreparationInput
   | { type: "outcome"; operation: OperationId; attempt: number;
-      result: "confirmed" | "refused" | "unknown";
-      evidence: unknown }                       // defined by the authority note
+      result: "confirmed" | "refused" | "unknown"; evidence: Evidence }   // section 4.3
   | { type: "checkpoint"; through: number; state: Digest };
+
+/**
+ * A preparation entry (section 4.1; 5.5): the signed intent that asks for a
+ * capability's step, the one grant judged, the capability and the step. It is
+ * a member of `Input`. Derive's `judgePreparation` writes it, and the fold
+ * keeps its index. The production runtime writes none, because its
+ * capabilities port has no code for a step, and a replay has no rules for
+ * one yet (I3 deltas, entries E5 and E13).
+ */
+export interface PreparationInput {
+  type: "preparation";
+  signed: SignedIntent;
+  authority: readonly Grant[];   // the one grant judged
+  capability: CapabilityName;
+  step: string;
+}
 
 /** The four classes of message (section 7.4). Only a request has a result. */
 export type Message = Request | Result | Control | Advisory;
@@ -84,9 +101,17 @@ export interface Send { n: number; to: ScopeRef | Seed; message: Message }
 /**
  * One derived change. The contract does not spell this union out; it is the
  * smallest set the effect forms of section 6.6 and the platform's own entries
- * can produce, with the record that an attempt of an outside operation was
- * opened, which an outcome needs (section 4.3). `item` is always a local ID: the `seq` of the entry that
+ * can produce, with the two records of an outside operation, which are as
+ * the contract states them (sections 4.1 and 4.3). `item` is always a local ID: the `seq` of the entry that
  * opened the item.
+ *
+ * `operation`: the entry opens an operation, at its ordinal `k` there, with
+ * its owner, its kind and the most attempts the owner allows. `attempt`: one
+ * change of one numbered attempt. `opened` opens it, and the other three are
+ * the result of the outcome entry that holds the record. An operation that
+ * its own entry opens is named `{ k }`, so no entry holds its own position.
+ * `selected` is true or false on a `confirmed` result of an operation whose
+ * kind selects one result, and null on every other record.
  */
 export type Effect =
   | { effect: "open"; item: number; type: string; state: string }
@@ -101,7 +126,9 @@ export type Effect =
   | { effect: "record"; capability: CapabilityName; kind: string; key: readonly FieldValue[];
       state: string; values: Record<string, unknown> }                                  // one change of a capability's record; section 6.11
   | { effect: "activate" }                                                              // section 7.2
-  | { effect: "operation"; operation: OperationId; attempt: number }                    // opens an operation's next numbered attempt; section 4.3
+  | { effect: "operation"; k: number; owner: CapabilityName | PlatformDefinition; kind: string; attempts: number }   // section 4.3
+  | { effect: "attempt"; operation: OperationId | { k: number }; attempt: number;
+      result: "opened" | "confirmed" | "refused" | "unknown"; selected: boolean | null }   // section 4.3
   | { effect: "index"; from: FactRef; fields: Record<string, FieldValue> }              // a projection row in the directory
   | { effect: "attention"; item: number; members: readonly MemberRef[]; reason: string };
 

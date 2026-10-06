@@ -7,15 +7,15 @@
  * the answer to a founding, is the contract's, and is exported here again.
  */
 
-import type { ActType, Answer, Beside, Bounds, DeclaredDefinition, Digest, DutyId, Entry, FactRef, Founded, Grant, PlatformDefinition, Receipt, RefusalReason, ScopeId, Seed, Settlement, SignedIntent, UnavailableReason } from "@generalbusiness/artroom-contract";
-import { canonicalize, definitionDigest, intentDigest, isDigest, isGrant, newIncarnation, parseStrict, textDigest, utf8 } from "@generalbusiness/artroom-bytes";
-import { checkpointOf, derivable, factsNamed, inputTexts, isObject, judgeAct, judgeCheckpoint, judgeGenesis, own, prepareRules, presentedTypes, readFields, validateDefinition } from "@generalbusiness/artroom-derive";
-import type { ActJudgment, Clock as Reading, Draft, Fetched, Founding, JudgeContext, Own, Texts, ValidDefinition } from "@generalbusiness/artroom-derive";
+import type { ActType, Answer, Beside, Bounds, CapabilityName, DeclaredDefinition, Digest, DutyId, Entry, FactRef, Founded, Grant, PlatformDefinition, Receipt, RefusalReason, ScopeId, Seed, Settlement, SignedIntent, UnavailableReason } from "@generalbusiness/artroom-contract";
+import { canonicalize, definitionDigest, intentDigest, isDigest, isGrant, isPlatformDefinition, newIncarnation, parseStrict, platformName, textDigest, utf8 } from "@generalbusiness/artroom-bytes";
+import { actionOf, checkpointOf, derivable, factsNamed, ownersOf, inputTexts, isObject, judgeAct, judgeCheckpoint, judgeGenesis, judgePreparation, own, prepareRules, presentedTypes, readFields, runnable, stepsOf, validateDefinition, windowOf } from "@generalbusiness/artroom-derive";
+import type { ActJudgment, Clock as Reading, Draft, Fetched, Founding, GrantDecision, JudgeContext, Own, Owners, PlatformRules, Presented, StateView, Texts, ValidDefinition, Window } from "@generalbusiness/artroom-derive";
 import { RULE_PROFILES } from "@generalbusiness/artroom-derive/rule";
 import { namedBy } from "./definitions.ts";
-import type { DefinitionRead, Ports } from "./ports.ts";
+import type { Asked, DefinitionRead, Ports, Standing } from "./ports.ts";
 import type { Retained, Sealed, Store } from "./store.ts";
-import { Turns, fetchFacts, isSigned, type Verdict } from "./turn.ts";
+import { LATE, Turns, fetchFacts, isSigned, within, type Verdict } from "./turn.ts";
 
 export type { Founded };
 
@@ -25,8 +25,18 @@ export type Checkpointed =
   | { answer: "refused"; reason: RefusalReason }
   | { answer: "unavailable"; reason: UnavailableReason };
 
-/** The definition a scope pins: what its seed names, and the validated declaration. Null: this runtime cannot run it. */
-export interface Pinned { named: Digest | PlatformDefinition; definition: ValidDefinition | null }
+/**
+ * The definition a scope pins: what its seed names, and the validated
+ * declaration. Null: this runtime cannot run it, and the scope admits
+ * nothing (section 6.1). `platform`: the rules of the platform definition
+ * that the scope pins, which every judge of this scope is given, and which
+ * the judges run at the place of each mark. Null: a declared definition,
+ * which holds no mark, or a definition that this runtime cannot run.
+ */
+export interface Pinned { named: Digest | PlatformDefinition; definition: ValidDefinition | null; platform: PlatformRules | null }
+
+/** A platform definition as this runtime can run it: the validated data, and its rules. */
+export interface Supplied { definition: ValidDefinition; platform: PlatformRules }
 
 /** The receipt of a sealed entry: a view, built after sealing (section 4.1). */
 export function receiptOf({ entry, hash }: Sealed, definition: Digest | PlatformDefinition): Receipt {
@@ -115,6 +125,30 @@ export const NO_INCARNATION = newIncarnation(new Uint8Array(16));
 const unavailable = (reason: UnavailableReason) => ({ answer: "unavailable", reason }) as const;
 const said = <A>(answer: A): Verdict<A> => ({ verdict: "answer", answer });
 
+/**
+ * Phase two of the authority port, in the commit (section 5.1): what the
+ * read of this input's own turn holds, at this head and this reading. Null:
+ * it cannot serve this commit. A port that fails here has decided nothing,
+ * so the act is not judged.
+ */
+function heldBy(standing: Standing, view: StateView, clock: Reading): readonly Presented[] | null {
+  try {
+    const held = standing.held(view, clock);
+    return Array.isArray(held) ? held as readonly Presented[] : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The entry that was written on what `held` answered, for a port that keeps its read. A port that fails here has changed nothing in the entry. */
+function told(standing: Standing, sealed: Sealed): void {
+  try {
+    standing.sealed?.(sealed);
+  } catch {
+    // The entry stands. What the port then holds of this read is its own to judge at the next read.
+  }
+}
+
 export class Scope {
   readonly #name: ScopeId | null;
   readonly #store: Store;
@@ -132,7 +166,7 @@ export class Scope {
     this.#store = store;
     this.#ports = ports;
     this.#bounds = bounds;
-    this.#turns = new Turns(store, ports, bounds, () => { const pinned = this.pinned(); return pinned ? pinned.definition : undefined; });
+    this.#turns = new Turns(store, ports, bounds, () => { const pinned = this.pinned(); return pinned ? pinned.definition : undefined; }, () => this.owners());
   }
 
   /**
@@ -150,17 +184,68 @@ export class Scope {
     }
   }
 
-  /** The pinned definition, read from the genesis entry and the retained declaration. Null before the genesis. */
+  /**
+   * A platform definition, as this runtime's code supplies it through the
+   * definitions port (section 6.1): its data, validated, and its rules.
+   * Null: the runtime does not implement that version, or cannot run it
+   * whole: `unsupported-definition`.
+   *
+   * The data is the platform package's, so it is validated with the
+   * validator's platform option, which lets a name begin `platform:`. This
+   * is the one use of that option, and no input reaches it: an input names
+   * a platform definition and never supplies one. Bytes that an input, a
+   * peer or this scope's storage gave are validated by `validate`, without
+   * the option.
+   *
+   * The rule of section 6.1 is of the whole scope, for a platform
+   * definition as for a capability form with no code: "a scope runs every
+   * turn under its whole pinned definition, or none". The data holds a mark
+   * at each place that is code, and the validator lists the marks. When one
+   * mark of that list has no rule, the definition is null: no scope is
+   * founded under it, and a scope that exists under it admits nothing (I3
+   * deltas, entry EC4).
+   */
+  platform(named: PlatformDefinition): Supplied | null {
+    const supplied = this.#ports.definitions.platform(named);
+    if (!supplied) return null;
+    try {
+      const checked = validateDefinition(parseStrict(canonicalize(supplied.data)), this.#bounds, RULE_PROFILES, { platform: true });
+      // Section 6.1: the name of a platform definition is its platform name without the version, which is what `under` compares.
+      if (!checked.ok || checked.definition.declared.name !== platformName(named) || !derivable(checked.definition, this.#ports.capabilities)) return null;
+      // The marks are in the data, and the validator lists them: no table beside the data says which entries are code.
+      // Section 6.1, "A mark with no rule: the whole scope": every mark needs a rule of that name, of the kind of the mark's place.
+      if (!runnable(checked.definition, supplied.rules)) return null;
+      // A scope whose every rule is supplied runs every row of its definition: the judges run each rule at the place of its mark.
+      return { definition: checked.definition, platform: { named, rules: supplied.rules } };
+    } catch {
+      return null;
+    }
+  }
+
+  /** The pinned definition, read from the genesis entry and the retained declaration, or from the runtime's code. Null before the genesis. */
   pinned(): Pinned | null {
     if (this.#pinned) return this.#pinned;
     const genesis = this.#store.stored(0);
     if (!genesis) return null;
     const input = (JSON.parse(genesis.bytes) as Entry).input as Extract<Entry["input"], { type: "genesis" }>;
     const named = input.seed.definition;
+    // A platform definition is pinned by its name and version. No bytes are retained for it: it is read from the code again.
+    const supplied = isPlatformDefinition(named) ? this.platform(named) : null;
     const kept = isDigest(named) ? this.#store.retained("definition", named) : null;
-    const definition = kept ? this.validate(kept.bytes) : null;
+    const definition = supplied ? supplied.definition : kept ? this.validate(kept.bytes) : null;
     if (definition) this.#store.cover(definition.indexes);
-    return (this.#pinned = { named, definition });
+    return (this.#pinned = { named, definition, platform: supplied?.platform ?? null });
+  }
+
+  /**
+   * The rules of the owners of outside operations, for this scope: those of
+   * the owners port, and, under a platform definition, the rules that its
+   * data names in `outcomes` for the operations that it owns (section 6.1,
+   * place 7). Undefined: no owner has rules here.
+   */
+  owners(): Owners | undefined {
+    const pinned = this.pinned();
+    return pinned?.definition ? ownersOf(pinned.definition, pinned.platform, this.#ports.owners) : (this.#ports.owners ?? undefined);
   }
 
   #receipt(seq: number, named: Digest | PlatformDefinition): Receipt {
@@ -174,7 +259,9 @@ export class Scope {
    * digest is this object's name. The incarnation is minted in the commit.
    * The entry's sends are written to the outbox. `definition` is a
    * declaration, or the digest or platform name of one, which the
-   * definitions port is asked for.
+   * definitions port is asked for. A platform name pins the runtime's own
+   * code, by that name: the seed holds the name, and no bytes are retained
+   * for it.
    *
    * `definitions`: the declarations of the definitions this one names in
    * `create` sends, and of those they name in turn. Each that is named is
@@ -197,20 +284,33 @@ export class Scope {
     const { random, resolver } = this.#ports;
     const bounds = this.#bounds;
 
-    let bytes: string;
-    if (typeof definition === "string") {
-      const read = await this.#ports.definitions.read(definition, null);
-      if (!read.ok) return read.reason === "unavailable" ? unavailable("dependency-unavailable") : refused("unsupported-definition");
-      bytes = read.bytes;
+    // Null: a platform definition, which has no bytes to retain.
+    let bytes: string | null = null;
+    let valid: ValidDefinition | null;
+    let platform: PlatformRules | null = null;
+    if (typeof definition === "string" && definition.startsWith("platform:")) {
+      // Section 6.1: the founding names a platform definition, and the runtime's code supplies it. Nothing of it comes from the input.
+      const supplied = isPlatformDefinition(definition) ? this.platform(definition) : null;
+      // Null: a mark of the definition has no rule, so nothing is founded under it.
+      if (!supplied) return refused("unsupported-definition");
+      ({ definition: valid, platform } = supplied);
     } else {
-      try {
-        bytes = canonicalize(definition);
-      } catch {
-        return refused("unsupported-definition");
+      if (typeof definition === "string") {
+        const read = await this.#ports.definitions.read(definition as Digest, null);
+        if (!read.ok) return read.reason === "unavailable" ? unavailable("dependency-unavailable") : refused("unsupported-definition");
+        bytes = read.bytes;
+      } else {
+        try {
+          bytes = canonicalize(definition);
+        } catch {
+          return refused("unsupported-definition");
+        }
       }
+      valid = this.validate(bytes);
     }
-    const valid = this.validate(bytes);
     if (!valid || (typeof definition === "string" && isDigest(definition) && valid.digest !== definition)) return refused("unsupported-definition");
+    // What the seed names: the platform name, or the digest of the declaration.
+    const names: Digest | PlatformDefinition = bytes === null ? definition as PlatformDefinition : valid.digest;
 
     // Section 9.2: the declarations this scope retains for its children, from what the founder supplied.
     const supplied = new Map<Digest, string>();
@@ -225,7 +325,7 @@ export class Scope {
     }, (text) => this.validate(text), bounds.namedDefinitions);
     if (!children.ok) return refused("unsupported-definition");
 
-    const seed: Seed = { v: 1, kind: "directory", definition: valid.digest, creator: null, cause: intentDigest(founding.intent), ordinal: 0 };
+    const seed: Seed = { v: 1, kind: "directory", definition: names, creator: null, cause: intentDigest(founding.intent), ordinal: 0 };
     // Step 1: the facts the founding intent's fields name. A scope that has its genesis is asked again, a repeat: the judge answers it
     // from the genesis, or refuses it as another founding, and reads no fact. So none is fetched, and a fact that cannot be read
     // now does not hide the receipt (section 7.4, as for a delivery that the store has decided).
@@ -238,8 +338,8 @@ export class Scope {
 
     const texts = Received.beside(besideOf(beside).texts, act.fields, bounds);
     const asked = (inc: Founding["inc"]): Founding => ({ name, inc, seed, founding });
-    const context = (clock: Reading) => ({ clock, bounds, facts, source: null, texts: texts.sizes, capabilities: this.#ports.capabilities ?? undefined });
-    const pinned = (): Pinned => this.pinned() ?? { named: valid.digest, definition: valid };
+    const context = (clock: Reading) => ({ clock, bounds, facts, source: null, texts: texts.sizes, capabilities: this.#ports.capabilities ?? undefined, platform: platform ?? undefined });
+    const pinned = (): Pinned => this.pinned() ?? { named: names, definition: valid, platform };
     const answer = (sealed: Sealed): Founded =>
       (sealed.entry.input.type === "genesis" && sealed.entry.input.decision === "applied" ? { answer: "accepted", receipt: receiptOf(sealed, pinned().named) } : refused("scope-refused"));
 
@@ -253,7 +353,7 @@ export class Scope {
             // The item the genesis opens is indexed as this definition says, from its first write.
             this.#store.cover(valid.indexes);
             return {
-              verdict: "write", draft: judged.draft, retain: [{ kind: "definition", digest: valid.digest, bytes }, ...children.retain, ...used(judged.draft, facts), ...texts.retain(valid, judged.draft)],
+              verdict: "write", draft: judged.draft, retain: [...(bytes === null ? [] : [{ kind: "definition", digest: valid.digest, bytes } as const]), ...children.retain, ...used(judged.draft, facts), ...texts.retain(valid, judged.draft)],
               sealed: answer, unfit: () => refused("bad-field"), full: () => refused("scope-full"),
             };
           case "repeat": {
@@ -273,8 +373,12 @@ export class Scope {
   /**
    * Submit an act (sections 4.2 and 5.2). Step 1 is here: the signature and
    * the shape, then the foreign entries that the fields and the presented
-   * facts name. The turn does the rest. A refusal is a statement about the
-   * head it names and writes nothing.
+   * facts name, then what the authority port reads about the signer. The
+   * turn does the rest. A refusal is a statement about the head it names and
+   * writes nothing.
+   *
+   * `grants`: the grants presented beside the intent. The authority port's
+   * read is given them, and the commit decides on what that read holds.
    *
    * `beside`: what travels beside the intent and is not signed (sections 6.2
    * and 6.4). Each detached text is checked against the digest that a field
@@ -286,8 +390,9 @@ export class Scope {
     const scope = this.#store.scope();
     if (!pinned?.definition || !scope) return unavailable("unavailable");
     const { definition, named } = pinned;
+    const platform = pinned.platform ?? undefined;
     const bounds = this.#bounds;
-    const { authority, resolver } = this.#ports;
+    const { resolver } = this.#ports;
     if (!isSigned(signed)) return { answer: "refused", reason: "bad-intent", judgedAt: scope.head };
 
     const intent = signed.intent;
@@ -311,21 +416,34 @@ export class Scope {
     const facts = await fetchFacts(resolver, bounds, wanted);
     if (!facts) return unavailable("dependency-unavailable");
 
-    // Section 5.1: held authority is read with the clock. The verdict on each grant is asked for on the reading it is used with.
+    // Section 5.1, held authority, in two phases. Phase one is here, the last read before the turn: what the judgment of this
+    // signer needs, read for this input and held by this call alone. It is never stored, and no other input's turn is given it.
+    // An accepted key is answered from history at check 3, so nothing is read for it (section 5.2, step 1). A read that fails or
+    // is late leaves nothing: the act is then not judged at check 9, `authority-unavailable`, and no earlier check is hidden.
     const given = (Array.isArray(grants) ? grants : []).filter(isGrant);
-    const context = (clock: Reading): Omit<JudgeContext, "prepared"> =>
-      ({ clock, bounds, facts, own: ownOf(this.#store), texts: texts.sizes, presented: offered, capabilities: this.#ports.capabilities ?? undefined, grants: given.map((grant) => ({ grant, current: authority.current(grant, scope.at, clock.reading) })) });
+    const standing = known ? null : await this.#standing({ scope: scope.at, signed, action: act ? actionOf(act) : null, grants: given, window: windowOf(definition, scope.at.kind, intent.kind) });
+    // Phase two is in the commit: what that read holds at the commit's head, on the commit's one reading. The judge is given the
+    // answer and reads nothing.
+    const context = (view: StateView, clock: Reading): Omit<JudgeContext, "prepared"> =>
+      ({ clock, bounds, facts, own: ownOf(this.#store), texts: texts.sizes, presented: offered, capabilities: this.#ports.capabilities ?? undefined, platform, membership: standing?.membership ?? null, grants: standing === null ? null : heldBy(standing, view, clock) });
 
     const end = await this.#turns.run<Answer>({
-      asks: (view, clock) => prepareRules(view, definition, { act: signed, context: { ...context(clock), prepared: [] } }),
+      // The walk that finds the rules judges nothing (section 5.2, step 4), so what it is given of phase two decides nothing.
+      asks: (view, clock) => prepareRules(view, definition, { act: signed, context: { ...context(view, clock), prepared: [] } }),
       judge: (view, clock, prepared) => {
-        const judged: ActJudgment = judgeAct(view, definition, signed, { ...context(clock), prepared });
+        const judged: ActJudgment = judgeAct(view, definition, signed, { ...context(view, clock), prepared });
         switch (judged.result) {
           case "write": {
             const head = view.scope()!.head;
             return {
               verdict: "write", draft: judged.draft, retain: [...used(judged.draft, facts), ...texts.retain(definition, judged.draft)],
-              sealed: (sealed) => ({ answer: "accepted", receipt: receiptOf(sealed, named) }),
+              // The entry now retains the grant that was judged. A port that keeps a read for a later commit learns here, inside the
+              // transaction, which entry used it last (authority note, section 3.3, guard 3). A transaction that then does not commit
+              // breaks the object, and what the port holds in memory is gone with it.
+              sealed: (sealed) => {
+                if (standing) told(standing, sealed);
+                return { answer: "accepted", receipt: receiptOf(sealed, named) };
+              },
               // An entry over the size bound, or a grant that is not canonical values, is never written.
               unfit: (why) => ({ answer: "refused", reason: why === "size" ? "bad-field" : "unauthorized", judgedAt: head }),
               // Section 9.2: an act is refused when the duties it would admit, with those already admitted, have no room to settle.
@@ -341,6 +459,100 @@ export class Scope {
       },
     });
     return end.end === "answer" ? end.answer : unavailable(end.end === "idle" ? "unavailable" : end.end);
+  }
+
+  /**
+   * Ask for one step of a capability (section 5.5): the preparation path.
+   * The request is the signed intent that the step prepares for, the
+   * capability and the step. It goes through the same turn as every other
+   * input, and what it writes is a `preparation` entry: the capability's
+   * records and the operations that the step opens. Nothing outside the
+   * service is caused here: the operations driver sends each attempt after
+   * the entry is sealed.
+   *
+   * The answer has the forms of an act's. `accepted`: the entry is sealed,
+   * now or by an earlier call with the same intent, capability and step. A
+   * refusal is an answer and no entry. The act's idempotency key is not
+   * consumed: the intent's own turn is still to come.
+   *
+   * With no code for the step, nothing is judged and nothing is written:
+   * `unavailable`. That is the production wiring, whose capabilities port is
+   * null.
+   */
+  async prepare(signed: SignedIntent, grants: readonly Grant[], capability: string, step: string): Promise<Answer> {
+    const pinned = this.pinned();
+    const scope = this.#store.scope();
+    if (!pinned?.definition || !scope) return unavailable("unavailable");
+    const { definition, named } = pinned;
+    const bounds = this.#bounds;
+    if (!isSigned(signed)) return { answer: "refused", reason: "bad-intent", judgedAt: scope.head };
+    const steps = stepsOf(this.#ports.capabilities);
+    const asked = { signed, capability, step };
+
+    // Section 5.1, held authority, phase one: one read for this request, before the turn, as for an act. The action and the window
+    // are the ones that the capability names for the step: ten seconds for a step that a write outside the service follows, and the
+    // ordinary window for one that writes nothing outside (section 6.11; authority note, section 5.7, the table of steps). They are
+    // read from the pinned definition and from an item's type, which never change. With no action nothing is read, and the judge
+    // answers.
+    let needs: { action: string; window: Window } | null = null;
+    try {
+      needs = steps && typeof capability === "string" && typeof step === "string" && steps.implements(capability as CapabilityName, step)
+        ? steps.grant(capability as CapabilityName, step, { view: this.#store, definition, scope, self: scope.head.seq + 1, intent: signed.intent, digest: intentDigest(signed.intent), clock: { reading: scope.time, behind: false, asOf: scope.time } })
+        : null;
+    } catch {
+      needs = null;   // a request that the rules cannot read names no action
+    }
+    const given = (Array.isArray(grants) ? grants : []).filter(isGrant);
+    const standing = needs === null ? null : await this.#standing({ scope: scope.at, signed, action: needs.action, grants: given, window: needs.window });
+    // Phase two, in the commit: the decision on the grant. It is the grant guard of `derive/src/grant.ts`, which the port's second
+    // phase runs on the observation that the read obtained, at the commit's head and on the commit's one reading (section 16.1, "The
+    // guards, in the commit"). The read was made for one action and one window. A commit that asks another is not judged on it.
+    const granted = (view: StateView, clock: Reading): GrantDecision => (wanted) => {
+      if (standing === null || needs === null || wanted.action !== needs.action || wanted.window.seconds !== needs.window.seconds || wanted.window.once !== needs.window.once) return { result: "unavailable" };
+      const held = heldBy(standing, view, clock);
+      if (held === null) return { result: "unavailable" };
+      const found = held.find(({ grant, current }) => current && grant.key === wanted.key && grant.actions.includes(wanted.action));
+      return found ? { result: "granted", grant: found.grant } : { result: "refused" };
+    };
+
+    const end = await this.#turns.run<Answer>({
+      asks: () => [],
+      judge: (view, clock) => {
+        const judged = judgePreparation(view, definition, asked, { clock, bounds, steps, granted: granted(view, clock), membership: standing?.membership ?? null });
+        switch (judged.result) {
+          case "write": {
+            const head = view.scope()!.head;
+            return {
+              verdict: "write", draft: judged.draft, retain: [],
+              // The entry retains the grant that was judged, and the port learns which entry used its read, as for an act.
+              sealed: (sealed) => {
+                if (standing) told(standing, sealed);
+                return { answer: "accepted", receipt: receiptOf(sealed, named) };
+              },
+              unfit: (why) => ({ answer: "refused", reason: why === "size" ? "bad-field" : "unauthorized", judgedAt: head }),
+              // Section 17.3: a preparation is new work. It is admitted only with the room of what it reserves.
+              full: () => ({ answer: "refused", reason: "scope-full", judgedAt: head }),
+            };
+          }
+          case "due": return { verdict: "stop" };
+          case "repeat": return said<Answer>({ answer: "accepted", receipt: this.#receipt(judged.seq, named) });
+          case "refused": return said<Answer>({ answer: "refused", reason: judged.reason, ...(judged.name === undefined ? {} : { name: judged.name }), judgedAt: judged.judgedAt });
+          case "unavailable": return said<Answer>(unavailable(judged.reason));
+        }
+      },
+    });
+    return end.end === "answer" ? end.answer : unavailable(end.end === "idle" ? "unavailable" : end.end);
+  }
+
+  /**
+   * Phase one of the authority port (section 5.1; authority note, section
+   * 3.3): one read for one act, within the fetch time limit of step 1. Null:
+   * nothing was read. The port failed, was late, or gave no answer.
+   */
+  async #standing(asked: Asked): Promise<Standing | null> {
+    const seconds = this.#bounds.fetchSeconds;
+    const read = await within(() => this.#ports.authority.read(asked, seconds), seconds);
+    return read === LATE || !isObject(read) || typeof read.held !== "function" ? null : read;
   }
 
   /**

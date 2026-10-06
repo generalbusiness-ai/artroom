@@ -95,7 +95,8 @@ class StoryScope extends DeployedScope {
         ...deployed.ports,
         clock: { read: time },
         random: { bytes: (length) => new Uint8Array(createHash("sha256").update(`i1-story:${name}`).digest().subarray(0, length)) },
-        authority: { current: () => true },
+        // The two phases of the port, as I3 step 3 shaped it: the read keeps the presented grants, and the commit calls each current.
+        authority: { read: (asked) => Promise.resolve({ held: () => asked.grants.map((grant) => ({ grant, current: true })) }) },
         readers: { allows: () => true },
         // `world.hold`: a send it matches is not delivered, and its attempt gets no answer.
         transport: { send: async (envelope) => (world.hold?.(envelope) ? null : transport.send(envelope)) },

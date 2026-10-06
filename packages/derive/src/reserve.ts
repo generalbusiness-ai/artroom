@@ -25,23 +25,43 @@
  *   state that its handler declares with `settles: { copy }` reserves the
  *   same (`ValidDefinition.pendingCopies`);
  * - a provisional scope: the entry that records its confirmation;
- * - each opened attempt of an outside operation: one entry for its outcome,
- *   and before any outcome one more, because `unknown` may be followed by
- *   the same attempt's outcome;
+ * - an operation that is not settled (row 5; authority note, section 5.8):
+ *   2 entries for each attempt that has no outcome or may still be opened,
+ *   its first outcome and its late answer, and 1 for each attempt whose
+ *   latest outcome is `unknown`. The entry that opens the operation states
+ *   the most attempts, so all of this is reserved at the opening, and an
+ *   outcome entry is never refused for want of room (`pendingOf`, in
+ *   `ledger.ts`). With each of those outcome entries, the closure that the
+ *   operation's owner declares for one: the entries of the operations that
+ *   an outcome opens, such as a cleanup (`OperationRules.closure`);
+ * - a capability record that awaits its messages (row 6; authority note,
+ *   section 5.8): what its capability declares, which the owners' code
+ *   counts from the folded records (`Owners.reserves`). For `hold@1` that is
+ *   `holdReserves`, in `capability/hold.ts`;
  * - the closing checkpoint: one entry, once for the scope, from the genesis
  *   on, except while the head entry is a checkpoint and no other duty is
  *   pending.
  *
  * What is not counted is in the deltas note. The count is of entries, never
- * of bytes.
+ * of bytes. For an operation it is partial: the other four dimensions of
+ * section 17.1, and so the records that an outcome derives, are request
+ * `cc570904`'s. No adopted effect states a closure at the opening, so the
+ * owner's code declares it, and the count asks the owners' rules (I3
+ * deltas, entries EB6 and EC2).
  */
 
 import type { Bounds, Input } from "@generalbusiness/artroom-contract";
+import { closureOf, type Owners } from "./ledger.ts";
 import type { StateView } from "./state.ts";
 import type { ValidDefinition } from "./validate/index.ts";
 
-/** The entries the pending duties of this state reserve. `head` is the input of the head entry. */
-export function owed(view: StateView, definition: ValidDefinition, head: Input): number {
+/**
+ * The entries the pending duties of this state reserve. `head` is the input
+ * of the head entry. `owners`: the rules of the owners of outside
+ * operations, which declare the closure of an outcome. With none, no
+ * outcome is judged, so none has a closure.
+ */
+export function owed(view: StateView, definition: ValidDefinition, head: Input, owners?: Owners | null): number {
   const scope = view.scope();
   if (!scope) return 0;
   let entries = scope.status === "provisional" ? 1 : 0;        // the confirmation
@@ -54,7 +74,12 @@ export function owed(view: StateView, definition: ValidDefinition, head: Input):
   }
   for (const copy of definition.pendingCopies) entries += copy.entries * view.copies(copy.name, copy.kind, copy.states);
   const open = view.outstanding();
-  entries += (2 + definition.clauseEntries) * open.requests + (1 + definition.clauseEntries) * open.unavailable + 2 * open.opened + open.unknown;
+  entries += (2 + definition.clauseEntries) * open.requests + (1 + definition.clauseEntries) * open.unavailable;
+  // Section 17.2, row 5: each outcome entry that an operation may still write, and with it the closure that its owner declares.
+  for (const { owner, kind, entries: outcomes } of open.outcomes) entries += outcomes * (1 + closureOf(owners, owner, kind));
+  // Section 17.2, row 6: a capability record that awaits its messages, and what its capability declares for it. The owners' code
+  // counts its own records (`Owners.reserves`). With no code no such record is made, so none reserves.
+  entries += owners?.reserves?.(view, definition) ?? 0;
   // The closing checkpoint is reserved unless the history already ends on a checkpoint with nothing pending.
   return entries === 0 && head.type === "checkpoint" ? 0 : entries + 1;
 }
@@ -78,10 +103,10 @@ export function owed(view: StateView, definition: ValidDefinition, head: Input):
  * reserved, and it fits because its entry was. The next entry that is not a
  * checkpoint is asked with the reservation counted again.
  */
-export function fits(view: StateView, definition: ValidDefinition, bounds: Pick<Bounds, "scopeEntries">, input: Input, settled = false): boolean {
+export function fits(view: StateView, definition: ValidDefinition, bounds: Pick<Bounds, "scopeEntries">, input: Input, settled = false, owners?: Owners | null): boolean {
   const scope = view.scope();
   if (!scope) return true;
   const settles = settled || input.type === "timed" || input.type === "diagnosis" || input.type === "outcome"
     || (input.type === "delivery" && (input.message.class === "control" || ("clause" in input && input.clause !== "conflict")));
-  return settles || scope.head.seq + 1 + owed(view, definition, input) <= bounds.scopeEntries;
+  return settles || scope.head.seq + 1 + owed(view, definition, input, owners) <= bounds.scopeEntries;
 }

@@ -53,10 +53,27 @@ A stand-in proves only the boundary it exposes. A retry, an ordering or a
 restart is shown against the thing that really retries, orders or restarts.
 
 The scripted capability of `@generalbusiness/artroom-scope/testing` is a
-stand-in for the code of `hold@1` and `git-read@1`, which is not
-delivered. A test that uses it says so in its name or its first comment.
+stand-in for the code of `hold@1` and `git-read@1`. The derive package
+has that code, and the production runtime is not given it. A test that uses it says so in its name or its first comment.
 It shows what a definition does once a capability has answered, and
-nothing about a real hold, a Git read or a provider.
+nothing about a real hold, a Git read or a provider. A step that a test
+scripts in it names an action and a window, and derives nothing. It
+shows how a step's grant is read and judged, and nothing about the step.
+
+A scripted membership, `Controls.membership` of the same module, is a
+stand-in for the membership scope and for the reference to it that a
+scope's genesis will record. The test writes each answer, and no history
+stands behind the head it names. With one, the scope's authority is the
+real observation read, with the real guards and windows. A test that uses
+it says so in its name or its first comment. It shows the observing
+scope's side of a read, and nothing about membership.
+
+`codeLost`, of the same module, supplies each platform definition with
+its data and with no rule, while a test's control says so
+(`platformCode`). It stands for a runtime that lacks the rules of a
+version. It shows what a scope answers when its pinned definition cannot
+be run, and nothing about any rule. Without it the platform definitions
+are the platform package's, with their rules, as in production.
 
 A scripted peer, `net.peers` of the same module, is a stand-in for a scope
 of a platform kind that is not delivered, such as a rules scope or a
@@ -113,15 +130,19 @@ npm run gate
 It installs only if `package-lock.json` changed since the last install,
 typechecks every workspace, and runs every test: one vitest process for
 the repository (`vitest.config.ts` at the root, one project for each of
-`bytes`, `derive`, `replay`, `client`, `scope` and `lanes`), then one
-script (`scripts/active-source.test.mjs`). The script checks that no
+`bytes`, `derive`, `platform`, `git`, `replay`, `client`, `scope` and
+`lanes`), then one script (`scripts/active-source.test.mjs`). The script checks that no
 active file imports from `parked/` or names a removed format, and that no
 platform package depends on the lanes package or imports from it. It prints the head, the tree and
 each step's elapsed and CPU time. It also fails on a whitespace error in
 what the branch changed. `npm run gate -- --ci` reinstalls first.
 
 The `scope` project runs in the workerd pool, against real Durable Objects
-with SQLite storage. The others run in Node. Nothing runs twice.
+with SQLite storage. The others run in Node, as one group at the same time,
+and the `scope` project runs after them, by itself: it has one worker, and
+vitest lets projects share a group only when their worker counts agree. The
+`git` project runs the real `git` program, as a client and as a server, on
+local repositories. Nothing runs twice.
 
 The ten lane scenarios, `packages/lanes/test/*.scope.test.ts`, run from
 the root inside the `scope` project: the same test Worker, loaded once.

@@ -208,12 +208,16 @@ describe("idempotency (section 4.2)", () => {
     const over = { fields: { intent: 0 }, expected: { intent: 1 }, idempotencyKey: "once" };
     const signed = s.intent(rita, "offer", over);
 
+    // Nothing was read about the signer before the turn: the act is not judged at check 9, and nothing is written.
+    expect(s.submit(signed, { grants: null })).toEqual({ result: "unavailable", reason: "authority-unavailable" });
     // Refused for want of a grant: the key is not consumed, and the same intent is judged again.
     expect(s.submit(signed, { grants: [] }).result).toBe("refused");
     expect(s.submit(signed).result).toBe("write");
     const first = s.head;
 
     expect(s.submit(signed)).toEqual({ result: "accepted-before", seq: first.seq });
+    // Check 3 comes before check 9: an accepted key is answered from history, and needs no read.
+    expect(s.submit(signed, { grants: null })).toEqual({ result: "accepted-before", seq: first.seq });
     // The key is consumed for the life of the scope: the exact retry returns the first entry also after its notAfter.
     expect(s.submit(signed, { reading: t(3600) })).toEqual({ result: "accepted-before", seq: first.seq });
     // The key stays with the first intent: another intent under it never takes effect, even one that would be refused.

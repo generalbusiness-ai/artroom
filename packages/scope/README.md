@@ -25,20 +25,24 @@ what a judge drafts, in one storage transaction for each entry.
 |---|---|
 | `store` | `Store`: the storage the core needs. It is derive's `StateView` and `StateWriter`, with `transaction`, `append` (an entry and the row of each send), `retain`, and bounded reads of entries, retained inputs and duties. |
 | `sqlite` | `SqliteStore`, the one implementation, over `Sql`: `exec` and `transaction`, which a Durable Object's `ctx.storage.sql.exec` and `ctx.storage.transactionSync` satisfy. It keeps nothing in memory but the list of indexed slots. |
-| `ports` | `Clock`, `Random`, `Authority`, `Resolver`, `Rules`, `Alarm`, `Definitions`, `SentTexts`, `Readers`, and `production()`, their defaults. |
+| `ports` | `Clock`, `Random`, `Authority`, `Resolver`, `Rules`, `Alarm`, `Definitions`, `SentTexts`, `Readers`, the members `capabilities`, `outside` and `owners`, and `production()`, their defaults. |
 | `definitions` | `creates(declared)`: the digests a declaration names in its `create` sends. `namedBy(root, read, validate, limit)`: the declarations a scope retains for its children. |
 | `turn` | `Turns.run(waiting, founding?)`: section 5.2, steps 3 to 7, and section 5.3. `isSigned` and `fetchFacts`: step 1. `Waiting`, `Verdict`, `End`. |
 | `core` | `Scope`: `found`, `submit`, `settle`, `alarm`, `checkpoint`, `pinned`. `receiptOf`. The answers `Founded` and `Checkpointed`. |
-| `reads` | `Reads`: `summary`, `items`, `history`, `entry`, `outbox`, and `duty`, one send's row. For a verifier: `log`, a history page as stored bytes, and `retained`, one retained input. `ReadBounds` and `READ_BOUNDS`. |
+| `reads` | `Reads`: `summary`, `items`, `history`, `entry`, `outbox`, and `duty`, one send's row; `operations` and `operation`, the outside operations with their attempts and outcomes. For a verifier: `log`, a history page as stored bytes, and `retained`, one retained input. `ReadBounds` and `READ_BOUNDS`. |
 | `delivery` | `Deliveries.deliver(envelope)`: receiving. It reads the source entry through the resolver, checks it against the fact's hash, and runs derive's delivery judge, or its genesis judge for a `create` that reaches an empty store, in the scope's turn. It answers as transport does: `recorded` with a fact, `retry`, `routing` or `source-unverified`. |
-| `outbox` | `Dispatcher.run()`: sending. One pass at a time over the sends that are due: a durable record before each dispatch and after its answer, a retry delay that doubles, and a `diagnosis` input through the turn when a request is given up. `Wakes`: one alarm for the earliest deadline and the next dispatch. |
-| `namespace` | `namespace(binding)`: the production `Resolver`, `Transport`, `Definitions` and `SentTexts`, each one RPC call on the object a scope ID names. `routed`: the resolver of a name, which refuses a wrong address before any judgment. `sourced`: the answer to a read of one entry. `declaredBy`: the answer to a read of one retained declaration. `sentText`: the answer to a read of one detached text that a send of this scope names. |
-| `object` | `ScopeObject`: the Durable Object class. It wires the store, the ports, the core, receiving, the dispatcher and the reads, and exposes them over RPC: `found`, `submit`, `settle`, `checkpoint`, the reads, `deliver`, `source`, `declared`, `text` and `dispatch`. Its `alarm()` runs the alarm's turn and then a dispatch pass. With no transport, which is its default, nothing is dispatched. |
+| `outbox` | `Dispatcher.run()`: sending. One pass at a time over the sends that are due: a durable record before each dispatch and after its answer, a retry delay that doubles, and a `diagnosis` input through the turn when a request is given up. `Wakes`: one alarm for the earliest deadline, the next dispatch and the next attempt of an outside operation. |
+| `operations` | `Operations.run()`: the driver of outside effects, beside the dispatcher. An attempt is recorded by its entry, marked durably before its one request leaves, and never sent twice: one that is found marked with no outcome is recorded `unknown`. An answer becomes an `outcome` input through the turn. `Operations.answered()` takes an answer at any later time. `Outside` is the port, and `NO_OUTSIDE`, the default of `production()`, sends nothing. |
+| `authority` | `observing(config)`: the authority port over reads of a membership scope. The read is made before the turn, is counted by run and number, and is kept only in memory: at most one observation for each key, and a revoked answer for the run. `Membership` is the port that reads a membership scope. The production wiring does not use it yet. |
+| `namespace` | `namespace(binding)`: the production `Resolver`, `Transport`, `Definitions` and `SentTexts`, each one RPC call on the object a scope ID names. `membershipIn(binding)`: the read of a membership scope, which no object answers yet. `routed`: the resolver of a name, which refuses a wrong address before any judgment. `sourced`: the answer to a read of one entry. `declaredBy`: the answer to a read of one retained declaration. `sentText`: the answer to a read of one detached text that a send of this scope names. |
+| `object` | `ScopeObject`: the Durable Object class. It wires the store, the ports, the core, receiving, the dispatcher and the reads, and exposes them over RPC: `found`, `submit`, `settle`, `checkpoint`, the reads, `deliver`, `source`, `declared`, `text`, `dispatch` and `effect`. Its `alarm()` runs the alarm's turn, then a dispatch pass, then a pass of the operations driver. With no transport, which is its default, nothing is dispatched. With the outside port of `production()`, which sends nothing, and no owner rules, nothing is sent outside the service. |
 | `worker` (its own entry, `@generalbusiness/artroom-scope/worker`) | `route(request, binding)`: the HTTP routes. `ScopeService`: the same operations over a service binding; it implements the contract's `ScopeApi`, which a client's transport also is. `DeployedScope`: the object class with the namespace as its resolver, its transport and its source of declarations. `api(binding)`: what both call. The default export is the deployed Worker. |
 
 `@generalbusiness/artroom-scope/testing` is for tests only: a test
-authority that calls every grant current, a test readers port, a scripted
-clock, a gate that pauses preparation, a resolver over entries a test
+authority, which is a stand-in that reads no membership scope and calls
+every presented grant current, a scripted membership, which is a stand-in
+for the membership scope under the real observation read, a test readers
+port, a scripted clock, a gate that pauses preparation, a resolver over entries a test
 supplies, and, for several scopes in one namespace, a transport that a test
 can hold back or make lose an answer. It also has `scriptedCapability`, a
 stand-in for the code of `hold@1` and `git-read@1`: it answers each
@@ -69,19 +73,123 @@ for a few acts
 |---|---|---|
 | `Clock` | One reading for each call. | The runtime's clock. |
 | `Random` | The bytes of a new incarnation. | The runtime's random source. |
-| `Authority` | Whether a presented grant is current, in the commit, on the commit's reading. | No grant is current. Every act is refused `unauthorized`. |
+| `Authority` | Two phases. `read`, before the turn: what the judgment of one act's signer needs, within the fetch time limit. `held`, a method of what was read, in the commit: each grant the act may be judged on, and whether it is current at the commit's reading. It is a function of the folded state, that reading and what was read. `sealed`, optional: the commit tells the port the entry that it wrote on that answer. | The read finds no grant, so none is current. Every act that needs one is refused `unauthorized`. |
 | `Resolver` | One foreign entry by fact reference, within the fetch time limit: the entry, `absent` when the object at that name does not hold it, or nothing when it cannot be read now. | Nothing can be read. An act that names a foreign entry is answered `dependency-unavailable`. `DeployedScope` supplies the namespace. |
 | `Transport` | One dispatch of one send to the object its address names, answered or not. | None: the sends stay in the outbox. `DeployedScope` supplies the namespace. |
 | `Rules` | The results of prepared rule inputs. | Derive's evaluator, `evaluateRules`. |
 | `Alarm` | The next wake time. | In `production()`, nothing. `ScopeObject` supplies the object's own alarm. |
-| `Definitions` | A declaration by digest or platform name, from the scope that retains it. | A platform name is `unsupported-definition`. A digest is unavailable. `DeployedScope` supplies the namespace, which reads a child's declaration from its creator. |
+| `Definitions` | `read`: a declaration by digest, from the scope that retains it. `platform`: a platform definition by name and version, with the rows of each entry that are code and the rules written for them. | `read`: a digest is unavailable. `DeployedScope` supplies the namespace, which reads a child's declaration from its creator. `platform`: the platform package's definitions. A name it does not hold is `unsupported-definition`. |
 | `SentTexts` | A detached text that a delivered message names by digest, from the scope that sent the message. | Unavailable: a delivery that names one is not decided. `DeployedScope` supplies the namespace, which reads the text from the sender. |
-| `Readers` | Whether a reader may make a read. | Nobody may: every read is `forbidden`. |
-| `capabilities` | The rules of the capability versions this runtime has code for: the records, guards and effects of `hold@1`, and `git-read@1`. | None. A scope is not founded or created under a definition that needs one: `unsupported-definition`. The item form of `hold@1`, with its `hold` effect, needs none and runs. |
+| `Readers` | Whether a reader may make a read, by the read's name. `operations` and `operation` are asked as `operations`. | Nobody may: every read is `forbidden`. |
+| `capabilities` | The rules of the capability forms this runtime has code for: the records, guards and effects of `hold@1`, and `git-read@1`. Each rule is a pure function of its arguments, the folded state and the input being judged. | None. A scope is not founded or created under a definition that needs one: `unsupported-definition`. The item form of `hold@1`, with its `hold` effect, needs none and runs. |
+| `outside` | One request of one attempt of an outside operation, and its answer. | `NO_OUTSIDE`: nothing is sent. Each attempt stays recorded and not sent. |
+| `owners` | The rules of the owners of outside operations that this runtime has code for, by owner and kind: derive's `Owners`. | None. No outcome is judged, and no attempt is sent. |
 
 So a deployed scope can be founded and can create children, and then
 admits no act and answers no read. The authority note's rules and sessions
 each replace one port.
+
+## Authority, in two phases
+
+An act's authority is read before the turn and decided in the commit.
+
+1. Before the turn, after the foreign entries are fetched, the core asks
+   the authority port to read what the judgment of this signer needs. The
+   read is for this one act. The core keeps what it returns in the memory
+   of the call and nowhere else. Nothing stores it, so a restart leaves
+   none, and no other act is judged on it.
+2. In the commit, the core asks what was read which grants it holds, at
+   the commit's head and on the commit's one reading. The judge is given
+   the answer. It reads nothing.
+
+- A read that fails, is late or gives nothing leaves the act with nothing
+  to be judged on. The act is answered `authority-unavailable` at check 9
+  of the contract's section 4.2. It is Unavailable: nothing was recorded,
+  its key is not consumed, and the same signed intent may be sent again.
+  The earlier checks still answer first.
+- An act whose key is on a sealed entry is answered from history. Nothing
+  is read for it.
+- The entry records the one grant that was judged. A replay gives the
+  judge that grant and derives the same decision.
+
+`observing`, in `authority.ts`, is the port for a scope whose grants are
+judged on membership. Its read is made before the turn, with the scope's
+own clock noted first. It is counted by the run and by its number in the
+run. What it reads is kept in memory only, so a restart leaves none.
+
+- It keeps at most one observation for each key, for a later act of that
+  key inside the window. The observation of a ten-second kind, such as
+  taking a hold, serves the one commit that it was read for.
+- A read that shows a key revoked, or its member removed, is kept for the
+  run. From then on the key is refused at once, whatever a window says.
+- In the commit, derive's `judgeGrant` decides. A guard of the observation
+  that fails discards it: the act is answered `authority-unavailable`, and
+  the next read is made again. A standing that does not hold the action is
+  refused `unauthorized`.
+- Heads do not go back, also across a restart. The folded state holds,
+  for each key and each member that an entry retained an observation of,
+  the highest head of membership. The commit discards a read that was
+  answered from a lower head. A state that holds none has no member for
+  them, so its digest is unchanged.
+- A grant's `within` is a scope reference or a filter, `{ membership }`. A
+  filter covers a scope when it names the membership scope that the scope
+  itself records, with that incarnation. The read asks `{ of, key }`, and
+  names no asker. An answer whose `within` is not that filter, with `of`
+  as its `membership`, is no answer.
+- The entry's grant is built from the observation and retains it, with
+  the read and how the entry used it: `fresh`, or `reused` with the entry
+  before. The commit tells the port which entry used a read last.
+
+The production port does not use it yet: no scope records its membership
+scope, and no membership scope answers a read. Its read finds no grant,
+and every act that needs one is refused `unauthorized`.
+
+## A platform definition
+
+A platform definition is code of the runtime. It is pinned by its name and
+version, such as `platform:inbox@1`, and no scope retains bytes for it.
+One version is its data and its rules, and the platform package supplies
+both. The data holds a mark, `{ code, row }`, at each place where a rule is
+run, and `code` names the rule. What follows builds the scope contract's
+revision 15 and the authority note's revision 20. It was written while
+both were filed for review. Both are adopted since. The adoption is of
+the designs, and is no review of this source.
+
+- A founding that names a platform definition is run under the platform
+  package's data. That data alone is validated with the validator's
+  platform option, which reads a mark at seven places and lists it. A
+  declaration that an input, a peer or storage gave is validated without
+  it. So a declared definition never takes a name that begins
+  `platform:`, and never holds a mark.
+- The judges run each rule at the check of its mark's place, in a
+  commit and again in a replay. A rule is given the folded state before
+  the entry, the entry's input, the entry's time, the entries in `uses`,
+  the scope's own earlier entries, and what the judge resolved. It is
+  given no storage, no network and no other clock. A rule that throws, or
+  that returns a value outside what its place allows, leaves the input
+  not judged: an act is answered `unavailable`, a delivery gets `retry`,
+  and nothing is written.
+- The rule of the contract's section 6.1 is of the whole scope. A scope
+  is founded under a platform definition only when a rule of the right
+  kind is supplied for every mark of its data. When one is missing, the
+  founding is refused `unsupported-definition`, and nothing is written. A
+  scope that exists under such a definition admits nothing: an act is
+  answered `unavailable`, a delivery gets `retry`, no timed entry is
+  written, a read is answered `unsupported-definition`, and the
+  operations driver sends nothing outside the service.
+- `platform:inbox@1` has one mark, `notice-source`, among the effects of
+  its `notify` handlers, and the platform package has its rule. So the
+  production wiring founds a scope under it. A `notify` writes a notice
+  whose `source` the rule set. `codeLost`, of the testing entry, supplies
+  the data with no rule. It stands for a runtime that lacks the code.
+- An act of a row whose `grant` is a mark is judged by the mark's rule in
+  place of the grant check. When the rule passes, the entry records
+  `authority: []`.
+- A creation under a platform name is not built: it is answered
+  `unsupported-definition`.
+
+The founding makes a scope of the kind `directory`, as every founding
+does. The kinds of the platform scopes come with their own definitions.
 
 ## A child's definition
 
@@ -114,7 +222,9 @@ whose stored bytes are the canonical bytes.
 | `item_slot` | For each slot that a range guard's `where` reads, as `validateDefinition` derived them: the slot's value in each item, indexed by value. It is kept and not yet read, because `StateView.page` takes no `where`. |
 | `outbox` | One row for each send: `seq`, ordinal, target, class, message, the held flag, and for a request its result or diagnosis. The dispatcher's bookkeeping is in three more columns: `attempts`, the attempt log; `next`, when the next attempt is due; and `ack`, the fact transport acknowledged the send with. |
 | `inbox` | Each incoming delivery the scope recorded, by source scope, incarnation, entry and ordinal. |
-| `folded` | Folded records that are not items: relationship copies, held creations, outside operations. |
+| `folded` | Folded records that are not items: relationship copies, held creations, and the digests of the texts a slot has held. |
+| `operation` | The outside operations, folded, by the entry that opened each and its ordinal there, with what each still reserves. |
+| `attempt` | One row for each attempt that an entry opened, written with that entry. The driver's bookkeeping is in three columns: `next`, when it looks at the attempt next; `sent`, the time written before its one request left; and `outcome`, the entry that recorded its first outcome. |
 | `retained_input` | What an entry names by digest and does not carry: the definition's declaration, the bytes of each foreign entry in a `uses`, and the input of each rule evaluation. A delivered message, a rule's result and an outcome's evidence are inside the entry that records them. |
 
 An entry's row, the fold's changes, its sends and its retained inputs are
@@ -212,6 +322,7 @@ the contract's own answer.
 |---|---|---|
 | `POST /v1/scopes`, body `{ founding, definition, definitions?, texts? }` | `Founded` | 201 accepted; 422 refused; 503 unavailable |
 | `POST /v1/scopes/:scope/acts`, body `{ signed, grants, texts?, presented? }`. `texts`: each detached text that a field of the intent names by digest. `presented`: the facts presented beside the intent, by name | `Answer` | 200 accepted; 403 refused `unauthorized`; 422 refused otherwise; 409 mismatch; 503 unavailable |
+| `POST /v1/scopes/:scope/preparations`, body `{ signed, grants, capability, step }`. One step of a capability, asked for with the signed intent that it prepares for. With no code for the step, as in production, nothing is judged: 503 `unavailable` | `Answer` | as an act |
 | `POST /v1/scopes/:scope/settle`, body `{ signed }` | `Settlement` | as a read |
 | `GET /v1/scopes/:scope` | The summary | 200; 404 `not-found`; 403 `forbidden`; 409 `wrong-incarnation`, `scope-provisional`; 413 `too-large`; 501 `unsupported-definition`; 503 otherwise |
 | `GET /v1/scopes/:scope/items/:type?cursor=` | A page of retained final items | as above |

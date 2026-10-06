@@ -304,7 +304,8 @@ children.
 
 **Under the production wiring, nothing runs.** Both definitions list
 `git-read@1`, and both use forms that need the code of `hold@1` or
-`git-read@1`. No runtime in this repository has that code. The validator
+`git-read@1`. The derive package holds that code as pure functions, and no
+production port is given it. The validator
 reads those forms, checks them against the tables in the contract
 package, and lists each in `ValidDefinition.underived`. The production
 runtime then founds and creates no scope under either definition. It
@@ -360,9 +361,10 @@ One row cannot do today what the lane forms say, with or without a
 stand-in. The row was not changed.
 
 - `propose-manifest` staged in another lane needs a presented entry of
-  the kind `hold@1:check`. No source writes such an entry. So no real
-  change lane sends `pin-confirm` or `unpin` to an issue lane yet (entry
-  DK6).
+  the kind `hold@1:check`. The entry it presents is a check entry, which
+  is an outcome entry, and no reader gives an outcome entry a kind. So no
+  real change lane sends `pin-confirm` or `unpin` to an issue lane yet
+  (entry DK6; I3 deltas, entry EH3).
 
 The scripted capability is a stand-in and is named as one wherever it is
 used. It answers each capability guard and effect from a table that the

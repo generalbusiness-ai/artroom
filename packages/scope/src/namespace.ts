@@ -6,6 +6,7 @@
  * The asking side is `namespace`: the production `Resolver`, which reads a
  * foreign entry; the `Transport`, which delivers one send; and the
  * `Definitions`, which reads a declaration from the scope that retains it.
+ * `membershipIn` is the read of a membership scope, for an observation.
  * Each is one RPC call on the object the name gives.
  *
  * The answering side is what the object at a name does before any of its
@@ -16,9 +17,11 @@
  * that a send of this scope names.
  */
 
-import type { Digest, Entry, RoutingRefusal, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
+import type { Digest, Entry, ObservationRequest, RoutingRefusal, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
 import { canonicalize, isDigest, isPlatformDefinition, parseStrict, platformName, scopeIdOf } from "@generalbusiness/artroom-bytes";
 import { isObject, isScopeRef, type Delivered, type ScopeState } from "@generalbusiness/artroom-derive";
+import { platform } from "@generalbusiness/artroom-platform";
+import type { Membership } from "./authority.ts";
 import type { Pinned } from "./core.ts";
 import type { Definitions, Delivery, Resolver, SentTexts, Transport } from "./ports.ts";
 import type { Store } from "./store.ts";
@@ -26,12 +29,13 @@ import type { Store } from "./store.ts";
 /** What the object at a name answers to a read of one of its entries. `bytes` null: it has no entry at that sequence number. */
 export interface Sourced { at: ScopeRef; under: string; bytes: string | null }
 
-/** The four calls one scope's object takes from another's. */
+/** The five calls one scope's object takes from another's. `observe` is asked of a membership scope only. */
 export interface Peer {
   deliver(envelope: Delivered): Promise<Delivery>;
   source(seq: number): Promise<Sourced | null>;
   declared(digest: Digest): Promise<string | null>;
   text(seq: number, digest: Digest): Promise<string | null>;
+  observe(asked: ObservationRequest): Promise<unknown>;
 }
 
 /** The little of a Durable Object namespace binding this file uses. */
@@ -162,15 +166,16 @@ export function namespace(binding: Binding): { resolver: Resolver; transport: Tr
     definitions: {
       // Sections 5.1 and 9.2: a child reads its declaration from its creator, by digest, before its genesis turn.
       async read(named, holder) {
-        if (named.startsWith("platform:")) return { ok: false, reason: "unsupported-definition" };
         if (!holder) return { ok: false, reason: "unavailable" };
         try {
-          const bytes = await peer(holder.scope).declared(named as Digest);
+          const bytes = await peer(holder.scope).declared(named);
           return bytes === null ? { ok: false, reason: "absent" } : { ok: true, bytes };
         } catch {
           return { ok: false, reason: "unavailable" };
         }
       },
+      // Section 6.1: a platform definition is the runtime's own code. No scope retains it, so no name of this namespace is asked.
+      platform,
     },
     texts: {
       // Section 6.2: the bytes of a detached text travel beside the message that names it. The receiver reads them from the sender.
@@ -183,6 +188,27 @@ export function namespace(binding: Binding): { resolver: Resolver; transport: Tr
           return { ok: false, reason: "unavailable" };
         }
       },
+    },
+  };
+}
+
+/**
+ * How a scope reads its membership scope over one namespace binding
+ * (authority note, section 3.3, step 2): one call on the object that the
+ * membership reference names. A call that fails is no answer, and the
+ * asking scope then holds nothing new. The answer names the scope and the
+ * incarnation that gave it, and the asking scope checks both.
+ */
+export function membershipIn(binding: Binding): Membership {
+  return {
+    async observe(asked) {
+      try {
+        // I3 merge: the answering side is membership's (plan step 7): the object's method `observe`, which answers from its head and
+        // answers nothing while provisional. No object has it yet, so this call fails and nothing is read.
+        return await (binding.get(binding.idFromName(asked.of.scope)) as Peer).observe(asked);
+      } catch {
+        return null;
+      }
     },
   };
 }

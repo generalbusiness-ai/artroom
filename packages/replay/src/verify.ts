@@ -30,13 +30,13 @@
  */
 
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { Bounds, Digest, Entry, FactRef, Head, PlatformDefinition, Report, RetainedInput, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
-import { canonicalize, definitionDigest, digestBytes, isDigest, isEntry, parseStrict, scopeIdOf, textDigest, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
+import type { Bounds, Digest, Entry, FactRef, Head, PlatformData, PlatformDefinition, Report, RetainedInput, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
+import { canonicalize, definitionDigest, digestBytes, isDigest, isEntry, isPlatformDefinition, parseStrict, platformName, scopeIdOf, textDigest, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import {
   MemoryState, applyEntry, clockOf, entryOf, inputTexts, isFactRef, isLocalId, isObject, isScopeRef, judgeAct, judgeCheckpoint, judgeDelivery, judgeDiagnosis, judgeGenesis, judgeOutcome, judgeTimed,
-  nextDue, timeMs, updateOf, validateDefinition,
+  membershipOf, nextDue, ruleAt, timeMs, updateOf, validateDefinition,
 } from "@generalbusiness/artroom-derive";
-import type { ActJudgment, Capabilities, Clock, Fetched, Judgment, TimedJudgment, ValidDefinition } from "@generalbusiness/artroom-derive";
+import type { ActJudgment, Capabilities, Clock, Fetched, Judgment, PlatformRules, Rules, TimedJudgment, ValidDefinition } from "@generalbusiness/artroom-derive";
 import { RULE_PROFILES, evaluateRules } from "@generalbusiness/artroom-derive/rule";
 import { PAGE_ENTRIES, PAGE_REPLY_BYTES, RETAINED_REPLY_BYTES, hashOfBytes, type HistorySource, type Stored } from "./source.ts";
 
@@ -74,6 +74,16 @@ export interface Options {
    * `unsupported-definition`. The package itself has none.
    */
   capabilities?: Capabilities | undefined;
+  /**
+   * The platform definitions this replay has code for, by name and version
+   * (section 9.3, "A history under a platform definition"): the data and the
+   * rules of each version, as a runtime is supplied them. A history under
+   * a platform definition is derived with them, in the order of section
+   * 4.2. With none, or with a version that lacks the rule of one mark of
+   * its data, such a scope is `unsupported-definition` at its genesis. The
+   * package itself has none.
+   */
+  platform?: ((named: PlatformDefinition) => { data: PlatformData; rules: Rules } | null) | undefined;
 }
 
 /** A report, and in words why its result is not `consistent`. */
@@ -102,6 +112,15 @@ export const TRUSTS = {
   redacted: "each redacted text: its bytes are gone, so nothing shows that they were the text its digest names, or that they were within the bound of their field",
 } as const;
 type Trust = keyof typeof TRUSTS;
+
+/**
+ * What the report lists under `trusts` for each platform definition whose
+ * rules the replay ran (section 9.3, "What it trusts"). A platform
+ * definition is pinned by a name and a version, and no digest names its
+ * rules. So a replay shows that the rules it holds derive the same bytes,
+ * and not that they are the ones that the runtime ran.
+ */
+export const platformCode = (named: PlatformDefinition): string => `platform-code: that the rules this replay ran for ${named} are the rules of that name and version`;
 
 /** Ends the traversal with a result that is not `consistent`. */
 class Stop extends Error {
@@ -137,6 +156,8 @@ interface Run {
   at: ScopeRef | null;
   named: Digest | PlatformDefinition | null;
   definition: ValidDefinition | null;
+  /** The rules of the platform definition that the scope pins, which each judge is given. Null: a declared definition. */
+  platform: PlatformRules | null;
   state: MemoryState;
   /** The checked entries, by `seq`. */
   sealed: { entry: Entry; hash: Digest }[];
@@ -151,6 +172,12 @@ interface Run {
   owed: { text: Digest; at: FactRef }[];
 }
 
+/** The membership reference that a scope's genesis records (section 6.6), from the entry that the replay checked first. */
+const recordedMembership = (run: Run): ScopeRef | null => {
+  const genesis = run.sealed[0]?.entry.input;
+  return genesis?.type === "genesis" && run.at ? membershipOf(genesis, run.at) : null;
+};
+
 const sameScope = (a: ScopeRef, b: ScopeRef): boolean => a.scope === b.scope && a.inc === b.inc && a.kind === b.kind;
 const named = (ref: ScopeRef): string => `${ref.scope} (incarnation ${ref.inc})`;
 
@@ -163,8 +190,11 @@ class Verifier {
   readonly #limits: Limits;
   readonly #bounds: Bounds;
   readonly #capabilities: Capabilities | undefined;
+  readonly #platform: Options["platform"];
   readonly #runs = new Map<ScopeId, Run>();
   readonly #trusts = new Set<Trust>();
+  /** Each platform definition whose rules this replay ran, by name and version. */
+  readonly #coded = new Set<PlatformDefinition>();
   /** The foreign facts proven, by scope, position and hash: by replay of their source, or by an anchor. */
   readonly #proven = new Map<string, "replayed" | "anchored">();
   readonly #anchored: FactRef[] = [];
@@ -183,6 +213,7 @@ class Verifier {
     // Section 9.3: each range guard is derived over every item it covers, so the scan never stops unfinished.
     this.#bounds = { ...(options.bounds ?? PROPOSED_BOUNDS), guardScan: Number.MAX_SAFE_INTEGER };
     this.#capabilities = options.capabilities;
+    this.#platform = options.platform;
   }
 
   async run(): Promise<Verification> {
@@ -230,7 +261,7 @@ class Verifier {
       coverage: covered.map((run) => ({ scope: run.at!, from: 0, through: run.sealed.length - 1 })),
       anchors: this.#anchored,
       dependencies: { verified: proven.filter((how) => how === "replayed").length, anchored: proven.filter((how) => how === "anchored").length, missing: stop?.missing ? [stop.missing] : [] },
-      trusts: (Object.keys(TRUSTS) as Trust[]).filter((trust) => this.#trusts.has(trust)).map((trust) => TRUSTS[trust]),
+      trusts: [...(Object.keys(TRUSTS) as Trust[]).filter((trust) => this.#trusts.has(trust)).map((trust) => TRUSTS[trust]), ...[...this.#coded].sort().map(platformCode)],
       redacted: this.#redacted,
       result: stop ? stop.result : "consistent",
       ...(stop?.at ? { at: stop.at } : {}),
@@ -245,7 +276,7 @@ class Verifier {
     if (this.#runs.size >= this.#limits.scopes) throw new Stop("incomplete", `the limit of ${this.#limits.scopes} scopes was reached`);
     const got = await this.#page(id, 0);
     if (!got.ok) return null;
-    const run: Run = { id, said: got.page.scope, head: got.page.head, at: null, named: null, definition: null, state: new MemoryState(), sealed: [], read: new Map(), next: 0, busy: false, depth: Number.POSITIVE_INFINITY, owed: [] };
+    const run: Run = { id, said: got.page.scope, head: got.page.head, at: null, named: null, definition: null, platform: null, state: new MemoryState(), sealed: [], read: new Map(), next: 0, busy: false, depth: Number.POSITIVE_INFINITY, owed: [] };
     if (!this.#take(run, 0, got.page.entries, got.page.next)) return null;
     this.#runs.set(id, run);
     return run;
@@ -461,6 +492,7 @@ class Verifier {
   /** The pinned definition, from the retained declaration the genesis's seed names (sections 6.1 and 9.2). */
   async #pin(run: Run, where: FactRef): Promise<ValidDefinition> {
     const digest = run.named;
+    if (isPlatformDefinition(digest)) return this.#code(run, digest, where);
     if (!isDigest(digest)) throw new Stop("unsupported-definition", `the scope pins ${String(digest)}, which this replay has no code for`, where);
     const kept = await this.#retained(run, where, "definition", digest, "the definition's declaration");
     let declared: unknown;
@@ -474,12 +506,41 @@ class Verifier {
     if (declared === undefined) throw new Stop("incomplete", `a retained input is not the one named: the definition's declaration, ${digest}`, where);
     const checked = validateDefinition(declared, this.#bounds, RULE_PROFILES);
     // Section 9.3: a capability version that the verifier does not implement gives `unsupported-definition`.
-    const needs = checked.ok ? checked.definition.underived.find((u) => !this.#capabilities?.implements(u.capability)) : undefined;
+    const needs = checked.ok ? checked.definition.underived.find((u) => !this.#capabilities?.implements(u)) : undefined;
     if (needs) throw new Stop("unsupported-definition", `the pinned definition needs ${needs.capability}, which this replay has no code for: ${needs.form} ${needs.name} at ${needs.path}`, where);
     if (checked.ok) return checked.definition;
     // Section 9.3: a history whose genesis opens a timed item is invalid.
     if (checked.problems.some((p) => p.code === "genesis-timed")) throw new Stop("mismatch", "genesis-timed: the pinned definition's genesis act opens a timed item", where);
     throw new Stop("unsupported-definition", `the pinned definition does not pass validation under the bounds given: ${checked.problems[0]?.code ?? "unknown"} at ${checked.problems[0]?.path ?? ""}`, where);
+  }
+
+  /**
+   * A platform definition, pinned by its name and version (sections 6.1 and
+   * 9.3). The replay derives its history with the data and the rules of
+   * that version, as the caller supplied them. The data is validated as a
+   * runtime validates it, with the validator's platform option, which no
+   * input reaches: the caller's code supplies the data, and the history
+   * supplies only the name. A replay that lacks the version, or the rule of
+   * one mark of its data, answers `unsupported-definition` at the genesis:
+   * every mark is in the data, so whether a history can hold an entry of a
+   * rule is a function of the definition. It is never `consistent`.
+   */
+  #code(run: Run, named: PlatformDefinition, where: FactRef): ValidDefinition {
+    const supplied = this.#platform?.(named) ?? null;
+    if (!supplied) throw new Stop("unsupported-definition", `the scope pins ${named}, which this replay has no code for`, where);
+    let checked: ReturnType<typeof validateDefinition> | null = null;
+    try {
+      checked = validateDefinition(parseStrict(canonicalize(supplied.data)), this.#bounds, RULE_PROFILES, { platform: true });
+    } catch { /* data with no canonical bytes is no definition */ }
+    if (!checked?.ok || checked.definition.declared.name !== platformName(named)) throw new Stop("unsupported-definition", `the data that this replay was given for ${named} is not a platform definition of that name under the bounds given`, where);
+    const needs = checked.definition.underived.find((u) => !this.#capabilities?.implements(u));
+    if (needs) throw new Stop("unsupported-definition", `the pinned definition needs ${needs.capability}, which this replay has no code for: ${needs.form} ${needs.name} at ${needs.path}`, where);
+    const lacks = checked.definition.marks.find((mark) => ruleAt(supplied.rules, mark.code, mark.kind) === null);
+    if (lacks) throw new Stop("unsupported-definition", `the pinned definition ${named} has the mark ${lacks.code} at ${lacks.path}, and this replay has no rule of that name for that place`, where);
+    run.platform = { named, rules: supplied.rules };
+    // Section 9.3, "What it trusts": that the rules which it ran are the rules of that name and version.
+    this.#coded.add(named);
+    return checked.definition;
   }
 
   /**
@@ -591,7 +652,9 @@ class Verifier {
       if (size === null) run.owed.push({ text, at: where });
     }
     // Section 6.2: a local fact, and a part of one, are read from this scope's own history: the entries checked so far.
-    const reading = { clock, bounds, facts, prepared: entry.prepared, own: (at: number) => run.sealed[at] ?? null, texts: (digest: Digest) => texts.get(digest) ?? null, capabilities: this.#capabilities };
+    // Section 9.3: a rule of a platform definition is given only what section 6.1 lists. All of it is in the history, in the retained
+    // inputs or in the caller's bounds.
+    const reading = { clock, bounds, facts, prepared: entry.prepared, own: (at: number) => run.sealed[at] ?? null, texts: (digest: Digest) => texts.get(digest) ?? null, capabilities: this.#capabilities, platform: run.platform ?? undefined };
     const copyOf = (fact: FactRef | null) => facts.find((f) => f.fact.hash === fact?.hash) ?? null;
     const own = (seq: unknown): Entry | null => (isLocalId(seq) ? (run.sealed[seq]?.entry ?? null) : null);
     let judged: ActJudgment | Judgment | TimedJudgment;
@@ -610,7 +673,8 @@ class Verifier {
       case "act":
         // Section 9.3: that a grant was fresh is not checked, beyond its recorded form. The authority port's verdict is trusted.
         this.#trusts.add("authority");
-        judged = judgeAct(state, definition, input.signed, { ...reading, presented: input.presented, grants: input.authority.map((grant) => ({ grant, current: true })) });
+        // Section 16.1, "Replay": that `within` covers the observing scope is checked by the reference that its genesis records.
+        judged = judgeAct(state, definition, input.signed, { ...reading, presented: input.presented, grants: input.authority.map((grant) => ({ grant, current: true })), membership: recordedMembership(run) });
         break;
       case "delivery": {
         this.#trusts.add("delivered");
@@ -627,12 +691,26 @@ class Verifier {
         judged = judgeDiagnosis(state, definition, { of: input.of, attempts: input.attempts }, { ...reading, prepared: [], origin: own(input.of.seq) });
         break;
       case "timed":
-        judged = judgeTimed(state, definition, { item: input.item, rule: input.rule, due: input.due }, { clock, bounds });
+        judged = judgeTimed(state, definition, { item: input.item, rule: input.rule, due: input.due }, { clock, bounds, capabilities: this.#capabilities });
         break;
+      case "preparation":
+        // Section 9.3 gives the preparation entry its rules. Derive's `judgePreparation` is its judge, and this replay is not given
+        // the steps' rules until plan step 22. A verifier that does not
+        // derive a capability form answers `unsupported-definition` (sections 6.1 and 9.3, "A capability guard or effect").
+        // The contract does not name this entry for a verifier without preparation rules: recorded as I3 delta E13.
+        throw new Stop("unsupported-definition", `entry ${entry.seq} is a preparation, and this replay has no rules for one`, where);
       case "outcome":
-        this.#trusts.add("outcomes");
-        judged = judgeOutcome(state, definition, input, { clock, bounds });
-        break;
+        // Section 9.3: an outcome entry of an operation that the pinned platform definition owns is judged with the rule that its
+        // data names in `outcomes` for the operation's kind.
+        if (run.platform && state.operation(input.operation)?.owner === run.platform.named) {
+          this.#trusts.add("outcomes");
+          judged = judgeOutcome(state, definition, input, { clock, bounds, platform: run.platform, own: reading.own });
+          break;
+        }
+        // Section 9.3, point E13, and section 9.4: an outcome entry of an operation whose rules the verifier does not derive is
+        // `unsupported-definition` at that entry, and never `consistent`. This verifier is given the rules of no other owner.
+        // I3 merge: step 22 gives the verifier the owners' rules, and judges an outcome that has them with `judgeOutcome`.
+        throw new Stop("unsupported-definition", `entry ${entry.seq} is an outcome, and this replay has no rules of the owner of its operation`, where);
       case "checkpoint":
         // Checked against the fold through that sequence. It is never taken as proof of the prefix (section 9.2).
         judged = judgeCheckpoint(state, definition, { through: input.through, state: input.state }, { clock, bounds });

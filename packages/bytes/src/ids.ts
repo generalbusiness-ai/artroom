@@ -11,7 +11,7 @@ import { wellFormed } from "./canonical.ts";
 import { unb64url } from "./encode.ts";
 import { publicKeyOf } from "./sign.ts";
 
-export const SCOPE_KINDS: readonly ScopeKind[] = ["directory", "membership", "rules", "destination", "inbox", "task", "lane"];
+export const SCOPE_KINDS: readonly ScopeKind[] = ["register", "directory", "membership", "rules", "destination", "inbox", "task", "lane"];
 
 export function isScopeKind(value: unknown): value is ScopeKind {
   return SCOPE_KINDS.includes(value as ScopeKind);
@@ -32,14 +32,15 @@ export function isMemberId(value: unknown): value is MemberId {
   return typeof value === "string" && /^@./.test(value) && wellFormed(value);
 }
 
-/** `op_` and at least one more character, well formed. The contract states no further form; the authority note may. */
-export function isOperationId(value: unknown): value is OperationId {
-  return typeof value === "string" && /^op_./.test(value) && wellFormed(value);
-}
-
 /** A position in one scope's history, or an ordinal, from its one decimal text: no sign, no leading zero, at most 16 digits. Null for any other text. */
 export function positionOf(text: unknown): number | null {
   return typeof text === "string" && /^(0|[1-9][0-9]{0,15})$/.test(text) && Number.isSafeInteger(Number(text)) ? Number(text) : null;
+}
+
+/** One operation of one entry: `seq:k`, the entry that opened it and its ordinal there, each a position in its one decimal form (section 4.1). */
+export function isOperationId(value: unknown): value is OperationId {
+  const parts = typeof value === "string" ? value.split(":") : [];
+  return parts.length === 2 && parts.every((part) => positionOf(part) !== null);
 }
 
 /** One send of one entry: `seq.n`, each a position in its one decimal form. */
@@ -50,7 +51,7 @@ export function isDutyId(value: unknown): value is DutyId {
 
 /** A definition the platform supplies in code: `platform:<name>@<version>`. */
 export function isPlatformDefinition(value: unknown): value is PlatformDefinition {
-  return typeof value === "string" && /^platform:(directory|membership|rules|destination|inbox|task)@(0|[1-9][0-9]*)$/.test(value);
+  return typeof value === "string" && /^platform:(register|directory|membership|rules|destination|inbox|task)@(0|[1-9][0-9]*)$/.test(value);
 }
 
 /** The name of a platform definition, which `under` is compared with: its platform name without the version, such as `platform:task` (section 6.1). */

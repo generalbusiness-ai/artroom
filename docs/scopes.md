@@ -1,7 +1,8 @@
 # Scopes
 
-This guide describes what the scope substrate delivers: the six platform
-packages under `packages/`. A seventh package, `lanes`, holds the two lane
+This guide describes what the scope substrate delivers: the eight packages
+under `packages/` that hold the substrate, the platform definitions and the
+Git code. A ninth package, `lanes`, holds the two lane
 definitions as data, and [lanes.md](lanes.md) describes it. This guide is
 for a technical reader who has not read the design notes. It says what a scope is, how a change to one takes effect,
 how scopes work together, how a history is checked, and what is not built
@@ -19,12 +20,14 @@ why. Nothing in either note is adopted by being built.
 | `@generalbusiness/artroom-contract` | Types and constant tables. No logic. | Nothing |
 | `@generalbusiness/artroom-bytes` | Canonical JSON, SHA-256, encodings, Ed25519, the seven byte domains, and the guard of each identifier. | contract |
 | `@generalbusiness/artroom-derive` | The definition validator, the fold, the judges and the rule evaluator. Pure functions. | contract, bytes |
-| `@generalbusiness/artroom-scope` | The runtime of a scope on a Cloudflare Durable Object with SQLite storage, and the Worker's routes. | contract, bytes, derive |
+| `@generalbusiness/artroom-platform` | The platform definitions as data, with the rules that no form can say. Today: `platform:inbox@1`. | contract, bytes, derive |
+| `@generalbusiness/artroom-git` | Everything that touches a Git repository or a Git host: the object reader, the commands, the outcome of a push, and the gateway. It is not part of a scope's commit and no other package imports it. | contract, bytes |
+| `@generalbusiness/artroom-scope` | The runtime of a scope on a Cloudflare Durable Object with SQLite storage, and the Worker's routes. | contract, bytes, derive, platform |
 | `@generalbusiness/artroom-replay` | An independent check of a history, its report, and the command `artroom-replay`. | contract, bytes, derive |
 | `@generalbusiness/artroom-client` | Building and signing an intent, and a typed handle on one scope. | contract, bytes |
 
 Each package's `README.md` lists its modules. The runtime and the verifier
-share `derive` and nothing else. The client shares neither. None of the six
+share `derive` and nothing else. The client shares neither. None of the eight
 imports the lanes package.
 
 ## What a scope is
@@ -103,7 +106,7 @@ There are seven inputs:
 | `delivery` | A message from another scope. |
 | `timed` | A deadline that an item held and that has passed. |
 | `diagnosis` | The scope's finding that a request it sent could not be delivered. |
-| `outcome` | The result of an attempt to write outside the service. No form opens one yet. |
+| `outcome` | The result of an attempt to write outside the service. A preparation entry opens such an operation under a capability's code. The production runtime has no such code, so it opens none. |
 | `checkpoint` | The digest of the whole folded state through a position. |
 
 ## Acts and the four answers
@@ -411,12 +414,16 @@ the entry records it in its input.
 
 **Capability forms.** A definition may list the capabilities `hold@1` and
 `git-read@1`, and may write a `capability` guard, a `capability` effect,
-the part `{ carried }`, and a fact kind such as `hold@1:check`. No source
-writes an entry of such a kind, so a `fact` guard over one does not hold.
+the part `{ carried }`, and a fact kind such as `hold@1:check`. A
+preparation entry has such a kind. An outcome entry has none, because its
+bytes hold neither the capability nor the step, so a `fact` guard over a
+check entry does not hold.
 The validator checks each form against what the listed version declares,
 in the contract package's `CAPABILITIES`. It derives none of them: a definition
-that passes lists each such form in `ValidDefinition.underived`. This
-repository has no code for a capability's rules. So the production runtime
+that passes lists each such form in `ValidDefinition.underived`. The derive
+package has the rules of `hold@1` over its records and the guard
+`ancestry` of `git-read@1`, with the judge of a preparation. The
+production runtime is not given them. So it
 founds and creates no scope under a definition whose list is not empty,
 and answers `unsupported-definition`. The verifier answers the same. The
 item form of `hold@1`, with its `hold` effect, needs no such code and
@@ -614,7 +621,7 @@ result is one of:
 | `mismatch` | An entry is not what its bytes, its chain, its signature or its replay say. The report names the entry. |
 | `missing-dependency` | A history that an entry used cannot be read, and no anchor names the entry. |
 | `incomplete` | A retained input is missing, or a limit was reached. A detached text that is gone with no tombstone is a missing input. No claim is made beyond the coverage. |
-| `unsupported-definition` | The scope pins a definition this replay has no code for: a platform definition, or a declared one that needs a capability's rules. The package has none of its own. |
+| `unsupported-definition` | The scope pins a definition this replay has no code for: a platform definition whose data and rules the caller did not give, or gave without the rule of one mark; or a declared one that needs a capability's rules. The package has none of its own. With the rules of a platform definition, the report lists `platform-code` under `trusts`, with the name and the version. |
 
 "Consistent" is always for a stated mode, target, coverage and set of
 trusts. It is not "verified". A replay trusts, among other things, the
@@ -682,12 +689,12 @@ and nothing here guesses at it.
 
 | Not delivered | Owner | What the substrate has in its place |
 |---|---|---|
-| Grants and membership: who may act, how a grant is shown to be current, revocation | The authority design, then the authority and publication delivery | The `Grant` shape and the check that a grant names the action, the key and the scope. Whether a grant is current is asked of a port, `Authority`, whose production default says no. The tests use a test authority that is named as one. |
+| Grants and membership: who may act, how a grant is shown to be current, revocation | The authority design, then the authority and publication delivery | The `Grant` shape and the check that a grant names the action, the key and the scope. Whether a grant is current is asked of a port, `Authority`, in two phases: a read before the turn, and a decision in the commit on what was read. The production default reads no grant, so none is current. The tests use a test authority that is named as one. |
 | Who may read, and sessions | The same | The `Readers` port, whose production default lets nobody read. |
-| Platform definitions: directory, membership, rules, destination, inbox, task | The same | A platform name is answered `unsupported-definition`. The tests run declared definitions. |
-| Hold tokens, workspaces and their export | The same | The hold item, its epoch, and its timed end. |
-| Git reads, and the rules of the `hold@1` and `git-read@1` capabilities: their records, guards, effects and steps | The same | The validator reads the capability forms against the contract package's tables, and derives none. The production runtime and the verifier answer `unsupported-definition` for a definition that uses one. The tests have a scripted stand-in, which is named as one. |
-| Publication to a destination, and the evidence of an outside write | The same | The `outcome` input and the numbering of operations and attempts. No form opens an operation. |
+| Platform definitions: register, directory, membership, rules, destination, inbox, task | The same | The data and the one rule of `platform:inbox@1`, in `packages/platform`. Its `notify` handlers hold the mark `notice-source`, and the judges run its rule, so a scope is founded under it and records a notice. A runtime or a replay that lacks a rule for a mark answers `unsupported-definition` for the whole scope. This builds the scope contract's revision 15 and the authority note's revision 20. Both are adopted. The adoption is of the designs, and is no review of this source. Every other platform name is answered `unsupported-definition`. |
+| Hold tokens, workspaces and their export | The same | The hold item, its epoch, and its timed end. The records of a hold's workspace are derived by `workspaceEffects` in `packages/derive` when a judge is given the code of `hold@1`. No production port gives it. |
+| The rules of the `hold@1` and `git-read@1` capabilities in a running scope: their records, guards, effects and steps | The same | The rules are pure functions in `packages/derive` (`src/capability/`, `src/prepare.ts`), with tests on made-up definitions, and the Git reader is `packages/git`. No production port holds them. The production runtime and the verifier answer `unsupported-definition` for a definition that uses a capability form. The tests of a scope have a scripted stand-in, which is named as one. |
+| Publication to a destination, and the evidence of an outside write | The same | The `outcome` input, the numbering of operations and attempts, and the driver in `packages/scope` that records an attempt before it sends it. The production port sends nothing, and no owner's rules are wired, so no outcome is judged there. |
 | Running the two lane definitions, `issue` and `change` | The authority and publication delivery, for the capability rules and the platform scopes that the rows read | The two definitions as data, in `packages/lanes`, validated whole and pinned by digest. Both use capability forms, so under the production wiring a scope is not founded or created under either: `unsupported-definition`. Ten test scenarios run them on real scopes with stand-ins that each test names. [lanes.md](lanes.md) says which rows wait and on whom. The fixtures' lane and ticket are made up for tests. |
 | The application: browser pages, the command line, tools for agents | The application delivery | The client handle. |
 | A deployment | Not authorized | `packages/scope/wrangler.jsonc` is configuration only. Nothing in this repository deploys it. |

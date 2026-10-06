@@ -4,7 +4,7 @@ import type { Notify } from "@generalbusiness/artroom-contract";
 import type { FieldType } from "@generalbusiness/artroom-contract";
 import { canonicalize, isDigest, isPlatformDefinition, isScopeKind } from "@generalbusiness/artroom-bytes";
 import { isObject, own } from "../values.ts";
-import { subject, type ClauseSet, type Ctx, type Defining, type Duties, type Type } from "./context.ts";
+import { mark, marked, subject, type ClauseSet, type Ctx, type Defining, type Duties, type Type } from "./context.ts";
 import { effects } from "./effects.ts";
 import { guards, range } from "./guards.ts";
 import { isDetached, operand } from "./operands.ts";
@@ -105,7 +105,19 @@ export function sends(d: Defining, v: unknown, path: string, ctx: Ctx, top: Rec,
   const kinds = new Map<string, { always: boolean; clause: boolean }[]>();
   let fanOuts = 0;
   let most = 0;
+  /** The marks of the list, in platform data, and whether each written send of it always makes exactly one send. */
+  const marks: string[] = [];
+  let steady = true;
   list(v, path, bounds.sends).forEach((s, i) => {
+    if (d.platform && marked(s)) {
+      // Section 6.1, place 6: the rule gives no request, or one: a `create`, a `tell` or a `relate`. Its clauses are the mark's
+      // own, as data, with the `conflict` clause of a creation. It is counted as one send and one request.
+      const o = mark(d, s, at(path, i), "send", ["result"]);
+      if (o) requests.push({ most: 1, clauses: clauses(d, o["result"], at(at(path, i), "result"), ctx, true) });
+      marks.push(at(path, i));
+      most += 1;
+      return;
+    }
     const f = form(s, at(path, i), ["create", "tell", "relate", "index"]);
     if (!f) return;
     const [k, x] = f;
@@ -167,7 +179,10 @@ export function sends(d: Defining, v: unknown, path: string, ctx: Ctx, top: Rec,
     } else {
       const r = rec(x, p, ["fields"]);
       if (r) sources(d, r["fields"], at(p, "fields"), ctx, false);
+      // An `index` send is made only by a scope that records a directory.
+      always = false;
     }
+    if (!always) steady = false;
     most += made;
     if (problems.length !== before) return;
     // A request's result names it by its ordinal, and a send that is not made takes none. So the form that made a recorded send is
@@ -179,6 +194,11 @@ export function sends(d: Defining, v: unknown, path: string, ctx: Ctx, top: Rec,
     if (others.some((o) => (o.clause || clause) && !(o.always && always))) bad("shape", p, "another send of this list makes a message of the same type and name, one of the two is not always made, and one has a result clause: the clause of a result could not be found again");
     kinds.set(said, [...others, { always, clause }]);
   });
+  // A result names its request by ordinal, and a rule's request states no type or name in the data. So the form that made a
+  // recorded send is found again, in a list with a mark, by counting: the list holds one mark, and each written send of it is
+  // always made exactly once. The entry then has one send for each written form, and one more when the rule gave a request.
+  if (marks.length > 1) bad("shape", marks[1]!, "another send of this list is a mark; a list has at most one, so that the clause of a result is found again");
+  else if (marks.length === 1 && !steady) bad("shape", marks[0]!, "a written send of this list is not always made exactly once, so the clause of a result could not be found again beside a mark");
   return most;
 }
 

@@ -5,12 +5,16 @@
  * reaches a record only through the declared guards and effects.
  *
  * `CAPABILITIES` restates the contract's tables for `hold@1` and
- * `git-read@1` as data, as far as the tables give names. It is what a
+ * `git-read@1` as data, as far as the tables give names, and adds the records
+ * and steps that the authority note's section 5.7 lists. It is what a
  * validator checks a `capability` guard or effect, a `carried` part and the
  * kind of a preparation entry against. It holds no rule: the rules behind
- * each record, guard, effect and step are the authority note's, and no
- * source derives them yet. A runtime that has no code for them answers
- * `unsupported-definition` for a definition that needs one.
+ * each record, guard, effect and step are the authority note's. The derive
+ * package derives them, in `src/capability/` and `src/prepare.ts`, as far
+ * as I3 steps 16a to 16c built them. They are not wired in production: the
+ * production capabilities port has none (plan step 16). A runtime that has
+ * no code for them answers `unsupported-definition` for a definition that
+ * needs one.
  */
 
 export type CapabilityName = `${"hold" | "git-read"}@${number}`;
@@ -69,6 +73,10 @@ export const CAPABILITIES = {
       pin: { states: ["provisional", "held", "released"], final: ["released"] },
       check: { states: ["recorded", "too-large"], final: ["recorded", "too-large"] },
       "receiver-pin": { states: ["standing", "released"], final: ["released"] },
+      // The authority note's, section 5.7: the three records beyond the item form. The contract leaves them to it (section 6.11).
+      fork: { states: ["creating", "selected", "deleting", "deleted", "failed"], final: ["deleted", "failed"] },
+      token: { states: ["minting", "live", "revoking", "ended"], final: ["ended"] },
+      instance: { states: ["current", "past"], final: ["past"] },
     },
     guards: {
       staged: { with: ["commit", "under", "pin"], refusals: ["not-staged"] },
@@ -82,7 +90,8 @@ export const CAPABILITIES = {
       license: { with: [["export", "from", "checkpoint", "hold", "instance", "k"]] },
       settle: { with: [["export", "by"]] },
     },
-    steps: { stage: { foreign: true }, check: { foreign: true } },
+    // `instance`, `token` and `retry` are the authority note's, section 5.7. Each is asked of the lane that owns the hold or the ledger.
+    steps: { stage: { foreign: true }, check: { foreign: true }, instance: { foreign: false }, token: { foreign: false }, retry: { foreign: false } },
     reserved: [{ record: "receiver-pin", while: "standing", request: { class: "tell", message: "export-license", number: "k" }, bound: 3, count: "decided" }],
   },
   "git-read@1": {
@@ -91,7 +100,8 @@ export const CAPABILITIES = {
       ancestry: { with: ["commit", "row", "pin", "selected", "earlier"], refusals: ["ancestry-too-large", "ancestry-stale", "unnamed-work"] },
     },
     effects: {},
-    steps: {},
+    // `job-read` is the authority note's, sections 3.11 and 5.7: the checker's request to the change lane that owns the job.
+    steps: { "job-read": { foreign: false } },
     reserved: [],
   },
 } as const satisfies Record<CapabilityName, Capability>;

@@ -10,14 +10,37 @@
  */
 
 import { CAPABILITIES, PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { Bounds, Capability, CapabilityName, Digest, Entry, Timestamp } from "@generalbusiness/artroom-contract";
-import type { Capabilities, Delivered, Recorded } from "@generalbusiness/artroom-derive";
-import type { Authority, Clock, Ports, Readers, Resolver, Rules, Transport } from "./ports.ts";
+import type { Bounds, Capability, CapabilityName, Digest, Entry, ObservationRequest, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
+import type { Capabilities, Delivered, Recorded, Steps, Window } from "@generalbusiness/artroom-derive";
+import { observing } from "./authority.ts";
+import type { Authority, Clock, Definitions, Ports, Readers, Resolver, Rules, Transport } from "./ports.ts";
 import { production } from "./ports.ts";
 import { READ_BOUNDS, type ReadBounds } from "./reads.ts";
 
-/** A test authority: every presented grant is current. It proves nothing about real authority. */
-export const testAuthority: Authority = { current: () => true };
+/**
+ * A test authority: a stand-in for the authority port, over its two phases.
+ * Its read phase reads no membership scope. It keeps the grants that were
+ * presented beside the intent, and its commit phase calls each of them
+ * current. So it proves nothing about real authority, an observation or a
+ * window: a test that uses it shows what a scope does once a grant is held.
+ *
+ * `answers` is read at each read. While it gives false, the read gives
+ * nothing, as when membership does not answer.
+ */
+export function testAuthority(answers: () => boolean = () => true): Authority {
+  return { read: (asked) => Promise.resolve(answers() ? { held: () => asked.grants.map((grant) => ({ grant, current: true })) } : null) };
+}
+
+/**
+ * A scripted membership: a stand-in for the membership scope and for what
+ * the scope's genesis records of it. `at` is the reference that the scope is
+ * said to record, which no genesis holds yet. `answers` is what that scope
+ * is said to answer for a key: nothing judged it, and no history stands
+ * behind its head. Null or a failure: membership does not answer. So a test
+ * that uses it shows the observing scope's side of a read, with the real
+ * read, guards and windows, and nothing about membership.
+ */
+export interface MembershipScript { at: ScopeRef; answers(asked: ObservationRequest): unknown }
 
 /** A test reader port: every reader may read everything. */
 export const testReaders: Readers = { allows: () => true };
@@ -32,13 +55,21 @@ export const testReaders: Readers = { allows: () => true };
 export interface CapabilityScript {
   guards?: Record<string, (args: Readonly<Record<string, unknown>>) => true | string>;
   effects?: Record<string, (args: Readonly<Record<string, unknown>>) => readonly Recorded[]>;
+  /**
+   * Scripted steps, as in `hold@1:instance`: the action whose grant the
+   * step is judged on, and the window of its observation. A scripted step
+   * derives nothing: no record and no operation. So its preparation entry
+   * shows how a step's grant is read and judged, and nothing about the step.
+   */
+  steps?: Record<string, { action: string; window: Window }>;
 }
 
 /**
  * A scripted test capability: a stand-in for the code of `hold@1` and
- * `git-read@1`, which is not delivered. It answers every guard and every
- * effect from the table that the test supplies, and reads no record, no
- * hold, no Git repository and no provider. So it proves nothing about
+ * `git-read@1`, which derive has and no production port holds. It answers every guard and every
+ * effect from the table that the test supplies. The port also gives a rule
+ * the folded state and the input, and this stand-in reads neither: no
+ * record, no hold, no Git repository and no provider. So it proves nothing about
  * staging, ancestry, pins, licenses or exports: a test that uses it shows
  * only what a definition does once a capability has answered.
  *
@@ -47,13 +78,28 @@ export interface CapabilityScript {
  * not script is refused with the first refusal its version declares, and an
  * effect that it does not script changes no record.
  */
-export function scriptedCapability(script: () => CapabilityScript | null): Capabilities {
+export function scriptedCapability(script: () => CapabilityScript | null): Capabilities & Steps {
   return {
-    implements: () => script() !== null,
+    // A form of a definition, or a capability and one of its steps. A step that the table does not script has no code, as in production.
+    implements: (form: unknown, step?: string) => (typeof form === "string" ? script()?.steps?.[`${form}:${step}`] !== undefined : script() !== null),
+    grant: (capability, step) => script()?.steps?.[`${capability}:${step}`] ?? null,
+    derive: () => ({ records: [], opens: [] }),
     guard: (capability: CapabilityName, guard, args) =>
       script()?.guards?.[`${capability}:${guard}`]?.(args) ?? (CAPABILITIES as Record<string, Capability>)[capability]!.guards[guard]!.refusals[0]!,
     effect: (capability, effect, args) => script()?.effects?.[`${capability}:${effect}`]?.(args) ?? [],
   };
+}
+
+/**
+ * A definitions port that has lost the code of its platform definitions
+ * while `lost` gives true: each definition is supplied with its data and
+ * with no rule, as by a runtime that lacks the rules of that version. It
+ * is how a test replaces a scope's runtime by one that cannot run its
+ * pinned definition (the contract's revision 15, witness 18.39, case 4).
+ * While `lost` gives false the port is the one given, unchanged.
+ */
+export function codeLost(definitions: Definitions, lost: () => boolean): Definitions {
+  return { read: (named, holder) => definitions.read(named, holder), platform: (named) => { const supplied = definitions.platform(named); return supplied && lost() ? { ...supplied, rules: {} } : supplied; } };
 }
 
 /** A scripted clock. Each reading is the next of `script`, or `now` when the script is empty. */
@@ -102,6 +148,16 @@ export interface Controls {
   reads: ReadBounds;
   /** The table of the scripted test capability, a stand-in. Null: no capability, as in production. */
   capability: CapabilityScript | null;
+  /** False: the read of the test authority, a stand-in, gives nothing, as when membership does not answer. */
+  authority: boolean;
+  /** True: a platform definition is as the platform package supplies it, as in production. False: its data with no rule, as in a runtime that has lost the code (`codeLost`). */
+  platformCode: boolean;
+  /**
+   * The scripted membership, a stand-in. With one, the scope's authority is
+   * the real observation read of `authority.ts` over it, and the grants
+   * presented beside an intent are not read. Null: the test authority.
+   */
+  membership: MembershipScript | null;
 }
 
 const all = new Map<string, Controls>();
@@ -109,22 +165,31 @@ const all = new Map<string, Controls>();
 /** The controls of the scope with that name, made on first use with a clock at `start`. They outlive a restart of the object. */
 export function controls(name: string, start: Timestamp = "2099-01-01T00:00:00Z"): Controls {
   let made = all.get(name);
-  if (!made) all.set(name, (made = { clock: new ScriptedClock(start), gate: new Gate(), foreign: new Map(), bounds: PROPOSED_BOUNDS, reads: READ_BOUNDS, capability: null }));
+  if (!made) all.set(name, (made = { clock: new ScriptedClock(start), gate: new Gate(), foreign: new Map(), bounds: PROPOSED_BOUNDS, reads: READ_BOUNDS, capability: null, authority: true, platformCode: true, membership: null }));
   return made;
 }
 
 /**
- * Test ports over those controls: the test authority and readers, the
+ * Test ports over those controls: the test authority, a stand-in that the
+ * controls can silence, or, while the controls hold a scripted membership,
+ * the real observation read over that stand-in; the test readers, the
  * scripted clock, a resolver that reads from `foreign`, derive's rule
  * evaluator behind the gate, and the scripted test capability over the
- * controls' table, which is none until a test sets one. The random source
- * and the alarm stay the runtime's and the object's.
+ * controls' table, which is none until a test sets one. The platform
+ * definitions are the platform package's, as in production, until a test
+ * takes their code away. The random source and the alarm stay the
+ * runtime's and the object's.
  */
 export function testPorts(c: Controls): Partial<Ports> {
-  const { rules } = production();
+  const { rules, definitions: given, random } = production();
+  const definitions = codeLost(given, () => !c.platformCode);
   const resolver: Resolver = { read: (fact) => Promise.resolve(c.foreign.get(fact.hash) ?? null) };
   const gated: Rules = { evaluate: async (asked) => { await c.gate.pass(); return rules.evaluate(asked); } };
-  return { clock: c.clock, authority: testAuthority, readers: testReaders, resolver, rules: gated, capabilities: scriptedCapability(() => c.capability) };
+  // One run for the life of these ports, which is the life of the object: a restart makes new ports, and so a new run that holds nothing.
+  const observed = observing({ clock: c.clock, random, membership: () => c.membership?.at ?? null, reader: { observe: (asked) => Promise.resolve(c.membership?.answers(asked) ?? null) } });
+  const standIn = testAuthority(() => c.authority);
+  const authority: Authority = { read: (asked, seconds) => (c.membership ? observed : standIn).read(asked, seconds) };
+  return { clock: c.clock, authority, readers: testReaders, resolver, rules: gated, definitions, capabilities: scriptedCapability(() => c.capability) };
 }
 
 // ---------------------------------------------------------------- several scopes in one namespace
@@ -144,6 +209,8 @@ export interface Net {
   deaf: ((envelope: Delivered) => boolean) | null;
   /** The table of the scripted test capability, a stand-in, for every scope of the namespace. Null: no capability, as in production. */
   capability: CapabilityScript | null;
+  /** True: a platform definition is as the platform package supplies it, as in production. False: its data with no rule, for every scope of the namespace (`codeLost`). */
+  platformCode: boolean;
   /**
    * The entries of scripted platform peers, by the hash of the fact that
    * names each, with the name of the definition that the peer is said to
@@ -156,7 +223,7 @@ export interface Net {
   peers: Map<Digest, { entry: Entry; under: string }>;
 }
 
-export const net: Net = { clock: new ScriptedClock("2099-01-01T00:00:00Z"), bounds: PROPOSED_BOUNDS, sized: new Map(), hold: null, deaf: null, capability: null, peers: new Map() };
+export const net: Net = { clock: new ScriptedClock("2099-01-01T00:00:00Z"), bounds: PROPOSED_BOUNDS, sized: new Map(), hold: null, deaf: null, capability: null, platformCode: true, peers: new Map() };
 
 /**
  * Test ports for a scope in that namespace: the test authority and readers,
@@ -178,5 +245,5 @@ export function netPorts(n: Net, transport: Transport, resolver?: Resolver): Par
     },
   };
   const scripted: Partial<Ports> = resolver ? { resolver: { read: (fact, seconds) => { const peer = n.peers.get(fact.hash); return peer ? Promise.resolve(peer) : resolver.read(fact, seconds); } } } : {};
-  return { clock: n.clock, authority: testAuthority, readers: testReaders, transport: disturbed, capabilities: scriptedCapability(() => n.capability), ...scripted };
+  return { clock: n.clock, authority: testAuthority(), readers: testReaders, transport: disturbed, capabilities: scriptedCapability(() => n.capability), ...scripted };
 }

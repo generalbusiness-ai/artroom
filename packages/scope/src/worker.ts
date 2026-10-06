@@ -22,6 +22,7 @@
  * |---|---|
  * | `POST /v1/scopes` | Found a directory. Body `{ founding, definition, definitions?, texts? }`. |
  * | `POST /v1/scopes/:scope/acts` | Submit an act. Body `{ signed, grants, texts?, presented? }`. `texts`: each detached text that a field names by digest. `presented`: the facts presented beside the intent, by name. |
+ * | `POST /v1/scopes/:scope/preparations` | Ask for one step of a capability. Body `{ signed, grants, capability, step }`. `signed`: the signed intent that the step prepares for. |
  * | `POST /v1/scopes/:scope/settle` | The receipt of an accepted act. Body `{ signed }`. |
  * | `GET /v1/scopes/:scope` | The summary. |
  * | `GET /v1/scopes/:scope/items/:type?cursor=` | A page of retained final items. |
@@ -53,6 +54,7 @@ export interface Env { SCOPES: DurableObjectNamespace }
 interface Remote {
   found(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions?: readonly DeclaredDefinition[], beside?: Beside): Promise<Founded>;
   submit(signed: SignedIntent, grants: readonly Grant[], beside?: Beside): Promise<Answer>;
+  prepare(signed: SignedIntent, grants: readonly Grant[], capability: string, step: string): Promise<Answer>;
   settle(signed: SignedIntent): Promise<Settlement>;
   summary(reader: unknown): Promise<Read<Summary>>;
   items(reader: unknown, type: string, cursor?: Cursor): Promise<Read<readonly Item[]>>;
@@ -89,6 +91,7 @@ export function api(binding: Binding): ScopeApi {
       return at(name)!.found(founding, definition, definitions, beside);
     },
     async submit(scope: string, signed: SignedIntent, grants: readonly Grant[], beside: Beside = {}): Promise<Answer> { return (await at(scope)?.submit(signed, grants, beside)) ?? { answer: "unavailable", reason: "unavailable" }; },
+    async prepare(scope: string, signed: SignedIntent, grants: readonly Grant[], capability: string, step: string): Promise<Answer> { return (await at(scope)?.prepare(signed, grants, capability, step)) ?? { answer: "unavailable", reason: "unavailable" }; },
     async settle(scope: string, signed: SignedIntent): Promise<Settlement> { return (await at(scope)?.settle(signed)) ?? MISSING; },
     async summary(scope: string, reader: unknown): Promise<Read<Summary>> { return (await at(scope)?.summary(reader)) ?? MISSING; },
     async items(scope: string, reader: unknown, type: string, cursor?: Cursor): Promise<Read<readonly Item[]>> { return (await at(scope)?.items(reader, type, cursor)) ?? MISSING; },
@@ -166,7 +169,7 @@ export async function route(request: Request, binding: Binding): Promise<Respons
   if (what === "retained" ? which === undefined || last === undefined : last !== undefined) return json(404, { error: "not-found" });
   const reader = request.headers.get("authorization");
   const cursor = url.searchParams.get("cursor") ?? undefined;
-  const posts = (scope === undefined && what === undefined) || ((what === "acts" || what === "settle") && which === undefined);
+  const posts = (scope === undefined && what === undefined) || ((what === "acts" || what === "preparations" || what === "settle") && which === undefined);
   if (request.method !== (posts ? "POST" : "GET")) return json(405, { error: "method-not-allowed" });
 
   if (posts) {
@@ -176,6 +179,7 @@ export async function route(request: Request, binding: Binding): Promise<Respons
     const beside = { ...("texts" in given ? { texts: given["texts"] } : {}), ...("presented" in given ? { presented: given["presented"] } : {}) } as Beside;
     if (scope === undefined) return answered(await scopes.found(given["founding"] as SignedIntent, given["definition"] as DeclaredDefinition, (given["definitions"] ?? []) as DeclaredDefinition[], beside), 201);
     if (what === "acts") return answered(await scopes.submit(scope, given["signed"] as SignedIntent, (given["grants"] ?? []) as Grant[], beside), 200);
+    if (what === "preparations") return answered(await scopes.prepare(scope, given["signed"] as SignedIntent, (given["grants"] ?? []) as Grant[], given["capability"] as string, given["step"] as string), 200);
     return read(await scopes.settle(scope, given["signed"] as SignedIntent));
   }
   if (scope === undefined) return json(404, { error: "not-found" });
@@ -209,6 +213,7 @@ export class ScopeService<E extends Env = Env> extends WorkerEntrypoint<E> imple
   protected scopes(): Binding { return this.env.SCOPES; }
   found(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions: readonly DeclaredDefinition[] = [], beside: Beside = {}): Promise<Founded> { return api(this.scopes()).found(founding, definition, definitions, beside); }
   submit(scope: string, signed: SignedIntent, grants: readonly Grant[], beside: Beside = {}): Promise<Answer> { return api(this.scopes()).submit(scope, signed, grants, beside); }
+  prepare(scope: string, signed: SignedIntent, grants: readonly Grant[], capability: string, step: string): Promise<Answer> { return api(this.scopes()).prepare(scope, signed, grants, capability, step); }
   settle(scope: string, signed: SignedIntent): Promise<Settlement> { return api(this.scopes()).settle(scope, signed); }
   summary(scope: string, reader: unknown): Promise<Read<Summary>> { return api(this.scopes()).summary(scope, reader); }
   items(scope: string, reader: unknown, type: string, cursor?: Cursor): Promise<Read<readonly Item[]>> { return api(this.scopes()).items(scope, reader, type, cursor); }
