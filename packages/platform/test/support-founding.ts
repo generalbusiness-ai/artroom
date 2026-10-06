@@ -49,11 +49,6 @@ export const registerPlatform: PlatformRules = { named: REGISTER, rules: registe
  * STAND-INS: a rule for each mark of the directory's data that the note's
  * table of marks does not list.
  *
- * - `create-rules`: the `create` of the rules scope, as creation 1 of the
- *   genesis, with the branch, the directory, and membership's scope ID:
- *   the digest of the seed of creation 0. The contract's revision 19 says
- *   that a rule derives a sibling's scope ID so, and that the rule's
- *   specification states the derivation. No specification states it yet.
  * - `create-destination`: the `create` of the destination, as creation 2 of
  *   the genesis, with `import` as a truth value and the scope IDs of
  *   membership and of the rules scope, each the digest of the seed of
@@ -63,14 +58,6 @@ export const registerPlatform: PlatformRules = { named: REGISTER, rules: registe
  *   `import-not-spent`.
  */
 export const directoryStandIns: Rules = {
-  "create-rules": {
-    place: "send",
-    run: ({ input, resolved }) => {
-      if (input.type !== "genesis") throw new Error("create-rules stands in the genesis");
-      const child = (kind: ScopeKind, name: string, ordinal: number): Seed => ({ v: 1, kind, definition: `platform:${name}@1` as Seed["definition"], creator: resolved.at, cause: seedDigest(input.seed), ordinal });
-      return { to: child("rules", "rules", 1), message: { class: "request", type: "create", body: { fields: { branch: resolved.fields["branch"], directory: resolved.at, membership: scopeIdOf(child("membership", "membership", 0)) } } } };
-    },
-  },
   "create-destination": {
     place: "send",
     run: ({ input, resolved }) => {

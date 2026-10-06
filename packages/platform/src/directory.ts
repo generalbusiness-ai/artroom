@@ -21,21 +21,23 @@
  * | `index-number` | 5, effect | 13 | `index` |
  * | `create-lane` | 6, send | a | `open-issue`, `open-pr` |
  * | `import` | 7, outcome | d | The outcomes of an `import` |
+ * | `create-rules` | 6, send, with `always` | s (P20) | `establish`: the second send |
  *
  * `compromised` is data, whole. The three creations of the genesis are held
  * sends of the entry, by the contract's rule for a provisional scope.
  *
- * **Three places that the note's rows state and no form can say, and that
- * its table of marks does not list.** Each is a mark in this data, with the
- * entry of the I3 deltas note as its `row`, and with NO rule in
- * `directoryRules`: the note names none, and none is invented here. So the
- * version lacks three rules, and by the whole-scope rule (the contract's
- * section 6.1) nothing is created under `platform:directory@1` by this
- * package's rules alone. Each stays so until its owner names the rule.
+ * Rows s to u are of the note's revision 25, which was filed for review,
+ * and not adopted, when they were written (I3 deltas, section 26).
+ *
+ * **Places that the note's rows state and no form can say, and whose rule
+ * is not written yet.** Each is a mark in this data, with the entry of the
+ * I3 deltas note as its `row`, and with NO rule in `directoryRules`. While
+ * one is left the version lacks a rule, and by the whole-scope rule (the
+ * contract's section 6.1) nothing is created under `platform:directory@1`
+ * by this package's rules alone.
  *
  * | Mark | Place | At | What the row states (deltas entry) |
  * |---|---|---|---|
- * | `create-rules` | 6, send | `establish` | The `create` of the rules scope carries membership's scope ID, which the directory derives from the seed that it sends. No form of a send says it (EP6). |
  * | `create-destination` | 6, send | `establish` | The destination's `create` carries `import` as a truth value, and the scope IDs of membership and of the rules scope, which the directory derives from the seeds that it sends. No form of a send says any of the three (EP6). |
  * | `import-spent` | 4, guard | `retry-import` | "The import's stated attempts are used, and none is `confirmed`." No guard form reads an operation (EP7). |
  *
@@ -46,8 +48,8 @@
  * rule gives its request in every genesis, so the three creations are at
  * the positions of their forms. The contract states the form. The names of
  * the two rules, and how each derives its request, are the authority
- * note's next revision's (the contract's section 15.8, the row "From
- * revision 19"), so neither rule is written here.
+ * note's revision 25's (its section 12.1.2, "The two creation rules of the
+ * genesis").
  *
  * One more thing cannot be written, and no mark can stand for it. The
  * register's `create` carries `founding`, the founder's signed intent. No
@@ -61,8 +63,8 @@
  * plan owns. They are written as the note has them.
  */
 
-import type { Digest, FactRef, FieldValue, Grant, MemberObservation, MemberRef, PlatformData, RulesObservation, ScopeRef, Seed } from "@generalbusiness/artroom-contract";
-import { intentDigest, isDigest } from "@generalbusiness/artroom-bytes";
+import type { Digest, FactRef, FieldValue, Grant, MemberObservation, MemberRef, PlatformData, RulesObservation, ScopeId, ScopeRef, Seed } from "@generalbusiness/artroom-contract";
+import { intentDigest, isDigest, scopeIdOf, seedDigest } from "@generalbusiness/artroom-bytes";
 import { PROFILES, isObject, isScopeRef, same, validateDefinition, type Item, type Operation, type RuleEffect, type RuleGiven, type Rules, type StateView } from "@generalbusiness/artroom-derive";
 import { CREATION_ATTEMPTS, DIRECTORY, REPOSITORY } from "./register.ts";
 
@@ -238,10 +240,10 @@ export const directory: PlatformData = {
           },
         },
         // The rules scope's creation: `branch`, `directory` and `membership`, which is membership's scope ID. No form of a send says
-        // the third, and the contract adds no operand for it: the rule of a send mark gives it (entry EP6; the contract's revision
-        // 19, section 6.1). The mark states `always`: every genesis creates the rules scope. Its clauses are data.
-        // I3 merge: this mark has no rule, until the authority note's rows name it and state its derivation.
-        { code: "create-rules", row: "EP6", always: true, result: { applied: [{ ref: { slot: "rules", from: { sender: true } } }] } },
+        // the third, and the contract adds no operand for it: the rule of a send mark gives it (row s of the table of marks, key
+        // P20; the contract's revision 19, section 6.1). The mark states `always`: every genesis creates the rules scope. Its
+        // clauses are data.
+        { code: "create-rules", row: "P20", always: true, result: { applied: [{ ref: { slot: "rules", from: { sender: true } } }] } },
         // The destination's creation: `repository`, `branch`, `import`, `claim`, `directory`, `membership` and `rules`. Three of
         // them no form of a send says, and the table of marks lists no rule for the send (entry EP6). Its clauses are data. When
         // `import` is set, the entry that records its applied result opens the operation `import` (Code P16, row 7). The mark
@@ -393,6 +395,24 @@ const repositoryAt = (given: RuleGiven): Item => {
   if (!repository) throw new Error("a directory has its repository item");
   return repository;
 };
+
+/**
+ * The seed of one scope that the genesis creates beside the two others
+ * (section 12.1.2, "The two creation rules of the genesis"): `creator` is
+ * this scope's own reference, with its incarnation; `cause` is the digest
+ * of this scope's own seed, the contract's third cause; and `ordinal`
+ * counts the creations of the entry from 0: membership 0, rules 1,
+ * destination 2. The seed of membership that a rule builds is the one that
+ * the judge builds for the written `create` of the same entry: both use the
+ * ordinal 0 and the same `creator` and `cause`.
+ */
+const SIBLINGS = { membership: 0, rules: 1, destination: 2 } as const;
+const sibling = ({ input, resolved }: RuleGiven, kind: keyof typeof SIBLINGS): Seed => {
+  if (input.type !== "genesis") throw new Error("a sibling is a scope that the genesis creates");
+  return { v: 1, kind, definition: `platform:${kind}@1`, creator: resolved.at, cause: seedDigest(input.seed), ordinal: SIBLINGS[kind] };
+};
+/** A sibling's scope ID: the contract's `ScopeId` of the sibling's seed, the text `sc_` and the 52 base32 characters of the seed's digest. It is not the bare digest. */
+const siblingId = (given: RuleGiven, kind: keyof typeof SIBLINGS): ScopeId => scopeIdOf(sibling(given, kind));
 
 /** The effects that open one operation of this definition in the entry being written, at ordinal 0, with its attempt 1. */
 const opened = (kind: string, attempts: number): RuleEffect[] => [
@@ -624,6 +644,23 @@ export const directoryRules: Rules = {
       const sent = Object.fromEntries(Object.entries(given_).filter(([, value]) => value !== undefined && value !== null));
       return { to: seed, message: { class: "request", type: "create", body: { fields: sent, directory: at, ...(membership ? { membership } : {}) } } };
     },
+  },
+  /**
+   * Row s, the second send of `establish` (P20), as the note's revision 25
+   * states it (section 12.1.2, "The two creation rules of the genesis").
+   * Exactly one request, in every genesis: the `create` of the rules scope,
+   * to the seed of creation 1. Its fields: `branch`, the field; `directory`,
+   * this scope's own reference; and `membership`, the scope ID of the
+   * sibling of creation 0.
+   *
+   * The body holds no member `membership`: at its genesis the directory
+   * records none, and the field holds the ID. The body is the one that the
+   * judge builds for the written `create` of membership in the same entry,
+   * which is `{ fields }` (I3 deltas, entry EY3).
+   */
+  "create-rules": {
+    place: "send",
+    run: (given) => ({ to: sibling(given, "rules"), message: { class: "request", type: "create", body: { fields: { branch: given.resolved.fields["branch"], directory: given.resolved.at, membership: siblingId(given, "membership") } } } }),
   },
   /**
    * Row d, for the outcomes of `import` (P16). Basis `own-answer`: the
