@@ -119,6 +119,8 @@ function given(mark: OutcomeMark, j: Judging, kinds: Readonly<Record<string, Out
   const { effects, sends, opens } = gives;
   if (effects.some((effect) => isObject(effect) && (effect["effect"] === "operation" || effect["effect"] === "attempt"))) throw outside(mark, "an operation among its effects: an outcome states the operations that it opens");
   if (sends.some((request) => isObject(request) && isObject(request["message"]) && request["message"]["type"] === "create")) throw outside(mark, "a creation, which only the send of its mark gives");
+  // I3 merge: a kind whose mark holds no `send` may still return requests of its own, with no clause, as the stand-in rules of the
+  // destination's outcomes do. When each of those kinds has its send mark (plan step 9f), `derives` returns no request at all.
   if (mark.send && sends.length > 0) throw outside(mark, "a request of its own, where its mark holds a send: an outcome entry sends at most one request");
   // Section 7.5: the bound on every send of one entry. The validator counts it for a row. An outcome entry has no row, and none of its rule's requests is cut off.
   if (sends.length > j.bounds.sendsPerEntry) throw outside(mark, "more requests than one entry sends");

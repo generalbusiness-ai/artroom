@@ -1231,3 +1231,135 @@ deployment. The checkout was run against a local repository with the real
 The service was run on stand-ins for the lane, the rules scope, the storage
 and the runner. The lane's side of a result was run on a real change lane,
 with a scripted rules peer and the scripted test capability.
+
+## 26. Steps 9 and 9c: the register and the directory whole, the membership reference of two scopes, and a founding on real scopes
+
+Written 2026-10-05, on `request/i3-founding`, by the worker of those
+steps. Entries have the prefix EY. The scope contract is at revision 19
+(`1ca8a59bf`), which is adopted. The authority note's adopted revision is
+24 (`d5616522b`).
+
+**The basis of this work was not adopted when it was built.** It builds
+the authority note's revision 25, at
+`a1d18e51745b26beb85ba00ea12af5cbafde1e7e`, Part A of its section 13.15.
+That revision was filed for review and was neither approved nor adopted.
+Nothing of it is in force for a source until it is adopted, and a review
+may change a row. This work is prepared ahead and is to be filed only
+after that adoption, with whatever the adoption changes. So each rule is
+a commit of its own, whose message names the row that it implements.
+Section numbers below are those of revision 25. The parts that rest on
+adopted texts alone are named so.
+
+No entry that an earlier source wrote has other bytes. Neither lane
+digest changes, and `packages/lanes` is not touched but for one comment
+of its test support. The data of `platform:register@1` and of
+`platform:directory@1` changes. A platform definition is pinned by name
+and version, no file pins a digest of either, and no scope under either
+was written by a deployed source.
+
+**What is built.**
+
+| Part | Built | Rests on | Witness |
+|---|---|---|---|
+| The outcome's send | The mark of a kind of `outcomes` may hold one `send`, a send mark with clauses of effect marks. The judge of an outcome runs its rule after the effects. A `create` among them has the fourth cause, and the sending side makes the four checks of the opening entry. The clause of the result is found by the kind of the outcome entry. | The contract's revision 19, adopted: section 6.1, "A request of an outcome's rule, and its clauses"; section 7.2; row I3-23 | `derive/test/forms-marks.test.ts`, the contract's 18.43 |
+| The register | `create-repository`, its send `create-directory`, the effect mark `claim-active`, and the bodies of the outcomes of the two cleanups. Every mark has its rule. | Revision 25, section 12.1.1 | `platform/test/register.test.ts`, `definitions.test.ts` |
+| The directory | `create-rules`, `create-destination`, `import-spent`, the selection of `import` with its send `import-update`, `activeKey` in `worker-standing`, and the refusal `unsupported-definition` of `definition-active`. Every mark has its rule. No stand-in rule is left. | Revision 25, section 12.1.2 | `platform/test/directory.test.ts`, `definitions.test.ts` |
+| The membership reference of a rules scope and of a destination | The ID is the fixed value. The incarnation is read from the folded state. The first read asks by the ID alone. Guard 1, the production authority and the replay's reader follow. | Revision 25, section 12.1, "Where the rules scope and the destination record their membership reference" | `derive/test/forms-grant.test.ts`; `platform/test/definitions.test.ts`; `scope/test/founding-real.test.ts` |
+| A founding on real scopes | A founding under `platform:register@1` founds a register. The whole path from the `install` to the rules scope runs on the deployed class. | The adopted texts for the seed's kind (entry EP2). Revision 25 for every rule that the path runs. | `scope/test/founding-real.test.ts` |
+
+**How far a founding runs, exactly.** On Durable Objects of the namespace
+`PLATFORM`, which is the deployed class with the production authority and
+the platform package's own data and rules:
+
+1. An `install` founds a register under `platform:register@1`.
+2. A founder's `found` opens a claim and the operation
+   `create-repository`.
+3. The operations driver sends the one request of attempt 1 to the host.
+   No answer comes. The outcome is `unknown`, with the body `{ name }`,
+   and opens attempt 2.
+4. The own answer of attempt 2 is `confirmed` and selected. It sets the
+   claim's `repository` and sends the `create` of the directory.
+5. The directory's genesis is written under the fourth cause, provisional.
+   The register records its `applied` result, makes the claim `active`
+   and confirms the directory.
+6. The directory, now active, sends its three creations. Membership and
+   the rules scope write their genesis, the directory records each result
+   and sets each reference, and confirms each.
+7. **The creation of the destination is not decided.** The object that
+   its seed names records nothing, and transport answers `retry`,
+   `unsupported-definition`. A runtime with this package lacks a rule for
+   ten marks of `platform:destination@1`: `resend-due`,
+   `abort-if-behind`, `first-head`, `judge`, `push`, `mint`, `revoke`,
+   `deciding-read`, `receipt` and `adopt-read`. Those are the plan's
+   steps 9e and 9f.
+
+So a founding is not whole, and **step 10, the removal of the earlier
+founding, is not built.** A directory with no creator is still founded by
+a `found` intent under a declared definition, as every other test of the
+scope package does.
+
+The Git host of that witness is a STAND-IN: `OutsideDouble`, of
+`packages/scope/test/outside.ts`, wired as the register's outside port.
+It answers an attempt with what the test wrote. The production outside
+port sends nothing, so under the production wiring a claim stays
+`pending` and no repository is created (entry EY10).
+
+**Earlier entries that this work answers.** Each line is dated 2026-10-05.
+The earlier sections stay as they were written. "Revision 25" is the
+unadopted revision named above.
+
+- **EJ1, closed for the source, on revision 25.** The contract's revision 17 decided the form. Revision 25 states the rule `create-repository` whole. Both are built. The stand-in rule is deleted.
+- **EP1, the sending side, closed.** The judge of an outcome lets the rule of the mark's `send` give a `create`. It makes the same four checks as the child, on the scope's own history, and requires a fact of the opening entry among the fields. A creation that fails one is a fault, and nothing is written (entry EY5).
+- **EP2, closed.** `Scope.found` and the Worker build the seed's kind from the definition that is named: `register` under the register's platform definition, and `directory` under any other.
+- **EP4, closed, on revision 25.** No read is decisive, as built. The body of every outcome of `revoke-credential` is `{ credential }` and of `delete-repository` is `{ id }`, each the one that the opening entry's body holds, and the source checks it.
+- **EP6, closed, on revision 25.** The two rules are written, under the key P20. A sibling's scope ID is `scopeIdOf` of the sibling's seed. The body of each creation is in entry EY3.
+- **EP7, closed, on revision 25.** `import-spent` is a rule of the package, under the key P29, refused `import-not-spent`. An `unknown` attempt counts as used. The stand-in, which waited for every attempt to be `confirmed` or `refused`, is deleted.
+- **EP9, closed, on revision 25.** The kind `import` selects one result, guarded by `repository.imported`. The body of a `refused` or an `unknown` outcome is an empty record. The update is the request of the send `import-update`. One case is in entry EY11.
+- **EP11, closed, on revision 25.** `worker-standing` reads `activeKey`. A worker whose observation does not show `activeKey: true` is refused `worker-not-active`. The row says "its `activeKey` is false": a null there is refused too, which is the narrower reading.
+- **EP15, closed, on revision 25.** `definition-active` states two refusals. Bytes that hash to their digest and do not validate, and a closure of more definitions than the bound, are refused `unsupported-definition`, with that name and that code.
+- **EX4, closed, on revision 25.** As EP6. `platform:directory@1` lacks no rule, and `platform/test/definitions.test.ts` asserts it for the register and the directory.
+- **EM21, closed for the rules scope and the destination, on revision 25.** The production authority reads where a platform version records the reference from the platform table. The first read of the two kinds asks by the ID alone, and the entry that retains the answer fixes the incarnation.
+- **EQ7, closed, on revision 25.** `rulesMembership` reads the ID with the incarnation of the retained observations, from the folded state. The rule `checkers` is confirmed as built, and is not changed.
+- **EU6, closed for the reader, on revision 25.** The replay reads the reference of a rules scope and of a destination with the same two functions. An entry that retains the first observation fixes the incarnation for itself. The check against the directory's history is not built (entry EY8). The contract is still asked to confirm that this function is reported under `platform-code`.
+
+| # | Where the texts differ or are silent | Implemented | Owner, and the question |
+|---|---|---|---|
+| EY1 | The contract's row I3-23: "An outcome's mark holds `attempts`, and may hold one `send`". Its `Mark` also holds `most`, `refusals` and `clock` (rows I3-21 and I3-22), which this base does not have: a mark is `{ code, row }`, and the rule table states the rest (entries EJ8 and EX1). The note's table of marks gives the send "7, the send" as its place. | The mark of a kind holds `send`, and no `attempts`. The rule that opens the operation states its attempts, as before. An `OutcomeRule` may state `most`, as the ledger's rules do, and `create-repository` and `import` state the note's numbers. The validator lists the send as a mark of the kind `send`, place 6, at `outcomes.<kind>.send`, and the mark of its clause as an effect. A send of an outcome's mark that states `always` is refused: the row says "no request or one". | The I3 delivery, with rows I3-21 and I3-22: `attempts` joins the mark with the other members. |
+| EY2 | The contract says that an outcome's row writes no send and that its mark holds "at most one request". Place 7 of its table of places still says that the rule gives "the entry's effects and sends". The stand-in rules of the destination's outcomes, in test support, return requests from `derives`. | Both stand. Where the mark holds a `send`, `derives` returns no request, or it has a fault, and the entry's one request is at ordinal 0. Where it holds none, `derives` may return requests with no clause, and never a creation, as before. Marked `I3 merge:` in `derive/src/outcomes.ts`. | The builder, at step 9f: when every kind of the destination has its send mark, `derives` returns no request at all. |
+| EY3 | Revision 25, section 12.1.2, "No member `membership` in these two creations": "the body of each of these two creations holds `{ fields, directory }`". The contract's section 6.6 has the platform put `directory` in a `create` of a lane. The source's judge gives the written `create` of membership, in the same entry, the body `{ fields }`. Each of the two creations carries `directory` as a field. | The body of each of the two creations is `{ fields }`, as the judge builds the first creation of the same genesis. A child of a directory reads its directory from its seed's creator, so no reader misses the member. | The authority note, with the contract. Does the body of a creation that a genesis sends hold the member `directory`, for all three? |
+| EY4 | Revision 25 states a body for every result of the register's and the directory's operations, an `unknown` one too: `{ name }`, `{ credential }`, `{ id }`, an empty record. A body names what the scope's records hold. The contract's place 7 says that the rule decides "whether the evidence is well formed", and not what it is given. The runtime's driver offered every `unknown` outcome with the body null, so such an outcome could never be written, and no further attempt would be opened. | `wellFormed` is given what the retry rule is given (the contract's row I3-35, for that rule). An owner's rules may state `unknown`: the body of an outcome that is not known, as a function of the state and of the scope's own entries. The driver asks it in place of null, and the judge checks the body like every other. An owner that states none is as before. | The scope contract. Is the evidence check given the state, and where does the body of an `unknown` outcome come from? |
+| EY5 | The contract's section 7.2 says what the child answers when a creation names no opening entry: `source-unverified`. It does not say what the creator does with a rule that returns such a creation. | A fault of the rule: the outcome is not judged, and nothing is written. The fact among the fields is compared whole: this scope, the position that the operation's ID states, and the hash of that entry. The same for a creation from the outcome of an operation that no act opened. | The scope contract, to confirm. |
+| EY6 | Revision 25: the send `create-directory` gives a request "on the selecting outcome, and on no other", and `import-update` "when `selected`". A rule at a send is given the six things, and `selected` is none of them: the ledger derives it. | Each send rule makes the ledger's judgment again on the same state: the result is `confirmed`, the operation has selected nothing, and the owner's guard holds. The guard is the same expression as the outcome rule's `holds`. | The scope contract. Is the rule of an outcome's send given `selected`? |
+| EY7 | Revision 25, "The first read": "It asks membership by its scope ID alone", and cites the contract's row I3-18, which is about the scope part of a read route. The contract's `ObservationRequest` has `of: ScopeRef`, with an incarnation. | A request's `of` may be a reference with no member `inc`: the scope ID and the kind. Membership answers it as it answers a full reference of its own, and the answer's `of` holds its incarnation. The request is no part of any entry. | The scope contract. The form of a request that names no incarnation. |
+| EY8 | Revision 25: "A replay checks it against the directory's history: the `applied` clause of the directory's `create` recorded the same reference". | **Not built.** The replay derives the value of each retained observation from the history of the scope that its `of` names, at the recorded head, as before. It does not read the directory of a rules scope to compare the incarnation with `repository.membership`. | The builder, with the replay's coverage. How does a replay of a rules scope reach its directory's entry that recorded the result? |
+| EY9 | Revision 25 takes the incarnation "from the first such entry on", and says that the folded state holds a head for each subject with its `of`. The folded state holds no order of entries. Guard 1 lets an entry retain one incarnation only, so a valid history holds one. | `StateView.incarnations(scope)`: the incarnations of the retained observations of one scope ID. One: the reference has it. None: the reference has no incarnation. More than one: the scope records no reference, and an act that needs a grant is answered `authority-unavailable`. | The authority note, to confirm the last case. |
+| EY10 | The outside port for the register's operations. The plan's host port (step 19) serves the token ledger. No text gives the request of `create-repository`, `revoke-credential` or `delete-repository` at a host. | No production port accepts an operation of `platform:register@1`. The driver gives a port the entry that opened the operation and the attempt's number, and `repositoryName` gives the attempt's own name from the claim's `seed`. The witness uses the labelled stand-in host. The incident for a `refused` creation or a name that is taken is not built: it is no effect of an entry. | The builder, with the installation design (N5): the host adapter of the register, and the operators' record. |
+| EY11 | Revision 25, "The last `refused`": the `refused` outcome after which every attempt that the operation states is opened and refused sends `failed`. It does not say what follows when another `import` operation was selected before. | As the row states. So when a retried import was `confirmed` and told the destination `done`, and the late answer of an attempt of the first operation then makes that operation's last `refused`, the destination is told `failed` after `done`. Seen while the witness was written, and not run as a test. | The authority note. Is `failed` sent when `repository.imported` is set? |
+| EY12 | Revision 25, section 3.9 with this block: a scope accepts a read session that names the membership reference which the scope records, with its incarnation. A rules scope records no incarnation before its first retained observation. | Such a scope accepts no read session until an entry of it retains an observation of membership. The witness shows the refusal and then the acceptance. | The authority note. Is that right, or is a session checked by the scope ID alone there? |
+| EY13 | The earlier founding. A directory with no creator is founded by a `found` intent under any definition that is not the register's, `platform:directory@1` too. | Not removed (step 10). By reading, and not run: a founding under `platform:directory@1` with no creator passes the seed check, and its genesis is then written `refused`, `bad-field`, because the intent holds no `claim`. It makes no repository. | The builder, at step 10. |
+
+**Lines for the merge.**
+
+- `PlatformData.outcomes` is a record of `OutcomeMark`, which may hold `send`.
+- `OutcomeRule.wellFormed` takes a third argument, and `OperationRules.wellFormed` a third and a fourth. A rule that ignores them is unchanged. A test that calls one with two arguments needs more. Both may state `unknown`.
+- `StateView` has one more method, `incarnations`. `MemoryState` and `SqliteStore` have it. A view that a test builds by hand needs it.
+- `GrantAsked.membership`, `Platform.membership`, `Coded.membership` and `recordedMembership` use `RecordedRef`, which may hold no incarnation. `fixedMembership` is the reference with its incarnation, for read sessions.
+- `ObservationRequest.of` is an `ObservedScope`.
+- `rules-scope.ts` gains `referenceOf` and `rulesMembership`, and `destination.ts` gains `destinationMembership` and `destinationRulesScope`. The workers of steps 9a, 9b, 9d and 9e were also told to read the membership reference as section 12.1 states it. One pair of functions must stay.
+- The platform package no longer exports `DIRECTORY_CLAUSES`. It exports `repositoryName` and `directoryIdOf`. `support-founding.ts` holds no rule: `registerStandIns` and `directoryStandIns` are gone.
+- `PlatformScope`, of the scope package's test Worker, takes the ports that a test wired for a name (`wired`, of `outside.ts`).
+- `scope/test/founding-real.test.ts` names the ten marks of the destination that have no rule. Each step that writes one shortens the list, and the test then fails by that assertion until the list is edited. Marked `I3 merge:` there.
+- `scope/test/founding.test.ts` no longer expects `unsupported-definition` for a founding under `platform:directory@1`, which is runnable. It asks for `platform:task@1`.
+
+**What is not built.** Step 10. The destination's rules (steps 9e and
+9f), so no founding is whole. The replay's check of an incarnation
+against the directory's history (entry EY8). A read of the rules scope
+before a turn, so `destinationRulesScope` has no caller, and the
+directory's guard `definition-active` is still never completed on a
+deployed scope (entries EM3 and EX6). The member `attempts` of an
+outcome's mark (entry EY1). A production host for the register (entry
+EY10). The capacity of an outcome entry that sends a request, and of the
+entry that records its result: request `cc570904`.
+
+**What was not run.** No deployment and no provider. No host: the Git
+host of the witness is a stand-in. The gate was not run.
