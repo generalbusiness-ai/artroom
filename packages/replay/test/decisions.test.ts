@@ -2,11 +2,46 @@ import { expect, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { Digest, FieldValue, PlatformData, PlatformDefinition, Request, Seed } from "@generalbusiness/artroom-contract";
 import { canonicalize, factRefOf, intentDigest, newIncarnation, scopeIdOf, signIntent, textDigest, utf8 } from "@generalbusiness/artroom-bytes";
-import { MemoryState, applyEntry, checkpointOf, clockOf, judgeCheckpoint, judgeDelivery, judgeGenesis, owed, stateDigest, validateDefinition } from "@generalbusiness/artroom-derive";
+import { MemoryState, applyEntry, checkpointOf, clockOf, judgeCheckpoint, judgeDelivery, judgeGenesis, owed, ownersOf, stateDigest, validateDefinition } from "@generalbusiness/artroom-derive";
 import { Ledger, T0, arriving, forged, keys, otherLane, t, valid } from "@generalbusiness/artroom-derive/testing";
 import { MemorySource, verify } from "../src/index.ts";
-import type { Rules } from "@generalbusiness/artroom-derive";
+import type { Rules, StateView } from "@generalbusiness/artroom-derive";
 import type { MemoryScope } from "../src/index.ts";
+import { register, registerRules } from "../../platform/src/index.ts";
+import { Register, registerPlatform } from "../../platform/test/support-founding.ts";
+import { served } from "./world.ts";
+
+test("replay admission counts the actual register's legacy cleanup closure and preserves scripted external reservations", async () => {
+  // The actual register data and rules judge and fold both entries in memory,
+  // under the register's install and founding-policy authority over test keys.
+  // The signed intents are test inputs; no host runs or answers. These small
+  // replay budgets are controlled test inputs, not production capacity claims.
+  const scope = new Register();
+  expect(scope.found(keys.rita).result).toBe("write");
+  expect([scope.last.seq, scope.state.outstanding().outcomes]).toEqual([1, [{ owner: registerPlatform.named, kind: "create-repository", entries: 6, unsent: 1 }]]);
+  // This legacy kind has no counted attempts in its data. Six possible
+  // outcomes each reserve the owner's 12-entry cleanup closure and the
+  // kind's two-entry directory request, plus one closing checkpoint:
+  // 6 * (1 + 12 + 2) + 1 = 91 reserved; two written entries make 93.
+  expect(register.outcomes["create-repository"]!.attempts).toBeUndefined();
+  expect([owed(scope.state, scope.definition, scope.last.input), owed(scope.state, scope.definition, scope.last.input, ownersOf(scope.definition, registerPlatform, null))]).toEqual([19, 91]);
+  const source = new MemorySource([served(scope, [scope])]);
+  const options = { mode: "replay" as const, scope: scope.at.scope, platform: () => ({ data: register, rules: registerRules }) };
+  for (const budget of [21, 92]) {
+    const tight = await verify(source, { ...options, bounds: { ...PROPOSED_BOUNDS, scopeEntries: budget } });
+    expect([tight.report.result, tight.report.at?.seq, tight.why]).toEqual(["mismatch", 1, "the taking or new-work entry exceeds the budget of used plus reserved entries"]);
+  }
+  const enough = await verify(source, { ...options, bounds: { ...PROPOSED_BOUNDS, scopeEntries: 93 } });
+  expect([enough.report.result, enough.why]).toEqual(["consistent", null]);
+
+  // SCRIPTED external owner reservation: four entries while any operation is
+  // pending. It stands in for capability records; no external owner runs.
+  const owners = { rules: () => null, reserves: (view: StateView) => view.outstanding().outcomes.length ? 4 : 0 };
+  const externalTight = await verify(source, { ...options, owners, bounds: { ...PROPOSED_BOUNDS, scopeEntries: 93 } });
+  expect([externalTight.report.result, externalTight.report.at?.seq]).toEqual(["mismatch", 1]);
+  const externalEnough = await verify(source, { ...options, owners, bounds: { ...PROPOSED_BOUNDS, scopeEntries: 97 } });
+  expect([externalEnough.report.result, externalEnough.why]).toEqual(["consistent", null]);
+});
 
 /**
  * Made-up platform data. The receiver's entries are judged, including its
