@@ -13,16 +13,18 @@
  *   list (`create-rules`, `create-destination` and `import-spent`; entries
  *   EP6 and EP7).
  *   Each does what the note's row says in prose.
- * - `Directory`: a directory that a SCRIPTED register created. The
- *   register's outcome entry is judged with the stand-in rule, and the
- *   `create` that the unwritten rule will send is added to it by hand. The
- *   register's confirmation, and the genesis of each of the directory's
- *   three children, are entries made by hand. It shows the directory's
- *   rows and rules. It shows nothing of a founding.
+ * - `Directory`: a directory that a register in memory created. The
+ *   register's `found` entry and its selecting outcome, with the `create`
+ *   that its rule sends, are judged with the register's own rules. The
+ *   register's entry that records the directory's result, with its
+ *   confirmation, and the genesis of each of the directory's three
+ *   children, are SCRIPTED: entries made by hand. It shows the directory's
+ *   rows and rules. A founding on scope objects is the scope package's
+ *   (`packages/scope/test/founding-real.test.ts`).
  */
 
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { Entry, FactRef, PlatformData, Request, Result, ScopeKind, ScopeRef, Seed, Send, SignedIntent } from "@generalbusiness/artroom-contract";
+import type { Digest, Entry, FactRef, PlatformData, Request, Result, ScopeKind, ScopeRef, Seed, Send, SignedIntent } from "@generalbusiness/artroom-contract";
 import { factRefOf, intentDigest, newIncarnation, scopeIdOf, seedDigest, signIntent } from "@generalbusiness/artroom-bytes";
 import { PROFILES, clockOf, judgeDelivery, judgeGenesis, judgeOutcome, operationSettled, ownersOf, validateDefinition } from "@generalbusiness/artroom-derive";
 import type { ActJudgment, Judgment, PlatformRules, Rules, Source, ValidDefinition } from "@generalbusiness/artroom-derive";
@@ -147,9 +149,9 @@ export class Register extends Ledger {
    * to write. `body` undefined: for an `unknown`, the body that the owner's rule states for it, as the driver asks; for another
    * result, null.
    */
-  outcome(operation: `${number}:${number}`, attempt: number, result: "confirmed" | "refused" | "unknown", body?: unknown, basis: "own-answer" | "read" | "none" = result === "unknown" ? "none" : "own-answer", sends: readonly Send[] = []): Judgment {
+  outcome(operation: `${number}:${number}`, attempt: number, result: "confirmed" | "refused" | "unknown", body?: unknown, basis: "own-answer" | "read" | "none" = result === "unknown" ? "none" : "own-answer"): Judgment {
     const judgment = judgeOutcome(this.state, registerDefinition, { type: "outcome", operation, attempt, result, evidence: { basis, body: body === undefined ? unknownBody(this, registerDefinition, registerPlatform, operation, attempt, result) : body } }, { clock: clockOf(this.state, this.now), bounds: this.bounds, platform: registerPlatform, own: this.own });
-    if (judgment.result === "write") this.seal({ ...judgment.draft, sends: [...judgment.draft.sends, ...sends] });
+    if (judgment.result === "write") this.seal(judgment.draft);
     return judgment;
   }
 }
@@ -189,11 +191,10 @@ export class Directory extends Ledger {
     if (R.submit(founding, { platform: registerPlatform, grants: [] }).result !== "write") throw new Error("the founding was not admitted");
     const found = R.head.seq;
     this.claim = R.fact(found);
-    // SCRIPTED: the selecting outcome, with the `create` that the unwritten rule of `create-repository` will send, added by hand.
-    const seed: Seed = { v: 1, kind: "directory", definition: DIRECTORY, creator: R.at, cause: intentDigest(founding.intent), ordinal: 0 };
-    const repository = { host: "git.example", namespace: "artroom", name: repositoryName(seedDigest(seed), 1), id: "r-1" };
-    const create: Request = { class: "request", type: "create", body: { fields: { claim: this.claim, repository, branch: "main", founderHandle: "@rita", recoveryKey: sam.key, ...(over.import === undefined ? {} : { import: over.import }) } } };
-    written(R.outcome(`${found}:0`, 1, "confirmed", { name: repository.name, id: "r-1" }, "own-answer", [{ n: 0, to: seed, message: create }]));
+    // The selecting outcome, judged with the register's own rules: its send `create-directory` gives the `create` of the directory.
+    const repository = { host: "git.example", namespace: "artroom", name: repositoryName(R.item(found).values["seed"] as Digest, 1), id: "r-1" };
+    written(R.outcome(`${found}:0`, 1, "confirmed", { name: repository.name, id: "r-1" }));
+    const { to: seed, message: create } = R.last.sends[0] as { to: Seed; message: Request };
     const sent = R.head.seq;
     // The directory's genesis: the real judge, with the fourth cause. The claim's entry is at hand, as a fetched fact.
     const context = () => ({ clock: clockOf(this.state, this.now), bounds: this.bounds, prepared: [], own: this.own, platform: directoryPlatform });

@@ -17,11 +17,13 @@ test("the register definition validates whole with the platform option; every ma
   // No row of the register's data writes a send: the one `create` is the selecting outcome's (section 12.1).
   expect(Object.values(register.acts).flatMap((act) => act.sends)).toEqual([]);
 
-  // The marks, by the rows of the note's table: rows 2 to 6, row r of revision 24, and row c of the further marks, one for each kind of operation.
+  // The marks, by the rows of the note's table: rows 2 to 6, row r of revision 24, row c of the further marks, one for each kind of
+  // operation, and row k of revision 25: the send of the mark of `create-repository`, which the validator lists as a send.
   expect(valid.marks.map((m) => [m.place, m.path, m.code, m.row])).toEqual([
     [1, "acts.install.grant", "install", "P13"], [1, "acts.found.grant", "founding-policy", "P13"], [4, "acts.found.guards.0", "handle-form", "P27"],
     [5, "acts.found.effects.3", "founder-key", "P14"], [5, "acts.found.effects.4", "claim-seed", "P16"], [5, "acts.found.effects.5", "open-create-repository", "P16"],
-    [7, "outcomes.create-repository", "create-repository", "P16"], [7, "outcomes.revoke-credential", "revoke-credential", "P16"], [7, "outcomes.delete-repository", "delete-repository", "P16"],
+    [7, "outcomes.create-repository", "create-repository", "P16"], [6, "outcomes.create-repository.send", "create-directory", "P16"],
+    [7, "outcomes.revoke-credential", "revoke-credential", "P16"], [7, "outcomes.delete-repository", "delete-repository", "P16"],
   ]);
   // The whole-scope rule (the contract's section 6.1): a version that lacks a rule runs nothing. The package has a rule of the kind
   // of its place for every mark, so a register can be founded under the package's rules. Without any one of them it cannot.
@@ -68,10 +70,10 @@ describe("the rules of platform:register@1, each as a plain function (authority 
   ];
   for (const [row, rule, args, expected] of rows) test(`${rule}, row ${row}`, () => expect(run(rule, ...args)).toEqual(expected));
 
-  test("the table has exactly the rules that are written: six at their places, and the outcomes of the three kinds of operation; only a creation selects, no read is decisive, and each allows another attempt", () => {
+  test("the table has exactly the rules that are written: six at their places, the outcomes of the three kinds of operation, and the send of the first; only a creation selects, no read is decisive, and each allows another attempt", () => {
     expect(Object.entries(registerRules).map(([name, rule]) => [name, rule.place, "refusals" in rule ? rule.refusals : "most" in rule ? rule.most : null])).toEqual([
       ["install", "grant", []], ["founding-policy", "grant", []], ["handle-form", "guard", ["bad-handle"]], ["founder-key", "effect", 1], ["claim-seed", "effect", 1], ["open-create-repository", "effect", 2],
-      ["create-repository", "outcome", null], ["revoke-credential", "outcome", null], ["delete-repository", "outcome", null],
+      ["create-repository", "outcome", null], ["create-directory", "send", null], ["revoke-credential", "outcome", null], ["delete-repository", "outcome", null],
     ]);
     const kinds = ["create-repository", "revoke-credential", "delete-repository"].map((kind) => (registerRules[kind] as { rules: OutcomeRule }).rules);
     expect(kinds.map((rules) => [rules.selects, rules.read, rules.retries("refused", null as never, null as never), rules.retries("unknown", null as never, null as never), rules.closure ?? 0, rules.most ?? null])).toEqual([
@@ -112,7 +114,7 @@ test("a register is founded by an install intent, under its own definition and n
 
 // Authority note, section 12.1.1: the row `found`, the cases a to d, and "The rule `create-repository`, whole" of the note's
 // revision 25. Every entry is judged with the register's own rules.
-test("a founding opens one claim and one creation of three attempts; a key outside the policy opens none; the same intent again opens nothing; the first confirmed creation is selected and sets the repository, a later one opens its deletion, a returned credential opens its revocation, and an outcome whose body does not follow is refused", () => {
+test("a founding opens one claim and one creation of three attempts; a key outside the policy opens none; the same intent again opens nothing; the first confirmed creation is selected, sets the repository and sends the `create` of the directory, a later one opens its deletion, a returned credential opens its revocation, and an outcome whose body does not follow is refused", () => {
   const r = new Register();
   // Case a: a `found` by a key that is not in `founders`, under the policy `keys`.
   expect([r.found(una), r.state.count("claim", "pending")]).toMatchObject([{ result: "refused", reason: "unauthorized" }, 0]);
@@ -159,6 +161,12 @@ test("a founding opens one claim and one creation of three attempts; a key outsi
     { effect: "attempt", operation: creation, attempt: 2, result: "confirmed", selected: true }, { effect: "value", item: claim, slot: "repository", value: { host: "git.example", namespace: "artroom", name: name(2), id: "r2" } },
     { effect: "operation", k: 0, owner: REGISTER, kind: "revoke-credential", attempts: 3 }, { effect: "attempt", operation: { k: 0 }, attempt: 1, result: "opened", selected: null },
   ]);
+  // The selecting outcome sends the `create` of the directory at ordinal 0, by the rule `create-directory`. Its seed is the one whose
+  // digest the claim holds, with the founder's intent as its cause. It names the `found` entry by its fact, as `claim`, and carries
+  // the record that this outcome set, with the fields of the founding intent. It carries no signed intent.
+  expect(r.last.sends).toEqual([{ n: 0, to: seed, message: { class: "request", type: "create", body: { fields: {
+    claim: r.fact(claim), repository: { host: "git.example", namespace: "artroom", name: name(2), id: "r2" }, branch: "main", founderHandle: "@rita", recoveryKey: paul.key,
+  } } } }]);
   // Case d: attempt 1's own answer arrives later, created. It is not selected, and opens its own deletion. The claim does not change.
   r.outcome(creation, 1, "confirmed", { name: name(1), id: "r1" });
   const deletion = `${r.head.seq}:0` as const;
@@ -166,6 +174,8 @@ test("a founding opens one claim and one creation of three attempts; a key outsi
     2, { host: "git.example", namespace: "artroom", name: name(2), id: "r2" },
     [{ effect: "attempt", operation: creation, attempt: 1, result: "confirmed", selected: false }, { effect: "operation", k: 0, owner: REGISTER, kind: "delete-repository", attempts: 3 }], "revoke-credential", "delete-repository",
   ]);
+  // No other outcome sends the `create`: the claim has its repository.
+  expect(r.last.sends).toEqual([]);
 
   // A second founding, refused at the host for its name: the outcome records the answer, opens the next attempt and derives nothing.
   const other = r.intent(rita, "found", { expected: { register: 1 }, fields: { branch: "main", founderHandle: "@rita", recoveryKey: paul.key }, idempotencyKey: "another founding" });

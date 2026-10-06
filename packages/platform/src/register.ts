@@ -160,7 +160,9 @@ export const register: PlatformData = {
   rules: {},
   // The operation kinds that this definition owns, each with the mark of the rule for its outcome entries (row c of the further marks).
   outcomes: {
-    "create-repository": { code: "create-repository", row: "P16" },
+    // Its `send` is the one request of the selecting outcome: the `create` of the directory (row k). The clauses `refused` and
+    // `conflict` have no effect. Each is an incident, which is no effect of an entry.
+    "create-repository": { code: "create-repository", row: "P16", send: { code: "create-directory", row: "P16", result: { applied: [], refused: [], conflict: [] } } },
     "revoke-credential": { code: "revoke-credential", row: "P16" },
     "delete-repository": { code: "delete-repository", row: "P16" },
   },
@@ -351,6 +353,49 @@ export const registerRules: Rules = {
           opens: [...(selected !== null && body["credential"] !== undefined ? [cleanup("revoke-credential")] : []), ...(selected === false ? [cleanup("delete-repository")] : [])],
         };
       },
+    },
+  },
+  /**
+   * Row k, the `send` of the mark of `create-repository` (P16), as the
+   * note's revision 25 makes it exact (section 12.1.1, "The send
+   * `create-directory`, and its clause"). It gives a request on the
+   * selecting outcome, and on no other: a `confirmed` outcome of an
+   * operation that has selected nothing, for a claim whose `repository` is
+   * unset. That is the judgment that the ledger makes of `selected`, on the
+   * same state.
+   *
+   * The request is the `create` of the directory. Its seed names this
+   * register as creator, and its cause is the digest of the founder's
+   * `found` intent, which the opening entry holds: the contract's fourth
+   * cause. It is the seed whose digest the rule `claim-seed` gave the claim.
+   * The fields: `claim`, the fact of the `found` entry, which is the opening
+   * entry; `repository`, the record that the same outcome sets; and
+   * `branch`, `founderHandle`, `recoveryKey` and, when the intent holds it,
+   * `import`, from the fields of the `found` intent. It carries no signed
+   * intent: the claim's entry holds it, and the directory retains that
+   * entry from its genesis on.
+   */
+  "create-directory": {
+    place: "send",
+    run: (given) => {
+      const input = given.input;
+      if (input.type !== "outcome" || input.result !== "confirmed") return null;
+      const operation = given.state.operation(input.operation);
+      const claim = claimOf(given.state, input.operation);
+      if (!operation || operation.selected !== null || !claim || (claim.values["repository"] ?? null) !== null) return null;
+      const opening = given.own(openedAt(input.operation));
+      const held = registerOf(given.state);
+      const body = isObject(input.evidence.body) ? input.evidence.body : {};
+      if (!opening || opening.entry.input.type !== "act" || !held) throw new Error("the operation create-repository was opened by a found entry of a register");
+      const { intent } = opening.entry.input.signed;
+      const seed: Seed = { v: 1, kind: "directory", definition: DIRECTORY, creator: given.resolved.at, cause: intentDigest(intent), ordinal: 0 };
+      const { branch, founderHandle, recoveryKey } = intent.fields;
+      const fields = {
+        claim: { at: given.resolved.at, seq: opening.entry.seq, hash: opening.hash },
+        repository: { host: held.values["host"]!, namespace: held.values["namespace"]!, name: body["name"] as string, id: body["id"] as string },
+        branch, founderHandle, recoveryKey, ...(intent.fields["import"] === undefined ? {} : { import: intent.fields["import"] }),
+      };
+      return { to: seed, message: { class: "request", type: "create", body: { fields } } };
     },
   },
   /**
