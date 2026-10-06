@@ -172,14 +172,22 @@ alone. Guard 1 takes an answer of that ID and of the kind `membership`,
 and the entry that retains it fixes the incarnation. From then on the
 read states the incarnation, and the recorded reference is checked again
 inside the commit (I3 deltas, section 26, entries EM21 and EY7 to EY9).
-Three limits stand. Such a scope accepts no read session before an entry
-of it retains an observation of membership (entry EY12). A scope whose
-entries retain more than one incarnation of that ID records no
-reference, and an act there that needs a grant is answered
-`authority-unavailable` (entry EY9). And no destination exists:
-`platform:destination@1` lacks two rules, so the read of a destination
-has run on no scope object. Nothing in this repository deploys the
-class.
+Two limits on the recorded membership reference remain. Such a scope
+accepts no read session before an entry of it retains an observation of
+membership (entry EY12). A scope whose entries retain more than one
+incarnation of that ID records no reference, and an act there that needs a
+grant is answered
+`authority-unavailable` (entry EY9).
+
+`platform:destination@1` now has a rule for every mark, including
+`first-head` and `receipt`.
+[test/founding-real.test.ts](test/founding-real.test.ts) creates and
+confirms a destination under the deployed class, reads real rules and
+membership observations, and publishes its first change with a required
+passed check. The Git host and source lane entries are scripted, and no
+checker runner runs. Under the default outside port nothing is sent to a
+host. Nothing in this repository deploys the class; this witness does not
+close full I3.
 
 ## A platform definition
 

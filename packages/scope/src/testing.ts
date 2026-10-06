@@ -49,11 +49,12 @@ export interface MembershipScript { at: ScopeRef; answers(asked: ObservationRequ
  * reference that the scope is said to record. `answers` is what that scope
  * is said to answer: the record, or the record with the bytes of each value
  * that it names beside it (`Answered`, in `authority.ts`). Nothing judged
- * it, and no history stands behind its head: no rules scope answers an
- * observation yet (I3 deltas, entries FB10 and GA7). `states`: what the
- * data of the definition that the answers name is said to state of the two
- * members of a rules content. A test that uses it shows the observing
- * scope's side of a read of the rules, and nothing about a rules scope.
+ * it, and no history stands behind its head. The platform rules scope has
+ * its own observation answer; this script replaces it in these tests.
+ * `states`: what the data of the definition that the answers name is said
+ * to state of the two members of a rules content. A test that uses it shows
+ * the observing scope's side of a read of the rules, and nothing about a
+ * rules scope.
  */
 export interface RulesScript { at: ScopeRef; definition: PlatformDefinition; states: ContentStates; answers(asked: ObservationRequest): unknown }
 
