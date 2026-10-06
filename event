@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:c83d6ac5ab238d9ab29b2c34e08b572b32bd93f3","text":"Merge retired a covered predecessor; the successor is at packages/lanes/README.md."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:c89030a37bfaef197272d0cf2a388c715a41d06f","text":"Merge retired a covered predecessor with no successor at its old path."}
