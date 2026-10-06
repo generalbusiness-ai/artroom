@@ -42,7 +42,7 @@
 
 import type { Digest, FieldValue, OperationId, PlatformData, PlatformDefinition, ScopeId, Seed } from "@generalbusiness/artroom-contract";
 import { base32, intentDigest, isDigest, seedDigest, utf8 } from "@generalbusiness/artroom-bytes";
-import { isObject, type Item, type Opening, type RuleGiven, type Rules, type StateView } from "@generalbusiness/artroom-derive";
+import { isObject, type Item, type Opening, type OutcomeRule, type Own, type RuleGiven, type Rules, type StateView } from "@generalbusiness/artroom-derive";
 import { handleForm } from "./membership.ts";
 
 /** The name and version that this data and these rules are. The `operation` effects of its rules state it as their owner. */
@@ -234,6 +234,27 @@ const ownName = (state: Pick<StateView, "item">, operation: OperationId, attempt
 const cleanup = (kind: "revoke-credential" | "delete-repository"): Opening => ({ owner: REGISTER, kind, attempts: CREATION_ATTEMPTS });
 /** The entries that the two cleanups of one outcome entry reserve: two operations of three attempts each, with a first outcome and a late answer for each attempt (the contract's section 17.2, row 5). */
 const CLEANUPS = 2 * (2 * CREATION_ATTEMPTS);
+
+/** The body of the evidence of the outcome entry that opened a cleanup: a `confirmed` outcome of `create-repository`, at the position that the cleanup's ID states. */
+const openingBody = (own: Own, operation: OperationId): Readonly<Record<string, unknown>> | null => {
+  const input = own(openedAt(operation))?.entry.input;
+  return input?.type === "outcome" && input.kind === "create-repository" && isObject(input.evidence.body) ? input.evidence.body : null;
+};
+
+/**
+ * The rule of the outcomes of one cleanup (section 12.1.1, the table of
+ * the two kinds): every body is one member, which is the one that the
+ * opening entry's body holds under that name.
+ */
+const ofCleanup = (member: "credential" | "id"): OutcomeRule => ({
+  selects: false, read: false,
+  retries: () => true,
+  wellFormed: (_result, evidence, given) => {
+    const named = given.input.type === "outcome" ? openingBody(given.own, given.input.operation)?.[member] : undefined;
+    return typeof named === "string" && bodyOf(evidence.body, [member])?.[member] === named;
+  },
+  unknown: (_state, operation, _attempt, own) => ({ [member]: openingBody(own, operation.id)?.[member] ?? null }),
+});
 
 /**
  * The rules of `platform:register@1`, by the name that a mark states
@@ -431,17 +452,25 @@ export const registerRules: Rules = {
   /**
    * Row c, for the outcomes of `revoke-credential`: the revocation of a
    * credential that the host returned with a repository, by its ID (section
-   * 3.8). The tables of section 12.1.1 state its attempts, and nothing that
-   * its outcome derives. So it selects nothing and derives nothing, and
-   * another attempt follows a `refused` or an `unknown` while the stated
-   * number allows. No text makes a read decisive for it, so only the
-   * request's own answer settles an attempt (I3 deltas, entry EP4).
+   * 3.8), as the note's revision 25 decides it (section 12.1.1, "The
+   * outcomes of `revoke-credential` and `delete-repository`"; I3 delta EP4).
+   *
+   * The operation is for the credential that the body of its opening entry
+   * names. The opening entry is a `confirmed` outcome of
+   * `create-repository`. A read is not decisive: only the request's own
+   * answer settles an attempt. The body of every result is
+   * `{ credential }`: for `confirmed`, the ID that the host answered as
+   * revoked. A body with another member, or a `credential` that is not the
+   * opening entry's, is `bad-input`. The rule selects nothing and derives
+   * nothing. Another attempt follows a `refused` or an `unknown`, to 3.
    */
-  "revoke-credential": { place: "outcome", rules: { selects: false, read: false, retries: () => true } },
+  "revoke-credential": { place: "outcome", rules: ofCleanup("credential") },
   /**
    * Row c, for the outcomes of `delete-repository`: the deletion of a
    * repository that was not selected, by the ID that its own answer gave
-   * (section 3.8, "What stays owed"). As `revoke-credential`.
+   * (section 3.8, "What stays owed"). As `revoke-credential`, with the body
+   * `{ id }`: the repository that the body of its opening entry names by
+   * `id`.
    */
-  "delete-repository": { place: "outcome", rules: { selects: false, read: false, retries: () => true } },
+  "delete-repository": { place: "outcome", rules: ofCleanup("id") },
 };

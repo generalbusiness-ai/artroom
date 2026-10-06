@@ -115,7 +115,7 @@ test("a register is founded by an install intent, under its own definition and n
 
 // Authority note, section 12.1.1: the row `found`, the cases a to d, and "The rule `create-repository`, whole" of the note's
 // revision 25. Every entry is judged with the register's own rules.
-test("a founding opens one claim and one creation of three attempts; a key outside the policy opens none; the same intent again opens nothing; the first confirmed creation is selected, sets the repository and sends the `create` of the directory, a later one opens its deletion, a returned credential opens its revocation, and an outcome whose body does not follow is refused", () => {
+test("a founding opens one claim and one creation of three attempts; a key outside the policy opens none; the same intent again opens nothing; the first confirmed creation is selected, sets the repository and sends the `create` of the directory, a later one opens its deletion, a returned credential opens its revocation, each cleanup's own answer settles its attempt, and an outcome whose body does not follow is refused", () => {
   const r = new Register();
   // Case a: a `found` by a key that is not in `founders`, under the policy `keys`.
   expect([r.found(una), r.state.count("claim", "pending")]).toMatchObject([{ result: "refused", reason: "unauthorized" }, 0]);
@@ -186,19 +186,23 @@ test("a founding opens one claim and one creation of three attempts; a key outsi
   r.outcome(second, 1, "refused", { name: taken, nameExists: true });
   expect([r.last.effects, r.last.sends]).toEqual([[{ effect: "attempt", operation: second, attempt: 1, result: "refused", selected: null }, { effect: "attempt", operation: second, attempt: 2, result: "opened", selected: null }], []]);
 
-  // The register's rules for the outcomes of the two cleanups. A read of the host settles nothing. A `refused` and an `unknown`
-  // are each followed by the next attempt, to the three that the opening states, and no further. Nothing is derived.
-  for (const cleanup of [deletion, revocation]) {
+  // The register's rules for the outcomes of the two cleanups (revision 25, the delta EP4). The body of every result is the one
+  // member that the opening entry's body holds: the credential that attempt 2 returned, or the ID that attempt 1 gave. A read of the
+  // host settles nothing, and a body with another member, with another value or with none is `bad-input`. A `refused` and an
+  // `unknown` are each followed by the next attempt, to the three that the opening states, and no further. Nothing is derived.
+  for (const [cleanup, body, other] of [[deletion, { id: "r1" }, { id: "r2" }], [revocation, { credential: "c2" }, { credential: "c1" }]] as const) {
     const before = r.head.seq;
-    expect([r.outcome(cleanup, 1, "confirmed", {}, "read"), r.head.seq]).toMatchObject([{ result: "refused", reason: "bad-input" }, before]);
-    r.outcome(cleanup, 1, "refused", {});
+    expect([r.outcome(cleanup, 1, "confirmed", body, "read"), r.outcome(cleanup, 1, "confirmed", other), r.outcome(cleanup, 1, "confirmed", { ...body, more: 1 }), r.outcome(cleanup, 1, "refused", {}), r.outcome(cleanup, 1, "unknown", null), r.head.seq])
+      .toMatchObject([...Array.from({ length: 5 }, () => ({ result: "refused", reason: "bad-input" })), before]);
+    r.outcome(cleanup, 1, "refused", body);
     r.outcome(cleanup, 2, "unknown");
-    r.outcome(cleanup, 3, "refused", {});
+    expect(r.last.input).toMatchObject({ result: "unknown", evidence: { basis: "none", body } });
+    r.outcome(cleanup, 3, "refused", body);
     expect(r.entries.slice(before + 1).map(({ entry }) => [entry.effects.map((effect) => (effect.effect === "attempt" ? [effect.attempt, effect.result] : effect.effect)), entry.sends])).toEqual([
       [[[1, "refused"], [2, "opened"]], []], [[[2, "unknown"], [3, "opened"]], []], [[[3, "refused"]], []],
     ]);
     // The late answer of attempt 2 settles that attempt and no other.
-    r.outcome(cleanup, 2, "confirmed", {});
+    r.outcome(cleanup, 2, "confirmed", body);
     expect(r.state.operation(cleanup)).toMatchObject({ most: 3, selected: null, attempts: [{ outcomes: [{ result: "refused" }] }, { outcomes: [{ result: "unknown" }, { result: "confirmed" }] }, { outcomes: [{ result: "refused" }] }] });
   }
 });
