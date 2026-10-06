@@ -1746,6 +1746,12 @@ const WRITTEN: Rules = {
         const [seen, read] = [bodyOf(evidence.body, ["seen"])?.["seen"], given.input.type === "outcome" ? given.state.operation(given.input.operation) : null];
         if (result !== "confirmed" || !read || !(seen === "absent" || isObjectId(seen))) return false;
         const of = readFor(given.state, given.own, read);
+        if (typeof of === "string" && seen === "absent") {
+          const opened = ownEntry(given.own, seqOf(read.id)).input;
+          const write = opened.type === "outcome" ? given.state.operation(opened.operation) : null;
+          // An absent first head or receipt decides nothing while its target is open. The runtime keeps reading.
+          if (!write || !closed(targetOf(given.state, given.own, write))) return false;
+        }
         const unprovable = of !== null && typeof of !== "string" && HELD.includes(of.state) && seen === branchOf(given.state)?.values["head"] && !everyRefused(given, of, null);
         return !unprovable;
       },
