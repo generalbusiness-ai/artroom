@@ -1,0 +1,13 @@
+gs publish exit1: read tracked .gitseq at published head 42e73eb7ff22c050c05709ab64649d48031120ec: git show 42e73eb7ff22c050c05709ab64649d48031120ec:.gitseq: exit status 128: fatal: path '.gitseq' does not exist in '42e73eb7ff22c050c05709ab64649d48031120ec'.
+Authorized fallback: native git push origin 6be14650db44d24339f2ed91ed4eddf272d4199e:refs/heads/main exit0, 42e73eb7f..6be14650d ->main.
+Remote verification exit0:
+6be14650db44d24339f2ed91ed4eddf272d4199e	refs/heads/main
+
+Package and plan tree checks:
+7a6968799f4b544b02ae8a7f3fb282b84cc1694c
+b462d9c9285072c955e7e9f14fffb380108ecb13
+7a6968799f4b544b02ae8a7f3fb282b84cc1694c
+b462d9c9285072c955e7e9f14fffb380108ecb13
+
+Checkout:
+## main
