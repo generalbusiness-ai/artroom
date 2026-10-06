@@ -66,8 +66,10 @@ type `job` holds a reservation. They are the made-up data of the
 contract's witnesses 18.47 and 18.49. Every count is made up, and every
 rule is a stand-in that a test scripts. A test that uses one says so. It
 shows where a count is taken, drawn and released, and nothing about a
-count or a rule of a platform definition. No data of the platform package
-states `holds` yet.
+count or a rule of a platform definition. The destination now states
+`holds` for its branch and publication types;
+`packages/platform/test/destination-creates.test.ts` checks their cleanup
+and receipt duties with the package's real rules.
 
 A scripted membership, `Controls.membership` of the same module, is a
 stand-in for the membership scope and for the reference to it that a
@@ -103,8 +105,9 @@ shows the rows and the rules of the two definitions as judgments in
 memory. A founding on scope objects is
 `packages/scope/test/founding-real.test.ts`, in the namespace `PLATFORM`:
 the deployed class, the production authority and the package's own rules,
-with a labelled stand-in for the Git host. It runs as far as the creation
-of the destination, which `platform:destination@1` cannot yet answer.
+with a labelled stand-in for the Git host. The destination has a rule for
+every mark, including `first-head` and `receipt`; its creation no longer needs substitute rules. The real-scope
+founding and publication witness is described below.
 
 The rules scope has four stand-ins, in
 `packages/platform/test/support-rules.ts`. `registrar` is a made-up
@@ -115,40 +118,57 @@ fixture set. `standing` is an observation of a member that the test
 writes by hand: no membership scope answered it. A test that uses one
 says so. The data and the six rules of `platform:rules@1` are the
 platform package's, and none of them is a stand-in. Such a test shows
-the rows and the rules as judgments in memory. It shows nothing about a
-founding, about a read of membership, or about how a scope receives and
-keeps a value beside an intent
-(`notes/2026-10-05-i3-contract-deltas.md`, entry EQ9). That a scope reads
-a value for a place of its pinned data, and keeps it under its domain, is
-`packages/scope/test/values.test.ts`, on real storage, with derive's
-made-up platform data `gate` in place of a definition of Artroom: no data
-of the platform package states a place yet.
+the rows and the rules as judgments in memory. The rules definition states
+a value place for check configurations and answers a rules observation
+with its publication revision and the digest of its extents. The reading
+scope retains the bytes beside that observation. The real scope witness
+below reads that answer from the rules scope.
+`packages/scope/test/values.test.ts` separately shows the generic match,
+SQLite retention and domain read routes, with derive's made-up `gate`
+data and rules. Its outcome witness also shows an owner-declared evidence
+value across a restart: bad bytes write nothing, the valid history replays
+over HTTP, and missing bytes make that replay `incomplete`. Its grants and
+outside system remain stand-ins.
 
 The destination has stand-ins of its own, in
-`packages/platform/test/support-destination.ts`. `standInRules` is a rule
-for each of the two marks of the destination's data that the platform
-package has no rule for, `first-head` and `receipt`
-(`notes/2026-10-05-i3-contract-deltas.md`, entries ER9 and FA6): without
-them nothing is created under `platform:destination@1`, in a test as in
-production. `Branch.read` is what is at hand for one reservation, written
-by hand: the observations that a runtime would read before the turn of
-the outcome of `judge`, and what the lane's entries say. The judge of the
-outcome is given the observations and the entries, and writes the entry's
-`observed` and `uses` itself. The rule `judge`, its judgment and its
-reading of each observation are the package's own. Only the reader of a
-lane's entries is a stand-in: the package has none
-(`notes/2026-10-05-i3-contract-deltas.md`, entries FA9 and FC5), and no
-runtime reads an observation for an outcome of the destination, whose
-data states no row of `observes` (entries FC6 and GA1). `bureau` is a
-made-up directory that creates one destination scope. The lane's and the
-register's entries, each observation and every answer of the Git host are
-made by hand.
-`Branch` is a destination scope in memory below such a bureau. A test
-that uses one says so. It shows the destination's rows and its 17 real
-rules as judgments in memory: what an outcome entry derives from an
-answer that the test wrote. It shows nothing about a host, a gateway, a
-push, an observation of membership or of the rules, a lane's entry, or a
-founding.
+`packages/platform/test/support-destination.ts`. `bureau` is a made-up
+directory that creates one destination scope. `Branch.read` supplies the
+observations and copies of lane entries at hand for a reservation. The
+lane's and register's entries, the observations, and each Git host answer
+are written by hand. `Branch` is a destination scope in memory below that
+bureau; derive's judges write its entries. Every destination mark has its
+rule in the platform package. No substitute `first-head` or `receipt` rule
+is supplied. `Branch` still replaces the lane reader with a scripted
+`LaneRead`, rather than reading a lane's entries. The package's production
+reader is tested in `packages/platform/test/destination-reading.test.ts`
+on entries written by hand: its author and deciding-key lists, and its
+checks of each job and verdict's provenance. The rows of `judge`, its
+changed-set value and its holder counts are the package's code. These
+tests show its judgments from scripted inputs, and no live host, gateway
+or push.
+
+`packages/scope/test/founding-real.test.ts` runs the register, directory,
+membership, rules and destination as real Durable Objects under the
+deployed class and the platform package's rules. The directory creates
+and confirms all three children. The destination records its first head
+and receipt, reads the real rules and membership scopes, and uses its
+production reader over retained lane bytes to reserve and publish the
+first change. Its receipt becomes written and its tokens are cleaned up.
+The publication's holder counts are read from SQLite, including its
+`withdraw` decision before publication and its release on the final item.
+
+The source change lane's manifest and merge entries are written by hand
+and anchored; no real lane admits them. The Git host is `OutsideDouble`,
+a scripted port whose replies name the package's computed target IDs;
+no host runs. Reads use the test readers except for the separate real
+read-session witness. All five runtime histories replay `consistent` over
+HTTP, with their authority derived from membership history and only the
+two scripted lane facts anchored. Publication updates to that scripted
+lane remain pending. This shows the founding and destination's first
+publication through these boundaries. It proves no deployment, production
+host or complete lane journey, and does not close full I3. Full capacity
+admission for items, records, retained bytes and pending requests remains
+request `cc570904`; the current admission checks entries.
 
 The bound-request tests in `packages/derive/test/forms-binding.test.ts`
 use the real holder ledger: counts are taken and added, a bound deciding
@@ -165,16 +185,16 @@ The rows of `observes` have a made-up definition and two scripted scopes.
 `weigher`, in `packages/derive/test/fixtures-observes.ts`, is made-up
 platform data whose acts, one kind of `outcomes` and one clause of a
 result state rows, with a stand-in rule for each of its marks. It is no
-definition of Artroom: no data of the platform package states a row
-(`notes/2026-10-05-i3-contract-deltas.md`, entry GA1). Each observation of
-that file is written by hand. A test that uses it says so. It shows where
-a subject comes from, what the judges retain and what a verifier derives,
+definition of Artroom. The destination, membership and task platform data
+now state their own rows, separately from these fixtures. Each
+observation of that file is written by hand. A test that uses it says so.
+It shows where a subject comes from, what the judges retain and what a verifier derives,
 and nothing about a rule of a destination or of a rules scope.
 `Controls.rulebook`, of `@generalbusiness/artroom-scope/testing`, is a
 scripted rules scope, beside the scripted membership: the test writes
 each answer and the bytes that are said to come beside it, and where the
-scope is said to record that reference. No rules scope answers an
-observation yet (entry GA7). With either script the reads of
+scope is said to record that reference. The platform rules scope has its
+own observation answer; this script still replaces it in the generic tests. With either script the reads of
 `packages/scope/test/observes.test.ts` are the real ones: before the
 turn, numbered in the run, judged in the commit, and kept by the store.
 One test of that file reads a real membership scope of the namespace

@@ -19,7 +19,7 @@ The library runs under Node and under Workers.
 
 | Module | Holds |
 |---|---|
-| `source` | `HistorySource`: what a verifier reads. `page(scope, from, allow)`: a page of a scope's entries, each as its canonical bytes with the hash the source gives for it. `retained(scope, kind, digest, allow)`: one retained input. `allow` is the most the read may take in, and each result says how many raw bytes it read. `httpSource(service, options?)`: a source over a scope service's read routes. `MemorySource`: a source over histories in memory. `hashOfBytes`. `PAGE_REPLY_BYTES`, `RETAINED_REPLY_BYTES`, `PAGE_ENTRIES`, `READ_SECONDS`. |
+| `source` | `HistorySource`: what a verifier reads. `page(scope, from, allow)`: a page of a scope's entries, each as its canonical bytes with the hash the source gives for it. `retained(scope, kind, digest, allow, domain?)`: one retained input. `allow` is the most the read may take in, and each result says how many raw bytes it read. `httpSource(service, options?)`: a source over a scope service's read routes, passing `?domain=` for a value. `MemorySource`: a source over histories in memory. `hashOfBytes`. `PAGE_REPLY_BYTES`, `RETAINED_REPLY_BYTES`, `PAGE_ENTRIES`, `READ_SECONDS`. |
 | `verify` | `verify(source, options, tally?)`: a `Verification`, which is the report and, in words, what was found. `tally`, a `Tally`, when it is given, counts the work of the replay over what it has already checked: a test counts work with it, and never times it. `Options`: the mode, the target scope ID, a known head, anchors, limits, bounds, `capabilities`: the rules of the capability versions the caller has code for; and `platform`: the data and the rules of the platform definitions the caller has code for, by name and version. This package has none of its own. A history under a platform definition is derived with those rules, and the report then lists `platformCode(named)` under `trusts`. `LIMITS`, `TRUSTS`, `SourceError`. |
 | `report` | `Report`, the contract's type, and `render(report, why?)`: the report in plain English. |
 | `cli` | `main(argv, io)`: the command, with no process state. `src/bin.ts` runs it under Node. |
@@ -65,7 +65,9 @@ every entry, from the genesis:
    time, with every range guard scanned to its end;
 6. compares the derived input with its decision, `uses`, `prepared`,
    `effects` and `sends` with the recorded ones, and then the whole entry;
-7. folds the entry.
+7. checks that the entry's draws stay within each holder's counts and
+   that a taking or new-work entry fits the budget of used plus reserved
+   entries, then folds it.
 
 A checkpoint is checked against the fold. It is never used as a place to
 start.
@@ -121,9 +123,12 @@ Each observation that an act retains in `observed` is derived as a grant's
 is: it is of the scope's own membership reference, `fresh` or `reused` as
 the earlier entries make it, inside the window of the act, from a head that
 is not lower than an earlier one, and its value is what the observed
-scope's history gives at that head. An observation of the rules is
-`unsupported-definition`: nothing states yet where a scope records its
-rules reference.
+scope's history gives at that head. The pinned version supplies the rules
+reference where the runtime reads it; the destination holds its ID in
+`branch.rules`. A rules observation is derived from that scope's history,
+including its revision at the last `publish`, when the supplied version
+states that publication kind. A version without the reference or
+observation code needed for the entry remains `unsupported-definition`.
 
 Under a definition whose data states rows of `observes`, the check is by
 the rows. The judge is given the recorded observations and derives the
@@ -133,7 +138,12 @@ a guard under its row's window and use, with the name of that guard. A
 row that is absent and states `write` is taken on the runtime's word,
 under `observation-read`. A value that an observation names is read by
 its domain and its digest, and without its bytes the replay is
-`incomplete`.
+`incomplete`. Values beside an intent's declared places, and values named
+by outcome evidence in owner-declared domains, are also read by domain
+and digest, checked for canonical bytes and their declared bound, and
+given to the judge. Missing bytes make the replay `incomplete`. The owner
+limits are taken from the same supplied pinned code as in the runtime,
+and counted in each possible outcome's reservation.
 
 What a source scope's history gives is derived once for each source scope,
 incarnation, head, definition and subject, and kept. Each entry of a
@@ -190,7 +200,7 @@ service being checked.
 | `mismatch` | An entry is not what its bytes, its chain, its signature or its replay say; or a reference names another entry, incarnation or kind than its source scope has; or the history does not reach or match the known head. `at` names the entry. |
 | `missing-dependency` | A source history cannot be read, or does not reach the entry a reference names, and no anchor names it. `at` names the entry that used it. |
 | `incomplete` | A retained input is missing or is not the bytes its digest names; or a detached text is gone and no later entry redacts it; or the history holds an ancestry record, whose walk the replay does not derive; or a limit was reached. |
-| `unsupported-definition` | The scope pins a platform definition for which the caller gave no data and rules (`platform`), or gave them without a rule for one mark of the data; or a declaration that does not pass validation under the bounds given, or a declaration that needs a capability version the caller gave no rules for. `at` names the genesis. Also a `preparation` entry of a step, or an `outcome` entry of an owner, that the caller gave no rules for, and an observation of the rules: `at` names that entry. |
+| `unsupported-definition` | The scope pins a platform definition for which the caller gave no data and rules (`platform`), or gave them without a rule for one mark of the data; or a declaration that does not pass validation under the bounds given, or a declaration that needs a capability version the caller gave no rules for. `at` names the genesis. Also a `preparation` entry of a step, or an `outcome` entry of an owner, that the caller gave no rules for, and an observation for which its platform version supplies no reference or answer code: `at` names that entry. |
 
 The check stops at the first finding. The report's coverage lists, for each
 scope, the entries that were checked to their end, with every fact they
@@ -264,15 +274,12 @@ A report lists these under `trusts`, each only when it applies:
 - for each redacted text, that its bytes were the text its digest names
   and were within the bound of their field.
 
-It also does not derive again whether an entry left room in the scope's
-entry budget.
-
-Three things are not derived and are not yet listed by a label of their
-own. With an anchor for an observed head, the value of the observation is
-taken with the anchor. A value beside an intent is not given to the judge,
-so an entry whose rule reads one is not derived. And an outcome entry or a
-delivery that retains an observation in `observed` is a mismatch, because
-no judge derives one there yet.
+The replay checks the scope's entry budget, including held operation,
+request and decision reservations. Admission in the other four capacity
+dimensions remains request `cc570904`: items, records, retained bytes and
+pending requests. An entry-budget check makes no claim about those
+dimensions. With an anchor for an observed head, the observation's value
+is taken with that anchor rather than derived from source history.
 
 ## The command
 
@@ -325,3 +332,18 @@ That replay agrees with the runtime is shown in the scope package,
 workerd pool, and the verifier reads them through the Worker's read routes.
 The test lives there because the pool, the test Worker and its fixtures are
 there, and so that no source file of this package imports the runtime.
+
+`packages/scope/test/values.test.ts` also replays an owner-declared evidence
+value over the real scope's HTTP retained route after a restart, and
+reports missing bytes as `incomplete`. Its definition, grants and outside
+answer are explicitly scripted. `test/decisions.test.ts` witnesses the
+entry-budget check of a bound decision reservation with a judged receiver
+and anchored sender entries. The generic row witnesses use made-up
+platform data. `packages/scope/test/founding-real.test.ts` replays the
+register, directory, membership, rules and destination histories through
+HTTP after the first publication and its receipt, using the platform
+package's rules and proven grants. Only the two scripted source lane
+facts are anchored. The host replies and most read authorization remain
+scripted; publication updates to that lane are still pending. None of
+these tests deploys a Worker or shows a production host. They do not close
+full I3; `docs/testing.md` states their boundaries.
