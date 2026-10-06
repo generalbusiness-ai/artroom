@@ -1,8 +1,8 @@
 import { expect, test } from "vitest";
 import { PROPOSED_BOUNDS, type DeclaredDefinition } from "@generalbusiness/artroom-contract";
 import { definitionDigest } from "@generalbusiness/artroom-bytes";
-import { PROFILES, derivable, ruleAt, runnable, validateDefinition } from "@generalbusiness/artroom-derive";
-import { ACTIONS_MOST, FIRST_ACTIONS, ROLE_LISTS, RULES, definitions, destinationMembership, destinationRulesScope, inbox, membership, platform, rulesMembership } from "../src/index.ts";
+import { PROFILES, derivable, ruleAt, runnable, outcomeValueDomains, validateDefinition } from "@generalbusiness/artroom-derive";
+import { ACTIONS_MOST, DESTINATION_CHANGED_SET, FIRST_ACTIONS, ROLE_LISTS, RULES, definitions, destinationMembership, destinationRulesScope, inbox, membership, platform, rulesMembership } from "../src/index.ts";
 
 // The plan's T43, for `platform:inbox@1` (authority note, revision 16, section 12.1.6). The package holds six definitions: the two
 // lists at the end of this test name them. T43 for each of the other five is in this file or in the test file of its definition.
@@ -112,7 +112,7 @@ test("the membership definition validates whole with the platform option; every 
 
 // The plan's steps 9 and 9c, as the authority note's revision 25 decides them (its "What revision 25 lets the I3 source do next"):
 // "Then `platform:directory@1` lacks no rule", and the register's one rule that every founding waited on is written.
-// Steps 9b, 9e and 9f, on the note's revision 26 (I3 deltas, section 29): the destination lacks exactly two rules.
+// Every definition carries its data and every rule of its marks.
 test("every platform definition supplies the rules of its whole pinned data, including destination first-head and receipt", () => {
   /** The marks of one definition's data that the package's table has no rule of the right kind for, by name, once each. */
   const lacks = (named: string): string[] | null => {
@@ -125,8 +125,7 @@ test("every platform definition supplies the rules of its whole pinned data, inc
     return [...new Set(missing)];
   };
   expect([lacks("platform:register@1"), lacks("platform:directory@1")]).toEqual([[], []]);
-  // The two rules of the destination's outcomes that wait on two details asked of the contract (authority note, section 12.1.5,
-  // "The founding commit, and the receipt"; entry ER9). Every other mark of `platform:destination@1` has its rule.
+  // Revision 28 gives the destination's two formerly missing commit rules, so none is absent.
   expect([lacks("platform:destination@1"), lacks("platform:membership@1"), lacks("platform:rules@1"), lacks("platform:inbox@1")]).toEqual([[], [], [], []]);
 });
 
@@ -150,20 +149,19 @@ test("a rules scope and a destination record the scope ID of membership as a val
   ]);
 });
 
-// Scope contract, revision 23, section 17.2a; authority note, revision 26, section 5.8, the two rows of the destination. The flag
-// `covered` is gone from the generic ledger: an operation is inside the closure of the operation that opens it, or it is counted
-// by a holder. No data of this package states `holds` yet: the rows are the authority note's, in a revision that is not adopted
-// (I3 deltas, entries FA3, FC1 and GB7). This test holds what stands in for them, so that it does not grow unseen: exactly five
-// kinds of the destination declare a closure that is not finite, which fails closed, and the entries of the note's own table that
-// no admission reserves for a publication that was admitted while queued.
+// Scope contract revision 23, section 17.2a, and authority revision 28, section 5.8. Each destination operation is counted by
+// its branch or publication. Its data gives finite reservations, the bound withdraw and the complete observation rows.
 test("destination data validates whole with finite reservations, a bound indexed withdraw and the five adopted judge observation rows", () => {
   const destination = platform("platform:destination@1")!;
-  const checked = validateDefinition(destination.data, PROPOSED_BOUNDS, PROFILES, { platform: true });
+  const checked = validateDefinition(destination.data, PROPOSED_BOUNDS, PROFILES, { platform: true, outcomeValues: outcomeValueDomains(destination.data, destination.rules) });
   if (!checked.ok) throw new Error(JSON.stringify(checked.problems));
   expect([checked.definition.observing, checked.definition.keyed, runnable(checked.definition, destination.rules)]).toEqual([true, { publication: ["operation"] }, true]);
   expect(Object.keys(checked.definition.reserving!.kinds).sort()).toEqual(["adopt-read", "first-head", "judge", "mint", "push", "read", "receipt", "revoke"]);
   const rules = Object.values(destination.rules).filter((rule) => rule.place === "outcome");
   expect(rules.filter((rule) => rule.rules.closure !== undefined && !Number.isFinite(rule.rules.closure))).toEqual([]);
   expect(checked.definition.reserving!.holders["publication"]?.holds).toEqual({ operations: { judge: 1, push: 1, mint: 6, revoke: 6, read: 3, receipt: 1 }, requests: 3, items: 1, decisions: { withdraw: 1 } });
+  const withoutEvidence = validateDefinition(destination.data, PROPOSED_BOUNDS, PROFILES, { platform: true });
+  if (!withoutEvidence.ok) throw new Error(JSON.stringify(withoutEvidence.problems));
+  expect(checked.definition.reserving!.kinds["judge"]!.whole.bytes - withoutEvidence.definition.reserving!.kinds["judge"]!.whole.bytes).toBe(2 * DESTINATION_CHANGED_SET.max);
   expect(destination.data.outcomes["judge"]!.observes!.map((row) => [row.of, "max" in row ? row.max : 1])).toEqual([["rules", 1], ["key", 1], ["holders", 1], ["member", 65], ["key", 8]]);
 });

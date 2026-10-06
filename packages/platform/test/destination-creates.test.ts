@@ -1,8 +1,8 @@
 import { expect, test } from "vitest";
-import type { OperationId } from "@generalbusiness/artroom-contract";
+import type { OperationId, Request, Result } from "@generalbusiness/artroom-contract";
 import { factRefOf } from "@generalbusiness/artroom-bytes";
 import { destinationReceipt, firstHeadCommit } from "../src/destination.ts";
-import { Branch, HEAD, OTHER, said } from "./support-destination.ts";
+import { Branch, HEAD, NEXT, OTHER, handMade, said } from "./support-destination.ts";
 import { t } from "@generalbusiness/artroom-derive/testing";
 
 // Real destination rules and derive judges, in memory. The bureau, claim
@@ -66,4 +66,40 @@ test("an imported first head compares the update's exact commit, not an arbitrar
   confirmed.imported("done", HEAD);
   expect(said(confirmed.answered(kinds(confirmed)["first-head"]!, 1, "confirmed", { send: "accepted", seen: HEAD }))).toEqual(WRITTEN);
   expect([confirmed.branch.state, confirmed.branch.values["head"], confirmed.state.count("receipt", "owed")]).toEqual(["ready", HEAD, 1]);
+});
+
+test("a repeated imported done update while the first head is unresolved opens no second first-head or mint", () => {
+  const b = new Branch(true).confirmed();
+  b.imported("done", HEAD);
+  const first = kinds(b)["first-head"]!;
+  expect(said(b.lost(first, 1))).toEqual(WRITTEN);
+  const held = b.state.holder(0);
+  expect(said(b.imported("done", HEAD))).toEqual(WRITTEN);
+  expect([b.opened, b.state.holder(0)]).toEqual([[], held]);
+});
+
+test("a publication reserves its own operations, keeps the receipt and cleanup after publication, and releases its remaining reservation only after its duties settle", () => {
+  const b = new Branch(false).ready();
+  const { publication, push, mint } = b.reserved();
+  expect(b.state.holder(publication)).toEqual({ operations: { mint: 5, revoke: 6, read: 3, receipt: 1 }, requests: 2, items: 1 });
+  expect(b.state.operation(push)!.for).toBe(publication);
+  expect(said(b.answered(push, 1, "confirmed", { send: "accepted", seen: NEXT }))).toEqual(WRITTEN);
+  const [receipt, opened] = [b.head.seq, kinds(b)];
+  expect([b.item(publication).state, b.state.operation(opened["receipt"]!)!.for, b.state.holder(publication) !== null]).toEqual(["published", publication, true]);
+  // A late mint cannot serve the completed push, so its own outcome opens the cleanup under this same holder.
+  expect(said(b.answered(mint, 1, "confirmed", TOKEN))).toEqual(WRITTEN);
+  expect(said(b.answered(kinds(b)["revoke"]!, 1, "confirmed", { token: TOKEN.token }))).toEqual(WRITTEN);
+  const second = { token: "receipt-token", ends: t(600) };
+  expect(said(b.answered(opened["mint"]!, 1, "confirmed", second))).toEqual(WRITTEN);
+  expect(said(b.answered(opened["receipt"]!, 1, "confirmed", { send: "accepted", seen: b.receiptCommit(receipt) }))).toEqual(WRITTEN);
+  expect(said(b.answered(kinds(b)["revoke"]!, 1, "confirmed", { token: second.token }))).toEqual(WRITTEN);
+  // STAND-IN lane answers to the two real outgoing updates, with source entries made by hand. No lane judged them.
+  for (const account of b.state.accountsOf(publication)) {
+    const message: Result = { class: "result", of: { from: b.fact(account.seq), n: account.n }, outcome: "applied" };
+    const source = { ...handMade(b.lane.at, "publication-result", [{ n: 0, to: b.at, message }]), input: {
+      type: "delivery" as const, from: message.of.from, n: account.n, message: b.entries[account.seq]!.entry.sends[account.n]!.message as Request, decision: "applied" as const,
+    } };
+    expect(said(b.delivered(message, { entry: source, under: "change" }))).toEqual(WRITTEN);
+  }
+  expect([b.item(publication).state, b.item(receipt).state, b.state.holder(publication)]).toEqual(["published", "written", null]);
 });

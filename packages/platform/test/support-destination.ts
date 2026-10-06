@@ -34,10 +34,10 @@
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { DeclaredDefinition, Entry, Evidence, FactRef, FieldValue, Input, MemberObservation, HoldersObservation, Observation, ObservationUse, OperationId, Request, RulesObservation, ScopeRef, Seed, Send, Timestamp } from "@generalbusiness/artroom-contract";
 import { canonicalize, factRefOf, intentDigest, newIncarnation, scopeIdOf, signIntent } from "@generalbusiness/artroom-bytes";
-import { PROFILES, clockOf, contentStates, valueDigest, judgeDelivery, judgeGenesis, settleOutcome, validateDefinition } from "@generalbusiness/artroom-derive";
+import { PROFILES, clockOf, contentStates, valueDigest, outcomeValueDomains, judgeDelivery, judgeGenesis, settleOutcome, validateDefinition } from "@generalbusiness/artroom-derive";
 import type { ActJudgment, Fetched, Judgment, OutcomeJudgment, Observing, PlatformRules, Source, ValidDefinition } from "@generalbusiness/artroom-derive";
 import { Ledger, Scope, T0, creation, d, keys, laneDefinition, sent, t, type Actor, type Context, type Over } from "@generalbusiness/artroom-derive/testing";
-import { DESTINATION, DESTINATION_KINDS, destination, destinationReceipt, destinationRulesWith, type LaneRead } from "../src/destination.ts";
+import { DESTINATION, DESTINATION_KINDS, destination, destinationReceipt, destinationRules, destinationRulesWith, type LaneRead } from "../src/destination.ts";
 import { firstExtents } from "../src/extents.ts";
 import { rulesScope } from "../src/rules-scope.ts";
 import type { JudgeEvidence, ReservationRead } from "../src/reservation.ts";
@@ -102,7 +102,7 @@ const checked = (result: ReturnType<typeof validateDefinition>): ValidDefinition
   return result.definition;
 };
 /** The destination's data, validated as a runtime validates it. */
-export const destinationDefinition = checked(validateDefinition(JSON.parse(JSON.stringify(destination)), PROPOSED_BOUNDS, PROFILES, { platform: true }));
+export const destinationDefinition = checked(validateDefinition(JSON.parse(JSON.stringify(destination)), PROPOSED_BOUNDS, PROFILES, { platform: true, outcomeValues: outcomeValueDomains(destination, destinationRules) }));
 
 const REPOSITORY = { host: "git.example", namespace: "artroom", name: "demo", id: "r1" };
 const NAME = { type: "text", max: 256 } as const;
@@ -265,7 +265,8 @@ export class Branch extends Ledger {
 
   /** A message of an entry of another scope, delivered here and judged. The entry is written if the judgment is to write. `source`: the entry that holds the send, as it is read. */
   delivered(message: Send["message"], source: Source, facts: readonly Fetched[] = [], from: FactRef = factRefOf(source.entry), write = true): Judgment {
-    const judgment = judgeDelivery(this.state, this.definition, { to: this.at, from, n: 0, message }, { clock: clockOf(this.state, this.now), bounds: this.bounds, facts, prepared: [], own: this.own, source, origin: null, platform: this.rules });
+    const origin = message.class === "result" ? this.entries[message.of.from.seq]?.entry ?? null : null;
+    const judgment = judgeDelivery(this.state, this.definition, { to: this.at, from, n: 0, message }, { clock: clockOf(this.state, this.now), bounds: this.bounds, facts, prepared: [], own: this.own, source, origin, platform: this.rules });
     if (write && judgment.result === "write") this.seal(judgment.draft);
     return judgment;
   }
@@ -340,7 +341,13 @@ export class Branch extends Ledger {
    * what is at hand, and writes the entry's `observed` and `uses` from what its rules read: nothing here seals either by hand.
    */
   outcome(operation: OperationId, attempt: number, result: "confirmed" | "refused" | "unknown", evidence: Evidence): OutcomeJudgment {
-    const judgment = settleOutcome(this.state, this.definition, { type: "outcome", operation, attempt, result, evidence }, { clock: clockOf(this.state, this.now), bounds: this.bounds, own: this.own, platform: this.rules, ...this.#atHand(operation) });
+    const hand = this.#atHand(operation);
+    const body = evidence.body;
+    // STAND-IN host answer: the test gives the resolved changed set. Its wire body names the separately retained value.
+    const changes = this.state.operation(operation)?.kind === DESTINATION_KINDS.judge && typeof body === "object" && body !== null && !Array.isArray(body) && "changes" in body ? body.changes : null;
+    const inline = typeof changes === "object" && changes !== null && !Array.isArray(changes) && !("over" in changes);
+    const wire = inline ? { ...evidence, body: { ...body as object, changes: valueDigest("artroom-changed-set-1", changes) } } : evidence;
+    const judgment = settleOutcome(this.state, this.definition, { type: "outcome", operation, attempt, result, evidence: wire }, { clock: clockOf(this.state, this.now), bounds: this.bounds, own: this.own, platform: this.rules, ...hand, ...(inline ? { values: [...hand.values ?? [], canonicalize(changes)] } : {}) });
     if (judgment.result === "write") this.seal(judgment.draft);
     return judgment;
   }
