@@ -342,8 +342,9 @@ and anchored sender entries. The generic row witnesses use made-up
 platform data. `packages/scope/test/founding-real.test.ts` replays the
 register, directory, membership, rules and destination histories through
 HTTP after the first publication and its receipt, using the platform
-package's rules and proven grants. Only the two scripted source lane
-facts are anchored. The host replies and most read authorization remain
+package's rules and proven grants. Only the four scripted source lane
+facts are anchored: manifest, check opening, check decision and merge.
+The host replies and most read authorization remain
 scripted; publication updates to that lane are still pending. None of
 these tests deploys a Worker or shows a production host. They do not close
 full I3; `docs/testing.md` states their boundaries.

@@ -491,8 +491,9 @@ destination reads real rules and membership observations and retained
 source entries, reserves the first publication, publishes it and writes
 its receipt. The test reads its holder and decision counts from SQLite
 and replays all five runtime histories over HTTP with proven grants. The
-Git host is a scripted port, and the source change lane's manifest and
-merge entries are scripted and anchored; the updates to that lane remain
+Git host is a scripted port, and the source change lane's manifest, check
+opening, check decision and merge entries are scripted and anchored;
+the updates to that lane remain
 pending. Readers are the test readers except for a separate real session
 witness. This is no deployment or production-host check, and does not
 close full I3.

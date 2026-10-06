@@ -153,6 +153,7 @@ production token delivery, browser session or cloud deployment.
 | A prior checked delivery can prove an erased text's size bound | `095b3f380` uses a successful earlier field check in the same scope, incarnation and checked prefix, including superseded tells. An equal or smaller maximum proves the deciding size check; a larger maximum leaves it ambiguous. The larger-maximum control distinguishes. No code or guard is rerun and no text size is guessed. |
 | Checker `eb03426a`: accepted outcome names could read inherited domains or lose their reservation table entry | `530e39fe6` reads only own domain declarations and builds tables without prototype setters. Strict canonical-loaded `__proto__`, `constructor` and `toString` follow ordinary validation; an explicitly declared `__proto__` held kind keeps the same positive kind, holder and addition amounts as an ordinary name. Restoring either old branch fails an assertion. No name is banned and no amount formula changes. |
 | Checker `44739493`: replay admission omitted pinned platform owners and their positive legacy closure | `8eaf531f2` uses the runtime's shared owner adapter at the final `fits` check. Actual register data/rules judge and fold genesis and a founding in memory; no host answers. Its pending creation needs 93 entries in the controlled witness, and a scripted external reservation needs four more. Tight budgets fail at the founding, sufficient budgets replay consistently, and restoring the raw-owner call fails the mismatch assertion. No capacity formula or production ceiling changes. |
+| Checker `e6e5fde8`: observation-only clauses lost retained-byte reservation when effects were omitted | `98faddb3c` retains rows independently of missing or empty effects. Canonical applied/refused/superseded forms have equal amounts; a 321-byte declared value adds 321 bytes to request, clause, holder and addition amounts. Restoring the old skip fails that positive-byte assertion. Invalid effect lists still report shape problems. Outcome-send grammar and all formulas remain unchanged. |
 
 The worker reports and the integration logs record these controls as
 `DISTINGUISHES`, by assertions. The tests label their scripted histories,
@@ -285,3 +286,16 @@ This annotation changes this note only; the gated packages tree remains
 membership failure remains separately owned under `bd5a8986`, with all
 five previous outputs retained in assertion `4049031f`. Neither this
 pass nor the diagnostic assertions credit a functional repair of it.
+
+Corrected `4b53c528` was filed as primary `00f03498` under the same
+milestone, with ordinary full review `3dea48c3`. Review `b7a616c2`
+requested the separate observation-only clause-retention correction
+`e6e5fde8`, and the requester accepted that disposition. Source
+`98faddb3c` repairs it; 34 focused holds tests and the derive typecheck
+passed, with an assertion control distinguishing the old skip. The
+replay and scope guides now name all four scripted lane anchors, as
+documentation follow-through `3bb1fd41` asks. The named-definition
+root-count countercheck was closed by supported counterevidence; no
+directory change is included. The gate at `47bc3a5be` remains historical
+after this actual source repair. The amended integrated gate will be
+recorded after it completes. All existing limits above remain open.
