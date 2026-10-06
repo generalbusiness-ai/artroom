@@ -1,0 +1,173 @@
+{
+  "head": "68ffd6371e908880b38c2c2c62d5fca9cbdeb57e",
+  "packages": [
+    {
+      "path": "packages/bytes/package.json",
+      "name": "@generalbusiness/artroom-bytes",
+      "version": "0.1.0-dev.1",
+      "private": false,
+      "exports": {
+        ".": "./src/index.ts",
+        "./web": {
+          "types": "./src/web.d.ts"
+        }
+      },
+      "bin": null,
+      "dependencies": {
+        "@generalbusiness/artroom-contract": "0.1.0-dev.1",
+        "@noble/curves": "2.4.0",
+        "@noble/hashes": "2.4.0"
+      },
+      "peerDependencies": {}
+    },
+    {
+      "path": "packages/checkers/package.json",
+      "name": "@generalbusiness/artroom-checkers",
+      "version": "0.1.0-dev.1",
+      "private": false,
+      "exports": {
+        ".": "./src/index.ts"
+      },
+      "bin": null,
+      "dependencies": {
+        "@generalbusiness/artroom-bytes": "0.1.0-dev.1",
+        "@generalbusiness/artroom-contract": "0.1.0-dev.1",
+        "@generalbusiness/artroom-git": "0.1.0-dev.1"
+      },
+      "peerDependencies": {}
+    },
+    {
+      "path": "packages/client/package.json",
+      "name": "@generalbusiness/artroom-client",
+      "version": "0.1.0-dev.1",
+      "private": false,
+      "exports": {
+        ".": "./src/index.ts"
+      },
+      "bin": null,
+      "dependencies": {
+        "@generalbusiness/artroom-bytes": "0.1.0-dev.1",
+        "@generalbusiness/artroom-contract": "0.1.0-dev.1"
+      },
+      "peerDependencies": {}
+    },
+    {
+      "path": "packages/contract/package.json",
+      "name": "@generalbusiness/artroom-contract",
+      "version": "0.1.0-dev.1",
+      "private": false,
+      "exports": {
+        ".": "./src/index.ts"
+      },
+      "bin": null,
+      "dependencies": {},
+      "peerDependencies": {}
+    },
+    {
+      "path": "packages/derive/package.json",
+      "name": "@generalbusiness/artroom-derive",
+      "version": "0.1.0-dev.1",
+      "private": false,
+      "exports": {
+        ".": "./src/index.ts",
+        "./rule": "./src/rule/index.ts",
+        "./testing": "./test/fixtures.ts"
+      },
+      "bin": null,
+      "dependencies": {
+        "@generalbusiness/artroom-bytes": "0.1.0-dev.1",
+        "@generalbusiness/artroom-contract": "0.1.0-dev.1",
+        "jsonata": "2.2.2"
+      },
+      "peerDependencies": {}
+    },
+    {
+      "path": "packages/git/package.json",
+      "name": "@generalbusiness/artroom-git",
+      "version": "0.1.0-dev.1",
+      "private": false,
+      "exports": {
+        ".": "./src/index.ts",
+        "./node": "./src/node.ts"
+      },
+      "bin": null,
+      "dependencies": {
+        "@generalbusiness/artroom-bytes": "0.1.0-dev.1",
+        "@generalbusiness/artroom-contract": "0.1.0-dev.1",
+        "@noble/hashes": "2.4.0"
+      },
+      "peerDependencies": {}
+    },
+    {
+      "path": "packages/lanes/package.json",
+      "name": "@generalbusiness/artroom-lanes",
+      "version": "0.1.0-dev.1",
+      "private": false,
+      "exports": {
+        ".": "./src/index.ts",
+        "./definitions/issue.json": "./definitions/issue.json",
+        "./definitions/change.json": "./definitions/change.json"
+      },
+      "bin": null,
+      "dependencies": {
+        "@generalbusiness/artroom-contract": "0.1.0-dev.1"
+      },
+      "peerDependencies": {}
+    },
+    {
+      "path": "packages/platform/package.json",
+      "name": "@generalbusiness/artroom-platform",
+      "version": "0.1.0-dev.1",
+      "private": false,
+      "exports": {
+        ".": "./src/index.ts",
+        "./testing": "./test/support.ts"
+      },
+      "bin": null,
+      "dependencies": {
+        "@generalbusiness/artroom-bytes": "0.1.0-dev.1",
+        "@generalbusiness/artroom-contract": "0.1.0-dev.1",
+        "@generalbusiness/artroom-derive": "0.1.0-dev.1"
+      },
+      "peerDependencies": {}
+    },
+    {
+      "path": "packages/replay/package.json",
+      "name": "@generalbusiness/artroom-replay",
+      "version": "0.1.0-dev.1",
+      "private": false,
+      "exports": {
+        ".": "./src/index.ts"
+      },
+      "bin": {
+        "artroom-replay": "./src/bin.ts"
+      },
+      "dependencies": {
+        "@generalbusiness/artroom-bytes": "0.1.0-dev.1",
+        "@generalbusiness/artroom-contract": "0.1.0-dev.1",
+        "@generalbusiness/artroom-derive": "0.1.0-dev.1"
+      },
+      "peerDependencies": {}
+    },
+    {
+      "path": "packages/scope/package.json",
+      "name": "@generalbusiness/artroom-scope",
+      "version": "0.1.0-dev.1",
+      "private": false,
+      "exports": {
+        ".": "./src/index.ts",
+        "./worker": "./src/worker.ts",
+        "./testing": "./src/testing.ts",
+        "./testing/worker": "./test/worker.ts"
+      },
+      "bin": null,
+      "dependencies": {
+        "@generalbusiness/artroom-bytes": "0.1.0-dev.1",
+        "@generalbusiness/artroom-contract": "0.1.0-dev.1",
+        "@generalbusiness/artroom-derive": "0.1.0-dev.1",
+        "@generalbusiness/artroom-platform": "0.1.0-dev.1"
+      },
+      "peerDependencies": {}
+    }
+  ]
+}
