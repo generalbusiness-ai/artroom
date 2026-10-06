@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:91a7bb773df3d4792977070baef02181a7fc4b2e","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-05-i3-contract-deltas.md."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:91be0568e0021a11858b538d1a27f392c8f73f0a","text":"Merge retired a covered predecessor; the successor is at packages/contract/src/observation.ts."}
