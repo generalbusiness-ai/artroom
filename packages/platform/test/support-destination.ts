@@ -5,16 +5,21 @@
  * Everything here but `Branch` is a STAND-IN, and each is labelled where
  * it is used.
  *
- * - `standInRules`: a rule for each mark of the destination's data that the
- *   platform package writes no rule for (`abort-if-behind`, `resend-due`,
- *   and the eight rules of `outcomes`; I3 deltas, entries ER4 to ER9). The
- *   package cannot run `platform:destination@1`. With these a test can
- *   judge its rows. `abort-if-behind` gives nothing and `resend-due` holds.
- *   The outcome of `first-head` makes the branch `ready` at the commit that
- *   the evidence names, and the outcome of `judge` reserves the oldest
- *   queued publication. They are there so that a test can reach those
- *   states. They show nothing about how the note's rows 33, 35 and e will be
- *   written.
+ * - `standInRules`: a rule for each of the two marks of the destination's
+ *   data that the platform package writes no rule for, `first-head` and
+ *   `receipt` (I3 deltas, entries ER9 and FA6). The package cannot run
+ *   `platform:destination@1`. With these a test can judge its rows. The
+ *   outcome of `first-head` makes the branch `ready` at the commit that the
+ *   read back saw. The outcome of `receipt` derives nothing. They show
+ *   nothing about how the note's two rows will be written.
+ * - The reader of a reservation, `Branch.read`: what `observed` and the
+ *   entries in `uses` say for the reservation that the rule `judge` judges
+ *   (`ReservationRead`). The test writes it by hand. No membership scope,
+ *   no rules scope and no lane answered it. The rule `judge`, its judgment
+ *   and what it yields are the package's own.
+ * - The retained observations of an outcome entry: `Branch.outcome` may
+ *   seal an entry with a member `observed` that the test wrote. The judge
+ *   of an outcome writes none yet (entries EM3 and EU4).
  * - `bureau`: a made-up directory that creates one destination scope at its
  *   founding. It stands for the real directory's genesis, below a register
  *   (authority note, section 12.1). It shows nothing of a founding.
@@ -24,63 +29,83 @@
  *   change lane (R2 section 4.2).
  * - The register's claim: one entry made by hand, read as an entry `found`
  *   under `platform:register`.
+ * - Every answer of the Git host: an outcome's evidence is written by the
+ *   test. No host, no gateway and no Git command is reached.
  *
  * `Branch` is a destination scope in memory, below such a bureau. Its
  * genesis, its confirmation, its deliveries, its acts and its outcomes are
- * judged by derive's real judges, with the destination's own rules and the
- * stand-ins.
+ * judged by derive's real judges, with the destination's own rules, the
+ * two stand-in rules and the stand-in reader.
  */
 
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { DeclaredDefinition, Entry, Evidence, FactRef, FieldValue, Input, OperationId, Request, ScopeRef, Seed, Send } from "@generalbusiness/artroom-contract";
+import type { DeclaredDefinition, Entry, Evidence, FactRef, FieldValue, Input, Observation, ObservationUse, OperationId, Request, RulesObservation, ScopeRef, Seed, Send, Timestamp } from "@generalbusiness/artroom-contract";
 import { factRefOf, intentDigest, newIncarnation, scopeIdOf, signIntent } from "@generalbusiness/artroom-bytes";
 import { PROFILES, clockOf, judgeDelivery, judgeGenesis, settleOutcome, validateDefinition } from "@generalbusiness/artroom-derive";
 import type { ActJudgment, Fetched, Judgment, OutcomeJudgment, PlatformRules, Rules, Source, StateView, ValidDefinition } from "@generalbusiness/artroom-derive";
 import { Ledger, Scope, T0, creation, d, keys, laneDefinition, sent, t, type Actor, type Context, type Over } from "@generalbusiness/artroom-derive/testing";
-import { DESTINATION, destination, destinationRules } from "../src/destination.ts";
+import { DESTINATION, destination, destinationRulesWith } from "../src/destination.ts";
+import type { JudgeEvidence, ReservationRead } from "../src/reservation.ts";
 
 export const { rita, una } = keys;
-/** Two commits, as text: the first head, and an integration commit. */
-export const [HEAD, NEXT] = ["a".repeat(40), "b".repeat(40)];
+/** Three commits and a tree, as text: the first head, an integration commit, a commit that another writer made, and the integration commit's tree. */
+export const [HEAD, NEXT, OTHER, TREE] = ["a".repeat(40), "b".repeat(40), "c".repeat(40), "d".repeat(40)];
 
 const branchOf = (state: StateView) => state.page("branch", ["empty", "ready"], null, 1).items[0]!;
 
 /**
- * STAND-INS: a rule for each mark of the destination's data that the
- * package writes no rule for. None is the note's rule.
+ * STAND-INS: a rule for each of the two marks of the destination's data
+ * that the package writes no rule for. Neither is the note's rule.
  */
 export const standInRules: Rules = {
-  "abort-if-behind": { place: "effect", most: 0, run: () => [] },
-  "resend-due": { place: "guard", refusals: [], run: () => ({ holds: true }) },
-  // The branch becomes `ready` at the commit that the evidence names. Nothing is checked of it.
+  // The branch becomes `ready` at the commit that the read back saw. Nothing is checked of it, and no receipt is opened.
   "first-head": {
     place: "outcome",
     rules: {
-      selects: false, read: true, retries: () => true,
-      derives: ({ state, input }, _operation) => {
-        const value = input.type === "outcome" && input.result === "confirmed" ? (input.evidence.body as { value: string }).value : null;
-        const branch = branchOf(state);
-        return { effects: value === null ? [] : [{ effect: "state", item: branch.id, state: "ready" }, { effect: "value", item: branch.id, slot: "head", value }], sends: [], opens: [] };
-      },
-    },
-  },
-  // The oldest queued publication is `reserved` and takes the slot. Nothing of section 6.5 is judged.
-  judge: {
-    place: "outcome",
-    rules: {
-      selects: false, read: true, retries: () => false,
+      selects: false, read: false, retries: () => true,
       derives: ({ state, input }) => {
-        const [branch, queued] = [branchOf(state), state.page("publication", ["queued"], null, 1).items[0]];
-        if (input.type !== "outcome" || input.result !== "confirmed" || !queued) return { effects: [], sends: [], opens: [] };
-        return { effects: [{ effect: "state", item: queued.id, state: "reserved" }, { effect: "ref", item: branch.id, slot: "slot", to: queued.id }], sends: [], opens: [] };
+        const seen = input.type === "outcome" && input.result === "confirmed" ? (input.evidence.body as { seen: string }).seen : null;
+        const branch = branchOf(state);
+        return { effects: seen === null ? [] : [{ effect: "state", item: branch.id, state: "ready" }, { effect: "value", item: branch.id, slot: "head", value: seen }], sends: [], opens: [] };
       },
     },
   },
-  ...Object.fromEntries(["push", "mint", "revoke", "deciding-read", "receipt", "adopt-read"].map((code) => [code, { place: "outcome", rules: { selects: false, read: true, retries: () => false } }] as const)),
+  receipt: { place: "outcome", rules: { selects: false, read: false, retries: () => false } },
 };
 
-/** The destination's rules with the stand-ins: what a judge of these tests is given. */
-export const rules: PlatformRules = { named: DESTINATION, rules: { ...destinationRules, ...standInRules } };
+/** STAND-IN: a membership scope and a rules scope that the hand-written observations name. Neither exists. */
+const observedScope = (kind: "membership" | "rules", fill: number): ScopeRef => {
+  const seed: Seed = { v: 1, kind, definition: d("f"), creator: null, cause: d(String(fill)), ordinal: 0 };
+  return { scope: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(fill)), kind };
+};
+export const [MEMBERSHIP, RULES] = [observedScope("membership", 3), observedScope("rules", 4)];
+
+/** STAND-IN: an observation of one key, written by hand. No membership scope answered it. */
+export const keyObserved = (who: Actor, at: Timestamp, over: Partial<Observation> = {}): Observation => ({
+  of: MEMBERSHIP, head: { seq: 412, hash: d("4") }, key: who.key, keyState: "active", member: who.member.member, memberState: "active", role: "maintainer", actions: ["change.merge", "change.review"],
+  within: { membership: MEMBERSHIP } as unknown as Observation["within"], controller: null, controllerActive: null, notAfter: null, definition: "platform:membership@1", at, ...over,
+});
+/** STAND-IN: an observation of the rules, written by hand. No rules scope answered it. */
+export const rulesObserved = (at: Timestamp, content: Partial<Extract<RulesObservation["content"], { asked: "rules" }>> = {}): RulesObservation => ({
+  subject: "rules", of: RULES, head: { seq: 60, hash: d("6") }, revision: 57, content: { asked: "rules", approvals: 0, ownerMayReview: true, checks: [], labels: [], ...content }, definition: "platform:rules@1", at,
+});
+/** STAND-IN: an observation as an entry retains it. */
+export const retained = (observation: Observation | RulesObservation, n: number): ObservationUse => ({ observation, read: { run: "run-1" as ObservationUse["read"]["run"], n }, use: "fresh", prior: null });
+
+/** The evidence of a `judge` whose reads found the branch at the first head and the integration commit whole, with one changed path. */
+export const FOUND: JudgeEvidence = { head: HEAD, present: true, tree: TREE, firstParent: HEAD, ancestors: [], changes: { paths: ["src/a.ts"], links: [], unreadable: 0 } };
+
+/**
+ * STAND-IN: what `observed` and `uses` say for a reservation that nothing
+ * stands against: rita signed the `merge` and holds `change.merge`, the
+ * rules ask no approval and no check, and the manifest is complete, from
+ * the first head to the integration commit.
+ */
+export const reading = (at: Timestamp, over: Partial<ReservationRead> = {}): ReservationRead => ({
+  merger: keyObserved(rita, at), rules: rulesObserved(at), extents: null, singleControllerException: false,
+  manifest: { base: HEAD, integration: NEXT, tree: TREE, reports: [], authors: [], complete: true },
+  controllersOfAuthors: [], controllers: null, verdicts: [], checks: {}, ...over,
+});
 
 const checked = (result: ReturnType<typeof validateDefinition>): ValidDefinition => {
   if (!result.ok) throw new Error(`a definition of test support is refused: ${JSON.stringify(result.problems)}`);
@@ -174,6 +199,10 @@ export class Branch extends Ledger {
   /** STAND-IN: a lane in memory, whose genesis was made by hand. It is read as a lane under `change`. */
   readonly lane = new Scope(laneDefinition);
   readonly other = new Scope(laneDefinition, keys.una.member, true, 1);
+  /** STAND-IN: what `observed` and `uses` say for the next reservation that the rule `judge` judges. Null: nothing is at hand, as in the runtime. */
+  read: ReservationRead | null = null;
+  /** The destination's rules, with the stand-in reader and the two stand-in rules: what a judge of these tests is given. */
+  readonly rules: PlatformRules = { named: DESTINATION, rules: { ...destinationRulesWith(() => this.read), ...standInRules } };
 
   constructor(importing: boolean) {
     super(destinationDefinition, "platform:destination");
@@ -187,7 +216,7 @@ export class Branch extends Ledger {
     const seed: Seed = { v: 1, kind: "directory", definition: bureauDefinition.digest, creator: null, cause: intentDigest(founding.intent), ordinal: 0 };
     this.bureau.seal(written(judgeGenesis(this.bureau.state, bureauDefinition, { name: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(1)), seed, founding }, { clock: clockOf(this.bureau.state, T0), bounds: PROPOSED_BOUNDS, facts, prepared: [], source: null })));
     const { asked, source } = creation(this.bureau, 0);
-    this.seal(written(judgeGenesis(this.state, destinationDefinition, asked, { clock: clockOf(this.state, T0), bounds: PROPOSED_BOUNDS, facts, prepared: [], source, platform: rules })));
+    this.seal(written(judgeGenesis(this.state, destinationDefinition, asked, { clock: clockOf(this.state, T0), bounds: PROPOSED_BOUNDS, facts, prepared: [], source, platform: this.rules })));
   }
 
   /** The bureau records the `applied` result and sends the confirmation, which makes the destination active. */
@@ -201,7 +230,7 @@ export class Branch extends Ledger {
 
   /** A message of an entry of another scope, delivered here and judged. The entry is written if the judgment is to write. `source`: the entry that holds the send, as it is read. */
   delivered(message: Send["message"], source: Source, facts: readonly Fetched[] = [], from: FactRef = factRefOf(source.entry), write = true): Judgment {
-    const judgment = judgeDelivery(this.state, this.definition, { to: this.at, from, n: 0, message }, { clock: clockOf(this.state, this.now), bounds: this.bounds, facts, prepared: [], own: this.own, source, origin: null, platform: rules });
+    const judgment = judgeDelivery(this.state, this.definition, { to: this.at, from, n: 0, message }, { clock: clockOf(this.state, this.now), bounds: this.bounds, facts, prepared: [], own: this.own, source, origin: null, platform: this.rules });
     if (write && judgment.result === "write") this.seal(judgment.draft);
     return judgment;
   }
@@ -239,21 +268,60 @@ export class Branch extends Ledger {
 
   /** An act, judged with the destination's rules and the stand-ins. Every key of the fixture set holds every action here. */
   override act(who: Actor, kind: string, over: Over = {}, context: Context = {}): ActJudgment {
-    return super.act(who, kind, over, { platform: rules, ...context });
+    return super.act(who, kind, over, { platform: this.rules, ...context });
   }
 
-  /** An outcome of one attempt, as the operations driver offers it, judged with the stand-in rules of `outcomes`. It is written if the judgment is to write. */
-  outcome(operation: OperationId, attempt: number, result: "confirmed" | "refused" | "unknown", evidence: Evidence): OutcomeJudgment {
-    const judgment = settleOutcome(this.state, this.definition, { type: "outcome", operation, attempt, result, evidence }, { clock: clockOf(this.state, this.now), bounds: this.bounds, own: this.own, platform: rules });
-    if (judgment.result === "write") this.seal(judgment.draft);
+  /**
+   * An outcome of one attempt, as the operations driver offers it. It is written if the judgment is to write. `observed`: STAND-IN
+   * for the observations that the entry would retain, which the judge of an outcome does not write yet.
+   */
+  outcome(operation: OperationId, attempt: number, result: "confirmed" | "refused" | "unknown", evidence: Evidence, observed?: readonly ObservationUse[]): OutcomeJudgment {
+    const judgment = settleOutcome(this.state, this.definition, { type: "outcome", operation, attempt, result, evidence }, { clock: clockOf(this.state, this.now), bounds: this.bounds, own: this.own, platform: this.rules });
+    if (judgment.result === "write") this.seal(observed ? { ...judgment.draft, input: { ...judgment.draft.input, observed } as Input } : judgment.draft);
     return judgment;
   }
+  /** The answer of the host to one attempt, as an outcome with the basis `own-answer`. */
+  answered(operation: OperationId, attempt: number, result: "confirmed" | "refused", body: unknown, observed?: readonly ObservationUse[]): OutcomeJudgment {
+    return this.outcome(operation, attempt, result, { basis: "own-answer", body } as Evidence, observed);
+  }
+  /** An attempt that no answer came for: the outcome that the driver offers, with the body that the owner's rule states for it. */
+  lost(operation: OperationId, attempt: number): OutcomeJudgment {
+    const of = this.state.operation(operation)!;
+    const rule = this.rules.rules[destination.outcomes[of.kind]!.code]!;
+    const body = rule.place === "outcome" ? (rule.rules.unknown?.(this.state, of, attempt, this.own) ?? null) : null;
+    return this.outcome(operation, attempt, "unknown", { basis: "none", body } as Evidence);
+  }
 
-  /** The branch has its first head, by the STAND-IN outcome of `first-head`: a read that shows the commit. The operation is the one that the genesis declared. */
+  /** The branch has its first head, by the STAND-IN outcome of `first-head`: its own answer, with a read back that shows the commit. The operation is the one that the genesis declared. */
   ready(): this {
     this.confirmed();
-    if (this.outcome("0:0", 1, "confirmed", { basis: "read", body: { ref: "refs/heads/main", value: HEAD, reported: "created" } }).result !== "write") throw new Error("the stand-in first head was not written");
+    if (this.answered("0:0", 1, "confirmed", { send: "accepted", seen: HEAD }).result !== "write") throw new Error("the stand-in first head was not written");
     return this;
+  }
+
+  /**
+   * A `reserve` from the lane, and the outcome of its `judge`: by the STAND-IN reader, rita's `merge` is reserved. The entry
+   * retains the reader's hand-written observations of the merger's key and of the rules. It gives the publication, its `merge`
+   * entry, the entry that reserved it, and the push and the mint that the reservation opened.
+   */
+  reserved(over: Partial<ReservationRead> = {}): { publication: number; merge: Entry; at: number; push: OperationId; mint: OperationId } {
+    const { merge } = this.reserve();
+    const publication = this.head.seq;
+    const read = (this.read = reading(this.now, over));
+    const judgment = this.answered(`${publication}:0`, 1, "confirmed", FOUND, [retained(read.merger!, 1), retained(read.rules!, 2)]);
+    if (judgment.result !== "write" || this.item(publication).state !== "reserved") throw new Error(`the reservation was not written: ${JSON.stringify(judgment)}`);
+    const at = this.head.seq;
+    return { publication, merge, at, push: `${at}:0`, mint: `${at}:1` };
+  }
+
+  /**
+   * STAND-IN for the directory's `compromised` notice (section 12.1, "Messages between scopes"): a `tell` from the bureau, with the
+   * key, its member and a `revoke-key` entry of membership that is made by hand.
+   */
+  compromised(who: Actor): Judgment {
+    const entry = handMade(MEMBERSHIP, "revoke-key");
+    const message: Request = { class: "request", type: "tell", body: { message: "compromised", fields: { key: who.key, member: who.member, entry: factRefOf(entry) } } };
+    return this.from(this.bureau.at, "platform:directory", "compromised", message, [fetched(entry, "platform:membership")]).judgment;
   }
 
   get branch() { return this.item(0); }

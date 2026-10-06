@@ -211,7 +211,7 @@ the designs, and is no review of this source.
   Its selecting outcome creates the directory, whose genesis creates
   membership and the rules scope. The creation of the destination is
   answered `unsupported-definition`: `platform:destination@1` lacks
-  rules. `test/founding-real.test.ts` shows it on real scopes. The
+  two rules, `first-head` and `receipt`. `test/founding-real.test.ts` shows it on real scopes. The
   production outside port sends nothing, so under the production wiring
   no repository is created at a host and a claim stays `pending`.
 - A directory under `platform:directory@1` records its membership

@@ -126,12 +126,14 @@ describe("a founding on real scopes under the deployed class (authority note, se
     // that its seed names records nothing: transport answers `retry`, `unsupported-definition`, because a runtime with this package
     // lacks a rule for these marks of `platform:destination@1`, and a version with a mark and no rule runs nothing (the contract's
     // section 6.1). So the destination does not exist, the duty stays with the directory, and the founding is not whole.
-    // I3 merge: the names below are the marks of the destination's data that have no rule at this head. Each step that writes one of
-    // them (plan steps 9e and 9f) shortens the list. When it is empty the destination answers its creation, this part of the witness
-    // is replaced by the rest of the founding, and step 10 can follow.
+    // I3 merge: the names below are the marks of the destination's data that have no rule at this head: the two rules of plan step
+    // 9f that wait on two details asked of the contract (authority note, revision 26, section 12.1.5, "The founding commit, and the
+    // receipt"; I3 deltas, entries ER9 and FA1). Steps 9b and 9e, and the other rules of step 9f, are written. When the list is
+    // empty the destination answers its creation, this part of the witness is replaced by the rest of the founding, and step 10
+    // can follow.
     const { entry, hash } = (await D.sealed())[0]!;
     const create = entry.sends.find((send) => send.n === 3)!;
-    expect(lacking("platform:destination@1")).toEqual(["resend-due", "abort-if-behind", "first-head", "judge", "push", "mint", "revoke", "deciding-read", "receipt", "adopt-read"]);
+    expect(lacking("platform:destination@1")).toEqual(["first-head", "receipt"]);
     expect([lacking(REGISTER), lacking(DIRECTORY), lacking("platform:membership@1"), lacking("platform:rules@1")]).toEqual([[], [], [], []]);
     expect([
       await destination!.stub.deliver({ to: create.to, from: { at: directory, seq: 0, hash }, n: 3, message: create.message }),
