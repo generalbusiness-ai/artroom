@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:1c6010510804cdd15dfc008487455315761f827c","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-05-i3-git-review.md."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:1d31b6fbf4126522d445e7eaef19ce9896f8d1dd","text":"Merge retired a covered predecessor; the successor is at packages/derive/src/genesis.ts."}
