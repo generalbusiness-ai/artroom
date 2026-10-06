@@ -126,7 +126,8 @@ effect recorded as an operation before it is sent and sent at most once.
 founding-real and operations files, 1.42 s; the one that matters most for
 the lost reply above is T19: "an attempt is recorded before it is sent,
 and sent at most once; a stop between the send and the outcome leaves
-`unknown`", which a restart, elapsed time or a later attempt resolves.
+`unknown`", which a restart, elapsed time or a later attempt does not settle;
+its own late answer does.
 
 What the story does not reach: the destination (two rules missing, their
 forms answered by contract revision 20 but not yet adopted), any
