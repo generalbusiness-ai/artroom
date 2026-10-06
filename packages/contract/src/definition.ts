@@ -115,8 +115,15 @@ export type AlsoRule =
 /** What a guard or effect is about: the primary item, another named item, or the scope. */
 export type Subject = "on" | `also.${string}` | "scope";
 
-/** What an act or handler settles: an item in stated states, or a relationship copy in stated states (section 17). */
-export type Settles = { of: Subject; in: readonly string[] } | { copy: readonly string[] };
+/**
+ * What an act or handler settles (sections 6.4 and 17): an item in stated
+ * states; a relationship copy in stated states; or, from revision 21, an
+ * item by a mark that the entry sets. In the third form `sets` names a
+ * value slot of the subject's type that is a truth value, required, with
+ * the default `false`, and not fixed. An item awaits the settlement while
+ * its state is one of `in` and that slot is `false`.
+ */
+export type Settles = { of: Subject; in: readonly string[] } | { copy: readonly string[] } | { of: Subject; sets: string; in: readonly string[] };
 
 // ---------------------------------------------------------------- section 6.5
 

@@ -7,7 +7,9 @@
 import type { FieldType } from "@generalbusiness/artroom-contract";
 import { canonicalize, isScopeKind } from "@generalbusiness/artroom-bytes";
 import { isObject, own } from "../values.ts";
+import { alsoMark, bound, type Selecting } from "./binding.ts";
 import { mark, marked, naming, onSubject, subject, type ClauseSet, type Ctx, type Defining, type Duties, type Type } from "./context.ts";
+import { settlesByMark } from "./markers.ts";
 import { effects, setsSlot } from "./effects.ts";
 import { declaredFields, fieldType } from "./fields.ts";
 import { guards } from "./guards.ts";
@@ -46,7 +48,7 @@ function opens(top: Rec, kind: string, type: string): boolean {
  * of them: its rule reads the input and the state of the entry that it is
  * run in, and no text says how a later entry would select the item again.
  */
-function also(d: Defining, v: unknown, path: string, fields: Map<string, FieldType>, on: Type | null, top: Rec): { types: Map<string, Type>; unsettled: Set<string> } {
+function also(d: Defining, v: unknown, path: string, fields: Map<string, FieldType>, on: Type | null, top: Rec, binds: ({ name: string } & Selecting) | null = null): { types: Map<string, Type>; unsettled: Set<string>; marked: Set<string>; through: Set<string> } {
   const { bounds, types, bad, rec, form, entries } = d;
   const out = new Map<string, Type>();
   const via = new Map<string, { of: string; slot: unknown; path: string }>();
@@ -61,7 +63,9 @@ function also(d: Defining, v: unknown, path: string, fields: Map<string, FieldTy
     if (name === "on") bad("shape", p, "an also entry is not named on");
     if (d.platform && marked(a)) {
       // Section 6.1, place 2: the rule gives one local item of the type that the mark states, or none.
-      const o = mark(d, a, p, "also", ["item"]);
+      // Section 17.2a, revision 23: the mark that binds the name which `bound.of` names is a binding selector, and states `index`
+      // and `key`. No other mark at place 2 states either.
+      const o = alsoMark(d, a, p, binds?.name === name ? binds : null);
       const t = o && typeof o["item"] === "string" ? types.get(o["item"]) : undefined;
       if (o && !t) bad("name", p, "names no item type");
       if (t) { out.set(name, t); selected.add(name); }
@@ -87,6 +91,8 @@ function also(d: Defining, v: unknown, path: string, fields: Map<string, FieldTy
   // A canonical definition keeps no order of its names. So a `via` is resolved after the subject it reads, whatever the order, and
   // no chain of them may lead back to itself.
   const unsettled = new Set<string>(selected);
+  /** The names that are reached through a slot of a name which a mark binds. */
+  const through = new Set<string>();
   for (const [name, { of, slot, path: p }] of via) {
     const from = of === "on" ? on : out.get(of.slice(5));
     const read = typeof slot === "string" ? from?.slots.get(slot) : undefined;
@@ -103,11 +109,11 @@ function also(d: Defining, v: unknown, path: string, fields: Map<string, FieldTy
       if (typeof read.slot !== "string" || source?.slots.get(read.slot)?.fixed !== true) settled = false;
       link = read.of === "on" ? null : read.of.slice(5);
       // A chain that ends at a name which a mark selects cannot be followed again by a later entry.
-      if (link !== null && selected.has(link)) settled = false;
+      if (link !== null && selected.has(link)) { settled = false; through.add(name); }
     }
     if (!settled) unsettled.add(name);
   }
-  return { types: out, unsettled };
+  return { types: out, unsettled, marked: selected, through };
 }
 
 /** True when a written list of effects of platform data holds a mark, whose rule may set a slot (section 6.1, place 5). */
@@ -131,9 +137,9 @@ function entrySends(d: Defining, path: string, declared: number, told: number, p
  * name and the kind of scope that owns it. Null: it declares none, or what
  * it declares is refused.
  */
-function settling(d: Defining, v: unknown, path: string, ctx: Ctx, copy: { name: string; kind: string } | null): Duties["settles"] {
+function settling(d: Defining, v: unknown, path: string, ctx: Ctx, copy: { name: string; kind: string } | null, top: Rec): Duties["settles"] {
   const { bad, form, rec, names, list } = d;
-  const f = form(v, path, ["of", "copy"], ["in"]);
+  const f = form(v, path, ["of", "copy"], ["in", "sets"]);
   if (!f) return null;
   if (f[0] === "copy") {
     if (!rec(v, path, ["copy"])) return null;
@@ -142,13 +148,17 @@ function settling(d: Defining, v: unknown, path: string, ctx: Ctx, copy: { name:
     if (states.length === 0 || !states.every((s) => typeof s === "string" && s !== "")) return bad("shape", at(path, "copy"), "is a list of states of the relationship, and is not empty");
     return { copy: states as string[], ...copy };
   }
-  const r = rec(v, path, ["of", "in"]);
+  // Revision 21: the third form, `{ of, sets, in }`, settles the item by a mark that the entry sets.
+  const r = rec(v, path, ["of", "in"], ["sets"]);
   const s = r && subject(d, r["of"], at(path, "of"), ctx, false);
   if (!r || !s || s === "scope") return null;
   // The item it opens is in no state before the entry, so it awaits nothing.
   if (ctx.nascent && onSubject(r["of"])) return bad("name", at(path, "of"), "an entry settles an item that exists before it, and not the one it opens");
   const states = names(r["in"], at(path, "in"), s.states, "state");
-  return states.length === 0 || states.some((state) => !s.states.has(state)) ? null : { subject: r["of"] as string, type: s.name, states };
+  if (states.length === 0 || states.some((state) => !s.states.has(state))) return null;
+  if (!("sets" in r)) return { subject: (r["of"] as string | undefined) ?? "on", type: s.name, states };
+  const slot = settlesByMark(d, r, s, states, path, top);
+  return slot === null ? null : { subject: (r["of"] as string | undefined) ?? "on", type: s.name, states, slot };
 }
 
 /** What a list of effects can set, read while `read` validates it, with the item the entry opens in its initial state. */
@@ -198,7 +208,7 @@ export function acts(d: Defining, v: unknown, timed: Readonly<Record<string, unk
     if (step === "comment") for (const k of ["guards", "effects", "sends"]) if (!Array.isArray(o[k]) || o[k].length > 0) bad("shape", at(path, k), "a comment has none");
     if (step === "comment" && ctx.also.size > 0) bad("shape", at(path, "also"), "a comment names no other item");
     guards(d, o["guards"], at(path, "guards"), ctx, true);
-    const duties: Duties = { path, settles: "settles" in o ? settling(d, o["settles"], at(path, "settles"), ctx, null) : null, sets: [], requests: [] };
+    const duties: Duties = { path, settles: "settles" in o ? settling(d, o["settles"], at(path, "settles"), ctx, null, top) : null, sets: [], requests: [] };
     duties.sets = setsOf(d, step === "open" ? on : null, () => effects(d, o["effects"], at(path, "effects"), ctx, false));
     // A child's genesis sends the platform's one result beside what its act declares.
     entrySends(d, path, sends(d, o["sends"], at(path, "sends"), ctx, top, duties.requests), attention(d, o["attention"], at(path, "attention"), ctx), name === top["genesis"] ? 1 : 0);
@@ -223,7 +233,7 @@ export function receives(d: Defining, v: unknown, top: Rec): void {
   const handled = new Set<string>();
   for (const [name, hv] of entries(v, "receives", bounds.receives)) {
     const path = at("receives", name);
-    const o = rec(hv, path, ["message", "class", "from", "fields", "opens", "also", "guards", "effects", "sends", "attention"], ["copies", "settles"]);
+    const o = rec(hv, path, ["message", "class", "from", "fields", "opens", "also", "guards", "effects", "sends", "attention"], ["copies", "settles", ...(d.platform ? ["bound"] : [])]);
     if (!o) continue;
     const message = str(o["message"], at(path, "message"));
     const cls = o["class"];
@@ -251,11 +261,14 @@ export function receives(d: Defining, v: unknown, top: Rec): void {
     // A handler has no signer. Section 6.5: it has a sender and a source entry, and a handler of a relationship has the update being
     // applied. The item it opens may not exist before the entry, so no guard and no `via` reads it. The kind of its entry is its
     // message's name (section 6.2); the entry of an advisory has none.
-    const named = also(d, o["also"], at(path, "also"), fields, null, top);
+    // Section 17.2a: the name of `also` that `bound.of` names. A mark that binds it is the handler's binding selector.
+    const of = isObject(o["bound"]) && typeof o["bound"]["of"] === "string" && o["bound"]["of"].startsWith("also.") ? o["bound"]["of"].slice(5) : null;
+    const named = also(d, o["also"], at(path, "also"), fields, null, top, of === null ? null : { name: of, message, fields, written: o["fields"] });
+    if ("bound" in o) bound(d, o["bound"], at(path, "bound"), { tell: cls === "tell", opens: o["opens"], message, fields }, named);
     const ctx: Ctx = { ...naming(), on, also: named.types, nascent: on !== null, fields, kind: cls === "advisory" ? null : message, handler: { update: cls === "relate", under: typeof from?.["under"] === "string" ? from["under"] : null }, unsettled: named.unsettled };
     guards(d, o["guards"], at(path, "guards"), ctx, true);
     const copy = cls === "relate" && message !== null && isScopeKind(from?.["kind"]) ? { name: message, kind: from["kind"] } : null;
-    const duties: Duties = { path, settles: "settles" in o ? settling(d, o["settles"], at(path, "settles"), ctx, copy) : null, sets: [], requests: [] };
+    const duties: Duties = { path, settles: "settles" in o ? settling(d, o["settles"], at(path, "settles"), ctx, copy, top) : null, sets: [], requests: [] };
     duties.sets = setsOf(d, on, () => effects(d, o["effects"], at(path, "effects"), ctx, false));
     // The entry that decides a request sends the platform's one result.
     entrySends(d, path, sends(d, o["sends"], at(path, "sends"), ctx, top, duties.requests), attention(d, o["attention"], at(path, "attention"), ctx), cls === "advisory" ? 0 : 1);

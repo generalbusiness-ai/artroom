@@ -98,6 +98,14 @@ export interface Draft {
    * reservation, and is not asked whether it fits. It is in no entry.
    */
   settles?: boolean;
+  /**
+   * Section 17.2a, "A request that is bound to a holder": the delivery is
+   * bound to that item, for that message, on the state before the entry.
+   * Its deciding entry is settling whatever it decides, and draws 1 from
+   * the item's count for the message. It is in no entry: the fold of the
+   * reservation ledger derives the draw from the entry and the state.
+   */
+  bound?: { item: number; message: string };
 }
 
 /** `name`: the reason the failed guard declares, if it declares one. `detail` is for the caller and is in no entry. */

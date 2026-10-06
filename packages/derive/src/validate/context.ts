@@ -11,7 +11,12 @@ import type { Underived } from "./capability.ts";
 import type { Shapes } from "./shape.ts";
 
 export interface Slot { kind: "party" | "ref" | "value"; fixed: boolean; required: boolean; list: boolean; type: FieldType; hasDefault: boolean }
-export interface Type { name: string; states: Map<string, boolean>; initial: string; slots: Map<string, Slot> }
+/**
+ * An item type as it was read. `indexes`: the slots that the type declares as indexed, in platform data (section 17.2a, revision
+ * 23). `decisions`: for each message name that the type's `holds` lists in `decisions`, its count (revision 21). Each is absent
+ * where the type states none.
+ */
+export interface Type { name: string; states: Map<string, boolean>; initial: string; slots: Map<string, Slot>; indexes?: readonly string[]; decisions?: ReadonlyMap<string, number> }
 
 /** What the forms of one act, handler or timed rule may name. */
 export interface Ctx {
@@ -48,13 +53,14 @@ export type ClauseSet = { subject: string; type: string; state?: string; slot?: 
  * What one act or handler can start, as the reservations of section 17.2
  * read it. `settles`: an item of that type in those states, which that
  * subject names; or a copy of that relationship, owned by a scope of that
- * kind, in those states. `sets`: what its own effects can set, and the item
- * it opens. `requests`: each request among its send forms, with the most
+ * kind, in those states. `slot`, of an item: the mark that the entry sets,
+ * where the form settles by a mark (revision 21, section 6.4). `sets`: what
+ * its own effects can set, and the item it opens. `requests`: each request among its send forms, with the most
  * sends that form can make and what each reserved clause can set.
  */
 export interface Duties {
   path: string;
-  settles: { subject: string; type: string; states: readonly string[] } | { copy: readonly string[]; name: string; kind: string } | null;
+  settles: { subject: string; type: string; states: readonly string[]; slot?: string } | { copy: readonly string[]; name: string; kind: string } | null;
   sets: ClauseSet;
   requests: { most: number; clauses: readonly ClauseSet[] }[];
 }
@@ -113,7 +119,15 @@ export interface Defining extends Shapes {
   readonly platform: boolean;               // the platform option: the data of a platform definition, which may hold a mark at seven places (section 6.1)
   readonly marks: MarkPlace[];              // each mark that was read, with its place
   readonly places: Map<string, number>;     // section 6.2, revision 19: each byte domain that a field of an act states for a value, with its one bound
+  readonly valueSets: ValueSet[];           // each written `value` effect that was read, for the rule that a mark is set only to `true` (section 6.4, revision 21)
+  readonly bindings: Binding[];             // each handler that states `bound`, for the checks of `decisions` (section 17.2a, revision 21)
 }
+
+/** One written `value` effect: the type and the slot that it sets, where it stands, and whether it sets the constant `true`. */
+export interface ValueSet { type: string; slot: string; path: string; constant: boolean }
+
+/** One handler that states `bound`: its message, the item type that its `bound.of` names, and where it stands. */
+export interface Binding { message: string; type: string; path: string }
 
 export const onSubject = (of: unknown) => of === undefined || of === "on";
 

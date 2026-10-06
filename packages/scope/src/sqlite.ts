@@ -56,6 +56,14 @@ export interface Sql {
  *   at the attempt next, the time written before its one request left, and
  *   the entry that recorded its first outcome. `attempt_due` indexes the
  *   attempts with no outcome.
+ * - `item_key`: the indexes that an item type declares (section 17.2a,
+ *   revision 23): one row for each indexed slot of each item, live and
+ *   final, written with the item by the entry that opens it. Its primary
+ *   key is the lookup: a type, a slot and a key give the item IDs in
+ *   order. No row is changed or removed. `folded` holds, under `keyed`,
+ *   how many rows a type and slot have, so that a lookup knows from one
+ *   read whether the index holds every item of the type. It is derived
+ *   state, and `all` reads none of it.
  * - `retained_input`: section 9.2; see `Retained`.
  * - `retained_value`: the retained inputs of the kind `value` (sections 6.2
  *   and 9.2, revision 19). A value is kept under its byte domain and its
@@ -87,6 +95,7 @@ CREATE INDEX IF NOT EXISTS record_by_state ON record (capability, kind, state);
 CREATE TABLE IF NOT EXISTS prepared (intent TEXT NOT NULL, capability TEXT NOT NULL, step TEXT NOT NULL, seq INTEGER NOT NULL, PRIMARY KEY (intent, capability, step)) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS retained_input (kind TEXT NOT NULL, digest TEXT NOT NULL, bytes TEXT NOT NULL, under TEXT, PRIMARY KEY (kind, digest)) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS retained_value (domain TEXT NOT NULL, digest TEXT NOT NULL, bytes TEXT NOT NULL, PRIMARY KEY (domain, digest)) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS item_key (type TEXT NOT NULL, slot TEXT NOT NULL, key TEXT NOT NULL, id INTEGER NOT NULL, PRIMARY KEY (type, slot, key, id)) WITHOUT ROWID;
 `;
 
 /** A send that is still to be dispatched: not held, not acknowledged, and for a request with no result and no diagnosis. */
@@ -220,6 +229,16 @@ export class SqliteStore implements Store {
   }
 
   /**
+   * Section 17.2a: one ordered read of `item_key`, of at most `limit` rows, after two small reads that say whether the index holds
+   * every item of the type. So a lookup does not grow with the items that the scope retains.
+   */
+  lookup(type: string, slot: string, key: string, limit: number): readonly number[] | null {
+    const items = this.#one("SELECT COALESCE(SUM(n), 0) AS n FROM item_count WHERE type = ?", type)!["n"] as number;
+    if ((this.#folded<number>("keyed", canonicalize([type, slot])) ?? 0) !== items) return null;
+    return this.#all("SELECT id FROM item_key WHERE type = ? AND slot = ? AND key = ? ORDER BY id LIMIT ?", type, slot, key, limit).map((row) => row["id"] as number);
+  }
+
+  /**
    * Everything, for a checkpoint: the one read that is not bounded. The rows
    * are put in derive's `MemoryState`, whose snapshot fixes the order of each
    * list, so the digest is the one a verifier computes.
@@ -234,6 +253,8 @@ export class SqliteStore implements Store {
       if (row["kind"] === "relation") memory.putRelation(json(row["value"]));
       else if (row["kind"] === "creation") memory.putCreation(row["key"] as Digest, json(row["value"]));
       else if (row["kind"] === "observed") memory.putObserved(json(row["value"]));
+      // The count of a declared index is derived state: a checkpoint holds no row of it.
+      else if (row["kind"] === "keyed") continue;
       else memory.putTexts(...json<[number, string, Digest[]]>(row["value"]));
     }
     for (const row of this.#all("SELECT value FROM operation ORDER BY seq, k")) memory.putOperation(json(row["value"]));
@@ -283,6 +304,10 @@ export class SqliteStore implements Store {
   }
   putCreation(seed: Digest, held: HeldCreation): void { this.#fold("creation", seed, held); }
   putObserved(head: ObservedHead): void { this.#fold("observed", canonicalize([head.of.scope, head.of.inc, head.subject]), { of: { scope: head.of.scope, inc: head.of.inc }, subject: head.subject, seq: head.seq }); }
+  putIndexed(type: string, slot: string, key: string, item: number): void {
+    this.#run("INSERT INTO item_key (type, slot, key, id) VALUES (?, ?, ?, ?)", type, slot, key, item);
+    this.#fold("keyed", canonicalize([type, slot]), (this.#folded<number>("keyed", canonicalize([type, slot])) ?? 0) + 1);
+  }
   putOperation(operation: Operation): void {
     const [seq, k] = partsOf(operation.id);
     const { opened, unknown, unopened } = pendingOf(operation);

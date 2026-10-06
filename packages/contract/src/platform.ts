@@ -25,7 +25,7 @@
  * | 7 | `outcomes`, by the kind of each operation that the definition owns | `OutcomeMark` |
  */
 
-import type { ActType, AlsoRule, DeclaredDefinition, EffectForm, FieldType, Guard, ItemType, ReceiveType, ResultClauses, SendForm, SlotRule } from "./definition.ts";
+import type { ActType, AlsoRule, DeclaredDefinition, EffectForm, FieldType, Guard, ItemType, ReceiveType, ResultClauses, SendForm, SlotRule, Subject, Where } from "./definition.ts";
 import type { FieldValue } from "./intent.ts";
 
 /**
@@ -40,6 +40,34 @@ export interface Mark { code: string; row: string }
 export type GrantMark = Mark & { grant?: string };
 /** Place 2. The rule gives one local item of the type `item`, or none. */
 export type AlsoMark = Mark & { item: string };
+/**
+ * Place 2, where the mark binds the name that the `bound.of` of its handler
+ * names: a binding selector (revision 23, section 17.2a, "The source of
+ * `bound.of`"). It states five members and no other. `index` names a slot
+ * that the `indexes` of the type `item` lists. `key` names a required field
+ * of the handler whose type is the type of that slot. Its rule is given the
+ * items that the index returns for the value of that field, and the fields
+ * of the message, and nothing else.
+ */
+export type BindingMark = AlsoMark & { index: string; key: string };
+/**
+ * On a `tell` handler whose `opens` is null (revision 21, section 17.2a, "A
+ * request that is bound to a holder"): the item that a delivery is bound
+ * to, and the conditions of the binding. `of` is a name of `also`. Each
+ * `where` reads the sender, the message's own fields and the slots of that
+ * item, and nothing else.
+ */
+export interface Bound { of: Subject; where: readonly Where[] }
+/**
+ * What one item of a type reserves from the entry that opens it (section
+ * 17.2a). This revision of the source reads one member: `decisions`, by the
+ * message name of a `tell` handler that states `bound`, the most bound
+ * requests that are decided for one item.
+ *
+ * I3 merge: the members `operations`, `requests` and `items` of the
+ * contract's `Held` are row I3-44's, and are joined to this type there.
+ */
+export interface Held { decisions?: Record<string, number> }
 /** Place 3. The data states no shape for the value: the rule says whether a value is of the type. */
 export type TypeMark = Mark & { type: "code" };
 /**
@@ -98,12 +126,22 @@ export type PlatformAct = Omit<ActType, "grant" | "fields" | keyof MarkedForms> 
   grant: string | GrantMark;
   fields: Record<string, (PlatformFieldType | ValuePlace) & { required: boolean; default?: FieldValue }>;
 };
-export type PlatformReceive = Omit<ReceiveType, "fields" | keyof MarkedForms> & MarkedForms & {
+export type PlatformReceive = Omit<ReceiveType, "fields" | "also" | keyof MarkedForms> & Omit<MarkedForms, "also"> & {
+  also: Record<string, AlsoRule | AlsoMark | BindingMark>;
   fields: Record<string, PlatformFieldType & { required: boolean }>;
+  bound?: Bound;
 };
+/**
+ * `indexes` (revision 23, section 17.2a, "An index that an item type
+ * declares"): one to four of the type's own slots of `refs` or of `values`,
+ * each fixed and required and of one of seven types. The scope keeps, for
+ * each, one row for each item of the type, from the entry that opens it.
+ */
 export type PlatformItem = Omit<ItemType, "refs" | "values"> & {
   refs: Record<string, SlotRule & { to: PlatformFieldType }>;
   values: Record<string, SlotRule & { of: PlatformFieldType; default?: FieldValue }>;
+  indexes?: readonly string[];
+  holds?: Held;
 };
 
 /**

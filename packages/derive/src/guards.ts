@@ -64,6 +64,9 @@ export interface Judging {
   platform?: PlatformRules | undefined;                // the rules of the platform definition that the scope pins. Without them a mark is a fault
   judged?: JudgedInput | undefined;                    // the input of the entry being judged, whole, as a rule is given it
   ran?: { clock: boolean } | undefined;                // one for a judgment: whether a rule that reads the clock was run for it
+  settling?: boolean | undefined;                      // the form of the row declares `settles`: an effect that a rule returns changes no state (section 6.4, revision 22)
+  bound?: boolean | undefined;                         // the delivery is bound to an item (section 17.2a): an `open` effect of a rule is a fault
+  outcome?: { selected: boolean | null; further: boolean } | undefined;   // an outcome: what the ledger derived before the owner's effects, which its rules are given (section 6.1, revision 20)
   coded?: Map<Guard, Declined> | undefined;            // each guard that is a mark and did not hold, with the refusal its rule states
   beside?: AtHand | undefined;                         // the further observations and the values at hand for this entry, and what its rules read of them (sections 4.1 and 6.2)
 }

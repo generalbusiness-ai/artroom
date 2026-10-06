@@ -149,6 +149,9 @@ export function effect(d: Defining, v: unknown, path: string, ctx: Ctx, later: b
         if (sl.type.type !== "time") bad("name", p, "the commit time goes in a slot of type time");
       } else if (from !== null) source(from, at(p, "from"), sl.type);
       d.clause?.push({ subject: sk, type: s.name, slot: String(r["slot"]) });
+      // Section 6.4, "`settles` by a mark": a mark is set once, so a written effect on it is a `value` effect of the constant `true`.
+      // Which slots are marks is known when every form is read (`setOnce`, in `markers.ts`).
+      d.valueSets.push({ type: s.name, slot: String(r["slot"]), path: p, constant: isObject(from) && Object.keys(from).length === 1 && from["const"] === true });
       return sets(r["slot"]);
     }
     case "attribute": {

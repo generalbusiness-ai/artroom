@@ -19,6 +19,7 @@
 import type { ActType, AlsoMark, Attempt, Bounds, CapabilityName, Digest, DomainTag, Effect, Evidence, FactRef, FieldType, FieldValue, Grant, GrantMark, Guard, KeyId, Mark, MemberId, MemberRef, Message, ObservationUse, OperationId, PlatformDefinition, Request, ScopeRef, Seed, SignedIntent, Timestamp } from "@generalbusiness/artroom-contract";
 import { canonicalize, digestBytes, domainBytes, isDigest, isFieldValue, isMemberRef, parseStrict, utf8 } from "@generalbusiness/artroom-bytes";
 import type { Signer } from "./attribution.ts";
+import type { BindingSelect } from "./binding.ts";
 import type { Own } from "./fields.ts";
 import type { Fetched, GuardResult, Judging } from "./guards.ts";
 import type { Most, Opening } from "./ledger.ts";
@@ -201,6 +202,17 @@ export interface Resolved {
   readonly subjects: ReadonlyMap<string, Item>;
   readonly signer: Signer | null;
   readonly bounds: Bounds;
+  /**
+   * For an outcome (revision 20, section 6.1, "What the judge resolved, for
+   * an outcome"; row I3-47): the two things that the ledger derives before
+   * the owner's effects. `selected`: whether this outcome is selected, as
+   * the entry's `attempt` effect records it. `further`: whether the entry
+   * opens a further attempt. The rule of the effects and the rule of the
+   * `send` are given both, so neither derives them again. Absent: the entry
+   * is no outcome, or the rule is run before the ledger derived them, as
+   * `holds`, `retries` and `wellFormed` are.
+   */
+  readonly outcome?: { readonly selected: boolean | null; readonly further: boolean };
 }
 
 /**
@@ -328,6 +340,8 @@ export interface OutcomeRule {
 export type PlatformRule = { clock?: boolean } & (
   | { place: "grant"; run: GrantRule; refusals: readonly string[] }
   | { place: "also"; run: AlsoSelect }
+  /** Place 2, for the mark that is a binding selector (section 17.2a, revision 23): the rule is given the indexed items and the fields, and nothing else. It reads no clock. */
+  | { place: "also"; bind: BindingSelect }
   | { place: "type"; run: TypeRule }
   | { place: "guard"; run: GuardRule; refusals: readonly string[] }
   | { place: "effect"; run: EffectRule; most: number }
@@ -388,7 +402,7 @@ export function unjudged<T>(judge: () => T): T | { result: "unavailable"; reason
 export const markOf = (v: unknown): Mark | null => (isObject(v) && typeof v["code"] === "string" && typeof v["row"] === "string" ? (v as unknown as Mark) : null);
 
 /** What a judge holds when it gives a rule its six things: the parts of a `Judging` that a rule is given. */
-export type Giving = Pick<Judging, "view" | "clock" | "bounds" | "scope" | "self" | "fields" | "subjects" | "signer" | "facts" | "own" | "source" | "platform" | "judged" | "ran" | "beside">;
+export type Giving = Pick<Judging, "view" | "clock" | "bounds" | "scope" | "self" | "fields" | "subjects" | "signer" | "facts" | "own" | "source" | "platform" | "judged" | "ran" | "beside" | "outcome">;
 
 /** The six things, and no other (section 6.1). The entries in `uses` are those that the input's fields name, and for a delivery its source entry. */
 export function givenTo(g: Giving): RuleGiven {
@@ -397,7 +411,7 @@ export function givenTo(g: Giving): RuleGiven {
   const hand = g.beside;
   return {
     state: g.view, input: g.judged, time: g.clock.asOf, uses, own: g.own ?? (() => null),
-    resolved: { at: g.scope.at, self: g.self, fields: g.fields, subjects: g.subjects, signer: g.signer, bounds: g.bounds },
+    resolved: { at: g.scope.at, self: g.self, fields: g.fields, subjects: g.subjects, signer: g.signer, bounds: g.bounds, ...(g.outcome ? { outcome: g.outcome } : {}) },
     // Sections 4.1 and 16.1: an observation that a rule reads is one that the entry retains. The judge notes each read.
     observed(subject) {
       const use = hand?.observed.find((at) => isOf(at, subject)) ?? null;
@@ -461,7 +475,10 @@ export function fieldOutsideType(g: Giving, types: Readonly<Record<string, Field
  * that the mark states. Any other answer is a fault.
  */
 export function selectedBy(g: Giving, mark: AlsoMark): Item | null {
-  const id = run(mark, () => ruleFor(g, mark, "also").run(givenTo(g), mark.item));
+  const rule = ruleFor(g, mark, "also");
+  // A rule that is written as a binding selector is given two things only, and stands only where `bound.of` names its name.
+  if (!("run" in rule)) throw new RuleFault(`the rule ${mark.code} is a binding selector, and its mark binds no name that a bound names`);
+  const id = run(mark, () => rule.run(givenTo(g), mark.item));
   if (id === null) return null;
   const item = typeof id === "number" && Number.isSafeInteger(id) && id >= 0 ? g.view.item(id) : null;
   if (item?.type !== mark.item) throw outside(mark, `no item of the type ${mark.item}`);
