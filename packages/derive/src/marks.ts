@@ -71,17 +71,21 @@ export interface ValueRead { domain: string; digest: Digest; bytes: string }
  * rule reads is not written, and a value that no rule reads is not kept.
  * So an entry of a row whose rules read neither has the bytes it had.
  *
- * I3 merge: the judge of an act is given both and writes `observed`
- * (`judge.ts`). Three things are owed in modules of other steps, and until
- * then a rule that reads either is given none there and its guard is not
- * completed. The judges of a result's delivery and of an outcome build no
- * `AtHand` and write no `observed` (`delivery.ts`, `handlers.ts` and
- * `outcomes.ts`). The scope makes no further read before a turn, reads no
- * `values` from what came beside an intent and keeps no value
- * (`scope/src/core.ts`, with the store). A replay is given the retained
- * value of each place that the pinned data states, and none for a row whose
- * rule holds the domain in its own code (`replay/src/verify.ts`). The I3
- * deltas note, entries EM1 to EM4 and EX4 to EX6, has the lines.
+ * The judge of an act is given both and writes `observed` (`judge.ts`). The
+ * judges of an outcome and of a result's delivery are given the
+ * observations, and write `observed` too (`settle.ts`, `outcomes.ts`,
+ * `delivery.ts` and `handlers.ts`): no value travels beside either. No
+ * other judge is given either, because no other input may hold the member
+ * (section 4.1): a rule that reads one there is given none.
+ *
+ * I3 merge: what is still owed is in the scope's runtime. It reads `values`
+ * beside an intent where the pinned data states a place, and keeps each. It
+ * makes no further read of an observation before any turn: no form states
+ * the subjects that an entry observes (the contract's point R1-67; I3
+ * deltas, entries EM2 and FC6). A replay is given the retained value of
+ * each place that the pinned data states, and none for a row whose rule
+ * holds the domain in its own code (`replay/src/verify.ts`; entries EM1 to
+ * EM4 and EX5).
  */
 export interface AtHand {
   readonly observed: readonly ObservationUse[];

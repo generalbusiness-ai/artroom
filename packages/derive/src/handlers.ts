@@ -13,7 +13,7 @@ import { deriveEffects } from "./effects.ts";
 import { creationFields, factsNamed, isLocalFact, messageFields, presentedTypes, readFacts, readFields, textsNamed, updateOf, type Reading, type Update } from "./fields.ts";
 import { signerOf } from "./fold.ts";
 import { judgeGuards, slotOf, type Fetched, type Judging } from "./guards.ts";
-import { fieldOutsideType, markOf, selectedBy, type Giving, type JudgedInput } from "./marks.ts";
+import { fieldOutsideType, markOf, selectedBy, type AtHand, type Giving, type JudgedInput } from "./marks.ts";
 import { conditionsReadClock, deriveSends, formOf, readsClock } from "./sends.ts";
 import type { Item, OwnRequest, ScopeState, StateView } from "./state.ts";
 import type { ValidDefinition } from "./validate/index.ts";
@@ -352,8 +352,12 @@ export type Clause = keyof ResultClauses | "conflict";
  * `judged`: the input of the entry that runs the clause, the delivery of
  * the result or the diagnosis, for a mark among the clause's effects, in
  * platform data. Its rule is run when the clause runs (section 4.2).
+ *
+ * `beside`: for the delivery of a result, the further observations at hand,
+ * which a rule of the clause reads and the entry then retains (sections 4.1
+ * and 16.1). A diagnosis may hold none, and is given none.
  */
-export function runClause(view: StateView, definition: ValidDefinition, context: Reading & { origin?: Entry | null | undefined }, scope: ScopeState, request: OwnRequest, clause: Clause, answered?: { sender: ScopeRef; reason?: Reason; source?: Fetched }, judged?: JudgedInput):
+export function runClause(view: StateView, definition: ValidDefinition, context: Reading & { origin?: Entry | null | undefined }, scope: ScopeState, request: OwnRequest, clause: Clause, answered?: { sender: ScopeRef; reason?: Reason; source?: Fetched }, judged?: JudgedInput, beside?: AtHand):
   { result: "ran"; effects: Effect[]; uses: FactUse[]; judgesTime: boolean } | { result: "unavailable"; reason: UnavailableReason } {
   const origin = context.origin;
   if (!origin || origin.seq !== request.seq || entryHash(origin) !== request.hash) return { result: "unavailable", reason: "unavailable" };
@@ -414,8 +418,8 @@ export function runClause(view: StateView, definition: ValidDefinition, context:
   // A detached text that the origin's fields name was checked when the origin was judged, and is not asked for again.
   const local = { at: scope.at, own: context.own, texts: () => null };
   const facts = readFacts(view, frame.fieldTypes, frame.fields, context.facts, local);
-  const beside = readFacts(view, presentedTypes(frame.presents), frame.presented ?? {}, context.facts, local);
-  if (facts.result !== "read" || beside.result !== "read") return { result: "unavailable", reason: "dependency-unavailable" };
+  const presented = readFacts(view, presentedTypes(frame.presents), frame.presented ?? {}, context.facts, local);
+  if (facts.result !== "read" || presented.result !== "read") return { result: "unavailable", reason: "dependency-unavailable" };
   // Section 6.6: a clause's subjects are those of the entry that made the send, as that entry resolved them, and they are read as
   // they are now. A name that the origin left unbound stays unbound. The validator lets a clause name no subject that was
   // selected through a slot which may have changed since.
@@ -430,8 +434,8 @@ export function runClause(view: StateView, definition: ValidDefinition, context:
   const update = written && "relate" in written && written.relate.each ? updateOf(origin.sends.find((s) => s.n === request.n)!.message as Request, { at: scope.at, seq: origin.seq, hash: request.hash }) : null;
   const j: Judging = {
     view, definition, bounds: context.bounds, clock: context.clock, scope, self: scope.head.seq + 1, kind: frame.kind, fields: facts.fields, fieldTypes: frame.fieldTypes, subjects, signer: frame.signer,
-    facts: new Map([...facts.facts, ...beside.facts]), prepared: [], used: [], own: context.own, sender: answered?.sender, result: answered?.reason, each: (update && view.item(update.item.seq)) ?? undefined,
-    presented: beside.fields, capabilities: context.capabilities, platform: context.platform, judged, ran: { clock: false },
+    facts: new Map([...facts.facts, ...presented.facts]), prepared: [], used: [], own: context.own, sender: answered?.sender, result: answered?.reason, each: (update && view.item(update.item.seq)) ?? undefined,
+    presented: presented.fields, capabilities: context.capabilities, platform: context.platform, judged, ran: { clock: false }, beside,
     // The clause of an outcome's send has no field that names a fact. Its rule may give the fact of the entry that answered, which
     // is at hand as the verified source entry of the result, and which the entry that records the result retains.
     ...(frame.sent && answered?.source ? { source: answered.source } : {}),
@@ -442,5 +446,5 @@ export function runClause(view: StateView, definition: ValidDefinition, context:
   // Section 6.3: `max` bounds the live items of a type, whatever opens the item. In platform data a rule of the clause may open
   // one. Past the bound the clause's effects cannot apply now, and it changes nothing, as above.
   const applies = effects.ok && (effects.opened === null || overMax(view, definition, effects.opened.type, effects.opened.state) === null);
-  return { result: "ran", effects: applies ? effects.effects : [], uses: [...facts.uses, ...beside.uses.filter((use) => !facts.facts.has(use.fact.hash))], judgesTime: forms.some(timesEffect) || j.ran?.clock === true };
+  return { result: "ran", effects: applies ? effects.effects : [], uses: [...facts.uses, ...presented.uses.filter((use) => !facts.facts.has(use.fact.hash))], judgesTime: forms.some(timesEffect) || j.ran?.clock === true };
 }

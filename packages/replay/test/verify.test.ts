@@ -282,6 +282,33 @@ describe("an outcome entry of a platform definition, and where a scope records i
     expect(await changed((o) => { o.of.inc = otherLane.inc; })).toEqual(["mismatch", 2, "a retained observation is not of the membership scope that the scope records, with that incarnation"]);
   });
 
+  // Sections 4.1 and 16.1; witness 18.34, cases 3, 9 and 10 (I3 deltas, entries EU4 and FC4). The rule and the observation are STAND-INS.
+  test("each observation that an outcome retains in `observed` is derived again, in the ten-second window and `fresh`; the judge derives the member from what its rule read, so an outcome that holds one which no rule read, or lacks one that its rule read, is a mismatch", async () => {
+    /** The rule of the probe's outcome reads the standing of one member. Without it the rule has a fault. */
+    const reads = (given: Parameters<typeof opens>[0] & { observed(subject: object): unknown }) => { if (!given.observed({ member: "@paul" })) throw new Error("the standing is not at hand"); return opens(given); };
+    const g = new Gate(reads as never, true);
+    const good = await replayed(g, g.served(), g.coded());
+    expect([entryOf(g.served(), 3).input, good.report.result, good.why, good.report.trusts.includes(TRUSTS.observed)]).toMatchObject([{ type: "outcome", observed: [{ observation: { subject: "member", member: "@paul" }, use: "fresh" }] }, "consistent", null, true]);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const changed = async (of: Gate, change: (input: any) => void) => {
+      const history = of.served();
+      rewrite(history, 3, (entry) => change(entry.input));
+      const found = await replayed(of, history, of.coded());
+      return [found.report.result, found.report.at?.seq, found.why];
+    };
+    // Guard 5, at ten seconds: the read began eleven seconds before the entry's time. Guard 3: a ten-second kind is `fresh`.
+    const eleven = new Date(Date.parse(entryOf(g.served(), 3).time) - 11_000).toISOString().replace(".000Z", "Z");
+    expect(await changed(g, (input) => { input.observed[0].observation.at = eleven; })).toEqual(["mismatch", 3, "derived again on the entry's time, a retained observation is outside its window of 10 seconds"]);
+    expect(await changed(g, (input) => { input.observed[0].use = "reused"; })).toEqual(["mismatch", 3, "observation-reused: an observation of a ten-second kind serves one commit, and the entry retains it as reused"]);
+    // The entry lacks the observation that its rule reads: the rule has a fault, and no entry is derived.
+    expect(await changed(g, (input) => { delete input.observed; })).toEqual(["mismatch", 3, "derived again, this input writes no entry: unavailable, unavailable"]);
+    // The entry holds an observation that no rule of it reads: the judge derives an input without it.
+    const plain = new Gate(opens as never, true);
+    const one = plain.seen();
+    expect("observed" in entryOf(plain.served(), 3).input).toBe(false);
+    expect(await changed(plain, (input) => { input.observed = [one]; })).toEqual(["mismatch", 3, "the recorded input, with its decision, is not the one derived again"]);
+  });
+
   // Scope contract, revision 19, sections 6.2 and 9.2; witness 18.45, case 8. The data and the rules are STAND-INS.
   test("a value that an entry names is a retained input of the kind `value`, under its domain: a replay with the bytes derives the entry again, and one without them, with other bytes, or with the bytes under another domain is `incomplete` and no mismatch", async () => {
     const g = new Gate(opens as never, false, true);

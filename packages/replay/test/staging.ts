@@ -24,7 +24,7 @@
  */
 
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { Digest, Entry, Evidence, FieldValue, Grant, MemberId, MemberObservation, Observation, OperationId, PlatformDefinition, RetainedInput, Seed, SignedIntent, Timestamp } from "@generalbusiness/artroom-contract";
+import type { Digest, Entry, Evidence, FieldValue, Grant, MemberId, MemberObservation, Observation, ObservationUse, OperationId, PlatformDefinition, RetainedInput, Seed, SignedIntent, Timestamp } from "@generalbusiness/artroom-contract";
 import { canonicalize, factRefOf, intentDigest, newIncarnation, scopeIdOf, signIntent, textDigest } from "@generalbusiness/artroom-bytes";
 import { RETIRE_ACTION, actionOf, clockOf, grantFrom, judgeDelivery, judgeGenesis, judgePreparation, settleOutcome, valueDigest } from "@generalbusiness/artroom-derive";
 import type { OutcomeRule, PlatformRules, Source } from "@generalbusiness/artroom-derive";
@@ -175,7 +175,8 @@ export class Gate extends Ledger {
   readonly proof: { domain: string; digest: Digest; bytes: string } | null;
 
   /**
-   * `watched`: the guard rule of `enter` reads an observation of the member `@paul`, which the entry then retains in `observed`.
+   * `watched`: the guard rule of `enter` reads an observation of the member `@paul`, which the entry then retains in `observed`. The
+   * judge of the outcome is given one too, of another read, and the outcome entry retains it when the rule `derives` reads it.
    * `placed`: the act `issue` has a field `proof` that names a value, in a made-up domain with a bound of 64 bytes (the contract's
    * revision 19, section 6.2), and the issue of entry 1 names one, which came beside its intent.
    */
@@ -194,7 +195,7 @@ export class Gate extends Ledger {
     this.seal(written(judgeGenesis(this.state, this.definition, asked, { clock: clockOf(this.state, T0), bounds: PROPOSED_BOUNDS, facts: [], prepared: [], source: null, platform: this.rules })).draft);
     if (this.act(keys.rita, "issue", { fields: { hash: textDigest("one"), ...(this.proof ? { proof: this.proof.digest } : {}) } }, this.proof ? { values: [this.proof.bytes] } : {}).result !== "write") throw new Error("the issue was not written");
     const entered = this.did(keys.una, "enter", { on: 0, expected: { on: this.item(0).revision }, fields: { secret: "one" } });
-    const judged = settleOutcome(this.state, this.definition, { type: "outcome", operation: `${entered.seq}:0`, attempt: 1, result: "confirmed", evidence: { basis: "own-answer", body: {} } }, { clock: clockOf(this.state, this.now), bounds: PROPOSED_BOUNDS, own: this.own, platform: this.rules });
+    const judged = settleOutcome(this.state, this.definition, { type: "outcome", operation: `${entered.seq}:0`, attempt: 1, result: "confirmed", evidence: { basis: "own-answer", body: {} } }, { clock: clockOf(this.state, this.now), bounds: PROPOSED_BOUNDS, own: this.own, platform: this.rules, ...(this.watched ? { observed: [this.seen()] } : {}) });
     this.seal(written(judged).draft);
   }
 
@@ -216,10 +217,13 @@ export class Gate extends Ledger {
     const actions = ["gate.establish", "gate.issue", "gate.enter"];
     return Object.values(keys).map((who) => ({ grant: proofOf(who, actions, ++this.#reads, this.now), current: true }));
   }
-  override context(over: Context = {}) {
-    // STAND-IN: an observation of a member, written by hand as the grants' observations are. The judge retains it only when a rule reads it.
+  /** STAND-IN: an observation of a member, written by hand as the grants' observations are, as one more read of the run. The judge of an act or of an outcome retains it only when a rule reads it. */
+  seen(): ObservationUse {
     const paul: MemberObservation = { subject: "member", of: membership, head: STANDING, member: "@paul" as MemberId, memberState: "active", role: "member", activeKey: true, controller: null, controllerActive: null, definition: "platform:membership@1", at: this.now };
-    return super.context({ platform: this.rules, membership, ...(this.watched ? { observed: [{ observation: paul, read: { run: RUN, n: ++this.#reads }, use: "fresh", prior: null }] } : {}), ...over });
+    return { observation: paul, read: { run: RUN, n: ++this.#reads }, use: "fresh", prior: null };
+  }
+  override context(over: Context = {}) {
+    return super.context({ platform: this.rules, membership, ...(this.watched ? { observed: [this.seen()] } : {}), ...over });
   }
 
   /** What the scope's object would serve: its entries, and the value that entry 1 names, as one retained input of the kind `value` with its domain. */

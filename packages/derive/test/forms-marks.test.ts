@@ -493,4 +493,69 @@ describe("a rule is run at the check of its mark's place (sections 4.2 and 6.1)"
     expect(recorded.result === "write" && [recorded.draft.effects, recorded.draft.sends]).toEqual([ticketOf({ resolved: { self: outcome + 1 } } as RuleGiven), [{ n: 0, to: child, message: { class: "control", type: "confirm", genesis: arrival.from } }]]);
     expect(read).toEqual([["delivery", [arrival.from.hash], 0, null]]);
   });
+
+  // Sections 4.1 and 16.1, and section 6.1, items 2 and 4 of what a rule is given; witness 18.34, cases 1, 2 and 8 (I3 deltas, entries
+  // EM3 and FC3). Every rule here is a stand-in, the observations are written by hand, and the foreign entry is made by hand.
+  test("an outcome's rule, and the rule of a result's clause, read a further observation, and an outcome's rule the foreign entries at hand: each entry retains exactly the observations that were read; an outcome names each entry at hand in `uses`; neither is written clamped; and with nothing read the bytes are as before", () => {
+    const standing = (member: MemberId, n: number): ObservationUse => ({
+      observation: { subject: "member", of: membership, head: { seq: 40, hash: d("4") }, member, memberState: "active", role: "member", activeKey: true, controller: null, controllerActive: null, definition: "platform:membership@1", at: T0 },
+      read: { run: "r1", n }, use: "fresh", prior: null,
+    });
+    const [vic, una] = [standing("@vic", 7), standing("@una", 8)];
+    const made = (): Scope => {
+      const s = new Scope(gateWith((d) => { d.acts.enter.grant = "gate.enter"; d.outcomes.probe.send = { code: "tell-other", row: "P16", result: { applied: [{ code: "noted", row: "P16" }] } }; }));
+      s.did(rita, "issue", { fields: { hash: textDigest("one") } });
+      const opens = some(() => [{ effect: "operation", k: 0, owner: OWNER, kind: "probe", attempts: 1 }, { effect: "attempt", operation: { k: 0 }, attempt: 1, result: "opened", selected: null }]);
+      if (enter(s, keys.una, "one", owned({ "key-id": opens })).result !== "write") throw new Error("the operation was not opened");
+      return s;
+    };
+    const s = made();
+    const operation = `${s.last.seq}:0` as OperationId;
+    /** A foreign entry at hand for the outcome, MADE BY HAND. */
+    const foreign = forged(otherLane, 5, { type: "checkpoint", through: 4, state: d("5") }, []);
+    const fetched = { fact: factRefOf(foreign.entry), entry: foreign.entry, under: foreign.under };
+    const tell = { to: otherLane, message: { class: "request", type: "tell", body: { message: "hello", fields: {} } } } as const;
+    /** The rule of the outcome reads the standing of one member, and each entry in `uses`. With either missing it has a fault. */
+    const seen: unknown[] = [];
+    const reads: OutcomeRule = {
+      selects: false, read: false, retries: () => false,
+      derives: (given) => {
+        const use = given.observed({ member: "@una" });
+        seen.push([use?.read.n ?? null, given.uses.map((used) => used.fact.hash)]);
+        if (!use || given.uses.length === 0) throw new Error("the standing and the entry are read for this outcome, and one is not at hand");
+        return { effects: [], sends: [], opens: [] };
+      },
+    };
+    const settle = (on: Scope, rule: OutcomeRule, beside: object, at = on.now) => settleOutcome(on.state, on.definition, { type: "outcome", operation, attempt: 1, result: "confirmed", evidence: { basis: "own-answer", body: {} } },
+      { clock: clockOf(on.state, at), bounds: PROPOSED_BOUNDS, own: on.own, platform: owned({ probe: { place: "outcome", rules: rule }, "tell-other": { place: "send", run: () => tell } }), ...beside });
+
+    // Nothing at hand, then one of the two: the rule has a fault, and nothing is written. On a clock that is behind, the entry
+    // would judge time: not written on that reading, and offered again (case 2).
+    expect([settle(s, reads, {}).result, settle(s, reads, { observed: [una] }).result, settle(s, reads, { facts: [fetched] }).result]).toEqual(["unavailable", "unavailable", "unavailable"]);
+    expect(settle(s, reads, { observed: [vic, una], facts: [fetched] }, "2000-01-01T00:00:00Z")).toEqual({ result: "unavailable", reason: "clock-behind" });
+    // Both at hand, with an observation that no rule reads. The outcome entry holds the one that was read, and names the entry.
+    const judged = settle(s, reads, { observed: [vic, una], facts: [fetched] });
+    if (judged.result !== "write") throw new Error(`the outcome was not written: ${JSON.stringify(judged)}`);
+    expect([judged.draft.input.type === "outcome" && judged.draft.input.observed, judged.draft.uses.map((use) => use.fact), judged.draft.judgesTime, seen.at(-1)]).toEqual([[una], [fetched.fact], true, [8, [fetched.fact.hash]]]);
+    const outcome = s.seal(judged.draft).seq;
+    expect([isEntry(s.last), s.state.observed(membership, "@una"), s.state.observed(membership, "@vic")]).toEqual([true, 40, null]);
+    // The control: a rule that reads neither, with the same observations at hand and with none. The input holds no member
+    // `observed`, and the entry may be written clamped, as before.
+    const [a, b] = [made(), made()];
+    const plain: OutcomeRule = { selects: false, read: false, retries: () => false };
+    const [given, none] = [settle(a, plain, { observed: [vic, una] }), settle(b, plain, {}, "2000-01-01T00:00:00Z")];
+    expect([given.result === "write" && ["observed" in given.draft.input, given.draft.uses, given.draft.judgesTime], none.result === "write" && none.draft.judgesTime]).toEqual([[false, [], false], false]);
+
+    // The result of the request that the outcome sent: the rule of its `applied` clause reads the standing of the other member.
+    const request = { from: s.fact(outcome), n: 0 };
+    const answer: Send = { n: 0, to: s.at, message: { class: "result", of: request, outcome: "applied" } };
+    const source = forged(otherLane, 9, { type: "delivery", from: request.from, n: 0, message: tell.message, decision: "applied" }, [answer]);
+    const arrival = { ...answer, from: factRefOf(source.entry) };
+    const noted = some((rule) => (rule.observed({ member: "@vic" }) ? [] : (() => { throw new Error("the standing is read for this clause, and it is not at hand"); })()));
+    const record = (beside: object, at = s.now) => judgeDelivery(s.state, s.definition, arrival, { ...arriving(s, arrival, source), clock: clockOf(s.state, at), platform: owned({ noted }), ...beside });
+    const recorded = record({ observed: [vic, una] });
+    expect([record({}).result, record({ observed: [vic, una] }, "2000-01-01T00:00:00Z"), recorded.result === "write" && [recorded.draft.input.type === "delivery" && "clause" in recorded.draft.input && recorded.draft.input.observed, recorded.draft.judgesTime]])
+      .toEqual(["unavailable", { result: "unavailable", reason: "clock-behind" }, [[vic], true]]);
+    if (recorded.result === "write") expect(isEntry(s.seal(recorded.draft))).toBe(true);
+  });
 });

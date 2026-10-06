@@ -4,14 +4,14 @@
  * advisory.
  */
 
-import type { Advisory, CapabilityName, Control, Effect, Entry, FactRef, FactUse, Message, Prepared, Reason, Request, Result, RoutingRefusal, ScopeRef, Seed, Send } from "@generalbusiness/artroom-contract";
+import type { Advisory, CapabilityName, Control, Effect, Entry, FactRef, FactUse, Message, ObservationUse, Prepared, Reason, Request, Result, RoutingRefusal, ScopeRef, Seed, Send } from "@generalbusiness/artroom-contract";
 import { deliveryCauseDigest, messageDigest, scopeIdOf, seedDigest } from "@generalbusiness/artroom-bytes";
 import { declaredBy, type Recorded } from "./capability.ts";
 import { isEntryOf, updateOf, useOf, type Reading } from "./fields.ts";
 import { bound, runClause, runHandler, type Clause, type Handled, type Sent } from "./handlers.ts";
 import type { Judgment } from "./judge.ts";
 import { heldOpenings } from "./ledger.ts";
-import { unjudged, type JudgedInput } from "./marks.ts";
+import { atHand, retainedOf, unjudged, type JudgedInput } from "./marks.ts";
 import { recordEffects } from "./prepare.ts";
 import type { ScopeState, StateView } from "./state.ts";
 import { nextDue } from "./timed.ts";
@@ -33,6 +33,14 @@ export interface DeliveryContext extends Reading {
   source: Source | null;
   /** For a result: this scope's own entry that sent the request, from its history. */
   origin?: Entry | null | undefined;
+  /**
+   * For a result: the further observations at hand (sections 4.1 and 16.1),
+   * each judged by the guards of an observation before the judge is given
+   * it. A rule of the clause that runs reads one, and the entry retains
+   * exactly those that were read. No other delivery may hold the member, so
+   * a handler of a request or of an advisory is given none. Absent: none.
+   */
+  observed?: readonly ObservationUse[] | undefined;
 }
 
 /** How the resolver of this name answers an address that is not this scope and incarnation (sections 2.3 and 7.4), or null. */
@@ -245,7 +253,7 @@ function confirmation(view: StateView, scope: ScopeState, { from, n }: Delivered
  * request. It runs the matching clause of the send.
  */
 function result(view: StateView, definition: ValidDefinition, context: DeliveryContext, scope: ScopeState, { from, n }: Delivered, message: Result, source: Entry,
-  write: (input: { type: "delivery"; from: FactRef; n: number; message: Result; clause: Exclude<Clause, "undelivered"> }, effects: readonly Effect[], sends: readonly Send[], prepared: readonly Prepared[], judgesTime: boolean, read: readonly FactUse[]) => Judgment,
+  write: (input: { type: "delivery"; from: FactRef; n: number; message: Result; clause: Exclude<Clause, "undelivered">; observed?: readonly ObservationUse[] }, effects: readonly Effect[], sends: readonly Send[], prepared: readonly Prepared[], judgesTime: boolean, read: readonly FactUse[]) => Judgment,
   judged: JudgedInput): Judgment {
   const unverified = (detail: string): Judgment => ({ result: "source-unverified", detail });
   const of = message.of;
@@ -267,9 +275,14 @@ function result(view: StateView, definition: ValidDefinition, context: DeliveryC
     if (!held || message.outcome !== "applied" || held.inc === from.at.inc) return { result: "repeat", seq: request.result.seq };
     clause = "conflict";
   }
-  const ran = runClause(view, definition, context, scope, request, clause, { sender: from.at, ...(message.reason ? { reason: message.reason } : {}), source: { fact: from, entry: source, under: context.source!.under } }, judged);
+  // Sections 4.1 and 16.1: a rule of the clause reads a further observation, in platform data, and what it reads is noted.
+  const beside = context.observed === undefined ? undefined : atHand(context.observed, undefined);
+  const ran = runClause(view, definition, context, scope, request, clause, { sender: from.at, ...(message.reason ? { reason: message.reason } : {}), source: { fact: from, entry: source, under: context.source!.under } }, judged, beside);
   if (ran.result === "unavailable") return ran;
   // Section 7.2: the creator confirms the incarnation of the first applied result it records, and no other.
   const confirm: Send[] = clause === "applied" && request.type === "create" ? [{ n: 0, to: from.at, message: { class: "control", type: "confirm", genesis: from } }] : [];
-  return write({ type: "delivery", from, n, message, clause }, ran.effects, confirm, [], ran.judgesTime, ran.uses);
+  // Section 4.1: the entry holds each observation that a rule of its clause read, in ascending order of `read.n`, and no member
+  // when none was read. Section 16.1: an entry that retains one judges time, and is never written clamped.
+  const retained = retainedOf(beside).observed;
+  return write({ type: "delivery", from, n, message, clause, ...(retained.length > 0 ? { observed: retained } : {}) }, ran.effects, confirm, [], ran.judgesTime || retained.length > 0, ran.uses);
 }

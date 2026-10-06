@@ -20,17 +20,25 @@ import type { Digest, EffectForm, OutcomeMark, PlatformData, Send, SendForm } fr
 import { intentDigest } from "@generalbusiness/artroom-bytes";
 import { deriveEffects } from "./effects.ts";
 import type { Reading } from "./fields.ts";
-import type { Judging } from "./guards.ts";
+import type { Fetched, Judging } from "./guards.ts";
 import { overMax } from "./handlers.ts";
 import type { OperationRules, OutcomeDerived, OutcomeInput, Owner, Owners } from "./ledger.ts";
-import { RuleFault, givenTo, outside, ruleAt, run, type OutcomeGives, type PlatformRules, type Rules } from "./marks.ts";
+import { RuleFault, givenTo, outside, ruleAt, run, type AtHand, type OutcomeGives, type PlatformRules, type Rules } from "./marks.ts";
 import { deriveSends } from "./sends.ts";
 import type { Operation, StateView } from "./state.ts";
 import type { ValidDefinition } from "./validate/index.ts";
 import { isFactRef, isObject, own, same } from "./values.ts";
 
-/** What the judge of an outcome reads beside the state: the one reading, the bounds, the scope's own history, and whether a rule that reads the clock was run. */
-export type OutcomeReading = Pick<Reading, "clock" | "bounds" | "own"> & { ran: { clock: boolean } };
+/**
+ * What the judge of an outcome reads beside the state: the one reading, the
+ * bounds, the scope's own history, and whether a rule that reads the clock
+ * was run. `facts`: the foreign entries at hand for this outcome, which a
+ * rule is given as the entries in `uses` (section 6.1, item 4). `beside`:
+ * the further observations at hand, and what the rules read of them
+ * (sections 4.1 and 16.1). An outcome has no intent, so no value came
+ * beside one.
+ */
+export type OutcomeReading = Pick<Reading, "clock" | "bounds" | "own"> & { ran: { clock: boolean }; facts?: readonly Fetched[] | undefined; beside?: AtHand | undefined };
 
 /**
  * The owners' rules, with those of the platform definition that the scope
@@ -55,7 +63,10 @@ export function ownersOf(definition: ValidDefinition, platform: PlatformRules | 
         if (rule.clock === true) reading.ran.clock = true;
         return {
           view, definition, bounds: reading.bounds, clock: reading.clock, scope, self: scope.head.seq + 1, kind, fields: {}, fieldTypes: {}, subjects: new Map(), signer: null,
-          facts: new Map(), prepared: [], used: [], own: reading.own, platform, judged: { type: "outcome", operation: outcome.operation, attempt: outcome.attempt, owner: outcome.owner, kind: outcome.kind, result: outcome.result, evidence: outcome.evidence }, ran: reading.ran,
+          facts: new Map((reading.facts ?? []).map((fact) => [fact.fact.hash, fact])), prepared: [], used: [], own: reading.own, platform, judged: { type: "outcome", operation: outcome.operation, attempt: outcome.attempt, owner: outcome.owner, kind: outcome.kind, result: outcome.result, evidence: outcome.evidence }, ran: reading.ran,
+          // Item 2 and item 4 of what a rule is given: `observed`, and each entry in `uses`. Every rule of the one entry reads through
+          // the one `beside`, so the entry retains each observation that any of them read, once.
+          beside: reading.beside,
         };
       };
       const answer = (given: unknown): boolean => {
