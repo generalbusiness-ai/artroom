@@ -2,9 +2,9 @@ import { runInDurableObject } from "cloudflare:test";
 import { describe, expect, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { Answer, Entry, Intent, Observation, ObservationUse, OperationId, Read, Seed } from "@generalbusiness/artroom-contract";
-import { b64url, canonicalize, entryHash, factRefOf, intentDigest, scopeIdOf, seedDigest, signIntent } from "@generalbusiness/artroom-bytes";
+import { b64url, canonicalize, entryHash, factRefOf, intentDigest, scopeIdOf, seedDigest, signIntent, textDigest } from "@generalbusiness/artroom-bytes";
 import { requestSession, sessionRequest, type Fetch } from "@generalbusiness/artroom-client";
-import { PROFILES, ruleAt, validateDefinition, valueDigest, type Item } from "@generalbusiness/artroom-derive";
+import { PROFILES, grantFrom, ruleAt, validateDefinition, valueDigest, type Item } from "@generalbusiness/artroom-derive";
 import { d, keys, otherLane } from "@generalbusiness/artroom-derive/testing";
 import { CONFIGURATION_DOMAIN, DESTINATION, DESTINATION_CHANGED_SET, DIRECTORY, REGISTER, destinationReceipt, firstExtents, foundingObjects, platform, repositoryName, revokedToken, RULES_EXTENTS_VALUE } from "@generalbusiness/artroom-platform";
 import { httpSource, verify } from "@generalbusiness/artroom-replay";
@@ -34,20 +34,22 @@ function lacking(named: string): string[] {
   return [...new Set(checked.definition.marks.filter((mark) => ruleAt(supplied.rules, mark.code, mark.kind) === null).map((mark) => mark.code))];
 }
 
+// Invariant: a real destination reserves and publishes the first source change when its touched extent requires a passed
+// check bound to the retained job, configured digest and the current member and key of the real membership scope.
 // The plan's step 9c (authority note, revision 28, section 3.8, and sections 12.1.1, 12.1.2 and 12.1.5;
 // the scope contract, sections 7.1 and 7.2). Every scope here is a Durable Object of the namespace `PLATFORM`: the deployed class,
-// with the production authority and the platform package's own data and rules. No rule is a stand-in. Two lane entries below are
+// with the production authority and the platform package's own data and rules. No rule is a stand-in. Four lane entries below are
 // SCRIPTED, made by hand and anchored explicitly for replay; no actual lane or Git host is run here.
 //
 // | Part | Is |
 // |---|---|
 // | The register, the directory, membership and the rules scope | Real scopes, written through the turn, the store, the dispatchers and the operations driver. |
 // | The Git host | A STAND-IN: `OutsideDouble` of `outside.ts`, wired as the register's outside port. It answers the one request of an attempt with what the test wrote. Nothing here creates a repository. |
-// | The change lane | SCRIPTED: a manifest and its merge entry, signed and hashed by the test, with their integrator stated by hand. No lane judged them. Its progress messages retain duties at the destination. |
+// | The change lane | SCRIPTED: a manifest, a job opening, its passed decision and a merge entry, signed and hashed by the test. The integrator and job facts are stated by hand; the checker grant uses a real membership answer. No lane judged them and no checker runner ran. Its progress messages retain duties at the destination. |
 // | The clock, transport and the readers | The scripted clock, the namespace's transport, and the test readers, as in every test of the namespace `PLATFORM`. For the reads that are about a session, the readers are the real read sessions, under a TEST SECRET that the test generates. |
 // | Who may install | Nothing checks it: that is the installation design's (N5). paul signs the `install`. |
 describe("a founding on real scopes under the deployed class (authority note, section 3.8; I3 plan, step 9c). The Git host is a STAND-IN", () => {
-  test("an install founds a register; a founder's claim opens the creation of a repository; the reply to its first attempt is lost, and the own answer of the second selects it and creates the directory; the directory creates and confirms membership, rules and destination; real rules and membership observations decide the first publication", async () => {
+  test("an install founds a register; a founder's claim opens the creation of a repository; the reply to its first attempt is lost, and the own answer of the second selects it and creates the directory; the directory creates and confirms membership, rules and destination; real rules and membership observations decide the first publication with a required passed check", async () => {
     net.hold = net.deaf = null;
     // Step 0: the register, by an `install` intent with `to: null`, under `platform:register@1`. Its seed has the kind `register` and
     // no creator, and the object's name is the seed's digest.
@@ -227,25 +229,39 @@ describe("a founding on real scopes under the deployed class (authority note, se
     const digest = valueDigest(CONFIGURATION_DOMAIN, configuration);
     const keptConfiguration = await rulesScope!.stub.submit(await rulesScope!.intent(rita, "keep-configuration", { fields: { digest, name: "unit" } }), [], { values: [canonicalize(configuration)] });
     expect(keptConfiguration.answer, JSON.stringify(keptConfiguration)).toBe("accepted");
-    const withChecker = async (member: string) => rulesScope!.act(rita, "publish", { on: 0, expected: await rulesScope!.expected({ on: 0 }), fields: { approvals: 0, ownerMayReview: false, checks: [{ name: "unit", configuration: digest, required: false, checker: { membership, member } }], labels: [], extents: firstExtents({ approvals: 0, checks: [] }) as never } });
+    const withChecker = async (member: string) => rulesScope!.act(rita, "publish", { on: 0, expected: await rulesScope!.expected({ on: 0 }), fields: { approvals: 0, ownerMayReview: false, checks: [{ name: "unit", configuration: digest, required: true, checker: { membership, member } }], labels: [], extents: firstExtents({ approvals: 0, checks: [{ name: "unit", required: true }] }) as never } });
     // The signer's own member is served by her grant. Its projected admin standing is available to the checker rule.
     expect(await withChecker("@rita")).toMatchObject({ answer: "refused", reason: "guard-failed", name: "not-a-checker" });
-    await membershipScope!.did(rita, "add-member", { fields: { handle: "@check", kind: "checker" } });
+    const checkerMember = await membershipScope!.did(rita, "add-member", { fields: { handle: "@check", kind: "checker" } });
+    const checkerSecret = "the invitation of the required checker key";
+    const checkerInvitation = await membershipScope!.did(rita, "invite-key", { fields: { member: checkerMember, kind: "checker", inviteHash: textDigest(checkerSecret), inviteEnds: soon(3600) }, expected: await membershipScope!.expected({ member: checkerMember }) });
+    await membershipScope!.did(paul, "enrol", { on: 0, fields: { invitation: checkerInvitation, secret: checkerSecret }, expected: await membershipScope!.expected({ on: 0, member: checkerMember }) });
     expect(await withChecker("@check")).toMatchObject({ answer: "accepted" });
     const checked = await rulesScope!.last();
     expect(checked.input.type === "act" && checked.input.observed).toMatchObject([{ observation: { subject: "member", of: membership, member: "@check", memberState: "active", role: "checker" }, use: "fresh" }]);
 
-    // SCRIPTED: the change lane and its two entries. No lane judged either entry. The destination reads their actual retained
-    // bytes with its package reader, and observes their merger and integrator at this repository's real membership scope.
+    expect((await rulesScope!.item(0)).values["checks"]).toEqual([{ name: "unit", configuration: digest, required: true, checker: { membership, member: "@check" } }]);
+    const retainedConfiguration = await rulesScope!.stub.retained(reader, "value", digest, CONFIGURATION_DOMAIN);
+    expect(retainedConfiguration).toMatchObject({ ok: true, value: { bytes: canonicalize(configuration) } });
+
+    // SCRIPTED source facts: manifest (anchor 1), job opening (anchor 2), passed decision (anchor 3), merge (anchor 4).
+    // No lane judged them and no checker runner ran. The passed decision is signed by the actually enrolled key; its fresh
+    // change.check grant is built from this real membership answer, with only the source read metadata supplied by the test.
+    // The destination retains all four facts, reads them with its production reader, and reads that key's current standing.
     const integration = "b".repeat(40);
     const tree = "d".repeat(40);
     const by = { membership, member: "@rita" } as const;
     const signed = (kind: string, fields: Intent["fields"]) => signIntent({ v: 1, to: otherLane, actor: rita.key, kind, on: null, expected: {}, fields, idempotencyKey: kind, notAfter: soon(60) }, rita.secret);
     const manifest: Entry = { v: 1, at: otherLane, seq: 1, prev: d("0"), time: net.clock.now, clamped: false, epoch: 0, input: { type: "act", signed: signed("propose-manifest", { base: firstHead, integration, tree, complete: true, selected: [] }), authority: [], presented: {} }, uses: [], prepared: [], effects: [{ effect: "party", item: 1, slot: "integrator", member: by }], sends: [] };
-    const request = { class: "request", type: "tell", body: { message: "reserve", fields: { operation: { self: true }, manifest: factRefOf(manifest), verdicts: [], jobs: [], links: [], reports: [] } } } as const;
-    const merge: Entry = { v: 1, at: otherLane, seq: 2, prev: entryHash(manifest), time: net.clock.now, clamped: false, epoch: 0, input: { type: "act", signed: signed("merge", { manifest: 1 }), authority: [], presented: {} }, uses: [], prepared: [], effects: [], sends: [{ n: 0, to: branchScope, message: request }] };
-    net.peers.set(entryHash(manifest), { entry: manifest, under: "change" });
-    net.peers.set(entryHash(merge), { entry: merge, under: "change" });
+    const checkerAnswer = await membershipScope!.stub.observe({ of: membership, key: paul.key }) as Omit<Observation, "at">;
+    expect(checkerAnswer).toMatchObject({ of: membership, head: (await membershipScope!.summary()).at, key: paul.key, keyState: "active", member: "@check", memberState: "active", role: "checker", actions: expect.arrayContaining(["change.check"]), within: { membership } });
+    const checkGrant = grantFrom({ observation: { ...checkerAnswer, at: net.clock.now }, read: { run: "scripted-source-check-read", n: 1 }, use: "fresh", prior: null });
+    const job: Entry = { v: 1, at: otherLane, seq: 2, prev: entryHash(manifest), time: net.clock.now, clamped: false, epoch: 0, input: { type: "act", signed: signed("request-check", { manifest: 1, name: "unit", configuration: digest }), authority: [], presented: {} }, uses: [], prepared: [], effects: [{ effect: "value", item: 2, slot: "tree", value: tree }], sends: [] };
+    const decision: Entry = { v: 1, at: otherLane, seq: 3, prev: entryHash(job), time: net.clock.now, clamped: false, epoch: 0, input: { type: "act", signed: signIntent({ v: 1, to: otherLane, actor: paul.key, kind: "check", on: null, expected: {}, fields: { job: 2, tree, configuration: digest, outcome: "passed" }, idempotencyKey: "scripted-check", notAfter: soon(60) }, paul.secret), authority: [checkGrant], presented: {} }, uses: [], prepared: [], effects: [{ effect: "state", item: 2, state: "passed" }], sends: [] };
+    const request = { class: "request", type: "tell", body: { message: "reserve", fields: { operation: { self: true }, manifest: factRefOf(manifest), verdicts: [], jobs: [{ job: factRefOf(job), name: "unit", state: "passed", decidedBy: factRefOf(decision) }], links: [], reports: [] } } } as const;
+    const merge: Entry = { v: 1, at: otherLane, seq: 4, prev: entryHash(decision), time: net.clock.now, clamped: false, epoch: 0, input: { type: "act", signed: signed("merge", { manifest: 1 }), authority: [], presented: {} }, uses: [], prepared: [], effects: [], sends: [{ n: 0, to: branchScope, message: request }] };
+    const sourceFacts = [manifest, job, decision, merge];
+    for (const entry of sourceFacts) net.peers.set(entryHash(entry), { entry, under: "change" });
     expect(await G.stub.deliver({ to: branchScope, from: factRefOf(merge), n: 0, message: request })).toMatchObject({ answer: "recorded" });
     driving = "judge";
     const queued = await G.last();
@@ -255,6 +271,8 @@ describe("a founding on real scopes under the deployed class (authority note, se
       return { item: store.item(publication), held: store.holder(publication), operations: store.operationsFor(publication), owedReceipts: store.page("receipt", ["owed"], null, 130).items };
     });
     expect(await G.item(publication)).toMatchObject({ state: "queued", refs: { operation: factRefOf(merge), manifest: factRefOf(manifest), lane: otherLane } });
+    expect(queued.uses.map((use) => use.fact.hash).sort()).toEqual(sourceFacts.map(entryHash).sort());
+    for (const use of queued.uses) expect(await G.stub.retained(reader, "entry", use.content)).toMatchObject({ ok: true, value: { bytes: canonicalize(sourceFacts.find((entry) => entryHash(entry) === use.fact.hash)) } });
     expect((await storedPublication()).held?.decisions?.["withdraw"]).toBe(1);
     const judging = `${queued.seq}:0` as OperationId;
     const changes = { paths: ["src/a.ts"], links: [], unreadable: 0 };
@@ -270,9 +288,13 @@ describe("a founding on real scopes under the deployed class (authority note, se
       { observation: { of: membership, key: rita.key, keyState: "active", actions: expect.arrayContaining(["change.merge"]) }, use: "fresh" },
       { observation: { subject: "holders", of: membership, action: "rules.publish", count: 1 }, use: "fresh" },
       { observation: { subject: "member", of: membership, member: "@rita", memberState: "active" }, use: "fresh" },
+      { observation: { of: membership, key: paul.key, keyState: "active", member: "@check", role: "checker", actions: expect.arrayContaining(["change.check"]) }, use: "fresh" },
     ] });
     expect(judged.uses).toEqual(queued.uses);
-    expect(await G.item(publication)).toMatchObject({ state: "reserved", values: { integration, reservedAt: judged.seq } });
+    if (judged.input.type !== "outcome") throw new Error("the judge recorded no outcome");
+    const currentRules = judged.input.observed?.find((use) => "subject" in use.observation && use.observation.subject === "rules");
+    expect(currentRules?.observation).toMatchObject({ content: { checks: [{ name: "unit", configuration: digest, required: true, checker: "@check" }] } });
+    expect((await storedPublication()).item).toMatchObject({ state: "reserved", values: { integration, reservedAt: judged.seq } });
     expect(await G.item(0)).toMatchObject({ refs: { slot: publication, judging: null } });
     expect(judged.sends[0]!.message).toMatchObject({ type: "relate", body: { name: "publication", state: "reserved", detail: { operation: factRefOf(merge), outcome: "committed", rules: checked.seq } } });
     expect((await storedPublication()).operations.filter((operation) => ["judge", "push", "mint"].includes(operation.kind)).every((operation) => operation.for === publication)).toBe(true);
@@ -291,13 +313,15 @@ describe("a founding on real scopes under the deployed class (authority note, se
     expect(finished.owedReceipts).toHaveLength(0);
     expect(finished.held?.decisions ?? {}).toEqual({});
     expect(finished.operations.every((operation) => operation.attempts.every((attempt) => attempt.outcomes.length > 0))).toBe(true);
+    const outbox = await G.stub.outbox(reader);
+    expect(outbox.ok && outbox.value.filter((duty) => "scope" in duty.to && duty.to.scope === otherLane.scope).map((duty) => [duty.acknowledged, duty.result, duty.diagnosis])).toEqual([[null, null, null], [null, null, null], [null, null, null]]);
     wired.delete(G.name);
 
     // A verifier reads the five histories as bytes and derives every entry again, with the platform package's data and rules: the
     // register's outcome entry with its creation, the directory's genesis under the fourth cause, the clause of the result, and
     // the grants of the rules scope from their observations, the first of which fixed the incarnation. No grant is taken as current.
-    // Only the two scripted lane entries are anchored. Every actual founding, authority and destination history is replayed.
-    const options = { mode: "replay", platform, grants: "proven", anchors: [manifest, merge].map((entry) => ({ scope: entry.at.scope, seq: entry.seq, hash: entryHash(entry) })) } as const;
+    // Only the four scripted source facts are anchored (no membership or rules facts). Every actual founding, authority and destination history is replayed.
+    const options = { mode: "replay", platform, grants: "proven", anchors: sourceFacts.map((entry) => ({ scope: entry.at.scope, seq: entry.seq, hash: entryHash(entry) })) } as const;
     for (const node of [R, D, membershipScope!, rulesScope!, G]) {
       const { report, why } = await verify(httpSource(SERVICE, { fetch: routed }), { ...options, scope: node.name, head: (await node.summary()).at });
       expect([(await node.at()).kind, report.result, why]).toEqual([(await node.at()).kind, "consistent", null]);

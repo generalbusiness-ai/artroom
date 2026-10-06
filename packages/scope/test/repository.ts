@@ -37,7 +37,7 @@ interface Surface {
   summary(reader: unknown): Promise<Read<Summary>>;
   history(reader: unknown, cursor?: string): Promise<Read<readonly Sealed[]>>;
   outbox(reader: unknown): Promise<Read<readonly Duty[]>>;
-  retained(reader: unknown, kind: RetainedInput["kind"], digest: Digest): Promise<Read<RetainedInput>>;
+  retained(reader: unknown, kind: RetainedInput["kind"], digest: Digest, domain?: string): Promise<Read<RetainedInput>>;
   deliver(envelope: Delivered): Promise<Delivery>;
   dispatch(): Promise<number>;
   observe(asked: unknown): Promise<unknown>;

@@ -153,17 +153,24 @@ deployed class and the platform package's rules. The directory creates
 and confirms all three children. The destination records its first head
 and receipt, reads the real rules and membership scopes, and uses its
 production reader over retained lane bytes to reserve and publish the
-first change. Its receipt becomes written and its tokens are cleaned up.
+first change with a required passed check. Membership admits the checker member
+and its active key. The rules scope retains the actual configuration bytes and
+publishes its digest, required status and checker. The destination retains the
+job opening and decision, reads the checker's current standing, and admits their
+pass against those rules. Its receipt becomes written and its tokens are cleaned up.
 The publication's holder counts are read from SQLite, including its
 `withdraw` decision before publication and its release on the final item.
 
-The source change lane's manifest and merge entries are written by hand
-and anchored; no real lane admits them. The Git host is `OutsideDouble`,
+The source change lane's manifest, job opening, passed decision and merge
+entries are written by hand and anchored; no real lane admits them and no checker
+runner runs. The decision uses the admitted checker key and a fresh
+`change.check` grant built from a real membership answer. The test supplies the
+source read metadata and the passed outcome. The Git host is `OutsideDouble`,
 a scripted port whose replies name the package's computed target IDs;
 no host runs. Reads use the test readers except for the separate real
 read-session witness. All five runtime histories replay `consistent` over
 HTTP, with their authority derived from membership history and only the
-two scripted lane facts anchored. Publication updates to that scripted
+four scripted source facts anchored. Publication updates to that scripted
 lane remain pending. This shows the founding and destination's first
 publication through these boundaries. It proves no deployment, production
 host or complete lane journey, and does not close full I3. Full capacity
