@@ -28,6 +28,15 @@ describe("a fact reference as text", () => {
     expect(/^[\x20-\x7e]+$/.test(longest)).toBe(true);
   });
 
+  test("a value that passes the record guard and has no canonical bytes of a reference is refused, never thrown and never put right", () => {
+    // Negative zero is a safe integer of at least 0, and the canonical writer refuses it. It is not written as zero.
+    class Ref { at = F.at; hash = F.hash; seq = 41; }
+    const hidden = Object.defineProperty({ at: F.at, hash: F.hash }, "seq", { value: 41, enumerable: false });
+    for (const value of [{ ...F, seq: -0 }, new Ref(), hidden]) expect(factText(value)).toBeNull();
+    // A valid reference has the bytes it had.
+    expect(factText(F)).toBe(TEXT);
+  });
+
   test.each([
     ["a hash in upper case", { ...F, hash: `sha256:${HEX.toUpperCase()}` }],
     ["a hash without its prefix", { ...F, hash: HEX }],

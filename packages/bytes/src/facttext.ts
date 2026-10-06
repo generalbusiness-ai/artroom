@@ -25,7 +25,19 @@ export const FACT_TEXT_MOST = 237;
  * `scope`, then `hash`, then `seq`. Null for a value that is no `FactRef`.
  */
 export function factText(ref: unknown): string | null {
-  return isFactRef(ref) ? canonicalize(ref) : null;
+  // The guard of a record reads members, and the canonical writer reads a plain object's own enumerable keys. So a value may pass
+  // the first and have no canonical bytes, or other ones: a position of negative zero, an object that is not plain, a required
+  // member that is not enumerable. Each is refused here, and nothing is thrown. Negative zero is not written as zero. The text is
+  // returned only when it reads back as a `FactRef` from its own bytes.
+  if (!isFactRef(ref)) return null;
+  let text: string;
+  try {
+    text = canonicalize(ref);
+  } catch (e) {
+    if (e instanceof CanonicalError) return null;
+    throw e;
+  }
+  return factOfText(text) === null ? null : text;
 }
 
 /**
