@@ -402,14 +402,18 @@ test("a compromised notice for a key behind the held publication sets aborting, 
   expect([said(b.answered(read, 1, "confirmed", { seen: HEAD })), b.last.effects.length, b.last.sends]).toEqual([WRITTEN, 1, []]);
 
   // The other end: the integration commit landed before it could be stopped. The read publishes it.
+  // No token is live yet, so the notice opens the read alone. The token then arrives for a publication that is `aborting`: it is
+  // never live, and its revocation is opened.
   const p = new Branch(false).ready();
   const landed = p.reserved();
-  p.compromised(rita);
-  expect([said(p.answered(op(p.head.seq, 0), 1, "confirmed", { seen: NEXT })), p.item(landed.publication).state, p.branch.values["head"]]).toEqual([WRITTEN, "published", NEXT]);
+  expect([said(p.compromised(rita)), p.opened]).toEqual([WRITTEN, [["read", 1, true]]]);
+  const deciding = op(p.head.seq, 0);
+  expect([said(p.answered(landed.mint, 1, "confirmed", TOKEN)), p.opened, p.item(landed.publication).values["token"], p.item(landed.publication).state]).toEqual([WRITTEN, [["revoke", 3, true]], null, "reserved"]);
+  expect([said(p.answered(deciding, 1, "confirmed", { seen: NEXT })), p.item(landed.publication).state, p.branch.values["head"]]).toEqual([WRITTEN, "published", NEXT]);
 });
 
 // "The guard and the effect of `resend`" (ER4), and the last rows of "What `seen` decides for a push".
-test("a resend is refused `resend-not-due` while an attempt of the publication's push is not used, and opens one push with its mint once every stated attempt has an outcome; a commit of another writer holds the slot and opens nothing", () => {
+test("a resend is refused `resend-not-due` while an attempt of the publication's push is not used, and opens one push with its mint once every stated attempt has an outcome; the base with an attempt not known opens one read; a commit of another writer holds the slot and opens nothing", () => {
   const b = new Branch(false).ready();
   const { publication, push } = b.reserved();
   const resend = () => said(b.act(rita, "resend", { on: publication, expected: { on: b.item(publication).revision } }));
@@ -419,8 +423,11 @@ test("a resend is refused `resend-not-due` while an attempt of the publication's
   const unknown = (attempt: number, seen: string) => said(b.outcome(push, attempt, "unknown", { basis: "none", body: { send: "unknown", seen } }));
   expect([unknown(1, HEAD), b.item(publication).state, resend(), unknown(2, HEAD), b.state.operation(push)!.attempts.length, resend()])
     .toEqual([WRITTEN, "unresolved", ["refused", "guard-failed", "resend-not-due"], WRITTEN, 3, ["refused", "guard-failed", "resend-not-due"]]);
-  // Attempt 3 is not known either, and a commit of another writer is on the branch. The slot stays held, and nothing is opened.
-  expect([unknown(3, OTHER), b.opened, b.item(publication).state, b.branch.refs["slot"], b.last.sends]).toEqual([WRITTEN, [], "unresolved", publication, []]);
+  // The own answer of attempt 1 comes late, while attempt 3 is open: it opens no read, because an attempt of that push is open.
+  expect([said(b.answered(push, 1, "refused", { send: "refused", seen: HEAD })), b.opened, outcomesOf(b, push)]).toEqual([WRITTEN, [], [["unknown", "refused"], ["unknown"], []]]);
+  // Attempt 3 is not known either, and its read back shows the base. No attempt is left, and not every attempt is refused: nothing
+  // is provable. The slot stays held, and one read of the branch is opened.
+  expect([unknown(3, HEAD), b.opened, b.item(publication).state, b.branch.refs["slot"], b.last.sends]).toEqual([WRITTEN, [["read", 1, true]], "unresolved", publication, []]);
   // Every attempt that the push states is opened and has an outcome: the resend is due. It opens one push with 1 attempt, and that attempt's mint.
   expect([resend(), b.opened]).toEqual([WRITTEN, [["push", 1, true], ["mint", 1, true]]]);
   const again = op(b.head.seq, 0);
@@ -428,6 +435,24 @@ test("a resend is refused `resend-not-due` while an attempt of the publication's
   expect(resend()).toEqual(["refused", "guard-failed", "resend-not-due"]);
   // That attempt lands. Its outcome is its own answer, and the read back publishes.
   expect([said(b.answered(again, 1, "confirmed", { send: "accepted", seen: NEXT })), b.item(publication).state, b.branch.values["head"]]).toEqual([WRITTEN, "published", NEXT]);
+  // A commit of another writer on the branch (section 6.9): the slot stays held, and no attempt and no read is opened.
+  const w = new Branch(false).ready();
+  const other = w.reserved();
+  expect([said(w.outcome(other.push, 1, "unknown", { basis: "none", body: { send: "unknown", seen: OTHER } })), w.opened, w.state.operation(other.push)!.attempts.length, w.item(other.publication).state, w.branch.refs["slot"]])
+    .toEqual([WRITTEN, [], 1, "unresolved", other.publication]);
+  // Section 12.1.5 names a `resend` as a way forward there. The guard, as its row states it, does not hold: two of the three
+  // attempts that the push states were never opened (I3 deltas, entry FA13).
+  expect(said(w.act(rita, "resend", { on: other.publication, expected: { on: w.item(other.publication).revision } }))).toEqual(["refused", "guard-failed", "resend-not-due"]);
+  // An attempt whose own answer is `accepted`, while the read back still shows the base: the ledger opens no attempt after a
+  // `confirmed` outcome, so the rule opens no mint. Nothing is provable, and one read of the branch is opened.
+  const c = new Branch(false).ready();
+  const accepted = c.reserved();
+  expect([said(c.answered(accepted.push, 1, "confirmed", { send: "accepted", seen: HEAD })), c.opened, c.state.operation(accepted.push)!.attempts.length, c.item(accepted.publication).state])
+    .toEqual([WRITTEN, [["read", 1, true]], 1, "unresolved"]);
+
+  // The note also lets a resend open a receipt's write for a `published` publication. `published` is final, and an act on a final
+  // item is refused before any guard of its row: that half of the row cannot run (I3 deltas, entry FA6).
+  expect([b.item(publication).values["receipt"], resend()]).toEqual(["owed", ["refused", "final", null]]);
 });
 
 // Section 6.9 and the rows `adopt-head` and `adopt-read` (ER13), with row 36 of the table of marks.
