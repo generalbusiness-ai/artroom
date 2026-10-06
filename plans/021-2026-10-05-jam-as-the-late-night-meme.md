@@ -90,10 +90,12 @@ What it looks like:
 What it sounds like:
 
 - 0 to 3.3 s: a voiced hum, about eight syllables at roughly three a
-  second, with strong harmonics and large leaps: the dominant pitch sits
-  around G sharp 3 for a second, drops to G sharp 2 and E 2, jumps to D
-  sharp 4, falls back. It is a tune, but a silly one, sung badly on
-  purpose.
+  second, with strong harmonics. Builder's pitch tracker (spike J0, first
+  run, 2026-10-05) found eight notes, all between A2 and A sharp 3. The
+  planner's first figures here named leaps to G sharp 2 and D sharp 4;
+  they came from the loudest spectral bin per quarter second, which
+  follows harmonics, and were wrong. It is a tune, but a silly one, sung
+  badly on purpose.
 - 3.3 to 7.5 s: mouth percussion, dry and regular, about four hits a
   second: the singer "drums" the rhythm.
 - 7.5 s to the end: the keyboard player's track, at about 120 beats per
