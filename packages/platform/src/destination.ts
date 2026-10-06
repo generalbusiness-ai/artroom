@@ -45,7 +45,8 @@
 
 import type { FactRef, FieldValue, OperationId, PlatformData, PlatformDefinition, ScopeId } from "@generalbusiness/artroom-contract";
 import { canonicalize, isFactRef, isMemberRef, isScopeRef, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
-import type { Item, Opening, Operation, Own, RecordedRef, RuleEffect, RuleGiven, Rules, StateView } from "@generalbusiness/artroom-derive";
+import type { Item, Opening, Operation, Own, RecordedRef, RuleEffect, RuleGiven, RuleRequest, Rules, StateView } from "@generalbusiness/artroom-derive";
+import { isObjectId } from "./reservation.ts";
 import { referenceOf } from "./rules-scope.ts";
 
 /** The name and version that this data and these rules are. An operation that the destination opens states it as its owner (the contract's section 4.3). */
@@ -102,6 +103,8 @@ const HELD: readonly string[] = ["reserved", "publishing", "unresolved"];
 const EVERY = ["queued", "reserved", "publishing", "unresolved", "published", "aborted", "not-reserved"] as const;
 /** The type of a `collect` list of a `reserve` (Code P25; row b). */
 const COLLECTED = { code: "collect-list", row: "P25", type: "code", required: true } as const;
+/** The send of the mark of an outcome's kind: the `relate`, `publication`, to the lane. Its clauses are empty (rows m and n). */
+const UPDATE = { code: "publication-update", row: "P16", result: {} } as const;
 /** The sender is the scope that the operation's fact is in (section 6.4). */
 const OWNER = { equals: { a: { field: "operation", part: "scope" }, b: { sender: true } }, reason: "not-owner" } as const;
 
@@ -324,16 +327,17 @@ export const destination: PlatformData = {
   // No timed rule exists (section 12.1.5, "Reservations").
   timed: {},
   rules: {},
-  // The kinds of operation that this definition owns, each with the mark of the rule for its outcome entries (rows 33 and e).
-  // Row 33 names the rule `judge`. The names of the other seven are this source's (entry ER1). None of the eight is written.
+  // The kinds of operation that this definition owns, each with the mark of the rule for its outcome entries (rows 33 and e;
+  // revision 25 confirms the eight names, entry ER1). The mark of a kind holds the send mark `publication-update` where rows m and
+  // n of the table of further marks name the kind: `judge`, and a push, its mint, its revocation, the deciding read and the receipt.
   outcomes: {
     [DESTINATION_KINDS.firstHead]: { code: "first-head", row: "P16" },
-    [DESTINATION_KINDS.judge]: { code: "judge", row: "P19" },
-    [DESTINATION_KINDS.push]: { code: "push", row: "P16" },
-    [DESTINATION_KINDS.mint]: { code: "mint", row: "P16" },
-    [DESTINATION_KINDS.revoke]: { code: "revoke", row: "P16" },
-    [DESTINATION_KINDS.read]: { code: "deciding-read", row: "P16" },
-    [DESTINATION_KINDS.receipt]: { code: "receipt", row: "P16" },
+    [DESTINATION_KINDS.judge]: { code: "judge", row: "P19", send: UPDATE },
+    [DESTINATION_KINDS.push]: { code: "push", row: "P16", send: UPDATE },
+    [DESTINATION_KINDS.mint]: { code: "mint", row: "P16", send: UPDATE },
+    [DESTINATION_KINDS.revoke]: { code: "revoke", row: "P16", send: UPDATE },
+    [DESTINATION_KINDS.read]: { code: "deciding-read", row: "P16", send: UPDATE },
+    [DESTINATION_KINDS.receipt]: { code: "receipt", row: "P16", send: UPDATE },
     [DESTINATION_KINDS.adoptRead]: { code: "adopt-read", row: "P16" },
   },
 };
@@ -585,6 +589,170 @@ export function revokedToken(state: Pick<StateView, "operation" | "item">, own: 
   const token = input?.type === "outcome" ? bodyOf(input.evidence.body, ["token", "ends"])?.["token"] : null;
   return typeof token === "string" ? token : null;
 }
+
+// ---------------------------------------------------------------- what an outcome decides
+
+/**
+ * The request of the send mark `publication-update` (rows m and n; section
+ * 12.1.5, "The send `publication-update`"): one `relate`, named
+ * `publication`, to the publication's `lane`, of the publication item. Its
+ * relationship state is the publication's state, as the written update of
+ * a `withdraw` has it. Its detail is `operation`, `outcome`, `commit`,
+ * `reason` and `rules`.
+ *
+ * `rules` is the revision of the rules that the destination observed for
+ * the reservation (section 12.1.4a, "`rules` in the update"). It is read
+ * from the reservation's retained observation. An entry that retains none
+ * gives none, and the update then holds no member `rules` (I3 deltas,
+ * entry FA8).
+ */
+interface Update { publication: Item; state: string; outcome: "committed" | "unknown" | "published" | "refused" | "aborted"; commit?: string; reason?: string; rules?: number | null }
+
+/** What the rule of an outcome yields: the effects, the operations that the entry opens, and the update, when the table says "the update". */
+interface Decided { effects: readonly RuleEffect[]; opens: readonly Opening[]; update: Update | null }
+const NOTHING: Decided = { effects: [], opens: [], update: null };
+type Decides = (given: RuleGiven, operation: Operation) => Decided;
+
+/** The revision of the rules in the retained observations of one of this scope's own entries, or null. */
+const rulesObserved = (own: Own, at: unknown): number | null => {
+  const input = typeof at === "number" ? ownEntry(own, at).input : null;
+  const observed = input?.type === "outcome" ? (input.observed ?? []).map((use) => use.observation).find((observation) => "subject" in observation && observation.subject === "rules") : undefined;
+  return observed && "revision" in observed ? observed.revision : null;
+};
+
+function updateRequest({ own, resolved }: RuleGiven, update: Update): RuleRequest {
+  const { publication, state, outcome, commit, reason } = update;
+  const [lane, operation] = [publication.refs["lane"], publication.refs["operation"]];
+  if (!isScopeRef(lane) || !isFactRef(operation) || publication.opened === null) throw new Error("an update is of a publication that holds its lane and its operation");
+  const rules = update.rules === undefined ? rulesObserved(own, publication.values["reservedAt"]) : update.rules;
+  const detail: Record<string, FieldValue> = { operation: operation as FactRef & FieldValue, outcome, ...(commit === undefined ? {} : { commit }), ...(reason === undefined ? {} : { reason }), ...(rules === null ? {} : { rules }) };
+  return { to: lane, message: { class: "request", type: "relate", body: { name: "publication", item: { at: resolved.at, seq: publication.id, hash: publication.opened }, state, detail } } };
+}
+
+/** "The next `judge`", as an outcome's rule yields it: the reference `branch.judging` and the operation. `emptied`: the entry empties `judging`, so it is emptied where no `judge` follows. */
+function andNext(state: Pick<StateView, "page">, after: Parameters<typeof nextJudge>[1], emptied = false): Pick<Decided, "effects" | "opens"> {
+  const [branch, publication] = [branchOf(state), nextJudge(state, after)];
+  if (!branch) throw new Error("a destination holds its branch item");
+  if (publication === null) return { effects: emptied ? [{ effect: "ref", item: branch.id, slot: "judging", to: null }] : [], opens: [] };
+  return { effects: [{ effect: "ref", item: branch.id, slot: "judging", to: publication }], opens: [opening(DESTINATION_KINDS.judge, DESTINATION_ATTEMPTS.judge)] };
+}
+
+/** One attempt of a push, as the outcome entry that is written leaves it: the operation, the attempt, the result, and whether the ledger opens the next attempt in the entry. */
+interface PushAt { push: Operation; attempt: number; result: "confirmed" | "refused" | "unknown"; next: boolean }
+
+/**
+ * "Every attempt of every push operation of this publication has a
+ * `refused` outcome", with the outcome that is being written counted. Then
+ * no attempt is open, and nothing that was sent can still land (section
+ * 6.8).
+ */
+function everyRefused({ state, own, resolved }: RuleGiven, publication: Item, at: PushAt | null): boolean {
+  const refused = (push: Operation, attempt: Operation["attempts"][number]) =>
+    attempt.outcomes.some((outcome) => outcome.result === "refused") || (at !== null && push.id === at.push.id && attempt.attempt === at.attempt && at.result === "refused");
+  return writesOf(state, own, publication, "push", resolved.self).every((push) => push.attempts.every((attempt) => refused(push, attempt)));
+}
+
+/**
+ * "What `seen` decides for a push" (section 12.1.5). The rule runs this
+ * table in every outcome entry of a push attempt, the first and a late
+ * answer alike, and in the outcome of a `read` of the branch. `at`: the
+ * attempt, in an outcome of a push; null, in an outcome of a read. Where
+ * the publication does not hold the slot it is final, and nothing follows.
+ *
+ * `seen` is what the ref held when it was read: a commit ID; the text
+ * `absent`; or the text `failed`, when the read did not finish.
+ */
+function seenDecides(given: RuleGiven, publication: Item, seen: unknown, at: PushAt | null): Decided {
+  const { state } = given;
+  const branch = branchOf(state);
+  if (!branch) throw new Error("a destination holds its branch item");
+  if (!HELD.includes(publication.state)) return NOTHING;
+  const [base, integration, id] = [branch.values["head"], publication.values["integration"], publication.id];
+  /** `{ state: "unresolved" }`, when the state was another, with the update `unknown`. */
+  const unresolved = (opens: readonly Opening[]): Decided => (publication.state === "unresolved"
+    ? { effects: [], opens, update: null }
+    : { effects: [{ effect: "state", item: id, state: "unresolved" }], opens, update: { publication, state: "unresolved", outcome: "unknown" } });
+
+  // The publication's `integration`: `published`.
+  if (isObjectId(seen) && seen === integration) {
+    const next = andNext(state, { slot: true });
+    return {
+      effects: [
+        { effect: "state", item: id, state: "published" }, { effect: "ref", item: branch.id, slot: "slot", to: null }, { effect: "value", item: branch.id, slot: "head", value: seen },
+        { effect: "value", item: id, slot: "receipt", value: "owed" }, ...next.effects,
+      ],
+      opens: [opening(DESTINATION_KINDS.receipt, DESTINATION_ATTEMPTS.receipt), opening(DESTINATION_KINDS.mint, DESTINATION_ATTEMPTS.mint), ...next.opens],
+      update: { publication, state: "published", outcome: "published", commit: seen },
+    };
+  }
+  if (isObjectId(seen) && seen === base) {
+    // The base, and the ledger opens a further attempt in this entry: `unresolved`, and the `mint` of attempt n + 1.
+    if (at?.next) return unresolved([opening(DESTINATION_KINDS.mint, DESTINATION_ATTEMPTS.mint)]);
+    // The base; no attempt is open; and every attempt has a `refused` outcome: `aborted`.
+    if (everyRefused(given, publication, at)) {
+      const [compromised, next] = [publication.values["aborting"] === true, andNext(state, { slot: true })];
+      const reason = compromised ? "compromised" : "host-refused";
+      return {
+        effects: [{ effect: "state", item: id, state: "aborted" }, { effect: "ref", item: branch.id, slot: "slot", to: null }, { effect: "value", item: id, slot: "reason", value: reason }, ...next.effects],
+        opens: next.opens,
+        update: { publication, state: "aborted", outcome: compromised ? "aborted" : "refused", reason },
+      };
+    }
+  }
+  // The base, otherwise: not provable. `failed`: nothing is decided. The slot stays held. In an outcome of a push, a `read` of the
+  // branch is opened, where no attempt of that push is open after this entry (section 12.1.5, "The deciding read").
+  if (seen === "failed" || (isObjectId(seen) && seen === base)) {
+    const open = at !== null && at.push.attempts.some((attempt) => attempt.attempt !== at.attempt && attempt.outcomes.length === 0);
+    return unresolved(at !== null && !open ? [opening(DESTINATION_KINDS.read, DESTINATION_ATTEMPTS.read)] : []);
+  }
+  // Any other commit, or a ref that is absent: another writer (section 6.9). The slot stays held. No attempt and no read is opened.
+  return unresolved([]);
+}
+
+/** The publication of a push, and whether its rule allows another attempt: only when `seen` is the base and `aborting` is not set (section 12.1.5, "Whether another attempt of a push is allowed"). */
+function pushOf({ state, own, input }: RuleGiven, push: Operation): { publication: Item; seen: unknown; allows: boolean } {
+  const publication = subjectOf(state, own, push);
+  if (input.type !== "outcome" || publication?.type !== "publication") throw new Error("a push is of one publication");
+  const seen = isObject(input.evidence.body) ? input.evidence.body["seen"] : null;
+  return { publication, seen, allows: isObjectId(seen) && seen === branchOf(state)?.values["head"] && publication.values["aborting"] !== true };
+}
+
+/**
+ * The outcome entry of one attempt of a push (the row `push` of "What each
+ * rule of an outcome yields"). First, in the first outcome of an attempt:
+ * when the slot `token` names its mint, the token's `revoke` and its
+ * attempt 1, and `token` emptied. Then the table of `seenDecides`.
+ *
+ * Where the publication is final when the first outcome of an attempt
+ * comes, the slot cannot be emptied: no effect changes an item that was
+ * final before the entry. The revocation is still opened. No other entry
+ * opens one for that token: a mint sets the slot only on a publication
+ * that holds the branch's slot, and `abort-if-behind` acts only on one (I3
+ * deltas, entry FA6).
+ */
+const pushDecides: Decides = (given, push) => {
+  const { state, input } = given;
+  const { publication, seen, allows } = pushOf(given, push);
+  if (input.type !== "outcome") throw new Error("a push is judged in its outcome entry");
+  const attempt = push.attempts.find((opened) => opened.attempt === input.attempt);
+  const mint = mintOf(state, push, input.attempt);
+  const revokes = attempt?.outcomes.length === 0 && mint !== null && publication.values["token"] === mint.id;
+  // The ledger's own conditions for attempt n + 1, made again on the same state (the contract's section 4.3, item 2).
+  const next = input.result !== "confirmed" && input.attempt === push.attempts.length && push.attempts.length < push.most && push.selected === null && allows;
+  const table = seenDecides(given, publication, seen, { push, attempt: input.attempt, result: input.result, next });
+  return {
+    effects: [...(revokes && HELD.includes(publication.state) ? [{ effect: "value", item: publication.id, slot: "token", value: null } as const] : []), ...table.effects],
+    opens: [...(revokes ? [opening(DESTINATION_KINDS.revoke, DESTINATION_ATTEMPTS.revoke)] : []), ...table.opens],
+    update: table.update,
+  };
+};
+
+/** What the rule of each kind decides for the outcome entry that is written, for the send mark that its kind holds. */
+const DECIDES: Readonly<Record<string, Decides>> = { [DESTINATION_KINDS.push]: pushDecides };
+
+/** The body of an outcome of a write: `{ send, seen }`, with a `send` that fits the result (section 12.1.5, "The evidence of a write"). */
+const SENDS: Readonly<Record<string, readonly string[]>> = { confirmed: ["accepted"], refused: ["refused", "not-sent"], unknown: ["unknown"] };
+const isSeen = (seen: unknown): boolean => seen === "absent" || seen === "failed" || isObjectId(seen);
 
 // ---------------------------------------------------------------- the rules
 
@@ -870,6 +1038,59 @@ export const destinationRules: Rules = {
         return body !== null && token !== null && body["token"] === token;
       },
       unknown: (state, operation, _attempt, own) => { const token = revokedToken(state, own, operation); return token === null ? null : { token }; },
+    },
+  },
+  /**
+   * Row e, the outcome entries of a push (P16; section 12.1.5, the row
+   * `push`, and "What `seen` decides for a push"; entry ER7). It reads the
+   * opening entry; the publication; `branch.head`; and the attempts of the
+   * publication's push operations.
+   *
+   * - The body is `{ send, seen }`. `confirmed`: `send` is `accepted`.
+   *   `refused`: `refused` or `not-sent`, the classes of section 6.6, step
+   *   4. `unknown`: `unknown`. A read is evidence in the body, and settles
+   *   no attempt: no outcome has the basis `read`.
+   * - An outcome that is not known, where the driver has no read back to
+   *   offer: `{ send: "unknown", seen: "failed" }`. Nothing is then
+   *   decided, and the deciding read follows (I3 deltas, entry FA7).
+   * - Another attempt is allowed only when `seen` is the base and
+   *   `aborting` is not set. The ledger adds its own conditions.
+   * - The request of an attempt is sent only after its mint has an
+   *   outcome. Where the mint is `refused`, or its answer is lost, the
+   *   port has no token for the attempt: nothing is sent, and the
+   *   attempt's outcome is `refused`, with `send: "not-sent"`.
+   * - `most`: the first outcome of an attempt that publishes holds 6
+   *   effects of this rule and opens `revoke`, `receipt`, `mint` and
+   *   `judge`. The note counts 10 as the largest of the table, for
+   *   `judge`: this row is larger by the same table (entry FA11).
+   */
+  push: {
+    place: "outcome",
+    rules: {
+      selects: false, read: false, covered: true, most: { effects: 14, requests: 1, operations: 4 },
+      retries: (_result, push, given) => pushOf(given, push).allows,
+      ready: (state, push, attempt) => (mintOf(state, push, attempt)?.attempts[0]?.outcomes.length ?? 0) > 0,
+      wellFormed: (result, evidence) => { const body = bodyOf(evidence.body, ["send", "seen"]); return body !== null && SENDS[result]!.includes(body["send"] as string) && isSeen(body["seen"]); },
+      unknown: () => ({ send: "unknown", seen: "failed" }),
+      derives: (given, push) => { const { effects, opens } = pushDecides(given, push); return { effects, sends: [], opens }; },
+    },
+  },
+  /**
+   * Rows m and n, the `send` of the mark of an outcome's kind (P16): the
+   * one `relate`, `publication`, to the lane. Its clauses are empty. One
+   * rule stands at each kind. It gives the update only where the rule of
+   * the kind says "the update": it makes that rule's judgment again, on the
+   * same state and the same outcome, as every rule reads the state before
+   * its entry. No update is sent for `publishing`, so the kinds `mint`,
+   * `revoke` and `receipt` give none.
+   */
+  "publication-update": {
+    place: "send",
+    run: (given) => {
+      const operation = given.input.type === "outcome" ? given.state.operation(given.input.operation) : null;
+      if (!operation) throw new Error("publication-update stands at the kind of an outcome");
+      const update = Object.hasOwn(DECIDES, operation.kind) ? DECIDES[operation.kind]!(given, operation).update : null;
+      return update === null ? null : updateRequest(given, update);
     },
   },
 };
