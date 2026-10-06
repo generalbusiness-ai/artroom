@@ -42,7 +42,7 @@ function lacking(named: string): string[] {
 // | The clock, transport and the readers | The scripted clock, the namespace's transport, and the test readers, as in every test of the namespace `PLATFORM`. For the reads that are about a session, the readers are the real read sessions, under a TEST SECRET that the test generates. |
 // | Who may install | Nothing checks it: that is the installation design's (N5). paul signs the `install`. |
 describe("a founding on real scopes under the deployed class (authority note, section 3.8; I3 plan, step 9c). The Git host is a STAND-IN", () => {
-  test("an install founds a register; a founder's claim opens the creation of a repository; its own answer selects it and creates the directory; the directory's genesis creates membership and the rules scope, each held until the register's confirm; the creation of the destination is not decided, because `platform:destination@1` lacks rules; and the rules scope's first act fixes the incarnation of the membership scope whose ID it holds", async () => {
+  test("an install founds a register; a founder's claim opens the creation of a repository; the reply to its first attempt is lost, and the own answer of the second selects it and creates the directory; the directory's genesis creates membership and the rules scope, each held until the register's confirm; the creation of the destination is not decided, because `platform:destination@1` lacks rules; and the rules scope's first act fixes the incarnation of the membership scope whose ID it holds", async () => {
     net.hold = net.deaf = null;
     // Step 0: the register, by an `install` intent with `to: null`, under `platform:register@1`. Its seed has the kind `register` and
     // no creator, and the object's name is the seed's digest.
@@ -60,33 +60,40 @@ describe("a founding on real scopes under the deployed class (authority note, se
     const seed: Seed = { v: 1, kind: "directory", definition: DIRECTORY, creator: register, cause: intentDigest(found.intent), ordinal: 0 };
     const D = new Platform(scopeIdOf(seed));
     const creation: OperationId = "1:0";
-    // The host's own answer to attempt 1, which the test writes: created, under the attempt's own name, with the host's ID.
-    const name = repositoryName(seedDigest(seed), 1);
-    host.answer(creation, 1, { result: "confirmed", evidence: { basis: "own-answer", body: { name, id: "repo-7" } } });
+    // What the host answers, which the test writes (section 12.1.1, case c). The reply to attempt 1 is lost: no answer comes. The
+    // host's own answer to attempt 2 says created, under that attempt's own name, with the host's ID.
+    const name = repositoryName(seedDigest(seed), 2);
+    host.answer(creation, 1, null);
+    host.answer(creation, 2, { result: "confirmed", evidence: { basis: "own-answer", body: { name, id: "repo-7" } } });
     const claimed: Answer = await R.stub.submit(found, []);
     expect(claimed).toMatchObject({ answer: "accepted", receipt: { fact: { seq: 1 } } });
 
-    // Steps 2 to 7: the operations driver sends the one request, records its answer as an outcome entry, and the dispatchers carry
-    // every message from there. Nothing is carried by the test.
-    while ((await (R.stub as unknown as { effect(): Promise<number> }).effect()) > 0) { /* each pass may make the next one due */ }
+    // Steps 2 to 7: the operations driver sends the one request of each attempt and records what came as an outcome entry, and the
+    // dispatchers carry every message from there. Nothing is carried by the test. Attempt 1 is recorded `unknown`, with the body
+    // that the register's rule states for an outcome that is not known, and its entry opens attempt 2, which is due after a delay.
+    const driven = async () => { while ((await (R.stub as unknown as { effect(): Promise<number> }).effect()) > 0) { /* each pass may make the next one due */ } };
+    await driven();
+    expect((await R.last()).input).toMatchObject({ type: "outcome", attempt: 1, result: "unknown", evidence: { basis: "none", body: { name: repositoryName(seedDigest(seed), 1) } } });
+    net.clock.now = soon(PROPOSED_BOUNDS.dispatchRetrySeconds);
+    await driven();
     await settle(R, D);
     const directory = await D.at();
     const sent = (await D.entries())[0]!.sends;
     const [membershipScope, rulesScope, destination] = [1, 2, 3].map((n) => new Platform(scopeIdOf(sent.find((send) => send.n === n)!.to as Seed)));
     await settle(R, D, membershipScope!, rulesScope!);
 
-    // The register: the request reached the host once, by the attempt's own name. The outcome is selected, sets the claim's
-    // repository, and sends the `create` of the directory. The directory's applied result makes the claim `active`, and the register
-    // confirms the directory.
+    // The register: one request of each attempt reached the host. The outcome of attempt 2 is selected, sets the claim's repository,
+    // and sends the `create` of the directory. The directory's applied result makes the claim `active`, and the register confirms
+    // the directory.
     const r = await R.entries();
-    expect([host.attempts, r.map((entry) => entry.input.type), r[2]!.effects, r[2]!.sends.map((send) => [send.n, send.message.class, (send.to as Seed).kind])]).toEqual([
-      ["1:0#1"], ["genesis", "act", "outcome", "delivery"],
-      [{ effect: "attempt", operation: creation, attempt: 1, result: "confirmed", selected: true }, { effect: "value", item: 1, slot: "repository", value: { host: "git.example", namespace: "artroom", name, id: "repo-7" } }],
+    expect([host.attempts, r.map((entry) => entry.input.type), r[3]!.effects, r[3]!.sends.map((send) => [send.n, send.message.class, (send.to as Seed).kind])]).toEqual([
+      ["1:0#1", "1:0#2"], ["genesis", "act", "outcome", "outcome", "delivery"],
+      [{ effect: "attempt", operation: creation, attempt: 2, result: "confirmed", selected: true }, { effect: "value", item: 1, slot: "repository", value: { host: "git.example", namespace: "artroom", name, id: "repo-7" } }],
       [[0, "request", "directory"]],
     ]);
     // The claim is `active`, which is final: it is read with the retained final items.
     const claims = await (R.stub as unknown as { items(reader: unknown, type: string): Promise<Read<readonly Item[]>> }).items(reader, "claim");
-    expect([claims.ok && claims.value.map((item) => [item.id, item.state, item.refs]), r[3]!.sends.map((send) => send.message)]).toMatchObject([
+    expect([claims.ok && claims.value.map((item) => [item.id, item.state, item.refs]), r[4]!.sends.map((send) => send.message)]).toMatchObject([
       [[1, "active", { directory, genesis: { at: directory, seq: 0 } }]], [{ class: "control", type: "confirm" }],
     ]);
 
