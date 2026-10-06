@@ -213,13 +213,16 @@ describe("the list forms (section 6.5)", () => {
     expect([judged({ unset: "due" }), judged({ before: { slot: "due" } })]).toEqual(["write", "clock-behind"]);
   });
 
-  test("a handler reads the members of a record element of a list in its message", () => {
+  test("a handler reads the members of a record element of a list in its message, and a list that is a member of such an element", () => {
     const checked = (name: Operand): Guard => ({ each: { list: { field: "checks" }, as: "k", where: [{ equals: { a: { element: "k.required" }, b: { const: true } } }], guards: [{ differs: { a: { element: "k.name" }, b: name } }] }, reason: "required" });
+    // Row I3-49 (the contract's section 6.2, point DF1, and section 15.3g, "A list inside a record"): a member of a record may be a
+    // list, and the `list` of an `each` may name that member of an element. No path of any check is the barred name.
+    const pathed: Guard = { each: { list: { field: "checks" }, as: "k", guards: [{ each: { list: { element: "k.paths" }, as: "p", guards: [{ differs: { a: { element: "p" }, b: { field: "barred" } } }] } }] }, reason: "path" };
     const auditing = variant(desk, (d) => {
-      const check = { type: "record", of: { name: { type: "text", max: 16, required: true }, required: { type: "bool", required: true } } };
+      const check = { type: "record", of: { name: { type: "text", max: 16, required: true }, required: { type: "bool", required: true }, paths: { type: "list", of: { type: "text", max: 16 }, max: 4, required: false } } };
       d.receives.audit = {
         message: "audit", class: "tell", from: { kind: "lane" }, fields: { barred: { type: "text", max: 16, required: true }, checks: { type: "list", of: check, max: 4, required: true } }, opens: null,
-        also: {}, guards: [checked({ field: "barred" })], effects: [], sends: [], attention: [],
+        also: {}, guards: [checked({ field: "barred" }), pathed], effects: [], sends: [], attention: [],
       };
     });
     const D = founded();
@@ -233,6 +236,9 @@ describe("the list forms (section 6.5)", () => {
     };
     // `docs` is not required, so the `where` leaves it out. `lint` is required, and is judged.
     expect([decision("docs"), decision("lint")]).toEqual([["applied", undefined], ["refused", { code: "guard-failed", name: "required" }]]);
+    // The inner list is read from each element: a path of the second check is the barred name. A list of five is past its `max`.
+    const paths = (...of: string[]) => [{ name: "lint", required: false, paths: ["src"] }, { name: "docs", required: false, paths: of }];
+    expect([decision("a", paths("b", "c")), decision("c", paths("b", "c")), decision("a", paths("1", "2", "3", "4", "5"))]).toEqual([["applied", undefined], ["refused", { code: "guard-failed", name: "path" }], ["refused", { code: "bad-field" }]]);
     // A handler declares the fields of its message, so a value that is no list of such records is no value of the field.
     expect(decision("docs", "lint")).toEqual(["refused", { code: "bad-field" }]);
   });
