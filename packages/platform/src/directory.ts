@@ -511,11 +511,13 @@ export const directoryRules: Rules = {
    * Row 10, among the guards of `open-task` (P19). It reads the
    * `MemberObservation` of the worker, which the entry retains, and the
    * grant that was judged. It holds when the worker is an active member of
-   * this repository's membership scope and, for an agent, its controller is
-   * the signer or the signer's role is `admin`. An agent is a member whose
+   * this repository's membership scope, with an active key, and, for an
+   * agent, its controller is the signer or the signer's role is `admin`. An agent is a member whose
    * observation has a controller (section 3.3, entry ED6). Otherwise
    * `worker-not-active`. Not completed, `dependency-unavailable`, when the
-   * entry would lack the observation (I3 deltas, entry EP11).
+   * entry would lack the observation, or holds one of another scope than
+   * `repository.membership` (I3 deltas, entry EP11, as the note's revision
+   * 25 confirms it, with `activeKey` added).
    */
   "worker-standing": {
     place: "guard", refusals: ["worker-not-active"],
@@ -527,7 +529,8 @@ export const directoryRules: Rules = {
       if (!worker || !grant || !membership || !same(worker.membership, membership)) return refused;
       const observation = given.observed({ member: worker.member })?.observation as MemberObservation | undefined;
       if (!observation || !same(observation.of, membership)) return { holds: null, reason: "dependency-unavailable" };
-      if (observation.memberState !== "active") return refused;
+      // Revision 25 (I3 delta EP11): a member whose last key is revoked cannot work (section 3.5, rule 5). So `activeKey` is read.
+      if (observation.memberState !== "active" || observation.activeKey !== true) return refused;
       // The signer's role is in the observation that the grant was judged on (section 3.3). A grant that holds none shows no role.
       const judgedOn: unknown = (grant.fresh as Grant["fresh"] | null)?.observation;
       const admin = isObject(judgedOn) && judgedOn["role"] === "admin";

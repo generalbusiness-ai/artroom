@@ -129,6 +129,7 @@ describe("the rules of platform:directory@1, each as a plain function (authority
     // Row 10: the worker is an active member; an agent's controller is the signer, or the signer is an admin.
     ["10: an active member that is no agent", "worker-standing", [standing({})], HOLDS],
     ["10: a removed member", "worker-standing", [standing({ memberState: "removed" })], { holds: false, name: "worker-not-active" }],
+    ["10: an active member whose last key is revoked (revision 25, EP11)", "worker-standing", [standing({ activeKey: false })], { holds: false, name: "worker-not-active" }],
     ["10: an agent whose controller is the signer", "worker-standing", [standing({ controller: "@rita" })], HOLDS],
     ["10: an agent of another controller", "worker-standing", [standing({ controller: "@una" })], { holds: false, name: "worker-not-active" }],
     ["10: an agent of another controller, when the signer is an admin", "worker-standing", [standing({ controller: "@una" }, grantOf("admin"))], HOLDS],
