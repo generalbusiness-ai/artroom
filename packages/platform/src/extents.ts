@@ -75,6 +75,14 @@ export const holdsRulesExtent = (extents: readonly Extent[]): boolean =>
 
 // ---------------------------------------------------------------- a pattern
 
+/**
+ * A count of the work of `matches` and of `classify`, for a test that shows
+ * the work is bounded by the inputs: the places that a `**` reaches, and the
+ * lookups and links that a classification looks at. Giving one changes no
+ * answer.
+ */
+export interface Tally { steps: number }
+
 /** An ASCII letter in its lower case, and every other code unit as it is: nothing else is folded. */
 const folded = (unit: number): number => (unit >= 65 && unit <= 90 ? unit + 32 : unit);
 
@@ -103,18 +111,23 @@ const nameMatches = (pattern: string, name: string): boolean => {
  * A path whose bytes are no text has no string, and is the caller's to
  * refuse (entry EV13).
  */
-export const matches = (pattern: string, path: string): boolean => {
+export const matches = (pattern: string, path: string, tally?: Tally): boolean => {
   const [want, names] = [pattern.split("/"), path.split("/")];
   // reach[n]: the names before `n` are matched by the pattern's names so far.
   let reach = names.map(() => false).concat(false);
   reach[0] = true;
   for (const part of want) {
     const next = reach.map(() => false);
-    for (let n = 0; n <= names.length; n += 1) {
-      if (!reach[n]) continue;
-      if (part === "**") for (let more = n; more <= names.length; more += 1) next[more] = true;
-      else if (n < names.length && nameMatches(part, names[n]!)) next[n + 1] = true;
+    // `**` matches any number of names, so every place from the first one reached is reached: one pass over the rest of the path,
+    // whatever the number of places reached.
+    const from = part === "**" ? [reach.indexOf(true)].filter((n) => n >= 0) : [];
+    for (const first of from) {
+      for (let more = first; more <= names.length; more += 1) {
+        if (tally) tally.steps += 1;
+        next[more] = true;
+      }
     }
+    if (part !== "**") for (let n = 0; n < names.length; n += 1) if (reach[n] && nameMatches(part, names[n]!)) next[n + 1] = true;
     reach = next;
   }
   return reach[names.length]!;
@@ -195,11 +208,41 @@ export interface Touched {
  * A judged path that no extent holds makes its changed path unclassified
  * (entry EV14).
  */
-export function classify(extents: readonly Extent[], changed: readonly string[], links: readonly TreeLink[]): Touched {
+export function classify(extents: readonly Extent[], changed: readonly string[], links: readonly TreeLink[], tally?: Tally): Touched {
   const shown = new Map<string, string>();
   const [unclassified, refused] = [new Set<string>(), new Set<string>()];
   const patterned = extents.filter((extent) => extent.patterns.length > 0);
   const open = extents.filter((extent) => extent.patterns.length === 0);
+  // The links by their own path, and by each path that one resolves to, with the lengths of those paths. So a judged path looks at
+  // the links that are at it, and at the links that resolve to it or to a path above it, and at no other link: the work for one
+  // path does not grow with the number of links that have nothing to do with it.
+  const [at, into, lengths] = [new Map<string, TreeLink[]>(), new Map<string, TreeLink[]>(), new Set<number>()];
+  const listed = (index: Map<string, TreeLink[]>, key: string, link: TreeLink): void => { const list = index.get(key); if (list) list.push(link); else index.set(key, [link]); };
+  for (const link of links) {
+    listed(at, link.path, link);
+    for (const to of new Set(link.resolves ?? [])) { listed(into, to, link); lengths.add(to.length); }
+  }
+  const looked = (index: Map<string, TreeLink[]>, key: string): readonly TreeLink[] => {
+    const list = index.get(key) ?? [];
+    if (tally) tally.steps += 1 + list.length;
+    return list;
+  };
+  /** The paths that the links give for one judged path: steps 2 and 3 of the comment above. */
+  const given = (judgedAt: string, path: string, left: Set<string>): string[] => {
+    const out: string[] = [];
+    for (const link of looked(at, judgedAt)) {
+      // A link that leaves the tree is refused where the new tree holds it. Where only the old tree did, the change is one of the rules extent.
+      if (link.resolves === null && link.tree !== "old") refused.add(path);
+      if (link.resolves === null && link.tree === "old") left.add(path);
+      out.push(...(link.resolves ?? []));
+    }
+    // A link resolves to `to` when `to` is the judged path or a path above it: the judged path up to one of its `/`, or all of it.
+    for (const length of lengths) {
+      if (length > judgedAt.length || (length < judgedAt.length && judgedAt[length] !== "/")) continue;
+      for (const link of looked(into, judgedAt.slice(0, length))) out.push(link.path + judgedAt.slice(length));
+    }
+    return out;
+  };
   for (const path of [...new Set(changed)].sort(byteOrder)) {
     const judged = new Set([path]);
     const left = new Set<string>();
@@ -207,16 +250,7 @@ export function classify(extents: readonly Extent[], changed: readonly string[],
     for (let pass = 0; fresh.length > 0; pass += 1) {
       if (pass > links.length) { refused.add(path); break; }
       const found: string[] = [];
-      for (const at of fresh) {
-        for (const link of links) {
-          // A link that leaves the tree is refused where the new tree holds it. Where only the old tree did, the change is one of the rules extent.
-          if (link.path === at && link.resolves === null && link.tree !== "old") refused.add(path);
-          if (link.path === at && link.resolves === null && link.tree === "old") left.add(path);
-          const reached = link.path === at ? (link.resolves ?? []) : [];
-          const through = (link.resolves ?? []).filter((to) => at === to || at.startsWith(`${to}/`)).map((to) => link.path + at.slice(to.length));
-          for (const other of [...reached, ...through]) if (!judged.has(other)) { judged.add(other); found.push(other); }
-        }
-      }
+      for (const judgedAt of fresh) for (const other of given(judgedAt, path, left)) if (!judged.has(other)) { judged.add(other); found.push(other); }
       fresh = found;
     }
     for (const at of judged) {

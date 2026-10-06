@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { expect, test } from "vitest";
 import type { MemberId } from "@generalbusiness/artroom-contract";
 import { RULES_PATTERNS, actionsIn, classify, firstExtents, holdsRulesExtent, judgeExtents, matches } from "../src/index.ts";
@@ -182,4 +183,43 @@ test("the extents are a repository's own: a second rules content with other patt
   const closed = SECOND.slice(0, 3);
   const touched = classify(closed, ["docs/guide.md", "src/app.ts"], []);
   expect([touched.touched, touched.unclassified, said({ extents: closed, touched, reviews: [ada] }).slice(0, 2)]).toEqual([[{ extent: "docs", path: "docs/guide.md" }], ["src/app.ts"], [false, []]]);
+});
+
+test("the work of a match and of a classification is bounded by its inputs, counted in steps and never timed: a `**` reaches the rest of a path in one pass, and a changed path looks at the links that are at it or that resolve to a path above it, and at no other; the answers are those of the earlier code", () => {
+  // Answers first. Each digest is of what the code at `d0354e266` answered for the same inputs, which compared every reached name
+  // with every later one and every changed path with every link. They were taken once, by running this test against that code.
+  const digest = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, 16);
+  const patterns = ["**", "**/**", "**/x", "a/**/x", "**/a/**/x/**", "a/**/**/b/**/c", "*/**/*.ts", "**/A*/**", "a/b", "**/**/**/**/**/**/a", "x/**"];
+  const paths = ["a", "x", "a/x", "a/b/x", "a/a/a/x/y", "a/q/b/r/s/c", "src/lib/app.ts", "z/Ab/c", "b/a/x", "a/b/c/d/e/f/a", ""];
+  const answers = patterns.map((pattern) => paths.map((path) => (matches(pattern, path) ? 1 : 0)).join(""));
+  // A change of 240 paths in a tree of 180 links: links to a directory above changed paths, links to links, links whose target the
+  // change moves, and links that leave the tree in the old tree, the new one or both.
+  const changed = [...Array.from({ length: 220 }, (_, k) => `dir${k % 20}/sub${k % 7}/file${k}.ts`), ...Array.from({ length: 20 }, (_, k) => `links/l${k * 9}`)];
+  const links: TreeLink[] = Array.from({ length: 180 }, (_, k): TreeLink[] => [
+    { path: `links/l${k}`, tree: k % 5 === 0 ? "old" : "both", resolves: k % 11 === 3 ? null : [`dir${k % 20}/sub${k % 7}`] },
+    ...(k % 5 === 0 ? [{ path: `links/l${k}`, tree: "new" as const, resolves: k % 15 === 0 ? null : [`dir${(k + 1) % 20}`, k % 2 === 0 ? "AGENTS.md" : ".github/workflows/ci.yml"] }] : []),
+    ...(k % 4 === 0 ? [{ path: `chain/c${k}`, tree: "both" as const, resolves: [`links/l${k}`, `dir${k % 20}/sub${k % 7}`] }] : []),
+  ]).flat();
+  // A rules content with other patterns, with no extent `rules` and with no extent that holds every other path.
+  const OWN: readonly Extent[] = [
+    { name: "docs", patterns: ["**/*.md", "dir1*/**"], approvals: 1, approver: "change.review", checks: [], class: "content" },
+    { name: "deploy", patterns: ["links/**", "**/sub3/**"], approvals: 1, approver: "change.merge", checks: [], class: "deployment" },
+  ];
+  const loop: TreeLink[] = [{ path: "up/again", tree: "both", resolves: ["up"] }];
+  const classified = [classify(FIRST, changed, links), classify(OWN, changed, links), classify(FIRST, ["up/x", "src/a.ts"], loop), classify(FIRST, changed, [])];
+  // The generated change is no empty case: it has refused paths and unclassified paths, and a link that leads up into its own directory is refused.
+  expect([classified[0]!.touched.map((row) => row.extent), classified[0]!.refused.length > 0, classified[1]!.unclassified.length > 0, classified[2]!.refused]).toEqual([["rules", "source"], true, true, ["up/x"]]);
+  expect([digest(answers), digest(classified)]).toEqual(["b630ee547e933452", "d97cb9f671ed7b8c"]);
+
+  // The work. A path of 2,000 names against six `**`: each `**` reaches each later name once.
+  const long = Array.from({ length: 2000 }, () => "a").join("/");
+  const matching = { steps: 0 };
+  expect([matches("**/**/**/**/**/**/a", long, matching), matching.steps <= 6 * 2001]).toEqual([true, true]);
+  // 2,000 changed paths in a tree of 2,000 links that none of them is at or below: no link is looked at.
+  const many = Array.from({ length: 2000 }, (_, k) => `src/pkg${k % 50}/file${k}.ts`);
+  const apart: TreeLink[] = Array.from({ length: 2000 }, (_, k) => ({ path: `vendor/link${k}`, tree: "both", resolves: [`vendor/real${k}`] }));
+  const classifying = { steps: 0 };
+  const touched = classify(FIRST, many, apart, classifying);
+  // Two lookups for each changed path: the links at it, and the links to a path above it of the one length that any link resolves to here or of none.
+  expect([touched.touched, touched.unclassified, touched.refused, classifying.steps <= 4 * many.length]).toEqual([[{ extent: "source", path: "src/pkg0/file0.ts" }], [], [], true]);
 });
