@@ -8,11 +8,10 @@ import { COLLECT_MOST, DESTINATION, DESTINATION_KINDS, NAMED_MOST, RECEIPTS_OWED
 import { firstExtents } from "../src/extents.ts";
 import { platform } from "../src/index.ts";
 import { judgeReservation, type JudgeEvidence, type ReservationRead, type Statement } from "../src/reservation.ts";
-import { Branch, FOUND, HEAD, NEXT, OTHER, RECEIPT, TREE, destinationDefinition, fetched, handMade, keyObserved, listed, reading, reportMade, rita, rulesObserved, said, standInRules, una } from "./support-destination.ts";
+import { Branch, FOUND, HEAD, NEXT, OTHER, RECEIPT, TREE, destinationDefinition, fetched, handMade, keyObserved, listed, reading, reportMade, rita, rulesObserved, said, una } from "./support-destination.ts";
 
 // Every scope here is a `Branch` of test support: a destination scope in memory, below a made-up bureau that stands for the
-// directory. Its rules are the platform package's, with two STAND-IN rules for the marks that the package writes no rule for
-// (`first-head` and `receipt`) and a STAND-IN reader of what a lane's entries say for a reservation. The judge of an outcome is
+// directory. Its rules are the platform package's, with a STAND-IN reader of what a lane's entries say for a reservation. The judge of an outcome is
 // given the observations and the entries at hand, and writes `observed` and `uses` itself. The lane's entries,
 // each observation and every answer of the Git host are made by hand. No Git, no network and no provider is reached.
 
@@ -33,7 +32,7 @@ const rule = (name: string) => { const found = destinationRules[name]!; if (foun
 const TOKEN = { token: "host-token-1", ends: t(600) };
 
 // The plan's T43, for `platform:destination@1` (authority note, revision 26, section 12.1.5, and its table of marks, section 12.1.8).
-test("the destination definition validates whole with the platform option; its marks and its outcome kinds are listed; two marks have no rule, first-head and receipt, so the package's rules do not run it; it names no fence", () => {
+test("the destination definition validates whole with the platform option; its marks and its outcome kinds are listed; every mark has a rule, so the package's rules run it; it names no fence", () => {
   const checked = destinationDefinition;
   expect([checked.underived, derivable(checked, null), destination.capabilities, destination.rules, destination.timed]).toEqual([[], true, [], {}, {}]);
   // Section 12.1.5: three item types, with their states; the genesis `establish` and three acts; four handlers. From revision 28 a
@@ -82,21 +81,20 @@ test("the destination definition validates whole with the platform option; its m
     ["first-head", "judge", "push", "mint", "revoke", "read", "receipt", "adopt-read"], Object.keys(destination.outcomes), false,
   ]);
 
-  // The whole-scope rule (the contract's section 6.1): a version with a mark and no rule runs nothing. The package has 17 rules,
-  // each of the kind of its place, with the most effects that each states. Two marks have none: `first-head` and `receipt`.
+  // The whole-scope rule (the contract's section 6.1): a version with a mark and no rule runs nothing. The package has 19 rules,
+  // each of the kind of its place, with the most effects that each states. Every mark has its rule.
   const { rules } = platform(DESTINATION)!;
   expect(rules).toBe(destinationRules);
   expect(Object.entries(rules).map(([name, held]) => [name, held.place, "most" in held ? held.most : held.place === "outcome" ? (held.rules.most?.effects ?? null) : null])).toEqual([
     ["declare-first-head", "effect", 2], ["open-first-head", "effect", 4], ["open-judge", "effect", 3], ["publication-of", "also", null], ["open-withdrawn", "effect", 5],
     ["abort-if-behind", "effect", 6], ["open-branch-read", "effect", 2], ["resend-due", "guard", null], ["reopen-publish", "effect", 4], ["collect-list", "type", null],
     // `most`, counted again (revision 28; I3 deltas, entry FA11): a push that publishes yields 16 effects, and a read that publishes 13.
-    ["mint", "outcome", 2], ["revoke", "outcome", 0], ["push", "outcome", 16], ["deciding-read", "outcome", 13], ["adopt-read", "outcome", 5], ["judge", "outcome", 10], ["publication-update", "send", null],
+    ["mint", "outcome", 2], ["revoke", "outcome", 0], ["push", "outcome", 16], ["first-head", "outcome", 15], ["receipt", "outcome", 5], ["deciding-read", "outcome", 13], ["adopt-read", "outcome", 5], ["judge", "outcome", 10], ["publication-update", "send", null],
   ]);
   const lacking = [...new Set(checked.marks.filter((mark) => !Object.hasOwn(rules, mark.code)).map((mark) => mark.code))];
-  expect(lacking).toEqual(["first-head", "receipt"]);
-  expect(lacking.sort()).toEqual(Object.keys(standInRules).sort());
-  expect([runnable(checked, rules), runnable(checked, { ...rules, ...standInRules }), ...lacking.map((lost) => runnable(checked, { ...rules, ...standInRules, [lost]: undefined as never }))])
-    .toEqual([false, true, ...lacking.map(() => false)]);
+  expect(lacking).toEqual([]);
+  expect(runnable(checked, rules)).toBe(true);
+  for (const lost of ["first-head", "receipt"]) expect(runnable(checked, { ...rules, [lost]: undefined as never })).toBe(false);
 });
 
 // The plan's T50, the destination's first table: each rule of `platform:destination@1` at an act or a handler, as a plain function,
@@ -196,7 +194,7 @@ test("the directory's `done` update opens `first-head` with its attempt 1 and th
   const i = new Branch(true).confirmed();
   // A relationship update is applied only at a higher revision, so the `done` update comes from a later entry of the bureau.
   expect([said(i.imported("done")), result(i), i.opened]).toEqual([WRITTEN, ["applied", null, null], [["first-head", 3, true], ["mint", 1, true]]]);
-  // The STAND-IN outcome of `first-head` makes the branch ready. A further `done` update is then refused by the written guard.
+  // The real outcome of `first-head` makes the branch ready. A further `done` update is then refused by the written guard.
   i.answered(op(i.head.seq, 0), 1, "confirmed", { send: "accepted", seen: HEAD });
   expect([i.branch.state, said(i.imported("done", NEXT)), result(i), i.opened]).toEqual(["ready", WRITTEN, ["refused", "guard-failed", null], []]);
 });
@@ -526,8 +524,7 @@ const publish = (b: Branch, n: number): number => {
 };
 
 // Section 12.1.5, "Where a receipt's records stand" and "The rows that change, and three new acts", as the authority note's revision
-// 28 has them (I3 deltas, entry FA6), with its cases f, g, i and j. The rule `receipt` is a STAND-IN: its commit is the constant
-// `RECEIPT`. The item, its opening, the act, the two rules at the act and the guard are the package's.
+// 28 has them (I3 deltas, entry FA6), with its cases f, g, i and j. The receipt rule computes its commit from the history.
 test("a receipt is an item of its own: the entry that publishes opens it owed, with its write and that attempt's mint; its token and its state change on the receipt and never on the published publication; resend-receipt opens one more write once the stated attempts are used; with 65 receipts owed a reserve is refused receipts-owed", () => {
   const b = new Branch(false).ready();
   const { publication, push, mint } = b.reserved();
@@ -545,7 +542,7 @@ test("a receipt is an item of its own: the entry that publishes opens it owed, w
   expect([said(b.answered(first["mint"]!, 1, "confirmed", TOKEN2)), b.item(R).values["token"], b.last.sends, writeSends(b.state, b.own, b.state.operation(first["receipt"]!)!, 1)]).toEqual([WRITTEN, first["mint"], [], true]);
   // Then the outcome of the receipt's attempt 1, which shows the receipt's commit: the slot is emptied with the token's `revoke`,
   // and the receipt is `written`. No effect names the publication, and the kind's send mark gives no update.
-  expect([said(b.answered(first["receipt"]!, 1, "confirmed", { send: "accepted", seen: RECEIPT })), b.item(R).state, b.item(R).values["token"], b.opened, b.last.sends, b.item(publication)])
+  expect([said(b.answered(first["receipt"]!, 1, "confirmed", { send: "accepted", seen: b.receiptCommit(R) })), b.item(R).state, b.item(R).values["token"], b.opened, b.last.sends, b.item(publication)])
     .toEqual([WRITTEN, "written", null, [["revoke", 3, true]], [], final]);
   expect(revokedToken(b.state, b.own, b.state.operation(kinds(b)["revoke"]!)!)).toBe(TOKEN2.token);
   // A receipt that is final takes no `resend-receipt`: the written guard refuses it by name.
@@ -567,12 +564,11 @@ test("a receipt is an item of its own: the entry that publishes opens it owed, w
   const [owing, known] = [() => j.state.count("receipt", "owed"), () => j.state.count("publication", "published") + j.state.count("publication", "queued")];
   expect([owing(), publish(j, 65) > 0, owing(), known()]).toEqual([64, true, 65, 65]);
   expect([said(j.reserve().judgment), result(j), known()]).toEqual([WRITTEN, ["refused", "guard-failed", "receipts-owed"], 65]);
-  expect([said(j.answered(kinds(j, j.head.seq - 1)["receipt"]!, 1, "confirmed", { send: "accepted", seen: RECEIPT })), owing(), said(j.reserve().judgment), result(j), known()]).toEqual([WRITTEN, 64, WRITTEN, ["applied", null, null], 66]);
+  expect([said(j.answered(kinds(j, j.head.seq - 1)["receipt"]!, 1, "confirmed", { send: "accepted", seen: j.receiptCommit(j.head.seq - 1) })), owing(), said(j.reserve().judgment), result(j), known()]).toEqual([WRITTEN, 64, WRITTEN, ["applied", null, null], 66]);
 });
 
 // Section 12.1.5, "A token whose write can no longer act, and who cleans it up", decided in the authority note's revision 28: the
-// rules T1 to T8, "The verdict's case, in both orders, as entries", and cases m and n. The rule `receipt` and the read of a
-// receipt's ref are STAND-INS, on the package's `tokenStep`, `targetOf` and `closed`. The rule `mint` is the package's.
+// rules T1 to T8, "The verdict's case, in both orders, as entries", and cases m and n. Every destination rule is the package's.
 test("a mint whose receipt an older read made final sets no slot: its outcome records the token and opens the revocation; a mint that confirmed first is revoked by the first outcome of its attempt, which sets nothing on the final receipt; five entries in either order, and the older attempts stay unknown", () => {
   /** R is the receipt of a published publication. The three attempts of its write o1 are not known, and its one read rd1 is pending. An admin signs `resend-receipt`: o2, with 1 attempt, and that attempt's mint m2. */
   const owing = () => {
@@ -590,7 +586,7 @@ test("a mint whose receipt an older read made final sets no slot: its outcome re
   // Case m, the first order: the old read, and then the new mint.
   const m = owing();
   // Entry 2: the outcome of rd1 shows the receipt's commit. R is `written`. It touches no token and opens nothing (T6).
-  expect([said(m.b.answered(m.rd1, 1, "confirmed", { seen: RECEIPT })), m.b.item(m.R).state, m.b.item(m.R).values["token"], m.b.opened]).toEqual([WRITTEN, "written", null, []]);
+  expect([said(m.b.answered(m.rd1, 1, "confirmed", { seen: m.b.receiptCommit(m.R) })), m.b.item(m.R).state, m.b.item(m.R).values["token"], m.b.opened]).toEqual([WRITTEN, "written", null, []]);
   const written = m.b.item(m.R);
   // Entry 3: the outcome of m2, `confirmed`. T2: R is closed. The entry is written with `{ token, ends }`, it opens the revocation
   // with its attempt 1, and no effect is on the receipt. Under revision 27 the rule gave `receipt.token`, on a final item: a fault.
@@ -598,7 +594,7 @@ test("a mint whose receipt an older read made final sets no slot: its outcome re
   const v2 = kinds(m.b)["revoke"]!;
   // Entry 4: the gateway sends nothing for attempt 1 of o2 (T7), and its outcome is `refused`, `not-sent`. T4 does not apply: the
   // slot does not name m2. R is final, so nothing follows.
-  expect([m.sends(), said(m.b.answered(m.o2, 1, "refused", { send: "not-sent", seen: RECEIPT })), m.b.last.effects.length, m.b.opened, m.b.item(m.R)]).toEqual([false, WRITTEN, 1, [], written]);
+  expect([m.sends(), said(m.b.answered(m.o2, 1, "refused", { send: "not-sent", seen: m.b.receiptCommit(m.R) })), m.b.last.effects.length, m.b.opened, m.b.item(m.R)]).toEqual([false, WRITTEN, 1, [], written]);
   // Entry 5: the revocation names the token that entry 3 recorded. Five entries, and the three attempts of o1 stay `unknown`.
   expect([revokedToken(m.b.state, m.b.own, m.b.state.operation(v2)!), said(m.b.answered(v2, 1, "confirmed", { token: TOKEN.token })), m.b.entries.length - m.before, outcomesOf(m.b, m.o1)])
     .toEqual([TOKEN.token, WRITTEN, 5, [["unknown"], ["unknown"], ["unknown"]]]);
@@ -608,7 +604,7 @@ test("a mint whose receipt an older read made final sets no slot: its outcome re
   // Entry 2: the outcome of m2, `confirmed`. T1: R is `owed`, and attempt 1 of o2 has no outcome. `receipt.token` is m2.
   expect([said(n.b.answered(n.m2, 1, "confirmed", TOKEN)), n.b.item(n.R).values["token"], n.b.opened, n.sends()]).toEqual([WRITTEN, n.m2, [], true]);
   // Entry 3: the outcome of rd1. R is `written`. `receipt.token` is not touched and still names m2, and no revocation is opened (T6).
-  expect([said(n.b.answered(n.rd1, 1, "confirmed", { seen: RECEIPT })), n.b.item(n.R).state, n.b.item(n.R).values["token"], n.b.opened, n.sends()]).toEqual([WRITTEN, "written", n.m2, [], false]);
+  expect([said(n.b.answered(n.rd1, 1, "confirmed", { seen: n.b.receiptCommit(n.R) })), n.b.item(n.R).state, n.b.item(n.R).values["token"], n.b.opened, n.sends()]).toEqual([WRITTEN, "written", n.m2, [], false]);
   const kept = n.b.item(n.R);
   // Entry 4: the first outcome of attempt 1 of o2, whose request was sent before entry 3 and whose answer is lost. T4: the slot
   // names this attempt's own mint, and R was final before the entry. The revocation is opened, and nothing is set on R. Under
@@ -618,12 +614,12 @@ test("a mint whose receipt an older read made final sets no slot: its outcome re
   const v = kinds(n.b)["revoke"]!;
   expect([revokedToken(n.b.state, n.b.own, n.b.state.operation(v)!), said(n.b.answered(v, 1, "confirmed", { token: TOKEN.token })), n.b.entries.length - n.before, outcomesOf(n.b, n.o1)])
     .toEqual([TOKEN.token, WRITTEN, 5, [["unknown"], ["unknown"], ["unknown"]]]);
-  expect([said(n.b.answered(n.o2, 1, "confirmed", { send: "accepted", seen: RECEIPT })), n.b.opened, n.b.item(n.R)]).toEqual([WRITTEN, [], kept]);
+  expect([said(n.b.answered(n.o2, 1, "confirmed", { send: "accepted", seen: n.b.receiptCommit(n.R) })), n.b.opened, n.b.item(n.R)]).toEqual([WRITTEN, [], kept]);
 });
 
 // The same block, "The family of this fault, swept", rows 3, 4, 8 and 16, with cases p, q and r. Case o, the control, a mint that
 // answers after its own attempt's outcome, is in the test of the refused attempts, above: "a token that arrives after its
-// attempt's outcome is revoked and never live". The rule `first-head` is a STAND-IN, on the package's `tokenStep` and `closed`.
+// attempt's outcome is revoked and never live". The rule `first-head` is the package's.
 test("a target that another entry closed takes no token and no further attempt: a push that an older read published, in both orders of its new mint; a first head whose branch an adopt-head made ready, in both orders; and an adopt-read yields only while the guards of its act still hold", () => {
   /** P is `unresolved`. The three attempts of its push are not known, and the read of that push is pending. An admin signs `resend`: a push with 1 attempt, and its mint m2. */
   const unresolved = () => {

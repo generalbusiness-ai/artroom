@@ -24,9 +24,9 @@
  * reports to the manifest's selections, and each report's commit from its
  * entry (section 6.5, "`reserve` names each selected report"). The pinned
  * `change` lane does not send `reports` yet: that row is the lane forms'.
- * The rows
- * of that revision that need `observes`, `holds`, `adds`, `for`, `origin`,
- * an index or the text of a fact are not built here.
+ * The rows that need `observes`, `holds`, `adds`, `for`, `origin` or an
+ * index are not built here yet. The text of a fact and the ref names are
+ * written, with the rules `first-head` and `receipt`.
  *
  * One member of the data is one row of the note's tables. A cell of the
  * note that begins "Code" is a mark in this data, at the place where its
@@ -76,22 +76,14 @@
  * publication stays `queued`. A test gives it a stand-in reader of the
  * lane's entries (`destinationRulesWith`).
  *
- * **The marks that have NO rule here.** Two. So the version still lacks
- * rules, and by the whole-scope rule (the contract's section 6.1) nothing
- * is created under `platform:destination@1` by this package's rules.
- *
- * | Mark | Place | At | Why it has no rule |
- * |---|---|---|---|
- * | `first-head` | 7, `outcomes` | The kind `first-head` | It compares what the ref holds with the ID of the founding commit, or of the imported one. The note asks two details of the contract before that ID can be computed: the text of a fact reference in a commit message, and the byte domain of a ref's digest (section 12.1.5, "The founding commit, and the receipt"; entry ER9). |
- * | `receipt` | 7, `outcomes` | The kind `receipt` | The same two details. Its records stand on the item `receipt` now, which is built (entry FA6). |
- *
- * Three things that are written reach those two. The token of an attempt
- * of each write, and whether another attempt is allowed, are functions
- * here that the two rules will run (`tokenStep`, `closed`). The outcome of
- * a `read` that was opened for a first head or for a receipt's ref is not
- * judged. And each rule that publishes opens the item `receipt` and its
- * `receipt` operation with its mint, as its row says, whose outcomes then
- * have no rule.
+ * **Every mark has a rule here.** `first-head` and `receipt` compare the
+ * commit IDs computed from revision 28's byte forms, and a deciding read
+ * runs the same column. `destination-objects.ts` builds both object formats
+ * with the fact text and ref names of the adopted scope contract revision
+ * 23. The port must supply the repository's object format before writing.
+ * No production port writes these destination operations yet. Tests judge
+ * their outcomes in memory, with hand-written host answers; a separate
+ * witness writes the computed objects with real local Git in both formats.
  *
  * The fence of section 6.8 is not adopted (section 6.8, "The standing of
  * this section"; U2). The data names no fence: no operation, and no kind
@@ -102,10 +94,11 @@
  */
 
 import type { FactRef, FieldValue, KeyId, Observation, OperationId, PlatformData, PlatformDefinition, ScopeId } from "@generalbusiness/artroom-contract";
-import { canonicalize, isFactRef, isScopeRef, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
+import { canonicalize, factRefOf, isFactRef, isScopeRef, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
 import type { Item, Opening, Operation, Own, PlatformRule, RecordedRef, RuleEffect, RuleGiven, RuleRequest, Rules, StateView } from "@generalbusiness/artroom-derive";
 import { isJudgeEvidence, isObjectId, judgeReservation, type ReservationRead, type Statement } from "./reservation.ts";
 import { referenceOf } from "./rules-scope.ts";
+import { foundingObjects, receiptObjects, receiptRef, type DestinationCommit, type ObjectFormat } from "./destination-objects.ts";
 
 /** The name and version that this data and these rules are. An operation that the destination opens states it as its owner (the contract's section 4.3). */
 export const DESTINATION = "platform:destination@1" satisfies PlatformDefinition;
@@ -840,7 +833,7 @@ const isFinal = (item: Item): boolean => destination.items[item.type]?.states[it
  * 6.1). In every other outcome entry: nothing.
  *
  * The rule of each kind of write runs it first: `push` here, and the rules
- * `first-head` and `receipt` when they are written.
+ * `first-head` and `receipt`.
  *
  * I3 merge: the revocation is `for` the holder of the write, which is the
  * holder of the mint ("One holder for each cleanup"). An `operation` effect
@@ -1091,6 +1084,97 @@ const pushDecides: Decides = (given, push) => {
   return { effects: [...token.effects, ...table.effects], opens: [...token.opens, ...table.opens], update: table.update };
 };
 
+/** The first head an operation writes: its import's recorded commit, or the computed founding commit. */
+export function firstHeadCommit(state: Pick<StateView, "page">, own: Own, write: Operation, format: ObjectFormat): string {
+  const branch = branchOf(state);
+  if (!branch) throw new Error("a first head belongs to the destination's branch");
+  const opened = ownEntry(own, seqOf(write.id));
+  if (opened.input.type === "delivery" && opened.input.message.class === "request" && opened.input.message.type === "relate") {
+    const commit = (opened.input.message.body as { detail?: Record<string, unknown> }).detail?.["commit"];
+    if (!isObjectId(commit)) throw new Error("an imported first head names its commit in the update");
+    return commit;
+  }
+  const claim = branch.refs["claim"];
+  if (!isFactRef(claim)) throw new Error("a founding first head holds its verified claim");
+  const genesis = ownEntry(own, 0);
+  return foundingObjects(format, genesis.at.scope, genesis.time, claim).commit;
+}
+
+/** A receipt's recorded file, commit objects and public ref. Every fact is an own entry or a verified reference held by an item. */
+export function destinationReceipt(state: Pick<StateView, "item" | "page">, own: Own, receipt: Item, format: ObjectFormat): DestinationCommit & { ref: string; file: unknown } {
+  const entry = ownEntry(own, receipt.id);
+  const commit = receipt.values["commit"];
+  if (!isObjectId(commit)) throw new Error("a receipt holds the published commit");
+  const publication = publicationAt(state, receipt.refs["publication"]);
+  let operation: FactRef;
+  let file: unknown;
+  if (publication) {
+    const [heldOperation, manifest, reason] = [publication.refs["operation"], publication.refs["manifest"], publication.values["reason"]];
+    if (!isFactRef(heldOperation) || !isFactRef(manifest)) throw new Error("a publication's receipt holds its operation and manifest");
+    operation = heldOperation;
+    file = { v: 1, publication: factRefOf(entry), operation, manifest, commit, ...(typeof reason === "string" && reason.startsWith("single-controller:") ? { reason } : {}) };
+  } else {
+    const [branch, opening] = [branchOf(state), receipt.values["opening"]];
+    const claim = branch?.refs["claim"];
+    if (!isFactRef(claim) || typeof opening !== "number") throw new Error("a first head's receipt holds the claim and its opening position");
+    operation = factRefOf(ownEntry(own, opening));
+    file = { v: 1, first: factRefOf(entry), claim, commit };
+  }
+  const ref = receiptRef(operation);
+  if (ref === null) throw new Error("a verified operation's fact gives its receipt ref");
+  return { ...receiptObjects(format, entry.at.scope, entry.time, operation, file), ref, file };
+}
+
+/** The commit ID in `seen` alone states an object format. `absent` and `failed` never compute a commit. */
+const formatOf = (seen: unknown): ObjectFormat | null => isObjectId(seen) ? (seen.length === 40 ? "sha1" : "sha256") : null;
+
+/** A write's ledger condition for a further attempt, beside its rule's condition. A late answer can open none. */
+const nextWrite = ({ input }: RuleGiven, write: Operation, allows: boolean): boolean => input.type === "outcome" && input.result !== "confirmed" && input.attempt === write.attempts.length && write.attempts.length < write.most && write.selected === null && allows;
+
+/** The first-head column, from the table of revision 28. A deciding read runs only this column, with no token step and no further attempt. */
+function firstHeadSeen(given: RuleGiven, write: Operation, seen: unknown, fromRead: boolean): Decided {
+  const { state, own, resolved } = given;
+  const branch = branchOf(state);
+  if (!branch) throw new Error("a destination holds its branch");
+  if (closed(branch)) return NOTHING;
+  const format = formatOf(seen);
+  if (format !== null && seen === firstHeadCommit(state, own, write, format)) {
+    const next = andNext(state, { ready: true });
+    return {
+      effects: [
+        { effect: "state", item: branch.id, state: "ready" }, { effect: "value", item: branch.id, slot: "head", value: seen as string },
+        { effect: "open", item: resolved.self, type: "receipt", state: "owed" }, { effect: "value", item: resolved.self, slot: "commit", value: seen as string },
+        { effect: "value", item: resolved.self, slot: "opening", value: seqOf(write.id) }, ...next.effects,
+      ],
+      opens: [opening(DESTINATION_KINDS.receipt, DESTINATION_ATTEMPTS.receipt), opening(DESTINATION_KINDS.mint, DESTINATION_ATTEMPTS.mint), ...next.opens], update: null,
+    };
+  }
+  if (fromRead) return NOTHING;
+  if (seen === "absent" && nextWrite(given, write, true)) return { effects: [], opens: [opening(DESTINATION_KINDS.mint, DESTINATION_ATTEMPTS.mint)], update: null };
+  return seen === "failed" && !readOpened(state, write) ? { effects: [], opens: [opening(DESTINATION_KINDS.read, DESTINATION_ATTEMPTS.read)], update: null } : NOTHING;
+}
+
+/** The receipt column. Its read never touches a token; its write runs T4 before this function. */
+function receiptSeen(given: RuleGiven, write: Operation, seen: unknown, fromRead: boolean): Decided {
+  const { state, own } = given;
+  const receipt = targetOf(state, own, write);
+  if (receipt?.type !== "receipt") throw new Error("a receipt write belongs to one receipt");
+  if (closed(receipt)) return NOTHING;
+  const format = formatOf(seen);
+  if (format !== null) return { effects: [{ effect: "state", item: receipt.id, state: seen === destinationReceipt(state, own, receipt, format).commit ? "written" : "conflict" }], opens: [], update: null };
+  if (fromRead) return NOTHING;
+  if (seen === "absent" && nextWrite(given, write, true)) return { effects: [], opens: [opening(DESTINATION_KINDS.mint, DESTINATION_ATTEMPTS.mint)], update: null };
+  const last = given.input.type === "outcome" && given.input.attempt === write.most;
+  return (seen === "failed" || (seen === "absent" && last)) && !readOpened(state, write) ? { effects: [], opens: [opening(DESTINATION_KINDS.read, DESTINATION_ATTEMPTS.read)], update: null } : NOTHING;
+}
+
+const createDecides = (column: typeof firstHeadSeen): Decides => (given, write) => {
+  const token = tokenStep(given, write);
+  const seen = given.input.type === "outcome" && isObject(given.input.evidence.body) ? given.input.evidence.body["seen"] : null;
+  const table = column(given, write, seen, false);
+  return { effects: [...token.effects, ...table.effects], opens: [...token.opens, ...table.opens], update: null };
+};
+
 /**
  * What a `read` is for (the row `read` of "What an operation is for"): the
  * ref of the write after which it was opened, or the branch, for the
@@ -1116,8 +1200,13 @@ export function readFor(state: Pick<StateView, "operation" | "item" | "page">, o
  */
 const readDecides: Decides = (given, read) => {
   const [of, seen] = [readFor(given.state, given.own, read), given.input.type === "outcome" && isObject(given.input.evidence.body) ? given.input.evidence.body["seen"] : null];
-  // I3 merge: the read of a first head and of a receipt's ref is judged by the rows `first-head` and `receipt`, which wait (entry ER9).
-  if (of === null || typeof of === "string") throw new Error("the read of a first head, or of a receipt's ref, waits for the rules first-head and receipt");
+  if (of === null) throw new Error("a deciding read belongs to one write or abort");
+  if (typeof of === "string") {
+    const opened = ownEntry(given.own, seqOf(read.id)).input;
+    const write = opened.type === "outcome" ? given.state.operation(opened.operation) : null;
+    if (!write) throw new Error("a first-head or receipt read was opened by its write's outcome");
+    return (of === "first-head" ? firstHeadSeen : receiptSeen)(given, write, seen, true);
+  }
   return seenDecides(given, of, seen, null);
 };
 
@@ -1395,6 +1484,19 @@ const updateRule = (decides: Readonly<Record<string, Decides>>): PlatformRule =>
 /** The body of an outcome of a write: `{ send, seen }`, with a `send` that fits the result (section 12.1.5, "The evidence of a write"). */
 const SENDS: Readonly<Record<string, readonly string[]>> = { confirmed: ["accepted"], refused: ["refused", "not-sent"], unknown: ["unknown"] };
 const isSeen = (seen: unknown): boolean => seen === "absent" || seen === "failed" || isObjectId(seen);
+
+/** The two create rules share the evidence classes and token readiness of a push. Their table decides only from `seen`. */
+const createRule = (column: typeof firstHeadSeen, effects: number, operations: number): PlatformRule => ({
+  place: "outcome",
+  rules: {
+    selects: false, read: false, most: { effects, requests: 0, operations },
+    retries: (_result, write, given) => !closed(targetOf(given.state, given.own, write)) && given.input.type === "outcome" && isObject(given.input.evidence.body) && given.input.evidence.body["seen"] === "absent",
+    ready: (state, write, attempt) => (mintOf(state, write, attempt)?.attempts[0]?.outcomes.length ?? 0) > 0,
+    wellFormed: (result, evidence) => { const body = bodyOf(evidence.body, ["send", "seen"]); return body !== null && SENDS[result]!.includes(body["send"] as string) && isSeen(body["seen"]); },
+    unknown: () => ({ send: "unknown", seen: "failed" }),
+    derives: (given, write) => { const { effects, opens } = createDecides(column)(given, write); return { effects, sends: [], opens }; },
+  },
+});
 
 // ---------------------------------------------------------------- the rules
 
@@ -1730,6 +1832,10 @@ const WRITTEN: Rules = {
       derives: (given, push) => { const { effects, opens } = pushDecides(given, push); return { effects, sends: [], opens }; },
     },
   },
+  /** Authority revision 28, row e: the parentless founding commit or the imported commit, with its own receipt. */
+  "first-head": createRule(firstHeadSeen, 15, 5),
+  /** The same row's receipt column, including its next mint and one deciding read. */
+  receipt: createRule(receiptSeen, 5, 3),
   /**
    * Row e, the outcome of the kind `read` (P16; section 12.1.5, "The
    * deciding read", and the row `deciding-read`). A read is opened only
@@ -1751,9 +1857,8 @@ const WRITTEN: Rules = {
    *   `unknown` (section 6.6). It touches no slot `token` and opens no
    *   revocation, also where it closes the target of a write (rule T6).
    *
-   * The read of a first head, and of a receipt's ref, is judged by the rows
-   * `first-head` and `receipt`. Those two rules wait, and so does this rule
-   * for such a read: its outcome is not judged.
+   * The read of a first head, and of a receipt's ref, runs the same column
+   * as its write, without a token step or a further attempt.
    */
   "deciding-read": {
     place: "outcome",
