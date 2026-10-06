@@ -53,8 +53,8 @@
  */
 
 import type { DeclaredDefinition, Digest, MemberId, MemberObservation, ObservationRequest, PlatformData, PlatformDefinition, RulesObservation, ScopeId } from "@generalbusiness/artroom-contract";
-import { isDigest, isMemberRef } from "@generalbusiness/artroom-bytes";
-import { byteOrder, validateDefinition } from "@generalbusiness/artroom-derive";
+import { canonicalize, isDigest, isMemberRef, utf8 } from "@generalbusiness/artroom-bytes";
+import { byteOrder, validateDefinition, valueDigest } from "@generalbusiness/artroom-derive";
 import type { Item, RecordedRef, Rules, StateView } from "@generalbusiness/artroom-derive";
 import { firstExtents, holdsRulesExtent, isExtents } from "./extents.ts";
 import type { Extent } from "./extents.ts";
@@ -69,6 +69,8 @@ export const RULES_SCOPE = "platform:rules@1" satisfies PlatformDefinition;
  * domain").
  */
 export const CONFIGURATION_DOMAIN = "artroom-check-configuration-1";
+/** Authority revision 28: the bounded value that an observation of the rules names. */
+export const RULES_EXTENTS_VALUE = { domain: "artroom-rules-extents-1", max: 262144 } as const;
 /** The byte domain of a declared definition, which the contract names (its section 2.1). */
 export const DEFINITION_DOMAIN = "artroom-definition-1";
 /**
@@ -359,10 +361,7 @@ export const rulesMembership = (state: Pick<StateView, "page" | "incarnations">)
  * judged by one bar, and the `rules` extent holds from the first entry on.
  * Null: the state holds no item `rules`.
  *
- * The `rules` update reads it, below. An observation of the rules will,
- * when it carries the digest of the extents: the answer of a rules scope
- * holds no member `extents` yet (`rulesAnswer`, below; I3 deltas, entry
- * GD1).
+ * The `rules` update reads it, below. An observation of the rules names its digest, and `rulesObservedValues` supplies the bytes.
  */
 export function extentsOf(state: Pick<StateView, "page">): readonly Extent[] | null {
   const rules = rulesOf(state);
@@ -420,13 +419,8 @@ const PAGE = 100;
  *   `definition`. `content.active`: the digest and the name of each item
  *   `definition` that is `active`, in the order of their IDs.
  *
- * I3 merge: the member `extents` of the content that was asked as "rules"
- * is not given. The contract's revision 23 states it as the digest of the
- * list in the domain `artroom-rules-extents-1`, with the bytes beside the
- * answer and `retains` on the row that observes (its row I3-43). The record
- * check of this source refuses a content that holds the member. So the
- * answer here is the record as the contract's revision 19 has it, and a
- * reader of it judges no extent (I3 deltas, entry GD1).
+ * The member `extents` names the canonical value in `artroom-rules-extents-1`. `rulesObservedValues` serves its bounded bytes
+ * from the same folded state; the raw observation remains what a replay derives at the recorded head.
  */
 export function rulesAnswer(state: Pick<StateView, "scope" | "page">, asked: ObservationRequest): Omit<RulesObservation, "at"> | null {
   const scope = state.scope();
@@ -452,7 +446,18 @@ export function rulesAnswer(state: Pick<StateView, "scope" | "page">, asked: Obs
     const { name, configuration, required, checker } = check as unknown as { name: string; configuration: Digest; required: boolean; checker: { member: MemberId } };
     return { name, configuration, required, checker: checker.member };
   });
-  return { ...common, content: { asked: "rules", approvals, ownerMayReview, checks: listed, labels: Array.isArray(labels) ? (labels as string[]) : [], singleControllerException } };
+  const extents = extentsOf(state);
+  if (extents === null) return null;
+  return { ...common, content: { asked: "rules", approvals, ownerMayReview, checks: listed, labels: Array.isArray(labels) ? (labels as string[]) : [], singleControllerException, extents: valueDigest(RULES_EXTENTS_VALUE.domain, extents) } };
+}
+
+/** The bounded bytes beside a rules observation, from the same folded state as its recorded head. */
+export function rulesObservedValues(state: Pick<StateView, "scope" | "page">, asked: ObservationRequest): readonly { domain: string; bytes: string }[] {
+  if (!("asked" in asked) || asked.asked !== "rules" || rulesAnswer(state, asked) === null) return [];
+  const extents = extentsOf(state);
+  if (extents === null) return [];
+  const bytes = canonicalize(extents);
+  return utf8(bytes).length > RULES_EXTENTS_VALUE.max ? [] : [{ domain: RULES_EXTENTS_VALUE.domain, bytes }];
 }
 
 // ---------------------------------------------------------------- the rules

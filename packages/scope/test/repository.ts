@@ -17,7 +17,7 @@
 
 import { env } from "cloudflare:workers";
 import { evictDurableObject } from "cloudflare:test";
-import type { Answer, Digest, Entry, FactRef, FieldValue, Grant, Intent, Read, RetainedInput, ScopeId, ScopeRef, Seed, SignedIntent } from "@generalbusiness/artroom-contract";
+import type { Answer, Beside, Digest, Entry, FactRef, FieldValue, Grant, Intent, Read, RetainedInput, ScopeId, ScopeRef, Seed, SignedIntent } from "@generalbusiness/artroom-contract";
 import { canonicalize, entryHash, intentDigest, isDigest, newIncarnation, scopeIdOf, signIntent, textDigest } from "@generalbusiness/artroom-bytes";
 import { hashOfBytes, type MemoryScope } from "@generalbusiness/artroom-replay";
 import type { Delivered, Item } from "@generalbusiness/artroom-derive";
@@ -33,7 +33,7 @@ export const { rita, una, vic, sam } = keys;
 
 interface Surface {
   found(founding: SignedIntent, definition: unknown): Promise<{ answer: string }>;
-  submit(signed: SignedIntent, grants: readonly Grant[]): Promise<Answer>;
+  submit(signed: SignedIntent, grants: readonly Grant[], beside?: Beside): Promise<Answer>;
   summary(reader: unknown): Promise<Read<Summary>>;
   history(reader: unknown, cursor?: string): Promise<Read<readonly Sealed[]>>;
   outbox(reader: unknown): Promise<Read<readonly Duty[]>>;

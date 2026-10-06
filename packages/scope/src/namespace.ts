@@ -147,7 +147,8 @@ export function sentText(store: Store, seq: number, digest: Digest): string | nu
  */
 export function observedAt(store: Store, pinned: Pinned | null, asked: unknown): unknown {
   const kind = pinned?.named === MEMBERSHIP ? "membership" : pinned?.named === RULES_SCOPE ? "rules" : null;
-  const answers = pinned?.definition ? platform(pinned.named)?.observed : undefined;
+  const supplied = pinned?.definition ? platform(pinned.named) : null;
+  const answers = supplied?.observed;
   if (kind === null || !answers) return null;
   // Revision 20 (the contract's section 16.1, "An observation of the holders of one action"): the fourth request, `{ of, holders, most }`.
   const holders = isObject(asked) && Object.keys(asked).length === 3 && typeof asked["holders"] === "string" && asked["holders"] !== "" && typeof asked["most"] === "number" && Number.isSafeInteger(asked["most"]) && asked["most"] >= 1;
@@ -158,7 +159,14 @@ export function observedAt(store: Store, pinned: Pinned | null, asked: unknown):
   const byId = isObject(named) && Object.keys(named).length === 2 && isScopeId(named["scope"]) && named["kind"] === kind;
   if (!isScopeRef(named) && !byId) return null;
   const of = named as ObservedScope;
-  if (kind === "rules") return asked["asked"] === "rules" || asked["asked"] === "definitions" ? answers(store, { of, asked: asked["asked"] }) : null;
+  if (kind === "rules") {
+    if (asked["asked"] !== "rules" && asked["asked"] !== "definitions") return null;
+    const request = { of, asked: asked["asked"] } as const;
+    const answer = answers(store, request);
+    if (answer === null) return null;
+    const values = supplied?.observedValues?.(store, request) ?? [];
+    return values.length > 0 ? { answer, values } : answer;
+  }
   if (holders) return answers(store, { of, holders: asked["holders"] as string, most: asked["most"] as number });
   if (isKeyId(asked["key"])) return answers(store, { of, key: asked["key"] });
   return isMemberId(asked["member"]) ? answers(store, { of, member: asked["member"] }) : null;

@@ -18,7 +18,7 @@ import { register } from "./register.ts";
 import { directory, directoryMembership, directoryRulesScope } from "./directory.ts";
 import type { RecordedRef, Rules, StateView } from "@generalbusiness/artroom-derive";
 import { RULES } from "./rules.ts";
-import { PUBLISH, rulesAnswer, rulesMembership, rulesScope } from "./rules-scope.ts";
+import { PUBLISH, rulesAnswer, rulesMembership, rulesObservedValues, rulesScope } from "./rules-scope.ts";
 
 export { inbox, membership, register, directory, destination };
 export { ACTIONS_MOST, FIRST_ACTIONS, MEMBERSHIP, NO_MEMBER, ROLE_LISTS, ROLE_TABLE, actionsIn, isActions, isHandle, standingOf, type Role } from "./membership.ts";
@@ -31,7 +31,7 @@ export { DESTINATION_CHANGED_SET, NOT_RESERVED, isJudgeChanges, isJudgeEvidence,
 export type { JudgeChanges, JudgeEvidence, RecordedJudgeEvidence, Reservation, ReservationAsked, ReservationRead, Statement } from "./reservation.ts";
 export { RULES };
 export { rulesScope };
-export { CONFIGURATION_BYTES, CONFIGURATION_DOMAIN, PUBLISH, RULES_SCOPE, extentsOf, membershipId, referenceOf, revisionOf, rulesAnswer, rulesMembership } from "./rules-scope.ts";
+export { CONFIGURATION_BYTES, CONFIGURATION_DOMAIN, PUBLISH, RULES_EXTENTS_VALUE, RULES_SCOPE, extentsOf, membershipId, referenceOf, revisionOf, rulesAnswer, rulesMembership, rulesObservedValues } from "./rules-scope.ts";
 export type { PlatformName, RuleTable } from "./rules.ts";
 export { CONTROLLER, EXTENTS_MOST, EXTENT_CLASSES, LANDING, RULES_EXTENT, RULES_PATTERNS, classify, firstExtents, holdsRulesExtent, isExtents, judgeExtents, matches } from "./extents.ts";
 export type { Extent, ExtentClass, ExtentJudged, ExtentsAsked, ExtentsJudged, Holder, Lack, Review, Touched, TreeLink } from "./extents.ts";
@@ -58,6 +58,8 @@ export interface Platform {
    * answers no observation.
    */
   readonly observed?: (state: StateView, asked: ObservationRequest) => unknown;
+  /** Bounded values named by the observation, derived at the same head. The observation itself stays the replay's pure value. */
+  readonly observedValues?: (state: StateView, asked: ObservationRequest) => readonly { domain: string; bytes: string }[];
   /**
    * The kind of the act whose position is the `revision` that an answer of
    * this version states (authority note, revision 28, section 12.1.4, "What
@@ -99,5 +101,5 @@ export function platform(named: string): Platform | null {
   const name = named.slice(0, cut);
   const data = cut > 0 && named.slice(cut) === "@1" && Object.hasOwn(definitions, name) ? definitions[name] : undefined;
   if (!data) return null;
-  return { data, rules: Object.hasOwn(RULES, name) ? (RULES as Record<string, Rules>)[name]! : {}, ...(data === membership ? { observed: standingOf } : data === rulesScope ? { observed: rulesAnswer, revised: PUBLISH } : {}), ...(data === directory ? { membership: directoryMembership, rulesScope: directoryRulesScope } : data === rulesScope ? { membership: rulesMembership } : data === destination ? { membership: destinationMembership, rulesScope: destinationRulesScope } : {}) };
+  return { data, rules: Object.hasOwn(RULES, name) ? (RULES as Record<string, Rules>)[name]! : {}, ...(data === membership ? { observed: standingOf } : data === rulesScope ? { observed: rulesAnswer, observedValues: rulesObservedValues, revised: PUBLISH } : {}), ...(data === directory ? { membership: directoryMembership, rulesScope: directoryRulesScope } : data === rulesScope ? { membership: rulesMembership } : data === destination ? { membership: destinationMembership, rulesScope: destinationRulesScope } : {}) };
 }

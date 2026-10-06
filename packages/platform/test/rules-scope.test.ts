@@ -4,7 +4,7 @@ import { canonicalize, definitionDigest, isObservationUse, newIncarnation } from
 import { PROFILES, derivable, runnable, validateDefinition, valueDigest } from "@generalbusiness/artroom-derive";
 import type { ActJudgment, Judgment } from "@generalbusiness/artroom-derive";
 import { d, desk, deskDefinition, directory, keys, membership, ticket, ticketDefinition } from "@generalbusiness/artroom-derive/testing";
-import { CONFIGURATION_BYTES, CONFIGURATION_DOMAIN, DEFINITION_DOMAIN, PUBLISH, RULES_SCOPE, extentsOf, firstExtents, membershipId, platform, revisionOf, rulesScope } from "../src/index.ts";
+import { CONFIGURATION_BYTES, CONFIGURATION_DOMAIN, DEFINITION_DOMAIN, PUBLISH, RULES_EXTENTS_VALUE, RULES_SCOPE, extentsOf, firstExtents, membershipId, platform, revisionOf, rulesScope } from "../src/index.ts";
 import type { Extent } from "../src/index.ts";
 import { rulesScopeRules } from "../src/rules-scope.ts";
 import { BRANCH, Rulebook, lanePointingAt, memberOf, standing } from "./support-rules.ts";
@@ -101,7 +101,7 @@ test("keep-configuration keeps a configuration whose bytes beside the intent has
   const item = r.item(r.head.seq);
   expect([said(judged), kept(judged), item.type, item.state, item.values, item.parties]).toEqual([WRITTEN, [[CONFIGURATION_DOMAIN, unit.digest]], "configuration", "kept", { digest: unit.digest, name: "unit" }, { keeper: rita.member }]);
   // Case 2: no value at hand has the digest: none came, other bytes came, or the bytes are not the canonical form of the value.
-  const MISMATCH = ["refused", "bad-field", "configuration-mismatch"];
+  const MISMATCH = ["refused", "bad-field", null];
   expect([said(keep(r, lint, [])), said(keep(r, lint, [unit.bytes])), said(keep(r, lint, [` ${lint.bytes}`]))]).toEqual([MISMATCH, MISMATCH, MISMATCH]);
   // Case 3: a value that is longer than the bound of its domain is no value at hand. One byte under the bound is.
   const sized = (bytes: number) => { const base = configuration("big"); const value = { ...JSON.parse(base.bytes), pad: "" }; value.pad = "x".repeat(bytes - canonicalize(value).length); return { name: "big", bytes: canonicalize(value), digest: valueDigest(CONFIGURATION_DOMAIN, value) }; };
@@ -299,9 +299,9 @@ test("a rules scope answers an observation from its folded state at its head: th
     "publish", "publish", { fixed: false, required: false, to: { type: "fact", kind: ["publish"], under: "platform:rules" } }, { ref: { slot: "published", from: "self" } },
   ]);
   // Before any `publish`: the revision is 0, and the rules are what the genesis gave. A list that is unset is given empty. The
-  // answer holds no `at`, and no member `extents` (I3 deltas, entry GD1).
+  // answer holds no `at`; its extents digest names the bounded canonical bytes served from this same head.
   expect([revisionOf(r.state), answer(r, { of: r.at, asked: "rules" }), answer(r, { of: byId, asked: "definitions" })]).toEqual([
-    0, { ...common(), revision: 0, content: { asked: "rules", approvals: 1, ownerMayReview: false, checks: [], labels: [], singleControllerException: false } },
+    0, { ...common(), revision: 0, content: { asked: "rules", approvals: 1, ownerMayReview: false, checks: [], labels: [], singleControllerException: false, extents: valueDigest(RULES_EXTENTS_VALUE.domain, firstExtents({ approvals: 1, checks: [] })) } },
     { ...common(), revision: 0, content: { asked: "definitions", active: [] } },
   ]);
 
@@ -309,11 +309,12 @@ test("a rules scope answers an observation from its folded state at its head: th
   keep(r, unit);
   expect(said(publish(r, [check(unit)], [standing("@check", 7)], { singleControllerException: true }))).toEqual(WRITTEN);
   const first = r.head.seq;
+  expect(supplied.observedValues!(r.state, { of: r.at, asked: "rules" })).toEqual([{ domain: RULES_EXTENTS_VALUE.domain, bytes: canonicalize(FIRST) }]);
   const [deskBytes, ticketBytes] = [canonicalize(desk), canonicalize(ticket)];
   expect([said(activate(r, ticketDefinition.digest, "ticket", [ticketBytes])), said(activate(r, deskDefinition.digest, "desk", [deskBytes, ticketBytes]))]).toEqual([WRITTEN, WRITTEN]);
   expect([r.item(0).refs["published"], r.head.seq > first, answer(r, { of: byId, asked: "rules" }), answer(r, { of: r.at, asked: "definitions" })]).toEqual([
     first, true,
-    { ...common(), revision: first, content: { asked: "rules", approvals: 2, ownerMayReview: true, checks: [{ name: "unit", configuration: unit.digest, required: true, checker: "@check" }], labels: ["bug"], singleControllerException: true } },
+    { ...common(), revision: first, content: { asked: "rules", approvals: 2, ownerMayReview: true, checks: [{ name: "unit", configuration: unit.digest, required: true, checker: "@check" }], labels: ["bug"], singleControllerException: true, extents: valueDigest(RULES_EXTENTS_VALUE.domain, FIRST) } },
     { ...common(), revision: first, content: { asked: "definitions", active: [{ digest: ticketDefinition.digest, name: "ticket" }, { digest: deskDefinition.digest, name: "desk" }] } },
   ]);
   // A second `publish` is the revision from then on, and a retired definition is not listed. A refused `publish` changes neither.
