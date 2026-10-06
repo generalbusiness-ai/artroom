@@ -23,8 +23,8 @@
  */
 
 import type { Digest, FactRef } from "@generalbusiness/artroom-contract";
-import { canonicalBytes, digestBytes, isDigest, isRecord } from "@generalbusiness/artroom-bytes";
-import { environmentDigest, type Configuration, type Variable } from "./configuration.ts";
+import { canonicalBytes, digestBytes, isDigest, utf8, wellFormed } from "@generalbusiness/artroom-bytes";
+import { environmentDigest, exactly, type Configuration, type Variable } from "./configuration.ts";
 
 /** The reasons of a `check-error` that names no step. */
 export const ERRORS = [
@@ -85,15 +85,70 @@ export type Outcome = { act: "check"; outcome: "passed" | "failed" } | { act: "c
 
 const error = (reason: ErrorReason): Outcome => ({ act: "check-error", reason });
 
-/** True when the value has the form of a `RunReport`. A report in any other form is `report-malformed`. */
-export function isRunReport(v: unknown): v is RunReport {
-  if (!isRecord(v) || typeof v["started"] !== "boolean" || typeof v["checkout"] !== "boolean" || !(v["image"] === null || isDigest(v["image"]))) return false;
-  if (v["end"] !== "complete" && v["end"] !== "lost" && v["end"] !== "limits") return false;
-  const variables = v["environment"];
-  if (!Array.isArray(variables) || !variables.every((x) => isRecord(x) && typeof x["name"] === "string" && typeof x["value"] === "string")) return false;
-  const steps = v["steps"];
-  return Array.isArray(steps) && steps.every((s) => isRecord(s) && (s["status"] === null || (typeof s["status"] === "number" && Number.isSafeInteger(s["status"]))) && (s["line"] === null || typeof s["line"] === "string"));
+/**
+ * The most that a report may hold and still be read. A report is the
+ * runner's value, so its size is bounded before anything walks it. The
+ * numbers are this package's: no text states one (I3 deltas, entry EZ1).
+ * The first two are far above a configuration's own maxima, so a report
+ * of more variables or steps than any configuration has is still read,
+ * and is answered by its own row of the table.
+ */
+export const REPORT_BOUNDS = { variables: 1024, steps: 1024, textBytes: 64 * 1024 } as const;
+
+/** A string that canonical bytes can hold, within the bound: no lone surrogate. */
+const text = (v: unknown): v is string => typeof v === "string" && v.length <= REPORT_BOUNDS.textBytes && wellFormed(v) && utf8(v).length <= REPORT_BOUNDS.textBytes;
+/** A status that canonical bytes can hold: a safe integer, and never negative zero. */
+const status = (v: unknown): v is number => typeof v === "number" && Number.isSafeInteger(v) && !Object.is(v, -0);
+/** The elements of an array of at most `max`, each read once by its index, so that a hole is read as the absent value that it is. Null: no such array. */
+const listed = (v: unknown, max: number): unknown[] | null => (Array.isArray(v) && v.length <= max ? Array.from({ length: v.length }, (_, k): unknown => v[k]) : null);
+
+/**
+ * The report that a value is, as a new plain value, or null when it is not
+ * in the form of a `RunReport`. It never throws.
+ *
+ * The form is exact: the six members and no other, each variable its two
+ * and each step its two; every string well formed and within
+ * `REPORT_BOUNDS`; every status a safe integer that is not negative zero;
+ * no hole in a list. So what is returned can be written as canonical bytes
+ * (`packages/bytes/src/canonical.ts`), and the judgment, the record of what
+ * ran and the store, which all write such bytes, cannot fail on it.
+ *
+ * Each member of the value is read once, and what is returned shares
+ * nothing with it. A caller that judges a report and records what ran
+ * reads it once and gives both the same copy.
+ */
+export function readReport(v: unknown): RunReport | null {
+  try {
+    if (!exactly(v, ["started", "image", "environment", "checkout", "steps", "end"])) return null;
+    const { started, image, checkout, end } = v;
+    if (typeof started !== "boolean" || typeof checkout !== "boolean" || !(image === null || isDigest(image))) return null;
+    if (end !== "complete" && end !== "lost" && end !== "limits") return null;
+    const variables = listed(v["environment"], REPORT_BOUNDS.variables);
+    const ran = listed(v["steps"], REPORT_BOUNDS.steps);
+    if (variables === null || ran === null) return null;
+    const environment: Variable[] = [];
+    for (const x of variables) {
+      if (!exactly(x, ["name", "value"])) return null;
+      const { name, value } = x;
+      if (!text(name) || !text(value)) return null;
+      environment.push({ name, value });
+    }
+    const steps: StepReport[] = [];
+    for (const s of ran) {
+      if (!exactly(s, ["status", "line"])) return null;
+      const { status: ended, line } = s;
+      if (!(ended === null || status(ended)) || !(line === null || text(line))) return null;
+      steps.push({ status: ended, line });
+    }
+    return { started, image, environment, checkout, steps, end };
+  } catch {
+    // A value that fails while it is read, such as a member that throws, is no report.
+    return null;
+  }
 }
+
+/** True when the value has the form of a `RunReport`. A report in any other form is `report-malformed`. */
+export const isRunReport = (v: unknown): v is RunReport => readReport(v) !== null;
 
 /**
  * The outcome of one run, by the table of section 3.11, in its order. The
@@ -121,8 +176,9 @@ export function isRunReport(v: unknown): v is RunReport {
  *    other status, or a status and a last line that disagree:
  *    `judgment-unreadable`.
  */
-export function judge(configuration: Configuration, report: unknown): Outcome {
-  if (!isRunReport(report)) return error("report-malformed");
+export function judge(configuration: Configuration, given: unknown): Outcome {
+  const report = readReport(given);
+  if (report === null) return error("report-malformed");
   if (!report.started) return error("runner-not-started");
   if (report.image === null) return error("image-unresolved");
   if (report.image !== configuration.image) return error("image-mismatch");
@@ -144,7 +200,9 @@ export function judge(configuration: Configuration, report: unknown): Outcome {
 /**
  * The record of what ran, from the job, the configuration that was read and
  * the report. A report that is not well formed gives a record with no
- * resolved image and no step that ended: nothing of it is repeated. With no
+ * resolved image, the digest of no variables and no step that ended:
+ * nothing of it is repeated, and the record is canonical whatever the
+ * report held. With no
  * configuration there is no record: nothing was declared, and nothing ran.
  *
  * `image.resolved` is null when the platform reported none. The note's type
@@ -152,7 +210,7 @@ export function judge(configuration: Configuration, report: unknown): Outcome {
  * deltas, entry EW13).
  */
 export function provenanceOf(job: { fact: FactRef; tree: string; configuration: Digest }, configuration: Configuration, report: unknown, run: string): RunProvenance {
-  const read = isRunReport(report) ? report : null;
+  const read = readReport(report);
   return {
     job: job.fact, tree: job.tree, configuration: job.configuration,
     image: { declared: configuration.image, resolved: read?.image ?? null },

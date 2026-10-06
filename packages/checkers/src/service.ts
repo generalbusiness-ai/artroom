@@ -67,7 +67,7 @@ import type { Answer, Digest, PlatformDefinition, ScopeRef, Sealed, SignedIntent
 import { b64url } from "@generalbusiness/artroom-bytes";
 import { readConfiguration, type Configuration } from "./configuration.ts";
 import { manifestOf, originOf, type Job, type NotAJob, type Notice } from "./job.ts";
-import { judge, provenanceOf, type Details, type Outcome } from "./outcome.ts";
+import { judge, provenanceOf, readReport, type Details, type Outcome } from "./outcome.ts";
 import { JOB_READ, signJobRead, signResult, type ResultSigner } from "./signing.ts";
 import type { JobRecord, Outcomes } from "./store.ts";
 
@@ -258,10 +258,19 @@ export class CheckerService {
     return this.#submit(job, ran);
   }
 
-  /** Steps 6 and 7: the outcome of the run, kept with the record of what ran. An outcome that is already kept is not replaced. */
+  /**
+   * Steps 6 and 7: the outcome of the run, kept with the record of what ran. An outcome that is already kept is not replaced.
+   *
+   * The report is read once, into a value that canonical bytes can hold (`readReport`), and the judgment and the record of what ran
+   * are both made from that one reading. A report that is not in form is `report-malformed`, with a record of what ran that repeats
+   * nothing of it. So nothing that a runner returned can fail between the record of the run and the kept outcome, at the run's own
+   * delivery or at a later one that finds the same report: the outcome is kept and signed, and no second run starts.
+   */
   async #conclude(job: Job, run: string, configuration: Configuration | null, report: unknown): Promise<void> {
-    const outcome: Outcome = configuration === null ? { act: "check-error", reason: "configuration-unavailable" } : report === null || report === undefined ? { act: "check-error", reason: "run-lost" } : judge(configuration, report);
-    const details: Details | null = configuration === null ? null : { provenance: provenanceOf(job, configuration, report, run) };
+    const lost = report === null || report === undefined;
+    const read = lost ? null : readReport(report);
+    const outcome: Outcome = configuration === null ? { act: "check-error", reason: "configuration-unavailable" } : lost ? { act: "check-error", reason: "run-lost" } : judge(configuration, read);
+    const details: Details | null = configuration === null ? null : { provenance: provenanceOf(job, configuration, read, run) };
     await this.#o.outcomes.keep(job.fact, outcome, details);
   }
 
