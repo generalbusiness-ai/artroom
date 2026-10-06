@@ -2195,7 +2195,7 @@ and 27.5 CPU seconds, one observed run, on an Apple M5 Max, with a load
 average of 5 from other sessions and warm caches. The commits after it
 change this note alone. The gate was not run. No deployment, no
 provider, no host and no gateway.
-## 32. The smaller forms of the contract's revision 23: a fact as text, settlement by a mark, a bound request and its index, and five small rows
+## 33. The smaller forms of the contract's revision 23: a fact as text, settlement by a mark, a bound request and its index, and five small rows
 
 Written 2026-10-06, on `request/i4-forms4`, by the worker of the source
 rows I3-46, I3-47, I3-48, I3-49, I3-54, I3-55, I3-57, I3-58, I3-59 and
@@ -2222,7 +2222,7 @@ one more kind of row in `folded`, `keyed`. Neither is read for a
 checkpoint, so no state digest changes: witnessed in memory and on
 SQLite.
 
-### 32.1 What is built, by row
+### 33.1 What is built, by row
 
 | Row | Built | Where |
 |---|---|---|
@@ -2236,14 +2236,14 @@ SQLite.
 | I3-55 | In part. `bound` and `decisions` are validated, and the judge derives whether a delivery is bound and that its entry is settling. The count, the draw, the room `dec(m)` and their replay are not built: they are the reservation ledger's (row I3-44). | The same, and `delivery.ts` |
 | I3-57 | Whole. | `contract/src/report.ts`; `replay/src/verify.ts`, `report.ts` |
 
-### 32.2 Source choices
+### 33.2 Source choices
 
 | # | Where the texts differ or are silent | Implemented | Owner, and the question |
 |---|---|---|---|
 | GC1 | Section 3: "One name holds the characters of one fact, once", and a reader finds them "by splitting the name at `/`". The rules of the two fixed parts would let a component of a fixed part be 64 hexadecimal characters. | `isFactRefParts` refuses a fixed part with such a component. So a split finds one component of that form, or none. | The scope contract. Is that the rule, or may a fixed part hold such a component? |
 | GC2 | The length of a fixed part, and so of a name. The contract states 86 bytes for one example and no bound. | None is checked. | The authority note, which states the fixed parts of each version. |
 | GC3 | The word of a commit's line ("a word, one space, the text and one line feed"). | No function writes a line. The test of witness 18.48, case 4, writes one by hand with the made-up word `receipt`. | The authority note, revision 28. |
-| GC4 | The checker's finding on `d034be89` (request `bec3fbd8`): `factText` could throw, or write a text that is no `FactRef`. | Repaired in `04c4e0b4f`. Section 32.6 has the sweep. | Closed here. |
+| GC4 | The checker's finding on `d034be89` (request `bec3fbd8`): `factText` could throw, or write a text that is no `FactRef`. | Repaired in `04c4e0b4f`. Section 33.6 has the sweep. | Closed here. |
 | GC5 | The validator's name for a refused third form of `settles`. Section 6.4 says "the validator refuses", with no name. | `name` where `sets` names no slot of the stated form; `final` where `in` lists a final state; `shape` for a written effect that sets a mark otherwise than to `true`. | The scope contract, if a name is wanted. |
 | GC6 | DI19 with marker duties: what an item reserves in a state from which a timed rule leads to another. | Each duty, the state duty and each mark's, counts the larger of what it reserves in the state and in the state that the rule leads to. For a definition with no mark that is the rule as it was. | The scope contract. This is the reading of "a state that a timed rule leads to counts each marker duty whose forms list it". |
 | GC7 | "A marker duty", rule 10: both amounts are functions of the folded state. The amount of an item follows from its marks, and the state is indexed by type, state and ID. | `markerOwed` reads the items of each live state of a type with marks in which something can be awaited, a page at a time, at each admission: at most the type's `max` items. A final state is counted at the count of the state, with no mark completed, which is never less. | The proof plan, with request `cc570904`: a count by mark, if this read is too much. Nothing was measured. |
@@ -2259,7 +2259,7 @@ SQLite.
 | GC17 | I3-57: how the verifier finds the name. | From the name that the finding's sentence begins with, as the I2 source wrote it. So the report and the sentence cannot differ. | Closed here. |
 | GC18 | The index on `publication.operation`, the `bound` of `withdraw`, and `publication-of` as a binding selector. | Not written. `platform/src/destination.ts` has an `// I3 merge:` mark at the row. The rule still reads every publication (entry ER11). | The authority note, revision 28, with the next worker. |
 
-### 32.3 Witnesses
+### 33.3 Witnesses
 
 | Witness | Cases built | Where | Not built, and why |
 |---|---|---|---|
@@ -2273,7 +2273,7 @@ rule `open-stopped` opens the job in its initial state, sets its two
 required fixed references and then sets the final state, which is four
 effects.
 
-### 32.4 Earlier entries that this work answers
+### 33.4 Earlier entries that this work answers
 
 - 2026-10-06, entry EY6: answered. The rule of an outcome's send is
   given `selected`, and the two send rules read it (row I3-47).
@@ -2285,7 +2285,7 @@ effects.
 - 2026-10-06, entry ER11: the form that replaces the scan is built in
   derive. The rule is not changed. See GC18.
 
-### 32.5 Tests whose pinned behaviour was changed deliberately
+### 33.5 Tests whose pinned behaviour was changed deliberately
 
 - `scope/test/operations.test.ts`, "a snapshot that comes with an
   answer is stored only as its canonical bytes": `snapshotRead` took
@@ -2295,7 +2295,7 @@ effects.
   the operation of the test states 2 attempts, where it stated 1, so
   that a further attempt can be shown. No earlier assertion changed.
 
-### 32.6 The sweep for a function that promises a refusal and can throw
+### 33.6 The sweep for a function that promises a refusal and can throw
 
 Asked by the checker's request `bec3fbd8`, 2026-10-06. Each function of
 the new files that returns null or a refusal on bad input was read for a
@@ -2311,7 +2311,7 @@ call that can throw: the canonical writer, a hash, a parser.
 | `stated`, of `validate/binding.ts` | It could, on a type with no canonical bytes. | Repaired: such a type equals none, and the definition is refused at the end as before. |
 | `markerAmounts`, `itemAwaits`, `markerOwed`, `ruleMayNot`, `boundTo`, `decisionsOf` | No. None calls a writer, a hash or a parser. | Unchanged. |
 
-### 32.7 Lines for the merge
+### 33.7 Lines for the merge
 
 Shared files, and what each gained. Each change is additive.
 
@@ -2351,7 +2351,7 @@ Shared files, and what each gained. Each change is additive.
   Where `dec(m)` is to be counted: in what a holder reserves, with
   `markerAmounts` for the marker duties of the holder's own type.
 
-## 32. The subjects that an entry observes: rows I3-39 to I3-43, I3-53 and I3-56 of the contract's revision 23
+## 34. The subjects that an entry observes: rows I3-39 to I3-43, I3-53 and I3-56 of the contract's revision 23
 
 Written 2026-10-06, on `request/i4-observes`, by the worker of these
 rows. Entries have the prefix GA. The scope contract is read at its
@@ -2375,7 +2375,7 @@ outcome entry of such a definition copies the `uses` of its origin. No
 platform definition of Artroom is such a definition yet, so no deployed
 scope writes either.
 
-### 32.1 What is built
+### 34.1 What is built
 
 | Step | Built | From | Witness |
 |---|---|---|---|
@@ -2386,7 +2386,7 @@ scope writes either.
 | The replay | The judge is given the recorded observations and derives the origin, both lists and each row's status. A record that no row gives, and one that fails a guard, are named mismatches. The value of each record. `incomplete` without the bytes of a named value. | Section 16.1, "Replay" and "What a replay derives" | `replay test/verify.test.ts`, the last three tests; `scope test/observes.test.ts`, the last test |
 | Membership's answer | `standingOf` answers the holders of one action, and the namespace takes that request. | Section 16.1, "An observation of the holders of one action"; row I3-42 | `scope test/observes.test.ts`, the last test, on a real membership scope |
 
-### 32.2 The rows
+### 34.2 The rows
 
 | Row | State | What is not built, and why |
 |---|---|---|
@@ -2398,7 +2398,7 @@ scope writes either.
 | I3-53 | Built in part: the declaration, the read, the retention and the pure count. | The reservation: entry GA8. |
 | I3-56 | Built whole. | Nothing. |
 
-### 32.3 Witnesses, by the contract's section 18
+### 34.3 Witnesses, by the contract's section 18
 
 STAND-INS in every case but one: the platform data `weigher` and its
 rules are made up, each observation of membership and of the rules is
@@ -2417,7 +2417,7 @@ Commands: `npx vitest run --project derive packages/derive/test/forms-observes.t
 `npx vitest run --project scope packages/scope/test/observes.test.ts` and
 `npx vitest run --project replay packages/replay/test/verify.test.ts`.
 
-### 32.4 Entries
+### 34.4 Entries
 
 | # | Where the texts differ or are silent | Implemented | Owner, and the question |
 |---|---|---|---|
@@ -2456,7 +2456,7 @@ in the entry named.
   names the bound on the observations of one entry": the row is over its
   own `max`, and not that ceiling. The refusal's name is `observations`.
 
-### 32.5 Earlier entries that this work answers
+### 34.5 Earlier entries that this work answers
 
 Each line is dated 2026-10-06. The earlier sections stay as they were
 written.
@@ -2470,7 +2470,7 @@ written.
 - **The counter of the run, in `scope/src/authority.ts`.** One counter numbers the read of a signer's key and each further read. The mark for it is removed.
 - **EY7, used.** A first read of a scope that records no incarnation asks by the scope ID, also for a further read, and the entry that retains the answer fixes it.
 
-### 32.6 Lines for the merge
+### 34.6 Lines for the merge
 
 Shared files that this work changed, and what it added to each.
 
@@ -2484,13 +2484,13 @@ Shared files that this work changed, and what it added to each.
 - `RuleGiven.rows` is optional, so that a test which builds a `RuleGiven` by hand is unchanged.
 - `Report.name` (row I3-57) is not touched. The names of the mismatches are in the words of `why`, as before.
 
-### 32.7 Controls
+### 34.7 Controls
 
 One for each new guard, through `scripts/control.mjs`. 36 were run. 34
 distinguish: a test failed by an assertion with the one change applied.
 Two survive, and the table says why. Four of the 34 survived or were
 inconclusive at first, and the witness was made stronger before the
-control was run again: rows 2, 16, 31 and 32. Row 26 was added after
+control was run again: rows 2, 16, 31 and 34. Row 26 was added after
 its first run survived, with the assertion that it needed.
 
 | # | The change | Witness | Result |
@@ -2536,7 +2536,7 @@ No control was run for the read before the turn against the turn that
 starts again: each alone gives the same entries in these witnesses, by
 design, because the commit never trusts the first list.
 
-### 32.8 Tests whose pinned behaviour changed
+### 34.8 Tests whose pinned behaviour changed
 
 None was changed. The older rule, "exactly what its judgment reads", is
 changed only for a definition whose data states rows (entry GA1), and no
@@ -2550,7 +2550,7 @@ definitions state their rows.
 One existing test was strengthened: `platform test/rules.test.ts`, with
 the holders of an action.
 
-### 32.9 What was run
+### 34.9 What was run
 
 The derive, platform, replay and scope projects while working; every
 workspace's typecheck; `git diff --check`;
