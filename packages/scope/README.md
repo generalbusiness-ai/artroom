@@ -147,6 +147,17 @@ run. What it reads is kept in memory only, so a restart leaves none.
 - The entry's grant is built from the observation and retains it, with
   the read and how the entry used it: `fresh`, or `reused` with the entry
   before. The commit tells the port which entry used a read last.
+- Under a definition whose data states rows of `observes`, the same port
+  reads the further observations of an act, of an outcome and of a
+  delivery of a result (`Authority.further`). Before the turn the scope
+  runs the judge's own derivation of the subject list at its head, and
+  reads one observation for each subject, each with the next number of
+  the run. The commit derives the list again. Where it lacks a subject it
+  stops, the scope reads what is missing, and the turn starts again,
+  inside the bound on restarts (`Observes`, in `core.ts`). A value that an
+  answer names is kept only in a domain that the row states, within its
+  `max`. No platform definition of Artroom states a row yet, and no rules
+  scope answers an observation, so a deployed scope reads none of these.
 
 The production default does not use it: the `authority` of `production()`
 reads no grant, and every act that needs one is refused `unauthorized`.

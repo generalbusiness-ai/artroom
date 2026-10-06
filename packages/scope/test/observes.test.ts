@@ -171,6 +171,7 @@ test("18.46 cases 7, 8, 10 and 11, an outcome with rows, on real storage: its `u
     script.asked.length = 0;
     await g.offer();
     for (const [hash, entry] of lane) c.foreign.set(hash, entry);
+    expect(outcomeOf(await s.entries(), g.operation) === null).toBe(false);
     const entry = outcomeOf(await s.entries(), g.operation)!;
     expect([script.asked, records(entry), entry.uses, entry.clamped]).toEqual([["rules", k1, k2, "holders:x.do"], [["rules", 2, "fresh"], [k1, 3, "fresh"], [k2, 4, "fresh"], ["holders:x.do", 5, "fresh"]], g.origin.uses, false]);
     expect([g.origin.uses.map((use) => use.fact), s.seen.rows.at(-1), s.seen.read.at(-1)]).toEqual([[facts.first, facts.second], ["whole", "whole", "whole"], [2, 3, 4]]);

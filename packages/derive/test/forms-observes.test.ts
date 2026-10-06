@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import { PROPOSED_BOUNDS, RETAINED_INPUT_BYTES } from "@generalbusiness/artroom-contract";
 import type { FactUse, Input, KeyId, MemberId, ObservationUse, OperationId, Send } from "@generalbusiness/artroom-contract";
 import { canonicalize, entryHash, factRefOf, isEntry, isObservationUse, signIntent } from "@generalbusiness/artroom-bytes";
-import { actNeeds, clockOf, contentChecked, contentStates, judgeDelivery, observationBytes, retainable, retainableByRequest, rowsOfAct, rowsOfKind, settleOutcome, valueDigest, type ActJudgment, type Fetched, type Judgment, type Observing, type OutcomeJudgment, type RuleGiven, type Subject } from "../src/index.ts";
+import { PROFILES, actNeeds, clockOf, contentChecked, contentStates, judgeDelivery, observationBytes, retainable, retainableByRequest, rowsOfAct, rowsOfKind, settleOutcome, validateDefinition, valueDigest, type ActJudgment, type Fetched, type Judgment, type Observing, type OutcomeJudgment, type RuleGiven, type Subject } from "../src/index.ts";
 import { Scope, T0, arriving, forged, grantOf, keys, membership, otherLane, t } from "./fixtures.ts";
 import { EXTENTS, EXTENTS_MAX, RULEBOOK, STEP_ROWS, holdersSeen, keySeen, memberSeen, rulebook, rulesSeen, signers, stating, weighed, weigher, weigherRules, weigherWith, type Seen } from "./fixtures-observes.ts";
 
@@ -48,7 +48,7 @@ describe("the rows of `observes` in a definition (section 16.1, the ten checks)"
       "1 undelivered": clause("undelivered", [RULES]),
       "1 conflict of a tell": clause("conflict", [RULES]),
       // Check 2: at most 8 rows; a window of at least 1; one of the two words; `most` at most the bound on the elements of a list.
-      "2 rows": kind(Array.from({ length: 9 }, () => ({ of: "definitions", window: 10, use: "once", without: "wait" }))),
+      "2 rows": kind(Array.from({ length: 9 }, (_, n) => ({ of: "holders", action: `x.${n}`, most: 1, window: 10, use: "once", without: "wait" }))),
       "2 window": act({ window: 0 }),
       "2 use": act({ use: "always" }),
       "2 max": act({ max: 0 }),
@@ -64,8 +64,9 @@ describe("the rows of `observes` in a definition (section 16.1, the ten checks)"
       "5 act": act({ without: "wait" }),
       "5 kind": kind([{ of: "rules", window: 10, use: "once" }]),
       "5 clause": clause("applied", [{ of: "rules", window: 10, use: "once" }]),
-      // Check 6: the sum of `max` is at most the ceiling on the observations of one entry. Such rows also pass the entry size.
-      "6": kind([kindRow({ of: "member", max: 100 }), kindRow({ of: "member", max: 29 })]),
+      // Check 6: the sum of `max`, with 1 for each row that has one subject, is at most the ceiling on the observations of one entry.
+      // The three rows of `weigh` give 5 subjects at most: under a ceiling of 4 they do not validate, and under 5 they do.
+      "6": [4, 5].map((usesPerEntry) => { const v = validateDefinition(weigher, { ...PROPOSED_BOUNDS, usesPerEntry }, PROFILES, { platform: true }); return v.ok ? null : v.problems.map((p) => `${p.code} ${p.path}`); }),
       // Check 7: each row at its `max`, each observation at the largest size of its kind, fits the entry size. An act may pass it.
       "7": kind([kindRow({ max: 40 })]),
       "7 act": act({ max: 120 }),
@@ -96,7 +97,7 @@ describe("the rows of `observes` in a definition (section 16.1, the ten checks)"
       "5 act": ["shape acts.set.observes.0.without"],
       "5 kind": ["shape outcomes.weigh.observes.0.without"],
       "5 clause": ["shape acts.go.sends.0.tell.observes.applied.0.without"],
-      "6": ["bound outcomes.weigh.observes"],
+      "6": [["bound outcomes.weigh.observes"], null],
       "7": ["bound outcomes.weigh.observes"],
       "7 act": null,
       "8 place": ["shape outcomes.weigh.observes.0.retains"],
@@ -244,14 +245,24 @@ describe("an outcome with rows, and its origin (sections 6.1 and 16.1; witness 1
     // written. The observation is discarded and read again, and the outcome stays offered.
     const late = [rules, seen1, { ...seen2, observation: { ...seen2.observation, at: t(-2) } }, holders];
     expect([said(settleWith(g, blank(), late)), said(settleWith(g, blank(), late, READABLE))]).toEqual([["unavailable", "authority-unavailable"], ["unavailable", "authority-unavailable", [[{ key: k2 }, 10, true]]]]);
-    // A record that is not `fresh` does not serve a row that states `once`.
-    expect(said(settleWith(g, blank(), [rules, seen1, { ...seen2, use: "reused", prior: { seq: 1, hash: s.head.hash } }, holders]))).toEqual(["unavailable", "authority-unavailable"]);
+    // A record that is not `fresh` does not serve a row that states `once`, also when it is a true reuse of a read that an earlier
+    // entry retains: under a row that states `reuse` it would serve.
+    const prior = { seq: 1, hash: s.entries[1]!.hash };
+    const reused = { ...seen2, use: "reused" as const, prior };
+    const last = { last: (use: ObservationUse) => (use.read.n === 3 ? { entry: prior, time: T0, observation: seen2.observation as never } : null) };
+    expect(said(settleWith(g, blank(), [rules, seen1, reused, holders], last))).toEqual(["unavailable", "authority-unavailable"]);
+    const patient = made((d) => { d.outcomes.weigh.observes[1].use = "reuse"; });
+    patient.s.now = t(8);
+    expect(numbers(settleWith(patient, blank(), [rules, seen1, reused, holders], last))).toEqual([1, 2, 3, 4]);
 
     // Case 10: membership cannot be reached for the holders, and that row states `write`. Written, with three records. The rule is
     // told that the row is absent. Case 11: the rules scope cannot be reached, and that row states `wait`. Not written.
     const without = blank();
     const three = settleWith(g, without, [rules, seen1, seen2]);
     expect([numbers(three), without.rows, said(settleWith(g, blank(), [seen1, seen2, holders]))]).toEqual([[1, 2, 3], [["whole", "whole", "absent"]], ["unavailable", "authority-unavailable"]]);
+    // An observation that is longer than the largest size of its kind, which the validator counted for the row, serves no row.
+    const long = { ...seen2, observation: { ...seen2.observation, actions: Array.from({ length: 200 }, (_, i) => `x.${"a".repeat(60)}.${i}`) } };
+    expect(said(settleWith(g, blank(), [rules, seen1, long, holders]))).toEqual(["unavailable", "authority-unavailable"]);
     // An answer that lists other than the first `most` holders is no record of the row.
     expect(numbers(settleWith(g, blank(), [rules, seen1, seen2, holdersSeen(["@rita"], 3, 4, t(3))]))).toEqual([1, 2, 3]);
 

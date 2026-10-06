@@ -61,6 +61,13 @@ export interface ValueRead { domain: string; digest: Digest; bytes: string }
  * What is at hand for one entry beside its input, and what the rules of its
  * row read of it (sections 4.1, 6.2 and 16.1).
  *
+ * THE OLDER RULE, WHICH STANDS AS A STAND-IN. What follows is the rule of
+ * the contract's revisions 14 to 19, for a definition whose data states no
+ * row of `observes`. From revision 20 an entry retains the observations of
+ * the subjects that its rows give, read or not: `rows`, below, and
+ * `observes.ts`. No platform definition of Artroom states a row yet, so
+ * each of them is still judged as this says (I3 deltas, entry GA1).
+ *
  * `observed`: the further observations that the scope read before the turn
  * for this input, each with its read and its use, and each already judged
  * by the guards of section 16.1. A verifier gives the records of the
@@ -82,14 +89,15 @@ export interface ValueRead { domain: string; digest: Digest; bytes: string }
  * The scope's runtime reads `values` beside an intent where the pinned data
  * states a place, and keeps each (`scope/src/core.ts`).
  *
- * I3 merge: what is still owed. The runtime makes no further read of an
- * observation before any turn: no form states the subjects that an entry
- * observes (the contract's point R1-67; I3 deltas, entries EM2 and FC6). So
- * in a deployed scope a rule that reads one is given none, and where its
- * specification says so its guard is not completed. A replay is given the
- * retained value of each place that the pinned data states, and none for a
- * row whose rule holds the domain in its own code (`replay/src/verify.ts`;
- * entries EM1 to EM4 and EX5).
+ * I3 merge: what is still owed. Under a definition whose data states no
+ * row, the runtime makes no further read of an observation before any
+ * turn: nothing says what to read. So in a deployed scope under a platform
+ * definition of Artroom a rule that reads one is given none, and where its
+ * specification says so its guard is not completed. It ends when the
+ * authority note's rows are adopted and written into that data (entry
+ * GA1). A replay is given the retained value of each place that the pinned
+ * data states, and none for a row whose rule holds the domain in its own
+ * code (`replay/src/verify.ts`; entries EM1 to EM4 and EX5).
  */
 export interface AtHand {
   readonly observed: readonly ObservationUse[];

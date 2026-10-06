@@ -2011,3 +2011,213 @@ working; every workspace's typecheck; `git diff --check`;
 25.5 CPU seconds, one observed run, on an Apple M5 Max with 18 cores, a
 load average of 4 from other sessions, and warm caches. The gate was
 not run. No deployment, no provider, no host and no gateway.
+
+## 32. The subjects that an entry observes: rows I3-39 to I3-43, I3-53 and I3-56 of the contract's revision 23
+
+Written 2026-10-06, on `request/i4-observes`, by the worker of these
+rows. Entries have the prefix GA. The scope contract is read at its
+revision 23 (`3b3e394fc`), which the checker approved. **Its adoption by
+the planner was not recorded when this was written**: every row here is
+built on that revision as approved, and each is in a commit that names
+its rows, so that a change is cheap. The authority note is at its
+adopted revision 26 (`f7175296`). Its revision 28 is in review and is no
+basis: no row of `observes`, no `origin` and no `retains` is written into
+a platform definition of Artroom.
+
+Another worker of this wave may have taken the number 32 for a section
+of its own. The prefix GA tells the entries apart.
+
+No entry that an earlier source wrote has other bytes. Neither lane
+digest changes, and `packages/lanes` is not touched. No data of a
+platform definition changes. What is new in what a scope may write: an
+entry of a definition whose data states rows retains one observation for
+each subject that a whole row gives, read by a rule or not; and an
+outcome entry of such a definition copies the `uses` of its origin. No
+platform definition of Artroom is such a definition yet, so no deployed
+scope writes either.
+
+### 32.1 What is built
+
+| Step | Built | From | Witness |
+|---|---|---|---|
+| The data form | The types of a row, of `retains`, of `second` and of `origin`, in `contract/src/observes.ts`; where they stand in platform data; the kind `HoldersObservation`, its request and its answer; `extents` in a `RulesContent`. The validator's ten checks and the check of `origin`, in `derive/src/validate/observes.ts`, with the platform option only. | Sections 6.1 and 16.1; rows I3-39, I3-42, I3-43, I3-53, I3-56 | `derive test/forms-observes.test.ts`, the first three tests |
+| The judges | The subject list, the six guards with each row's window and use, the status of each row, and what the entry retains, in `derive/src/observes.ts`. The judge of an act (`judge.ts`), of an outcome (`settle.ts`, `byRows`) and of a result's delivery (`handlers.ts`, `runClause`). An outcome's origin, and its `uses` as a copy. The second step. | Section 16.1; section 6.1, "The origin of an outcome"; rows I3-39, I3-41, I3-56 | The same file, the tests of an act, of an outcome and of a clause |
+| The read before the turn | `Authority.further`, in `scope/src/ports.ts`; the real read in `authority.ts`, with one counter for the run; `Observes`, in `core.ts`, which runs the judge's own derivation at the head, reads what it names, and starts the turn again when the commit stops. The act path, the outcome driver and the delivery of a result. | Section 5.2, step 1; section 16.1, "The order before the turn" and "In the commit"; row I3-40 | `scope test/observes.test.ts`, on real storage |
+| A value that an observation names | The read keeps a value only in a domain that the row states, within its `max` and by its digest. The judge holds it to the row again. The scope stores it under the kind `value`, once for a domain and a digest. `retainable` and `retainableByRequest` give the bytes that a form may retain by its rows. | Section 16.1, "A value that a row may retain"; row I3-53 | The clause tests of both files |
+| The replay | The judge is given the recorded observations and derives the origin, both lists and each row's status. A record that no row gives, and one that fails a guard, are named mismatches. The value of each record. `incomplete` without the bytes of a named value. | Section 16.1, "Replay" and "What a replay derives" | `replay test/verify.test.ts`, the last three tests; `scope test/observes.test.ts`, the last test |
+| Membership's answer | `standingOf` answers the holders of one action, and the namespace takes that request. | Section 16.1, "An observation of the holders of one action"; row I3-42 | `scope test/observes.test.ts`, the last test, on a real membership scope |
+
+### 32.2 The rows
+
+| Row | State | What is not built, and why |
+|---|---|---|
+| I3-39 | Built, as a generic form. | No platform definition states a row: entry GA1. Check 7 counts the observations and the fixed members of an entry only: entry GA4. |
+| I3-40 | Built. | Production reads nothing for the rules: entry GA7. The reference by which a scope records membership is real for a scope whose genesis or version records one, and no made-up scope has such a genesis: the witness on a real membership scope writes it. |
+| I3-41 | Built, under a definition whose data states rows or an origin. | The destination's kinds state no `origin`, so their `uses` is still what the judge is given: entry GA1. |
+| I3-42 | Built whole: the kind, the request, the answer, the record check, the order of heads, membership's answer and its replay. | Nothing. |
+| I3-43 | Built in part. `extents` is in the type and in the record check. The exact check, by the data of the observation's `definition`, is made at the read and under rows. | The retained list as a value is built with `retains`. The domain's tag and its bound are the authority note's. Under a definition that states no row the record check stays as it was: entry GA10. |
+| I3-53 | Built in part: the declaration, the read, the retention and the pure count. | The reservation: entry GA8. |
+| I3-56 | Built whole. | Nothing. |
+
+### 32.3 Witnesses, by the contract's section 18
+
+STAND-INS in every case but one: the platform data `weigher` and its
+rules are made up, each observation of membership and of the rules is
+written by hand or scripted, and each entry of a lane is made by hand.
+The exception is the last test of `scope test/observes.test.ts`, which
+reads a real membership scope.
+
+| Witness | Cases built, and where | Cases not built, and why |
+|---|---|---|
+| 18.46 | 1 to 3, 4 to 6 and 16: `derive test/forms-observes.test.ts`. 7 to 12: the same file, as judgments. 4, 5, 7, 8, 10 and 11: `scope test/observes.test.ts`, on real storage with a scripted clock. 13 to 15: `replay test/verify.test.ts`. | Cases 6, 9 and 12 are not repeated on real storage: each is a judgment, shown in derive. Case 16 is built for a definition that states rows: entry GA1. |
+| 18.48 | 6, 7 and 9: derive. 6 to 8: scope, on real storage. 10: replay. | Cases 1 to 5 are about a fact as text and a ref's name. That is row I3-46, which is not one of these rows. |
+| 18.50 | 9 and 10: derive, as validator checks. 4, 6 and 7: derive. 4 to 8: scope, on real storage. 11: replay. The term of cases 1 and 2 that the rows give, 400,000 bytes against none: derive. | Case 3, and the sums of cases 1, 2, 4 and 5 in bytes: no source counts bytes against a budget. Entry GA8. |
+| 18.52 | 1 to 4, and 5 to 10: derive. 5: scope, on real storage. 10: scope, on a real observation of the signer. 11 and 12: replay. | Cases 6 to 9 are not repeated on real storage: each is a judgment, shown in derive. |
+
+Commands: `npx vitest run --project derive packages/derive/test/forms-observes.test.ts`,
+`npx vitest run --project scope packages/scope/test/observes.test.ts` and
+`npx vitest run --project replay packages/replay/test/verify.test.ts`.
+
+### 32.4 Entries
+
+| # | Where the texts differ or are silent | Implemented | Owner, and the question |
+|---|---|---|---|
+| GA1 | Section 16.1, "The windows of the rows that exist": "Until a definition's data states the rows, the constant is a stand-in for those two rows, and an entry of any other form retains no `observed`." The rows of the destination, of the rules scope and of the directory are the authority note's revision 28, which is not adopted. | One switch for a definition: `ValidDefinition.observing`, true when its data states a row of `observes` or an `origin` anywhere. Under such a definition every entry retains exactly what its rows give, an outcome's `uses` is its origin's, a form that states no row has no `observed`, and a rule that reads an observation of a subject that no row gives has a fault (witness 18.46, case 16). Under any other definition the older rule stands, as a STAND-IN: an entry retains what a rule read, the window is the constant, and an outcome names the entries that its judge was given (entries FC3 and FC4). So the destination's `judge` and its tests are as they were. Marked `I3 merge:` in `scope/src/operations.ts`. | The authority note, with its revision 28: the rows of each platform definition. The builder, when they are adopted: write the rows, and remove the stand-in path (`AtHand.read.observed`, `Verifier.#observed`, and the `facts` of `settleOutcome`). |
+| GA2 | The same sentence would leave an act with no `observed` until its row is stated. The rules scope's `publish` reads the standing of each checker so, on the window of the act's own grant. | The stand-in of GA1 is kept for an act too. Otherwise `publish` could name no check until revision 28 is adopted. | The contract, with the authority note: is the stand-in for the two rows only, so that `publish` waits for its row? |
+| GA3 | Check 7 counts "each observation at the largest size of its kind". The contract states one size: 48,931 bytes for the `content` of the rules, as a sum. For a key, a member and the holders it says that the largest is R4's to count, and the type of an `Observation` bounds neither `role` nor `actions`. | `observationBytes`, in `derive/src/validate/observes.ts`: LABELLED PROPOSALS. A role of at most 64 bytes; at most `listElements` actions of at most 64 bytes each; the 48,931 for both contents of the rules. Under rows, an observation that is longer than the size of its kind serves no row, so the count holds for each entry that is written. The grant's observation is not held to it. | R4, for each number. The authority note, for a bound on a role's name and on the actions of one role. |
+| GA4 | Check 7: the size "must fit the entry size with the rest of the entry, by the rule of section 6.1, 'A declared maximum for everything that derives'". No source counts the effects of an outcome's rule in bytes: a mark states no `most` in the data (entry EJ6). | The count is the rows, each at its `max`, and the fixed members of an entry. Marked `I3 merge:` in the validator. | Request `cc570904`, with the capacity work. |
+| GA5 | Section 16.1 puts rows on "a `create`, a `tell` or a `relate`, by clause". A request that a send mark gives, at place 6 or as the send of an outcome's kind, is one of the three, and its mark holds its clauses. No text gives a mark the member `observes`. | Rows on a written send only. The validator refuses the member on a send mark, as any member that it does not know there. | The contract. May a send mark state rows by clause, and what does a source read there, where an outcome binds no subject? |
+| GA6 | "The observed scope gives the bytes of each named value beside its answer." No text states the form of what crosses between the two scopes. | The port's form, `Answered` in `scope/src/authority.ts`: `{ answer, values: [{ domain, bytes }] }`. A reader that gives the bare record gives no value. | The contract, with the authority note: the form of the answer with its values, and of the route that carries it. |
+| GA7 | No version of a rules scope answers an observation (entry FB10), and the authority note's row for it is in its revision 28. | The production read asks the rules scope by its ID, through the namespace, and gets no answer: each row of the rules is absent. Where a scope records its rules reference is `Platform.rulesScope`, which only the destination states. The witnesses use `Controls.rulebook`, a scripted rules scope, labelled a STAND-IN. | The authority note, revision 28. The builder, after it: the answer of `platform:rules@1`, with the bytes of the extents beside it. |
+| GA8 | Section 17.2, "A value that an observation names": each record of `retains` is counted at its `max` in what the form's entry may newly retain, and for a clause it is reserved when the entry that sends the request is admitted. No source counts bytes against a budget (section 17.5). | Not built here. `retainable(rows)` gives the bytes for the rows of one form, and `retainableByRequest(send form)` the largest over `applied`, `refused` and `superseded`. Both are pure, in `derive/src/observes.ts`. The worker on reservations calls the first with `rowsOfAct(act)` for an act that settles and with `rowsOfKind(data, kind)` for each outcome entry of a kind, and the second where it reserves for a request. Witness 18.50, case 3, and the byte sums of its cases 1, 2, 4 and 5 wait for that ledger. | The worker on reservations, with `cc570904`. |
+| GA9 | "A definition that fails one does not validate." The contract names no problem for a check. | `shape`, `name` or `bound`, by the kind of the failure, at the path of the member. No new problem code. | Nobody, unless a name for each check is wanted: the contract. |
+| GA10 | Row I3-43: the record check requires `extents` and `singleControllerException` exactly when the data of the observation's `definition` states them. The data of `platform:rules@1` states both. The destination's tests hand it observations of the rules with no `extents`, under the stand-in of GA1. | The exact check is made at the read of an answer and under rows (`contentChecked`). The byte-level check of a record takes the member where it is present, as before, so a history under the stand-in is not refused. | The builder, with GA1: when the destination states its rows, its observations of the rules hold `extents`, and its rule reads the list as a retained value. |
+| GA11 | Two rows of one form may name the holders of one action with different `most`. The record has no member for `most`. | One subject, asked with the larger `most`. A row is served by a record that lists exactly as many as its own `most` allows, so the row with the smaller one is then absent. | The contract. Should the validator refuse two rows of one action in one form? |
+| GA12 | "A subject with no such observation is answered `authority-unavailable`", "after the bound on restarts". The texts do not say how often a read that got no answer is made again for one input. | A subject is read once for one input. A read that gave no answer is not made again for that input: the row is then absent. An observation that fails a guard in the commit is read again, at most as often as the bound on restarts allows, and after that no more is read. | The builder. A retry policy, if one is wanted, is R4's. |
+| GA13 | "Part 3. It derives the subject list... This derivation judges nothing." The signer's own member is known only from the grant's observation, which is judged in the commit. | The derivation before the turn is the judge's own code, run at the head with no grant. It may name the signer's own member, and the scope then reads it. The commit finds that the grant serves the subject, and retains no record: the read took a number of the run and was not used. | The builder. It costs one read where a field names the signer. |
+| GA14 | The authority note's rule G10: a read that shows a revocation is kept for the run. It is stated for the signer's key. | Not applied to the further observations. Each is kept for reuse only inside its row's window, by its subject, one for each subject in a run. What a rule concludes from a value is the definition's. The mark in `scope/src/authority.ts` stands. | The authority note. |
+| GA15 | Section 16.1 gives a rule of a mark at place 2 "the grant and `observed`". The list is derived after check 8, where that rule runs. | Under rows nothing is at hand at checks 7 and 8: a rule that reads an observation there is given none. It is no fault. | The contract: the sentence and the order do not agree. Check 10 exists because of it. |
+| GA16 | Check 3 asks for a static type of `member`. The table of sources lets a part of an entry be read, and a part has no static type. | A source with a part, and a constant that is a member reference, are taken. The commit reads the value. In an act a value that is no member of this repository is `bad-field`. In a clause it is left out. | The contract, to confirm. |
+| GA17 | A replay reads one value "by the kind, the domain and the digest". An entry names the digest, and the domain is in a row of its form. | The verifier asks in each domain that a row of the pinned data states under `retains`. The judge then holds the value to the row of the entry's own form. | Nobody. |
+| GA18 | Witness 18.50, case 8: "the answer names a second value, in a domain that the row does not state". A `RulesContent` has one member that names a value, `extents`. | Built at the read: a value beside the answer in a domain that the row does not state makes the answer no answer. | The contract: which member of the record would name a second value? |
+
+**Text of the contract that was found wrong or unclear.** Each is quoted
+in the entry named.
+
+- GA1 and GA2: "an entry of any other form retains no `observed`" does
+  not fit the act `publish`, which the same section lists with a window
+  of 300 seconds.
+- GA15: "The rule of a mark at place 2 is given the grant and
+  `observed`", against "the judge derives the subject list again ... after
+  the fields are read and the names of `also` are bound".
+- GA16: "its static type is `member`, or a list of `member`", against "A
+  part reads the bytes of an entry that the input names".
+- GA18: the second value of witness 18.50, case 8.
+- "An act with a row that is over is refused `entry-too-large`, which
+  names the bound on the observations of one entry": the row is over its
+  own `max`, and not that ceiling. The refusal's name is `observations`.
+
+### 32.5 Earlier entries that this work answers
+
+Each line is dated 2026-10-06. The earlier sections stay as they were
+written.
+
+- **FC6, closed for a definition that states rows.** The scope reads each subject before the turn, and the commit derives the list again. The three places that were marked for it are closed: `scope/src/core.ts`, `scope/src/operations.ts` and `derive/src/marks.ts`. For a definition that states none, entry GA1.
+- **FC3, answered by the contract and built.** An outcome's `uses` is a copy of its origin's. The older answer stands only as the stand-in of GA1.
+- **FC4 and EU4, built.** The window and the use come from the row. `WINDOWS.once` stands only as the stand-in of GA1.
+- **FC8, witnessed.** A replay of a result's delivery that retains an observation: the history `asked` of `replay/test/weighing.ts`.
+- **EM2, closed.** The form is the row of `observes`.
+- **FB2 and FB3, built in part.** `extents` is in the type, and the exact check exists: entry GA10.
+- **The counter of the run, in `scope/src/authority.ts`.** One counter numbers the read of a signer's key and each further read. The mark for it is removed.
+- **EY7, used.** A first read of a scope that records no incarnation asks by the scope ID, also for a further read, and the entry that retains the answer fixes it.
+
+### 32.6 Lines for the merge
+
+Shared files that this work changed, and what it added to each.
+
+- `contract/src/observation.ts`: `HoldersObservation`; `extents` in `RulesContent`; a fourth request and a fourth answer. `contract/src/platform.ts`: `observes` on `PlatformAct`, on `OutcomeMark` and beside `result` of a written send; `origin` on `OutcomeMark`. `contract/src/index.ts`: one export line. New: `contract/src/observes.ts`.
+- `bytes/src/records.ts`: the record of the holders, and `extents` as an optional digest.
+- `derive/src/validate/index.ts`: `ValidDefinition.observing`; `origin` and `observes` in the optional members of a kind of `outcomes`. `validate/context.ts`: `Defining.observing`. `validate/handlers.ts`: `observes` among the optional members of an act, read after its guards; `also` returns the names that a mark selects. `validate/sends.ts`: `observes` among the optional members of a `create`, a `tell` and a `relate`. New: `validate/observes.ts`.
+- `derive/src/marks.ts`: `AtHand.rows`, `atHandByRows`, `RuleGiven.rows`, `OutcomeRule.origin` and `subjects`, `FirstStep`; `Observed` takes `{ holders }`. `derive/src/ledger.ts`: `OperationRules.origin` and `subjects`. `derive/src/judge.ts`: `Unjudged`, with `missing` and `rows`; `Draft.rows`; `JudgeContext.observing`; `actNeeds`. `derive/src/settle.ts`: `byRows`, and `retained`, `observing` and `values` in `OutcomeContext`. `derive/src/handlers.ts`: one more optional argument of `runClause`. `derive/src/delivery.ts`: `observing` and `values` in `DeliveryContext`. `derive/src/fold.ts`: the head of a holders observation. `derive/src/outcomes.ts`: the two functions of a kind. New: `derive/src/observes.ts`. `reserve.ts` is not touched.
+- `replay/src/verify.ts`: `#hand` and `#byRows`, and one branch at an act, a delivery and an outcome. The older `#observed` is called only under a definition that states no row.
+- `scope/src/ports.ts`: `Authority.further` and `Further`. `authority.ts`: `further` in `observing`, `recordedRules`, `Answered`. `core.ts`: `Observes`, `Scope.observes`, and `valuesOf` is exported. `operations.ts` and `delivery.ts`: the read before the turn and the turn that starts again. `namespace.ts`: the request of the holders. `testing.ts`: `Controls.rulebook`.
+- `platform/src/membership.ts`: `standingOf` answers the holders.
+- `RuleGiven.rows` is optional, so that a test which builds a `RuleGiven` by hand is unchanged.
+- `Report.name` (row I3-57) is not touched. The names of the mismatches are in the words of `why`, as before.
+
+### 32.7 Controls
+
+One for each new guard, through `scripts/control.mjs`. 36 were run. 34
+distinguish: a test failed by an assertion with the one change applied.
+Two survive, and the table says why. Four of the 34 survived or were
+inconclusive at first, and the witness was made stronger before the
+control was run again: rows 2, 16, 31 and 32. Row 26 was added after
+its first run survived, with the assertion that it needed.
+
+| # | The change | Witness | Result |
+|---|---|---|---|
+| 1 | Rows under `undelivered` are read as rows of a clause | `derive test/forms-observes.test.ts` | Distinguishes |
+| 2 | A form may state 64 rows | The same | Distinguishes |
+| 3 | The type of `value` in an `each` is not asked | The same | Distinguishes |
+| 4 | A row of an outcome may state an operand | The same | Distinguishes |
+| 5 | `without` is not asked | The same | Distinguishes |
+| 6 | No ceiling on the subjects of one form | The same | Distinguishes |
+| 7 | No static size | The same | Distinguishes |
+| 8 | A `max` of `retains` past one retained read | The same | Distinguishes |
+| 9 | `second` on any row | The same | Distinguishes |
+| 10 | A source may read `signer` and `intent` | The same | Distinguishes |
+| 11 | A source may read a name that a mark binds | The same | Distinguishes |
+| 12 | An act with a row that is over is judged | The same | Distinguishes |
+| 13 | A member of another repository is left out of an act's list | The same | Distinguishes |
+| 14 | The grant never serves the signer's own member | The same | Distinguishes |
+| 15 | An age that equals the window is inside it | The same | Distinguishes |
+| 16 | A row that states `once` takes a reused record | The same | Distinguishes |
+| 17 | An outcome's `uses` in another order than its origin's | The same | Distinguishes |
+| 18 | No row is over | The same | Distinguishes |
+| 19 | An absent row that states `wait` is written | The same | Distinguishes |
+| 20 | A value over the row's `max` is taken | The same | Distinguishes |
+| 21 | The record of the rules is not held to its definition's data | The same | Distinguishes |
+| 22 | A rule reads an observation of a subject that no row gives | The same | Distinguishes |
+| 23 | The holders that a record lists are not held to the row's `most` | The same | Distinguishes |
+| 24 | A rule of the second step reads past the first | The same | Distinguishes |
+| 25 | A named value whose bytes are not at hand is passed over by the judge | The same | Distinguishes |
+| 26 | An observation past the largest size of its kind serves a row | The same | Distinguishes |
+| 27 | The read keeps a value in a domain that the row does not state | `scope test/observes.test.ts` | Survives. The judge makes the same check on what the read gives it (rows 20 and 25), so no entry and no stored byte differs. The check at the read is kept: the contract asks that the scope has no observation then. |
+| 28 | The read takes an answer whose bytes are missing | The same | Survives, for the same reason. |
+| 29 | The port is not told which entry retains a read | The same | Distinguishes |
+| 30 | A subject that was read and gave no answer can still be read | The same | Distinguishes |
+| 31 | An outcome is not given the retained copies of its origin's `uses` | The same | Distinguishes |
+| 32 | A member with no active key is a holder | `platform test/rules.test.ts` | Distinguishes |
+| 33 | A replay takes a record that no row gives | `replay test/verify.test.ts` | Distinguishes |
+| 34 | A replay names no guard | The same | Distinguishes |
+| 35 | A replay goes on without the bytes of a named value | The same | Distinguishes |
+| 36 | A replay does not derive the value of a record | `scope test/observes.test.ts` | Distinguishes |
+
+No control was run for the read before the turn against the turn that
+starts again: each alone gives the same entries in these witnesses, by
+design, because the commit never trusts the first list.
+
+### 32.8 Tests whose pinned behaviour changed
+
+None was changed. The older rule, "exactly what its judgment reads", is
+changed only for a definition whose data states rows (entry GA1), and no
+earlier test is of such a definition. The tests that still pin the older
+rule, as the stand-in: `derive test/forms-marks.test.ts`, the two tests of
+a rule that reads a further observation; `platform test/destination.test.ts`
+and `rules-scope.test.ts`; and `replay test/verify.test.ts`, the two tests
+of an observation in `observed`. Each must change when the platform
+definitions state their rows.
+
+One existing test was strengthened: `platform test/rules.test.ts`, with
+the holders of an action.
+
+### 32.9 What was run
+
+The derive, platform, replay and scope projects while working; every
+workspace's typecheck; `git diff --check`;
+`node --test scripts/active-source.test.mjs`; and the root vitest run
+once, at the head before this note's last commit: 71 files and 554 tests
+passed in 10.4 seconds elapsed and 26.7 CPU seconds, one observed run, on
+an Apple M5 Max with 18 cores, a load average of 4 from other sessions,
+and warm caches. The gate was not run. No deployment, no provider, no
+host and no gateway.

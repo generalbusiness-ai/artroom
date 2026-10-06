@@ -125,6 +125,16 @@ scope's history gives at that head. An observation of the rules is
 `unsupported-definition`: nothing states yet where a scope records its
 rules reference.
 
+Under a definition whose data states rows of `observes`, the check is by
+the rows. The judge is given the recorded observations and derives the
+origin of an outcome, the subject lists and the status of each row. A
+record of a subject that no row gives is a mismatch. So is one that fails
+a guard under its row's window and use, with the name of that guard. A
+row that is absent and states `write` is taken on the runtime's word,
+under `observation-read`. A value that an observation names is read by
+its domain and its digest, and without its bytes the replay is
+`incomplete`.
+
 What a source scope's history gives is derived once for each source scope,
 incarnation, head, definition and subject, and kept. Each entry of a
 source is folded once more into a view of that scope, in order, as far as
