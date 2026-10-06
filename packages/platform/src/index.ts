@@ -15,7 +15,7 @@ import { destination, destinationMembership, destinationRulesScope } from "./des
 import { inbox } from "./inbox.ts";
 import { membership, standingOf } from "./membership.ts";
 import { register } from "./register.ts";
-import { directory, directoryMembership } from "./directory.ts";
+import { directory, directoryMembership, directoryRulesScope } from "./directory.ts";
 import type { RecordedRef, Rules, StateView } from "@generalbusiness/artroom-derive";
 import { RULES } from "./rules.ts";
 import { PUBLISH, rulesAnswer, rulesMembership, rulesScope } from "./rules-scope.ts";
@@ -23,7 +23,7 @@ import { PUBLISH, rulesAnswer, rulesMembership, rulesScope } from "./rules-scope
 export { inbox, membership, register, directory, destination };
 export { ACTIONS_MOST, FIRST_ACTIONS, MEMBERSHIP, NO_MEMBER, ROLE_LISTS, ROLE_TABLE, actionsIn, isActions, isHandle, standingOf, type Role } from "./membership.ts";
 export { CREATION_ATTEMPTS, REGISTER, REPOSITORY, directoryIdOf, directorySeed, registerRules, repositoryName } from "./register.ts";
-export { DEFINITION_DOMAIN, DIRECTORY, IMPORT_ATTEMPTS, SEEN, directoryMembership, directoryRules } from "./directory.ts";
+export { DEFINITION_DOMAIN, DIRECTORY, IMPORT_ATTEMPTS, SEEN, directoryMembership, directoryRules, directoryRulesScope } from "./directory.ts";
 export { COLLECT_MOST, DESTINATION, DESTINATION_ATTEMPTS, DESTINATION_KINDS, destinationMembership, destinationRulesScope, destinationReceipt, firstHeadCommit, revokedToken } from "./destination.ts";
 export { foundingObjects, receiptObjects, receiptRef, importRef, type DestinationObject, type DestinationCommit, type ObjectFormat } from "./destination-objects.ts";
 export type { LaneRead } from "./destination.ts";
@@ -99,5 +99,5 @@ export function platform(named: string): Platform | null {
   const name = named.slice(0, cut);
   const data = cut > 0 && named.slice(cut) === "@1" && Object.hasOwn(definitions, name) ? definitions[name] : undefined;
   if (!data) return null;
-  return { data, rules: Object.hasOwn(RULES, name) ? (RULES as Record<string, Rules>)[name]! : {}, ...(data === membership ? { observed: standingOf } : data === rulesScope ? { observed: rulesAnswer, revised: PUBLISH } : {}), ...(data === directory ? { membership: directoryMembership } : data === rulesScope ? { membership: rulesMembership } : data === destination ? { membership: destinationMembership, rulesScope: destinationRulesScope } : {}) };
+  return { data, rules: Object.hasOwn(RULES, name) ? (RULES as Record<string, Rules>)[name]! : {}, ...(data === membership ? { observed: standingOf } : data === rulesScope ? { observed: rulesAnswer, revised: PUBLISH } : {}), ...(data === directory ? { membership: directoryMembership, rulesScope: directoryRulesScope } : data === rulesScope ? { membership: rulesMembership } : data === destination ? { membership: destinationMembership, rulesScope: destinationRulesScope } : {}) };
 }

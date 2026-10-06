@@ -108,6 +108,7 @@ const opens = (kind: "issue" | "pr"): PlatformData["acts"][string] => ({
   fields: kind === "issue"
     ? { ...opening, conditions: { type: "list", of: { type: "text", max: 4096 }, max: 16, required: true } }
     : { ...opening, draft: { type: "bool", required: true } },
+  observes: [{ of: "definitions", window: 300, use: "reuse" }],
   guards: [
     // For `open-pr`: the repository has its destination and its rules scope (case b).
     ...(kind === "pr" ? [{ set: "destination", of: "also.repository" }, { set: "rules", of: "also.repository" }] as const : []),
@@ -264,6 +265,7 @@ export const directory: PlatformData = {
         controller: { type: "member", required: true },
         lane: { type: "scope", kind: "lane", required: true },
       },
+      observes: [{ of: "member", from: { field: "worker" }, max: 1, window: 300, use: "reuse" }],
       // The worker is an active member. For an agent, its controller is the signer, or the signer is an admin. Both from the
       // observation (Code P19).
       guards: [{ code: "worker-standing", row: "P19" }],
@@ -361,6 +363,12 @@ const repositoryOf = (state: Pick<StateView, "page">): Item | null => state.page
 export function directoryMembership(state: Pick<StateView, "page">): ScopeRef | null {
   // The slot's type is a scope of the kind `membership`, which the commit checked when the clause set it.
   const held: unknown = repositoryOf(state)?.refs["membership"];
+  return isScopeRef(held) ? held : null;
+}
+
+/** The rules scope confirmed by this directory's creation result, including its incarnation. */
+export function directoryRulesScope(state: Pick<StateView, "page">): ScopeRef | null {
+  const held: unknown = repositoryOf(state)?.refs["rules"];
   return isScopeRef(held) ? held : null;
 }
 

@@ -130,7 +130,7 @@ test("publish sets the rules when each check's configuration is kept and each ch
   // membership scope that this scope records.
   const elsewhere = { ...membership, scope: directory.scope };
   for (const observed of [[], [checkA], [checkB], [checkA, standing("@bot", 8, { of: elsewhere })]]) {
-    expect(said(publish(r, checks, observed))).toEqual(["unavailable", "dependency-unavailable", null]);
+    expect(said(publish(r, checks, observed))).toEqual(["unavailable", "authority-unavailable", null]);
   }
   // Case a: `not-a-checker`. The role is not `checker`; the member is removed, or unknown; the field names the checker in another
   // membership scope, or in another incarnation of it than the one observed.
@@ -142,7 +142,7 @@ test("publish sets the rules when each check's configuration is kept and each ch
     said(publish(r, checks, [checkA, standing("@bot", 8, { memberState: "unknown", role: null, activeKey: null })])),
     said(publish(r, [check(unit, memberOf("@check", elsewhere))], [checkA])),
     said(publish(r, [check(unit, memberOf("@check", reborn))], [checkA])),
-  ]).toEqual(Array(5).fill(NOT));
+  ]).toEqual([NOT, NOT, NOT, ["refused", "bad-field", null], ["refused", "bad-field", null]]);
   // The rules did not change, and nothing was written.
   expect([r.item(0), r.last.input.type === "act" && r.last.input.signed.intent.kind]).toEqual([before, "keep-configuration"]);
 

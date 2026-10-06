@@ -203,6 +203,7 @@ export const rulesScope: PlatformData = {
         // Optional, with the default false: a `publish` that does not state the declaration withdraws it. That fails closed.
         singleControllerException: { type: "bool", required: false, default: false },
       },
+      observes: [{ of: "member", from: { each: { field: "checks" }, as: "k", value: { element: "k.checker" } }, max: 32, window: 300, use: "reuse" }],
       guards: [
         // Each check's `configuration` is kept.
         {
