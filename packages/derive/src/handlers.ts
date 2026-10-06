@@ -81,6 +81,16 @@ function messageRead(view: StateView, at: ScopeRef, handler: ReceiveType, given:
   return readFields(handler.fields, Object.fromEntries(Object.entries(given).map(([name, v]) => [name, local(own(handler.fields, name), v)])), bounds);
 }
 
+/** Internal evidence failure, not a serialized phase or a guessed count. */
+class UnprovenDecisionBinding extends Error {
+  constructor(texts: ReadonlySet<Digest>) {
+    super(`the decision binding and draw are unproven: original UTF-8 size or reviewed phase evidence is owed for ${[...texts].join(", ")}`);
+  }
+}
+
+/** The verifier may report this private evidence failure as incomplete. */
+export const isUnprovenDecisionBinding = (error: unknown): error is Error => error instanceof UnprovenDecisionBinding;
+
 /**
  * The binding of a recorded deciding entry, reconstructed by the same
  * field and subject checks as its judge. The refusal's code says nothing
@@ -97,8 +107,21 @@ export function decisionBinding(view: StateView, definition: ValidDefinition, en
   const found = bound(definition, input.message, input.from, source?.under);
   if (!scope || !found?.handler || !found.fields || !(found.handler as unknown as PlatformReceive).bound) return null;
   if (!source || !isEntryOf(source.entry, input.from)) throw new RuleFault("a decision binding has no retained source entry");
-  const ready = prepareHandler(view, definition, context, scope, found.handler, found.kind, found.fields, { source, update: null }, { type: "delivery", from: input.from, n: input.n, message: input.message });
+  const unknownSizes = new Set<Digest>();
+  const texts = context.texts ? (digest: Digest) => {
+    const size = context.texts!(digest);
+    if (size === null) unknownSizes.add(digest);
+    return size;
+  } : undefined;
+  const ready = prepareHandler(view, definition, { ...context, texts }, scope, found.handler, found.kind, found.fields, { source, update: null }, { type: "delivery", from: input.from, n: input.n, message: input.message });
   if (ready.result === "unavailable") throw new RuleFault(`a decision binding cannot reconstruct its field and subject checks: ${ready.reason}`);
+  // Owner disposition 4157eaa2: first exhaust structural checks under the
+  // ordinary redaction assumptions. An early failure or no remaining
+  // matching holder proves no draw. Applied/superseded or a named guard
+  // proves the earlier size checks passed. Only a bare bad-field refusal
+  // can still be either an over-max field (no draw) or a later effect
+  // refusal (a draw). No later checkpoint may decide between those.
+  if (ready.result === "ready" && ready.bound !== undefined && unknownSizes.size > 0 && input.decision === "refused" && input.reason?.code === "bad-field" && input.reason.name === undefined) throw new UnprovenDecisionBinding(unknownSizes);
   return ready.result === "ready" && ready.bound !== undefined ? { item: ready.bound, message: found.kind } : null;
 }
 

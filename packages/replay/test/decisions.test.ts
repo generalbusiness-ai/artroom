@@ -1,8 +1,8 @@
 import { expect, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { FieldValue, PlatformData, PlatformDefinition, Request, Seed } from "@generalbusiness/artroom-contract";
-import { canonicalize, factRefOf, intentDigest, newIncarnation, scopeIdOf, signIntent } from "@generalbusiness/artroom-bytes";
-import { checkpointOf, clockOf, judgeCheckpoint, judgeDelivery, judgeGenesis, owed, validateDefinition } from "@generalbusiness/artroom-derive";
+import type { Digest, FieldValue, PlatformData, PlatformDefinition, Request, Seed } from "@generalbusiness/artroom-contract";
+import { canonicalize, factRefOf, intentDigest, newIncarnation, scopeIdOf, signIntent, textDigest, utf8 } from "@generalbusiness/artroom-bytes";
+import { MemoryState, applyEntry, checkpointOf, clockOf, judgeCheckpoint, judgeDelivery, judgeGenesis, owed, stateDigest, validateDefinition } from "@generalbusiness/artroom-derive";
 import { Ledger, T0, arriving, forged, keys, otherLane, t, valid } from "@generalbusiness/artroom-derive/testing";
 import { MemorySource, verify } from "../src/index.ts";
 import type { Rules } from "@generalbusiness/artroom-derive";
@@ -32,11 +32,15 @@ const DATA: PlatformData = {
 
 class Deciding extends Ledger {
   readonly foreign: ReturnType<typeof forged>[] = [];
-  constructor(readonly data: PlatformData = DATA, readonly rules: Rules = {}) {
+  readonly texts = new Map<Digest, string>();
+  readonly sizes = (digest: Digest) => { const text = this.texts.get(digest); return text === undefined ? undefined : utf8(text).length; };
+  override get foldOptions() { return { ...super.foldOptions, platform: { named: NAMED, rules: this.rules }, texts: this.sizes }; }
+  constructor(readonly data: PlatformData = DATA, readonly rules: Rules = {}, memo?: string) {
     super(valid(validateDefinition(data, PROPOSED_BOUNDS, undefined, { platform: true })));
-    const founding = signIntent({ v: 1, to: null, actor: keys.rita.key, kind: "found", on: null, expected: {}, fields: { opener: keys.rita.member }, idempotencyKey: "decisions", notAfter: t(60) }, keys.rita.secret);
+    if (memo !== undefined) this.texts.set(textDigest(memo), memo);
+    const founding = signIntent({ v: 1, to: null, actor: keys.rita.key, kind: "found", on: null, expected: {}, fields: { opener: keys.rita.member, ...(memo === undefined ? {} : { memo: textDigest(memo) }) }, idempotencyKey: "decisions", notAfter: t(60) }, keys.rita.secret);
     const seed: Seed = { v: 1, kind: "directory", definition: NAMED, creator: null, cause: intentDigest(founding.intent), ordinal: 0 };
-    const judged = judgeGenesis(this.state, this.definition, { name: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(6)), seed, founding }, { clock: clockOf(this.state, T0), bounds: PROPOSED_BOUNDS, facts: [], prepared: [], source: null, platform: { named: NAMED, rules: this.rules } });
+    const judged = judgeGenesis(this.state, this.definition, { name: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(6)), seed, founding }, { clock: clockOf(this.state, T0), bounds: PROPOSED_BOUNDS, facts: [], prepared: [], source: null, platform: { named: NAMED, rules: this.rules }, texts: this.sizes });
     if (judged.result !== "write") throw new Error(JSON.stringify(judged));
     this.seal(judged.draft);
   }
@@ -45,13 +49,13 @@ class Deciding extends Ledger {
     const source = forged(otherLane, this.foreign.length + 1, { type: "checkpoint", through: 0, state: this.definition.digest }, [{ n: 0, to: this.at, message: request }]);
     this.foreign.push(source);
     const arrival = { to: this.at, from: factRefOf(source.entry), n: 0, message: request };
-    const judged = judgeDelivery(this.state, this.definition, arrival, { ...arriving(this, arrival, source), platform: { named: NAMED, rules: this.rules } });
+    const judged = judgeDelivery(this.state, this.definition, arrival, { ...arriving(this, arrival, source), platform: { named: NAMED, rules: this.rules }, texts: this.sizes });
     if (judged.result !== "write") throw new Error(JSON.stringify(judged));
     const entry = this.seal(judged.draft);
     return { entry, draft: judged.draft, total: this.entries.length + owed(this.state, this.definition, entry.input) };
   }
   served(): MemoryScope {
-    return { scope: this.at, entries: this.entries.map(({ entry, hash }) => ({ seq: entry.seq, hash, bytes: canonicalize(entry) })), retained: this.entries.flatMap(({ entry }) => entry.uses.map((use) => ({ kind: "entry" as const, digest: use.content, bytes: canonicalize(this.foreign.find((copy) => factRefOf(copy.entry).hash === use.fact.hash)!.entry), under: "lane" }))) };
+    return { scope: this.at, entries: this.entries.map(({ entry, hash }) => ({ seq: entry.seq, hash, bytes: canonicalize(entry) })), retained: [...this.entries.flatMap(({ entry }) => entry.uses.map((use) => ({ kind: "entry" as const, digest: use.content, bytes: canonicalize(this.foreign.find((copy) => factRefOf(copy.entry).hash === use.fact.hash)!.entry), under: "lane" }))), ...[...this.texts].map(([digest, text]) => ({ kind: "text" as const, digest, bytes: canonicalize(text) }))] };
   }
   anchors() { return this.foreign.map(({ entry }) => { const fact = factRefOf(entry); return { scope: fact.at.scope, seq: fact.seq, hash: fact.hash }; }); }
 }
@@ -87,4 +91,59 @@ test("replay and a closing checkpoint preserve the early field refusal and draw 
   scope.seal(checkpoint.draft);
   const replay = await verify(new MemorySource([scope.served()]), { mode: "replay", scope: scope.at.scope, anchors: scope.anchors(), bounds: { ...PROPOSED_BOUNDS, scopeEntries: 5 }, platform: () => ({ data, rules }) });
   expect([replay.report.result, replay.why, guards]).toEqual(["consistent", null, 2]);
+});
+
+/** A larger founding field really holds the text before the smaller stop field reads it. Every receiver entry is judged. */
+function redacted(text: string, decision: "bare" | "named" | "other" | "applied" | "invalid" | "spent" = "bare") {
+  const data = structuredClone(DATA);
+  const memo = { type: "text", max: 16, detached: true } as const;
+  data.items["board"]!.values["memo"] = { fixed: false, required: true, of: memo };
+  data.items["job"]!.values["amount"] = { fixed: false, required: true, default: 0, of: { type: "int", min: 0, max: 1 } };
+  data.acts["found"]!.fields = { ...data.acts["found"]!.fields, memo: { ...memo, required: true } };
+  data.acts["found"]!.effects = [...data.acts["found"]!.effects, { value: { slot: "memo", from: { field: "memo" } } }];
+  data.acts["redact"] = { ...form, step: "transition", on: "board", grant: "redact", guards: [{ state: ["open"] }], effects: [{ redact: { slot: "memo" } }] };
+  data.receives["stop"]!.fields = { note: { type: "text", max: 2, detached: true, required: true }, reject: { type: "bool", required: true } };
+  data.receives["stop"]!.guards = decision === "named" ? [{ code: "decline", row: "P15" }] : decision === "other" ? [{ of: "also.job", equals: { a: { const: true }, b: { const: false } } }] : [];
+  data.receives["stop"]!.effects = [{ code: "effect", row: "P15" }];
+  const rules: Rules = {
+    decline: { place: "guard", refusals: ["late"], run: () => ({ holds: false, name: "late", code: "bad-field" }) },
+    effect: { place: "effect", most: 1, run: ({ resolved }) => resolved.fields["reject"] === true ? [{ effect: "value", item: resolved.subjects.get("also.job")!.id, slot: "amount", value: "wrong" }] : [] },
+  };
+  const scope = new Deciding(data, rules, text);
+  const taking = scope.delivery("start");
+  if (decision === "spent") scope.delivery("stop", { note: textDigest(text), reject: false });
+  const deciding = scope.delivery("stop", { note: textDigest(text), reject: decision === "invalid" ? "wrong" : decision !== "applied" });
+  const count = scope.state.holder(taking.entry.seq);
+  const tombstone = scope.did(keys.rita, "redact", { on: 0, expected: { on: scope.item(0).revision } });
+  expect(tombstone.effects).toEqual([{ effect: "redact", item: 0, slot: "memo", texts: [textDigest(text)] }]);
+  scope.texts.delete(textDigest(text));
+  const checkpoint = judgeCheckpoint(scope.state, scope.definition, checkpointOf(scope.state), { clock: clockOf(scope.state, T0), bounds: PROPOSED_BOUNDS });
+  if (checkpoint.result !== "write") throw new Error(JSON.stringify(checkpoint));
+  scope.seal(checkpoint.draft);
+  return { scope, deciding, taking, tombstone, count, options: { mode: "replay" as const, scope: scope.at.scope, anchors: scope.anchors(), grants: "as-recorded" as const, platform: () => ({ data, rules }) } };
+}
+
+test("erased text leaves the early size refusal and late effect refusal with the same bare code unproven; replay and cold folding stop before the draw", async () => {
+  for (const [text, bound] of [["long", false], ["ok", true]] as const) {
+    const { scope, deciding, taking, count, options } = redacted(text);
+    expect([deciding.entry.input, deciding.draft.bound, count]).toEqual([expect.objectContaining({ decision: "refused", reason: { code: "bad-field" } }), bound ? { item: taking.entry.seq, message: "stop" } : undefined, bound ? null : { decisions: { stop: 1 } }]);
+    const replay = await verify(new MemorySource([scope.served()]), options);
+    expect([replay.report.result, replay.report.at?.seq, replay.report.coverage.find((coverage) => coverage.scope.scope === scope.at.scope)?.through]).toEqual(["incomplete", deciding.entry.seq, deciding.entry.seq - 1]);
+    expect(replay.why).toContain("binding and draw are unproven");
+    const cold = new MemoryState();
+    const inputs = { ...scope.foldOptions, texts: () => null };
+    for (const { entry, hash } of scope.entries.slice(0, deciding.entry.seq)) applyEntry(cold, scope.definition, entry, hash, inputs);
+    const before = stateDigest(cold.all());
+    expect(() => applyEntry(cold, scope.definition, deciding.entry, scope.entries[deciding.entry.seq]!.hash, inputs)).toThrow("binding and draw are unproven");
+    expect([stateDigest(cold.all()), cold.scope()!.head.seq]).toEqual([before, deciding.entry.seq - 1]);
+  }
+});
+
+test("ordinary redacted replay keeps applied, named-guard, definitive early-field and zero-remaining-count cases derivable", async () => {
+  for (const decision of ["applied", "named", "other", "invalid", "spent"] as const) {
+    const { scope, options, count } = redacted("ok", decision);
+    const replay = await verify(new MemorySource([scope.served()]), options);
+    expect([replay.report.result, replay.why, replay.report.coverage.find((coverage) => coverage.scope.scope === scope.at.scope)?.through, count]).toEqual(["consistent", null, scope.head.seq, decision === "invalid" ? { decisions: { stop: 1 } } : null]);
+    expect(replay.report.redacted.length).toBeGreaterThan(0);
+  }
 });
