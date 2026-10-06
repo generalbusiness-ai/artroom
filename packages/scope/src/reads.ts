@@ -163,8 +163,8 @@ export class Reads {
    *
    * The kinds are those that a commit of this scope stores, each under its digest alone: `READABLE`. A snapshot of staged refs is
    * one: the outcome entry that names it stores it in its own commit (`operations.ts`), and a verifier reads it by its digest
-   * before it derives that entry (section 16.4). A `value` is not: it is kept under its domain and its digest, this scope stores
-   * none yet, and no route reads one by its domain (I3 deltas, entry EX6).
+   * before it derives that entry (section 16.4). A `value` is not: it is kept under its domain and its digest, in a table
+   * of its own, and no route reads one by its domain: no text states the route's form for a domain (I3 deltas, entries EX6 and FC7).
    */
   retained(reader: unknown, kind: RetainedInput["kind"], digest: Digest): Read<RetainedInput> {
     const open = this.#open(reader, "retained");

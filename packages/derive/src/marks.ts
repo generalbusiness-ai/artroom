@@ -21,7 +21,7 @@ import { canonicalize, digestBytes, domainBytes, isDigest, isFieldValue, isMembe
 import type { Signer } from "./attribution.ts";
 import type { Own } from "./fields.ts";
 import type { Fetched, GuardResult, Judging } from "./guards.ts";
-import type { Opening } from "./ledger.ts";
+import type { Most, Opening } from "./ledger.ts";
 import type { Item, Operation, StateView } from "./state.ts";
 import { valuePlaces } from "./validate/fields.ts";
 import type { MarkKind, ValidDefinition } from "./validate/index.ts";
@@ -71,17 +71,24 @@ export interface ValueRead { domain: string; digest: Digest; bytes: string }
  * rule reads is not written, and a value that no rule reads is not kept.
  * So an entry of a row whose rules read neither has the bytes it had.
  *
- * I3 merge: the judge of an act is given both and writes `observed`
- * (`judge.ts`). Three things are owed in modules of other steps, and until
- * then a rule that reads either is given none there and its guard is not
- * completed. The judges of a result's delivery and of an outcome build no
- * `AtHand` and write no `observed` (`delivery.ts`, `handlers.ts` and
- * `outcomes.ts`). The scope makes no further read before a turn, reads no
- * `values` from what came beside an intent and keeps no value
- * (`scope/src/core.ts`, with the store). A replay is given the retained
- * value of each place that the pinned data states, and none for a row whose
- * rule holds the domain in its own code (`replay/src/verify.ts`). The I3
- * deltas note, entries EM1 to EM4 and EX4 to EX6, has the lines.
+ * The judge of an act is given both and writes `observed` (`judge.ts`). The
+ * judges of an outcome and of a result's delivery are given the
+ * observations, and write `observed` too (`settle.ts`, `outcomes.ts`,
+ * `delivery.ts` and `handlers.ts`): no value travels beside either. No
+ * other judge is given either, because no other input may hold the member
+ * (section 4.1): a rule that reads one there is given none.
+ *
+ * The scope's runtime reads `values` beside an intent where the pinned data
+ * states a place, and keeps each (`scope/src/core.ts`).
+ *
+ * I3 merge: what is still owed. The runtime makes no further read of an
+ * observation before any turn: no form states the subjects that an entry
+ * observes (the contract's point R1-67; I3 deltas, entries EM2 and FC6). So
+ * in a deployed scope a rule that reads one is given none, and where its
+ * specification says so its guard is not completed. A replay is given the
+ * retained value of each place that the pinned data states, and none for a
+ * row whose rule holds the domain in its own code (`replay/src/verify.ts`;
+ * entries EM1 to EM4 and EX5).
  */
 export interface AtHand {
   readonly observed: readonly ObservationUse[];
@@ -282,17 +289,29 @@ export interface OutcomeGives { effects: readonly RuleEffect[]; sends: readonly 
  * it. `retries`: another attempt is allowed; it is given what every rule
  * is given, with the folded state (revision 19, row I3-35). `holds`: the owner's local
  * guard for a selection; absent, it holds. `wellFormed`: the evidence is
- * well formed; absent, any body is. `derives`: the entry's effects and
+ * well formed; absent, any body is. It is given what every rule is given,
+ * for a body that names what the scope's own records hold. `unknown`: the
+ * body of the evidence of an `unknown` outcome, which the runtime's driver
+ * offers when no answer came; absent, null. `derives`: the entry's effects and
  * requests; absent, none. `closure`: the most entries that the operations
- * which one outcome entry opens reserve (section 17.2, row 5).
+ * which one outcome entry opens reserve (section 17.2, row 5). `most`: the
+ * most that `derives` returns in one outcome entry, with the two effects
+ * of each operation that it opens, where the specification states it. An
+ * outcome that would hold more writes nothing.
  */
 export interface OutcomeRule {
   selects: boolean;
   read: boolean;
   closure?: number;
+  /** The operations that an outcome of this kind opens are reserved by another duty, which the specification counts (`OperationRules.covered`). */
+  covered?: boolean;
+  most?: Most;
+  /** Whether the request of that attempt may be sent now (`OperationRules.ready`). It reads the folded state alone. Absent: it may. */
+  ready?(state: StateView, operation: Operation, attempt: number): boolean;
   retries(result: "refused" | "unknown", operation: Operation, given: RuleGiven): boolean;
   holds?(given: RuleGiven, operation: Operation): boolean;
-  wellFormed?(result: "confirmed" | "refused" | "unknown", evidence: Evidence): boolean;
+  wellFormed?(result: "confirmed" | "refused" | "unknown", evidence: Evidence, given: RuleGiven): boolean;
+  unknown?(state: StateView, operation: Operation, attempt: number, own: Own): unknown;
   derives?(given: RuleGiven, operation: Operation, selected: boolean | null): OutcomeGives;
 }
 

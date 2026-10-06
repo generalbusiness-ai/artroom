@@ -66,7 +66,7 @@ import type { Duty, OperationStatus, Sealed } from "./store.ts";
  */
 export interface Given extends Pick<Ports, "clock" | "random"> {
   genesis(): Extract<Input, { type: "genesis" }> | null;
-  state: Pick<StateView, "page">;
+  state: StateView;
   /** The scope's record: its reference, its head and the time of its previous entry. */
   scope(): ScopeState | null;
 }

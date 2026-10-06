@@ -20,7 +20,8 @@ function written(judgment: { result: string }): void {
   if (judgment.result !== "write") throw new Error(`the fixture history was not written: ${JSON.stringify(judgment)}`);
 }
 
-function histories(): Record<"D" | "P" | "I", Ledger> {
+/** The three ledgers that wrote the good histories, made anew. */
+export function histories(): Record<"D" | "P" | "I", Ledger> {
   const D = founded();
   const ticket = (title: string, mint: number): Ledger => {
     const act = D.did(keys.rita, "open-issue", fields({ title }));

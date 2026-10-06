@@ -49,15 +49,16 @@ export type RuleTable = { readonly [name in PlatformName]?: Rules };
  * The rules that are written: those of the inbox, and the ten of membership
  * that the authority note's table of marks names (revision 24). They are
  * the whole of membership's version, so `platform:membership@1` is
- * runnable (`membership.ts`). The three rules of the rules scope are the
- * whole of its version (`rules-scope.ts`).
+ * runnable (`membership.ts`). The six rules of the rules scope are the
+ * whole of its version (`rules-scope.ts`). The rules of the register and of
+ * the directory are the whole of each version, with the rows of the note's
+ * revision 25 (`register.ts`, `directory.ts`).
  */
 export const RULES: RuleTable = {
   "platform:inbox": inboxRules, "platform:membership": membershipRules,
-  // The register lacks the rule of one mark, `create-repository`, and the directory's data holds three marks that the note's table
-  // does not list (`register.ts`, `directory.ts`). So this table makes neither runnable.
+  // Every mark of the register's data and of the directory's has its rule, so both are runnable.
   "platform:register": registerRules, "platform:directory": directoryRules,
-  // The three rules of the rules scope are the whole of its version, so `platform:rules@1` is runnable (`rules-scope.ts`).
+  // The six rules of the rules scope are the whole of its version, so `platform:rules@1` is runnable (`rules-scope.ts`).
   "platform:rules": rulesScopeRules,
   // The destination's data holds ten marks with no rule: `abort-if-behind`, `resend-due` and the eight rules of its `outcomes`
   // (`destination.ts`). So this table does not make `platform:destination@1` runnable.

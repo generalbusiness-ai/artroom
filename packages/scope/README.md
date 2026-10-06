@@ -153,10 +153,20 @@ reads no grant, and every act that needs one is refused `unauthorized`.
 The deployed class, `DeployedScope`, uses it, in `repositoryAuthority`: a
 membership scope answers the read (`observe`), and a scope whose genesis
 records a membership scope, such as an inbox, is judged on it. A rules
-scope and a destination record theirs in a way that the authority does
-not read yet, and an act there that needs a grant is answered
-`authority-unavailable` (I3 deltas, entry EM21). Nothing in this
-repository deploys the class.
+scope and a destination hold membership's scope ID as a fixed value, and
+no incarnation at first. The authority's first read there asks by the ID
+alone. Guard 1 takes an answer of that ID and of the kind `membership`,
+and the entry that retains it fixes the incarnation. From then on the
+read states the incarnation, and the recorded reference is checked again
+inside the commit (I3 deltas, section 26, entries EM21 and EY7 to EY9).
+Three limits stand. Such a scope accepts no read session before an entry
+of it retains an observation of membership (entry EY12). A scope whose
+entries retain more than one incarnation of that ID records no
+reference, and an act there that needs a grant is answered
+`authority-unavailable` (entry EY9). And no destination exists:
+`platform:destination@1` lacks two rules, so the read of a destination
+has run on no scope object. Nothing in this repository deploys the
+class.
 
 ## A platform definition
 
@@ -205,19 +215,28 @@ the designs, and is no review of this source.
   `unsupported-definition`: transport answers `retry`, and nothing is
   recorded.
 - The platform package holds the data of `platform:register@1` and of
-  `platform:directory@1`, and each rule of the two that can be written.
-  The register lacks the rule of one mark, and the directory's data holds
-  three marks with no rule (`notes/2026-10-05-i3-contract-deltas.md`,
-  entries EJ1, EP6 and EP7, and section 22). So nothing is founded or created under
-  either by the production wiring.
+  `platform:directory@1`, with a rule for every mark of each
+  (`notes/2026-10-05-i3-contract-deltas.md`, section 26). A founding
+  under `platform:register@1` founds a register, by an `install` intent.
+  Its selecting outcome creates the directory, whose genesis creates
+  membership and the rules scope. The creation of the destination is
+  answered `unsupported-definition`: `platform:destination@1` lacks
+  two rules, `first-head` and `receipt`. `test/founding-real.test.ts` shows it on real scopes. The
+  production outside port sends nothing, so under the production wiring
+  no repository is created at a host and a claim stays `pending`.
 - A directory under `platform:directory@1` records its membership
   reference in its slot `repository.membership`. The production authority
-  reads it there, from the scope's own folded state.
+  reads it there, from the scope's own folded state. A rules scope and a
+  destination hold membership's scope ID, and the incarnation of the
+  observations of it that their entries retain: before the first, the
+  authority asks by the ID alone.
 
-The founding makes a scope of the kind `directory`, as every founding
-does. Derive's genesis judge also founds a register, of the kind
-`register`, by an `install` intent under `platform:register`. The scope's
-`found` does not build that seed yet.
+A founding under `platform:register@1` makes a scope of the kind
+`register`, by an `install` intent: the scope's `found` and the Worker
+build the seed's kind from the definition that is named. A founding under
+any other definition makes a directory with no creator, by a `found`
+intent. That earlier founding stays until a repository's founding by its
+register is whole.
 
 ## A child's definition
 
@@ -254,6 +273,7 @@ whose stored bytes are the canonical bytes.
 | `operation` | The outside operations, folded, by the entry that opened each and its ordinal there, with what each still reserves. |
 | `attempt` | One row for each attempt that an entry opened, written with that entry. The driver's bookkeeping is in three columns: `next`, when it looks at the attempt next; `sent`, the time written before its one request left; and `outcome`, the entry that recorded its first outcome. |
 | `retained_input` | What an entry names by digest and does not carry: the definition's declaration, the bytes of each foreign entry in a `uses`, and the input of each rule evaluation. A delivered message, a rule's result and an outcome's evidence are inside the entry that records them. |
+| `retained_value` | Each value that an entry names and that came beside its intent, by its domain and its digest. It is written in the commit of that entry. No route reads it (I3 deltas, entry FC7). |
 
 An entry's row, the fold's changes, its sends and its retained inputs are
 written in one transaction. A transaction that does not commit leaves
@@ -349,7 +369,7 @@ the contract's own answer.
 | Route | Answer | Status |
 |---|---|---|
 | `POST /v1/scopes`, body `{ founding, definition, definitions?, texts? }` | `Founded` | 201 accepted; 422 refused; 503 unavailable |
-| `POST /v1/scopes/:scope/acts`, body `{ signed, grants, texts?, presented? }`. `texts`: each detached text that a field of the intent names by digest. `presented`: the facts presented beside the intent, by name | `Answer` | 200 accepted; 403 refused `unauthorized`; 422 refused otherwise; 409 mismatch; 503 unavailable |
+| `POST /v1/scopes/:scope/acts`, body `{ signed, grants, texts?, presented?, values? }`. `texts`: each detached text that a field of the intent names by digest. `presented`: the facts presented beside the intent, by name. `values`: each value that a place of the act names by digest, as its canonical bytes; only an act of a platform definition whose data states a place has one, and no platform definition of this source states one yet | `Answer` | 200 accepted; 403 refused `unauthorized`; 422 refused otherwise; 409 mismatch; 503 unavailable |
 | `POST /v1/scopes/:scope/preparations`, body `{ signed, grants, capability, step }`. One step of a capability, asked for with the signed intent that it prepares for. With no code for the step, as in production, nothing is judged: 503 `unavailable` | `Answer` | as an act |
 | `POST /v1/scopes/:scope/settle`, body `{ signed }` | `Settlement` | as a read |
 | `GET /v1/scopes/:scope` | The summary | 200; 404 `not-found`; 403 `forbidden`; 409 `wrong-incarnation`, `scope-provisional`; 413 `too-large`; 501 `unsupported-definition`; 503 otherwise |
@@ -359,7 +379,7 @@ the contract's own answer.
 | `GET /v1/scopes/:scope/outbox?cursor=` | A page of the outbox | as above |
 | `GET /v1/scopes/:scope/outbox/:duty` | The outbox status of one send, by its duty ID | as above |
 | `GET /v1/scopes/:scope/log?cursor=` | A page of the history as stored: each entry's canonical bytes and hash, for a verifier | as above |
-| `GET /v1/scopes/:scope/retained/:kind/:digest` | One retained input: a `definition`, an `entry`, a `rule` input, a detached `text` or a `snapshot` of staged refs, by digest. A text that was redacted is `not-found`. A `value` is not served: it is kept by its domain and its digest, and no route names a domain (I3 deltas, entry EX6) | as above; 413 past 1 MiB |
+| `GET /v1/scopes/:scope/retained/:kind/:digest` | One retained input: a `definition`, an `entry`, a `rule` input, a detached `text` or a `snapshot` of staged refs, by digest. A text that was redacted is `not-found`. A `value` is not served: the scope keeps each value that an entry names, by its domain and its digest, and no route names a domain (I3 deltas, entries EX6 and FC7) | as above; 413 past 1 MiB |
 
 A body is at most 1 MiB of bytes, counted while it is read: a larger body
 is cancelled and is not held. A body over that, or one that is not a JSON

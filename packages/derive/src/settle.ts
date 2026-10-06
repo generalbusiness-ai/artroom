@@ -6,13 +6,14 @@
  * is offered again, or is not an input the scope can write.
  */
 
-import type { Attempt, Digest, Entry } from "@generalbusiness/artroom-contract";
-import type { Reading } from "./fields.ts";
+import type { Attempt, Digest, Entry, ObservationUse } from "@generalbusiness/artroom-contract";
+import { useOf, type Reading } from "./fields.ts";
+import type { Fetched } from "./guards.ts";
 import { runClause } from "./handlers.ts";
 import { namesOwn, outcomeOf, recordedOutcome, type OutcomeOffered, type Owners } from "./ledger.ts";
 import { ownersOf } from "./outcomes.ts";
 import type { Judgment } from "./judge.ts";
-import { unjudged, type PlatformRules } from "./marks.ts";
+import { atHand, retainedOf, unjudged, type PlatformRules } from "./marks.ts";
 import { stateDigest, type ScopeState, type StateView } from "./state.ts";
 import { nextDue } from "./timed.ts";
 import { timeMs } from "./time.ts";
@@ -74,7 +75,27 @@ export function judgeDiagnosis(view: StateView, definition: ValidDefinition, dia
  * a platform definition, that definition's rules and the scope's own
  * history, which a rule of an outcome entry is given (section 6.1, place 7).
  */
-export type OutcomeContext = Settling & { owners?: Owners | undefined; platform?: PlatformRules | undefined; own?: Reading["own"] };
+export type OutcomeContext = Settling & {
+  owners?: Owners | undefined; platform?: PlatformRules | undefined; own?: Reading["own"];
+  /**
+   * The further observations at hand for this outcome (sections 4.1 and
+   * 16.1): what the scope read before the turn, each judged by the guards
+   * of an observation before the judge is given it. A verifier gives the
+   * records of the entry's own `observed`. Only a rule of a platform
+   * definition reads one, and the entry retains exactly those that its
+   * rules read. Absent: none is at hand.
+   */
+  observed?: readonly ObservationUse[] | undefined;
+  /**
+   * The foreign entries at hand for this outcome, fetched before the turn,
+   * each already checked against its hash. A rule is given them as the
+   * entries in `uses` (section 6.1, item 4), and the entry names every one
+   * in `uses`, as a written entry names every foreign entry that was
+   * fetched for its input (section 17.3). A verifier gives the retained
+   * copy of each entry that the recorded `uses` name. Absent: none.
+   */
+  facts?: readonly Fetched[] | undefined;
+};
 
 /** `conflict`: the outcome contradicts a recorded `confirmed` or `refused` of the same attempt. It writes nothing, and is answered `outcome-conflict` with the entry it contradicts (section 4.3, item 6). */
 export type OutcomeJudgment = Judgment | { result: "conflict"; seq: number };
@@ -88,7 +109,13 @@ export type OutcomeJudgment = Judgment | { result: "conflict"; seq: number };
  * attempt's record with `selected`, the next attempt when one follows, and
  * what the owner derives. The evidence is carried, and its truth is not
  * judged. An outcome judges no time, so it may be written clamped (section
- * 5.3).
+ * 5.3), unless a rule of it read the clock or the entry retains an
+ * observation.
+ *
+ * In a scope under a platform definition, a rule of the outcome is given
+ * `observed` and the entries in `uses`, as a rule of an act is (section 6.1,
+ * "What a rule is given"). The entry's input holds each observation that a
+ * rule read, and its `uses` each foreign entry at hand.
  */
 export function settleOutcome(view: StateView, definition: ValidDefinition, outcome: OutcomeOffered, context: OutcomeContext): OutcomeJudgment {
   // Section 4.1: an outcome that is offered with another owner or kind than its operation has is `bad-input`, also when it would
@@ -102,10 +129,23 @@ export function settleOutcome(view: StateView, definition: ValidDefinition, outc
   // The owner of the operation may be the platform definition that this scope pins. Its rule for outcome entries of this kind is
   // the one that `outcomes` names. A fault of the rule leaves the outcome not judged, and nothing is written (section 6.1).
   const ran = { clock: false };
-  const judged = unjudged(() => outcomeOf(view, definition, outcome, ownersOf(definition, context.platform, context.owners, { clock: context.clock, bounds: context.bounds, own: context.own, ran })));
-  // An outcome judges no time. An entry for which a rule read the clock does, and is never written clamped (section 6.1).
-  if (judged.result !== "write" || !ran.clock) return judged;
-  return context.clock.behind ? { result: "unavailable", reason: "clock-behind" } : { result: "write", draft: { ...judged.draft, judgesTime: true } };
+  const facts = context.facts ?? [];
+  // Sections 4.1 and 16.1: what a rule of this outcome reads of the observations at hand is noted, and the entry retains it.
+  const beside = context.observed === undefined ? undefined : atHand(context.observed, undefined);
+  const judged = unjudged(() => outcomeOf(view, definition, outcome, ownersOf(definition, context.platform, context.owners, { clock: context.clock, bounds: context.bounds, own: context.own, ran, facts, beside })));
+  if (judged.result !== "write") return judged;
+  const retained = retainedOf(beside).observed;
+  // Section 7.5: one entry names no more foreign entries than the bound. An outcome is never refused, so more at hand than that
+  // leaves it not written: the caller fetched what no entry can hold.
+  if (facts.length > context.bounds.usesPerEntry) return { result: "unavailable", reason: "unavailable" };
+  // An outcome judges no time. An entry for which a rule read the clock does, and so does one that retains an observation,
+  // wherever the observation stands: neither is written clamped (sections 6.1 and 16.1).
+  const judgesTime = ran.clock || retained.length > 0;
+  if (judgesTime && context.clock.behind) return { result: "unavailable", reason: "clock-behind" };
+  // Section 4.1, "An input may retain observations": each one that a rule read, in ascending order of `read.n`, and no member when
+  // none was read. So an outcome whose rules read none has the bytes it had.
+  const input = retained.length > 0 ? { ...judged.draft.input, observed: retained } : judged.draft.input;
+  return { result: "write", draft: { ...judged.draft, input, uses: facts.map((fact) => useOf(fact.fact, fact.entry)), judgesTime } };
 }
 
 /** `settleOutcome`, for a caller that only asks whether the outcome writes an entry: a contradiction is an input that the scope never writes. */

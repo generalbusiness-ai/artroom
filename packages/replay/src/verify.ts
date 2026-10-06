@@ -42,11 +42,12 @@ import type { Bounds, CapabilityName, Digest, Entry, FactRef, Grant, Head, KeyId
 import { canonicalize, definitionDigest, digestBytes, intentDigest, isDigest, isEntry, isObservationUse, isPlatformDefinition, parseStrict, platformName, scopeIdOf, textDigest, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import {
   HOLD, HOLD_KINDS, MISMATCHES, MemoryState, WINDOWS, actionOf, agrees, applyEntry, clockOf, entryOf, headsOf, highestHead, inputTexts, isAncestryCheck, isFactRef, isLocalId, isObject, isScopeRef, judgeAct, judgeCheckpoint, judgeDelivery,
-  judgeDiagnosis, judgeGenesis, judgeGrant, judgeOutcome, judgePreparation, judgeTimed, membershipOf, nextDue, own, ownersOf, placesOf, ruleAt, same, snapshotRead, stepsOf, timeMs, updateOf, validateDefinition, valueDigest, windowOf,
+  judgeDiagnosis, fixedBy, judgeGenesis, judgeGrant, judgeOutcome, judgePreparation, judgeTimed, membershipOf, nextDue, observedOf, own, ownersOf, placesOf, ruleAt, same, snapshotRead, stepsOf, timeMs, updateOf, validateDefinition, valueDigest, windowOf,
 } from "@generalbusiness/artroom-derive";
-import type { ActJudgment, AncestryCheck, Capabilities, Clock, Fetched, Judgment, Owners, PlatformRules, PreparationJudgment, Retains, Rules, StateView, TimedJudgment, ValidDefinition, Window } from "@generalbusiness/artroom-derive";
+import type { ActJudgment, AncestryCheck, Capabilities, Clock, Fetched, Judgment, Owners, PlatformRules, PreparationJudgment, RecordedRef, Retains, Rules, StateView, TimedJudgment, ValidDefinition, Window } from "@generalbusiness/artroom-derive";
 import { RULE_PROFILES, evaluateRules } from "@generalbusiness/artroom-derive/rule";
 import { PAGE_ENTRIES, PAGE_REPLY_BYTES, RETAINED_REPLY_BYTES, hashOfBytes, type HistorySource, type Stored } from "./source.ts";
+import { View } from "./view.ts";
 
 /**
  * The bounds of one traversal (section 9.4). A limit reached is `incomplete`,
@@ -135,11 +136,48 @@ export interface Coded {
    * when that is not its genesis entry (authority note, section 3.3, "Where
    * it records its membership reference"): a pure function of the folded
    * state before the entry that is judged. A directory holds it in a slot.
-   * Null: the scope records none yet. Absent: a scope under this version
-   * records it in its genesis entry (section 6.6).
+   * A rules scope and a destination hold the scope ID, with the incarnation
+   * of the observations of that ID which their earlier entries retain, and
+   * with none before the first (authority note, section 12.1, decided in
+   * revision 25). Null: the scope records none yet. Absent: a scope under
+   * this version records it in its genesis entry (section 6.6).
    */
-  membership?: ((state: StateView) => ScopeRef | null) | undefined;
+  membership?: ((state: StateView) => RecordedRef | null) | undefined;
+  /**
+   * Where a scope under this version records its rules reference: the
+   * rules scope that it observes (section 16.1, guard 1). A destination
+   * holds the scope ID in the value `branch.rules`, with the incarnation
+   * of the observations of that ID which its earlier entries retain
+   * (authority note, section 12.1, the same table). Absent: this replay
+   * has no rule for where such a scope records it, and an entry that
+   * retains an observation of the rules is `unsupported-definition` (I3
+   * deltas, entry EU5).
+   */
+  rulesScope?: ((state: StateView) => RecordedRef | null) | undefined;
 }
+
+/**
+ * A count of the work that a replay does over what it has already checked,
+ * for a caller that wants it: a test counts work here, and never times it
+ * (I3 deltas, section 31). Each member is a number of steps, and a replay
+ * adds to it.
+ *
+ * - `folds`: entries of a source scope that were folded into its view, for
+ *   the values of the observations that other scopes retain of it. Each
+ *   entry of a source is folded there once, so this is at most the entries
+ *   of the sources that were checked.
+ * - `values`: values that the definition of a source scope answered from a
+ *   state of its view. One for each distinct source scope, incarnation,
+ *   head, definition and subject that a replayed entry names.
+ * - `states`: states of a source that were built from its view's log, for
+ *   a head before the one that the view was folded through.
+ * - `runs`: lookups of the run of a retained observation among the runs
+ *   that the scope's earlier entries name. One for each retained
+ *   observation that is not of the run of the entry before it.
+ * - `owed`: lookups of a text that a `redact` effect lists among the texts
+ *   that the scope owes. One for each text that such an effect lists.
+ */
+export interface Tally { folds: number; values: number; states: number; runs: number; owed: number }
 
 /** A report, and in words why its result is not `consistent`. */
 export interface Verification { report: Report; why: string | null }
@@ -226,18 +264,20 @@ interface Run {
   busy: boolean;
   /** How many foreign facts lead to this scope from the target, by the shortest chain that was followed. The target is at 0. */
   depth: number;
-  /** Section 9.3: each detached text whose bytes are not at hand, with the entry that names it. A later tombstone of this scope answers for it. */
-  owed: { text: Digest; at: FactRef }[];
+  /** Section 9.3: each detached text whose bytes are not at hand, with the first entry that names it, in the order of the history. A later tombstone of this scope answers for it. */
+  owed: Map<Digest, FactRef>;
   /** Section 16.1: the latest checked entry that retains each read, by its run and its number, with the observation as that entry retains it. */
   reads: Map<string, Retains>;
-  /** The runs of the retained observations, in the order of the history: each run once, at its first entry. */
-  runs: string[];
+  /** The runs of the retained observations: each run that an entry so far names, and the run of the latest such entry. */
+  runs: { seen: Set<string>; last: string | null };
   /** The answer of the pinned platform definition to an observation read, when the replay was given one. */
   observed: Coded["observed"];
-  /** This scope's state folded through one earlier position, for the value of an observation that another scope retains of it. */
-  viewed: { state: MemoryState; through: number } | null;
+  /** This scope's states at its heads, for the value of an observation that another scope retains of it: each checked entry folded once more, as far as an observation names (`View`). */
+  viewed: View | null;
   /** Where a scope under the pinned platform definition records its membership reference, when the replay was given that. */
   membership: Coded["membership"];
+  /** Where a scope under the pinned platform definition records its rules reference, when the replay was given that. */
+  rulesScope: Coded["rulesScope"];
   /** Section 16.4: the bytes of each snapshot of staged refs that a checked outcome entry names, by digest, each checked against its digest. */
   snapshots: Map<Digest, string>;
 }
@@ -250,12 +290,39 @@ interface Run {
  * through the entry before the one that is judged, as a directory's slot
  * `repository.membership` (I3 deltas, entry EP14). Every other scope: from
  * its genesis entry, the first that the replay checked (section 6.6).
+ *
+ * A rules scope and a destination record the ID with no incarnation until
+ * an entry retains an observation of it. A grant there is judged by guard 1
+ * for such a scope: its observation is of that ID, and the entry fixes the
+ * incarnation (`fixedIn`). That the incarnation is the one that the
+ * directory confirmed, by the directory's history, is not checked here (I3
+ * deltas, entry EY8).
  */
-const recordedMembership = (run: Run): ScopeRef | null => {
+const recordedMembership = (run: Run): RecordedRef | null => {
   if (run.membership) return run.state.scope() ? run.membership(run.state) : null;
   const genesis = run.sealed[0]?.entry.input;
   return genesis?.type === "genesis" && run.at ? membershipOf(genesis, run.at) : null;
 };
+
+/** Each observation that an entry retains: the freshness proof of the one grant of an act or of a preparation, and the records of `observed` of an act, of an outcome and of a delivery of a result (section 4.1). */
+const retainedBy = (input: Entry["input"]): ObservationUse[] => {
+  const proofs: unknown[] = input.type === "act" || input.type === "preparation" ? input.authority.map((grant) => grant.fresh) : [];
+  const further: unknown[] = input.type === "act" || input.type === "outcome" || (input.type === "delivery" && "clause" in input) ? [...(input.observed ?? [])] : [];
+  return [...proofs, ...further].filter(isObservationUse);
+};
+
+/**
+ * A reference with its incarnation, for one entry that is judged: the one
+ * recorded before it, or, while no incarnation is recorded, the `of` of the
+ * first observation of the recorded scope ID that the entry itself retains,
+ * in its grant or in `observed`, which fixes it.
+ */
+const fixedFor = (recorded: RecordedRef | null, input: Entry["input"]): ScopeRef | null => {
+  if (recorded === null || recorded.inc !== null) return recorded as ScopeRef | null;
+  return fixedBy(recorded, retainedBy(input).map((use) => use.observation.of).find((of) => observedOf(of, recorded)) ?? null);
+};
+/** The membership reference, so. */
+const fixedIn = (run: Run, input: Entry["input"]): ScopeRef | null => fixedFor(recordedMembership(run), input);
 
 /**
  * The ancestry record that an outcome entry holds as its evidence (section
@@ -298,10 +365,18 @@ class Verifier {
    * source of commits, so it makes no claim for such a check: once every other check has run, the result is `incomplete`.
    */
   readonly #unwalked: FactRef[] = [];
+  /**
+   * The value of each observation that was derived from the history of its source: what the source's definition answers, by the
+   * exact source scope, incarnation, head, definition and subject. A later entry that names the same is compared with it, and
+   * nothing is derived again. Every entry is still compared: this holds what the history gives, and never that an entry agreed.
+   */
+  readonly #values = new Map<string, unknown>();
+  readonly #tally: Tally;
   #entries = 0;
   #bytes = 0;
 
-  constructor(source: HistorySource, options: Options) {
+  constructor(source: HistorySource, options: Options, tally: Tally = { folds: 0, values: 0, states: 0, runs: 0, owed: 0 }) {
+    this.#tally = tally;
     this.#source = source;
     this.#mode = options.mode;
     this.#target = options.scope;
@@ -380,7 +455,7 @@ class Verifier {
     if (this.#runs.size >= this.#limits.scopes) throw new Stop("incomplete", `the limit of ${this.#limits.scopes} scopes was reached`);
     const got = await this.#page(id, 0);
     if (!got.ok) return null;
-    const run: Run = { id, said: got.page.scope, head: got.page.head, at: null, named: null, definition: null, platform: null, state: new MemoryState(), sealed: [], read: new Map(), next: 0, busy: false, depth: Number.POSITIVE_INFINITY, owed: [], reads: new Map(), runs: [], observed: undefined, viewed: null, membership: undefined, snapshots: new Map() };
+    const run: Run = { id, said: got.page.scope, head: got.page.head, at: null, named: null, definition: null, platform: null, state: new MemoryState(), sealed: [], read: new Map(), next: 0, busy: false, depth: Number.POSITIVE_INFINITY, owed: new Map(), reads: new Map(), runs: { seen: new Set(), last: null }, observed: undefined, viewed: null, membership: undefined, rulesScope: undefined, snapshots: new Map() };
     if (!this.#take(run, 0, got.page.entries, got.page.next)) return null;
     this.#runs.set(id, run);
     return run;
@@ -484,15 +559,15 @@ class Verifier {
    * that would pass the limit ends the replay `incomplete`.
    */
   async #settle(): Promise<void> {
-    const owing = () => [...this.#runs.values()].find((run) => run.owed.length > 0);
+    const owing = () => [...this.#runs.values()].find((run) => run.owed.size > 0);
     for (let run = owing(); run; run = owing()) {
       try {
         await this.#advance(run, run.head.seq, run.depth);
       } catch (error) {
         if (!(error instanceof Gap)) throw error;
       }
-      const owed = run.owed[0];
-      if (owed) throw new Stop("incomplete", `a retained input is missing: the detached text ${owed.text}, which no later entry of ${run.id} redacts`, owed.at);
+      const [owed] = run.owed;
+      if (owed) throw new Stop("incomplete", `a retained input is missing: the detached text ${owed[0]}, which no later entry of ${run.id} redacts`, owed[1]);
     }
   }
 
@@ -646,6 +721,7 @@ class Verifier {
     run.platform = { named, rules: supplied.rules };
     run.observed = supplied.observed;
     run.membership = supplied.membership;
+    run.rulesScope = supplied.rulesScope;
     // Section 9.3, "What it trusts": that the rules which it ran are the rules of that name and version.
     this.#coded.add(named);
     return checked.definition;
@@ -685,18 +761,22 @@ class Verifier {
   }
 
   /**
-   * The state of a checked scope folded through one earlier position: what
-   * it would answer an observation from at that head. The entries are the
-   * checked ones, folded again. A later position goes on from the last one.
+   * The state of a checked scope at one of its heads: what it would answer
+   * an observation from there. The entries are the checked ones, each
+   * folded once more into the scope's view, in order, as far as the highest
+   * head that an observation names. A head before that is read from the
+   * view's log, and no entry is folded again for it (`View`).
    */
-  #viewAt(source: Run, seq: number): MemoryState {
-    if (!source.viewed || source.viewed.through > seq) source.viewed = { state: new MemoryState(), through: -1 };
-    const view = source.viewed;
-    for (; view.through < seq; view.through++) {
+  #viewAt(source: Run, seq: number): StateView {
+    const view = source.viewed ?? (source.viewed = new View());
+    while (view.through < seq) {
       const next = source.sealed[view.through + 1]!;
-      applyEntry(view.state, source.definition!, next.entry, next.hash);
+      view.fold(source.definition!, next.entry, next.hash);
+      this.#tally.folds++;
     }
-    return view.state;
+    const { state, built } = view.at(seq);
+    if (built) this.#tally.states++;
+    return state;
   }
 
   /**
@@ -707,9 +787,11 @@ class Verifier {
    */
   #inRun(run: Run, use: ObservationUse, where: FactRef): void {
     const id = use.read.run;
-    if (run.runs.at(-1) === id) return;
-    if (run.runs.includes(id)) throw new Stop("mismatch", `run-returned: the entry retains an observation of the run ${id}, and an entry of another run lies between it and that run's earlier entries`, where);
-    run.runs.push(id);
+    if (run.runs.last === id) return;
+    this.#tally.runs++;
+    if (run.runs.seen.has(id)) throw new Stop("mismatch", `run-returned: the entry retains an observation of the run ${id}, and an entry of another run lies between it and that run's earlier entries`, where);
+    run.runs.seen.add(id);
+    run.runs.last = id;
   }
 
   /** After an entry is checked: it is the latest entry that retains each of its reads. */
@@ -728,23 +810,37 @@ class Verifier {
    * by an anchor, which covers the entry and leaves the value on trust.
    * Without the history and with no anchor the report is
    * `missing-dependency`.
+   *
+   * What the history of another scope gives is derived once for each exact
+   * source scope, incarnation, head, definition and subject, and kept
+   * (`#values`). The head is proved for every entry, and every retained
+   * observation is compared with the value, whether it was derived for
+   * this entry or for an earlier one (I3 deltas, section 31).
    */
   async #standing(run: Run, entry: Entry, o: ObservationUse["observation"], where: FactRef, depth: number): Promise<void> {
     const mismatch = (why: string): Stop => new Stop("mismatch", why, where);
-    let view: StateView;
-    let answers: Coded["observed"];
+    const asked: ObservationRequest = !("subject" in o) ? { of: o.of, key: o.key } : o.subject === "member" ? { of: o.of, member: o.member } : { of: o.of, asked: o.content.asked };
+    const unanswered = (): Stop => new Stop("unsupported-definition", `the observed scope ${o.of.scope} pins a definition for which this replay has no answer to an observation`, where);
+    let derived: unknown;
     if (o.of.scope === run.id) {
       if (o.head.seq !== entry.seq - 1 || o.head.hash !== entry.prev || o.at !== entry.time) throw mismatch("a membership scope judges its own act on the head before the entry, at the entry's time, and the retained observation states another");
-      [view, answers] = [run.state, run.observed];
+      if (!run.observed) throw unanswered();
+      // The state that this replay holds at the head before the entry. Nothing is folded for it, and each entry names another head.
+      derived = run.observed(run.state, asked);
     } else {
       const fact: FactRef = { at: o.of, seq: o.head.seq, hash: o.head.hash };
       if (await this.#prove(fact, where, depth) === "anchored") return;
       const source = this.#runs.get(o.of.scope)!;
-      [view, answers] = [this.#viewAt(source, o.head.seq), source.observed];
+      if (!source.observed) throw unanswered();
+      // The head is proved: the source has that incarnation, and that hash at that position. So the key names one state and one question.
+      const key = canonicalize([o.of.scope, o.of.inc, o.head.seq, o.head.hash, source.named, asked]);
+      if (this.#values.has(key)) derived = this.#values.get(key);
+      else {
+        derived = source.observed(this.#viewAt(source, o.head.seq), asked);
+        this.#tally.values++;
+        this.#values.set(key, derived);
+      }
     }
-    if (!answers) throw new Stop("unsupported-definition", `the observed scope ${o.of.scope} pins a definition for which this replay has no answer to an observation`, where);
-    const asked: ObservationRequest = !("subject" in o) ? { of: o.of, key: o.key } : o.subject === "member" ? { of: o.of, member: o.member } : { of: o.of, asked: o.content.asked };
-    const derived = answers(view, asked);
     if (!isObject(derived) || canonicalize({ ...derived, at: o.at }) !== canonicalize(o)) throw mismatch(`the retained observation is not what the history of ${o.of.scope} gives ${"key" in asked ? "that key" : "member" in asked ? "that member" : "the rules"} at its entry ${o.head.seq}`);
   }
 
@@ -793,10 +889,11 @@ class Verifier {
   }
 
   /**
-   * The further observations that an act retains in `observed` (sections
-   * 4.1 and 16.1, "The guards, in the commit" and "Replay"), each derived
-   * again from the entry and the earlier entries: guard 1, that it is of
-   * the scope's own membership reference; guard 3, that a ten-second kind
+   * The further observations that an act, an outcome or a delivery of a
+   * result retains in `observed` (sections 4.1 and 16.1, "The guards, in
+   * the commit" and "Replay"), each derived again from the entry and the
+   * earlier entries: guard 1, that it is of the scope's own membership
+   * reference, or of its rules reference; guard 3, that a ten-second kind
    * is `fresh`; guard 4, `fresh` or `reused` as the earlier entries make
    * it, and that the clock has moved; guard 5, the age inside the window;
    * guard 6, that no head goes back; that the runs do not return; and the
@@ -804,23 +901,34 @@ class Verifier {
    * That the entry holds exactly those that its judgment reads is the
    * judge's derivation.
    *
-   * The window is the one of the act's own grant: every row of the
-   * authority note's section 3.3 that states a window for an observation
-   * in an act states that one (I3 deltas, entry EU4). With no window
-   * stated, the entry is a `mismatch`. No form states where a scope
-   * records its rules reference, so an observation of the rules is
-   * `unsupported-definition` (entry EU5). The judges of an outcome and of
-   * a delivery derive no `observed`, so such an entry that holds one is a
-   * `mismatch` at the comparison of its input.
+   * **The window.** No form of platform data states the window of an entry
+   * and a subject (the contract's point R1-67). The authority note's
+   * section 3.3 states each in a table of entries, and the rule here is
+   * read from its rows (I3 deltas, entries EU4 and FC4). For an act: the
+   * window of the act's own grant, which every row for an act states. For
+   * an outcome and for a delivery of a result: ten seconds, and `fresh`,
+   * which both rows of that table state (the outcome of `judge`, and the
+   * delivery of a license result), as the contract's own table of section
+   * 16.1 does. With no window stated, the entry is a `mismatch`.
+   *
+   * **The rules reference.** Where a scope records it is code of its
+   * version (`Coded.rulesScope`). With none, an observation of the rules is
+   * `unsupported-definition` (entry EU5). Its value needs the answer of the
+   * rules scope's version to a read, which no version has yet (entry FB10):
+   * with an anchor for the head it is taken on trust, and without one the
+   * replay is `unsupported-definition` there.
    */
   async #observed(run: Run, entry: Entry, uses: readonly ObservationUse[], window: Window | null, where: FactRef, depth: number): Promise<void> {
     const mismatch = (why: string): Stop => new Stop("mismatch", why, where);
     if (entry.clamped) throw mismatch("an entry that retains an observation judges time, and is never clamped");
-    const membership = recordedMembership(run);
+    const membership = fixedIn(run, entry.input);
     for (const use of uses) {
       const o = use.observation;
-      if ("subject" in o && o.subject === "rules") throw new Stop("unsupported-definition", "the entry retains an observation of the rules, and this replay has no rule for where a scope records its rules reference", where);
-      if (membership === null || !same(o.of, membership)) throw mismatch("a retained observation is not of the membership scope that the scope records, with that incarnation");
+      if ("subject" in o && o.subject === "rules") {
+        if (!run.rulesScope) throw new Stop("unsupported-definition", "the entry retains an observation of the rules, and this replay has no rule for where a scope records its rules reference", where);
+        const rules = fixedFor(run.state.scope() ? run.rulesScope(run.state) : null, entry.input);
+        if (rules === null || !same(o.of, rules)) throw mismatch("a retained observation of the rules is not of the rules scope that the scope records, with that incarnation");
+      } else if (membership === null || !same(o.of, membership)) throw mismatch("a retained observation is not of the membership scope that the scope records, with that incarnation");
       this.#inRun(run, use, where);
       if (window === null) throw mismatch("the entry retains an observation, and no window is stated for it");
       if (window.once && use.use !== "fresh") throw mismatch("observation-reused: an observation of a ten-second kind serves one commit, and the entry retains it as reused");
@@ -950,7 +1058,7 @@ class Verifier {
     for (const text of inputTexts(definition, input, input.type === "delivery" ? facts.find((f) => f.fact.hash === input.from.hash)?.under : undefined)) {
       const size = await this.#text(run, text);
       texts.set(text, size);
-      if (size === null) run.owed.push({ text, at: where });
+      if (size === null && !run.owed.has(text)) run.owed.set(text, where);
     }
     // Section 6.2: a local fact, and a part of one, are read from this scope's own history: the entries checked so far.
     // Section 9.3: a rule of a platform definition is given only what section 6.1 lists. All of it is in the history, in the retained
@@ -1005,7 +1113,7 @@ class Verifier {
           if (!named) throw new Stop("incomplete", `a retained input is not the one named: ${what}, ${place.digest}`, where);
           values.push(kept.bytes);
         }
-        judged = judgeAct(state, definition, input.signed, { ...reading, presented: input.presented, grants: input.authority.map((grant) => ({ grant, current: true })), membership: recordedMembership(run), ...(input.observed ? { observed: input.observed } : {}), ...(values.length > 0 ? { values } : {}) });
+        judged = judgeAct(state, definition, input.signed, { ...reading, presented: input.presented, grants: input.authority.map((grant) => ({ grant, current: true })), membership: fixedIn(run, input), ...(input.observed ? { observed: input.observed } : {}), ...(values.length > 0 ? { values } : {}) });
         break;
       case "delivery": {
         this.#trusts.add("delivered");
@@ -1014,7 +1122,11 @@ class Verifier {
         const to = source?.entry.sends.find((send) => send.n === input.n)?.to;
         if (!source || to === undefined) throw mismatch("the source entry holds no send at that ordinal");
         const origin = input.message.class === "result" && isObject(input.message.of) && isObject(input.message.of.from) ? sealed(input.message.of.from.seq) : null;
-        judged = judgeDelivery(state, definition, { to, from: input.from, n: input.n, message: input.message }, { ...reading, source: { entry: source.entry, under: source.under }, origin });
+        // Sections 4.1 and 16.1: a delivery of a result may retain observations, each of the ten-second kind. Each is derived again,
+        // and the judge is given the recorded ones: its clause's rules read them, and it derives an input with those that were read.
+        const further = "clause" in input ? input.observed : undefined;
+        if (further) await this.#observed(run, entry, further, WINDOWS.once, where, depth);
+        judged = judgeDelivery(state, definition, { to, from: input.from, n: input.n, message: input.message }, { ...reading, source: { entry: source.entry, under: source.under }, origin, ...(further ? { observed: further } : {}) });
         break;
       }
       case "diagnosis":
@@ -1043,7 +1155,7 @@ class Verifier {
         if (needs) await this.#granted(run, entry, grant, { key: input.signed.intent.actor, ...needs }, where, depth);
         this.#trusts.add("dispatched");
         judged = judgePreparation(state, definition, { signed: input.signed, capability, step }, {
-          clock, bounds, steps, own: reading.own, membership: recordedMembership(run),
+          clock, bounds, steps, own: reading.own, membership: fixedIn(run, input),
           granted: (wanted) => (needs !== null && wanted.action === needs.action && wanted.window.seconds === needs.window.seconds && wanted.window.once === needs.window.once ? { result: "granted", grant } : { result: "unavailable" }),
         });
         break;
@@ -1059,10 +1171,14 @@ class Verifier {
         // Section 9.3, point E13, and section 9.4: an outcome entry of an operation whose rules the verifier does not derive is
         // `unsupported-definition` at that entry, and never `consistent`.
         if (!owners?.rules(owner, kind)) throw new Stop("unsupported-definition", `entry ${entry.seq} is an outcome, and this replay has no rules of the owner of its operation`, where);
-        // The judges of an outcome derive no `observed` (I3 deltas, entry EU4): an outcome entry that holds one is not derived.
         this.#trusts.add("outcomes");
         await this.#snapshots(run, input, owners, owner, kind, where);
-        judged = judgeOutcome(state, definition, input, { clock, bounds, owners: this.#owners, platform: run.platform ?? undefined, own: reading.own });
+        // Sections 4.1 and 16.1, "Replay": each observation that the outcome retains, of the ten-second kind, is derived again. The
+        // judge is given the recorded ones and the retained copy of each entry in `uses`, as a rule of the outcome reads them, and
+        // derives an input with the observations that a rule read: one that no rule reads, and one that a rule reads and the entry
+        // lacks, are each a mismatch (I3 deltas, entries EU4 and FC4).
+        if (input.observed) await this.#observed(run, entry, input.observed, WINDOWS.once, where, depth);
+        judged = judgeOutcome(state, definition, input, { clock, bounds, owners: this.#owners, platform: run.platform ?? undefined, own: reading.own, facts, ...(input.observed ? { observed: input.observed } : {}) });
         break;
       }
       case "checkpoint":
@@ -1083,15 +1199,15 @@ class Verifier {
     }
     if (canonicalize(derived) !== bytes) throw mismatch("the recorded entry is not the one derived again");
     applyEntry(state, definition, entry, hash);
-    // Section 16.1: this entry is now the latest that retains each of its reads, in its grant and in `observed`. A preparation retains one in its grant.
-    if (input.type === "act" || input.type === "preparation") this.#retains(run, entry, hash, [...input.authority.map((grant) => grant.fresh as ObservationUse | null).filter((use): use is ObservationUse => use !== null), ...(input.type === "act" ? (input.observed ?? []) : [])]);
+    // Section 16.1: this entry is now the latest that retains each of its reads, in its grant and in `observed`. A preparation retains one in its grant,
+    // and an outcome and a delivery of a result in `observed` alone.
+    this.#retains(run, entry, hash, retainedBy(input));
     // Section 9.3: this entry is the tombstone of each text that its `redact` effects list. The judge derived the list again from
     // what the slot had held. A text that an earlier entry names, and whose bytes are gone, is reported as redacted.
     for (const effect of entry.effects) {
       if (effect.effect !== "redact") continue;
-      const answered = run.owed.filter((owed) => effect.texts.includes(owed.text));
-      if (answered.length === 0) continue;
-      run.owed = run.owed.filter((owed) => !answered.includes(owed));
+      this.#tally.owed += effect.texts.length;
+      if (effect.texts.filter((text) => run.owed.delete(text)).length === 0) continue;
       this.#redacted.push({ tombstone: where, item: effect.item, slot: effect.slot });
       this.#trusts.add("redacted");
     }
@@ -1101,8 +1217,9 @@ class Verifier {
 /**
  * Check the history of `options.scope`, as `source` serves it. Rejects with
  * `SourceError` when that history cannot be read at all. Every other end is
- * a report.
+ * a report. `tally`, when it is given, counts the work of the replay over
+ * what it has already checked (`Tally`).
  */
-export function verify(source: HistorySource, options: Options): Promise<Verification> {
-  return new Verifier(source, options).run();
+export function verify(source: HistorySource, options: Options, tally?: Tally): Promise<Verification> {
+  return new Verifier(source, options, tally).run();
 }

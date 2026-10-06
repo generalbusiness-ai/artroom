@@ -1,7 +1,7 @@
 /**
- * `platform:directory@1`, as data, with its rules (authority note, revision
- * 21, sections 3.8 and 12.1.2; its table of marks, section 12.1.8, rows 7 to
- * 13, a and d). One directory for a repository. It creates the repository's
+ * `platform:directory@1`, as data, with its rules (authority note, sections
+ * 3.8 and 12.1.2; its table of marks, section 12.1.8, rows 7 to 13, a, d, l
+ * and s to u). One directory for a repository. It creates the repository's
  * scopes and its lanes, allocates numbers, and keeps one index row for each
  * lane. It orders no ordinary act of a lane.
  *
@@ -21,23 +21,23 @@
  * | `index-number` | 5, effect | 13 | `index` |
  * | `create-lane` | 6, send | a | `open-issue`, `open-pr` |
  * | `import` | 7, outcome | d | The outcomes of an `import` |
+ * | `import-update` | 7, the send | l | The send of the mark of `import` |
+ * | `create-rules` | 6, send, with `always` | s (P20) | `establish`: the second send |
+ * | `create-destination` | 6, send, with `always` | t (P20) | `establish`: the third send |
+ * | `import-spent` | 4, guard | u (P29) | `retry-import` |
  *
  * `compromised` is data, whole. The three creations of the genesis are held
  * sends of the entry, by the contract's rule for a provisional scope.
  *
- * **Three places that the note's rows state and no form can say, and that
- * its table of marks does not list.** Each is a mark in this data, with the
- * entry of the I3 deltas note as its `row`, and with NO rule in
- * `directoryRules`: the note names none, and none is invented here. So the
- * version lacks three rules, and by the whole-scope rule (the contract's
- * section 6.1) nothing is created under `platform:directory@1` by this
- * package's rules alone. Each stays so until its owner names the rule.
+ * Rows s to u, the selection of `import`, `activeKey` in
+ * `worker-standing` and the second refusal of `definition-active` are of
+ * the note's revision 25 ("The directory, decided in revision 25"), which
+ * was filed for review, and not adopted, when they were written (I3
+ * deltas, section 26). Revision 26 is adopted since, at `f7175296`.
  *
- * | Mark | Place | At | What the row states (deltas entry) |
- * |---|---|---|---|
- * | `create-rules` | 6, send | `establish` | The `create` of the rules scope carries membership's scope ID, which the directory derives from the seed that it sends. No form of a send says it (EP6). |
- * | `create-destination` | 6, send | `establish` | The destination's `create` carries `import` as a truth value, and the scope IDs of membership and of the rules scope, which the directory derives from the seeds that it sends. No form of a send says any of the three (EP6). |
- * | `import-spent` | 4, guard | `retry-import` | "The import's stated attempts are used, and none is `confirmed`." No guard form reads an operation (EP7). |
+ * The data holds no mark that the table does not list, and every mark has
+ * its rule here. So a runtime with this package can run
+ * `platform:directory@1`.
  *
  * The two send marks of the genesis both state `always`: the scope
  * contract's revision 19 lets a written list hold several marks when at
@@ -46,8 +46,8 @@
  * rule gives its request in every genesis, so the three creations are at
  * the positions of their forms. The contract states the form. The names of
  * the two rules, and how each derives its request, are the authority
- * note's next revision's (the contract's section 15.8, the row "From
- * revision 19"), so neither rule is written here.
+ * note's revision 25's (its section 12.1.2, "The two creation rules of the
+ * genesis").
  *
  * One more thing cannot be written, and no mark can stand for it. The
  * register's `create` carries `founding`, the founder's signed intent. No
@@ -61,8 +61,8 @@
  * plan owns. They are written as the note has them.
  */
 
-import type { Digest, FactRef, FieldValue, Grant, MemberObservation, MemberRef, PlatformData, RulesObservation, ScopeRef, Seed } from "@generalbusiness/artroom-contract";
-import { intentDigest, isDigest } from "@generalbusiness/artroom-bytes";
+import type { Digest, FactRef, FieldValue, Grant, MemberObservation, MemberRef, PlatformData, RulesObservation, ScopeId, ScopeRef, Seed } from "@generalbusiness/artroom-contract";
+import { intentDigest, isDigest, scopeIdOf, seedDigest } from "@generalbusiness/artroom-bytes";
 import { PROFILES, isObject, isScopeRef, same, validateDefinition, type Item, type Operation, type RuleEffect, type RuleGiven, type Rules, type StateView } from "@generalbusiness/artroom-derive";
 import { CREATION_ATTEMPTS, DIRECTORY, REPOSITORY } from "./register.ts";
 
@@ -238,16 +238,16 @@ export const directory: PlatformData = {
           },
         },
         // The rules scope's creation: `branch`, `directory` and `membership`, which is membership's scope ID. No form of a send says
-        // the third, and the contract adds no operand for it: the rule of a send mark gives it (entry EP6; the contract's revision
-        // 19, section 6.1). The mark states `always`: every genesis creates the rules scope. Its clauses are data.
-        // I3 merge: this mark has no rule, until the authority note's rows name it and state its derivation.
-        { code: "create-rules", row: "EP6", always: true, result: { applied: [{ ref: { slot: "rules", from: { sender: true } } }] } },
+        // the third, and the contract adds no operand for it: the rule of a send mark gives it (row s of the table of marks, key
+        // P20; the contract's revision 19, section 6.1). The mark states `always`: every genesis creates the rules scope. Its
+        // clauses are data.
+        { code: "create-rules", row: "P20", always: true, result: { applied: [{ ref: { slot: "rules", from: { sender: true } } }] } },
         // The destination's creation: `repository`, `branch`, `import`, `claim`, `directory`, `membership` and `rules`. Three of
-        // them no form of a send says, and the table of marks lists no rule for the send (entry EP6). Its clauses are data. When
-        // `import` is set, the entry that records its applied result opens the operation `import` (Code P16, row 7). The mark
-        // states `always`, as the other does, so the list holds two marks and each creation is at the position of its form.
-        // I3 merge: this mark has no rule, until the authority note's rows name it and state its derivation.
-        { code: "create-destination", row: "EP6", always: true, result: { applied: [{ ref: { slot: "destination", from: { sender: true } } }, { code: "open-import", row: "P16" }] } },
+        // them no form of a send says: the rule of the send mark gives the request (row t of the table of marks, key P20). Its
+        // clauses are data. When `import` is set, the entry that records its applied result opens the operation `import` (Code
+        // P16, row 7). The mark states `always`, as the other does, so the list holds two marks and each creation is at the
+        // position of its form.
+        { code: "create-destination", row: "P20", always: true, result: { applied: [{ ref: { slot: "destination", from: { sender: true } } }, { code: "open-import", row: "P16" }] } },
       ],
       attention: [],
     },
@@ -286,10 +286,9 @@ export const directory: PlatformData = {
       step: "transition", on: "repository", grant: "ledger.retry",
       also: {},
       fields: {},
-      // "The import's stated attempts are used, and none is `confirmed`." No guard form reads an operation, and the table of marks
-      // lists no rule for the guard (I3 deltas, entry EP7).
-      // I3 merge: this mark has no rule until that entry is answered.
-      guards: [{ code: "import-spent", row: "EP7" }],
+      // "The import's stated attempts are used, and none is `confirmed`." No guard form reads an operation: the guard is a rule
+      // (row u of the table of marks, key P29).
+      guards: [{ code: "import-spent", row: "P29" }],
       effects: [{ code: "reopen-import", row: "P16" }],
       sends: [],
       attention: [],
@@ -340,8 +339,9 @@ export const directory: PlatformData = {
   },
   timed: {},
   rules: {},
-  // The operation kind that this definition owns, with the mark of the rule for its outcome entries (row d of the further marks).
-  outcomes: { import: { code: "import", row: "P16" } },
+  // The operation kind that this definition owns, with the mark of the rule for its outcome entries (row d of the further marks),
+  // and its `send`: the update `import` to the destination (row l). Its clauses are empty.
+  outcomes: { import: { code: "import", row: "P16", send: { code: "import-update", row: "P16", result: {} } } },
 };
 
 // ---------------------------------------------------------------- reading the directory's state
@@ -393,6 +393,24 @@ const repositoryAt = (given: RuleGiven): Item => {
   if (!repository) throw new Error("a directory has its repository item");
   return repository;
 };
+
+/**
+ * The seed of one scope that the genesis creates beside the two others
+ * (section 12.1.2, "The two creation rules of the genesis"): `creator` is
+ * this scope's own reference, with its incarnation; `cause` is the digest
+ * of this scope's own seed, the contract's third cause; and `ordinal`
+ * counts the creations of the entry from 0: membership 0, rules 1,
+ * destination 2. The seed of membership that a rule builds is the one that
+ * the judge builds for the written `create` of the same entry: both use the
+ * ordinal 0 and the same `creator` and `cause`.
+ */
+const SIBLINGS = { membership: 0, rules: 1, destination: 2 } as const;
+const sibling = ({ input, resolved }: RuleGiven, kind: keyof typeof SIBLINGS): Seed => {
+  if (input.type !== "genesis") throw new Error("a sibling is a scope that the genesis creates");
+  return { v: 1, kind, definition: `platform:${kind}@1`, creator: resolved.at, cause: seedDigest(input.seed), ordinal: SIBLINGS[kind] };
+};
+/** A sibling's scope ID: the contract's `ScopeId` of the sibling's seed, the text `sc_` and the 52 base32 characters of the seed's digest. It is not the bare digest. */
+const siblingId = (given: RuleGiven, kind: keyof typeof SIBLINGS): ScopeId => scopeIdOf(sibling(given, kind));
 
 /** The effects that open one operation of this definition in the entry being written, at ordinal 0, with its attempt 1. */
 const opened = (kind: string, attempts: number): RuleEffect[] => [
@@ -464,15 +482,24 @@ export const directoryRules: Rules = {
    * in that observation, and the bytes of the definition and of each
    * definition of its closure are at hand and validate. `not-activated`: the
    * digest is not `active` there, whether it never was or is `retired`.
+   *
+   * `unsupported-definition`, with that name, as the note's revision 25
+   * decides it (section 12.1.2, "The refusals of `definition-active`"; I3
+   * delta EP15): the bytes of the definition, or of one of its closure, hash
+   * to their digest and do not validate in this runtime; or the closure
+   * names more definitions than the bound. It does not pass with time, so
+   * the signer is not told to send the act again.
+   *
    * Not completed, `dependency-unavailable`: the entry would lack the
    * observation, which must be of the rules scope that `repository.rules`
-   * names; or it would lack the bytes of one definition, or bytes that this
-   * runtime validates (section 12.1.2, "Activation and the creator's read").
+   * names; or it would lack the bytes of one definition (section 12.1.2,
+   * "Activation and the creator's read").
    */
   "definition-active": {
-    place: "guard", refusals: ["not-activated"],
+    place: "guard", refusals: ["not-activated", "unsupported-definition"],
     run: (given) => {
       const unavailable = { holds: null, reason: "dependency-unavailable" } as const;
+      const unsupported = { holds: false, name: "unsupported-definition", code: "unsupported-definition" } as const;
       const digest = given.resolved.fields["definition"];
       const rules: unknown = repositoryAt(given).refs["rules"];
       const observation = given.observed({ asked: "definitions" })?.observation as RulesObservation | undefined;
@@ -483,10 +510,14 @@ export const directoryRules: Rules = {
       for (const queue: Digest[] = [digest]; queue.length > 0;) {
         const next = queue.shift()!;
         if (read.has(next)) continue;
-        if (read.size > bounds.namedDefinitions) return unavailable;
+        if (read.size > bounds.namedDefinitions) return unsupported;
         read.add(next);
-        const checked = validateDefinition(given.value(DEFINITION_DOMAIN, next, bounds.definitionBytes), bounds, PROFILES);
-        if (!checked.ok || checked.definition.digest !== next) return unavailable;
+        // A value is at hand only when its bytes hash to the digest in the domain. Without one, the bytes cannot be read now.
+        const bytes = given.value(DEFINITION_DOMAIN, next, bounds.definitionBytes);
+        if (bytes === undefined) return unavailable;
+        const checked = validateDefinition(bytes, bounds, PROFILES);
+        if (!checked.ok) return unsupported;
+        if (checked.definition.digest !== next) return unavailable;
         queue.push(...namedIn(checked.definition.declared));
       }
       return { holds: true };
@@ -496,11 +527,13 @@ export const directoryRules: Rules = {
    * Row 10, among the guards of `open-task` (P19). It reads the
    * `MemberObservation` of the worker, which the entry retains, and the
    * grant that was judged. It holds when the worker is an active member of
-   * this repository's membership scope and, for an agent, its controller is
-   * the signer or the signer's role is `admin`. An agent is a member whose
+   * this repository's membership scope, with an active key, and, for an
+   * agent, its controller is the signer or the signer's role is `admin`. An agent is a member whose
    * observation has a controller (section 3.3, entry ED6). Otherwise
    * `worker-not-active`. Not completed, `dependency-unavailable`, when the
-   * entry would lack the observation (I3 deltas, entry EP11).
+   * entry would lack the observation, or holds one of another scope than
+   * `repository.membership` (I3 deltas, entry EP11, as the note's revision
+   * 25 confirms it, with `activeKey` added).
    */
   "worker-standing": {
     place: "guard", refusals: ["worker-not-active"],
@@ -512,7 +545,8 @@ export const directoryRules: Rules = {
       if (!worker || !grant || !membership || !same(worker.membership, membership)) return refused;
       const observation = given.observed({ member: worker.member })?.observation as MemberObservation | undefined;
       if (!observation || !same(observation.of, membership)) return { holds: null, reason: "dependency-unavailable" };
-      if (observation.memberState !== "active") return refused;
+      // Revision 25 (I3 delta EP11): a member whose last key is revoked cannot work (section 3.5, rule 5). So `activeKey` is read.
+      if (observation.memberState !== "active" || observation.activeKey !== true) return refused;
       // The signer's role is in the observation that the grant was judged on (section 3.3). A grant that holds none shows no role.
       const judgedOn: unknown = (grant.fresh as Grant["fresh"] | null)?.observation;
       const admin = isObject(judgedOn) && judgedOn["role"] === "admin";
@@ -524,6 +558,45 @@ export const directoryRules: Rules = {
    * effect, `import`, with 1 attempt, and its attempt 1 (G3).
    */
   "reopen-import": { place: "effect", most: 2, run: () => opened("import", 1) },
+  /**
+   * Row u, the one guard of `retry-import` (P29), as the note's revision 25
+   * decides it (section 12.1.2, "The guard of `retry-import`"; I3 delta
+   * EP7). It reads the `import` operations of this scope and their
+   * attempts, `repository.import` and `repository.imported`.
+   *
+   * It holds when `repository.import` is set; `repository.imported` is
+   * unset; at least one `import` operation exists; and every attempt that
+   * each `import` operation states is opened and has an outcome. An attempt
+   * whose outcome is `unknown` is used: its request was sent, and its
+   * outcome is recorded. Otherwise `import-not-spent`. It is never not
+   * completed: it reads this scope's own state only.
+   *
+   * The folded state has no read of the operations of one kind, so the rule
+   * walks the scope's own entries for the `operation` effects of the kind.
+   * A bound or an index for that read is asked of the proof plan. An entry
+   * that cannot be read leaves the guard not holding.
+   */
+  "import-spent": {
+    place: "guard", refusals: ["import-not-spent"],
+    run: ({ state, own }) => {
+      const refused = { holds: false, name: "import-not-spent" } as const;
+      const repository = repositoryOf(state);
+      const head = state.scope()?.head.seq;
+      if (!repository || head === undefined || typeof repository.values["import"] !== "string" || (repository.values["imported"] ?? null) !== null) return refused;
+      let imports = 0;
+      for (let seq = 0; seq <= head; seq++) {
+        const entry = own(seq)?.entry;
+        if (!entry) return refused;
+        for (const effect of entry.effects) {
+          if (effect.effect !== "operation" || effect.owner !== DIRECTORY || effect.kind !== "import") continue;
+          const operation = state.operation(`${seq}:${effect.k}`);
+          if (!operation || operation.attempts.length < operation.most || operation.attempts.some((attempt) => attempt.outcomes.length === 0)) return refused;
+          imports++;
+        }
+      }
+      return imports > 0 ? { holds: true } : refused;
+    },
+  },
   /**
    * Row 12, among the effects of `index` (P15). It reads the `lane` items
    * and the delivery's `from`. When no row's `scope` is the sender: one
@@ -626,39 +699,105 @@ export const directoryRules: Rules = {
     },
   },
   /**
-   * Row d, for the outcomes of `import` (P16). Basis `own-answer`: the
-   * copy's own answer, with the imported head. No read is decisive, and it
-   * selects nothing. Another attempt follows a `refused` or an `unknown`
-   * while the stated number allows.
+   * Row s, the second send of `establish` (P20), as the note's revision 25
+   * states it (section 12.1.2, "The two creation rules of the genesis").
+   * Exactly one request, in every genesis: the `create` of the rules scope,
+   * to the seed of creation 1. Its fields: `branch`, the field; `directory`,
+   * this scope's own reference; and `membership`, the scope ID of the
+   * sibling of creation 0.
    *
-   * `confirmed`: sets `imported`, and sends the destination the update
-   * `import`, state `done`, with `commit`. The last `refused`: the same
-   * update, state `failed`. "The last" is the one after which every stated
-   * attempt is opened and refused, so that no answer can still confirm the
-   * import (I3 deltas, entry EP9). The update is of the `repository` item,
-   * to the scope that `repository.destination` names. Its result runs no
-   * clause: the row states none (entry EJ1).
+   * The body holds no member `membership`: at its genesis the directory
+   * records none, and the field holds the ID. The body is the one that the
+   * judge builds for the written `create` of membership in the same entry,
+   * which is `{ fields }` (I3 deltas, entry EY3).
+   */
+  "create-rules": {
+    place: "send",
+    run: (given) => ({ to: sibling(given, "rules"), message: { class: "request", type: "create", body: { fields: { branch: given.resolved.fields["branch"], directory: given.resolved.at, membership: siblingId(given, "membership") } } } }),
+  },
+  /**
+   * Row t, the third send of `establish` (P20), as the note's revision 25
+   * states it. Exactly one request, in every genesis: the `create` of the
+   * destination, to the seed of creation 2. Its seven fields: `repository`,
+   * `branch` and `claim`, each the field; `import`, a truth value, true when
+   * the creation's field `import` is present; `directory`, this scope's own
+   * reference; `membership`, the scope ID of the sibling of creation 0; and
+   * `rules`, the scope ID of the sibling of creation 1. The body holds no
+   * member `membership`, as for `create-rules`.
+   */
+  "create-destination": {
+    place: "send",
+    run: (given) => {
+      const { fields, at } = given.resolved;
+      return {
+        to: sibling(given, "destination"),
+        message: {
+          class: "request", type: "create",
+          body: { fields: { repository: fields["repository"], branch: fields["branch"], import: fields["import"] !== undefined, claim: fields["claim"], directory: at, membership: siblingId(given, "membership"), rules: siblingId(given, "rules") } },
+        },
+      };
+    },
+  },
+  /**
+   * Row d, for the outcomes of `import` (P16), as the note's revision 25
+   * decides them (section 12.1.2, "The outcomes of `import`"; I3 delta EP9).
+   *
+   * - The kind selects one result. The owner's local guard:
+   *   `repository.imported` is unset. So one import is used, also when a
+   *   late answer or a retried operation is `confirmed` after another.
+   * - A read is never decisive. Another attempt follows a `refused` or an
+   *   `unknown`, while the stated number allows and nothing is selected.
+   * - The evidence. `confirmed`, basis `own-answer`: `{ commit }`, a commit
+   *   ID of 40 or 64 hexadecimal characters, the imported head. `refused`
+   *   and `unknown`: an empty record. Any other body is `bad-input`.
+   * - When `selected`: one `value` effect, `repository.imported` is the
+   *   commit. The update to the destination is the request of the mark's
+   *   `send`, the rule `import-update`.
+   * - A `confirmed` outcome that is not selected derives nothing and sends
+   *   nothing.
+   * - `most`: 1 effect, and the one request.
    */
   import: {
     place: "outcome",
     rules: {
-      selects: false, read: false,
+      selects: true, read: false, most: { effects: 1, requests: 1, operations: 0 },
       retries: () => true,
-      wellFormed: (result, evidence) => result !== "confirmed" || importedHead(evidence.body) !== null,
-      derives: (given, operation) => {
-        const input = given.input;
+      holds: (given) => { const repository = repositoryOf(given.state); return repository !== null && (repository.values["imported"] ?? null) === null; },
+      wellFormed: (result, evidence) => (result === "confirmed" ? importedHead(evidence.body) !== null : isObject(evidence.body) && Object.keys(evidence.body).length === 0),
+      unknown: () => ({}),
+      derives: (given, _operation, selected) => {
         const repository = repositoryOf(given.state);
-        const destination: unknown = repository?.refs["destination"];
-        if (input.type !== "outcome" || !repository || !isScopeRef(destination)) throw new Error("an import is of a directory that holds its destination");
-        const update = (state: "done" | "failed", detail: Record<string, FieldValue>) =>
-          ({ to: destination, message: { class: "request", type: "relate", body: { name: "import", item: { at: given.resolved.at, seq: repository.id, hash: repository.opened }, state, detail } } }) as const;
-        if (input.result === "confirmed") {
-          const commit = importedHead(input.evidence.body)!;
-          return { effects: [{ effect: "value", item: repository.id, slot: "imported", value: commit }], sends: [update("done", { commit })], opens: [] };
-        }
-        const last = input.result === "refused" && spent(operation, { attempt: input.attempt });
-        return { effects: [], sends: last ? [update("failed", {})] : [], opens: [] };
+        if (given.input.type !== "outcome" || !repository) throw new Error("an import is of a directory that holds its repository item");
+        return { effects: selected === true ? [{ effect: "value", item: repository.id, slot: "imported", value: importedHead(given.input.evidence.body)! }] : [], sends: [], opens: [] };
       },
+    },
+  },
+  /**
+   * Row l, the `send` of the mark of `import` (P16): the `relate`, `import`,
+   * of the `repository` item, to the scope that `repository.destination`
+   * names. Its clauses are empty.
+   *
+   * On the selecting outcome: state `done`, with the detail `commit`. That
+   * is a `confirmed` outcome of an operation that has selected nothing,
+   * while `repository.imported` is unset: the judgment that the ledger makes
+   * of `selected`, on the same state. On the last `refused`: state `failed`,
+   * with no detail. "The last" is the `refused` outcome after which every
+   * attempt that the operation states is opened and each has a `refused`
+   * outcome. An `unknown` attempt keeps the operation open, and no `failed`
+   * is sent for it. Otherwise no request.
+   */
+  "import-update": {
+    place: "send",
+    run: (given) => {
+      const input = given.input;
+      const repository = repositoryOf(given.state);
+      const destination: unknown = repository?.refs["destination"];
+      const operation = input.type === "outcome" ? given.state.operation(input.operation) : null;
+      if (input.type !== "outcome" || !operation || !repository || !isScopeRef(destination)) throw new Error("an import is of a directory that holds its destination");
+      const update = (state: "done" | "failed", detail: Record<string, FieldValue>) =>
+        ({ to: destination, message: { class: "request", type: "relate", body: { name: "import", item: { at: given.resolved.at, seq: repository.id, hash: repository.opened }, state, detail } } }) as const;
+      if (input.result === "confirmed") return operation.selected === null && (repository.values["imported"] ?? null) === null ? update("done", { commit: importedHead(input.evidence.body)! }) : null;
+      return input.result === "refused" && spent(operation, { attempt: input.attempt }) ? update("failed", {}) : null;
     },
   },
 };

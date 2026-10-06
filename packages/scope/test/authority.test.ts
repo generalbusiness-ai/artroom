@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import type { Entry, KeyId, Observation, ObservationUse } from "@generalbusiness/artroom-contract";
+import type { Entry, KeyId, Observation, ObservationUse, ScopeRef } from "@generalbusiness/artroom-contract";
 import { WINDOWS, agrees } from "@generalbusiness/artroom-derive";
 import { d, membership } from "@generalbusiness/artroom-derive/testing";
 import { HOLD, at, definition, found, rita, una, type Lane } from "./support.ts";
@@ -21,7 +21,9 @@ function scripted(s: Lane) {
     answers: (asked): Omit<Observation, "at"> | null => {
       // The read of this scope asks the standing of one key, and no other form of the request.
       if (!("key" in asked)) return null;
-      const { of, key } = asked;
+      // The scopes of this test record their membership reference with its incarnation, so the read states it.
+      const { key } = asked;
+      const of = asked.of as ScopeRef;
       m.reads++;
       const who = [rita, una].find((actor) => actor.key === key);
       if (m.silent || !who) return null;

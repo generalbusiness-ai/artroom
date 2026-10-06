@@ -20,7 +20,7 @@ The library runs under Node and under Workers.
 | Module | Holds |
 |---|---|
 | `source` | `HistorySource`: what a verifier reads. `page(scope, from, allow)`: a page of a scope's entries, each as its canonical bytes with the hash the source gives for it. `retained(scope, kind, digest, allow)`: one retained input. `allow` is the most the read may take in, and each result says how many raw bytes it read. `httpSource(service, options?)`: a source over a scope service's read routes. `MemorySource`: a source over histories in memory. `hashOfBytes`. `PAGE_REPLY_BYTES`, `RETAINED_REPLY_BYTES`, `PAGE_ENTRIES`, `READ_SECONDS`. |
-| `verify` | `verify(source, options)`: a `Verification`, which is the report and, in words, what was found. `Options`: the mode, the target scope ID, a known head, anchors, limits, bounds, `capabilities`: the rules of the capability versions the caller has code for; and `platform`: the data and the rules of the platform definitions the caller has code for, by name and version. This package has none of its own. A history under a platform definition is derived with those rules, and the report then lists `platformCode(named)` under `trusts`. `LIMITS`, `TRUSTS`, `SourceError`. |
+| `verify` | `verify(source, options, tally?)`: a `Verification`, which is the report and, in words, what was found. `tally`, a `Tally`, when it is given, counts the work of the replay over what it has already checked: a test counts work with it, and never times it. `Options`: the mode, the target scope ID, a known head, anchors, limits, bounds, `capabilities`: the rules of the capability versions the caller has code for; and `platform`: the data and the rules of the platform definitions the caller has code for, by name and version. This package has none of its own. A history under a platform definition is derived with those rules, and the report then lists `platformCode(named)` under `trusts`. `LIMITS`, `TRUSTS`, `SourceError`. |
 | `report` | `Report`, the contract's type, and `render(report, why?)`: the report in plain English. |
 | `cli` | `main(argv, io)`: the command, with no process state. `src/bin.ts` runs it under Node. |
 
@@ -124,6 +124,14 @@ is not lower than an earlier one, and its value is what the observed
 scope's history gives at that head. An observation of the rules is
 `unsupported-definition`: nothing states yet where a scope records its
 rules reference.
+
+What a source scope's history gives is derived once for each source scope,
+incarnation, head, definition and subject, and kept. Each entry of a
+source is folded once more into a view of that scope, in order, as far as
+the highest head that an observation names. The state at an earlier head
+is read from the view's log of writes, and no entry is folded again. Every
+entry that retains an observation is compared with the value, whether it
+was derived for that entry or for an earlier one.
 
 A detached text is a retained input. The verifier asks for each text that
 an entry's input names and checks it against its digest. A text whose
