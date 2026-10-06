@@ -22,7 +22,7 @@ export function manifestAuthors(entry: Entry): MemberId[] {
 }
 
 /** Read the statement from its retained entries, and compare each listed check against the currently observed rules. Nothing is fetched here. */
-export function readLane(given: Pick<RuleGiven, "uses">, statement: Statement, rules: RulesObservation | null): LaneRead | null {
+export function readLane(given: Pick<RuleGiven, "uses" | "observed">, statement: Statement, rules: RulesObservation | null): LaneRead | null {
   const [merge, manifest] = [of(given, statement.operation), of(given, statement.manifest)];
   const [merged, proposed] = [fields(merge, "merge"), fields(manifest, "propose-manifest")];
   if (!manifest || !merged || !proposed) return null;
@@ -46,9 +46,17 @@ export function readLane(given: Pick<RuleGiven, "uses">, statement: Statement, r
       const sound = !!opened && opened["manifest"] === statement.manifest.seq && opened["name"] === job.name && storedTree?.effect === "value" && storedTree.value === tree;
       const states = deciding?.effects.filter((effect) => effect.effect === "state" && effect.state === "passed") ?? [];
       const grant = deciding?.input.type === "act" ? deciding.input.authority.find((authority) => authority.actions.includes("change.check")) : undefined;
+      const key = actor(deciding);
+      const counted = required !== undefined && job.state === "passed" && statement.jobs.filter((listed) => listed.name === job.name).length === 1;
+      const observed = counted && key !== null ? given.observed({ key })?.observation : null;
+      // The rules answer projects its checker to a MemberId. The destination's current key observation supplies the full
+      // membership reference, including its incarnation; the historical signing subject and grant must both name that member.
+      const checker = required && observed && !("subject" in observed) && observed.key === key && observed.member === required.checker ? { membership: observed.of, member: required.checker } : null;
       const proved = !!decided && !!required && decided["job"] === job.job.seq && decided["tree"] === tree && decided["configuration"] === assigned && decided["outcome"] === "passed"
-        && states.length === 1 && states[0]?.effect === "state" && states[0].item === job.job.seq && same(signer(deciding), required.checker) && !!grant && grant.fresh !== null && !("subject" in grant.fresh.observation) && grant.fresh.observation.key === actor(deciding)
-        && grant.fresh.observation.actions.includes("change.check") && isMemberRef(grant.subject) && same(grant.subject, required.checker);
+        && states.length === 1 && states[0]?.effect === "state" && states[0].item === job.job.seq && checker !== null && same(signer(deciding), checker)
+        && !!grant && grant.key === key && grant.fresh !== null && !("subject" in grant.fresh.observation) && grant.fresh.observation.key === key
+        && grant.fresh.observation.actions.includes("change.check") && grant.fresh.observation.member === required.checker && same(grant.fresh.observation.of, checker.membership)
+        && isMemberRef(grant.subject) && same(grant.subject, checker);
       return [job.name, { opening: !sound ? "unsound" : !required || assigned !== required.configuration ? "other-configuration" : "sound", deciding: proved, key: actor(deciding) }];
     })),
   };
