@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at packages/derive/test/forms-settles.test.ts","body":{"commit":"cd665d9d31ed4e0a9ba447dfe2a2ec73cf277026","path":"packages/derive/test/forms-settles.test.ts"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:04656fc81de98c4d1938c9c76303fefd64d01ba1","text":"Merge retired a covered predecessor; the successor is at packages/derive/src/validate/context.ts."}
