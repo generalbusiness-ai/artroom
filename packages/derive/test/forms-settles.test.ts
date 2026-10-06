@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { DeclaredDefinition, PlatformData, PlatformDefinition } from "@generalbusiness/artroom-contract";
 import { canonicalBytes, entryHash, factRefOf, parseStrictBytes } from "@generalbusiness/artroom-bytes";
-import { PROFILES, applyEntry, clockOf, entryOf, fits, itemAwaits, judgeDelivery, markerAmounts, owed, validateDefinition } from "../src/index.ts";
+import { PROFILES, applyEntry, clockOf, entryOf, fits, itemAwaits, judgeDelivery, markerAmounts, markerReservations, owed, validateDefinition } from "../src/index.ts";
 import type { Draft, PlatformRules, RuleEffect, ValidDefinition } from "../src/index.ts";
 import { Scope, arriving, directory, fields, forged, keys, on, valid, type Over } from "./fixtures.ts";
 
@@ -222,9 +222,16 @@ describe("the form `{ of, sets, in }` at the validator", () => {
     const definition = checked.definition;
     const r = definition.reserving!;
     expect([definition.pending, definition.clauseEntries, r.itm.entries, r.req.entries, r.kinds["pulse"]!.whole.entries, r.kinds["spawn"]!.whole.entries]).toEqual([{}, 6, 6, 8, 14, 14]);
-    expect([r.holders["root"]!.amount.entries, r.holders["root"]!.amount.bytes, r.holders["root"]!.amount.items, r.holders["root"]!.amount.requests]).toEqual([28, 29 * PROPOSED_BOUNDS.entryBytes, 1, 1]);
+    // Each possible settlement of a reserves its future request, including its result's foreign source entry. The two outcome
+    // entries of pulse/spawn each count it; itm counts it once, and req counts it beside its own future pending-request unit.
+    const amounts = [r.itm, r.req, r.kinds["pulse"]!.whole, r.kinds["spawn"]!.whole, r.holders["root"]!.amount];
+    expect(amounts.map((amount) => amount.requests)).toEqual([1, 2, 2, 2, 5]);
+    expect(amounts.map((amount) => amount.bytes)).toEqual([7, 10, 16, 16, 33].map((units) => units * PROPOSED_BOUNDS.entryBytes));
+    expect([r.holders["root"]!.amount.entries, r.holders["root"]!.amount.items]).toEqual([28, 1]);
     // The shared marker sum already includes the state duty. Adding the pending table again would double-count it.
     expect(markerAmounts(definition.markers!).awaits("job", "open", [])).toBe(5);
+    const marks = markerReservations(definition.markers!);
+    expect([marks.awaits("job", "open", []).requests, marks.awaits("job", "open", ["a"]).requests]).toEqual([1, 0]);
   });
 
   test("18.51 cases 2 and 3, and the grammar: the mark is a required truth value with the default false that is not fixed, `in` lists no final state, and no written effect sets the mark but to true", () => {

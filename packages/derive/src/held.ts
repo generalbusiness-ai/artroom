@@ -27,10 +27,10 @@
  * static size of an entry is the bound on one entry (section 17.2, "Bytes
  * of a reservation": "the entry size of section 7.5 stands in for this
  * whole amount"), and so is the bound on one foreign entry. What an item in
- * a state reserves is known in entries only: the validator counts no other
- * dimension of a settlement (section 17.5; request `cc570904`). So the
- * items, the records and the pending requests that a change of state or an
- * opened item starts are not in these amounts.
+ * a state reserves includes its declared future requests and the foreign
+ * source entry that each result may retain. The other item, record and
+ * retention terms of a settlement remain partial (section 17.5; request
+ * `cc570904`). These pure amounts are not five-dimensional admission.
  */
 
 import type { Held } from "@generalbusiness/artroom-contract";
@@ -91,6 +91,9 @@ export const outcomes = (kind: Pick<KindStated, "attempts">): number => 2 * kind
 /** One entry that the platform builds: 1 entry, at its static size, with the bytes that it may newly retain. */
 const entryOf = (c: Counting, retains = 0): Amount => ({ ...NOTHING, entries: 1, bytes: c.entry + retains });
 
+/** One future request: its pending-request unit, diagnosis and result, and the result's foreign source entry at the entry bound. */
+export const requestEntries = (entry: number): Amount => ({ ...NOTHING, entries: 2, requests: 1, bytes: 3 * entry });
+
 /**
  * The closure C(k) of one operation of a kind that no item holds (section
  * 17.2, "The closure of an operation"). Null: it is not finite, because the
@@ -147,7 +150,7 @@ export function requestOf(c: Counting, clauses: readonly ClauseStarts[], how: { 
     }
     byClause.push(started);
   }
-  return sum({ ...NOTHING, entries: 2, requests: 1, bytes: 3 * c.entry }, largest(c.written, ...byClause));
+  return sum(requestEntries(c.entry), largest(c.written, ...byClause));
 }
 
 /**

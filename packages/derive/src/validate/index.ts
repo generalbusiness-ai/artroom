@@ -20,7 +20,7 @@ import type { Bounds, DeclaredDefinition, Digest } from "@generalbusiness/artroo
 import { canonicalize, definitionDigest, utf8 } from "@generalbusiness/artroom-bytes";
 import { isObject, own } from "../values.ts";
 import { capabilities, type Underived } from "./capability.ts";
-import { capacityOf, type PendingCopy } from "./capacity.ts";
+import { capacityOf, type DutyAmounts, type PendingCopy } from "./capacity.ts";
 import { mark, marked, type Defining, type MarkPlace, type RangeIndex } from "./context.ts";
 import { acts, receives } from "./handlers.ts";
 import { heldUnderBytes, holdForms, holdTypes } from "./hold.ts";
@@ -68,6 +68,8 @@ export interface ValidDefinition {
   readonly pending: Readonly<Record<string, Readonly<Record<string, number>>>>;
   /** Section 17.2, row 4: each relationship whose copies await a settlement, with the states and the entries a copy in one of them reserves. */
   readonly pendingCopies: readonly PendingCopy[];
+  /** Known declared duty terms, including future requests and their result-source bytes. Other axes/retention remain partial. */
+  readonly dutyAmounts: DutyAmounts;
   /**
    * Section 6.11: each form that this package reads and does not derive by
    * itself, with the capability version whose own code derives it. A runtime

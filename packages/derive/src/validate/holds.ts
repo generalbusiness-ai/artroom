@@ -33,7 +33,7 @@
 import { RETAINED_INPUT_BYTES } from "@generalbusiness/artroom-contract";
 import type { FieldType, Held } from "@generalbusiness/artroom-contract";
 import { NOTHING, closure, holding, itemOf, largest, one, requestOf, retainedBytes, starts, sum, type Amount, type ClauseStarts, type Counting, type KindStated, type Starts, STARTS_NOTHING } from "../held.ts";
-import { markerAmounts } from "../markers.ts";
+import { markerReservations } from "../markers.ts";
 import { isObject, own } from "../values.ts";
 import type { Capacity } from "./capacity.ts";
 import { marked, type Defining } from "./context.ts";
@@ -85,7 +85,7 @@ export interface Reserving {
 const CLAUSES = ["applied", "refused", "superseded", "undelivered", "conflict"] as const;
 
 /** Reads the members, makes the checks, and computes the amounts. Undefined: the value is no platform data, or it has no kind and no `holds`. */
-export function reserving(d: Defining, top: Rec, capacity: Pick<Capacity, "deadlines" | "pending" | "markers" | "clauseEntries" | "decisionEntries">, outcomeValues: Readonly<Record<string, readonly import("../ledger.ts").EvidenceValueDomain[]>> = {}): Reserving | undefined {
+export function reserving(d: Defining, top: Rec, capacity: Pick<Capacity, "dutyAmounts" | "markers">, outcomeValues: Readonly<Record<string, readonly import("../ledger.ts").EvidenceValueDomain[]>> = {}): Reserving | undefined {
   if (!d.platform) return undefined;
   const { bad, rec, int, list, bounds } = d;
   const kindsWritten = isObject(top["outcomes"]) ? top["outcomes"] : {};
@@ -261,18 +261,18 @@ export function reserving(d: Defining, top: Rec, capacity: Pick<Capacity, "deadl
 
   // Rule 11 of "A marker duty": an unnamed item reserves the whole sum of rule 6, with no mark completed. A marked type has no
   // row in pending: its state duty and each marker duty are counted together by the shared calculator, beside its deadline.
-  const markedAmounts = capacity.markers ? markerAmounts(capacity.markers) : null;
-  const inState = (type: string, state: string): Amount => {
-    const entries = (own(own(capacity.deadlines, type), state) ?? 0) + (own(capacity.markers, type) ? markedAmounts!.awaits(type, state, []) : (own(own(capacity.pending, type), state) ?? 0));
-    return { ...NOTHING, entries, bytes: entries * bounds.entryBytes };
-  };
+  const markedAmounts = capacity.markers ? markerReservations(capacity.markers) : null;
+  const inState = (type: string, state: string): Amount => sum(
+    own(own(capacity.dutyAmounts.deadlines, type), state) ?? NOTHING,
+    own(capacity.markers, type) ? markedAmounts!.awaits(type, state, []) : (own(own(capacity.dutyAmounts.pending, type), state) ?? NOTHING),
+  );
   const everyState = [...d.types.values()].flatMap((type) => [...type.states.keys()].map((state) => inState(type.name, state)));
   const c: Counting = {
     kinds: Object.fromEntries(stated), held,
     initial: (type) => { const of = d.types.get(type); return of ? inState(type, of.initial) : NOTHING; },
     change: largest(...everyState),
     entry: bounds.entryBytes,
-    written: { ...NOTHING, entries: capacity.clauseEntries, bytes: capacity.clauseEntries * bounds.entryBytes },
+    written: capacity.dutyAmounts.clause,
   };
 
   // Checks 4 and 5, for each kind that no item holds, and so for each such kind below another (edge 3).
@@ -336,10 +336,10 @@ export function reserving(d: Defining, top: Rec, capacity: Pick<Capacity, "deadl
     const path = binding.path.slice(0, -".bound".length);
     const handler = Object.entries(handlersWritten).find(([name]) => at("receives", name) === path)?.[1];
     if (!isObject(handler)) continue;
-    const written = capacity.decisionEntries[path] ?? 0;
+    const written = own(capacity.dutyAmounts.decisions, path) ?? NOTHING;
     // The derived-effect ceiling stands in for the records a handler can
     // change, as entryBytes stands in for the whole static entry size.
-    let amount: Amount | null = { ...NOTHING, entries: 1 + written, records: bounds.derivedEffects, bytes: (2 + written) * bounds.entryBytes };
+    let amount: Amount | null = sum({ ...NOTHING, entries: 1, records: bounds.derivedEffects, bytes: 2 * bounds.entryBytes }, written);
     for (const [i, effect] of (Array.isArray(handler["effects"]) ? handler["effects"] : []).entries()) {
       if (!marked(effect)) continue;
       const more = starts(c, mostOf(effect, at(at(path, "effects"), i)), { item: false });

@@ -5,7 +5,7 @@
  * sets, in }`: it settles an item by a mark that its entry sets. The mark
  * is a truth value that only becomes `true`.
  *
- * This file is the rule of 11 parts as one pure function, in entries. The
+ * This file is the rule of 11 parts as one pure Amount traversal. The
  * validator runs it over the data to find a closure that is not finite,
  * and the runtime and a verifier run it over the folded state to count
  * what the items of a type with marks reserve. Both use the same code, so
@@ -26,11 +26,14 @@
  *   leads to another counts, for each duty, the larger of what it reserves
  *   here and there (point DI19).
  *
- * The amounts are of entries only, as every count of `reserve.ts` is: the
- * other four dimensions are request `cc570904`'s.
+ * The known amounts include declared future requests and the result's
+ * foreign source entry at the entry-size stand-in. Items, records and other
+ * retained-input terms remain partial. `reserve.ts` still reads entry
+ * projections only: admission in the other four dimensions is cc570904's.
  */
 
 import type { Item, StateView } from "./state.ts";
+import { NOTHING, largest, sum, type Amount } from "./held.ts";
 import type { ValidDefinition } from "./validate/index.ts";
 import { own } from "./values.ts";
 
@@ -42,22 +45,26 @@ import { own } from "./values.ts";
  * subjects and in an item that it opens, each counted with no mark
  * completed. `sets`: the states that a written effect of the form can set
  * on the settled item. `chain`: the longest chain of a deadline slot that
- * a written effect of the form sets on the settled item.
+ * a written effect of the form sets on the settled item. `amount` and
+ * `chainAmount` hold the known Amount terms; `base` and `chain` are their
+ * numeric entry projections.
  */
-export interface MarkerForm { path: string; slot: string | null; in: readonly string[]; base: number; sets: readonly string[]; chain: number }
+export interface MarkerForm { path: string; slot: string | null; in: readonly string[]; base: number; amount: Amount; sets: readonly string[]; chain: number; chainAmount: Amount }
 
 /**
  * One item type that some form settles by a mark. `marks`: its slots that
  * are marks. `forms`: every form that settles an item of the type, by a
  * mark or by state. `moves`: its timed rules, each with the states that it
  * applies in and the state that it leaves its item in. `held`: the entries
- * that a deadline reserves in each state (`ValidDefinition.deadlines`).
+ * that a deadline reserves in each state (`ValidDefinition.deadlines`),
+ * projected from `heldAmounts`.
  */
 export interface MarkedType {
   marks: readonly string[];
   forms: readonly MarkerForm[];
   moves: readonly { from: readonly string[]; to: string }[];
   held: Readonly<Record<string, number>>;
+  heldAmounts: Readonly<Record<string, Amount>>;
 }
 
 /** The item types of a definition that have marks, by name. */
@@ -67,44 +74,44 @@ export type Markers = Readonly<Record<string, MarkedType>>;
  * The amounts of "A marker duty", over the types that have marks.
  *
  * `base`: what a form reserves beside what it leaves on the settled item.
- * The runtime reads the number that the validator stored. The validator
+ * The runtime reads the amount that the validator stored. The validator
  * computes it while it looks for a cycle. `cyclic`: called when the count
  * of a type in a state, with a set of completed marks, reaches itself. The
  * closure is then not finite (rule 9), and the validator refuses the
  * definition.
  */
-export function markerAmounts(types: Markers, base: (type: string, form: MarkerForm) => number = (_, form) => form.base, cyclic: (type: string, state: string) => void = () => undefined) {
-  const known = new Map<string, number>();
+export function markerReservations(types: Markers, base: (type: string, form: MarkerForm) => Amount = (_, form) => form.amount, cyclic: (type: string, state: string) => void = () => undefined) {
+  const known = new Map<string, Amount>();
   const open = new Set<string>();
   const completed = (t: MarkedType, done: readonly string[]): string[] => t.marks.filter((mark) => done.includes(mark));
 
   /** Rule 7, and point DI18 for a form by state: what one form reserves, where `done` holds the marks that are completed after its entry. */
-  const formOf = (name: string, t: MarkedType, form: MarkerForm, done: readonly string[]): number => {
+  const formOf = (name: string, t: MarkedType, form: MarkerForm, done: readonly string[]): Amount => {
     // A form by state that leaves the item in a state of its own `in` settles nothing there, so that state is not counted.
     const left = form.sets.filter((state) => form.slot !== null || !form.in.includes(state));
-    return base(name, form) + Math.max(form.chain, 0, ...left.map((state) => (own(t.held, state) ?? 0) + awaits(name, state, done)));
+    return sum(base(name, form), largest(form.chainAmount, ...left.map((state) => sum(own(t.heldAmounts, state) ?? NOTHING, awaits(name, state, done)))));
   };
   /** One duty of an item in a state: the largest over its alternatives there, and over the states that a timed rule leads to (point DI19). `slot` null: the state duty. */
-  const dutyOf = (name: string, t: MarkedType, slot: string | null, state: string, done: readonly string[]): number => {
+  const dutyOf = (name: string, t: MarkedType, slot: string | null, state: string, done: readonly string[]): Amount => {
     const here = t.forms.filter((form) => form.slot === slot && form.in.includes(state)).map((form) => formOf(name, t, form, slot === null ? done : [...done, slot]));
     const there = t.moves.filter((move) => move.from.includes(state)).map((move) => dutyOf(name, t, slot, move.to, done));
-    return Math.max(0, ...here, ...there);
+    return largest(...here, ...there);
   };
   /**
    * Rule 6, without the chain of the deadline: what an item of that type in
    * that state awaits, where the marks of `done` are `true`. It is the
    * state duty and each marker duty of a mark that is not completed.
    */
-  const awaits = (name: string, state: string, done: readonly string[]): number => {
+  const awaits = (name: string, state: string, done: readonly string[]): Amount => {
     const t = own(types, name);
-    if (!t) return 0;
+    if (!t) return NOTHING;
     const set = completed(t, done);
     const key = JSON.stringify([name, state, set]);
     const found = known.get(key);
     if (found !== undefined) return found;
-    if (open.has(key)) { cyclic(name, state); return 0; }
+    if (open.has(key)) { cyclic(name, state); return NOTHING; }
     open.add(key);
-    const total = dutyOf(name, t, null, state, set) + t.marks.filter((mark) => !set.includes(mark)).reduce((sum, mark) => sum + dutyOf(name, t, mark, state, set), 0);
+    const total = sum(dutyOf(name, t, null, state, set), ...t.marks.filter((mark) => !set.includes(mark)).map((mark) => dutyOf(name, t, mark, state, set)));
     open.delete(key);
     known.set(key, total);
     return total;
@@ -115,6 +122,12 @@ export function markerAmounts(types: Markers, base: (type: string, form: MarkerF
     return t ? t.marks.filter((mark) => !done.includes(mark) && t.forms.some((form) => form.slot === mark && form.in.includes(state))) : [];
   };
   return { awaits, pending };
+}
+
+/** The existing numeric API is the entry projection of the same traversal, including a caller's optional numeric base. */
+export function markerAmounts(types: Markers, base?: (type: string, form: MarkerForm) => number, cyclic: (type: string, state: string) => void = () => undefined) {
+  const amounts = markerReservations(types, base ? (type, form) => ({ ...NOTHING, entries: base(type, form) }) : undefined, cyclic);
+  return { awaits: (name: string, state: string, done: readonly string[]) => amounts.awaits(name, state, done).entries, pending: amounts.pending };
 }
 
 /** The marks of an item that are `true`: completed, and in no later count (rule 8). */
