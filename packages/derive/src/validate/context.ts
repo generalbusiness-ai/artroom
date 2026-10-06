@@ -56,11 +56,15 @@ export type ClauseSet = { subject: string; type: string; state?: string; slot?: 
  * kind, in those states. `slot`, of an item: the mark that the entry sets,
  * where the form settles by a mark (revision 21, section 6.4). `sets`: what
  * its own effects can set, and the item it opens. `requests`: each request among its send forms, with the most
- * sends that form can make and what each reserved clause can set.
+ * sends that form can make and what each reserved clause can set. `opens`: the declared primary type, if the form may open it;
+ * this is distinct from a state/slot change on an existing subject. `mayCreateCopy`: a relate handler can receive a first key,
+ * except when its own copy is the duty being settled, which already implies that key.
  */
 export interface Duties {
   path: string;
   settles: { subject: string; type: string; states: readonly string[]; slot?: string } | { copy: readonly string[]; name: string; kind: string } | null;
+  opens: string | null;
+  mayCreateCopy: boolean;
   sets: ClauseSet;
   requests: { most: number; clauses: readonly ClauseSet[] }[];
 }

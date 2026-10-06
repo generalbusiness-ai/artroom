@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { DeclaredDefinition, PlatformData, PlatformDefinition } from "@generalbusiness/artroom-contract";
+import type { DeclaredDefinition, PlatformData, PlatformDefinition, Subject } from "@generalbusiness/artroom-contract";
 import { canonicalBytes, entryHash, factRefOf, parseStrictBytes } from "@generalbusiness/artroom-bytes";
 import { PROFILES, applyEntry, clockOf, entryOf, fits, itemAwaits, judgeDelivery, markerAmounts, markerReservations, owed, validateDefinition } from "../src/index.ts";
 import type { Draft, PlatformRules, RuleEffect, ValidDefinition } from "../src/index.ts";
@@ -18,7 +18,7 @@ import { Scope, arriving, directory, fields, forged, keys, on, valid, type Over 
  */
 const act = (a: Record<string, unknown>) => ({ also: {}, fields: {}, guards: [], effects: [], sends: [], attention: [], ...a });
 const MARK = { fixed: false, required: true, of: { type: "bool" }, default: false } as const;
-const set = (slot: string, of?: string) => ({ ...(of ? { of } : {}), value: { slot, from: { const: true } } });
+const set = (slot: string, of?: Subject) => ({ ...(of ? { of } : {}), value: { slot, from: { const: true } } });
 const M: DeclaredDefinition = {
   format: "artroom-definition-1", name: "marks", profile: { name: "restricted", version: 1 }, capabilities: [], genesis: "file",
   items: {
@@ -212,6 +212,19 @@ describe("the form `{ of, sets, in }` at the validator", () => {
     data.items["job"]!.values["until"] = { fixed: false, required: false, of: { type: "time" } };
     data.timed["pause"] = { on: "job", states: ["open"], deadline: "until", effects: [{ state: "held" }], attention: [] };
     data.acts["start"]!.sends = [{ tell: { to: { slot: "desk" }, message: "resume", fields: {}, result: { applied: [{ state: "open" }] } } }];
+    data.items["result"] = { many: true, max: 8, states: { done: { final: true } }, initial: "done", parties: {}, refs: {}, values: {} };
+    // One alternative opens a result while settling the existing job. The shorter relate alternative may create its first
+    // copy while settling that same mark: each dimension takes its own largest alternative, not the form with most entries.
+    data.acts["mark-a-far"] = act({
+      step: "open", on: "result", grant: "mark", also: { job: { item: "job", by: "job" } }, fields: { job: { type: "item", of: "job", required: true } },
+      settles: { of: "also.job", sets: "a", in: ["open"] }, effects: [set("a", "also.job")],
+      sends: [{ tell: { to: { slot: "desk", of: "also.job" }, message: "marked", fields: {}, result: {} } }],
+    }) as unknown as PlatformData["acts"][string];
+    data.receives["record-a"] = {
+      class: "relate", message: "record-a", from: { kind: "lane" }, copies: 8, opens: null,
+      fields: { job: { type: "item", of: "job", required: true } }, also: { job: { item: "job", by: "job" } },
+      settles: { of: "also.job", sets: "a", in: ["open"] }, guards: [], effects: [set("a", "also.job")], sends: [], attention: [],
+    };
     data.outcomes = {
       pulse: { code: "pulse", row: "X1", attempts: 1, most: { effects: 1, opens: "job" } },
       spawn: { code: "spawn", row: "X2", attempts: 1, most: { effects: 0, opens: "job" } },
@@ -227,11 +240,22 @@ describe("the form `{ of, sets, in }` at the validator", () => {
     const amounts = [r.itm, r.req, r.kinds["pulse"]!.whole, r.kinds["spawn"]!.whole, r.holders["root"]!.amount];
     expect(amounts.map((amount) => amount.requests)).toEqual([1, 2, 2, 2, 5]);
     expect(amounts.map((amount) => amount.bytes)).toEqual([7, 10, 16, 16, 33].map((units) => units * PROPOSED_BOUNDS.entryBytes));
-    expect([r.holders["root"]!.amount.entries, r.holders["root"]!.amount.items]).toEqual([28, 1]);
+    expect(r.holders["root"]!.amount.entries).toBe(28);
+    expect(amounts.map(({ items, records }) => [items, records])).toEqual([[2, 1], [1, 1], [2, 2], [4, 2], [5, 4]]);
     // The shared marker sum already includes the state duty. Adding the pending table again would double-count it.
     expect(markerAmounts(definition.markers!).awaits("job", "open", [])).toBe(5);
     const marks = markerReservations(definition.markers!);
     expect([marks.awaits("job", "open", []).requests, marks.awaits("job", "open", ["a"]).requests]).toEqual([1, 0]);
+    expect([marks.awaits("job", "open", []), marks.awaits("job", "open", ["a"])].map(({ items, records }) => [items, records])).toEqual([[1, 1], [0, 0]]);
+    // Slot/state updates on existing subjects open neither items nor copies. The finite copy-settlement control can open a
+    // result item, but its own relationship key exists already, so it reserves no new record for that update.
+    expect(definition.markers!["job"]!.forms.filter((form) => ["acts.mark-a", "acts.mark-b", "acts.close"].includes(form.path)).map(({ amount }) => [amount.items, amount.records])).toEqual([[0, 0], [0, 0], [0, 0]]);
+    const ownCopy = structuredClone(data);
+    ownCopy.receives["record-a"]!.settles = { copy: ["set"] };
+    ownCopy.receives["record-a"]!.opens = "result";
+    const checkedCopy = validateDefinition(parseStrictBytes(canonicalBytes(ownCopy)), PROPOSED_BOUNDS, PROFILES, { platform: true });
+    expect(checkedCopy.ok).toBe(true);
+    if (checkedCopy.ok) expect(checkedCopy.definition.dutyAmounts.pendingCopies.map(({ amount }) => [amount.entries, amount.items, amount.records])).toEqual([[1, 1, 0]]);
   });
 
   test("18.51 cases 2 and 3, and the grammar: the mark is a required truth value with the default false that is not fixed, `in` lists no final state, and no written effect sets the mark but to true", () => {
