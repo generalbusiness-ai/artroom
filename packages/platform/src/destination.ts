@@ -43,9 +43,9 @@
  * plan owns. They are written as the note has them.
  */
 
-import type { FactRef, FieldValue, PlatformData, PlatformDefinition, ScopeId } from "@generalbusiness/artroom-contract";
+import type { FactRef, FieldValue, OperationId, PlatformData, PlatformDefinition, ScopeId } from "@generalbusiness/artroom-contract";
 import { canonicalize, isFactRef, isMemberRef, isScopeRef, utf8 } from "@generalbusiness/artroom-bytes";
-import type { Item, RecordedRef, RuleEffect, RuleGiven, Rules, StateView } from "@generalbusiness/artroom-derive";
+import type { Item, Operation, Own, RecordedRef, RuleEffect, RuleGiven, Rules, StateView } from "@generalbusiness/artroom-derive";
 import { referenceOf } from "./rules-scope.ts";
 
 /** The name and version that this data and these rules are. An operation that the destination opens states it as its owner (the contract's section 4.3). */
@@ -66,11 +66,12 @@ export const DESTINATION_KINDS = { firstHead: "first-head", judge: "judge", push
  * The most attempts that an opening states (section 12, G3, proposed for
  * the proof plan): a creation of a ref, 3 (section 12.2); the push of one
  * publication, 3 (U5); a receipt write, 3; a credentialed read, 1. A further
- * try that an admin's `resend` opens has 1 (the row `resend`). The note
- * states no number for `judge`: it is a read of the host with the
- * observations, so it has the 1 of a credentialed read (entry ER2).
+ * try that an admin's `resend` opens has 1 (the row `resend`). Revision 25
+ * states each in one table (section 12.1.5, "The kinds of operation, and
+ * the rules of their outcomes"): `judge`, `mint`, the kind `read` and
+ * `adopt-read` have 1, and `revoke` has 3.
  */
-export const DESTINATION_ATTEMPTS = { firstHead: 3, judge: 1, adoptRead: 1, resend: 1 } as const;
+export const DESTINATION_ATTEMPTS = { firstHead: 3, judge: 1, push: 3, mint: 1, revoke: 3, read: 1, receipt: 3, adoptRead: 1, resend: 1 } as const;
 
 /**
  * The most records of each `collect` list of a `reserve` (row b; section
@@ -95,6 +96,8 @@ const CLAIM = { type: "fact", kind: ["found"], under: "platform:register" } as c
 const BRANCH = { branch: { item: "branch", one: true } } as const;
 const FROM_LANE = { kind: "lane", under: "change" } as const;
 const FROM_DIRECTORY = { kind: "directory", under: "platform:directory" } as const;
+/** The states in which a publication holds the slot (section 6.6, "What is never done"). */
+const HELD: readonly string[] = ["reserved", "publishing", "unresolved"];
 /** Every state of a publication, final or not: a publication that exists for an operation, whatever became of it. */
 const EVERY = ["queued", "reserved", "publishing", "unresolved", "published", "aborted", "not-reserved"] as const;
 /** The type of a `collect` list of a `reserve` (Code P25; row b). */
@@ -301,8 +304,8 @@ export const destination: PlatformData = {
       attention: [],
     },
     // `compromised`: a delivery of a `tell`, from the directory, with the fields of membership's notice (section 12.1, "Messages
-    // between scopes"). Section 6.8, when the key is behind the publication that holds the slot (Code P19). Its rule is not written
-    // (entry ER5).
+    // between scopes"). Section 6.8, when the key is behind the publication that holds the slot (Code P19): the rule
+    // `abort-if-behind`.
     compromised: {
       message: "compromised", class: "tell", from: FROM_DIRECTORY, opens: null,
       also: BRANCH,
@@ -397,6 +400,29 @@ function nextJudge(state: Pick<StateView, "page">, after: { slot?: boolean; judg
   const queued = state.page("publication", ["queued"], null, 2).items.find((item) => item.id !== after.ended);
   return queued?.id ?? after.opens ?? null;
 }
+
+/** The operations that the entry at that position opened, in the order of their records there. Their IDs are that position and an ordinal from 0. */
+function openedIn(state: Pick<StateView, "operation">, seq: number): Operation[] {
+  const found: Operation[] = [];
+  for (let k = 0; ; k += 1) {
+    const operation = state.operation(`${seq}:${k}` as OperationId);
+    if (!operation) return found;
+    found.push(operation);
+  }
+}
+
+/** The publication with that item ID, or none. */
+const publicationAt = (state: Pick<StateView, "item">, id: unknown): Item | null => {
+  const item = typeof id === "number" ? state.item(id) : null;
+  return item?.type === "publication" ? item : null;
+};
+
+/** This scope's own entry at a position before the one that is written. A rule that needs one and is given none has a fault: nothing is judged from a history that is not at hand. */
+const ownEntry = (own: Own, seq: number) => {
+  const kept = own(seq);
+  if (!kept) throw new Error(`this scope's own entry ${seq} is not at hand`);
+  return kept.entry;
+};
 
 /** An operation that this entry opens, at its ordinal among the operations of the entry, with its attempt 1 (the contract's section 4.3, items 1 and 2). */
 const opened = (k: number, kind: string, attempts: number): RuleEffect[] => [
@@ -517,6 +543,44 @@ export const destinationRules: Rules = {
         { effect: "ref", item, slot: "lane", to: input.from.at },
         { effect: "state", item, state: "not-reserved" },
         { effect: "value", item, slot: "reason", value: "withdrawn" },
+      ];
+    },
+  },
+  /**
+   * Row 35, among the effects of `compromised` (P19), as revision 25 states
+   * it whole (section 12.1.5, "The rule `abort-if-behind`"; entry ER5). It
+   * reads `branch.slot`; that publication, with `reservedAt`, `aborting`
+   * and `token`; this scope's own entry at `reservedAt`, with its
+   * `observed`; and the field `key` of the notice.
+   *
+   * The key is behind the publication when it is the `key` of an
+   * `Observation` in the `observed` of the reservation entry: the merger's
+   * key, or a key behind a counted verdict or a deciding result. When the
+   * slot is held by a publication that is `reserved`, `publishing` or
+   * `unresolved`, the key is behind it and `aborting` is not set, the rule
+   * yields: `aborting` is true; when `token` is set, the token's `revoke`
+   * operation with its attempt 1, and `token` emptied; and a `read`
+   * operation of the branch, with its attempt 1. Otherwise nothing: the
+   * notice is recorded and changes nothing.
+   *
+   * The abort is no operation. It is this entry, which sets `aborting`. The
+   * rule for a further attempt of a push reads `aborting`, and the read
+   * then decides (the rules `push` and `deciding-read`).
+   */
+  "abort-if-behind": {
+    place: "effect", most: 6,
+    run: ({ state, own, resolved }) => {
+      const publication = publicationAt(state, branchOf(state)?.refs["slot"]);
+      const [key, at] = [resolved.fields["key"], publication?.values["reservedAt"]];
+      if (!publication || !HELD.includes(publication.state) || publication.values["aborting"] === true || typeof key !== "string" || typeof at !== "number") return [];
+      const reserved = ownEntry(own, at).input;
+      // An observation of a key has no member `subject`. One of a member, or of the rules, names no key.
+      if (reserved.type !== "outcome" || !(reserved.observed ?? []).some(({ observation }) => !("subject" in observation) && observation.key === key)) return [];
+      const live = (publication.values["token"] ?? null) !== null;
+      return [
+        { effect: "value", item: publication.id, slot: "aborting", value: true },
+        ...(live ? [...opened(0, DESTINATION_KINDS.revoke, DESTINATION_ATTEMPTS.revoke), { effect: "value", item: publication.id, slot: "token", value: null } as const] : []),
+        ...opened(live ? 1 : 0, DESTINATION_KINDS.read, DESTINATION_ATTEMPTS.read),
       ];
     },
   },
