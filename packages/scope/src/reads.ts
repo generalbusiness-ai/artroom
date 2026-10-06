@@ -29,8 +29,8 @@ import { waitingIn, type Incident, type OperatorRecord } from "./operator.ts";
 import type { ReadName, Readers } from "./ports.ts";
 import type { Duty, OperationStatus, Sealed, Store, Stored } from "./store.ts";
 
-/** The kinds of retained input that the read route serves by digest. `value` is not among them (I3 deltas, entry EX6). */
-export const READABLE: readonly RetainedInput["kind"][] = ["definition", "entry", "rule", "text", "snapshot"];
+/** The kinds of retained input that the read route serves by digest. `value` is read by domain as well. */
+export const READABLE: readonly RetainedInput["kind"][] = ["definition", "entry", "rule", "text", "snapshot", "value"];
 
 /** The bound of each read. The defaults are the contract's table, and for a retained input the history page's byte bound. */
 export interface ReadBounds { retainedItems: number; historyEntries: number; historyBytes: number; entryBytes: number; outboxDuties: number; retainedBytes: number }
@@ -161,20 +161,17 @@ export class Reads {
   /**
    * One retained input, by kind and digest (section 9.2). One over the byte bound is `too-large`.
    *
-   * The kinds are those that a commit of this scope stores, each under its digest alone: `READABLE`. A snapshot of staged refs is
-   * one: the outcome entry that names it stores it in its own commit (`operations.ts`), and a verifier reads it by its digest
-   * before it derives that entry (section 16.4). A `value` is not: it is kept under its domain and its digest, in a table
-   * of its own, and no route reads one by its domain: no text states the route's form for a domain (I3 deltas, entries EX6 and FC7).
+   * Values are read by domain and digest, with the same authority and byte bound as every other retained input.
    */
-  retained(reader: unknown, kind: RetainedInput["kind"], digest: Digest): Read<RetainedInput> {
+  retained(reader: unknown, kind: RetainedInput["kind"], digest: Digest, domain?: string): Read<RetainedInput> {
     const open = this.#open(reader, "retained");
     if (!("scope" in open)) return open;
-    if (!READABLE.includes(kind) || typeof digest !== "string") return no("not-found");
+    if (!READABLE.includes(kind) || typeof digest !== "string" || (kind === "value" && (typeof domain !== "string" || domain.length === 0))) return no("not-found");
     // The size is asked of storage first, so an input over the bound is refused before any of it is read into memory.
-    const size = this.#store.retainedSize(kind, digest);
+    const size = this.#store.retainedSize(kind, digest, domain);
     if (size === null) return no("not-found");
     if (size > this.#bounds.retainedBytes) return no("too-large");
-    const kept = this.#store.retained(kind, digest);
+    const kept = this.#store.retained(kind, digest, domain);
     if (!kept) return no("not-found");
     return { ok: true, at: open.scope.head, value: kept, complete: true };
   }

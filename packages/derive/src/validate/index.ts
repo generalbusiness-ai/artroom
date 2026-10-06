@@ -137,7 +137,11 @@ export const PROFILES: Readonly<Record<string, Profile>> = { "restricted@1": {} 
  * does not read the table of rules. A definition that came from an input is validated without the option: a mark in it is a form
  * that the contract does not define, and is refused as any such form is.
  */
-export interface ValidateOptions { readonly platform?: boolean }
+export interface ValidateOptions {
+  readonly platform?: boolean;
+  /** Static declarations of the trusted pinned owner code, by outcome kind. */
+  readonly outcomeValues?: Readonly<Record<string, readonly import("../ledger.ts").EvidenceValueDomain[]>>;
+}
 
 export function validateDefinition(input: unknown, bounds: Bounds, profiles: Readonly<Record<string, Profile>> = PROFILES, options: ValidateOptions = {}): Validation {
   const read = shapes(bounds);
@@ -256,7 +260,7 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
   const capacity = capacityOf(d, graph, moves);
   if (problems.length > 0) return { ok: false, problems };
   // Section 17.2a: a reservation that an item holds, and what each kind of `outcomes` reserves. In platform data only.
-  const reserved = reserving(d, top, capacity);
+  const reserved = reserving(d, top, capacity, options.outcomeValues);
   if (problems.length > 0) return { ok: false, problems };
   try {
     const keyed = [...d.types.values()].flatMap((type): [string, readonly string[]][] => (type.indexes ? [[type.name, type.indexes]] : []));

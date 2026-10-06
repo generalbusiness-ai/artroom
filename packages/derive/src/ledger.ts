@@ -75,6 +75,11 @@ export interface Most { effects: number; requests: number; operations: number }
  */
 export interface OutcomeAt { opens: number | null; definition: ValidDefinition }
 
+/** One value domain declared by an operation owner, bounded in canonical bytes. */
+export interface EvidenceValueDomain { domain: string; max: number }
+/** The value of a declared domain that one outcome names. One outcome names at most one value of each declared domain. */
+export interface EvidenceValue extends EvidenceValueDomain { digest: Digest }
+
 /** The owner's rules for one kind of operation. Each is a function of what it is given, and reads nothing else. */
 export interface OperationRules {
   /** Item 7: the kind selects one result, as a founding claim selects one repository. */
@@ -117,6 +122,10 @@ export interface OperationRules {
    * names the digest. Absent: the evidence of this kind names none.
    */
   retains?(evidence: Evidence): readonly Digest[];
+  /** Evidence kept apart from the entry: domains and maxima of this pinned version, counted for every possible outcome entry. */
+  valueDomains?: readonly EvidenceValueDomain[];
+  /** The values named by this evidence, with their declared domains and bounds. Their canonical bytes must be at hand. */
+  values?(evidence: Evidence): readonly EvidenceValue[];
   /** What the outcome derives beside the ledger's records. Absent: nothing. */
   derives?(view: StateView, operation: Operation, outcome: OutcomeInput, selected: boolean | null, at: OutcomeAt): OutcomeDerived;
   /**

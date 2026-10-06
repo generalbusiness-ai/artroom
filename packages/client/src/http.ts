@@ -101,6 +101,6 @@ export function httpTransport(service: string, options: { fetch?: Fetch; bytes?:
     outbox: (scope, reader, cursor) => call("outbox", `/${part(scope)}/outbox${page(cursor)}`, reader),
     duty: (scope, reader, duty) => call("duty", `/${part(scope)}/outbox/${part(duty)}`, reader),
     log: (scope, reader, cursor) => call("log", `/${part(scope)}/log${page(cursor)}`, reader),
-    retained: (scope, reader, kind, digest) => call("retained", `/${part(scope)}/retained/${part(kind)}/${part(digest)}`, reader),
+    retained: (scope, reader, kind, digest, domain) => call("retained", `/${part(scope)}/retained/${part(kind)}/${part(digest)}${domain === undefined ? "" : `?domain=${part(domain)}`}`, reader),
   };
 }
