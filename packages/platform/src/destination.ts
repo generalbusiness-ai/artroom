@@ -747,8 +747,38 @@ const pushDecides: Decides = (given, push) => {
   };
 };
 
+/**
+ * What a `read` is for (the row `read` of "What an operation is for"): the
+ * ref of the write after which it was opened, or the branch, for the
+ * publication that `abort-if-behind` set `aborting`. It is read from the
+ * entry that opened the read.
+ */
+function readFor(state: Pick<StateView, "operation" | "item" | "page">, own: Own, read: Operation): Item | "first-head" | "receipt" | null {
+  const { input, effects } = ownEntry(own, seqOf(read.id));
+  if (input.type === "delivery") {
+    const set = effects.find((effect) => effect.effect === "value" && effect.slot === "aborting" && effect.value === true);
+    return set?.effect === "value" ? publicationAt(state, set.item) : null;
+  }
+  const of = input.type === "outcome" ? state.operation(input.operation) : null;
+  if (!of || !ours(of, ...WRITES)) return null;
+  return of.kind === DESTINATION_KINDS.push ? subjectOf(state, own, of) : (of.kind as "first-head" | "receipt");
+}
+
+/**
+ * The outcome of a `read` of the branch, where its opening entry is of a
+ * push or of `compromised`: the same table as a push. A read never settles
+ * an attempt: what it saw moves the publication's state, the branch's head
+ * and the slot, and gives no attempt an outcome.
+ */
+const readDecides: Decides = (given, read) => {
+  const [of, seen] = [readFor(given.state, given.own, read), given.input.type === "outcome" && isObject(given.input.evidence.body) ? given.input.evidence.body["seen"] : null];
+  // I3 merge: the read of a first head and of a receipt's ref is judged by the rows `first-head` and `receipt`, which wait (entry ER9).
+  if (of === null || typeof of === "string") throw new Error("the read of a first head, or of a receipt's ref, waits for the rules first-head and receipt");
+  return seenDecides(given, of, seen, null);
+};
+
 /** What the rule of each kind decides for the outcome entry that is written, for the send mark that its kind holds. */
-const DECIDES: Readonly<Record<string, Decides>> = { [DESTINATION_KINDS.push]: pushDecides };
+const DECIDES: Readonly<Record<string, Decides>> = { [DESTINATION_KINDS.push]: pushDecides, [DESTINATION_KINDS.read]: readDecides };
 
 /** The body of an outcome of a write: `{ send, seen }`, with a `send` that fits the result (section 12.1.5, "The evidence of a write"). */
 const SENDS: Readonly<Record<string, readonly string[]>> = { confirmed: ["accepted"], refused: ["refused", "not-sent"], unknown: ["unknown"] };
@@ -1091,6 +1121,45 @@ export const destinationRules: Rules = {
       if (!operation) throw new Error("publication-update stands at the kind of an outcome");
       const update = Object.hasOwn(DECIDES, operation.kind) ? DECIDES[operation.kind]!(given, operation).update : null;
       return update === null ? null : updateRequest(given, update);
+    },
+  },
+  /**
+   * Row e, the outcome of the kind `read` (P16; section 12.1.5, "The
+   * deciding read", and the row `deciding-read`). A read is opened only
+   * where a write's own outcome left nothing decided and no attempt of that
+   * write is open, and by `abort-if-behind`. It has 1 attempt. The runtime
+   * reads again for as long as a read fails or decides nothing, and offers
+   * the one outcome when a read decides.
+   *
+   * - The one outcome is `confirmed`, with the body `{ seen }`: a commit
+   *   ID, or the text `absent`. `failed` does not follow, and neither does
+   *   `refused` or `unknown`: each is `bad-input`.
+   * - For the branch of a publication that holds the slot, a `seen` that is
+   *   the base, while not every attempt of its pushes has a `refused`
+   *   outcome, does not follow either: nothing is provable, and the
+   *   runtime keeps reading (the table, its fourth row; section 6.8, the
+   *   last row).
+   * - It yields what the table of `seenDecides` gives, and no attempt gains
+   *   an outcome. So after `published` an attempt that was `unknown` stays
+   *   `unknown` (section 6.6).
+   *
+   * The read of a first head, and of a receipt's ref, is judged by the rows
+   * `first-head` and `receipt`. Those two rules wait, and so does this rule
+   * for such a read: its outcome is not judged.
+   */
+  "deciding-read": {
+    place: "outcome",
+    rules: {
+      selects: false, read: false, covered: true, most: { effects: 11, requests: 1, operations: 3 },
+      retries: () => false,
+      wellFormed: (result, evidence, given) => {
+        const [seen, read] = [bodyOf(evidence.body, ["seen"])?.["seen"], given.input.type === "outcome" ? given.state.operation(given.input.operation) : null];
+        if (result !== "confirmed" || !read || !(seen === "absent" || isObjectId(seen))) return false;
+        const of = readFor(given.state, given.own, read);
+        const unprovable = of !== null && typeof of !== "string" && HELD.includes(of.state) && seen === branchOf(given.state)?.values["head"] && !everyRefused(given, of, null);
+        return !unprovable;
+      },
+      derives: (given, read) => { const { effects, opens } = readDecides(given, read); return { effects, sends: [], opens }; },
     },
   },
 };
