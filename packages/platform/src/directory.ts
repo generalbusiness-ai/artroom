@@ -23,6 +23,7 @@
  * | `import` | 7, outcome | d | The outcomes of an `import` |
  * | `create-rules` | 6, send, with `always` | s (P20) | `establish`: the second send |
  * | `create-destination` | 6, send, with `always` | t (P20) | `establish`: the third send |
+ * | `import-spent` | 4, guard | u (P29) | `retry-import` |
  *
  * `compromised` is data, whole. The three creations of the genesis are held
  * sends of the entry, by the contract's rule for a provisional scope.
@@ -30,16 +31,9 @@
  * Rows s to u are of the note's revision 25, which was filed for review,
  * and not adopted, when they were written (I3 deltas, section 26).
  *
- * **Places that the note's rows state and no form can say, and whose rule
- * is not written yet.** Each is a mark in this data, with the entry of the
- * I3 deltas note as its `row`, and with NO rule in `directoryRules`. While
- * one is left the version lacks a rule, and by the whole-scope rule (the
- * contract's section 6.1) nothing is created under `platform:directory@1`
- * by this package's rules alone.
- *
- * | Mark | Place | At | What the row states (deltas entry) |
- * |---|---|---|---|
- * | `import-spent` | 4, guard | `retry-import` | "The import's stated attempts are used, and none is `confirmed`." No guard form reads an operation (EP7). |
+ * The data holds no mark that the table does not list, and every mark has
+ * its rule here. So a runtime with this package can run
+ * `platform:directory@1`.
  *
  * The two send marks of the genesis both state `always`: the scope
  * contract's revision 19 lets a written list hold several marks when at
@@ -288,10 +282,9 @@ export const directory: PlatformData = {
       step: "transition", on: "repository", grant: "ledger.retry",
       also: {},
       fields: {},
-      // "The import's stated attempts are used, and none is `confirmed`." No guard form reads an operation, and the table of marks
-      // lists no rule for the guard (I3 deltas, entry EP7).
-      // I3 merge: this mark has no rule until that entry is answered.
-      guards: [{ code: "import-spent", row: "EP7" }],
+      // "The import's stated attempts are used, and none is `confirmed`." No guard form reads an operation: the guard is a rule
+      // (row u of the table of marks, key P29).
+      guards: [{ code: "import-spent", row: "P29" }],
       effects: [{ code: "reopen-import", row: "P16" }],
       sends: [],
       attention: [],
@@ -544,6 +537,45 @@ export const directoryRules: Rules = {
    * effect, `import`, with 1 attempt, and its attempt 1 (G3).
    */
   "reopen-import": { place: "effect", most: 2, run: () => opened("import", 1) },
+  /**
+   * Row u, the one guard of `retry-import` (P29), as the note's revision 25
+   * decides it (section 12.1.2, "The guard of `retry-import`"; I3 delta
+   * EP7). It reads the `import` operations of this scope and their
+   * attempts, `repository.import` and `repository.imported`.
+   *
+   * It holds when `repository.import` is set; `repository.imported` is
+   * unset; at least one `import` operation exists; and every attempt that
+   * each `import` operation states is opened and has an outcome. An attempt
+   * whose outcome is `unknown` is used: its request was sent, and its
+   * outcome is recorded. Otherwise `import-not-spent`. It is never not
+   * completed: it reads this scope's own state only.
+   *
+   * The folded state has no read of the operations of one kind, so the rule
+   * walks the scope's own entries for the `operation` effects of the kind.
+   * A bound or an index for that read is asked of the proof plan. An entry
+   * that cannot be read leaves the guard not holding.
+   */
+  "import-spent": {
+    place: "guard", refusals: ["import-not-spent"],
+    run: ({ state, own }) => {
+      const refused = { holds: false, name: "import-not-spent" } as const;
+      const repository = repositoryOf(state);
+      const head = state.scope()?.head.seq;
+      if (!repository || head === undefined || typeof repository.values["import"] !== "string" || (repository.values["imported"] ?? null) !== null) return refused;
+      let imports = 0;
+      for (let seq = 0; seq <= head; seq++) {
+        const entry = own(seq)?.entry;
+        if (!entry) return refused;
+        for (const effect of entry.effects) {
+          if (effect.effect !== "operation" || effect.owner !== DIRECTORY || effect.kind !== "import") continue;
+          const operation = state.operation(`${seq}:${effect.k}`);
+          if (!operation || operation.attempts.length < operation.most || operation.attempts.some((attempt) => attempt.outcomes.length === 0)) return refused;
+          imports++;
+        }
+      }
+      return imports > 0 ? { holds: true } : refused;
+    },
+  },
   /**
    * Row 12, among the effects of `index` (P15). It reads the `lane` items
    * and the delivery's `from`. When no row's `scope` is the sender: one

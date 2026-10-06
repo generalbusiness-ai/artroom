@@ -3,16 +3,10 @@
  * exported from the package's main entry, and no production entry imports
  * it.
  *
- * Everything that is not the platform package's own data and rules is a
- * STAND-IN, and each is labelled where it is used.
+ * The rules of the register and of the directory are all the platform
+ * package's: this file holds no rule. What is SCRIPTED, an entry made by
+ * hand, is labelled where it is used.
  *
- * The register's rules are all the platform package's: it has none here.
- *
- * - `directoryStandIns`: a rule for each of the three marks of the
- *   directory's data that the authority note's table of marks does not
- *   list (`create-rules`, `create-destination` and `import-spent`; entries
- *   EP6 and EP7).
- *   Each does what the note's row says in prose.
  * - `Directory`: a directory that a register in memory created. The
  *   register's `found` entry and its selecting outcome, with the `create`
  *   that its rule sends, are judged with the register's own rules. So
@@ -26,8 +20,8 @@
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { Digest, Entry, FactRef, PlatformData, Request, ScopeRef, Seed, Send, SignedIntent } from "@generalbusiness/artroom-contract";
 import { factRefOf, intentDigest, newIncarnation, scopeIdOf, signIntent } from "@generalbusiness/artroom-bytes";
-import { PROFILES, clockOf, judgeDelivery, judgeGenesis, judgeOutcome, operationSettled, ownersOf, validateDefinition } from "@generalbusiness/artroom-derive";
-import type { ActJudgment, Judgment, PlatformRules, Rules, Source, ValidDefinition } from "@generalbusiness/artroom-derive";
+import { PROFILES, clockOf, judgeDelivery, judgeGenesis, judgeOutcome, ownersOf, validateDefinition } from "@generalbusiness/artroom-derive";
+import type { ActJudgment, Judgment, PlatformRules, Source, ValidDefinition } from "@generalbusiness/artroom-derive";
 import { Ledger, T0, forged, keys, t, type Actor, type Context, type Over } from "@generalbusiness/artroom-derive/testing";
 import { DIRECTORY, REGISTER, directory, directoryRules, directorySeed, register, registerRules, repositoryName } from "../src/index.ts";
 
@@ -45,30 +39,8 @@ export const directoryDefinition = checked(directory);
 /** The register's rules, as the package supplies them: what a judge of these tests is given. */
 export const registerPlatform: PlatformRules = { named: REGISTER, rules: registerRules };
 
-/**
- * STAND-INS: a rule for each mark of the directory's data that the note's
- * table of marks does not list.
- *
- * - `import-spent`: an `import` operation exists, each has its stated
- *   attempts opened and settled, and `imported` is not set. Its refusal is
- *   `import-not-spent`.
- */
-export const directoryStandIns: Rules = {
-  "import-spent": {
-    place: "guard", refusals: ["import-not-spent"],
-    run: ({ state, own }) => {
-      const head = state.scope()!.head.seq;
-      const imports = Array.from({ length: head + 1 }, (_, seq) => own(seq)?.entry).flatMap((entry) =>
-        (entry?.effects ?? []).flatMap((effect) => (effect.effect === "operation" && effect.kind === "import" ? [state.operation(`${entry!.seq}:${effect.k}`)!] : [])));
-      const repository = state.page("repository", ["open"], null, 1).items[0];
-      const spent = imports.length > 0 && imports.every((operation) => operation.attempts.length === operation.most && operationSettled(operation)) && (repository?.values["imported"] ?? null) === null;
-      return spent ? { holds: true } : { holds: false, name: "import-not-spent" };
-    },
-  },
-};
-
-/** The directory's rules with the stand-ins: what a judge of these tests is given. */
-export const directoryPlatform: PlatformRules = { named: DIRECTORY, rules: { ...directoryRules, ...directoryStandIns } };
+/** The directory's rules, as the package supplies them: what a judge of these tests is given. */
+export const directoryPlatform: PlatformRules = { named: DIRECTORY, rules: directoryRules };
 
 function written(judgment: Judgment): Extract<Judgment, { result: "write" }>["draft"] {
   if (judgment.result !== "write") throw new Error(`not written: ${JSON.stringify(judgment)}`);
@@ -132,7 +104,7 @@ export const scripted = (at: ScopeRef, seq: number, input: Entry["input"], sends
  * A directory in memory, below a SCRIPTED register: see the head of this
  * file. rita founds it. Its genesis, its acts, its handlers, its clauses and
  * the outcomes of its import are judged by derive's judges, with the
- * directory's rules and the stand-ins. Its acts are judged on the grants of
+ * directory's own rules. Its acts are judged on the grants of
  * the test authority: every actor of the key set holds every action here.
  *
  * `children`: which of the three children answer `applied`, each from a
@@ -206,7 +178,7 @@ export class Directory extends Ledger {
     return (this.children[kind] = this.created(0, send.n, `platform:${kind}`));
   }
 
-  /** An act, judged with the directory's rules and the stand-ins, on the grants of the test authority. */
+  /** An act, judged with the directory's rules, on the grants of the test authority. */
   override act(who: Actor, kind: string, over: Over = {}, context: Context = {}): ActJudgment {
     return super.act(who, kind, over, { platform: directoryPlatform, ...context });
   }

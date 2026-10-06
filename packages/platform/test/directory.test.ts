@@ -6,11 +6,11 @@ import { clockOf, derivable, judgeGenesis, runnable, valueDigest, type Item, typ
 import { Ledger, T0, creation, desk, deskDefinition, t, ticket, ticketDefinition } from "@generalbusiness/artroom-derive/testing";
 import { DIRECTORY, directory, directoryMembership, directoryRules, membershipId, platform, repositoryName } from "../src/index.ts";
 import { rules as rulesScopeRules, rulesScopeDefinition } from "./support-rules.ts";
-import { Directory, directoryDefinition, directoryStandIns, rita, sam, scripted, una, vic } from "./support-founding.ts";
+import { Directory, directoryDefinition, rita, sam, scripted, una, vic } from "./support-founding.ts";
 
-// Every directory here is a `Directory` of test support: a directory in memory that a SCRIPTED register created, with STAND-IN rules
-// for the three marks that the authority note's table of marks does not list, and with children and lanes whose entries are made by
-// hand. The rows and the nine rules that are tested are the platform package's. Nothing here shows a founding.
+// Every directory here is a `Directory` of test support: a directory in memory that a register in memory created, by its own rules,
+// with children and lanes whose entries are SCRIPTED, made by hand. The rows and the rules that are tested are the platform
+// package's, and no rule is a stand-in. A founding on scope objects is the scope package's.
 
 const IMPORT = "https://git.example/elsewhere/repo.git";
 /** What a judgment answered: the result, with the reason and the refusal's name where it has them. */
@@ -36,8 +36,9 @@ const active = (d: Directory) => ({ observed: [rulesObserved(d.children.rules!, 
 /** One index row of a lane's entry: the position of the source entry, its time, and the fields that the row carries. */
 type Row = readonly [seq: number, time: string, fields: Record<string, FieldValue>];
 
-// The plan's T43, for `platform:directory@1` (authority note, revision 21, section 12.1.2, and its table of marks, section 12.1.8).
-test("the directory definition validates whole with the platform option; every mark of the note's table has its rule; three marks that the table does not list have none, so the package's rules do not run it", () => {
+// The plan's T43, for `platform:directory@1` (authority note, section 12.1.2, and its table of marks, section 12.1.8, with rows s to u
+// of its revision 25).
+test("the directory definition validates whole with the platform option; every mark of the note's table has its rule, so the package's rules run it, and with any one missing they do not", () => {
   const valid = directoryDefinition;
   expect([valid.underived, derivable(valid, null), directory.capabilities, directory.rules, directory.timed]).toEqual([[], true, [], {}, {}]);
   // Section 12.1.2: three item types, the genesis `establish` with four acts, two handlers, and one kind of operation.
@@ -54,21 +55,18 @@ test("the directory definition validates whole with the platform option; every m
     [4, "acts.open-pr.guards.2", "definition-active", "P19"], [5, "acts.open-pr.effects.4", "next-number", "P17"], [6, "acts.open-pr.sends.0", "create-lane", "P21"],
     [4, "acts.open-task.guards.0", "worker-standing", "P19"], [5, "acts.retry-import.effects.0", "reopen-import", "P16"],
     [5, "receives.index.effects.0", "index-row", "P15"], [5, "receives.index.effects.1", "index-number", "P17"], [7, "outcomes.import", "import", "P16"],
-    // Rows s to u of the note's revision 25.
-    [6, "acts.establish.sends.1", "create-rules", "P20"], [6, "acts.establish.sends.2", "create-destination", "P20"],
+    // Rows s to u of the note's revision 25: the two creation rules of the genesis, under the key P20, and the guard of
+    // `retry-import`, under the key P29. The genesis holds two send marks, which the contract's revision 19 lets a list hold when at
+    // most one does not state `always`: both state it (its section 6.1; witness 18.45).
+    [6, "acts.establish.sends.1", "create-rules", "P20"], [6, "acts.establish.sends.2", "create-destination", "P20"], [4, "acts.retry-import.guards.0", "import-spent", "P29"],
   ];
-  // The places that the note's rows state, that no form can say, and whose rule is not written yet. Each is a mark whose row is
-  // the entry of the I3 deltas note, and the package has no rule for it. The genesis holds two send marks, which the contract's
-  // revision 19 lets a list hold when at most one does not state `always`: both state it (its section 6.1; witness 18.45).
-  const unlisted = [[4, "acts.retry-import.guards.0", "import-spent", "EP7"]];
   expect(directory.acts["establish"]!.sends.map((send) => ("code" in send ? [send.code, send.always ?? false] : Object.keys(send)))).toEqual([["create"], ["create-rules", true], ["create-destination", true]]);
-  expect(valid.marks.map((m) => [m.place, m.path, m.code, m.row]).sort()).toEqual([...listed, ...unlisted].sort());
+  expect(valid.marks.map((m) => [m.place, m.path, m.code, m.row]).sort()).toEqual([...listed].sort());
+  // The whole-scope rule (the contract's section 6.1): a version with a mark and no rule runs nothing. The package has a rule of the
+  // kind of its place for every mark, so a directory can be created under the package's rules. Without any one of them it cannot.
   const { rules } = platform(DIRECTORY)!;
-  expect([rules === directoryRules, valid.marks.filter((mark) => !Object.hasOwn(rules, mark.code)).map((mark) => mark.code).sort()]).toEqual([true, ["import-spent"]]);
-  // The whole-scope rule (the contract's section 6.1): a version with a mark and no rule runs nothing. With a stand-in for each of
-  // the three, of test support, it can be run, and without any one of them it cannot.
-  expect([runnable(valid, rules), runnable(valid, { ...rules, ...directoryStandIns }), ...Object.keys(directoryStandIns).map((lost) => runnable(valid, { ...rules, ...directoryStandIns, [lost]: undefined as never }))])
-    .toEqual([false, true, false]);
+  expect([rules === directoryRules, valid.marks.filter((mark) => !Object.hasOwn(rules, mark.code)).map((mark) => mark.code)]).toEqual([true, []]);
+  expect([runnable(valid, rules), ...Object.keys(rules).map((lost) => runnable(valid, { ...rules, [lost]: undefined as never }))]).toEqual([true, ...Object.keys(rules).map(() => false)]);
 });
 
 // The plan's T50, the directory's table: each rule of `platform:directory@1` as a plain function, from its row of the note's table
@@ -166,7 +164,7 @@ describe("the rules of platform:directory@1, each as a plain function (authority
   test("the table has exactly the rules that the note's table of marks names for the directory and that are written, each of the kind of its place; the evidence of a confirmed import states the imported head", () => {
     expect(Object.entries(directoryRules).map(([name, rule]) => [name, rule.place, "refusals" in rule ? rule.refusals : "most" in rule ? rule.most : null])).toEqual([
       ["open-import", "effect", 2], ["next-number", "effect", 2], ["definition-active", "guard", ["not-activated"]], ["worker-standing", "guard", ["worker-not-active"]], ["reopen-import", "effect", 2],
-      ["index-row", "effect", 32], ["index-number", "effect", 2], ["create-lane", "send", null], ["create-rules", "send", null], ["create-destination", "send", null], ["import", "outcome", null],
+      ["import-spent", "guard", ["import-not-spent"]], ["index-row", "effect", 32], ["index-number", "effect", 2], ["create-lane", "send", null], ["create-rules", "send", null], ["create-destination", "send", null], ["import", "outcome", null],
     ]);
     // Row d: basis `own-answer`, so no read is decisive; it selects nothing; another attempt may follow.
     const { rules: outcome } = directoryRules["import"] as { rules: OutcomeRule };
@@ -349,27 +347,36 @@ test("a `compromised` notice from the repository's membership scope is sent on t
   const other = notice({ scope: membership.scope, kind: "membership", inc: newIncarnation(new Uint8Array(16).fill(80)) });
   expect(other.sends.map((send) => send.message)).toMatchObject([{ class: "result", outcome: "refused", reason: { code: "guard-failed", name: "not-the-membership" } }]);
 
-  // The import that the founding opened, with 3 attempts. `retry-import` waits until they are used (a STAND-IN guard).
-  const retry = () => d.act(rita, "retry-import", { on: 0, expected: { on: d.item(0).revision } });
+  // The import that the founding opened, with 3 attempts. `retry-import` waits until they are used, by the rule `import-spent`
+  // (revision 25, row u): every stated attempt is opened and has an outcome. A directory that was founded with no import is never
+  // spent: it asked for none.
+  const retry = (of = d) => of.act(rita, "retry-import", { on: 0, expected: { on: of.item(0).revision } });
   const first = [...d.entries].reverse().find(({ entry }) => entry.effects.some((effect) => effect.effect === "operation"))!.entry.seq;
   const operation = `${first}:0` as const;
-  expect(said(retry())).toEqual(["refused", "guard-failed", "import-not-spent"]);
+  const NOT_SPENT = ["refused", "guard-failed", "import-not-spent"];
+  expect([said(retry()), said(retry(new Directory()))]).toEqual([NOT_SPENT, NOT_SPENT]);
   // A refusal that is not the last tells nobody. A read of the host settles nothing, and neither does an answer that states no head.
   d.outcome(operation, 1, "refused");
   d.outcome(operation, 2, "unknown");
+  // Attempt 3 is opened and has no outcome yet, so the import is not spent.
+  expect(said(retry())).toEqual(NOT_SPENT);
   d.outcome(operation, 3, "refused");
   expect([d.entries.slice(-3).map(({ entry }) => entry.sends), said(d.outcome(operation, 2, "confirmed", { commit: "a".repeat(40) }, "read")), said(d.outcome(operation, 2, "confirmed", { head: "main" }))])
     .toEqual([[[], [], []], ["refused", "bad-input", null], ["refused", "bad-input", null]]);
+  // An `unknown` attempt counts as used: its request was sent, and its outcome is recorded. So the import is spent while attempt 2
+  // is still `unknown`, and one lost reply does not end a founding by import. `retry-import` opens one new import, with 1 attempt.
+  expect(said(retry())).toEqual(WRITTEN);
+  const again = `${d.head.seq}:0` as const;
+  expect(d.state.operation(again)).toMatchObject({ owner: DIRECTORY, kind: "import", most: 1, attempts: [{ attempt: 1 }] });
+  // The new import has no outcome yet, so no second one is opened beside it.
+  expect(said(retry())).toEqual(NOT_SPENT);
   // The last `refused`: every stated attempt is opened and refused. The destination is told `failed`, by an update of the repository item.
   d.outcome(operation, 2, "refused");
   const update = (state: string, detail: Record<string, string>) => [{ n: 0, to: destination, message: { class: "request", type: "relate", body: { name: "import", item: d.fact(0), state, detail } } }];
   expect([d.last.sends, d.last.effects.map((effect) => effect.effect), d.item(0).values["imported"]]).toEqual([update("failed", {}), ["attempt"], null]);
 
-  // `retry-import` opens one new import, with 1 attempt. Its confirmed outcome sets `imported`, and tells the destination `done`.
-  expect(said(retry())).toEqual(WRITTEN);
-  const again = `${d.head.seq}:0` as const;
-  expect(d.state.operation(again)).toMatchObject({ owner: DIRECTORY, kind: "import", most: 1, attempts: [{ attempt: 1 }] });
+  // The confirmed outcome of the new import sets `imported`, and tells the destination `done`.
   const commit = "c".repeat(40);
   expect(said(d.outcome(again, 1, "confirmed", { commit }))).toEqual(WRITTEN);
-  expect([d.last.sends, d.item(0).values["imported"], said(retry())]).toEqual([update("done", { commit }), commit, ["refused", "guard-failed", "import-not-spent"]]);
+  expect([d.last.sends, d.item(0).values["imported"], said(retry())]).toEqual([update("done", { commit }), commit, NOT_SPENT]);
 });
