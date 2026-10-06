@@ -91,6 +91,10 @@ export interface Statement {
  * of that table, or the check of section 6.5, that it is read for.
  */
 export interface ReservationRead {
+  /** The merge names the manifest that the statement names. */
+  sound?: boolean;
+  /** Membership head that showed the holders of rules.publish, for the exception record. */
+  controllersHead?: number | undefined;
   /** `observed`: the observation of the key that signed P's `merge` entry. Null: none is at hand. */
   merger: Observation | null;
   /** `observed`: the one observation of the rules scope, asked as "rules". Null: none is at hand. */
@@ -194,7 +198,7 @@ export function judgeReservation({ recorded, evidence, statement, read, time }: 
   // one `job` or one `decidedBy`: the lane's `collect` gives one record for an item, and a deciding entry sets one job.
   const [own, twice] = [(fact: FactRef) => fact.at.scope === statement.operation.at.scope && fact.at.inc === statement.operation.at.inc, (facts: readonly FactRef[]) => new Set(facts.map((fact) => canonicalize(fact))).size !== facts.length];
   const [reviews, jobs, deciding] = [statement.verdicts.map((verdict) => verdict.review), statement.jobs.map((job) => job.job), statement.jobs.flatMap((job) => (job.decidedBy ? [job.decidedBy] : []))];
-  let invalid = manifest.reports === null || ![statement.manifest, ...reviews, ...jobs, ...deciding].every(own) || twice(reviews) || twice(jobs) || twice(deciding)
+  let invalid = read.sound === false || manifest.reports === null || ![statement.manifest, ...reviews, ...jobs, ...deciding].every(own) || twice(reviews) || twice(jobs) || twice(deciding)
     || statement.verdicts.some((_, n) => read.verdicts[n]?.sound !== true);
   const changesAsked = statement.verdicts.some((verdict) => verdict.verdict === "request-changes");
   const approvals = statement.verdicts.flatMap((verdict, n) => {
@@ -268,7 +272,7 @@ export function judgeReservation({ recorded, evidence, statement, read, time }: 
   if (ordered.length > 0) return no(`rules-not-met:${ordered.join(",")}`);
   if (touched.unclassified.length > 0) return no("rules-not-met");
   if (!manifest.complete) return no("incomplete");
-  return { reserved: true, integration: manifest.integration, reason: used ? `single-controller:${RULES_EXTENT}:${excepted}:m${merger.head.seq}:r${read.rules.revision}:h${read.rules.head.seq}` : null };
+  return { reserved: true, integration: manifest.integration, reason: used ? `single-controller:${RULES_EXTENT}:${excepted}:m${read.controllersHead ?? merger.head.seq}:r${read.rules.revision}:h${read.rules.head.seq}` : null };
 }
 
 const OBJECT_ID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
