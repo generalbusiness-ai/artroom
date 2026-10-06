@@ -21,7 +21,8 @@ export interface PendingCopy { name: string; kind: ScopeKind; states: readonly s
 
 /**
  * The known declared duty terms, in Amount form: entries, declared future requests, and their entries' stand-in bytes, including
- * each result's foreign source entry. Item/record terms and other retained inputs remain owed under cc570904. The numeric
+ * each result's foreign source entry, a declared primary opening and a possible first relationship copy. Other item/record
+ * terms and retained inputs remain owed under cc570904. The numeric
  * fields of Capacity are entry projections of these amounts, not a second calculation or five-dimensional admission.
  */
 export interface DutyAmounts {
@@ -51,6 +52,9 @@ export interface Capacity {
  */
 export function capacityOf(d: Pick<Defining, "bad" | "bounds" | "duties" | "clauseSets" | "types">, graph: TimedGraph, moves: readonly TimedMove[]): Capacity {
   const entry: Amount = { ...NOTHING, entries: 1, bytes: d.bounds.entryBytes };
+  // One settling form's own entry and declared openings. Changes to existing subjects and to the copy being settled create
+  // no new item/key. Initial-state duties remain in starts, so the opening unit is included once, beside those duties.
+  const entryFor = (form: Duties): Amount => sum(entry, { ...NOTHING, items: form.opens === null ? 0 : 1, records: form.mayCreateCopy ? 1 : 0 });
   const deadline = (entries: number): Amount => times(entries, entry);
   /** A deadline's known amount in that state, with each timed entry at the entry-size stand-in. */
   const held = (type: string, state: string): Amount => deadline(graph.fromState.get(type)?.get(state) ?? 0);
@@ -65,7 +69,7 @@ export function capacityOf(d: Pick<Defining, "bad" | "bounds" | "duties" | "clau
   const unbounded = new Set<Duties>();
   // Revision 22, "A marker duty": an item of a type that some form settles by a mark reserves by its state and by the marks that
   // are `true`. Every form that settles an item of such a type, by a mark or by state, is counted there, and not below.
-  const markers = markerCapacity(d, { graph, moves, entry, deadline, starts: (set) => starts(set), requests: (form) => requestsOf(form) }, unbounded);
+  const markers = markerCapacity(d, { graph, moves, entry: entryFor, deadline, starts: (set) => starts(set), requests: (form) => requestsOf(form) }, unbounded);
   for (const form of d.duties) {
     if (form.settles && "subject" in form.settles && !markers.marked(form.settles.type)) for (const state of new Set(form.settles.states)) settlers.set(key(form.settles.type, state), [...(settlers.get(key(form.settles.type, state)) ?? []), form]);
   }
@@ -128,7 +132,7 @@ export function capacityOf(d: Pick<Defining, "bad" | "bounds" | "duties" | "clau
   const amountOf = (form: Duties): Amount => {
     const settled = form.settles && "subject" in form.settles ? form.settles : undefined;
     forms.push(form);
-    const amount = sum(entry, starts(form.sets, settled), requestsOf(form));
+    const amount = sum(entryFor(form), starts(form.sets, settled), requestsOf(form));
     forms.pop();
     return amount;
   };

@@ -61,7 +61,7 @@ export function setOnce(d: Defining): void {
 export interface Counting {
   graph: TimedGraph;
   moves: readonly TimedMove[];
-  entry: Amount;
+  entry(form: Duties): Amount;
   deadline(entries: number): Amount;
   starts(set: ClauseSet): Amount;
   requests(form: Duties): Amount;
@@ -107,7 +107,7 @@ export function markerCapacity(d: Pick<Defining, "duties" | "types">, count: Cou
   const base = (form: MarkerForm): Amount => {
     const from = origin.get(form)!;
     const subject = from.settles && "subject" in from.settles ? from.settles.subject : null;
-    return sum(count.entry, count.starts(from.sets.filter((e) => e.subject !== subject)), count.requests(from));
+    return sum(count.entry(from), count.starts(from.sets.filter((e) => e.subject !== subject)), count.requests(from));
   };
   const amounts = markerReservations(markers, (_, form) => base(form), (name, state) => {
     const forms = markers[name]!.forms;
