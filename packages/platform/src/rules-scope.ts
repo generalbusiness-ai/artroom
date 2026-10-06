@@ -36,7 +36,7 @@ import type { DeclaredDefinition, Digest, MemberObservation, PlatformData, Platf
 import { isDigest, isMemberRef } from "@generalbusiness/artroom-bytes";
 import { byteOrder, validateDefinition } from "@generalbusiness/artroom-derive";
 import type { Item, RecordedRef, Rules, StateView } from "@generalbusiness/artroom-derive";
-import { isExtents } from "./extents.ts";
+import { holdsRulesExtent, isExtents } from "./extents.ts";
 
 /** The name and version that this data and these rules are. */
 export const RULES_SCOPE = "platform:rules@1" satisfies PlatformDefinition;
@@ -175,6 +175,9 @@ export const rulesScope: PlatformData = {
         },
         // Each check's `checker` is a member with the role `checker`, by an observation of membership that the entry retains (Code P19).
         { code: "checkers", row: "P19" },
+        // From revision 25: the fixed minimum of the `rules` extent, the one extent with no pattern, and the checks that an extent
+        // names (row x of the further marks, P28). After the two older guards.
+        { code: "extents-hold", row: "P28" },
       ],
       effects: [
         { value: { slot: "approvals", from: { field: "approvals" } } },
@@ -340,6 +343,35 @@ export const rulesScopeRules: Rules = {
    * is `bad-field` (case i of section 12.1.4). It reads the value alone.
    */
   "extent-list": { place: "type", run: (_given, value) => isExtents(value) },
+  /**
+   * Row x, the third guard of `publish` (P28): the three checks of section
+   * 12.1.4, in this order. The first that fails gives its name, under
+   * `guard-failed`.
+   *
+   * 1. `rules-extent-required` (case f). The fixed minimum of the `rules`
+   *    extent: `extents` holds an extent named `rules` with the four
+   *    patterns of the first definition, at least 1 approval, the approver
+   *    `rules.publish` and the class `authority` (`holdsRulesExtent`).
+   * 2. `catch-all-required` (case g). Exactly one extent has no pattern:
+   *    the one that holds every path that no pattern matches. So no path
+   *    is unclassified.
+   * 3. `extent-check-unknown` (case h). Each name in an extent's `checks`
+   *    is the `name` of a check in the field `checks` of the same act.
+   *
+   * It reads the fields `extents` and `checks`, as read, and nothing else:
+   * no state, no observation and no value. So it is always completed.
+   */
+  "extents-hold": {
+    place: "guard", refusals: ["rules-extent-required", "catch-all-required", "extent-check-unknown"],
+    run: (given) => {
+      const { extents, checks } = given.resolved.fields;
+      if (!isExtents(extents) || !Array.isArray(checks)) throw new Error("this rule stands in `publish`, whose field `extents` is of the type `extent-list` and which names its checks");
+      if (!holdsRulesExtent(extents)) return { holds: false, name: "rules-extent-required" };
+      if (extents.filter((extent) => extent.patterns.length === 0).length !== 1) return { holds: false, name: "catch-all-required" };
+      const named = new Set(checks.map((check) => (isRecord(check) ? check["name"] : null)));
+      return extents.every((extent) => extent.checks.every((check) => named.has(check))) ? { holds: true } : { holds: false, name: "extent-check-unknown" };
+    },
+  },
   /**
    * Row 27, among the guards of `publish` (P19). It reads `observed`: one
    * `MemberObservation` for each check's `checker`, of the membership scope

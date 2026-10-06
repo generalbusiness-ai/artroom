@@ -62,11 +62,12 @@ test("the rules definition validates whole with the platform option; its marks a
   expect(checked.definition.marks.map((m) => [m.place, m.path, m.code, m.row]).sort()).toEqual([
     [3, "acts.publish.fields.extents", "extent-list", "P28"], [3, "items.rules.values.extents.of", "extent-list", "P28"],
     [4, "acts.activate.guards.0", "definition-bytes", "P21"], [4, "acts.keep-configuration.guards.0", "configuration-bytes", "P18"], [4, "acts.publish.guards.1", "checkers", "P19"],
+    [4, "acts.publish.guards.2", "extents-hold", "P28"],
   ]);
   // The table has exactly the rules that the note names, each of the kind of its place, with the refusal names that its row states.
   expect(Object.entries(rulesScopeRules).map(([name, rule]) => [name, rule.place, "refusals" in rule ? rule.refusals : null, rule.clock ?? false]).sort()).toEqual([
     ["checkers", "guard", ["not-a-checker"], false], ["configuration-bytes", "guard", ["configuration-mismatch"], false], ["definition-bytes", "guard", ["unsupported-definition"], false],
-    ["extent-list", "type", null, false],
+    ["extent-list", "type", null, false], ["extents-hold", "guard", ["rules-extent-required", "catch-all-required", "extent-check-unknown"], false],
   ]);
   // The whole-scope rule (the contract's section 6.1): the package's own rules run the version, with no stand-in. Without any one of
   // the three, or with a rule of another place under a name, it is not runnable.
@@ -213,7 +214,7 @@ test("rules-wanted from a lane is applied by one entry that changes nothing: the
 });
 
 // Section 12.1.4, "The rows of the rules scope, changed in revision 25", cases f to j: the missing forms 2, 3 and 14 of section 12.1.4a.
-test("publish keeps the extents that it states, whole, and the scope holds them; a list outside the bounds of an extent is refused bad-field", () => {
+test("publish keeps the extents that it states, whole, and the scope holds them; a list outside the bounds of an extent is refused bad-field; one without the fixed minimum of the rules extent, without exactly one extent that has no pattern, or with a check that the act does not hold is refused by name", () => {
   const r = new Rulebook();
   // A repository's own extents: one more pattern in `rules`, a layer of its own, and the extent with no pattern under another name.
   const [rules, infrastructure] = FIRST as [Extent, Extent, Extent];
@@ -230,4 +231,24 @@ test("publish keeps the extents that it states, whole, and the scope holds them;
   const nine = [...own, ...["a", "b", "c", "d", "e"].map((name) => ({ ...own[2]!, name }))];
   expect([said(publish(r, [], [], { extents: [{ ...rules }, infrastructure, { ...own[3]!, name: "Code" }] })), said(publish(r, [], [], { extents: nine })), said(publish(r, [], [], { extents: nine.slice(0, 8) })), r.item(0).values["extents"]])
     .toEqual([["refused", "bad-field", null], ["refused", "bad-field", null], WRITTEN, nine.slice(0, 8)]);
+
+  // The rule `extents-hold`, the third guard: three checks in order, each refused `guard-failed` under its name.
+  const before = r.item(0);
+  const refusedAs = (name: string) => ["refused", "guard-failed", name];
+  const stated = (extents: readonly unknown[], checks: readonly unknown[] = [], observed: readonly ReturnType<typeof standing>[] = []) => said(publish(r, checks, observed, { extents }));
+  const [, , docs, code] = own as [Extent, Extent, Extent, Extent];
+  // Case f: no extent named `rules`; one that lacks a pattern of the four; one that lowers the approvals, or names another approver or class.
+  const lesser = (over: Partial<Extent>) => stated([{ ...rules, ...over }, infrastructure, code]);
+  expect([stated([infrastructure, code]), lesser({ patterns: rules.patterns.slice(1) }), lesser({ approvals: 0 }), lesser({ approver: "change.merge" }), lesser({ class: "deployment" }), stated([{ ...rules, name: "policy" }, infrastructure, code])])
+    .toEqual(Array(6).fill(refusedAs("rules-extent-required")));
+  // Case g: two extents with no pattern, or none.
+  expect([stated([rules, { ...docs, patterns: [] }, code]), stated([rules, infrastructure, docs])]).toEqual(Array(2).fill(refusedAs("catch-all-required")));
+  // Case h: an extent names a check that the same act does not hold. With the check in the act it is written.
+  keep(r, unit);
+  const [checked, seen] = [[rules, infrastructure, { ...code, checks: ["unit"] }], [standing("@check", 7)]];
+  expect([stated(checked), stated(checked, [check(lint)], seen), r.item(0)]).toEqual([refusedAs("extent-check-unknown"), ["refused", "guard-failed", "configuration-unknown"], before]);
+  expect([stated(checked, [check(unit)], seen), r.item(0).values["extents"]]).toEqual([WRITTEN, checked]);
+  // The first check that fails gives its name: a list with no `rules` extent and no extent without a pattern, and one with no extent
+  // without a pattern and an unknown check.
+  expect([stated([infrastructure, docs]), stated([rules, infrastructure, { ...docs, checks: ["absent"] }])]).toEqual([refusedAs("rules-extent-required"), refusedAs("catch-all-required")]);
 });
