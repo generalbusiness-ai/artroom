@@ -151,6 +151,8 @@ production token delivery, browser session or cloud deployment.
 | Checker `5255923a`: a no-account clause could use a final holder's retained cleanup count | `7b674fa8f` faults before an unrelated draw. The result stays offered and the state/head unchanged; nonfinal draws and final own-account cleanup remain valid. The guard-removal control distinguishes. |
 | Erased text could hide whether a bare `bad-field` refusal reached binding | Owner disposition `4157eaa2` and source `1a114ae51` stop before an unproved draw. Two actually judged histories have different counts before erasure and both stop before the deciding entry afterward. Ordinary redacted decisions keep their credit; removing the ambiguity guard fails the coverage assertion. |
 | A prior checked delivery can prove an erased text's size bound | `095b3f380` uses a successful earlier field check in the same scope, incarnation and checked prefix, including superseded tells. An equal or smaller maximum proves the deciding size check; a larger maximum leaves it ambiguous. The larger-maximum control distinguishes. No code or guard is rerun and no text size is guessed. |
+| Checker `eb03426a`: accepted outcome names could read inherited domains or lose their reservation table entry | `530e39fe6` reads only own domain declarations and builds tables without prototype setters. Strict canonical-loaded `__proto__`, `constructor` and `toString` follow ordinary validation; an explicitly declared `__proto__` held kind keeps the same positive kind, holder and addition amounts as an ordinary name. Restoring either old branch fails an assertion. No name is banned and no amount formula changes. |
+| Checker `44739493`: replay admission omitted pinned platform owners and their positive legacy closure | `8eaf531f2` uses the runtime's shared owner adapter at the final `fits` check. Actual register data/rules judge and fold genesis and a founding in memory; no host answers. Its pending creation needs 93 entries in the controlled witness, and a scripted external reservation needs four more. Tight budgets fail at the founding, sufficient budgets replay consistently, and restoring the raw-owner call fails the mismatch assertion. No capacity formula or production ceiling changes. |
 
 The worker reports and the integration logs record these controls as
 `DISTINGUISHES`, by assertions. The tests label their scripted histories,
@@ -254,3 +256,18 @@ elapsed, 36.46 user CPU and 6.97 system CPU. Logs are
 `/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.236Ce8Bbdp`.
 This annotation changes this note only. The preceding failed run remains
 an unexplained failure, rather than a credited functional repair.
+
+That candidate was filed as `057392c6cc851a79ba7ea65ca6e94d460315ddc5`
+under milestone request `8eb14bd1`, primary artifact `84e29afd` and
+ordinary review invitation `4b6abd64`. Review `5b0ce240` requested
+changes for the outcome-name defect, with its early, partial source
+coverage explicit. The requester accepted that disposition. Source
+`530e39fe6` repairs it; all 33 focused holds tests and the derive
+typecheck passed, and both controls distinguished. The gate at
+`436026fec` is now historical evidence, rather than validation of the
+amended source. Source `8eaf531f2` repairs the separately confirmed
+current replay owner-composition defect `44739493`; its five focused
+replay tests and replay typecheck passed. Its old-call control reports
+`DISTINGUISHES` by an assertion. Both repairs are integrated before the
+amended source gate and replacement filing. The final amended gate and
+head will be recorded below once that gate completes.
