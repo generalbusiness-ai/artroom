@@ -34,25 +34,26 @@ export const OBSERVES_ROWS = 8;
  * its read, its use and its `prior` (section 16.1, check 7: "each
  * observation at the largest size of its kind").
  *
- * LABELLED PROPOSALS. The contract states one of these numbers: 48,931
- * bytes for the `content` of an observation of the rules, as a sum by the
- * declared types (section 16.1, "The size of `content`, and the bound").
- * For the other kinds it says that the largest is R4's to count, and the
- * type of an `Observation` bounds neither `role` nor `actions`. So this
- * states the two bounds that no text states: a role of at most 64 bytes,
- * and at most `listElements` actions of at most 64 bytes each. An answer
- * that is longer than the size of its kind is no answer, in the read and in
- * the commit (`observes.ts`, `fits`), so the count holds for every entry
- * that is written (I3 deltas, entry GA3).
+ * Authority revision 28 fixes the supported membership handle grammar to
+ * ASCII letters, digits and hyphens, and action names to ASCII letters,
+ * digits, hyphens and full stops. Neither needs JSON escaping. A handle
+ * still takes at most `memberBytes`; a role takes at most 64 bytes and an
+ * action list at most `listElements` names of 64 bytes. These size caps
+ * are checked again for each observation before it serves a row.
+ *
+ * The rules content ceiling is 49,571 bytes at a 256-byte handle (authority
+ * revision 28, section 3.3). The earlier 48,931 used 236-byte handles.
+ * This counts observations and the fixed entry frame, not the outcome's
+ * copied uses or effects; their separate whole-entry check remains owed.
  */
 export function observationBytes(of: Observe["of"], bounds: Bounds, most = 0): number {
-  const id = 2 + 6 * bounds.memberBytes;
+  const id = 2 + bounds.memberBytes;
   // `of`, `head`, `definition` and `at`, with the read, the use and `prior`.
   const common = SCOPE_BYTES + 128 + 96 + 40 + 320;
   switch (of) {
     case "key": return common + 96 + 2 * id + 2 * 96 + SCOPE_BYTES + 128 + bounds.listElements * 67;
     case "member": return common + 2 * id + 2 * 96 + 64;
-    case "rules": case "definitions": return common + 32 + 48_931;
+    case "rules": case "definitions": return common + 32 + 49_571;
     case "holders": return common + 96 + 32 + most * (id + 1);
   }
 }
