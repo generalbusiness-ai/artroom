@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import { PROPOSED_BOUNDS, type DeclaredDefinition } from "@generalbusiness/artroom-contract";
-import { canonicalize, definitionDigest, newIncarnation } from "@generalbusiness/artroom-bytes";
+import { canonicalize, definitionDigest, isObservationUse, newIncarnation } from "@generalbusiness/artroom-bytes";
 import { PROFILES, derivable, runnable, validateDefinition, valueDigest } from "@generalbusiness/artroom-derive";
 import type { ActJudgment, Judgment } from "@generalbusiness/artroom-derive";
 import { d, desk, deskDefinition, directory, keys, membership, ticket, ticketDefinition } from "@generalbusiness/artroom-derive/testing";
@@ -81,7 +81,7 @@ test("the rules definition validates whole with the platform option; its marks a
 test("the genesis opens the rules with the branch, the directory and membership's scope ID, and the other values at their defaults; the scope records that ID and no incarnation; a provisional rules scope admits no act", () => {
   const r = new Rulebook();
   const rules = r.item(0);
-  expect([rules.type, rules.state, rules.values, rules.refs]).toEqual(["rules", "current", { branch: BRANCH, membership: membership.scope, approvals: 1, ownerMayReview: false, checks: null, labels: null, extents: null }, { directory: r.registrar.at }]);
+  expect([rules.type, rules.state, rules.values, rules.refs]).toEqual(["rules", "current", { branch: BRANCH, membership: membership.scope, approvals: 1, ownerMayReview: false, checks: null, labels: null, extents: null, singleControllerException: false }, { directory: r.registrar.at }]);
   expect([membershipId(r.state), membershipId(r.registrar.state)]).toEqual([membership.scope, null]);
   // The creation's fields hold the ID as a text, which fits the slot: a scope ID is at most 64 bytes.
   expect(membership.scope.length).toBeLessThanOrEqual(64);
@@ -148,7 +148,7 @@ test("publish sets the rules when each check's configuration is kept and each ch
   const extra = standing("@other", 3);
   expect(said(publish(r, [...checks, { ...check(unit), name: "unit-again" }], [checkB, extra, checkA]))).toEqual(WRITTEN);
   expect([r.item(0).values, r.last.input.type === "act" && r.last.input.observed]).toEqual([
-    { branch: BRANCH, membership: membership.scope, approvals: 2, ownerMayReview: true, checks: [...checks, { ...check(unit), name: "unit-again" }], labels: ["bug"], extents: FIRST }, [checkA, checkB],
+    { branch: BRANCH, membership: membership.scope, approvals: 2, ownerMayReview: true, checks: [...checks, { ...check(unit), name: "unit-again" }], labels: ["bug"], extents: FIRST, singleControllerException: false }, [checkA, checkB],
   ]);
   // Rules with no check read no observation: the entry has no member `observed`.
   expect([said(publish(r, [], [checkA])), "observed" in r.last.input, r.item(0).values["checks"]]).toEqual([WRITTEN, false, []]);
@@ -251,4 +251,20 @@ test("publish keeps the extents that it states, whole, and the scope holds them;
   // The first check that fails gives its name: a list with no `rules` extent and no extent without a pattern, and one with no extent
   // without a pattern and an unknown check.
   expect([stated([infrastructure, docs]), stated([rules, infrastructure, { ...docs, checks: ["absent"] }])]).toEqual([refusedAs("rules-extent-required"), refusedAs("catch-all-required")]);
+});
+
+// Section 12.1.4, case j, and section 12.1.4a, "Which rules declare it" (the missing form 14); the contract's revision 19, row I3-36.
+test("the declaration of the single-controller exception is false from the genesis, a publish sets it, and a publish that does not state it withdraws it; the record of an observation of the rules takes the declaration, and takes no extents", () => {
+  const r = new Rulebook();
+  const declared = () => r.item(0).values["singleControllerException"];
+  // `publish` has no guard on the number of controllers: the declaration may be made at any time, and gives nobody anything by itself.
+  expect([declared(), said(publish(r, [], [], { singleControllerException: true })), declared()]).toEqual([false, WRITTEN, true]);
+  // Case j: a `publish` with no such field, after one that declared it. Written, and the value is false.
+  expect([said(publish(r, [])), declared(), said(publish(r, [], [], { singleControllerException: "yes" }))[1]]).toEqual([WRITTEN, false, "bad-field"]);
+
+  // What an entry may retain of the rules: the fixed record of the contract, with the declaration under this definition. A record
+  // with a member `extents` is no observation: the contract states no such member, so no observation carries the extents.
+  const content = { asked: "rules", approvals: 1, ownerMayReview: false, checks: [], labels: [] };
+  const use = (over: Record<string, unknown>) => isObservationUse({ observation: { subject: "rules", of: r.at, head: r.head, revision: 0, content: { ...content, ...over }, definition: RULES_SCOPE, at: standing("@check", 1).observation.at }, read: { run: "r1", n: 1 }, use: "fresh", prior: null });
+  expect([use({}), use({ singleControllerException: true }), use({ singleControllerException: "yes" }), use({ singleControllerException: false, extents: FIRST })]).toEqual([true, true, false, false]);
 });

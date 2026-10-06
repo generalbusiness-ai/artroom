@@ -207,7 +207,8 @@ const furtherObservation = variant("subject", {
   rules: record({
     ...observedFrom, subject: any, revision: isLocalId,
     content: variant("asked", {
-      rules: record({ asked: any, approvals: isLocalId, ownerMayReview: flag, checks: listOf(record({ name: text, configuration: isDigest, required: flag, checker: isMemberId })), labels: listOf(text) }),
+      // Revision 19 (row I3-36): under a rules definition whose data states the value, the record also holds `singleControllerException`.
+      rules: record({ asked: any, approvals: isLocalId, ownerMayReview: flag, checks: listOf(record({ name: text, configuration: isDigest, required: flag, checker: isMemberId })), labels: listOf(text) }, { singleControllerException: flag }),
       definitions: record({ asked: any, active: listOf(record({ digest: isDigest, name: text })) }),
     }),
   }),

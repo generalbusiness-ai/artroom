@@ -51,11 +51,27 @@ export interface MemberObservation {
   at: Timestamp;                   // the observer's clock when the read began
 }
 
-/** What the rules scope holds at one head: one of two fixed records, by what the reader asked for (section 16.1). */
+/**
+ * What the rules scope holds at one head: one of two fixed records, by what
+ * the reader asked for (section 16.1).
+ *
+ * `singleControllerException` (revision 19, "The declaration of the
+ * single-controller exception"; source row I3-36): under a rules
+ * definition whose item `rules` states a value of that name, the record
+ * that was asked as "rules" holds the member, always, and it is false when
+ * the repository never set it. Under a rules definition whose data does
+ * not state the value the record has no such member. The observation
+ * states its `definition`, so a reader knows which to expect. A reader
+ * takes anything but `true` as no declaration.
+ *
+ * The record holds no member `extents`: the authority note asks the
+ * contract for it, and no revision of the contract states it.
+ */
 export type RulesContent =
   | { asked: "rules"; approvals: number; ownerMayReview: boolean;
       checks: readonly { name: string; configuration: Digest; required: boolean; checker: MemberId }[];
-      labels: readonly string[] }
+      labels: readonly string[];
+      singleControllerException?: boolean }
   | { asked: "definitions"; active: readonly { digest: Digest; name: string }[] };
 
 /** An observation of the rules scope (section 16.1). It stands only in the member `observed` of an input. */

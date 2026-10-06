@@ -108,6 +108,8 @@ export const rulesScope: PlatformData = {
         // From revision 25: the extents that the last `publish` stated, whole. Unset until the first `publish`, and a slot whose
         // type is a mark takes no default: `extentsOf`, below, gives the first definition meanwhile.
         extents: { fixed: false, required: false, of: EXTENT_LIST },
+        // From revision 25: the declaration of the single-controller exception (section 12.1.4a). False from the genesis.
+        singleControllerException: { fixed: false, required: true, of: { type: "bool" }, default: false },
       },
     },
     // The second row. A lane is created only under a digest that an item of this type holds as `active` (section 12.1.2).
@@ -166,6 +168,8 @@ export const rulesScope: PlatformData = {
         checks: { ...CHECKS, required: true },
         labels: { ...LABELS, required: true },
         extents: { ...EXTENT_LIST, required: true },
+        // Optional, with the default false: a `publish` that does not state the declaration withdraws it. That fails closed.
+        singleControllerException: { type: "bool", required: false, default: false },
       },
       guards: [
         // Each check's `configuration` is kept.
@@ -186,6 +190,7 @@ export const rulesScope: PlatformData = {
         { value: { slot: "labels", from: { field: "labels" } } },
         // A written effect: a value of a marked type is assignable to a slot of the same mark (the contract's section 6.1).
         { value: { slot: "extents", from: { field: "extents" } } },
+        { value: { slot: "singleControllerException", from: { field: "singleControllerException" } } },
       ],
       sends: [],
       attention: [],
