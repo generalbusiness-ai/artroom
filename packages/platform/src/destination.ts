@@ -21,7 +21,7 @@
  * | `open-withdrawn` | 5, effect | 34 | `withdraw` |
  * | `open-branch-read` | 5, effect | 36 | `adopt-head` |
  * | `reopen-publish` | 5, effect | 37 | `resend` |
- * | `collect-list` | 3, type | b | `reserve`, the fields `verdicts`, `jobs` and `links` |
+ * | `collect-list` | 3, type | b | `reserve`, the fields `verdicts`, `jobs` and `links`; a verdict may state `extent` |
  *
  * **The marks that have NO rule here.** The adopted texts do not let any of
  * them be written whole, and none is invented. So the version lacks rules,
@@ -73,11 +73,13 @@ export const DESTINATION_KINDS = { firstHead: "first-head", judge: "judge", push
 export const DESTINATION_ATTEMPTS = { firstHead: 3, judge: 1, adoptRead: 1, resend: 1 } as const;
 
 /**
- * The most records of each `collect` list of a `reserve` (row b): "up to
- * the `max` of the sender's type". The sender is a lane under `change`, and
- * the numbers are those of its item types `review`, `job` and `link`
- * (`packages/lanes/src/change.ts`). This package does not read that
- * definition, so they are written here (entry ER3).
+ * The most records of each `collect` list of a `reserve` (row b; section
+ * 12.1.5, "The three lists of `reserve`"). They are constants of version 1
+ * of the rule `collect-list`. They equal the `max` of the types `review`,
+ * `job` and `link` of the pinned `change` lane. The rule does not read them
+ * from the sender's pinned definition: a rule is given no definition of
+ * another scope. If the lane's row or a `max` changes, this changes with
+ * it, in a revision of the note (entry ER3).
  */
 export const COLLECT_MOST = { verdicts: 256, jobs: 64, links: 32 } as const;
 
@@ -243,8 +245,7 @@ export const destination: PlatformData = {
         manifest: { ...MANIFEST, required: true },
         verdicts: COLLECTED,
         jobs: COLLECTED,
-        // The note gives `links` no type. A list of records that each hold a fact would have every one fetched, and section 6.5
-        // fetches none of them. So it is typed as the two other `collect` lists are (entry ER3).
+        // The third list, with the same mark (revision 25, "The three lists of `reserve`"; entry ER3).
         links: COLLECTED,
       },
       guards: [
@@ -408,15 +409,21 @@ const record = (value: unknown, required: Readonly<Record<string, (member: unkno
   isObject(value) && Object.keys(required).every((name) => Object.hasOwn(value, name)) && Object.entries(value).every(([name, member]) => (required[name] ?? optional[name])?.(member) === true);
 const oneOf = (names: readonly string[]) => (value: unknown): boolean => typeof value === "string" && names.includes(value);
 
+/** The name of one extent, as a verdict states it: lowercase letters, digits and hyphens, at most 64 bytes (section 12.1.4a, "The exact text of `reason`"). */
+const isExtentName = (value: unknown): boolean => typeof value === "string" && /^[a-z0-9-]{1,64}$/.test(value);
+
 /**
  * One record of each `collect` list of a `reserve`, as the lane's `merge`
  * row sends it (R2 section 4.2; the eligibility statement of section 6.3).
- * An item of the lane is named by the fact of the entry that opened it. A
- * job that is `requested` has no deciding entry, so `decidedBy` may be
- * absent.
+ * An item of the lane is named by the fact of the entry that opened it,
+ * which is how a send carries a local item. A job that is `requested` has
+ * no deciding entry, so `decidedBy` may be absent. A verdict may state the
+ * one extent that it counts for (the lane forms' revision 15; section
+ * 12.1.4a, "Which reviews count for an extent"). The pinned lane of today
+ * sends none.
  */
 const COLLECTED_RECORD: Readonly<Record<keyof typeof COLLECT_MOST, (value: unknown) => boolean>> = {
-  verdicts: (value) => record(value, { review: isFactRef, reviewer: isMemberRef, verdict: oneOf(["approve", "request-changes"]) }),
+  verdicts: (value) => record(value, { review: isFactRef, reviewer: isMemberRef, verdict: oneOf(["approve", "request-changes"]) }, { extent: isExtentName }),
   jobs: (value) => record(value, { job: isFactRef, name: (name) => typeof name === "string" && utf8(name).length <= 128, state: oneOf(["requested", "passed", "failed", "errored", "timed-out"]) }, { decidedBy: isFactRef }),
   links: (value) => record(value, { link: isFactRef, issue: (issue) => isScopeRef(issue) && issue.kind === "lane" }),
 };
@@ -539,10 +546,15 @@ export const destinationRules: Rules = {
   },
   /**
    * Row b, the type of the fields `verdicts`, `jobs` and `links` of
-   * `reserve` (P25). A `collect` list may hold more than the 32 elements of
-   * a declared list. The value is of the type when it is a list of at most
-   * the `max` of the sender's type, and each element is one record of that
-   * list. Otherwise the message is `bad-field`.
+   * `reserve` (P25; section 12.1.5, "The three lists of `reserve`"). A
+   * `collect` list may hold more than the 32 elements of a declared list.
+   * The value is of the type when it is a list of at most the number of
+   * its field, and each element is one record of that list: a verdict
+   * `review`, `reviewer`, `verdict` and, when it states one, `extent`; a
+   * job `job`, `name`, `state` and, when something decided it,
+   * `decidedBy`; a link `link`, `issue`. A record with another member, or
+   * with a required one missing, and a list with more records, make the
+   * message `bad-field`.
    */
   "collect-list": {
     place: "type",
