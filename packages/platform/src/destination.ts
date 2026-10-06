@@ -1,103 +1,34 @@
 /**
- * `platform:destination@1`, as data, with its rules (authority note,
- * revision 26, sections 6.1 to 6.10, 12.1.5 and 12.2; its table of marks,
- * section 12.1.8, rows 30 to 37 and the further rows b, e, m, n and z). One
- * destination scope for each published branch. It is the only writer of
- * that branch.
+ * platform:destination@1 is the single writer of one published branch.
+ * Its rows implement adopted authority revision 28 (8b1c3c9d7), sections
+ * 3.3, 5.8, 6.1–6.10, 12.1.5 and 12.2, under scope contract revision 23.
  *
- * Revision 26 was approved by the checker, and its adoption was not
- * recorded when this was built (I3 deltas, section 29). It is adopted
- * since, at `f7175296`. Section 12.1.5,
- * "The destination, decided in revision 25", is the rule wherever a row of
- * its tables differs.
+ * A branch and each publication hold the counts that their operations
+ * draw. Recovery acts add room explicitly. A withdraw finds its publication
+ * through the declared operation index and draws its one deciding entry.
  *
- * Some rows are of the note's revision 28, at `8b1c3c9d7`, which its
- * checker approved and whose adoption was not recorded when they were
- * built (I3 deltas, the entries GD). Each is on a form that this source
- * has. They are: the item `receipt`, the act `resend-receipt`, the guard
- * `receipts-owed`, a `resend` on an `unresolved` publication alone, and one
- * read for an operation ("Where a receipt's records stand", and "The rows
- * that change, and three new acts"); the rules T1 to T8 of a token, and
- * the guards that `adopt-read` reads again ("A token whose write can no
- * longer act, and who cleans it up"); and the field `reports` of `reserve`
- * with the written types of `verdicts` and `jobs`, the binding of the
- * reports to the manifest's selections, and each report's commit from its
- * entry (section 6.5, "`reserve` names each selected report"). The pinned
- * `change` lane does not send `reports` yet: that row is the lane forms'.
- * The rows that need `observes`, `holds`, `adds`, `for`, `origin` or an
- * index are not built here yet. The text of a fact and the ref names are
- * written, with the rules `first-head` and `receipt`.
+ * The judge copies the facts retained by reserve, derives two lists of
+ * observation subjects, and judges from those records and retained values.
+ * Its lane reader is destination-reading.ts. The single-controller record
+ * names the membership head that answered the holders observation.
  *
- * One member of the data is one row of the note's tables. A cell of the
- * note that begins "Code" is a mark in this data, at the place where its
- * rule is run (the scope contract, section 6.1), and the rule is in
- * `destinationRules`, below.
+ * First-head and receipt rules compare the commit IDs built by
+ * destination-objects.ts from the contract's fact text and ref names. The
+ * port must supply the repository's object format before writing.
+ * No production port writes destination operations yet. In-memory tests
+ * use labelled host answers; object witnesses also use real local Git.
  *
- * **The rules that are written**, each from its row of the table of marks:
- *
- * | Rule | Place | Row | At |
- * |---|---|---|---|
- * | `declare-first-head` | 5, effect | 30 | `establish`: the operation, and its attempt's `mint`, both held |
- * | `open-first-head` | 5, effect | 31 | `import`: the operation, and its attempt's `mint` |
- * | `open-judge` | 5, effect | 32 | `reserve`: one `judge` at a time, by `branch.judging` |
- * | `publication-of` | 2, `also` | 34 | `withdraw`, the name `publication` |
- * | `open-withdrawn` | 5, effect | 34 | `withdraw` |
- * | `abort-if-behind` | 5, effect | 35 | `compromised` |
- * | `open-branch-read` | 5, effect | 36 | `adopt-head` |
- * | `reopen-publish` | 5, effect | 37 | `resend` and `resend-receipt`: the write, and its attempt's `mint` |
- * | `resend-due` | 4, guard | z | `resend` and `resend-receipt`, refused `resend-not-due` |
- * | `collect-list` | 3, type | b | `reserve`, the field `links`. From revision 28 `verdicts` and `jobs` have written types |
- * | `mint` | 7, outcome | e | The kind `mint` |
- * | `revoke` | 7, outcome | e | The kind `revoke` |
- * | `push` | 7, outcome | e | The kind `push` |
- * | `deciding-read` | 7, outcome | e | The kind `read`, for the branch of a publication |
- * | `adopt-read` | 7, outcome | e | The kind `adopt-read` |
- * | `judge` | 7, outcome | 33 | The kind `judge`. See below: it reserves nothing in this runtime. |
- * | `publication-update` | 7, the send | m, n | The kinds `judge`, `push`, `mint`, `revoke`, `read` and `receipt` |
- *
- * **The rule `judge` is written, and in this runtime it reserves nothing.**
- * Its judgment, `judgeReservation`, and what its outcome yields are
- * written whole. The judge of an outcome gives the rule `observed` and the
- * entries in `uses`, and the rule reads its observations itself
- * (`reservationRead`). Two things still stand between it and a
- * reservation. No runtime reads an observation before the turn of an
- * outcome of this definition, because its data states no row of
- * `observes`: the rows are the authority note's, in a revision that is
- * not adopted (I3 deltas, entries FC6 and GA1). And no text states how an entry of a lane
- * is read by its bytes, so the package has no reader of the manifest, the
- * verdicts and the checks (entries FA9 and FC5). Two reads are stated
- * exactly, and the rule makes them itself: the field `selected` of the
- * manifest's intent, and the commit that a `report` entry set
- * (`reportsBound`). So the rule decides what
- * the evidence and this scope's own records decide: a publication that is
- * no longer `queued`, `evidence-too-large`, a head that is not the
- * recorded head, and an integration commit that is not in the repository.
- * For every other outcome it has a fault: nothing is written, and the
- * publication stays `queued`. A test gives it a stand-in reader of the
- * lane's entries (`destinationRulesWith`).
- *
- * **Every mark has a rule here.** `first-head` and `receipt` compare the
- * commit IDs computed from revision 28's byte forms, and a deciding read
- * runs the same column. `destination-objects.ts` builds both object formats
- * with the fact text and ref names of the adopted scope contract revision
- * 23. The port must supply the repository's object format before writing.
- * No production port writes these destination operations yet. Tests judge
- * their outcomes in memory, with hand-written host answers; a separate
- * witness writes the computed objects with real local Git in both formats.
- *
- * The fence of section 6.8 is not adopted (section 6.8, "The standing of
- * this section"; U2). The data names no fence: no operation, and no kind
- * of outcome.
- *
- * The note's `max`, text lengths and ranges are examples that the proof
- * plan owns. They are written as the note has them.
+ * Section 6.8's proposed fence has no operation here. The bounds are the
+ * authority's proposals, to be measured by the proof plan.
  */
 
 import type { FactRef, FieldValue, KeyId, Observation, OperationId, PlatformData, PlatformDefinition, ScopeId } from "@generalbusiness/artroom-contract";
-import { canonicalize, factRefOf, isFactRef, isScopeRef, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
+import { canonicalize, factRefOf, isDigest, isFactRef, isScopeRef, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
 import type { Item, Opening, Operation, Own, PlatformRule, RecordedRef, RuleEffect, RuleGiven, RuleRequest, Rules, StateView } from "@generalbusiness/artroom-derive";
-import { isJudgeEvidence, isObjectId, judgeReservation, type ReservationRead, type Statement } from "./reservation.ts";
+import { DESTINATION_CHANGED_SET, isJudgeChanges, isRecordedJudgeEvidence, isObjectId, judgeReservation, type ReservationRead, type Statement } from "./reservation.ts";
 import { referenceOf } from "./rules-scope.ts";
+import { isExtents } from "./extents.ts";
+import { decidingKeys, manifestAuthors, readLane } from "./destination-reading.ts";
 import { foundingObjects, receiptObjects, receiptRef, type DestinationCommit, type ObjectFormat } from "./destination-objects.ts";
 
 /** The name and version that this data and these rules are. An operation that the destination opens states it as its owner (the contract's section 4.3). */
@@ -124,83 +55,6 @@ export const DESTINATION_KINDS = { firstHead: "first-head", judge: "judge", push
  * `adopt-read` have 1, and `revoke` has 3.
  */
 export const DESTINATION_ATTEMPTS = { firstHead: 3, judge: 1, push: 3, mint: 1, revoke: 3, read: 1, receipt: 3, adoptRead: 1, resend: 1 } as const;
-
-/**
- * The one named declaration that stands in for the reservation by a
- * publication, for exactly five kinds: `judge`, `push`, `mint`, the
- * deciding `read` and `adopt-read`. It is the closure that each of the five
- * rules declares for one outcome entry, and it is not finite.
- *
- * Why it is stated. The five kinds open each other in a circle: an outcome
- * of a `judge` opens a push, and an outcome of that push opens the next
- * `judge`, for another publication. By kind no number is a closure of one
- * (the scope contract, revision 23, section 17.2a, its opening). The
- * contract's form for this is `holds` on the item type `publication`, and
- * on the branch, with `for` on each operation. The rows of that form are
- * the authority note's, in its revision 28, which is not adopted. Two of
- * the rules that draw on them, `first-head` and `receipt`, are not written.
- * So the counts cannot be derived from this package's rules without
- * inventing them, and none is stated here.
- *
- * What it does, in the generic code, which has no exemption (derive's
- * `ledger.ts` and `reserve.ts`):
- *
- * - The ledger writes an outcome entry of the five kinds whatever it
- *   opens: no opening passes a closure that is not finite.
- * - While an operation of one of the five kinds is open, what the scope
- *   reserves is not finite. So no entry that is new work is admitted, and a
- *   `reserve` whose rule opens a `judge` is never decided: transport
- *   answers "retry". The answer fails closed.
- *
- * What it does not do. It reserves no room. A `reserve` that only queues
- * its publication is admitted with its own entry, and the outcome entries
- * that later open and settle that publication's operations are written
- * with no room that an admission checked: 71 entries by the note's own
- * table (`publicationRoom`). That gap is the one that entries FA3 and FC1
- * of the I3 deltas record. It closes when the data states `holds`.
- */
-// I3 merge: THE AUTHORITY NOTE'S REVISION 28 ROW REPLACES THIS. When its rows of `holds` for a publication and for the branch are
-// adopted, the data states them, each opening of this file states `for`, the kinds state `attempts` and `most`, and this constant
-// and the five declarations go (I3 deltas, entry GB7).
-export const DESTINATION_NOT_FINITE = Number.POSITIVE_INFINITY;
-
-/**
- * What one publication reserves, in entries, by the two rows of the
- * destination in the table of the authority note's section 5.8, counted
- * from the attempts above as that section counts them: "An operation"
- * reserves 2 entries for each attempt, and "a request" 2.
- *
- * - `queued`, 4: 1 entry for the decision to reserve or not; the final
- *   update, a request; and 1 entry for one `withdraw`.
- * - `reserved`, 68: the push, with for each attempt its mint and its
- *   token's revocation, 30; 1 entry for the read that decides; the updates
- *   `reserved` and `unresolved`, two requests; 1 entry for an abort and 1
- *   for the first `compromised` notice; and the receipt, counted as the
- *   push, with 1 entry for its read, 31.
- *
- * Both are reserved "when" the `reserve` is delivered, which "is admitted
- * only with the room of this row and the next": 72 entries, and 73 with
- * the delivery's own.
- *
- * **THIS COUNT IS NOT HELD BY ANY RUNTIME** (I3 deltas, entries FA3, FC1
- * and GB7). The data of this definition states no `holds` yet, so no
- * publication reserves it: see `DESTINATION_NOT_FINITE`, below. `asked` is
- * what the table counts for the `judge` that a `reserve` may open: its 2
- * outcome entries, of which the table counts 1, the decision. `unreserved`
- * is the rest of the table: the entries that a publication which was
- * admitted while `queued` may write in entries that are never asked whether
- * they fit. It is 71. `platform/test/definitions.test.ts` holds the
- * numbers, and the kinds that state the declaration, so that neither grows
- * unseen.
- */
-export function publicationRoom(attempts: { push: number; mint: number; revoke: number; receipt: number; judge: number } = DESTINATION_ATTEMPTS): { queued: number; reserved: number; asked: number; unreserved: number } {
-  const [operation, request] = [(most: number) => 2 * most, 2];
-  /** A write, with for each of its attempts a mint and the revocation of its token. */
-  const write = (most: number) => operation(most) + most * (operation(attempts.mint) + operation(attempts.revoke));
-  const queued = 1 + request + 1;
-  const reserved = write(attempts.push) + 1 + 2 * request + 1 + 1 + write(attempts.receipt) + 1;
-  return { queued, reserved, asked: operation(attempts.judge), unreserved: queued + reserved - 1 };
-}
 
 /**
  * The most records of the `collect` list of a `reserve` that keeps the
@@ -313,6 +167,7 @@ export const destination: PlatformData = {
     // Section 12.1.5, the first row of the item table. The slot of section 6.1 is `slot`: empty, or the one publication that holds it.
     branch: {
       many: false, max: 1, initial: "empty",
+      holds: { operations: { "first-head": 1, mint: 6, revoke: 6, read: 2, receipt: 1 }, items: 1 },
       states: { empty: { final: false }, ready: { final: false } },
       parties: {},
       refs: {
@@ -336,6 +191,8 @@ export const destination: PlatformData = {
     // The second row. The eligibility statement is not copied into an item: it is the `reserve` message, which the deciding entry holds.
     publication: {
       many: true, max: 64, initial: "queued",
+      indexes: ["operation"],
+      holds: { operations: { judge: 1, push: 1, mint: 6, revoke: 6, read: 3, receipt: 1 }, requests: 3, items: 1, decisions: { withdraw: 1 } },
       states: {
         queued: { final: false }, reserved: { final: false }, publishing: { final: false }, unresolved: { final: false },
         published: { final: true }, aborted: { final: true }, "not-reserved": { final: true },
@@ -416,6 +273,7 @@ export const destination: PlatformData = {
     // says that the act "records who adopted what and why".
     "adopt-head": {
       step: "transition", on: "branch", grant: "destination.adopt",
+      adds: { operations: { "adopt-read": 1 } },
       also: {},
       fields: { commit: { type: "commit", required: true }, why: { type: "text", max: 1024, required: true } },
       guards: [{ none: { type: "publication", states: ["reserved", "publishing", "unresolved"] } }, { unset: "slot" }],
@@ -430,6 +288,7 @@ export const destination: PlatformData = {
     // alone: a `published` one is final, and an act on a final item is refused `final` (entry FA6).
     resend: {
       step: "transition", on: "publication", grant: "ledger.retry",
+      adds: { operations: { push: 1, mint: 1, revoke: 1, read: 1 } },
       also: {},
       fields: {},
       guards: [{ state: ["unresolved"] }, { code: "resend-due", row: "P29" }],
@@ -444,6 +303,7 @@ export const destination: PlatformData = {
     // final, and the branch is never final.
     "resend-receipt": {
       step: "transition", on: "branch", grant: "ledger.retry",
+      adds: { operations: { receipt: 1, mint: 1, revoke: 1, read: 1 } },
       also: { receipt: { item: "receipt", by: "receipt" } },
       fields: { receipt: { type: "item", of: "receipt", required: true } },
       guards: [{ state: ["owed"], of: "also.receipt", reason: "receipt-not-owed" }, { code: "resend-due", row: "P29" }],
@@ -451,6 +311,15 @@ export const destination: PlatformData = {
       effects: [{ code: "reopen-publish", row: "P16" }],
       sends: [],
       attention: [],
+    },
+    "add-room": {
+      step: "transition", on: "publication", grant: "ledger.retry", also: {}, fields: {},
+      guards: [{ state: ["queued", "reserved", "publishing", "unresolved"] }], effects: [], sends: [], attention: [],
+      adds: { operations: { judge: 1, push: 1, mint: 1, revoke: 1, read: 1, receipt: 1 }, requests: 1, items: 1 },
+    },
+    "add-branch-room": {
+      step: "transition", on: "branch", grant: "ledger.retry", also: {}, fields: {}, guards: [], effects: [], sends: [], attention: [],
+      adds: { operations: { "first-head": 1, mint: 1, revoke: 1, read: 1, receipt: 1, "adopt-read": 1 }, items: 1 },
     },
   },
   receives: {
@@ -513,11 +382,9 @@ export const destination: PlatformData = {
     // effects are the table of section 6.4, "G's answer to `withdraw`". A guard whose subject is unbound is not evaluated.
     withdraw: {
       message: "withdraw", class: "tell", from: FROM_LANE, opens: null,
-      // I3 merge: the scope contract's revision 23 makes this mark a binding selector, with `index: "operation"` and `key:
-      // "operation"`, on a `publication` that states `indexes: ["operation"]`, `holds.decisions` and a handler `bound`
-      // (rows I3-55, I3-58 and I3-61). The forms are built in derive (`binding.ts`). These rows are the authority note's to state,
-      // so the data and the rule `publication-of` are as they were: the rule reads every publication (entry ER11).
-      also: { publication: { code: "publication-of", row: "P15", item: "publication" } },
+      // The fixed operation index gives the pending publication without scanning the history.
+      also: { publication: { code: "publication-of", row: "P15", item: "publication", index: "operation", key: "operation" } },
+      bound: { of: "also.publication", where: [{ equals: { a: { sender: true }, b: { slot: "lane", of: "also.publication" } } }] },
       fields: { operation: { ...OPERATION, required: true } },
       guards: [
         OWNER,
@@ -572,20 +439,25 @@ export const destination: PlatformData = {
   // revision 25 confirms the eight names, entry ER1). The mark of a kind holds the send mark `publication-update` where rows m and
   // n of the table of further marks name the kind: `judge`, and a push, its mint, its revocation, the deciding read and the receipt.
   outcomes: {
-    [DESTINATION_KINDS.firstHead]: { code: "first-head", row: "P16" },
-    [DESTINATION_KINDS.judge]: { code: "judge", row: "P19", send: UPDATE },
-    [DESTINATION_KINDS.push]: { code: "push", row: "P16", send: UPDATE },
-    [DESTINATION_KINDS.mint]: { code: "mint", row: "P16", send: UPDATE },
-    [DESTINATION_KINDS.revoke]: { code: "revoke", row: "P16", send: UPDATE },
-    [DESTINATION_KINDS.read]: { code: "deciding-read", row: "P16", send: UPDATE },
-    [DESTINATION_KINDS.receipt]: { code: "receipt", row: "P16", send: UPDATE },
-    [DESTINATION_KINDS.adoptRead]: { code: "adopt-read", row: "P16" },
+    [DESTINATION_KINDS.firstHead]: { code: "first-head", row: "P16", attempts: 3, most: { effects: 15, operations: ["revoke", "receipt", "mint", "judge", "read"], opens: "receipt" } },
+    [DESTINATION_KINDS.judge]: { code: "judge", row: "P19", send: UPDATE, attempts: 1, origin: "rule", most: { effects: 10, operations: ["push", "mint", "judge"] }, observes: [
+      { of: "rules", window: 10, use: "once", without: "wait", retains: [{ domain: "artroom-rules-extents-1", max: 262144 }] },
+      { of: "key", from: "rule", max: 1, window: 10, use: "once", without: "wait" },
+      { of: "holders", action: "rules.publish", most: 1, window: 10, use: "once", without: "wait" },
+      { of: "member", from: "rule", max: 65, window: 10, use: "once", without: "wait" },
+      { of: "key", from: "rule", second: true, max: 8, window: 10, use: "once", without: "wait" },
+    ] },
+    [DESTINATION_KINDS.push]: { code: "push", row: "P16", send: UPDATE, attempts: DESTINATION_ATTEMPTS.push, most: { effects: 16, operations: ["revoke", "receipt", "mint", "judge", "read"], opens: "receipt" } },
+    [DESTINATION_KINDS.mint]: { code: "mint", row: "P16", send: UPDATE, attempts: DESTINATION_ATTEMPTS.mint, most: { effects: 2, operations: ["revoke"] } },
+    [DESTINATION_KINDS.revoke]: { code: "revoke", row: "P16", send: UPDATE, attempts: DESTINATION_ATTEMPTS.revoke, most: { effects: 0, operations: [] } },
+    [DESTINATION_KINDS.read]: { code: "deciding-read", row: "P16", send: UPDATE, attempts: DESTINATION_ATTEMPTS.read, most: { effects: 13, operations: ["receipt", "mint", "judge"], opens: "receipt" } },
+    [DESTINATION_KINDS.receipt]: { code: "receipt", row: "P16", send: UPDATE, attempts: DESTINATION_ATTEMPTS.receipt, most: { effects: 5, operations: ["revoke", "mint", "read"] } },
+    [DESTINATION_KINDS.adoptRead]: { code: "adopt-read", row: "P16", attempts: DESTINATION_ATTEMPTS.adoptRead, most: { effects: 5, operations: ["judge"] } },
   },
 };
 
 // ---------------------------------------------------------------- reading the destination's state
 
-const PAGE = 100;
 
 /** The one branch item of a destination scope. */
 const branchOf = (state: Pick<StateView, "page">): Item | null => state.page("branch", ["empty", "ready"], null, 1).items[0] ?? null;
@@ -607,19 +479,8 @@ const heldId = (state: Pick<StateView, "page">, slot: "membership" | "rules"): S
  * read it.
  */
 export const destinationMembership = (state: Pick<StateView, "page" | "incarnations">): RecordedRef | null => referenceOf(state, heldId(state, "membership"), "membership");
-/** The same, for the rules scope that a destination observes: the value `branch.rules` (the same table). Guard 1 of an observation of the rules reads it, in a replay (`Platform.rulesScope`). No runtime reads the rules scope before a turn yet. */
+/** The same, for the rules scope that a destination observes: the value `branch.rules` (the same table). Guard 1 of an observation of the rules reads it, in a replay (`Platform.rulesScope`). The outcome rows read this reference before their turn. */
 export const destinationRulesScope = (state: Pick<StateView, "page" | "incarnations">): RecordedRef | null => referenceOf(state, heldId(state, "rules"), "rules");
-
-/** Every publication, lowest ID first. No index is by a value, so a search for an operation reads each page, retained final items too (entry ER11). */
-function* publications(state: Pick<StateView, "page">): Generator<Item> {
-  for (let after: number | null = null; ;) {
-    const page = state.page("publication", EVERY, after, PAGE);
-    yield* page.items;
-    const last = page.items.at(-1);
-    if (!page.more || !last) return;
-    after = last.id;
-  }
-}
 
 /**
  * "The next `judge`" (section 12.1.5, "The rule `open-judge`, and one `judge`
@@ -718,8 +579,8 @@ function receiptWrites(state: Pick<StateView, "operation">, own: Own, receipt: I
 }
 
 /** An operation that this entry opens, at its ordinal among the operations of the entry, with its attempt 1 (the contract's section 4.3, items 1 and 2). */
-const opened = (k: number, kind: string, attempts: number): RuleEffect[] => [
-  { effect: "operation", k, owner: DESTINATION, kind, attempts },
+const opened = (k: number, kind: string, attempts: number, holder: number): RuleEffect[] => [
+  { effect: "operation", k, owner: DESTINATION, kind, attempts, for: holder },
   { effect: "attempt", operation: { k }, attempt: 1, result: "opened", selected: null },
 ];
 
@@ -745,7 +606,7 @@ const COLLECTED_RECORD: Readonly<Record<keyof typeof COLLECT_MOST, (value: unkno
 const WRITES: readonly string[] = [DESTINATION_KINDS.firstHead, DESTINATION_KINDS.push, DESTINATION_KINDS.receipt];
 const ours = (operation: Operation, ...kinds: readonly string[]): boolean => operation.owner === DESTINATION && kinds.includes(operation.kind);
 /** An operation that the outcome entry opens. The ledger numbers it and opens its attempt 1. */
-const opening = (kind: string, attempts: number): Opening => ({ owner: DESTINATION, kind, attempts });
+const opening = (kind: string, attempts: number, holder: number): Opening => ({ owner: DESTINATION, kind, attempts, for: holder });
 /** The body of an outcome's evidence, when it is a record with exactly those members. */
 const bodyOf = (body: unknown, names: readonly string[]): Record<string, FieldValue> | null =>
   (isObject(body) && Object.keys(body).length === names.length && names.every((name) => Object.hasOwn(body, name)) ? body : null);
@@ -835,9 +696,8 @@ const isFinal = (item: Item): boolean => destination.items[item.type]?.states[it
  * The rule of each kind of write runs it first: `push` here, and the rules
  * `first-head` and `receipt`.
  *
- * I3 merge: the revocation is `for` the holder of the write, which is the
- * holder of the mint ("One holder for each cleanup"). An `operation` effect
- * has no member `for` in this source, so the holder is not stated here.
+ * The revocation is for the holder of the write, which is also the holder
+ * of the mint ("One holder for each cleanup").
  */
 export function tokenStep(given: Pick<RuleGiven, "state" | "own" | "input">, write: Operation): Pick<Decided, "effects" | "opens"> {
   const { state, own, input } = given;
@@ -847,7 +707,7 @@ export function tokenStep(given: Pick<RuleGiven, "state" | "own" | "input">, wri
   if (!first || target === null || mint === null || target.values["token"] !== mint.id) return { effects: [], opens: [] };
   return {
     effects: isFinal(target) ? [] : [{ effect: "value", item: target.id, slot: "token", value: null }],
-    opens: [opening(DESTINATION_KINDS.revoke, DESTINATION_ATTEMPTS.revoke)],
+    opens: [opening(DESTINATION_KINDS.revoke, DESTINATION_ATTEMPTS.revoke, write.for!)],
   };
 }
 
@@ -964,7 +824,7 @@ function andNext(state: Pick<StateView, "page">, after: Parameters<typeof nextJu
   const [branch, publication] = [branchOf(state), nextJudge(state, after)];
   if (!branch) throw new Error("a destination holds its branch item");
   if (publication === null) return { effects: emptied ? [{ effect: "ref", item: branch.id, slot: "judging", to: null }] : [], opens: [] };
-  return { effects: [{ effect: "ref", item: branch.id, slot: "judging", to: publication }], opens: [opening(DESTINATION_KINDS.judge, DESTINATION_ATTEMPTS.judge)] };
+  return { effects: [{ effect: "ref", item: branch.id, slot: "judging", to: publication }], opens: [opening(DESTINATION_KINDS.judge, DESTINATION_ATTEMPTS.judge, publication)] };
 }
 
 /** One attempt of a push, as the outcome entry that is written leaves it: the operation, the attempt, the result, and whether the ledger opens the next attempt in the entry. */
@@ -1013,13 +873,13 @@ function seenDecides(given: RuleGiven, publication: Item, seen: unknown, at: Pus
         { effect: "open", item: resolved.self, type: "receipt", state: "owed" }, { effect: "ref", item: resolved.self, slot: "publication", to: id }, { effect: "value", item: resolved.self, slot: "commit", value: seen },
         ...next.effects,
       ],
-      opens: [opening(DESTINATION_KINDS.receipt, DESTINATION_ATTEMPTS.receipt), opening(DESTINATION_KINDS.mint, DESTINATION_ATTEMPTS.mint), ...next.opens],
+      opens: [opening(DESTINATION_KINDS.receipt, DESTINATION_ATTEMPTS.receipt, id), opening(DESTINATION_KINDS.mint, DESTINATION_ATTEMPTS.mint, id), ...next.opens],
       update: { publication, state: "published", outcome: "published", commit: seen },
     };
   }
   if (isObjectId(seen) && seen === base) {
     // The base, and the ledger opens a further attempt in this entry: `unresolved`, and the `mint` of attempt n + 1.
-    if (at?.next) return unresolved([opening(DESTINATION_KINDS.mint, DESTINATION_ATTEMPTS.mint)]);
+    if (at?.next) return unresolved([opening(DESTINATION_KINDS.mint, DESTINATION_ATTEMPTS.mint, id)]);
     // The base; no attempt is open; and every attempt has a `refused` outcome: `aborted`.
     if (everyRefused(given, publication, at)) {
       const [compromised, next] = [publication.values["aborting"] === true, andNext(state, { slot: true })];
@@ -1037,7 +897,7 @@ function seenDecides(given: RuleGiven, publication: Item, seen: unknown, at: Pus
   if (seen === "failed" || (isObjectId(seen) && seen === base)) {
     const open = at !== null && at.push.attempts.some((attempt) => attempt.attempt !== at.attempt && attempt.outcomes.length === 0);
     // One read for an operation: none is opened where an outcome of this push has opened one (entry FA14).
-    return unresolved(at !== null && !open && !readOpened(state, at.push) ? [opening(DESTINATION_KINDS.read, DESTINATION_ATTEMPTS.read)] : []);
+    return unresolved(at !== null && !open && !readOpened(state, at.push) ? [opening(DESTINATION_KINDS.read, DESTINATION_ATTEMPTS.read, id)] : []);
   }
   // Any other commit, or a ref that is absent: another writer (section 6.9). The slot stays held. No attempt and no read is opened.
   return unresolved([]);
@@ -1146,12 +1006,12 @@ function firstHeadSeen(given: RuleGiven, write: Operation, seen: unknown, fromRe
         { effect: "open", item: resolved.self, type: "receipt", state: "owed" }, { effect: "value", item: resolved.self, slot: "commit", value: seen as string },
         { effect: "value", item: resolved.self, slot: "opening", value: seqOf(write.id) }, ...next.effects,
       ],
-      opens: [opening(DESTINATION_KINDS.receipt, DESTINATION_ATTEMPTS.receipt), opening(DESTINATION_KINDS.mint, DESTINATION_ATTEMPTS.mint), ...next.opens], update: null,
+      opens: [opening(DESTINATION_KINDS.receipt, DESTINATION_ATTEMPTS.receipt, write.for!), opening(DESTINATION_KINDS.mint, DESTINATION_ATTEMPTS.mint, write.for!), ...next.opens], update: null,
     };
   }
   if (fromRead) return NOTHING;
-  if (seen === "absent" && nextWrite(given, write, true)) return { effects: [], opens: [opening(DESTINATION_KINDS.mint, DESTINATION_ATTEMPTS.mint)], update: null };
-  return seen === "failed" && !readOpened(state, write) ? { effects: [], opens: [opening(DESTINATION_KINDS.read, DESTINATION_ATTEMPTS.read)], update: null } : NOTHING;
+  if (seen === "absent" && nextWrite(given, write, true)) return { effects: [], opens: [opening(DESTINATION_KINDS.mint, DESTINATION_ATTEMPTS.mint, write.for!)], update: null };
+  return seen === "failed" && !readOpened(state, write) ? { effects: [], opens: [opening(DESTINATION_KINDS.read, DESTINATION_ATTEMPTS.read, write.for!)], update: null } : NOTHING;
 }
 
 /** The receipt column. Its read never touches a token; its write runs T4 before this function. */
@@ -1163,9 +1023,9 @@ function receiptSeen(given: RuleGiven, write: Operation, seen: unknown, fromRead
   const format = formatOf(seen);
   if (format !== null) return { effects: [{ effect: "state", item: receipt.id, state: seen === destinationReceipt(state, own, receipt, format).commit ? "written" : "conflict" }], opens: [], update: null };
   if (fromRead) return NOTHING;
-  if (seen === "absent" && nextWrite(given, write, true)) return { effects: [], opens: [opening(DESTINATION_KINDS.mint, DESTINATION_ATTEMPTS.mint)], update: null };
+  if (seen === "absent" && nextWrite(given, write, true)) return { effects: [], opens: [opening(DESTINATION_KINDS.mint, DESTINATION_ATTEMPTS.mint, write.for!)], update: null };
   const last = given.input.type === "outcome" && given.input.attempt === write.most;
-  return (seen === "failed" || (seen === "absent" && last)) && !readOpened(state, write) ? { effects: [], opens: [opening(DESTINATION_KINDS.read, DESTINATION_ATTEMPTS.read)], update: null } : NOTHING;
+  return (seen === "failed" || (seen === "absent" && last)) && !readOpened(state, write) ? { effects: [], opens: [opening(DESTINATION_KINDS.read, DESTINATION_ATTEMPTS.read, write.for!)], update: null } : NOTHING;
 }
 
 const createDecides = (column: typeof firstHeadSeen): Decides => (given, write) => {
@@ -1219,6 +1079,7 @@ const readDecides: Decides = (given, read) => {
  * by its ID: the rule reads each observation itself, through the judge.
  */
 export interface LaneRead {
+  sound?: boolean;
   /** As `ReservationRead.manifest`, but for the commits of the selected reports, which the rule derives itself (`reportCommits`). */
   manifest: Omit<ReservationRead["manifest"], "reports">;
   /** One for each verdict of the statement, in its order: whether its entry is that verdict, and the key that signed it. Null: no entry says. */
@@ -1230,12 +1091,10 @@ export interface LaneRead {
 /** The reader of a lane's entries for one reservation. Null: they are not at hand, or no reader is written. */
 export type Reads = (given: RuleGiven, publication: Item, statement: Statement) => LaneRead | null;
 
-// I3 merge: no text states how an entry of a lane is read by its bytes: which field of a `propose-manifest` intent is the base, how
-// the authors of section 3.10 and the completeness of R2's section 5.2 are read, and which entry is a verdict's (I3 deltas, entries
-// FA9 and FC5). So the package's own rule `judge` is given no reader of them. It then judges what the evidence and this scope's
-// own records decide, and writes nothing for the rest: the outcome stays offered, the publication stays `queued`, and
-// `branch.judging` stays set. What the rule reads of `observed` it reads itself, below.
-const NOT_AT_HAND: Reads = () => null;
+const READ_LANE: Reads = (given, _publication, statement) => {
+  const seen = given.observed({ asked: "rules" })?.observation;
+  return readLane(given, statement, seen && "subject" in seen && seen.subject === "rules" ? seen : null);
+};
 
 /**
  * What `observed` and the entries in `uses` say for one reservation
@@ -1255,11 +1114,9 @@ const NOT_AT_HAND: Reads = () => null;
  *   whose observation is not at hand gives null, and its verdict or its
  *   result is then not counted.
  *
- * **Three inputs are filled with the value that fails closed**, because no
- * form supplies them (I3 deltas, entry FC5): `extents`, null, since a
- * `RulesContent` has no such member (the contract's part of the missing
- * form 2); `controllers`, null (the missing form 11); and
- * `controllersOfAuthors`, null (the missing form 15).
+ * The retained extents value, the holders observation and the author
+ * observations supply the remaining inputs. A second-step row includes
+ * every listed passed check, including a check only an extent asks for.
  *
  * The commits of the selected reports are read from the entries that the
  * field `reports` names (`reportsBound`), and no longer from a reader.
@@ -1279,13 +1136,18 @@ function reservationRead(given: RuleGiven, publication: Item, statement: Stateme
   };
   const seen = given.observed({ asked: "rules" })?.observation;
   const rules = seen && "subject" in seen && seen.subject === "rules" ? seen : null;
-  const required = rules?.content.asked === "rules" ? rules.content.checks.filter((check) => check.required).map((check) => check.name) : [];
+  const required = rules?.content.asked === "rules" ? rules.content.checks.map((check) => check.name) : [];
   const reports = reportsBound(given, statement);
   if (reports === undefined) return null;
   return {
     merger: keyOf(merge.input.signed.intent.actor), rules,
-    extents: null, singleControllerException: rules?.content.asked === "rules" && rules.content.singleControllerException === true,
-    manifest: { ...lane.manifest, reports }, controllersOfAuthors: null, controllers: null,
+    sound: lane.sound !== false,
+    extents: rules?.content.asked === "rules" && rules.content.extents ? (() => { const list = given.value("artroom-rules-extents-1", rules.content.extents!, 262144); if (!isExtents(list)) throw new Error("the rules observation names no list of extents"); return list; })() : null,
+    singleControllerException: rules?.content.asked === "rules" && rules.content.singleControllerException === true,
+    manifest: { ...lane.manifest, reports },
+    controllersOfAuthors: lane.manifest.authors.flatMap((member) => { const seen = given.observed({ member })?.observation; return seen && "subject" in seen && seen.subject === "member" && seen.controller !== null ? [seen.controller] : []; }),
+    controllers: (() => { const seen = given.observed({ holders: "rules.publish" })?.observation; return seen && "subject" in seen && seen.subject === "holders" ? (seen.count === 1 ? seen.holders : []) : null; })(),
+    controllersHead: (() => { const seen = given.observed({ holders: "rules.publish" })?.observation; return seen && "subject" in seen && seen.subject === "holders" ? seen.head.seq : undefined; })(),
     // Only an approval is counted, and only a required check's result decides: no other key is read, so no other is retained.
     verdicts: statement.verdicts.map((verdict, n) => ({ sound: lane.verdicts[n]?.sound === true, key: verdict.verdict === "approve" ? keyOf(lane.verdicts[n]?.key ?? null) : null })),
     checks: Object.fromEntries(Object.entries(lane.checks).map(([name, check]) => [name, { opening: check.opening, deciding: check.deciding, key: required.includes(name) ? keyOf(check.key) : null }])),
@@ -1386,8 +1248,15 @@ const judgeDecides = (reads: Reads): Decides => (given) => {
   const publication = publicationAt(state, branch?.refs["judging"]);
   if (!branch || !publication || input.type !== "outcome") throw new Error("a judge is of the publication that branch.judging names");
   if (publication.state !== "queued") return { ...andNext(state, { judging: true }, true), update: null };
-  const evidence = input.evidence.body;
-  if (!isJudgeEvidence(evidence)) throw new Error("the evidence of a judge is not well formed");
+  if (given.rows?.[3] === "over" || given.rows?.[4] === "over") {
+    const next = andNext(state, { judging: true, ended: publication.id }, true);
+    return { effects: [{ effect: "state", item: publication.id, state: "not-reserved" }, { effect: "value", item: publication.id, slot: "reason", value: "evidence-too-large" }, ...next.effects], opens: next.opens, update: { publication, state: "not-reserved", outcome: "refused", reason: "evidence-too-large" } };
+  }
+  const recorded = input.evidence.body;
+  if (!isRecordedJudgeEvidence(recorded)) throw new Error("the evidence of a judge is not well formed");
+  const changes = isDigest(recorded.changes) ? given.value(DESTINATION_CHANGED_SET.domain, recorded.changes, DESTINATION_CHANGED_SET.max) : recorded.changes;
+  if (isDigest(recorded.changes) && !isJudgeChanges(changes)) throw new Error("the changed set is not at hand in its declared domain");
+  const evidence = { ...recorded, changes } as import("./reservation.ts").JudgeEvidence;
   const head = branch.values["head"];
   const asked = { recorded: typeof head === "string" ? head : null, evidence, statement: statementOf(own, publication), time };
   // First from the evidence and this scope's own records. Only where that does not decide are `observed` and `uses` read.
@@ -1412,7 +1281,7 @@ const judgeDecides = (reads: Reads): Decides => (given) => {
       { effect: "value", item: publication.id, slot: "integration", value: judged.integration }, { effect: "value", item: publication.id, slot: "reservedAt", value: resolved.self },
       ...(judged.reason === null ? [] : [{ effect: "value", item: publication.id, slot: "reason", value: judged.reason } as const]),
     ],
-    opens: [opening(DESTINATION_KINDS.push, DESTINATION_ATTEMPTS.push), opening(DESTINATION_KINDS.mint, DESTINATION_ATTEMPTS.mint)],
+    opens: [opening(DESTINATION_KINDS.push, DESTINATION_ATTEMPTS.push, publication.id), opening(DESTINATION_KINDS.mint, DESTINATION_ATTEMPTS.mint, publication.id)],
     update: { publication, state: "reserved", outcome: "committed", ...(judged.reason === null ? {} : { reason: judged.reason }), rules },
   };
 };
@@ -1441,15 +1310,26 @@ const DECIDES: Readonly<Record<string, Decides>> = {
  * The judgment is `judgeReservation`, and what the outcome yields is
  * `judgeDecides`. The rule reads `observed` itself (`reservationRead`).
  * `reads` gives what the lane's entries in `uses` say. The package's own
- * rule is given none (`NOT_AT_HAND`).
+ * production rule reads each retained lane entry (`READ_LANE`).
  */
 const judgeRule = (decides: Decides): PlatformRule => ({
   place: "outcome", clock: true,
   rules: {
-    selects: false, read: false, closure: DESTINATION_NOT_FINITE, most: { effects: 10, requests: 1, operations: 2 },
+    selects: false, read: false, most: { effects: 10, requests: 1, operations: 2 },
+    origin: ({ state }) => publicationAt(state, branchOf(state)?.refs["judging"])?.id ?? null,
+    subjects: (given, _operation, row, first) => {
+      const publication = publicationAt(given.state, branchOf(given.state)?.refs["judging"]);
+      if (!publication) throw new Error("the judge has no publication");
+      const statement = statementOf(given.own, publication);
+      const entry = (fact: FactRef) => given.uses.find((copy) => canonicalize(copy.fact) === canonicalize(fact))?.entry;
+      if (row === 1) { const merge = entry(statement.operation); return merge?.input.type === "act" ? [merge.input.signed.intent.actor] : []; }
+      if (row === 3) { const manifest = entry(statement.manifest); return manifest ? manifestAuthors(manifest) : []; }
+      if (row === 4) { const seen = first?.observed({ asked: "rules" })?.observation; return decidingKeys(given, statement, seen && "subject" in seen && seen.subject === "rules" ? seen : null); }
+      return [];
+    },
     retries: () => false,
     wellFormed: (result, evidence, given) => {
-      if (result !== "confirmed" || !isJudgeEvidence(evidence.body)) return false;
+      if (result !== "confirmed" || !isRecordedJudgeEvidence(evidence.body)) return false;
       // From revision 28: the member `ancestors` holds those of the reports' commits that the host showed to be ancestors, and no
       // other commit. One that no named report holds does not follow. Where the publication is not `queued` nothing of the
       // evidence is read, and where a named entry is not at hand the rule has a fault in `derives`: neither is judged here.
@@ -1520,8 +1400,8 @@ const WRITTEN: Rules = {
   "declare-first-head": {
     place: "effect", most: 2,
     run: ({ resolved }) => (resolved.fields["import"] === false ? [
-      { effect: "operation", k: 0, owner: DESTINATION, kind: DESTINATION_KINDS.firstHead, attempts: DESTINATION_ATTEMPTS.firstHead },
-      { effect: "operation", k: 1, owner: DESTINATION, kind: DESTINATION_KINDS.mint, attempts: DESTINATION_ATTEMPTS.mint },
+      { effect: "operation", k: 0, owner: DESTINATION, kind: DESTINATION_KINDS.firstHead, attempts: DESTINATION_ATTEMPTS.firstHead, for: resolved.self },
+      { effect: "operation", k: 1, owner: DESTINATION, kind: DESTINATION_KINDS.mint, attempts: DESTINATION_ATTEMPTS.mint, for: resolved.self },
     ] : []),
   },
   /**
@@ -1533,10 +1413,14 @@ const WRITTEN: Rules = {
    */
   "open-first-head": {
     place: "effect", most: 4,
-    run: ({ input, resolved }) => {
+    run: ({ state: view, own, input, resolved }) => {
       if (input.type !== "delivery" || input.message.class !== "request" || input.message.type !== "relate") throw new Error("open-first-head stands in a `relate` handler, and reads its update");
       const state = isObject(input.message.body) ? input.message.body["state"] : null;
-      return state === "done" && typeof resolved.fields["commit"] === "string" ? [...opened(0, DESTINATION_KINDS.firstHead, DESTINATION_ATTEMPTS.firstHead), ...opened(1, DESTINATION_KINDS.mint, DESTINATION_ATTEMPTS.mint)] : [];
+      const branch = branchOf(view)!;
+      for (let seq = branch.id; seq < resolved.self; seq += 1) {
+        if (own(seq)?.entry.effects.some((effect) => effect.effect === "operation" && effect.owner === DESTINATION && effect.kind === DESTINATION_KINDS.firstHead)) return [];
+      }
+      return state === "done" && typeof resolved.fields["commit"] === "string" ? [...opened(0, DESTINATION_KINDS.firstHead, DESTINATION_ATTEMPTS.firstHead, branchOf(view)!.id), ...opened(1, DESTINATION_KINDS.mint, DESTINATION_ATTEMPTS.mint, branchOf(view)!.id)] : [];
     },
   },
   /**
@@ -1554,7 +1438,7 @@ const WRITTEN: Rules = {
     place: "effect", most: 3,
     run: ({ state, resolved }) => {
       const [branch, publication] = [branchOf(state), nextJudge(state, { opens: resolved.self })];
-      return branch && publication !== null ? [...opened(0, DESTINATION_KINDS.judge, DESTINATION_ATTEMPTS.judge), { effect: "ref", item: branch.id, slot: "judging", to: publication }] : [];
+      return branch && publication !== null ? [...opened(0, DESTINATION_KINDS.judge, DESTINATION_ATTEMPTS.judge, publication), { effect: "ref", item: branch.id, slot: "judging", to: publication }] : [];
     },
   },
   /**
@@ -1564,13 +1448,7 @@ const WRITTEN: Rules = {
    */
   "publication-of": {
     place: "also",
-    run: ({ state, resolved }) => {
-      const operation = resolved.fields["operation"];
-      if (!isFactRef(operation)) return null;
-      const named = canonicalize(operation);
-      for (const item of publications(state)) if (isFactRef(item.refs["operation"]) && canonicalize(item.refs["operation"]) === named) return item.id;
-      return null;
-    },
+    bind: (items) => items[0]?.id ?? null,
   },
   /**
    * Row 34, among the effects of `withdraw` (P15). When the mark of `also`
@@ -1629,8 +1507,8 @@ const WRITTEN: Rules = {
       const live = (publication.values["token"] ?? null) !== null;
       return [
         { effect: "value", item: publication.id, slot: "aborting", value: true },
-        ...(live ? [...opened(0, DESTINATION_KINDS.revoke, DESTINATION_ATTEMPTS.revoke), { effect: "value", item: publication.id, slot: "token", value: null } as const] : []),
-        ...opened(live ? 1 : 0, DESTINATION_KINDS.read, DESTINATION_ATTEMPTS.read),
+        ...(live ? [...opened(0, DESTINATION_KINDS.revoke, DESTINATION_ATTEMPTS.revoke, publication.id), { effect: "value", item: publication.id, slot: "token", value: null } as const] : []),
+        ...opened(live ? 1 : 0, DESTINATION_KINDS.read, DESTINATION_ATTEMPTS.read, publication.id),
       ];
     },
   },
@@ -1640,7 +1518,7 @@ const WRITTEN: Rules = {
    */
   "open-branch-read": {
     place: "effect", most: 2,
-    run: () => opened(0, DESTINATION_KINDS.adoptRead, DESTINATION_ATTEMPTS.adoptRead),
+    run: ({ resolved }) => opened(0, DESTINATION_KINDS.adoptRead, DESTINATION_ATTEMPTS.adoptRead, resolved.subjects.get("on")!.id),
   },
   /**
    * Row z, the second guard of `resend` and of `resend-receipt` (P29;
@@ -1682,9 +1560,8 @@ const WRITTEN: Rules = {
    * each act opens one. In any other state the written guard has refused
    * the act before this place.
    *
-   * I3 merge: each operation is `for` the publication, or for the branch
-   * at `resend-receipt`, from what the act adds. This source has no `for`
-   * and no `adds` (I3 deltas, entry GD7).
+   * Each operation is for the publication, or for the branch at
+   * resend-receipt, from what the act adds.
    */
   "reopen-publish": {
     place: "effect", most: 4,
@@ -1692,7 +1569,7 @@ const WRITTEN: Rules = {
       const [on, receipt] = [resolved.subjects.get("on"), resolved.subjects.get("also.receipt")];
       const kind = receipt?.type === "receipt" ? (receipt.state === "owed" ? DESTINATION_KINDS.receipt : null) : on?.type === "publication" ? (on.state === "unresolved" ? DESTINATION_KINDS.push : null) : undefined;
       if (kind === undefined) throw new Error("reopen-publish stands in a row whose primary item is a publication, or which names a receipt");
-      return kind === null ? [] : [...opened(0, kind, DESTINATION_ATTEMPTS.resend), ...opened(1, DESTINATION_KINDS.mint, DESTINATION_ATTEMPTS.mint)];
+      return kind === null ? [] : [...opened(0, kind, DESTINATION_ATTEMPTS.resend, on!.id), ...opened(1, DESTINATION_KINDS.mint, DESTINATION_ATTEMPTS.mint, on!.id)];
     },
   },
   /**
@@ -1749,7 +1626,7 @@ const WRITTEN: Rules = {
   mint: {
     place: "outcome",
     rules: {
-      selects: false, read: false, closure: DESTINATION_NOT_FINITE, most: { effects: 2, requests: 0, operations: 1 },
+      selects: false, read: false, most: { effects: 2, requests: 0, operations: 1 },
       retries: () => false,
       wellFormed: (result, evidence) => {
         const body = bodyOf(evidence.body, result === "confirmed" ? ["token", "ends"] : []);
@@ -1762,7 +1639,7 @@ const WRITTEN: Rules = {
         if (!served) throw new Error("a mint is of one attempt of a write");
         const target = targetOf(state, own, served.write);
         const attempt = served.write.attempts.find((opened) => opened.attempt === served.attempt);
-        if (target === null || closed(target) || (attempt?.outcomes.length ?? 0) > 0) return { effects: [], sends: [], opens: [opening(DESTINATION_KINDS.revoke, DESTINATION_ATTEMPTS.revoke)] };
+        if (target === null || closed(target) || (attempt?.outcomes.length ?? 0) > 0) return { effects: [], sends: [], opens: [opening(DESTINATION_KINDS.revoke, DESTINATION_ATTEMPTS.revoke, mint.for!)] };
         return {
           effects: [{ effect: "value", item: target.id, slot: "token", value: mint.id }, ...(target.type === "publication" && target.state === "reserved" ? [{ effect: "state", item: target.id, state: "publishing" } as const] : [])],
           sends: [], opens: [],
@@ -1824,7 +1701,7 @@ const WRITTEN: Rules = {
   push: {
     place: "outcome",
     rules: {
-      selects: false, read: false, closure: DESTINATION_NOT_FINITE, most: { effects: 16, requests: 1, operations: 4 },
+      selects: false, read: false, most: { effects: 16, requests: 1, operations: 4 },
       retries: (_result, push, given) => pushOf(given, push).allows,
       ready: (state, push, attempt) => (mintOf(state, push, attempt)?.attempts[0]?.outcomes.length ?? 0) > 0,
       wellFormed: (result, evidence) => { const body = bodyOf(evidence.body, ["send", "seen"]); return body !== null && SENDS[result]!.includes(body["send"] as string) && isSeen(body["seen"]); },
@@ -1863,12 +1740,18 @@ const WRITTEN: Rules = {
   "deciding-read": {
     place: "outcome",
     rules: {
-      selects: false, read: false, closure: DESTINATION_NOT_FINITE, most: { effects: 13, requests: 1, operations: 3 },
+      selects: false, read: false, most: { effects: 13, requests: 1, operations: 3 },
       retries: () => false,
       wellFormed: (result, evidence, given) => {
         const [seen, read] = [bodyOf(evidence.body, ["seen"])?.["seen"], given.input.type === "outcome" ? given.state.operation(given.input.operation) : null];
         if (result !== "confirmed" || !read || !(seen === "absent" || isObjectId(seen))) return false;
         const of = readFor(given.state, given.own, read);
+        if (typeof of === "string" && seen === "absent") {
+          const opened = ownEntry(given.own, seqOf(read.id)).input;
+          const write = opened.type === "outcome" ? given.state.operation(opened.operation) : null;
+          // An absent first head or receipt decides nothing while its target is open. The runtime keeps reading.
+          if (!write || !closed(targetOf(given.state, given.own, write))) return false;
+        }
         const unprovable = of !== null && typeof of !== "string" && HELD.includes(of.state) && seen === branchOf(given.state)?.values["head"] && !everyRefused(given, of, null);
         return !unprovable;
       },
@@ -1896,7 +1779,7 @@ const WRITTEN: Rules = {
   "adopt-read": {
     place: "outcome",
     rules: {
-      selects: false, read: false, closure: DESTINATION_NOT_FINITE, most: { effects: 5, requests: 0, operations: 1 },
+      selects: false, read: false, most: { effects: 5, requests: 0, operations: 1 },
       retries: () => false,
       wellFormed: (result, evidence) => { const seen = bodyOf(evidence.body, ["seen"])?.["seen"]; return result === "confirmed" && (seen === "absent" || isObjectId(seen)); },
       derives: ({ state, own, input }, read) => {
@@ -1926,4 +1809,4 @@ export function destinationRulesWith(reads: Reads): Rules {
 }
 
 /** The rules of `platform:destination@1` that this package holds: what a runtime and a verifier run. */
-export const destinationRules: Rules = destinationRulesWith(NOT_AT_HAND);
+export const destinationRules: Rules = destinationRulesWith(READ_LANE);

@@ -32,12 +32,14 @@
  */
 
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { DeclaredDefinition, Entry, Evidence, FactRef, FieldValue, Input, Observation, ObservationUse, OperationId, Request, RulesObservation, ScopeRef, Seed, Send, Timestamp } from "@generalbusiness/artroom-contract";
-import { factRefOf, intentDigest, newIncarnation, scopeIdOf, signIntent } from "@generalbusiness/artroom-bytes";
-import { PROFILES, clockOf, judgeDelivery, judgeGenesis, settleOutcome, validateDefinition } from "@generalbusiness/artroom-derive";
-import type { ActJudgment, Fetched, Judgment, OutcomeJudgment, PlatformRules, Source, ValidDefinition } from "@generalbusiness/artroom-derive";
+import type { DeclaredDefinition, Entry, Evidence, FactRef, FieldValue, Input, MemberObservation, HoldersObservation, Observation, ObservationUse, OperationId, Request, RulesObservation, ScopeRef, Seed, Send, Timestamp } from "@generalbusiness/artroom-contract";
+import { canonicalize, factRefOf, intentDigest, newIncarnation, scopeIdOf, signIntent } from "@generalbusiness/artroom-bytes";
+import { PROFILES, clockOf, contentStates, valueDigest, judgeDelivery, judgeGenesis, settleOutcome, validateDefinition } from "@generalbusiness/artroom-derive";
+import type { ActJudgment, Fetched, Judgment, OutcomeJudgment, Observing, PlatformRules, Source, ValidDefinition } from "@generalbusiness/artroom-derive";
 import { Ledger, Scope, T0, creation, d, keys, laneDefinition, sent, t, type Actor, type Context, type Over } from "@generalbusiness/artroom-derive/testing";
 import { DESTINATION, DESTINATION_KINDS, destination, destinationReceipt, destinationRulesWith, type LaneRead } from "../src/destination.ts";
+import { firstExtents } from "../src/extents.ts";
+import { rulesScope } from "../src/rules-scope.ts";
 import type { JudgeEvidence, ReservationRead } from "../src/reservation.ts";
 
 export const { rita, una } = keys;
@@ -65,7 +67,7 @@ export const rulesObserved = (at: Timestamp, content: Partial<Extract<RulesObser
   subject: "rules", of: RULES, head: { seq: 60, hash: d("6") }, revision: 57, content: { asked: "rules", approvals: 0, ownerMayReview: true, checks: [], labels: [], ...content }, definition: "platform:rules@1", at,
 });
 /** STAND-IN: an observation as an entry retains it. */
-export const retained = (observation: Observation | RulesObservation, n: number): ObservationUse => ({ observation, read: { run: "run-1" as ObservationUse["read"]["run"], n }, use: "fresh", prior: null });
+export const retained = (observation: Observation | MemberObservation | RulesObservation | HoldersObservation, n: number): ObservationUse => ({ observation, read: { run: "run-1" as ObservationUse["read"]["run"], n }, use: "fresh", prior: null });
 
 /** The evidence of a `judge` whose reads found the branch at the first head and the integration commit whole, with one changed path. */
 export const FOUND: JudgeEvidence = { head: HEAD, present: true, tree: TREE, firstParent: HEAD, ancestors: [], changes: { paths: ["src/a.ts"], links: [], unreadable: 0 } };
@@ -244,7 +246,7 @@ export class Branch extends Ledger {
     this.bureau = new Ledger(bureauDefinition, "platform:directory");
     const founding = signIntent({
       v: 1, to: null, actor: rita.key, kind: "found", on: null, expected: {}, idempotencyKey: `found-${importing}`, notAfter: t(60),
-      fields: { repository: REPOSITORY, branch: "main", import: importing, claim: factRefOf(claim) as unknown as FieldValue, membership: "m".repeat(20), rules: "r".repeat(20) },
+      fields: { repository: REPOSITORY, branch: "main", import: importing, claim: factRefOf(claim) as unknown as FieldValue, membership: MEMBERSHIP.scope, rules: RULES.scope },
     }, rita.secret);
     const seed: Seed = { v: 1, kind: "directory", definition: bureauDefinition.digest, creator: null, cause: intentDigest(founding.intent), ordinal: 0 };
     this.bureau.seal(written(judgeGenesis(this.bureau.state, bureauDefinition, { name: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(1)), seed, founding }, { clock: clockOf(this.bureau.state, T0), bounds: PROPOSED_BOUNDS, facts, prepared: [], source: null })));
@@ -316,15 +318,21 @@ export class Branch extends Ledger {
    * one read of one run, in the order merger, rules, verdicts, checks, and each key once; and the lane's entries that the
    * publication names, as fetched. For any other outcome, and with no record, nothing is at hand.
    */
-  #atHand(operation: OperationId): { observed?: readonly ObservationUse[]; facts?: readonly Fetched[] } {
+  #atHand(operation: OperationId): { observed?: readonly ObservationUse[]; facts?: readonly Fetched[]; values?: readonly string[]; observing?: Observing } {
     const of = this.state.operation(operation);
     const judging = this.branch.refs["judging"];
     if (!this.read || of?.kind !== DESTINATION_KINDS.judge || typeof judging !== "number") return {};
     const keys = [this.read.merger, ...this.read.verdicts.map((verdict) => verdict.key), ...Object.values(this.read.checks).map((check) => check.key)].filter((seen): seen is Observation => seen !== null);
     const once = keys.filter((seen, n) => keys.findIndex((other) => other.key === seen.key) === n);
     const [merger, ...others] = this.read.merger ? once : [null, ...once];
-    const seen = [merger, this.read.rules, ...others].filter((observation): observation is Observation | RulesObservation => observation !== null);
-    return { observed: seen.map((observation, n) => retained(observation, n + 1)), facts: this.#fetched.get(judging) ?? [] };
+    // STAND-IN observations for the adopted rows: the rules' full fixed content and one count of controllers.
+    const content = this.read.rules?.content;
+    const extents = content?.asked === "rules" ? firstExtents(content) : null;
+    const rules = this.read.rules && content?.asked === "rules" ? { ...this.read.rules, content: { ...content, singleControllerException: content.singleControllerException ?? false, extents: content.extents ?? valueDigest("artroom-rules-extents-1", extents) } } : this.read.rules;
+    const holders: HoldersObservation = { subject: "holders", of: MEMBERSHIP, head: merger?.head ?? { seq: 412, hash: d("4") }, action: "rules.publish", count: 2, holders: [rita.member.member], definition: "platform:membership@1", at: this.now };
+    const seen = [merger, rules, holders, ...others].filter((observation): observation is Observation | RulesObservation | HoldersObservation => observation !== null);
+    return { observed: seen.map((observation, n) => retained(observation, n + 1)), facts: this.#fetched.get(judging) ?? [],
+      values: extents === null ? [] : [canonicalize(extents)], observing: { membership: { ...MEMBERSHIP, inc: null }, rules: { ...RULES, inc: null }, content: () => contentStates(rulesScope) } };
   }
 
   /**

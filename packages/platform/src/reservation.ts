@@ -40,8 +40,8 @@
  * | `controllersOfAuthors` | Form 15, the controller of an authoring agent | Null. No exception is shown by its second clause. And no review is shown to be independent by the second point of section 3.10: where that point is asked, which is when `ownerMayReview` is false and for the extent `rules` always, no review counts. |
  */
 
-import type { FactRef, MemberId, MemberRef, Observation, RulesObservation, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
-import { canonicalize, timeMs } from "@generalbusiness/artroom-bytes";
+import type { Digest, FactRef, MemberId, MemberRef, Observation, RulesObservation, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
+import { canonicalize, isDigest, timeMs } from "@generalbusiness/artroom-bytes";
 import { byteOrder } from "@generalbusiness/artroom-derive";
 import { LANDING, RULES_EXTENT, classify, judgeExtents, type Extent, type ExtentsAsked, type Review, type TreeLink } from "./extents.ts";
 
@@ -69,6 +69,25 @@ export interface JudgeEvidence {
   changes: JudgeChanges | { over: "paths" | "links" | "bytes" } | null;   // null when `present` is false
 }
 
+/** The host's changed set is retained separately; the outcome records only its digest (authority revision 28). */
+export const DESTINATION_CHANGED_SET = { domain: "artroom-changed-set-1", max: 262144, paths: 2048, links: 256 } as const;
+export type RecordedJudgeEvidence = Omit<JudgeEvidence, "changes"> & { changes: Digest | { over: "paths" | "links" | "bytes" } | null };
+
+/** The recorded body is checked before the separate bytes are read. A present integration names a digest or an explicit bound failure. */
+export function isRecordedJudgeEvidence(value: unknown): value is RecordedJudgeEvidence {
+  if (!isRecord(value)) return false;
+  const changes = value["changes"];
+  if (isDigest(changes)) return isJudgeEvidence({ ...value, changes: { paths: [], links: [], unreadable: 0 } });
+  return (changes === null || (isRecord(changes) && Object.hasOwn(changes, "over"))) && isJudgeEvidence(value);
+}
+
+/** The resolved changed set, within the domain's path and link bounds. Byte size and digest are checked by the generic value read. */
+export function isJudgeChanges(changes: unknown): changes is JudgeChanges {
+  if (!isRecord(changes) || Object.hasOwn(changes, "over")) return false;
+  return isJudgeEvidence({ head: null, present: true, tree: "a".repeat(40), firstParent: null, ancestors: [], changes })
+    && (changes["paths"] as unknown[]).length <= DESTINATION_CHANGED_SET.paths && (changes["links"] as unknown[]).length <= DESTINATION_CHANGED_SET.links;
+}
+
 /**
  * The eligibility statement, as the message of the publication's `reserve`
  * holds it (section 6.3): its six fields. `operation` is P's `merge` entry,
@@ -91,6 +110,10 @@ export interface Statement {
  * of that table, or the check of section 6.5, that it is read for.
  */
 export interface ReservationRead {
+  /** The merge names the manifest that the statement names. */
+  sound?: boolean;
+  /** Membership head that showed the holders of rules.publish, for the exception record. */
+  controllersHead?: number | undefined;
   /** `observed`: the observation of the key that signed P's `merge` entry. Null: none is at hand. */
   merger: Observation | null;
   /** `observed`: the one observation of the rules scope, asked as "rules". Null: none is at hand. */
@@ -194,7 +217,7 @@ export function judgeReservation({ recorded, evidence, statement, read, time }: 
   // one `job` or one `decidedBy`: the lane's `collect` gives one record for an item, and a deciding entry sets one job.
   const [own, twice] = [(fact: FactRef) => fact.at.scope === statement.operation.at.scope && fact.at.inc === statement.operation.at.inc, (facts: readonly FactRef[]) => new Set(facts.map((fact) => canonicalize(fact))).size !== facts.length];
   const [reviews, jobs, deciding] = [statement.verdicts.map((verdict) => verdict.review), statement.jobs.map((job) => job.job), statement.jobs.flatMap((job) => (job.decidedBy ? [job.decidedBy] : []))];
-  let invalid = manifest.reports === null || ![statement.manifest, ...reviews, ...jobs, ...deciding].every(own) || twice(reviews) || twice(jobs) || twice(deciding)
+  let invalid = read.sound === false || manifest.reports === null || ![statement.manifest, ...reviews, ...jobs, ...deciding].every(own) || twice(reviews) || twice(jobs) || twice(deciding)
     || statement.verdicts.some((_, n) => read.verdicts[n]?.sound !== true);
   const changesAsked = statement.verdicts.some((verdict) => verdict.verdict === "request-changes");
   const approvals = statement.verdicts.flatMap((verdict, n) => {
@@ -268,7 +291,7 @@ export function judgeReservation({ recorded, evidence, statement, read, time }: 
   if (ordered.length > 0) return no(`rules-not-met:${ordered.join(",")}`);
   if (touched.unclassified.length > 0) return no("rules-not-met");
   if (!manifest.complete) return no("incomplete");
-  return { reserved: true, integration: manifest.integration, reason: used ? `single-controller:${RULES_EXTENT}:${excepted}:m${merger.head.seq}:r${read.rules.revision}:h${read.rules.head.seq}` : null };
+  return { reserved: true, integration: manifest.integration, reason: used ? `single-controller:${RULES_EXTENT}:${excepted}:m${read.controllersHead ?? merger.head.seq}:r${read.rules.revision}:h${read.rules.head.seq}` : null };
 }
 
 const OBJECT_ID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
