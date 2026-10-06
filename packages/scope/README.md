@@ -153,10 +153,20 @@ reads no grant, and every act that needs one is refused `unauthorized`.
 The deployed class, `DeployedScope`, uses it, in `repositoryAuthority`: a
 membership scope answers the read (`observe`), and a scope whose genesis
 records a membership scope, such as an inbox, is judged on it. A rules
-scope and a destination record theirs in a way that the authority does
-not read yet, and an act there that needs a grant is answered
-`authority-unavailable` (I3 deltas, entry EM21). Nothing in this
-repository deploys the class.
+scope and a destination hold membership's scope ID as a fixed value, and
+no incarnation at first. The authority's first read there asks by the ID
+alone. Guard 1 takes an answer of that ID and of the kind `membership`,
+and the entry that retains it fixes the incarnation. From then on the
+read states the incarnation, and the recorded reference is checked again
+inside the commit (I3 deltas, section 26, entries EM21 and EY7 to EY9).
+Three limits stand. Such a scope accepts no read session before an entry
+of it retains an observation of membership (entry EY12). A scope whose
+entries retain more than one incarnation of that ID records no
+reference, and an act there that needs a grant is answered
+`authority-unavailable` (entry EY9). And no destination exists:
+`platform:destination@1` lacks two rules, so the read of a destination
+has run on no scope object. Nothing in this repository deploys the
+class.
 
 ## A platform definition
 
