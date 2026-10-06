@@ -1,6 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
 import { PROPOSED_BOUNDS, type Receipt } from "@generalbusiness/artroom-contract";
-import { MemoryState, applyEntry, stateDigest, timeMs } from "@generalbusiness/artroom-derive";
+import { MemoryState, applyEntry, checkpointOf, stateDigest, timeMs } from "@generalbusiness/artroom-derive";
+import { SqliteStore, Turns, Wakes, production } from "../src/index.ts";
 import { variant } from "@generalbusiness/artroom-derive/testing";
 import { HOLD, at, definition, found, rita, una, vic } from "./support.ts";
 
@@ -46,6 +47,31 @@ describe("a due expiry is written before any other input (section 5.2, steps 3 a
     const timed = (item: number) => ({ type: "timed", item, rule: "hold-end", due: at(HOLD) });
     expect((await s.entries(7)).map((e) => [e.time, e.input.type === "act" ? "act" : e.input])).toEqual([[at(HOLD), timed(low!)], [at(HOLD), timed(high!)], [at(HOLD), "act"]]);
     expect(await s.alarmAt()).toBeNull();
+  });
+});
+
+describe("what follows the head is told of each commit (`Turns.onSealed`)", () => {
+  test("a turn tells its listener after each entry that it seals, a timed entry as an input's, at that entry's head and in order; a turn that writes nothing tells nothing; a listener that fails changes no entry. The turns are made by hand over the object's storage", async () => {
+    const s = await found();
+    await s.holds(2);                                         // entries 1 to 6; both holds end at the same time
+    s.c.clock.now = at(HOLD);
+    const told = await s.inside(async (state) => {
+      const store = new SqliteStore({ exec: (query, ...bindings) => state.storage.sql.exec(query, ...bindings), transaction: (closure) => state.storage.transactionSync(closure) });
+      const wakes = new Wakes(store, { set: (time) => (time === null ? state.storage.deleteAlarm() : state.storage.setAlarm(timeMs(time)!)) }, false);
+      const turns = new Turns(store, { clock: s.c.clock, rules: production().rules, alarm: wakes.deadline, capabilities: null }, s.c.bounds, () => definition, () => undefined);
+      const heads: number[] = [];
+      turns.onSealed(() => { heads.push(store.scope()!.head.seq); });
+      // An input that writes one entry: a checkpoint, as the scope's own `checkpoint` drafts it.
+      const write = () => turns.run<number>({ asks: () => [], judge: (view) => ({ verdict: "write", retain: [], draft: { input: { type: "checkpoint", ...checkpointOf(view) }, uses: [], prepared: [], effects: [], sends: [], judgesTime: false }, sealed: ({ entry }) => entry.seq, unfit: () => -1, full: () => -1 }) });
+      // The alarm's turn: the two holds end, in entries 7 and 8. Then an input, entry 9.
+      // The last two write nothing: an input that is answered with no entry, and an alarm's turn with nothing due.
+      const ends = [await turns.run(null), await write(), await turns.run<number>({ asks: () => [], judge: () => ({ verdict: "answer", answer: 0 }) }), await turns.run(null)];
+      const after = [...heads];
+      // A listener that fails: the entry is sealed all the same, and the turn answers.
+      turns.onSealed(() => { throw new Error("a listener failed"); });
+      return { ends, after, failing: await write().catch(() => "the turn failed"), head: store.scope()!.head.seq };
+    });
+    expect(told).toEqual({ ends: [{ end: "idle" }, { end: "answer", answer: 9 }, { end: "answer", answer: 0 }, { end: "idle" }], after: [7, 8, 9], failing: { end: "answer", answer: 10 }, head: 10 });
   });
 });
 

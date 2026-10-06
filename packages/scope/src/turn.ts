@@ -145,6 +145,32 @@ export class Turns {
   }
 
   /**
+   * Told after each commit that sealed an entry, whoever asked for the turn:
+   * a caller's request, the alarm, a delivery, the dispatcher's diagnosis or
+   * the operations driver's outcome, also for a late answer. It is told
+   * after the transaction has committed and before the turn does anything
+   * else, in the turn's own section, so two commits are told in their
+   * order. What is no history follows the head from here: the object's open
+   * streams and the operator's record (`object.ts`). A listener that fails
+   * changes nothing: the entry is sealed.
+   */
+  #sealed: (() => void) | null = null;
+  onSealed(told: () => void): void { this.#sealed = told; }
+
+  /** Run `commit`, one transaction, and tell the listener if the head moved. A transaction that throws committed nothing, and tells nothing. */
+  #telling<T>(commit: () => T): T {
+    const at = (): number | null => this.#store.scope()?.head.seq ?? null;
+    const before = at();
+    const done = commit();
+    if (this.#sealed && at() !== before) {
+      try {
+        this.#sealed();
+      } catch { /* a notice was lost, and no fact */ }
+    }
+    return done;
+  }
+
+  /**
    * One turn. `waiting` null: an alarm's turn, which runs the drain alone
    * under the same budget. `founding`: the definition a genesis asks for. It
    * is used only while the scope has no genesis; after that the pinned
@@ -230,7 +256,7 @@ export class Turns {
    */
   #commitTimed(definition: ValidDefinition, turn: Counts, selected: Due, snapshot: Head): "written" | "dropped" | "clock-behind" | "unfit" {
     try {
-      return this.#timed(definition, turn, selected, snapshot);
+      return this.#telling(() => this.#timed(definition, turn, selected, snapshot));
     } catch (error) {
       if (error instanceof Unfit) return "unfit";   // thrown before anything was written
       throw error;
@@ -256,7 +282,7 @@ export class Turns {
   #commit<A>(definition: ValidDefinition, waiting: Waiting<A>, turn: Counts, attempt: Attempt): End<A> | "stopped" {
     let full: (() => A) | null = null;
     try {
-      return this.#store.transaction((): End<A> | "stopped" => this.#judged(definition, waiting, turn, attempt, (answer) => { full = answer; }));
+      return this.#telling(() => this.#store.transaction((): End<A> | "stopped" => this.#judged(definition, waiting, turn, attempt, (answer) => { full = answer; })));
     } catch (error) {
       // The entry would have left an admitted duty no room to settle. The transaction wrote nothing.
       if (error instanceof Full && full) return { end: "answer", answer: (full as () => A)() };

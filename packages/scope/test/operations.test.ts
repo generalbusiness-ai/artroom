@@ -49,6 +49,8 @@ async function seen(s: Lane, id: OperationId): Promise<OperationStatus> {
 }
 /** An answer that arrives by itself, after its request: given to the driver of the object in memory, inside the object. */
 const late = (s: Lane, out: OutsideDouble, id: OperationId, attempt: number, answer: EffectAnswer): Promise<OutcomeRecorded> => s.inside(() => out.deliver!(id, attempt, answer));
+/** One turn of the event loop, so that what is already due can happen. It waits for no time to pass. */
+const tick = () => new Promise<void>((resolve) => { setTimeout(resolve, 0); });
 const own = (commit: string): EffectAnswer => ({ result: "confirmed", evidence: { basis: "own-answer", body: { commit } } });
 /** Each attempt's outcomes, as `result at seq`. */
 const outcomes = (status: OperationStatus) => status.operation.attempts.map((a) => a.outcomes.map((o) => `${o.result} at ${o.seq}`));
@@ -243,6 +245,38 @@ describe("outside operations at a real scope (scope contract, section 4.3; autho
     c.capability = {};
     await s.restart();
     expect([await surface(s).effect(), out.attempts, (await seen(s, op)).state]).toEqual([1, [`${op}#1`], "settled"]);
+  });
+
+  test("a stream that waits is sent the head of an entry that a late answer wrote, when it is committed: no caller's request, no further write and no alarm follows that entry; and the head of a checkpoint in the same way. The test readers, the outside system and the opening entry are stand-ins", async () => {
+    const s = await found();
+    const out = outsideOf(s.name);
+    const [op] = await open(s, pushOf(1)) as [OperationId];
+    // The one attempt is sent and gets no answer: its outcome is `unknown`, in entry 2. It was the last attempt, so nothing is left to send.
+    out.answer(op, 1, null);
+    expect([await s.alarm(), (await s.head()).seq, outcomes(await seen(s, op)), await s.alarmAt()]).toEqual([true, 2, [["unknown at 2"]], null]);
+
+    const text = new TextDecoder();
+    const line = (read: ReadableStreamReadResult<Uint8Array> | null) => (read === null ? "nothing was sent" : read.done ? "the stream ended" : JSON.parse(text.decode(read.value)) as unknown);
+    const stream = await s.inside(async (_state, instance) => {
+      const opened = (instance as { stream(reader: unknown): { id: string; body: ReadableStream<Uint8Array> } }).stream(reader);
+      const from = opened.body.getReader();
+      // The stream begins with the head, entry 2. The next read waits: the reader has been sent that head, and there is no other.
+      const first = line(await from.read());
+      const waiting = from.read();
+      const idle = await Promise.race([waiting, tick().then(() => null)]);
+      // That request's own answer arrives by itself. The driver writes it as entry 3, in a turn that no caller asked for.
+      const recorded = await out.deliver!(op, 1, own("c1"));
+      // Nothing else happens: no call, no write and no alarm. The read that waited has the new head.
+      const sent = await Promise.race([waiting, tick().then(() => null)]);
+      // A checkpoint is the one writer among the object's calls that follows nothing itself. Its entry is told to the stream in the same way.
+      const next = from.read();
+      const checkpoint = await (instance as { checkpoint(): Promise<{ answer: string }> }).checkpoint();
+      const after = await Promise.race([next, tick().then(() => null)]);
+      await from.cancel();
+      return { first, idle: line(idle), recorded: recorded.recorded, sent: line(sent), checkpoint: checkpoint.answer, after: line(after) };
+    });
+    const [second, third, fourth] = (await s.sealed(2)).map((e) => ({ at: { seq: e.entry.seq, hash: e.hash } }));
+    expect([stream, (await s.head()).seq, outcomes(await seen(s, op)), await s.alarmAt()]).toEqual([{ first: second, idle: "nothing was sent", recorded: "written", sent: third, checkpoint: "written", after: fourth }, 4, [["unknown at 2", "confirmed at 3"]], null]);
   });
 
   test("a snapshot that comes with an answer is stored only as its canonical bytes: the same pairs in another order, or with other spacing, have the same digest and are no answer. A plain function, and no scope", () => {
