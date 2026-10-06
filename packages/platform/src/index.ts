@@ -18,10 +18,10 @@ import { register } from "./register.ts";
 import { directory, directoryMembership } from "./directory.ts";
 import type { RecordedRef, Rules, StateView } from "@generalbusiness/artroom-derive";
 import { RULES } from "./rules.ts";
-import { rulesMembership, rulesScope } from "./rules-scope.ts";
+import { PUBLISH, rulesAnswer, rulesMembership, rulesScope } from "./rules-scope.ts";
 
 export { inbox, membership, register, directory, destination };
-export { FIRST_ACTIONS, MEMBERSHIP, NO_MEMBER, ROLE_LISTS, ROLE_TABLE, actionsIn, isHandle, standingOf, type Role } from "./membership.ts";
+export { ACTIONS_MOST, FIRST_ACTIONS, MEMBERSHIP, NO_MEMBER, ROLE_LISTS, ROLE_TABLE, actionsIn, isActions, isHandle, standingOf, type Role } from "./membership.ts";
 export { CREATION_ATTEMPTS, REGISTER, REPOSITORY, directoryIdOf, directorySeed, registerRules, repositoryName } from "./register.ts";
 export { DEFINITION_DOMAIN, DIRECTORY, IMPORT_ATTEMPTS, SEEN, directoryMembership, directoryRules } from "./directory.ts";
 export { COLLECT_MOST, DESTINATION, DESTINATION_ATTEMPTS, DESTINATION_KINDS, DESTINATION_NOT_FINITE, destinationMembership, destinationRulesScope, publicationRoom, revokedToken } from "./destination.ts";
@@ -30,7 +30,7 @@ export { NOT_RESERVED, isJudgeEvidence, judgeReservation } from "./reservation.t
 export type { JudgeChanges, JudgeEvidence, Reservation, ReservationAsked, ReservationRead, Statement } from "./reservation.ts";
 export { RULES };
 export { rulesScope };
-export { CONFIGURATION_BYTES, CONFIGURATION_DOMAIN, RULES_SCOPE, extentsOf, membershipId, referenceOf, rulesMembership } from "./rules-scope.ts";
+export { CONFIGURATION_BYTES, CONFIGURATION_DOMAIN, PUBLISH, RULES_SCOPE, extentsOf, membershipId, referenceOf, revisionOf, rulesAnswer, rulesMembership } from "./rules-scope.ts";
 export type { PlatformName, RuleTable } from "./rules.ts";
 export { CONTROLLER, EXTENTS_MOST, EXTENT_CLASSES, LANDING, RULES_EXTENT, RULES_PATTERNS, classify, firstExtents, holdsRulesExtent, isExtents, judgeExtents, matches } from "./extents.ts";
 export type { Extent, ExtentClass, ExtentJudged, ExtentsAsked, ExtentsJudged, Holder, Lack, Review, Touched, TreeLink } from "./extents.ts";
@@ -57,6 +57,15 @@ export interface Platform {
    * answers no observation.
    */
   readonly observed?: (state: StateView, asked: ObservationRequest) => unknown;
+  /**
+   * The kind of the act whose position is the `revision` that an answer of
+   * this version states (authority note, revision 28, section 12.1.4, "What
+   * a replay derives"): for a rules scope, `publish`. A replay checks that
+   * the revision of an answer at a head is the position of the last entry
+   * of that kind at or before the head, or 0 where there is none. Absent:
+   * an answer of this version states no revision.
+   */
+  readonly revised?: string;
   /**
    * Where a scope under this version records its membership reference,
    * when that is not its genesis entry (authority note, section 3.3, "Where
@@ -89,5 +98,5 @@ export function platform(named: string): Platform | null {
   const name = named.slice(0, cut);
   const data = cut > 0 && named.slice(cut) === "@1" && Object.hasOwn(definitions, name) ? definitions[name] : undefined;
   if (!data) return null;
-  return { data, rules: Object.hasOwn(RULES, name) ? (RULES as Record<string, Rules>)[name]! : {}, ...(data === membership ? { observed: standingOf } : {}), ...(data === directory ? { membership: directoryMembership } : data === rulesScope ? { membership: rulesMembership } : data === destination ? { membership: destinationMembership, rulesScope: destinationRulesScope } : {}) };
+  return { data, rules: Object.hasOwn(RULES, name) ? (RULES as Record<string, Rules>)[name]! : {}, ...(data === membership ? { observed: standingOf } : data === rulesScope ? { observed: rulesAnswer, revised: PUBLISH } : {}), ...(data === directory ? { membership: directoryMembership } : data === rulesScope ? { membership: rulesMembership } : data === destination ? { membership: destinationMembership, rulesScope: destinationRulesScope } : {}) };
 }

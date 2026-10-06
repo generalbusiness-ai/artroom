@@ -10,6 +10,13 @@
  * was not recorded when its rows were built here (I3 deltas, section 28,
  * the entries FB). It is adopted since, at `f7175296`.
  *
+ * One row is of the note's revision 28, at `8b1c3c9d7`, which its checker
+ * approved and whose adoption was not recorded when the row was built (I3
+ * deltas, the entries GD): the reference `published` of the item `rules`,
+ * its effect in `publish`, the revision of the rules and the answer to an
+ * observation (section 12.1.4, "The revision of the rules, and the answer
+ * to an observation"; `revisionOf` and `rulesAnswer`, below).
+ *
  * This file is named `rules-scope.ts` because `rules.ts` is the package's
  * table of rules.
  *
@@ -45,7 +52,7 @@
  * entries EQ1 to EQ11 and FB1 to FB5.
  */
 
-import type { DeclaredDefinition, Digest, MemberObservation, PlatformData, PlatformDefinition, ScopeId } from "@generalbusiness/artroom-contract";
+import type { DeclaredDefinition, Digest, MemberId, MemberObservation, ObservationRequest, PlatformData, PlatformDefinition, RulesObservation, ScopeId } from "@generalbusiness/artroom-contract";
 import { isDigest, isMemberRef } from "@generalbusiness/artroom-bytes";
 import { byteOrder, validateDefinition } from "@generalbusiness/artroom-derive";
 import type { Item, RecordedRef, Rules, StateView } from "@generalbusiness/artroom-derive";
@@ -97,6 +104,12 @@ const APPROVALS = { type: "int", min: 0, max: 64 } as const;
  */
 const EXTENT_LIST = { code: "extent-list", row: "P28", type: "code" } as const;
 const RULES = { rules: { item: "rules", one: true } } as const;
+/**
+ * The kind of the act whose position is the revision of the rules (section
+ * 12.1.4, the row `publish`). A replay checks the slot `published` against
+ * the last entry of this kind.
+ */
+export const PUBLISH = "publish";
 
 export const rulesScope: PlatformData = {
   format: "artroom-definition-1",
@@ -111,7 +124,12 @@ export const rulesScope: PlatformData = {
       many: false, max: 1, initial: "current",
       states: { current: { final: false } },
       parties: {},
-      refs: { directory: { fixed: true, required: true, to: { type: "scope", kind: "directory" } } },
+      refs: {
+        directory: { fixed: true, required: true, to: { type: "scope", kind: "directory" } },
+        // From revision 28 (its second commit of revision 27; "The revision of the rules, and the answer to an observation"): a fact
+        // of the last `publish`. Unset until the first `publish`. The revision of the rules is its position (`revisionOf`, below).
+        published: { fixed: false, required: false, to: { type: "fact", kind: [PUBLISH], under: "platform:rules" } },
+      },
       values: {
         branch: { fixed: true, required: true, of: { type: "text", max: 256 } },
         membership: { fixed: true, required: true, of: { type: "text", max: 64 } },
@@ -205,6 +223,8 @@ export const rulesScope: PlatformData = {
         // A written effect: a value of a marked type is assignable to a slot of the same mark (the contract's section 6.1).
         { value: { slot: "extents", from: { field: "extents" } } },
         { value: { slot: "singleControllerException", from: { field: "singleControllerException" } } },
+        // The entry records `"self"`, and the fold reads it as the entry's own position, as membership's `revoke-key` sets `revokedBy`.
+        { ref: { slot: "published", from: "self" } },
       ],
       sends: [],
       attention: [],
@@ -339,9 +359,9 @@ export const rulesMembership = (state: Pick<StateView, "page" | "incarnations">)
  * Null: the state holds no item `rules`.
  *
  * The `rules` update reads it, below. An observation of the rules will,
- * when it carries extents: no rules scope answers an observation yet (I3
- * deltas, entry EQ8), and the contract's `RulesContent` has no member
- * `extents` (entry FB2).
+ * when it carries the digest of the extents: the answer of a rules scope
+ * holds no member `extents` yet (`rulesAnswer`, below; I3 deltas, entry
+ * GD1).
  */
 export function extentsOf(state: Pick<StateView, "page">): readonly Extent[] | null {
   const rules = rulesOf(state);
@@ -357,9 +377,84 @@ export function extentsOf(state: Pick<StateView, "page">): readonly Extent[] | n
   return firstExtents({ approvals, checks: Array.isArray(checks) ? (checks as unknown as { name: string; required: boolean }[]) : [] });
 }
 
-// ---------------------------------------------------------------- the rules
+/**
+ * The revision of the rules, from a rules scope's folded state (section
+ * 12.1.4, "The revision of the rules, and the answer to an observation"):
+ * the position of the entry that the reference `published` names, which is
+ * the last `publish`. While the slot is unset it is 0. Position 0 is the
+ * genesis, and no `publish` can stand there, so 0 says one thing: no
+ * `publish` was made, and the rules are what the genesis gave. Null: the
+ * state holds no item `rules`.
+ */
+export function revisionOf(state: Pick<StateView, "page">): number | null {
+  const rules = rulesOf(state);
+  if (!rules) return null;
+  const published = rules.refs["published"] ?? null;
+  if (published !== null && typeof published !== "number") throw new Error("the slot `published` holds a reference that is no entry of this scope");
+  return published ?? 0;
+}
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
+const PAGE = 100;
+
+/**
+ * What a rules scope answers to an observation read, from its folded state
+ * at one head (section 12.1.4, "The revision of the rules, and the answer
+ * to an observation"; section 3.3, step 3; the contract's section 16.1). It
+ * is the observation without `at`, which is the asking scope's own clock.
+ * It is a pure function of the state, so a replay derives the same value
+ * from the history of the rules scope at the head that an observation
+ * names. The scope writes no entry for a read.
+ *
+ * Null: no answer. A provisional rules scope answers none (section 12.1),
+ * and so does one that is asked as another scope or incarnation, or for a
+ * key or a member.
+ *
+ * - **Asked as "rules".** `revision`, as `revisionOf` gives it. `content`:
+ *   `approvals`, `ownerMayReview` and `singleControllerException` from
+ *   their slots; `labels` and `checks` from theirs, each an empty list
+ *   while the slot is unset; and of each check its `checker` as the member
+ *   ID of the slot's member reference.
+ * - **Asked as "definitions".** The same `of`, `head`, `revision` and
+ *   `definition`. `content.active`: the digest and the name of each item
+ *   `definition` that is `active`, in the order of their IDs.
+ *
+ * I3 merge: the member `extents` of the content that was asked as "rules"
+ * is not given. The contract's revision 23 states it as the digest of the
+ * list in the domain `artroom-rules-extents-1`, with the bytes beside the
+ * answer and `retains` on the row that observes (its row I3-43). The record
+ * check of this source refuses a content that holds the member. So the
+ * answer here is the record as the contract's revision 19 has it, and a
+ * reader of it judges no extent (I3 deltas, entry GD1).
+ */
+export function rulesAnswer(state: Pick<StateView, "scope" | "page">, asked: ObservationRequest): Omit<RulesObservation, "at"> | null {
+  const scope = state.scope();
+  if (!scope || scope.status !== "active" || scope.at.kind !== "rules" || asked.of.kind !== "rules" || asked.of.scope !== scope.at.scope || ("inc" in asked.of && asked.of.inc !== scope.at.inc)) return null;
+  const [rules, revision] = [rulesOf(state), revisionOf(state)];
+  if (!("asked" in asked) || !rules || revision === null) return null;
+  const common = { subject: "rules", of: scope.at, head: scope.head, revision, definition: RULES_SCOPE } as const;
+  if (asked.asked === "definitions") {
+    const active: { digest: Digest; name: string }[] = [];
+    for (let after: number | null = null; ;) {
+      const page = state.page("definition", ["active"], after, PAGE);
+      for (const item of page.items) active.push({ digest: item.values["digest"] as Digest, name: item.values["name"] as string });
+      const last = page.items.at(-1);
+      if (!page.more || !last) break;
+      after = last.id;
+    }
+    return { ...common, content: { asked: "definitions", active } };
+  }
+  if (asked.asked !== "rules") return null;
+  const { approvals, ownerMayReview, checks, labels, singleControllerException } = rules.values;
+  if (typeof approvals !== "number" || typeof ownerMayReview !== "boolean" || typeof singleControllerException !== "boolean") throw new Error("the item `rules` has these three values from the genesis");
+  const listed = (Array.isArray(checks) ? checks : []).map((check) => {
+    const { name, configuration, required, checker } = check as unknown as { name: string; configuration: Digest; required: boolean; checker: { member: MemberId } };
+    return { name, configuration, required, checker: checker.member };
+  });
+  return { ...common, content: { asked: "rules", approvals, ownerMayReview, checks: listed, labels: Array.isArray(labels) ? (labels as string[]) : [], singleControllerException } };
+}
+
+// ---------------------------------------------------------------- the rules
 
 /** The digests that a declaration names in its `create` sends, once each, in byte order: the first step of its named closure (the contract's section 7.2). */
 const creates = (declared: DeclaredDefinition): Digest[] => {

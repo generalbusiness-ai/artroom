@@ -99,7 +99,7 @@ export function reserving(d: Defining, top: Rec, capacity: Pick<Capacity, "deadl
     const o = isObject(v) ? v : bad("holds", path, "is a record of counts");
     if (!o) return null;
     let ok = true;
-    const held: { operations?: Record<string, number>; requests?: number; items?: number } = {};
+    const held: Held = {};
     for (const [name, value] of Object.entries(o)) {
       if (name === "operations") {
         const byKind: [string, number][] = [];
@@ -111,11 +111,22 @@ export function reserving(d: Defining, top: Rec, capacity: Pick<Capacity, "deadl
         }
         if (!isObject(value)) ok = false;
         held.operations = Object.fromEntries(byKind);
+      } else if (name === "decisions") {
+        // The binding validator reads the counts and checks the bound handler of each message on an item type. Preserve them
+        // with the holder for its ledger; an addition is read here too.
+        const byMessage: [string, number][] = [];
+        for (const [message, n] of Object.entries(isObject(value) ? value : (bad("holds", at(path, name), "is a record of counts, by message") ?? {}))) {
+          const counted = count(n, at(at(path, name), message));
+          if (counted === null) ok = false;
+          else byMessage.push([message, counted]);
+        }
+        if (!isObject(value)) ok = false;
+        held.decisions = Object.fromEntries(byMessage);
       } else if (name === "requests" || name === "items") {
         const counted = count(value, at(path, name));
         if (counted === null) ok = false;
         else held[name] = counted;
-      } else ok = bad("holds", at(path, name), "is no count that an item holds: operations, requests or items") ?? false;
+      } else ok = bad("holds", at(path, name), "is no count that an item holds: operations, requests, items or decisions") ?? false;
     }
     return ok ? held : null;
   };
@@ -136,7 +147,12 @@ export function reserving(d: Defining, top: Rec, capacity: Pick<Capacity, "deadl
     if (on === null) bad("holds", path, "an act adds to an item whose type states holds");
     // The act is on a holder that exists before its entry. An `open` act opens its item, which then takes the type's `holds`.
     else if (av["step"] !== "transition") bad("holds", path, "an act that adds is a transition on its holder");
-    else if (added) adds.set(name, { on, adds: added });
+    else if (added) {
+      for (const message of Object.keys(added.decisions ?? {})) {
+        if (!d.bindings.some((binding) => binding.message === message && binding.type === on)) bad("name", at(at(path, "decisions"), message), `is the message of no tell handler that states bound, whose of names ${on}`);
+      }
+      adds.set(name, { on, adds: added });
+    }
   }
   const holderTypes = new Set(Object.entries(typesWritten).filter(([, tv]) => isObject(tv) && "holds" in tv).map(([type]) => type));
   const held = new Set([...holds.values(), ...[...adds.values()].map((a) => a.adds)].flatMap((h) => Object.keys(h.operations ?? {})));

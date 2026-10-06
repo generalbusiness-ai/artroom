@@ -19,7 +19,8 @@
  *
  * I3 merge: `holds` has three members more, `operations`, `requests` and
  * `items`, and an act has `adds`. They are row I3-44's. `held`, below,
- * reads `decisions` alone and refuses any other member.
+ * reads `decisions`; `holds.ts` reads the other three members and derives
+ * their amounts.
  */
 
 import type { FieldType } from "@generalbusiness/artroom-contract";
@@ -56,7 +57,7 @@ export function indexes(d: Defining, v: unknown, path: string, slots: ReadonlyMa
  * that states `bound` is checked when the handlers are read (`decisions`).
  */
 export function held(d: Defining, v: unknown, path: string): ReadonlyMap<string, number> | null {
-  const o = d.rec(v, path, [], ["decisions"]);
+  const o = d.rec(v, path, [], ["decisions", "operations", "requests", "items"]);
   if (!o) return null;
   const counts = new Map<string, number>();
   for (const [message, n] of d.entries(o["decisions"] ?? {}, at(path, "decisions"), null)) {
