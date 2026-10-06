@@ -54,14 +54,14 @@ export const largest = (...amounts: readonly Amount[]): Amount => each((d) => Ma
 export interface Starts { effects: number; operations: readonly string[]; opens: string | null }
 export const STARTS_NOTHING: Starts = { effects: 0, operations: [], opens: null };
 
-/** One clause of a result: its effect marks, and the bytes of the values that its rows of `observes` state under `retains`. */
+/** One clause of a result: its effect marks, and the bytes of the values that its rows of `observes` state under `retains`, plus the evidence values its pinned owner declares. */
 export interface ClauseStarts { marks: readonly Starts[]; retains: number }
 
 /**
  * One kind of `outcomes`, as its data states it. `attempts`: the most
  * attempts. `most`: what one outcome entry may start. `send`: its one send
  * mark, with `once` and each clause. `retains`: the bytes of the values
- * that its rows of `observes` state under `retains`.
+ * that its rows of `observes` state under `retains`, plus the evidence values its pinned owner declares.
  */
 export interface KindStated { attempts: number; most: Starts; send: { once: boolean; clauses: readonly ClauseStarts[] } | null; retains: number }
 

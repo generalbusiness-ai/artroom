@@ -34,10 +34,10 @@
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { DeclaredDefinition, Entry, Evidence, FactRef, FieldValue, Input, MemberObservation, HoldersObservation, Observation, ObservationUse, OperationId, Request, RulesObservation, ScopeRef, Seed, Send, Timestamp } from "@generalbusiness/artroom-contract";
 import { canonicalize, factRefOf, intentDigest, newIncarnation, scopeIdOf, signIntent } from "@generalbusiness/artroom-bytes";
-import { PROFILES, clockOf, contentStates, valueDigest, judgeDelivery, judgeGenesis, settleOutcome, validateDefinition } from "@generalbusiness/artroom-derive";
+import { PROFILES, clockOf, contentStates, valueDigest, outcomeValueDomains, judgeDelivery, judgeGenesis, settleOutcome, validateDefinition } from "@generalbusiness/artroom-derive";
 import type { ActJudgment, Fetched, Judgment, OutcomeJudgment, Observing, PlatformRules, Source, ValidDefinition } from "@generalbusiness/artroom-derive";
 import { Ledger, Scope, T0, creation, d, keys, laneDefinition, sent, t, type Actor, type Context, type Over } from "@generalbusiness/artroom-derive/testing";
-import { DESTINATION, DESTINATION_KINDS, destination, destinationReceipt, destinationRulesWith, type LaneRead } from "../src/destination.ts";
+import { DESTINATION, DESTINATION_KINDS, destination, destinationReceipt, destinationRules, destinationRulesWith, type LaneRead } from "../src/destination.ts";
 import { firstExtents } from "../src/extents.ts";
 import { rulesScope } from "../src/rules-scope.ts";
 import type { JudgeEvidence, ReservationRead } from "../src/reservation.ts";
@@ -102,7 +102,7 @@ const checked = (result: ReturnType<typeof validateDefinition>): ValidDefinition
   return result.definition;
 };
 /** The destination's data, validated as a runtime validates it. */
-export const destinationDefinition = checked(validateDefinition(JSON.parse(JSON.stringify(destination)), PROPOSED_BOUNDS, PROFILES, { platform: true }));
+export const destinationDefinition = checked(validateDefinition(JSON.parse(JSON.stringify(destination)), PROPOSED_BOUNDS, PROFILES, { platform: true, outcomeValues: outcomeValueDomains(destination, destinationRules) }));
 
 const REPOSITORY = { host: "git.example", namespace: "artroom", name: "demo", id: "r1" };
 const NAME = { type: "text", max: 256 } as const;

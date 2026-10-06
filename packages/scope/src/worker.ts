@@ -38,7 +38,7 @@
  * | `GET /v1/scopes/:scope/outbox?cursor=` | A page of the outbox. |
  * | `GET /v1/scopes/:scope/outbox/:duty` | The outbox status of one send. |
  * | `GET /v1/scopes/:scope/log?cursor=` | A page of the history as stored: each entry's canonical bytes. |
- * | `GET /v1/scopes/:scope/retained/:kind/:digest` | One retained input. The kind `text` is a detached text, until it is redacted. |
+ * | `GET /v1/scopes/:scope/retained/:kind/:digest` | One retained input. For `value`, `?domain=` names its byte domain. |
  * | `POST /v1/scopes/:scope/sessions` | Ask a membership scope for a read session. Body: a signed session request, `{ request, sig }`. The answer holds the token, and is marked not to be stored. |
  * | `GET /v1/scopes/:scope/stream` | A stream of the scope's head, one line of JSON for each, for a read session. |
  * | `GET /v1/scopes/:scope/incidents?cursor=` | A page of the operator's record of the scope, for the session of an admin. |
@@ -97,7 +97,7 @@ interface Remote {
   outbox(reader: unknown, cursor?: Cursor): Promise<Read<readonly Duty[]>>;
   duty(reader: unknown, duty: DutyId): Promise<Read<Duty>>;
   log(reader: unknown, cursor?: Cursor): Promise<Read<LogPage>>;
-  retained(reader: unknown, kind: RetainedInput["kind"], digest: Digest): Promise<Read<RetainedInput>>;
+  retained(reader: unknown, kind: RetainedInput["kind"], digest: Digest, domain?: string): Promise<Read<RetainedInput>>;
   session(asked: unknown): Promise<SessionAnswer>;
   stream(reader: unknown): Promise<Opened | StreamRefusal>;
   release(id: string): Promise<void>;
@@ -155,7 +155,7 @@ export function api(binding: Binding, address: string | null = null): Api {
     async outbox(scope: string, reader: unknown, cursor?: Cursor): Promise<Read<readonly Duty[]>> { return (await at(scope)?.outbox(reader, cursor)) ?? MISSING; },
     async duty(scope: string, reader: unknown, duty: DutyId): Promise<Read<Duty>> { return (await at(scope)?.duty(reader, duty)) ?? MISSING; },
     async log(scope: string, reader: unknown, cursor?: Cursor): Promise<Read<LogPage>> { return (await at(scope)?.log(reader, cursor)) ?? MISSING; },
-    async retained(scope: string, reader: unknown, kind: RetainedInput["kind"], digest: Digest): Promise<Read<RetainedInput>> { return (await at(scope)?.retained(reader, kind, digest)) ?? MISSING; },
+    async retained(scope: string, reader: unknown, kind: RetainedInput["kind"], digest: Digest, domain?: string): Promise<Read<RetainedInput>> { return (await at(scope)?.retained(reader, kind, digest, domain)) ?? MISSING; },
     async session(scope: string, asked: unknown): Promise<SessionAnswer> { return (await at(scope)?.session(asked)) ?? MISSING; },
     async stream(scope: string, reader: unknown) {
       const object = at(scope);
@@ -263,7 +263,7 @@ export async function route(request: Request, binding: Binding): Promise<Respons
   if (seq !== null) return read(await scopes.entry(scope, reader, seq));
   if (what === "outbox") return read(which === undefined ? await scopes.outbox(scope, reader, cursor) : await scopes.duty(scope, reader, which as DutyId));
   if (what === "log" && which === undefined) return read(await scopes.log(scope, reader, cursor));
-  if (what === "retained") return read(await scopes.retained(scope, reader, which as RetainedInput["kind"], last as Digest));
+  if (what === "retained") return read(await scopes.retained(scope, reader, which as RetainedInput["kind"], last as Digest, url.searchParams.get("domain") ?? undefined));
   if (what === "incidents") return read(await scopes.incidents(scope, reader, cursor));
   if (what === "waiting" && (which === "diagnosed" || which === "unanswered")) return read(await scopes.waiting(scope, reader, which, cursor));
   if (what === "stream") {
@@ -335,7 +335,7 @@ export class ScopeService<E extends Env = Env> extends WorkerEntrypoint<E> imple
   outbox(scope: string, reader: unknown, cursor?: Cursor): Promise<Read<readonly Duty[]>> { return api(this.scopes()).outbox(scope, reader, cursor); }
   duty(scope: string, reader: unknown, duty: DutyId): Promise<Read<Duty>> { return api(this.scopes()).duty(scope, reader, duty); }
   log(scope: string, reader: unknown, cursor?: Cursor): Promise<Read<LogPage>> { return api(this.scopes()).log(scope, reader, cursor); }
-  retained(scope: string, reader: unknown, kind: RetainedInput["kind"], digest: Digest): Promise<Read<RetainedInput>> { return api(this.scopes()).retained(scope, reader, kind, digest); }
+  retained(scope: string, reader: unknown, kind: RetainedInput["kind"], digest: Digest, domain?: string): Promise<Read<RetainedInput>> { return api(this.scopes()).retained(scope, reader, kind, digest, domain); }
 }
 
 export default { fetch: (request: Request, env: Env): Promise<Response> => route(request, env.SCOPES) };

@@ -1316,6 +1316,8 @@ const judgeRule = (decides: Decides): PlatformRule => ({
   place: "outcome", clock: true,
   rules: {
     selects: false, read: false, most: { effects: 10, requests: 1, operations: 2 },
+    valueDomains: [{ domain: DESTINATION_CHANGED_SET.domain, max: DESTINATION_CHANGED_SET.max }],
+    values: (evidence) => isObject(evidence.body) && isDigest(evidence.body["changes"]) ? [{ domain: DESTINATION_CHANGED_SET.domain, digest: evidence.body["changes"], max: DESTINATION_CHANGED_SET.max }] : [],
     origin: ({ state }) => publicationAt(state, branchOf(state)?.refs["judging"])?.id ?? null,
     subjects: (given, _operation, row, first) => {
       const publication = publicationAt(given.state, branchOf(given.state)?.refs["judging"]);

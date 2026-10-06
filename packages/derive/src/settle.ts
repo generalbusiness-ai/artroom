@@ -7,6 +7,7 @@
  */
 
 import type { Attempt, Digest, Entry, FactUse, ObservationUse, PlatformData } from "@generalbusiness/artroom-contract";
+import { evidenceValues } from "./evidence-values.ts";
 import { useOf, type Reading } from "./fields.ts";
 import type { Fetched } from "./guards.ts";
 import { runClause } from "./handlers.ts";
@@ -14,7 +15,7 @@ import { namesOwn, outcomeOf, recordedOutcome, type OutcomeInput, type OutcomeOf
 import { ownersOf, type OutcomeReading } from "./outcomes.ts";
 import type { Judgment } from "./judge.ts";
 import { withinCounts } from "./draws.ts";
-import { RuleFault, atHand, atHandByRows, retainedOf, unjudged, type FirstStep, type PlatformRules } from "./marks.ts";
+import { RuleFault, atHand, atHandByRows, placeWithoutValue, retainedOf, unjudged, type FirstStep, type PlatformRules } from "./marks.ts";
 import { listedByRule, observedName, rowsOfKind, settle, subjectName, waits, type Observing, type Settling as RowsGiven } from "./observes.ts";
 import { stateDigest, type ScopeState, type StateView } from "./state.ts";
 import { nextDue } from "./timed.ts";
@@ -106,8 +107,8 @@ export type OutcomeContext = Settling & {
    * "The origin of an outcome"). Absent: `facts` is searched. `observing`:
    * what the commit holds for the rows of the kind, beside `observed`,
    * whose records the judge then judges itself, by the six guards with the
-   * window and the use of each row. `values`: the canonical bytes of each
-   * value that came beside an observation.
+   * window and the use of each row. `values`: canonical bytes beside an
+   * observation or named by evidence in an owner-declared domain.
    */
   retained?: ((use: FactUse) => Fetched | null) | undefined;
   observing?: Observing | undefined;
@@ -139,6 +140,14 @@ export function settleOutcome(view: StateView, definition: ValidDefinition, outc
   // be a copy of a recorded answer. Nothing is written.
   const operation = view.operation(outcome.operation);
   if (operation && !namesOwn(operation, outcome)) return invalid("the outcome names another owner or kind than its operation has");
+  // Evidence values are matched before any rule reads them, and kept even when no rule reads one.
+  const names = unjudged(() => evidenceValues(operation ? ownersOf(definition, context.platform, context.owners)?.rules(operation.owner, operation.kind) : null, outcome.evidence));
+  if (names === null) return invalid("the evidence names a value outside its owner declaration");
+  if ("result" in names) return names;
+  const places = names.map((value, n) => ({ ...value, field: `evidence:${n}` }));
+  const values = atHand(undefined, context.values, places);
+  if (placeWithoutValue(values) !== null) return invalid("the evidence names a value whose canonical bytes were not given under its digest and bound");
+  const kept = retainedOf(values).values;
   const known = recordedOutcome(view, outcome);
   if (known) return known;
   const admit = admitted(view, definition, context);
@@ -148,10 +157,13 @@ export function settleOutcome(view: StateView, definition: ValidDefinition, outc
   const ran = { clock: false };
   // Revision 20: under a definition whose data states rows or an origin, the entry retains what its rows give and copies the `uses`
   // of its origin. Under any other, the older rule below stands, as a stand-in.
-  if (definition.observing) return withinCounts(view, definition, unjudged(() => byRows(view, definition, outcome, context, ran)));
+  if (definition.observing) {
+    const judged = unjudged(() => byRows(view, definition, outcome, context, ran));
+    return withinCounts(view, definition, judged.result === "write" ? { ...judged, draft: { ...judged.draft, values: [...kept, ...(judged.draft.values ?? []).filter((value) => !kept.some((read) => read.domain === value.domain && read.digest === value.digest))] } } : judged);
+  }
   const facts = context.facts ?? [];
   // Sections 4.1 and 16.1: what a rule of this outcome reads of the observations at hand is noted, and the entry retains it.
-  const beside = context.observed === undefined ? undefined : atHand(context.observed, undefined);
+  const beside = atHand(context.observed, context.values);
   const judged = unjudged(() => outcomeOf(view, definition, outcome, ownersOf(definition, context.platform, context.owners, { clock: context.clock, bounds: context.bounds, own: context.own, ran, facts, beside })));
   if (judged.result !== "write") return judged;
   const retained = retainedOf(beside).observed;
@@ -166,7 +178,7 @@ export function settleOutcome(view: StateView, definition: ValidDefinition, outc
   // none was read. So an outcome whose rules read none has the bytes it had.
   const input = retained.length > 0 ? { ...judged.draft.input, observed: retained } : judged.draft.input;
   // Section 17.2a, "Past a count": an outcome whose entry would draw past a count of a holder is not judged. It stays offered.
-  return withinCounts(view, definition, { result: "write", draft: { ...judged.draft, input, uses: facts.map((fact) => useOf(fact.fact, fact.entry)), judgesTime } } satisfies Judgment);
+  return withinCounts(view, definition, { result: "write", draft: { ...judged.draft, input, uses: facts.map((fact) => useOf(fact.fact, fact.entry)), judgesTime, values: [...kept, ...retainedOf(beside).values.filter((value) => !kept.some((read) => read.domain === value.domain && read.digest === value.digest))] } } satisfies Judgment);
 }
 
 /**

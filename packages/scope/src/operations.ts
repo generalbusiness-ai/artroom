@@ -34,8 +34,8 @@
  */
 
 import type { Bounds, CapabilityName, DecisiveEvidence, Entry, Evidence, FactRef, FactUse, OperationId, PlatformDefinition, RetainedInput, ScopeRef } from "@generalbusiness/artroom-contract";
-import { isEvidence, isOperationId, isRetainedInput } from "@generalbusiness/artroom-bytes";
-import { clockOf, settleOutcome, snapshotInput, snapshotRead, timeMs, timeOf, type Clock as Reading, type Fetched, type OutcomeOffered, type Owners } from "@generalbusiness/artroom-derive";
+import { canonicalize, isEvidence, isOperationId, isRetainedInput, parseStrict, utf8 } from "@generalbusiness/artroom-bytes";
+import { clockOf, evidenceValues, valueDigest, settleOutcome, snapshotInput, snapshotRead, timeMs, timeOf, type Clock as Reading, type Fetched, type OutcomeOffered, type Owners } from "@generalbusiness/artroom-derive";
 import { ownOf, valuesOf, type Scope } from "./core.ts";
 import { report } from "./diag.ts";
 import type { Wakes } from "./outbox.ts";
@@ -66,8 +66,8 @@ export interface EffectRequest {
 export interface EffectAnswer {
   result: "confirmed" | "refused"; evidence: DecisiveEvidence;
   /**
-   * The snapshots of staged refs that the evidence names by digest (section
-   * 16.4), as retained inputs. The driver checks each against its digest,
+   * The snapshots of staged refs (section 16.4), and values in the byte domains
+   * that this pinned owner declares, named by the evidence as retained inputs. The driver checks each against its digest,
    * and the scope stores them in the commit of the outcome entry, so the
    * bytes are there before any entry names the digest. An answer whose
    * evidence names a snapshot that is not given here, and that the scope
@@ -130,21 +130,24 @@ const keyOf = (operation: OperationId, attempt: number) => `${operation}#${attem
  */
 export const isAnswer = (answer: unknown): answer is EffectAnswer => {
   const a = answer as { result?: unknown; evidence?: unknown; retain?: unknown } | null;
-  return typeof a === "object" && a !== null && (a.result === "confirmed" || a.result === "refused") && isEvidence(a.evidence) && a.evidence.basis !== "none" && snapshotsOf(a) !== null;
+  return typeof a === "object" && a !== null && (a.result === "confirmed" || a.result === "refused") && isEvidence(a.evidence) && a.evidence.basis !== "none" && inputsOf(a) !== null;
 };
 /**
- * The snapshots that came with an answer, each checked against the digest it is given under. Null: one of them is no snapshot with
+ * The snapshots and values that came with an answer, each checked against its domain and digest. Null: one of them is no snapshot with
  * that digest, or its bytes are not the snapshot's canonical bytes. The scope stores the bytes as they are given, under the digest,
  * and a retained input's bytes are canonical JSON text (`RetainedInput`): the same pairs in another order or with other spacing have
  * the same digest and are not those bytes.
  */
-const snapshotsOf = (answer: { retain?: unknown }): readonly RetainedInput[] | null => {
+const canonicalValue = (input: RetainedInput): boolean => {
+  try { const value = parseStrict(input.bytes); return typeof input.domain === "string" && canonicalize(value) === input.bytes && valueDigest(input.domain, value) === input.digest; } catch { return false; }
+};
+const inputsOf = (answer: { retain?: unknown }): readonly RetainedInput[] | null => {
   const given = answer.retain === undefined ? [] : answer.retain;
   const canonical = (input: RetainedInput): boolean => { const pairs = snapshotRead(input.digest, input.bytes); return pairs !== null && snapshotInput(pairs)?.bytes === input.bytes; };
-  return Array.isArray(given) && given.every((input) => isRetainedInput(input) && input.kind === "snapshot" && canonical(input)) ? (given as RetainedInput[]) : null;
+  return Array.isArray(given) && given.every((input) => isRetainedInput(input) && (input.kind === "snapshot" ? canonical(input) : input.kind === "value" && canonicalValue(input))) ? (given as RetainedInput[]) : null;
 };
 
-/** An outcome as the driver offers it: it states no owner and no kind, which the judge sets from the operation (section 4.1). `retain`: the snapshots that came with its answer, which are no part of the input. */
+/** An outcome as the driver offers it: it states no owner and no kind, which the judge sets from the operation (section 4.1). `retain`: the snapshots and values that came with its answer, which are no part of the input. */
 type Outcome = OutcomeOffered & { retain?: readonly RetainedInput[] | undefined };
 
 export class Operations {
@@ -416,7 +419,7 @@ export class Operations {
    * one kept.
    */
   async answered(operation: OperationId, attempt: number, answer: EffectAnswer): Promise<OutcomeRecorded> {
-    if (!isAnswer(answer)) return { recorded: "refused", detail: "not an answer" };
+    if (!isAnswer(answer)) return { recorded: "refused", detail: "bad-input: not an answer" };
     const row = isOperationId(operation) && Number.isSafeInteger(attempt) ? this.#store.sending(operation, attempt) : null;
     if (!row || row.sent === null) return { recorded: "refused", detail: "no request of that attempt was sent" };
     const key = keyOf(operation, attempt);
@@ -439,8 +442,22 @@ export class Operations {
     // with the answer, or the scope retains it already. Otherwise this is no answer.
     const operation = this.#store.operation(input.operation);
     const retain = input.retain ?? [];
-    const named = (operation && this.#scope.owners()?.rules(operation.owner, operation.kind)?.retains?.(input.evidence)) ?? [];
-    if (named.some((digest) => !retain.some((given) => given.digest === digest) && this.#store.retained("snapshot", digest) === null)) {
+    const rules = operation && this.#scope.owners()?.rules(operation.owner, operation.kind);
+    const named = rules?.retains?.(input.evidence) ?? [];
+    let values: ReturnType<typeof evidenceValues>;
+    try { values = evidenceValues(rules, input.evidence); } catch { values = null; }
+    const invalidValue = (detail: string): OutcomeRecorded => {
+      if (input.result !== "unknown") this.#judged(input.operation, input.attempt, null);
+      return { recorded: "refused", detail: `bad-input: ${detail}` };
+    };
+    if (values === null) return invalidValue("the evidence names a value outside its owner declaration");
+    const bytes: string[] = [];
+    for (const value of values) {
+      const given = retain.find((input) => input.kind === "value" && input.domain === value.domain && input.digest === value.digest) ?? this.#store.retained("value", value.digest, value.domain);
+      if (!given || utf8(given.bytes).length > value.max || !canonicalValue(given)) return invalidValue("the evidence names a value whose canonical bytes were not given under its digest and bound");
+      bytes.push(given.bytes);
+    }
+    if (named.some((digest) => !retain.some((given) => given.kind === "snapshot" && given.digest === digest) && this.#store.retained("snapshot", digest) === null)) {
       if (input.result !== "unknown") this.#judged(input.operation, input.attempt, null);
       return { recorded: "refused", detail: "the evidence names a snapshot whose bytes were not given" };
     }
@@ -458,7 +475,7 @@ export class Operations {
       const kept = store.retained("entry", use.content);
       return kept ? { fact: use.fact, entry: JSON.parse(kept.bytes) as Entry, under: kept.under ?? "" } : null;
     };
-    const context = (clock: Reading) => ({ clock, bounds, owners: this.#owners, platform: this.#scope.pinned()?.platform ?? undefined, own: ownOf(store), ...(definition.observing ? { retained, ...rows.hand() } : {}) });
+    const context = (clock: Reading) => ({ clock, bounds, owners: this.#owners, platform: this.#scope.pinned()?.platform ?? undefined, own: ownOf(store), ...(definition.observing ? { retained, ...rows.hand() } : {}), values: [...bytes, ...(rows.hand().values ?? [])] });
     await rows.before(() => { const planned = settleOutcome(store, definition, input, context(clockOf(store, this.#clock.read()))); return planned.result === "unavailable" ? planned.missing : undefined; }, 2);
     const end = await rows.turn((stop) => this.#scope.turns.run<OutcomeRecorded>({
       asks: () => [],
@@ -473,7 +490,7 @@ export class Operations {
             if (view.scope()!.head.seq + 1 >= bounds.scopeEntries) return said({ recorded: "unavailable" });
             return {
               // Section 16.1, "A value that a row may retain": each value that a retained observation names is kept with the entry.
-              verdict: "write", draft: judged.draft, retain: [...retain.filter((given) => named.includes(given.digest)), ...valuesOf(judged.draft)],
+              verdict: "write", draft: judged.draft, retain: [...retain.filter((given) => given.kind === "snapshot" && named.includes(given.digest)), ...valuesOf(judged.draft)],
               sealed: (sealed) => { wrote.sealed = sealed; rows.sealed(sealed); return { recorded: "written", fact: { at: sealed.entry.at, seq: sealed.entry.seq, hash: sealed.hash } }; },
               unfit: () => ({ recorded: "refused", detail: "the outcome cannot be an entry" }), full: () => ({ recorded: "unavailable" }),
             };
