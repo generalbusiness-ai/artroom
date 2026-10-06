@@ -253,6 +253,9 @@ describe("a preparation, its outcomes and an ancestry record are derived again (
     { name: "an outcome that the rules of its owner are not given for: `unsupported-definition`", change: () => ({ owners: undefined }), result: "unsupported-definition", at: 7, why: /an outcome, and this replay has no rules/ },
     // Witness 18.10: with the snapshot's bytes gone the replay makes no claim for that check.
     { name: "a check entry whose snapshot is no longer retained: `incomplete`", change: (h) => { h.retained = h.retained.filter((r) => r.kind !== "snapshot"); }, result: "incomplete", at: 8, why: /retained input is missing: the snapshot of staged refs/ },
+    // Row I3-48 (the contract's revision 20, point EZ5): a verifier takes a retained input only as its canonical bytes. The same
+    // pairs with one space before them are not the input that the digest names, so the verifier lacks it.
+    { name: "a check entry whose retained snapshot is not its canonical bytes: `incomplete`", change: (h) => { h.retained = h.retained.map((r) => (r.kind === "snapshot" ? { ...r, bytes: ` ${r.bytes}` } : r)); }, result: "incomplete", at: 8, why: /a retained input is not the one named: the snapshot of staged refs/ },
     { name: "an ancestry record that states another count than its snapshot holds", change: (h) => rewrite(h, 8, (entry) => { for (const record of records(entry)) record.snapshot.count = 2; }), result: "mismatch", at: 8, why: /states 2 staged refs, and the snapshot that it names holds 1/ },
     // The check entry still derives: its rule records what the answer says. The report names nothing, so the guard refuses the act that the entry says was admitted.
     { name: "an ancestry record that lists a staged commit of other work: the act that it admitted is not derived",
