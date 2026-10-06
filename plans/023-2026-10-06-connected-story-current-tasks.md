@@ -64,8 +64,9 @@ and preservation of the selected branch and grant in storage and replay.
 Public refusals must keep the required selected,
 attempted or null authorization. Existing v1 scopes retain their exact
 lifetime meaning and pins; menus and raw design hashes activate nothing.
-The narrow normalized-result-work wording successor `101b209b` remains
-under independent review; it changes no signed canonical bytes.
+The existing `335ef3ea` result-work rule compares absent and empty work
+equally while preserving meaningful effects, observations and order.
+That comparison changes no signed canonical bytes.
 
 Recovery R10 at `9bea347e` is adopted by `cf5ecc64`. Uploaded manifest
 bytes remain separate from the guarded recorded checkpoint receipt and
@@ -110,7 +111,8 @@ The next assigned shared-form source task is `7df6a805`. Its exact R3
 authority confirmation belongs to that handoff; it does not require reopening
 all R3 or waiting for the separate compiler-manifest design. Other capacity
 work remains with `cc570904`. The manifest interface, normalized wording and
-production runtime proposals follow their own design reviews. Complete
+production runtime proposals follow their own design reviews and adoption.
+Complete
 capacity, I3, IA, I5 and I6 claims require their full evidence.
 Source promises name exact adopted decisions, affected interfaces and
 focused commands. Real operational runs also identify their test resources,
