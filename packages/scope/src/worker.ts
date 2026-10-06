@@ -27,7 +27,7 @@
  *
  * | Route | Operation |
  * |---|---|
- * | `POST /v1/scopes` | Found a directory. Body `{ founding, definition, definitions?, texts? }`. |
+ * | `POST /v1/scopes` | Found a scope with no creator: under `platform:register@1` the founding register, by an `install` intent; under another definition a directory. Body `{ founding, definition, definitions?, texts? }`. |
  * | `POST /v1/scopes/:scope/acts` | Submit an act. Body `{ signed, grants, texts?, presented? }`. `texts`: each detached text that a field names by digest. `presented`: the facts presented beside the intent, by name. |
  * | `POST /v1/scopes/:scope/preparations` | Ask for one step of a capability. Body `{ signed, grants, capability, step }`. `signed`: the signed intent that the step prepares for. |
  * | `POST /v1/scopes/:scope/settle` | The receipt of an accepted act. Body `{ signed }`. |
@@ -66,7 +66,7 @@ import { WorkerEntrypoint } from "cloudflare:workers";
 import type { Answer, Beside, Cursor, DeclaredDefinition, Digest, DutyId, Grant, LogPage, PlatformDefinition, Read, ReadRefusal, RetainedInput, ScopeApi, ScopeId, Seed, SessionAnswer, SessionRefusal, Settlement, SignedIntent } from "@generalbusiness/artroom-contract";
 import { definitionDigest, intentDigest, isScopeId, positionOf, scopeIdOf } from "@generalbusiness/artroom-bytes";
 import { isObject, type Item } from "@generalbusiness/artroom-derive";
-import type { Founded } from "./core.ts";
+import { foundedKind, type Founded } from "./core.ts";
 import { recordedMembership, repositoryAuthority } from "./authority.ts";
 import { membershipIn, namespace, type Binding } from "./namespace.ts";
 import { ScopeObject, type Wiring } from "./object.ts";
@@ -136,7 +136,9 @@ export function api(binding: Binding, address: string | null = null): Api {
     async found(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions: readonly DeclaredDefinition[] = [], beside: Beside = {}): Promise<Founded> {
       let name: ScopeId;
       try {
-        const seed: Seed = { v: 1, kind: "directory", definition: typeof definition === "string" ? definition : definitionDigest(definition), creator: null, cause: intentDigest(founding.intent), ordinal: 0 };
+        const names = typeof definition === "string" ? definition : definitionDigest(definition);
+        // Under the register's platform definition the scope is the founding register, of the kind `register` (I3 delta EP2).
+        const seed: Seed = { v: 1, kind: foundedKind(names), definition: names, creator: null, cause: intentDigest(founding.intent), ordinal: 0 };
         name = scopeIdOf(seed);
       } catch {
         return { answer: "refused", reason: "source-unverified" };   // not values that have canonical bytes

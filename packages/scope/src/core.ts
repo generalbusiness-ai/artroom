@@ -119,6 +119,17 @@ export class Received {
   }
 }
 
+/**
+ * The kind of the scope that a founding under that definition makes
+ * (section 7.1; I3 delta EP2): the register's platform definition founds a
+ * register, and no other definition does. The genesis judge checks the
+ * three together: the kind `register`, an intent of the kind `install`, and
+ * the register's definition, each only with the other two. The Worker
+ * builds the same seed to find the object's name.
+ */
+export const foundedKind = (definition: unknown): "register" | "directory" =>
+  (isPlatformDefinition(definition) && platformName(definition) === "platform:register" ? "register" : "directory");
+
 /** What came beside an intent, as a caller over a transport sent it: untrusted, so anything that is not a record is nothing. */
 const besideOf = (beside: unknown): { texts?: unknown; presented?: unknown } => (isObject(beside) ? beside : {});
 
@@ -266,7 +277,12 @@ export class Scope {
   }
 
   /**
-   * Found a repository's directory (section 7.1). The seed is built from the
+   * Found a scope with no creator (section 7.1). Under the register's
+   * platform definition it is the founding register, of the kind `register`,
+   * which an `install` intent asks for. Under any other definition it is a
+   * directory with no creator, by a `found` intent: the first delivery's
+   * stand-in for a register, which stays until a repository's founding by
+   * its register is whole (I3 plan, step 10). The seed is built from the
    * signed intent and the definition, and the genesis judge checks that its
    * digest is this object's name. The incarnation is minted in the commit.
    * The entry's sends are written to the outbox. `definition` is a
@@ -337,7 +353,7 @@ export class Scope {
     }, (text) => this.validate(text), bounds.namedDefinitions);
     if (!children.ok) return refused("unsupported-definition");
 
-    const seed: Seed = { v: 1, kind: "directory", definition: names, creator: null, cause: intentDigest(founding.intent), ordinal: 0 };
+    const seed: Seed = { v: 1, kind: foundedKind(names), definition: names, creator: null, cause: intentDigest(founding.intent), ordinal: 0 };
     // Step 1: the facts the founding intent's fields name. A scope that has its genesis is asked again, a repeat: the judge answers it
     // from the genesis, or refuses it as another founding, and reads no fact. So none is fetched, and a fact that cannot be read
     // now does not hide the receipt (section 7.4, as for a delivery that the store has decided).
