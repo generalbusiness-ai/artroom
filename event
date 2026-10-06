@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at vitest.config.ts","body":{"commit":"b452882f83fabdd3fb3bc5df356dd8a7a5b6cc1e","path":"vitest.config.ts"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:0065324d7a8adc59064e22f64bbf3b740f54020b","text":"Merge retired a covered predecessor; the successor is at packages/derive/src/fold.ts."}
