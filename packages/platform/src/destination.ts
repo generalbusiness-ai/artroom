@@ -20,7 +20,7 @@
  * | `publication-of` | 2, `also` | 34 | `withdraw`, the name `publication` |
  * | `open-withdrawn` | 5, effect | 34 | `withdraw` |
  * | `open-branch-read` | 5, effect | 36 | `adopt-head` |
- * | `reopen-publish` | 5, effect | 37 | `resend` |
+ * | `reopen-publish` | 5, effect | 37 | `resend`: the write, and its attempt's `mint` |
  * | `collect-list` | 3, type | b | `reserve`, the fields `verdicts`, `jobs` and `links`; a verdict may state `extent` |
  *
  * **The marks that have NO rule here.** The adopted texts do not let any of
@@ -216,7 +216,7 @@ export const destination: PlatformData = {
       also: {},
       fields: {},
       guards: [{ state: ["unresolved", "published"] }, { code: "resend-due", row: "P29" }],
-      // Code P16: opens one new operation, the same compare-and-swap, with 1 attempt (G3).
+      // Code P16: opens one new operation, the same compare-and-swap, with 1 attempt (G3), and that attempt's `mint`.
       effects: [{ code: "reopen-publish", row: "P16" }],
       sends: [],
       attention: [],
@@ -400,6 +400,9 @@ function nextJudge(state: Pick<StateView, "page">, after: { slot?: boolean; judg
   const queued = state.page("publication", ["queued"], null, 2).items.find((item) => item.id !== after.ended);
   return queued?.id ?? after.opens ?? null;
 }
+
+/** The position of the entry that opened an operation: the first part of its ID (the contract's section 4.3, item 1). */
+const seqOf = (id: OperationId): number => Number(id.slice(0, id.indexOf(":")));
 
 /** The operations that the entry at that position opened, in the order of their records there. Their IDs are that position and an ordinal from 0. */
 function openedIn(state: Pick<StateView, "operation">, seq: number): Operation[] {
@@ -645,20 +648,21 @@ export const destinationRules: Rules = {
     },
   },
   /**
-   * Row 37, among the effects of `resend` (P16). An `operation` effect: the
-   * same compare-and-swap, with 1 attempt, and its attempt 1. Which
-   * operation is "the same" follows from the publication's state, as the
-   * row's guard has it: the push while the publication is `unresolved`, and
-   * the receipt's write when it is `published`. In any other state the
-   * written guard has refused the act before this place.
+   * Row 37, among the effects of `resend` (P16), as revision 25 changed it
+   * (section 12.1.5, "The guard and the effect of `resend`"; entry ER4). It
+   * reads the publication's state. `unresolved`: a `push` operation with 1
+   * attempt, its attempt 1 and that attempt's `mint`. `published`: a
+   * `receipt` operation with 1 attempt, its attempt 1 and its `mint`. Every
+   * attempt of a write has its own mint, so a `resend` opens one. In any
+   * other state the written guard has refused the act before this place.
    */
   "reopen-publish": {
-    place: "effect", most: 2,
+    place: "effect", most: 4,
     run: ({ resolved }) => {
       const publication = resolved.subjects.get("on");
       if (publication?.type !== "publication") throw new Error("reopen-publish stands in a row whose primary item is a publication");
       const kind = publication.state === "unresolved" ? DESTINATION_KINDS.push : publication.state === "published" ? DESTINATION_KINDS.receipt : null;
-      return kind === null ? [] : opened(0, kind, DESTINATION_ATTEMPTS.resend);
+      return kind === null ? [] : [...opened(0, kind, DESTINATION_ATTEMPTS.resend), ...opened(1, DESTINATION_KINDS.mint, DESTINATION_ATTEMPTS.mint)];
     },
   },
   /**
