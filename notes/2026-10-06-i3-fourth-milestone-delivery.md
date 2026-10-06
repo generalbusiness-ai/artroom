@@ -330,3 +330,17 @@ are comments only. These repairs are integrated together. The earlier
 source requires its own final gate before replacement filing. No full
 I3, numerical capacity, host, deployment or unexplained membership
 failure duty is closed by these corrections.
+
+The corrected integrated gate at
+`432511e19866e2f68fb3b78ae79bea7bcbd6568a`, tree
+`475161c60b4910b42431d350ef0ab1f3012ca468`, passed whitespace,
+all workspace typechecks, 720 Vitest tests and six Node tests. The
+checkout was clean; installation was skipped against the unchanged
+lockfile. Whitespace took 0.0 seconds elapsed; typecheck took 3.3
+seconds elapsed and 9.4 CPU; tests took 11.5 seconds elapsed and 32.3
+CPU. The whole command took 15.06 seconds elapsed, 35.56 user CPU and
+6.34 system CPU. Logs are `/tmp/artroom-i3-m4-index-record-gate.log`
+and `/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.rFFHZPj6FJ`.
+This annotation changes this note only; the gated packages tree remains
+`62bffe221dc1f4fd1e4b4da619d18e50fcf40c2a`. The unknown membership
+failure and all retained outputs remain separately owned.
