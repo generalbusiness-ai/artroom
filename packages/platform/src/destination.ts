@@ -16,7 +16,7 @@
  * |---|---|---|---|
  * | `declare-first-head` | 5, effect | 30 | `establish` |
  * | `open-first-head` | 5, effect | 31 | `import` |
- * | `open-judge` | 5, effect | 32 | `reserve` |
+ * | `open-judge` | 5, effect | 32 | `reserve`: one `judge` at a time, by `branch.judging` |
  * | `publication-of` | 2, `also` | 34 | `withdraw`, the name `publication` |
  * | `open-withdrawn` | 5, effect | 34 | `withdraw` |
  * | `open-branch-read` | 5, effect | 36 | `adopt-head` |
@@ -256,7 +256,8 @@ export const destination: PlatformData = {
         { ref: { slot: "operation", from: { field: "operation" } } },
         { ref: { slot: "lane", from: { sender: true } } },
         { ref: { slot: "manifest", from: { field: "manifest" } } },
-        // Code P16: when the slot is empty and the branch is `ready`, opens the operation `judge` for the oldest queued publication.
+        // Code P16: when the slot is empty, no `judge` is open and the branch is `ready`, opens the operation `judge` for the oldest
+        // queued publication, and sets `branch.judging` to it (revision 25; entry ER2).
         { code: "open-judge", row: "P16" },
       ],
       sends: [],
@@ -370,6 +371,31 @@ function* publications(state: Pick<StateView, "page">): Generator<Item> {
   }
 }
 
+/**
+ * "The next `judge`" (section 12.1.5, "The rule `open-judge`, and one `judge`
+ * at a time"; entry ER2). A `judge` is opened when all of these hold after
+ * the entry's other effects: `branch.slot` is empty; `branch.judging` is
+ * empty; the branch is `ready`; and a publication is `queued`. It is for
+ * the `queued` publication with the lowest item ID, which may be the one
+ * that the entry itself opens.
+ *
+ * A rule is given the state before its entry. So the caller says what the
+ * entry's other effects change of the four: `slot` and `judging`, whether
+ * each is empty after them; `ready`, whether the branch is `ready` after
+ * them; `ended`, a publication that they take out of `queued`; and `opens`,
+ * a publication that the entry opens as `queued`. Absent: as the state has
+ * it. It gives the publication to judge, or null when no `judge` is opened.
+ */
+function nextJudge(state: Pick<StateView, "page">, after: { slot?: boolean; judging?: boolean; ready?: boolean; ended?: number; opens?: number } = {}): number | null {
+  const branch = branchOf(state);
+  if (!branch) return null;
+  const empty = (slot: "slot" | "judging") => after[slot] ?? (branch.refs[slot] ?? null) === null;
+  if (!empty("slot") || !empty("judging") || !(after.ready ?? branch.state === "ready")) return null;
+  // The lowest ID of those that are still `queued`: one more than the one that the entry ends is enough to read.
+  const queued = state.page("publication", ["queued"], null, 2).items.find((item) => item.id !== after.ended);
+  return queued?.id ?? after.opens ?? null;
+}
+
 /** An operation that this entry opens, at its ordinal among the operations of the entry, with its attempt 1 (the contract's section 4.3, items 1 and 2). */
 const opened = (k: number, kind: string, attempts: number): RuleEffect[] => [
   { effect: "operation", k, owner: DESTINATION, kind, attempts },
@@ -430,17 +456,21 @@ export const destinationRules: Rules = {
     },
   },
   /**
-   * Row 32, among the effects of `reserve` (P16). It reads `branch.slot` and
-   * the branch's state. When the slot is empty and the branch is `ready`:
-   * an `operation` effect, `judge`, and its attempt 1. The publication that
-   * this entry opens is `queued`, so a queued publication exists. Before the
-   * branch has a head nothing is judged (section 12.2; case b).
+   * Row 32, among the effects of `reserve` (P16), as revision 25 changed it
+   * (entry ER2). It runs "The next `judge`": when the slot is empty, no
+   * `judge` is open and the branch is `ready`, an `operation` effect,
+   * `judge`, its attempt 1, and the reference `branch.judging`, set to the
+   * `queued` publication with the lowest item ID. That is the one that this
+   * entry opens when no other is `queued`. While a `judge` is open a
+   * further `reserve` opens none: the slot stays empty until the outcome of
+   * `judge`, and `judging` is what closes that. Before the branch has a
+   * head nothing is judged (section 12.2; case b).
    */
   "open-judge": {
-    place: "effect", most: 2,
-    run: ({ state }) => {
-      const branch = branchOf(state);
-      return branch?.state === "ready" && branch.refs["slot"] === null ? opened(0, DESTINATION_KINDS.judge, DESTINATION_ATTEMPTS.judge) : [];
+    place: "effect", most: 3,
+    run: ({ state, resolved }) => {
+      const [branch, publication] = [branchOf(state), nextJudge(state, { opens: resolved.self })];
+      return branch && publication !== null ? [...opened(0, DESTINATION_KINDS.judge, DESTINATION_ATTEMPTS.judge), { effect: "ref", item: branch.id, slot: "judging", to: publication }] : [];
     },
   },
   /**
