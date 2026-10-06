@@ -235,7 +235,7 @@ export const rulesScope: PlatformData = {
     "keep-configuration": {
       step: "open", on: "configuration", grant: "rules.publish",
       also: {},
-      fields: { digest: { ...DIGEST, required: true }, name: { type: "text", max: 128, required: true } },
+      fields: { digest: { ...DIGEST, required: true, value: { domain: CONFIGURATION_DOMAIN, max: CONFIGURATION_BYTES } }, name: { type: "text", max: 128, required: true } },
       guards: [{ code: "configuration-bytes", row: "P18" }],
       effects: [
         { value: { slot: "digest", from: { field: "digest" } } },
