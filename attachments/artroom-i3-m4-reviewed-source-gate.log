@@ -1,0 +1,44 @@
+
+> gate
+> bash scripts/gate.sh
+
+head 1edd88a211f0dd8c04b8d8fd94f1fe71ca83a4dd  tree b8177fe88577c8c9dce7a335a62fb220404c9826  changed files 0
+install    skipped: node_modules was installed from this package-lock.json
+whitespace exit 0  elapsed    0.0 s  cpu    0.0 s
+typecheck  exit 0  elapsed    3.8 s  cpu    9.9 s
+test       exit 1  elapsed   25.9 s  cpu   40.6 s
+--- last lines of /var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.Y2p4H9iIVF/test.log
+
+> test
+> vitest run && node --test scripts/active-source.test.mjs
+
+
+ RUN  v4.1.11 /Users/hughpyle/play/artroom-worktrees/i3-m4
+
+ ❯ |scope| test/membership.test.ts (4 tests | 1 failed) 408ms
+     × replay agrees with the runtime: each recorded grant is derived again from the observation that it retains and from membership's history at the observed head; a history that was changed is reported by the name of what it breaks 101ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |scope| test/membership.test.ts > authority on real scopes, under the production wiring (authority note, sections 3.1, 3.3, 3.5 and 12.1.3; the contract's section 16.1) > replay agrees with the runtime: each recorded grant is derived again from the observation that it retains and from membership's history at the observed head; a history that was changed is reported by the name of what it breaks
+TypeError: Cannot read properties of undefined (reading 'seq')
+ ❯ test/membership.test.ts:134:70
+    132|     const { O, M, unasInbox, ritasInbox } = await repository();
+    133|     const [a, b] = [await notify(unasInbox, { reason: "mentioned" }), …
+    134|     const [one, two] = [(a.answer as { fact: { seq: number } }).fact.s…
+       |                                                                      ^
+    135|     const marks = async (kind: string, notice: number) => unasInbox.di…
+    136|     // Three acts of una in her inbox: on a fresh read; on the same re…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 84 passed (85)
+      Tests  1 failed | 713 passed (714)
+   Start at  10:16:47
+   Duration  24.96s (transform 14.49s, setup 0ms, import 22.13s, tests 36.23s, environment 3ms)
+
+gate FAILED; logs in /var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.Y2p4H9iIVF
+real 29.94
+user 42.50
+sys 8.39

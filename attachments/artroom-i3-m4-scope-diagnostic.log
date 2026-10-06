@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /Users/hughpyle/play/artroom-worktrees/i3-m4
+
+
+ Test Files  30 passed (30)
+      Tests  93 passed (93)
+   Start at  10:22:42
+   Duration  7.61s (transform 471ms, setup 0ms, import 1.04s, tests 6.35s, environment 0ms)
+

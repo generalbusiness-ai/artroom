@@ -1,0 +1,15 @@
+
+> gate
+> bash scripts/gate.sh
+
+head 436026fec9372aea3f54b3c0e0328a35638284c1  tree 525cdae2a2b7e08e2730c3f7ea125601305334c0  changed files 0
+install    skipped: node_modules was installed from this package-lock.json
+whitespace exit 0  elapsed    0.0 s  cpu    0.0 s
+typecheck  exit 0  elapsed    3.4 s  cpu    9.6 s
+test       exit 0  elapsed   12.2 s  cpu   33.6 s
+  Tests  714 passed (714)
+  ℹ pass 6
+gate passed; logs in /var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.236Ce8Bbdp
+real 15.85
+user 36.46
+sys 6.97
