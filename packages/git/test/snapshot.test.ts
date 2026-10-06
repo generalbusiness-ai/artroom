@@ -1,7 +1,8 @@
+import { createHash } from "node:crypto";
 import { rmSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, beforeAll, expect, test } from "vitest";
-import { GitRefusal, Reader, repositorySource, snapshotCommit, snapshotFiles, type SnapshotFile } from "../src/index.ts";
+import { GitRefusal, Reader, SNAPSHOT_BOUNDS, repositorySource, snapshotCommit, snapshotFiles, type SnapshotCommit, type SnapshotFile } from "../src/index.ts";
 import { bare, blob, cleanup, git, program, put, tree } from "./support/repo.ts";
 
 afterAll(cleanup);
@@ -75,4 +76,36 @@ test("a tree that cannot be read is not an empty tree (host review, fault A3): w
     .toEqual(["missing-object", "missing-object", "missing-object"]);
   // A blob in a tree's place is not a tree either.
   expect(await refused(() => snapshotFiles(reader(), f.one, () => true))).toBe("wrong-type");
+});
+
+test("the objects of a snapshot commit are each written once, with one lookup for each tree that is built, and they are the objects that the earlier code built: the same IDs and bytes in the same order, each tree before whatever names it", async () => {
+  const blob = "1".repeat(40);
+  const message = "a filtered snapshot, for a test\n";
+  const pad = (k: number) => String(k).padStart(5, "0");
+  // `count` directories under the root, each with the one blob under a leaf name of its own: `count` distinct trees and the root.
+  const distinct = (count: number): SnapshotFile[] => Array.from({ length: count }, (_, k) => ({ path: `d${pad(k)}/leaf-${pad(k)}`, mode: "100644", id: blob }));
+  // The same, with one leaf name: every directory is the same tree, which is written once, where it was first built.
+  const shared = (count: number): SnapshotFile[] => Array.from({ length: count }, (_, k) => ({ path: `d${pad(k)}/leaf`, mode: "100644", id: blob }));
+  // The whole output as one digest: the commit, the root tree, and each object's ID, type and bytes, in order.
+  const digest = (built: SnapshotCommit) => createHash("sha256").update(JSON.stringify([built.commit, built.tree, built.objects.map((o) => [o.id, o.type, Buffer.from(o.data).toString("hex")])])).digest("hex");
+  const built = (files: readonly SnapshotFile[]) => {
+    const tally = { lookups: 0 };
+    const made = snapshotCommit(files, message, SNAPSHOT_BOUNDS, tally);
+    const trees = made.objects.filter((o) => o.type === "tree");
+    // Each tree is there before the tree that names it: its ID, as bytes, is in no object that stands before it.
+    const at = new Map(made.objects.map((o, k) => [o.id, k]));
+    // Asked of the small lists only: this check of the test's own compares every pair.
+    const ordered = () => trees.every((o, k) => { const hex = Buffer.from(o.data).toString("hex"); return [...at].every(([id, where]) => where <= k || !hex.includes(id)); });
+    return { digest: digest(made), trees: trees.length, once: at.size === made.objects.length, ordered: trees.length > 400 ? "not asked" : ordered(), lookups: tally.lookups, last: made.objects.at(-1)!.id === made.commit };
+  };
+  const existing = await snapshotFiles(reader(), f.root, (path) => path !== "link");
+  // The digests are of what the code at `d0354e266` built for the same lists, which scanned every object for each tree. They were
+  // taken once, by running this test against that code, and are not computed here.
+  expect({ existing: built(existing), distinct: built(distinct(300)), shared: built(shared(300)), limit: built(distinct(SNAPSHOT_BOUNDS.files - 1)) }).toEqual({
+    existing: { digest: "2710f6d787f3767d60444dc8fae380dd0120a624f39d78d27e97599dc1284f41", trees: 3, once: true, ordered: true, lookups: 3, last: true },
+    distinct: { digest: "ac3446572f13ab8cc3a507e3d123d385b13bd8ade769321ca075a5f3841713cb", trees: 301, once: true, ordered: true, lookups: 301, last: true },
+    shared: { digest: "7a05207866762774acfec2ea7a9c3dde8b612ff93bf5fc5f41452b512ca8e19d", trees: 2, once: true, ordered: true, lookups: 301, last: true },
+    // The stated bounds, once: 19,999 files in 19,999 directories are 20,000 distinct trees, and 20,000 lookups. The earlier code compared 199,990,000 IDs here.
+    limit: { digest: "15d3f2a22225d4efb500b918772480a48bac0f71a20fa898e9c8231bc4f5c0dd", trees: SNAPSHOT_BOUNDS.files, once: true, ordered: "not asked", lookups: SNAPSHOT_BOUNDS.files, last: true },
+  });
 });
