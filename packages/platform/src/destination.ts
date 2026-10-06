@@ -188,8 +188,8 @@ export const destination: PlatformData = {
         { ref: { slot: "directory", from: { field: "directory" } } },
         { value: { slot: "membership", from: { field: "membership" } } },
         { value: { slot: "rules", from: { field: "rules" } } },
-        // Code P16: when `import` is false, the genesis declares the operation `first-head`, held. The entry that records the
-        // `confirm` opens its attempt 1 (section 12.2; the contract's section 4.3, item 1).
+        // Code P16: when `import` is false, the genesis declares the operation `first-head`, held, with that attempt's `mint`. The
+        // entry that records the `confirm` opens attempt 1 of both (section 12.2; the contract's section 4.3, item 1).
         { code: "declare-first-head", row: "P16" },
       ],
       sends: [],
@@ -494,27 +494,33 @@ const COLLECTED_RECORD: Readonly<Record<keyof typeof COLLECT_MOST, (value: unkno
 export const destinationRules: Rules = {
   /**
    * Row 30, among the effects of `establish` (P16). It reads the creation's
-   * `import`. When it is false: one `operation` effect, `first-head`, held,
-   * with no attempt. The entry that records the `confirm` opens its attempt
-   * 1, by the contract's own rule (its section 4.3, item 1). With an import
-   * the first head is the imported history's, and `import` opens the write.
+   * `import`. When it is false: two `operation` effects, held, with no
+   * attempt: `first-head`, and the `mint` of its attempt 1 (section 12.1.5,
+   * "Who opens the mint"; entry ER7). The entry that records the `confirm`
+   * opens attempt 1 of both, by the contract's own rule (its section 4.3,
+   * item 1). With an import the first head is the imported history's, and
+   * `import` opens the write.
    */
   "declare-first-head": {
-    place: "effect", most: 1,
-    run: ({ resolved }) => (resolved.fields["import"] === false ? [{ effect: "operation", k: 0, owner: DESTINATION, kind: DESTINATION_KINDS.firstHead, attempts: DESTINATION_ATTEMPTS.firstHead }] : []),
+    place: "effect", most: 2,
+    run: ({ resolved }) => (resolved.fields["import"] === false ? [
+      { effect: "operation", k: 0, owner: DESTINATION, kind: DESTINATION_KINDS.firstHead, attempts: DESTINATION_ATTEMPTS.firstHead },
+      { effect: "operation", k: 1, owner: DESTINATION, kind: DESTINATION_KINDS.mint, attempts: DESTINATION_ATTEMPTS.mint },
+    ] : []),
   },
   /**
    * Row 31, among the effects of `import` (P16). It reads the update's
-   * state and `commit`. On `done`: an `operation` effect, `first-head`, and
-   * its attempt 1. On `failed`, and on any other state: nothing. A `done`
-   * that names no commit names no first head, and opens nothing.
+   * state and `commit`. On `done`: an `operation` effect, `first-head`, its
+   * attempt 1, and that attempt's `mint` with its attempt 1 (entry ER7). On
+   * `failed`, and on any other state: nothing. A `done` that names no
+   * commit names no first head, and opens nothing.
    */
   "open-first-head": {
-    place: "effect", most: 2,
+    place: "effect", most: 4,
     run: ({ input, resolved }) => {
       if (input.type !== "delivery" || input.message.class !== "request" || input.message.type !== "relate") throw new Error("open-first-head stands in a `relate` handler, and reads its update");
       const state = isObject(input.message.body) ? input.message.body["state"] : null;
-      return state === "done" && typeof resolved.fields["commit"] === "string" ? opened(0, DESTINATION_KINDS.firstHead, DESTINATION_ATTEMPTS.firstHead) : [];
+      return state === "done" && typeof resolved.fields["commit"] === "string" ? [...opened(0, DESTINATION_KINDS.firstHead, DESTINATION_ATTEMPTS.firstHead), ...opened(1, DESTINATION_KINDS.mint, DESTINATION_ATTEMPTS.mint)] : [];
     },
   },
   /**
