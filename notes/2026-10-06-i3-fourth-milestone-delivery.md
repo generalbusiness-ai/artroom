@@ -150,6 +150,7 @@ production token delivery, browser session or cloud deployment.
 | Checker `0f963cd0`: late coded `bad-field` lost its bound draw | `0427af924` shares the original field/subject checks with the fold through retained sidecars. Early failures keep counts; later guard/effect refusals draw one. Counters prove no guard/effect reruns; the old shortcut fails two count assertions. |
 | Checker `5255923a`: a no-account clause could use a final holder's retained cleanup count | `7b674fa8f` faults before an unrelated draw. The result stays offered and the state/head unchanged; nonfinal draws and final own-account cleanup remain valid. The guard-removal control distinguishes. |
 | Erased text could hide whether a bare `bad-field` refusal reached binding | Owner disposition `4157eaa2` and source `1a114ae51` stop before an unproved draw. Two actually judged histories have different counts before erasure and both stop before the deciding entry afterward. Ordinary redacted decisions keep their credit; removing the ambiguity guard fails the coverage assertion. |
+| A prior checked delivery can prove an erased text's size bound | `095b3f380` uses a successful earlier field check in the same scope, incarnation and checked prefix, including superseded tells. An equal or smaller maximum proves the deciding size check; a larger maximum leaves it ambiguous. The larger-maximum control distinguishes. No code or guard is rerun and no text size is guessed. |
 
 The worker reports and the integration logs record these controls as
 `DISTINGUISHES`, by assertions. The tests label their scripted histories,
@@ -226,3 +227,18 @@ Later checker findings required source repairs, so this run is historical
 and does not validate the amended delivery. The final amended source
 will be gated before filing. Its logs are retained at
 `/tmp/artroom-i3-m4-gate.log` and in the directory the gate printed.
+
+The amended gate at `06fbcf38d` failed two withdrawal fixture cases because
+the fixture omitted its pinned fold rules and source sidecar. After that
+fixture repair, `8b3383cb0d835925f0d16a8ff31055611e116f1c` passed
+714 Vitest tests and six Node tests in 15.34 seconds elapsed. The later
+prior-bound proof repair changed source, so that pass is historical too.
+
+The gate at `1edd88a211f0dd8c04b8d8fd94f1fe71ca83a4dd` failed one
+membership replay setup: a notice's delivery answer had no fact to replay.
+It passed 713 of 714 Vitest tests; the command took 29.94 seconds elapsed.
+The failed test then passed alone, all four membership tests passed
+together, and the scope project passed all 93 tests in 30 files. These
+checks did not establish the cause. The witness now asserts that both
+notices are recorded before reading their facts, so a recurrence reports
+the actual delivery answer. No retry or larger timeout was added.
