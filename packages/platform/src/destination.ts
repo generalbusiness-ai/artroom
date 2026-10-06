@@ -193,11 +193,12 @@ export const destination: PlatformData = {
       attention: [],
     },
     // `adopt-head`: an act. Grant `destination.adopt` (section 6.9). The outcome of the read that this act opens sets `branch.head`,
-    // and `ready`.
+    // and `ready`, only when it shows the commit that the act names. Its two fields are of revision 25 (entry ER13): section 6.9
+    // says that the act "records who adopted what and why".
     "adopt-head": {
       step: "transition", on: "branch", grant: "destination.adopt",
       also: {},
-      fields: {},
+      fields: { commit: { type: "commit", required: true }, why: { type: "text", max: 1024, required: true } },
       guards: [{ none: { type: "publication", states: ["reserved", "publishing", "unresolved"] } }, { unset: "slot" }],
       // Code P16: opens one read of the branch.
       effects: [{ code: "open-branch-read", row: "P16" }],
@@ -228,8 +229,8 @@ export const destination: PlatformData = {
       guards: [
         { equals: { a: { sender: true }, b: { slot: "directory", of: "also.branch" } }, reason: "not-the-directory" },
         { state: ["empty"], of: "also.branch" },
-        // `import` is true.
-        { equals: { a: { slot: "import", of: "also.branch" }, b: { const: true } } },
+        // `import` is true. Named in revision 25 (entry ER13).
+        { equals: { a: { slot: "import", of: "also.branch" }, b: { const: true } }, reason: "not-importing" },
       ],
       effects: [{ code: "open-first-head", row: "P16" }],
       sends: [],
@@ -310,8 +311,8 @@ export const destination: PlatformData = {
         member: { type: "member", required: true },
         entry: { type: "fact", kind: ["revoke-key"], under: "platform:membership", required: true },
       },
-      // The sender is the directory.
-      guards: [{ equals: { a: { sender: true }, b: { slot: "directory", of: "also.branch" } } }],
+      // The sender is the directory. Named in revision 25, as the row `import` writes it (entry ER13).
+      guards: [{ equals: { a: { sender: true }, b: { slot: "directory", of: "also.branch" } }, reason: "not-the-directory" }],
       effects: [{ code: "abort-if-behind", row: "P19" }],
       sends: [],
       attention: [],
