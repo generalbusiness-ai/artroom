@@ -83,6 +83,8 @@ export const COLLECT_MOST = { verdicts: 256, jobs: 64, links: 32 } as const;
 
 const NAME = { type: "text", max: 256 } as const;
 const SCOPE_ID = { type: "text", max: 64 } as const;
+/** The ID of an operation of this scope, as the two slots `token` hold the ID of a `mint`. */
+const TOKEN = { type: "text", max: 32 } as const;
 /** The record of section 12.1.1, the value `repository` of a claim. */
 const REPOSITORY = { type: "record", of: { host: { ...NAME, required: true }, namespace: { ...NAME, required: true }, name: { ...NAME, required: true }, id: { ...NAME, required: true } } } as const;
 const OPERATION = { type: "fact", kind: ["merge"], under: "change" } as const;
@@ -114,6 +116,8 @@ export const destination: PlatformData = {
         directory: { fixed: true, required: true, to: { type: "scope", kind: "directory" } },
         claim: { fixed: true, required: true, to: CLAIM },
         slot: { fixed: false, required: false, to: { type: "item", of: "publication" } },
+        // "Six more slots" (revision 25; entry ER6). The one publication whose `judge` is open. Empty when none is.
+        judging: { fixed: false, required: false, to: { type: "item", of: "publication" } },
       },
       values: {
         repository: { fixed: true, required: true, of: REPOSITORY },
@@ -122,6 +126,8 @@ export const destination: PlatformData = {
         membership: { fixed: true, required: true, of: SCOPE_ID },
         rules: { fixed: true, required: true, of: SCOPE_ID },
         head: { fixed: false, required: false, of: { type: "commit" } },
+        // The ID of the `mint` operation of a `first-head` attempt whose token is live and has no revocation yet.
+        token: { fixed: false, required: false, of: TOKEN },
       },
     },
     // The second row. The eligibility statement is not copied into an item: it is the `reserve` message, which the deciding entry holds.
@@ -141,6 +147,14 @@ export const destination: PlatformData = {
         integration: { fixed: false, required: false, of: { type: "commit" } },
         reason: { fixed: false, required: false, of: { type: "text", max: 1024 } },
         withdrawDecided: { fixed: false, required: true, of: { type: "bool" }, default: false },
+        // The position, in this scope's history, of the entry that reserved it.
+        reservedAt: { fixed: false, required: false, of: { type: "int", min: 0, max: 1000000000 } },
+        // That a `compromised` notice named a key behind it. No further attempt of its push is opened.
+        aborting: { fixed: false, required: true, of: { type: "bool" }, default: false },
+        // As `branch.token`, for an attempt of its push or of its receipt.
+        token: { fixed: false, required: false, of: TOKEN },
+        // Where its receipt stands. Unset before `published`.
+        receipt: { fixed: false, required: false, of: { type: "enum", of: ["owed", "written", "conflict"] } },
       },
     },
   },
