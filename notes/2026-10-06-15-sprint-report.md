@@ -109,7 +109,7 @@ rule (`68c47da1`); both promised.
   minutes of the sprint. The review of 4b53c528 is the checker's next
   item; landing follows approval.
 - **Spike J0's second half.** Hugh judged path B good at 07:15 and
-  allowed hosted models; the Workers AI and OpenRouter comparison is
+  allowed hosted models; the hosted-model comparison is
   not run yet, behind the milestone.
 - **The jam room note's revision 9** (instrument order, start condition
   and stop rule) waits on the measurement request.
