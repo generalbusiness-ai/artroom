@@ -13,6 +13,7 @@ import type { Digest, Effect, Entry, ItemType, MemberRef, OperationId } from "@g
 import { intentDigest, seedDigest } from "@generalbusiness/artroom-bytes";
 import { UNDER, historyOf, withActing, withMembers, withPrincipal, type Signer } from "./attribution.ts";
 import { drawsOf, released } from "./draws.ts";
+import { indexRows } from "./binding.ts";
 import { HOLDER, changeHold } from "./hold.ts";
 import { attemptedBy, openedBy, operationId } from "./ledger.ts";
 import type { Item, ObservedHead, Party, StateWriter, Status } from "./state.ts";
@@ -199,6 +200,9 @@ export function applyEntry(writer: StateWriter, definition: ValidDefinition, ent
     const was = before.get(id) ?? null;
     // Section 6.3: an existing item that one entry changes rises by one, once, however many effects touch it.
     writer.putItem(was ? { ...item, revision: was.revision + 1 } : item);
+    // Section 17.2a, "An index that an item type declares": the rows of an item are written in the transaction of the entry that
+    // opens it, with the item, and by no later entry: an indexed slot is fixed. A type that declares no index has none.
+    if (!was) for (const row of indexRows(definition, item, entry.at)) writer.putIndexed(item.type, row.slot, row.key, item.id);
     if (was?.state !== item.state) {
       if (was) writer.addCount(was.type, was.state, -1);
       writer.addCount(item.type, item.state, 1);

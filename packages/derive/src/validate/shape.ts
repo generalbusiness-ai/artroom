@@ -31,6 +31,8 @@ export type ProblemCode =
   | "fan-out-unbounded"  // a fan-out over a final state or over a type whose `max` is past the bound, or a second fan-out in one list (section 6.6)
   | "attention-unbounded" // the attention forms of one act, handler or timed rule could tell more members than one entry may (section 6.6)
   | "redactable-read"    // a guard, a rule, a send to a scope that is no lane, or an index send reads a detached text (section 6.2)
+  | "bound-source"       // a `bound.of` whose source may not bind a request, or a mark at place 2 that states `index` or `key` and is no binding selector (section 17.2a)
+  | "unsupported-definition" // an `indexes` that is stated ill (section 17.2a, check 6)
   | "capability" | "profile" | "rule";
 
 export interface Problem { code: ProblemCode; path: string; message: string }

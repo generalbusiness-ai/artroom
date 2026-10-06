@@ -38,7 +38,7 @@
  */
 
 import { DOMAINS, PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { Bounds, CapabilityName, Digest, Entry, FactRef, Grant, Head, KeyId, Observation, ObservationRequest, ObservationUse, PlatformData, PlatformDefinition, Report, RetainedInput, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
+import type { Bounds, CapabilityName, Digest, Entry, FactRef, Grant, Head, KeyId, Observation, ObservationRequest, ObservationUse, MismatchName, PlatformData, PlatformDefinition, Report, RetainedInput, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
 import { canonicalize, definitionDigest, digestBytes, intentDigest, isDigest, isEntry, isObservationUse, isPlatformDefinition, parseStrict, platformName, scopeIdOf, textDigest, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import {
   HOLD, HOLD_KINDS, MISMATCHES, MemoryState, WINDOWS, actionOf, agrees, applyEntry, drawsOf, clockOf, entryOf, headsOf, highestHead, inputTexts, isAncestryCheck, isFactRef, isLocalId, isObject, isScopeRef, judgeAct, judgeCheckpoint, judgeDelivery,
@@ -219,6 +219,20 @@ type Trust = keyof typeof TRUSTS;
 export const platformCode = (named: PlatformDefinition): string => `platform-code: that the rules this replay ran for ${named} are the rules of that name and version`;
 
 /** Ends the traversal with a result that is not `consistent`. */
+/** The six named mismatches (section 9.5, as revision 21 reconciles it; row I3-57). */
+const NAMED: readonly MismatchName[] = ["genesis-kind", "genesis-timed", "observation-older", "run-returned", "observation-not-moved", "observation-reused"];
+
+/**
+ * The `name` of a report: there exactly when the result is `mismatch` and
+ * the failure is one of the six that the contract names. The finding's
+ * sentence begins with the name and a colon, and the name is read from
+ * there, so the report and the sentence cannot differ.
+ */
+const nameOf = (stop: Stop): { name?: MismatchName } => {
+  const name = stop.result === "mismatch" ? NAMED.find((known) => stop.why.startsWith(`${known}: `)) : undefined;
+  return name ? { name } : {};
+};
+
 class Stop extends Error {
   readonly result: Exclude<Report["result"], "consistent">;
   readonly why: string;
@@ -444,6 +458,7 @@ class Verifier {
       redacted: this.#redacted,
       result: stop ? stop.result : "consistent",
       ...(stop?.at ? { at: stop.at } : {}),
+      ...(stop ? nameOf(stop) : {}),
     };
     return { report, why: stop ? stop.why : null };
   }

@@ -19,6 +19,7 @@ import { judgeGuards, members, readsUnbound, slotOf, type Judging } from "./guar
 import { EPOCH, HOLDER, deriveHold, endsUnder, type HoldEffect } from "./hold.ts";
 import { bindEach, covered, typeOfElement } from "./lists.ts";
 import { givenTo, markOf, ofCodedType, outside, ruleFor, run, type RuleEffect } from "./marks.ts";
+import { ruleMayNot } from "./markers.ts";
 import { kindOf, operand } from "./operand.ts";
 import type { Item } from "./state.ts";
 import type { ValidDefinition } from "./validate/index.ts";
@@ -211,6 +212,8 @@ export function deriveEffects(j: Judging, forms: readonly EffectForm[], attentio
         // Section 4.1: an entry opens at most one item, whatever opens it, and its ID is the entry's `seq`. Section 6.3: in its initial state.
         // Section 6.8: a hold is opened by `hold: open`, as the primary item of an act. No rule returns that record, so none opens a hold.
         const type = own(items, effect.type);
+        // Section 17.2a, "A bound delivery opens no item": its room counts no item, and a holder is opened only by new work.
+        if (j.bound) throw outside(mark, "an opening, in a delivery that is bound");
         if (opens !== null || byRule || !type || effect.item !== j.self || effect.state !== type.initial || j.definition.holdTypes.includes(effect.type)) throw outside(mark, "an opening that its entry cannot make");
         byRule = newItem(effect, type, null);
         others.set(effect.item, byRule);
@@ -226,6 +229,9 @@ export function deriveEffects(j: Judging, forms: readonly EffectForm[], attentio
       // item's ID is the `seq` of the entry that opened it, so the item that this entry opens is the one whose ID is `self`.
       const declared = effect.effect === "state" ? undefined : effect.effect === "ref" ? own(type.refs, effect.slot) : effect.effect === "value" ? own(type.values, effect.slot) : own(type.parties, effect.slot);
       if (declared?.fixed && item.id !== j.self) throw outside(mark, `an effect on a fixed slot of item ${item.id}, which its entry does not open`);
+      // Section 6.4, revisions 21 and 22: a mark is set only to `true`, and a rule of a form that declares `settles` changes no state.
+      const may = ruleMayNot(j.definition, j.settling === true, item.type, effect);
+      if (may !== null) throw outside(mark, may);
       // Section 6.8: only a `hold` record changes the state, the holder or the epoch of a hold, and its end is set from the commit
       // time. The validator refuses a written effect that sets one of the four. No rule returns a `hold` record, so a rule sets none.
       if (j.definition.holdTypes.includes(item.type) && (effect.effect === "state" || [HOLDER, EPOCH, endOf(j.definition, item.type)].includes(effect.slot))) throw outside(mark, `an effect on what only the hold capability sets, of hold ${item.id}`);

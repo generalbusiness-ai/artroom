@@ -388,6 +388,10 @@ export const destination: PlatformData = {
     // effects are the table of section 6.4, "G's answer to `withdraw`". A guard whose subject is unbound is not evaluated.
     withdraw: {
       message: "withdraw", class: "tell", from: FROM_LANE, opens: null,
+      // I3 merge: the scope contract's revision 23 makes this mark a binding selector, with `index: "operation"` and `key:
+      // "operation"`, on a `publication` that states `indexes: ["operation"]`, `holds.decisions` and a handler `bound`
+      // (rows I3-55, I3-58 and I3-61). The forms are built in derive (`binding.ts`). These rows are the authority note's to state,
+      // so the data and the rule `publication-of` are as they were: the rule reads every publication (entry ER11).
       also: { publication: { code: "publication-of", row: "P15", item: "publication" } },
       fields: { operation: { ...OPERATION, required: true } },
       guards: [

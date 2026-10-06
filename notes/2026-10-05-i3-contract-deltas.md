@@ -2195,3 +2195,158 @@ and 27.5 CPU seconds, one observed run, on an Apple M5 Max, with a load
 average of 5 from other sessions and warm caches. The commits after it
 change this note alone. The gate was not run. No deployment, no
 provider, no host and no gateway.
+## 32. The smaller forms of the contract's revision 23: a fact as text, settlement by a mark, a bound request and its index, and five small rows
+
+Written 2026-10-06, on `request/i4-forms4`, by the worker of the source
+rows I3-46, I3-47, I3-48, I3-49, I3-54, I3-55, I3-57, I3-58, I3-59 and
+I3-61. Entries have the prefix GC. Two other workers wrote sections on
+other rows of the same revision at the same time, so this section's
+number may be taken twice: the merge gives it its place.
+
+**The bases.** The scope contract's revision 23 at `3b3e394fc` is
+approved by the checker and reported. Its adoption by the planner was
+not recorded when this was written. Each row is in a commit that names
+it, so that a change of one row is cheap, with one exception that is
+stated: rows I3-54, I3-59, I3-55, I3-58 and I3-61 are one commit,
+because their changes stand in the same lines of six shared files. The
+authority note is at its adopted revision 26 for everything here. Its
+revision 28 was adopted while this work ran (planner act `e93b737b`),
+and nothing here is built on it: no row of a platform definition
+changes.
+
+No entry that an earlier source wrote has other bytes. No entry gains a
+member. Neither lane digest changes, and `packages/lanes` is touched
+only in its test. No data of a platform definition changes. The store
+has one more table, `item_key`, made empty when an object starts, and
+one more kind of row in `folded`, `keyed`. Neither is read for a
+checkpoint, so no state digest changes: witnessed in memory and on
+SQLite.
+
+### 32.1 What is built, by row
+
+| Row | Built | Where |
+|---|---|---|
+| I3-46 | In part. The text of a `FactRef` and the name of a public ref, as pure functions with every refusal, and the check that Git accepts the names. The rules `first-head` and `receipt` are not written, as the task says: their bytes are the authority note's. | `bytes/src/facttext.ts`; `bytes/test/facttext.test.ts`; `git/test/factref.test.ts` |
+| I3-47 | Whole. | `derive/src/marks.ts` (`Resolved.outcome`), `outcomes.ts`; `platform/src/register.ts`, `directory.ts` |
+| I3-48 | In part. A verifier takes a snapshot only as its canonical bytes. The bound on one retained input is not built: R4 has not given the number. | `derive/src/capability/ancestry.ts` |
+| I3-49 | Checked: it is so. No source changed. | `derive/test/forms-guards.test.ts` |
+| I3-54, I3-59 | Whole, in entries. The other four dimensions are request `cc570904`'s, as for every count. | `derive/src/markers.ts`, `validate/markers.ts`, `validate/capacity.ts`, `reserve.ts`, `handlers.ts`, `effects.ts` |
+| I3-61 | Whole: the form, check 6, the rows in the fold, the lookup in memory and on SQLite, the rebuild from a checkpoint's items. | `derive/src/binding.ts`, `state.ts`, `fold.ts`; `scope/src/sqlite.ts` |
+| I3-58 | Whole, on made-up data: the validator's `bound-source` refusals, the selector's two inputs, the lookup at check 8, the three outcomes of a lookup, the fault of an `open` in a bound delivery. | `derive/src/binding.ts`, `validate/binding.ts`, `handlers.ts` |
+| I3-55 | In part. `bound` and `decisions` are validated, and the judge derives whether a delivery is bound and that its entry is settling. The count, the draw, the room `dec(m)` and their replay are not built: they are the reservation ledger's (row I3-44). | The same, and `delivery.ts` |
+| I3-57 | Whole. | `contract/src/report.ts`; `replay/src/verify.ts`, `report.ts` |
+
+### 32.2 Source choices
+
+| # | Where the texts differ or are silent | Implemented | Owner, and the question |
+|---|---|---|---|
+| GC1 | Section 3: "One name holds the characters of one fact, once", and a reader finds them "by splitting the name at `/`". The rules of the two fixed parts would let a component of a fixed part be 64 hexadecimal characters. | `isFactRefParts` refuses a fixed part with such a component. So a split finds one component of that form, or none. | The scope contract. Is that the rule, or may a fixed part hold such a component? |
+| GC2 | The length of a fixed part, and so of a name. The contract states 86 bytes for one example and no bound. | None is checked. | The authority note, which states the fixed parts of each version. |
+| GC3 | The word of a commit's line ("a word, one space, the text and one line feed"). | No function writes a line. The test of witness 18.48, case 4, writes one by hand with the made-up word `receipt`. | The authority note, revision 28. |
+| GC4 | The checker's finding on `d034be89` (request `bec3fbd8`): `factText` could throw, or write a text that is no `FactRef`. | Repaired in `04c4e0b4f`. Section 32.6 has the sweep. | Closed here. |
+| GC5 | The validator's name for a refused third form of `settles`. Section 6.4 says "the validator refuses", with no name. | `name` where `sets` names no slot of the stated form; `final` where `in` lists a final state; `shape` for a written effect that sets a mark otherwise than to `true`. | The scope contract, if a name is wanted. |
+| GC6 | DI19 with marker duties: what an item reserves in a state from which a timed rule leads to another. | Each duty, the state duty and each mark's, counts the larger of what it reserves in the state and in the state that the rule leads to. For a definition with no mark that is the rule as it was. | The scope contract. This is the reading of "a state that a timed rule leads to counts each marker duty whose forms list it". |
+| GC7 | "A marker duty", rule 10: both amounts are functions of the folded state. The amount of an item follows from its marks, and the state is indexed by type, state and ID. | `markerOwed` reads the items of each live state of a type with marks in which something can be awaited, a page at a time, at each admission: at most the type's `max` items. A final state is counted at the count of the state, with no mark completed, which is never less. | The proof plan, with request `cc570904`: a count by mark, if this read is too much. Nothing was measured. |
+| GC8 | A cycle of settlements through a state that no form lists, reached by a timed rule. The count of the I2 source names the forms that settle the state where the count returned, and there are none. | For a type with marks every form of the type is then refused `reserve-unbounded`. For a type with no mark the earlier code stands as it was, and refuses nothing there. | The capacity work under `cc570904`. Not changed here: it is outside these rows. |
+| GC9 | Witness 18.54, case 13, and 18.53: the marks state `most`. | The member `most` of a mark is row I3-52's, and this branch does not read it. The made-up marks state none, and the stand-in rules state their most in code, as the rules of main do. With that, an effect mark of a form that declares `settles` counts nothing at the validator, which is what the case asks. | The merge, with row I3-52. |
+| GC10 | The name for an ill-stated `holds.decisions`, and for a `bound` that stands where it may not. The tables of section 17.2a name `bound-source` for the source and `unsupported-definition` for check 6. | `shape` for a count that is no whole number of at least 1 and for a `bound` on another handler or with a `where` that reads more; `bound` for a count past the ceiling; `name` for a key of `decisions` that is the message of no bound handler of that type, and for a written source whose type does not list the message. | The scope contract, with row I3-44: whether these are check 1, and so `unsupported-definition`. |
+| GC11 | The numbers 4, 8 and 9 of an index. The contract calls them its proposals. | Constants of `derive/src/binding.ts`, and no member of `Bounds`. | R4. |
+| GC12 | "A runtime whose index does not hold every item of a type answers no lookup from it." How a runtime knows. | The state keeps, for each type and slot, how many rows it wrote. A lookup is answered only when that equals the number of items of the type. Two small reads on SQLite. | Closed here. |
+| GC13 | The rule of a binding selector, in code. The contract says what it is given. | A rule of the place `also` written as `{ place: "also", bind }`. A rule with `run` at a binding selector, one with `bind` anywhere else, and one that states `clock`, are faults in the commit. `runnable` does not tell the two apart. | The builder: whether `runnable` should. |
+| GC14 | The count of `decisions`, the draw and `dec(m)`. | Not built. `Reading.counts` is the hook: what an item still holds for a message. A runtime gives none, so no delivery is bound there and each is new work, which is never less safe. The judge writes `Draft.bound`, in no entry, for the ledger's fold. | Row I3-44, at the merge. |
+| GC15 | The replay of a settlement and of a binding: "With case 8 read as new work on a full scope: `mismatch`". | Not built. The verifier of main checks no admission against a budget, so it has no place for this. A fold of the same entries gives the same amounts, which is witnessed. | The proof plan (B9), with request `cc570904`. |
+| GC16 | I3-48, first half: the bound on one retained input. | Not built. A snapshot over 1 MiB is still stored whole (entry EZ4). | R4, for the number. |
+| GC17 | I3-57: how the verifier finds the name. | From the name that the finding's sentence begins with, as the I2 source wrote it. So the report and the sentence cannot differ. | Closed here. |
+| GC18 | The index on `publication.operation`, the `bound` of `withdraw`, and `publication-of` as a binding selector. | Not written. `platform/src/destination.ts` has an `// I3 merge:` mark at the row. The rule still reads every publication (entry ER11). | The authority note, revision 28, with the next worker. |
+
+### 32.3 Witnesses
+
+| Witness | Cases built | Where | Not built, and why |
+|---|---|---|---|
+| 18.48 | 1 to 5 | `bytes/test/facttext.test.ts`; `git/test/factref.test.ts` (3 and 4, on a real local repository) | Case 5's "not used" is the rule's duty, and no rule is written: the test shows the equal name and the other text. Cases 6 to 10 are rows I3-43 and I3-53. |
+| 18.54 | 1 to 14; 15 as far as the fold | `derive/test/forms-settles.test.ts` | Case 15's report: entry GC15. Cases 2 to 8, 10 and 14 ran in memory, with the real judges, fold and count, and not on real storage. |
+| 18.51 | 1 to 13 | `forms-settles.test.ts` (2 and 3); `forms-binding.test.ts` | Case 14: entry GC15. In cases 4 and 13 the entry of the decision is the ledger's, and is not counted. Cases 8 to 12 use the stand-in ledger. |
+| 18.53 | 1 to 25; 17 as far as the selection | `forms-binding.test.ts`; `scope/test/keyed.test.ts` (the lookup of 23 and 25 on real SQLite) | Case 17's draw and amounts: entries GC14 and GC15. Cases 4, 5, 8, 10 to 13, 22 and 23 need the count: they use the stand-in ledger, which is labelled. Cases 1 to 3, 6, 7, 9, 14 to 16, 18 to 21, 24 and 25 need none. |
+
+Cases 9 and 22 of witness 18.53 are built as corrected: the stand-in
+rule `open-stopped` opens the job in its initial state, sets its two
+required fixed references and then sets the final state, which is four
+effects.
+
+### 32.4 Earlier entries that this work answers
+
+- 2026-10-06, entry EY6: answered. The rule of an outcome's send is
+  given `selected`, and the two send rules read it (row I3-47).
+- 2026-10-06, entry EZ5: answered for the verifier. `snapshotRead`
+  takes only the canonical bytes (row I3-48).
+- 2026-10-06, entry EZ4: not answered. See GC16.
+- 2026-10-06, entries ER9 and FA15: the text and the name that they
+  waited for are built (row I3-46). The two rules are still unwritten.
+- 2026-10-06, entry ER11: the form that replaces the scan is built in
+  derive. The rule is not changed. See GC18.
+
+### 32.5 Tests whose pinned behaviour was changed deliberately
+
+- `scope/test/operations.test.ts`, "a snapshot that comes with an
+  answer is stored only as its canonical bytes": `snapshotRead` took
+  three spellings of one snapshot, and now takes one. Changed in the
+  commit of row I3-48.
+- `derive/test/forms-marks.test.ts`, "the send of an outcome's mark":
+  the operation of the test states 2 attempts, where it stated 1, so
+  that a further attempt can be shown. No earlier assertion changed.
+
+### 32.6 The sweep for a function that promises a refusal and can throw
+
+Asked by the checker's request `bec3fbd8`, 2026-10-06. Each function of
+the new files that returns null or a refusal on bad input was read for a
+call that can throw: the canonical writer, a hash, a parser.
+
+| Function | Can it throw | Result |
+|---|---|---|
+| `factText` | It could: the canonical writer, on negative zero and on an object that is not plain. It could also write a text that is no reference, for a required member that is not enumerable. | Repaired: null in each case. Negative zero is not written as zero. |
+| `factOfText` | No. The parser's error is caught, and the text is taken only when it is rewritten to the same bytes. | Unchanged. |
+| `factHex`, `isFactRefParts`, `factRefName`, `factOfRefName` | No. Each reads texts by patterns, and calls no writer, hash or parser. | Unchanged. |
+| `keyOf`, and so `indexRows` and `indexItems` | It could: the canonical writer, on a value with no canonical bytes. | Repaired: null, which is "no key". A key that is a whole `FactRef` is compared as its canonical text. |
+| `selectedByIndex` | It throws `RuleFault` only, which is its stated answer: the delivery is not judged. | Unchanged. |
+| `stated`, of `validate/binding.ts` | It could, on a type with no canonical bytes. | Repaired: such a type equals none, and the definition is refused at the end as before. |
+| `markerAmounts`, `itemAwaits`, `markerOwed`, `ruleMayNot`, `boundTo`, `decisionsOf` | No. None calls a writer, a hash or a parser. | Unchanged. |
+
+### 32.7 Lines for the merge
+
+Shared files, and what each gained. Each change is additive.
+
+- `contract/src/definition.ts`: the third member of `Settles`.
+  `platform.ts`: `BindingMark`, `Bound`, `Held` with `decisions` alone,
+  and `indexes`, `holds` and `bound` on the item and the handler.
+  **`Held` is to be joined with row I3-44's.** `report.ts`: `name`,
+  `MismatchName`.
+- `derive/src/validate/context.ts`: `Type.indexes` and `Type.decisions`;
+  `Duties.settles.slot`; `Defining.valueSets` and `bindings`.
+  `shape.ts`: the codes `bound-source` and `unsupported-definition`.
+  `items.ts`: `indexes` and `holds` as optional members, in platform
+  data. **`holds` is read here with `decisions` alone, by `held` of
+  `validate/binding.ts`: the other worker's reader of `holds` takes its
+  place and calls it for `decisions`.** `handlers.ts`: the third form in
+  `settling`; `bound`; a mark at place 2 is read by `alsoMark`.
+  `effects.ts`: one line that notes each `value` effect. `capacity.ts`:
+  a type with marks is counted by `markerCapacity`, and `requestsOf` is
+  split out of `entriesOf`. `index.ts`: `markers`, `keyed`, and the
+  calls of `setOnce` and `decisions`.
+- `derive/src/reserve.ts`: one line, `entries += markerOwed(...)`.
+  `ledger.ts` is not changed.
+- `derive/src/state.ts`: `StateView.lookup`, `StateWriter.putIndexed`,
+  and both in `MemoryState`. `fold.ts`: one line at the opening of an
+  item. `guards.ts`: `Judging.settling`, `bound` and `outcome`.
+  `fields.ts`: `Reading.counts`. `judge.ts`: `Draft.bound`.
+  `marks.ts`: `Resolved.outcome`, and the rule form `{ place: "also",
+  bind }`. `handlers.ts`, `delivery.ts`, `effects.ts`, `outcomes.ts`:
+  the calls.
+- `replay/src/verify.ts`: `nameOf`, and one line in `#report`. No other
+  line.
+- `scope/src/sqlite.ts`: the table `item_key`, `lookup`, `putIndexed`,
+  and one line in `all`.
+- Where `Reading.counts` is to be given: by the scope's turn, and by the
+  verifier, from the ledger's folded counts of `decisions`. Where
+  `Draft.bound` is to be read: by the ledger's fold, which draws 1.
+  Where `dec(m)` is to be counted: in what a holder reserves, with
+  `markerAmounts` for the marker duties of the holder's own type.

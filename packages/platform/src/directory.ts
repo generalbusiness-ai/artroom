@@ -780,7 +780,8 @@ export const directoryRules: Rules = {
    * On the selecting outcome: state `done`, with the detail `commit`. That
    * is a `confirmed` outcome of an operation that has selected nothing,
    * while `repository.imported` is unset: the judgment that the ledger makes
-   * of `selected`, on the same state. On the last `refused`: state `failed`,
+   * of `selected`, which the rule is given with what the judge resolved
+   * (the contract's revision 20, section 6.1; row I3-47). On the last `refused`: state `failed`,
    * with no detail. "The last" is the `refused` outcome after which every
    * attempt that the operation states is opened and each has a `refused`
    * outcome. An `unknown` attempt keeps the operation open, and no `failed`
@@ -796,7 +797,7 @@ export const directoryRules: Rules = {
       if (input.type !== "outcome" || !operation || !repository || !isScopeRef(destination)) throw new Error("an import is of a directory that holds its destination");
       const update = (state: "done" | "failed", detail: Record<string, FieldValue>) =>
         ({ to: destination, message: { class: "request", type: "relate", body: { name: "import", item: { at: given.resolved.at, seq: repository.id, hash: repository.opened }, state, detail } } }) as const;
-      if (input.result === "confirmed") return operation.selected === null && (repository.values["imported"] ?? null) === null ? update("done", { commit: importedHead(input.evidence.body)! }) : null;
+      if (input.result === "confirmed") return given.resolved.outcome?.selected === true ? update("done", { commit: importedHead(input.evidence.body)! }) : null;
       return input.result === "refused" && spent(operation, { attempt: input.attempt }) ? update("failed", {}) : null;
     },
   },

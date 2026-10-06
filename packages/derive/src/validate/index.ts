@@ -27,6 +27,9 @@ import { heldUnderBytes, holdForms, holdTypes } from "./hold.ts";
 import { reserving, type Reserving } from "./holds.ts";
 import { itemTypes } from "./items.ts";
 import { at, shapes, type Problem } from "./shape.ts";
+import type { Markers } from "../markers.ts";
+import { decisions } from "./binding.ts";
+import { setOnce } from "./markers.ts";
 import { timedEntryBytes, timedGraph, timedKinds, timedRules } from "./timed.ts";
 
 export type { MarkKind, MarkPlace, RangeIndex } from "./context.ts";
@@ -86,6 +89,21 @@ export interface ValidDefinition {
    * declared definition, or platform data with no kind and no `holds`.
    */
   readonly reserving?: Reserving;
+  /**
+   * Section 17.2, "A marker duty" (revision 22): each item type that some
+   * form settles by a mark, with what the amounts of its duties are derived
+   * from (`markers.ts`). An item of such a type reserves by its state and
+   * by the marks that are `true`, so `pending` has no row for the type.
+   * Absent: no form of the definition settles by a mark.
+   */
+  readonly markers?: Markers;
+  /**
+   * Section 17.2a, "An index that an item type declares" (revision 23): for
+   * each item type of platform data that states `indexes`, its indexed
+   * slots. The fold writes one row for each, with the item. Absent: no type
+   * declares one.
+   */
+  readonly keyed?: Readonly<Record<string, readonly string[]>>;
 }
 
 export type Validation = { ok: true; definition: ValidDefinition } | { ok: false; problems: readonly Problem[] };
@@ -132,7 +150,7 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
   const d: Defining = {
     ...read, bounds, name: typeof top["name"] === "string" ? top["name"] : null, typeNames: new Set(isObject(top["items"]) ? Object.keys(top["items"]) : []), types: new Map(), rules: new Set(), holds: false, holdTypes: new Set(),
     capabilities: new Map(), underived: [],
-    indexes: [], clauseSets: [], clause: null, duties: [], platform, marks: [], places: new Map(),
+    indexes: [], clauseSets: [], clause: null, duties: [], platform, marks: [], places: new Map(), valueSets: [], bindings: [],
   };
 
   const profile = rec(top["profile"], "profile", ["name", "version"]);
@@ -175,6 +193,10 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
   }
 
   holdForms(d, top);
+  // Section 6.4, "`settles` by a mark": no written effect sets a mark but to `true`. Section 17.2a: each key of `decisions` is the
+  // message of a handler that states `bound`, whose `of` names that item type.
+  setOnce(d);
+  decisions(d);
 
   // Section 6.1, place 7: the mark of the rule for the outcome entries of each kind of operation that this definition owns.
   // "A request of an outcome's rule, and its clauses" (revision 17; row I3-23): the mark may hold one `send`. It is a send mark,
@@ -219,7 +241,8 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
   const reserved = reserving(d, top, capacity);
   if (problems.length > 0) return { ok: false, problems };
   try {
-    return { ok: true, definition: { declared, digest: definitionDigest(declared), timedTypes: [...timedTypes].sort(), holdTypes: [...d.holdTypes].sort(), indexes: d.indexes, ...capacity, underived: d.underived, marks: d.marks, ...(reserved ? { reserving: reserved } : {}) } };
+    const keyed = [...d.types.values()].flatMap((type): [string, readonly string[]][] => (type.indexes ? [[type.name, type.indexes]] : []));
+    return { ok: true, definition: { declared, digest: definitionDigest(declared), timedTypes: [...timedTypes].sort(), holdTypes: [...d.holdTypes].sort(), indexes: d.indexes, ...capacity, underived: d.underived, marks: d.marks, ...(reserved ? { reserving: reserved } : {}), ...(keyed.length > 0 ? { keyed: Object.fromEntries(keyed) } : {}) } };
   } catch {
     return { ok: false, problems: [{ code: "shape", path: "", message: "has no canonical bytes" }] };
   }

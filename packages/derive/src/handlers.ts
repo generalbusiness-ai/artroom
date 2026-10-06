@@ -9,6 +9,7 @@
 import type { ActType, Advisory, AlsoMark, AlsoRule, Bounds, Digest, Effect, EffectForm, Entry, FactRef, FactUse, FieldType, FieldValue, Guard, Input, Notify, PlatformData, Prepared, Reason, ReceiveType, RefusalReason, Request, ResultClauses, ScopeRef, Send, SendForm, SendMark, Settles, UnavailableReason } from "@generalbusiness/artroom-contract";
 import { entryHash } from "@generalbusiness/artroom-bytes";
 import type { Signer } from "./attribution.ts";
+import { boundTo, selectedByIndex, selectorOf } from "./binding.ts";
 import { deriveEffects } from "./effects.ts";
 import { creationFields, factsNamed, isLocalFact, messageFields, presentedTypes, readFacts, readFields, textsNamed, updateOf, type Reading, type Update } from "./fields.ts";
 import { signerOf } from "./fold.ts";
@@ -210,10 +211,14 @@ export function overMax(view: StateView, definition: ValidDefinition, type: stri
 export interface Forms { guards: readonly Guard[]; effects: readonly EffectForm[]; sends: readonly SendForm[]; attention: readonly Notify[]; settles?: Settles | undefined }
 
 export type Ran =
-  /** `settles`: the form declares that it settles an item, the item was in a listed state, and these effects take it out of them (section 17.3). */
-  | { result: "ran"; effects: Effect[]; sends: Send[]; prepared: Prepared[]; judgesTime: boolean; settles: boolean }
+  /**
+   * `settles`: the form declares that it settles an item, the item was in a listed state, and these effects take it out of them
+   * (section 17.3); or, by a mark, the item awaited the mark and these effects set it (section 6.4, revision 21). `bound`: the
+   * delivery is bound to that item (section 17.2a), whatever is decided.
+   */
+  | { result: "ran"; effects: Effect[]; sends: Send[]; prepared: Prepared[]; judgesTime: boolean; settles: boolean; bound?: number }
   /** `name`: the reason the failed guard declares. `prepared`: the rule results the guards read before the refusal. An entry that records the refusal records them (section 9.2). */
-  | { result: "refused"; reason: RefusalReason; name?: string; detail: string; prepared: Prepared[] }
+  | { result: "refused"; reason: RefusalReason; name?: string; detail: string; prepared: Prepared[]; bound?: number }
   | { result: "unavailable"; reason: UnavailableReason };
 
 /** Section 4.2: when a failed guard declares a `reason`, that is the refusal's name. */
@@ -234,6 +239,8 @@ export const giving = (view: StateView, context: Reading, scope: Pick<ScopeState
  * records, when the entry is its genesis.
  */
 export function derive(j: Judging, forms: Forms, opens: string | null, cause: Digest, first = 0, directory?: ScopeRef | null): Ran {
+  // Section 6.4, "A rule of a form that declares `settles` sets no state": the effects of a rule are checked against it.
+  if (forms.settles !== undefined) j.settling = true;
   // Section 6.5: the guards are one list with three results. A guard that is false refuses, also after one that is not completed.
   // Section 6.4: a guard whose subject is unbound is not evaluated, and an effect whose subject is unbound is not applied.
   const guards = judgeGuards(j, forms.guards);
@@ -261,9 +268,13 @@ export function derive(j: Judging, forms: Forms, opens: string | null, cause: Di
   const judgesTime = readsClock(forms.guards) || forms.effects.some(timesEffect) || conditionsReadClock(forms.sends, forms.attention) || j.ran?.clock === true;
   // Section 17.3: a form that declares `settles` is judged in full. It settles when its subject is in a listed state at the
   // commit and the entry takes it out of the listed states. Any other entry of the form is new work.
+  // By a mark (revision 21): before the entry the subject's state was one of `in` and its mark was `false`, and after the entry's
+  // effects the mark is `true`. An entry of the form that finds the mark `true` already, or the state outside `in`, is new work.
   const settled = forms.settles && "of" in forms.settles ? forms.settles : null;
+  const mark = (settled as { sets?: string } | null)?.sets;
   const [was, is] = settled ? [j.subjects.get(settled.of), effects.working.get(settled.of)] : [];
-  const settles = !!settled && !!was && !!is && settled.in.includes(was.state) && !settled.in.includes(is.state);
+  const settles = !!settled && !!was && !!is && settled.in.includes(was.state)
+    && (mark !== undefined ? own(was.values, mark) === false && own(is.values, mark) === true : !settled.in.includes(is.state));
   return { result: "ran", effects: effects.effects, sends: sends.sends, prepared: j.used, judgesTime, settles };
 }
 
@@ -314,7 +325,10 @@ export function runHandler(view: StateView, definition: ValidDefinition, context
   }
   // The item this entry opens does not exist yet, and the validator lets no `via` of a handler read `on`.
   // Section 4.2, check 8: a name of `also` that a mark selects is resolved by the mark's rule.
-  const also = alsoItems(view, definition, handler.also, fields, null, undefined, g ? (mark, bound) => selectedBy({ ...g, subjects: bound }, mark) : undefined);
+  // Section 17.2a, revision 23: the mark that binds the name which `bound.of` names is a binding selector. The judge makes the one
+  // lookup of the declared index, and runs the rule on what it returns and on the fields, and on nothing else.
+  const selector = selectorOf(handler);
+  const also = alsoItems(view, definition, handler.also, fields, null, undefined, g ? (mark, bound) => (mark === selector ? selectedByIndex(g, selector) : selectedBy({ ...g, subjects: bound }, mark)) : undefined);
   if (!also.ok) return refused("no-item", also.detail, uses);
   for (const [name, item] of also.items) subjects.set(`also.${name}`, item);
   if (new Set([...subjects.values()].map((i) => i.id)).size !== subjects.size) return refused("alias", "two names resolve to one item", uses);
@@ -324,8 +338,12 @@ export function runHandler(view: StateView, definition: ValidDefinition, context
     // Section 6.5: `sender` is the envelope's source scope, `source` reads the source entry, and `update` the update, whose revision is the `seq` of the owner's entry.
     sender: sent?.source.fact.at, source: sent?.source, update: sent?.update ? { state: sent.update.state, item: sent.update.item, revision: sent.source.fact.seq } : undefined,
   };
+  // Section 17.2a: whether the delivery is bound is derived here, after the names are bound and before any guard of the handler,
+  // on the state before the entry. It decides nothing of the request.
+  const item = boundTo(j, handler, kind, context.counts);
+  if (item) j.bound = true;
   const ran = derive(j, handler, opens, cause);
-  return ran.result === "unavailable" ? ran : { ...ran, uses };
+  return ran.result === "unavailable" ? ran : { ...ran, uses, ...(item ? { bound: item.id } : {}) };
 }
 
 // ---------------------------------------------------------------- the clause of an earlier send (sections 6.6 and 7.4)

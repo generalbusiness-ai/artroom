@@ -281,6 +281,20 @@ export interface StateView {
   account(seq: number, n: number): number | null;
   /** The requests of that account, in the order of the sending entry, then the ordinal. */
   accountsOf(item: number): readonly Account[];
+  /**
+   * The one lookup of an index that an item type declares (section 17.2a,
+   * "An index that an item type declares", revision 23): the IDs of the
+   * items of that type, live and final, whose indexed slot holds that key,
+   * in order of item ID, at most `limit`. `key` is the key's canonical
+   * JSON (`keyOf`, in `binding.ts`). The index answers no range, no prefix,
+   * no part of a key and no count.
+   *
+   * Null: the index does not hold a row for every item of the type, so no
+   * lookup is answered from it. That is so for a slot that was never
+   * indexed. The index is derived state: `all` holds no row of it, and a
+   * replay rebuilds it by folding.
+   */
+  lookup(type: string, slot: string, key: string, limit: number): readonly number[] | null;
   /** Everything, for a checkpoint. This is the one read that is not bounded. */
   all(): StateSnapshot;
 }
@@ -306,6 +320,8 @@ export interface StateWriter extends StateView {
   putHolder(item: number, held: Held | null): void;
   /** The account of one request, set by the fold of the entry that sends it. */
   putAccount(account: Account): void;
+  /** One row of a declared index: an item that this entry opens, under the key that its indexed slot holds. The fold calls it once for each indexed slot of such an item, with the item. */
+  putIndexed(type: string, slot: string, key: string, item: number): void;
 }
 
 type Key = readonly (string | number)[];
@@ -368,6 +384,13 @@ export class MemoryState implements StateWriter {
    * reads it at the first update for each key (I3 deltas, section 31, entry FD6).
    */
   readonly #copies = new Map<string, number>();
+  /**
+   * The declared indexes (section 17.2a): for each type, slot and key, the IDs of its items in ascending order; and for each
+   * type and slot, how many rows it holds. A new item has the highest ID, so its row is appended. No row is ever removed. It is
+   * derived state, and `all` holds none of it.
+   */
+  readonly #keyed = new Map<string, number[]>();
+  readonly #rows = new Map<string, number>();
 
   /** `tally`, when it is given, counts what `incarnations` and `copies` read, for a test of their bounds. Nothing else is counted. */
   readonly tally: { steps: number } | undefined;
@@ -441,6 +464,18 @@ export class MemoryState implements StateWriter {
   operationsFor(item: number) { return [...this.#operations.values()].filter((o) => o.for === item).sort((a, b) => keyOrder(a.id.split(":").map(Number), b.id.split(":").map(Number))); }
   account(seq: number, n: number) { return this.#accounts.get(key(seq, n))?.item ?? null; }
   accountsOf(item: number) { return [...this.#accounts.values()].filter((a) => a.item === item).sort((a, b) => keyOrder([a.seq, a.n], [b.seq, b.n])); }
+  lookup(type: string, slot: string, at: string, limit: number): readonly number[] | null {
+    // Complete: one row for each item of the type that the state holds, live and final.
+    const items = [...this.#counts.values()].reduce((n, [of, , count]) => (of === type ? n + count : n), 0);
+    if ((this.#rows.get(key(type, slot)) ?? 0) !== items) return null;
+    return (this.#keyed.get(key(type, slot, at)) ?? []).slice(0, limit);
+  }
+  putIndexed(type: string, slot: string, at: string, item: number) {
+    const ids = this.#keyed.get(key(type, slot, at)) ?? [];
+    this.#keyed.set(key(type, slot, at), ids);
+    ids.splice(firstAbove(ids, item), 0, item);
+    this.#rows.set(key(type, slot), (this.#rows.get(key(type, slot)) ?? 0) + 1);
+  }
 
   setScope(scope: ScopeState) { this.#scope = scope; }
   putItem(item: Item) {

@@ -73,6 +73,7 @@ import type { Bounds, Input } from "@generalbusiness/artroom-contract";
 import { isPlatformDefinition } from "@generalbusiness/artroom-bytes";
 import { holding } from "./held.ts";
 import { closureOf, type Owners } from "./ledger.ts";
+import { markerOwed } from "./markers.ts";
 import type { StateView } from "./state.ts";
 import type { ValidDefinition } from "./validate/index.ts";
 import { own } from "./values.ts";
@@ -107,6 +108,9 @@ export function owed(view: StateView, definition: ValidDefinition, head: Input, 
   for (const [type, states] of Object.entries(definition.pending)) {
     for (const [state, reserved] of Object.entries(states)) entries += reserved * view.count(type, state);
   }
+  // Revision 22, "A marker duty": an item of a type that some form settles by a mark reserves its state duty and each marker duty
+  // that is pending, by its own marks. A definition with no such form has none, and counts as it did.
+  entries += markerOwed(view, definition);
   for (const copy of definition.pendingCopies) entries += copy.entries * view.copies(copy.name, copy.kind, copy.states);
   const open = view.outstanding();
   // Section 17.2, "What a mark may start": a clause may hold an effect mark, and the request reserves what that mark may start.
