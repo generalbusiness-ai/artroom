@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at packages/scope/test/worker.ts","body":{"commit":"48a2b285141cbeb00f181b5d544e86e4acde5374","path":"packages/scope/test/worker.ts"}}
+{"kind":"artifact","text":"Merge published the current artifact at packages/scope/wrangler.jsonc","body":{"commit":"48a2b285141cbeb00f181b5d544e86e4acde5374","path":"packages/scope/wrangler.jsonc"}}
