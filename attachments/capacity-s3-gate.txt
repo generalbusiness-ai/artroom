@@ -1,0 +1,15 @@
+
+> gate
+> bash scripts/gate.sh
+
+head 4a9a0d4af73824d318d6fd4b13deca614fc81469  tree ae45cd1f6d8eb63af2fc16499f3e8587c2448138  changed files 0
+install    exit 0  elapsed    1.9 s  cpu    2.3 s
+whitespace exit 0  elapsed    0.0 s  cpu    0.0 s
+typecheck  exit 0  elapsed    3.5 s  cpu    9.6 s
+test       exit 0  elapsed   12.2 s  cpu   32.8 s
+  Tests  722 passed (722)
+  ℹ pass 6
+gate passed; logs in /var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.9uJ7pzNVtZ
+real 17.85
+user 37.41
+sys 7.49
