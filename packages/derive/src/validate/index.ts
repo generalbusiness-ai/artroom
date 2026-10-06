@@ -140,10 +140,11 @@ export const PROFILES: Readonly<Record<string, Profile>> = { "restricted@1": {} 
 export interface ValidateOptions {
   readonly platform?: boolean;
   /** Static declarations of the trusted pinned owner code, by outcome kind. */
-  readonly outcomeValues?: Readonly<Record<string, readonly import("../ledger.ts").EvidenceValueDomain[]>>;
+  readonly outcomeValues?: Readonly<Record<string, readonly import("../ledger.ts").EvidenceValueDomain[]>> | null;
 }
 
 export function validateDefinition(input: unknown, bounds: Bounds, profiles: Readonly<Record<string, Profile>> = PROFILES, options: ValidateOptions = {}): Validation {
+  if (options.outcomeValues === null) return { ok: false, problems: [{ code: "shape", path: "outcomes", message: "an owner with an evidence value reader has no static domain declaration for this pinned version and kind" }] };
   const read = shapes(bounds);
   const { problems, bad, rec, entries, str } = read;
 

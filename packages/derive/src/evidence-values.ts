@@ -5,6 +5,7 @@ import type { EvidenceValue, OperationRules } from "./ledger.ts";
 
 /** Null: the evidence names a value outside this version's declaration. */
 export function evidenceValues(rules: Pick<OperationRules, "valueDomains" | "values"> | null | undefined, evidence: Evidence): readonly EvidenceValue[] | null {
+  if (rules?.values !== undefined && rules.valueDomains === undefined) return null;
   const domains = rules?.valueDomains ?? [];
   const declared = new Map<string, number>();
   for (const domain of domains) {
