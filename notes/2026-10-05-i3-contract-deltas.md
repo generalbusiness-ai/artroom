@@ -1852,3 +1852,162 @@ the one change applied.
 
 **What was not run.** No deployment, no provider, no host, no gateway
 and no Git command. The gate was not run.
+
+## 31. Review finding e2d4e074: the value of an observation is derived once, and a sweep of the replay's repeated work
+
+Written 2026-10-06, on `request/i3-m3`, by the worker of this finding.
+Entries have the prefix FD. The disposition is the planner's, in event
+`752a2725`: derive each historical observation value once, by the exact
+source scope, incarnation, head, definition and subject, or by an
+equivalent bounded strategy, and keep every check and every valid
+history.
+
+No entry has other bytes. No history that was valid has another answer,
+and a history that was a mismatch is the same mismatch at the same
+entry: the order of the checks is as it was. Neither lane digest
+changes, and no data of a platform definition changes. The branch was
+brought up to `origin/main` first (`48a2b2851`, the landing of the
+second milestone): the merge changed no file, because the branch held
+that milestone's tree already.
+
+### 31.1 The finding, against the source
+
+The source agrees with the finding. `#viewAt` of `replay/src/verify.ts`
+kept one folded state for a source, and began again from the genesis
+whenever an observation named a lower head than the last one. Two
+admins who publish in turn, one on a cached observation of head L and
+one on a cached observation of head H, are legal: guard 7 of an
+observation holds the head of each key and member, and not of the
+scope. So each pair cost L + 1 fold applications and then H - L more.
+The value was also answered again for each grant, though a reused read
+has the bytes of the one before it.
+
+### 31.2 What changed
+
+| # | What | Where |
+|---|---|---|
+| FD1 | The value that a source's history gives is derived once for each source scope, incarnation, head (position and hash), definition and subject, and kept. The head is proved for every entry, as before. Every retained observation is compared with the value, whether it was derived for that entry or for an earlier one: what is kept is what the history gives, and never that an entry agreed. An observation that a membership scope retains of itself is answered from the state that the replay holds, with no fold, as before: each entry names another head. | `Verifier.#standing`, `#values` |
+| FD2 | Each entry of a source is folded once into a view of that scope, in order, as far as the highest head that an observation names. The view keeps a log: every write of the fold, by record, with the position of the entry that made it. The state at the head folded last is the view. The state at an earlier head is built from the log, as the last write of each record at or before that head, and the state built last is kept. The disposition says to keep the states at the heads that the history names. A copy of a state for each named head costs a copy of the source's state for each, and a head may be named for the first time after the fold has passed it, so the log is kept instead: it is the equivalent bounded strategy, and it serves any head in any order. | `replay/src/view.ts`, `Verifier.#viewAt` |
+| FD3 | The run of a retained observation is looked up in a set, once for each observation that is not of the run of the entry before it. The earlier code searched a list of every run. | `Verifier.#inRun` |
+| FD4 | The texts that a scope owes are kept by digest, each with the first entry that names it, in the order of the history. A tombstone looks up each text that it lists. The earlier code searched the list of every owed text for each `redact` effect, twice. | `Run.owed`, `Verifier.#replay` |
+| FD5 | The state in memory keeps, for each observed scope ID, the incarnations of the heads that it holds. A rules scope and a destination read them for each entry that is judged on a grant. The earlier code read every observed head. | `MemoryState.incarnations` |
+| FD6 | The state in memory keeps the number of copies of each relationship name and kind of owner. The first update for each key reads it. The earlier code read every copy. A count by state, which only the reserve asks, still reads every copy. | `MemoryState.copies` |
+
+`verify` takes an optional third argument, a `Tally`, and `MemoryState`
+an optional tally. Each counts steps for a test, as `matches` and
+`classify` of the platform package do. No test times anything.
+
+### 31.3 The counts on the witness history
+
+The history is of the platform package's own membership and rules
+definitions, written by derive's judges: a membership scope with two
+admins, whose head is 5 (L) when the second has joined and 45 (H) after
+40 more entries; and a rules scope with 41 acts `publish`, 20 by each
+admin in turn on a cached read of H and of L, and one more on a new
+read of H. The office, the registrar and the reads are stand-ins of the
+platform package's test support: no scope read membership, and each
+observation is membership's own answer from its state at the head
+named.
+
+| | Fold applications for the source | Values answered | How taken |
+|---|---|---|---|
+| The earlier code | 966 | 41 | Observed, with a counter at each of the two places in the code of `441727709`, in one run of the witness history. The counter was not committed. |
+| This code | 46 | 2 | Observed, by the tally, in the witness. One state was built from the log. |
+
+The witness asserts that the folds are at most the entries of the
+source, 46, and the values at most the distinct heads and keys that the
+grants name, 2, and states both counts. The answer for the history, and
+the mismatch for the same history changed at one entry, are those that
+the earlier code gave, taken from it before the change.
+
+For entry FD3, on 40 acts each on a read of a run of its own: 40
+lookups for the rules scope, where the earlier code made 780
+comparisons (observed, with a counter, in the same way). For FD4, FD5
+and FD6 the earlier count is by reading the code: 930 comparisons for
+30 owed texts and their one tombstone, now 30 lookups; 1,000 heads read
+for one answer, now 3 steps; 1,000 copies read for one count, now 1
+step.
+
+### 31.4 The sweep: work for one replayed entry that grows with a history
+
+By reading `replay/src` and `derive/src`, at this head. N is the number
+of entries of a history. "Changed" names the entry above. Every other
+row is recorded and not changed, with its owner. The worst count is by
+reading, and none was run.
+
+| # | The loop | Its bound | Worst count over N entries | Changed, or the owner |
+|---|---|---|---|---|
+| 1 | `verify.ts`, `#viewAt`: the fold of a source for a head | Was: the head's position, for each head lower than the last. Now: each entry of the source once. | Was N times the source's length. Now the source's length. | Changed: FD2 |
+| 2 | `verify.ts`, `#standing`: the answer of the source's definition | Was: one for each retained observation. Now: one for each distinct key of FD1. | One answer for each distinct key. | Changed: FD1 |
+| 3 | The answer itself, `standingOf` of the platform package: it reads every key item, or every member item, of the source's state | The items of the type that the source holds, retained final ones too | Distinct keys times the source's items | Entry EM12: the proof plan, with request `cc570904`. A bound, or an index of key items by `id`. |
+| 4 | `view.ts`, `View.at`: a state built from the log, for a head before the one folded last | The records that the fold wrote. One build for each run of questions about one earlier head. | Distinct keys times the source's records, when new keys alternate among earlier heads. Of the order of row 3, which each such key pays in any case. | The builder, with row 3: an index for the answer would let it read the log directly. |
+| 5 | `verify.ts`, `#inRun`: the run among the runs seen | Was: the runs so far. Now: one lookup. | Was N squared over 2. Now N. | Changed: FD3 |
+| 6 | `verify.ts`, the tombstone of owed texts | Was: the owed texts, for each `redact` effect. Now: the texts that the effect lists. | Was the square of the texts. Now the texts listed. | Changed: FD4 |
+| 7 | `verify.ts`, `#prove`: the caller's anchors, searched for each distinct fact | The anchors that the caller gave | Distinct facts times anchors. No history sets the number of anchors. | The builder, when a limit on anchors is stated: an index by scope, position and hash. |
+| 8 | `source.ts`, `MemorySource.retained`: a search of one scope's retained inputs | The retained inputs that the caller holds for the scope | Reads times retained inputs, for a source in memory. The HTTP source searches nothing. | The builder. It is the source of tests and of a caller that holds the histories. |
+| 9 | `verify.ts`: the copies of used entries against the foreign facts of one entry | 128 foreign entries for one entry (`usesPerEntry`) | N times a constant | None needed. |
+| 10 | `state.ts`, `MemoryState.incarnations`, read through `rulesMembership`, `destinationMembership` and `destinationRulesScope` for each act and preparation | Was: every observed head. Now: the incarnations of one scope ID, which a valid history holds one of. | Was N times the subjects observed. Now N. | Changed: FD5 |
+| 11 | `state.ts`, `MemoryState.copies`, at `delivery.ts`, the first update for a key | Was: every copy. Now: one number. | Was N times the copies kept. Now N. | Changed: FD6 |
+| 12 | `timed.ts`, `nextDue`: the live items of each timed rule's type. The replay asks before every entry that is not timed, and each judge asks once more. | Eight timed rules times the type's `max`. The validator states no upper limit on `max`. | N times `max` | The proof plan, with request `cc570904`: a limit on `max`, or an index by deadline, which the runtime's commit would use too. |
+| 13 | `hold.ts`, `endsUnder`, and `capability/hold.ts`, `heldUnder`: the live holds of each hold type | The type's `max` | N times `max` | As row 12. |
+| 14 | `lists.ts`, `scan`: the items that a range guard covers | For an entry that a runtime wrote: 1,000 items (`guardScan`), because the same scan finished there. The replay sets no limit (section 9.3), so for a history that no runtime wrote: the items of the type. | N times 1,000 for a valid history. N times the items for one that is not. | The contract's section 9.3, with the proof plan: whether a replay may stop at the bound and report. |
+| 15 | `state.ts`, `MemoryState.records` and `recordCount`: every capability record is sorted for each read. The code of `hold@1` and `git-read@1` reads them at a step, at an outcome and at a `hold` effect that ends or changes a hold. | The records that the scope holds, which no text bounds | N times the records, times a logarithm | Entry EF6: request `cc570904`, the proof plan. An index by kind would leave the read of one kind unbounded, so nothing was changed here. |
+| 16 | `fold.ts`, the texts that a detached-text slot has held: searched and copied for each `value` effect on the slot | The texts held and not redacted. No text bounds them. | The square of the writes to one slot | The contract, with the proof plan: a bound on the texts that a slot holds before a redaction. The fold is the runtime's too. |
+| 17 | `attribution.ts`, the attribution history of an item: copied and searched for each effect that adds to it | The members of the history. No text bounds them. | N times the members | As row 16: a bound on an item's attribution history. |
+| 18 | `state.ts`, `MemoryState.putItem`: the index of a type and state is an array, and an item that changes state is moved in it | The items in that state | N times the items, as moved array elements | The builder: measure before a change. |
+| 19 | `settle.ts`, `judgeCheckpoint`: the digest of the whole folded state | The state | Checkpoints times the state | The contract (a checkpoint carries the digest of the state), with the proof plan. |
+| 20 | `directory.ts`, `rowOf`, and `destination.ts`, `publications`: a search of every item of a type by a value | The items of the type | N times the items | Entries EP10 and ER11. They are the platform package's, and are listed because a judge runs them. |
+
+Not on a replay's path, by reading: `MemoryState.outstanding` and a
+count of copies by state, which only `fits` asks, and a replay does not
+ask it; `MemoryState.preparations`, which only a read asks.
+
+### 31.5 What a replay now keeps
+
+| Record | How many | Its size |
+|---|---|---|
+| A value, in `#values` | One for each distinct key of FD1: at most the observations that the checked entries retain | The answer of the source's definition: an observation without `at` |
+| A write, in a view's log | One for each write of the fold, for each entry of a source up to the highest head that an observation names. Only a scope that another scope observes has a view. | A reference to the record that the fold wrote. The checked entries were already kept whole. |
+| A built state, in a view | One for each view: the one built last | The records of the source at that head |
+| A run, in `Run.runs` | One for each run that an entry names, as before | Its name |
+| An owed text, in `Run.owed` | One for each distinct owed text, where the list held one for each naming | A digest and a fact reference |
+| An incarnation list and a copy count, in `MemoryState` | One for each observed scope ID, and one for each relationship name and kind of owner | A short list, and a number |
+
+All are within the replay's limit on entries and on bytes read. None is
+written anywhere.
+
+### 31.6 Witnesses and controls
+
+- `replay test/verify.test.ts`: the alternating history, with the earlier code's answer and the counts; the same history changed at one entry whose head and key are already derived; 40 runs; a view against a fold from the genesis, at every head of seven histories, asked from the last head down; and 30 owed texts with one tombstone.
+- `derive test/forms-grant.test.ts`, for FD5, and `derive test/forms-handlers.test.ts`, for FD6.
+- Every earlier case of the replay package passes unchanged.
+
+Five controls, through `scripts/control.mjs`. Each distinguishes: a
+test failed by an assertion with the one change applied.
+
+| # | The change | The witness that failed |
+|---|---|---|
+| 1 | A kept value is never found, so each grant derives its own | The alternating history: 41 values where at most 2 are allowed |
+| 2 | An entry whose value is already kept is not compared | The changed history: `consistent` where the earlier code said `mismatch` at entry 42 |
+| 3 | A view reads the last write before the head, and not at it | The view against the fold, and both histories |
+| 4 | An incarnation is noted only for the first head of a scope ID | `forms-grant.test.ts` |
+| 5 | A copy is counted at each update, and not once for a key | `forms-handlers.test.ts` |
+
+### 31.7 Lines for the merge
+
+- `verify(source, options, tally?)`, and the type `Tally`. A caller that gives none is unchanged.
+- `MemoryState` takes an optional tally. `View`, of the replay package, extends it and is not exported from the package's index.
+- `Rulebook`, of the platform package's test support, takes the membership scope ID as an optional second argument. `histories` of the replay's `test/world.ts` is exported.
+- `Run.owed` is a map, `Run.runs` a set with the last run, and `Run.viewed` a `View`.
+
+**Documents.** No sentence of `docs/` or of a package README says that
+the second milestone is not landed or is under review, so none was
+changed. `packages/replay/README.md` says what FD1 and FD2 do.
+
+**What was run.** The replay, derive and platform projects while
+working; every workspace's typecheck; `git diff --check`;
+`scripts/active-source.test.mjs`; and the root vitest run once, at
+`f9a5ae91c`: 69 files and 537 tests passed in 9.9 seconds elapsed and
+25.5 CPU seconds, one observed run, on an Apple M5 Max with 18 cores, a
+load average of 4 from other sessions, and warm caches. The gate was
+not run. No deployment, no provider, no host and no gateway.
