@@ -28,7 +28,7 @@
  * | Route | Operation |
  * |---|---|
  * | `POST /v1/scopes` | Found a scope with no creator: under `platform:register@1` the founding register, by an `install` intent; under another definition a directory. Body `{ founding, definition, definitions?, texts? }`. |
- * | `POST /v1/scopes/:scope/acts` | Submit an act. Body `{ signed, grants, texts?, presented? }`. `texts`: each detached text that a field names by digest. `presented`: the facts presented beside the intent, by name. |
+ * | `POST /v1/scopes/:scope/acts` | Submit an act. Body `{ signed, grants, texts?, presented?, values? }`. `texts`: each detached text that a field names by digest. `presented`: the facts presented beside the intent, by name. `values`: each value that a place of the act names by digest, as its canonical bytes; only an act of a platform definition has a place. |
  * | `POST /v1/scopes/:scope/preparations` | Ask for one step of a capability. Body `{ signed, grants, capability, step }`. `signed`: the signed intent that the step prepares for. |
  * | `POST /v1/scopes/:scope/settle` | The receipt of an accepted act. Body `{ signed }`. |
  * | `GET /v1/scopes/:scope` | The summary. |
@@ -244,7 +244,7 @@ export async function route(request: Request, binding: Binding): Promise<Respons
     const given = await body(request);
     if (!given) return json(400, { error: "bad-request" });
     // What travels beside the intent is untrusted, like the rest of the body: the scope reads each text and each presented fact itself.
-    const beside = { ...("texts" in given ? { texts: given["texts"] } : {}), ...("presented" in given ? { presented: given["presented"] } : {}) } as Beside;
+    const beside = { ...("texts" in given ? { texts: given["texts"] } : {}), ...("presented" in given ? { presented: given["presented"] } : {}), ...("values" in given ? { values: given["values"] } : {}) } as Beside;
     if (scope === undefined) return answered(await scopes.found(given["founding"] as SignedIntent, given["definition"] as DeclaredDefinition, (given["definitions"] ?? []) as DeclaredDefinition[], beside), 201);
     if (what === "acts") return answered(await scopes.submit(scope, given["signed"] as SignedIntent, (given["grants"] ?? []) as Grant[], beside), 200);
     if (what === "sessions") {

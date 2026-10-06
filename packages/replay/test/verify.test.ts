@@ -4,7 +4,7 @@ import { textDigest } from "@generalbusiness/artroom-bytes";
 import { founded, keys, notesDefinition, on, otherLane, t, type Ledger } from "@generalbusiness/artroom-derive/testing";
 import { C, cap, clean } from "../../derive/test/fixtures-hold.ts";
 import { MemorySource, TRUSTS, platformCode, render, verify, type MemoryScope, type Options } from "../src/index.ts";
-import { Gate, Lane, OWNER } from "./staging.ts";
+import { Gate, Lane, OWNER, RULES_SCOPE } from "./staging.ts";
 import { entryOf, rewrite, served, sourceOf, world, type World } from "./world.ts";
 
 /**
@@ -307,6 +307,21 @@ describe("an outcome entry of a platform definition, and where a scope records i
     const one = plain.seen();
     expect("observed" in entryOf(plain.served(), 3).input).toBe(false);
     expect(await changed(plain, (input) => { input.observed = [one]; })).toEqual(["mismatch", 3, "the recorded input, with its decision, is not the one derived again"]);
+
+    // An observation of the rules is of the rules scope that the scope records (guard 1), where its version states where: with
+    // an incarnation, or with the scope ID alone, which the entry's own observation then fixes. Its value is taken on the anchor
+    // of that head: no version of a rules scope answers a read yet. With no such rule the entry is `unsupported-definition`.
+    const ruled = new Gate(((given: Parameters<typeof reads>[0]) => { if (!given.observed({ asked: "rules" })) throw new Error("the rules are not at hand"); return opens(given); }) as never, true);
+    const under = async (rulesScope?: () => { scope: string; kind: string; inc: string | null }) => {
+      const found = await replayed(ruled, ruled.served(), ruled.coded(ruled.rules, undefined, rulesScope as never));
+      return [found.report.result, found.report.at?.seq ?? null, found.why];
+    };
+    expect(entryOf(ruled.served(), 3).input).toMatchObject({ observed: [{ observation: { subject: "rules", of: RULES_SCOPE } }] });
+    expect([await under(() => RULES_SCOPE), await under(() => ({ ...RULES_SCOPE, inc: null })), await under(() => ({ ...RULES_SCOPE, inc: otherLane.inc })), await under()]).toEqual([
+      ["consistent", null, null], ["consistent", null, null],
+      ["mismatch", 3, "a retained observation of the rules is not of the rules scope that the scope records, with that incarnation"],
+      ["unsupported-definition", 3, "the entry retains an observation of the rules, and this replay has no rule for where a scope records its rules reference"],
+    ]);
   });
 
   // Scope contract, revision 19, sections 6.2 and 9.2; witness 18.45, case 8. The data and the rules are STAND-INS.

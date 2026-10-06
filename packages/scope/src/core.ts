@@ -7,10 +7,11 @@
  * the answer to a founding, is the contract's, and is exported here again.
  */
 
+import { DOMAINS } from "@generalbusiness/artroom-contract";
 import type { ActType, Answer, Beside, Bounds, CapabilityName, DeclaredDefinition, Digest, DutyId, Entry, FactRef, Founded, Grant, PlatformDefinition, Receipt, RefusalReason, ScopeId, Seed, Settlement, SignedIntent, UnavailableReason } from "@generalbusiness/artroom-contract";
 import { canonicalize, definitionDigest, intentDigest, isDigest, isGrant, isPlatformDefinition, newIncarnation, parseStrict, platformName, textDigest, utf8 } from "@generalbusiness/artroom-bytes";
-import { actionOf, checkpointOf, counted, derivable, factsNamed, ownersOf, inputTexts, isObject, judgeAct, judgeCheckpoint, judgeGenesis, judgePreparation, own, prepareRules, presentedTypes, readFields, runnable, stepsOf, validateDefinition, windowOf } from "@generalbusiness/artroom-derive";
-import type { ActJudgment, Clock as Reading, Draft, Fetched, Founding, GrantDecision, JudgeContext, Own, Owners, PlatformRules, Presented, Snapshots, StateView, Texts, ValidDefinition, Window } from "@generalbusiness/artroom-derive";
+import { actionOf, checkpointOf, counted, derivable, factsNamed, ownersOf, inputTexts, isObject, judgeAct, judgeCheckpoint, judgeGenesis, judgePreparation, own, placesOf, prepareRules, presentedTypes, readFields, runnable, stepsOf, validateDefinition, windowOf } from "@generalbusiness/artroom-derive";
+import type { ActJudgment, Clock as Reading, Draft, Fetched, Founding, GrantDecision, JudgeContext, Own, Owners, Placed, PlatformRules, Presented, Snapshots, StateView, Texts, ValidDefinition, Window } from "@generalbusiness/artroom-derive";
 import { RULE_PROFILES } from "@generalbusiness/artroom-derive/rule";
 import { namedBy } from "./definitions.ts";
 import type { Asked, DefinitionRead, Ports, Standing } from "./ports.ts";
@@ -131,7 +132,29 @@ export const foundedKind = (definition: unknown): "register" | "directory" =>
   (isPlatformDefinition(definition) && platformName(definition) === "platform:register" ? "register" : "directory");
 
 /** What came beside an intent, as a caller over a transport sent it: untrusted, so anything that is not a record is nothing. */
-const besideOf = (beside: unknown): { texts?: unknown; presented?: unknown } => (isObject(beside) ? beside : {});
+const besideOf = (beside: unknown): { texts?: unknown; presented?: unknown; values?: unknown } => (isObject(beside) ? beside : {});
+
+/**
+ * The values that came beside an intent, as the scope reads them before the
+ * turn (section 6.2, "What the member bounds, before the turn", revision
+ * 19). `places`: the places of the act that the intent sets, from the
+ * pinned data. At most as many values are read as those places name, and
+ * none past the largest `max` among them. The judge matches each by its
+ * digest in the domain of a place, and by that place's own bound. An act
+ * with no place, as every act of a declared definition, reads none.
+ */
+function valuesBeside(values: unknown, places: readonly Placed[]): string[] {
+  const most = Math.max(0, ...places.map((place) => place.max));
+  return (Array.isArray(values) ? values.slice(0, places.length) : []).filter((value): value is string => typeof value === "string" && value.length <= most && utf8(value).length <= most);
+}
+
+/**
+ * Sections 6.2 and 9.2: each value that the entry names, as one retained
+ * input under its domain and its digest: the kind `value`, or `definition`
+ * for a value in the domain of a definition.
+ */
+const valuesOf = (draft: Draft): Retained[] => (draft.values ?? []).map((value) =>
+  (value.domain === DOMAINS.definition ? { kind: "definition", digest: value.digest, bytes: value.bytes } : { kind: "value", domain: value.domain, digest: value.digest, bytes: value.bytes }));
 
 /** Asked for while rules are found in preparation, where nothing is written. The commit mints the real one. */
 export const NO_INCARNATION = newIncarnation(new Uint8Array(16));
@@ -411,7 +434,12 @@ export class Scope {
    * `beside`: what travels beside the intent and is not signed (sections 6.2
    * and 6.4). Each detached text is checked against the digest that a field
    * names, and is retained with the entry. Each presented fact is fetched
-   * like a fact field, and the entry records it.
+   * like a fact field, and the entry records it. Each value is read only
+   * for a place that the pinned platform data states, is matched by its
+   * digest in that place's domain, and is retained with the entry under
+   * that domain. No further observation is read: no form states the
+   * subjects that an act observes (the contract's point R1-67; I3 deltas,
+   * entry FC6), so a rule that reads one is given none here.
    */
   async submit(signed: SignedIntent, grants: readonly Grant[], beside: Beside = {}): Promise<Answer> {
     const pinned = this.pinned();
@@ -441,6 +469,10 @@ export class Scope {
     if (wanted.length > bounds.usesPerEntry) return { answer: "refused", reason: "bad-field", judgedAt: scope.head };
     // Section 6.2: the scope receives the bytes of each detached text with the intent, and the judge checks them against the field.
     const texts = Received.beside(besideOf(beside).texts, act?.fields, bounds);
+    // Section 6.2, revision 19: a value beside the intent is read only for a place that the pinned data states, and only platform
+    // data states one. So a scope under a declared definition reads no value and keeps none.
+    const places = act && fields?.ok ? placesOf(act.fields, fields.fields) : [];
+    const values = valuesBeside(besideOf(beside).values, places);
     const facts = await fetchFacts(resolver, bounds, wanted);
     if (!facts) return unavailable("dependency-unavailable");
 
@@ -453,7 +485,7 @@ export class Scope {
     // Phase two is in the commit: what that read holds at the commit's head, on the commit's one reading. The judge is given the
     // answer and reads nothing.
     const context = (view: StateView, clock: Reading): Omit<JudgeContext, "prepared"> =>
-      ({ clock, bounds, facts, own: ownOf(this.#store), snapshot: snapshotsOf(this.#store), texts: texts.sizes, presented: offered, capabilities: this.#ports.capabilities ?? undefined, platform, membership: standing?.membership ?? null, grants: standing === null ? null : heldBy(standing, view, clock) });
+      ({ clock, bounds, facts, own: ownOf(this.#store), snapshot: snapshotsOf(this.#store), texts: texts.sizes, presented: offered, capabilities: this.#ports.capabilities ?? undefined, platform, membership: standing?.membership ?? null, grants: standing === null ? null : heldBy(standing, view, clock), ...(places.length > 0 ? { values } : {}) });
 
     const end = await this.#turns.run<Answer>({
       // The walk that finds the rules judges nothing (section 5.2, step 4), so what it is given of phase two decides nothing.
@@ -464,7 +496,8 @@ export class Scope {
           case "write": {
             const head = view.scope()!.head;
             return {
-              verdict: "write", draft: judged.draft, retain: [...used(judged.draft, facts), ...texts.retain(definition, judged.draft)],
+              // Section 6.2, "Retention": each value that the entry names is kept with it, in the entry's own transaction.
+              verdict: "write", draft: judged.draft, retain: [...used(judged.draft, facts), ...texts.retain(definition, judged.draft), ...valuesOf(judged.draft)],
               // The entry now retains the grant that was judged. A port that keeps a read for a later commit learns here, inside the
               // transaction, which entry used it last (authority note, section 3.3, guard 3). A transaction that then does not commit
               // breaks the object, and what the port holds in memory is gone with it.

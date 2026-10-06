@@ -57,6 +57,11 @@ export interface Sql {
  *   the entry that recorded its first outcome. `attempt_due` indexes the
  *   attempts with no outcome.
  * - `retained_input`: section 9.2; see `Retained`.
+ * - `retained_value`: the retained inputs of the kind `value` (sections 6.2
+ *   and 9.2, revision 19). A value is kept under its byte domain and its
+ *   digest there, so it has a table of its own: one domain and one digest
+ *   are one input, and one digest under two domains is two. No row is
+ *   ever removed: a value is never redacted.
  */
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT NOT NULL) WITHOUT ROWID;
@@ -81,6 +86,7 @@ CREATE TABLE IF NOT EXISTS record (capability TEXT NOT NULL, kind TEXT NOT NULL,
 CREATE INDEX IF NOT EXISTS record_by_state ON record (capability, kind, state);
 CREATE TABLE IF NOT EXISTS prepared (intent TEXT NOT NULL, capability TEXT NOT NULL, step TEXT NOT NULL, seq INTEGER NOT NULL, PRIMARY KEY (intent, capability, step)) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS retained_input (kind TEXT NOT NULL, digest TEXT NOT NULL, bytes TEXT NOT NULL, under TEXT, PRIMARY KEY (kind, digest)) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS retained_value (domain TEXT NOT NULL, digest TEXT NOT NULL, bytes TEXT NOT NULL, PRIMARY KEY (domain, digest)) WITHOUT ROWID;
 `;
 
 /** A send that is still to be dispatched: not held, not acknowledged, and for a request with no result and no diagnosis. */
@@ -316,6 +322,11 @@ export class SqliteStore implements Store {
     }
   }
   retain(input: Retained): void {
+    if (input.kind === "value") {
+      if (typeof input.domain !== "string" || input.domain === "") throw new Error("a retained value states its byte domain");
+      this.#run("INSERT INTO retained_value (domain, digest, bytes) VALUES (?, ?, ?) ON CONFLICT (domain, digest) DO NOTHING", input.domain, input.digest, input.bytes);
+      return;
+    }
     this.#run("INSERT INTO retained_input (kind, digest, bytes, under) VALUES (?, ?, ?, ?) ON CONFLICT (kind, digest) DO NOTHING", input.kind, input.digest, input.bytes, input.under ?? null);
   }
 
@@ -325,12 +336,18 @@ export class SqliteStore implements Store {
   storedFrom(seq: number, limit: number): Stored[] {
     return this.#all("SELECT seq, hash, bytes, size FROM entry WHERE seq >= ? ORDER BY seq LIMIT ?", seq, limit).map((row) => ({ seq: row["seq"] as number, hash: row["hash"] as Digest, bytes: row["bytes"] as string, size: row["size"] as number }));
   }
-  retained(kind: Retained["kind"], digest: Digest): Retained | null {
+  retained(kind: Retained["kind"], digest: Digest, domain?: string): Retained | null {
+    if (kind === "value") {
+      const value = domain === undefined ? null : this.#one("SELECT bytes FROM retained_value WHERE domain = ? AND digest = ?", domain, digest);
+      return value && { kind, digest, bytes: value["bytes"] as string, domain: domain! };
+    }
     const row = this.#one("SELECT bytes, under FROM retained_input WHERE kind = ? AND digest = ?", kind, digest);
     return row && { kind, digest, bytes: row["bytes"] as string, ...(row["under"] === null ? {} : { under: row["under"] as string }) };
   }
-  retainedSize(kind: Retained["kind"], digest: Digest): number | null {
-    const row = this.#one("SELECT length(CAST(bytes AS BLOB)) AS size FROM retained_input WHERE kind = ? AND digest = ?", kind, digest);
+  retainedSize(kind: Retained["kind"], digest: Digest, domain?: string): number | null {
+    const row = kind === "value"
+      ? (domain === undefined ? null : this.#one("SELECT length(CAST(bytes AS BLOB)) AS size FROM retained_value WHERE domain = ? AND digest = ?", domain, digest))
+      : this.#one("SELECT length(CAST(bytes AS BLOB)) AS size FROM retained_input WHERE kind = ? AND digest = ?", kind, digest);
     return row && (row["size"] as number);
   }
   duty(seq: number, n: number): Duty | null {

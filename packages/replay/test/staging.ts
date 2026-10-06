@@ -24,7 +24,7 @@
  */
 
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { Digest, Entry, Evidence, FieldValue, Grant, MemberId, MemberObservation, Observation, ObservationUse, OperationId, PlatformDefinition, RetainedInput, Seed, SignedIntent, Timestamp } from "@generalbusiness/artroom-contract";
+import type { Digest, Entry, Evidence, FieldValue, Grant, MemberId, MemberObservation, Observation, ObservationUse, OperationId, PlatformDefinition, RetainedInput, RulesObservation, ScopeRef, Seed, SignedIntent, Timestamp } from "@generalbusiness/artroom-contract";
 import { canonicalize, factRefOf, intentDigest, newIncarnation, scopeIdOf, signIntent, textDigest } from "@generalbusiness/artroom-bytes";
 import { RETIRE_ACTION, actionOf, clockOf, grantFrom, judgeDelivery, judgeGenesis, judgePreparation, settleOutcome, valueDigest } from "@generalbusiness/artroom-derive";
 import type { OutcomeRule, PlatformRules, Source } from "@generalbusiness/artroom-derive";
@@ -151,6 +151,13 @@ export class Lane extends Ledger {
  */
 export const OWNER = "platform:task@1" as PlatformDefinition;
 
+/** STAND-IN: a rules scope that a gate's outcome observes. It does not exist, and its one head is anchored. */
+export const RULES_SCOPE: ScopeRef = (() => {
+  const seed: Seed = { v: 1, kind: "rules", definition: d("e"), creator: null, cause: d("c"), ordinal: 9 };
+  return { scope: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(9)), kind: "rules" };
+})();
+const RULES_HEAD = { seq: 12, hash: d("9") } as const;
+
 /** A made-up byte domain, which the made-up data of a gate with a place declares. */
 const PROOF_DOMAIN = "gate-proof-1";
 
@@ -195,7 +202,7 @@ export class Gate extends Ledger {
     this.seal(written(judgeGenesis(this.state, this.definition, asked, { clock: clockOf(this.state, T0), bounds: PROPOSED_BOUNDS, facts: [], prepared: [], source: null, platform: this.rules })).draft);
     if (this.act(keys.rita, "issue", { fields: { hash: textDigest("one"), ...(this.proof ? { proof: this.proof.digest } : {}) } }, this.proof ? { values: [this.proof.bytes] } : {}).result !== "write") throw new Error("the issue was not written");
     const entered = this.did(keys.una, "enter", { on: 0, expected: { on: this.item(0).revision }, fields: { secret: "one" } });
-    const judged = settleOutcome(this.state, this.definition, { type: "outcome", operation: `${entered.seq}:0`, attempt: 1, result: "confirmed", evidence: { basis: "own-answer", body: {} } }, { clock: clockOf(this.state, this.now), bounds: PROPOSED_BOUNDS, own: this.own, platform: this.rules, ...(this.watched ? { observed: [this.seen()] } : {}) });
+    const judged = settleOutcome(this.state, this.definition, { type: "outcome", operation: `${entered.seq}:0`, attempt: 1, result: "confirmed", evidence: { basis: "own-answer", body: {} } }, { clock: clockOf(this.state, this.now), bounds: PROPOSED_BOUNDS, own: this.own, platform: this.rules, ...(this.watched ? { observed: [this.seen(), this.rulesSeen()] } : {}) });
     this.seal(written(judged).draft);
   }
 
@@ -209,8 +216,8 @@ export class Gate extends Ledger {
     return { named: OWNER, rules: made.rules };
   }
   /** What a replay is supplied for the made-up version: its data, those rules, and where a scope under it records its membership reference. */
-  coded(rules: PlatformRules = this.rules, recorded: Coded["membership"] | null = () => membership): (named: PlatformDefinition) => Coded | null {
-    return (named) => (named === OWNER ? { data: this.definition.declared as never, rules: rules.rules, ...(recorded ? { membership: recorded } : {}) } : null);
+  coded(rules: PlatformRules = this.rules, recorded: Coded["membership"] | null = () => membership, rulesScope?: Coded["rulesScope"]): (named: PlatformDefinition) => Coded | null {
+    return (named) => (named === OWNER ? { data: this.definition.declared as never, rules: rules.rules, ...(recorded ? { membership: recorded } : {}), ...(rulesScope ? { rulesScope } : {}) } : null);
   }
 
   override grants() {
@@ -222,6 +229,11 @@ export class Gate extends Ledger {
     const paul: MemberObservation = { subject: "member", of: membership, head: STANDING, member: "@paul" as MemberId, memberState: "active", role: "member", activeKey: true, controller: null, controllerActive: null, definition: "platform:membership@1", at: this.now };
     return { observation: paul, read: { run: RUN, n: ++this.#reads }, use: "fresh", prior: null };
   }
+  /** STAND-IN: an observation of the rules, written by hand, as one more read of the run. No rules scope answered it. */
+  rulesSeen(): ObservationUse {
+    const rules: RulesObservation = { subject: "rules", of: RULES_SCOPE, head: RULES_HEAD, revision: 7, content: { asked: "rules", approvals: 0, ownerMayReview: true, checks: [], labels: [] }, definition: "platform:rules@1", at: this.now };
+    return { observation: rules, read: { run: RUN, n: ++this.#reads }, use: "fresh", prior: null };
+  }
   override context(over: Context = {}) {
     return super.context({ platform: this.rules, membership, ...(this.watched ? { observed: [this.seen()] } : {}), ...over });
   }
@@ -230,5 +242,5 @@ export class Gate extends Ledger {
   served(): MemoryScope {
     return { scope: this.at, entries: this.entries.map(({ entry, hash }) => ({ seq: entry.seq, hash, bytes: canonicalize(entry) })), retained: this.proof ? [{ kind: "value", domain: this.proof.domain, digest: this.proof.digest, bytes: this.proof.bytes }] : [] };
   }
-  anchors(): Anchor[] { return [{ scope: membership.scope, ...STANDING }]; }
+  anchors(): Anchor[] { return [{ scope: membership.scope, ...STANDING }, { scope: RULES_SCOPE.scope, ...RULES_HEAD }]; }
 }

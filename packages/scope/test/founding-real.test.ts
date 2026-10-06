@@ -130,7 +130,11 @@ describe("a founding on real scopes under the deployed class (authority note, se
     // 9f that wait on two details asked of the contract (authority note, revision 26, section 12.1.5, "The founding commit, and the
     // receipt"; I3 deltas, entries ER9 and FA1). Steps 9b and 9e, and the other rules of step 9f, are written. When the list is
     // empty the destination answers its creation, this part of the witness is replaced by the rest of the founding, and step 10
-    // can follow.
+    // can follow. What changed since, and does not move this stop (I3 deltas, section 30): the judge of an outcome gives the rule
+    // `judge` its observations and the entries in `uses`, and the entry retains what was read. A destination that exists would
+    // still reserve nothing here, for two reasons that are not this list: no runtime reads an observation before the turn of an
+    // outcome (the contract's point R1-67), and the package has no reader of a lane's entries (entries FC5 and FC6). The reservation
+    // of room by a publication is not built either (entry FC1).
     const { entry, hash } = (await D.sealed())[0]!;
     const create = entry.sends.find((send) => send.n === 3)!;
     expect(lacking("platform:destination@1")).toEqual(["first-head", "receipt"]);
