@@ -154,6 +154,8 @@ production token delivery, browser session or cloud deployment.
 | Checker `eb03426a`: accepted outcome names could read inherited domains or lose their reservation table entry | `530e39fe6` reads only own domain declarations and builds tables without prototype setters. Strict canonical-loaded `__proto__`, `constructor` and `toString` follow ordinary validation; an explicitly declared `__proto__` held kind keeps the same positive kind, holder and addition amounts as an ordinary name. Restoring either old branch fails an assertion. No name is banned and no amount formula changes. |
 | Checker `44739493`: replay admission omitted pinned platform owners and their positive legacy closure | `8eaf531f2` uses the runtime's shared owner adapter at the final `fits` check. Actual register data/rules judge and fold genesis and a founding in memory; no host answers. Its pending creation needs 93 entries in the controlled witness, and a scripted external reservation needs four more. Tight budgets fail at the founding, sufficient budgets replay consistently, and restoring the raw-owner call fails the mismatch assertion. No capacity formula or production ceiling changes. |
 | Checker `e6e5fde8`: observation-only clauses lost retained-byte reservation when effects were omitted | `98faddb3c` retains rows independently of missing or empty effects. Canonical applied/refused/superseded forms have equal amounts; a 321-byte declared value adds 321 bytes to request, clause, holder and addition amounts. Restoring the old skip fails that positive-byte assertion. Invalid effect lists still report shape problems. Outcome-send grammar and all formulas remain unchanged. |
+| Checker `4ff6e117`: an unknown own member selected an inherited record validator and caused an unavailable retry | `cba8fd645` selects only own declared validators. Canonical-loaded `__proto__`, `constructor`, `toString`, `hasOwnProperty` and ordinary unknown members receive a written `bad-field` refusal; valid link/issue delivery applies and opens a publication. Restoring the old helper fails the refusal assertion. No name is banned and no rule exception is swallowed. |
+| Checker `05fe74ed`: historical views omitted declared index rows | `e37933cec` journals each indexed row with the entry that opens it. The authored in-memory history checks actual lookup contents at empty, older, newer, repeated and out-of-order heads, equal keys, limits, final items, future exclusion and incomplete indexes. Removing that journal fails an assertion. This witnesses the fold/View boundary, not a failure of a built-in reader or a runtime observation. |
 
 The worker reports and the integration logs record these controls as
 `DISTINGUISHES`, by assertions. The tests label their scripted histories,
@@ -313,3 +315,18 @@ CPU. The whole command took 15.46 seconds elapsed, 35.46 user CPU and
 This annotation changes this note only; the gated packages tree remains
 `19562fc840cc9941672eaed12765189a1d4faec9`. The unknown membership
 failure and all its retained outputs remain separately owned.
+
+Candidate `47079235` was filed as primary `12d1c528` with full source
+review `8939d0a1`. Complete review `0709fe6c` requested the two source
+repairs `4ff6e117` and `05fe74ed`, plus current guidance correction
+`b8b3b701`; the requester accepted that disposition. The record repair
+passed all 19 focused destination tests and the platform typecheck. The
+historical-index repair passed 52 focused replay tests and the replay
+typecheck. Both old-code controls distinguish by assertions. Guidance
+`79f0ded0` reconciles destination/rules availability and the precise
+scripted, default-outside and deployment limits; its TypeScript changes
+are comments only. These repairs are integrated together. The earlier
+`a15cad6c` gate is historical after these source changes; the corrected
+source requires its own final gate before replacement filing. No full
+I3, numerical capacity, host, deployment or unexplained membership
+failure duty is closed by these corrections.
