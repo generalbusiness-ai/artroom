@@ -63,6 +63,15 @@ describe("the two lane definitions, as data (lane forms, revision 14)", () => {
       expect(sizes(name, 64)?.length, name).toBeGreaterThan(0);
     }
 
+    // The scope contract's revision 21 adds a third form of `settles`, by a mark. Neither definition states it: the seven `settles`
+    // of the two are six of the form `{ of, in }` and one `{ copy }`, and each reserves the entries that it did before that form
+    // was read. The numbers were read from the source before the change, at `d034be890`, and are the same.
+    const settles = (d: DeclaredDefinition) => [...Object.values(d.acts), ...Object.values(d.receives)].flatMap((form) => (form.settles ? [Object.keys(form.settles).sort().join(" ")] : []));
+    expect([settles(issue), settles(change)]).toEqual([["in of", "copy", "in of"], ["in of", "in of", "in of", "in of"]]);
+    const reserves = ({ deadlines, pending, pendingCopies, clauseEntries, markers }: ValidDefinition) => ({ deadlines, pending, pendingCopies, clauseEntries, markers });
+    expect(reserves(valid.issue)).toEqual({ deadlines: { hold: { held: 1 } }, pending: { concern: { created: 1 }, export: { authorized: 1 } }, pendingCopies: [{ name: "closes", kind: "lane", states: ["set"], entries: 1 }], clauseEntries: 1, markers: undefined });
+    expect(reserves(valid.change)).toEqual({ deadlines: { job: { requested: 1 }, hold: { held: 1 } }, pending: { job: { requested: 1, "timed-out": 1 }, merge: { intended: 67, committed: 67, unknown: 67 }, export: { authorized: 1 } }, pendingCopies: [], clauseEntries: 0, markers: undefined });
+
     // What the validator reads and derives nothing of: the rows that need the code of `hold@1` or `git-read@1`. They are 3 acts
     // and 7 handlers, with the type that names a check entry. A runtime with no such code runs neither definition.
     const rows = (definition: ValidDefinition) => [...new Set(definition.underived.map((u) => u.path.split(".").slice(0, 2).join(".")))];

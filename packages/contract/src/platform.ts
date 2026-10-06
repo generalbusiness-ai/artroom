@@ -25,8 +25,9 @@
  * | 7 | `outcomes`, by the kind of each operation that the definition owns | `OutcomeMark` |
  */
 
-import type { ActType, AlsoRule, DeclaredDefinition, EffectForm, FieldType, Guard, ItemType, ReceiveType, ResultClauses, SendForm, SlotRule } from "./definition.ts";
+import type { ActType, AlsoRule, DeclaredDefinition, EffectForm, FieldType, Guard, ItemType, ReceiveType, ResultClauses, SendForm, SlotRule, Subject, Where } from "./definition.ts";
 import type { FieldValue } from "./intent.ts";
+import type { ClauseObserves, Observe, Origin } from "./observes.ts";
 
 /**
  * A mark: in the data of a platform definition, and nowhere else. `code`
@@ -36,10 +37,60 @@ import type { FieldValue } from "./intent.ts";
  */
 export interface Mark { code: string; row: string }
 
+/**
+ * What a mark may start (scope contract, revision 21, section 17.2, "What a
+ * mark may start"; the listing of `Mark` in section 6.1). A rule's result
+ * is not in the data, so a reservation counts a mark by this, at the worst
+ * case: `effects` changes of state; one operation of each kind in
+ * `operations`; and one item of the type `opens`. It stands on a mark at
+ * place 5 and at place 7. In platform data only.
+ */
+export interface MarkMost { effects: number; operations?: readonly string[]; opens?: string }
+
+/**
+ * A reservation that an item holds (revision 20, section 17.2a). On an item
+ * type, as `holds`: what one item of the type reserves, from the entry that
+ * opens it. On an act, as `adds`: what the act adds to the reservation of
+ * the item that it is on. `operations`: by kind of `outcomes`, the most
+ * operations that are opened for one item. `requests`: the most requests
+ * that are sent for one item. `items`: the most items that are opened for
+ * one item. Each count is a whole number of at least 1. In platform data
+ * only.
+ */
+export interface Held { operations?: Readonly<Record<string, number>>; requests?: number; items?: number }
+
 /** Place 1. With `grant`, check 9 is made as written first, and the rule is run only when no current grant of that action is held (section 4.2). */
 export type GrantMark = Mark & { grant?: string };
 /** Place 2. The rule gives one local item of the type `item`, or none. */
 export type AlsoMark = Mark & { item: string };
+/**
+ * Place 2, where the mark binds the name that the `bound.of` of its handler
+ * names: a binding selector (revision 23, section 17.2a, "The source of
+ * `bound.of`"). It states five members and no other. `index` names a slot
+ * that the `indexes` of the type `item` lists. `key` names a required field
+ * of the handler whose type is the type of that slot. Its rule is given the
+ * items that the index returns for the value of that field, and the fields
+ * of the message, and nothing else.
+ */
+export type BindingMark = AlsoMark & { index: string; key: string };
+/**
+ * On a `tell` handler whose `opens` is null (revision 21, section 17.2a, "A
+ * request that is bound to a holder"): the item that a delivery is bound
+ * to, and the conditions of the binding. `of` is a name of `also`. Each
+ * `where` reads the sender, the message's own fields and the slots of that
+ * item, and nothing else.
+ */
+export interface Bound { of: Subject; where: readonly Where[] }
+/**
+ * What one item of a type reserves from the entry that opens it (section
+ * 17.2a). This revision of the source reads one member: `decisions`, by the
+ * message name of a `tell` handler that states `bound`, the most bound
+ * requests that are decided for one item.
+ *
+ * I3 merge: the members `operations`, `requests` and `items` of the
+ * contract's `Held` are row I3-44's, and are joined to this type there.
+ */
+export interface Held { decisions?: Record<string, number> }
 /** Place 3. The data states no shape for the value: the rule says whether a value is of the type. */
 export type TypeMark = Mark & { type: "code" };
 /**
@@ -61,8 +112,24 @@ export type SendMark = Mark & { result: PlatformClauses; always?: true };
  * clause of that send is an effect mark, whose rule names its items by
  * their IDs.
  */
-export type OutcomeSend = Mark & { result: { [clause in keyof ResultClauses]?: readonly Mark[] } };
-export type OutcomeMark = Mark & { send?: OutcomeSend };
+export type OutcomeSend = Mark & {
+  result: { [clause in keyof ResultClauses]?: readonly (Mark & { most?: MarkMost })[] };
+  /** Revision 20, section 17.2, "A request that an outcome sends": at most one outcome entry of one operation makes the request. */
+  once?: true;
+};
+/**
+ * `attempts`: the most attempts of the kind (revision 17). `most`: what one
+ * outcome entry of the kind may start (revision 21, section 17.2, "The
+ * closure of an operation"). A kind that states `attempts` is counted by
+ * these members. One that states none is counted as its rule declares, as
+ * before.
+ *
+ * `origin` (revision 20, section 6.1, "The origin of an outcome"; row
+ * I3-41): the one earlier entry of the scope whose `uses` an outcome of the
+ * kind copies. `observes` (section 16.1; rows I3-39 and I3-56): what the
+ * scope reads before the turn of each outcome entry of the kind.
+ */
+export type OutcomeMark = Mark & { send?: OutcomeSend; attempts?: number; most?: MarkMost; origin?: Origin; observes?: readonly Observe[] };
 
 /**
  * A place of an act that names a value beside the intent (revision 19,
@@ -76,13 +143,17 @@ export interface ValuePlace { type: "digest"; value: { domain: string; max: numb
 
 /** The type of a field or of a slot, in platform data. */
 export type PlatformFieldType = FieldType | TypeMark;
-/** An effect of a written list, in platform data. */
-export type PlatformEffect = EffectForm | Mark;
+/** An effect of a written list, in platform data. A mark may state what its rule may start (section 17.2). */
+export type PlatformEffect = EffectForm | (Mark & { most?: MarkMost });
 /** The result clauses of a request, in platform data: a clause may hold an effect mark. */
 export type PlatformClauses = { [clause in keyof ResultClauses]?: readonly PlatformEffect[] };
 
-/** A written send whose clauses may hold an effect mark. An `index` send has none. */
-type WithClauses<S> = S extends { index: unknown } ? S : { [K in keyof S]: Omit<S[K], "result"> & { result: PlatformClauses } };
+/**
+ * A written send whose clauses may hold an effect mark. An `index` send has
+ * none. `observes` (revision 20, section 16.1): the rows of a request, by
+ * clause, for the delivery of a result that runs that clause.
+ */
+type WithClauses<S> = S extends { index: unknown } ? S : { [K in keyof S]: Omit<S[K], "result"> & { result: PlatformClauses; observes?: ClauseObserves } };
 /** A send of a written list, in platform data. */
 export type PlatformSend = WithClauses<SendForm> | SendMark;
 
@@ -96,14 +167,29 @@ interface MarkedForms {
 
 export type PlatformAct = Omit<ActType, "grant" | "fields" | keyof MarkedForms> & MarkedForms & {
   grant: string | GrantMark;
+  /** Revision 20, section 16.1: what the scope reads before the turn of an entry of this act, beside its signer's key. */
+  observes?: readonly Observe[];
   fields: Record<string, (PlatformFieldType | ValuePlace) & { required: boolean; default?: FieldValue }>;
+  /** Section 17.2a: what the act adds to the reservation of the item that it is on, whose type states `holds`. */
+  adds?: Held;
 };
-export type PlatformReceive = Omit<ReceiveType, "fields" | keyof MarkedForms> & MarkedForms & {
+export type PlatformReceive = Omit<ReceiveType, "fields" | "also" | keyof MarkedForms> & Omit<MarkedForms, "also"> & {
+  also: Record<string, AlsoRule | AlsoMark | BindingMark>;
   fields: Record<string, PlatformFieldType & { required: boolean }>;
+  bound?: Bound;
 };
+/**
+ * `indexes` (revision 23, section 17.2a, "An index that an item type
+ * declares"): one to four of the type's own slots of `refs` or of `values`,
+ * each fixed and required and of one of seven types. The scope keeps, for
+ * each, one row for each item of the type, from the entry that opens it.
+ */
 export type PlatformItem = Omit<ItemType, "refs" | "values"> & {
   refs: Record<string, SlotRule & { to: PlatformFieldType }>;
   values: Record<string, SlotRule & { of: PlatformFieldType; default?: FieldValue }>;
+  indexes?: readonly string[];
+  /** Section 17.2a: what one item of the type reserves for the operations, the requests and the items that are opened or sent for it. */
+  holds?: Held;
 };
 
 /**

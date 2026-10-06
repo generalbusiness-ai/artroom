@@ -24,13 +24,19 @@ import { capacityOf, type PendingCopy } from "./capacity.ts";
 import { mark, marked, type Defining, type MarkPlace, type RangeIndex } from "./context.ts";
 import { acts, receives } from "./handlers.ts";
 import { heldUnderBytes, holdForms, holdTypes } from "./hold.ts";
+import { reserving, type Reserving } from "./holds.ts";
 import { itemTypes } from "./items.ts";
+import { observes } from "./observes.ts";
 import { at, shapes, type Problem } from "./shape.ts";
+import type { Markers } from "../markers.ts";
+import { decisions } from "./binding.ts";
+import { setOnce } from "./markers.ts";
 import { timedEntryBytes, timedGraph, timedKinds, timedRules } from "./timed.ts";
 
 export type { MarkKind, MarkPlace, RangeIndex } from "./context.ts";
 export type { Problem, ProblemCode } from "./shape.ts";
 export type { Underived } from "./capability.ts";
+export type { KindReserved, Reserving } from "./holds.ts";
 export { timedGraph, type TimedGraph, type TimedMove } from "./timed.ts";
 
 /** A definition that passed, with what was derived from it. The judges and the fold take only this. */
@@ -77,6 +83,38 @@ export interface ValidDefinition {
    * `marks.ts`). Empty: a declared definition, which holds no mark.
    */
   readonly marks: readonly MarkPlace[];
+  /**
+   * Section 17.2a: what the data of a platform definition reserves by the
+   * `holds` of its item types, the `adds` of its acts and the marks of its
+   * kinds of `outcomes`, as amounts in the five dimensions. Absent: a
+   * declared definition, or platform data with no kind and no `holds`.
+   */
+  readonly reserving?: Reserving;
+  /**
+   * Section 17.2, "A marker duty" (revision 22): each item type that some
+   * form settles by a mark, with what the amounts of its duties are derived
+   * from (`markers.ts`). An item of such a type reserves by its state and
+   * by the marks that are `true`, so `pending` has no row for the type.
+   * Absent: no form of the definition settles by a mark.
+   */
+  readonly markers?: Markers;
+  /**
+   * Section 17.2a, "An index that an item type declares" (revision 23): for
+   * each item type of platform data that states `indexes`, its indexed
+   * slots. The fold writes one row for each, with the item. Absent: no type
+   * declares one.
+   */
+  readonly keyed?: Readonly<Record<string, readonly string[]>>;
+  /**
+   * Section 16.1, "The subjects that an entry observes" (revision 20): the
+   * data of a platform definition states rows of `observes`, or the
+   * `origin` of an outcome, somewhere. Then each entry of the definition
+   * retains exactly the observations of the subjects that its rows give,
+   * and an outcome's `uses` is a copy of its origin's. False: no data of
+   * the definition states either, as for every declared definition, and
+   * the older rule stands as a stand-in (`observes.ts`, "The stand-in").
+   */
+  readonly observing: boolean;
 }
 
 export type Validation = { ok: true; definition: ValidDefinition } | { ok: false; problems: readonly Problem[] };
@@ -99,9 +137,14 @@ export const PROFILES: Readonly<Record<string, Profile>> = { "restricted@1": {} 
  * does not read the table of rules. A definition that came from an input is validated without the option: a mark in it is a form
  * that the contract does not define, and is refused as any such form is.
  */
-export interface ValidateOptions { readonly platform?: boolean }
+export interface ValidateOptions {
+  readonly platform?: boolean;
+  /** Static declarations of the trusted pinned owner code, by outcome kind. */
+  readonly outcomeValues?: Readonly<Record<string, readonly import("../ledger.ts").EvidenceValueDomain[]>> | null;
+}
 
 export function validateDefinition(input: unknown, bounds: Bounds, profiles: Readonly<Record<string, Profile>> = PROFILES, options: ValidateOptions = {}): Validation {
+  if (options.outcomeValues === null) return { ok: false, problems: [{ code: "shape", path: "outcomes", message: "an owner with an evidence value reader has no static domain declaration for this pinned version and kind" }] };
   const read = shapes(bounds);
   const { problems, bad, rec, entries, str } = read;
 
@@ -123,7 +166,7 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
   const d: Defining = {
     ...read, bounds, name: typeof top["name"] === "string" ? top["name"] : null, typeNames: new Set(isObject(top["items"]) ? Object.keys(top["items"]) : []), types: new Map(), rules: new Set(), holds: false, holdTypes: new Set(),
     capabilities: new Map(), underived: [],
-    indexes: [], clauseSets: [], clause: null, duties: [], platform, marks: [], places: new Map(),
+    indexes: [], clauseSets: [], clause: null, duties: [], platform, marks: [], places: new Map(), valueSets: [], bindings: [], observing: false,
   };
 
   const profile = rec(top["profile"], "profile", ["name", "version"]);
@@ -166,21 +209,33 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
   }
 
   holdForms(d, top);
+  // Section 6.4, "`settles` by a mark": no written effect sets a mark but to `true`. Section 17.2a: each key of `decisions` is the
+  // message of a handler that states `bound`, whose `of` names that item type.
+  setOnce(d);
+  decisions(d);
 
   // Section 6.1, place 7: the mark of the rule for the outcome entries of each kind of operation that this definition owns.
   // "A request of an outcome's rule, and its clauses" (revision 17; row I3-23): the mark may hold one `send`. It is a send mark,
   // because an outcome has no subject and no field for a written send to read, and each effect of its clauses is an effect mark.
   if (platform) {
     for (const [kind, m] of entries(top["outcomes"], "outcomes", null)) {
-      const o = mark(d, m, at("outcomes", kind), "outcome", [], ["send"]);
+      // Revision 21, section 17.2: the mark may state `attempts` and `most`, and its send `once`. `holds.ts` reads the three.
+      const o = mark(d, m, at("outcomes", kind), "outcome", [], ["send", "attempts", "most", "origin", "observes"]);
+      // Revision 20, section 6.1, "The origin of an outcome": one of the two words. With `opening`, nothing more is checked.
+      if (o && "origin" in o) {
+        d.observing = true;
+        if (o["origin"] !== "opening" && o["origin"] !== "rule") bad("shape", at(at("outcomes", kind), "origin"), "is opening or rule");
+      }
+      // Section 16.1, "The subjects that an entry observes": the rows of each outcome entry of an operation of this kind.
+      if (o && "observes" in o) observes(d, o["observes"], at(at("outcomes", kind), "observes"), { where: "outcome" });
       if (!o || !("send" in o)) continue;
       const p = at(at("outcomes", kind), "send");
-      const send = marked(o["send"]) ? mark(d, o["send"], p, "send", ["result"]) : bad("shape", p, "an outcome's mark holds at most one send, and it is a mark: an outcome's row writes no send");
+      const send = marked(o["send"]) ? mark(d, o["send"], p, "send", ["result"], ["once"]) : bad("shape", p, "an outcome's mark holds at most one send, and it is a mark: an outcome's row writes no send");
       const clauses = send ? rec(send["result"], at(p, "result"), [], ["applied", "refused", "superseded", "undelivered", "conflict"]) : null;
       for (const [clause, effects] of Object.entries(clauses ?? {})) {
         d.list(effects, at(at(p, "result"), clause), bounds.effects).forEach((e, i) => {
           const q = at(at(at(p, "result"), clause), i);
-          if (marked(e)) mark(d, e, q, "effect");
+          if (marked(e)) mark(d, e, q, "effect", [], ["most"]);
           else bad("shape", q, "a clause of an outcome's send holds effect marks only: an outcome has no subject and no field");
         });
       }
@@ -205,8 +260,13 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
   // Section 17.2: each reservation is derived from the definition. A closure that is not finite is refused.
   const capacity = capacityOf(d, graph, moves);
   if (problems.length > 0) return { ok: false, problems };
+  // Section 17.2a: a reservation that an item holds, and what each kind of `outcomes` reserves. In platform data only.
+  const reserved = reserving(d, top, capacity, options.outcomeValues);
+  const { decisionEntries: _decisionEntries, ...persistedCapacity } = capacity;
+  if (problems.length > 0) return { ok: false, problems };
   try {
-    return { ok: true, definition: { declared, digest: definitionDigest(declared), timedTypes: [...timedTypes].sort(), holdTypes: [...d.holdTypes].sort(), indexes: d.indexes, ...capacity, underived: d.underived, marks: d.marks } };
+    const keyed = [...d.types.values()].flatMap((type): [string, readonly string[]][] => (type.indexes ? [[type.name, type.indexes]] : []));
+    return { ok: true, definition: { declared, digest: definitionDigest(declared), timedTypes: [...timedTypes].sort(), holdTypes: [...d.holdTypes].sort(), indexes: d.indexes, ...persistedCapacity, underived: d.underived, marks: d.marks, observing: d.observing, ...(reserved ? { reserving: reserved } : {}), ...(keyed.length > 0 ? { keyed: Object.fromEntries(keyed) } : {}) } };
   } catch {
     return { ok: false, problems: [{ code: "shape", path: "", message: "has no canonical bytes" }] };
   }

@@ -9,6 +9,7 @@ import type { Bounds } from "@generalbusiness/artroom-contract";
 import { isObject } from "../values.ts";
 
 export type ProblemCode =
+  | "ambiguous-send"    // same-name sends may omit or fan out, and their result effects or observations differ (revision 24)
   | "shape"              // not the shape of the form, or a form or field the contract does not define
   | "bound"              // past a bound of sections 6.1 to 6.4
   | "name"               // a name that resolves to nothing, or to a thing of the wrong type
@@ -23,13 +24,16 @@ export type ProblemCode =
   | "genesis-timed"      // the genesis act opens a timed item type or has a `hold` effect (section 6.4)
   | "timed"              // a timed rule that is not about its own live item, or that would stay due
   | "timed-partial"      // a timed rule with an effect that its commit could refuse (section 6.4)
-  | "reserve-unbounded"  // what a duty can start is not finite: timed rules of one type that lead to one another in a cycle (section 17.2)
+  | "reserve-unbounded"  // what a duty can start is not finite: timed rules of one type that lead to one another in a cycle (section 17.2); kinds that no item holds and that open each other in a circle, or one that reaches a held kind (section 17.2a, checks 4 and 5)
   | "hold"               // the hold capability used without what it needs (section 6.8)
+  | "holds"              // a `holds` or an `adds` that is stated ill, or a type that states `holds` and is opened by an entry that is not new work (section 17.2a, checks 1 and 2). No scope is founded under such data: `unsupported-definition`
   | "handler"            // two handlers for one class and message from one kind of scope
   | "advisory-sends"     // a handler of class `advisory` declares a send or a notice (section 6.4)
   | "fan-out-unbounded"  // a fan-out over a final state or over a type whose `max` is past the bound, or a second fan-out in one list (section 6.6)
   | "attention-unbounded" // the attention forms of one act, handler or timed rule could tell more members than one entry may (section 6.6)
   | "redactable-read"    // a guard, a rule, a send to a scope that is no lane, or an index send reads a detached text (section 6.2)
+  | "bound-source"       // a `bound.of` whose source may not bind a request, or a mark at place 2 that states `index` or `key` and is no binding selector (section 17.2a)
+  | "unsupported-definition" // an `indexes` that is stated ill (section 17.2a, check 6)
   | "capability" | "profile" | "rule";
 
 export interface Problem { code: ProblemCode; path: string; message: string }

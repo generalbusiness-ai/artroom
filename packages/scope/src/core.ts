@@ -8,13 +8,13 @@
  */
 
 import { DOMAINS } from "@generalbusiness/artroom-contract";
-import type { ActType, Answer, Beside, Bounds, CapabilityName, DeclaredDefinition, Digest, DutyId, Entry, FactRef, Founded, Grant, PlatformDefinition, Receipt, RefusalReason, ScopeId, Seed, Settlement, SignedIntent, UnavailableReason } from "@generalbusiness/artroom-contract";
+import type { ActType, Answer, Beside, Bounds, CapabilityName, DeclaredDefinition, Digest, DutyId, Entry, FactRef, Founded, Grant, ObservationUse, PlatformDefinition, Receipt, RefusalReason, ScopeId, Seed, Settlement, SignedIntent, UnavailableReason } from "@generalbusiness/artroom-contract";
 import { canonicalize, definitionDigest, intentDigest, isDigest, isGrant, isPlatformDefinition, newIncarnation, parseStrict, platformName, textDigest, utf8 } from "@generalbusiness/artroom-bytes";
-import { actionOf, checkpointOf, counted, derivable, factsNamed, ownersOf, inputTexts, isObject, judgeAct, judgeCheckpoint, judgeGenesis, judgePreparation, own, placesOf, prepareRules, presentedTypes, readFields, runnable, stepsOf, validateDefinition, windowOf } from "@generalbusiness/artroom-derive";
-import type { ActJudgment, Clock as Reading, Draft, Fetched, Founding, GrantDecision, JudgeContext, Own, Owners, Placed, PlatformRules, Presented, Snapshots, StateView, Texts, ValidDefinition, Window } from "@generalbusiness/artroom-derive";
+import { actNeeds, actionOf, outcomeValueDomains, checkpointOf, clockOf, counted, derivable, factsNamed, ownersOf, inputTexts, isObject, judgeAct, judgeCheckpoint, judgeGenesis, judgePreparation, own, placesOf, prepareRules, presentedTypes, readFields, runnable, stepsOf, validateDefinition, windowOf } from "@generalbusiness/artroom-derive";
+import type { ActJudgment, Clock as Reading, Draft, Fetched, Founding, GrantDecision, JudgeContext, Needed, Observing, Own, Owners, Placed, PlatformRules, Presented, Snapshots, StateView, Texts, ValidDefinition, Window } from "@generalbusiness/artroom-derive";
 import { RULE_PROFILES } from "@generalbusiness/artroom-derive/rule";
 import { namedBy } from "./definitions.ts";
-import type { Asked, DefinitionRead, Ports, Standing } from "./ports.ts";
+import type { Asked, DefinitionRead, Further, Ports, Standing } from "./ports.ts";
 import type { Retained, Sealed, Store } from "./store.ts";
 import { LATE, Turns, fetchFacts, isSigned, within, type Verdict } from "./turn.ts";
 
@@ -153,7 +153,7 @@ function valuesBeside(values: unknown, places: readonly Placed[]): string[] {
  * input under its domain and its digest: the kind `value`, or `definition`
  * for a value in the domain of a definition.
  */
-const valuesOf = (draft: Draft): Retained[] => (draft.values ?? []).map((value) =>
+export const valuesOf = (draft: Draft): Retained[] => (draft.values ?? []).map((value) =>
   (value.domain === DOMAINS.definition ? { kind: "definition", digest: value.digest, bytes: value.bytes } : { kind: "value", domain: value.domain, digest: value.digest, bytes: value.bytes }));
 
 /** Asked for while rules are found in preparation, where nothing is written. The commit mints the real one. */
@@ -186,6 +186,84 @@ function told(standing: Standing, sealed: Sealed): void {
   }
 }
 
+/**
+ * The further observations of one input, before its turn and in its commit
+ * (scope contract, revision 20, section 16.1, "The order before the turn"
+ * and "In the commit"; source row I3-40). The reads are the authority
+ * port's (`Further`). This counts the rounds, and contains a port that
+ * fails or is late: such a read gave nothing.
+ *
+ * - **Before the turn.** The judge's own derivation, over the state at the
+ *   head that the scope holds, says which subjects have no observation at
+ *   hand. The scope reads one for each. For an outcome whose rows state
+ *   `second` that is done twice, the second time with the observations of
+ *   the first. It judges nothing, and its list is never trusted.
+ * - **In the commit.** The judge derives the list again. Where it names a
+ *   subject with no observation that passes the guards, the commit stops,
+ *   nothing is written, the scope reads what is missing and the turn starts
+ *   again, inside the bound on restarts (section 7.5). After that bound no
+ *   more is read: each subject that is still missing cannot be had, and what
+ *   follows is the row's.
+ *
+ * With no port for further observations, as under the production default,
+ * nothing is read and nothing is at hand: each row that needs a subject is
+ * absent.
+ */
+export class Observes {
+  readonly #further: Further | null;
+  readonly #bounds: Bounds;
+  constructor(further: Further | null, bounds: Bounds) {
+    this.#further = further;
+    this.#bounds = bounds;
+  }
+  /** What the judge is given: the observations at hand, the bytes of each value beside one, and what the commit holds for the rows. */
+  hand(): { observed?: readonly ObservationUse[]; values?: readonly string[]; observing?: Observing } {
+    const further = this.#further;
+    if (!further) return {};
+    try {
+      return { observed: further.observed(), values: further.values(), observing: further.observing() };
+    } catch {
+      return {};
+    }
+  }
+  async #read(missing: readonly Needed[]): Promise<void> {
+    const seconds = this.#bounds.fetchSeconds;
+    // One read for each subject, in the order of the list, each within the fetch time limit of step 1.
+    await within(() => this.#further!.read(missing, seconds), seconds * Math.max(1, missing.length));
+  }
+  /** Before the turn: `plan` is the judge's derivation at the head, with what is at hand. `steps`: 2 for an outcome, which may have a second step. */
+  async before(plan: () => readonly Needed[] | undefined, steps = 1): Promise<void> {
+    for (let step = 0; this.#further && step < steps; step++) {
+      const missing = plan() ?? [];
+      if (missing.length === 0) return;
+      await this.#read(missing);
+    }
+  }
+  /**
+   * The turn of the input, started again while its commit stops for a subject that is missing. `stop` is called by the commit's
+   * judge with the subjects that it lacks.
+   */
+  async turn<E>(run: (stop: (missing: readonly Needed[] | undefined) => void) => Promise<E>): Promise<E> {
+    for (let round = 0; ; round++) {
+      let missing: readonly Needed[] = [];
+      const end = await run((needed) => { missing = needed ?? []; });
+      if (missing.length === 0 || !this.#further) return end;
+      await this.#read(missing);
+      if (round + 1 >= this.#bounds.turnRestarts) {
+        try { this.#further.close(); } catch { /* a port that fails here is asked nothing more */ }
+      }
+    }
+  }
+  /** The entry that the commit wrote, for a port that keeps a read for a later commit. A port that fails here has changed nothing in the entry. */
+  sealed(sealed: Sealed): void {
+    try {
+      this.#further?.sealed(sealed);
+    } catch {
+      // The entry stands.
+    }
+  }
+}
+
 export class Scope {
   readonly #name: ScopeId | null;
   readonly #store: Store;
@@ -197,13 +275,29 @@ export class Scope {
   /** The one queue of this scope. Every writer's input waits in it: an act here, a delivery and a diagnosis from their own modules. */
   get turns(): Turns { return this.#turns; }
 
+  /**
+   * The further observations of one input of this scope (`Observes`). Under a definition whose data states no row, and with a
+   * port that reads none, nothing is read.
+   */
+  observes(): Observes {
+    const scope = this.#store.scope();
+    const observing = this.pinned()?.definition?.observing === true;
+    let further: Further | null = null;
+    try {
+      further = (scope && observing ? this.#ports.authority.further?.(scope.at) : null) ?? null;
+    } catch {
+      further = null;
+    }
+    return new Observes(further, this.#bounds);
+  }
+
   /** `name`: the name of the object that holds this scope (section 2.3), or null when it has none. */
   constructor(name: ScopeId | null, store: Store, ports: Ports, bounds: Bounds) {
     this.#name = name;
     this.#store = store;
     this.#ports = ports;
     this.#bounds = bounds;
-    this.#turns = new Turns(store, ports, bounds, () => { const pinned = this.pinned(); return pinned ? pinned.definition : undefined; }, () => this.owners());
+    this.#turns = new Turns(store, ports, bounds, () => { const pinned = this.pinned(); return pinned ? pinned.definition : undefined; }, () => this.owners(), () => this.pinned()?.platform ?? undefined);
   }
 
   /** True when this runtime has the code of every form that the definition uses, and each entry of it fits the bound on derived effects with that code. */
@@ -255,7 +349,7 @@ export class Scope {
     const supplied = this.#ports.definitions.platform(named);
     if (!supplied) return null;
     try {
-      const checked = validateDefinition(parseStrict(canonicalize(supplied.data)), this.#bounds, RULE_PROFILES, { platform: true });
+      const checked = validateDefinition(parseStrict(canonicalize(supplied.data)), this.#bounds, RULE_PROFILES, { platform: true, outcomeValues: outcomeValueDomains(supplied.data, supplied.rules) });
       // Section 6.1: the name of a platform definition is its platform name without the version, which is what `under` compares.
       if (!checked.ok || checked.definition.declared.name !== platformName(named) || !this.#derives(checked.definition)) return null;
       // The marks are in the data, and the validator lists them: no table beside the data says which entries are code.
@@ -437,9 +531,13 @@ export class Scope {
    * like a fact field, and the entry records it. Each value is read only
    * for a place that the pinned platform data states, is matched by its
    * digest in that place's domain, and is retained with the entry under
-   * that domain. No further observation is read: no form states the
-   * subjects that an act observes (the contract's point R1-67; I3 deltas,
-   * entry FC6), so a rule that reads one is given none here.
+   * that domain.
+   *
+   * Under a definition whose data states rows of `observes` (revision 20,
+   * section 16.1; row I3-40), the scope reads one observation for each
+   * subject of the act's rows before the turn, after the signer's, and the
+   * commit derives the list again (`Observes`). Under any other, no further
+   * observation is read: a rule that reads one is given none here.
    */
   async submit(signed: SignedIntent, grants: readonly Grant[], beside: Beside = {}): Promise<Answer> {
     const pinned = this.pinned();
@@ -484,13 +582,22 @@ export class Scope {
     const standing = known ? null : await this.#standing({ scope: scope.at, signed, action: act ? actionOf(act) : null, grants: given, window: windowOf(definition, scope.at.kind, intent.kind) });
     // Phase two is in the commit: what that read holds at the commit's head, on the commit's one reading. The judge is given the
     // answer and reads nothing.
-    // I3 merge: the judge of an act takes `observed`, the further observations at hand, and this gives none: no form of platform
-    // data states the subjects that an act observes, so nothing here could say what to read (the contract's point R1-67; I3
-    // deltas, entry FC6). A rule that reads one is given none, and its guard is then not completed.
-    const context = (view: StateView, clock: Reading): Omit<JudgeContext, "prepared"> =>
-      ({ clock, bounds, facts, own: ownOf(this.#store), snapshot: snapshotsOf(this.#store), texts: texts.sizes, presented: offered, capabilities: this.#ports.capabilities ?? undefined, platform, membership: standing?.membership ?? null, grants: standing === null ? null : heldBy(standing, view, clock), ...(places.length > 0 ? { values } : {}) });
+    // Section 16.1, "The order before the turn": the rows of the act, under a definition whose data states rows. The observations
+    // at hand are given to the judge as they are, and it makes the six guards with each row's window and use.
+    const rows = known ? new Observes(null, bounds) : this.observes();
+    const reading = (clock: Reading): Omit<JudgeContext, "prepared" | "grants"> => {
+      const hand = rows.hand();
+      const beside = [...(places.length > 0 ? values : []), ...(hand.values ?? [])];
+      return {
+        clock, bounds, facts, own: ownOf(this.#store), snapshot: snapshotsOf(this.#store), texts: texts.sizes, presented: offered, capabilities: this.#ports.capabilities ?? undefined, platform, membership: standing?.membership ?? null,
+        ...(places.length > 0 || beside.length > 0 ? { values: beside } : {}), ...(hand.observed ? { observed: hand.observed } : {}), ...(hand.observing ? { observing: hand.observing } : {}),
+      };
+    };
+    const context = (view: StateView, clock: Reading): Omit<JudgeContext, "prepared"> => ({ ...reading(clock), grants: standing === null ? null : heldBy(standing, view, clock) });
+    // Parts 3 and 4, before the turn: the subject list at the head that the scope holds, and one read for each subject of it.
+    await rows.before(() => actNeeds(this.#store, definition, signed, { ...reading(clockOf(this.#store, this.#ports.clock.read())), grants: null, prepared: [] }));
 
-    const end = await this.#turns.run<Answer>({
+    const end = await rows.turn((stop) => this.#turns.run<Answer>({
       // The walk that finds the rules judges nothing (section 5.2, step 4), so what it is given of phase two decides nothing.
       asks: (view, clock) => prepareRules(view, definition, { act: signed, context: { ...context(view, clock), prepared: [] } }),
       judge: (view, clock, prepared) => {
@@ -506,6 +613,7 @@ export class Scope {
               // breaks the object, and what the port holds in memory is gone with it.
               sealed: (sealed) => {
                 if (standing) told(standing, sealed);
+                rows.sealed(sealed);
                 return { answer: "accepted", receipt: receiptOf(sealed, named) };
               },
               // An entry over the size bound, or a grant that is not canonical values, is never written.
@@ -517,11 +625,15 @@ export class Scope {
           case "due": return { verdict: "stop" };
           case "accepted-before": return said<Answer>({ answer: "accepted", receipt: this.#receipt(judged.seq, named) });
           case "refused": return said<Answer>({ answer: "refused", reason: judged.reason, ...(judged.name === undefined ? {} : { name: judged.name }), judgedAt: judged.judgedAt });
-          case "unavailable": return said<Answer>(unavailable(judged.reason));
+          case "unavailable":
+            // Section 16.1, "In the commit": the list names a subject with no observation at hand. The commit stops, the scope
+            // reads what is missing, and the turn starts again.
+            stop(judged.missing);
+            return said<Answer>(unavailable(judged.reason));
           case "mismatch": return said<Answer>({ answer: "mismatch", reason: judged.reason });
         }
       },
-    });
+    }));
     return end.end === "answer" ? end.answer : unavailable(end.end === "idle" ? "unavailable" : end.end);
   }
 

@@ -22,12 +22,12 @@ import { deriveEffects } from "./effects.ts";
 import type { Reading } from "./fields.ts";
 import type { Fetched, Judging } from "./guards.ts";
 import { overMax } from "./handlers.ts";
-import type { OperationRules, OutcomeDerived, OutcomeInput, Owner, Owners } from "./ledger.ts";
+import type { EvidenceValueDomain, OperationRules, OutcomeDerived, OutcomeInput, Owner, Owners } from "./ledger.ts";
 import { RuleFault, givenTo, outside, ruleAt, run, type AtHand, type OutcomeGives, type PlatformRules, type Rules } from "./marks.ts";
 import { deriveSends } from "./sends.ts";
 import type { Operation, StateView } from "./state.ts";
 import type { ValidDefinition } from "./validate/index.ts";
-import { isFactRef, isObject, own, same } from "./values.ts";
+import { isFactRef, isLocalId, isObject, own, same } from "./values.ts";
 
 /**
  * What the judge of an outcome reads beside the state: the one reading, the
@@ -57,7 +57,7 @@ export function ownersOf(definition: ValidDefinition, platform: PlatformRules | 
       if (!mark || !rule) return null;
       const r = rule.rules;
       /** What a rule of this outcome entry is given: no field, no subject and no signer. */
-      const judging = (view: StateView, outcome: OutcomeInput): Judging => {
+      const judging = (view: StateView, outcome: OutcomeInput, resolved?: { selected: boolean | null; further: boolean }): Judging => {
         const scope = view.scope();
         if (!reading || !scope) throw new RuleFault(`the rule ${mark.code} is asked for an outcome that no judge is deriving`);
         if (rule.clock === true) reading.ran.clock = true;
@@ -67,6 +67,9 @@ export function ownersOf(definition: ValidDefinition, platform: PlatformRules | 
           // Item 2 and item 4 of what a rule is given: `observed`, and each entry in `uses`. Every rule of the one entry reads through
           // the one `beside`, so the entry retains each observation that any of them read, once.
           beside: reading.beside,
+          // Revision 20, "What the judge resolved, for an outcome": the rule of the effects and the rule of the `send` are given
+          // what the ledger derived, and derive neither again.
+          ...(resolved ? { outcome: resolved } : {}),
         };
       };
       const answer = (given: unknown): boolean => {
@@ -74,7 +77,9 @@ export function ownersOf(definition: ValidDefinition, platform: PlatformRules | 
         return given;
       };
       return {
-        selects: r.selects === true, read: r.read === true, ...(r.closure === undefined ? {} : { closure: r.closure }), ...(r.covered === true ? { covered: true } : {}), ...(r.most === undefined ? {} : { most: r.most }),
+        ...(r.valueDomains ? { valueDomains: r.valueDomains } : {}),
+        ...(r.values ? { values: (evidence) => run(mark, () => r.values!(evidence)) } : {}),
+        selects: r.selects === true, read: r.read === true, ...(r.closure === undefined ? {} : { closure: r.closure }), ...(r.most === undefined ? {} : { most: r.most }),
         // The driver asks this outside a commit, as it asks `unknown`: the rule reads the state only.
         ...(r.ready ? { ready: (view: StateView, operation: Operation, attempt: number) => answer(run(mark, () => r.ready!(view, operation, attempt))) } : {}),
         // Revision 19, section 6.1 (row I3-35): the rule that decides a further attempt is given what every rule is given.
@@ -84,7 +89,12 @@ export function ownersOf(definition: ValidDefinition, platform: PlatformRules | 
         // The driver asks this outside a commit, so no judge is deriving: the rule reads the state and the scope's own entries only.
         ...(r.unknown ? { unknown: (view: StateView, operation: Operation, attempt: number, own) => run(mark, () => r.unknown!(view, operation, attempt, own)) } : {}),
         // The send of the mark is derived with the entry, whether the rule of the kind derives anything beside it or not.
-        ...(r.derives || mark.send ? { derives: (view: StateView, operation: Operation, outcome: OutcomeInput, selected: boolean | null) => given(mark, judging(view, outcome), kinds, r.derives ? run(mark, () => r.derives!(givenTo(judging(view, outcome)), operation, selected)) : { effects: [], sends: [], opens: [] }) } : {}),
+        // Revision 20: the two functions that say what is to be read. Each is given the state, the outcome as it is offered and the
+        // scope's own entries; the second also each entry in the outcome's `uses`. Neither is given an observation: before the rows of
+        // the entry are settled nothing is at hand.
+        ...(r.origin ? { origin: (view: StateView, operation: Operation, outcome: OutcomeInput) => run(mark, () => r.origin!(givenTo(judging(view, outcome)), operation)) } : {}),
+        ...(r.subjects ? { subjects: (view: StateView, operation: Operation, outcome: OutcomeInput, row: number, first) => run(mark, () => r.subjects!(givenTo(judging(view, outcome)), operation, row, first)) } : {}),
+        ...(r.derives || mark.send ? { derives: (view: StateView, operation: Operation, outcome: OutcomeInput, selected: boolean | null, at) => { const j = judging(view, outcome, { selected, further: at.opens !== null }); return given(mark, j, kinds, r.derives ? run(mark, () => r.derives!(givenTo(j), operation, selected)) : { effects: [], sends: [], opens: [] }); } } : {}),
       };
     },
     ...(owners?.reserves ? { reserves: (view: StateView, pinned: ValidDefinition) => owners.reserves!(view, pinned) } : {}),
@@ -138,14 +148,40 @@ function given(mark: OutcomeMark, j: Judging, kinds: Readonly<Record<string, Out
   // Section 7.5: the bound on every send of one entry. The validator counts it for a row. An outcome entry has no row, and none of its rule's requests is cut off.
   if (sends.length > j.bounds.sendsPerEntry) throw outside(mark, "more requests than one entry sends");
   for (const open of opens) {
-    const { owner, kind, attempts }: { owner?: unknown; kind?: unknown; attempts?: unknown } = isObject(open) ? open : {};
+    const { owner, kind, attempts, for: holder }: { owner?: unknown; kind?: unknown; attempts?: unknown; for?: unknown } = isObject(open) ? open : {};
     if (owner !== j.platform?.named || typeof kind !== "string" || own(kinds, kind) === undefined || typeof attempts !== "number" || !Number.isSafeInteger(attempts) || attempts < 1) throw outside(mark, "an operation that its definition does not own");
+    // Section 17.2a, "`for`": the local ID of a holder. An outcome entry opens no holder, so it never names its own item.
+    if (holder !== undefined && !isLocalId(holder)) throw outside(mark, "an operation for a holder that is no local item");
+    // Revision 17: the data states the most attempts of a kind. An opening states no more.
+    const stated = own(kinds, kind)?.attempts;
+    if (stated !== undefined && attempts > stated) throw outside(mark, `an operation of the kind ${kind} with more attempts than its data states`);
+  }
+  // Section 17.2, "What a mark may start": where the data of the kind states its attempts, one outcome entry opens one operation of
+  // each kind that its `most` lists, and no other (witness 18.49, case 8). The reservation counted exactly that.
+  if (mark.attempts !== undefined) {
+    // Section 17.2, "A request that an outcome sends": the one request of such a kind is the request of its `send`, which its
+    // operation or its holder reserved. A request of the rule's own would be reserved by nobody.
+    if (sends.length > 0) throw outside(mark, "a request of its own: a kind that is counted by its data sends only the request of its send");
+    const listed = mark.most?.operations ?? [];
+    const opened = opens.map((open) => open.kind);
+    if (opened.some((kind, i) => !listed.includes(kind) || opened.indexOf(kind) !== i)) throw outside(mark, "an operation of a kind that its mark does not list, or two of one kind");
   }
   // The same derivation that a mark in a written list meets: one rule for the effects, and one for each request, in their order.
   const rules: [string, Rules[string]][] = [["effects", { place: "effect", most: effects.length, run: () => effects }], ...sends.map((request, n): [string, Rules[string]] => [`send.${n}`, { place: "send", run: () => request }])];
   const joining: Judging = { ...j, platform: { named: j.platform!.named, rules: Object.fromEntries(rules) } };
   const joined = deriveEffects(joining, [{ code: "effects", row: mark.row } as unknown as EffectForm], [], null);
   if (!joined.ok) throw outside(mark, `effects that the entry cannot hold: ${"reason" in joined ? joined.reason : joined.unavailable}`);
+  // The synthetic rule joins and validates the callback's effects; its
+  // length is no declaration of what the originating outcome may start.
+  // For a kind counted by its data, ordinary changes draw on most.effects
+  // and an item opening is the one type of most.opens. The ledger's own
+  // attempt records and the separately listed operation openings are not
+  // ordinary changes and keep their existing accounting.
+  if (mark.attempts !== undefined && joined.effects.filter((effect) => effect.effect !== "open").length > (mark.most?.effects ?? 0)) throw outside(mark, "more changes than its data states");
+  if (joined.opened && mark.attempts !== undefined && joined.opened.type !== mark.most?.opens) throw outside(mark, "an item opening that its data does not state");
+  // Section 17.2a, check 2: taking a holder is new work. No outcome,
+  // including a legacy kind counted by its owner's code, opens one.
+  if (joined.opened && Object.hasOwn(own((j.definition.declared as unknown as PlatformData).items, joined.opened.type)!, "holds")) throw outside(mark, "an opening of a holder in an outcome");
   // Section 6.3: `max` bounds the live items of a type, whatever opens the item. An act or a handler is refused `type-full`.
   if (joined.opened && overMax(j.view, j.definition, joined.opened.type, joined.opened.state) !== null) throw outside(mark, "effects that the entry cannot hold: type-full");
   const requests = deriveSends(joining, sends.map((_, n) => ({ code: `send.${n}`, row: mark.row }) as unknown as SendForm), joined.working, NO_CAUSE, 0, undefined, joined.opened !== null);
@@ -156,6 +192,9 @@ function given(mark: OutcomeMark, j: Judging, kinds: Readonly<Record<string, Out
   const opener = openerOf(j);
   const made = deriveSends(j, [mark.send as unknown as SendForm], joined.working, opener?.cause ?? NO_CAUSE, 0, undefined, joined.opened !== null);
   if (!made.ok) throw outside(mark.send, `a request that the entry cannot hold: ${"reason" in made ? made.reason : made.unavailable}`);
+  // Section 17.2, "A request that an outcome sends": where the send states `once`, at most one outcome entry of one operation makes
+  // the request, and a second is a fault of the rule. The operation reserved the request once.
+  if (mark.send.once === true && made.sends.some((send) => send.message.class === "request") && j.judged?.type === "outcome" && j.view.operation(j.judged.operation)?.sent === true) throw outside(mark.send, "a second request of an operation whose send states once");
   for (const { message } of made.sends) {
     if (message.class !== "request" || message.type !== "create") continue;
     const fields = isObject(message.body) && isObject(message.body["fields"]) ? Object.values(message.body["fields"]) : [];
@@ -183,4 +222,13 @@ function openerOf(j: Judging): { cause: Digest; fact: { at: Judging["scope"]["at
   const kept = seq !== undefined && Number.isSafeInteger(seq) && seq < j.self ? j.own?.(seq) : null;
   if (!kept || kept.entry.input.type !== "act" || !kept.entry.effects.some((effect) => effect.effect === "operation" && effect.k === k)) return null;
   return { cause: intentDigest(kept.entry.input.signed.intent), fact: { at: j.scope.at, seq: kept.entry.seq, hash: kept.hash } };
+}
+
+/** Evidence domains come from the rules of the pinned version, beside its data. No untrusted JSON member declares them. */
+export function outcomeValueDomains(data: PlatformData, rules: Rules): Readonly<Record<string, readonly EvidenceValueDomain[]>> | null {
+  if (Object.values(data.outcomes ?? {}).some((mark) => { const rule = ruleAt(rules, mark.code, "outcome")?.rules; return rule?.values !== undefined && rule.valueDomains === undefined; })) return null;
+  return Object.fromEntries(Object.entries(data.outcomes ?? {}).flatMap(([kind, mark]) => {
+    const domains = ruleAt(rules, mark.code, "outcome")?.rules.valueDomains;
+    return domains ? [[kind, domains]] : [];
+  }));
 }

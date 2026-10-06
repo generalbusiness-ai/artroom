@@ -6,12 +6,16 @@
  *
  * It applies the entry's recorded effects and the bookkeeping that its input
  * and sends imply. It judges nothing: whether the effects are the right ones
- * is the judges' question.
+ * is the judges' question. A bound decision is bookkeeping too: its
+ * binding is derived from the recorded fields and pre-entry local state,
+ * using the pinned selector rule where the definition states one.
  */
 
 import type { Digest, Effect, Entry, ItemType, MemberRef, OperationId } from "@generalbusiness/artroom-contract";
 import { intentDigest, seedDigest } from "@generalbusiness/artroom-bytes";
 import { UNDER, historyOf, withActing, withMembers, withPrincipal, type Signer } from "./attribution.ts";
+import { drawsOf, released, type DrawOptions } from "./draws.ts";
+import { indexRows } from "./binding.ts";
 import { HOLDER, changeHold } from "./hold.ts";
 import { attemptedBy, openedBy, operationId } from "./ledger.ts";
 import type { Item, ObservedHead, Party, StateWriter, Status } from "./state.ts";
@@ -97,10 +101,12 @@ export function headsOf(proof: unknown): ObservedHead[] {
   const [of, seq] = [{ scope: o["of"].scope, inc: o["of"].inc }, o["head"]["seq"]];
   // A key is `key_` and more, and a member is `@` and more, so the one name of the rules is neither.
   if (o["subject"] === "rules") return [{ of, subject: "rules", seq }];
+  // Revision 20 (section 16.1, "An observation of the holders of one action"): its subject, for the order of heads, is the action.
+  if (o["subject"] === "holders") return typeof o["action"] === "string" ? [{ of, subject: `holders:${o["action"]}`, seq }] : [];
   return [o["key"], o["member"]].flatMap((subject) => (typeof subject === "string" ? [{ of, subject, seq }] : []));
 }
 
-export function applyEntry(writer: StateWriter, definition: ValidDefinition, entry: Entry, hash: Digest): void {
+export function applyEntry(writer: StateWriter, definition: ValidDefinition, entry: Entry, hash: Digest, options: DrawOptions = {}): void {
   const scope = writer.scope();
   const input = entry.input;
   if (input.type === "genesis" ? scope !== null || entry.seq !== 0 || entry.prev !== null : scope === null || entry.seq !== scope.head.seq + 1 || entry.prev !== scope.head.hash) {
@@ -111,6 +117,12 @@ export function applyEntry(writer: StateWriter, definition: ValidDefinition, ent
   // Section 7.2: every send of a provisional genesis but its result, at ordinal 0, is a duty that is held until the confirmation.
   let held: readonly number[] = scope?.held ?? (status === "provisional" ? entry.sends.filter((s) => s.n !== 0).map((s) => s.n) : []);
   const signer = signerOf(entry);
+  // Section 17.2a: what the entry does to the counts of the holders, on the state before it. An entry that draws past a count, or
+  // that opens a held operation with no holder, is one that no judge writes.
+  const drawn = drawsOf(writer, definition, entry, options);
+  if ("fault" in drawn) throw new FoldError(`entry ${entry.seq}, ${drawn.fault}: ${drawn.detail}`);
+  /** The holders whose release is asked after this entry: each whose counts, item, operation or request the entry changed. */
+  const touched = new Set<number>(drawn.holders.keys());
 
   // Effects, in the order recorded. `before` holds each touched item as it was, or null for the one this entry opens.
   const before = new Map<number, Item | null>();
@@ -162,7 +174,7 @@ export function applyEntry(writer: StateWriter, definition: ValidDefinition, ent
         break;
       case "operation": {
         // Section 4.3, item 1: the operation exists from this entry, under this entry's `seq` and the record's ordinal.
-        const opened = openedBy(entry.seq, effect);
+        const opened = openedBy(entry.seq, effect, drawn.for.get(effect.k));
         if (typeof opened === "string" || writer.operation(opened.id)) throw new FoldError(`entry ${entry.seq} opens operation ${effect.k}, which ${typeof opened === "string" ? opened : "it has opened"}`);
         writer.putOperation(opened);
         break;
@@ -174,6 +186,7 @@ export function applyEntry(writer: StateWriter, definition: ValidDefinition, ent
         const changed = operation ? attemptedBy(operation, effect, entry) : "names an operation that no entry opened";
         if (typeof changed === "string") throw new FoldError(`entry ${entry.seq}, attempt ${effect.attempt} of ${id}: it ${changed}`);
         writer.putOperation(changed);
+        if (changed.for !== undefined) touched.add(changed.for);
         if (effect.result !== "opened") outcomes++;
         break;
       }
@@ -191,9 +204,13 @@ export function applyEntry(writer: StateWriter, definition: ValidDefinition, ent
     const was = before.get(id) ?? null;
     // Section 6.3: an existing item that one entry changes rises by one, once, however many effects touch it.
     writer.putItem(was ? { ...item, revision: was.revision + 1 } : item);
+    // Section 17.2a, "An index that an item type declares": the rows of an item are written in the transaction of the entry that
+    // opens it, with the item, and by no later entry: an indexed slot is fixed. A type that declares no index has none.
+    if (!was) for (const row of indexRows(definition, item, entry.at)) writer.putIndexed(item.type, row.slot, row.key, item.id);
     if (was?.state !== item.state) {
       if (was) writer.addCount(was.type, was.state, -1);
       writer.addCount(item.type, item.state, 1);
+      touched.add(id);
     }
   }
   // Section 6.7: every holder of a hold is in the attribution of the item the hold is under, and so is the principal of a member of
@@ -226,6 +243,7 @@ export function applyEntry(writer: StateWriter, definition: ValidDefinition, ent
       const of = input.message.of;
       const request = writer.request(of.from.seq, of.n);
       if (!request) throw new FoldError(`entry ${entry.seq} records a result of a request this scope did not send`);
+      if (drawn.account !== null) touched.add(drawn.account);
       // A request has one result. A conflict is a second incarnation's answer to a creation: it is recorded and replaces nothing.
       if (request.result === null) writer.putRequest({ ...request, result: { seq: entry.seq, clause: input.clause } });
       // Section 7.2: the first applied result of a creation is the incarnation this scope holds for that seed.
@@ -234,6 +252,7 @@ export function applyEntry(writer: StateWriter, definition: ValidDefinition, ent
   } else if (input.type === "diagnosis") {
     const request = writer.request(input.of.seq, input.of.n);
     if (!request) throw new FoldError(`entry ${entry.seq} diagnoses a request this scope did not send`);
+    if (drawn.account !== null) touched.add(drawn.account);
     writer.putRequest({ ...request, diagnosis: { seq: entry.seq, finding: input.finding } });
   }
   // Section 16.1, "The fold holds the highest head": for each subject of an observation that this entry retains, the highest
@@ -251,6 +270,21 @@ export function applyEntry(writer: StateWriter, definition: ValidDefinition, ent
   // Section 7.4: only a request has a result, so only a request is outstanding.
   for (const send of entry.sends) {
     if (send.message.class === "request") writer.putRequest({ seq: entry.seq, n: send.n, hash, type: send.message.type, to: send.to, result: null, diagnosis: null });
+  }
+
+  // Section 17.2, "A request that an outcome sends": where the send of the kind states `once`, the fold notes that this operation
+  // made its request. A second one is a fault of the rule, and the operation reserves the request no longer.
+  if (input.type === "outcome" && entry.sends.some((send) => send.message.class === "request") && own(definition.reserving?.kinds, input.kind)?.once === true) {
+    const operation = writer.operation(input.operation);
+    if (operation) writer.putOperation({ ...operation, sent: true });
+  }
+  // Section 17.2a, "What holds the count": the counts of each holder that the entry moved, and the account of each request that it
+  // sent. Then "Release": a final holder keeps only what its unsettled operations and its pending requests can still reach.
+  for (const [item, held] of drawn.holders) writer.putHolder(item, held);
+  for (const account of drawn.accounts) writer.putAccount(account);
+  for (const item of touched) {
+    const [held, kept] = [writer.holder(item), released(writer, definition, item)];
+    if (held !== null && !same(held, kept)) writer.putHolder(item, kept);
   }
 
   const genesis = scope?.genesis ?? { hash, source: input.type === "genesis" ? input.source : null, n: input.type === "genesis" ? input.n : null };

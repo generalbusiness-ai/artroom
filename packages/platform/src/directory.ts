@@ -108,6 +108,7 @@ const opens = (kind: "issue" | "pr"): PlatformData["acts"][string] => ({
   fields: kind === "issue"
     ? { ...opening, conditions: { type: "list", of: { type: "text", max: 4096 }, max: 16, required: true } }
     : { ...opening, draft: { type: "bool", required: true } },
+  observes: [{ of: "definitions", window: 300, use: "reuse" }],
   guards: [
     // For `open-pr`: the repository has its destination and its rules scope (case b).
     ...(kind === "pr" ? [{ set: "destination", of: "also.repository" }, { set: "rules", of: "also.repository" }] as const : []),
@@ -264,6 +265,7 @@ export const directory: PlatformData = {
         controller: { type: "member", required: true },
         lane: { type: "scope", kind: "lane", required: true },
       },
+      observes: [{ of: "member", from: { field: "worker" }, max: 1, window: 300, use: "reuse" }],
       // The worker is an active member. For an agent, its controller is the signer, or the signer is an admin. Both from the
       // observation (Code P19).
       guards: [{ code: "worker-standing", row: "P19" }],
@@ -361,6 +363,12 @@ const repositoryOf = (state: Pick<StateView, "page">): Item | null => state.page
 export function directoryMembership(state: Pick<StateView, "page">): ScopeRef | null {
   // The slot's type is a scope of the kind `membership`, which the commit checked when the clause set it.
   const held: unknown = repositoryOf(state)?.refs["membership"];
+  return isScopeRef(held) ? held : null;
+}
+
+/** The rules scope confirmed by this directory's creation result, including its incarnation. */
+export function directoryRulesScope(state: Pick<StateView, "page">): ScopeRef | null {
+  const held: unknown = repositoryOf(state)?.refs["rules"];
   return isScopeRef(held) ? held : null;
 }
 
@@ -780,7 +788,8 @@ export const directoryRules: Rules = {
    * On the selecting outcome: state `done`, with the detail `commit`. That
    * is a `confirmed` outcome of an operation that has selected nothing,
    * while `repository.imported` is unset: the judgment that the ledger makes
-   * of `selected`, on the same state. On the last `refused`: state `failed`,
+   * of `selected`, which the rule is given with what the judge resolved
+   * (the contract's revision 20, section 6.1; row I3-47). On the last `refused`: state `failed`,
    * with no detail. "The last" is the `refused` outcome after which every
    * attempt that the operation states is opened and each has a `refused`
    * outcome. An `unknown` attempt keeps the operation open, and no `failed`
@@ -796,7 +805,7 @@ export const directoryRules: Rules = {
       if (input.type !== "outcome" || !operation || !repository || !isScopeRef(destination)) throw new Error("an import is of a directory that holds its destination");
       const update = (state: "done" | "failed", detail: Record<string, FieldValue>) =>
         ({ to: destination, message: { class: "request", type: "relate", body: { name: "import", item: { at: given.resolved.at, seq: repository.id, hash: repository.opened }, state, detail } } }) as const;
-      if (input.result === "confirmed") return operation.selected === null && (repository.values["imported"] ?? null) === null ? update("done", { commit: importedHead(input.evidence.body)! }) : null;
+      if (input.result === "confirmed") return given.resolved.outcome?.selected === true ? update("done", { commit: importedHead(input.evidence.body)! }) : null;
       return input.result === "refused" && spent(operation, { attempt: input.attempt }) ? update("failed", {}) : null;
     },
   },

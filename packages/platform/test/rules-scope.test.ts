@@ -4,7 +4,7 @@ import { canonicalize, definitionDigest, isObservationUse, newIncarnation } from
 import { PROFILES, derivable, runnable, validateDefinition, valueDigest } from "@generalbusiness/artroom-derive";
 import type { ActJudgment, Judgment } from "@generalbusiness/artroom-derive";
 import { d, desk, deskDefinition, directory, keys, membership, ticket, ticketDefinition } from "@generalbusiness/artroom-derive/testing";
-import { CONFIGURATION_BYTES, CONFIGURATION_DOMAIN, DEFINITION_DOMAIN, RULES_SCOPE, extentsOf, firstExtents, membershipId, platform, rulesScope } from "../src/index.ts";
+import { CONFIGURATION_BYTES, CONFIGURATION_DOMAIN, DEFINITION_DOMAIN, PUBLISH, RULES_EXTENTS_VALUE, RULES_SCOPE, extentsOf, firstExtents, membershipId, platform, revisionOf, rulesScope } from "../src/index.ts";
 import type { Extent } from "../src/index.ts";
 import { rulesScopeRules } from "../src/rules-scope.ts";
 import { BRANCH, Rulebook, lanePointingAt, memberOf, standing } from "./support-rules.ts";
@@ -84,7 +84,7 @@ test("the rules definition validates whole with the platform option; its marks a
 test("the genesis opens the rules with the branch, the directory and membership's scope ID, and the other values at their defaults; the scope records that ID and no incarnation; a provisional rules scope admits no act", () => {
   const r = new Rulebook();
   const rules = r.item(0);
-  expect([rules.type, rules.state, rules.values, rules.refs]).toEqual(["rules", "current", { branch: BRANCH, membership: membership.scope, approvals: 1, ownerMayReview: false, checks: null, labels: null, extents: null, singleControllerException: false }, { directory: r.registrar.at }]);
+  expect([rules.type, rules.state, rules.values, rules.refs]).toEqual(["rules", "current", { branch: BRANCH, membership: membership.scope, approvals: 1, ownerMayReview: false, checks: null, labels: null, extents: null, singleControllerException: false }, { directory: r.registrar.at, published: null }]);
   expect([membershipId(r.state), membershipId(r.registrar.state)]).toEqual([membership.scope, null]);
   // The creation's fields hold the ID as a text, which fits the slot: a scope ID is at most 64 bytes.
   expect(membership.scope.length).toBeLessThanOrEqual(64);
@@ -101,7 +101,7 @@ test("keep-configuration keeps a configuration whose bytes beside the intent has
   const item = r.item(r.head.seq);
   expect([said(judged), kept(judged), item.type, item.state, item.values, item.parties]).toEqual([WRITTEN, [[CONFIGURATION_DOMAIN, unit.digest]], "configuration", "kept", { digest: unit.digest, name: "unit" }, { keeper: rita.member }]);
   // Case 2: no value at hand has the digest: none came, other bytes came, or the bytes are not the canonical form of the value.
-  const MISMATCH = ["refused", "bad-field", "configuration-mismatch"];
+  const MISMATCH = ["refused", "bad-field", null];
   expect([said(keep(r, lint, [])), said(keep(r, lint, [unit.bytes])), said(keep(r, lint, [` ${lint.bytes}`]))]).toEqual([MISMATCH, MISMATCH, MISMATCH]);
   // Case 3: a value that is longer than the bound of its domain is no value at hand. One byte under the bound is.
   const sized = (bytes: number) => { const base = configuration("big"); const value = { ...JSON.parse(base.bytes), pad: "" }; value.pad = "x".repeat(bytes - canonicalize(value).length); return { name: "big", bytes: canonicalize(value), digest: valueDigest(CONFIGURATION_DOMAIN, value) }; };
@@ -130,7 +130,7 @@ test("publish sets the rules when each check's configuration is kept and each ch
   // membership scope that this scope records.
   const elsewhere = { ...membership, scope: directory.scope };
   for (const observed of [[], [checkA], [checkB], [checkA, standing("@bot", 8, { of: elsewhere })]]) {
-    expect(said(publish(r, checks, observed))).toEqual(["unavailable", "dependency-unavailable", null]);
+    expect(said(publish(r, checks, observed))).toEqual(["unavailable", "authority-unavailable", null]);
   }
   // Case a: `not-a-checker`. The role is not `checker`; the member is removed, or unknown; the field names the checker in another
   // membership scope, or in another incarnation of it than the one observed.
@@ -142,7 +142,7 @@ test("publish sets the rules when each check's configuration is kept and each ch
     said(publish(r, checks, [checkA, standing("@bot", 8, { memberState: "unknown", role: null, activeKey: null })])),
     said(publish(r, [check(unit, memberOf("@check", elsewhere))], [checkA])),
     said(publish(r, [check(unit, memberOf("@check", reborn))], [checkA])),
-  ]).toEqual(Array(5).fill(NOT));
+  ]).toEqual([NOT, NOT, NOT, ["refused", "bad-field", null], ["refused", "bad-field", null]]);
   // The rules did not change, and nothing was written.
   expect([r.item(0), r.last.input.type === "act" && r.last.input.signed.intent.kind]).toEqual([before, "keep-configuration"]);
 
@@ -284,4 +284,55 @@ test("the declaration of the single-controller exception is false from the genes
   const content = { asked: "rules", approvals: 1, ownerMayReview: false, checks: [], labels: [] };
   const use = (over: Record<string, unknown>) => isObservationUse({ observation: { subject: "rules", of: r.at, head: r.head, revision: 0, content: { ...content, ...over }, definition: RULES_SCOPE, at: standing("@check", 1).observation.at }, read: { run: "r1", n: 1 }, use: "fresh", prior: null });
   expect([use({}), use({ singleControllerException: true }), use({ singleControllerException: "yes" }), use({ singleControllerException: false, extents: FIRST })]).toEqual([true, true, false, false]);
+});
+
+// Authority note, revision 28, section 12.1.4, "The revision of the rules, and the answer to an observation" (I3 deltas, entries EQ8
+// and FB10), with its case e. The answer is the platform's function `observed`, as a runtime and a replay are supplied it.
+test("a rules scope answers an observation from its folded state at its head: the revision is 0 and the values are the genesis's before a publish, and the position of the last publish after one; asked as definitions it lists the active ones in the order of their IDs; a provisional scope, another incarnation and a request for a key are answered nothing", () => {
+  const r = new Rulebook();
+  const supplied = platform(RULES_SCOPE)!;
+  const answer = (of: Rulebook, asked: object) => supplied.observed!(of.state, asked as never);
+  const common = () => ({ subject: "rules", of: r.at, head: r.head, definition: RULES_SCOPE });
+  const byId = { scope: r.at.scope, kind: "rules" };
+  // The slot is a reference to a fact of a `publish` under this definition, set by one written effect from the entry itself.
+  expect([supplied.revised, PUBLISH, rulesScope.items["rules"]!.refs["published"], rulesScope.acts["publish"]!.effects.at(-1)]).toEqual([
+    "publish", "publish", { fixed: false, required: false, to: { type: "fact", kind: ["publish"], under: "platform:rules" } }, { ref: { slot: "published", from: "self" } },
+  ]);
+  // Before any `publish`: the revision is 0, and the rules are what the genesis gave. A list that is unset is given empty. The
+  // answer holds no `at`; its extents digest names the bounded canonical bytes served from this same head.
+  expect([revisionOf(r.state), answer(r, { of: r.at, asked: "rules" }), answer(r, { of: byId, asked: "definitions" })]).toEqual([
+    0, { ...common(), revision: 0, content: { asked: "rules", approvals: 1, ownerMayReview: false, checks: [], labels: [], singleControllerException: false, extents: valueDigest(RULES_EXTENTS_VALUE.domain, firstExtents({ approvals: 1, checks: [] })) } },
+    { ...common(), revision: 0, content: { asked: "definitions", active: [] } },
+  ]);
+
+  // After a `publish`: the revision is that entry's position. An entry of another kind moves the head and not the revision.
+  keep(r, unit);
+  expect(said(publish(r, [check(unit)], [standing("@check", 7)], { singleControllerException: true }))).toEqual(WRITTEN);
+  const first = r.head.seq;
+  expect(supplied.observedValues!(r.state, { of: r.at, asked: "rules" })).toEqual([{ domain: RULES_EXTENTS_VALUE.domain, bytes: canonicalize(FIRST) }]);
+  const [deskBytes, ticketBytes] = [canonicalize(desk), canonicalize(ticket)];
+  expect([said(activate(r, ticketDefinition.digest, "ticket", [ticketBytes])), said(activate(r, deskDefinition.digest, "desk", [deskBytes, ticketBytes]))]).toEqual([WRITTEN, WRITTEN]);
+  expect([r.item(0).refs["published"], r.head.seq > first, answer(r, { of: byId, asked: "rules" }), answer(r, { of: r.at, asked: "definitions" })]).toEqual([
+    first, true,
+    { ...common(), revision: first, content: { asked: "rules", approvals: 2, ownerMayReview: true, checks: [{ name: "unit", configuration: unit.digest, required: true, checker: "@check" }], labels: ["bug"], singleControllerException: true, extents: valueDigest(RULES_EXTENTS_VALUE.domain, FIRST) } },
+    { ...common(), revision: first, content: { asked: "definitions", active: [{ digest: ticketDefinition.digest, name: "ticket" }, { digest: deskDefinition.digest, name: "desk" }] } },
+  ]);
+  // A second `publish` is the revision from then on, and a retired definition is not listed. A refused `publish` changes neither.
+  expect(said(publish(r, []))).toEqual(WRITTEN);
+  const second = r.head.seq;
+  const ticketItem = second - 2;
+  expect([said(publish(r, [check(lint)], [standing("@check", 7)])), said(r.act(rita, "retire-definition", { on: ticketItem, expected: { on: r.item(ticketItem).revision } }))]).toEqual([["refused", "guard-failed", "configuration-unknown"], WRITTEN]);
+  expect([second > first, revisionOf(r.state), answer(r, { of: r.at, asked: "definitions" })]).toMatchObject([true, second, { revision: second, content: { active: [{ name: "desk" }] } }]);
+
+  // No answer: a provisional rules scope (section 12.1); a request that states another incarnation, or another kind; one for a key
+  // or for a member; and a state that holds no rules.
+  const provisional = new Rulebook(false);
+  const reborn = { ...r.at, inc: newIncarnation(new Uint8Array(16).fill(77)) };
+  expect([
+    answer(provisional, { of: provisional.at, asked: "rules" }), answer(r, { of: reborn, asked: "rules" }), answer(r, { of: { ...r.at, kind: "membership" }, asked: "rules" }),
+    answer(r, { of: r.at, key: rita.key }), answer(r, { of: r.at, member: "@check" }), answer(r.registrar as never, { of: r.registrar.at, asked: "rules" }), revisionOf(r.registrar.state),
+  ]).toEqual([null, null, null, null, null, null, null]);
+  // What an entry may retain: the answer with the asking scope's `at` is an observation of the rules, by the record check.
+  const at = standing("@check", 1).observation.at;
+  expect(isObservationUse({ observation: { ...(answer(r, { of: r.at, asked: "rules" }) as object), at }, read: { run: "r1", n: 1 }, use: "fresh", prior: null })).toBe(true);
 });

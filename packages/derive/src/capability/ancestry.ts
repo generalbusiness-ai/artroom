@@ -110,7 +110,18 @@ export function snapshotInput(pairs: readonly StagedRef[]): RetainedInput | null
   return snapshot && { kind: "snapshot", digest: snapshot.digest, bytes: canonicalize(snapshot.pairs) };
 }
 
-/** The pairs of a retained snapshot, read from its bytes and checked against the digest that it is kept under. Null: the bytes are no snapshot with that digest. */
+/**
+ * The pairs of a retained snapshot, read from its bytes and checked against
+ * the digest that it is kept under. Null: the bytes are no snapshot with
+ * that digest, or they are not its canonical bytes.
+ *
+ * A retained input is taken only as its canonical bytes (scope contract,
+ * revision 20, sections 2.1 and 9.4; point EZ5 of section 15.6t; row
+ * I3-48). The same pairs in another order or with other spacing have the
+ * same digest of the sorted pairs, and are not what the digest names: a
+ * scope does not keep them, and a verifier does not take them. A verifier
+ * then lacks the input, which is `incomplete`.
+ */
 export function snapshotRead(digest: Digest, bytes: string): readonly StagedRef[] | null {
   let pairs: unknown;
   try {
@@ -119,7 +130,7 @@ export function snapshotRead(digest: Digest, bytes: string): readonly StagedRef[
     return null;
   }
   const snapshot = Array.isArray(pairs) ? snapshotOf(pairs as StagedRef[]) : null;
-  return snapshot?.digest === digest ? snapshot.pairs : null;
+  return snapshot?.digest === digest && canonicalize(snapshot.pairs) === bytes ? snapshot.pairs : null;
 }
 
 /** One of the lane's own roots under the source commitment, as its records hold it. */

@@ -19,10 +19,12 @@
 import type { ActType, AlsoMark, Attempt, Bounds, CapabilityName, Digest, DomainTag, Effect, Evidence, FactRef, FieldType, FieldValue, Grant, GrantMark, Guard, KeyId, Mark, MemberId, MemberRef, Message, ObservationUse, OperationId, PlatformDefinition, Request, ScopeRef, Seed, SignedIntent, Timestamp } from "@generalbusiness/artroom-contract";
 import { canonicalize, digestBytes, domainBytes, isDigest, isFieldValue, isMemberRef, parseStrict, utf8 } from "@generalbusiness/artroom-bytes";
 import type { Signer } from "./attribution.ts";
+import type { BindingSelect } from "./binding.ts";
 import type { Own } from "./fields.ts";
 import type { Fetched, GuardResult, Judging } from "./guards.ts";
 import type { Most, Opening } from "./ledger.ts";
 import type { Item, Operation, StateView } from "./state.ts";
+import { observedName, subjectName, type RowStatus } from "./observes.ts";
 import { valuePlaces } from "./validate/fields.ts";
 import type { MarkKind, ValidDefinition } from "./validate/index.ts";
 import { isObject, own } from "./values.ts";
@@ -51,7 +53,7 @@ export type JudgedInput =
  * "An observation outside a grant"): one key, one member, or what the rules
  * scope holds, by what was asked of it.
  */
-export type Observed = { key: KeyId } | { member: MemberId } | { asked: "rules" | "definitions" };
+export type Observed = { key: KeyId } | { member: MemberId } | { asked: "rules" | "definitions" } | { holders: string };
 
 /** A value beside an intent that a rule read (section 6.2): its byte domain, its digest in that domain, and its canonical bytes. */
 export interface ValueRead { domain: string; digest: Digest; bytes: string }
@@ -59,6 +61,13 @@ export interface ValueRead { domain: string; digest: Digest; bytes: string }
 /**
  * What is at hand for one entry beside its input, and what the rules of its
  * row read of it (sections 4.1, 6.2 and 16.1).
+ *
+ * THE OLDER RULE, WHICH STANDS AS A STAND-IN. What follows is the rule of
+ * the contract's revisions 14 to 19, for a definition whose data states no
+ * row of `observes`. From revision 20 an entry retains the observations of
+ * the subjects that its rows give, read or not: `rows`, below, and
+ * `observes.ts`. No platform definition of Artroom states a row yet, so
+ * each of them is still judged as this says (I3 deltas, entry GA1).
  *
  * `observed`: the further observations that the scope read before the turn
  * for this input, each with its read and its use, and each already judged
@@ -81,14 +90,15 @@ export interface ValueRead { domain: string; digest: Digest; bytes: string }
  * The scope's runtime reads `values` beside an intent where the pinned data
  * states a place, and keeps each (`scope/src/core.ts`).
  *
- * I3 merge: what is still owed. The runtime makes no further read of an
- * observation before any turn: no form states the subjects that an entry
- * observes (the contract's point R1-67; I3 deltas, entries EM2 and FC6). So
- * in a deployed scope a rule that reads one is given none, and where its
- * specification says so its guard is not completed. A replay is given the
- * retained value of each place that the pinned data states, and none for a
- * row whose rule holds the domain in its own code (`replay/src/verify.ts`;
- * entries EM1 to EM4 and EX5).
+ * I3 merge: what is still owed. Under a definition whose data states no
+ * row, the runtime makes no further read of an observation before any
+ * turn: nothing says what to read. So in a deployed scope under a platform
+ * definition of Artroom a rule that reads one is given none, and where its
+ * specification says so its guard is not completed. It ends when the
+ * authority note's rows are adopted and written into that data (entry
+ * GA1). A replay is given the retained value of each place that the pinned
+ * data states, and none for a row whose rule holds the domain in its own
+ * code (`replay/src/verify.ts`; entries EM1 to EM4 and EX5).
  */
 export interface AtHand {
   readonly observed: readonly ObservationUse[];
@@ -101,6 +111,19 @@ export interface AtHand {
    * as for every act of a declared definition.
    */
   readonly places: readonly Placed[];
+  /**
+   * Section 16.1, "The subjects that an entry observes" (revision 20), for
+   * an entry of a definition whose data states rows (`observes.ts`).
+   * Absent: the definition states none, and the older rule above stands,
+   * as a STAND-IN. Null: the rows of this entry are not settled yet, as at
+   * checks 7 and 8 of an act, and nothing is at hand. Otherwise: what the
+   * rows came to. The entry then retains `retained` and `values`, read by
+   * a rule or not. `listed` names every subject that a row gives. A rule
+   * that reads an observation of another subject has a fault. `status` is
+   * what a rule is told of each row, by its position: whole, over or
+   * absent.
+   */
+  rows?: { status: readonly (RowStatus | null)[]; listed: ReadonlySet<string>; retained: readonly ObservationUse[]; values: readonly ValueRead[]; grant?: { use: ObservationUse; subjects: ReadonlySet<string> } } | null;
 }
 
 /** One place of an act, in one intent: the field, the byte domain and the bound that the data states, and the digest that the field holds. */
@@ -109,6 +132,9 @@ export interface Placed { field: string; domain: string; max: number; digest: Di
 /** What is at hand for one entry: the observations and the values that its judge was given, and the places of its act that name a value. */
 export const atHand = (observed: readonly ObservationUse[] | undefined, values: readonly string[] | undefined, places: readonly Placed[] = []): AtHand =>
   ({ observed: observed ?? [], values: values ?? [], read: { observed: [], values: [] }, places });
+
+/** The same for an entry of a definition whose data states rows: nothing is at hand until its rows are settled (`AtHand.rows`). */
+export const atHandByRows = (values: readonly string[] | undefined, places: readonly Placed[] = []): AtHand => ({ ...atHand(undefined, values, places), rows: null });
 
 /**
  * The places of an act that an intent sets (section 6.2): each field that
@@ -160,16 +186,17 @@ export function placeWithoutValue(hand: AtHand | undefined): string | null {
  * that a rule read, once for a domain and a digest (section 6.2).
  */
 export function retainedOf(hand: AtHand | undefined): { observed: readonly ObservationUse[]; values: readonly ValueRead[] } {
+  // Revision 20: under rows the entry retains the observation of each subject that a whole row gives, and each value that one of
+  // them names, read or not. A value of a place of the act is kept beside them.
+  if (hand?.rows) {
+    const values = [...hand.rows.values, ...hand.read.values.filter((read) => !hand.rows!.values.some((kept) => kept.domain === read.domain && kept.digest === read.digest))];
+    return { observed: hand.rows.retained, values };
+  }
   return { observed: [...(hand?.read.observed ?? [])].sort((a, b) => a.read.n - b.read.n), values: hand?.read.values ?? [] };
 }
 
 /** True when a retained observation is of that subject. An observation of a key has no member `subject`. */
-const isOf = (use: ObservationUse, subject: Observed): boolean => {
-  const o = use.observation;
-  if ("key" in subject) return !("subject" in o) && o.key === subject.key;
-  if ("member" in subject) return "subject" in o && o.subject === "member" && o.member === subject.member;
-  return "subject" in o && o.subject === "rules" && o.content.asked === subject.asked;
-};
+const isOf = (use: ObservationUse, subject: Observed): boolean => observedName(use.observation) === subjectName(subject);
 
 /**
  * The digest of one value in one byte domain (section 6.2, "What a value
@@ -201,6 +228,17 @@ export interface Resolved {
   readonly subjects: ReadonlyMap<string, Item>;
   readonly signer: Signer | null;
   readonly bounds: Bounds;
+  /**
+   * For an outcome (revision 20, section 6.1, "What the judge resolved, for
+   * an outcome"; row I3-47): the two things that the ledger derives before
+   * the owner's effects. `selected`: whether this outcome is selected, as
+   * the entry's `attempt` effect records it. `further`: whether the entry
+   * opens a further attempt. The rule of the effects and the rule of the
+   * `send` are given both, so neither derives them again. Absent: the entry
+   * is no outcome, or the rule is run before the ledger derived them, as
+   * `holds`, `retries` and `wellFormed` are.
+   */
+  readonly outcome?: { readonly selected: boolean | null; readonly further: boolean };
 }
 
 /**
@@ -239,6 +277,14 @@ export interface RuleGiven {
   readonly own: Own;
   readonly resolved: Resolved;
   observed(subject: Observed): ObservationUse | null;
+  /**
+   * Revision 20, section 16.1: what the rows of `observes` of the entry's
+   * form came to, by the position of each row: whole, over or absent. A
+   * rule is told so that a row is over or absent. Null at a position: the
+   * row is of a later step, or is not settled yet. Empty, or absent: the
+   * form states no row.
+   */
+  readonly rows?: readonly (RowStatus | null)[];
   value(domain: string, digest: Digest, most: number): unknown;
   /**
    * Revision 19, section 6.2: the value that one field of the act names,
@@ -300,11 +346,11 @@ export interface OutcomeGives { effects: readonly RuleEffect[]; sends: readonly 
  * outcome that would hold more writes nothing.
  */
 export interface OutcomeRule {
+  valueDomains?: readonly import("./ledger.ts").EvidenceValueDomain[];
+  values?(evidence: Evidence): readonly import("./ledger.ts").EvidenceValue[];
   selects: boolean;
   read: boolean;
   closure?: number;
-  /** The operations that an outcome of this kind opens are reserved by another duty, which the specification counts (`OperationRules.covered`). */
-  covered?: boolean;
   most?: Most;
   /** Whether the request of that attempt may be sent now (`OperationRules.ready`). It reads the folded state alone. Absent: it may. */
   ready?(state: StateView, operation: Operation, attempt: number): boolean;
@@ -313,6 +359,32 @@ export interface OutcomeRule {
   wellFormed?(result: "confirmed" | "refused" | "unknown", evidence: Evidence, given: RuleGiven): boolean;
   unknown?(state: StateView, operation: Operation, attempt: number, own: Own): unknown;
   derives?(given: RuleGiven, operation: Operation, selected: boolean | null): OutcomeGives;
+  /**
+   * Revision 20, section 6.1, "The origin of an outcome", for a kind whose
+   * data states `origin: "rule"`: the position of the one earlier entry of
+   * the scope whose `uses` the outcome copies, or null for none. It is
+   * given the folded state, the outcome as it is offered and the scope's
+   * own earlier entries. It reads no clock and no observation. A position
+   * that is no earlier entry of the scope is a fault.
+   */
+  origin?(given: RuleGiven, operation: Operation): number | null;
+  /**
+   * Revision 20, section 16.1, for a row of `observes` that states `from:
+   * "rule"`: the subjects of that row, a list of key IDs or of member IDs.
+   * `row` is the row's position among the rows of the kind. It is given
+   * what `origin` is given, and each entry in the outcome's `uses`. It
+   * reads no clock and no observation. For a row that states `second`
+   * (revision 21), `first` holds what the rows of the first step came to:
+   * the observation at hand for each subject of a whole row, and for each
+   * other row that it is over or absent.
+   */
+  subjects?(given: RuleGiven, operation: Operation, row: number, first: FirstStep | null): readonly string[];
+}
+
+/** What the rule of a row of the second step is given of the first (section 16.1, "A second step, in an outcome"). */
+export interface FirstStep {
+  observed(subject: Observed): ObservationUse | null;
+  rows: readonly (RowStatus | null)[];
 }
 
 /**
@@ -328,6 +400,8 @@ export interface OutcomeRule {
 export type PlatformRule = { clock?: boolean } & (
   | { place: "grant"; run: GrantRule; refusals: readonly string[] }
   | { place: "also"; run: AlsoSelect }
+  /** Place 2, for the mark that is a binding selector (section 17.2a, revision 23): the rule is given the indexed items and the fields, and nothing else. It reads no clock. */
+  | { place: "also"; bind: BindingSelect }
   | { place: "type"; run: TypeRule }
   | { place: "guard"; run: GuardRule; refusals: readonly string[] }
   | { place: "effect"; run: EffectRule; most: number }
@@ -388,7 +462,7 @@ export function unjudged<T>(judge: () => T): T | { result: "unavailable"; reason
 export const markOf = (v: unknown): Mark | null => (isObject(v) && typeof v["code"] === "string" && typeof v["row"] === "string" ? (v as unknown as Mark) : null);
 
 /** What a judge holds when it gives a rule its six things: the parts of a `Judging` that a rule is given. */
-export type Giving = Pick<Judging, "view" | "clock" | "bounds" | "scope" | "self" | "fields" | "subjects" | "signer" | "facts" | "own" | "source" | "platform" | "judged" | "ran" | "beside">;
+export type Giving = Pick<Judging, "view" | "clock" | "bounds" | "scope" | "self" | "fields" | "subjects" | "signer" | "facts" | "own" | "source" | "platform" | "judged" | "ran" | "beside" | "outcome">;
 
 /** The six things, and no other (section 6.1). The entries in `uses` are those that the input's fields name, and for a delivery its source entry. */
 export function givenTo(g: Giving): RuleGiven {
@@ -397,13 +471,29 @@ export function givenTo(g: Giving): RuleGiven {
   const hand = g.beside;
   return {
     state: g.view, input: g.judged, time: g.clock.asOf, uses, own: g.own ?? (() => null),
-    resolved: { at: g.scope.at, self: g.self, fields: g.fields, subjects: g.subjects, signer: g.signer, bounds: g.bounds },
+    resolved: { at: g.scope.at, self: g.self, fields: g.fields, subjects: g.subjects, signer: g.signer, bounds: g.bounds, ...(g.outcome ? { outcome: g.outcome } : {}) },
     // Sections 4.1 and 16.1: an observation that a rule reads is one that the entry retains. The judge notes each read.
     observed(subject) {
+      // Revision 20, under rows: a rule reads an observation only of a subject on the list. One that reads another has a fault. A
+      // subject of a row that is over or absent has no observation, and the rule reads that it is absent.
+      if (hand?.rows === null) return null;
+      if (hand?.rows) {
+        if (!hand.rows.listed.has(subjectName(subject))) throw new RuleFault("a rule reads an observation of a subject that no row of its form gives");
+        const retained = hand.rows.retained.find((at) => isOf(at, subject));
+        if (retained) return retained;
+        const granted = hand.rows.grant;
+        const observation = granted?.use.observation;
+        // A member served by the signer's grant is read from that grant. It creates no further retained observation.
+        if (granted?.subjects.has(subjectName(subject)) && observation && !("subject" in observation) && "member" in subject) {
+          return { ...granted.use, observation: { subject: "member", of: observation.of, head: observation.head, member: observation.member, memberState: observation.memberState, role: observation.role, activeKey: observation.keyState === "active", controller: observation.controller, controllerActive: observation.controllerActive, definition: observation.definition, at: observation.at } };
+        }
+        return null;
+      }
       const use = hand?.observed.find((at) => isOf(at, subject)) ?? null;
       if (use && hand && !hand.read.observed.includes(use)) hand.read.observed.push(use);
       return use;
     },
+    rows: hand?.rows?.status ?? [],
     // Section 6.2: a value is matched by its digest in the domain that its place states. Bytes that are not the canonical form of a
     // JSON value, and a value that is longer than the bound of its domain, are no value at hand.
     value: (domain, digest, most) => matched(hand, domain, digest, most),
@@ -461,7 +551,10 @@ export function fieldOutsideType(g: Giving, types: Readonly<Record<string, Field
  * that the mark states. Any other answer is a fault.
  */
 export function selectedBy(g: Giving, mark: AlsoMark): Item | null {
-  const id = run(mark, () => ruleFor(g, mark, "also").run(givenTo(g), mark.item));
+  const rule = ruleFor(g, mark, "also");
+  // A rule that is written as a binding selector is given two things only, and stands only where `bound.of` names its name.
+  if (!("run" in rule)) throw new RuleFault(`the rule ${mark.code} is a binding selector, and its mark binds no name that a bound names`);
+  const id = run(mark, () => rule.run(givenTo(g), mark.item));
   if (id === null) return null;
   const item = typeof id === "number" && Number.isSafeInteger(id) && id >= 0 ? g.view.item(id) : null;
   if (item?.type !== mark.item) throw outside(mark, `no item of the type ${mark.item}`);

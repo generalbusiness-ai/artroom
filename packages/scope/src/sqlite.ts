@@ -13,10 +13,10 @@
  * the canonical bytes.
  */
 
-import type { CapabilityName, Digest, Entry, FactRef, FieldValue, Incarnation, KeyId, OperationId, ScopeId, ScopeKind, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
+import type { CapabilityName, Digest, Entry, FactRef, FieldValue, Held, Incarnation, KeyId, OperationId, ScopeId, ScopeKind, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
 import { canonicalize } from "@generalbusiness/artroom-bytes";
 import { MemoryState, byteOrder, operationId, operationStanding, pendingOf, slotOf, timeMs } from "@generalbusiness/artroom-derive";
-import type { Accepted, Decided, HeldCreation, Item, ObservedHead, Operation, Outstanding, OwnRequest, Page, PreparedStep, RangeIndex, RecordState, RecordsWhere, Relation, ScopeState, StateSnapshot } from "@generalbusiness/artroom-derive";
+import type { Accepted, Account, Decided, HeldCreation, Holder, Item, ObservedHead, Operation, Outstanding, OwnRequest, Page, PreparedStep, RangeIndex, RecordState, RecordsWhere, Relation, ScopeState, StateSnapshot } from "@generalbusiness/artroom-derive";
 import type { Dispatched, Duty, OperationStatus, Outgoing, Retained, Sending, Store, Stored } from "./store.ts";
 
 export type SqlValue = string | number | null | ArrayBuffer;
@@ -56,6 +56,14 @@ export interface Sql {
  *   at the attempt next, the time written before its one request left, and
  *   the entry that recorded its first outcome. `attempt_due` indexes the
  *   attempts with no outcome.
+ * - `item_key`: the indexes that an item type declares (section 17.2a,
+ *   revision 23): one row for each indexed slot of each item, live and
+ *   final, written with the item by the entry that opens it. Its primary
+ *   key is the lookup: a type, a slot and a key give the item IDs in
+ *   order. No row is changed or removed. `folded` holds, under `keyed`,
+ *   how many rows a type and slot have, so that a lookup knows from one
+ *   read whether the index holds every item of the type. It is derived
+ *   state, and `all` reads none of it.
  * - `retained_input`: section 9.2; see `Retained`.
  * - `retained_value`: the retained inputs of the kind `value` (sections 6.2
  *   and 9.2, revision 19). A value is kept under its byte domain and its
@@ -80,6 +88,7 @@ CREATE TABLE IF NOT EXISTS inbox (scope TEXT NOT NULL, inc TEXT NOT NULL, seq IN
 CREATE TABLE IF NOT EXISTS folded (kind TEXT NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL, PRIMARY KEY (kind, key)) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS operation (seq INTEGER NOT NULL, k INTEGER NOT NULL, value TEXT NOT NULL, opened INTEGER NOT NULL, unknown INTEGER NOT NULL, unopened INTEGER NOT NULL, PRIMARY KEY (seq, k)) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS operation_open ON operation (seq, k) WHERE opened + unknown + unopened > 0;
+CREATE INDEX IF NOT EXISTS operation_for ON operation (json_extract(value, '$.for'), seq, k) WHERE json_extract(value, '$.for') IS NOT NULL;
 CREATE TABLE IF NOT EXISTS attempt (seq INTEGER NOT NULL, k INTEGER NOT NULL, attempt INTEGER NOT NULL, opened INTEGER NOT NULL, next INTEGER, sent TEXT, outcome INTEGER, PRIMARY KEY (seq, k, attempt)) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS attempt_due ON attempt (next, seq, k, attempt) WHERE outcome IS NULL;
 CREATE TABLE IF NOT EXISTS record (capability TEXT NOT NULL, kind TEXT NOT NULL, key TEXT NOT NULL, state TEXT NOT NULL, value TEXT NOT NULL, PRIMARY KEY (capability, kind, key)) WITHOUT ROWID;
@@ -87,6 +96,7 @@ CREATE INDEX IF NOT EXISTS record_by_state ON record (capability, kind, state);
 CREATE TABLE IF NOT EXISTS prepared (intent TEXT NOT NULL, capability TEXT NOT NULL, step TEXT NOT NULL, seq INTEGER NOT NULL, PRIMARY KEY (intent, capability, step)) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS retained_input (kind TEXT NOT NULL, digest TEXT NOT NULL, bytes TEXT NOT NULL, under TEXT, PRIMARY KEY (kind, digest)) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS retained_value (domain TEXT NOT NULL, digest TEXT NOT NULL, bytes TEXT NOT NULL, PRIMARY KEY (domain, digest)) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS item_key (type TEXT NOT NULL, slot TEXT NOT NULL, key TEXT NOT NULL, id INTEGER NOT NULL, PRIMARY KEY (type, slot, key, id)) WITHOUT ROWID;
 `;
 
 /** A send that is still to be dispatched: not held, not acknowledged, and for a request with no result and no diagnosis. */
@@ -211,12 +221,34 @@ export class SqliteStore implements Store {
     const open = this.#one("SELECT COALESCE(SUM(diagnosis IS NULL), 0) AS requests, COALESCE(SUM(diagnosis LIKE '%\"delivery-unavailable\"%'), 0) AS unavailable FROM outbox WHERE request IS NOT NULL AND result IS NULL")!;
     const pending = this.#one(`SELECT COALESCE(SUM(opened), 0) AS opened, COALESCE(SUM(unknown), 0) AS unknown, COALESCE(SUM(unopened), 0) AS unopened FROM operation WHERE ${OPEN}`)!;
     // The outcome entries that the open operations may still write, by owner and kind: an owner declares a closure for each (derive's `owed`).
-    const outcomes = this.#all(`SELECT json_extract(value, '$.owner') AS owner, json_extract(value, '$.kind') AS kind, SUM(2 * (opened + unopened) + unknown) AS entries FROM operation WHERE ${OPEN} GROUP BY 1, 2`)
-      .map((row) => ({ owner: row["owner"] as Outstanding["outcomes"][number]["owner"], kind: row["kind"] as string, entries: row["entries"] as number }));
+    // `unsent`: how many of them have not made the request of their kind's send, which a send that states `once` reserves once.
+    const outcomes = this.#all(`SELECT json_extract(value, '$.owner') AS owner, json_extract(value, '$.kind') AS kind, SUM(2 * (opened + unopened) + unknown) AS entries, SUM(json_extract(value, '$.sent') IS NULL) AS unsent FROM operation WHERE ${OPEN} GROUP BY 1, 2`)
+      .map((row) => ({ owner: row["owner"] as Outstanding["outcomes"][number]["owner"], kind: row["kind"] as string, entries: row["entries"] as number, unsent: row["unsent"] as number }));
     return {
       requests: open["requests"] as number, unavailable: open["unavailable"] as number,
       opened: pending["opened"] as number, unknown: pending["unknown"] as number, unopened: pending["unopened"] as number, outcomes,
     };
+  }
+
+  // Section 17.2a, "What holds the count": what each holder still holds, the operations of one holder, and the account of each
+  // request. A holder that holds nothing has no row, so `holders` reads the reservations that are open. The operations of one
+  // item are read by the item, from the index `operation_for`.
+  holder(item: number): Held | null { return this.#folded<Holder>("holder", String(item))?.held ?? null; }
+  holders(): readonly Holder[] { return this.#all("SELECT value FROM folded WHERE kind = 'holder'").map((row) => json<Holder>(row["value"])).sort((a, b) => a.item - b.item); }
+  operationsFor(item: number): readonly Operation[] { return this.#all("SELECT value FROM operation WHERE json_extract(value, '$.for') = ? ORDER BY seq, k", item).map((row) => json<Operation>(row["value"])); }
+  account(seq: number, n: number): number | null { return this.#folded<Account>("account", canonicalize([seq, n]))?.item ?? null; }
+  accountsOf(item: number): readonly Account[] {
+    return this.#all("SELECT value FROM folded WHERE kind = 'account' AND json_extract(value, '$.item') = ?", item).map((row) => json<Account>(row["value"])).sort((a, b) => a.seq - b.seq || a.n - b.n);
+  }
+
+  /**
+   * Section 17.2a: one ordered read of `item_key`, of at most `limit` rows, after two small reads that say whether the index holds
+   * every item of the type. So a lookup does not grow with the items that the scope retains.
+   */
+  lookup(type: string, slot: string, key: string, limit: number): readonly number[] | null {
+    const items = this.#one("SELECT COALESCE(SUM(n), 0) AS n FROM item_count WHERE type = ?", type)!["n"] as number;
+    if ((this.#folded<number>("keyed", canonicalize([type, slot])) ?? 0) !== items) return null;
+    return this.#all("SELECT id FROM item_key WHERE type = ? AND slot = ? AND key = ? ORDER BY id LIMIT ?", type, slot, key, limit).map((row) => row["id"] as number);
   }
 
   /**
@@ -234,6 +266,10 @@ export class SqliteStore implements Store {
       if (row["kind"] === "relation") memory.putRelation(json(row["value"]));
       else if (row["kind"] === "creation") memory.putCreation(row["key"] as Digest, json(row["value"]));
       else if (row["kind"] === "observed") memory.putObserved(json(row["value"]));
+      else if (row["kind"] === "holder") { const holder = json<Holder>(row["value"]); memory.putHolder(holder.item, holder.held); }
+      else if (row["kind"] === "account") memory.putAccount(json<Account>(row["value"]));
+      // The count of a declared index is derived state: a checkpoint holds no row of it.
+      else if (row["kind"] === "keyed") continue;
       else memory.putTexts(...json<[number, string, Digest[]]>(row["value"]));
     }
     for (const row of this.#all("SELECT value FROM operation ORDER BY seq, k")) memory.putOperation(json(row["value"]));
@@ -283,12 +319,21 @@ export class SqliteStore implements Store {
   }
   putCreation(seed: Digest, held: HeldCreation): void { this.#fold("creation", seed, held); }
   putObserved(head: ObservedHead): void { this.#fold("observed", canonicalize([head.of.scope, head.of.inc, head.subject]), { of: { scope: head.of.scope, inc: head.of.inc }, subject: head.subject, seq: head.seq }); }
+  putIndexed(type: string, slot: string, key: string, item: number): void {
+    this.#run("INSERT INTO item_key (type, slot, key, id) VALUES (?, ?, ?, ?)", type, slot, key, item);
+    this.#fold("keyed", canonicalize([type, slot]), (this.#folded<number>("keyed", canonicalize([type, slot])) ?? 0) + 1);
+  }
   putOperation(operation: Operation): void {
     const [seq, k] = partsOf(operation.id);
     const { opened, unknown, unopened } = pendingOf(operation);
     this.#run("INSERT INTO operation (seq, k, value, opened, unknown, unopened) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (seq, k) DO UPDATE SET value = excluded.value, opened = excluded.opened, unknown = excluded.unknown, unopened = excluded.unopened",
       seq, k, canonicalize(operation), opened, unknown, unopened);
   }
+  putHolder(item: number, held: Held | null): void {
+    if (held === null) this.#run("DELETE FROM folded WHERE kind = 'holder' AND key = ?", String(item));
+    else this.#fold("holder", String(item), { item, held });
+  }
+  putAccount(account: Account): void { this.#fold("account", canonicalize([account.seq, account.n]), { seq: account.seq, n: account.n, item: account.item }); }
   putTexts(item: number, slot: string, texts: readonly Digest[]): void {
     if (texts.length === 0) this.#run("DELETE FROM folded WHERE kind = 'texts' AND key = ?", canonicalize([item, slot]));
     else this.#fold("texts", canonicalize([item, slot]), [item, slot, texts]);

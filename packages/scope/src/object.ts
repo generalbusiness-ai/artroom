@@ -261,7 +261,7 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
   operations(reader: unknown, cursor?: Cursor, open = false): Read<readonly OperationStatus[]> { return this.#reads.operations(reader, cursor, open); }
   operation(reader: unknown, operation: OperationId): Read<OperationStatus> { return this.#reads.operation(reader, operation); }
   log(reader: unknown, cursor?: Cursor): Read<LogPage> { return this.#reads.log(reader, cursor); }
-  retained(reader: unknown, kind: RetainedInput["kind"], digest: Digest): Read<RetainedInput> { return this.#reads.retained(reader, kind, digest); }
+  retained(reader: unknown, kind: RetainedInput["kind"], digest: Digest, domain?: string): Read<RetainedInput> { return this.#reads.retained(reader, kind, digest, domain); }
   incidents(reader: unknown, cursor?: Cursor): Read<readonly Incident[]> { return this.#reads.incidents(reader, cursor); }
   waiting(reader: unknown, list: "diagnosed" | "unanswered", cursor?: Cursor): Read<readonly Duty[]> { return this.#reads.waiting(reader, list, cursor); }
 }

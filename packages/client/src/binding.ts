@@ -46,6 +46,6 @@ export function bindingTransport(service: ServiceBinding): Transport {
     outbox: (scope, reader, cursor) => call("outbox", () => service.outbox(scope, reader, cursor)),
     duty: (scope, reader, duty) => call("duty", () => service.duty(scope, reader, duty)),
     log: (scope, reader, cursor) => call("log", () => service.log(scope, reader, cursor)),
-    retained: (scope, reader, kind, digest) => call("retained", () => service.retained(scope, reader, kind, digest)),
+    retained: (scope, reader, kind, digest, domain) => call("retained", () => service.retained(scope, reader, kind, digest, domain)),
   };
 }

@@ -6,7 +6,7 @@
  * `Status`, are the contract's, and are exported here again.
  */
 
-import type { CapabilityName, Digest, FactRef, FieldValue, Head, Incarnation, Item, KeyId, OperationId, Party, PlatformDefinition, Request, ScopeId, ScopeKind, ScopeRef, Seed, Status, Timestamp } from "@generalbusiness/artroom-contract";
+import type { CapabilityName, Digest, FactRef, FieldValue, Head, Held, Incarnation, Item, KeyId, OperationId, Party, PlatformDefinition, Request, ScopeId, ScopeKind, ScopeRef, Seed, Status, Timestamp } from "@generalbusiness/artroom-contract";
 import { canonicalBytes, canonicalize, digestBytes } from "@generalbusiness/artroom-bytes";
 import { pendingOf } from "./ledger.ts";
 import { byteOrder } from "./values.ts";
@@ -76,11 +76,30 @@ export interface AttemptState { attempt: number; opened: number; outcomes: reado
  * number of the attempt whose result was selected, which is set once and
  * never moves (item 7). An operation with no attempt is a held duty of a
  * provisional scope's genesis (item 1).
+ *
+ * `for` (section 17.2a, "What holds the count"): the holder that the
+ * operation is for, by its item's ID, as its `operation` effect states it.
+ * Only an operation of a kind that an item holds has it. `sent` (section
+ * 17.2, "A request that an outcome sends"): an outcome entry of the
+ * operation made the request of its kind's `send`. It is kept only for a
+ * kind whose send states `once`. So an operation of any other kind has the
+ * bytes it had.
  */
 export interface Operation {
   id: OperationId; owner: CapabilityName | PlatformDefinition; kind: string; most: number;
   attempts: readonly AttemptState[]; selected: number | null;
+  for?: number; sent?: true;
 }
+
+/**
+ * What one holder still holds (section 17.2a): the item, and its three
+ * counts. A holder that holds nothing has no record: one whose every count
+ * is drawn, and one that is final and has released what it held.
+ */
+export interface Holder { item: number; held: Held }
+
+/** The account of one request that this scope sent (section 17.2a): the holder on whose reservation the sending entry drew. */
+export interface Account { seq: number; n: number; item: number }
 
 /**
  * The duties that are open and are not items (section 9.2). `requests`: sent
@@ -91,11 +110,13 @@ export interface Operation {
  * `unopened`, attempts that may still be opened. `outcomes`: for each owner
  * and kind of those operations, in no stated order, the outcome entries
  * that they may still write: 2 for each attempt that is opened or may be,
- * and 1 for each that is `unknown`.
+ * and 1 for each that is `unknown`. `unsent`: how many of those operations
+ * have not made the request of their kind's `send`, which a kind that
+ * states `once` reserves once for each (section 17.2).
  */
 export interface Outstanding {
   requests: number; unavailable: number; opened: number; unknown: number; unopened: number;
-  outcomes: readonly { owner: CapabilityName | PlatformDefinition; kind: string; entries: number }[];
+  outcomes: readonly { owner: CapabilityName | PlatformDefinition; kind: string; entries: number; unsent: number }[];
 }
 
 /**
@@ -167,6 +188,15 @@ export interface StateSnapshot {
    * digest is the one it had before the fold held this.
    */
   observed?: readonly ObservedHead[];
+  /**
+   * What each holder still holds, by item (section 17.2a, "What holds the
+   * count"). Absent: no item of the scope holds anything. A state with none
+   * has no member, so its digest is the one it had before the fold held
+   * this. The holder of each operation is the member `for` of the operation.
+   */
+  holders?: readonly Holder[];
+  /** The account of each request that an entry with an account sent, by the sending entry and the send's ordinal (section 17.2a). Absent: none. */
+  accounts?: readonly Account[];
 }
 
 /** The digest a checkpoint entry carries: SHA-256 of the snapshot's canonical JSON. */
@@ -236,6 +266,35 @@ export interface StateView {
   incarnations(scope: ScopeId): readonly Incarnation[];
   /** How many duties are open, for the room they need to settle (section 9.2); see `Outstanding`. */
   outstanding(): Outstanding;
+  /** What that item still holds (section 17.2a). Null: it holds nothing, or it is no holder. */
+  holder(item: number): Held | null;
+  /** Every holder that still holds something, in the order of the items. A holder that holds nothing has no record, so this reads the reservations that are open. */
+  holders(): readonly Holder[];
+  /**
+   * The operations that are for that holder, in the order in which they were
+   * opened (section 17.2a, "What holds the count"): the index of operations
+   * by item, which a rule is given with the rest of the state (I3 deltas,
+   * entry FA5). A holder's counts bound how many there are.
+   */
+  operationsFor(item: number): readonly Operation[];
+  /** The account of that request of this scope. Null: its sending entry had none. */
+  account(seq: number, n: number): number | null;
+  /** The requests of that account, in the order of the sending entry, then the ordinal. */
+  accountsOf(item: number): readonly Account[];
+  /**
+   * The one lookup of an index that an item type declares (section 17.2a,
+   * "An index that an item type declares", revision 23): the IDs of the
+   * items of that type, live and final, whose indexed slot holds that key,
+   * in order of item ID, at most `limit`. `key` is the key's canonical
+   * JSON (`keyOf`, in `binding.ts`). The index answers no range, no prefix,
+   * no part of a key and no count.
+   *
+   * Null: the index does not hold a row for every item of the type, so no
+   * lookup is answered from it. That is so for a slot that was never
+   * indexed. The index is derived state: `all` holds no row of it, and a
+   * replay rebuilds it by folding.
+   */
+  lookup(type: string, slot: string, key: string, limit: number): readonly number[] | null;
   /** Everything, for a checkpoint. This is the one read that is not bounded. */
   all(): StateSnapshot;
 }
@@ -257,6 +316,12 @@ export interface StateWriter extends StateView {
   putRecord(record: RecordState): void;
   /** The highest head of one subject. The fold calls it only with a head that is higher than the one held. */
   putObserved(head: ObservedHead): void;
+  /** What a holder still holds. Null: it holds nothing more, and its record is removed. */
+  putHolder(item: number, held: Held | null): void;
+  /** The account of one request, set by the fold of the entry that sends it. */
+  putAccount(account: Account): void;
+  /** One row of a declared index: an item that this entry opens, under the key that its indexed slot holds. The fold calls it once for each indexed slot of such an item, with the item. */
+  putIndexed(type: string, slot: string, key: string, item: number): void;
 }
 
 type Key = readonly (string | number)[];
@@ -304,6 +369,8 @@ export class MemoryState implements StateWriter {
   readonly #prepared = new Map<string, PreparedStep>();
   readonly #records = new Map<string, RecordState>();
   readonly #observed = new Map<string, ObservedHead>();
+  readonly #holders = new Map<number, Held>();
+  readonly #accounts = new Map<string, Account>();
   /**
    * For each observed scope ID, the incarnations of the observed heads that are held, once each, in byte order. `putObserved`
    * keeps it, and no head is ever removed. So `incarnations` reads one list, and not every head that the scope holds: a scope
@@ -317,6 +384,13 @@ export class MemoryState implements StateWriter {
    * reads it at the first update for each key (I3 deltas, section 31, entry FD6).
    */
   readonly #copies = new Map<string, number>();
+  /**
+   * The declared indexes (section 17.2a): for each type, slot and key, the IDs of its items in ascending order; and for each
+   * type and slot, how many rows it holds. A new item has the highest ID, so its row is appended. No row is ever removed. It is
+   * derived state, and `all` holds none of it.
+   */
+  readonly #keyed = new Map<string, number[]>();
+  readonly #rows = new Map<string, number>();
 
   /** `tally`, when it is given, counts what `incarnations` and `copies` read, for a test of their bounds. Nothing else is counted. */
   readonly tally: { steps: number } | undefined;
@@ -376,13 +450,31 @@ export class MemoryState implements StateWriter {
     operations.forEach(({ owner, kind }, i) => {
       const entries = 2 * (pending[i]!.opened + pending[i]!.unopened) + pending[i]!.unknown;
       const at = key(owner, kind);
-      if (entries > 0) outcomes.set(at, { owner, kind, entries: (outcomes.get(at)?.entries ?? 0) + entries });
+      if (entries > 0) outcomes.set(at, { owner, kind, entries: (outcomes.get(at)?.entries ?? 0) + entries, unsent: (outcomes.get(at)?.unsent ?? 0) + (operations[i]!.sent === true ? 0 : 1) });
     });
     return {
       requests: open.filter((r) => r.diagnosis === null).length, unavailable: open.filter((r) => r.diagnosis?.finding === "delivery-unavailable").length,
       opened: sum((p) => p.opened), unknown: sum((p) => p.unknown), unopened: sum((p) => p.unopened),
       outcomes: [...outcomes.values()],
     };
+  }
+
+  holder(item: number) { return this.#holders.get(item) ?? null; }
+  holders(): Holder[] { return [...this.#holders].sort(([a], [b]) => a - b).map(([item, held]) => ({ item, held })); }
+  operationsFor(item: number) { return [...this.#operations.values()].filter((o) => o.for === item).sort((a, b) => keyOrder(a.id.split(":").map(Number), b.id.split(":").map(Number))); }
+  account(seq: number, n: number) { return this.#accounts.get(key(seq, n))?.item ?? null; }
+  accountsOf(item: number) { return [...this.#accounts.values()].filter((a) => a.item === item).sort((a, b) => keyOrder([a.seq, a.n], [b.seq, b.n])); }
+  lookup(type: string, slot: string, at: string, limit: number): readonly number[] | null {
+    // Complete: one row for each item of the type that the state holds, live and final.
+    const items = [...this.#counts.values()].reduce((n, [of, , count]) => (of === type ? n + count : n), 0);
+    if ((this.#rows.get(key(type, slot)) ?? 0) !== items) return null;
+    return (this.#keyed.get(key(type, slot, at)) ?? []).slice(0, limit);
+  }
+  putIndexed(type: string, slot: string, at: string, item: number) {
+    const ids = this.#keyed.get(key(type, slot, at)) ?? [];
+    this.#keyed.set(key(type, slot, at), ids);
+    ids.splice(firstAbove(ids, item), 0, item);
+    this.#rows.set(key(type, slot), (this.#rows.get(key(type, slot)) ?? 0) + 1);
   }
 
   setScope(scope: ScopeState) { this.#scope = scope; }
@@ -421,6 +513,11 @@ export class MemoryState implements StateWriter {
     const held = this.#incarnations.get(h.of.scope) ?? [];
     if (!held.includes(h.of.inc)) this.#incarnations.set(h.of.scope, [...held, h.of.inc].sort(byteOrder));
   }
+  putHolder(item: number, held: Held | null) {
+    if (held === null) this.#holders.delete(item);
+    else this.#holders.set(item, held);
+  }
+  putAccount(a: Account) { this.#accounts.set(key(a.seq, a.n), { seq: a.seq, n: a.n, item: a.item }); }
 
   all(): StateSnapshot {
     const sorted = <T>(values: Iterable<T>, of: (value: T) => Key) => [...values].sort((a, b) => keyOrder(of(a), of(b)));
@@ -439,6 +536,8 @@ export class MemoryState implements StateWriter {
       ...(this.#prepared.size === 0 ? {} : { prepared: this.#steps() }),
       ...(this.#records.size === 0 ? {} : { records: this.#kept() }),
       ...(this.#observed.size === 0 ? {} : { observed: sorted(this.#observed.values(), (h) => [h.of.scope, h.of.inc, h.subject]) }),
+      ...(this.#holders.size === 0 ? {} : { holders: this.holders() }),
+      ...(this.#accounts.size === 0 ? {} : { accounts: sorted(this.#accounts.values(), (a) => [a.seq, a.n]) }),
     };
   }
   /** The snapshot as one canonical text, to compare two states. */

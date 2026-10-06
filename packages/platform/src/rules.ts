@@ -60,7 +60,7 @@ export const RULES: RuleTable = {
   "platform:register": registerRules, "platform:directory": directoryRules,
   // The six rules of the rules scope are the whole of its version, so `platform:rules@1` is runnable (`rules-scope.ts`).
   "platform:rules": rulesScopeRules,
-  // The destination's data holds ten marks with no rule: `abort-if-behind`, `resend-due` and the eight rules of its `outcomes`
-  // (`destination.ts`). So this table does not make `platform:destination@1` runnable.
+  // Every destination mark has its rule, including `first-head` and `receipt`, so `platform:destination@1` is runnable
+  // (`destination.ts`). The real-scope founding and publication witness uses a scripted Git host (`scope/test/founding-real.test.ts`).
   "platform:destination": destinationRules,
 };

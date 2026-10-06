@@ -268,7 +268,7 @@ test("a lane is created only under a digest that the retained observation of the
     // Revision 25, EP15: a digest that is `active`, whose bytes hash to it and do not validate, is refused under its own code.
     said(d.act(rita, "open-issue", opening(d, {}, BROKEN.digest), { observed: [rulesObserved(rules, [BROKEN.digest])], values: [BROKEN.bytes] })),
     d.head.seq, d.item(0).values["lastNumber"],
-  ]).toEqual([["refused", "guard-failed", "not-activated"], ["unavailable", "dependency-unavailable", null], ["unavailable", "dependency-unavailable", null], ["refused", "unsupported-definition", "unsupported-definition"], head, 0]);
+  ]).toEqual([["refused", "guard-failed", "not-activated"], ["unavailable", "authority-unavailable", null], ["unavailable", "dependency-unavailable", null], ["refused", "unsupported-definition", "unsupported-definition"], head, 0]);
 
   // One entry: the row, with the next number, and the one `create` of a lane under that digest, at ordinal 0. Its cause is the
   // act's intent. The entry retains the observation of the rules that its guard read.
@@ -289,7 +289,7 @@ test("a lane is created only under a digest that the retained observation of the
   // `open-task`: the worker's standing, from the observation that the entry retains. The signer is the agent's controller.
   const bot: MemberRef = { membership, member: "@bot" };
   const task = (observed: readonly ObservationUse[]) => d.act(rita, "open-task", { expected: { repository: d.item(0).revision }, fields: { worker: bot, controller: { membership, member: "@rita" }, lane } }, { observed });
-  expect([said(task([])), said(task([memberObserved(membership, "@bot", { memberState: "removed", controller: "@rita" })]))]).toEqual([["unavailable", "dependency-unavailable", null], ["refused", "guard-failed", "worker-not-active"]]);
+  expect([said(task([])), said(task([memberObserved(membership, "@bot", { memberState: "removed", controller: "@rita" })]))]).toEqual([["unavailable", "authority-unavailable", null], ["refused", "guard-failed", "worker-not-active"]]);
   expect(said(task([memberObserved(membership, "@bot", { controller: "@rita" })]))).toEqual(WRITTEN);
   expect([d.item(d.head.seq).state, d.item(d.head.seq).parties, d.last.sends.map((send) => [(send.to as Seed).kind, (send.to as Seed).definition, (send.message as { body: { fields: unknown } }).body.fields])]).toEqual([
     "creating", { worker: bot, controller: { membership, member: "@rita" } }, [["task", "platform:task@1", { worker: bot, controller: { membership, member: "@rita" }, lane, membership, directory: d.at }]],

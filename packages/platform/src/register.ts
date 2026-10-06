@@ -382,8 +382,9 @@ export const registerRules: Rules = {
    * `create-directory`, and its clause"). It gives a request on the
    * selecting outcome, and on no other: a `confirmed` outcome of an
    * operation that has selected nothing, for a claim whose `repository` is
-   * unset. That is the judgment that the ledger makes of `selected`, on the
-   * same state.
+   * unset. That is the judgment that the ledger makes of `selected`, and
+   * the rule is given it with what the judge resolved (the contract's
+   * revision 20, section 6.1; row I3-47). It derives nothing of it again.
    *
    * The request is the `create` of the directory. Its seed names this
    * register as creator, and its cause is the digest of the founder's
@@ -400,10 +401,7 @@ export const registerRules: Rules = {
     place: "send",
     run: (given) => {
       const input = given.input;
-      if (input.type !== "outcome" || input.result !== "confirmed") return null;
-      const operation = given.state.operation(input.operation);
-      const claim = claimOf(given.state, input.operation);
-      if (!operation || operation.selected !== null || !claim || (claim.values["repository"] ?? null) !== null) return null;
+      if (input.type !== "outcome" || given.resolved.outcome?.selected !== true) return null;
       const opening = given.own(openedAt(input.operation));
       const held = registerOf(given.state);
       const body = isObject(input.evidence.body) ? input.evidence.body : {};

@@ -11,7 +11,9 @@ import { isEntryOf, updateOf, useOf, type Reading } from "./fields.ts";
 import { bound, runClause, runHandler, type Clause, type Handled, type Sent } from "./handlers.ts";
 import type { Judgment } from "./judge.ts";
 import { heldOpenings } from "./ledger.ts";
-import { atHand, retainedOf, unjudged, type JudgedInput } from "./marks.ts";
+import { withinCounts } from "./draws.ts";
+import { atHand, atHandByRows, retainedOf, unjudged, type JudgedInput } from "./marks.ts";
+import type { Observing } from "./observes.ts";
 import { recordEffects } from "./prepare.ts";
 import type { ScopeState, StateView } from "./state.ts";
 import { nextDue } from "./timed.ts";
@@ -41,6 +43,15 @@ export interface DeliveryContext extends Reading {
    * a handler of a request or of an advisory is given none. Absent: none.
    */
   observed?: readonly ObservationUse[] | undefined;
+  /**
+   * Revision 20, section 16.1, for a result under a definition whose data
+   * states rows: what the commit holds for the rows of the clause that
+   * runs, beside `observed`, whose records the judge then judges itself by
+   * the six guards with each row's window and use; and the canonical bytes
+   * of each value that came beside an observation.
+   */
+  observing?: Observing | undefined;
+  values?: readonly string[] | undefined;
 }
 
 /** How the resolver of this name answers an address that is not this scope and incarnation (sections 2.3 and 7.4), or null. */
@@ -85,7 +96,7 @@ function oneUpdateForKey(source: Entry, from: FactRef, to: ScopeRef, name: strin
  * judged: transport answers `retry`, and nothing is written (section 6.1).
  */
 export function judgeDelivery(view: StateView, definition: ValidDefinition, delivered: Delivered, context: DeliveryContext): Judgment {
-  return unjudged(() => deliveryJudged(view, definition, delivered, context));
+  return withinCounts(view, definition, unjudged(() => deliveryJudged(view, definition, delivered, context)));
 }
 
 function deliveryJudged(view: StateView, definition: ValidDefinition, delivered: Delivered, context: DeliveryContext): Judgment {
@@ -122,8 +133,8 @@ function deliveryJudged(view: StateView, definition: ValidDefinition, delivered:
   const use = useOf(from, source);
   /** Section 5.3: an entry that judges no time condition may be written clamped; one that does is `clock-behind`. */
   /** `read`: the foreign entries a clause read beside the source entry. Each fact is recorded once (section 9.2). */
-  const write = (input: Extract<Judgment, { result: "write" }>["draft"]["input"], effects: readonly Effect[], sends: readonly Send[], prepared: readonly Prepared[], judgesTime: boolean, read: readonly FactUse[] = [], settles = false): Judgment =>
-    (judgesTime && clock.behind ? { result: "unavailable", reason: "clock-behind" } : { result: "write", draft: { input, uses: [use, ...read.filter((u) => u.fact.hash !== from.hash)], prepared, effects, sends, judgesTime, settles } });
+  const write = (input: Extract<Judgment, { result: "write" }>["draft"]["input"], effects: readonly Effect[], sends: readonly Send[], prepared: readonly Prepared[], judgesTime: boolean, read: readonly FactUse[] = [], settles = false, bound?: { item: number; message: string }): Judgment =>
+    (judgesTime && clock.behind ? { result: "unavailable", reason: "clock-behind" } : { result: "write", draft: { input, uses: [use, ...read.filter((u) => u.fact.hash !== from.hash)], prepared, effects, sends, judgesTime, settles, ...(bound ? { bound } : {}) } });
   /** Section 7.2: the cause of any scope this delivery's handler creates names this one delivery. */
   const cause = () => deliveryCauseDigest({ v: 1, from, n, message: messageDigest(message) });
 
@@ -151,9 +162,9 @@ function deliveryJudged(view: StateView, definition: ValidDefinition, delivered:
    * entry sends exactly one result, which names the request by its source
    * fact and ordinal. The result follows the sends the handler declares.
    */
-  const decide = (decision: "applied" | "refused" | "superseded", reason: Reason | undefined, effects: readonly Effect[] = [], sends: readonly Send[] = [], prepared: readonly Prepared[] = [], judgesTime = false, read: readonly FactUse[] = [], settles = false): Judgment => {
+  const decide = (decision: "applied" | "refused" | "superseded", reason: Reason | undefined, effects: readonly Effect[] = [], sends: readonly Send[] = [], prepared: readonly Prepared[] = [], judgesTime = false, read: readonly FactUse[] = [], settles = false, bound?: { item: number; message: string }): Judgment => {
     const answer: Result = { class: "result", of: { from, n }, outcome: decision, ...(reason ? { reason } : {}) };
-    return write({ type: "delivery", from, n, message: message as Request, decision, ...(reason ? { reason } : {}) }, effects, [...sends, { n: sends.length, to: from.at, message: answer }], prepared, judgesTime, read, settles);
+    return write({ type: "delivery", from, n, message: message as Request, decision, ...(reason ? { reason } : {}) }, effects, [...sends, { n: sends.length, to: from.at, message: answer }], prepared, judgesTime, read, settles, bound);
   };
   const b = bound(definition, message, from);
   if (!b) return decide("refused", { code: "bad-field" });
@@ -161,8 +172,10 @@ function deliveryJudged(view: StateView, definition: ValidDefinition, delivered:
   // pin reserved for its number, whatever it decides. So its deciding entry is a settling entry. When it refuses, for any reason, the
   // entry holds one effect: the record whose `decided` is the request's number. A request that is not bound is as it was: new work.
   const reserved = message.type === "tell" ? reservedFor(view, definition, context, scope.at, from.at, b.kind, message.body) : null;
-  const refuse = (reason: Reason, prepared: readonly Prepared[] = [], read: readonly FactUse[] = []): Judgment =>
-    decide("refused", reason, reserved ? recordEffects(reserved.capability, [reserved.refused]) : [], [], prepared, false, read, reserved !== null);
+  // Section 17.2a, "A request that is bound to a holder": the deciding entry of a delivery that is bound to an item is settling
+  // too, whether it decides `applied` or `refused`, and a refused one still holds no effect of its handler.
+  const refuse = (reason: Reason, prepared: readonly Prepared[] = [], read: readonly FactUse[] = [], bound?: { item: number; message: string }): Judgment =>
+    decide("refused", reason, reserved ? recordEffects(reserved.capability, [reserved.refused]) : [], [], prepared, false, read, reserved !== null || bound !== undefined, bound);
   // Section 4.2: a request that names no handler of the definition, for a scope of the sender's kind and definition, is decided
   // `refused`. That holds for a relationship update too: a scope keeps a copy only for a relationship it declares a handler for.
   // An entry so decided has no kind (section 6.2): no handler of this definition received it.
@@ -192,12 +205,13 @@ function deliveryJudged(view: StateView, definition: ValidDefinition, delivered:
   if (ran.result === "unavailable") return ran;
   // A refusal, among them `duplicate-relation` for a handler whose sends hold two for one key: no effect and no send but the result.
   // The deciding entry records each rule result a guard read before the refusal, and each foreign entry the fields named (section 9.2).
-  if (ran.result === "refused") return refuse(reasonOf(ran), ran.prepared, ran.uses);
+  const item = ran.bound === undefined ? undefined : { item: ran.bound, message: b.kind };
+  if (ran.result === "refused") return refuse(reasonOf(ran), ran.prepared, ran.uses, item);
   // Section 7.3: copies are bounded. The first update for a key beyond the number its handler states is refused, like an opening
   // past a type's `max`. An update for a key that is already held is never refused for that reason.
-  if (first && view.copies(b.kind, from.at.kind) >= (handler.copies ?? 0)) return refuse({ code: "type-full" }, ran.prepared, ran.uses);
+  if (first && view.copies(b.kind, from.at.kind) >= (handler.copies ?? 0)) return refuse({ code: "type-full" }, ran.prepared, ran.uses, item);
   // A refusal takes nothing out of a pending state, so it is new work (section 17.3). An applied update or message may settle.
-  return decide("applied", undefined, [...platform, ...ran.effects], ran.sends, ran.prepared, ran.judgesTime, ran.uses, ran.settles || settlesCopy || reserved !== null);
+  return decide("applied", undefined, [...platform, ...ran.effects], ran.sends, ran.prepared, ran.judgesTime, ran.uses, ran.settles || settlesCopy || reserved !== null || item !== undefined, item);
 }
 
 /**
@@ -276,13 +290,18 @@ function result(view: StateView, definition: ValidDefinition, context: DeliveryC
     clause = "conflict";
   }
   // Sections 4.1 and 16.1: a rule of the clause reads a further observation, in platform data, and what it reads is noted.
-  const beside = context.observed === undefined ? undefined : atHand(context.observed, undefined);
-  const ran = runClause(view, definition, context, scope, request, clause, { sender: from.at, ...(message.reason ? { reason: message.reason } : {}), source: { fact: from, entry: source, under: context.source!.under } }, judged, beside);
+  // Revision 20: under a definition whose data states rows, the entry retains what the rows of its clause give, and nothing is at
+  // hand for a rule until they are settled. Under any other, the older rule stands, as a stand-in.
+  const beside = definition.observing ? atHandByRows(context.values) : context.observed === undefined ? undefined : atHand(context.observed, undefined);
+  const given = definition.observing ? { observed: context.observed ?? [], values: context.values ?? [], observing: context.observing } : undefined;
+  const ran = runClause(view, definition, context, scope, request, clause, { sender: from.at, ...(message.reason ? { reason: message.reason } : {}), source: { fact: from, entry: source, under: context.source!.under } }, judged, beside, given);
   if (ran.result === "unavailable") return ran;
   // Section 7.2: the creator confirms the incarnation of the first applied result it records, and no other.
   const confirm: Send[] = clause === "applied" && request.type === "create" ? [{ n: 0, to: from.at, message: { class: "control", type: "confirm", genesis: from } }] : [];
   // Section 4.1: the entry holds each observation that a rule of its clause read, in ascending order of `read.n`, and no member
   // when none was read. Section 16.1: an entry that retains one judges time, and is never written clamped.
-  const retained = retainedOf(beside).observed;
-  return write({ type: "delivery", from, n, message, clause, ...(retained.length > 0 ? { observed: retained } : {}) }, ran.effects, confirm, [], ran.judgesTime || retained.length > 0, ran.uses);
+  const { observed: retained, values } = retainedOf(beside);
+  const written = write({ type: "delivery", from, n, message, clause, ...(retained.length > 0 ? { observed: retained } : {}) }, ran.effects, confirm, [], ran.judgesTime || retained.length > 0, ran.uses);
+  // Section 16.1, "A value that a row may retain": each value that a retained observation names is kept with the entry, apart from it.
+  return written.result === "write" && (values.length > 0 || ran.rows) ? { ...written, draft: { ...written.draft, ...(values.length > 0 ? { values } : {}), ...(ran.rows ? { rows: ran.rows } : {}) } } : written;
 }

@@ -180,7 +180,7 @@ export class Directory extends Ledger {
 
   /** An act, judged with the directory's rules, on the grants of the test authority. */
   override act(who: Actor, kind: string, over: Over = {}, context: Context = {}): ActJudgment {
-    return super.act(who, kind, over, { platform: directoryPlatform, ...context });
+    return super.act(who, kind, over, { platform: directoryPlatform, membership: this.children.membership ?? null, observing: { membership: this.children.membership ?? null, rules: this.children.rules ?? null, content: () => ({ singleControllerException: true, extents: true }) }, ...context });
   }
 
   /** The outcome of one attempt of an operation of the directory, judged with its rules. Written when the judgment is to write. `body` undefined: as for `Register.outcome`. */

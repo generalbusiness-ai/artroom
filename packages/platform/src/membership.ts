@@ -38,12 +38,20 @@
  * and an admin's first list has 34. That needs the bound on a list of the
  * scope contract's revision 19 (its section 6.1, 64).
  *
+ * Two rows are of the note's revision 28, at `8b1c3c9d7`, which its checker
+ * approved and whose adoption was not recorded when they were built (I3
+ * deltas, the entries GD). The mark `action-list` is an eleventh rule: the
+ * type of the five role lists and of the field `actions` (row aa, P27).
+ * And `revoke-key` and `remove-member` each declare `settles` (section
+ * 5.8, "`settles` on the rows of membership").
+ *
  * The note's `max`, text lengths and ranges are examples that the proof
  * plan owns. They are written as the note has them.
  */
 
-import type { KeyId, MemberId, MemberObservation, Observation, ObservationRequest, PlatformData, PlatformDefinition, ScopeRef } from "@generalbusiness/artroom-contract";
+import type { HoldersObservation, KeyId, MemberId, MemberObservation, Observation, ObservationRequest, PlatformData, PlatformDefinition, ScopeRef } from "@generalbusiness/artroom-contract";
 import { textDigest } from "@generalbusiness/artroom-bytes";
+import { firstHolders } from "@generalbusiness/artroom-derive";
 import type { Item, PlatformRule, RuleGiven, Rules, StateView } from "@generalbusiness/artroom-derive";
 
 /** The name and version that this data and these rules are. An observation states it (section 3.3). */
@@ -51,8 +59,31 @@ export const MEMBERSHIP = "platform:membership@1" satisfies PlatformDefinition;
 
 const KEY = { type: "text", max: 64 } as const;
 const HANDLE = { type: "text", max: 256 } as const;
-/** A list of actions: each of the five lists of the roster, and the field `actions` of `set-actions` (section 3.2, "The table, counted": 64 from revision 24). */
-const ACTIONS = { type: "list", of: { type: "text", max: 64 }, max: 64 } as const;
+/**
+ * A list of actions: each of the five lists of the roster, and the field
+ * `actions` of `set-actions` (section 3.2, "The table, counted": 64 from
+ * revision 24). From the note's revision 28 (the second commit of its
+ * revision 27) the type is a mark at place 3 (section 12.1.8, row aa, P27),
+ * in place of the written list of texts: a text type states a length only,
+ * and an observation of a key holds one such list, so its largest size
+ * rests on the rule on a name's characters (section 3.3). The rule is
+ * `action-list`, below.
+ */
+const ACTIONS = { code: "action-list", row: "P27", type: "code" } as const;
+/** The most names of one list of actions, and the most bytes of one name (section 3.2). */
+export const ACTIONS_MOST = 64;
+const ACTION_BYTES = 64;
+
+/**
+ * A list of actions (section 3.2; section 12.1.8, row aa): at most 64
+ * names, with no name twice, each of 1 to 64 bytes, and each byte a
+ * lower-case ASCII letter, a digit, a hyphen or a full stop. It is the rule
+ * that an extent's `approver` has (section 12.1.4). Every byte of such a
+ * name is one character, so the length of the text is its bytes.
+ */
+export const isActions = (value: unknown): value is readonly string[] =>
+  Array.isArray(value) && value.length <= ACTIONS_MOST && new Set(value).size === value.length
+  && value.every((name) => typeof name === "string" && name.length >= 1 && name.length <= ACTION_BYTES && /^[a-z0-9.-]+$/.test(name));
 const ROLE = { type: "enum", of: ["admin", "maintainer", "member", "agent", "checker"] } as const;
 const INVITATION = { inviteHash: { fixed: true, required: false, of: { type: "digest" } }, inviteEnds: { fixed: true, required: false, of: { type: "time" } } } as const;
 const ROSTER = { roster: { item: "roster", one: true } } as const;
@@ -443,6 +474,8 @@ export const membership: PlatformData = {
       effects: [{ state: "removed" }],
       sends: [],
       attention: [],
+      // From revision 28 (section 5.8, "`settles` on the rows of membership"): an active member reserves the entry of its removal.
+      settles: { of: "on", in: ["active"] },
     },
     // `revoke-key`: an act. Grant `membership.manage`, or the recovery key (Code P13). The last active key of the last admin is not
     // revoked, except by the recovery key (row i). A key revoked as compromised is told to the directory.
@@ -464,6 +497,11 @@ export const membership: PlatformData = {
         },
       }],
       attention: [],
+      // From revision 28 (the same table): an active key reserves the entry of its revocation, and the pending request of the
+      // `compromised` notice with its 2 entries. That is 3.
+      // I3 merge: `join` and `enrol` declare no `settles`. Their `of` would be a name of `also` that the mark `invitation` binds, and
+      // the note asks the contract to confirm that form (its section 13.17, ask 5). No adopted text confirms it (I3 deltas, entry GD4).
+      settles: { of: "on", in: ["active"] },
     },
     // `rotate-recovery`: an act, signed by the recovery key (Code P13 and P14). The new key is not, and never was, a member's key.
     "rotate-recovery": {
@@ -666,6 +704,13 @@ export const membershipRules: Rules = {
       return [{ effect: "party", item: resolved.self, slot: "member", member: { membership: resolved.at, member: handle } }];
     },
   },
+  /**
+   * Row aa, the type of the five lists of the roster and of the field
+   * `actions` of `set-actions` (P27). The value is of the type when it is a
+   * list of actions (`isActions`). Otherwise the act is `bad-field`. It
+   * reads the value alone.
+   */
+  "action-list": { place: "type", run: (_given, value) => isActions(value) },
   /** Row q, among the guards of `invite-member` and `add-member` (P27), on the field `handle`. */
   "handle-form": handleForm("handle"),
   "last-admin-kept": {
@@ -714,12 +759,20 @@ export const NO_MEMBER = "@-" satisfies MemberId;
  *   answers so for every key of that member, whatever the key's own state
  *   (row 23 of the table of marks).
  * - **A member.** The member's item, and whether it has an active key.
+ * - **The holders of an action** (the contract's revision 20, section
+ *   16.1, "An observation of the holders of one action"; source row I3-42):
+ *   each active member who has an active key and whose role's list of
+ *   actions at that head holds the action, which is what an observation of
+ *   that key would list. `count` is how many there are, and `holders` the
+ *   first of them in byte order of member ID, as many as the request's
+ *   `most`. One pass over the active keys and the members. The count
+ *   permits nothing.
  *
  * `within` names the scopes of this repository: this membership scope, with
  * its incarnation. No grant of membership has an end time, so `notAfter`
  * is null.
  */
-export function standingOf(state: Pick<StateView, "scope" | "page" | "item">, asked: ObservationRequest): Omit<Observation, "at"> | Omit<MemberObservation, "at"> | null {
+export function standingOf(state: Pick<StateView, "scope" | "page" | "item">, asked: ObservationRequest): Omit<Observation, "at"> | Omit<MemberObservation, "at"> | Omit<HoldersObservation, "at"> | null {
   const scope = state.scope();
   // A request that states an incarnation is answered by that incarnation only. One that asks by the scope ID alone, as the first read
   // of a rules scope or of a destination does, is answered by the scope that holds the name: the answer's `of` says which.
@@ -738,6 +791,18 @@ export function standingOf(state: Pick<StateView, "scope" | "page" | "item">, as
     const item = memberItem(state, asked.member);
     if (!item) return { ...common, subject: "member", member: asked.member, memberState: "unknown", role: null, activeKey: null, controller: null, controllerActive: null };
     return { ...common, subject: "member", member: asked.member, memberState: item.state === "active" ? "active" : "removed", role: text(item.values["role"]), activeKey: hasActiveKey(state, item.id), ...controlled(item) };
+  }
+  if ("holders" in asked) {
+    if (typeof asked.holders !== "string" || !Number.isSafeInteger(asked.most) || asked.most < 1) return null;
+    const keyed = new Set<unknown>();
+    for (const key of itemsOf(state, "key", ["active"])) keyed.add(key.refs["member"]);
+    const holding: MemberId[] = [];
+    for (const member of itemsOf(state, "member", ["active"])) {
+      const [role, handle] = [text(member.values["role"]), text(member.values["handle"])];
+      if (!keyed.has(member.id) || role === null || handle === null || !roster || !Object.hasOwn(ROLE_LISTS, role)) continue;
+      if (texts(roster.values[ROLE_LISTS[role as Role]]).includes(asked.holders)) holding.push(handle as MemberId);
+    }
+    return { ...common, subject: "holders", action: asked.holders, count: holding.length, holders: firstHolders(holding, asked.most) };
   }
   if (!("key" in asked)) return null;
   const within = { membership: of };

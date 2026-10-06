@@ -42,6 +42,25 @@
  *   on, except while the head entry is a checkpoint and no other duty is
  *   pending.
  *
+ * From revision 20 of the contract (section 17.2a), under platform data:
+ *
+ * - a holder: for what it still holds, each count times its amount, as the
+ *   validator computed them from the data (`Reserving`): `one(k)` for each
+ *   operation of a kind, `req` for each request and `itm` for each item.
+ *   The entry that opens a holder is new work, so `fits` asks it with the
+ *   whole amount. Each draw then moves an amount from the holder to the
+ *   operation, the request or the item that it is for, which reserves no
+ *   more than that: used plus reserved does not grow;
+ * - an operation of a kind whose data states its attempts: each outcome
+ *   entry that it may still write, with what the mark of its kind may
+ *   start, counted from the data and not declared by a rule;
+ * - the request that the `send` of an operation's kind can make (I3 delta
+ *   FC2): once for each outcome entry that the operation may still write,
+ *   or once for the operation where the send states `once` and no outcome
+ *   has made the request yet. An operation of a held kind reserves none:
+ *   its request draws on its holder;
+ * - with each pending request, what the marks of one clause can start.
+ *
  * What is not counted is in the deltas note. The count is of entries, never
  * of bytes. For an operation it is partial: the other four dimensions of
  * section 17.1, and so the records that an outcome derives, are request
@@ -51,9 +70,26 @@
  */
 
 import type { Bounds, Input } from "@generalbusiness/artroom-contract";
+import { isPlatformDefinition } from "@generalbusiness/artroom-bytes";
+import { holding } from "./held.ts";
 import { closureOf, type Owners } from "./ledger.ts";
+import { markerOwed } from "./markers.ts";
 import type { StateView } from "./state.ts";
 import type { ValidDefinition } from "./validate/index.ts";
+import { own } from "./values.ts";
+
+/**
+ * Section 17.2a, "What a holder reserves, in full": the entries that the
+ * holders of this state reserve for what they still hold. A holder that
+ * holds nothing has no record, so this reads the reservations that are
+ * open, and not every item that ever held one.
+ */
+export function heldEntries(view: StateView, definition: ValidDefinition): number {
+  const r = definition.reserving;
+  if (!r) return 0;
+  const one = Object.fromEntries(Object.entries(r.kinds).filter(([, kind]) => kind.held).map(([name, kind]) => [name, kind.whole]));
+  return view.holders().reduce((entries, holder) => entries + holding(holder.held, { one, req: r.req, itm: r.itm, dec: r.dec }).entries, 0);
+}
 
 /**
  * The entries the pending duties of this state reserve. `head` is the input
@@ -72,11 +108,25 @@ export function owed(view: StateView, definition: ValidDefinition, head: Input, 
   for (const [type, states] of Object.entries(definition.pending)) {
     for (const [state, reserved] of Object.entries(states)) entries += reserved * view.count(type, state);
   }
+  // Revision 22, "A marker duty": an item of a type that some form settles by a mark reserves its state duty and each marker duty
+  // that is pending, by its own marks. A definition with no such form has none, and counts as it did.
+  entries += markerOwed(view, definition);
   for (const copy of definition.pendingCopies) entries += copy.entries * view.copies(copy.name, copy.kind, copy.states);
   const open = view.outstanding();
-  entries += (2 + definition.clauseEntries) * open.requests + (1 + definition.clauseEntries) * open.unavailable;
-  // Section 17.2, row 5: each outcome entry that an operation may still write, and with it the closure that its owner declares.
-  for (const { owner, kind, entries: outcomes } of open.outcomes) entries += outcomes * (1 + closureOf(owners, owner, kind));
+  // Section 17.2, "What a mark may start": a clause may hold an effect mark, and the request reserves what that mark may start.
+  const clause = definition.clauseEntries + (definition.reserving?.clause.entries ?? 0);
+  entries += (2 + clause) * open.requests + (1 + clause) * open.unavailable;
+  // Section 17.2, row 5: each outcome entry that an operation may still write, and with it the closure of one outcome entry: what
+  // the data of its kind states, or what its owner declares.
+  for (const { owner, kind, entries: outcomes, unsent } of open.outcomes) {
+    entries += outcomes * (1 + closureOf(owners, owner, kind, definition));
+    // Section 17.2, "A request that an outcome sends": the request of the kind's `send`, with its 2 entries and what one clause can
+    // start. Under `holds` the request is one of its account's `requests`, and the holder reserves it.
+    const counted = isPlatformDefinition(owner) ? own(definition.reserving?.kinds, kind) : undefined;
+    if (counted?.request && !counted.held) entries += (counted.once ? unsent : outcomes) * counted.request.entries;
+  }
+  // Section 17.2a: what each holder still holds.
+  entries += heldEntries(view, definition);
   // Section 17.2, row 6: a capability record that awaits its messages, and what its capability declares for it. The owners' code
   // counts its own records (`Owners.reserves`). With no code no such record is made, so none reserves.
   entries += owners?.reserves?.(view, definition) ?? 0;

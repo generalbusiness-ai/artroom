@@ -6,18 +6,20 @@
  * send is run again from the entry that sent it.
  */
 
-import type { ActType, Advisory, AlsoMark, AlsoRule, Bounds, Digest, Effect, EffectForm, Entry, FactRef, FactUse, FieldType, FieldValue, Guard, Input, Notify, PlatformData, Prepared, Reason, ReceiveType, RefusalReason, Request, ResultClauses, ScopeRef, Send, SendForm, SendMark, Settles, UnavailableReason } from "@generalbusiness/artroom-contract";
+import type { ActType, Advisory, AlsoMark, AlsoRule, Bounds, Digest, Effect, EffectForm, Entry, FactRef, FactUse, FieldType, FieldValue, Guard, Input, Notify, PlatformData, PlatformReceive, Prepared, Reason, ReceiveType, RefusalReason, Request, ResultClauses, ScopeRef, Send, SendForm, SendMark, Settles, UnavailableReason } from "@generalbusiness/artroom-contract";
 import { entryHash } from "@generalbusiness/artroom-bytes";
 import type { Signer } from "./attribution.ts";
+import { boundTo, decisionCounts, selectedByIndex, selectorOf } from "./binding.ts";
 import { deriveEffects } from "./effects.ts";
-import { creationFields, factsNamed, isLocalFact, messageFields, presentedTypes, readFacts, readFields, textsNamed, updateOf, type Reading, type Update } from "./fields.ts";
+import { creationFields, factsNamed, isEntryOf, isLocalFact, messageFields, presentedTypes, readFacts, readFields, textsNamed, updateOf, type Reading, type Update } from "./fields.ts";
 import { signerOf } from "./fold.ts";
 import { judgeGuards, slotOf, type Fetched, type Judging } from "./guards.ts";
-import { fieldOutsideType, markOf, selectedBy, type AtHand, type Giving, type JudgedInput } from "./marks.ts";
+import { RuleFault, fieldOutsideType, markOf, selectedBy, type AtHand, type Giving, type JudgedInput } from "./marks.ts";
+import { listedBy, rowsOfClause, settle, waits, type Needed, type Settled, type Settling } from "./observes.ts";
 import { conditionsReadClock, deriveSends, formOf, readsClock } from "./sends.ts";
 import type { Item, OwnRequest, ScopeState, StateView } from "./state.ts";
 import type { ValidDefinition } from "./validate/index.ts";
-import { isFactRef, isLocalId, isObject, own } from "./values.ts";
+import { isFactRef, isLocalId, isObject, own, same } from "./values.ts";
 
 // ---------------------------------------------------------------- messages and handlers (sections 6.4 and 7.4)
 
@@ -77,6 +79,90 @@ function messageRead(view: StateView, at: ScopeRef, handler: ReceiveType, given:
     return type?.type === "item" && isFactRef(v) && isLocalFact(v, at) && view.item(v.seq)?.opened === v.hash ? v.seq : v;
   };
   return readFields(handler.fields, Object.fromEntries(Object.entries(given).map(([name, v]) => [name, local(own(handler.fields, name), v)])), bounds);
+}
+
+/** Internal evidence failure, not a serialized phase or a guessed count. */
+class UnprovenDecisionBinding extends Error {
+  constructor(texts: ReadonlySet<Digest>) {
+    super(`the decision binding and draw are unproven: original UTF-8 size or reviewed phase evidence is owed for ${[...texts].join(", ")}`);
+  }
+}
+
+/** The verifier may report this private evidence failure as incomplete. */
+export const isUnprovenDecisionBinding = (error: unknown): error is Error => error instanceof UnprovenDecisionBinding;
+
+/** Detached field bounds, by digest. No code or byte read is needed. */
+function detachedBounds(types: Readonly<Record<string, FieldType & { default?: FieldValue }>>, fields: Readonly<Record<string, FieldValue>>): Map<Digest, number> {
+  const limits = new Map<Digest, number>();
+  const read = (type: FieldType, value: FieldValue | undefined): void => {
+    if (type.type === "text" && type.detached && typeof value === "string") limits.set(value as Digest, Math.min(limits.get(value as Digest) ?? Number.POSITIVE_INFINITY, type.max));
+    else if (type.type === "list" && Array.isArray(value)) for (const element of value) read(type.of, element);
+    else if (type.type === "record" && isObject(value)) for (const [name, member] of Object.entries(type.of)) read(member, own(value, name) as FieldValue | undefined);
+  };
+  for (const [name, type] of Object.entries(types)) read(type, own(fields, name) ?? type.default);
+  return limits;
+}
+
+/** A previous successful check of this same digest can prove its bound after erasure. */
+function priorDetachedBounds(definition: ValidDefinition, context: Reading, at: ScopeRef, before: number): Map<Digest, number> {
+  const limits = new Map<Digest, number>();
+  const keep = (types: Readonly<Record<string, FieldType & { default?: FieldValue }>>, fields: Readonly<Record<string, FieldValue>> | null): void => {
+    for (const [digest, max] of fields ? detachedBounds(types, fields) : []) limits.set(digest, Math.min(limits.get(digest) ?? Number.POSITIVE_INFINITY, max));
+  };
+  if (!context.own) return limits;
+  for (let seq = 0; seq < before; seq++) {
+    const entry = context.own(seq)?.entry;
+    if (!entry || entry.seq !== seq || !same(entry.at, at)) continue;
+    const input = entry.input;
+    if (input?.type === "act") keep(own(definition.declared.acts, input.signed.intent.kind)?.fields ?? {}, input.signed.intent.fields);
+    else if (input?.type === "genesis" && input.decision === "applied") {
+      const fields = own(definition.declared.acts, definition.declared.genesis)!.fields;
+      keep(fields, input.founding ? input.founding.intent.fields : input.source ? creationFields(input.message, input.source, fields) : null);
+    } else if (input?.type === "delivery" && "decision" in input && input.message.class === "request" && (input.decision === "applied" || (input.decision === "superseded" && input.message.type === "tell"))) {
+      const received = bound(definition, input.message, input.from);
+      if (received?.handler) keep(received.handler.fields, received.fields);
+    }
+  }
+  return limits;
+}
+
+/**
+ * The binding of a recorded deciding entry, reconstructed by the same
+ * field and subject checks as its judge. The refusal's code says nothing
+ * about which phase refused: a guard or an effect can use bad-field too.
+ * Only pre-guard code (type rules and selectors) is run. Retained inputs
+ * supply its source, facts, texts and local history; no guard or effect is
+ * rerun, and no runtime-only Draft.bound is trusted.
+ */
+export function decisionBinding(view: StateView, definition: ValidDefinition, entry: Pick<Entry, "seq" | "input">, context: Reading): { item: number; message: string } | null {
+  const input = entry.input;
+  if (input.type !== "delivery" || input.message.class !== "request" || input.message.type !== "tell" || !("decision" in input)) return null;
+  const scope = view.scope();
+  const source = context.facts.find((fact) => same(fact.fact, input.from));
+  const found = bound(definition, input.message, input.from, source?.under);
+  if (!scope || !found?.handler || !found.fields || !(found.handler as unknown as PlatformReceive).bound) return null;
+  if (!source || !isEntryOf(source.entry, input.from)) throw new RuleFault("a decision binding has no retained source entry");
+  const unknownSizes = new Set<Digest>();
+  const texts = context.texts ? (digest: Digest) => {
+    const size = context.texts!(digest);
+    if (size === null) unknownSizes.add(digest);
+    return size;
+  } : undefined;
+  const ready = prepareHandler(view, definition, { ...context, texts }, scope, found.handler, found.kind, found.fields, { source, update: null }, { type: "delivery", from: input.from, n: input.n, message: input.message });
+  if (ready.result === "unavailable") throw new RuleFault(`a decision binding cannot reconstruct its field and subject checks: ${ready.reason}`);
+  // Owner disposition 4157eaa2: first exhaust structural checks under the
+  // ordinary redaction assumptions. An early failure or no remaining
+  // matching holder proves no draw. Applied/superseded or a named guard
+  // proves the earlier size checks passed. Only a bare bad-field refusal
+  // can still be either an over-max field (no draw) or a later effect
+  // refusal (a draw). No later checkpoint may decide between those.
+  if (ready.result === "ready" && ready.bound !== undefined && unknownSizes.size > 0 && input.decision === "refused" && input.reason?.code === "bad-field" && input.reason.name === undefined) {
+    const required = detachedBounds(found.handler.fields, ready.j.fields);
+    const proven = priorDetachedBounds(definition, context, scope.at, entry.seq);
+    const unresolved = new Set([...unknownSizes].filter((digest) => (proven.get(digest) ?? Number.POSITIVE_INFINITY) > (required.get(digest) ?? 0)));
+    if (unresolved.size > 0) throw new UnprovenDecisionBinding(unresolved);
+  }
+  return ready.result === "ready" && ready.bound !== undefined ? { item: ready.bound, message: found.kind } : null;
 }
 
 /**
@@ -210,10 +296,14 @@ export function overMax(view: StateView, definition: ValidDefinition, type: stri
 export interface Forms { guards: readonly Guard[]; effects: readonly EffectForm[]; sends: readonly SendForm[]; attention: readonly Notify[]; settles?: Settles | undefined }
 
 export type Ran =
-  /** `settles`: the form declares that it settles an item, the item was in a listed state, and these effects take it out of them (section 17.3). */
-  | { result: "ran"; effects: Effect[]; sends: Send[]; prepared: Prepared[]; judgesTime: boolean; settles: boolean }
+  /**
+   * `settles`: the form declares that it settles an item, the item was in a listed state, and these effects take it out of them
+   * (section 17.3); or, by a mark, the item awaited the mark and these effects set it (section 6.4, revision 21). `bound`: the
+   * delivery is bound to that item (section 17.2a), whatever is decided.
+   */
+  | { result: "ran"; effects: Effect[]; sends: Send[]; prepared: Prepared[]; judgesTime: boolean; settles: boolean; bound?: number }
   /** `name`: the reason the failed guard declares. `prepared`: the rule results the guards read before the refusal. An entry that records the refusal records them (section 9.2). */
-  | { result: "refused"; reason: RefusalReason; name?: string; detail: string; prepared: Prepared[] }
+  | { result: "refused"; reason: RefusalReason; name?: string; detail: string; prepared: Prepared[]; bound?: number }
   | { result: "unavailable"; reason: UnavailableReason };
 
 /** Section 4.2: when a failed guard declares a `reason`, that is the refusal's name. */
@@ -234,6 +324,8 @@ export const giving = (view: StateView, context: Reading, scope: Pick<ScopeState
  * records, when the entry is its genesis.
  */
 export function derive(j: Judging, forms: Forms, opens: string | null, cause: Digest, first = 0, directory?: ScopeRef | null): Ran {
+  // Section 6.4, "A rule of a form that declares `settles` sets no state": the effects of a rule are checked against it.
+  if (forms.settles !== undefined) j.settling = true;
   // Section 6.5: the guards are one list with three results. A guard that is false refuses, also after one that is not completed.
   // Section 6.4: a guard whose subject is unbound is not evaluated, and an effect whose subject is unbound is not applied.
   const guards = judgeGuards(j, forms.guards);
@@ -261,9 +353,13 @@ export function derive(j: Judging, forms: Forms, opens: string | null, cause: Di
   const judgesTime = readsClock(forms.guards) || forms.effects.some(timesEffect) || conditionsReadClock(forms.sends, forms.attention) || j.ran?.clock === true;
   // Section 17.3: a form that declares `settles` is judged in full. It settles when its subject is in a listed state at the
   // commit and the entry takes it out of the listed states. Any other entry of the form is new work.
+  // By a mark (revision 21): before the entry the subject's state was one of `in` and its mark was `false`, and after the entry's
+  // effects the mark is `true`. An entry of the form that finds the mark `true` already, or the state outside `in`, is new work.
   const settled = forms.settles && "of" in forms.settles ? forms.settles : null;
+  const mark = (settled as { sets?: string } | null)?.sets;
   const [was, is] = settled ? [j.subjects.get(settled.of), effects.working.get(settled.of)] : [];
-  const settles = !!settled && !!was && !!is && settled.in.includes(was.state) && !settled.in.includes(is.state);
+  const settles = !!settled && !!was && !!is && settled.in.includes(was.state)
+    && (mark !== undefined ? own(was.values, mark) === false && own(is.values, mark) === true : !settled.in.includes(is.state));
   return { result: "ran", effects: effects.effects, sends: sends.sends, prepared: j.used, judgesTime, settles };
 }
 
@@ -285,8 +381,15 @@ export type Handled = (Exclude<Ran, { result: "unavailable" }> & { uses: FactUse
  * that opens a type which is not `many` opens it only if the scope has none;
  * otherwise `on` is the one that exists. No two names may select one item.
  */
-export function runHandler(view: StateView, definition: ValidDefinition, context: Reading, scope: ScopeState, handler: ReceiveType, kind: string, given: Readonly<Record<string, FieldValue>>, cause: Digest, sent?: Sent, judged?: JudgedInput): Handled {
-  const refused = (reason: RefusalReason, detail: string, uses: FactUse[] = []): Handled => ({ result: "refused", reason, detail, prepared: [], uses });
+type HandlerPreparation =
+  | { result: "ready"; j: Judging; opens: string | null; uses: FactUse[]; bound?: number }
+  | Exclude<Handled, { result: "ran" }>;
+
+/** Checks 7 and 8 only. Both the judge and the fold reconstruct this stage. */
+function prepareHandler(view: StateView, definition: ValidDefinition, context: Reading, scope: ScopeState, handler: ReceiveType, kind: string, given: Readonly<Record<string, FieldValue>>, sent?: Sent, judged?: JudgedInput): HandlerPreparation {
+  const clocked = { clock: false };
+  const refused = (reason: RefusalReason, detail: string, uses: FactUse[] = []): Exclude<Handled, { result: "ran" }> =>
+    (clocked.clock && context.clock.behind ? { result: "unavailable", reason: "clock-behind" } : { result: "refused", reason, detail, prepared: [], uses });
   const { bounds } = context;
   const read = messageRead(view, scope.at, handler, given, bounds);
   if (!read.ok) return refused("bad-field", read.detail);
@@ -298,7 +401,6 @@ export function runHandler(view: StateView, definition: ValidDefinition, context
   if (named.result !== "read") return refused(named.result, named.detail, named.uses);
   const { fields, facts, uses } = named;
   // Platform data: what a rule of this row is given before the row's forms are derived (section 6.1). A handler has no check 9.
-  const clocked = { clock: false };
   const g = judged ? giving(view, context, scope, scope.head.seq + 1, judged, clocked, fields, facts, sent?.source) : null;
   // Section 4.2, check 7: a field whose type is a mark is checked by the mark's rule.
   const outside = g && fieldOutsideType(g, handler.fields);
@@ -314,7 +416,10 @@ export function runHandler(view: StateView, definition: ValidDefinition, context
   }
   // The item this entry opens does not exist yet, and the validator lets no `via` of a handler read `on`.
   // Section 4.2, check 8: a name of `also` that a mark selects is resolved by the mark's rule.
-  const also = alsoItems(view, definition, handler.also, fields, null, undefined, g ? (mark, bound) => selectedBy({ ...g, subjects: bound }, mark) : undefined);
+  // Section 17.2a, revision 23: the mark that binds the name which `bound.of` names is a binding selector. The judge makes the one
+  // lookup of the declared index, and runs the rule on what it returns and on the fields, and on nothing else.
+  const selector = selectorOf(handler);
+  const also = alsoItems(view, definition, handler.also, fields, null, undefined, g ? (mark, bound) => (mark === selector ? selectedByIndex(g, selector) : selectedBy({ ...g, subjects: bound }, mark)) : undefined);
   if (!also.ok) return refused("no-item", also.detail, uses);
   for (const [name, item] of also.items) subjects.set(`also.${name}`, item);
   if (new Set([...subjects.values()].map((i) => i.id)).size !== subjects.size) return refused("alias", "two names resolve to one item", uses);
@@ -324,8 +429,22 @@ export function runHandler(view: StateView, definition: ValidDefinition, context
     // Section 6.5: `sender` is the envelope's source scope, `source` reads the source entry, and `update` the update, whose revision is the `seq` of the owner's entry.
     sender: sent?.source.fact.at, source: sent?.source, update: sent?.update ? { state: sent.update.state, item: sent.update.item, revision: sent.source.fact.seq } : undefined,
   };
-  const ran = derive(j, handler, opens, cause);
-  return ran.result === "unavailable" ? ran : { ...ran, uses };
+  // Section 17.2a: whether the delivery is bound is derived here, after the names are bound and before any guard of the handler,
+  // on the state before the entry. It decides nothing of the request.
+  const item = boundTo(j, handler, kind, context.counts ?? decisionCounts(view));
+  if (item) j.bound = true;
+  if (clocked.clock && context.clock.behind) return { result: "unavailable", reason: "clock-behind" };
+  return { result: "ready", j, opens, uses, ...(item ? { bound: item.id } : {}) };
+}
+
+export function runHandler(view: StateView, definition: ValidDefinition, context: Reading, scope: ScopeState, handler: ReceiveType, kind: string, given: Readonly<Record<string, FieldValue>>, cause: Digest, sent?: Sent, judged?: JudgedInput): Handled {
+  const ready = prepareHandler(view, definition, context, scope, handler, kind, given, sent, judged);
+  if (ready.result !== "ready") return ready;
+  const ran = derive(ready.j, handler, ready.opens, cause);
+  // A clock-declaring rule that refused still judged time (§5.3). Its
+  // original reading cannot be recovered from a clamped recorded time.
+  if (ready.j.ran?.clock && context.clock.behind) return { result: "unavailable", reason: "clock-behind" };
+  return ran.result === "unavailable" ? ran : { ...ran, uses: ready.uses, ...(ready.bound === undefined ? {} : { bound: ready.bound }) };
 }
 
 // ---------------------------------------------------------------- the clause of an earlier send (sections 6.6 and 7.4)
@@ -357,8 +476,9 @@ export type Clause = keyof ResultClauses | "conflict";
  * which a rule of the clause reads and the entry then retains (sections 4.1
  * and 16.1). A diagnosis may hold none, and is given none.
  */
-export function runClause(view: StateView, definition: ValidDefinition, context: Reading & { origin?: Entry | null | undefined }, scope: ScopeState, request: OwnRequest, clause: Clause, answered?: { sender: ScopeRef; reason?: Reason; source?: Fetched }, judged?: JudgedInput, beside?: AtHand):
-  { result: "ran"; effects: Effect[]; uses: FactUse[]; judgesTime: boolean } | { result: "unavailable"; reason: UnavailableReason } {
+export function runClause(view: StateView, definition: ValidDefinition, context: Reading & { origin?: Entry | null | undefined }, scope: ScopeState, request: OwnRequest, clause: Clause, answered?: { sender: ScopeRef; reason?: Reason; source?: Fetched }, judged?: JudgedInput, beside?: AtHand,
+  given?: Pick<Settling, "observed" | "values" | "observing">):
+  { result: "ran"; effects: Effect[]; uses: FactUse[]; judgesTime: boolean; rows?: Settled } | { result: "unavailable"; reason: UnavailableReason; missing?: readonly Needed[]; rows?: Settled } {
   const origin = context.origin;
   if (!origin || origin.seq !== request.seq || entryHash(origin) !== request.hash) return { result: "unavailable", reason: "unavailable" };
   const { declared } = definition;
@@ -411,7 +531,12 @@ export function runClause(view: StateView, definition: ValidDefinition, context:
   const written = marked ? null : (form as Exclude<SendForm, { index: unknown }>);
   const clauses = (marked ? marked.result : "create" in written! ? written.create.result : "tell" in written! ? written.tell.result : written!.relate.result) as ResultClauses & { conflict?: readonly EffectForm[] };
   const forms = clauses[clause] ?? [];
-  if (forms.length === 0) return { result: "ran", effects: [], uses: [], judgesTime: false };
+  // Revision 20, section 16.1: the rows of this clause, for the delivery of a result that runs it, under a definition whose data
+  // states rows. A request that a rule gave states none: its mark holds its clauses, and no text gives a mark rows (I3 deltas,
+  // entry GA5). A diagnosis holds no observation, so `undelivered` has none.
+  const rows = definition.observing && written && beside && given && clause !== "undelivered" ? rowsOfClause(written, clause) : [];
+  if (beside && definition.observing) beside.rows = { status: [], listed: new Set(), retained: [], values: [] };
+  if (forms.length === 0 && rows.length === 0) return { result: "ran", effects: [], uses: [], judgesTime: false };
 
   // The uses of the origin are the facts its fields name; a clause may read one (section 6.6, a party from a fetched fact).
   // A local fact that the origin's fields name was checked when the origin was judged. It is put in normal form again here.
@@ -440,11 +565,25 @@ export function runClause(view: StateView, definition: ValidDefinition, context:
     // is at hand as the verified source entry of the result, and which the entry that records the result retains.
     ...(frame.sent && answered?.source ? { source: answered.source } : {}),
   };
+  // Section 16.1, "In the commit": for a clause the list is derived before any rule of the entry runs. A source reads what a clause
+  // reads: the state as it is now, the fields and the facts of the entry that sent the request, and the result. A member of another
+  // repository is left out. A subject with no observation at hand, which the scope can still read, stops the commit. An absent row
+  // that states `wait` leaves the result not recorded now: the delivery is tried again. Every other absent row, and every row that
+  // is over, is told to the rule, and the entry is written.
+  let settled: Settled | undefined;
+  if (rows.length > 0 && beside && given) {
+    const list = listedBy(j, rows, given.observing?.membership).rows;
+    settled = settle(list, { view, bounds: context.bounds, clock: context.clock, ...given });
+    if (settled.missing.length > 0) return { result: "unavailable", reason: "authority-unavailable", missing: settled.missing, rows: settled };
+    if (waits(list, settled)) return { result: "unavailable", reason: "authority-unavailable", rows: settled };
+    const { status } = settled;
+    beside.rows = { status: rows.map((_, n) => status.get(n) ?? null), listed: settled.listed, retained: settled.retained, values: settled.values };
+  }
   const effects = deriveEffects(j, forms, [], null);
   // Section 6.6: a clause's condition that is not completed leaves the result not recorded now. It is offered again.
   if (!effects.ok && "unavailable" in effects) return { result: "unavailable", reason: effects.unavailable };
   // Section 6.3: `max` bounds the live items of a type, whatever opens the item. In platform data a rule of the clause may open
   // one. Past the bound the clause's effects cannot apply now, and it changes nothing, as above.
   const applies = effects.ok && (effects.opened === null || overMax(view, definition, effects.opened.type, effects.opened.state) === null);
-  return { result: "ran", effects: applies ? effects.effects : [], uses: [...facts.uses, ...presented.uses.filter((use) => !facts.facts.has(use.fact.hash))], judgesTime: forms.some(timesEffect) || j.ran?.clock === true };
+  return { result: "ran", effects: applies ? effects.effects : [], uses: [...facts.uses, ...presented.uses.filter((use) => !facts.facts.has(use.fact.hash))], judgesTime: forms.some(timesEffect) || j.ran?.clock === true, ...(settled ? { rows: settled } : {}) };
 }

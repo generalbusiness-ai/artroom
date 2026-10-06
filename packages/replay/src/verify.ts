@@ -38,13 +38,13 @@
  */
 
 import { DOMAINS, PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { Bounds, CapabilityName, Digest, Entry, FactRef, Grant, Head, KeyId, Observation, ObservationRequest, ObservationUse, PlatformData, PlatformDefinition, Report, RetainedInput, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
+import type { Bounds, CapabilityName, Digest, Entry, FactRef, Grant, Head, KeyId, Observation, ObservationRequest, ObservationUse, MismatchName, PlatformData, PlatformDefinition, Report, RetainedInput, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
 import { canonicalize, definitionDigest, digestBytes, intentDigest, isDigest, isEntry, isObservationUse, isPlatformDefinition, parseStrict, platformName, scopeIdOf, textDigest, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import {
-  HOLD, HOLD_KINDS, MISMATCHES, MemoryState, WINDOWS, actionOf, agrees, applyEntry, clockOf, entryOf, headsOf, highestHead, inputTexts, isAncestryCheck, isFactRef, isLocalId, isObject, isScopeRef, judgeAct, judgeCheckpoint, judgeDelivery,
-  judgeDiagnosis, fixedBy, judgeGenesis, judgeGrant, judgeOutcome, judgePreparation, judgeTimed, membershipOf, nextDue, observedOf, own, ownersOf, placesOf, ruleAt, same, snapshotRead, stepsOf, timeMs, updateOf, validateDefinition, valueDigest, windowOf,
+  HOLD, HOLD_KINDS, MISMATCHES, MemoryState, WINDOWS, actionOf, agrees, applyEntry, drawsOf, clockOf, contentStates, entryOf, fits, namedBy, observedName, retainsOf, headsOf, highestHead, inputTexts, isAncestryCheck, isFactRef, isLocalId, isObject, isScopeRef, isUnprovenDecisionBinding, judgeAct, judgeCheckpoint, judgeDelivery,
+  judgeDiagnosis, evidenceValues, outcomeValueDomains, fixedBy, judgeGenesis, judgeGrant, judgeOutcome, judgePreparation, judgeTimed, membershipOf, nextDue, observedOf, own, ownersOf, placesOf, ruleAt, same, snapshotRead, stepsOf, timeMs, updateOf, validateDefinition, valueDigest, windowOf,
 } from "@generalbusiness/artroom-derive";
-import type { ActJudgment, AncestryCheck, Capabilities, Clock, Fetched, Judgment, Owners, PlatformRules, PreparationJudgment, RecordedRef, Retains, Rules, StateView, TimedJudgment, ValidDefinition, Window } from "@generalbusiness/artroom-derive";
+import type { ActJudgment, AncestryCheck, Capabilities, Clock, DrawOptions, Fetched, Judgment, Observing, Owners, PlatformRules, PreparationJudgment, RecordedRef, Retains, Rules, StateView, TimedJudgment, ValidDefinition, Window } from "@generalbusiness/artroom-derive";
 import { RULE_PROFILES, evaluateRules } from "@generalbusiness/artroom-derive/rule";
 import { PAGE_ENTRIES, PAGE_REPLY_BYTES, RETAINED_REPLY_BYTES, hashOfBytes, type HistorySource, type Stored } from "./source.ts";
 import { View } from "./view.ts";
@@ -154,6 +154,15 @@ export interface Coded {
    * deltas, entry EU5).
    */
   rulesScope?: ((state: StateView) => RecordedRef | null) | undefined;
+  /**
+   * The kind of the act whose position is the `revision` that an answer of
+   * this version states (authority note, revision 28, section 12.1.4, "What
+   * a replay derives"): for a rules scope, `publish`. With it, the revision
+   * of each value that is derived from a history of this version is checked
+   * against the last entry of that kind at or before the head, or against 0
+   * where the history holds none. A difference is a `mismatch`.
+   */
+  revised?: string | undefined;
 }
 
 /**
@@ -219,6 +228,20 @@ type Trust = keyof typeof TRUSTS;
 export const platformCode = (named: PlatformDefinition): string => `platform-code: that the rules this replay ran for ${named} are the rules of that name and version`;
 
 /** Ends the traversal with a result that is not `consistent`. */
+/** The six named mismatches (section 9.5, as revision 21 reconciles it; row I3-57). */
+const NAMED: readonly MismatchName[] = ["genesis-kind", "genesis-timed", "observation-older", "run-returned", "observation-not-moved", "observation-reused"];
+
+/**
+ * The `name` of a report: there exactly when the result is `mismatch` and
+ * the failure is one of the six that the contract names. The finding's
+ * sentence begins with the name and a colon, and the name is read from
+ * there, so the report and the sentence cannot differ.
+ */
+const nameOf = (stop: Stop): { name?: MismatchName } => {
+  const name = stop.result === "mismatch" ? NAMED.find((known) => stop.why.startsWith(`${known}: `)) : undefined;
+  return name ? { name } : {};
+};
+
 class Stop extends Error {
   readonly result: Exclude<Report["result"], "consistent">;
   readonly why: string;
@@ -257,6 +280,8 @@ interface Run {
   state: MemoryState;
   /** The checked entries, by `seq`. */
   sealed: { entry: Entry; hash: Digest }[];
+  /** Existing retained inputs, checked with each entry, reused when an observation view folds that entry. No wire metadata. */
+  foldInputs: Map<number, DrawOptions>;
   /** Entries read and not yet checked, by `seq`, and where the next page begins. */
   read: Map<number, Stored>;
   next: number | null;
@@ -278,6 +303,8 @@ interface Run {
   membership: Coded["membership"];
   /** Where a scope under the pinned platform definition records its rules reference, when the replay was given that. */
   rulesScope: Coded["rulesScope"];
+  /** The kind of the act whose position is the revision of an answer, when the replay was given one, and the positions of the checked entries of that kind, in order. */
+  revised: { kind: string; at: number[] } | null;
   /** Section 16.4: the bytes of each snapshot of staged refs that a checked outcome entry names, by digest, each checked against its digest. */
   snapshots: Map<Digest, string>;
 }
@@ -444,6 +471,7 @@ class Verifier {
       redacted: this.#redacted,
       result: stop ? stop.result : "consistent",
       ...(stop?.at ? { at: stop.at } : {}),
+      ...(stop ? nameOf(stop) : {}),
     };
     return { report, why: stop ? stop.why : null };
   }
@@ -455,7 +483,7 @@ class Verifier {
     if (this.#runs.size >= this.#limits.scopes) throw new Stop("incomplete", `the limit of ${this.#limits.scopes} scopes was reached`);
     const got = await this.#page(id, 0);
     if (!got.ok) return null;
-    const run: Run = { id, said: got.page.scope, head: got.page.head, at: null, named: null, definition: null, platform: null, state: new MemoryState(), sealed: [], read: new Map(), next: 0, busy: false, depth: Number.POSITIVE_INFINITY, owed: new Map(), reads: new Map(), runs: { seen: new Set(), last: null }, observed: undefined, viewed: null, membership: undefined, rulesScope: undefined, snapshots: new Map() };
+    const run: Run = { id, said: got.page.scope, head: got.page.head, at: null, named: null, definition: null, platform: null, state: new MemoryState(), sealed: [], foldInputs: new Map(), read: new Map(), next: 0, busy: false, depth: Number.POSITIVE_INFINITY, owed: new Map(), reads: new Map(), runs: { seen: new Set(), last: null }, observed: undefined, viewed: null, membership: undefined, rulesScope: undefined, revised: null, snapshots: new Map() };
     if (!this.#take(run, 0, got.page.entries, got.page.next)) return null;
     this.#runs.set(id, run);
     return run;
@@ -661,11 +689,15 @@ class Verifier {
         await this.#replay(run, entry, hash, stored.bytes, where, depth);
       } catch (error) {
         if (error instanceof Stop || error instanceof Gap || error instanceof SourceError) throw error;
+        // The evidence failed before applyEntry could change any count or
+        // this entry could enter verified coverage. No suffix crosses it.
+        if (isUnprovenDecisionBinding(error)) throw new Stop("incomplete", error.message, where);
         // A judge or the fold could not take the entry at all.
         throw mismatch(`the entry cannot be derived again: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
     run.sealed.push({ entry, hash });
+    if (run.revised && entry.input.type === "act" && entry.input.signed.intent.kind === run.revised.kind) run.revised.at.push(entry.seq);
   }
 
   // ---------------------------------------------------------------- replay of one entry
@@ -711,7 +743,7 @@ class Verifier {
     if (!supplied) throw new Stop("unsupported-definition", `the scope pins ${named}, which this replay has no code for`, where);
     let checked: ReturnType<typeof validateDefinition> | null = null;
     try {
-      checked = validateDefinition(parseStrict(canonicalize(supplied.data)), this.#bounds, RULE_PROFILES, { platform: true });
+      checked = validateDefinition(parseStrict(canonicalize(supplied.data)), this.#bounds, RULE_PROFILES, { platform: true, outcomeValues: outcomeValueDomains(supplied.data, supplied.rules) });
     } catch { /* data with no canonical bytes is no definition */ }
     if (!checked?.ok || checked.definition.declared.name !== platformName(named)) throw new Stop("unsupported-definition", `the data that this replay was given for ${named} is not a platform definition of that name under the bounds given`, where);
     const needs = checked.definition.underived.find((u) => !this.#capabilities?.implements(u));
@@ -722,6 +754,7 @@ class Verifier {
     run.observed = supplied.observed;
     run.membership = supplied.membership;
     run.rulesScope = supplied.rulesScope;
+    run.revised = supplied.revised === undefined ? null : { kind: supplied.revised, at: [] };
     // Section 9.3, "What it trusts": that the rules which it ran are the rules of that name and version.
     this.#coded.add(named);
     return checked.definition;
@@ -771,7 +804,7 @@ class Verifier {
     const view = source.viewed ?? (source.viewed = new View());
     while (view.through < seq) {
       const next = source.sealed[view.through + 1]!;
-      view.fold(source.definition!, next.entry, next.hash);
+      view.fold(source.definition!, next.entry, next.hash, source.foldInputs.get(next.entry.seq) ?? { bounds: this.#bounds, platform: source.platform ?? undefined });
       this.#tally.folds++;
     }
     const { state, built } = view.at(seq);
@@ -819,7 +852,9 @@ class Verifier {
    */
   async #standing(run: Run, entry: Entry, o: ObservationUse["observation"], where: FactRef, depth: number): Promise<void> {
     const mismatch = (why: string): Stop => new Stop("mismatch", why, where);
-    const asked: ObservationRequest = !("subject" in o) ? { of: o.of, key: o.key } : o.subject === "member" ? { of: o.of, member: o.member } : { of: o.of, asked: o.content.asked };
+    // The holders of an action: the answer lists the first of them, as many as the row's `most` or all. The judge checks the list's
+    // length against the row, so the value is asked here for as many as the record lists.
+    const asked: ObservationRequest = !("subject" in o) ? { of: o.of, key: o.key } : o.subject === "member" ? { of: o.of, member: o.member } : o.subject === "holders" ? { of: o.of, holders: o.action, most: o.holders.length } : { of: o.of, asked: o.content.asked };
     const unanswered = (): Stop => new Stop("unsupported-definition", `the observed scope ${o.of.scope} pins a definition for which this replay has no answer to an observation`, where);
     let derived: unknown;
     if (o.of.scope === run.id) {
@@ -837,11 +872,18 @@ class Verifier {
       if (this.#values.has(key)) derived = this.#values.get(key);
       else {
         derived = source.observed(this.#viewAt(source, o.head.seq), asked);
+        // Authority note, section 12.1.4, "What a replay derives": the revision that the folded state gives is the position of the
+        // last entry of the stated kind at or before the head, or 0 where there is none.
+        if (source.revised && isObject(derived)) {
+          let last = 0;
+          for (let i = source.revised.at.length - 1; i >= 0 && last === 0; i--) if (source.revised.at[i]! <= o.head.seq) last = source.revised.at[i]!;
+          if (derived["revision"] !== last) throw mismatch(`the state of ${o.of.scope} at its entry ${o.head.seq} gives the revision ${String(derived["revision"])}, and the last entry of the kind ${source.revised.kind} at or before it is at ${last}`);
+        }
         this.#tally.values++;
         this.#values.set(key, derived);
       }
     }
-    if (!isObject(derived) || canonicalize({ ...derived, at: o.at }) !== canonicalize(o)) throw mismatch(`the retained observation is not what the history of ${o.of.scope} gives ${"key" in asked ? "that key" : "member" in asked ? "that member" : "the rules"} at its entry ${o.head.seq}`);
+    if (!isObject(derived) || canonicalize({ ...derived, at: o.at }) !== canonicalize(o)) throw mismatch(`the retained observation is not what the history of ${o.of.scope} gives ${"key" in asked ? "that key" : "member" in asked ? "that member" : "holders" in asked ? "the holders of that action" : "the rules"} at its entry ${o.head.seq}`);
   }
 
   /**
@@ -947,6 +989,77 @@ class Verifier {
       await this.#standing(run, entry, o, where, depth);
       this.#trusts.add("observed");
     }
+  }
+
+  /**
+   * What a judge is given for the rows of `observes` of one entry, under a
+   * definition whose data states rows (revision 20, section 16.1,
+   * "Replay"): the records of the entry's own `observed`; the two
+   * references that the scope records, as the state before the entry has
+   * them; the latest earlier entry that retains each read; what the data of
+   * a rules definition states; and the bytes of each value that a record
+   * names, which the scope keeps by its domain and its digest. No subject
+   * can be read: a row with none is absent on the runtime's word.
+   *
+   * A replay without the bytes of a named value is `incomplete` (witness
+   * 18.48, case 10, and 18.50, case 11). The value is asked in each domain
+   * that a row of the pinned data states under `retains`: the judge then
+   * holds it to the row of the entry's own form.
+   */
+  async #hand(run: Run, entry: Entry, recorded: readonly ObservationUse[] | undefined, where: FactRef): Promise<{ observed: readonly ObservationUse[]; values: string[]; observing: Observing }> {
+    const observed = recorded ?? [];
+    if (observed.length > 0 && entry.clamped) throw new Stop("mismatch", "an entry that retains an observation judges time, and is never clamped", where);
+    for (const use of observed) this.#inRun(run, use, where);
+    const values: string[] = [];
+    const domains = retainsOf(run.definition!);
+    for (const digest of observed.flatMap((use) => namedBy(use.observation))) {
+      let found: string | null = null;
+      for (const domain of domains) {
+        const left = this.#limits.bytes - this.#bytes;
+        const got = await this.#source.retained(run.id, "value", digest, { bytes: Math.min(left, RETAINED_REPLY_BYTES) }, domain);
+        if (!got.ok) { this.#unread(got.reason, left < RETAINED_REPLY_BYTES, `a retained input of ${run.id}`); continue; }
+        this.#count(got.bytes);
+        try { if (valueDigest(domain, parseStrict(got.input.bytes)) === digest) found = got.input.bytes; } catch { /* not the one named */ }
+        if (found !== null) break;
+      }
+      if (found === null) throw new Stop("incomplete", `a retained input is missing: the value that an observation of the entry names, ${digest}`, where);
+      values.push(found);
+    }
+    const state = run.state;
+    return {
+      observed, values,
+      observing: {
+        membership: recordedMembership(run), rules: run.rulesScope && state.scope() ? run.rulesScope(state) : null,
+        last: (use) => run.reads.get(`${use.read.run}:${use.read.n}`) ?? null,
+        content: (named) => { const data = this.#platform?.(named)?.data; return data ? contentStates(data) : null; },
+      },
+    };
+  }
+
+  /**
+   * The records of `observed` of one entry, against what the rows of its
+   * form came to when the judge derived them again (section 16.1, "What a
+   * replay derives"). A record of a subject that no row gives, and one that
+   * serves no row, are each a `mismatch`: a guard that failed is named as
+   * the authority note names it, `observation-reused`,
+   * `observation-not-moved` or `observation-older`. Then the value of each
+   * record, against the history of the observed scope at its head. That
+   * the entry holds exactly the subjects of the whole rows, and that no
+   * absent row states `wait`, is the judge's derivation, which the caller
+   * compares with the entry. That a subject of an absent row could not be
+   * read is the runtime's word, under `observation-read`.
+   */
+  async #byRows(run: Run, entry: Entry, judged: ActJudgment | Judgment, recorded: readonly ObservationUse[], where: FactRef, depth: number): Promise<void> {
+    const settled = judged.result === "write" ? judged.draft.rows : judged.result === "unavailable" ? judged.rows : undefined;
+    for (const use of settled ? recorded : []) {
+      if (!settled!.listed.has(observedName(use.observation))) throw new Stop("mismatch", "the entry holds a record of `observed` of a subject that no row of its form gives", where);
+      const why = settled!.unserved.get(use);
+      if (why === undefined) continue;
+      const name = why === "record" || why === "value" ? undefined : MISMATCHES[why];
+      throw new Stop("mismatch", `${name ? `${name}: ` : ""}derived again on the entry's time, a retained observation serves no row of the entry's form: ${why}`, where);
+    }
+    for (const use of recorded) await this.#standing(run, entry, use.observation, where, depth);
+    if (recorded.length > 0 || (settled && [...settled.status.values()].includes("absent"))) this.#trusts.add("observed");
   }
 
   /**
@@ -1069,6 +1182,13 @@ class Verifier {
       clock, bounds, facts, prepared: entry.prepared, own: (at: number) => run.sealed[at] ?? null, texts: (digest: Digest) => texts.get(digest) ?? null, snapshot: (digest: Digest) => run.snapshots.get(digest) ?? null,
       capabilities: this.#capabilities, platform: run.platform ?? undefined,
     };
+    // Section 17.2a, "What a verifier does": the counts of each holder, the account of each entry and each `for` are derived again
+    // from the history. The fold derives each draw and each release, and the checkpoint's digest covers what it keeps. An entry
+    // that draws past a count, or that opens an operation of a held kind for no holder, is a mismatch with its own name, whatever
+    // a judge would say of its input.
+    const foldInputs: DrawOptions = reading;
+    const drawn = drawsOf(state, definition, entry, foldInputs);
+    if ("fault" in drawn) throw mismatch(`${drawn.fault === "past-count" ? "draw-past-count" : "held-without-holder"}: ${drawn.detail}`);
     const copyOf = (fact: FactRef | null) => facts.find((f) => f.fact.hash === fact?.hash) ?? null;
     const sealed = (seq: unknown): Entry | null => (isLocalId(seq) ? (run.sealed[seq]?.entry ?? null) : null);
     let judged: ActJudgment | Judgment | TimedJudgment | PreparationJudgment;
@@ -1094,7 +1214,10 @@ class Verifier {
           const window = run.at!.kind === "membership" ? WINDOWS.once : windowOf(definition, run.at!.kind, input.signed.intent.kind);
           await this.#granted(run, entry, grant, { key: input.signed.intent.actor, action: row ? actionOf(row) : null, window }, where, depth);
         }
-        if (input.observed) await this.#observed(run, entry, input.observed, windowOf(definition, run.at!.kind, input.signed.intent.kind), where, depth);
+        // Revision 20, section 16.1, "Replay": under a definition whose data states rows, the check is by the rows (`#byRows`, below).
+        // Under any other, the older rule stands as a stand-in: the window of the act's own grant.
+        if (input.observed && !definition.observing) await this.#observed(run, entry, input.observed, windowOf(definition, run.at!.kind, input.signed.intent.kind), where, depth);
+        const actRows = definition.observing ? await this.#hand(run, entry, input.observed, where) : null;
         // Section 16.1, "Replay": that `within` covers the observing scope is checked by the reference that its genesis records.
         // Section 16.1, "Replay": the entry holds exactly the observations that its judgment reads. The judge is given the recorded
         // ones, and derives an input with those that a rule read: one that no rule reads, and one that a rule reads and the entry
@@ -1113,7 +1236,9 @@ class Verifier {
           if (!named) throw new Stop("incomplete", `a retained input is not the one named: ${what}, ${place.digest}`, where);
           values.push(kept.bytes);
         }
-        judged = judgeAct(state, definition, input.signed, { ...reading, presented: input.presented, grants: input.authority.map((grant) => ({ grant, current: true })), membership: fixedIn(run, input), ...(input.observed ? { observed: input.observed } : {}), ...(values.length > 0 ? { values } : {}) });
+        if (actRows) values.push(...actRows.values);
+        judged = judgeAct(state, definition, input.signed, { ...reading, presented: input.presented, grants: input.authority.map((grant) => ({ grant, current: true })), membership: fixedIn(run, input), ...(input.observed ? { observed: input.observed } : {}), ...(values.length > 0 ? { values } : {}), ...(actRows ? { observed: actRows.observed, observing: actRows.observing } : {}) });
+        if (actRows) await this.#byRows(run, entry, judged, actRows.observed, where, depth);
         break;
       case "delivery": {
         this.#trusts.add("delivered");
@@ -1125,8 +1250,12 @@ class Verifier {
         // Sections 4.1 and 16.1: a delivery of a result may retain observations, each of the ten-second kind. Each is derived again,
         // and the judge is given the recorded ones: its clause's rules read them, and it derives an input with those that were read.
         const further = "clause" in input ? input.observed : undefined;
-        if (further) await this.#observed(run, entry, further, WINDOWS.once, where, depth);
-        judged = judgeDelivery(state, definition, { to, from: input.from, n: input.n, message: input.message }, { ...reading, source: { entry: source.entry, under: source.under }, origin, ...(further ? { observed: further } : {}) });
+        // Revision 20: under a definition whose data states rows, the check is by the rows of the clause that ran. Under any other,
+        // the ten-second window of the two rows of the authority note's table stands, as a stand-in.
+        if (further && !definition.observing) await this.#observed(run, entry, further, WINDOWS.once, where, depth);
+        const clauseRows = definition.observing && "clause" in input ? await this.#hand(run, entry, further, where) : null;
+        judged = judgeDelivery(state, definition, { to, from: input.from, n: input.n, message: input.message }, { ...reading, source: { entry: source.entry, under: source.under }, origin, ...(further ? { observed: further } : {}), ...(clauseRows ?? {}) });
+        if (clauseRows) await this.#byRows(run, entry, judged, clauseRows.observed, where, depth);
         break;
       }
       case "diagnosis":
@@ -1171,14 +1300,33 @@ class Verifier {
         // Section 9.3, point E13, and section 9.4: an outcome entry of an operation whose rules the verifier does not derive is
         // `unsupported-definition` at that entry, and never `consistent`.
         if (!owners?.rules(owner, kind)) throw new Stop("unsupported-definition", `entry ${entry.seq} is an outcome, and this replay has no rules of the owner of its operation`, where);
+        const valueOwner = owners.rules(owner, kind);
+        if (valueOwner?.values !== undefined && valueOwner.valueDomains === undefined) throw new Stop("unsupported-definition", "the outcome owner has a value reader but no static domain declaration for this pinned version and kind", where);
         this.#trusts.add("outcomes");
         await this.#snapshots(run, input, owners, owner, kind, where);
         // Sections 4.1 and 16.1, "Replay": each observation that the outcome retains, of the ten-second kind, is derived again. The
         // judge is given the recorded ones and the retained copy of each entry in `uses`, as a rule of the outcome reads them, and
         // derives an input with the observations that a rule read: one that no rule reads, and one that a rule reads and the entry
         // lacks, are each a mismatch (I3 deltas, entries EU4 and FC4).
-        if (input.observed) await this.#observed(run, entry, input.observed, WINDOWS.once, where, depth);
-        judged = judgeOutcome(state, definition, input, { clock, bounds, owners: this.#owners, platform: run.platform ?? undefined, own: reading.own, facts, ...(input.observed ? { observed: input.observed } : {}) });
+        // Revision 20, sections 6.1 and 16.1, "Replay": under a definition whose data states rows or an origin, the judge finds the
+        // origin again, by the operation's ID or by the rule, and copies its `uses`; it derives both subject lists, the second from
+        // the recorded observations of the first; and the check of each record is by the rows of the kind. Under any other, the
+        // ten-second window stands, as a stand-in.
+        if (input.observed && !definition.observing) await this.#observed(run, entry, input.observed, WINDOWS.once, where, depth);
+        const kindRows = definition.observing ? await this.#hand(run, entry, input.observed, where) : null;
+        let named;
+        try { named = evidenceValues(owners.rules(owner, kind), input.evidence); } catch { named = null; }
+        if (named === null) throw mismatch("the evidence names a value outside its owner declaration");
+        const values = [...(kindRows?.values ?? [])];
+        for (const value of named) {
+          const kept = await this.#retained(run, where, "value", value.digest, "the value named by outcome evidence", value.domain);
+          try {
+            if (utf8(kept.bytes).length > value.max || canonicalize(parseStrict(kept.bytes)) !== kept.bytes || valueDigest(value.domain, parseStrict(kept.bytes)) !== value.digest) throw new Error();
+          } catch { throw new Stop("incomplete", `a retained input is not the one named: the outcome evidence value, ${value.digest}`, where); }
+          values.push(kept.bytes);
+        }
+        judged = judgeOutcome(state, definition, input, { clock, bounds, owners: this.#owners, platform: run.platform ?? undefined, own: reading.own, facts, ...(input.observed ? { observed: input.observed } : {}), ...(kindRows ?? {}), values });
+        if (kindRows) await this.#byRows(run, entry, judged, kindRows.observed, where, depth);
         break;
       }
       case "checkpoint":
@@ -1198,7 +1346,9 @@ class Verifier {
       if (canonicalize(derived[part]) !== canonicalize(entry[part])) throw mismatch(`the recorded ${part} are not the ones derived again`);
     }
     if (canonicalize(derived) !== bytes) throw mismatch("the recorded entry is not the one derived again");
-    applyEntry(state, definition, entry, hash);
+    applyEntry(state, definition, entry, hash, foldInputs);
+    if (input.type === "delivery" && input.message.class === "request") run.foldInputs.set(entry.seq, foldInputs);
+    if (!fits(state, definition, bounds, input, judged.draft.settles, ownersOf(definition, run.platform, this.#owners))) throw mismatch("the taking or new-work entry exceeds the budget of used plus reserved entries");
     // Section 16.1: this entry is now the latest that retains each of its reads, in its grant and in `observed`. A preparation retains one in its grant,
     // and an outcome and a delivery of a result in `observed` alone.
     this.#retains(run, entry, hash, retainedBy(input));

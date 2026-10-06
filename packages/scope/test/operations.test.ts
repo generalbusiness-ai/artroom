@@ -284,8 +284,9 @@ describe("outside operations at a real scope (scope contract, section 4.3; autho
     const pairs = [1, 2].map((root) => ({ ref: stagedRefName(lane, "c".repeat(40), root), target: "c".repeat(40) }));
     const snapshot = snapshotInput(pairs)!;
     const answer = (bytes: string) => ({ result: "confirmed", evidence: { basis: "own-answer", body: { read: true } }, retain: [{ ...snapshot, bytes }] });
-    // Each of the three has the pairs of the snapshot, so each is read as a snapshot with that digest. Only the first is its bytes.
+    // Each of the three has the pairs of the snapshot. Only the first is its bytes, and only that one is read as the snapshot: by
+    // the driver, and by every reader of a retained input (the contract's revision 20, point EZ5; row I3-48).
     const given = [snapshot.bytes, ` ${snapshot.bytes}`, canonicalize([...pairs].reverse())];
-    expect([given.map((bytes) => snapshotRead(snapshot.digest, bytes) !== null), given.map((bytes) => isAnswer(answer(bytes)))]).toEqual([[true, true, true], [true, false, false]]);
+    expect([given.map((bytes) => snapshotRead(snapshot.digest, bytes) !== null), given.map((bytes) => isAnswer(answer(bytes)))]).toEqual([[true, false, false], [true, false, false]]);
   });
 });

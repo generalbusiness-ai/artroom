@@ -132,7 +132,7 @@ export class Rulebook extends Ledger {
 
   /** An act, judged with the rules scope's rules. `context`: what is at hand beside the intent, as `observed` and `values`. */
   override act(...[who, kind, over = {}, context = {}]: Parameters<Ledger["act"]>): ReturnType<Ledger["act"]> {
-    return super.act(who, kind, over, { platform: rules, ...context });
+    return super.act(who, kind, over, { platform: rules, membership, ...context });
   }
 
   /** The delivery of send `n` of entry `seq` of another scope, judged with the rules scope's rules, and written if it is to be. */

@@ -131,6 +131,8 @@ describe("authority on real scopes, under the production wiring (authority note,
   test("replay agrees with the runtime: each recorded grant is derived again from the observation that it retains and from membership's history at the observed head; a history that was changed is reported by the name of what it breaks", async () => {
     const { O, M, unasInbox, ritasInbox } = await repository();
     const [a, b] = [await notify(unasInbox, { reason: "mentioned" }), await notify(unasInbox, { reason: "assigned" })];
+    expect(a.answer, "the mentioned notice must be recorded before replay").toMatchObject({ answer: "recorded" });
+    expect(b.answer, "the assigned notice must be recorded before replay").toMatchObject({ answer: "recorded" });
     const [one, two] = [(a.answer as { fact: { seq: number } }).fact.seq, (b.answer as { fact: { seq: number } }).fact.seq];
     const marks = async (kind: string, notice: number) => unasInbox.did(una, kind, { on: notice, expected: await unasInbox.expected({ on: notice, inbox: 0 }) });
     // Three acts of una in her inbox: on a fresh read; on the same read again, ten seconds later; and, after membership has moved

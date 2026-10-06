@@ -4,11 +4,12 @@ import type { Grant, SignedIntent } from "@generalbusiness/artroom-contract";
 import { keyIdOfSecret, textDigest } from "@generalbusiness/artroom-bytes";
 import type { ActJudgment, Item, PlatformRule, RuleGiven } from "@generalbusiness/artroom-derive";
 import { d, t } from "@generalbusiness/artroom-derive/testing";
-import { FIRST_ACTIONS, MEMBERSHIP, NO_MEMBER, ROLE_LISTS, actionsIn, membershipRules, standingOf, type Role } from "../src/membership.ts";
+import { definitions } from "../src/index.ts";
+import { FIRST_ACTIONS, MEMBERSHIP, NO_MEMBER, ROLE_LISTS, ROLE_TABLE, actionsIn, isActions, membershipRules, standingOf, type Role } from "../src/membership.ts";
 import { Roster, paul, rita, sam, una, vic } from "./support.ts";
 
 // Every scope here is a `Roster` of test support: a membership scope in memory, below a made-up office, which is a STAND-IN for the
-// directory. Every rule of membership is the platform package's: the ten of the authority note's table of marks, at its revision 24.
+// directory. Every rule of membership is the platform package's: the eleven of the authority note's table of marks, at its revision 28.
 
 /** What a judgment answered: the result, with the reason and the refusal's name where it has them. */
 const said = (j: ActJudgment) => [j.result, "reason" in j ? j.reason : null, "name" in j ? (j.name ?? null) : null];
@@ -93,11 +94,11 @@ describe("the rules of platform:membership@1, each as a plain function (authorit
   ];
   for (const [row, rule, args, expected] of rows) test(`${rule}, row ${row}`, () => expect(run(rule, ...args)).toEqual(expected));
 
-  test("the table has exactly the ten rules that the note's table of marks names for membership, each of the kind of its place; a text that is no handle is refused `bad-field`, named `bad-handle`, and is no member", () => {
+  test("the table has exactly the eleven rules that the note's table of marks names for membership, each of the kind of its place; a text that is no handle is refused `bad-field`, named `bad-handle`, and is no member", () => {
     expect(Object.entries(membershipRules).map(([name, rule]) => [name, rule.place, "refusals" in rule ? rule.refusals : "most" in rule ? rule.most : null])).toEqual([
       ["founding-key", "grant", []], ["recovery-key", "grant", []], ["by-invitation", "grant", ["recovery-key", "key-in-use", "invitation-refused"]],
       ["invitation", "also", null], ["key-id", "effect", 1], ["former-recovery", "effect", 1],
-      ["role-table", "effect", 5], ["member-of", "effect", 1], ["handle-form", "guard", ["bad-handle"]], ["last-admin-kept", "guard", ["last-admin"]],
+      ["role-table", "effect", 5], ["member-of", "effect", 1], ["action-list", "type", null], ["handle-form", "guard", ["bad-handle"]], ["last-admin-kept", "guard", ["last-admin"]],
     ]);
     // Row q, each way that a text is no handle: nothing after the `@`, a hyphen first or last, an uppercase letter, another
     // character, no `@`, and no text. The length is the field's own type, and the rule does not judge it.
@@ -206,6 +207,9 @@ test("membership answers an observation from its head: the key's state, its memb
   const admin = [...FIRST_ACTIONS.admin];
   expect(admin.includes("task.control")).toBe(true);
   expect(standingOf(m.state, { of, key: rita.key })).toEqual({ ...common, key: rita.key, keyState: "active", member: "@rita", memberState: "active", role: "admin", actions: admin });
+  // The holders of an action (the contract's section 16.1; row I3-42): each active member with an active key whose role holds it.
+  const holders = (action: string, most = 2) => { const answer = standingOf(m.state, { of, holders: action, most }); return answer && "holders" in answer ? [answer.count, answer.holders] : null; };
+  expect([standingOf(m.state, { of, holders: "issue.open", most: 2 }), holders("no.such")]).toEqual([{ of, head: m.head, definition: MEMBERSHIP, subject: "holders", action: "issue.open", count: 1, holders: ["@rita"] }, [0, []]]);
   // A key that no item holds: `unknown`, with no member and no action. An invited member is no member yet.
   const member = invited(m);
   expect(standingOf(m.state, { of, key: una.key })).toEqual({ ...common, head: m.head, key: una.key, keyState: "unknown", member: NO_MEMBER, memberState: "active", role: "", actions: [] });
@@ -214,12 +218,30 @@ test("membership answers an observation from its head: the key's state, its memb
   expect(standingOf(m.state, { of, key: una.key })).toMatchObject({ head: m.head, keyState: "active", member: "@una", memberState: "active", role: "member", actions: actionsIn("member") });
   expect(standingOf(m.state, { of, member: "@una" })).toEqual({ of, head: m.head, definition: MEMBERSHIP, subject: "member", member: "@una", memberState: "active", role: "member", activeKey: true, controller: null, controllerActive: null });
 
+  // Two hold the action now. The answer lists the first of them in byte order of member ID, as many as `most`, and counts all.
+  expect([holders("issue.open"), holders("issue.open", 1), holders("rules.publish")]).toEqual([[2, ["@rita", "@una"]], [2, ["@rita"]], [1, ["@rita"]]]);
+
   // The role table is a value of the scope at one head: an admin's act changes a list, and the next answer has it.
-  m.did(rita, "set-actions", { on: 0, expected: { on: m.item(0).revision }, fields: { role: "member", actions: ["inbox.own"] } });
+  const set = (actions: unknown) => m.act(rita, "set-actions", { on: 0, expected: { on: m.item(0).revision }, fields: { role: "member", actions: actions as never } });
+  // The type of the list is the rule `action-list` (the note's revision 28, section 3.2 and section 12.1.8, row aa): at most 64
+  // names with no name twice, each of 1 to 64 bytes of lower-case letters, digits, hyphens and full stops. A value outside it is
+  // `bad-field`, and the list stays: an upper-case letter, a space, a control character, a character outside ASCII, an empty
+  // name, a name of 65 bytes, a name twice, 65 names, a name that is no text, and a value that is no list.
+  const names = (count: number, bytes = 64) => Array.from({ length: count }, (_, i) => `${i}`.padEnd(bytes, "a"));
+  const outside = [["Inbox.own"], ["inbox own"], ["inbox\u0000own"], ["inbox.öwn"], [""], names(1, 65), ["inbox.own", "inbox.own"], names(65, 4), [7], "inbox.own"];
+  expect([...outside.map((actions) => said(set(actions))), m.item(0).values[ROLE_LISTS.member]]).toEqual([...outside.map(() => ["refused", "bad-field", null]), actionsIn("member")]);
+  // The largest list is of the type: 64 names of 64 bytes. So is every name of an action that a platform definition states as a
+  // grant, and every name of the first table, each of whose five lists the rule `role-table` set through the same type.
+  const granted = [...new Set(Object.values(definitions).flatMap((data) => Object.values(data.acts).flatMap((act) => (typeof act.grant === "string" ? [act.grant] : "grant" in act.grant && typeof act.grant.grant === "string" ? [act.grant.grant] : []))))];
+  expect([said(set(names(64))), ["membership.manage", "rules.publish", "ledger.retry"].every((name) => granted.includes(name)), granted.every((name) => isActions([name])), roles.every((role) => isActions(FIRST_ACTIONS[role])), isActions(ROLE_TABLE.flatMap(([actions]) => actions))]).toEqual([WRITTEN, true, true, true, true]);
+  expect(said(set(["inbox.own"]))).toEqual(WRITTEN);
   expect(standingOf(m.state, { of, key: una.key })).toMatchObject({ actions: ["inbox.own"] });
+  expect([holders("issue.open"), holders("inbox.own")]).toEqual([[1, ["@rita"]], [2, ["@rita", "@una"]]]);
   // An agent's controller is active while that member is active and has an active key.
   m.did(rita, "add-member", { fields: { handle: "@bot", kind: "agent", controller: { membership: of, member: "@una" } } });
   expect(standingOf(m.state, { of, member: "@bot" })).toMatchObject({ role: "agent", activeKey: false, controller: "@una", controllerActive: true });
+  // An agent's role holds `issue.open`, and this agent has no active key: it is no holder.
+  expect(holders("issue.open", 8)).toEqual([1, ["@rita"]]);
   expect([said(m.act(rita, "add-member", { fields: { handle: "@bot2", kind: "agent" } })), said(m.act(rita, "add-member", { fields: { handle: "@Bad", kind: "checker" } }))])
     .toEqual([["refused", "guard-failed", "no-controller"], ["refused", "bad-field", "bad-handle"]]);
 

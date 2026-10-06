@@ -445,7 +445,7 @@ describe("a rule is run at the check of its mark's place (sections 4.2 and 6.1)"
   test("the send of an outcome's mark: its rule gives one request at ordinal 0, and a `create` among them has the fourth cause and names the opening entry by a fact; the clause of its result is found by the outcome's kind and runs an effect mark", () => {
     const s = new Scope(gateWith((d) => { d.acts.enter.grant = "gate.enter"; const send = { code: "create-child", row: "P16", result: { applied: [{ code: "noted", row: "P16" }] } }; d.outcomes.probe.send = send; d.outcomes.later = { code: "later", row: "P16", send }; }));
     s.did(rita, "issue", { fields: { hash: textDigest("one") } });
-    const opens = some(() => [{ effect: "operation", k: 0, owner: OWNER, kind: "probe", attempts: 1 }, { effect: "attempt", operation: { k: 0 }, attempt: 1, result: "opened", selected: null }]);
+    const opens = some(() => [{ effect: "operation", k: 0, owner: OWNER, kind: "probe", attempts: 2 }, { effect: "attempt", operation: { k: 0 }, attempt: 1, result: "opened", selected: null }]);
     expect(said(enter(s, una, "one", owned({ "key-id": opens })))).toEqual(["write", null, null, null]);
     const opened = s.last.seq;
     const act = s.last.input;
@@ -463,6 +463,23 @@ describe("a rule is run at the check of its mark's place (sections 4.2 and 6.1)"
     // opened the operation, and a field names that act's entry by its fact.
     const named = settle(operation, () => create({ opened: s.fact(opened) }));
     expect(named.result === "write" && named.draft.sends).toEqual([{ n: 0, ...create({ opened: s.fact(opened) }) }]);
+    // Row I3-47 (revision 20, section 6.1, "What the judge resolved, for an outcome"): the rule of the effects and the rule of the
+    // send are each given `selected`, and whether the entry opens a further attempt, as the ledger derived them. The entry's own
+    // `attempt` effects say the same. A rule that is run before the ledger derived them, as `holds` is, is given neither.
+    const seen: unknown[] = [];
+    const resolved = (result: "confirmed" | "refused", holds: boolean) => {
+      const judged = settleOutcome(s.state, s.definition, { type: "outcome", operation: operation as OperationId, attempt: 1, result, evidence: { basis: "own-answer", body: {} } }, { clock: clockOf(s.state, s.now), bounds: PROPOSED_BOUNDS, own: s.own, platform: owned({
+        probe: { place: "outcome", rules: { selects: true, read: false, retries: () => true, holds: (given) => { seen.push(["holds", given.resolved.outcome]); return holds; }, derives: (given) => { seen.push(["effects", given.resolved.outcome]); return { effects: [], sends: [], opens: [] }; } } },
+        "create-child": { place: "send", run: (given) => { seen.push(["send", given.resolved.outcome]); return null; } },
+      }) });
+      return judged.result === "write" && judged.draft.effects.map((e) => (e.effect === "attempt" ? [e.attempt, e.result, e.selected] : null));
+    };
+    expect([resolved("confirmed", true), resolved("confirmed", false), resolved("refused", true)]).toEqual([[[1, "confirmed", true]], [[1, "confirmed", false]], [[1, "refused", null], [2, "opened", null]]]);
+    expect(seen).toEqual([
+      ["holds", undefined], ["effects", { selected: true, further: false }], ["send", { selected: true, further: false }],
+      ["holds", undefined], ["effects", { selected: false, further: false }], ["send", { selected: false, further: false }],
+      ["effects", { selected: null, further: true }], ["send", { selected: null, further: true }],
+    ]);
     // What the child could not verify is a fault of the rule, and nothing is written: no fact among the fields; a fact of another
     // entry; a seed with another cause; a creation that is not the entry's first; and a request of the rule's own beside the send.
     // Case 4: a rule that gives no request leaves the entry with no send.

@@ -261,7 +261,7 @@ describe("sends (section 6.6)", () => {
       ["a collect of a member that is no slot of the type", refusal((d) => { reserve(d).fields.links.collect.fields.peer = "peer"; }), "name"],
       ["a condition that reads the item its entry opens", refusal((d) => { reserve(d).if = [{ set: "peer" }]; }), "nascent-guard"],
       ["a definition to create under that is no digest, platform name or `self`", refusal((d) => { d.acts.merge.sends.push({ create: { kind: "lane", definition: "pull", fields: {}, result: {} } }); }), "shape"],
-      ["two sends of one type and name, one of them conditional and one with a clause", refusal((d) => { d.acts.merge.sends[1].tell.message = "reserve"; }), "shape"],
+      ["two sends of one type and name, one of them conditional and their clauses differ", refusal((d) => { d.acts.merge.sends[1].tell.message = "reserve"; }), "ambiguous-send"],
       ["a condition on a notice of a timed rule", refusal((d) => {
         d.items.merge.values.until = { fixed: false, required: false, of: { type: "time" } };
         d.timed.lapse = { on: "merge", states: ["intended"], deadline: "until", effects: [{ state: "refused" }], attention: [{ notify: { slot: "watchers", of: "on", when: "after", reason: "lapsed", if: [{ state: ["intended"] }] } }] };
