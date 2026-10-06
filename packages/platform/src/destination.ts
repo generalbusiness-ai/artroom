@@ -104,6 +104,46 @@ export const DESTINATION_KINDS = { firstHead: "first-head", judge: "judge", push
 export const DESTINATION_ATTEMPTS = { firstHead: 3, judge: 1, push: 3, mint: 1, revoke: 3, read: 1, receipt: 3, adoptRead: 1, resend: 1 } as const;
 
 /**
+ * What one publication reserves, in entries, by the two rows of the
+ * destination in the table of the authority note's section 5.8, counted
+ * from the attempts above as that section counts them: "An operation"
+ * reserves 2 entries for each attempt, and "a request" 2.
+ *
+ * - `queued`, 4: 1 entry for the decision to reserve or not; the final
+ *   update, a request; and 1 entry for one `withdraw`.
+ * - `reserved`, 68: the push, with for each attempt its mint and its
+ *   token's revocation, 30; 1 entry for the read that decides; the updates
+ *   `reserved` and `unresolved`, two requests; 1 entry for an abort and 1
+ *   for the first `compromised` notice; and the receipt, counted as the
+ *   push, with 1 entry for its read, 31.
+ *
+ * Both are reserved "when" the `reserve` is delivered, which "is admitted
+ * only with the room of this row and the next": 72 entries, and 73 with
+ * the delivery's own.
+ *
+ * **THIS COUNT IS NOT HELD BY ANY RUNTIME** (I3 deltas, entries FA3 and
+ * FC1). The ledger counts, for a publication, only the outcome entries of
+ * each operation that is open (`owed`, in derive's `reserve.ts`), and the
+ * kinds of this definition state `covered`, so nothing is reserved for
+ * what an outcome opens. `asked` is what the one entry of a publication
+ * that is new work, the delivery of its `reserve`, is admitted with: the
+ * 2 entries of the `judge` that it opens, of which the table counts 1,
+ * the decision. `unreserved` is the rest of the table: the entries that a
+ * publication may write, or reserve, in entries that are never asked
+ * whether they fit. It is 71, and 72 where the `reserve` opened no
+ * `judge`. `platform/test/definitions.test.ts` holds the numbers, and the
+ * kinds that state `covered`, so that neither grows unseen.
+ */
+export function publicationRoom(attempts: { push: number; mint: number; revoke: number; receipt: number; judge: number } = DESTINATION_ATTEMPTS): { queued: number; reserved: number; asked: number; unreserved: number } {
+  const [operation, request] = [(most: number) => 2 * most, 2];
+  /** A write, with for each of its attempts a mint and the revocation of its token. */
+  const write = (most: number) => operation(most) + most * (operation(attempts.mint) + operation(attempts.revoke));
+  const queued = 1 + request + 1;
+  const reserved = write(attempts.push) + 1 + 2 * request + 1 + 1 + write(attempts.receipt) + 1;
+  return { queued, reserved, asked: operation(attempts.judge), unreserved: queued + reserved - 1 };
+}
+
+/**
  * The most records of each `collect` list of a `reserve` (row b; section
  * 12.1.5, "The three lists of `reserve`"). They are constants of version 1
  * of the rule `collect-list`. They equal the `max` of the types `review`,

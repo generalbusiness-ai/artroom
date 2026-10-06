@@ -1,8 +1,8 @@
 import { expect, test } from "vitest";
 import { PROPOSED_BOUNDS, type DeclaredDefinition } from "@generalbusiness/artroom-contract";
 import { definitionDigest } from "@generalbusiness/artroom-bytes";
-import { PROFILES, derivable, ruleAt, runnable, validateDefinition } from "@generalbusiness/artroom-derive";
-import { FIRST_ACTIONS, ROLE_LISTS, RULES, definitions, destinationMembership, destinationRulesScope, inbox, membership, platform, rulesMembership } from "../src/index.ts";
+import { PROFILES, derivable, reservedBy, ruleAt, runnable, validateDefinition } from "@generalbusiness/artroom-derive";
+import { DESTINATION, DESTINATION_ATTEMPTS, DESTINATION_KINDS, FIRST_ACTIONS, ROLE_LISTS, RULES, definitions, destinationMembership, destinationRulesScope, inbox, membership, platform, publicationRoom, rulesMembership } from "../src/index.ts";
 
 // The plan's T43, for `platform:inbox@1` (authority note, revision 16, section 12.1.6). The package holds six definitions: the two
 // lists at the end of this test name them. T43 for each of the other five is in this file or in the test file of its definition.
@@ -135,4 +135,29 @@ test("a rules scope and a destination record the scope ID of membership as a val
     { scope: id, kind: "membership", inc: null }, { scope: id, kind: "membership", inc: "in_a" },
     { scope: other, kind: "rules", inc: "in_z" },
   ]);
+});
+
+// Authority note, revision 26, section 5.8, the two rows of the destination; the contract's section 17.2, row 5. The reservation by a
+// publication is NOT BUILT (I3 deltas, entries FA3 and FC1). This test holds what is exempt meanwhile, and by how much, so that neither
+// grows unseen: the kinds that state `covered`, and the entries of the note's own table that no admission reserves.
+test("only five kinds of the destination state that what their outcomes open is covered by another duty; by the note's table a publication reserves 4 and 68 entries, its admission is asked for the 2 of its judge, and 71 are reserved by no admission", () => {
+  /** Each rule of an outcome, of every definition of the package, that states `covered`; and each that declares a closure. */
+  const stating = (member: "covered" | "closure") => Object.entries(RULES).flatMap(([name, rules]) =>
+    Object.entries(rules).flatMap(([code, rule]) => (rule.place === "outcome" && rule.rules[member] !== undefined ? [`${name}:${code}`] : [])));
+  expect(stating("covered")).toEqual(["mint", "push", "deciding-read", "adopt-read", "judge"].map((code) => `platform:destination:${code}`));
+  // A kind that states `covered` declares no closure: the ledger then counts nothing for what an outcome of it opens.
+  expect(stating("closure").filter((rule) => rule.startsWith("platform:destination:"))).toEqual([]);
+
+  // The table, in entries: 1 + 2 + 1, and 30 + 1 + 4 + 1 + 1 + 31. The 30 is 6 for the push, 6 for the three mints and 18 for the
+  // three revocations. A new `reserve` needs 73 with its own entry (the witness "a destination at its budget", step 1).
+  const room = publicationRoom();
+  expect([room.queued, room.reserved, 1 + room.queued + room.reserved]).toEqual([4, 68, 73]);
+  // What the ledger asks of the delivery of `reserve`, the one entry of a publication that is new work: the two outcome entries of
+  // the `judge` that it opens, and nothing for what that outcome opens. The table counts one of the two, the decision.
+  const { rules } = platform(DESTINATION)!;
+  const kindRule = rules["judge"]!;
+  const owners = { rules: () => (kindRule.place === "outcome" ? { ...kindRule.rules, retries: () => false } : null) } as never;
+  expect([reservedBy({ owner: DESTINATION, kind: DESTINATION_KINDS.judge, attempts: DESTINATION_ATTEMPTS.judge }, owners), room.asked]).toEqual([2, 2]);
+  // So of the table's 72, 71 are written or reserved by entries that are never asked whether they fit: outcome entries.
+  expect(room.unreserved).toBe(71);
 });

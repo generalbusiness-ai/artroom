@@ -143,8 +143,11 @@ export interface OperationRules {
    * ledger then makes no closure check for an outcome of this kind, and
    * `closure` counts nothing for it. Absent: the closure is the check.
    */
-  // I3 merge: the count of that other duty is not built for any owner. A destination reserves for an open operation only its own
-  // outcome entries (I3 deltas, entry FA3; request `cc570904`).
+  // I3 merge: THE COUNT OF THAT OTHER DUTY IS NOT BUILT FOR ANY OWNER, so this member exempts and reserves nothing. A destination
+  // reserves for an open operation only its own outcome entries. By the note's own table one publication may write 71 entries that
+  // no admission reserved (the platform package's `publicationRoom`, whose test holds the number and the kinds that state this
+  // member). What the adopted texts do not state, so that the count could be derived from the folded state, is in the I3 deltas,
+  // entry FC1, with entry FA3; the owner is request `cc570904`.
   covered?: boolean;
 }
 
