@@ -130,15 +130,13 @@ export function httpSource(service: string, options: { fetch?: Fetch; reader?: s
       }
       return { ok: true, page: { scope: value["scope"], head: at, entries, next: complete === false ? positionOf(next) : null }, bytes: got.bytes };
     },
-    async retained(scope, kind, digest, allow) {
-      // I3 merge: the service has no route that reads one value by its domain, so a value is not read over HTTP: the replay of an
-      // entry that names one is `incomplete` here (I3 deltas, entry EX6).
-      if (kind === "value") return unread("not-found");
-      const got = await get(`/v1/scopes/${scope}/retained/${kind}/${encodeURIComponent(digest)}`, Math.min(allow.bytes, RETAINED_REPLY_BYTES));
+    async retained(scope, kind, digest, allow, domain) {
+      if (kind === "value" && (typeof domain !== "string" || domain.length === 0)) return unread("not-found");
+      const got = await get(`/v1/scopes/${scope}/retained/${kind}/${encodeURIComponent(digest)}${domain === undefined ? "" : `?domain=${encodeURIComponent(domain)}`}`, Math.min(allow.bytes, RETAINED_REPLY_BYTES));
       if (!("body" in got)) return got;
       const value = got.body["value"];
-      if (!isObject(value) || typeof value["bytes"] !== "string" || (value["under"] !== undefined && typeof value["under"] !== "string")) return unread("unavailable");
-      return { ok: true, input: { kind, digest, bytes: value["bytes"], ...(value["under"] === undefined ? {} : { under: value["under"] }) }, bytes: got.bytes };
+      if (!isObject(value) || (kind === "value" && value["domain"] !== domain) || typeof value["bytes"] !== "string" || (value["under"] !== undefined && typeof value["under"] !== "string")) return unread("unavailable");
+      return { ok: true, input: { kind, digest, bytes: value["bytes"], ...(kind === "value" ? { domain: domain! } : {}), ...(value["under"] === undefined ? {} : { under: value["under"] }) }, bytes: got.bytes };
     },
   };
 }

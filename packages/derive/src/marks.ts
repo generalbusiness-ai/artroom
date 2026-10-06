@@ -346,6 +346,8 @@ export interface OutcomeGives { effects: readonly RuleEffect[]; sends: readonly 
  * outcome that would hold more writes nothing.
  */
 export interface OutcomeRule {
+  valueDomains?: readonly import("./ledger.ts").EvidenceValueDomain[];
+  values?(evidence: Evidence): readonly import("./ledger.ts").EvidenceValue[];
   selects: boolean;
   read: boolean;
   closure?: number;

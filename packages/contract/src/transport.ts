@@ -78,6 +78,6 @@ export interface ScopeApi {
   duty(scope: string, reader: unknown, duty: DutyId): Promise<Read<Duty>>;
   /** A page of the history as stored: each entry's canonical bytes. */
   log(scope: string, reader: unknown, cursor?: Cursor): Promise<Read<LogPage>>;
-  /** One retained input, by kind and digest. */
-  retained(scope: string, reader: unknown, kind: RetainedInput["kind"], digest: Digest): Promise<Read<RetainedInput>>;
+  /** One retained input, by kind and digest; a value also names its byte domain. */
+  retained(scope: string, reader: unknown, kind: RetainedInput["kind"], digest: Digest, domain?: string): Promise<Read<RetainedInput>>;
 }
