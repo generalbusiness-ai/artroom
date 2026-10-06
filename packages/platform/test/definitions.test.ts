@@ -2,7 +2,7 @@ import { expect, test } from "vitest";
 import { PROPOSED_BOUNDS, type DeclaredDefinition } from "@generalbusiness/artroom-contract";
 import { definitionDigest } from "@generalbusiness/artroom-bytes";
 import { PROFILES, derivable, ruleAt, runnable, validateDefinition } from "@generalbusiness/artroom-derive";
-import { FIRST_ACTIONS, ROLE_LISTS, RULES, definitions, inbox, membership, platform } from "../src/index.ts";
+import { FIRST_ACTIONS, ROLE_LISTS, RULES, definitions, destinationMembership, destinationRulesScope, inbox, membership, platform, rulesMembership } from "../src/index.ts";
 
 // The plan's T43, for `platform:inbox@1` (authority note, revision 16, section 12.1.6). The package holds six definitions: the two
 // lists at the end of this test name them. T43 for each of the other five is in this file or in the test file of its definition.
@@ -111,4 +111,24 @@ test("the register and the directory each lack no rule: every mark of their data
     return [...new Set(missing)];
   };
   expect([lacks("platform:register@1"), lacks("platform:directory@1")]).toEqual([[], []]);
+});
+
+// Authority note, revision 25, section 12.1, "Where the rules scope and the destination record their membership reference" (I3 deltas
+// EM21, EQ7 and EU6). The states are MADE BY HAND: one item with the value, and the incarnations that the fold would hold.
+test("a rules scope and a destination record the scope ID of membership as a value, and the incarnation is that of the observations of that ID which their entries retain: none before the first, and no reference from a state that holds two", () => {
+  const [id, other] = ["sc_membership", "sc_rules"];
+  const holding = (type: string, values: Record<string, string>, fixed: Record<string, readonly string[]>) =>
+    ({ page: (asked: string) => ({ items: asked === type ? [{ values }] : [], more: false }), incarnations: (scope: string) => fixed[scope] ?? [] }) as never;
+  const { membership: ofRules } = platform("platform:rules@1")!;
+  const { membership: ofDestination } = platform("platform:destination@1")!;
+  expect([ofRules, ofDestination, platform("platform:membership@1")!.membership, platform("platform:inbox@1")!.membership]).toEqual([rulesMembership, destinationMembership, undefined, undefined]);
+  expect([
+    ofRules!(holding("rules", { membership: id }, {})), ofRules!(holding("rules", { membership: id }, { [id]: ["in_a"], [other]: ["in_z"] })), ofRules!(holding("rules", { membership: id }, { [id]: ["in_a", "in_b"] })), ofRules!(holding("rules", {}, {})),
+    ofDestination!(holding("branch", { membership: id, rules: other }, { [other]: ["in_z"] })), ofDestination!(holding("branch", { membership: id, rules: other }, { [id]: ["in_a"] })),
+    destinationRulesScope(holding("branch", { membership: id, rules: other }, { [other]: ["in_z"] })),
+  ]).toEqual([
+    { scope: id, kind: "membership", inc: null }, { scope: id, kind: "membership", inc: "in_a" }, null, null,
+    { scope: id, kind: "membership", inc: null }, { scope: id, kind: "membership", inc: "in_a" },
+    { scope: other, kind: "rules", inc: "in_z" },
+  ]);
 });

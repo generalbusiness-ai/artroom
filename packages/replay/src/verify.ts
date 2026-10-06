@@ -42,9 +42,9 @@ import type { Bounds, CapabilityName, Digest, Entry, FactRef, Grant, Head, KeyId
 import { canonicalize, definitionDigest, digestBytes, intentDigest, isDigest, isEntry, isObservationUse, isPlatformDefinition, parseStrict, platformName, scopeIdOf, textDigest, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import {
   HOLD, HOLD_KINDS, MISMATCHES, MemoryState, WINDOWS, actionOf, agrees, applyEntry, clockOf, entryOf, headsOf, highestHead, inputTexts, isAncestryCheck, isFactRef, isLocalId, isObject, isScopeRef, judgeAct, judgeCheckpoint, judgeDelivery,
-  judgeDiagnosis, judgeGenesis, judgeGrant, judgeOutcome, judgePreparation, judgeTimed, membershipOf, nextDue, own, ownersOf, placesOf, ruleAt, same, snapshotRead, stepsOf, timeMs, updateOf, validateDefinition, valueDigest, windowOf,
+  judgeDiagnosis, fixedBy, judgeGenesis, judgeGrant, judgeOutcome, judgePreparation, judgeTimed, membershipOf, nextDue, own, ownersOf, placesOf, ruleAt, same, snapshotRead, stepsOf, timeMs, updateOf, validateDefinition, valueDigest, windowOf,
 } from "@generalbusiness/artroom-derive";
-import type { ActJudgment, AncestryCheck, Capabilities, Clock, Fetched, Judgment, Owners, PlatformRules, PreparationJudgment, Retains, Rules, StateView, TimedJudgment, ValidDefinition, Window } from "@generalbusiness/artroom-derive";
+import type { ActJudgment, AncestryCheck, Capabilities, Clock, Fetched, Judgment, Owners, PlatformRules, PreparationJudgment, RecordedRef, Retains, Rules, StateView, TimedJudgment, ValidDefinition, Window } from "@generalbusiness/artroom-derive";
 import { RULE_PROFILES, evaluateRules } from "@generalbusiness/artroom-derive/rule";
 import { PAGE_ENTRIES, PAGE_REPLY_BYTES, RETAINED_REPLY_BYTES, hashOfBytes, type HistorySource, type Stored } from "./source.ts";
 
@@ -135,10 +135,13 @@ export interface Coded {
    * when that is not its genesis entry (authority note, section 3.3, "Where
    * it records its membership reference"): a pure function of the folded
    * state before the entry that is judged. A directory holds it in a slot.
-   * Null: the scope records none yet. Absent: a scope under this version
-   * records it in its genesis entry (section 6.6).
+   * A rules scope and a destination hold the scope ID, with the incarnation
+   * of the observations of that ID which their earlier entries retain, and
+   * with none before the first (authority note, section 12.1, decided in
+   * revision 25). Null: the scope records none yet. Absent: a scope under
+   * this version records it in its genesis entry (section 6.6).
    */
-  membership?: ((state: StateView) => ScopeRef | null) | undefined;
+  membership?: ((state: StateView) => RecordedRef | null) | undefined;
 }
 
 /** A report, and in words why its result is not `consistent`. */
@@ -250,11 +253,30 @@ interface Run {
  * through the entry before the one that is judged, as a directory's slot
  * `repository.membership` (I3 deltas, entry EP14). Every other scope: from
  * its genesis entry, the first that the replay checked (section 6.6).
+ *
+ * A rules scope and a destination record the ID with no incarnation until
+ * an entry retains an observation of it. A grant there is judged by guard 1
+ * for such a scope: its observation is of that ID, and the entry fixes the
+ * incarnation (`fixedIn`). That the incarnation is the one that the
+ * directory confirmed, by the directory's history, is not checked here (I3
+ * deltas, entry EY8).
  */
-const recordedMembership = (run: Run): ScopeRef | null => {
+const recordedMembership = (run: Run): RecordedRef | null => {
   if (run.membership) return run.state.scope() ? run.membership(run.state) : null;
   const genesis = run.sealed[0]?.entry.input;
   return genesis?.type === "genesis" && run.at ? membershipOf(genesis, run.at) : null;
+};
+
+/**
+ * The reference with its incarnation, for one entry that is judged: the one
+ * recorded before it, or, while no incarnation is recorded, the `of` of the
+ * first observation that the entry itself retains, in its grant or in
+ * `observed`, which fixes it.
+ */
+const fixedIn = (run: Run, input: Entry["input"]): ScopeRef | null => {
+  const retained: unknown[] = input.type === "act" || input.type === "preparation" ? [...input.authority.map((grant) => grant.fresh), ...((input.type === "act" && input.observed) || [])] : [];
+  const first = retained.find(isObservationUse)?.observation.of;
+  return fixedBy(recordedMembership(run), first ?? null);
 };
 
 /**
@@ -816,7 +838,7 @@ class Verifier {
   async #observed(run: Run, entry: Entry, uses: readonly ObservationUse[], window: Window | null, where: FactRef, depth: number): Promise<void> {
     const mismatch = (why: string): Stop => new Stop("mismatch", why, where);
     if (entry.clamped) throw mismatch("an entry that retains an observation judges time, and is never clamped");
-    const membership = recordedMembership(run);
+    const membership = fixedIn(run, entry.input);
     for (const use of uses) {
       const o = use.observation;
       if ("subject" in o && o.subject === "rules") throw new Stop("unsupported-definition", "the entry retains an observation of the rules, and this replay has no rule for where a scope records its rules reference", where);
@@ -1005,7 +1027,7 @@ class Verifier {
           if (!named) throw new Stop("incomplete", `a retained input is not the one named: ${what}, ${place.digest}`, where);
           values.push(kept.bytes);
         }
-        judged = judgeAct(state, definition, input.signed, { ...reading, presented: input.presented, grants: input.authority.map((grant) => ({ grant, current: true })), membership: recordedMembership(run), ...(input.observed ? { observed: input.observed } : {}), ...(values.length > 0 ? { values } : {}) });
+        judged = judgeAct(state, definition, input.signed, { ...reading, presented: input.presented, grants: input.authority.map((grant) => ({ grant, current: true })), membership: fixedIn(run, input), ...(input.observed ? { observed: input.observed } : {}), ...(values.length > 0 ? { values } : {}) });
         break;
       case "delivery": {
         this.#trusts.add("delivered");
@@ -1043,7 +1065,7 @@ class Verifier {
         if (needs) await this.#granted(run, entry, grant, { key: input.signed.intent.actor, ...needs }, where, depth);
         this.#trusts.add("dispatched");
         judged = judgePreparation(state, definition, { signed: input.signed, capability, step }, {
-          clock, bounds, steps, own: reading.own, membership: recordedMembership(run),
+          clock, bounds, steps, own: reading.own, membership: fixedIn(run, input),
           granted: (wanted) => (needs !== null && wanted.action === needs.action && wanted.window.seconds === needs.window.seconds && wanted.window.once === needs.window.once ? { result: "granted", grant } : { result: "unavailable" }),
         });
         break;

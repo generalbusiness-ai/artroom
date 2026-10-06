@@ -43,9 +43,10 @@
  * plan owns. They are written as the note has them.
  */
 
-import type { FactRef, FieldValue, PlatformData, PlatformDefinition } from "@generalbusiness/artroom-contract";
+import type { FactRef, FieldValue, PlatformData, PlatformDefinition, ScopeId } from "@generalbusiness/artroom-contract";
 import { canonicalize, isFactRef, isMemberRef, isScopeRef, utf8 } from "@generalbusiness/artroom-bytes";
-import type { Item, RuleEffect, RuleGiven, Rules, StateView } from "@generalbusiness/artroom-derive";
+import type { Item, RecordedRef, RuleEffect, RuleGiven, Rules, StateView } from "@generalbusiness/artroom-derive";
+import { referenceOf } from "./rules-scope.ts";
 
 /** The name and version that this data and these rules are. An operation that the destination opens states it as its owner (the contract's section 4.3). */
 export const DESTINATION = "platform:destination@1" satisfies PlatformDefinition;
@@ -323,6 +324,26 @@ const PAGE = 100;
 
 /** The one branch item of a destination scope. */
 const branchOf = (state: Pick<StateView, "page">): Item | null => state.page("branch", ["empty", "ready"], null, 1).items[0] ?? null;
+
+/** The scope ID that the item `branch` holds in that value: a text that the genesis set from the creation's fields, and that no entry changes. */
+const heldId = (state: Pick<StateView, "page">, slot: "membership" | "rules"): ScopeId | null => {
+  const id = branchOf(state)?.values[slot];
+  return typeof id === "string" ? (id as ScopeId) : null;
+};
+
+/**
+ * Where a scope under `platform:destination@1` records its membership
+ * reference (authority note, section 12.1, "Where the rules scope and the
+ * destination record their membership reference", decided in revision 25;
+ * I3 deltas, entries EM21 and EU6): the scope ID is the value
+ * `branch.membership`, and the incarnation is that of the observations of
+ * that ID which its entries retain (`referenceOf`, in `rules-scope.ts`).
+ * It is code of the version, as the production authority and a replay
+ * read it.
+ */
+export const destinationMembership = (state: Pick<StateView, "page" | "incarnations">): RecordedRef | null => referenceOf(state, heldId(state, "membership"), "membership");
+/** The same, for the rules scope that a destination observes: the value `branch.rules`. No runtime reads the rules scope before a turn yet, so nothing calls this but a test. */
+export const destinationRulesScope = (state: Pick<StateView, "page" | "incarnations">): RecordedRef | null => referenceOf(state, heldId(state, "rules"), "rules");
 
 /** Every publication, lowest ID first. No index is by a value, so a search for an operation reads each page, retained final items too (entry ER11). */
 function* publications(state: Pick<StateView, "page">): Generator<Item> {

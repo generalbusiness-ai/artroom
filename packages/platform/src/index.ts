@@ -10,24 +10,24 @@
  * it.
  */
 
-import type { ObservationRequest, PlatformData, ScopeRef } from "@generalbusiness/artroom-contract";
-import { destination } from "./destination.ts";
+import type { ObservationRequest, PlatformData } from "@generalbusiness/artroom-contract";
+import { destination, destinationMembership } from "./destination.ts";
 import { inbox } from "./inbox.ts";
 import { membership, standingOf } from "./membership.ts";
 import { register } from "./register.ts";
 import { directory, directoryMembership } from "./directory.ts";
-import type { Rules, StateView } from "@generalbusiness/artroom-derive";
+import type { RecordedRef, Rules, StateView } from "@generalbusiness/artroom-derive";
 import { RULES } from "./rules.ts";
-import { rulesScope } from "./rules-scope.ts";
+import { rulesMembership, rulesScope } from "./rules-scope.ts";
 
 export { inbox, membership, register, directory, destination };
 export { FIRST_ACTIONS, MEMBERSHIP, NO_MEMBER, ROLE_LISTS, ROLE_TABLE, actionsIn, isHandle, standingOf, type Role } from "./membership.ts";
 export { CREATION_ATTEMPTS, REGISTER, REPOSITORY, directoryIdOf, directorySeed, registerRules, repositoryName } from "./register.ts";
 export { DEFINITION_DOMAIN, DIRECTORY, IMPORT_ATTEMPTS, SEEN, directoryMembership, directoryRules } from "./directory.ts";
-export { COLLECT_MOST, DESTINATION, DESTINATION_ATTEMPTS, DESTINATION_KINDS } from "./destination.ts";
+export { COLLECT_MOST, DESTINATION, DESTINATION_ATTEMPTS, DESTINATION_KINDS, destinationMembership, destinationRulesScope } from "./destination.ts";
 export { RULES };
 export { rulesScope };
-export { CONFIGURATION_BYTES, CONFIGURATION_DOMAIN, RULES_SCOPE, membershipId } from "./rules-scope.ts";
+export { CONFIGURATION_BYTES, CONFIGURATION_DOMAIN, RULES_SCOPE, membershipId, referenceOf, rulesMembership } from "./rules-scope.ts";
 export type { PlatformName, RuleTable } from "./rules.ts";
 export { CONTROLLER, EXTENTS_MOST, EXTENT_CLASSES, LANDING, RULES_EXTENT, RULES_PATTERNS, classify, firstExtents, holdsRulesExtent, judgeExtents, matches } from "./extents.ts";
 export type { Extent, ExtentClass, ExtentJudged, ExtentsAsked, ExtentsJudged, Holder, Lack, Touched, TreeLink } from "./extents.ts";
@@ -59,9 +59,12 @@ export interface Platform {
    * when that is not its genesis entry (authority note, section 3.3, "Where
    * it records its membership reference"): a pure function of its folded
    * state. A replay reads the reference with it, as the production
-   * authority does. Absent: the genesis entry holds it.
+   * authority does. Absent: the genesis entry holds it. A directory holds
+   * it in a slot, with its incarnation. A rules scope and a destination
+   * hold the scope ID, and no incarnation before their first retained
+   * observation (section 12.1, decided in revision 25).
    */
-  readonly membership?: (state: StateView) => ScopeRef | null;
+  readonly membership?: (state: StateView) => RecordedRef | null;
 }
 
 /**
@@ -74,5 +77,5 @@ export function platform(named: string): Platform | null {
   const name = named.slice(0, cut);
   const data = cut > 0 && named.slice(cut) === "@1" && Object.hasOwn(definitions, name) ? definitions[name] : undefined;
   if (!data) return null;
-  return { data, rules: Object.hasOwn(RULES, name) ? (RULES as Record<string, Rules>)[name]! : {}, ...(data === membership ? { observed: standingOf } : {}), ...(data === directory ? { membership: directoryMembership } : {}) };
+  return { data, rules: Object.hasOwn(RULES, name) ? (RULES as Record<string, Rules>)[name]! : {}, ...(data === membership ? { observed: standingOf } : {}), ...(data === directory ? { membership: directoryMembership } : data === rulesScope ? { membership: rulesMembership } : data === destination ? { membership: destinationMembership } : {}) };
 }
