@@ -27,7 +27,7 @@ export { DEFINITION_DOMAIN, DIRECTORY, IMPORT_ATTEMPTS, SEEN, directoryMembershi
 export { COLLECT_MOST, DESTINATION, DESTINATION_ATTEMPTS, DESTINATION_KINDS, destinationMembership, destinationRulesScope } from "./destination.ts";
 export { RULES };
 export { rulesScope };
-export { CONFIGURATION_BYTES, CONFIGURATION_DOMAIN, RULES_SCOPE, membershipId, referenceOf, rulesMembership } from "./rules-scope.ts";
+export { CONFIGURATION_BYTES, CONFIGURATION_DOMAIN, RULES_SCOPE, extentsOf, membershipId, referenceOf, rulesMembership } from "./rules-scope.ts";
 export type { PlatformName, RuleTable } from "./rules.ts";
 export { CONTROLLER, EXTENTS_MOST, EXTENT_CLASSES, LANDING, RULES_EXTENT, RULES_PATTERNS, classify, firstExtents, holdsRulesExtent, isExtents, judgeExtents, matches } from "./extents.ts";
 export type { Extent, ExtentClass, ExtentJudged, ExtentsAsked, ExtentsJudged, Holder, Lack, Review, Touched, TreeLink } from "./extents.ts";

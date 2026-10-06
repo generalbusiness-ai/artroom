@@ -1,8 +1,14 @@
 /**
- * `platform:rules@1`, as data, with its rules (authority note, revision 21,
- * sections 3.3, 3.11 and 12.1.4; its table of marks, section 12.1.8, rows 1
- * and 27 to 29). One rules scope for a repository. It holds the branch
- * rules, the labels, the check configurations and the active definitions.
+ * `platform:rules@1`, as data, with its rules (authority note, revision 26,
+ * sections 3.3, 3.11, 12.1.4 and 12.1.4a; its table of marks, section
+ * 12.1.8, rows 1 and 27 to 29, and rows w, x and y of the further marks).
+ * One rules scope for a repository. It holds the branch rules, with the
+ * extents and the declaration of the single-controller exception, the
+ * labels, the check configurations and the active definitions.
+ *
+ * Revision 26 is approved by its checker. The planner's adoption of it was
+ * not recorded when the rows of revision 25 were built here (I3 deltas,
+ * section 27).
  *
  * This file is named `rules-scope.ts` because `rules.ts` is the package's
  * table of rules.
@@ -10,33 +16,41 @@
  * One member of the data is one row of the note's tables. A cell of the
  * note that begins "Code" is a mark in this data, at the place where its
  * rule is run (the scope contract, section 6.1), and the rule is in
- * `rulesScopeRules`, below. The table of marks gives the rules scope three
- * rules, each at place 4, a guard:
+ * `rulesScopeRules`, below. The table of marks gives the rules scope six
+ * rules.
  *
- * | Rule | Row of the table | At | Its mark's `row` |
- * |---|---|---|---|
- * | `checkers` | 27 | `publish` | P19 |
- * | `configuration-bytes` | 28 | `keep-configuration` | P18. The cell names P18 and P21, and a mark states one key. |
- * | `definition-bytes` | 29 | `activate` | P21 |
+ * | Rule | Row of the table | Place | At | Its mark's `row` |
+ * |---|---|---|---|---|
+ * | `checkers` | 27 | 4, a guard | `publish` | P19 |
+ * | `configuration-bytes` | 28 | 4, a guard | `keep-configuration` | P18. The cell names P18 and P21, and a mark states one key. |
+ * | `definition-bytes` | 29 | 4, a guard | `activate` | P21 |
+ * | `extent-list` | w | 3, a type | The field `extents` of `publish`, and the slot `rules.extents` | P28 |
+ * | `extents-hold` | x | 4, a guard | `publish`, after the two older guards | P28 |
+ * | `rules-update` | y | 6, a send | `rules-wanted` | P28 |
  *
  * Row 1 has no mark: the membership reference of a scope that is created
  * beside membership derives nothing of an entry (`membershipId`, below).
  *
- * The data holds no mark that the table does not list, so the three rules
+ * The data holds no mark that the table does not list, so the six rules
  * are the whole version: a runtime with this package can run
  * `platform:rules@1`.
+ *
+ * The extents themselves, their bounds and what a change to one must meet
+ * are in `extents.ts`. Before a first `publish` a repository has the three
+ * extents of the first definition (`extentsOf`, below).
  *
  * The note's `max`, text lengths and ranges are examples that the proof
  * plan owns. They are written as the note has them. What the rows leave
  * unsaid, and what this file holds meanwhile, is in the I3 deltas note,
- * entries EQ1 to EQ11.
+ * entries EQ1 to EQ11 and FB1 to FB5.
  */
 
 import type { DeclaredDefinition, Digest, MemberObservation, PlatformData, PlatformDefinition, ScopeId } from "@generalbusiness/artroom-contract";
 import { isDigest, isMemberRef } from "@generalbusiness/artroom-bytes";
 import { byteOrder, validateDefinition } from "@generalbusiness/artroom-derive";
 import type { Item, RecordedRef, Rules, StateView } from "@generalbusiness/artroom-derive";
-import { holdsRulesExtent, isExtents } from "./extents.ts";
+import { firstExtents, holdsRulesExtent, isExtents } from "./extents.ts";
+import type { Extent } from "./extents.ts";
 
 /** The name and version that this data and these rules are. */
 export const RULES_SCOPE = "platform:rules@1" satisfies PlatformDefinition;
@@ -244,26 +258,19 @@ export const rulesScope: PlatformData = {
     },
   },
   receives: {
-    // `rules-wanted`: a delivery of a `tell`, from a lane. It changes nothing, and sends the lane one `rules` update with the four
-    // rule values. A lane of another repository is answered too (the limit of G7): the values carry no private text.
+    // `rules-wanted`: a delivery of a `tell`, from a lane. It changes nothing, and sends the lane one `rules` update. A lane of
+    // another repository is answered too (the limit of G7): the values carry no private text.
+    // From revision 25 the one send is the mark `rules-update`, with empty clauses, in place of the written `relate` of the row
+    // (row y of the further marks, P28): the update carries a projection of the extents, which no operand makes, and a value of
+    // a marked type is assignable to no written type. Its rule gives one request in every entry of the row, so the mark states
+    // `always` (I3 deltas, entry FB5).
     "rules-wanted": {
       message: "rules-wanted", class: "tell", from: { kind: "lane" }, opens: null,
       also: RULES,
       fields: {},
       guards: [],
       effects: [],
-      sends: [{
-        relate: {
-          to: { sender: true }, name: "rules", item: { item: "also.rules" }, state: "current",
-          detail: {
-            approvals: { slot: "approvals", of: "also.rules" },
-            checks: { slot: "checks", of: "also.rules" },
-            ownerMayReview: { slot: "ownerMayReview", of: "also.rules" },
-            labels: { slot: "labels", of: "also.rules" },
-          },
-          result: {},
-        },
-      }],
+      sends: [{ code: "rules-update", row: "P28", result: {}, always: true }],
       attention: [],
     },
   },
@@ -321,6 +328,35 @@ export function referenceOf(state: Pick<StateView, "incarnations">, id: ScopeId 
  */
 export const rulesMembership = (state: Pick<StateView, "page" | "incarnations">): RecordedRef | null => referenceOf(state, membershipId(state), "membership");
 
+/**
+ * The extents of a repository, from its rules scope's folded state (section
+ * 12.1.4, "Before the first `publish`: the first definition is the
+ * default"). The slot `extents` holds what the last `publish` stated,
+ * whole. Until a `publish` sets it, a repository has the three extents of
+ * the first definition all the same, computed from the values `approvals`
+ * and `checks` as they then are (`firstExtents`). So no repository is
+ * judged by one bar, and the `rules` extent holds from the first entry on.
+ * Null: the state holds no item `rules`.
+ *
+ * The `rules` update reads it, below. An observation of the rules will,
+ * when it carries extents: no rules scope answers an observation yet (I3
+ * deltas, entry EQ8), and the contract's `RulesContent` has no member
+ * `extents` (entry FB2).
+ */
+export function extentsOf(state: Pick<StateView, "page">): readonly Extent[] | null {
+  const rules = rulesOf(state);
+  if (!rules) return null;
+  const held = rules.values["extents"] ?? null;
+  if (held !== null) {
+    // The type of the slot is the rule `extent-list`, so the scope set no other value.
+    if (!isExtents(held)) throw new Error("the slot `extents` holds a value that is no list of extents");
+    return held;
+  }
+  const { approvals, checks } = rules.values;
+  if (typeof approvals !== "number") throw new Error("the item `rules` has its approvals from the genesis");
+  return firstExtents({ approvals, checks: Array.isArray(checks) ? (checks as unknown as { name: string; required: boolean }[]) : [] });
+}
+
 // ---------------------------------------------------------------- the rules
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
@@ -341,6 +377,35 @@ const creates = (declared: DeclaredDefinition): Digest[] => {
  * list. None reads the clock.
  */
 export const rulesScopeRules: Rules = {
+  /**
+   * Row y, the one send of `rules-wanted` (P28): the `rules` update of
+   * section 12.1.4. Exactly one request, in every entry of the row: one
+   * `relate` to the sender, named `rules`, of the item `rules`, in the
+   * state `current`. Its `detail` has at most six members.
+   *
+   * | Member | From |
+   * |---|---|
+   * | `approvals`, `ownerMayReview`, `singleControllerException` | The slots of those names |
+   * | `labels`, `checks` | The slot, when it is set. Before the first `publish` neither is, and the member is left out, as an absent value is left out of every message |
+   * | `extents` | For each extent of the rules, in their order: `name`, `approvals`, `approver`, `checks` and `class`. The patterns are left out: a lane reads no path. Before the first `publish`: the extents of the first definition (`extentsOf`) |
+   *
+   * It reads the item `rules` and the delivery's `from`. It never refuses.
+   */
+  "rules-update": {
+    place: "send",
+    run: (given) => {
+      const [rules, extents] = [rulesOf(given.state), extentsOf(given.state)];
+      if (given.input.type !== "delivery" || !rules || !extents) throw new Error("rules-update stands in the handler `rules-wanted`, in a scope that has its rules");
+      const { approvals, ownerMayReview, labels, checks, singleControllerException } = rules.values;
+      const detail = {
+        approvals, ownerMayReview, labels, checks, singleControllerException,
+        extents: extents.map(({ name, approvals, approver, checks, class: of }) => ({ name, approvals, approver, checks, class: of })),
+      };
+      // An absent value is left out of a message, as an absent field is left out of an intent.
+      const carried = Object.fromEntries(Object.entries(detail).filter(([, value]) => value !== undefined && value !== null));
+      return { to: given.input.from.at, message: { class: "request", type: "relate", body: { name: "rules", item: { at: given.resolved.at, seq: rules.id, hash: rules.opened }, state: "current", detail: carried } } };
+    },
+  },
   /**
    * Row w, the type of the field `extents` of `publish` and of the slot
    * `rules.extents` (P28). The value is of the type when it is a list of 1

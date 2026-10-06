@@ -158,7 +158,7 @@ describe("a founding on real scopes under the deployed class (authority note, se
     const reads = async (node: Platform) => (await real(() => routed(`${SERVICE}/v1/scopes/${node.name}`, { headers: { authorization: issued.session.reader() } }))).status;
     // The directory records the reference with its incarnation, and the rules scope records the ID alone: no session is accepted there yet.
     expect([await reads(D), await reads(rulesScope!)]).toEqual([200, 403]);
-    const publish = async (approvals: number) => rulesScope!.act(rita, "publish", { on: 0, expected: await rulesScope!.expected({ on: 0 }), fields: { approvals, ownerMayReview: false, checks: [], labels: [], extents: firstExtents({ approvals, checks: [] }) } });
+    const publish = async (approvals: number) => rulesScope!.act(rita, "publish", { on: 0, expected: await rulesScope!.expected({ on: 0 }), fields: { approvals, ownerMayReview: false, checks: [], labels: [], extents: firstExtents({ approvals, checks: [] }) as never } });
     // The rules scope's first act that needs a grant. It holds membership's scope ID and no incarnation, so its first read asks by the
     // ID alone. The answer's `of` holds the incarnation of the scope that answered, guard 1 takes it, and the entry that retains
     // the observation fixes it: the grant covers this scope by that reference.

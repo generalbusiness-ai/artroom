@@ -104,7 +104,7 @@ tells it `rules-wanted`. `Rulebook` is a rules scope in memory below such
 a registrar, whose acts are judged on the test authority of derive's
 fixture set. `standing` is an observation of a member that the test
 writes by hand: no membership scope answered it. A test that uses one
-says so. The data and the three rules of `platform:rules@1` are the
+says so. The data and the six rules of `platform:rules@1` are the
 platform package's, and none of them is a stand-in. Such a test shows
 the rows and the rules as judgments in memory. It shows nothing about a
 founding, about a read of membership, or about how a scope receives and

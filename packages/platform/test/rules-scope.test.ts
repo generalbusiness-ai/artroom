@@ -4,13 +4,13 @@ import { canonicalize, definitionDigest, isObservationUse, newIncarnation } from
 import { PROFILES, derivable, runnable, validateDefinition, valueDigest } from "@generalbusiness/artroom-derive";
 import type { ActJudgment, Judgment } from "@generalbusiness/artroom-derive";
 import { d, desk, deskDefinition, directory, keys, membership, ticket, ticketDefinition } from "@generalbusiness/artroom-derive/testing";
-import { CONFIGURATION_BYTES, CONFIGURATION_DOMAIN, DEFINITION_DOMAIN, RULES_SCOPE, firstExtents, membershipId, platform, rulesScope } from "../src/index.ts";
+import { CONFIGURATION_BYTES, CONFIGURATION_DOMAIN, DEFINITION_DOMAIN, RULES_SCOPE, extentsOf, firstExtents, membershipId, platform, rulesScope } from "../src/index.ts";
 import type { Extent } from "../src/index.ts";
 import { rulesScopeRules } from "../src/rules-scope.ts";
 import { BRANCH, Rulebook, lanePointingAt, memberOf, standing } from "./support-rules.ts";
 
 // Every scope here is a `Rulebook` of test support: a rules scope in memory, below a STAND-IN registrar, whose acts are judged on the
-// test authority of derive's fixture set. The data and the three rules that are tested are the platform package's, and no rule is a
+// test authority of derive's fixture set. The data and the six rules that are tested are the platform package's, and no rule is a
 // stand-in. An observation is written by hand (`standing`): nothing here shows a read of membership.
 
 const { rita } = keys;
@@ -47,8 +47,9 @@ test("the rules definition validates whole with the platform option; its marks a
   // The item table, by its bounds and states: one `rules`, 16 live definitions, 1000 configurations. A retired definition is final.
   expect(Object.entries(rulesScope.items).map(([name, item]) => [name, item.many, item.max, item.initial, Object.entries(item.states).filter(([, state]) => state.final).map(([state]) => state)]))
     .toEqual([["rules", false, 1, "current", []], ["definition", true, 16, "active", ["retired"]], ["configuration", true, 1000, "kept", []]]);
-  // No act sends a request, and no update goes to any lane from `publish` (G11). The one send is the handler's `relate` to its sender.
-  expect([Object.values(rulesScope.acts).flatMap((act) => act.sends), Object.values(rulesScope.receives).flatMap((h) => h.sends.map((send) => Object.keys(send)[0]))]).toEqual([[], ["relate"]]);
+  // No act sends a request, and no update goes to any lane from `publish` (G11). The one send is the handler's: the mark
+  // `rules-update`, with empty clauses, whose rule gives one request in every entry of the row.
+  expect([Object.values(rulesScope.acts).flatMap((act) => act.sends), Object.values(rulesScope.receives).flatMap((h) => h.sends)]).toEqual([[], [{ code: "rules-update", row: "P28", result: {}, always: true }]]);
 
   // Without the option it is no declared definition, and under a declared name each mark is a form that the contract does not define.
   const { outcomes: _, ...rows } = rulesScope;
@@ -57,17 +58,19 @@ test("the rules definition validates whole with the platform option; its marks a
     [["shape", "outcomes"]], [["shape", "name"], ["shape", "items.rules.values.extents.of"]], [["shape", "items.rules.values.extents.of"]],
   ]);
 
-  // The marks, by the rows of the note's table: rows 27, 28 and 29, each at place 4, and row w of the further marks, at place 3, on
-  // the slot and on the field. Row 1 derives nothing of an entry and has no mark.
+  // The marks, by the rows of the note's table: rows 27, 28 and 29, each at place 4, and rows w, x and y of the further marks: the
+  // type of the slot and of the field at place 3, a guard at place 4 and the send at place 6. Row 1 derives nothing of an entry and
+  // has no mark.
   expect(checked.definition.marks.map((m) => [m.place, m.path, m.code, m.row]).sort()).toEqual([
     [3, "acts.publish.fields.extents", "extent-list", "P28"], [3, "items.rules.values.extents.of", "extent-list", "P28"],
     [4, "acts.activate.guards.0", "definition-bytes", "P21"], [4, "acts.keep-configuration.guards.0", "configuration-bytes", "P18"], [4, "acts.publish.guards.1", "checkers", "P19"],
-    [4, "acts.publish.guards.2", "extents-hold", "P28"],
+    [4, "acts.publish.guards.2", "extents-hold", "P28"], [6, "receives.rules-wanted.sends.0", "rules-update", "P28"],
   ]);
   // The table has exactly the rules that the note names, each of the kind of its place, with the refusal names that its row states.
   expect(Object.entries(rulesScopeRules).map(([name, rule]) => [name, rule.place, "refusals" in rule ? rule.refusals : null, rule.clock ?? false]).sort()).toEqual([
     ["checkers", "guard", ["not-a-checker"], false], ["configuration-bytes", "guard", ["configuration-mismatch"], false], ["definition-bytes", "guard", ["unsupported-definition"], false],
     ["extent-list", "type", null, false], ["extents-hold", "guard", ["rules-extent-required", "catch-all-required", "extent-check-unknown"], false],
+    ["rules-update", "send", null, false],
   ]);
   // The whole-scope rule (the contract's section 6.1): the package's own rules run the version, with no stand-in. Without any one of
   // the three, or with a rule of another place under a name, it is not runnable.
@@ -197,20 +200,34 @@ test("activate opens an active definition when its bytes and its whole named clo
   expect([said(r.act(rita, "retire-definition", { on: item.id, expected: { on: item.revision } })), r.item(item.id).state, again()]).toEqual([WRITTEN, "retired", WRITTEN]);
 });
 
-// Section 12.1.4, the row `rules-wanted` and case d. The lane is a STAND-IN: a made-up definition that sends the `tell`.
-test("rules-wanted from a lane is applied by one entry that changes nothing: the rules update to the sender at ordinal 0, with the four rule values, and the result at ordinal 1", () => {
+// Section 12.1.4, the row `rules-wanted` with the send mark `rules-update`, and cases d and k. The lane is a STAND-IN: a made-up
+// definition that sends the `tell`.
+test("rules-wanted from a lane is applied by one entry that changes nothing: the rules update to the sender at ordinal 0 and the result at ordinal 1; before a first publish the update and the scope give the three extents of the first definition, and after one the extents that it stated, without their patterns in the update", () => {
   const r = new Rulebook();
-  keep(r, unit);
-  publish(r, [check(unit)], [standing("@check", 7)]);
   const lane = lanePointingAt(r.at);
-  lane.did(rita, "want", { on: 0, expected: { on: lane.item(0).revision } });
-  const before = r.item(0);
-  expect(said(r.receive(lane, lane.head.seq))).toEqual(WRITTEN);
-  expect([r.last.effects, r.item(0)]).toEqual([[], before]);
-  expect(r.last.sends.map((send) => [send.n, send.to, send.message.class, send.message.class === "request" ? [send.message.type, send.message.body] : send.message.class === "result" ? send.message.outcome : null])).toEqual([
-    [0, lane.at, "request", ["relate", { name: "rules", item: r.fact(0), state: "current", detail: { approvals: 2, checks: [check(unit)], ownerMayReview: true, labels: ["bug"] } }]],
-    [1, lane.at, "result", "applied"],
-  ]);
+  /** The lane asks, the rules scope takes the delivery, and what its entry sends: the update's body, and the result. */
+  const asked = () => {
+    lane.did(rita, "want", { on: 0, expected: { on: lane.item(0).revision } });
+    const [before, judged] = [r.item(0), said(r.receive(lane, lane.head.seq))];
+    const sends = r.last.sends.map((send) => [send.n, send.to, send.message.class, send.message.class === "request" ? [send.message.type, send.message.body] : send.message.class === "result" ? send.message.outcome : null]);
+    return [judged, r.last.effects, JSON.stringify(r.item(0)) === JSON.stringify(before), sends];
+  };
+  const update = (detail: Record<string, unknown>) => [WRITTEN, [], true, [[0, lane.at, "request", ["relate", { name: "rules", item: r.fact(0), state: "current", detail }]], [1, lane.at, "result", "applied"]]];
+  const projected = (extents: readonly Extent[]) => extents.map(({ patterns: _, ...five }) => five);
+
+  // Case k: before any `publish`. The slot `extents` is unset, and a repository has the three extents of the first definition all
+  // the same, from the `approvals` of the genesis. The update has no member `checks`, and none for the labels, which are unset too.
+  const first = firstExtents({ approvals: 1, checks: [] });
+  expect([r.item(0).values["extents"], extentsOf(r.state), first.map((extent) => extent.name)]).toEqual([null, first, ["rules", "infrastructure", "source"]]);
+  expect(asked()).toEqual(update({ approvals: 1, ownerMayReview: false, singleControllerException: false, extents: projected(first) }));
+
+  // Case d, after a `publish` that states a repository's own extents and declares the exception. The scope holds them whole, with
+  // their patterns. The update carries five members of each, in their order, and no pattern: a lane reads no path.
+  keep(r, unit);
+  const own: Extent[] = [first[0]!, { name: "deploy", patterns: ["deploy/**"], approvals: 2, approver: "change.merge", checks: ["unit"], class: "deployment" }, { ...first[2]!, name: "code", checks: ["unit"] }];
+  expect(said(publish(r, [check(unit)], [standing("@check", 7)], { extents: own, singleControllerException: true }))).toEqual(WRITTEN);
+  expect([extentsOf(r.state), extentsOf(r.registrar.state)]).toEqual([own, null]);
+  expect(asked()).toEqual(update({ approvals: 2, checks: [check(unit)], ownerMayReview: true, labels: ["bug"], singleControllerException: true, extents: projected(own) }));
 });
 
 // Section 12.1.4, "The rows of the rules scope, changed in revision 25", cases f to j: the missing forms 2, 3 and 14 of section 12.1.4a.
