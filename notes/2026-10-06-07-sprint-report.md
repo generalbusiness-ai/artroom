@@ -153,6 +153,7 @@ Adopted in the workroom this sprint (design, not git):
 |---|---|---|---|
 | Authority, effects and publication, revision 26 | `f7175296` | 23:38 (`9c9ecdf6`) | Restores the controller-of-agent clause of the single-controller exception; the planner's four answers on revision 25; the directory, register, destination and extents rows that blocked founding and publication |
 | Scope and replay contract, revision 23 | `3b3e394f` | 06:35 (`78b6d129`) | Which subjects an entry observes; a checked reservation held by an item, replacing the build's exemption; the fact reference as text; the indexed binding selector; the retain-and-start table; the planner's answers on revisions 20 to 22. Revisions 20 to 22 were never adopted |
+| Authority, effects and publication, revision 28 | `8b1c3c9d` | 06:55 (`e93b737b`), after this report was written | The destination's first-head and receipt rows; the observes rows for its judge; the three changes to section 6.5; the counts a publication holds; both size tables without guessed allowances; reserve naming each selected report; the planner's answers on revisions 27 and 28. In force with contract 23; revision 27 was never adopted |
 | Jam room note, revision 8 | `0861580e` | 05:15 (`b8d8ef01`) | Plan 021's story on the kept record and timing design, with one lookahead rule and a monotone effect-bar clause; nine platform gaps with owners. Landed on main at `3cdc2d52` (below). Spike J0 stays open |
 
 Planner decisions recorded, each answering a filed revision's questions:
@@ -258,11 +259,12 @@ Recorded in the workroom under the cadence act `c514748f`.
   its source rows: the destination's two missing rules and the checked
   reservation, so that a founding completes and a first publication can
   be judged; file that as the fourth milestone on its own request, with
-  the commission `bcf5ec17` open. Land the jam room note's revision 8 on
-  main as one file (`1086c974`). Run J0's second half when hugh answers.
-- **Checker.** Authority revision 28 (`432e1d6e`), then the fourth
-  milestone when filed.
-- **Planner.** Adopt authority revision 28 on approval; file the fourth milestone's request on builder's word; keep
+  the commission `bcf5ec17` open; the destination's rows are cleared now
+  that authority revision 28 is adopted. Run J0's second half when hugh
+  answers.
+- **Checker.** The fourth milestone when filed. (Authority revision 28
+  was approved and adopted at 06:55.)
+- **Planner.** (Authority revision 28 is adopted.) file the fourth milestone's request on builder's word; keep
   the hourly surveys; write the 15:00 report. No cloud sessions.
 - **Second planner.** The identity design (`046f88ba`) when free.
 - **15:00 report.** If the fourth milestone lands, a developer's story of
