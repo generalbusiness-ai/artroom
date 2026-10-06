@@ -11,8 +11,10 @@ already proposes. It changes no platform design.
 A person at a microphone, late at night, hums or sings a few bars,
 "kinda". An agent at a synth listens, works out the tune, and plays it
 back as a track. More agents arrive and each picks up an instrument: the
-first is always the synth, the second the bass line, the third
-percussion, and then a guitar or a saxophone solos over the top. The
+first is always the synth, which carries the whole danceable groove,
+bass included; the second is percussion, which hits the floor; the third
+is a lead, a guitar or a saxophone, which takes it over the top. A bass
+part exists but goes unclaimed in the demo. The
 person hums another phrase and the band picks it up; and again, as long
 as they like. The agents talk while they play. It is funny to watch and
 to listen to, and it looks like the videos the story comes from: a room,
@@ -32,7 +34,7 @@ The acts of this story, each a declared act of the jam's own definition:
 |---|---|---|
 | `sing` | the person | A theme: a MIDI-equivalent encoding of pitch and timing, transcribed from the microphone, with the audio digest beside it. Nothing of the audio itself is authoritative |
 | `interpret` | the first agent (synth) | The interpretation of the latest theme: key, tempo, time signature, the bar grid, and the quantized theme. Others come in on this, not on the raw transcription. One interpretation per theme; the synth's is the one in force until the next `sing` |
-| `take` | an arriving agent | Claims an instrument. The rule for which instrument is by arrival order: synth, bass, drums, then a lead (guitar or saxophone). An instrument is an exclusive commitment |
+| `take` | an arriving agent | Claims an instrument. The rule for which instrument is by arrival order: synth, percussion, lead (guitar or saxophone), then bass. An instrument is an exclusive commitment. The synth is a full techno voice, bass instrumentation included, with no drum kit and no lead melody; the bass part stays available and unclaimed in the demo |
 | `pattern` | any player | A pattern of a stated length in bars, bound to the interpretation it follows. It takes effect at the first bar boundary at least one lookahead after the room records it, as the timing rule derives; it never names its start bar. This is what the live layer renders |
 | `solo` | a lead | A claimed stretch of bars; one solo at a time |
 | `say` | anyone | Banter. Bounded, as the lane forms bound comments |
@@ -129,7 +131,7 @@ the bar counter is fine as a corner detail, not the subject.
 |---|---|---|
 | J0, hum to theme | Can the browser transcribe real humming well enough that a synth playing the transcription back is recognizably the tune? If not, which audio-capable model does, and how fast? | A note with observed runs on at least five real hummed phrases by two people, the transcriptions, the time each took, and a recommendation between the two places above, with the model named and its cost |
 | J1, commit to bar | The jam room note's first spike: commit-to-effect timing on a deployed room, so that lookahead is known | As the note states |
-| J2, riffing | The note's second spike, now with a theme fact as input: four agents, in the instrument order above, each with a prompt, producing patterns on a theme; then a second theme they pick up at a bar boundary | A recording, the patterns as recorded, and a judgment of whether it is worth hearing |
+| J2, riffing | The note's second spike, now with a theme fact as input: three agents, in the instrument order above (synth, percussion, lead), each with a prompt, producing patterns on a theme; then a second theme they pick up at a bar boundary | A recording, the patterns as recorded, and a judgment of whether it is worth hearing |
 
 Visuals come after J2 has something to animate. The second and later
 phrases are the same path as the first, so "indefinitely" costs nothing in
@@ -153,3 +155,12 @@ not recorded; a rhythm phrase is a second `sing`; the lookahead is a
 value of the rules item; and an entry's effect bar is never before the
 effect bar of the entry before it in sequence. The note is the design in
 force; this plan is the story.
+
+## Amended 2026-10-06, 07:25 Eastern
+
+Hugh's direction: no bass part is needed in the demo, or it is available
+and unclaimed. The claiming order is synth, percussion, lead, bass. The
+synth provides a danceable rhythm with a full techno sound, bass
+instrumentation included, and no drum kit or lead melody; percussion hits
+the floor; the lead takes it over the top. The jam room note carries this
+in its next revision.
