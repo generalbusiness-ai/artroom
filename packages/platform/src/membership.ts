@@ -38,6 +38,11 @@
  * and an admin's first list has 34. That needs the bound on a list of the
  * scope contract's revision 19 (its section 6.1, 64).
  *
+ * One row is of the note's revision 28, at `8b1c3c9d7`, which its checker
+ * approved and whose adoption was not recorded when it was built (I3
+ * deltas, the entries GD). The mark `action-list` is an eleventh rule: the
+ * type of the five role lists and of the field `actions` (row aa, P27).
+ *
  * The note's `max`, text lengths and ranges are examples that the proof
  * plan owns. They are written as the note has them.
  */
@@ -51,8 +56,31 @@ export const MEMBERSHIP = "platform:membership@1" satisfies PlatformDefinition;
 
 const KEY = { type: "text", max: 64 } as const;
 const HANDLE = { type: "text", max: 256 } as const;
-/** A list of actions: each of the five lists of the roster, and the field `actions` of `set-actions` (section 3.2, "The table, counted": 64 from revision 24). */
-const ACTIONS = { type: "list", of: { type: "text", max: 64 }, max: 64 } as const;
+/**
+ * A list of actions: each of the five lists of the roster, and the field
+ * `actions` of `set-actions` (section 3.2, "The table, counted": 64 from
+ * revision 24). From the note's revision 28 (the second commit of its
+ * revision 27) the type is a mark at place 3 (section 12.1.8, row aa, P27),
+ * in place of the written list of texts: a text type states a length only,
+ * and an observation of a key holds one such list, so its largest size
+ * rests on the rule on a name's characters (section 3.3). The rule is
+ * `action-list`, below.
+ */
+const ACTIONS = { code: "action-list", row: "P27", type: "code" } as const;
+/** The most names of one list of actions, and the most bytes of one name (section 3.2). */
+export const ACTIONS_MOST = 64;
+const ACTION_BYTES = 64;
+
+/**
+ * A list of actions (section 3.2; section 12.1.8, row aa): at most 64
+ * names, with no name twice, each of 1 to 64 bytes, and each byte a
+ * lower-case ASCII letter, a digit, a hyphen or a full stop. It is the rule
+ * that an extent's `approver` has (section 12.1.4). Every byte of such a
+ * name is one character, so the length of the text is its bytes.
+ */
+export const isActions = (value: unknown): value is readonly string[] =>
+  Array.isArray(value) && value.length <= ACTIONS_MOST && new Set(value).size === value.length
+  && value.every((name) => typeof name === "string" && name.length >= 1 && name.length <= ACTION_BYTES && /^[a-z0-9.-]+$/.test(name));
 const ROLE = { type: "enum", of: ["admin", "maintainer", "member", "agent", "checker"] } as const;
 const INVITATION = { inviteHash: { fixed: true, required: false, of: { type: "digest" } }, inviteEnds: { fixed: true, required: false, of: { type: "time" } } } as const;
 const ROSTER = { roster: { item: "roster", one: true } } as const;
@@ -666,6 +694,13 @@ export const membershipRules: Rules = {
       return [{ effect: "party", item: resolved.self, slot: "member", member: { membership: resolved.at, member: handle } }];
     },
   },
+  /**
+   * Row aa, the type of the five lists of the roster and of the field
+   * `actions` of `set-actions` (P27). The value is of the type when it is a
+   * list of actions (`isActions`). Otherwise the act is `bad-field`. It
+   * reads the value alone.
+   */
+  "action-list": { place: "type", run: (_given, value) => isActions(value) },
   /** Row q, among the guards of `invite-member` and `add-member` (P27), on the field `handle`. */
   "handle-form": handleForm("handle"),
   "last-admin-kept": {
