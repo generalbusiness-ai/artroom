@@ -29,6 +29,9 @@ import { waitingIn, type Incident, type OperatorRecord } from "./operator.ts";
 import type { ReadName, Readers } from "./ports.ts";
 import type { Duty, OperationStatus, Sealed, Store, Stored } from "./store.ts";
 
+/** The kinds of retained input that the read route serves by digest. `value` is not among them (I3 deltas, entry EX6). */
+export const READABLE: readonly RetainedInput["kind"][] = ["definition", "entry", "rule", "text", "snapshot"];
+
 /** The bound of each read. The defaults are the contract's table, and for a retained input the history page's byte bound. */
 export interface ReadBounds { retainedItems: number; historyEntries: number; historyBytes: number; entryBytes: number; outboxDuties: number; retainedBytes: number }
 export const READ_BOUNDS: ReadBounds = {
@@ -155,11 +158,18 @@ export class Reads {
     return { ok: true, at: open.scope.head, value, complete: !more, ...(more ? { next: String(from + rows.length) } : {}) };
   }
 
-  /** One retained input, by kind and digest (section 9.2). One over the byte bound is `too-large`. */
+  /**
+   * One retained input, by kind and digest (section 9.2). One over the byte bound is `too-large`.
+   *
+   * The kinds are those that a commit of this scope stores, each under its digest alone: `READABLE`. A snapshot of staged refs is
+   * one: the outcome entry that names it stores it in its own commit (`operations.ts`), and a verifier reads it by its digest
+   * before it derives that entry (section 16.4). A `value` is not: it is kept under its domain and its digest, this scope stores
+   * none yet, and no route reads one by its domain (I3 deltas, entry EX6).
+   */
   retained(reader: unknown, kind: RetainedInput["kind"], digest: Digest): Read<RetainedInput> {
     const open = this.#open(reader, "retained");
     if (!("scope" in open)) return open;
-    if (!(kind === "definition" || kind === "entry" || kind === "rule" || kind === "text") || typeof digest !== "string") return no("not-found");
+    if (!READABLE.includes(kind) || typeof digest !== "string") return no("not-found");
     // The size is asked of storage first, so an input over the bound is refused before any of it is read into memory.
     const size = this.#store.retainedSize(kind, digest);
     if (size === null) return no("not-found");
