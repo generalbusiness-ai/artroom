@@ -112,7 +112,7 @@ test("the membership definition validates whole with the platform option; every 
 
 // The plan's steps 9 and 9c, as the authority note's revision 25 decides them (its "What revision 25 lets the I3 source do next"):
 // "Then `platform:directory@1` lacks no rule", and the register's one rule that every founding waited on is written.
-// Steps 9b, 9e and 9f, on the note's revision 26 (I3 deltas, section 29): the destination lacks exactly two rules.
+// Every definition carries its data and every rule of its marks.
 test("every platform definition supplies the rules of its whole pinned data, including destination first-head and receipt", () => {
   /** The marks of one definition's data that the package's table has no rule of the right kind for, by name, once each. */
   const lacks = (named: string): string[] | null => {
@@ -125,8 +125,7 @@ test("every platform definition supplies the rules of its whole pinned data, inc
     return [...new Set(missing)];
   };
   expect([lacks("platform:register@1"), lacks("platform:directory@1")]).toEqual([[], []]);
-  // The two rules of the destination's outcomes that wait on two details asked of the contract (authority note, section 12.1.5,
-  // "The founding commit, and the receipt"; entry ER9). Every other mark of `platform:destination@1` has its rule.
+  // Revision 28 gives the destination's two formerly missing commit rules, so none is absent.
   expect([lacks("platform:destination@1"), lacks("platform:membership@1"), lacks("platform:rules@1"), lacks("platform:inbox@1")]).toEqual([[], [], [], []]);
 });
 
@@ -150,12 +149,8 @@ test("a rules scope and a destination record the scope ID of membership as a val
   ]);
 });
 
-// Scope contract, revision 23, section 17.2a; authority note, revision 26, section 5.8, the two rows of the destination. The flag
-// `covered` is gone from the generic ledger: an operation is inside the closure of the operation that opens it, or it is counted
-// by a holder. No data of this package states `holds` yet: the rows are the authority note's, in a revision that is not adopted
-// (I3 deltas, entries FA3, FC1 and GB7). This test holds what stands in for them, so that it does not grow unseen: exactly five
-// kinds of the destination declare a closure that is not finite, which fails closed, and the entries of the note's own table that
-// no admission reserves for a publication that was admitted while queued.
+// Scope contract revision 23, section 17.2a, and authority revision 28, section 5.8. Each destination operation is counted by
+// its branch or publication. Its data gives finite reservations, the bound withdraw and the complete observation rows.
 test("destination data validates whole with finite reservations, a bound indexed withdraw and the five adopted judge observation rows", () => {
   const destination = platform("platform:destination@1")!;
   const checked = validateDefinition(destination.data, PROPOSED_BOUNDS, PROFILES, { platform: true });

@@ -265,7 +265,8 @@ export class Branch extends Ledger {
 
   /** A message of an entry of another scope, delivered here and judged. The entry is written if the judgment is to write. `source`: the entry that holds the send, as it is read. */
   delivered(message: Send["message"], source: Source, facts: readonly Fetched[] = [], from: FactRef = factRefOf(source.entry), write = true): Judgment {
-    const judgment = judgeDelivery(this.state, this.definition, { to: this.at, from, n: 0, message }, { clock: clockOf(this.state, this.now), bounds: this.bounds, facts, prepared: [], own: this.own, source, origin: null, platform: this.rules });
+    const origin = message.class === "result" ? this.entries[message.of.from.seq]?.entry ?? null : null;
+    const judgment = judgeDelivery(this.state, this.definition, { to: this.at, from, n: 0, message }, { clock: clockOf(this.state, this.now), bounds: this.bounds, facts, prepared: [], own: this.own, source, origin, platform: this.rules });
     if (write && judgment.result === "write") this.seal(judgment.draft);
     return judgment;
   }
