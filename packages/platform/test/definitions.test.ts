@@ -43,7 +43,7 @@ test("the inbox definition validates whole with the platform option, with its ma
 });
 
 // The plan's T43, for `platform:membership@1` (authority note, revision 24, section 12.1.3, and its table of marks, section 12.1.8).
-test("the membership definition validates whole with the platform option; every mark has its rule, the three of revision 24 and the type `action-list` of revision 28 among them, so the package's rules run it, and with any one of the eleven missing they do not", () => {
+test("the membership definition validates whole with the platform option; every mark has its rule, the three of revision 24 and the type `action-list` of revision 28 among them, so the package's rules run it, and with any one of the eleven missing they do not; an active key and an active member each reserve their settlement", () => {
   const checked = validateDefinition(JSON.parse(JSON.stringify(membership)), PROPOSED_BOUNDS, PROFILES, { platform: true });
   if (!checked.ok) throw new Error(`membership is refused: ${JSON.stringify(checked.problems)}`);
   expect([checked.definition.underived, derivable(checked.definition, null), membership.capabilities, membership.rules, membership.outcomes, membership.receives]).toEqual([[], true, [], {}, {}, {}]);
@@ -84,6 +84,12 @@ test("the membership definition validates whole with the platform option; every 
   // type there, so the validator's bound on a written list does not read it (`ACTIONS_MOST`, with its witness in `rules.test.ts`).
   const at32 = validateDefinition(JSON.parse(JSON.stringify(membership)), { ...PROPOSED_BOUNDS, listElements: 32 }, PROFILES, { platform: true });
   expect([at32.ok, ACTIONS_MOST]).toEqual([true, 64]);
+  // Section 5.8, "`settles` on the rows of membership", as the note's revision 28 has it: `revoke-key` and `remove-member` each
+  // state `settles: { of: "on", in: ["active"] }`. So an active key reserves 3 entries, the revocation and the pending request of
+  // the `compromised` notice with its 2, and an active member 1. `join` and `enrol` state none: their name is bound by a mark, and
+  // an invitation reserves its timed end alone (I3 deltas, entry GD4).
+  expect([membership.acts["revoke-key"]!.settles, membership.acts["remove-member"]!.settles, Object.values(membership.acts).filter((act) => act.settles).length, checked.definition.pending, checked.definition.deadlines])
+    .toEqual([{ of: "on", in: ["active"] }, { of: "on", in: ["active"] }, 2, { member: { active: 1 }, key: { active: 3 } }, { member: { invited: 1 }, key: { invited: 1 } }]);
   // The check that the note's section 12.1.8 leaves to I3 ("One thing that was not checked"): the validator takes a constant list as
   // the source of a list slot. The same data with the mark `role-table` replaced by five written `value` effects, each from a
   // constant, validates. It is a check of the validator only: no entry was derived from that data, and the row stays a rule until

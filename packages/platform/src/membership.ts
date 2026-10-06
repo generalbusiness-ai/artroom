@@ -38,10 +38,12 @@
  * and an admin's first list has 34. That needs the bound on a list of the
  * scope contract's revision 19 (its section 6.1, 64).
  *
- * One row is of the note's revision 28, at `8b1c3c9d7`, which its checker
- * approved and whose adoption was not recorded when it was built (I3
+ * Two rows are of the note's revision 28, at `8b1c3c9d7`, which its checker
+ * approved and whose adoption was not recorded when they were built (I3
  * deltas, the entries GD). The mark `action-list` is an eleventh rule: the
  * type of the five role lists and of the field `actions` (row aa, P27).
+ * And `revoke-key` and `remove-member` each declare `settles` (section
+ * 5.8, "`settles` on the rows of membership").
  *
  * The note's `max`, text lengths and ranges are examples that the proof
  * plan owns. They are written as the note has them.
@@ -471,6 +473,8 @@ export const membership: PlatformData = {
       effects: [{ state: "removed" }],
       sends: [],
       attention: [],
+      // From revision 28 (section 5.8, "`settles` on the rows of membership"): an active member reserves the entry of its removal.
+      settles: { of: "on", in: ["active"] },
     },
     // `revoke-key`: an act. Grant `membership.manage`, or the recovery key (Code P13). The last active key of the last admin is not
     // revoked, except by the recovery key (row i). A key revoked as compromised is told to the directory.
@@ -492,6 +496,11 @@ export const membership: PlatformData = {
         },
       }],
       attention: [],
+      // From revision 28 (the same table): an active key reserves the entry of its revocation, and the pending request of the
+      // `compromised` notice with its 2 entries. That is 3.
+      // I3 merge: `join` and `enrol` declare no `settles`. Their `of` would be a name of `also` that the mark `invitation` binds, and
+      // the note asks the contract to confirm that form (its section 13.17, ask 5). No adopted text confirms it (I3 deltas, entry GD4).
+      settles: { of: "on", in: ["active"] },
     },
     // `rotate-recovery`: an act, signed by the recovery key (Code P13 and P14). The new key is not, and never was, a member's key.
     "rotate-recovery": {
