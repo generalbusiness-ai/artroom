@@ -185,15 +185,29 @@ describe("an act with rows (section 16.1; witness 18.46, cases 4 to 6 and 16; wi
   });
 
   test("18.52 case 10, and 18.46 case 16: the signer's own member is served by the grant's observation inside the row's window, and `observed` holds no record of it; a rule of a form that states no row has a fault when it reads an observation; and an entry of such a form has the bytes it had", () => {
-    const s = made();
+    const s = new Scope(weigherWith((data) => { data.acts["own"] = { ...data.acts["peek"]!, observes: data.acts["set"]!.observes }; }));
+    const read: ObservationUse[] = [];
+    const supplied = weigherRules();
+    const reading = { ...supplied, rules: { ...supplied.rules, sees: { place: "guard" as const, refusals: ["unseen"], run: (given: RuleGiven) => {
+      const observed = given.observed({ member: "@una" as MemberId });
+      if (observed) read.push(observed);
+      return observed ? { holds: true as const } : { holds: false as const, name: "unseen" };
+    } } } };
     // Case 10: `a` is the signer's own member, and the grant's observation is 40 seconds old and `reused`. The row states `reuse`.
     const proof = (age: number): ObservationUse => ({ ...keySeen(una.key, "@una", 3, t(-age)), use: "reused", prior: { seq: 1, hash: s.head.hash } });
     const grants = (age: number) => [{ grant: { ...grantOf(una, s.at, ["weigher.set"]), fresh: proof(age) }, current: true }];
-    const own = s.act(una, "set", { fields: { a: una.member } }, { ...context([]), grants: grants(40) });
+    const firstGrant = grants(40);
+    const own = s.act(una, "own", { on: 0, expected: { on: s.item(0).revision }, fields: { a: una.member } }, { ...context([]), platform: reading, grants: firstGrant });
     expect([said(own), s.last.input.type === "act" && "observed" in s.last.input]).toEqual([["write", null], false]);
+    expect(read).toEqual([{ ...firstGrant[0]!.grant.fresh, observation: { subject: "member", of: membership, head: firstGrant[0]!.grant.fresh.observation.head, member: "@una", memberState: "active", role: "member", activeKey: true, controller: null, controllerActive: null, definition: "platform:membership@1", at: t(-40) } }]);
     // The control: a grant's observation that is outside the row's window does not serve it, and another member is read as any other.
     expect(said(s.act(una, "set", { fields: { a: una.member } }, { ...context([], READABLE), grants: grants(300) }))).toEqual(["unavailable", "authority-unavailable", [[{ member: "@una" }, 300, false]]]);
     expect(said(s.act(una, "set", { fields: { a: vic.member } }, { ...context([]), grants: grants(40) }))).toEqual(["unavailable", "authority-unavailable"]);
+    // A once-only row cannot be served by a reused grant. Its fresh grant can serve it without a further observation.
+    const once = new Scope(weigherWith((data) => { data.acts["own"] = { ...data.acts["peek"]!, observes: data.acts["set"]!.observes }; data.acts["own"]!.observes![0]!.use = "once"; }));
+    const onceGrant = { ...grantOf(una, once.at, ["weigher.set"]), fresh: proof(40) };
+    expect(said(once.act(una, "own", { on: 0, expected: { on: once.item(0).revision }, fields: { a: una.member } }, { ...context([]), grants: [{ grant: onceGrant, current: true }] }))).toEqual(["unavailable", "authority-unavailable"]);
+    expect(said(once.act(una, "own", { on: 0, expected: { on: once.item(0).revision }, fields: { a: una.member } }, { ...context([]), grants: [{ grant: { ...onceGrant, fresh: { ...proof(40), use: "fresh", prior: null } }, current: true }] }))).toEqual(["write", null]);
 
     // Case 16: `peek` states no row, and its guard reads the standing of a member. No subject is on the list: a fault.
     const peek = { on: 0, expected: { on: s.item(0).revision }, fields: { a: una.member } };

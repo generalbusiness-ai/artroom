@@ -366,7 +366,7 @@ function actJudged(view: StateView, definition: ValidDefinition, signed: SignedI
     if (settled.missing.length > 0) return { result: "unavailable", reason: "authority-unavailable", missing: settled.missing, rows: settled };
     if (list.some((row) => settled!.status.get(row.n) !== "whole")) return { result: "unavailable", reason: "authority-unavailable", rows: settled };
     const { status } = settled;
-    beside.rows = { status: rows.map((_, n) => status.get(n) ?? null), listed: settled.listed, retained: settled.retained, values: settled.values };
+    beside.rows = { status: rows.map((_, n) => status.get(n) ?? null), listed: settled.listed, retained: settled.retained, values: settled.values, ...(granted?.fresh ? { grant: { use: granted.fresh, subjects: settled.served } } : {}) };
   }
 
   const j: Judging = {

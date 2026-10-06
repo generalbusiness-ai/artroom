@@ -123,7 +123,7 @@ export interface AtHand {
    * what a rule is told of each row, by its position: whole, over or
    * absent.
    */
-  rows?: { status: readonly (RowStatus | null)[]; listed: ReadonlySet<string>; retained: readonly ObservationUse[]; values: readonly ValueRead[] } | null;
+  rows?: { status: readonly (RowStatus | null)[]; listed: ReadonlySet<string>; retained: readonly ObservationUse[]; values: readonly ValueRead[]; grant?: { use: ObservationUse; subjects: ReadonlySet<string> } } | null;
 }
 
 /** One place of an act, in one intent: the field, the byte domain and the bound that the data states, and the digest that the field holds. */
@@ -479,7 +479,15 @@ export function givenTo(g: Giving): RuleGiven {
       if (hand?.rows === null) return null;
       if (hand?.rows) {
         if (!hand.rows.listed.has(subjectName(subject))) throw new RuleFault("a rule reads an observation of a subject that no row of its form gives");
-        return hand.rows.retained.find((at) => isOf(at, subject)) ?? null;
+        const retained = hand.rows.retained.find((at) => isOf(at, subject));
+        if (retained) return retained;
+        const granted = hand.rows.grant;
+        const observation = granted?.use.observation;
+        // A member served by the signer's grant is read from that grant. It creates no further retained observation.
+        if (granted?.subjects.has(subjectName(subject)) && observation && !("subject" in observation) && "member" in subject) {
+          return { ...granted.use, observation: { subject: "member", of: observation.of, head: observation.head, member: observation.member, memberState: observation.memberState, role: observation.role, activeKey: observation.keyState === "active", controller: observation.controller, controllerActive: observation.controllerActive, definition: observation.definition, at: observation.at } };
+        }
+        return null;
       }
       const use = hand?.observed.find((at) => isOf(at, subject)) ?? null;
       if (use && hand && !hand.read.observed.includes(use)) hand.read.observed.push(use);
