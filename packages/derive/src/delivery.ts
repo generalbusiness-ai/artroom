@@ -299,5 +299,5 @@ function result(view: StateView, definition: ValidDefinition, context: DeliveryC
   const { observed: retained, values } = retainedOf(beside);
   const written = write({ type: "delivery", from, n, message, clause, ...(retained.length > 0 ? { observed: retained } : {}) }, ran.effects, confirm, [], ran.judgesTime || retained.length > 0, ran.uses);
   // Section 16.1, "A value that a row may retain": each value that a retained observation names is kept with the entry, apart from it.
-  return written.result === "write" && values.length > 0 ? { ...written, draft: { ...written.draft, values } } : written;
+  return written.result === "write" && (values.length > 0 || ran.rows) ? { ...written, draft: { ...written.draft, ...(values.length > 0 ? { values } : {}), ...(ran.rows ? { rows: ran.rows } : {}) } } : written;
 }

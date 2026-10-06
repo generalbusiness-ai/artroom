@@ -20,7 +20,7 @@ import { covers } from "./grant.ts";
 import type { Judging } from "./guards.ts";
 import { alsoItems, derive, giving } from "./handlers.ts";
 import { actionOf, atHand, atHandByRows, fieldOutsideType, grantByRule, markOf, placeWithoutValue, placesOf, retainedOf, selectedBy, unjudged, type JudgedInput, type ValueRead } from "./marks.ts";
-import { listedBy, rowsOfAct, settle, type Listed, type Needed, type Observing } from "./observes.ts";
+import { listedBy, rowsOfAct, settle, type Listed, type Needed, type Observing, type Settled } from "./observes.ts";
 import type { Item, StateView } from "./state.ts";
 import { nextDue, type Due } from "./timed.ts";
 import { timeMs, type Clock } from "./time.ts";
@@ -92,7 +92,11 @@ export interface JudgeContext extends Reading {
  * observation at hand passes the guards for them. The commit stops, nothing
  * is written, the scope reads what is missing and the turn starts again.
  */
-export interface Unjudged { result: "unavailable"; reason: UnavailableReason; missing?: readonly Needed[] }
+export interface Unjudged {
+  result: "unavailable"; reason: UnavailableReason; missing?: readonly Needed[];
+  /** What the rows of the input's form came to, where they are why it is not judged. A verifier names the guard that failed from it. */
+  rows?: Settled;
+}
 
 /** What a judged input writes. `seq`, `prev` and `time` are allocated when it is sealed; see `entryOf`. */
 export interface Draft {
@@ -118,6 +122,13 @@ export interface Draft {
    * reservation, and is not asked whether it fits. It is in no entry.
    */
   settles?: boolean;
+  /**
+   * Section 16.1, under a definition whose data states rows: what the rows
+   * of the entry's form came to. It is in no entry. A verifier reads from
+   * it why a recorded observation serves no row, for the name of the
+   * mismatch, and whether a row is absent on the runtime's word.
+   */
+  rows?: Settled;
 }
 
 /** `name`: the reason the failed guard declares, if it declares one. `detail` is for the caller and is in no entry. */
@@ -340,11 +351,13 @@ function actJudged(view: StateView, definition: ValidDefinition, signed: SignedI
   // The signer's own member is served by the grant's observation where that passes the row's window and use. A subject with no such
   // observation stops the commit: the scope reads what is missing and the turn starts again, and the act is answered
   // `authority-unavailable` once none can be had. An act is never written with a row over or absent.
+  let settled: Settled | undefined;
   if (beside && definition.observing) {
-    const settled = settle(list, { ...settling, grant: granted?.fresh ?? null });
-    if (settled.missing.length > 0) return { result: "unavailable", reason: "authority-unavailable", missing: settled.missing };
-    if (list.some((row) => settled.status.get(row.n) !== "whole")) return { result: "unavailable", reason: "authority-unavailable" };
-    beside.rows = { status: rows.map((_, n) => settled.status.get(n) ?? null), listed: settled.listed, retained: settled.retained, values: settled.values };
+    settled = settle(list, { ...settling, grant: granted?.fresh ?? null });
+    if (settled.missing.length > 0) return { result: "unavailable", reason: "authority-unavailable", missing: settled.missing, rows: settled };
+    if (list.some((row) => settled!.status.get(row.n) !== "whole")) return { result: "unavailable", reason: "authority-unavailable", rows: settled };
+    const { status } = settled;
+    beside.rows = { status: rows.map((_, n) => status.get(n) ?? null), listed: settled.listed, retained: settled.retained, values: settled.values };
   }
 
   const j: Judging = {
@@ -367,7 +380,7 @@ function actJudged(view: StateView, definition: ValidDefinition, signed: SignedI
   // with the entry, and is in no entry.
   const retained = retainedOf(beside);
   const input = { type: "act", signed, authority: granted ? [granted] : [], presented: shown.fields as Record<string, FactRef>, ...(retained.observed.length > 0 ? { observed: retained.observed } : {}) } as const;
-  return { result: "write", draft: { input, uses, prepared: ran.prepared, effects: ran.effects, sends: ran.sends, judgesTime: true, settles: ran.settles, ...(retained.values.length > 0 ? { values: retained.values } : {}) } };
+  return { result: "write", draft: { input, uses, prepared: ran.prepared, effects: ran.effects, sends: ran.sends, judgesTime: true, settles: ran.settles, ...(retained.values.length > 0 ? { values: retained.values } : {}), ...(settled ? { rows: settled } : {}) } };
 }
 
 /**

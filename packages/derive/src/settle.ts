@@ -231,8 +231,8 @@ function byRows(view: StateView, definition: ValidDefinition, outcome: OutcomeOf
       // 2. The first list, and what is at hand for it.
       const first = listedByRule(rows, false, named(null));
       settled = settle(first, g);
-      if (settled.missing.length > 0) return { result: "unavailable", reason: "authority-unavailable", missing: settled.missing };
-      if (waits(first, settled)) return { result: "unavailable", reason: "authority-unavailable" };
+      if (settled.missing.length > 0) return { result: "unavailable", reason: "authority-unavailable", missing: settled.missing, rows: settled };
+      if (waits(first, settled)) return { result: "unavailable", reason: "authority-unavailable", rows: settled };
       // 3. The second list, from the observations of the first: each that is at hand for a whole row, and for each other row that it
       // is over or absent. A row of the second step is given no observation of the second step.
       if (rows.some((row) => "second" in row && row.second === true)) {
@@ -247,8 +247,8 @@ function byRows(view: StateView, definition: ValidDefinition, outcome: OutcomeOf
         const all = [...first, ...listedByRule(rows, true, named(step))];
         // 4. One subject of both steps is one subject.
         settled = settle(all, g);
-        if (settled.missing.length > 0) return { result: "unavailable", reason: "authority-unavailable", missing: settled.missing };
-        if (waits(all, settled)) return { result: "unavailable", reason: "authority-unavailable" };
+        if (settled.missing.length > 0) return { result: "unavailable", reason: "authority-unavailable", missing: settled.missing, rows: settled };
+        if (waits(all, settled)) return { result: "unavailable", reason: "authority-unavailable", rows: settled };
       }
     }
   }
@@ -261,7 +261,7 @@ function byRows(view: StateView, definition: ValidDefinition, outcome: OutcomeOf
   const judgesTime = ran.clock || retained.observed.length > 0;
   if (judgesTime && context.clock.behind) return { result: "unavailable", reason: "clock-behind" };
   const input = retained.observed.length > 0 ? { ...judged.draft.input, observed: retained.observed } : judged.draft.input;
-  return { result: "write", draft: { ...judged.draft, input, uses, judgesTime, ...(retained.values.length > 0 ? { values: retained.values } : {}) } };
+  return { result: "write", draft: { ...judged.draft, input, uses, judgesTime, ...(retained.values.length > 0 ? { values: retained.values } : {}), ...(settled ? { rows: settled } : {}) } };
 }
 
 /** `settleOutcome`, for a caller that only asks whether the outcome writes an entry: a contradiction is an input that the scope never writes. */

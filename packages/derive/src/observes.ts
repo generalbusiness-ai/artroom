@@ -40,6 +40,7 @@ import { operand, type Judging } from "./guards.ts";
 import { RuleFault, valueDigest, type ValueRead } from "./marks.ts";
 import type { Item, StateView } from "./state.ts";
 import { timeMs, type Clock } from "./time.ts";
+import type { ValidDefinition } from "./validate/index.ts";
 import { observationBytes } from "./validate/observes.ts";
 import { byteOrder, isObject, own, same } from "./values.ts";
 
@@ -451,6 +452,23 @@ export const retainable = (rows: readonly Observe[]): number =>
  */
 export const retainableByRequest = (form: SendForm | null | undefined): number =>
   Math.max(0, ...(["applied", "refused", "superseded"] as const).map((clause) => retainable(rowsOfClause(form, clause))));
+
+/**
+ * Each byte domain that a row of the pinned data states under `retains`,
+ * once, in the order of the data: on an act, on a kind of `outcomes`, and
+ * on a clause of a send of an act or of a handler. A verifier asks a value
+ * that an observation names in each of them (section 9.2: a read of one
+ * value asks by the kind, the domain and the digest).
+ */
+export function retainsOf(definition: Pick<ValidDefinition, "declared">): string[] {
+  const data = definition.declared as unknown as PlatformData;
+  const forms = [...Object.values(data.acts), ...Object.values(data.receives)];
+  const rows: Observe[] = [
+    ...Object.values(data.acts).flatMap((act) => rowsOfAct(act)), ...Object.keys(data.outcomes ?? {}).flatMap((kind) => rowsOfKind(data, kind)),
+    ...forms.flatMap((form) => form.sends.flatMap((send) => (["applied", "refused", "superseded", "conflict"] as const).flatMap((clause) => rowsOfClause(send as SendForm, clause)))),
+  ];
+  return [...new Set(rows.flatMap((row) => (row.of === "rules" ? (row.retains ?? []).map((record) => record.domain) : [])))];
+}
 
 /** The holders that one answer lists: the first `most` of them, in byte order of member ID (section 16.1, "An observation of the holders of one action"). */
 export const firstHolders = (holders: readonly MemberId[], most: number): MemberId[] => [...holders].sort(byteOrder).slice(0, most);
