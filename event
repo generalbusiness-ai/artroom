@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:b06c933aace07499c3aa13a5a6ddb21e0f5e2c0f","text":"Merge retired a covered predecessor; the successor is at package-lock.json."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:b11184343377d9457dcc800022b8caa95f387aff","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-05-i3-limits-review.md."}
