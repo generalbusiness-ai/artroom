@@ -24,6 +24,7 @@ import { capacityOf, type PendingCopy } from "./capacity.ts";
 import { mark, marked, type Defining, type MarkPlace, type RangeIndex } from "./context.ts";
 import { acts, receives } from "./handlers.ts";
 import { heldUnderBytes, holdForms, holdTypes } from "./hold.ts";
+import { reserving, type Reserving } from "./holds.ts";
 import { itemTypes } from "./items.ts";
 import { at, shapes, type Problem } from "./shape.ts";
 import { timedEntryBytes, timedGraph, timedKinds, timedRules } from "./timed.ts";
@@ -31,6 +32,7 @@ import { timedEntryBytes, timedGraph, timedKinds, timedRules } from "./timed.ts"
 export type { MarkKind, MarkPlace, RangeIndex } from "./context.ts";
 export type { Problem, ProblemCode } from "./shape.ts";
 export type { Underived } from "./capability.ts";
+export type { KindReserved, Reserving } from "./holds.ts";
 export { timedGraph, type TimedGraph, type TimedMove } from "./timed.ts";
 
 /** A definition that passed, with what was derived from it. The judges and the fold take only this. */
@@ -77,6 +79,13 @@ export interface ValidDefinition {
    * `marks.ts`). Empty: a declared definition, which holds no mark.
    */
   readonly marks: readonly MarkPlace[];
+  /**
+   * Section 17.2a: what the data of a platform definition reserves by the
+   * `holds` of its item types, the `adds` of its acts and the marks of its
+   * kinds of `outcomes`, as amounts in the five dimensions. Absent: a
+   * declared definition, or platform data with no kind and no `holds`.
+   */
+  readonly reserving?: Reserving;
 }
 
 export type Validation = { ok: true; definition: ValidDefinition } | { ok: false; problems: readonly Problem[] };
@@ -172,15 +181,16 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
   // because an outcome has no subject and no field for a written send to read, and each effect of its clauses is an effect mark.
   if (platform) {
     for (const [kind, m] of entries(top["outcomes"], "outcomes", null)) {
-      const o = mark(d, m, at("outcomes", kind), "outcome", [], ["send"]);
+      // Revision 21, section 17.2: the mark may state `attempts` and `most`, and its send `once`. `holds.ts` reads the three.
+      const o = mark(d, m, at("outcomes", kind), "outcome", [], ["send", "attempts", "most"]);
       if (!o || !("send" in o)) continue;
       const p = at(at("outcomes", kind), "send");
-      const send = marked(o["send"]) ? mark(d, o["send"], p, "send", ["result"]) : bad("shape", p, "an outcome's mark holds at most one send, and it is a mark: an outcome's row writes no send");
+      const send = marked(o["send"]) ? mark(d, o["send"], p, "send", ["result"], ["once"]) : bad("shape", p, "an outcome's mark holds at most one send, and it is a mark: an outcome's row writes no send");
       const clauses = send ? rec(send["result"], at(p, "result"), [], ["applied", "refused", "superseded", "undelivered", "conflict"]) : null;
       for (const [clause, effects] of Object.entries(clauses ?? {})) {
         d.list(effects, at(at(p, "result"), clause), bounds.effects).forEach((e, i) => {
           const q = at(at(at(p, "result"), clause), i);
-          if (marked(e)) mark(d, e, q, "effect");
+          if (marked(e)) mark(d, e, q, "effect", [], ["most"]);
           else bad("shape", q, "a clause of an outcome's send holds effect marks only: an outcome has no subject and no field");
         });
       }
@@ -205,8 +215,11 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
   // Section 17.2: each reservation is derived from the definition. A closure that is not finite is refused.
   const capacity = capacityOf(d, graph, moves);
   if (problems.length > 0) return { ok: false, problems };
+  // Section 17.2a: a reservation that an item holds, and what each kind of `outcomes` reserves. In platform data only.
+  const reserved = reserving(d, top, capacity);
+  if (problems.length > 0) return { ok: false, problems };
   try {
-    return { ok: true, definition: { declared, digest: definitionDigest(declared), timedTypes: [...timedTypes].sort(), holdTypes: [...d.holdTypes].sort(), indexes: d.indexes, ...capacity, underived: d.underived, marks: d.marks } };
+    return { ok: true, definition: { declared, digest: definitionDigest(declared), timedTypes: [...timedTypes].sort(), holdTypes: [...d.holdTypes].sort(), indexes: d.indexes, ...capacity, underived: d.underived, marks: d.marks, ...(reserved ? { reserving: reserved } : {}) } };
   } catch {
     return { ok: false, problems: [{ code: "shape", path: "", message: "has no canonical bytes" }] };
   }

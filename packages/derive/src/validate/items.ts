@@ -12,7 +12,8 @@ export function itemTypes(d: Defining, v: unknown): void {
   for (const [name, tv] of entries(v, "items", bounds.items)) {
     const path = at("items", name);
     const before = problems.length;
-    const o = rec(tv, path, ["many", "max", "states", "initial", "parties", "refs", "values"]);
+    // Section 17.2a: in platform data an item type may state `holds`. `holds.ts` reads it.
+    const o = rec(tv, path, ["many", "max", "states", "initial", "parties", "refs", "values"], d.platform ? ["holds"] : []);
     if (!o) continue;
     const many = bool(o["many"], at(path, "many"));
     const max = int(o["max"], at(path, "max"), 1);

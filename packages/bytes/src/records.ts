@@ -167,7 +167,8 @@ const effect = variant("effect", {
   record: record({ effect: any, capability: capabilityName, kind: text, key: listOf(isFieldValue), state: text, values: isRecord }),
   activate: record({ effect: any }),
   // Section 4.3: an operation's opening, and one change of one numbered attempt. An operation of the entry itself is named by its ordinal.
-  operation: record({ effect: any, k: isLocalId, owner: (v) => capabilityName(v) || isPlatformDefinition(v), kind: text, attempts: isLocalId }),
+  // Section 17.2a: `for` is the holder that an operation of a held kind draws on, by its local ID, or `self` for the item that the same entry opens.
+  operation: record({ effect: any, k: isLocalId, owner: (v) => capabilityName(v) || isPlatformDefinition(v), kind: text, attempts: isLocalId }, { for: (v) => v === "self" || isLocalId(v) }),
   attempt: record({
     effect: any, operation: (v) => isOperationId(v) || record({ k: isLocalId })(v), attempt: isLocalId,
     result: among({ opened: true, confirmed: true, refused: true, unknown: true }), selected: (v) => v === null || typeof v === "boolean",

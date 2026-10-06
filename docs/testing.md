@@ -60,6 +60,15 @@ nothing about a real hold, a Git read or a provider. A step that a test
 scripts in it names an action and a window, and derives nothing. It
 shows how a step's grant is read and judged, and nothing about the step.
 
+Derive has two more values of made-up platform data, in
+`packages/derive/test/fixtures-holds.ts`: `works` and `chain`, whose item
+type `job` holds a reservation. They are the made-up data of the
+contract's witnesses 18.47 and 18.49. Every count is made up, and every
+rule is a stand-in that a test scripts. A test that uses one says so. It
+shows where a count is taken, drawn and released, and nothing about a
+count or a rule of a platform definition. No data of the platform package
+states `holds` yet.
+
 A scripted membership, `Controls.membership` of the same module, is a
 stand-in for the membership scope and for the reference to it that a
 scope's genesis will record. The test writes each answer, and no history

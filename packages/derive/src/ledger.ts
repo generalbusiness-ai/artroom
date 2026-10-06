@@ -20,12 +20,13 @@
  */
 
 import type { CapabilityName, Digest, Effect, Entry, Evidence, Input, OperationId, PlatformDefinition, Send, Timestamp } from "@generalbusiness/artroom-contract";
-import { canonicalBytes, digestBytes, isEvidence } from "@generalbusiness/artroom-bytes";
+import { canonicalBytes, digestBytes, isEvidence, isPlatformDefinition } from "@generalbusiness/artroom-bytes";
 import type { Own } from "./fields.ts";
 import type { Draft } from "./judge.ts";
 import type { AttemptState, Operation, OutcomeState, StateView } from "./state.ts";
 import { timeMs, type Clock } from "./time.ts";
 import type { ValidDefinition } from "./validate/index.ts";
+import { own } from "./values.ts";
 
 export type Owner = CapabilityName | PlatformDefinition;
 export type OutcomeInput = Extract<Input, { type: "outcome" }>;
@@ -49,7 +50,11 @@ export const namesOwn = (operation: Pick<Operation, "owner" | "kind">, outcome: 
 export const operationId = (seq: number, k: number): OperationId => `${seq}:${k}`;
 
 /** What the entry that opens an operation states: the owner, the kind, and the most attempts the owner allows (item 1; G3). */
-export interface Opening { owner: Owner; kind: string; attempts: number }
+export interface Opening {
+  owner: Owner; kind: string; attempts: number;
+  /** Section 17.2a: the holder that the operation is for, by its item's ID. An opening of a kind that an item holds states it, and no other does. */
+  for?: number;
+}
 
 /** What an owner derives from one outcome beside the ledger's own records: its records, its sends, and the operations it opens, such as a cleanup (item 7). */
 export interface OutcomeDerived { effects: readonly Effect[]; sends: readonly Send[]; opens: readonly Opening[] }
@@ -132,23 +137,6 @@ export interface OperationRules {
    * `cc570904`'s.
    */
   closure?: number;
-  /**
-   * The operations that an outcome entry of this kind opens are reserved by
-   * another duty than the operation itself, which the owner's specification
-   * counts: a publication of the destination reserves, at its `reserve`,
-   * every operation of its judgment, its push and its receipt (authority
-   * note, section 5.8, the two rows of the destination). The kinds of such
-   * an owner open each other in a circle, as a `judge` opens a push whose
-   * outcome opens the next `judge`, so no number is a closure of one. The
-   * ledger then makes no closure check for an outcome of this kind, and
-   * `closure` counts nothing for it. Absent: the closure is the check.
-   */
-  // I3 merge: THE COUNT OF THAT OTHER DUTY IS NOT BUILT FOR ANY OWNER, so this member exempts and reserves nothing. A destination
-  // reserves for an open operation only its own outcome entries. By the note's own table one publication may write 71 entries that
-  // no admission reserved (the platform package's `publicationRoom`, whose test holds the number and the kinds that state this
-  // member). What the adopted texts do not state, so that the count could be derived from the folded state, is in the I3 deltas,
-  // entry FC1, with entry FA3; the owner is request `cc570904`.
-  covered?: boolean;
 }
 
 /**
@@ -165,15 +153,26 @@ export interface Owners {
   reserves?(view: StateView, definition: ValidDefinition): number;
 }
 
-/** The closure that the owner declares for one outcome entry of that kind of operation (section 17.2, row 5). With no rules, no outcome is judged, so none derives anything. */
-export const closureOf = (owners: Owners | null | undefined, owner: Owner, kind: string): number => owners?.rules(owner, kind)?.closure ?? 0;
+/**
+ * The closure of one outcome entry of that kind of operation, in entries
+ * (section 17.2, row 5, and "The closure of an operation"). A kind of the
+ * pinned platform definition that states its attempts is counted from its
+ * data, by what its mark may start: the validator computed it
+ * (`Reserving`). For a held kind that is the part of `one(k)` for one
+ * outcome entry. Every other kind has the closure that its owner's rules
+ * declare. With no rules, no outcome is judged, so none derives anything.
+ */
+export function closureOf(owners: Owners | null | undefined, owner: Owner, kind: string, definition?: ValidDefinition): number {
+  const counted = isPlatformDefinition(owner) ? own(definition?.reserving?.kinds, kind) : undefined;
+  return counted && counted.attempts !== null ? counted.outcome.entries - 1 : (owners?.rules(owner, kind)?.closure ?? 0);
+}
 
 /**
  * The entries that one opening reserves when its entry is folded (section
  * 17.2, row 5): for each attempt it states, its first outcome and its late
- * answer, and with each of those the closure that its owner declares.
+ * answer, and with each of those the closure of one outcome entry.
  */
-export const reservedBy = (open: Opening, owners: Owners | null | undefined): number => 2 * open.attempts * (1 + closureOf(owners, open.owner, open.kind));
+export const reservedBy = (open: Opening, owners: Owners | null | undefined, definition?: ValidDefinition): number => 2 * open.attempts * (1 + closureOf(owners, open.owner, open.kind, definition));
 
 /**
  * The effects that open one operation in the entry being derived, at its
@@ -190,7 +189,7 @@ export const reservedBy = (open: Opening, owners: Owners | null | undefined): nu
 // I3 merge: the platform rules open their operations with it, in their own step.
 export function operationOpening(k: number, open: Opening, held = false): Effect[] {
   if (!Number.isSafeInteger(open.attempts) || open.attempts < 1) throw new Error("an operation states at least one attempt");
-  const operation: Effect = { effect: "operation", k, owner: open.owner, kind: open.kind, attempts: open.attempts };
+  const operation: Effect = { effect: "operation", k, owner: open.owner, kind: open.kind, attempts: open.attempts, ...(open.for === undefined ? {} : { for: open.for }) };
   return held ? [operation] : [operation, { effect: "attempt", operation: { k }, attempt: 1, result: "opened", selected: null }];
 }
 
@@ -258,9 +257,10 @@ export function operationStanding(operation: Operation): "settled" | "pending" |
  * The fold of one `operation` record (item 1). A string says why the state
  * cannot take it.
  */
-export function openedBy(seq: number, effect: Extract<Effect, { effect: "operation" }>): Operation | string {
+// `holder`: the item that the operation is for, as the draw of its entry resolved the effect's `for` (section 17.2a; `draws.ts`).
+export function openedBy(seq: number, effect: Extract<Effect, { effect: "operation" }>, holder?: number): Operation | string {
   if (!Number.isSafeInteger(effect.attempts) || effect.attempts < 1) return "states no attempt";
-  return { id: operationId(seq, effect.k), owner: effect.owner, kind: effect.kind, most: effect.attempts, attempts: [], selected: null };
+  return { id: operationId(seq, effect.k), owner: effect.owner, kind: effect.kind, most: effect.attempts, attempts: [], selected: null, ...(holder === undefined ? {} : { for: holder }) };
 }
 
 /**
@@ -391,8 +391,11 @@ export function outcomeOf(view: StateView, definition: ValidDefinition, outcome:
   // Section 17.2, row 5: an outcome entry is never asked whether it fits (section 17.3), so what it opens was reserved with its own
   // operation, as the closure that the owner declares. An owner whose outcome would open more has broken its own declaration:
   // fail closed, and nothing is written.
-  // An owner whose specification reserves them by another duty states `covered`, and is not asked here.
-  if (rules.covered !== true && derived.opens.reduce((entries, open) => entries + reservedBy(open, owners), 0) > (rules.closure ?? 0)) return { result: "unavailable", reason: "unavailable" };
+  // Section 17.2a: an opening that states `for` is of a held kind, and is in no closure: it draws on the count of its holder, and
+  // a draw past the count is a fault (`drawsOf`, which every judge asks of the entry that it derived). Nothing is exempt: an
+  // opening is inside the closure of its operation, or it is counted by a holder.
+  const closed = derived.opens.filter((open) => open.for === undefined).reduce((entries, open) => entries + reservedBy(open, owners, definition), 0);
+  if (closed > closureOf(owners, operation.owner, operation.kind, definition)) return { result: "unavailable", reason: "unavailable" };
   // Section 6.1, "An entry that cannot be refused": the same for the most that the owner declares for one outcome entry.
   const { most } = rules;
   if (most && (derived.effects.length + 2 * derived.opens.length > most.effects || derived.sends.length > most.requests || derived.opens.length > most.operations)) return { result: "unavailable", reason: "unavailable" };

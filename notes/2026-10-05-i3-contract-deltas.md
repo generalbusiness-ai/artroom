@@ -2011,3 +2011,187 @@ working; every workspace's typecheck; `git diff --check`;
 25.5 CPU seconds, one observed run, on an Apple M5 Max with 18 cores, a
 load average of 4 from other sessions, and warm caches. The gate was
 not run. No deployment, no provider, no host and no gateway.
+
+## 32. A reservation that an item holds: rows I3-44, I3-45, I3-51, I3-52 and I3-60
+
+Written 2026-10-06, on `request/i4-holds`, by the worker of these rows.
+Entries have the prefix GB.
+
+**The basis.** The scope contract's revision 23, at `3b3e394fc`. The
+checker approved it and reported it. The planner's adoption was expected
+and was not recorded when this was written. If it is not adopted as
+written, each row below is one small place: section 32.6 names the
+files. The authority note is at its adopted revision 26 (`f7175296`).
+Its revision 28 is in review, and nothing here is taken from it.
+
+**Reported first: the destination.** Its five kinds are not held by a
+publication. The flag `covered` is gone from the generic code. In its
+place the five rules declare a closure that is not finite, under one
+name of the platform package, `DESTINATION_NOT_FINITE`. Entry GB7 says
+what that does and what it leaves open.
+
+No entry that an earlier source wrote has other bytes. Neither lane
+digest changes, and `packages/lanes` is not touched. No data of a
+platform definition changes. An entry gains a member only where its
+definition states `holds`: `for`, on an `operation` effect. A folded
+state gains members only where a holder, an account or a `sent` mark
+exists, so a state digest under any definition that is on main is the
+one it was.
+
+### 32.1 What is built
+
+| Row | Built | Where | Witness |
+|---|---|---|---|
+| I3-44 | Whole in the generic code. `holds` on an item type, `adds` on an act, `for` on an `operation` effect. The fold keeps what each holder still holds, the holder of each operation and the account of each request, and a checkpoint's digest covers them. The entry that opens a holder is admitted with the whole amount. A held kind is in no closure. A draw past a count is a fault. A final holder is released by the rule of release. `covered` is removed. Not built: the rows of a real platform definition (entry GB7). | `contract/src/platform.ts` and `entry.ts`; `derive/src/validate/holds.ts`, `held.ts`, `draws.ts`, `fold.ts`, `state.ts`, `reserve.ts`, `ledger.ts`; `scope/src/sqlite.ts`; `replay/src/verify.ts` and `view.ts` | `derive/test/forms-holds.test.ts`; `scope/test/holds.test.ts`; `replay/test/verify.test.ts` |
+| I3-45 | Whole for a kind of platform data, in entries. The request of a kind's `send` is reserved with its operation: once for each outcome entry that it may still write, or once with `once`. A second request under `once` is a fault. It also holds for the kinds on main that state no attempts (entry GB10). | `derive/src/reserve.ts`, `outcomes.ts`, `fold.ts`, `validate/holds.ts` | `forms-holds.test.ts`, the two tests of a request that an outcome sends |
+| I3-51 | Whole. `one(k)` holds the closure of each kind that the mark lists and that no item holds. The amount moves to the operation, and to the child when it is opened. A kind that no item holds whose mark lists a held kind is refused `reserve-unbounded`. | `derive/src/held.ts`, `validate/holds.ts`, `reserve.ts` | `forms-holds.test.ts`, witness 18.49 |
+| I3-52 | In part. The closure is counted by outcome entry, and a mark by its `most`, at place 7 and in a clause of a result. Not built: a mark of a form that declares `settles` (entry GB5); and the dimensions other than entries for what a change of state or an opened item starts (entry GB2). The data on main states no `most`, so its kinds are counted as before (entry GB4). | `derive/src/held.ts`, `validate/holds.ts`, `outcomes.ts`, `effects.ts` | `forms-holds.test.ts`, the tests of the pure functions |
+| I3-60 | Whole. Check 5 is made by every edge: the mark of a kind that no item holds, a clause of its send, and each such kind below it. | `derive/src/validate/holds.ts` | `forms-holds.test.ts`, the test of check 5 |
+
+**Section 18, case by case.** "Memory" is derive's
+`forms-holds.test.ts`: the judges, the fold and the rule of admission
+that a scope runs, over a state in memory. "Storage" is
+`scope/test/holds.test.ts`, at a real scope. "Replay" is
+`replay/test/verify.test.ts`.
+
+| Witness | Cases | Built |
+|---|---|---|
+| 18.47 | 1 to 3 | Memory: the validator. |
+| 18.47 | 4, 5 | Memory, and storage. |
+| 18.47 | 6 | Memory, and storage: the outcome is offered by the scope's driver, with the test's outside double. |
+| 18.47 | 7 to 13 | Memory only. The contract gives them to B2, on real storage. They use the same fold, which storage runs in cases 4 to 6. |
+| 18.47 | 14 | Memory: the snapshot that the digest is of. Storage: a checkpoint is written on the store's fold, and its state has the digest of the same history folded in memory. |
+| 18.47 | 15 | Replay: `consistent`. A `for` changed to an item that is no holder, and a `for` left out, are each a mismatch. Not built as the case words it: a `for` changed from one holder to another. The fixture has one holder. A recorded `for` that the rule does not give is caught by the comparison of the recorded effects, which is not new. |
+| 18.49 | 1, 2, 9, 10, 11, and the control of revision 22 | Memory: the validator. Case 11 also draws. |
+| 18.49 | 3 to 8 | Memory only, for the same reason as 18.47, cases 7 to 13. |
+| 18.49 | 12 | Replay: `consistent`. The replay derives the counts by the fold. It compares no amount with a budget (entry GB8). |
+
+### 32.2 Entries
+
+| # | Where the texts differ or are silent | Implemented | Owner, and the question |
+|---|---|---|---|
+| GB1 | Section 17.2a states `req` as "the largest, over the request sends of the forms of the account". Section 17.2, "More, and never less", lets a runtime hold, for every pending request, the largest over all request sends of the definition, because "its folded state does not say which form a request came from". The two do not agree at a draw: a holder would reserve the smaller `req`, and the request that is then pending the larger amount, so reserved would grow at a settling entry. | `req` and `itm` are the largest over every form of the definition. A pending request reserves the same number. So a draw moves an equal amount. It is never less than the contract's `req`. | The contract. Is `req` over the forms of the account only where the runtime also holds each pending request by its own form? |
+| GB2 | Section 17.2a asks `one(k)`, `req` and `itm` in five dimensions. "What an item in a state reserves" is an amount in each. The validator on main derives it in entries only (`capacity.ts`; section 17.5). | The amounts are in five dimensions. In items, records and pending requests they hold what the marks and the requests themselves start: an item for `most.opens`, a pending request for a send. What a change of state or an opened item then starts is counted in entries, and in bytes at the stand-in. The runtime's admission counts entries only, as before: `Bounds` has one budget, `scopeEntries`. | Request `cc570904`, with the proof plan. |
+| GB3 | Section 17.2a, "Release": a final holder keeps the count of a kind while the kind "is reached from the kind of an operation that is `for` the holder and is not settled, and from each kind that a clause of a pending request of its account may open", by the relation "the mark of kind j lists kind k". An outcome of that open operation may still send the request of its kind's `send`, and a clause of it may list a kind that the mark does not. By the rule as written that count is released before the request is sent, and the clause then draws past it. | What a kind reaches counts the kinds that a clause of the kind's own send lists, beside those of its mark. Never less. | The contract. |
+| GB4 | The contract's listing makes `attempts` a member of every kind of `outcomes`, and `most` a member of a mark (rows I3-22 and I3-23). No data on main states either. | Both are optional. A kind that states `attempts` is counted by its data, and its openings are held to its `most`. A kind that states none is counted by the closure that its rule declares, as on main. Such a kind may be neither held nor listed by a mark. | The builder, with the authority note's rows of the register and the directory. Marked `I3 merge:` in `validate/holds.ts`. |
+| GB5 | Section 17.2, "What a mark may start", a settling form: the reservation of an item that awaits its settlement counts the mark of the settling form. | Not counted: `capacity.ts` counts the written effects of a settling form. Until it does, the validator refuses, as `reserve-unbounded`, a form that declares `settles` and holds a mark whose `most` names an item or a kind that no item holds. No data on main has such a form. | The builder, at the merge with the settlement by a mark (rows I3-54 and I3-59), which changes the same counts. |
+| GB6 | Section 17.2a: an act that does not fit "is refused `scope-full`. It names the dimension." Witness 18.47, case 10: "with the dimension". | The answer is `scope-full`, as before. No form of an answer has a member for a dimension, and the source counts one. | The contract, for the form. Request `cc570904`, for the dimensions. |
+| GB7 | The destination's five kinds open each other in a circle. The contract's form is `holds` on a publication, and on the branch, with `for` on each operation and `adds` on `adopt-head` and `resend`. Those rows are the authority note's, in its revision 28, which is not adopted. The rules `first-head` and `receipt` are not written (entry ER9), and they open what nearly half of a publication's table counts. So the counts cannot be derived from this package's rules without inventing them. | `DESTINATION_NOT_FINITE`, in `platform/src/destination.ts`: the closure that the rules of `judge`, `push`, `mint`, the deciding `read` and `adopt-read` declare for one outcome entry. The generic ledger then writes their outcome entries, and the generic admission admits no new work while an operation of one of them is open: a `reserve` whose rule opens a `judge` is not decided, and transport answers "retry". It reserves no room: a publication that was admitted while `queued` may still write 71 entries, by the note's table, that no admission was asked for. `platform/test/definitions.test.ts` holds the five kinds, the 71, and that no data states `holds`. | The authority note, revision 28: the rows of `holds` for a publication and the branch, with `attempts` and `most` for the eight kinds. Then the builder: `for` at each opening of `destination.ts`, and this constant goes. |
+| GB8 | Section 17.2a, "What a verifier does": "It needs the budget only to check that a taking entry and an adding entry fitted". | The replay derives the counts, each `for`, each draw and each release, by the fold. It checks no admission against a budget: no replay on main does, for any entry. A draw past a count is the mismatch `draw-past-count`, and a held operation with no holder is `held-without-holder`. Both are the first words of the report's reason, as `observation-older` is. Neither is a name of the contract. | The contract, for the two names (row I3-57 lists six). The builder, for a budget in a replay. |
+| GB9 | Section 17.2a, "Release": "No flag is kept: it is derived from the state." | The fold keeps, for each holder, what it holds after the rule of release, and derives it again at each entry that can change it: one that draws on the holder, that changes its item's state, that changes an operation for it, or that settles a request of its account. A holder that holds nothing has no record. So the admission reads the open reservations and not every item that ever held one. It is a function of the entries alone, and no flag. | Nobody, unless the contract means that the released counts must stay readable. |
+| GB10 | Entry FC2: the request that an outcome's send mark makes was reserved by nobody. | Reserved for every kind whose mark holds a `send`, also where the data states no attempts: the `create` of the register's claim and the directory's `import-update`. Each reserves the request once for each outcome entry that its operation may still write. `once` is not stated in the register's data, so its claim reserves more than the contract's count. | The authority note, for `once` on the register's row. |
+| GB11 | Revisions 21 to 23 add `decisions`, `bound` and `indexes` beside `holds`. | Not read here: they are other rows. A `holds` that states `decisions` is refused as a member that is no count. | The builder, at the merge with rows I3-55, I3-58 and I3-61. |
+| GB12 | Section 17.2, "A value that an observation names": the bytes of each record of `retains` are reserved by the form that states the row. | The hook is `retainedBytes(rows)`, in `derive/src/held.ts`: a pure function over the rows of `observes`, which gives the bytes. `validate/holds.ts` calls it for each kind of `outcomes` and for each clause of each send, and the amounts count it in bytes. The validator of this branch reads no member `observes`, so the number is 0 until the declaration is merged. For an act that settles it is not called: entry GB5's counts are entries. | The builder, at the merge with row I3-53. |
+| GB13 | Section 17.2a, check 1: `adds` stands "on an act whose `on` is a type that states `holds`". It does not say which step. | The act is a `transition`. An `open` act opens its item, which takes the type's `holds`. | The contract, to confirm. |
+| GB14 | Section 17.2a, "Past a count": "the fault is reported to operators". | A fault answers `unavailable`, and an outcome stays offered, as for every fault of a rule. No read says which rule stopped which input. | The authority note and the lane forms, as the contract's revision 22 splits it. |
+| GB15 | Section 17.2, "A request that an outcome sends": a second request under `once` "is a fault of the rule". Whether an operation made its request is not in the folded state. | The fold notes it on the operation, as `sent`, only for a kind whose send states `once`. `Outstanding.outcomes` gains `unsent`. | Nobody. |
+
+### 32.3 The sweep: what is not asked whether it fits
+
+Read in `derive/src` (`reserve.ts`, `ledger.ts`, `outcomes.ts`,
+`delivery.ts`, `handlers.ts`, `settle.ts`, `effects.ts`) and `scope/src`
+(`turn.ts`, `core.ts`, `delivery.ts`, `operations.ts`, `outbox.ts`).
+
+| Where | What is not asked | By | What reserves it now |
+|---|---|---|---|
+| `fits`: a timed entry | Whether it fits | The input's type | The chain of each live item in a timed state. Counted. |
+| `fits`: a diagnosis, and a result's delivery that is no `conflict` | Whether it fits | The input's type | 2 entries for each pending request, with the largest that the written effects of a clause start, and now the largest that the marks of a clause may start, where they state `most`. A clause's mark that states no `most` and opens an operation is still counted by nothing: entry GB4. |
+| `fits`: a delivery of a control | Whether it fits | The input's type | 1 entry for a provisional scope. Counted. |
+| `fits`: an outcome | Whether it fits | The input's type | Its entry: with its operation. What it opens: a kind of a holder, by the draw on the holder's count, or a fault; another kind, inside the closure of one outcome entry, from the data or from the owner's rule, or a fault. **Fixed here:** nothing is exempt from both. `covered` is gone. |
+| `outcomeOf`: the closure check | An opening that states `for` | The member `for` | The holder's count, checked by `drawsOf` in every judge. A counted reservation. **New here.** |
+| A request that an outcome's send mark makes | Its 2 entries, and what its clause starts | Nothing asked it on main | **Fixed here:** its operation, or its holder's `requests`. |
+| A request that an outcome's rule returns itself, with no send mark | Its 2 entries | Nothing | A fault for a kind that states its attempts. **Not reserved** for a kind that states none: the destination's rules return such requests (`outcomes.ts`, at its `I3 merge:` mark). Owner: the builder, with plan step 9f. |
+| `fits`: the judge's `settles` | Whether it fits | A flag of the draft, which the judge derives | The item's or the copy's reservation by `settles`, or a pending record of `hold@1`. Counted. A mark of such a form: entry GB5. |
+| The rows of the authority note's section 5.8 for membership, the register and the directory | What a key, a member, an invitation and a claim reserve | No form on main | **Not reserved.** The form now exists: `holds`, or `settles`. The rows are the authority note's. |
+| `DESTINATION_NOT_FINITE` | The closure check, for five kinds | A declared number of the platform package | Nothing: entry GB7. It is outside `derive/src` and `scope/src`, and fails closed there. |
+| The driver, the outbox, a delivery and a checkpoint, at `scopeEntries` | Nothing is exempt | A floor | An entry that settles is not written at the last position either. A stop, and no exemption. |
+
+### 32.4 Earlier entries that this work answers
+
+Each line is dated 2026-10-06. The earlier sections stay as written.
+
+- **FA3, built in the generic code; open for the destination.** The form of the reservation exists and is witnessed on made-up data. The destination states none: entry GB7.
+- **FA5, built.** `StateView.operationsFor(item)` reads the operations of one holder by the holder, from the member `for` of each operation. The store has an index for it. A rule is given it with the state. It serves an operation of a held kind only: the destination's operations state no `for` yet.
+- **FC1, rows 1 and 2 answered; rows 3 to 6 stand.** How the amount is derived from the folded state, and the form in which a definition declares it, are the contract's section 17.2a, built here. When a final publication's last duty has ended is the rule of release. The count of reads, what a `resend` reserves and the rule `receipt` are the authority note's.
+- **FC2, the first finding answered; the second stands.** A request that an outcome's send mark makes is reserved (entry GB10). The rows of section 5.8 for membership, the register and the directory are not.
+- **EJ6, answered in part.** The static counts take a mark's `most`, at place 7 and in a clause, where the data states it (entries GB4 and GB5).
+
+### 32.5 Tests whose pinned behaviour changed, and controls
+
+One test was changed deliberately: in
+`platform/test/definitions.test.ts`, the test that held the five kinds
+that state `covered`, and the number 71. It now holds that no rule
+states `covered`; that exactly five kinds of the destination declare
+`DESTINATION_NOT_FINITE`; that no data of the package states `holds`,
+`adds`, `attempts` or `most`; that a `judge` then reserves no finite
+number, so new work does not fit while one is open and a settling entry
+does; and the 4, the 68, the 73 and the 71 of the note's table, as what
+a queued publication may still write unreserved. `replay/test/staging.ts`:
+`Gate` takes one more optional argument, and its rules one more kind.
+
+24 controls were run through `scripts/control.mjs`, one for each new
+guard. Each distinguishes. Three survived at first, because another
+check decided first; each witness was changed so that its own guard
+decides, and the control was run again.
+
+| # | The change | Witness |
+|---|---|---|
+| 1 | A count of 0 is taken | `forms-holds`, check 1 |
+| 2 | An outcome's mark may open a holder | `forms-holds`, check 2 |
+| 3 | Check 5, edge 1, is not made | `forms-holds`, check 5 |
+| 4 | Check 5, edge 2, is not made | The same |
+| 5 | A kind that reaches itself has an empty closure | `forms-holds`, 18.47 case 2 |
+| 6 | A draw at a count of 0 is taken | `forms-holds`, cases 7 and 8 |
+| 7 | A held kind with no `for` is taken | The same |
+| 8 | The holders are not in what is reserved | `forms-holds`, cases 4 and 5 |
+| 9 | A final holder keeps `requests` and `items` | `forms-holds`, cases 12 and 13 |
+| 10 | A final holder keeps no count | The same |
+| 11 | An outcome may open a kind twice, or one that is not listed | `forms-holds`, 18.49 cases 7 and 8 |
+| 12 | A second request under `once` is taken | `forms-holds`, `once` |
+| 13 | The request of a send is not reserved | `forms-holds`, without `once` |
+| 14 | The replay does not name a draw past a count | `replay`, 18.47 case 15 |
+| 15 | A mark of a settling form is not refused | `forms-holds`, check 2 |
+| 16 | A rule's own request is taken for a kind that its data counts | `forms-holds`, 18.49 cases 5 and 6 |
+| 17 | A clause's mark may open a kind that it does not list | `forms-holds`, the release of a final holder |
+| 18 | An operation may state more attempts than its data | `forms-holds`, cases 4 and 5 |
+| 19 | A sixth kind of the destination declares the closure that is not finite | `platform`, the definitions test |
+| 20 | A request at a count of 0 is taken | `forms-holds`, a request and an item |
+| 21 | The closure check of the ledger is not made | `forms-ledger` |
+| 22 | The fold does not release | `forms-holds`, cases 12 and 13 |
+| 23 | An item at a count of 0 is taken | `forms-holds`, a request and an item |
+| 24 | The store reads no holder | `scope`, `holds.test.ts` |
+
+### 32.6 Lines for the merge
+
+Shared files, with what was added to each.
+
+- `contract/src/platform.ts`: the types `MarkMost` and `Held`; `attempts` and `most` on `OutcomeMark`; `once`, and `most` on a clause's mark, in `OutcomeSend`; `most` on an effect mark in `PlatformEffect`; `adds` on `PlatformAct`; `holds` on `PlatformItem`. All optional.
+- `contract/src/entry.ts`: `for?: number | "self"` on the `operation` effect. `bytes/src/records.ts`: the same member in the check of that record.
+- `derive/src/validate/index.ts`: the optional members of the marks of `outcomes`; the call of `reserving` after `capacityOf`; `ValidDefinition.reserving`. `validate/shape.ts`: the problem `holds`. `validate/items.ts`, `handlers.ts` and `effects.ts`: one optional member each, read with the platform option. New: `validate/holds.ts`.
+- `derive/src/ledger.ts`: `covered` removed from `OperationRules`; `Opening.for`; `closureOf` and `reservedBy` take an optional definition; `openedBy` takes the holder; the closure check leaves out an opening with `for`. `marks.ts`: `covered` removed from `OutcomeRule`. `outcomes.ts`: `covered` is not passed on; three checks in `given`.
+- `derive/src/reserve.ts`: `heldEntries`; in `owed`, the marks of a clause, the request of a send, and the holders. `fits` is unchanged.
+- `derive/src/state.ts`: `Operation.for` and `sent`; `Holder`, `Account`; `Outstanding.outcomes[].unsent`; five reads and two writes on the state, in `MemoryState` too; `holders` and `accounts` in the snapshot.
+- `derive/src/fold.ts`: the draw before the effects, and the counts, the accounts, `sent` and the release after the sends. `effects.ts`: three checks of an `operation` that a rule returns. `judge.ts`, `genesis.ts`, `delivery.ts`, `settle.ts`: each judge's answer goes through `withinCounts`. New: `held.ts`, `draws.ts`.
+- `replay/src/verify.ts`: one check before the judge of each entry. `view.ts`: two writes.
+- `scope/src/sqlite.ts`: the index `operation_for`; the folded kinds `holder` and `account`; five reads and two writes; `unsent`.
+- `platform/src/destination.ts`: `DESTINATION_NOT_FINITE`, in place of `covered` in five rules. `index.ts` exports it.
+
+The rows came in few commits and not one for each row: rows I3-44, I3-51
+and I3-52 are one amount, and I3-60 one more check of the same
+validator. To take one row back: I3-45 is `sent`, `unsent`, the request
+part of `owed` and the check of `once` in `outcomes.ts`; I3-60 is the
+branch `inClause` of `validate/holds.ts`; I3-52 is `starts` in `held.ts`
+with the checks of `most` in `outcomes.ts` and `effects.ts`.
+
+**Documents.** `packages/derive/README.md` has the rows `held` and
+`draws`, and what `ledger` and `reserve` now read. `docs/testing.md`
+names the made-up data `works` and `chain`.
+
+**What was run.** The derive, platform, replay and scope projects while
+working; every workspace's typecheck; `git diff --check`;
+`scripts/active-source.test.mjs`, 6 tests; and the root vitest run once,
+at `136397657`: 71 files and 566 tests passed in 11.1 seconds elapsed
+and 27.5 CPU seconds, one observed run, on an Apple M5 Max, with a load
+average of 5 from other sessions and warm caches. The commits after it
+change this note alone. The gate was not run. No deployment, no
+provider, no host and no gateway.

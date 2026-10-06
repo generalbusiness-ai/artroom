@@ -17,6 +17,7 @@ import { judgeDelivery, reasonOf, sentBy, type DeliveryContext } from "./deliver
 import { creationFields, isEntryOf, isIntent, readFacts, readFields, useOf } from "./fields.ts";
 import type { Fetched, Judging } from "./guards.ts";
 import { derive, giving } from "./handlers.ts";
+import { withinCounts } from "./draws.ts";
 import { fieldOutsideType, grantByRule, markOf, unjudged, type JudgedInput } from "./marks.ts";
 import { directoryOf } from "./sends.ts";
 import type { Judgment } from "./judge.ts";
@@ -92,7 +93,7 @@ function causeOf(source: Entry, message: Request, facts: readonly Fetched[]): Se
  * leaves the genesis not judged, and nothing is written (section 6.1).
  */
 export function judgeGenesis(view: StateView, definition: ValidDefinition, asked: Founding | Creation, context: DeliveryContext): Judgment {
-  return unjudged(() => genesisJudged(view, definition, asked, context));
+  return withinCounts(view, definition, unjudged(() => genesisJudged(view, definition, asked, context)));
 }
 
 function genesisJudged(view: StateView, definition: ValidDefinition, asked: Founding | Creation, context: DeliveryContext): Judgment {

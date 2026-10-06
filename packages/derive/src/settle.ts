@@ -13,6 +13,7 @@ import { runClause } from "./handlers.ts";
 import { namesOwn, outcomeOf, recordedOutcome, type OutcomeOffered, type Owners } from "./ledger.ts";
 import { ownersOf } from "./outcomes.ts";
 import type { Judgment } from "./judge.ts";
+import { withinCounts } from "./draws.ts";
 import { atHand, retainedOf, unjudged, type PlatformRules } from "./marks.ts";
 import { stateDigest, type ScopeState, type StateView } from "./state.ts";
 import { nextDue } from "./timed.ts";
@@ -66,7 +67,7 @@ export function judgeDiagnosis(view: StateView, definition: ValidDefinition, dia
   const ran = finding === "undelivered" ? unjudged(() => runClause(view, definition, context, admit.scope, request, "undelivered", undefined, { type: "diagnosis", of: { seq: of.seq, n: of.n }, attempts })) : { result: "ran", effects: [], uses: [], judgesTime: false } as const;
   if (ran.result === "unavailable") return ran;
   if (ran.judgesTime && context.clock.behind) return { result: "unavailable", reason: "clock-behind" };
-  return { result: "write", draft: { input: { type: "diagnosis", of: { seq: of.seq, n: of.n }, finding, attempts }, uses: ran.uses, prepared: [], effects: ran.effects, sends: [], judgesTime: ran.judgesTime } };
+  return withinCounts(view, definition, { result: "write", draft: { input: { type: "diagnosis", of: { seq: of.seq, n: of.n }, finding, attempts }, uses: ran.uses, prepared: [], effects: ran.effects, sends: [], judgesTime: ran.judgesTime } } satisfies Judgment);
 }
 
 /**
@@ -145,7 +146,8 @@ export function settleOutcome(view: StateView, definition: ValidDefinition, outc
   // Section 4.1, "An input may retain observations": each one that a rule read, in ascending order of `read.n`, and no member when
   // none was read. So an outcome whose rules read none has the bytes it had.
   const input = retained.length > 0 ? { ...judged.draft.input, observed: retained } : judged.draft.input;
-  return { result: "write", draft: { ...judged.draft, input, uses: facts.map((fact) => useOf(fact.fact, fact.entry)), judgesTime } };
+  // Section 17.2a, "Past a count": an outcome whose entry would draw past a count of a holder is not judged. It stays offered.
+  return withinCounts(view, definition, { result: "write", draft: { ...judged.draft, input, uses: facts.map((fact) => useOf(fact.fact, fact.entry)), judgesTime } } satisfies Judgment);
 }
 
 /** `settleOutcome`, for a caller that only asks whether the outcome writes an entry: a contradiction is an input that the scope never writes. */

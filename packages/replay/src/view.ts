@@ -95,5 +95,7 @@ export class View extends MemoryState {
   override putTexts(...given: Put<"putTexts">) { super.putTexts(...given); this.#keep("texts", [given[0], given[1]], (state) => state.putTexts(...given)); }
   override putPrepared(...given: Put<"putPrepared">) { super.putPrepared(...given); const [p] = given; this.#keep("prepared", [p.intent, p.capability, p.step], (state) => state.putPrepared(...given)); }
   override putRecord(...given: Put<"putRecord">) { super.putRecord(...given); const [r] = given; this.#keep("record", [r.capability, r.kind, canonicalize(r.key)], (state) => state.putRecord(...given)); }
+  override putHolder(...given: Put<"putHolder">) { super.putHolder(...given); this.#keep("holder", [given[0]], (state) => state.putHolder(...given)); }
+  override putAccount(...given: Put<"putAccount">) { super.putAccount(...given); const [a] = given; this.#keep("account", [a.seq, a.n], (state) => state.putAccount(...given)); }
   override putObserved(...given: Put<"putObserved">) { super.putObserved(...given); const [h] = given; this.#keep("observed", [h.of.scope, h.of.inc, h.subject], (state) => state.putObserved(...given)); }
 }
