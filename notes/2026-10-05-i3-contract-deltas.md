@@ -2635,3 +2635,54 @@ reconstruct the earlier phase or its decision count. The tombstone has
 no size. The existing redacted-text treatment is unchanged here; no new
 `incomplete` restriction, wire metadata or phase record is introduced.
 The R1/R2 owner disposition is still needed for that case.
+
+### Redacted decision evidence: owner disposition 4157eaa2
+
+The effective owner report `4157eaa22de46287b4ed7ea15f57a1b107bd87d9`,
+under request `06068683`, narrows the remaining exception. After the
+existing retained context and structural checks are read, a deciding
+delivery may still match a holder with a decision left. If a declared
+detached field's original UTF-8 size is now unknown and the receipt is a
+bare `bad-field`, two phases can remain possible: an early over-max
+refusal drew nothing, or a later effect refusal drew one. DJ10's trust in
+a removed text's field bound cannot certify that a size check in this
+refusal passed. No draw is guessed from the refusal code.
+
+Only that unresolved case raises a private evidence error. The verifier
+reports `incomplete` at the entry, before the draw or verified coverage
+advances. It claims no verified state or capacity suffix, and a later
+checkpoint cannot select the count. The report names the original size
+or reviewed phase evidence that is owed. A later tombstone beyond this
+prefix is not thereby verified; a missing text with no verified
+tombstone already owes evidence under the ordinary missing-input rule.
+
+Another definitive early field or subject failure proves no draw. So
+does a failed binding or no remaining decision. An applied/superseded
+receipt or a legitimate later refusal name/code can establish that the
+pre-binding checks passed. Those cases keep normal redacted replay
+credit, including witness 18.37 case 2. No new serialized phase/size
+field, version or guard/effect rerun is introduced. R1 revision 24 owes
+the exact DJ10 follow-through, as the owner report says.
+
+The live path is distinct. `Turns.#seal` retains inputs and folds their
+draw before forgetting redacted bytes, in one transaction. SQLite
+persists holder/account rows, and ordinary constructors reuse them;
+forget removes retained bytes, not those rows. This is the owner report's
+source observation, not executed interruption or cold-recovery
+acceptance. A cold rebuild of the erased history encounters the same
+evidence error before installing a count. It needs the original
+evidence or an explicitly trusted anchor. Reporting `incomplete` does
+not deliver that recovery or prove whole reservation correctness.
+
+`replay/test/decisions.test.ts` now builds two actually judged receiver
+histories: a founding field of max 16 holds the text, and a bound stop
+field of max 2 either rejects `long` early or reaches a native late
+effect refusal with `ok`. Each then has a legally judged same-scope
+redaction and checkpoint. Both erased histories stop at the deciding
+entry with no verified suffix. Direct cold folds leave the prefix
+unchanged. Applied, named-guard, other guard-code, definitive early-field
+and zero-count histories still replay consistently with redaction
+credit. The sender entries and grants are fixture stand-ins, labelled
+by the test. A focused control removing the ambiguity throw continued
+the early history to its checkpoint and failed the coverage assertion.
+Targeted tests and typechecks passed; no worker gate was run.
