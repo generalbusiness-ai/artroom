@@ -164,6 +164,28 @@ the real founding/publication and value/replay scenarios. All 25
 publication and creation cases passed after the fixture fold was given
 its pinned binding rules and its expected real decision count.
 
-The required gate will be run once at the candidate source head after
-this draft is committed. Its observed result and source tree will be
-recorded below before filing. No gate result is claimed yet.
+One `npm run gate` passed at `c6b5e16b1f8d01ee7c0bdfcf5ccfe9d27a5f503f`,
+tree `7710fc8219062444712230d287274fe62c0a231a`. It printed 694 Vitest
+tests passed and 6 in Node's runner. Whitespace passed; every workspace
+typecheck passed. The install was skipped: dependencies had already been
+installed from the unchanged lockfile.
+
+| Observed step | Elapsed seconds | CPU seconds |
+|---|---:|---:|
+| Whitespace | 0.0 | 0.0 |
+| Typecheck | 3.3 | 9.4 |
+| Tests | 11.6 | 32.0 |
+
+The whole command took 15.08 seconds elapsed, 34.96 user CPU and 6.72
+system CPU. These are one observed run, on shared Mac17,7 hardware with
+18 CPUs, after focused tests had already run. Load was not captured
+before the gate; the reading after it was 3.64, 3.69 and 3.86. No cost
+saving or controlled comparison is claimed. The previous milestone's
+note reports 537 Vitest tests; this gate has 157 more.
+
+Before the gate the latest main commit `f09de095d`, a plan 021 document
+change, was merged. The final gate annotation changes this note only.
+The packages tree is `410b80a5a23e3d74675b9528ce112290fc94b78f` at the
+gated head and the filed head. Source and tests are unchanged after that
+gate; no second gate was run. Its logs are retained at
+`/tmp/artroom-i3-m4-gate.log` and in the directory the gate printed.
