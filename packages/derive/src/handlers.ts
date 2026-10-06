@@ -15,6 +15,7 @@ import { creationFields, factsNamed, isLocalFact, messageFields, presentedTypes,
 import { signerOf } from "./fold.ts";
 import { judgeGuards, slotOf, type Fetched, type Judging } from "./guards.ts";
 import { fieldOutsideType, markOf, selectedBy, type AtHand, type Giving, type JudgedInput } from "./marks.ts";
+import { listedBy, rowsOfClause, settle, waits, type Needed, type Settled, type Settling } from "./observes.ts";
 import { conditionsReadClock, deriveSends, formOf, readsClock } from "./sends.ts";
 import type { Item, OwnRequest, ScopeState, StateView } from "./state.ts";
 import type { ValidDefinition } from "./validate/index.ts";
@@ -375,8 +376,9 @@ export type Clause = keyof ResultClauses | "conflict";
  * which a rule of the clause reads and the entry then retains (sections 4.1
  * and 16.1). A diagnosis may hold none, and is given none.
  */
-export function runClause(view: StateView, definition: ValidDefinition, context: Reading & { origin?: Entry | null | undefined }, scope: ScopeState, request: OwnRequest, clause: Clause, answered?: { sender: ScopeRef; reason?: Reason; source?: Fetched }, judged?: JudgedInput, beside?: AtHand):
-  { result: "ran"; effects: Effect[]; uses: FactUse[]; judgesTime: boolean } | { result: "unavailable"; reason: UnavailableReason } {
+export function runClause(view: StateView, definition: ValidDefinition, context: Reading & { origin?: Entry | null | undefined }, scope: ScopeState, request: OwnRequest, clause: Clause, answered?: { sender: ScopeRef; reason?: Reason; source?: Fetched }, judged?: JudgedInput, beside?: AtHand,
+  given?: Pick<Settling, "observed" | "values" | "observing">):
+  { result: "ran"; effects: Effect[]; uses: FactUse[]; judgesTime: boolean; rows?: Settled } | { result: "unavailable"; reason: UnavailableReason; missing?: readonly Needed[]; rows?: Settled } {
   const origin = context.origin;
   if (!origin || origin.seq !== request.seq || entryHash(origin) !== request.hash) return { result: "unavailable", reason: "unavailable" };
   const { declared } = definition;
@@ -429,7 +431,12 @@ export function runClause(view: StateView, definition: ValidDefinition, context:
   const written = marked ? null : (form as Exclude<SendForm, { index: unknown }>);
   const clauses = (marked ? marked.result : "create" in written! ? written.create.result : "tell" in written! ? written.tell.result : written!.relate.result) as ResultClauses & { conflict?: readonly EffectForm[] };
   const forms = clauses[clause] ?? [];
-  if (forms.length === 0) return { result: "ran", effects: [], uses: [], judgesTime: false };
+  // Revision 20, section 16.1: the rows of this clause, for the delivery of a result that runs it, under a definition whose data
+  // states rows. A request that a rule gave states none: its mark holds its clauses, and no text gives a mark rows (I3 deltas,
+  // entry GA5). A diagnosis holds no observation, so `undelivered` has none.
+  const rows = definition.observing && written && beside && given && clause !== "undelivered" ? rowsOfClause(written, clause) : [];
+  if (beside && definition.observing) beside.rows = { status: [], listed: new Set(), retained: [], values: [] };
+  if (forms.length === 0 && rows.length === 0) return { result: "ran", effects: [], uses: [], judgesTime: false };
 
   // The uses of the origin are the facts its fields name; a clause may read one (section 6.6, a party from a fetched fact).
   // A local fact that the origin's fields name was checked when the origin was judged. It is put in normal form again here.
@@ -458,11 +465,25 @@ export function runClause(view: StateView, definition: ValidDefinition, context:
     // is at hand as the verified source entry of the result, and which the entry that records the result retains.
     ...(frame.sent && answered?.source ? { source: answered.source } : {}),
   };
+  // Section 16.1, "In the commit": for a clause the list is derived before any rule of the entry runs. A source reads what a clause
+  // reads: the state as it is now, the fields and the facts of the entry that sent the request, and the result. A member of another
+  // repository is left out. A subject with no observation at hand, which the scope can still read, stops the commit. An absent row
+  // that states `wait` leaves the result not recorded now: the delivery is tried again. Every other absent row, and every row that
+  // is over, is told to the rule, and the entry is written.
+  let settled: Settled | undefined;
+  if (rows.length > 0 && beside && given) {
+    const list = listedBy(j, rows, given.observing?.membership).rows;
+    settled = settle(list, { view, bounds: context.bounds, clock: context.clock, ...given });
+    if (settled.missing.length > 0) return { result: "unavailable", reason: "authority-unavailable", missing: settled.missing, rows: settled };
+    if (waits(list, settled)) return { result: "unavailable", reason: "authority-unavailable", rows: settled };
+    const { status } = settled;
+    beside.rows = { status: rows.map((_, n) => status.get(n) ?? null), listed: settled.listed, retained: settled.retained, values: settled.values };
+  }
   const effects = deriveEffects(j, forms, [], null);
   // Section 6.6: a clause's condition that is not completed leaves the result not recorded now. It is offered again.
   if (!effects.ok && "unavailable" in effects) return { result: "unavailable", reason: effects.unavailable };
   // Section 6.3: `max` bounds the live items of a type, whatever opens the item. In platform data a rule of the clause may open
   // one. Past the bound the clause's effects cannot apply now, and it changes nothing, as above.
   const applies = effects.ok && (effects.opened === null || overMax(view, definition, effects.opened.type, effects.opened.state) === null);
-  return { result: "ran", effects: applies ? effects.effects : [], uses: [...facts.uses, ...presented.uses.filter((use) => !facts.facts.has(use.fact.hash))], judgesTime: forms.some(timesEffect) || j.ran?.clock === true };
+  return { result: "ran", effects: applies ? effects.effects : [], uses: [...facts.uses, ...presented.uses.filter((use) => !facts.facts.has(use.fact.hash))], judgesTime: forms.some(timesEffect) || j.ran?.clock === true, ...(settled ? { rows: settled } : {}) };
 }

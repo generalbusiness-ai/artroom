@@ -6,20 +6,21 @@
  * is offered again, or is not an input the scope can write.
  */
 
-import type { Attempt, Digest, Entry, ObservationUse } from "@generalbusiness/artroom-contract";
+import type { Attempt, Digest, Entry, FactUse, ObservationUse, PlatformData } from "@generalbusiness/artroom-contract";
 import { useOf, type Reading } from "./fields.ts";
 import type { Fetched } from "./guards.ts";
 import { runClause } from "./handlers.ts";
-import { namesOwn, outcomeOf, recordedOutcome, type OutcomeOffered, type Owners } from "./ledger.ts";
-import { ownersOf } from "./outcomes.ts";
+import { namesOwn, outcomeOf, recordedOutcome, type OutcomeInput, type OutcomeOffered, type Owners } from "./ledger.ts";
+import { ownersOf, type OutcomeReading } from "./outcomes.ts";
 import type { Judgment } from "./judge.ts";
 import { withinCounts } from "./draws.ts";
-import { atHand, retainedOf, unjudged, type PlatformRules } from "./marks.ts";
+import { RuleFault, atHand, atHandByRows, retainedOf, unjudged, type FirstStep, type PlatformRules } from "./marks.ts";
+import { listedByRule, observedName, rowsOfKind, settle, subjectName, waits, type Observing, type Settling as RowsGiven } from "./observes.ts";
 import { stateDigest, type ScopeState, type StateView } from "./state.ts";
 import { nextDue } from "./timed.ts";
 import { timeMs } from "./time.ts";
 import type { ValidDefinition } from "./validate/index.ts";
-import { isLocalId } from "./values.ts";
+import { isLocalId, own } from "./values.ts";
 
 type Settling = Pick<Reading, "clock" | "bounds">;
 const invalid = (detail: string): Judgment => ({ result: "refused", reason: "bad-input", detail });
@@ -96,6 +97,21 @@ export type OutcomeContext = Settling & {
    * copy of each entry that the recorded `uses` name. Absent: none.
    */
   facts?: readonly Fetched[] | undefined;
+  /**
+   * Revision 20, under a definition whose data states rows or an `origin`
+   * (`ValidDefinition.observing`). `retained`: the scope's retained copy of
+   * one foreign entry that an entry of it names in `uses`, with the name of
+   * the definition that its scope pins. The judge asks it for each entry
+   * in the `uses` of the outcome's origin: nothing is fetched (section 6.1,
+   * "The origin of an outcome"). Absent: `facts` is searched. `observing`:
+   * what the commit holds for the rows of the kind, beside `observed`,
+   * whose records the judge then judges itself, by the six guards with the
+   * window and the use of each row. `values`: the canonical bytes of each
+   * value that came beside an observation.
+   */
+  retained?: ((use: FactUse) => Fetched | null) | undefined;
+  observing?: Observing | undefined;
+  values?: readonly string[] | undefined;
 };
 
 /** `conflict`: the outcome contradicts a recorded `confirmed` or `refused` of the same attempt. It writes nothing, and is answered `outcome-conflict` with the entry it contradicts (section 4.3, item 6). */
@@ -130,6 +146,9 @@ export function settleOutcome(view: StateView, definition: ValidDefinition, outc
   // The owner of the operation may be the platform definition that this scope pins. Its rule for outcome entries of this kind is
   // the one that `outcomes` names. A fault of the rule leaves the outcome not judged, and nothing is written (section 6.1).
   const ran = { clock: false };
+  // Revision 20: under a definition whose data states rows or an origin, the entry retains what its rows give and copies the `uses`
+  // of its origin. Under any other, the older rule below stands, as a stand-in.
+  if (definition.observing) return withinCounts(view, definition, unjudged(() => byRows(view, definition, outcome, context, ran)));
   const facts = context.facts ?? [];
   // Sections 4.1 and 16.1: what a rule of this outcome reads of the observations at hand is noted, and the entry retains it.
   const beside = context.observed === undefined ? undefined : atHand(context.observed, undefined);
@@ -148,6 +167,103 @@ export function settleOutcome(view: StateView, definition: ValidDefinition, outc
   const input = retained.length > 0 ? { ...judged.draft.input, observed: retained } : judged.draft.input;
   // Section 17.2a, "Past a count": an outcome whose entry would draw past a count of a holder is not judged. It stays offered.
   return withinCounts(view, definition, { result: "write", draft: { ...judged.draft, input, uses: facts.map((fact) => useOf(fact.fact, fact.entry)), judgesTime } } satisfies Judgment);
+}
+
+/**
+ * An outcome under a definition whose data states rows of `observes`, or
+ * the `origin` of an outcome (revision 20, sections 6.1 and 16.1; rows
+ * I3-39, I3-41 and I3-56), in this order.
+ *
+ * 1. **The origin.** With `origin: "opening"` it is the entry that opened
+ *    the outcome's operation, at the position that the operation's ID
+ *    states. With `origin: "rule"` the rule of the kind names it by its
+ *    position, or names none. With no member `origin` the outcome has none.
+ *    The outcome's `uses` is a copy of its origin's, whole and in that
+ *    order, and with no origin it is empty. A rule is given each of those
+ *    entries by its bytes, from the copy that the scope retains.
+ * 2. **The first list.** The subjects of the rows that do not state
+ *    `second`. For a row that states `from: "rule"` the rule names them.
+ * 3. **The second list**, from the observations of the first: the subjects
+ *    of the rows that state `second`.
+ * 4. **The rows, settled.** A subject of either list with no observation at
+ *    hand, which the scope can still read, stops the commit. An absent row
+ *    that states `wait` leaves the outcome not written: it stays offered.
+ *    Every other absent row, and every row that is over, is told to the
+ *    rule, and the entry is written.
+ *
+ * Then the ledger derives the entry. Its input holds one record of
+ * `observed` for each subject that a whole row gives, and no other.
+ */
+function byRows(view: StateView, definition: ValidDefinition, outcome: OutcomeOffered, context: OutcomeContext, ran: { clock: boolean }): OutcomeJudgment {
+  const scope = view.scope()!;
+  const operation = view.operation(outcome.operation);
+  const beside = atHandByRows(context.values);
+  const reading: OutcomeReading = { clock: context.clock, bounds: context.bounds, own: context.own, ran, facts: [], beside };
+  const owners = ownersOf(definition, context.platform, context.owners, reading);
+  const kind = operation && operation.owner === context.platform?.named ? own((definition.declared as unknown as PlatformData).outcomes ?? {}, operation.kind) : undefined;
+  const rules = operation && kind ? owners?.rules(operation.owner, operation.kind) : null;
+  let uses: readonly FactUse[] = [];
+  let settled: ReturnType<typeof settle> | null = null;
+  const rows = operation && kind ? rowsOfKind(definition.declared, operation.kind) : [];
+  if (operation && kind && rules) {
+    const offered: OutcomeInput = { type: "outcome", operation: operation.id, attempt: outcome.attempt, owner: operation.owner, kind: operation.kind, result: outcome.result, evidence: outcome.evidence };
+    // 1. The origin, and the entries that it retained.
+    let at: number | null = null;
+    if (kind.origin === "opening") at = Number(operation.id.split(":")[0]);
+    else if (kind.origin === "rule") {
+      if (!rules.origin) throw new RuleFault(`the kind ${operation.kind} states origin: rule, and its rule names no origin`);
+      at = rules.origin(view, operation, offered);
+    }
+    if (at !== null) {
+      const origin = typeof at === "number" && Number.isSafeInteger(at) && at >= 0 && at <= scope.head.seq ? (context.own?.(at) ?? null) : null;
+      // A position that is no entry of the scope is a fault of the rule.
+      if (!origin) throw new RuleFault(`the origin of an outcome of ${operation.kind} is no earlier entry of the scope`);
+      uses = origin.entry.uses;
+      const copies = uses.map((use) => context.retained?.(use) ?? (context.facts ?? []).find((fact) => fact.fact.hash === use.fact.hash) ?? null);
+      // The scope retained each of those entries when it wrote the origin. One that is not at hand leaves the outcome not written now.
+      if (copies.some((copy, i) => !copy || useOf(copy.fact, copy.entry).content !== uses[i]!.content)) return { result: "unavailable", reason: "dependency-unavailable" };
+      reading.facts = copies as Fetched[];
+    }
+    if (rows.length > 0) {
+      const g: RowsGiven = { view, bounds: context.bounds, clock: context.clock, observed: context.observed ?? [], values: context.values ?? [], observing: context.observing };
+      const named = (first: FirstStep | null) => (n: number): unknown => {
+        if (!rules.subjects) throw new RuleFault(`a row of the kind ${operation.kind} states from: rule, and its rule names no subjects`);
+        return rules.subjects(view, operation, offered, n, first);
+      };
+      // 2. The first list, and what is at hand for it.
+      const first = listedByRule(rows, false, named(null));
+      settled = settle(first, g);
+      if (settled.missing.length > 0) return { result: "unavailable", reason: "authority-unavailable", missing: settled.missing, rows: settled };
+      if (waits(first, settled)) return { result: "unavailable", reason: "authority-unavailable", rows: settled };
+      // 3. The second list, from the observations of the first: each that is at hand for a whole row, and for each other row that it
+      // is over or absent. A row of the second step is given no observation of the second step.
+      if (rows.some((row) => "second" in row && row.second === true)) {
+        const { listed, retained, status } = settled;
+        const step: FirstStep = {
+          rows: rows.map((_, n) => status.get(n) ?? null),
+          observed(subject) {
+            if (!listed.has(subjectName(subject))) throw new RuleFault("the rule of a row of the second step reads an observation of a subject that no row of the first step gives");
+            return retained.find((use) => observedName(use.observation) === subjectName(subject)) ?? null;
+          },
+        };
+        const all = [...first, ...listedByRule(rows, true, named(step))];
+        // 4. One subject of both steps is one subject.
+        settled = settle(all, g);
+        if (settled.missing.length > 0) return { result: "unavailable", reason: "authority-unavailable", missing: settled.missing, rows: settled };
+        if (waits(all, settled)) return { result: "unavailable", reason: "authority-unavailable", rows: settled };
+      }
+    }
+  }
+  // What a rule of the entry reads: an observation only of a subject on the list. A kind that states no row has none.
+  beside.rows = { status: rows.map((_, n) => settled?.status.get(n) ?? null), listed: settled?.listed ?? new Set(), retained: settled?.retained ?? [], values: settled?.values ?? [] };
+  const judged = outcomeOf(view, definition, outcome, owners);
+  if (judged.result !== "write") return judged;
+  const retained = retainedOf(beside);
+  // An entry that retains an observation judges time, wherever the observation stands, and is never written clamped (section 16.1).
+  const judgesTime = ran.clock || retained.observed.length > 0;
+  if (judgesTime && context.clock.behind) return { result: "unavailable", reason: "clock-behind" };
+  const input = retained.observed.length > 0 ? { ...judged.draft.input, observed: retained.observed } : judged.draft.input;
+  return { result: "write", draft: { ...judged.draft, input, uses, judgesTime, ...(retained.values.length > 0 ? { values: retained.values } : {}), ...(settled ? { rows: settled } : {}) } };
 }
 
 /** `settleOutcome`, for a caller that only asks whether the outcome writes an entry: a contradiction is an input that the scope never writes. */

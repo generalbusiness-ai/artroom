@@ -14,6 +14,7 @@ import { effects, setsSlot } from "./effects.ts";
 import { declaredFields, fieldType } from "./fields.ts";
 import { guards } from "./guards.ts";
 import { holdDoes, opensHold } from "./hold.ts";
+import { observes } from "./observes.ts";
 import { attention, sends } from "./sends.ts";
 import { at, type Rec } from "./shape.ts";
 
@@ -176,7 +177,7 @@ export function acts(d: Defining, v: unknown, timed: Readonly<Record<string, unk
   for (const [name, av] of entries(v, "acts", bounds.acts)) {
     const path = at("acts", name);
     // Section 17.2a: in platform data an act may state `adds`. `holds.ts` reads it.
-    const o = rec(av, path, ["step", "on", "also", "fields", "grant", "guards", "effects", "sends", "attention"], ["settles", "presents", ...(d.platform ? ["adds"] : [])]);
+    const o = rec(av, path, ["step", "on", "also", "fields", "grant", "guards", "effects", "sends", "attention"], ["settles", "presents", ...(d.platform ? ["adds", "observes"] : [])]);
     if (!o) continue;
     const step = o["step"];
     if (step !== "open" && step !== "transition" && step !== "comment") bad("shape", at(path, "step"), "is open, transition or comment");
@@ -209,6 +210,9 @@ export function acts(d: Defining, v: unknown, timed: Readonly<Record<string, unk
     if (step === "comment") for (const k of ["guards", "effects", "sends"]) if (!Array.isArray(o[k]) || o[k].length > 0) bad("shape", at(path, k), "a comment has none");
     if (step === "comment" && ctx.also.size > 0) bad("shape", at(path, "also"), "a comment names no other item");
     guards(d, o["guards"], at(path, "guards"), ctx, true);
+    // Section 16.1, "The subjects that an entry observes": the rows of an act, in platform data. A source reads what a guard of the
+    // act may read, and no name of `also` that a mark binds.
+    if ("observes" in o) observes(d, o["observes"], at(path, "observes"), { where: "act", ctx, selected: new Set([...named.marked, ...named.through]) });
     const duties: Duties = { path, settles: "settles" in o ? settling(d, o["settles"], at(path, "settles"), ctx, null, top) : null, sets: [], requests: [] };
     duties.sets = setsOf(d, step === "open" ? on : null, () => effects(d, o["effects"], at(path, "effects"), ctx, false));
     // A child's genesis sends the platform's one result beside what its act declares.

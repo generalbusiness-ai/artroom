@@ -27,6 +27,7 @@
 
 import type { ActType, AlsoRule, DeclaredDefinition, EffectForm, FieldType, Guard, ItemType, ReceiveType, ResultClauses, SendForm, SlotRule, Subject, Where } from "./definition.ts";
 import type { FieldValue } from "./intent.ts";
+import type { ClauseObserves, Observe, Origin } from "./observes.ts";
 
 /**
  * A mark: in the data of a platform definition, and nowhere else. `code`
@@ -122,8 +123,13 @@ export type OutcomeSend = Mark & {
  * closure of an operation"). A kind that states `attempts` is counted by
  * these members. One that states none is counted as its rule declares, as
  * before.
+ *
+ * `origin` (revision 20, section 6.1, "The origin of an outcome"; row
+ * I3-41): the one earlier entry of the scope whose `uses` an outcome of the
+ * kind copies. `observes` (section 16.1; rows I3-39 and I3-56): what the
+ * scope reads before the turn of each outcome entry of the kind.
  */
-export type OutcomeMark = Mark & { send?: OutcomeSend; attempts?: number; most?: MarkMost };
+export type OutcomeMark = Mark & { send?: OutcomeSend; attempts?: number; most?: MarkMost; origin?: Origin; observes?: readonly Observe[] };
 
 /**
  * A place of an act that names a value beside the intent (revision 19,
@@ -142,8 +148,12 @@ export type PlatformEffect = EffectForm | (Mark & { most?: MarkMost });
 /** The result clauses of a request, in platform data: a clause may hold an effect mark. */
 export type PlatformClauses = { [clause in keyof ResultClauses]?: readonly PlatformEffect[] };
 
-/** A written send whose clauses may hold an effect mark. An `index` send has none. */
-type WithClauses<S> = S extends { index: unknown } ? S : { [K in keyof S]: Omit<S[K], "result"> & { result: PlatformClauses } };
+/**
+ * A written send whose clauses may hold an effect mark. An `index` send has
+ * none. `observes` (revision 20, section 16.1): the rows of a request, by
+ * clause, for the delivery of a result that runs that clause.
+ */
+type WithClauses<S> = S extends { index: unknown } ? S : { [K in keyof S]: Omit<S[K], "result"> & { result: PlatformClauses; observes?: ClauseObserves } };
 /** A send of a written list, in platform data. */
 export type PlatformSend = WithClauses<SendForm> | SendMark;
 
@@ -157,6 +167,8 @@ interface MarkedForms {
 
 export type PlatformAct = Omit<ActType, "grant" | "fields" | keyof MarkedForms> & MarkedForms & {
   grant: string | GrantMark;
+  /** Revision 20, section 16.1: what the scope reads before the turn of an entry of this act, beside its signer's key. */
+  observes?: readonly Observe[];
   fields: Record<string, (PlatformFieldType | ValuePlace) & { required: boolean; default?: FieldValue }>;
   /** Section 17.2a: what the act adds to the reservation of the item that it is on, whose type states `holds`. */
   adds?: Held;

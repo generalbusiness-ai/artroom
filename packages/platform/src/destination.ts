@@ -44,8 +44,9 @@
  * entries in `uses`, and the rule reads its observations itself
  * (`reservationRead`). Two things still stand between it and a
  * reservation. No runtime reads an observation before the turn of an
- * outcome, because no form states the subjects (the contract's point
- * R1-67; I3 deltas, entry FC6). And no text states how an entry of a lane
+ * outcome of this definition, because its data states no row of
+ * `observes`: the rows are the authority note's, in a revision that is
+ * not adopted (I3 deltas, entries FC6 and GA1). And no text states how an entry of a lane
  * is read by its bytes, so the package has no reader of the manifest, the
  * verdicts and the checks (entries FA9 and FC5). So the rule decides what
  * the evidence and this scope's own records decide: a publication that is

@@ -42,8 +42,9 @@
  * plan owns. They are written as the note has them.
  */
 
-import type { KeyId, MemberId, MemberObservation, Observation, ObservationRequest, PlatformData, PlatformDefinition, ScopeRef } from "@generalbusiness/artroom-contract";
+import type { HoldersObservation, KeyId, MemberId, MemberObservation, Observation, ObservationRequest, PlatformData, PlatformDefinition, ScopeRef } from "@generalbusiness/artroom-contract";
 import { textDigest } from "@generalbusiness/artroom-bytes";
+import { firstHolders } from "@generalbusiness/artroom-derive";
 import type { Item, PlatformRule, RuleGiven, Rules, StateView } from "@generalbusiness/artroom-derive";
 
 /** The name and version that this data and these rules are. An observation states it (section 3.3). */
@@ -714,12 +715,20 @@ export const NO_MEMBER = "@-" satisfies MemberId;
  *   answers so for every key of that member, whatever the key's own state
  *   (row 23 of the table of marks).
  * - **A member.** The member's item, and whether it has an active key.
+ * - **The holders of an action** (the contract's revision 20, section
+ *   16.1, "An observation of the holders of one action"; source row I3-42):
+ *   each active member who has an active key and whose role's list of
+ *   actions at that head holds the action, which is what an observation of
+ *   that key would list. `count` is how many there are, and `holders` the
+ *   first of them in byte order of member ID, as many as the request's
+ *   `most`. One pass over the active keys and the members. The count
+ *   permits nothing.
  *
  * `within` names the scopes of this repository: this membership scope, with
  * its incarnation. No grant of membership has an end time, so `notAfter`
  * is null.
  */
-export function standingOf(state: Pick<StateView, "scope" | "page" | "item">, asked: ObservationRequest): Omit<Observation, "at"> | Omit<MemberObservation, "at"> | null {
+export function standingOf(state: Pick<StateView, "scope" | "page" | "item">, asked: ObservationRequest): Omit<Observation, "at"> | Omit<MemberObservation, "at"> | Omit<HoldersObservation, "at"> | null {
   const scope = state.scope();
   // A request that states an incarnation is answered by that incarnation only. One that asks by the scope ID alone, as the first read
   // of a rules scope or of a destination does, is answered by the scope that holds the name: the answer's `of` says which.
@@ -738,6 +747,18 @@ export function standingOf(state: Pick<StateView, "scope" | "page" | "item">, as
     const item = memberItem(state, asked.member);
     if (!item) return { ...common, subject: "member", member: asked.member, memberState: "unknown", role: null, activeKey: null, controller: null, controllerActive: null };
     return { ...common, subject: "member", member: asked.member, memberState: item.state === "active" ? "active" : "removed", role: text(item.values["role"]), activeKey: hasActiveKey(state, item.id), ...controlled(item) };
+  }
+  if ("holders" in asked) {
+    if (typeof asked.holders !== "string" || !Number.isSafeInteger(asked.most) || asked.most < 1) return null;
+    const keyed = new Set<unknown>();
+    for (const key of itemsOf(state, "key", ["active"])) keyed.add(key.refs["member"]);
+    const holding: MemberId[] = [];
+    for (const member of itemsOf(state, "member", ["active"])) {
+      const [role, handle] = [text(member.values["role"]), text(member.values["handle"])];
+      if (!keyed.has(member.id) || role === null || handle === null || !roster || !Object.hasOwn(ROLE_LISTS, role)) continue;
+      if (texts(roster.values[ROLE_LISTS[role as Role]]).includes(asked.holders)) holding.push(handle as MemberId);
+    }
+    return { ...common, subject: "holders", action: asked.holders, count: holding.length, holders: firstHolders(holding, asked.most) };
   }
   if (!("key" in asked)) return null;
   const within = { membership: of };

@@ -41,10 +41,10 @@ import { DOMAINS, PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { Bounds, CapabilityName, Digest, Entry, FactRef, Grant, Head, KeyId, Observation, ObservationRequest, ObservationUse, MismatchName, PlatformData, PlatformDefinition, Report, RetainedInput, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
 import { canonicalize, definitionDigest, digestBytes, intentDigest, isDigest, isEntry, isObservationUse, isPlatformDefinition, parseStrict, platformName, scopeIdOf, textDigest, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import {
-  HOLD, HOLD_KINDS, MISMATCHES, MemoryState, WINDOWS, actionOf, agrees, applyEntry, drawsOf, clockOf, entryOf, headsOf, highestHead, inputTexts, isAncestryCheck, isFactRef, isLocalId, isObject, isScopeRef, judgeAct, judgeCheckpoint, judgeDelivery,
+  HOLD, HOLD_KINDS, MISMATCHES, MemoryState, WINDOWS, actionOf, agrees, applyEntry, drawsOf, clockOf, contentStates, entryOf, namedBy, observedName, retainsOf, headsOf, highestHead, inputTexts, isAncestryCheck, isFactRef, isLocalId, isObject, isScopeRef, judgeAct, judgeCheckpoint, judgeDelivery,
   judgeDiagnosis, fixedBy, judgeGenesis, judgeGrant, judgeOutcome, judgePreparation, judgeTimed, membershipOf, nextDue, observedOf, own, ownersOf, placesOf, ruleAt, same, snapshotRead, stepsOf, timeMs, updateOf, validateDefinition, valueDigest, windowOf,
 } from "@generalbusiness/artroom-derive";
-import type { ActJudgment, AncestryCheck, Capabilities, Clock, Fetched, Judgment, Owners, PlatformRules, PreparationJudgment, RecordedRef, Retains, Rules, StateView, TimedJudgment, ValidDefinition, Window } from "@generalbusiness/artroom-derive";
+import type { ActJudgment, AncestryCheck, Capabilities, Clock, Fetched, Judgment, Observing, Owners, PlatformRules, PreparationJudgment, RecordedRef, Retains, Rules, StateView, TimedJudgment, ValidDefinition, Window } from "@generalbusiness/artroom-derive";
 import { RULE_PROFILES, evaluateRules } from "@generalbusiness/artroom-derive/rule";
 import { PAGE_ENTRIES, PAGE_REPLY_BYTES, RETAINED_REPLY_BYTES, hashOfBytes, type HistorySource, type Stored } from "./source.ts";
 import { View } from "./view.ts";
@@ -834,7 +834,9 @@ class Verifier {
    */
   async #standing(run: Run, entry: Entry, o: ObservationUse["observation"], where: FactRef, depth: number): Promise<void> {
     const mismatch = (why: string): Stop => new Stop("mismatch", why, where);
-    const asked: ObservationRequest = !("subject" in o) ? { of: o.of, key: o.key } : o.subject === "member" ? { of: o.of, member: o.member } : { of: o.of, asked: o.content.asked };
+    // The holders of an action: the answer lists the first of them, as many as the row's `most` or all. The judge checks the list's
+    // length against the row, so the value is asked here for as many as the record lists.
+    const asked: ObservationRequest = !("subject" in o) ? { of: o.of, key: o.key } : o.subject === "member" ? { of: o.of, member: o.member } : o.subject === "holders" ? { of: o.of, holders: o.action, most: o.holders.length } : { of: o.of, asked: o.content.asked };
     const unanswered = (): Stop => new Stop("unsupported-definition", `the observed scope ${o.of.scope} pins a definition for which this replay has no answer to an observation`, where);
     let derived: unknown;
     if (o.of.scope === run.id) {
@@ -856,7 +858,7 @@ class Verifier {
         this.#values.set(key, derived);
       }
     }
-    if (!isObject(derived) || canonicalize({ ...derived, at: o.at }) !== canonicalize(o)) throw mismatch(`the retained observation is not what the history of ${o.of.scope} gives ${"key" in asked ? "that key" : "member" in asked ? "that member" : "the rules"} at its entry ${o.head.seq}`);
+    if (!isObject(derived) || canonicalize({ ...derived, at: o.at }) !== canonicalize(o)) throw mismatch(`the retained observation is not what the history of ${o.of.scope} gives ${"key" in asked ? "that key" : "member" in asked ? "that member" : "holders" in asked ? "the holders of that action" : "the rules"} at its entry ${o.head.seq}`);
   }
 
   /**
@@ -962,6 +964,77 @@ class Verifier {
       await this.#standing(run, entry, o, where, depth);
       this.#trusts.add("observed");
     }
+  }
+
+  /**
+   * What a judge is given for the rows of `observes` of one entry, under a
+   * definition whose data states rows (revision 20, section 16.1,
+   * "Replay"): the records of the entry's own `observed`; the two
+   * references that the scope records, as the state before the entry has
+   * them; the latest earlier entry that retains each read; what the data of
+   * a rules definition states; and the bytes of each value that a record
+   * names, which the scope keeps by its domain and its digest. No subject
+   * can be read: a row with none is absent on the runtime's word.
+   *
+   * A replay without the bytes of a named value is `incomplete` (witness
+   * 18.48, case 10, and 18.50, case 11). The value is asked in each domain
+   * that a row of the pinned data states under `retains`: the judge then
+   * holds it to the row of the entry's own form.
+   */
+  async #hand(run: Run, entry: Entry, recorded: readonly ObservationUse[] | undefined, where: FactRef): Promise<{ observed: readonly ObservationUse[]; values: string[]; observing: Observing }> {
+    const observed = recorded ?? [];
+    if (observed.length > 0 && entry.clamped) throw new Stop("mismatch", "an entry that retains an observation judges time, and is never clamped", where);
+    for (const use of observed) this.#inRun(run, use, where);
+    const values: string[] = [];
+    const domains = retainsOf(run.definition!);
+    for (const digest of observed.flatMap((use) => namedBy(use.observation))) {
+      let found: string | null = null;
+      for (const domain of domains) {
+        const left = this.#limits.bytes - this.#bytes;
+        const got = await this.#source.retained(run.id, "value", digest, { bytes: Math.min(left, RETAINED_REPLY_BYTES) }, domain);
+        if (!got.ok) { this.#unread(got.reason, left < RETAINED_REPLY_BYTES, `a retained input of ${run.id}`); continue; }
+        this.#count(got.bytes);
+        try { if (valueDigest(domain, parseStrict(got.input.bytes)) === digest) found = got.input.bytes; } catch { /* not the one named */ }
+        if (found !== null) break;
+      }
+      if (found === null) throw new Stop("incomplete", `a retained input is missing: the value that an observation of the entry names, ${digest}`, where);
+      values.push(found);
+    }
+    const state = run.state;
+    return {
+      observed, values,
+      observing: {
+        membership: recordedMembership(run), rules: run.rulesScope && state.scope() ? run.rulesScope(state) : null,
+        last: (use) => run.reads.get(`${use.read.run}:${use.read.n}`) ?? null,
+        content: (named) => { const data = this.#platform?.(named)?.data; return data ? contentStates(data) : null; },
+      },
+    };
+  }
+
+  /**
+   * The records of `observed` of one entry, against what the rows of its
+   * form came to when the judge derived them again (section 16.1, "What a
+   * replay derives"). A record of a subject that no row gives, and one that
+   * serves no row, are each a `mismatch`: a guard that failed is named as
+   * the authority note names it, `observation-reused`,
+   * `observation-not-moved` or `observation-older`. Then the value of each
+   * record, against the history of the observed scope at its head. That
+   * the entry holds exactly the subjects of the whole rows, and that no
+   * absent row states `wait`, is the judge's derivation, which the caller
+   * compares with the entry. That a subject of an absent row could not be
+   * read is the runtime's word, under `observation-read`.
+   */
+  async #byRows(run: Run, entry: Entry, judged: ActJudgment | Judgment, recorded: readonly ObservationUse[], where: FactRef, depth: number): Promise<void> {
+    const settled = judged.result === "write" ? judged.draft.rows : judged.result === "unavailable" ? judged.rows : undefined;
+    for (const use of settled ? recorded : []) {
+      if (!settled!.listed.has(observedName(use.observation))) throw new Stop("mismatch", "the entry holds a record of `observed` of a subject that no row of its form gives", where);
+      const why = settled!.unserved.get(use);
+      if (why === undefined) continue;
+      const name = why === "record" || why === "value" ? undefined : MISMATCHES[why];
+      throw new Stop("mismatch", `${name ? `${name}: ` : ""}derived again on the entry's time, a retained observation serves no row of the entry's form: ${why}`, where);
+    }
+    for (const use of recorded) await this.#standing(run, entry, use.observation, where, depth);
+    if (recorded.length > 0 || (settled && [...settled.status.values()].includes("absent"))) this.#trusts.add("observed");
   }
 
   /**
@@ -1115,7 +1188,10 @@ class Verifier {
           const window = run.at!.kind === "membership" ? WINDOWS.once : windowOf(definition, run.at!.kind, input.signed.intent.kind);
           await this.#granted(run, entry, grant, { key: input.signed.intent.actor, action: row ? actionOf(row) : null, window }, where, depth);
         }
-        if (input.observed) await this.#observed(run, entry, input.observed, windowOf(definition, run.at!.kind, input.signed.intent.kind), where, depth);
+        // Revision 20, section 16.1, "Replay": under a definition whose data states rows, the check is by the rows (`#byRows`, below).
+        // Under any other, the older rule stands as a stand-in: the window of the act's own grant.
+        if (input.observed && !definition.observing) await this.#observed(run, entry, input.observed, windowOf(definition, run.at!.kind, input.signed.intent.kind), where, depth);
+        const actRows = definition.observing ? await this.#hand(run, entry, input.observed, where) : null;
         // Section 16.1, "Replay": that `within` covers the observing scope is checked by the reference that its genesis records.
         // Section 16.1, "Replay": the entry holds exactly the observations that its judgment reads. The judge is given the recorded
         // ones, and derives an input with those that a rule read: one that no rule reads, and one that a rule reads and the entry
@@ -1134,7 +1210,9 @@ class Verifier {
           if (!named) throw new Stop("incomplete", `a retained input is not the one named: ${what}, ${place.digest}`, where);
           values.push(kept.bytes);
         }
-        judged = judgeAct(state, definition, input.signed, { ...reading, presented: input.presented, grants: input.authority.map((grant) => ({ grant, current: true })), membership: fixedIn(run, input), ...(input.observed ? { observed: input.observed } : {}), ...(values.length > 0 ? { values } : {}) });
+        if (actRows) values.push(...actRows.values);
+        judged = judgeAct(state, definition, input.signed, { ...reading, presented: input.presented, grants: input.authority.map((grant) => ({ grant, current: true })), membership: fixedIn(run, input), ...(input.observed ? { observed: input.observed } : {}), ...(values.length > 0 ? { values } : {}), ...(actRows ? { observed: actRows.observed, observing: actRows.observing } : {}) });
+        if (actRows) await this.#byRows(run, entry, judged, actRows.observed, where, depth);
         break;
       case "delivery": {
         this.#trusts.add("delivered");
@@ -1146,8 +1224,12 @@ class Verifier {
         // Sections 4.1 and 16.1: a delivery of a result may retain observations, each of the ten-second kind. Each is derived again,
         // and the judge is given the recorded ones: its clause's rules read them, and it derives an input with those that were read.
         const further = "clause" in input ? input.observed : undefined;
-        if (further) await this.#observed(run, entry, further, WINDOWS.once, where, depth);
-        judged = judgeDelivery(state, definition, { to, from: input.from, n: input.n, message: input.message }, { ...reading, source: { entry: source.entry, under: source.under }, origin, ...(further ? { observed: further } : {}) });
+        // Revision 20: under a definition whose data states rows, the check is by the rows of the clause that ran. Under any other,
+        // the ten-second window of the two rows of the authority note's table stands, as a stand-in.
+        if (further && !definition.observing) await this.#observed(run, entry, further, WINDOWS.once, where, depth);
+        const clauseRows = definition.observing && "clause" in input ? await this.#hand(run, entry, further, where) : null;
+        judged = judgeDelivery(state, definition, { to, from: input.from, n: input.n, message: input.message }, { ...reading, source: { entry: source.entry, under: source.under }, origin, ...(further ? { observed: further } : {}), ...(clauseRows ?? {}) });
+        if (clauseRows) await this.#byRows(run, entry, judged, clauseRows.observed, where, depth);
         break;
       }
       case "diagnosis":
@@ -1198,8 +1280,14 @@ class Verifier {
         // judge is given the recorded ones and the retained copy of each entry in `uses`, as a rule of the outcome reads them, and
         // derives an input with the observations that a rule read: one that no rule reads, and one that a rule reads and the entry
         // lacks, are each a mismatch (I3 deltas, entries EU4 and FC4).
-        if (input.observed) await this.#observed(run, entry, input.observed, WINDOWS.once, where, depth);
-        judged = judgeOutcome(state, definition, input, { clock, bounds, owners: this.#owners, platform: run.platform ?? undefined, own: reading.own, facts, ...(input.observed ? { observed: input.observed } : {}) });
+        // Revision 20, sections 6.1 and 16.1, "Replay": under a definition whose data states rows or an origin, the judge finds the
+        // origin again, by the operation's ID or by the rule, and copies its `uses`; it derives both subject lists, the second from
+        // the recorded observations of the first; and the check of each record is by the rows of the kind. Under any other, the
+        // ten-second window stands, as a stand-in.
+        if (input.observed && !definition.observing) await this.#observed(run, entry, input.observed, WINDOWS.once, where, depth);
+        const kindRows = definition.observing ? await this.#hand(run, entry, input.observed, where) : null;
+        judged = judgeOutcome(state, definition, input, { clock, bounds, owners: this.#owners, platform: run.platform ?? undefined, own: reading.own, facts, ...(input.observed ? { observed: input.observed } : {}), ...(kindRows ?? {}) });
+        if (kindRows) await this.#byRows(run, entry, judged, kindRows.observed, where, depth);
         break;
       }
       case "checkpoint":

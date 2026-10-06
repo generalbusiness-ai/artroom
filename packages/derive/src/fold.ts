@@ -99,6 +99,8 @@ export function headsOf(proof: unknown): ObservedHead[] {
   const [of, seq] = [{ scope: o["of"].scope, inc: o["of"].inc }, o["head"]["seq"]];
   // A key is `key_` and more, and a member is `@` and more, so the one name of the rules is neither.
   if (o["subject"] === "rules") return [{ of, subject: "rules", seq }];
+  // Revision 20 (section 16.1, "An observation of the holders of one action"): its subject, for the order of heads, is the action.
+  if (o["subject"] === "holders") return typeof o["action"] === "string" ? [{ of, subject: `holders:${o["action"]}`, seq }] : [];
   return [o["key"], o["member"]].flatMap((subject) => (typeof subject === "string" ? [{ of, subject, seq }] : []));
 }
 

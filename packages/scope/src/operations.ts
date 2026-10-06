@@ -33,10 +33,10 @@
  * commit and from the object's alarm.
  */
 
-import type { Bounds, CapabilityName, DecisiveEvidence, Entry, Evidence, FactRef, OperationId, PlatformDefinition, RetainedInput, ScopeRef } from "@generalbusiness/artroom-contract";
+import type { Bounds, CapabilityName, DecisiveEvidence, Entry, Evidence, FactRef, FactUse, OperationId, PlatformDefinition, RetainedInput, ScopeRef } from "@generalbusiness/artroom-contract";
 import { isEvidence, isOperationId, isRetainedInput } from "@generalbusiness/artroom-bytes";
-import { settleOutcome, snapshotInput, snapshotRead, timeMs, timeOf, type OutcomeOffered, type Owners } from "@generalbusiness/artroom-derive";
-import { ownOf, type Scope } from "./core.ts";
+import { clockOf, settleOutcome, snapshotInput, snapshotRead, timeMs, timeOf, type Clock as Reading, type Fetched, type OutcomeOffered, type Owners } from "@generalbusiness/artroom-derive";
+import { ownOf, valuesOf, type Scope } from "./core.ts";
 import { report } from "./diag.ts";
 import type { Wakes } from "./outbox.ts";
 import type { Clock, Ports } from "./ports.ts";
@@ -445,21 +445,36 @@ export class Operations {
       return { recorded: "refused", detail: "the evidence names a snapshot whose bytes were not given" };
     }
     const wrote: { sealed: Sealed | null } = { sealed: null };
-    const end = await this.#scope.turns.run<OutcomeRecorded>({
+    // Scope contract, revision 20, sections 6.1 and 16.1 (rows I3-40 and I3-41), under a definition whose data states rows of
+    // `observes` or the `origin` of an outcome. The judge copies the outcome's `uses` from its origin, and is given the copy that
+    // this scope retains of each of those entries: nothing is fetched. The scope reads one observation for each subject of the
+    // kind's rows before the turn, in two steps where a row states `second`, and the commit derives both lists again (`Observes`).
+    // I3 merge: under a definition whose data states neither, as each platform definition of Artroom until the authority note's
+    // rows are adopted (I3 deltas, entry GA1), the judge is given no observation and no foreign entry, as before. A rule that
+    // needs one then has a fault, and its outcome stays offered: the destination's `judge`.
+    const rows = this.#scope.observes();
+    const store = this.#store;
+    const retained = (use: FactUse): Fetched | null => {
+      const kept = store.retained("entry", use.content);
+      return kept ? { fact: use.fact, entry: JSON.parse(kept.bytes) as Entry, under: kept.under ?? "" } : null;
+    };
+    const context = (clock: Reading) => ({ clock, bounds, owners: this.#owners, platform: this.#scope.pinned()?.platform ?? undefined, own: ownOf(store), ...(definition.observing ? { retained, ...rows.hand() } : {}) });
+    await rows.before(() => { const planned = settleOutcome(store, definition, input, context(clockOf(store, this.#clock.read()))); return planned.result === "unavailable" ? planned.missing : undefined; }, 2);
+    const end = await rows.turn((stop) => this.#scope.turns.run<OutcomeRecorded>({
       asks: () => [],
       judge: (view, clock) => {
-        // I3 merge: derive's judge of an outcome takes `observed` and `facts`, gives both to a rule of the outcome, and writes what was
-        // read (`settleOutcome`). This driver gives neither. No form of platform data states the subjects that an outcome observes, or
-        // the foreign entries that it fetches, so nothing here could say what to read before this turn (the contract's point R1-67;
-        // I3 deltas, entry FC6). A rule that needs one then has a fault, and its outcome stays offered: the destination's `judge`.
-        const judged = settleOutcome(view, definition, input, { clock, bounds, owners: this.#owners, platform: this.#scope.pinned()?.platform ?? undefined, own: ownOf(this.#store) });
+        const judged = settleOutcome(view, definition, input, context(clock));
+        // Section 16.1, "In the commit": a subject of the commit's list with no observation at hand stops the commit. The scope
+        // reads what is missing, and the turn starts again. The outcome stays offered.
+        stop(judged.result === "unavailable" ? judged.missing : undefined);
         switch (judged.result) {
           case "write":
             // Room for this entry was reserved when its operation was opened (sections 17.2, row 5, and 17.3). A scope with no room at all writes nothing.
             if (view.scope()!.head.seq + 1 >= bounds.scopeEntries) return said({ recorded: "unavailable" });
             return {
-              verdict: "write", draft: judged.draft, retain: retain.filter((given) => named.includes(given.digest)),
-              sealed: (sealed) => { wrote.sealed = sealed; return { recorded: "written", fact: { at: sealed.entry.at, seq: sealed.entry.seq, hash: sealed.hash } }; },
+              // Section 16.1, "A value that a row may retain": each value that a retained observation names is kept with the entry.
+              verdict: "write", draft: judged.draft, retain: [...retain.filter((given) => named.includes(given.digest)), ...valuesOf(judged.draft)],
+              sealed: (sealed) => { wrote.sealed = sealed; rows.sealed(sealed); return { recorded: "written", fact: { at: sealed.entry.at, seq: sealed.entry.seq, hash: sealed.hash } }; },
               unfit: () => ({ recorded: "refused", detail: "the outcome cannot be an entry" }), full: () => ({ recorded: "unavailable" }),
             };
           case "repeat": return said({ recorded: "repeat", seq: judged.seq });
@@ -469,7 +484,7 @@ export class Operations {
           default: return said({ recorded: "unavailable" });
         }
       },
-    });
+    }));
     const recorded: OutcomeRecorded = end.end === "answer" ? end.answer : { recorded: "unavailable" };
     // The turn has ended, so an entry that it wrote is committed. An outcome entry may be what an attempt that is not ready waits
     // for: the walk looks at each of them again.

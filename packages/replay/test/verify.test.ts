@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { PROPOSED_BOUNDS, type Entry, type ObservationUse, type Report } from "@generalbusiness/artroom-contract";
 import { canonicalize, textDigest } from "@generalbusiness/artroom-bytes";
-import { grantFrom, observationOf } from "@generalbusiness/artroom-derive";
+import { grantFrom, namedBy, observationOf } from "@generalbusiness/artroom-derive";
 import { founded, keys, notesDefinition, on, otherLane, t, type Actor, type Ledger } from "@generalbusiness/artroom-derive/testing";
 import { C, cap, clean } from "../../derive/test/fixtures-hold.ts";
 import { MEMBERSHIP, RULES_SCOPE as RULES, firstExtents, platform, standingOf } from "../../platform/src/index.ts";
@@ -10,6 +10,7 @@ import { Rulebook } from "../../platform/test/support-rules.ts";
 import { MemorySource, TRUSTS, platformCode, render, verify, type MemoryScope, type Options, type Tally } from "../src/index.ts";
 import { View } from "../src/view.ts";
 import { Gate, Lane, OWNER, RULES_SCOPE } from "./staging.ts";
+import { VALUE, Weighing } from "./weighing.ts";
 import { entryOf, histories as ledgers, rewrite, served, sourceOf, world, type World } from "./world.ts";
 
 /**
@@ -522,5 +523,63 @@ describe("the value of an observation is derived once from the history of its so
       // From the last head down, and then an early head after a late one.
       for (const seq of [...ledger.entries.map((_, i) => last - i), last, 0]) expect([ledger.definition.declared.name, seq, canonicalize(view.at(seq).state.all())]).toEqual([ledger.definition.declared.name, seq, ledger.replay(seq + 1).snapshot()]);
     }
+  });
+});
+
+// Scope contract, revisions 20 and 21, section 16.1, "Replay" and "What a replay derives"; witnesses 18.46 (cases 13 to 15), 18.48
+// (case 10), 18.50 (case 11) and 18.52 (cases 11 and 12). STAND-INS: the data, its rules, every observation and every foreign entry
+// of these histories are made by hand (`weighing.ts`), and each head is anchored. They show what a verifier derives from the rows.
+describe("the rows of `observes`, replayed: the origin, the subject lists, the guards with each row's window, and the values that an observation names", () => {
+  const found = async (g: Weighing, history: MemoryScope = g.served()) => {
+    const got = await verify(new MemorySource([history]), { mode: "replay", scope: g.at.scope, anchors: g.anchors(), platform: g.coded() });
+    return [got.report.result, got.report.at?.seq ?? null, got.why];
+  };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const changed = (g: Weighing, seq: number, change: (entry: any) => void) => { const history = g.served(); rewrite(history, seq, change); return found(g, history); };
+  /** The records of `observed` of one entry, as the history holds them. */
+  const held = (g: Weighing, seq: number): ObservationUse[] => { const input = entryOf(g.served(), seq).input; return "observed" in input ? [...(input.observed ?? [])] : []; };
+  const eleven = (g: Weighing) => new Date(Date.parse(entryOf(g.served(), g.outcome).time) - 11_000).toISOString().replace(".000Z", "Z");
+
+  test("18.46 cases 13 to 15: the entry of an outcome with four subjects is consistent, with `observation-read` and `platform-code` under `trusts`; a record that no row gives, a `uses` that is no copy of the origin's, and a record that fails a guard under its row's window and use are each a mismatch, and a record that only a row which states `write` gives may be absent", async () => {
+    const g = new Weighing("weigh");
+    const good = await verify(new MemorySource([g.served()]), { mode: "replay", scope: g.at.scope, anchors: g.anchors(), platform: g.coded() });
+    expect([good.report.result, good.why, good.report.trusts.includes(TRUSTS.observed), good.report.trusts.includes(platformCode(OWNER)), held(g, g.outcome).length, entryOf(g.served(), g.outcome).uses.length]).toEqual(["consistent", null, true, true, 4, 2]);
+    const at = g.outcome;
+    // Case 14: a fifth record, of a key that the rule did not name.
+    expect(await changed(g, at, (entry) => { entry.input.observed.push(g.seen(keys.paul)); })).toEqual(["mismatch", at, "the entry holds a record of `observed` of a subject that no row of its form gives"]);
+    // Case 15: `uses` in another order than the origin's.
+    expect(await changed(g, at, (entry) => { entry.uses.reverse(); })).toEqual(["mismatch", at, "the recorded uses are not the ones derived again"]);
+    // The guards, with the window and the use of the subject's row: ten seconds, and `fresh`.
+    expect(await changed(g, at, (entry) => { entry.input.observed[1].observation.at = eleven(g); })).toEqual(["mismatch", at, "derived again on the entry's time, a retained observation serves no row of the entry's form: age"]);
+    expect(await changed(g, at, (entry) => { entry.input.observed[1].use = "reused"; })).toEqual(["mismatch", at, "observation-reused: derived again on the entry's time, a retained observation serves no row of the entry's form: once"]);
+    // A subject of a row that states `wait` has no record: no such entry is written. One of a row that states `write` may lack its
+    // record: that it could not be read is the runtime's word.
+    expect(await changed(g, at, (entry) => { entry.input.observed.splice(1, 1); })).toEqual(["mismatch", at, "derived again, this input writes no entry: unavailable, authority-unavailable"]);
+    expect(await changed(g, at, (entry) => { entry.input.observed.pop(); })).toEqual(["consistent", null, null]);
+    // An act with a row: the entry holds one record for each member of its list, on the row's window, and never lacks one.
+    const act = g.entries.length - 1;
+    expect([held(g, act).length, await changed(g, act, (entry) => { entry.input.observed.pop(); })]).toEqual([2, ["mismatch", act, "derived again, this input writes no entry: unavailable, authority-unavailable"]]);
+    expect(await changed(g, act, (entry) => { entry.input.observed[0].observation.at = "2026-10-04T11:55:09Z"; })).toEqual(["mismatch", act, "derived again on the entry's time, a retained observation serves no row of the entry's form: age"]);
+  });
+
+  test("18.52 cases 11 and 12: the second list is derived from the recorded observation of the rules, so a record of a key that it does not give is a mismatch; an entry whose row is absent and states `write` is consistent, with `observation-read` under `trusts`", async () => {
+    const g = new Weighing("steps");
+    expect([await found(g), held(g, g.outcome).length]).toEqual([["consistent", null, null], 3]);
+    expect(await changed(g, g.outcome, (entry) => { entry.input.observed.push(g.seen(keys.vic)); })).toEqual(["mismatch", g.outcome, "the entry holds a record of `observed` of a subject that no row of its form gives"]);
+    // Case 12: k3 has no record, so R3 is absent, and it states `write`.
+    const absent = new Weighing("absent");
+    const got = await verify(new MemorySource([absent.served()]), { mode: "replay", scope: absent.at.scope, anchors: absent.anchors(), platform: absent.coded() });
+    expect([got.report.result, got.why, got.report.trusts.includes(TRUSTS.observed), held(absent, absent.outcome).length]).toEqual(["consistent", null, true, 2]);
+  });
+
+  test("18.48 case 10, and 18.50 case 11: an entry whose observation of the rules names a value is derived again with the bytes that the scope keeps by the domain and the digest; without them, or with other bytes under that digest, the replay is incomplete", async () => {
+    const g = new Weighing("asked");
+    expect([await found(g), namedBy(held(g, g.outcome)[0]!.observation)]).toEqual([["consistent", null, null], [VALUE.digest]]);
+    const without = g.served();
+    without.retained = without.retained.filter((kept) => kept.kind !== "value");
+    const other = g.served();
+    other.retained = other.retained.map((kept) => (kept.kind === "value" ? { ...kept, bytes: canonicalize(["src/**"]) } : kept));
+    const why = `a retained input is missing: the value that an observation of the entry names, ${VALUE.digest}`;
+    expect([await found(g, without), await found(g, other)]).toEqual([["incomplete", g.outcome, why], ["incomplete", g.outcome, why]]);
   });
 });

@@ -121,6 +121,7 @@ export interface Defining extends Shapes {
   readonly places: Map<string, number>;     // section 6.2, revision 19: each byte domain that a field of an act states for a value, with its one bound
   readonly valueSets: ValueSet[];           // each written `value` effect that was read, for the rule that a mark is set only to `true` (section 6.4, revision 21)
   readonly bindings: Binding[];             // each handler that states `bound`, for the checks of `decisions` (section 17.2a, revision 21)
+  observing: boolean;                       // section 16.1, revision 20: the data states rows of `observes`, or the `origin` of an outcome, somewhere
 }
 
 /** One written `value` effect: the type and the slot that it sets, where it stands, and whether it sets the constant `true`. */

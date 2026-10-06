@@ -130,8 +130,8 @@ export function sentText(store: Store, seq: number, digest: Digest): string | nu
 /**
  * What a membership scope answers to an observation read (authority note,
  * section 3.3, step 3; section 12.1.3, "Two things that are answers and no
- * entries"): the standing of one key or of one member, from its folded
- * state at its head. It is the platform package's `standingOf`. Membership
+ * entries"): the standing of one key or of one member, or the holders of
+ * one action, from its folded state at its head. It is the platform package's `standingOf`. Membership
  * writes no entry for a read, and the answer names the scope, the
  * incarnation and the head that gave it.
  *
@@ -143,13 +143,16 @@ export function sentText(store: Store, seq: number, digest: Digest): string | nu
  */
 export function observedAt(store: Store, pinned: Pinned | null, asked: unknown): unknown {
   if (!pinned?.definition || pinned.named !== MEMBERSHIP) return null;
-  if (!isObject(asked) || Object.keys(asked).length !== 2) return null;
+  // Revision 20 (the contract's section 16.1, "An observation of the holders of one action"): the fourth request, `{ of, holders, most }`.
+  const holders = isObject(asked) && Object.keys(asked).length === 3 && typeof asked["holders"] === "string" && asked["holders"] !== "" && typeof asked["most"] === "number" && Number.isSafeInteger(asked["most"]) && asked["most"] >= 1;
+  if (!isObject(asked) || (Object.keys(asked).length !== 2 && !holders)) return null;
   // `of` is a full reference, or the scope ID and the kind alone: the first read of a scope that records no incarnation yet
   // (authority note, section 12.1, "The first read").
   const named: unknown = asked["of"];
   const byId = isObject(named) && Object.keys(named).length === 2 && isScopeId(named["scope"]) && named["kind"] === "membership";
   if (!isScopeRef(named) && !byId) return null;
   const of = named as ObservedScope;
+  if (holders) return standingOf(store, { of, holders: asked["holders"] as string, most: asked["most"] as number });
   if (isKeyId(asked["key"])) return standingOf(store, { of, key: asked["key"] });
   return isMemberId(asked["member"]) ? standingOf(store, { of, member: asked["member"] }) : null;
 }

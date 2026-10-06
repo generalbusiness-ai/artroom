@@ -24,9 +24,9 @@
 
 import type { Bounds, Digest, Entry, FactRef, Incarnation, ScopeId, Seed, UnavailableReason } from "@generalbusiness/artroom-contract";
 import { canonicalize, isDigest, isPlatformDefinition, newIncarnation, parseStrict } from "@generalbusiness/artroom-bytes";
-import { creationFields, factsNamed, isEntryOf, isFactRef, isLocalId, isObject, isScopeRef, judgeDelivery, judgeGenesis, messageFacts, messageTexts, own, prepareRules, readFields, textsNamed } from "@generalbusiness/artroom-derive";
+import { clockOf, creationFields, factsNamed, isEntryOf, isFactRef, isLocalId, isObject, isScopeRef, judgeDelivery, judgeGenesis, messageFacts, messageTexts, own, prepareRules, readFields, textsNamed } from "@generalbusiness/artroom-derive";
 import type { Clock as Reading, Creation, Delivered, DeliveryContext, Fetched, Judgment, PlatformRules, StateView, ValidDefinition } from "@generalbusiness/artroom-derive";
-import { NO_INCARNATION, Received, ownOf, retainedFacts, snapshotsOf, used, type Scope } from "./core.ts";
+import { NO_INCARNATION, Observes, Received, ownOf, retainedFacts, snapshotsOf, used, valuesOf, type Scope } from "./core.ts";
 import { namedBy } from "./definitions.ts";
 import type { DefinitionRead, Delivery, Ports } from "./ports.ts";
 import type { Retained, Store } from "./store.ts";
@@ -40,10 +40,10 @@ export class Deliveries {
   readonly #name: ScopeId | null;
   readonly #scope: Scope;
   readonly #store: Store;
-  readonly #ports: Pick<Ports, "resolver" | "definitions" | "texts" | "random" | "capabilities">;
+  readonly #ports: Pick<Ports, "resolver" | "definitions" | "texts" | "random" | "capabilities" | "clock">;
   readonly #bounds: Bounds;
 
-  constructor(name: ScopeId | null, scope: Scope, store: Store, ports: Pick<Ports, "resolver" | "definitions" | "texts" | "random" | "capabilities">, bounds: Bounds) {
+  constructor(name: ScopeId | null, scope: Scope, store: Store, ports: Pick<Ports, "resolver" | "definitions" | "texts" | "random" | "capabilities" | "clock">, bounds: Bounds) {
     this.#name = name;
     this.#scope = scope;
     this.#store = store;
@@ -180,15 +180,23 @@ export class Deliveries {
     const texts = await this.#texts(from, carried);
     if (!texts) return retry("dependency-unavailable");
 
+    // Scope contract, revision 20, section 16.1 (row I3-40): for a result, under a definition whose data states rows of `observes`,
+    // the scope reads one observation for each subject of the rows of the clause that runs, before the turn, and the commit
+    // derives the list again (`Observes`). No other delivery may hold `observed`, so nothing is read for one.
+    const rows = message.class === "result" && !known ? this.#scope.observes() : new Observes(null, bounds);
     const context = (clock: Reading): Omit<DeliveryContext, "prepared"> =>
-      ({ clock, bounds, facts, own: ownOf(store), snapshot: snapshotsOf(store), texts: texts.sizes, capabilities: this.#ports.capabilities ?? undefined, platform: (this.#scope.pinned() ?? founding)?.platform ?? undefined, source: { entry: source.entry, under: source.under }, origin });
+      ({ clock, bounds, facts, own: ownOf(store), snapshot: snapshotsOf(store), texts: texts.sizes, capabilities: this.#ports.capabilities ?? undefined, platform: (this.#scope.pinned() ?? founding)?.platform ?? undefined, source: { entry: source.entry, under: source.under }, origin, ...rows.hand() });
     /** The definition a section of the turn runs under: the pinned one, or before the genesis the one the seed names. */
     const definition = (): ValidDefinition => this.#scope.pinned()?.definition ?? founding!.valid;
     /** A `create` goes to the genesis judge, which answers a repeat from the genesis when the scope exists. */
     const judge = (view: StateView, inc: Incarnation, reading: DeliveryContext): Judgment =>
       (creates ? judgeGenesis(view, definition(), { name, inc, to: delivered.to as Seed, from, n: delivered.n, message } as Creation, reading) : judgeDelivery(view, definition(), delivered, reading));
 
-    const end = await this.#scope.turns.run<Delivery>({
+    if (pinned?.definition && !creates) {
+      const at = pinned.definition;
+      await rows.before(() => { const planned = judgeDelivery(store, at, delivered, { ...context(clockOf(store, this.#ports.clock.read())), prepared: [] }); return planned.result === "unavailable" ? planned.missing : undefined; });
+    }
+    const end = await rows.turn((stop) => this.#scope.turns.run<Delivery>({
       asks: (view, clock) => {
         const reading = { ...context(clock), prepared: [] };
         return creates ? prepareRules(view, definition(), { genesis: { name, inc: NO_INCARNATION, to: delivered.to as Seed, from, n: delivered.n, message } as Creation, context: reading }) : prepareRules(view, definition(), { delivery: delivered, context: reading });
@@ -197,11 +205,15 @@ export class Deliveries {
         const genesis = view.scope() === null;
         // Section 2.2: the incarnation is minted in the transaction that writes the first entry.
         const judged = judge(view, genesis ? newIncarnation(this.#ports.random.bytes(16)) : NO_INCARNATION, { ...context(clock), prepared });
+        // Section 16.1, "In the commit": a subject of the commit's list with no observation at hand stops the commit. The scope
+        // reads what is missing, and the turn starts again. The delivery is tried again.
+        stop(judged.result === "unavailable" ? judged.missing : undefined);
         switch (judged.result) {
           case "write": {
             // Section 9.2: an entry that settles nothing is written only while the scope has room; one that settles is counted for.
             if ((view.scope()?.head.seq ?? -1) + 1 >= bounds.scopeEntries) return said(retry("scope-full"));
-            const retain: Retained[] = [...used(judged.draft, [source, ...facts]), ...texts.retain(definition(), judged.draft, source.under)];
+            // Section 16.1, "A value that a row may retain": each value that a retained observation names is kept with the entry.
+            const retain: Retained[] = [...used(judged.draft, [source, ...facts]), ...texts.retain(definition(), judged.draft, source.under), ...valuesOf(judged.draft)];
             if (genesis && founding) {
               store.cover(founding.valid.indexes);
               // A platform definition is pinned by its name and version, and no bytes are retained for it.
@@ -210,7 +222,7 @@ export class Deliveries {
             }
             return {
               verdict: "write", draft: judged.draft, retain,
-              sealed: ({ entry, hash }) => ({ answer: "recorded", fact: { at: entry.at, seq: entry.seq, hash } }),
+              sealed: ({ entry, hash }) => { rows.sealed({ entry, hash }); return { answer: "recorded", fact: { at: entry.at, seq: entry.seq, hash } }; },
               // An entry that cannot be written now is not a decision: the sender keeps the duty.
               unfit: () => retry("unavailable"), full: () => retry("scope-full"),
             };
@@ -228,7 +240,7 @@ export class Deliveries {
           case "refused": return said(retry("unavailable"));
         }
       },
-    }, founding?.valid);
+    }, founding?.valid));
     return end.end === "answer" ? end.answer : retry(end.end === "idle" ? "unavailable" : end.end);
   }
 }

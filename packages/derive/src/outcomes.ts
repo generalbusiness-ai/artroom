@@ -87,6 +87,11 @@ export function ownersOf(definition: ValidDefinition, platform: PlatformRules | 
         // The driver asks this outside a commit, so no judge is deriving: the rule reads the state and the scope's own entries only.
         ...(r.unknown ? { unknown: (view: StateView, operation: Operation, attempt: number, own) => run(mark, () => r.unknown!(view, operation, attempt, own)) } : {}),
         // The send of the mark is derived with the entry, whether the rule of the kind derives anything beside it or not.
+        // Revision 20: the two functions that say what is to be read. Each is given the state, the outcome as it is offered and the
+        // scope's own entries; the second also each entry in the outcome's `uses`. Neither is given an observation: before the rows of
+        // the entry are settled nothing is at hand.
+        ...(r.origin ? { origin: (view: StateView, operation: Operation, outcome: OutcomeInput) => run(mark, () => r.origin!(givenTo(judging(view, outcome)), operation)) } : {}),
+        ...(r.subjects ? { subjects: (view: StateView, operation: Operation, outcome: OutcomeInput, row: number, first) => run(mark, () => r.subjects!(givenTo(judging(view, outcome)), operation, row, first)) } : {}),
         ...(r.derives || mark.send ? { derives: (view: StateView, operation: Operation, outcome: OutcomeInput, selected: boolean | null, at) => { const j = judging(view, outcome, { selected, further: at.opens !== null }); return given(mark, j, kinds, r.derives ? run(mark, () => r.derives!(givenTo(j), operation, selected)) : { effects: [], sends: [], opens: [] }); } } : {}),
       };
     },

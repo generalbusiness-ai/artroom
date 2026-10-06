@@ -138,7 +138,8 @@ outcome is given the observations and the entries, and writes the entry's
 reading of each observation are the package's own. Only the reader of a
 lane's entries is a stand-in: the package has none
 (`notes/2026-10-05-i3-contract-deltas.md`, entries FA9 and FC5), and no
-runtime reads an observation for an outcome (entry FC6). `bureau` is a
+runtime reads an observation for an outcome of the destination, whose
+data states no row of `observes` (entries FC6 and GA1). `bureau` is a
 made-up directory that creates one destination scope. The lane's and the
 register's entries, each observation and every answer of the Git host are
 made by hand.
@@ -158,6 +159,29 @@ of that file, and of `forms-settles.test.ts`, are made up. A test that
 uses them says so. Such a test shows the judge's side of a binding and
 the amounts of a marker duty. It shows nothing about how a count is
 kept, released or replayed, and nothing about a definition of Artroom.
+
+The rows of `observes` have a made-up definition and two scripted scopes.
+`weigher`, in `packages/derive/test/fixtures-observes.ts`, is made-up
+platform data whose acts, one kind of `outcomes` and one clause of a
+result state rows, with a stand-in rule for each of its marks. It is no
+definition of Artroom: no data of the platform package states a row
+(`notes/2026-10-05-i3-contract-deltas.md`, entry GA1). Each observation of
+that file is written by hand. A test that uses it says so. It shows where
+a subject comes from, what the judges retain and what a verifier derives,
+and nothing about a rule of a destination or of a rules scope.
+`Controls.rulebook`, of `@generalbusiness/artroom-scope/testing`, is a
+scripted rules scope, beside the scripted membership: the test writes
+each answer and the bytes that are said to come beside it, and where the
+scope is said to record that reference. No rules scope answers an
+observation yet (entry GA7). With either script the reads of
+`packages/scope/test/observes.test.ts` are the real ones: before the
+turn, numbered in the run, judged in the commit, and kept by the store.
+One test of that file reads a real membership scope of the namespace
+`PLATFORM`, by its own method `observe`. There the reference by which the
+made-up scope records membership is still written by the test.
+`Weighing`, in `packages/replay/test/weighing.ts`, is such a scope in
+memory, whose entries derive's judges wrote. Each head and each entry
+that was made by hand is anchored.
 
 The token ledger has three stand-ins. `TokenHost` and `Vault`, in
 `packages/git/test/support/tokens.ts`, stand for a Git host's token

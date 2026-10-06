@@ -7,6 +7,7 @@ import { isObject, own } from "../values.ts";
 import { mark, marked, subject, type ClauseSet, type Ctx, type Defining, type Duties, type Type } from "./context.ts";
 import { effects } from "./effects.ts";
 import { guards, range } from "./guards.ts";
+import { clauseObserves } from "./observes.ts";
 import { isDetached, operand } from "./operands.ts";
 import { at, type Rec } from "./shape.ts";
 import { RECORD_BYTES, stated } from "./sizes.ts";
@@ -57,6 +58,9 @@ function source(d: Defining, v: unknown, path: string, ctx: Ctx, field: boolean,
 }
 /** The fields of one message. `lane`: the message goes to a lane, so a field may carry a detached text. */
 const sources = (d: Defining, v: unknown, path: string, ctx: Ctx, lane: boolean) => { for (const [name, s] of d.entries(v, path, d.bounds.sendFields)) source(d, s, at(path, name), ctx, true, lane); };
+
+/** Section 16.1, check 1: in platform data a `create`, a `tell` and a `relate` may state rows of `observes`, by clause, beside `result`. */
+const ROWS = (d: Defining): string[] => (d.platform ? ["observes"] : []);
 
 /** True when a result clause list is written with an effect. */
 const hasClause = (result: unknown): boolean => isObject(result) && Object.values(result).some((e) => Array.isArray(e) && e.length > 0);
@@ -135,8 +139,9 @@ export function sends(d: Defining, v: unknown, path: string, ctx: Ctx, top: Rec,
     let made = 1;
     let result: unknown = null;
     if (k === "create") {
-      const r = rec(x, p, ["kind", "definition", "fields", "result"]);
+      const r = rec(x, p, ["kind", "definition", "fields", "result"], ROWS(d));
       if (!r) return;
+      if ("observes" in r) clauseObserves(d, r["observes"], at(p, "observes"), ctx, true);
       if (!isScopeKind(r["kind"])) bad("shape", at(p, "kind"), "is not a scope kind");
       // Section 6.6: a definition cannot hold its own digest, so `self` names the creating scope's own pinned definition.
       if (r["definition"] !== "self" && !isDigest(r["definition"]) && !isPlatformDefinition(r["definition"])) bad("shape", at(p, "definition"), "is a definition digest, a platform definition, or self");
@@ -144,8 +149,9 @@ export function sends(d: Defining, v: unknown, path: string, ctx: Ctx, top: Rec,
       requests.push({ most: 1, clauses: clauses(d, r["result"], at(p, "result"), ctx, true) });
       [kind, result] = [[k, r["kind"], r["definition"]], r["result"]];
     } else if (k === "tell") {
-      const r = rec(x, p, ["to", "message", "fields", "result"], ["if"]);
+      const r = rec(x, p, ["to", "message", "fields", "result"], ["if", ...ROWS(d)]);
       if (!r) return;
+      if ("observes" in r) clauseObserves(d, r["observes"], at(p, "observes"), ctx, false);
       // Section 6.6: a `tell` is addressed by a reference slot, of any subject. A field is not an address.
       const to = rec(r["to"], at(p, "to"), ["slot"], ["of"]) && source(d, r["to"], at(p, "to"), ctx, false);
       if (to && to.type?.type !== "scope") bad("name", at(p, "to"), "names no slot that holds a scope");
@@ -155,7 +161,7 @@ export function sends(d: Defining, v: unknown, path: string, ctx: Ctx, top: Rec,
       requests.push({ most: 1, clauses: clauses(d, r["result"], at(p, "result"), ctx, false) });
       [kind, result, always] = [[k, r["message"]], r["result"], !("if" in r) && alsoRead(r["to"]).length === 0];
     } else if (k === "relate") {
-      const r = rec(x, p, ["to", "name", "item", "state", "detail", "result"], ["each", "if"]);
+      const r = rec(x, p, ["to", "name", "item", "state", "detail", "result"], ["each", "if", ...ROWS(d)]);
       if (!r) return;
       // Section 6.6: a fan-out makes one send for each item its range covers. Its sends are bounded because the range reads live items
       // only, and the type's `max` bounds those.
@@ -175,7 +181,9 @@ export function sends(d: Defining, v: unknown, path: string, ctx: Ctx, top: Rec,
       sources(d, r["detail"], at(p, "detail"), within, to?.type?.type === "scope" && to.type.kind === "lane");
       // Section 6.6: a clause of a fan-out send may read `each`, the item of that send. The entry records the item of each update and
       // nothing else of the range. So `each` is found again, when the result is recorded, only where the update's `item` is `each`.
-      requests.push({ most: Number.isFinite(max) ? max : 0, clauses: clauses(d, r["result"], at(p, "result"), each && canonicalize(r["item"]) === canonicalize({ item: "each" }) ? within : ctx, false) });
+      const clauseCtx = each && canonicalize(r["item"]) === canonicalize({ item: "each" }) ? within : ctx;
+      requests.push({ most: Number.isFinite(max) ? max : 0, clauses: clauses(d, r["result"], at(p, "result"), clauseCtx, false) });
+      if ("observes" in r) clauseObserves(d, r["observes"], at(p, "observes"), clauseCtx, false);
       [kind, result, always, made] = [[k, r["name"], r["state"]], r["result"], !("if" in r) && !each && alsoRead([r["to"], r["item"]]).length === 0, Number.isFinite(max) ? max : 0];
       if (problems.length === before) {
         // Section 6.4: no two `relate` sends written with the same `to`, `item` and `name`.
