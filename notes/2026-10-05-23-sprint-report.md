@@ -7,6 +7,11 @@ report covers 15:00 to 23:00 on 2026-10-05 Eastern. The previous report
 landed as `d899dc31` at 14:38 Eastern. Main at the boundary is `b2b62d26`
 (15:40 Eastern), unless updated.
 
+**Updated 23:20 Eastern.** Milestone F landed on main at `b452882f`
+(22:51 Eastern), after this report was written and pushed at 22:02; the
+update section below, the landed table and the summary's second
+paragraph say what that changes. Everything else is as written at 22:02.
+
 Everything marked "observed run" was run for this report between 21:58
 and 22:00 Eastern on the shared machine, Node v26.10.0: on main in the
 clean worktree `~/play/artroom-worktrees/sprint` at `b2b62d26`, and once
@@ -31,8 +36,10 @@ filed under the promise on the whole I3 commission, which closes on a
 sealed receipt, so approving it there could have sealed I3 as complete.
 The planner gave F its own request at 17:25 and builder promised it at
 17:31. The refiling then stalled: the workroom tool ran from 17:32 to
-21:57 without filing anything, and the planner stopped it. F lands next
-sprint at a fresh head with the same tree.
+21:57 without filing anything, and the planner stopped it. At 22:02 this
+report said F lands next sprint. It landed this one, at 22:51, as the
+update below records: a one-file child commit filed in 25 minutes, the
+checker's approval at 22:29, builder's merge at 22:51.
 
 Four design revisions were adopted this sprint and are now in force:
 recovery revision 9, authority revision 24, lane forms revision 15 and
@@ -138,6 +145,8 @@ step now stands.
 | Plan 019, the demo story as a GitHub user knows it | `012869e9`, 15:23 | The demo reads as issue, comments, optional assignment, a pull request that closes the issue, cross-references, merge closes. Three defaults agreed with hugh: assignment is never required to merge; any member may comment; a closes-link auto-closes on merge with the link recorded, and the opener's acceptance is a rule. The script must say these are the things a rule can change. Split and merge, and rule customizability, are the wedge |
 | Plan 020, repository to live site through the lane | `400986e2`, 15:33 | The destination scope's first effect class: a preview per lane on the standard Workers hostnames, production on merge, rollback as a signed act, every deploy an entry with its outcome. Five steps for a person; not framework detection; no custom domains |
 | Plan 020, comments on the preview page and four more needs | `b2b62d26`, 15:40 | In-page comments on a preview as the second priority, each a `comment` act on the change lane with a page anchor (lane forms revision 15, part B); plus a dependency cache, member-only previews, destination-held secrets, and a deploy log a member can read |
+| Plan 021, the jam as the late-night meme | `87c0df1e` 22:17, `be53de5c` 22:30, `ba813aad` 23:09 | Hugh's new story for the jam demo: a person hums, a synth agent interprets, agents take instruments in order, the band picks up each new phrase; the reference clip measured; spike J0 commissioned (`9ce8533f`) |
+| **I3 milestone F, the foundation** (request `2ae1523e`, approval `50701bf2`) | `b452882f`, 22:51 (merge of `2ad870f3`; then `6592f82e`, 23:17, merging the plan correction) | 148 files, 12,890 insertions and 3,338 deletions against `be53de5c` (git diff stat): authority forms, outside effects as recorded operations, the Git package, and the marks of platform data. Builder's gate at the gated tree: 341 vitest tests and 5 in Node's runner, one observed run. See the update below |
 
 Adopted in the workroom this sprint (design, not git; each replaces the
 earlier revision as the note in force):
@@ -213,7 +222,8 @@ and milestone F is what they stand on.
   request to name it (`5139cc36`). The filing is running detached as this
   report lands; the checker's invitation follows it. F has a sound
   verdict but no approval, and lands next sprint. The workroom head did
-  not move between 17:39 and 22:05. Planner's account.
+  not move between 17:39 and 22:05. Planner's account. **Overtaken: see
+  the update below. F landed at 22:51.**
 - **The next milestone branch, `6f9c3186`.** Builder merged the read
   sessions and join limits, the host port with redaction, the replay of
   outcomes, contract revision 19's source rows (membership under its own
@@ -260,21 +270,58 @@ and milestone F is what they stand on.
   and did not finish once. Builder and planner now file in the background
   and watch the process, not the prompt.
 
+## Update at 23:20 Eastern: milestone F landed
+
+The one-file child commit `2ad870f3` was filed in 25 minutes (so the
+empty commit was the stall's likely cause). The checker approved at
+22:29 (`50701bf2`): an ordinary assigned source review of all 135
+subjects, with byte custody from the earlier full readings for the 134
+unchanged ones; the binding finding repaired; the I3 commission and every
+remaining duty left open. Builder ratified the verdict and, because the
+workroom requires the implementer to sign a merge, landed it: merge
+`b452882f` at 22:51 (receipt `c767376a`), then `6592f82e` at 23:17
+merging a plan correction that arrived during the merge. Builder's gate
+at `6592f82e` in the landing worktree, one observed run: typecheck
+3.1 s, tests 8.5 s elapsed, 341 vitest tests and 5 in Node's runner
+passed. The planner's own merge-plan at 22:38 passed the checkout,
+frontier and approval checks and was refused on the implementer check;
+that is recorded, and the planner lands only its own document commits.
+
+What F lets a developer do on main, in builder's observed statement: a
+scope can state a platform definition as data with marked places where a
+rule stands, and the service refuses the whole scope when a rule is
+missing; an outside effect is recorded as an operation before it is sent,
+never sent twice, and after an unknown result only its own answer can
+follow; authority is read before a turn and decided inside the commit;
+and a Git package reads a real repository and classifies a push outcome.
+Nothing new runs in production: the production ports refuse, and the
+inbox is the one platform definition the production wiring can found.
+The journey table above does not change: the rules scope and the
+destination are still scripted peers, and the extents are still on a
+branch. The 07:00 report tells F's story as an observed run.
+
+Also after 22:02: the second milestone was filed at `d0354e26` and got
+changes requested (`25e00e2a`): four P2 findings in source, under repair
+with sibling sweeps. Authority revision 25 (`a1d18e51`) got changes
+requested on one point the planner had answered, and revision 26
+(`f7175296`) restores it with the planner's four answers (`5a036318`).
+Spike J0's first half ran on the reference clip's audio; its judgment
+waits on hugh listening.
+
 ## Sprint 5 commitments, 23:00 to 07:00 Eastern
 
 Recorded in the workroom under the cadence act `c514748f`.
 
-- **Builder.** See the filing of milestone F at `2ad870f3` through (stop
-  and refile if it passes 80 minutes); invite the checker; on approval,
-  land F on main through the shared checkout route. Then run the gate on `6f9c3186`, state its test
-  count and time, and file it as the second milestone on its own request.
+- **Builder.** (F is landed at 22:51; that part is met.) Repair the
+  second milestone's four P2 findings at a child of `d0354e26`, refile
+  under request `53f83851` and invite the checker; on approval, land it.
   Carry the G30 refinements into the next lane forms revision, and write
   the rules content that holds an extent when authority revision 24's
   missing forms exist.
-- **Checker.** F at its refiled head first, as an exact-head independent
-  review with the earlier verdict's evidence carried by tree; then the
-  second milestone when filed.
-- **Planner.** Land F on approval; file the second milestone's request with the
+- **Checker.** Authority revision 26 (`f7175296`) when filed; the second
+  milestone at its repaired head; then the next design revisions as they
+  come.
+- **Planner.** (F is landed; the second milestone's request `53f83851` is filed.) Adopt authority revision 26 on approval; land the second milestone's approval through builder; file the next milestone's request with the
   same "the commission stays open" condition; keep the hourly surveys;
   write the 07:00 report. No cloud sessions.
 - **Second planner.** The identity design (`046f88ba`) when free; carry
