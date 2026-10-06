@@ -185,6 +185,28 @@ describe("18.47: a reservation that an item holds is taken once, drawn down and 
     expect([s.state.holder(job), s.state.account(s.last.seq, 0), s.state.accountsOf(job), s.state.operationsFor(job).map((o) => o.id)]).toEqual([{ operations: { tidy: 1 } }, job, [{ seq: s.last.seq, n: 0, item: job }], [step, s.opened()[0]]]);
   });
 
+  test("a request and an item of the account draw on `requests` and `items`: a second request, and a second item, are past the count, and nothing is written", () => {
+    // M with one more type, `note`, which the mark of `step` may open. A job holds 1 item beside its 1 request.
+    const s = new Works(valid(changed(works, (d) => { d.items.note = { ...d.items.job, holds: undefined }; delete d.items.note.holds; d.items.job.holds.items = 1; d.outcomes.step.most = { effects: 2, operations: ["step", "tidy"], opens: "note" }; })));
+    expect(s.definition.reserving!.holders["job"]!.amount).toEqual({ entries: 8, items: 1, records: 0, bytes: 9 * EB, requests: 1 });
+    s.script.begin = ({ resolved }) => opened(0, "step", 1, resolved.self);
+    expect(s.start()).toBe("written");
+    const [job, first] = [s.last.seq, s.opened()[0]!];
+    // The first outcome opens the second step, sends the request and opens a note: three draws, each within its count.
+    s.script.report = () => TELL;
+    s.script.derives = (_kind, { resolved }, operation) => ({ effects: [{ effect: "open", item: resolved.self, type: "note", state: "open" }], sends: [], opens: operation.id === first ? [{ owner: OWNER, kind: "step", attempts: 1, for: job }] : [] });
+    expect([s.outcome(first, 1, "confirmed"), s.state.holder(job), s.item(s.last.seq).type]).toEqual(["written", { operations: { tidy: 1 } }, "note"]);
+    const [second, written] = [s.opened()[0]!, s.entries.length];
+    // The second outcome would open a second note: past the count of items. Without the note it would send a second request: past the count of requests.
+    s.script.report = () => null;
+    expect([s.outcome(second, 1, "confirmed"), s.entries.length]).toEqual(["unavailable", written]);
+    s.script.report = () => TELL;
+    s.script.derives = () => ({ effects: [], sends: [], opens: [] });
+    expect([s.outcome(second, 1, "confirmed"), s.entries.length]).toEqual(["unavailable", written]);
+    s.script.report = () => null;
+    expect(s.outcome(second, 1, "confirmed")).toBe("written");
+  });
+
   test("cases 7 and 8: a draw past a count is a fault, and so is an operation of a held kind with no `for`: nothing is written, and the outcome stays offered", () => {
     const { s, job, step } = started();
     again(s, job, job);
