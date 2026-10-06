@@ -66,10 +66,26 @@ assertions, with the changed file restored. Logs:
 
 Initial focused commands could not start because this new worktree had
 no usable dependency links. A local link farm then reused installed
-third-party packages and this worktree's workspace sources. No package
-was installed, no lockfile changed, and shared dependencies were not
+third-party packages and this worktree's workspace sources. For those
+focused checks no package was installed, no lockfile changed, and shared dependencies were not
 modified. The failed setup attempts are not source regressions or test
 passes. The final changed-source gate is recorded after it runs.
+
+The final source gate passed at
+`db613d1c18139bfa753f0d2f8aa6c7dae570d513`, tree
+`58fd599048ccdd3d436b0a53b939042ea25f7ee1`, with a clean checkout:
+722 Vitest tests, six Node tests, all workspace typechecks and whitespace.
+The gate installed the unchanged locked dependencies because the local
+link farm had no installation stamp. Installation took 1.9 seconds
+elapsed and 2.2 CPU; typecheck 3.8 elapsed and 9.6 CPU; tests 12.3 elapsed
+and 33.4 CPU. The whole command took 18.31 seconds elapsed, 37.83 user
+CPU and 7.71 system CPU. These are one observed run on the shared Mac,
+not a controlled cost comparison or saving claim. Logs are
+`/tmp/artroom-capacity-s1-gate.log` and
+`/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.TmoSsa2MFB`.
+This annotation changes only this note; the gated packages tree is
+`b41af33fe7f3d4b78b9879f6080e718babcfcfb4`. Source and tests are unchanged
+after the gate, so no document-only repeat is needed.
 
 ## Duties kept open
 
