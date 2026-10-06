@@ -132,6 +132,20 @@ export interface OperationRules {
    * `cc570904`'s.
    */
   closure?: number;
+  /**
+   * The operations that an outcome entry of this kind opens are reserved by
+   * another duty than the operation itself, which the owner's specification
+   * counts: a publication of the destination reserves, at its `reserve`,
+   * every operation of its judgment, its push and its receipt (authority
+   * note, section 5.8, the two rows of the destination). The kinds of such
+   * an owner open each other in a circle, as a `judge` opens a push whose
+   * outcome opens the next `judge`, so no number is a closure of one. The
+   * ledger then makes no closure check for an outcome of this kind, and
+   * `closure` counts nothing for it. Absent: the closure is the check.
+   */
+  // I3 merge: the count of that other duty is not built for any owner. A destination reserves for an open operation only its own
+  // outcome entries (I3 deltas, entry FA3; request `cc570904`).
+  covered?: boolean;
 }
 
 /**
@@ -374,7 +388,8 @@ export function outcomeOf(view: StateView, definition: ValidDefinition, outcome:
   // Section 17.2, row 5: an outcome entry is never asked whether it fits (section 17.3), so what it opens was reserved with its own
   // operation, as the closure that the owner declares. An owner whose outcome would open more has broken its own declaration:
   // fail closed, and nothing is written.
-  if (derived.opens.reduce((entries, open) => entries + reservedBy(open, owners), 0) > (rules.closure ?? 0)) return { result: "unavailable", reason: "unavailable" };
+  // An owner whose specification reserves them by another duty states `covered`, and is not asked here.
+  if (rules.covered !== true && derived.opens.reduce((entries, open) => entries + reservedBy(open, owners), 0) > (rules.closure ?? 0)) return { result: "unavailable", reason: "unavailable" };
   // Section 6.1, "An entry that cannot be refused": the same for the most that the owner declares for one outcome entry.
   const { most } = rules;
   if (most && (derived.effects.length + 2 * derived.opens.length > most.effects || derived.sends.length > most.requests || derived.opens.length > most.operations)) return { result: "unavailable", reason: "unavailable" };
