@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at vitest.config.ts","body":{"commit":"48a2b285141cbeb00f181b5d544e86e4acde5374","path":"vitest.config.ts"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:000498bcaa06328fb1c0f3fb3b3267f871c8d388","text":"Merge retired a covered predecessor; the successor is at packages/scope/test/turn.test.ts."}
