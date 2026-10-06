@@ -269,5 +269,19 @@ amended source. Source `8eaf531f2` repairs the separately confirmed
 current replay owner-composition defect `44739493`; its five focused
 replay tests and replay typecheck passed. Its old-call control reports
 `DISTINGUISHES` by an assertion. Both repairs are integrated before the
-amended source gate and replacement filing. The final amended gate and
-head will be recorded below once that gate completes.
+amended source gate and replacement filing.
+
+The corrected gate at `47bc3a5be6765dd9b0c1fb300ddb36d6f4213731`,
+tree `46e969c82d934a41adbd1e446cd825a135086f28`, passed whitespace,
+all workspace typechecks, 717 Vitest tests and six Node tests. The
+checkout was clean; installation was skipped against the unchanged
+lockfile. Typecheck took 3.2 seconds elapsed and 9.4 CPU; tests took
+11.3 seconds elapsed and 31.8 CPU. The whole command took 14.81 seconds
+elapsed, 34.88 user CPU and 6.54 system CPU. Logs are
+`/tmp/artroom-i3-m4-owner-corrected-gate.log` and
+`/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.cOomu7Lr6w`.
+This annotation changes this note only; the gated packages tree remains
+`3d4cb3ff2bfdb4e33072bbc44f46e85a96228f56`. The earlier unexplained
+membership failure remains separately owned under `bd5a8986`, with all
+five previous outputs retained in assertion `4049031f`. Neither this
+pass nor the diagnostic assertions credit a functional repair of it.
