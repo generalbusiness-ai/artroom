@@ -278,8 +278,8 @@ export const destination: PlatformData = {
         { state: ["queued"], of: "also.publication", reason: "ended" },
       ],
       effects: [
-        // While `queued`: the first decision that is bound. A refused deciding entry applies no effect of its handler, so the mark
-        // is not set when a bound `withdraw` is refused (entry ER10).
+        // While `queued`: the bound `withdraw` that is applied. A refused deciding entry applies no effect of its handler, so a
+        // refused `withdraw` sets nothing (revision 25, "A refused `withdraw` sets nothing"; entry ER10). It is then new work.
         { value: { slot: "withdrawDecided", from: { const: true } }, of: "also.publication" },
         { state: "not-reserved", of: "also.publication" },
         { value: { slot: "reason", from: { const: "withdrawn" } }, of: "also.publication" },
