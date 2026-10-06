@@ -44,7 +44,7 @@ import {
   HOLD, HOLD_KINDS, MISMATCHES, MemoryState, WINDOWS, actionOf, agrees, applyEntry, drawsOf, clockOf, contentStates, entryOf, fits, namedBy, observedName, retainsOf, headsOf, highestHead, inputTexts, isAncestryCheck, isFactRef, isLocalId, isObject, isScopeRef, judgeAct, judgeCheckpoint, judgeDelivery,
   judgeDiagnosis, evidenceValues, outcomeValueDomains, fixedBy, judgeGenesis, judgeGrant, judgeOutcome, judgePreparation, judgeTimed, membershipOf, nextDue, observedOf, own, ownersOf, placesOf, ruleAt, same, snapshotRead, stepsOf, timeMs, updateOf, validateDefinition, valueDigest, windowOf,
 } from "@generalbusiness/artroom-derive";
-import type { ActJudgment, AncestryCheck, Capabilities, Clock, Fetched, Judgment, Observing, Owners, PlatformRules, PreparationJudgment, RecordedRef, Retains, Rules, StateView, TimedJudgment, ValidDefinition, Window } from "@generalbusiness/artroom-derive";
+import type { ActJudgment, AncestryCheck, Capabilities, Clock, DrawOptions, Fetched, Judgment, Observing, Owners, PlatformRules, PreparationJudgment, RecordedRef, Retains, Rules, StateView, TimedJudgment, ValidDefinition, Window } from "@generalbusiness/artroom-derive";
 import { RULE_PROFILES, evaluateRules } from "@generalbusiness/artroom-derive/rule";
 import { PAGE_ENTRIES, PAGE_REPLY_BYTES, RETAINED_REPLY_BYTES, hashOfBytes, type HistorySource, type Stored } from "./source.ts";
 import { View } from "./view.ts";
@@ -280,6 +280,8 @@ interface Run {
   state: MemoryState;
   /** The checked entries, by `seq`. */
   sealed: { entry: Entry; hash: Digest }[];
+  /** Existing retained inputs, checked with each entry, reused when an observation view folds that entry. No wire metadata. */
+  foldInputs: Map<number, DrawOptions>;
   /** Entries read and not yet checked, by `seq`, and where the next page begins. */
   read: Map<number, Stored>;
   next: number | null;
@@ -481,7 +483,7 @@ class Verifier {
     if (this.#runs.size >= this.#limits.scopes) throw new Stop("incomplete", `the limit of ${this.#limits.scopes} scopes was reached`);
     const got = await this.#page(id, 0);
     if (!got.ok) return null;
-    const run: Run = { id, said: got.page.scope, head: got.page.head, at: null, named: null, definition: null, platform: null, state: new MemoryState(), sealed: [], read: new Map(), next: 0, busy: false, depth: Number.POSITIVE_INFINITY, owed: new Map(), reads: new Map(), runs: { seen: new Set(), last: null }, observed: undefined, viewed: null, membership: undefined, rulesScope: undefined, revised: null, snapshots: new Map() };
+    const run: Run = { id, said: got.page.scope, head: got.page.head, at: null, named: null, definition: null, platform: null, state: new MemoryState(), sealed: [], foldInputs: new Map(), read: new Map(), next: 0, busy: false, depth: Number.POSITIVE_INFINITY, owed: new Map(), reads: new Map(), runs: { seen: new Set(), last: null }, observed: undefined, viewed: null, membership: undefined, rulesScope: undefined, revised: null, snapshots: new Map() };
     if (!this.#take(run, 0, got.page.entries, got.page.next)) return null;
     this.#runs.set(id, run);
     return run;
@@ -799,7 +801,7 @@ class Verifier {
     const view = source.viewed ?? (source.viewed = new View());
     while (view.through < seq) {
       const next = source.sealed[view.through + 1]!;
-      view.fold(source.definition!, next.entry, next.hash, { bounds: this.#bounds, platform: source.platform ?? undefined });
+      view.fold(source.definition!, next.entry, next.hash, source.foldInputs.get(next.entry.seq) ?? { bounds: this.#bounds, platform: source.platform ?? undefined });
       this.#tally.folds++;
     }
     const { state, built } = view.at(seq);
@@ -1181,7 +1183,8 @@ class Verifier {
     // from the history. The fold derives each draw and each release, and the checkpoint's digest covers what it keeps. An entry
     // that draws past a count, or that opens an operation of a held kind for no holder, is a mismatch with its own name, whatever
     // a judge would say of its input.
-    const drawn = drawsOf(state, definition, entry, { bounds, platform: run.platform ?? undefined });
+    const foldInputs: DrawOptions = reading;
+    const drawn = drawsOf(state, definition, entry, foldInputs);
     if ("fault" in drawn) throw mismatch(`${drawn.fault === "past-count" ? "draw-past-count" : "held-without-holder"}: ${drawn.detail}`);
     const copyOf = (fact: FactRef | null) => facts.find((f) => f.fact.hash === fact?.hash) ?? null;
     const sealed = (seq: unknown): Entry | null => (isLocalId(seq) ? (run.sealed[seq]?.entry ?? null) : null);
@@ -1340,7 +1343,8 @@ class Verifier {
       if (canonicalize(derived[part]) !== canonicalize(entry[part])) throw mismatch(`the recorded ${part} are not the ones derived again`);
     }
     if (canonicalize(derived) !== bytes) throw mismatch("the recorded entry is not the one derived again");
-    applyEntry(state, definition, entry, hash, { bounds, platform: run.platform ?? undefined });
+    applyEntry(state, definition, entry, hash, foldInputs);
+    if (input.type === "delivery" && input.message.class === "request") run.foldInputs.set(entry.seq, foldInputs);
     if (!fits(state, definition, bounds, input, judged.draft.settles, this.#owners)) throw mismatch("the taking or new-work entry exceeds the budget of used plus reserved entries");
     // Section 16.1: this entry is now the latest that retains each of its reads, in its grant and in `observed`. A preparation retains one in its grant,
     // and an outcome and a delivery of a result in `observed` alone.

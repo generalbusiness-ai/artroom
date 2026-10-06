@@ -126,7 +126,7 @@ function ticket(of: ScopeRef, seq = ++made): Fetched {
 class Jobs extends Scope {
   budget = 0;
   readonly counts: Counts = decisionCounts(this.state);
-  override get foldOptions() { return { bounds: this.bounds, platform: this.using?.foldPlatform }; }
+  override get foldOptions() { return { ...super.foldOptions, platform: this.using?.foldPlatform }; }
   constructor(definition: ValidDefinition, readonly using = rules()) { super(definition); }
   row() { return [this.head.seq + 1, owed(this.state, this.definition, this.last.input)] as const; }
   free(entries: number) { const [used, reserved] = this.row(); this.budget = used + reserved + entries; return this; }
@@ -262,6 +262,77 @@ describe("18.53, at the validator: the index, the binding selector and `bound`",
 });
 
 describe("18.53, in the judge: a bound request finds its item by a selector, at a full scope", () => {
+  test("an early ill-typed field keeps the count, while a late coded bad-field guard refusal draws it without rerunning the guard in the fold", () => {
+    const data = structuredClone(M) as unknown as import("@generalbusiness/artroom-contract").PlatformData;
+    data.receives["stop"]!.fields["amount"] = { type: "int", min: 0, max: 1, required: true };
+    data.receives["stop"]!.guards = [{ code: "decline", row: "P15" }];
+    data.receives["stop"]!.effects = [];
+    let guards = 0;
+    const using = rules({ decline: { place: "guard", refusals: ["late"], run: () => { guards++; return { holds: false, name: "late", code: "bad-field" }; } } });
+    const G = new Jobs(valid(validateDefinition(data, PROPOSED_BOUNDS, PROFILES, { platform: true })), using);
+    const t = ticket(Q);
+    const job = G.start(Q, t);
+    expect(G.free(1).deliver(G.request(Q, "stop", { ticket: t.fact, amount: "wrong" }, [t]))).toBe("new work");
+    expect([G.last.input, G.state.holder(job), guards]).toEqual([expect.objectContaining({ decision: "refused", reason: { code: "bad-field" } }), { decisions: { stop: 1 } }, 0]);
+    const before = G.row().reduce((a, b) => a + b);
+    G.free(0);
+    expect(G.deliver(G.request(Q, "stop", { ticket: t.fact, amount: 0 }, [t]))).toBe("settles");
+    expect([G.last.input, G.last.effects, G.state.holder(job), G.row().reduce((a, b) => a + b), guards]).toEqual([expect.objectContaining({ decision: "refused", reason: { code: "bad-field", name: "late" } }), [], null, before, 1]);
+    expect([G.replay().holder(job), guards]).toEqual([null, 1]);
+  });
+
+  test("a late effect refusal with the same unqualified bad-field code as an early field refusal still consumes its bound decision", () => {
+    const data = structuredClone(M) as unknown as import("@generalbusiness/artroom-contract").PlatformData;
+    data.items["job"]!.values["amount"] = { fixed: false, required: true, default: 0, of: { type: "int", min: 0, max: 1 } };
+    data.receives["stop"]!.guards = [];
+    data.receives["stop"]!.effects = [{ code: "invalid-value", row: "P15" }];
+    let effects = 0;
+    const using = rules({ "invalid-value": { place: "effect", most: 1, run: ({ resolved }) => { effects++; return [{ effect: "value", item: resolved.subjects.get("also.job")!.id, slot: "amount", value: "wrong" }]; } } });
+    const G = new Jobs(valid(validateDefinition(data, PROPOSED_BOUNDS, PROFILES, { platform: true })), using);
+    const t = ticket(Q);
+    const job = G.start(Q, t);
+    G.free(0);
+    expect(G.deliver(G.stop(Q, t))).toBe("settles");
+    expect([G.last.input, G.last.effects, G.state.holder(job), G.replay().holder(job), effects]).toEqual([expect.objectContaining({ decision: "refused", reason: { code: "bad-field" } }), [], null, null, 1]);
+  });
+
+  test("genuine pre-binding item, local-fact and alias failures keep their decisions and never run the later coded guard", () => {
+    for (const failure of ["no-item", "fact-mismatch", "alias"]) {
+      const data = structuredClone(M51) as unknown as import("@generalbusiness/artroom-contract").PlatformData;
+      data.receives["stop"]!.effects = [];
+      data.receives["stop"]!.guards = [{ code: "decline", row: "P15" }];
+      if (failure === "fact-mismatch") data.receives["stop"]!.fields = { job: { type: "fact", kind: ["start"], under: data.name, required: true } };
+      if (failure === "alias") data.receives["stop"]!.also["duplicate"] = { item: "job", by: "job" };
+      let guards = 0;
+      const using = rules({ decline: { place: "guard", refusals: ["late"], run: () => { guards++; return { holds: false, name: "late", code: "bad-field" }; } } });
+      const G = new Jobs(valid(validateDefinition(data, PROPOSED_BOUNDS, PROFILES, { platform: true })), using);
+      expect(G.free(3).deliver(G.request(Q, "start", {}))).toBe("new work");
+      const job = G.head.seq;
+      const ref = failure === "no-item" ? G.fact(0) : failure === "fact-mismatch" ? { ...G.fact(job), hash: d("f") } : G.fact(job);
+      expect(G.free(1).deliver(G.request(Q, "stop", { job: ref }))).toBe("new work");
+      expect([G.last.input, G.state.holder(job), G.replay().holder(job), guards]).toEqual([expect.objectContaining({ decision: "refused", reason: { code: failure } }), { decisions: { stop: 1 } }, { decisions: { stop: 1 } }, 0]);
+    }
+  });
+
+  test("a clock-declaring type or guard refusal is not written with a clamped reading that would lose its pre-binding inputs", () => {
+    for (const phase of ["type", "guard"]) {
+      const data = structuredClone(M) as unknown as import("@generalbusiness/artroom-contract").PlatformData;
+      data.receives["stop"]!.effects = [];
+      data.receives["stop"]!.guards = [{ code: "decline", row: "P15" }];
+      if (phase === "type") data.receives["stop"]!.fields["amount"] = { type: "code", code: "typed", row: "P15", required: true };
+      const using = rules({
+        typed: { place: "type", clock: true, run: () => false },
+        decline: { place: "guard", clock: phase === "guard", refusals: ["late"], run: () => ({ holds: false, name: "late", code: "bad-field" }) },
+      });
+      const G = new Jobs(valid(validateDefinition(data, PROPOSED_BOUNDS, PROFILES, { platform: true })), using);
+      const t = ticket(Q);
+      const job = G.start(Q, t);
+      const head = G.head;
+      G.now = "2026-10-04T11:59:59Z";
+      expect([G.judged(G.request(Q, "stop", { ticket: t.fact, ...(phase === "type" ? { amount: 0 } : {}) }, [t])), G.head, G.state.holder(job)]).toEqual([{ result: "unavailable", reason: "clock-behind" }, head, { decisions: { stop: 1 } }]);
+    }
+  });
+
   test("dec(m) reserves the whole closure of an unheld operation that a bound handler's mark may open", () => {
     const data = structuredClone(M) as unknown as import("@generalbusiness/artroom-contract").PlatformData;
     data.outcomes["audit"] = { code: "audit", row: "P16", attempts: 1 };
