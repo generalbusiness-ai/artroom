@@ -1,17 +1,27 @@
 import { describe, expect, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { Answer, Intent, OperationId, Read, Seed } from "@generalbusiness/artroom-contract";
-import { intentDigest, scopeIdOf, seedDigest, signIntent } from "@generalbusiness/artroom-bytes";
+import type { Answer, Entry, Intent, Observation, ObservationUse, OperationId, Read, Seed } from "@generalbusiness/artroom-contract";
+import { b64url, intentDigest, scopeIdOf, seedDigest, signIntent } from "@generalbusiness/artroom-bytes";
+import { requestSession, sessionRequest, type Fetch } from "@generalbusiness/artroom-client";
 import { PROFILES, ruleAt, validateDefinition, type Item } from "@generalbusiness/artroom-derive";
 import { keys } from "@generalbusiness/artroom-derive/testing";
 import { DIRECTORY, REGISTER, platform, repositoryName } from "@generalbusiness/artroom-platform";
+import { httpSource, verify } from "@generalbusiness/artroom-replay";
 import { net } from "../src/testing.ts";
 import { soon } from "./net.ts";
 import { outsideOf, wired } from "./outside.ts";
-import { Platform, rita, sam, settle } from "./repository.ts";
+import { Platform, rita, routed, sam, settle } from "./repository.ts";
 import { reader } from "./support.ts";
+import { platformNet } from "./worker.ts";
 
 const { paul } = keys;
+const SERVICE = "https://scopes.test";
+
+/** The freshness proof that an act's entry retains in its grant. */
+const proof = (entry: Entry): ObservationUse & { observation: Observation } => {
+  if (entry.input.type !== "act" || !entry.input.authority[0]) throw new Error("the entry records no grant");
+  return entry.input.authority[0].fresh as ObservationUse & { observation: Observation };
+};
 
 /** The marks of one platform definition that the platform package has no rule of the right kind for, by name, once each: what a runtime with this package lacks to run it. */
 function lacking(named: string): string[] {
@@ -29,10 +39,10 @@ function lacking(named: string): string[] {
 // |---|---|
 // | The register, the directory, membership and the rules scope | Real scopes, written through the turn, the store, the dispatchers and the operations driver. |
 // | The Git host | A STAND-IN: `OutsideDouble` of `outside.ts`, wired as the register's outside port. It answers the one request of an attempt with what the test wrote. Nothing here creates a repository. |
-// | The clock, transport and the readers | The scripted clock, the namespace's transport, and the test readers, as in every test of the namespace `PLATFORM`. |
+// | The clock, transport and the readers | The scripted clock, the namespace's transport, and the test readers, as in every test of the namespace `PLATFORM`. For the reads that are about a session, the readers are the real read sessions, under a TEST SECRET that the test generates. |
 // | Who may install | Nothing checks it: that is the installation design's (N5). paul signs the `install`. |
 describe("a founding on real scopes under the deployed class (authority note, section 3.8; I3 plan, step 9c). The Git host is a STAND-IN", () => {
-  test("an install founds a register; a founder's claim opens the creation of a repository; its own answer selects it and creates the directory; the directory's genesis creates membership and the rules scope, each held until the register's confirm; and the creation of the destination is not decided, because `platform:destination@1` lacks rules", async () => {
+  test("an install founds a register; a founder's claim opens the creation of a repository; its own answer selects it and creates the directory; the directory's genesis creates membership and the rules scope, each held until the register's confirm; the creation of the destination is not decided, because `platform:destination@1` lacks rules; and the rules scope's first act fixes the incarnation of the membership scope whose ID it holds", async () => {
     net.hold = net.deaf = null;
     // Step 0: the register, by an `install` intent with `to: null`, under `platform:register@1`. Its seed has the kind `register` and
     // no creator, and the object's name is the seed's digest.
@@ -123,5 +133,49 @@ describe("a founding on real scopes under the deployed class (authority note, se
       [["0.0", false, true, false], ["0.1", false, true, true], ["0.2", false, true, true], ["0.3", false, false, false], [expect.any(String), false, true, false], [expect.any(String), false, true, false]],
     ]);
     wired.delete(R.name);
+
+    // Where the rules scope records its membership reference (authority note, revision 25, section 12.1; I3 deltas EM21, EQ7 and
+    // EU6). rita takes her seat in membership, on the founding key, and so is an admin, who holds `rules.publish`.
+    const seat = await membershipScope!.did(rita, "seat", { expected: await membershipScope!.expected({ roster: 0 }) });
+    await membershipScope!.did(rita, "first-key", { fields: { member: seat }, expected: await membershipScope!.expected({ roster: 0, member: seat }) });
+    // A read session of rita's, issued by membership under a TEST SECRET that this test generates. A scope accepts a session only
+    // when it names the membership reference that the scope itself records, with its incarnation. So what a reader with it is
+    // answered at the rules scope shows what that scope records, as its own store holds it.
+    platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32)));
+    const real = async <T>(run: () => Promise<T>): Promise<T> => { platformNet.sessions = true; try { return await run(); } finally { platformNet.sessions = false; } };
+    const issued = await real(async () => requestSession(SERVICE, membershipScope!.name, sessionRequest(membership, rita.secret, soon(60), "founding-real"), { fetch: routed as unknown as Fetch }));
+    if (!issued.ok) throw new Error(`no session: ${issued.reason}`);
+    const reads = async (node: Platform) => (await real(() => routed(`${SERVICE}/v1/scopes/${node.name}`, { headers: { authorization: issued.session.reader() } }))).status;
+    // The directory records the reference with its incarnation, and the rules scope records the ID alone: no session is accepted there yet.
+    expect([await reads(D), await reads(rulesScope!)]).toEqual([200, 403]);
+    const publish = async (approvals: number) => rulesScope!.act(rita, "publish", { on: 0, expected: await rulesScope!.expected({ on: 0 }), fields: { approvals, ownerMayReview: false, checks: [], labels: [] } });
+    // The rules scope's first act that needs a grant. It holds membership's scope ID and no incarnation, so its first read asks by the
+    // ID alone. The answer's `of` holds the incarnation of the scope that answered, guard 1 takes it, and the entry that retains
+    // the observation fixes it: the grant covers this scope by that reference.
+    expect(await publish(2)).toMatchObject({ answer: "accepted" });
+    const first = proof(await rulesScope!.last());
+    expect(first).toMatchObject({ observation: { of: membership, key: rita.key, keyState: "active", role: "admin", within: { membership } }, use: "fresh", prior: null });
+    // From then on the incarnation is a function of the folded state: the rules scope records the reference with it, and accepts the
+    // session. A later read states it: after a restart the object holds no observation in memory, records the same reference from
+    // its store, reads again, and is answered by the same incarnation.
+    expect(await reads(rulesScope!)).toBe(200);
+    await rulesScope!.restart();
+    net.clock.now = soon(10);
+    expect(await reads(rulesScope!)).toBe(200);
+    platformNet.secret = null;
+    expect(await publish(3)).toMatchObject({ answer: "accepted" });
+    expect([proof(await rulesScope!.last()).observation.of, proof(await rulesScope!.last()).use, (await rulesScope!.item(0)).values["approvals"]]).toEqual([membership, "fresh", 3]);
+    // A request that states another incarnation of membership's name is answered by nobody, and one by the ID alone is answered.
+    const asked = { ...membership, inc: register.inc };
+    expect([await membershipScope!.stub.observe({ of: asked, key: rita.key }), await membershipScope!.stub.observe({ of: { scope: membership.scope, kind: "membership" }, key: rita.key })]).toMatchObject([null, { of: membership, key: rita.key }]);
+
+    // A verifier reads the four histories as bytes and derives every entry again, with the platform package's data and rules: the
+    // register's outcome entry with its creation, the directory's genesis under the fourth cause, the clause of the result, and
+    // the grants of the rules scope from their observations, the first of which fixed the incarnation. No grant is taken as current.
+    const options = { mode: "replay", platform, grants: "proven" } as const;
+    for (const node of [R, D, membershipScope!, rulesScope!]) {
+      const { report, why } = await verify(httpSource(SERVICE, { fetch: routed }), { ...options, scope: node.name, head: (await node.summary()).at });
+      expect([(await node.at()).kind, report.result, why]).toEqual([(await node.at()).kind, "consistent", null]);
+    }
   });
 });

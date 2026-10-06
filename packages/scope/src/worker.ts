@@ -67,7 +67,7 @@ import type { Answer, Beside, Cursor, DeclaredDefinition, Digest, DutyId, Grant,
 import { definitionDigest, intentDigest, isScopeId, positionOf, scopeIdOf } from "@generalbusiness/artroom-bytes";
 import { isObject, type Item } from "@generalbusiness/artroom-derive";
 import { foundedKind, type Founded } from "./core.ts";
-import { recordedMembership, repositoryAuthority } from "./authority.ts";
+import { fixedMembership, repositoryAuthority } from "./authority.ts";
 import { membershipIn, namespace, type Binding } from "./namespace.ts";
 import { ScopeObject, type Wiring } from "./object.ts";
 import type { Incident } from "./operator.ts";
@@ -280,10 +280,10 @@ export async function route(request: Request, binding: Binding): Promise<Respons
  * The two parts of a wiring that read sessions need, over one source of the
  * session configuration, which is asked at every use. The readers port
  * accepts a session only for the membership scope that the scope itself
- * records: the reference that its authority reads (`recordedMembership`).
+ * records: the reference that its authority reads, with its incarnation (`fixedMembership`).
  */
 export function sessionWiring(sessions: () => Sessions | null): Required<Pick<Wiring, "readers" | "sessions">> {
-  return { readers: (given) => sessionReaders({ sessions, clock: given.clock, scope: given.scope, membership: (scope) => recordedMembership(given, scope) }), sessions };
+  return { readers: (given) => sessionReaders({ sessions, clock: given.clock, scope: given.scope, membership: (scope) => fixedMembership(given, scope) }), sessions };
 }
 
 /**
