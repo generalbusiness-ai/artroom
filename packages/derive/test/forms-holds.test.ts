@@ -105,6 +105,10 @@ describe("the validator's checks of `holds`, `adds` and what a mark may start (s
       // A mark of a handler of a request may open one: its entry is new work.
       codes(changed(works, (d) => { d.receives.start.opens = null; d.receives.start.effects = [{ code: "begin", row: "P16", most: { effects: 2, opens: "job" } }]; })),
     ]).toEqual([["holds outcomes.tidy.most.opens"], ["holds outcomes.step.send.result.applied"], "valid"]);
+    // A settling form is written with no free room. This source counts no mark of one, so a mark there that may open an item, or
+    // an operation of a kind that no item holds, is refused. One that lists held kinds draws on a holder, and validates.
+    const settling = (operations: string[]) => codes(changed(chain, (d) => { d.acts.finish.settles = { of: "on", in: ["open"] }; d.acts.finish.effects.push({ code: "after", row: "P16", most: { effects: 0, operations } }); }));
+    expect([settling(["u"]), settling(["k"])]).toEqual([["reserve-unbounded acts.finish.effects.1"], "valid"]);
   });
 
   test("18.49 cases 1 and 2: a held kind reserves the closure of a kind that no item holds: C(u) is 6, `one(k)` is 14 and a job reserves 14; with no child, 2", () => {
@@ -162,6 +166,10 @@ describe("18.47: a reservation that an item holds is taken once, drawn down and 
     expect([result, total - before, s.last.effects.find((effect) => effect.effect === "operation")]).toEqual(["written", 9, { effect: "operation", k: 0, owner: OWNER, kind: "step", attempts: 1, for: "self" }]);
     // The item still holds 1 `step`, 1 `tidy` and 1 request, and the open operation reserves 2 entries by row 5.
     expect([s.state.holder(job), s.state.operation(step)!.for, heldEntries(s.state, s.definition)]).toEqual([{ operations: { step: 1, tidy: 1 }, requests: 1 }, job, 6]);
+    // The data states 1 attempt of a `step`: a rule that opens one with 2 has a fault.
+    const more = new Works(worksDefinition);
+    more.script.begin = ({ resolved }) => opened(0, "step", 2, resolved.self);
+    expect(more.start()).toBe("unavailable");
     // Case 5: the entry and the item's 8 do not fit. Nothing is written.
     const short = started(8);
     expect([short.result, short.s.entries.length, short.s.state.holders()]).toEqual(["scope-full", 2, []]);
@@ -248,6 +256,9 @@ describe("18.47: a reservation that an item holds is taken once, drawn down and 
     const sent = s.last.seq;
     // The job is final and its one operation is settled. Its request is pending, and a clause of it can reach `tidy`: that count stays.
     expect([s.state.holder(job), s.definition.reserving!.reach]).toEqual([{ operations: { tidy: 1 } }, ["tidy"]]);
+    // A mark that states `most` opens one operation of each kind that it lists, and no other: a `step` there is a fault of the rule.
+    s.script.after = () => opened(0, "step", 1, job);
+    expect(s.answered(sent)).toBe("unavailable");
     // The result arrives at a scope with no free room. Its clause opens the `tidy` for the job: the account of the delivery is the job.
     s.script.after = () => opened(0, "tidy", 1, job);
     const before = s.free(0).total();
@@ -324,7 +335,11 @@ describe("18.49: a held kind opens a kind that no item holds, at capacity (secti
     // Under M the same outcome may not open two of one kind, or state more attempts than the data of `u` does.
     const m = started().s;
     const twice = (opens: { kind: string; attempts: number }[]) => { m.script.derives = () => ({ effects: [], sends: [], opens: opens.map((open) => ({ owner: OWNER, ...open })) }); return m.outcome(m.opened(m.entries[2]!.entry)[0]!, 1, "confirmed"); };
-    expect([twice([{ kind: "u", attempts: 3 }, { kind: "u", attempts: 3 }]), twice([{ kind: "u", attempts: 4 }]), twice([{ kind: "u", attempts: 2 }])]).toEqual(["unavailable", "unavailable", "written"]);
+    expect([twice([{ kind: "u", attempts: 3 }, { kind: "u", attempts: 3 }]), twice([{ kind: "u", attempts: 4 }])]).toEqual(["unavailable", "unavailable"]);
+    // A kind that is counted by its data sends only the request of its `send`: a request of the rule's own was reserved by nobody.
+    m.script.derives = () => ({ effects: [], sends: [TELL], opens: [] });
+    expect(m.outcome(m.opened(m.entries[2]!.entry)[0]!, 1, "confirmed")).toBe("unavailable");
+    expect(twice([{ kind: "u", attempts: 2 }])).toBe("written");
   });
 });
 

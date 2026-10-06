@@ -212,6 +212,11 @@ export function reserving(d: Defining, top: Rec, capacity: Pick<Capacity, "deadl
         // Check 2: a handler of an advisory is no request, so its entry opens no holder.
         if (most.opens !== null && holderTypes.has(most.opens) && fv["class"] === "advisory") bad("holds", at(at(path, "effects"), i), "a type that states holds is opened only by new work, and no handler of an advisory opens one");
         if (most.opens !== null) opened.add(most.opens);
+        // I3 merge: section 17.2, "What a mark may start", a settling form: the reservation of an item that awaits its settlement
+        // counts what a mark of the settling form may start. `capacity.ts` counts the written effects of such a form, and no mark
+        // (I3 deltas, entry GB5). Until it does, a settling form whose mark may open a kind that no item holds, or an item, is
+        // refused: its entry is written with no free room, and nothing would have reserved what it starts.
+        if ("settles" in fv && (most.opens !== null || most.operations.some((kind) => !held.has(kind)))) bad("reserve-unbounded", at(at(path, "effects"), i), "a form that declares settles holds a mark that may open an item, or an operation of a kind that no item holds, and no reservation of this source counts what such a mark starts");
       });
       if (fv["class"] === "advisory" && typeof fv["opens"] === "string" && holderTypes.has(fv["opens"])) bad("holds", at(path, "opens"), "a type that states holds is opened only by new work, and no handler of an advisory opens one");
       (Array.isArray(fv["sends"]) ? fv["sends"] : []).forEach((s, i) => {

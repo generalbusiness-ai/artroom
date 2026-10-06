@@ -149,6 +149,9 @@ function given(mark: OutcomeMark, j: Judging, kinds: Readonly<Record<string, Out
   // Section 17.2, "What a mark may start": where the data of the kind states its attempts, one outcome entry opens one operation of
   // each kind that its `most` lists, and no other (witness 18.49, case 8). The reservation counted exactly that.
   if (mark.attempts !== undefined) {
+    // Section 17.2, "A request that an outcome sends": the one request of such a kind is the request of its `send`, which its
+    // operation or its holder reserved. A request of the rule's own would be reserved by nobody.
+    if (sends.length > 0) throw outside(mark, "a request of its own: a kind that is counted by its data sends only the request of its send");
     const listed = mark.most?.operations ?? [];
     const opened = opens.map((open) => open.kind);
     if (opened.some((kind, i) => !listed.includes(kind) || opened.indexOf(kind) !== i)) throw outside(mark, "an operation of a kind that its mark does not list, or two of one kind");
