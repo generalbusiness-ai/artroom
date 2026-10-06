@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import type { MemberId } from "@generalbusiness/artroom-contract";
 import { RULES_PATTERNS, actionsIn, classify, firstExtents, holdsRulesExtent, judgeExtents, matches } from "../src/index.ts";
-import type { Extent, ExtentsAsked, Holder, Role, TreeLink } from "../src/index.ts";
+import type { Extent, ExtentsAsked, Holder, Review, Role, TreeLink } from "../src/index.ts";
 
 // Judgments over data that each test writes by hand (authority note, revision 24, section 12.1.4a; the planner's request `42de9e34`).
 // No scope ran here, and no destination called these functions: the reservation that will is not built. A member's actions are those
@@ -11,6 +11,10 @@ const holder = (handle: string, role: Role): Holder => ({ member: handle as Memb
 // Two admins, who are the controllers of the rules scope; a maintainer; two members; and an agent, whose controller is `ada`.
 const [ada, ann, max, mel, art] = [holder("@ada", "admin"), holder("@ann", "admin"), holder("@max", "maintainer"), holder("@mel", "member"), holder("@art", "member")];
 const bot = "@bot" as MemberId;
+/** One approving verdict of a member for each extent that is named: a reviewer who covers two extents signs two verdicts. */
+const on = (who: Holder, ...extents: (string | null)[]): Review[] => extents.map((extent) => ({ ...who, extent }));
+/** A verdict of each member for every extent of the rules that these tests use. What each then meets is the extent's `approver` to say. */
+const each = (...who: Holder[]): Review[] => who.flatMap((member) => on(member, "rules", "infrastructure", "docs", "source"));
 
 /** The first definition, for a repository whose rules ask 1 approval and one required check. */
 const FIRST = firstExtents({ approvals: 1, checks: [{ name: "unit", required: true }, { name: "lint", required: false }] });
@@ -21,7 +25,7 @@ const names = (extents: readonly Extent[], paths: readonly string[], links: read
 /** A reservation of the mixed change by `art`, which `max` merges, with the check passed. Each test states what it changes. */
 const asked = (over: Partial<ExtentsAsked> = {}): ExtentsAsked => ({
   extents: FIRST, ownerMayReview: false, singleControllerException: false, touched: classify(FIRST, MIXED, []),
-  authors: [art.member], controllersOfAuthors: [], reviews: [], passed: ["unit"], merger: max, controllers: [ada.member, ann.member], ...over,
+  authors: [art.member], controllersOfAuthors: [], reviews: each(), passed: ["unit"], merger: max, controllers: [ada.member, ann.member], ...over,
 });
 /** What a judgment says: whether it is met, the unmet extents, and for each touched extent who counted and what it lacks. */
 const said = (over: Partial<ExtentsAsked> = {}) => {
@@ -51,7 +55,7 @@ test("the first definition names rules, infrastructure and source; an agent inst
     .toEqual([true, true, false, false, false, false, false]);
 });
 
-test("plan 016's mixed change touches three extents and needs each obligation; a reviewer outside an extent does not meet it, and nothing is averaged", () => {
+test("plan 016's mixed change touches three extents and needs each obligation; a reviewer outside an extent does not meet it, a verdict counts only for the extent that it states, and nothing is averaged", () => {
   const touched = classify(FIRST, MIXED, []);
   expect([touched.touched, touched.class, touched.unclassified, touched.refused]).toEqual([
     [{ extent: "rules", path: "AGENTS.md" }, { extent: "infrastructure", path: ".gitignore" }, { extent: "source", path: "src/app.ts" }], "authority", [], [],
@@ -59,49 +63,54 @@ test("plan 016's mixed change touches three extents and needs each obligation; a
   expect([classify(FIRST, ["src/app.ts"], []).class, classify(FIRST, ["src/app.ts", ".gitignore"], []).class, classify(FIRST, [], []).class]).toEqual(["content", "deployment", null]);
 
   // A source reviewer meets source alone. Two of them are still no infrastructure reviewer.
-  expect(said({ reviews: [mel] })).toEqual([false, ["rules", "infrastructure"], { rules: [[], ["approvals"]], infrastructure: [[], ["approvals"]], source: [["@mel"], []] }]);
-  expect(said({ reviews: [mel, holder("@moe", "member")] })[1]).toEqual(["rules", "infrastructure"]);
+  expect(said({ reviews: each(mel) })).toEqual([false, ["rules", "infrastructure"], { rules: [[], ["approvals"]], infrastructure: [[], ["approvals"]], source: [["@mel"], []] }]);
+  expect(said({ reviews: each(mel, holder("@moe", "member")) })[1]).toEqual(["rules", "infrastructure"]);
   // A maintainer meets infrastructure and source. A feature reviewer never meets rules.
-  expect(said({ reviews: [mel, max] })).toEqual([false, ["rules"], { rules: [[], ["approvals"]], infrastructure: [["@max"], []], source: [["@max", "@mel"], []] }]);
-  // The rules scope's controller meets rules, and one review may count for several extents.
-  expect(said({ reviews: [mel, max, ada] })[0]).toBe(true);
-  expect(said({ reviews: [ada] })).toEqual([true, [], { rules: [["@ada"], []], infrastructure: [["@ada"], []], source: [["@ada"], []] }]);
+  expect(said({ reviews: each(mel, max) })).toEqual([false, ["rules"], { rules: [[], ["approvals"]], infrastructure: [["@max"], []], source: [["@max", "@mel"], []] }]);
+  // The rules scope's controller meets rules. A reviewer who covers three extents signs three verdicts.
+  expect(said({ reviews: each(mel, max, ada) })[0]).toBe(true);
+  expect(said({ reviews: each(ada) })).toEqual([true, [], { rules: [["@ada"], []], infrastructure: [["@ada"], []], source: [["@ada"], []] }]);
+  // A verdict counts for the one extent that it states (the lane forms' revision 15, ask 4), whatever its reviewer holds: an admin's
+  // verdict on `source` meets source alone, a verdict that states no extent meets none, and so does one that states an unknown name.
+  expect(said({ reviews: on(ada, "source") })).toEqual([false, ["rules", "infrastructure"], { rules: [[], ["approvals"]], infrastructure: [[], ["approvals"]], source: [["@ada"], []] }]);
+  expect([said({ reviews: on(ada, null) })[1], said({ reviews: on(ada, "all") })[1], said({ reviews: [{ member: ada.member, holds: ada.holds } as Review] })[1]]).toEqual(Array(3).fill(["rules", "infrastructure", "source"]));
+  expect(said({ reviews: [...on(ada, "rules"), ...on(max, "infrastructure"), ...on(mel, "source")] })).toEqual([true, [], { rules: [["@ada"], []], infrastructure: [["@max"], []], source: [["@mel"], []] }]);
   // Two reviews of one member are one reviewer.
-  expect(said({ extents: FIRST.map((extent) => ({ ...extent, approvals: 2 })), reviews: [ada, ada] })[1]).toEqual(["rules", "infrastructure", "source"]);
+  expect(said({ extents: FIRST.map((extent) => ({ ...extent, approvals: 2 })), reviews: each(ada, ada) })[1]).toEqual(["rules", "infrastructure", "source"]);
 
   // Each extent asks its own checks, and a class beyond `content` asks the landing actor's standing grant.
-  expect(said({ reviews: [ada], passed: [] })).toEqual([false, ["source"], { rules: [["@ada"], []], infrastructure: [["@ada"], []], source: [["@ada"], ["checks"]] }]);
-  expect(said({ reviews: [ada], merger: mel })[1]).toEqual(["rules", "infrastructure"]);
-  expect(said({ reviews: [ada], merger: mel, touched: classify(FIRST, ["src/app.ts"], []) })[0]).toBe(true);
+  expect(said({ reviews: each(ada), passed: [] })).toEqual([false, ["source"], { rules: [["@ada"], []], infrastructure: [["@ada"], []], source: [["@ada"], ["checks"]] }]);
+  expect(said({ reviews: each(ada), merger: mel })[1]).toEqual(["rules", "infrastructure"]);
+  expect(said({ reviews: each(ada), merger: mel, touched: classify(FIRST, ["src/app.ts"], []) })[0]).toBe(true);
 });
 
 test("a change to the rules extent is not met by its author's review, whatever `ownerMayReview` says, and with no declared exception one controller alone changes nothing", () => {
   // The author is the only controller, and the only reviewer.
-  const own = { authors: [ada.member], reviews: [ada], merger: ada, controllers: [ada.member] };
+  const own = { authors: [ada.member], reviews: each(ada), merger: ada, controllers: [ada.member] };
   expect(said(own)).toEqual([false, ["rules", "infrastructure", "source"], { rules: [[], ["approvals"]], infrastructure: [[], ["approvals"]], source: [[], ["approvals"]] }]);
   // The controller of an agent among the authors: `ownerMayReview` lets that review count for the other extents, and never for rules.
-  const agent = { authors: [bot], controllersOfAuthors: [ada.member], reviews: [ada], controllers: [ada.member] };
+  const agent = { authors: [bot], controllersOfAuthors: [ada.member], reviews: each(ada), controllers: [ada.member] };
   expect([said({ ...agent, ownerMayReview: true })[1], said({ ...agent, ownerMayReview: false })[1]]).toEqual([["rules"], ["rules", "infrastructure", "source"]]);
   // A second controller, independent of the authors, meets it.
-  expect(said({ ...own, reviews: [ada, ann], controllers: [ada.member, ann.member] })[0]).toBe(true);
+  expect(said({ ...own, reviews: each(ada, ann), controllers: [ada.member, ann.member] })[0]).toBe(true);
 });
 
 test("the single-controller exception holds only when it is declared, membership shows one controller, and that controller is an author or controls one; then the controller's `merge` meets the rules extent and every other obligation stands", () => {
   // `ada` wrote the change, is the one controller, and signs the `merge`. `max` reviews the other extents.
-  const use = { singleControllerException: true, authors: [ada.member], reviews: [max], merger: ada, controllers: [ada.member] };
+  const use = { singleControllerException: true, authors: [ada.member], reviews: each(max), merger: ada, controllers: [ada.member] };
   const exception = (over: Partial<ExtentsAsked>) => { const judged = judgeExtents(asked({ ...use, ...over })); return [judged.met, judged.unmet, judged.extents[0]!.exception]; };
   // 1. Not declared.
   expect(exception({ singleControllerException: false })).toEqual([false, ["rules"], null]);
   // 2. Two controllers, and no count at all (the observation that gives it is not built).
   expect([exception({ controllers: [ada.member, ann.member] }), exception({ controllers: null }), exception({ controllers: [] })]).toEqual([[false, ["rules"], null], [false, ["rules"], null], [false, ["rules"], null]]);
   // 3. The one controller is independent of the authors: that member's review is asked, and no exception is used with or without it.
-  expect([exception({ authors: [art.member] }), exception({ authors: [art.member], reviews: [max, ada] })]).toEqual([[false, ["rules"], null], [true, [], null]]);
+  expect([exception({ authors: [art.member] }), exception({ authors: [art.member], reviews: each(max, ada) })]).toEqual([[false, ["rules"], null], [true, [], null]]);
   // All three hold, for an author and for the controller of an agent among the authors.
   expect([exception({}), exception({ authors: [bot], controllersOfAuthors: [ada.member] })]).toEqual([[true, [], "@ada"], [true, [], "@ada"]]);
   // Another member signed the `merge`.
   expect(exception({ merger: max })).toEqual([false, ["rules"], null]);
   // It meets the reviews of the rules extent and nothing else: the other extents' reviews, and each check, stand.
-  expect([exception({ reviews: [] })[1], exception({ reviews: [ada] })[1]]).toEqual([["infrastructure", "source"], ["infrastructure", "source"]]);
+  expect([exception({ reviews: each() })[1], exception({ reviews: each(ada) })[1]]).toEqual([["infrastructure", "source"], ["infrastructure", "source"]]);
   const checked = FIRST.map((extent) => (extent.name === "rules" ? { ...extent, checks: ["policy"] } : extent));
   expect([exception({ extents: checked })[1], exception({ extents: checked, passed: ["unit", "policy"] })[1]]).toEqual([["rules"], []]);
 });
@@ -125,9 +134,9 @@ test("a symbolic link is judged at its path and at every path that it resolves t
   // A link that the change creates, outside the tree or not resolvable: refused. No review meets it, and the class is `authority`.
   const outside = classify(FIRST, ["src/app.ts", "docs/secrets"], [{ path: "docs/secrets", tree: "new", resolves: null }]);
   expect([outside.touched, outside.refused, outside.class]).toEqual([[{ extent: "source", path: "docs/secrets" }], ["docs/secrets"], "authority"]);
-  expect(said({ touched: outside, reviews: [ada, ann] })).toEqual([false, ["rules"], { source: [["@ada", "@ann"], []] }]);
+  expect(said({ touched: outside, reviews: each(ada, ann) })).toEqual([false, ["rules"], { source: [["@ada", "@ann"], []] }]);
   // Where the change also touches the rules extent, that extent is the one that is not met.
-  const both = judgeExtents(asked({ touched: classify(FIRST, ["AGENTS.md", "docs/secrets"], [{ path: "docs/secrets", tree: "new", resolves: null }]), reviews: [ada] }));
+  const both = judgeExtents(asked({ touched: classify(FIRST, ["AGENTS.md", "docs/secrets"], [{ path: "docs/secrets", tree: "new", resolves: null }]), reviews: each(ada) }));
   expect([both.met, both.unmet, both.extents[0]!.met, both.extents[0]!.lacks]).toEqual([false, ["rules"], false, []]);
 });
 
@@ -149,7 +158,7 @@ test("a link that leaves the tree is refused only where the change creates it or
   expect(judged(["docs/secrets"], [bad("old"), { path: "docs/secrets", tree: "new", resolves: [".gitignore"] }])).toEqual([["rules", "infrastructure", "source"], [], "authority"]);
   // The reviews that the rules extent asks then meet it: an allowed change is judged, and not refused.
   const removal = classify(FIRST, ["docs/secrets"], [bad("old")]);
-  expect([said({ touched: removal, reviews: [max] }).slice(0, 2), said({ touched: removal, reviews: [ada, max] }).slice(0, 2)]).toEqual([[false, ["rules"]], [true, []]]);
+  expect([said({ touched: removal, reviews: each(max) }).slice(0, 2), said({ touched: removal, reviews: each(ada, max) }).slice(0, 2)]).toEqual([[false, ["rules"]], [true, []]]);
   // An unrelated change in a tree that already holds such a link: not blocked, and the link is not followed. Nothing is judged at it.
   expect(judged(["src/app.ts"], [bad("both")])).toEqual([["source"], [], "content"]);
   expect(judged(["docs/guide.md"], [bad("both"), { path: "docs/latest", tree: "both", resolves: ["docs/guide.md"] }])).toEqual([["source"], [], "content"]);
@@ -172,7 +181,7 @@ test("the extents are a repository's own: a second rules content with other patt
   ]);
   // The same change under the two contents: the second asks two infrastructure reviewers and its own check.
   const change = ["deploy/prod.toml", "src/app.ts"];
-  const under = (extents: readonly Extent[]) => said({ extents, touched: classify(extents, change, []), reviews: [max] });
+  const under = (extents: readonly Extent[]) => said({ extents, touched: classify(extents, change, []), reviews: each(max) });
   expect([under(FIRST), under(SECOND)]).toEqual([
     [true, [], { source: [["@max"], []] }],
     [false, ["infrastructure"], { infrastructure: [["@max"], ["approvals", "checks"]], source: [["@max"], []] }],
@@ -181,5 +190,5 @@ test("the extents are a repository's own: a second rules content with other patt
   // With no extent that has no pattern, a path that no pattern matches is held by nothing, and the change is not met.
   const closed = SECOND.slice(0, 3);
   const touched = classify(closed, ["docs/guide.md", "src/app.ts"], []);
-  expect([touched.touched, touched.unclassified, said({ extents: closed, touched, reviews: [ada] }).slice(0, 2)]).toEqual([[{ extent: "docs", path: "docs/guide.md" }], ["src/app.ts"], [false, []]]);
+  expect([touched.touched, touched.unclassified, said({ extents: closed, touched, reviews: each(ada) }).slice(0, 2)]).toEqual([[{ extent: "docs", path: "docs/guide.md" }], ["src/app.ts"], [false, []]]);
 });

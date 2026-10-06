@@ -241,6 +241,13 @@ export function classify(extents: readonly Extent[], changed: readonly string[],
 
 /** A member with the actions that the member holds, by the observation that the destination reads for the reservation. */
 export interface Holder { member: MemberId; holds: readonly string[] }
+/**
+ * An approving verdict of `reserve`, by its reviewer, with the one extent
+ * that it states ("Which reviews count for an extent", from revision 25; the
+ * lane forms' revision 15, section 20.2, ask 4). Null: it states none, and
+ * counts for none. A reviewer who covers two extents signs two verdicts.
+ */
+export interface Review extends Holder { extent: string | null }
 
 /**
  * What the destination has at a reservation, for the judgment of the
@@ -259,8 +266,8 @@ export interface ExtentsAsked {
   authors: readonly MemberId[];
   /** The controller of each agent among the authors. */
   controllersOfAuthors: readonly MemberId[];
-  /** The approving reviews that count for the manifest by the first three rules of section 3.10, each by its reviewer. Independence is judged here. */
-  reviews: readonly Holder[];
+  /** The approving verdicts that count for the manifest by the first three rules of section 3.10, each by its reviewer, with the extent that it states. Independence is judged here. */
+  reviews: readonly Review[];
   /** The names of the checks with a passed job on the manifest, as section 6.5 counts a required check. */
   passed: readonly string[];
   /** The member who signed the `merge`: the landing actor. */
@@ -297,11 +304,12 @@ export interface ExtentsJudged {
  * Which obligations of a change are met ("How a change is judged", steps 2
  * to 5, and "What the planner decided").
  *
- * - *Each touched extent is asked.* Enough approving reviews from different
- *   members who hold its `approver` and are independent of the authors, and
- *   a passed job for each check that it names. The obligations of a mixed
- *   change are the union: nothing is averaged, and one review may count for
- *   several extents.
+ * - *Each touched extent is asked.* Enough approving verdicts that state
+ *   the extent, from different members who hold its `approver` and are
+ *   independent of the authors, and a passed job for each check that it
+ *   names. The obligations of a mixed change are the union: nothing is
+ *   averaged. A verdict counts for the one extent that it states, and one
+ *   that states none counts for none.
  * - *Independence* (section 3.10). A reviewer is not among the authors.
  *   When `ownerMayReview` is false, a reviewer is not the controller of an
  *   agent among them.
@@ -337,8 +345,8 @@ export function judgeExtents(asked: ExtentsAsked): ExtentsJudged {
 
   const extents = asked.extents.filter((extent) => touched.has(extent.name)).map((extent): ExtentJudged => {
     const rules = extent.name === RULES_EXTENT;
-    const counts = (review: Holder) =>
-      review.holds.includes(extent.approver) && (!rules || review.holds.includes(CONTROLLER))
+    const counts = (review: Review) =>
+      review.extent === extent.name && review.holds.includes(extent.approver) && (!rules || review.holds.includes(CONTROLLER))
       && !authors.has(review.member) && ((asked.ownerMayReview && !rules) || !owners.has(review.member));
     const counted = [...new Set(asked.reviews.filter(counts).map((review) => review.member))].sort(byteOrder);
     const exception = rules && counted.length < extent.approvals ? excepted : null;
