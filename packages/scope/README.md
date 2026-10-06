@@ -32,13 +32,13 @@ what a judge drafts, in one storage transaction for each entry.
 | `sessions` | Read sessions: `sessionsOf`, `mintSession`, `openSession`, `sessionReaders` (the production readers port), `issueSession` (membership's answer to a signed request), `credentialInUrl`, and `Streams` with `relay`, the streams of a scope's head. |
 | `limits` | `JoinLimits`: the serving limits of a join at the front of a membership scope. `addressKey`, `isJoin`, `PROPOSED_LIMITS`. |
 | `operator` | `OperatorRecord`: the operator's record of a scope, outside its history. `incidentsOf`, `waitingIn`, and `sendAgain`, the instruction to dispatch a waiting request once more. |
-| `reads` | `Reads`: `summary`, `items`, `history`, `entry`, `outbox`, and `duty`, one send's row; `operations` and `operation`, the outside operations with their attempts and outcomes; `incidents`, a page of the operator's record, and `waiting`, the two lists of requests that wait. For a verifier: `log`, a history page as stored bytes, and `retained`, one retained input. `ReadBounds` and `READ_BOUNDS`. |
+| `reads` | `Reads`: `summary`, `items`, `history`, `entry`, `outbox`, and `duty`, one send's row; `operations` and `operation`, the outside operations with their attempts and outcomes; `incidents`, a page of the operator's record, and `waiting`, the two lists of requests that wait. For a verifier: `log`, a history page as stored bytes, and `retained`, one retained input by kind and digest, with a domain for `value`. `ReadBounds` and `READ_BOUNDS`. |
 | `delivery` | `Deliveries.deliver(envelope)`: receiving. It reads the source entry through the resolver, checks it against the fact's hash, and runs derive's delivery judge, or its genesis judge for a `create` that reaches an empty store, in the scope's turn. It answers as transport does: `recorded` with a fact, `retry`, `routing` or `source-unverified`. |
 | `outbox` | `Dispatcher.run()`: sending. One pass at a time over the sends that are due: a durable record before each dispatch and after its answer, a retry delay that doubles, and a `diagnosis` input through the turn when a request is given up. `Wakes`: one alarm for the earliest deadline, the next dispatch and the next attempt of an outside operation. |
-| `operations` | `Operations.run()`: the driver of outside effects, beside the dispatcher. An attempt is recorded by its entry, marked durably before its one request leaves, and never sent twice: one that is found marked with no outcome is recorded `unknown`. An answer becomes an `outcome` input through the turn. `Operations.answered()` takes an answer at any later time. `Outside` is the port, and `NO_OUTSIDE`, the default of `production()`, sends nothing. |
+| `operations` | `Operations.run()`: the driver of outside effects, beside the dispatcher. An attempt is recorded by its entry, marked durably before its one request leaves, and never sent twice: one that is found marked with no outcome is recorded `unknown`. An answer becomes an `outcome` input through the turn. `Operations.answered()` takes an answer at any later time. `Outside` is the port, and `NO_OUTSIDE`, the default of `production()`, sends nothing. The driver matches owner-declared evidence values by domain, digest and canonical byte bound and retains them with the outcome entry. |
 | `diag` | `diagnosis`, `report` and `redact`: one line of the log for a failure at a port that no entry and no answer describes. A diagnosis holds an event and a step, which are fixed words, and an error's name from a fixed list. It reads no message of a thrown value. `redact` replaces what has the syntax of a credential and cuts to a stated length: a second guard, and not a complete one. |
-| `authority` | `observing(config)`: the authority port over reads of a membership scope. The read is made before the turn, is counted by run and number, and is kept only in memory: at most one observation for each key, and a revoked answer for the run. `Membership` is the port that reads a membership scope. `repositoryAuthority(config)`: the authority of the deployed class. A membership scope judges its own acts on its own head, and every other scope reads the membership scope that it records, with `observing`. A scope that records none reads nothing. |
-| `namespace` | `namespace(binding)`: the production `Resolver`, `Transport`, `Definitions` and `SentTexts`, each one RPC call on the object a scope ID names. `membershipIn(binding)`: the read of a membership scope, which that scope's object answers as `observe`. `routed`: the resolver of a name, which refuses a wrong address before any judgment. `sourced`: the answer to a read of one entry. `declaredBy`: the answer to a read of one retained declaration. `sentText`: the answer to a read of one detached text that a send of this scope names. |
+| `authority` | `observing(config)`: the authority port over reads of a membership scope. The read is made before the turn, is counted by run and number, and is kept only in memory: at most one observation for each key, and a revoked answer for the run. `Membership` is the port that reads a membership scope; further reads also reach the recorded rules scope. `repositoryAuthority(config)`: the authority of the deployed class. A membership scope judges its own acts on its own head, and every other scope reads the membership scope that it records, with `observing`. A scope that records none reads nothing. |
+| `namespace` | `namespace(binding)`: the production `Resolver`, `Transport`, `Definitions` and `SentTexts`, each one RPC call on the object a scope ID names. `membershipIn(binding)`: observation reads of membership and rules scopes, which the objects answer as `observe`. `routed`: the resolver of a name, which refuses a wrong address before any judgment. `sourced`: the answer to a read of one entry. `declaredBy`: the answer to a read of one retained declaration. `sentText`: the answer to a read of one detached text that a send of this scope names. |
 | `object` | `ScopeObject`: the Durable Object class. It wires the store, the ports, the core, receiving, the dispatcher and the reads, and exposes them over RPC: `found`, `submit`, `settle`, `checkpoint`, the reads, `deliver`, `source`, `declared`, `text`, `dispatch` and `effect`. Its `alarm()` runs the alarm's turn, then a dispatch pass, then a pass of the operations driver. With no transport, which is its default, nothing is dispatched. With the outside port of `production()`, which sends nothing, nothing is sent outside the service. |
 | `worker` (its own entry, `@generalbusiness/artroom-scope/worker`) | `route(request, binding)`: the HTTP routes. `ScopeService`: the same operations over a service binding; it implements the contract's `ScopeApi`, which a client's transport also is. `DeployedScope`: the object class with the namespace as its resolver, its transport and its source of declarations, with `repositoryAuthority` as its authority and read sessions as its readers port. `api(binding)`: what both call. The default export is the deployed Worker. |
 
@@ -87,7 +87,7 @@ for a few acts
 | `Readers` | Whether a reader may make a read, by the read's name. `operations` and `operation` are asked as `operations`. It answers yes, no, or one of two names for a session that could not be judged: `sessions-unavailable` and `clock-behind`. | Nobody may: every read is `forbidden`. The deployed class uses read sessions: "Read sessions", below. |
 | `capabilities` | The rules of the capability forms this runtime has code for: the records, guards and effects of `hold@1`, and `git-read@1`. Each rule is a pure function of its arguments, the folded state and the input being judged. | `CAPABILITY_CODE`: derive's code of `hold@1` and `git-read@1`, with the floor of 2 tokens for one hold and no retention of a root. A runtime with none does not found or create a scope under a definition that needs one: `unsupported-definition`. The item form of `hold@1`, with its `hold` effect, needs none and runs. |
 | `outside` | One request of one attempt of an outside operation, and its answer. | `NO_OUTSIDE`: nothing is sent. Each attempt stays recorded and not sent. |
-| `owners` | The rules of the owners of outside operations that this runtime has code for, by owner and kind: derive's `Owners`. | `CAPABILITY_CODE`: the rules of the operations that `hold@1` and `git-read@1` own. No operation is opened in production, and the `outside` port sends nothing, so no attempt is sent. |
+| `owners` | The rules of the owners of outside operations that this runtime has code for, by owner and kind: derive's `Owners`. | `CAPABILITY_CODE`: the rules of the operations that `hold@1` and `git-read@1` own. Platform rules can open operations; the default `outside` port sends none, so their attempts stay recorded and not sent. |
 | `diagnoses` | Where a diagnosis goes. | `toConsole`: one JSON line in the runtime's log. |
 
 So a scope with only these defaults can be founded, and then admits no
@@ -156,8 +156,10 @@ run. What it reads is kept in memory only, so a restart leaves none.
   stops, the scope reads what is missing, and the turn starts again,
   inside the bound on restarts (`Observes`, in `core.ts`). A value that an
   answer names is kept only in a domain that the row states, within its
-  `max`. No platform definition of Artroom states a row yet, and no rules
-  scope answers an observation, so a deployed scope reads none of these.
+  `max`. The destination's `judge`, the task result clause, and membership
+  acts state their rows. The rules scope answers from its recorded rules,
+  with the last publication revision and the digest of its extents; the
+  namespace supplies those retained bytes beside the observation.
 
 The production default does not use it: the `authority` of `production()`
 reads no grant, and every act that needs one is refused `unauthorized`.
@@ -230,11 +232,11 @@ the designs, and is no review of this source.
   (`notes/2026-10-05-i3-contract-deltas.md`, section 26). A founding
   under `platform:register@1` founds a register, by an `install` intent.
   Its selecting outcome creates the directory, whose genesis creates
-  membership and the rules scope. The creation of the destination is
-  answered `unsupported-definition`: `platform:destination@1` lacks
-  two rules, `first-head` and `receipt`. `test/founding-real.test.ts` shows it on real scopes. The
-  production outside port sends nothing, so under the production wiring
-  no repository is created at a host and a claim stays `pending`.
+  membership, the rules scope and the destination. Every destination mark
+  has a rule, including `first-head` and `receipt`. The real-scope founding
+  witness uses a scripted Git host; no production host is exercised. The
+  production outside port sends nothing, so under its default wiring no
+  repository is created at a host and a claim stays `pending`.
 - A directory under `platform:directory@1` records its membership
   reference in its slot `repository.membership`. The production authority
   reads it there, from the scope's own folded state. A rules scope and a
@@ -283,9 +285,9 @@ whose stored bytes are the canonical bytes.
 | `folded` | Folded records that are not items: relationship copies, held creations, and the digests of the texts a slot has held. |
 | `operation` | The outside operations, folded, by the entry that opened each and its ordinal there, with what each still reserves. |
 | `attempt` | One row for each attempt that an entry opened, written with that entry. The driver's bookkeeping is in three columns: `next`, when it looks at the attempt next; `sent`, the time written before its one request left; and `outcome`, the entry that recorded its first outcome. |
-| `retained_input` | What an entry names by digest and does not carry: the definition's declaration, the bytes of each foreign entry in a `uses`, and the input of each rule evaluation. A delivered message, a rule's result and an outcome's evidence are inside the entry that records them. |
-| `item_key` | The indexes that an item type of platform data declares (the contract's revision 23, section 17.2a): one row for each indexed slot of each item, written with the item by the entry that opens it. `StateView.lookup` reads it, after it has read that the index holds a row for every item of the type. No definition of Artroom declares an index, so no deployed scope writes a row. |
-| `retained_value` | Each value that an entry names and that came beside its intent, by its domain and its digest. It is written in the commit of that entry. No route reads it (I3 deltas, entry FC7). |
+| `retained_input` | What an entry names by digest and does not carry: the definition's declaration, the bytes of each foreign entry in a `uses`, and the input of each rule evaluation. A delivered message and a rule's result are inside their entry. Outcome evidence carries its body; a value that the body names by digest is in `retained_value`. |
+| `item_key` | The indexes that an item type of platform data declares (the contract's revision 23, section 17.2a): one row for each indexed slot of each item, written with the item by the entry that opens it. `StateView.lookup` reads it, after it has read that the index holds a row for every item of the type. The destination declares the publication's `operation` index, used to bind `withdraw` to its holder. |
+| `retained_value` | Each value named by an intent place, an observation or an owner's outcome evidence, by domain and digest. It is written with the entry; RPC and HTTP retained reads serve it by domain and digest under the same reader authority and byte bound. |
 
 An entry's row, the fold's changes, its sends and its retained inputs are
 written in one transaction. A transaction that does not commit leaves
@@ -326,7 +328,12 @@ counts those entries from the folded state, inside the commit. An act that
 does not fit is refused `scope-full`; a delivery is answered `retry`; a
 checkpoint is `unavailable`. One entry is reserved for the closing
 checkpoint: the checkpoint written when nothing else is pending. The deltas
-note, sections 15 and 22, lists what is counted and what is not.
+note, sections 15 and 22, lists what is counted and what is not. Branches
+and publications hold reservations; the latter also holds the decision
+count for `withdraw`. Settling entries draw on those accounts, including a
+bound request that is refused. This admission checks entries. Full
+admission for items, records, retained bytes and pending requests remains
+request `cc570904`; the five-dimensional amounts alone do not prove it.
 
 ## Between scopes
 
@@ -381,7 +388,7 @@ the contract's own answer.
 | Route | Answer | Status |
 |---|---|---|
 | `POST /v1/scopes`, body `{ founding, definition, definitions?, texts? }` | `Founded` | 201 accepted; 422 refused; 503 unavailable |
-| `POST /v1/scopes/:scope/acts`, body `{ signed, grants, texts?, presented?, values? }`. `texts`: each detached text that a field of the intent names by digest. `presented`: the facts presented beside the intent, by name. `values`: each value that a place of the act names by digest, as its canonical bytes; only an act of a platform definition whose data states a place has one, and no platform definition of this source states one yet | `Answer` | 200 accepted; 403 refused `unauthorized`; 422 refused otherwise; 409 mismatch; 503 unavailable |
+| `POST /v1/scopes/:scope/acts`, body `{ signed, grants, texts?, presented?, values? }`. `texts`: each detached text that a field of the intent names by digest. `presented`: the facts presented beside the intent, by name. `values`: each value that a place of the act names by digest, as its canonical bytes; only an act of a platform definition whose data states a place has one. The rules scope states a place for check configuration | `Answer` | 200 accepted; 403 refused `unauthorized`; 422 refused otherwise; 409 mismatch; 503 unavailable |
 | `POST /v1/scopes/:scope/preparations`, body `{ signed, grants, capability, step }`. One step of a capability, asked for with the signed intent that it prepares for. With no code for the step, as in production, nothing is judged: 503 `unavailable` | `Answer` | as an act |
 | `POST /v1/scopes/:scope/settle`, body `{ signed }` | `Settlement` | as a read |
 | `GET /v1/scopes/:scope` | The summary | 200; 404 `not-found`; 403 `forbidden`; 409 `wrong-incarnation`, `scope-provisional`; 413 `too-large`; 501 `unsupported-definition`; 503 otherwise |
@@ -391,7 +398,7 @@ the contract's own answer.
 | `GET /v1/scopes/:scope/outbox?cursor=` | A page of the outbox | as above |
 | `GET /v1/scopes/:scope/outbox/:duty` | The outbox status of one send, by its duty ID | as above |
 | `GET /v1/scopes/:scope/log?cursor=` | A page of the history as stored: each entry's canonical bytes and hash, for a verifier | as above |
-| `GET /v1/scopes/:scope/retained/:kind/:digest` | One retained input: a `definition`, an `entry`, a `rule` input, a detached `text` or a `snapshot` of staged refs, by digest. A text that was redacted is `not-found`. A `value` is not served: the scope keeps each value that an entry names, by its domain and its digest, and no route names a domain (I3 deltas, entries EX6 and FC7) | as above; 413 past 1 MiB |
+| `GET /v1/scopes/:scope/retained/:kind/:digest` | One retained input: a `definition`, an `entry`, a `rule` input, a detached `text` or a `snapshot` of staged refs, by digest. A text that was redacted is `not-found`. For `value`, `?domain=<encoded domain>` is required; another or missing domain is `not-found` | as above; 413 past `ReadBounds.retainedBytes` |
 
 A body is at most 1 MiB of bytes, counted while it is read: a larger body
 is cancelled and is not held. A body over that, or one that is not a JSON
@@ -466,8 +473,8 @@ namespace.
 Pure derivation is tested in the derive package and is not tested again
 here.
 
-Three files here hold what needs this package and another together, so
-that neither of those imports the runtime in its source:
+These files keep checks that need this package and another together here,
+so neither of those imports the runtime in its source:
 
 - `test/replay.test.ts`: histories that real scopes wrote are read through
   the Worker's read routes and replayed by
@@ -477,3 +484,15 @@ that neither of those imports the runtime in its source:
   service-binding entrypoint.
 - `test/conformance.types.ts`: typechecked only. The entrypoint and the
   client's transport satisfy one interface, the contract's `ScopeApi`.
+
+`test/founding-real.test.ts` also creates and confirms the directory's
+membership, rules and destination children under the deployed class. The
+destination reads real rules and membership observations and retained
+source entries, reserves the first publication, publishes it and writes
+its receipt. The test reads its holder and decision counts from SQLite
+and replays all five runtime histories over HTTP with proven grants. The
+Git host is a scripted port, and the source change lane's manifest and
+merge entries are scripted and anchored; the updates to that lane remain
+pending. Readers are the test readers except for a separate real session
+witness. This is no deployment or production-host check, and does not
+close full I3.
