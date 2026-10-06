@@ -1,7 +1,7 @@
 /**
- * `platform:directory@1`, as data, with its rules (authority note, revision
- * 21, sections 3.8 and 12.1.2; its table of marks, section 12.1.8, rows 7 to
- * 13, a and d). One directory for a repository. It creates the repository's
+ * `platform:directory@1`, as data, with its rules (authority note, sections
+ * 3.8 and 12.1.2; its table of marks, section 12.1.8, rows 7 to 13, a, d, l
+ * and s to u). One directory for a repository. It creates the repository's
  * scopes and its lanes, allocates numbers, and keeps one index row for each
  * lane. It orders no ordinary act of a lane.
  *
@@ -29,8 +29,11 @@
  * `compromised` is data, whole. The three creations of the genesis are held
  * sends of the entry, by the contract's rule for a provisional scope.
  *
- * Rows s to u are of the note's revision 25, which was filed for review,
- * and not adopted, when they were written (I3 deltas, section 26).
+ * Rows s to u, the selection of `import`, `activeKey` in
+ * `worker-standing` and the second refusal of `definition-active` are of
+ * the note's revision 25 ("The directory, decided in revision 25"), which
+ * was filed for review, and not adopted, when they were written (I3
+ * deltas, section 26).
  *
  * The data holds no mark that the table does not list, and every mark has
  * its rule here. So a runtime with this package can run

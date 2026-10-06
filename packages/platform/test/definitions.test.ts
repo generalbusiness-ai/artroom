@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import { PROPOSED_BOUNDS, type DeclaredDefinition } from "@generalbusiness/artroom-contract";
 import { definitionDigest } from "@generalbusiness/artroom-bytes";
-import { PROFILES, derivable, runnable, validateDefinition } from "@generalbusiness/artroom-derive";
+import { PROFILES, derivable, ruleAt, runnable, validateDefinition } from "@generalbusiness/artroom-derive";
 import { FIRST_ACTIONS, ROLE_LISTS, RULES, definitions, inbox, membership, platform } from "../src/index.ts";
 
 // The plan's T43, for `platform:inbox@1` (authority note, revision 16, section 12.1.6). The package holds six definitions: the two
@@ -95,4 +95,20 @@ test("the membership definition validates whole with the platform option; every 
     ["role-table", "effect"], ["member-of", "effect"], ["handle-form", "guard"], ["last-admin-kept", "guard"],
   ]);
   expect([runnable(checked.definition, rules), ...Object.keys(rules).map((lost) => runnable(checked.definition, { ...rules, [lost]: undefined as never }))]).toEqual([true, ...Object.keys(rules).map(() => false)]);
+});
+
+// The plan's steps 9 and 9c, as the authority note's revision 25 decides them (its "What revision 25 lets the I3 source do next"):
+// "Then `platform:directory@1` lacks no rule", and the register's one rule that every founding waited on is written.
+test("the register and the directory each lack no rule: every mark of their data has a rule of the kind of its place in the package's table, so a runtime with this package runs both", () => {
+  /** The marks of one definition's data that the package's table has no rule of the right kind for, by name, once each. */
+  const lacks = (named: string): string[] | null => {
+    const supplied = platform(named)!;
+    const checked = validateDefinition(JSON.parse(JSON.stringify(supplied.data)), PROPOSED_BOUNDS, PROFILES, { platform: true });
+    if (!checked.ok) return null;
+    const missing = checked.definition.marks.filter((mark) => ruleAt(supplied.rules, mark.code, mark.kind) === null).map((mark) => mark.code);
+    // `runnable` is the whole-scope rule that a scope's runtime asks before it founds or creates anything under the definition.
+    expect(runnable(checked.definition, supplied.rules)).toBe(missing.length === 0);
+    return [...new Set(missing)];
+  };
+  expect([lacks("platform:register@1"), lacks("platform:directory@1")]).toEqual([[], []]);
 });
