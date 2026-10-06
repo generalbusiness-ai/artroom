@@ -80,6 +80,7 @@ export class View extends MemoryState {
 
   override setScope(...given: Put<"setScope">) { super.setScope(...given); this.#keep("scope", [], (state) => state.setScope(...given)); }
   override putItem(...given: Put<"putItem">) { super.putItem(...given); this.#keep("item", [given[0].id], (state) => state.putItem(...given)); }
+  override putIndexed(...given: Put<"putIndexed">) { super.putIndexed(...given); this.#keep("indexed", given, (state) => state.putIndexed(...given)); }
   override addCount(type: string, state: string, by: number) {
     super.addCount(type, state, by);
     // A count is written as a change. The log keeps the count that the change gave, which a new state takes whole.
