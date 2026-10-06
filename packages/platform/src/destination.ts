@@ -1,9 +1,14 @@
 /**
- * `platform:destination@1`, as data, with its rules at acts and handlers
- * (authority note, revision 21, sections 6.1 to 6.10, 12.1.5 and 12.2; its
- * table of marks, section 12.1.8, rows 30 to 37 and the further rows b and
- * e). One destination scope for each published branch. It is the only
- * writer of that branch.
+ * `platform:destination@1`, as data, with its rules (authority note,
+ * revision 26, sections 6.1 to 6.10, 12.1.5 and 12.2; its table of marks,
+ * section 12.1.8, rows 30 to 37 and the further rows b, e, m, n and z). One
+ * destination scope for each published branch. It is the only writer of
+ * that branch.
+ *
+ * Revision 26 is approved by the checker, and its adoption was not
+ * recorded when this was built (I3 deltas, section 27). Section 12.1.5,
+ * "The destination, decided in revision 25", is the rule wherever a row of
+ * its tables differs.
  *
  * One member of the data is one row of the note's tables. A cell of the
  * note that begins "Code" is a mark in this data, at the place where its
@@ -14,26 +19,50 @@
  *
  * | Rule | Place | Row | At |
  * |---|---|---|---|
- * | `declare-first-head` | 5, effect | 30 | `establish` |
- * | `open-first-head` | 5, effect | 31 | `import` |
+ * | `declare-first-head` | 5, effect | 30 | `establish`: the operation, and its attempt's `mint`, both held |
+ * | `open-first-head` | 5, effect | 31 | `import`: the operation, and its attempt's `mint` |
  * | `open-judge` | 5, effect | 32 | `reserve`: one `judge` at a time, by `branch.judging` |
  * | `publication-of` | 2, `also` | 34 | `withdraw`, the name `publication` |
  * | `open-withdrawn` | 5, effect | 34 | `withdraw` |
+ * | `abort-if-behind` | 5, effect | 35 | `compromised` |
  * | `open-branch-read` | 5, effect | 36 | `adopt-head` |
  * | `reopen-publish` | 5, effect | 37 | `resend`: the write, and its attempt's `mint` |
+ * | `resend-due` | 4, guard | z | `resend`, refused `resend-not-due` |
  * | `collect-list` | 3, type | b | `reserve`, the fields `verdicts`, `jobs` and `links`; a verdict may state `extent` |
+ * | `mint` | 7, outcome | e | The kind `mint` |
+ * | `revoke` | 7, outcome | e | The kind `revoke` |
+ * | `push` | 7, outcome | e | The kind `push` |
+ * | `deciding-read` | 7, outcome | e | The kind `read`, for the branch of a publication |
+ * | `adopt-read` | 7, outcome | e | The kind `adopt-read` |
+ * | `judge` | 7, outcome | 33 | The kind `judge`. See below: it reserves nothing in this runtime. |
+ * | `publication-update` | 7, the send | m, n | The kinds `judge`, `push`, `mint`, `revoke`, `read` and `receipt` |
  *
- * **The marks that have NO rule here.** The adopted texts do not let any of
- * them be written whole, and none is invented. So the version lacks rules,
- * and by the whole-scope rule (the contract's section 6.1) nothing is
- * created under `platform:destination@1` by this package's rules. The I3
- * deltas note, section 18, has each in full.
+ * **The rule `judge` is written, and in this runtime it reserves nothing.**
+ * Its judgment, `judgeReservation`, and what its outcome yields are
+ * written whole. What it reads of `observed` and of the entries in `uses`
+ * is not: the judge of an outcome gives a rule neither (I3 deltas, entries
+ * EM3 and EU4), and no text states how an entry of a lane is read by its
+ * bytes (entry FA9). So the rule decides what the evidence and this
+ * scope's own records decide: a publication that is no longer `queued`,
+ * `evidence-too-large`, a head that is not the recorded head, and an
+ * integration commit that is not in the repository. For every other
+ * outcome it has a fault: nothing is written, and the publication stays
+ * `queued`. A test gives it a stand-in reader (`destinationRulesWith`).
  *
- * | Mark | Place | At | Why it has no rule (deltas entry) |
+ * **The marks that have NO rule here.** Two. So the version still lacks
+ * rules, and by the whole-scope rule (the contract's section 6.1) nothing
+ * is created under `platform:destination@1` by this package's rules.
+ *
+ * | Mark | Place | At | Why it has no rule |
  * |---|---|---|---|
- * | `abort-if-behind` | 5, effect | `compromised` | Row 35. No record names the live token, no text names the kind of "the abort attempt", and a retry rule is not given the state, so it cannot stop a further attempt (ER5). |
- * | `resend-due` | 4, guard | `resend` | The row's guard reads the receipt's and the push's operations. No form reads an operation, the table of marks lists no rule for it, and no slot names a publication's operations (ER4). |
- * | `first-head`, `judge`, `push`, `mint`, `revoke`, `deciding-read`, `receipt`, `adopt-read` | 7, `outcomes` | Each kind of operation | Rows 33 and e, which are plan step 9f. No text says which publication, which token or which commit an operation is for, and the read that ends a publication is the note's open point O11 (ER6 to ER9). |
+ * | `first-head` | 7, `outcomes` | The kind `first-head` | It compares what the ref holds with the ID of the founding commit, or of the imported one. The note asks two details of the contract before that ID can be computed: the text of a fact reference in a commit message, and the byte domain of a ref's digest (section 12.1.5, "The founding commit, and the receipt"; entry ER9). |
+ * | `receipt` | 7, `outcomes` | The kind `receipt` | The same two details. And its slots `token` and `receipt` are on a `published` publication, which is final and takes no effect (entry FA6). |
+ *
+ * Three rules that are written reach those two. The outcome of a mint of a
+ * receipt's attempt opens the token's revocation at once. The outcome of a
+ * `read` that was opened for a first head or for a receipt's ref is not
+ * judged. And each rule that publishes opens the `receipt` operation with
+ * its mint, as its row says, whose outcomes then have no rule.
  *
  * The fence of section 6.8 is not adopted (section 6.8, "The standing of
  * this section"; U2). The data names no fence: no operation, and no kind
@@ -45,8 +74,8 @@
 
 import type { FactRef, FieldValue, OperationId, PlatformData, PlatformDefinition, ScopeId } from "@generalbusiness/artroom-contract";
 import { canonicalize, isFactRef, isMemberRef, isScopeRef, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
-import type { Item, Opening, Operation, Own, RecordedRef, RuleEffect, RuleGiven, RuleRequest, Rules, StateView } from "@generalbusiness/artroom-derive";
-import { isObjectId } from "./reservation.ts";
+import type { Item, Opening, Operation, Own, PlatformRule, RecordedRef, RuleEffect, RuleGiven, RuleRequest, Rules, StateView } from "@generalbusiness/artroom-derive";
+import { isJudgeEvidence, isObjectId, judgeReservation, type ReservationRead, type Statement } from "./reservation.ts";
 import { referenceOf } from "./rules-scope.ts";
 
 /** The name and version that this data and these rules are. An operation that the destination opens states it as its owner (the contract's section 4.3). */
@@ -777,8 +806,128 @@ const readDecides: Decides = (given, read) => {
   return seenDecides(given, of, seen, null);
 };
 
-/** What the rule of each kind decides for the outcome entry that is written, for the send mark that its kind holds. */
+/**
+ * What `observed` and the entries in `uses` say for the reservation of one
+ * publication, for the rule `judge` (`ReservationRead`, in
+ * `reservation.ts`). Null: they are not at hand.
+ */
+export type Reads = (given: RuleGiven, publication: Item, statement: Statement) => ReservationRead | null;
+
+// I3 merge: the judge of an outcome gives a rule no `observed` and no `uses`, and writes neither (I3 deltas, entries EM3 and EU4), and
+// no text states how an entry of a lane is read by its bytes (entry FA9). So the package's own rule `judge` is given nothing here.
+// It then judges what the evidence and this scope's own records decide, and writes nothing for the rest: the outcome stays
+// offered, the publication stays `queued`, and `branch.judging` stays set. The reader is written when both exist.
+const NOT_AT_HAND: Reads = () => null;
+
+/** The eligibility statement of a publication: the three lists of its `reserve`, in this scope's own entry that recorded the message and opened the item. The rule `collect-list` checked each record when it was delivered. */
+function statementOf(own: Own, publication: Item): Statement {
+  const input = ownEntry(own, publication.id).input;
+  const body = input.type === "delivery" && input.message.class === "request" && isObject(input.message.body) ? input.message.body : null;
+  const fields = body !== null && body["message"] === "reserve" && isObject(body["fields"]) ? body["fields"] : null;
+  if (fields === null) throw new Error("a queued publication was opened by the delivery of its reserve");
+  return { verdicts: fields["verdicts"], jobs: fields["jobs"], links: fields["links"] } as unknown as Statement;
+}
+
+/**
+ * The outcome of `judge` (row 33; the row `judge` of "What each rule of an
+ * outcome yields"). It is for the publication that `branch.judging` names.
+ *
+ * - The publication is not `queued`, because a `withdraw` ended it while
+ *   its `judge` was open: nothing of it changes and nothing is sent.
+ *   `judging` is emptied, and the next `judge` is opened.
+ * - Not reserved: `not-reserved`, with `reason`; `judging` emptied; the next
+ *   `judge`; and the update `refused`.
+ * - Reserved: `reserved`; `branch.slot`; `judging` emptied; `integration`;
+ *   `reservedAt`, which is this entry's position; `reason`, when the
+ *   exception was used; the `push` operation with 3 attempts, its attempt
+ *   1, and that attempt's `mint`; and the update `committed`.
+ */
+const judgeDecides = (reads: Reads): Decides => (given) => {
+  const { state, own, input, resolved, time } = given;
+  const branch = branchOf(state);
+  const publication = publicationAt(state, branch?.refs["judging"]);
+  if (!branch || !publication || input.type !== "outcome") throw new Error("a judge is of the publication that branch.judging names");
+  if (publication.state !== "queued") return { ...andNext(state, { judging: true }, true), update: null };
+  const evidence = input.evidence.body;
+  if (!isJudgeEvidence(evidence)) throw new Error("the evidence of a judge is not well formed");
+  const head = branch.values["head"];
+  const asked = { recorded: typeof head === "string" ? head : null, evidence, statement: statementOf(own, publication), time };
+  // First from the evidence and this scope's own records. Only where that does not decide are `observed` and `uses` read.
+  let [read, judged] = [null as ReservationRead | null, judgeReservation({ ...asked, read: null })];
+  if (judged.reserved === null) {
+    read = reads(given, publication, asked.statement);
+    judged = judgeReservation({ ...asked, read });
+  }
+  if (judged.reserved === null) throw new Error("what observed and uses say of this reservation is not at hand");
+  const rules = read?.rules?.revision ?? null;
+  if (!judged.reserved) {
+    const next = andNext(state, { judging: true, ended: publication.id }, true);
+    return {
+      effects: [{ effect: "state", item: publication.id, state: "not-reserved" }, { effect: "value", item: publication.id, slot: "reason", value: judged.reason }, ...next.effects],
+      opens: next.opens,
+      update: { publication, state: "not-reserved", outcome: "refused", reason: judged.reason, rules },
+    };
+  }
+  return {
+    effects: [
+      { effect: "state", item: publication.id, state: "reserved" }, { effect: "ref", item: branch.id, slot: "slot", to: publication.id }, { effect: "ref", item: branch.id, slot: "judging", to: null },
+      { effect: "value", item: publication.id, slot: "integration", value: judged.integration }, { effect: "value", item: publication.id, slot: "reservedAt", value: resolved.self },
+      ...(judged.reason === null ? [] : [{ effect: "value", item: publication.id, slot: "reason", value: judged.reason } as const]),
+    ],
+    opens: [opening(DESTINATION_KINDS.push, DESTINATION_ATTEMPTS.push), opening(DESTINATION_KINDS.mint, DESTINATION_ATTEMPTS.mint)],
+    update: { publication, state: "reserved", outcome: "committed", ...(judged.reason === null ? {} : { reason: judged.reason }), rules },
+  };
+};
+
+/** What the rule of each kind decides for the outcome entry that is written, for the send mark that its kind holds. `judge` is added with its reader. */
 const DECIDES: Readonly<Record<string, Decides>> = { [DESTINATION_KINDS.push]: pushDecides, [DESTINATION_KINDS.read]: readDecides };
+
+/**
+ * Row 33, the outcome entries of `judge` (P19; section 12.1.5, "The rule
+ * `open-judge`, and one `judge` at a time", and "The evidence of `judge`,
+ * and what the rule reads"; entries ER2 and ER8).
+ *
+ * - A `judge` writes nothing outside the service, and has 1 attempt. Its
+ *   one outcome is `confirmed`, with its evidence. An outcome that is
+ *   offered as `refused` or `unknown` is `bad-input`. When a read of the
+ *   host fails, the runtime reads again under the same attempt.
+ * - It judges time, by the ten seconds of the merger's observation, and is
+ *   never written clamped.
+ * - `most`: 10 effects, with the operations `push` and `mint`, for the
+ *   outcome that reserves.
+ *
+ * The judgment is `judgeReservation`, and what the outcome yields is
+ * `judgeDecides`. `reads` gives what `observed` and `uses` say. The
+ * package's own rule is given none (`NOT_AT_HAND`).
+ */
+const judgeRule = (decides: Decides): PlatformRule => ({
+  place: "outcome", clock: true,
+  rules: {
+    selects: false, read: false, covered: true, most: { effects: 10, requests: 1, operations: 2 },
+    retries: () => false,
+    wellFormed: (result, evidence) => result === "confirmed" && isJudgeEvidence(evidence.body),
+    derives: (given, judge) => { const { effects, opens } = decides(given, judge); return { effects, sends: [], opens }; },
+  },
+});
+
+/**
+ * Rows m and n, the `send` of the mark of an outcome's kind (P16): the one
+ * `relate`, `publication`, to the lane. Its clauses are empty. One rule
+ * stands at each kind. It gives the update only where the rule of the kind
+ * says "the update": it makes that rule's judgment again, on the same
+ * state and the same outcome, as every rule reads the state before its
+ * entry. No update is sent for `publishing`, so the kinds `mint`, `revoke`
+ * and `receipt` give none.
+ */
+const updateRule = (decides: Readonly<Record<string, Decides>>): PlatformRule => ({
+  place: "send",
+  run: (given) => {
+    const operation = given.input.type === "outcome" ? given.state.operation(given.input.operation) : null;
+    if (!operation) throw new Error("publication-update stands at the kind of an outcome");
+    const update = Object.hasOwn(decides, operation.kind) ? decides[operation.kind]!(given, operation).update : null;
+    return update === null ? null : updateRequest(given, update);
+  },
+});
 
 /** The body of an outcome of a write: `{ send, seen }`, with a `send` that fits the result (section 12.1.5, "The evidence of a write"). */
 const SENDS: Readonly<Record<string, readonly string[]>> = { confirmed: ["accepted"], refused: ["refused", "not-sent"], unknown: ["unknown"] };
@@ -788,11 +937,12 @@ const isSeen = (seen: unknown): boolean => seen === "absent" || seen === "failed
 
 /**
  * The rules of `platform:destination@1` that are written, by the name that
- * a mark states (section 12.1.8, the table of marks). Each is a pure
- * function of what a rule is given. None reads the clock, and none
- * refuses.
+ * a mark states (section 12.1.8, the table of marks), but for `judge` and
+ * `publication-update`, which are made with a reader (below). Each is a
+ * pure function of what a rule is given. One refuses: the guard
+ * `resend-due`.
  */
-export const destinationRules: Rules = {
+const WRITTEN: Rules = {
   /**
    * Row 30, among the effects of `establish` (P16). It reads the creation's
    * `import`. When it is false: two `operation` effects, held, with no
@@ -1106,24 +1256,6 @@ export const destinationRules: Rules = {
     },
   },
   /**
-   * Rows m and n, the `send` of the mark of an outcome's kind (P16): the
-   * one `relate`, `publication`, to the lane. Its clauses are empty. One
-   * rule stands at each kind. It gives the update only where the rule of
-   * the kind says "the update": it makes that rule's judgment again, on the
-   * same state and the same outcome, as every rule reads the state before
-   * its entry. No update is sent for `publishing`, so the kinds `mint`,
-   * `revoke` and `receipt` give none.
-   */
-  "publication-update": {
-    place: "send",
-    run: (given) => {
-      const operation = given.input.type === "outcome" ? given.state.operation(given.input.operation) : null;
-      if (!operation) throw new Error("publication-update stands at the kind of an outcome");
-      const update = Object.hasOwn(DECIDES, operation.kind) ? DECIDES[operation.kind]!(given, operation).update : null;
-      return update === null ? null : updateRequest(given, update);
-    },
-  },
-  /**
    * Row e, the outcome of the kind `read` (P16; section 12.1.5, "The
    * deciding read", and the row `deciding-read`). A read is opened only
    * where a write's own outcome left nothing decided and no attempt of that
@@ -1194,3 +1326,17 @@ export const destinationRules: Rules = {
     },
   },
 };
+
+/**
+ * The rules of `platform:destination@1`, with a reader of what `observed`
+ * and `uses` say for a reservation. A test gives a STAND-IN reader. The
+ * production rules are `destinationRules`, below.
+ */
+export function destinationRulesWith(reads: Reads): Rules {
+  const judge = judgeDecides(reads);
+  return { ...WRITTEN, judge: judgeRule(judge), "publication-update": updateRule({ ...DECIDES, [DESTINATION_KINDS.judge]: judge }) };
+}
+
+/** The rules of `platform:destination@1` that this package holds: what a runtime and a verifier run. */
+export const destinationRules: Rules = destinationRulesWith(NOT_AT_HAND);
+
