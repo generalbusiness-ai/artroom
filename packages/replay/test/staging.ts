@@ -187,15 +187,19 @@ export class Gate extends Ledger {
    * `placed`: the act `issue` has a field `proof` that names a value, in a made-up domain with a bound of 64 bytes (the contract's
    * revision 19, section 6.2), and the issue of entry 1 names one, which came beside its intent.
    */
-  constructor(derives: NonNullable<OutcomeRule["derives"]>, readonly watched = false, placed = false) {
+  // `held`: one more change of the made-up data, for a gate whose tickets hold a reservation (the contract's section 17.2a). The rule
+  // `key-id` then opens its probe for the ticket.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  constructor(derives: NonNullable<OutcomeRule["derives"]>, readonly watched = false, placed = false, held?: (data: any) => void) {
     super(gateWith((data) => {
       data.name = "platform:task";
       data.acts.enter.grant = "gate.enter";
+      held?.(data);
       if (placed) data.acts.issue.fields.proof = { type: "digest", required: false, value: { domain: PROOF_DOMAIN, max: 64 } };
     }));
     const proof = { seat: 12 };
     this.proof = placed ? { domain: PROOF_DOMAIN, digest: valueDigest(PROOF_DOMAIN, proof), bytes: canonicalize(proof) } : null;
-    this.rules = Gate.rulesWith(derives, watched);
+    this.rules = Gate.rulesWith(derives, watched, held ? this.ticket : undefined);
     const founding = signIntent({ v: 1, to: null, actor: keys.rita.key, kind: "found", on: null, expected: {}, fields: { opener: keys.rita.member }, idempotencyKey: "gate", notAfter: t(60) }, keys.rita.secret);
     const seed: Seed = { v: 1, kind: "directory", definition: OWNER, creator: null, cause: intentDigest(founding.intent), ordinal: 0 };
     const asked = { name: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(1)), seed, founding };
@@ -203,21 +207,26 @@ export class Gate extends Ledger {
     if (this.act(keys.rita, "issue", { fields: { hash: textDigest("one"), ...(this.proof ? { proof: this.proof.digest } : {}) } }, this.proof ? { values: [this.proof.bytes] } : {}).result !== "write") throw new Error("the issue was not written");
     const entered = this.did(keys.una, "enter", { on: 0, expected: { on: this.item(0).revision }, fields: { secret: "one" } });
     const judged = settleOutcome(this.state, this.definition, { type: "outcome", operation: `${entered.seq}:0`, attempt: 1, result: "confirmed", evidence: { basis: "own-answer", body: {} } }, { clock: clockOf(this.state, this.now), bounds: PROPOSED_BOUNDS, own: this.own, platform: this.rules, ...(this.watched ? { observed: [this.seen(), this.rulesSeen()] } : {}) });
+    // A gate whose tickets hold a reservation may be given a rule that draws past a count: its outcome is then not judged, and the history ends before it.
+    if (held && judged.result === "unavailable") return;
     this.seal(written(judged).draft);
   }
 
   /** The made-up rules, with that rule for what an outcome of the probe derives. */
-  static rulesWith(derives: NonNullable<OutcomeRule["derives"]>, watched = false): PlatformRules {
-    const opens = [{ effect: "operation", k: 0, owner: OWNER, kind: "probe", attempts: 1 }, { effect: "attempt", operation: { k: 0 }, attempt: 1, result: "opened", selected: null }];
+  static rulesWith(derives: NonNullable<OutcomeRule["derives"]>, watched = false, holder?: number): PlatformRules {
+    const opens = [{ effect: "operation", k: 0, owner: OWNER, kind: "probe", attempts: 1, ...(holder === undefined ? {} : { for: holder }) }, { effect: "attempt", operation: { k: 0 }, attempt: 1, result: "opened", selected: null }];
     const made = gateRules({
       "key-id": { place: "effect", most: 2, run: (() => opens) as never }, probe: { place: "outcome", rules: { selects: false, read: false, retries: () => false, derives } },
+      // A second kind of operation, for a gate whose data names it. It derives nothing.
+      after: { place: "outcome", rules: { selects: false, read: false, retries: () => true } },
       ...(watched ? { fresh: { place: "guard", refusals: ["seated"], run: (given) => (given.observed({ member: "@paul" as MemberId })?.observation ? { holds: true } : { holds: false, name: "seated" }) } } : {}),
     });
     return { named: OWNER, rules: made.rules };
   }
   /** What a replay is supplied for the made-up version: its data, those rules, and where a scope under it records its membership reference. */
-  coded(rules: PlatformRules = this.rules, recorded: Coded["membership"] | null = () => membership, rulesScope?: Coded["rulesScope"]): (named: PlatformDefinition) => Coded | null {
-    return (named) => (named === OWNER ? { data: this.definition.declared as never, rules: rules.rules, ...(recorded ? { membership: recorded } : {}), ...(rulesScope ? { rulesScope } : {}) } : null);
+  // `data`: other data than this gate was written under, for a replay of its history under a version that states other counts.
+  coded(rules: PlatformRules = this.rules, recorded: Coded["membership"] | null = () => membership, rulesScope?: Coded["rulesScope"], data: unknown = this.definition.declared): (named: PlatformDefinition) => Coded | null {
+    return (named) => (named === OWNER ? { data: data as never, rules: rules.rules, ...(recorded ? { membership: recorded } : {}), ...(rulesScope ? { rulesScope } : {}) } : null);
   }
 
   override grants() {

@@ -267,6 +267,50 @@ describe("a preparation, its outcomes and an ancestry record are derived again (
   });
 });
 
+// Scope contract, revision 23, section 17.2a, "What a verifier does"; witness 18.47, case 15, and witness 18.49, case 12 (B9).
+// STAND-INS: derive's made-up data `gate`, with a ticket that holds a reservation, and made-up rules. Every count is made up.
+describe("a reservation that an item holds, in a replay: the counts, each `for` and each draw are derived again from the history", () => {
+  const replayed = (g: Gate, history: MemoryScope, platform: Options["platform"]) => verify(new MemorySource([history]), { mode: "replay", scope: g.at.scope, anchors: g.anchors(), platform });
+  /** A ticket holds that many probes. The mark of `probe` lists `probe`: the kinds are in a circle, and each is held. */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const holding = (probes: number) => (data: any) => { data.items.ticket.holds = { operations: { probe: probes } }; data.outcomes.probe = { ...data.outcomes.probe, attempts: 1, most: { effects: 0, operations: ["probe"] } }; };
+  /** The rule of the outcome opens one more probe, for the holder of its own operation. */
+  const again = (_given: unknown, operation: { for?: number }) => ({ effects: [], sends: [], opens: [{ owner: OWNER, kind: "probe", attempts: 1, for: operation.for }] });
+
+  test("18.47 case 15: a history whose entries draw within the counts is consistent; an entry that opens a held operation for no holder, and one that draws past a count, are each a mismatch with its name", async () => {
+    // Entry 1 opens the ticket, which takes 2 probes. Entry 2 opens one for it, and entry 3, the outcome, opens the second.
+    const g = new Gate(again as never, false, false, holding(2));
+    expect([g.state.holder(g.ticket), g.state.operationsFor(g.ticket).map((operation) => operation.id), g.entries[2]!.entry.effects.find((effect) => effect.effect === "operation")]).toEqual([null, ["2:0", "3:0"], { effect: "operation", k: 0, owner: OWNER, kind: "probe", attempts: 1, for: g.ticket }]);
+    const good = await replayed(g, g.served(), g.coded());
+    expect([good.report.result, good.why]).toEqual(["consistent", null]);
+
+    // The `for` of entry 2 changed to the gate, which is no holder; and the `for` left out. Each is named before any judge is asked.
+    const changed = async (seq: number, change: (effect: Record<string, unknown>) => void) => {
+      const history = g.served();
+      rewrite(history, seq, (entry) => change(entry.effects.find((effect: { effect: string }) => effect.effect === "operation")));
+      const found = await replayed(g, history, g.coded());
+      return [found.report.result, found.report.at?.seq, found.why?.split(":")[0]];
+    };
+    expect([await changed(2, (effect) => { effect["for"] = 0; }), await changed(3, (effect) => { delete effect["for"]; })]).toEqual([["mismatch", 2, "held-without-holder"], ["mismatch", 3, "held-without-holder"]]);
+
+    // The same history under data whose ticket holds 1 probe: entry 3 draws the second, past the count.
+    const short = new Gate(again as never, false, false, holding(1));
+    const past = await replayed(g, g.served(), g.coded(g.rules, undefined, undefined, short.definition.declared));
+    expect([past.report.result, past.report.at?.seq, past.why]).toEqual(["mismatch", 3, "draw-past-count: operation 0 is for item 1, which holds no count of the kind probe"]);
+    // At write time the same draw was a fault: under that data the outcome wrote no entry, and the gate ends at entry 2.
+    expect(short.entries.length).toBe(3);
+  });
+
+  test("18.49 case 12: a history in which a held kind opens a kind that no item holds is consistent, and the operation of that kind has no holder", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const chained = (data: any) => { data.items.ticket.holds = { operations: { probe: 1 } }; data.outcomes.probe = { ...data.outcomes.probe, attempts: 1, most: { effects: 0, operations: ["after"] } }; data.outcomes.after = { code: "after", row: "P16", attempts: 3 }; };
+    const g = new Gate((() => ({ effects: [], sends: [], opens: [{ owner: OWNER, kind: "after", attempts: 3 }] })) as never, false, false, chained);
+    expect([g.definition.reserving!.kinds["probe"]!.whole.entries, g.state.operation("3:0")?.kind, g.state.operation("3:0")?.for, g.state.holders()]).toEqual([14, "after", undefined, []]);
+    const good = await replayed(g, g.served(), g.coded());
+    expect([good.report.result, good.why]).toEqual(["consistent", null]);
+  });
+});
+
 describe("an outcome entry of a platform definition, and where a scope records its membership reference", () => {
   /** What the made-up rule `probe` derives for the outcome: a ticket that the outcome entry opens, with the hash that a ticket must hold. */
   const opens = ({ resolved }: { resolved: { self: number } }) => ({ effects: [{ effect: "open", item: resolved.self, type: "ticket", state: "open" }, { effect: "value", item: resolved.self, slot: "hash", value: textDigest("made") }], sends: [], opens: [] });
