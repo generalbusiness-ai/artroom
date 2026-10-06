@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { Entry, FieldValue, OperationId, Request } from "@generalbusiness/artroom-contract";
-import { canonicalize, factRefOf } from "@generalbusiness/artroom-bytes";
+import { canonicalize, factRefOf, parseStrict } from "@generalbusiness/artroom-bytes";
 import { derivable, operationSettled, runnable, type Item, type JudgedInput, type PlatformRule, type RuleGiven } from "@generalbusiness/artroom-derive";
 import { t } from "@generalbusiness/artroom-derive/testing";
 import { COLLECT_MOST, DESTINATION, DESTINATION_KINDS, NAMED_MOST, RECEIPTS_OWED, REPORTS_MOST, destination, destinationRules, revokedToken, writeSends } from "../src/destination.ts";
@@ -251,6 +251,25 @@ test("a reserve stays queued before the first head and opens `judge` after it, o
   ];
   expect(outside.map((over) => [said(r.reserve(over, r.lane, [review]).judgment), result(r)])).toEqual(outside.map(() => [WRITTEN, ["refused", "bad-field", null]]));
   expect([publications(r).length, p2 > p1]).toEqual([before, true]);
+});
+
+// A closed collect-list record refuses every undeclared own member as bad-field, including names inherited by the validator tables.
+test("canonical-loaded links with unknown own members are decided bad-field, while a valid link delivery opens a publication", () => {
+  const b = new Branch(false).ready();
+  const link = { link: factRefOf(handMade(b.lane.at, "link")), issue: b.other.at };
+  for (const name of ["__proto__", "constructor", "toString", "hasOwnProperty", "label"]) {
+    const loaded = parseStrict(canonicalize({ ...link, [name]: true }));
+    expect(Object.hasOwn(loaded as object, name)).toBe(true);
+    const before = b.head.seq;
+    const { judgment } = b.reserve({ links: [loaded] });
+    expect([said(judgment), b.head.seq - before], name).toEqual([WRITTEN, 1]);
+    expect([result(b), b.last.effects, publications(b)], name).toEqual([["refused", "bad-field", null], [], []]);
+  }
+
+  const valid = parseStrict(canonicalize(link));
+  expect(said(b.reserve({ links: [valid] }).judgment)).toEqual(WRITTEN);
+  expect([result(b), b.item(b.head.seq).type, b.item(b.head.seq).state, b.opened])
+    .toEqual([["applied", null, null], "publication", "queued", [["judge", 1, true]]]);
 });
 
 test("a withdraw is decided by the state of the publication: applied while queued or not yet known, refused `reserved` after reservation and `ended` after a final state, and `not-owner` from another lane", () => {
