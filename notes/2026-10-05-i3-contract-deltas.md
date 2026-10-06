@@ -2686,3 +2686,16 @@ credit. The sender entries and grants are fixture stand-ins, labelled
 by the test. A focused control removing the ambiguity throw continued
 the early history to its checkpoint and failed the coverage assertion.
 Targeted tests and typechecks passed; no worker gate was run.
+
+A checked earlier entry of this same scope can resolve the size without
+bytes: a successfully checked field of the same digest with an equal or
+smaller maximum proves that maximum again. The narrow error path reads
+only the earlier checked prefix, never a later receipt/checkpoint, and
+uses the receiver's pinned field types; an external definition name alone
+is no proof. It does not refold that prefix or rerun code. The live path
+with real sizes does no such scan. A two-decision witness applies the
+first request, then preserves redacted credit for the second bare
+refusal with one decision still remaining. The founding field of max 16
+in the ambiguity witnesses remains a negative: it cannot prove max 2.
+A control incorrectly crediting that larger bound fails the deciding
+entry/coverage assertions.
