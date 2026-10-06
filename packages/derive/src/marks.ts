@@ -303,8 +303,6 @@ export interface OutcomeRule {
   selects: boolean;
   read: boolean;
   closure?: number;
-  /** The operations that an outcome of this kind opens are reserved by another duty, which the specification counts (`OperationRules.covered`). */
-  covered?: boolean;
   most?: Most;
   /** Whether the request of that attempt may be sent now (`OperationRules.ready`). It reads the folded state alone. Absent: it may. */
   ready?(state: StateView, operation: Operation, attempt: number): boolean;

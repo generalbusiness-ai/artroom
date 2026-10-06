@@ -250,7 +250,8 @@ export function effects(d: Defining, v: unknown, path: string, ctx: Ctx, later: 
       // none. Nothing is derived from a mark: it conflicts with no written effect, and what it can set is not counted here (the
       // contract's point R1-59).
       if (ctx.timed) bad("timed-partial", at(path, i), "a timed rule's effects are total, so none is a mark");
-      else mark(d, e, at(path, i), "effect");
+      // Section 17.2, "What a mark may start": the mark may state `most`. `holds.ts` reads it, wherever the mark stands.
+      else mark(d, e, at(path, i), "effect", [], ["most"]);
       return;
     }
     const sets = effect(d, e, at(path, i), ctx, later);

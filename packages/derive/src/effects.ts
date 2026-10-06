@@ -10,7 +10,7 @@
  * nothing and is judged by no rule.
  */
 
-import type { Condition, Effect, EffectForm, FieldType, FieldValue, Mark, MemberRef, Notify, Operand, PlatformData, RefusalReason, UnavailableReason } from "@generalbusiness/artroom-contract";
+import type { Condition, Effect, EffectForm, FieldType, FieldValue, Mark, MarkMost, MemberRef, Notify, Operand, PlatformData, RefusalReason, UnavailableReason } from "@generalbusiness/artroom-contract";
 import { attribution, byMember, historyOf } from "./attribution.ts";
 import { capabilityEffect } from "./capability.ts";
 import { isEntryOf, isLocalFact } from "./fields.ts";
@@ -185,6 +185,16 @@ export function deriveEffects(j: Judging, forms: readonly EffectForm[], attentio
         const kinds = (j.definition.declared as unknown as PlatformData).outcomes;
         const k = effects.filter((e) => e.effect === "operation").length;
         if (effect.owner !== j.platform?.named || own(kinds, effect.kind) === undefined || effect.k !== k || !Number.isSafeInteger(effect.attempts) || effect.attempts < 1) throw outside(mark, "an operation that its definition does not own, or out of its ordinal");
+        // Revision 17: the data states the most attempts of a kind. An operation states no more.
+        const stated = own(kinds, effect.kind)?.attempts;
+        if (stated !== undefined && effect.attempts > stated) throw outside(mark, `an operation of the kind ${effect.kind} with more attempts than its data states`);
+        // Section 17.2, "What a mark may start": a mark that states `most` opens one operation of each kind that it lists, and no other.
+        const listed = (mark as Mark & { most?: MarkMost }).most;
+        if (listed && (!(listed.operations ?? []).includes(effect.kind) || effects.some((e) => e.effect === "operation" && openers.get(e.k) === mark && e.kind === effect.kind))) throw outside(mark, "an operation of a kind that its mark does not list, or two of one kind");
+        // Section 17.2a, "`for`": the local ID of a holder, or `"self"` for the item that this entry opens. A rule may name that item
+        // by the position that it was given, and the entry records `"self"`, as for every effect on it (section 6.1, item 6).
+        if (effect.for !== undefined && effect.for !== "self" && !isLocalId(effect.for)) throw outside(mark, "an operation for a holder that is no local item");
+        if (effect.for === j.self) { effects.push({ ...effect, for: "self" }); openers.set(effect.k, mark); continue; }
         effects.push(effect);
         openers.set(effect.k, mark);
         continue;

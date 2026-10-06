@@ -14,6 +14,7 @@
 import type { Effect, Entry, FactRef, FactUse, Grant, GrantMark, Head, Input, MismatchReason, ObservationUse, Prepared, RefusalReason, RoutingRefusal, ScopeRef, Send, SignedIntent, UnavailableReason } from "@generalbusiness/artroom-contract";
 import { intentDigest, scopeIdOf, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import type { Signer } from "./attribution.ts";
+import { withinCounts } from "./draws.ts";
 import { deriveEffects } from "./effects.ts";
 import { isIntent, presentedTypes, readFacts, readFields, type Reading } from "./fields.ts";
 import { covers } from "./grant.ts";
@@ -138,7 +139,7 @@ export type Judgment =
  * judged: `unavailable`, and nothing is written (section 6.1).
  */
 export function judgeAct(view: StateView, definition: ValidDefinition, signed: SignedIntent, context: JudgeContext): ActJudgment {
-  return unjudged(() => actJudged(view, definition, signed, context));
+  return withinCounts(view, definition, unjudged(() => actJudged(view, definition, signed, context)));
 }
 
 function actJudged(view: StateView, definition: ValidDefinition, signed: SignedIntent, context: JudgeContext): ActJudgment {

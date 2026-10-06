@@ -23,8 +23,9 @@ export type ProblemCode =
   | "genesis-timed"      // the genesis act opens a timed item type or has a `hold` effect (section 6.4)
   | "timed"              // a timed rule that is not about its own live item, or that would stay due
   | "timed-partial"      // a timed rule with an effect that its commit could refuse (section 6.4)
-  | "reserve-unbounded"  // what a duty can start is not finite: timed rules of one type that lead to one another in a cycle (section 17.2)
+  | "reserve-unbounded"  // what a duty can start is not finite: timed rules of one type that lead to one another in a cycle (section 17.2); kinds that no item holds and that open each other in a circle, or one that reaches a held kind (section 17.2a, checks 4 and 5)
   | "hold"               // the hold capability used without what it needs (section 6.8)
+  | "holds"              // a `holds` or an `adds` that is stated ill, or a type that states `holds` and is opened by an entry that is not new work (section 17.2a, checks 1 and 2). No scope is founded under such data: `unsupported-definition`
   | "handler"            // two handlers for one class and message from one kind of scope
   | "advisory-sends"     // a handler of class `advisory` declares a send or a notice (section 6.4)
   | "fan-out-unbounded"  // a fan-out over a final state or over a type whose `max` is past the bound, or a second fan-out in one list (section 6.6)

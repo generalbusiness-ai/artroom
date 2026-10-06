@@ -165,7 +165,8 @@ export function acts(d: Defining, v: unknown, timed: Readonly<Record<string, unk
   const { bounds, types, bad, rec, entries, str } = d;
   for (const [name, av] of entries(v, "acts", bounds.acts)) {
     const path = at("acts", name);
-    const o = rec(av, path, ["step", "on", "also", "fields", "grant", "guards", "effects", "sends", "attention"], ["settles", "presents"]);
+    // Section 17.2a: in platform data an act may state `adds`. `holds.ts` reads it.
+    const o = rec(av, path, ["step", "on", "also", "fields", "grant", "guards", "effects", "sends", "attention"], ["settles", "presents", ...(d.platform ? ["adds"] : [])]);
     if (!o) continue;
     const step = o["step"];
     if (step !== "open" && step !== "transition" && step !== "comment") bad("shape", at(path, "step"), "is open, transition or comment");

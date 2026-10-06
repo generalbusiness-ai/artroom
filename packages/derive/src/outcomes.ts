@@ -27,7 +27,7 @@ import { RuleFault, givenTo, outside, ruleAt, run, type AtHand, type OutcomeGive
 import { deriveSends } from "./sends.ts";
 import type { Operation, StateView } from "./state.ts";
 import type { ValidDefinition } from "./validate/index.ts";
-import { isFactRef, isObject, own, same } from "./values.ts";
+import { isFactRef, isLocalId, isObject, own, same } from "./values.ts";
 
 /**
  * What the judge of an outcome reads beside the state: the one reading, the
@@ -74,7 +74,7 @@ export function ownersOf(definition: ValidDefinition, platform: PlatformRules | 
         return given;
       };
       return {
-        selects: r.selects === true, read: r.read === true, ...(r.closure === undefined ? {} : { closure: r.closure }), ...(r.covered === true ? { covered: true } : {}), ...(r.most === undefined ? {} : { most: r.most }),
+        selects: r.selects === true, read: r.read === true, ...(r.closure === undefined ? {} : { closure: r.closure }), ...(r.most === undefined ? {} : { most: r.most }),
         // The driver asks this outside a commit, as it asks `unknown`: the rule reads the state only.
         ...(r.ready ? { ready: (view: StateView, operation: Operation, attempt: number) => answer(run(mark, () => r.ready!(view, operation, attempt))) } : {}),
         // Revision 19, section 6.1 (row I3-35): the rule that decides a further attempt is given what every rule is given.
@@ -138,8 +138,20 @@ function given(mark: OutcomeMark, j: Judging, kinds: Readonly<Record<string, Out
   // Section 7.5: the bound on every send of one entry. The validator counts it for a row. An outcome entry has no row, and none of its rule's requests is cut off.
   if (sends.length > j.bounds.sendsPerEntry) throw outside(mark, "more requests than one entry sends");
   for (const open of opens) {
-    const { owner, kind, attempts }: { owner?: unknown; kind?: unknown; attempts?: unknown } = isObject(open) ? open : {};
+    const { owner, kind, attempts, for: holder }: { owner?: unknown; kind?: unknown; attempts?: unknown; for?: unknown } = isObject(open) ? open : {};
     if (owner !== j.platform?.named || typeof kind !== "string" || own(kinds, kind) === undefined || typeof attempts !== "number" || !Number.isSafeInteger(attempts) || attempts < 1) throw outside(mark, "an operation that its definition does not own");
+    // Section 17.2a, "`for`": the local ID of a holder. An outcome entry opens no holder, so it never names its own item.
+    if (holder !== undefined && !isLocalId(holder)) throw outside(mark, "an operation for a holder that is no local item");
+    // Revision 17: the data states the most attempts of a kind. An opening states no more.
+    const stated = own(kinds, kind)?.attempts;
+    if (stated !== undefined && attempts > stated) throw outside(mark, `an operation of the kind ${kind} with more attempts than its data states`);
+  }
+  // Section 17.2, "What a mark may start": where the data of the kind states its attempts, one outcome entry opens one operation of
+  // each kind that its `most` lists, and no other (witness 18.49, case 8). The reservation counted exactly that.
+  if (mark.attempts !== undefined) {
+    const listed = mark.most?.operations ?? [];
+    const opened = opens.map((open) => open.kind);
+    if (opened.some((kind, i) => !listed.includes(kind) || opened.indexOf(kind) !== i)) throw outside(mark, "an operation of a kind that its mark does not list, or two of one kind");
   }
   // The same derivation that a mark in a written list meets: one rule for the effects, and one for each request, in their order.
   const rules: [string, Rules[string]][] = [["effects", { place: "effect", most: effects.length, run: () => effects }], ...sends.map((request, n): [string, Rules[string]] => [`send.${n}`, { place: "send", run: () => request }])];
@@ -156,6 +168,9 @@ function given(mark: OutcomeMark, j: Judging, kinds: Readonly<Record<string, Out
   const opener = openerOf(j);
   const made = deriveSends(j, [mark.send as unknown as SendForm], joined.working, opener?.cause ?? NO_CAUSE, 0, undefined, joined.opened !== null);
   if (!made.ok) throw outside(mark.send, `a request that the entry cannot hold: ${"reason" in made ? made.reason : made.unavailable}`);
+  // Section 17.2, "A request that an outcome sends": where the send states `once`, at most one outcome entry of one operation makes
+  // the request, and a second is a fault of the rule. The operation reserved the request once.
+  if (mark.send.once === true && made.sends.some((send) => send.message.class === "request") && j.judged?.type === "outcome" && j.view.operation(j.judged.operation)?.sent === true) throw outside(mark.send, "a second request of an operation whose send states once");
   for (const { message } of made.sends) {
     if (message.class !== "request" || message.type !== "create") continue;
     const fields = isObject(message.body) && isObject(message.body["fields"]) ? Object.values(message.body["fields"]) : [];

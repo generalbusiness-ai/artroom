@@ -11,6 +11,7 @@ import { isEntryOf, updateOf, useOf, type Reading } from "./fields.ts";
 import { bound, runClause, runHandler, type Clause, type Handled, type Sent } from "./handlers.ts";
 import type { Judgment } from "./judge.ts";
 import { heldOpenings } from "./ledger.ts";
+import { withinCounts } from "./draws.ts";
 import { atHand, retainedOf, unjudged, type JudgedInput } from "./marks.ts";
 import { recordEffects } from "./prepare.ts";
 import type { ScopeState, StateView } from "./state.ts";
@@ -85,7 +86,7 @@ function oneUpdateForKey(source: Entry, from: FactRef, to: ScopeRef, name: strin
  * judged: transport answers `retry`, and nothing is written (section 6.1).
  */
 export function judgeDelivery(view: StateView, definition: ValidDefinition, delivered: Delivered, context: DeliveryContext): Judgment {
-  return unjudged(() => deliveryJudged(view, definition, delivered, context));
+  return withinCounts(view, definition, unjudged(() => deliveryJudged(view, definition, delivered, context)));
 }
 
 function deliveryJudged(view: StateView, definition: ValidDefinition, delivered: Delivered, context: DeliveryContext): Judgment {

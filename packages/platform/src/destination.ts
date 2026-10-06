@@ -110,6 +110,45 @@ export const DESTINATION_KINDS = { firstHead: "first-head", judge: "judge", push
 export const DESTINATION_ATTEMPTS = { firstHead: 3, judge: 1, push: 3, mint: 1, revoke: 3, read: 1, receipt: 3, adoptRead: 1, resend: 1 } as const;
 
 /**
+ * The one named declaration that stands in for the reservation by a
+ * publication, for exactly five kinds: `judge`, `push`, `mint`, the
+ * deciding `read` and `adopt-read`. It is the closure that each of the five
+ * rules declares for one outcome entry, and it is not finite.
+ *
+ * Why it is stated. The five kinds open each other in a circle: an outcome
+ * of a `judge` opens a push, and an outcome of that push opens the next
+ * `judge`, for another publication. By kind no number is a closure of one
+ * (the scope contract, revision 23, section 17.2a, its opening). The
+ * contract's form for this is `holds` on the item type `publication`, and
+ * on the branch, with `for` on each operation. The rows of that form are
+ * the authority note's, in its revision 28, which is not adopted. Two of
+ * the rules that draw on them, `first-head` and `receipt`, are not written.
+ * So the counts cannot be derived from this package's rules without
+ * inventing them, and none is stated here.
+ *
+ * What it does, in the generic code, which has no exemption (derive's
+ * `ledger.ts` and `reserve.ts`):
+ *
+ * - The ledger writes an outcome entry of the five kinds whatever it
+ *   opens: no opening passes a closure that is not finite.
+ * - While an operation of one of the five kinds is open, what the scope
+ *   reserves is not finite. So no entry that is new work is admitted, and a
+ *   `reserve` whose rule opens a `judge` is never decided: transport
+ *   answers "retry". The answer fails closed.
+ *
+ * What it does not do. It reserves no room. A `reserve` that only queues
+ * its publication is admitted with its own entry, and the outcome entries
+ * that later open and settle that publication's operations are written
+ * with no room that an admission checked: 71 entries by the note's own
+ * table (`publicationRoom`). That gap is the one that entries FA3 and FC1
+ * of the I3 deltas record. It closes when the data states `holds`.
+ */
+// I3 merge: THE AUTHORITY NOTE'S REVISION 28 ROW REPLACES THIS. When its rows of `holds` for a publication and for the branch are
+// adopted, the data states them, each opening of this file states `for`, the kinds state `attempts` and `most`, and this constant
+// and the five declarations go (I3 deltas, entry GB7).
+export const DESTINATION_NOT_FINITE = Number.POSITIVE_INFINITY;
+
+/**
  * What one publication reserves, in entries, by the two rows of the
  * destination in the table of the authority note's section 5.8, counted
  * from the attempts above as that section counts them: "An operation"
@@ -127,18 +166,16 @@ export const DESTINATION_ATTEMPTS = { firstHead: 3, judge: 1, push: 3, mint: 1, 
  * only with the room of this row and the next": 72 entries, and 73 with
  * the delivery's own.
  *
- * **THIS COUNT IS NOT HELD BY ANY RUNTIME** (I3 deltas, entries FA3 and
- * FC1). The ledger counts, for a publication, only the outcome entries of
- * each operation that is open (`owed`, in derive's `reserve.ts`), and the
- * kinds of this definition state `covered`, so nothing is reserved for
- * what an outcome opens. `asked` is what the one entry of a publication
- * that is new work, the delivery of its `reserve`, is admitted with: the
- * 2 entries of the `judge` that it opens, of which the table counts 1,
- * the decision. `unreserved` is the rest of the table: the entries that a
- * publication may write, or reserve, in entries that are never asked
- * whether they fit. It is 71, and 72 where the `reserve` opened no
- * `judge`. `platform/test/definitions.test.ts` holds the numbers, and the
- * kinds that state `covered`, so that neither grows unseen.
+ * **THIS COUNT IS NOT HELD BY ANY RUNTIME** (I3 deltas, entries FA3, FC1
+ * and GB7). The data of this definition states no `holds` yet, so no
+ * publication reserves it: see `DESTINATION_NOT_FINITE`, below. `asked` is
+ * what the table counts for the `judge` that a `reserve` may open: its 2
+ * outcome entries, of which the table counts 1, the decision. `unreserved`
+ * is the rest of the table: the entries that a publication which was
+ * admitted while `queued` may write in entries that are never asked whether
+ * they fit. It is 71. `platform/test/definitions.test.ts` holds the
+ * numbers, and the kinds that state the declaration, so that neither grows
+ * unseen.
  */
 export function publicationRoom(attempts: { push: number; mint: number; revoke: number; receipt: number; judge: number } = DESTINATION_ATTEMPTS): { queued: number; reserved: number; asked: number; unreserved: number } {
   const [operation, request] = [(most: number) => 2 * most, 2];
@@ -1013,7 +1050,7 @@ const DECIDES: Readonly<Record<string, Decides>> = { [DESTINATION_KINDS.push]: p
 const judgeRule = (decides: Decides): PlatformRule => ({
   place: "outcome", clock: true,
   rules: {
-    selects: false, read: false, covered: true, most: { effects: 10, requests: 1, operations: 2 },
+    selects: false, read: false, closure: DESTINATION_NOT_FINITE, most: { effects: 10, requests: 1, operations: 2 },
     retries: () => false,
     wellFormed: (result, evidence) => result === "confirmed" && isJudgeEvidence(evidence.body),
     derives: (given, judge) => { const { effects, opens } = decides(given, judge); return { effects, sends: [], opens }; },
@@ -1282,7 +1319,7 @@ const WRITTEN: Rules = {
   mint: {
     place: "outcome",
     rules: {
-      selects: false, read: false, covered: true, most: { effects: 2, requests: 0, operations: 1 },
+      selects: false, read: false, closure: DESTINATION_NOT_FINITE, most: { effects: 2, requests: 0, operations: 1 },
       retries: () => false,
       wellFormed: (result, evidence) => {
         const body = bodyOf(evidence.body, result === "confirmed" ? ["token", "ends"] : []);
@@ -1357,7 +1394,7 @@ const WRITTEN: Rules = {
   push: {
     place: "outcome",
     rules: {
-      selects: false, read: false, covered: true, most: { effects: 14, requests: 1, operations: 4 },
+      selects: false, read: false, closure: DESTINATION_NOT_FINITE, most: { effects: 14, requests: 1, operations: 4 },
       retries: (_result, push, given) => pushOf(given, push).allows,
       ready: (state, push, attempt) => (mintOf(state, push, attempt)?.attempts[0]?.outcomes.length ?? 0) > 0,
       wellFormed: (result, evidence) => { const body = bodyOf(evidence.body, ["send", "seen"]); return body !== null && SENDS[result]!.includes(body["send"] as string) && isSeen(body["seen"]); },
@@ -1392,7 +1429,7 @@ const WRITTEN: Rules = {
   "deciding-read": {
     place: "outcome",
     rules: {
-      selects: false, read: false, covered: true, most: { effects: 11, requests: 1, operations: 3 },
+      selects: false, read: false, closure: DESTINATION_NOT_FINITE, most: { effects: 11, requests: 1, operations: 3 },
       retries: () => false,
       wellFormed: (result, evidence, given) => {
         const [seen, read] = [bodyOf(evidence.body, ["seen"])?.["seen"], given.input.type === "outcome" ? given.state.operation(given.input.operation) : null];
@@ -1419,7 +1456,7 @@ const WRITTEN: Rules = {
   "adopt-read": {
     place: "outcome",
     rules: {
-      selects: false, read: false, covered: true, most: { effects: 5, requests: 0, operations: 1 },
+      selects: false, read: false, closure: DESTINATION_NOT_FINITE, most: { effects: 5, requests: 0, operations: 1 },
       retries: () => false,
       wellFormed: (result, evidence) => { const seen = bodyOf(evidence.body, ["seen"])?.["seen"]; return result === "confirmed" && (seen === "absent" || isObjectId(seen)); },
       derives: ({ state, own, input }, read) => {
