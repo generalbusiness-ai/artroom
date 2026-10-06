@@ -587,7 +587,10 @@ const opened = (k: number, kind: string, attempts: number, holder: number): Rule
 const isObject = (value: unknown): value is Record<string, FieldValue> => typeof value === "object" && value !== null && !Array.isArray(value);
 /** True when the record has each required member, no member that is not named, and each member that it has is of its kind. */
 const record = (value: unknown, required: Readonly<Record<string, (member: unknown) => boolean>>, optional: Readonly<Record<string, (member: unknown) => boolean>> = {}): boolean =>
-  isObject(value) && Object.keys(required).every((name) => Object.hasOwn(value, name)) && Object.entries(value).every(([name, member]) => (required[name] ?? optional[name])?.(member) === true);
+  isObject(value) && Object.keys(required).every((name) => Object.hasOwn(value, name)) && Object.entries(value).every(([name, member]) => {
+    const check = Object.hasOwn(required, name) ? required[name] : Object.hasOwn(optional, name) ? optional[name] : undefined;
+    return check?.(member) === true;
+  });
 
 /**
  * One record of the `collect` list `links` of a `reserve`, as the lane's
