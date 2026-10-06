@@ -11,7 +11,7 @@
  */
 
 import type { ObservationRequest, PlatformData } from "@generalbusiness/artroom-contract";
-import { destination, destinationMembership } from "./destination.ts";
+import { destination, destinationMembership, destinationRulesScope } from "./destination.ts";
 import { inbox } from "./inbox.ts";
 import { membership, standingOf } from "./membership.ts";
 import { register } from "./register.ts";
@@ -25,6 +25,7 @@ export { FIRST_ACTIONS, MEMBERSHIP, NO_MEMBER, ROLE_LISTS, ROLE_TABLE, actionsIn
 export { CREATION_ATTEMPTS, REGISTER, REPOSITORY, directoryIdOf, directorySeed, registerRules, repositoryName } from "./register.ts";
 export { DEFINITION_DOMAIN, DIRECTORY, IMPORT_ATTEMPTS, SEEN, directoryMembership, directoryRules } from "./directory.ts";
 export { COLLECT_MOST, DESTINATION, DESTINATION_ATTEMPTS, DESTINATION_KINDS, destinationMembership, destinationRulesScope, publicationRoom, revokedToken } from "./destination.ts";
+export type { LaneRead } from "./destination.ts";
 export { NOT_RESERVED, isJudgeEvidence, judgeReservation } from "./reservation.ts";
 export type { JudgeChanges, JudgeEvidence, Reservation, ReservationAsked, ReservationRead, Statement } from "./reservation.ts";
 export { RULES };
@@ -67,6 +68,15 @@ export interface Platform {
    * observation (section 12.1, decided in revision 25).
    */
   readonly membership?: (state: StateView) => RecordedRef | null;
+  /**
+   * Where a scope under this version records its rules reference: the
+   * rules scope that it observes (the contract's section 16.1, guard 1). A
+   * destination holds the scope ID in the value `branch.rules`, and no
+   * incarnation before its first retained observation of the rules
+   * (authority note, section 12.1, the same table). Absent: no text states
+   * where a scope under this version records one.
+   */
+  readonly rulesScope?: (state: StateView) => RecordedRef | null;
 }
 
 /**
@@ -79,5 +89,5 @@ export function platform(named: string): Platform | null {
   const name = named.slice(0, cut);
   const data = cut > 0 && named.slice(cut) === "@1" && Object.hasOwn(definitions, name) ? definitions[name] : undefined;
   if (!data) return null;
-  return { data, rules: Object.hasOwn(RULES, name) ? (RULES as Record<string, Rules>)[name]! : {}, ...(data === membership ? { observed: standingOf } : {}), ...(data === directory ? { membership: directoryMembership } : data === rulesScope ? { membership: rulesMembership } : data === destination ? { membership: destinationMembership } : {}) };
+  return { data, rules: Object.hasOwn(RULES, name) ? (RULES as Record<string, Rules>)[name]! : {}, ...(data === membership ? { observed: standingOf } : {}), ...(data === directory ? { membership: directoryMembership } : data === rulesScope ? { membership: rulesMembership } : data === destination ? { membership: destinationMembership, rulesScope: destinationRulesScope } : {}) };
 }

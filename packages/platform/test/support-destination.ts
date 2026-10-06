@@ -12,14 +12,14 @@
  *   outcome of `first-head` makes the branch `ready` at the commit that the
  *   read back saw. The outcome of `receipt` derives nothing. They show
  *   nothing about how the note's two rows will be written.
- * - The reader of a reservation, `Branch.read`: what `observed` and the
- *   entries in `uses` say for the reservation that the rule `judge` judges
- *   (`ReservationRead`). The test writes it by hand. No membership scope,
- *   no rules scope and no lane answered it. The rule `judge`, its judgment
- *   and what it yields are the package's own.
- * - The retained observations of an outcome entry: `Branch.outcome` may
- *   seal an entry with a member `observed` that the test wrote. The judge
- *   of an outcome writes none yet (entries EM3 and EU4).
+ * - What is at hand for a reservation, `Branch.read`: the observations
+ *   that a runtime would have read before the turn of the outcome of
+ *   `judge`, and what the lane's entries in `uses` say. The test writes
+ *   both by hand. No membership scope, no rules scope and no lane answered.
+ *   The judge of the outcome is given the observations and the entries, as
+ *   a runtime gives them, and writes the entry's `observed` and `uses`
+ *   itself. The rule `judge` reads each observation through the judge. Of
+ *   the reader, only the lane's part is a stand-in: `LaneRead`.
  * - `bureau`: a made-up directory that creates one destination scope at its
  *   founding. It stands for the real directory's genesis, below a register
  *   (authority note, section 12.1). It shows nothing of a founding.
@@ -35,7 +35,7 @@
  * `Branch` is a destination scope in memory, below such a bureau. Its
  * genesis, its confirmation, its deliveries, its acts and its outcomes are
  * judged by derive's real judges, with the destination's own rules, the
- * two stand-in rules and the stand-in reader.
+ * two stand-in rules and the stand-in reader of a lane's entries.
  */
 
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
@@ -44,7 +44,7 @@ import { factRefOf, intentDigest, newIncarnation, scopeIdOf, signIntent } from "
 import { PROFILES, clockOf, judgeDelivery, judgeGenesis, settleOutcome, validateDefinition } from "@generalbusiness/artroom-derive";
 import type { ActJudgment, Fetched, Judgment, OutcomeJudgment, PlatformRules, Rules, Source, StateView, ValidDefinition } from "@generalbusiness/artroom-derive";
 import { Ledger, Scope, T0, creation, d, keys, laneDefinition, sent, t, type Actor, type Context, type Over } from "@generalbusiness/artroom-derive/testing";
-import { DESTINATION, destination, destinationRulesWith } from "../src/destination.ts";
+import { DESTINATION, DESTINATION_KINDS, destination, destinationRulesWith, type LaneRead } from "../src/destination.ts";
 import type { JudgeEvidence, ReservationRead } from "../src/reservation.ts";
 
 export const { rita, una } = keys;
@@ -99,13 +99,26 @@ export const FOUND: JudgeEvidence = { head: HEAD, present: true, tree: TREE, fir
  * STAND-IN: what `observed` and `uses` say for a reservation that nothing
  * stands against: rita signed the `merge` and holds `change.merge`, the
  * rules ask no approval and no check, and the manifest is complete, from
- * the first head to the integration commit.
+ * the first head to the integration commit. The plain judgment
+ * `judgeReservation` takes it whole. A `Branch` takes its observations and
+ * what its lane's entries say (`Hand`).
  */
 export const reading = (at: Timestamp, over: Partial<ReservationRead> = {}): ReservationRead => ({
   merger: keyObserved(rita, at), rules: rulesObserved(at), extents: null, singleControllerException: false,
   manifest: { base: HEAD, integration: NEXT, tree: TREE, reports: [], authors: [], complete: true },
   controllersOfAuthors: [], controllers: null, verdicts: [], checks: {}, ...over,
 });
+
+/**
+ * STAND-IN: what a `Branch` has at hand for the next outcome of `judge`,
+ * written by hand. The observations are those that the destination's
+ * runtime would read before the turn. `manifest`, and `sound`, `opening`
+ * and `deciding`, are what a reader of the lane's entries would say. The
+ * four inputs that no form supplies are not here: the package's rule fills
+ * `extents`, `controllers` and `controllersOfAuthors`, and reads the
+ * declaration of the exception from the rules observation.
+ */
+export type Hand = Pick<ReservationRead, "merger" | "rules" | "manifest" | "verdicts" | "checks">;
 
 const checked = (result: ReturnType<typeof validateDefinition>): ValidDefinition => {
   if (!result.ok) throw new Error(`a definition of test support is refused: ${JSON.stringify(result.problems)}`);
@@ -199,10 +212,18 @@ export class Branch extends Ledger {
   /** STAND-IN: a lane in memory, whose genesis was made by hand. It is read as a lane under `change`. */
   readonly lane = new Scope(laneDefinition);
   readonly other = new Scope(laneDefinition, keys.una.member, true, 1);
-  /** STAND-IN: what `observed` and `uses` say for the next reservation that the rule `judge` judges. Null: nothing is at hand, as in the runtime. */
-  read: ReservationRead | null = null;
-  /** The destination's rules, with the stand-in reader and the two stand-in rules: what a judge of these tests is given. */
-  readonly rules: PlatformRules = { named: DESTINATION, rules: { ...destinationRulesWith(() => this.read), ...standInRules } };
+  /** STAND-IN: what is at hand for the next reservation that the rule `judge` judges. Null: nothing is at hand, as in the runtime. */
+  read: Hand | null = null;
+  /** STAND-IN: the `merge` entry and the manifest's entry of each publication, made by hand, as they are fetched for the outcome of its `judge`. */
+  readonly #named = new Map<number, readonly Entry[]>();
+  /** STAND-IN reader of a lane's entries: what the hand-written record says of them, with each key by its ID. No entry is read. */
+  readonly #lane = (): LaneRead | null => this.read && {
+    manifest: this.read.manifest,
+    verdicts: this.read.verdicts.map(({ sound, key }) => ({ sound, key: key?.key ?? null })),
+    checks: Object.fromEntries(Object.entries(this.read.checks).map(([name, check]) => [name, { opening: check.opening, deciding: check.deciding, key: check.key?.key ?? null }])),
+  };
+  /** The destination's rules, with the stand-in reader of a lane's entries and the two stand-in rules: what a judge of these tests is given. */
+  readonly rules: PlatformRules = { named: DESTINATION, rules: { ...destinationRulesWith(this.#lane), ...standInRules } };
 
   constructor(importing: boolean) {
     super(destinationDefinition, "platform:destination");
@@ -257,6 +278,7 @@ export class Branch extends Ledger {
     const manifest = handMade(sender.at, "propose-manifest");
     const message: Request = { class: "request", type: "tell", body: { message: "reserve", fields: { operation: { self: true }, manifest: factRefOf(manifest), verdicts: [], jobs: [], links: [], ...over } } };
     const { judgment, entry } = this.from(sender.at, "change", "merge", message, [manifest, ...named].map((entry) => fetched(entry, "change")));
+    if (judgment.result === "write" && this.item(this.head.seq)?.type === "publication") this.#named.set(this.head.seq, [entry, manifest]);
     return { judgment, operation: factRefOf(entry), merge: entry };
   }
 
@@ -272,17 +294,33 @@ export class Branch extends Ledger {
   }
 
   /**
-   * An outcome of one attempt, as the operations driver offers it. It is written if the judgment is to write. `observed`: STAND-IN
-   * for the observations that the entry would retain, which the judge of an outcome does not write yet.
+   * STAND-IN for what a runtime has at hand for an outcome of `judge`, from the hand-written record: the observations, each as
+   * one read of one run, in the order merger, rules, verdicts, checks, and each key once; and the lane's entries that the
+   * publication names, as fetched. For any other outcome, and with no record, nothing is at hand.
    */
-  outcome(operation: OperationId, attempt: number, result: "confirmed" | "refused" | "unknown", evidence: Evidence, observed?: readonly ObservationUse[]): OutcomeJudgment {
-    const judgment = settleOutcome(this.state, this.definition, { type: "outcome", operation, attempt, result, evidence }, { clock: clockOf(this.state, this.now), bounds: this.bounds, own: this.own, platform: this.rules });
-    if (judgment.result === "write") this.seal(observed ? { ...judgment.draft, input: { ...judgment.draft.input, observed } as Input } : judgment.draft);
+  #atHand(operation: OperationId): { observed?: readonly ObservationUse[]; facts?: readonly Fetched[] } {
+    const of = this.state.operation(operation);
+    const judging = this.branch.refs["judging"];
+    if (!this.read || of?.kind !== DESTINATION_KINDS.judge || typeof judging !== "number") return {};
+    const keys = [this.read.merger, ...this.read.verdicts.map((verdict) => verdict.key), ...Object.values(this.read.checks).map((check) => check.key)].filter((seen): seen is Observation => seen !== null);
+    const once = keys.filter((seen, n) => keys.findIndex((other) => other.key === seen.key) === n);
+    const [merger, ...others] = this.read.merger ? once : [null, ...once];
+    const seen = [merger, this.read.rules, ...others].filter((observation): observation is Observation | RulesObservation => observation !== null);
+    return { observed: seen.map((observation, n) => retained(observation, n + 1)), facts: (this.#named.get(judging) ?? []).map((entry) => fetched(entry, "change")) };
+  }
+
+  /**
+   * An outcome of one attempt, as the operations driver offers it. It is written if the judgment is to write. The judge is given
+   * what is at hand, and writes the entry's `observed` and `uses` from what its rules read: nothing here seals either by hand.
+   */
+  outcome(operation: OperationId, attempt: number, result: "confirmed" | "refused" | "unknown", evidence: Evidence): OutcomeJudgment {
+    const judgment = settleOutcome(this.state, this.definition, { type: "outcome", operation, attempt, result, evidence }, { clock: clockOf(this.state, this.now), bounds: this.bounds, own: this.own, platform: this.rules, ...this.#atHand(operation) });
+    if (judgment.result === "write") this.seal(judgment.draft);
     return judgment;
   }
   /** The answer of the host to one attempt, as an outcome with the basis `own-answer`. */
-  answered(operation: OperationId, attempt: number, result: "confirmed" | "refused", body: unknown, observed?: readonly ObservationUse[]): OutcomeJudgment {
-    return this.outcome(operation, attempt, result, { basis: "own-answer", body } as Evidence, observed);
+  answered(operation: OperationId, attempt: number, result: "confirmed" | "refused", body: unknown): OutcomeJudgment {
+    return this.outcome(operation, attempt, result, { basis: "own-answer", body } as Evidence);
   }
   /** An attempt that no answer came for: the outcome that the driver offers, with the body that the owner's rule states for it. */
   lost(operation: OperationId, attempt: number): OutcomeJudgment {
@@ -300,15 +338,15 @@ export class Branch extends Ledger {
   }
 
   /**
-   * A `reserve` from the lane, and the outcome of its `judge`: by the STAND-IN reader, rita's `merge` is reserved. The entry
-   * retains the reader's hand-written observations of the merger's key and of the rules. It gives the publication, its `merge`
-   * entry, the entry that reserved it, and the push and the mint that the reservation opened.
+   * A `reserve` from the lane, and the outcome of its `judge`: by what is at hand, a STAND-IN, rita's `merge` is reserved. The
+   * judge writes the entry's `observed`: the hand-written observations of the merger's key and of the rules, which the rule read.
+   * It gives the publication, its `merge` entry, the entry that reserved it, and the push and the mint that the reservation opened.
    */
-  reserved(over: Partial<ReservationRead> = {}): { publication: number; merge: Entry; at: number; push: OperationId; mint: OperationId } {
+  reserved(over: Partial<Hand> = {}): { publication: number; merge: Entry; at: number; push: OperationId; mint: OperationId } {
     const { merge } = this.reserve();
     const publication = this.head.seq;
-    const read = (this.read = reading(this.now, over));
-    const judgment = this.answered(`${publication}:0`, 1, "confirmed", FOUND, [retained(read.merger!, 1), retained(read.rules!, 2)]);
+    this.read = reading(this.now, over);
+    const judgment = this.answered(`${publication}:0`, 1, "confirmed", FOUND);
     if (judgment.result !== "write" || this.item(publication).state !== "reserved") throw new Error(`the reservation was not written: ${JSON.stringify(judgment)}`);
     const at = this.head.seq;
     return { publication, merge, at, push: `${at}:0`, mint: `${at}:1` };

@@ -39,15 +39,20 @@
  *
  * **The rule `judge` is written, and in this runtime it reserves nothing.**
  * Its judgment, `judgeReservation`, and what its outcome yields are
- * written whole. What it reads of `observed` and of the entries in `uses`
- * is not: the judge of an outcome gives a rule neither (I3 deltas, entries
- * EM3 and EU4), and no text states how an entry of a lane is read by its
- * bytes (entry FA9). So the rule decides what the evidence and this
- * scope's own records decide: a publication that is no longer `queued`,
- * `evidence-too-large`, a head that is not the recorded head, and an
- * integration commit that is not in the repository. For every other
- * outcome it has a fault: nothing is written, and the publication stays
- * `queued`. A test gives it a stand-in reader (`destinationRulesWith`).
+ * written whole. The judge of an outcome gives the rule `observed` and the
+ * entries in `uses`, and the rule reads its observations itself
+ * (`reservationRead`). Two things still stand between it and a
+ * reservation. No runtime reads an observation before the turn of an
+ * outcome, because no form states the subjects (the contract's point
+ * R1-67; I3 deltas, entry FC6). And no text states how an entry of a lane
+ * is read by its bytes, so the package has no reader of the manifest, the
+ * verdicts and the checks (entries FA9 and FC5). So the rule decides what
+ * the evidence and this scope's own records decide: a publication that is
+ * no longer `queued`, `evidence-too-large`, a head that is not the
+ * recorded head, and an integration commit that is not in the repository.
+ * For every other outcome it has a fault: nothing is written, and the
+ * publication stays `queued`. A test gives it a stand-in reader of the
+ * lane's entries (`destinationRulesWith`).
  *
  * **The marks that have NO rule here.** Two. So the version still lacks
  * rules, and by the whole-scope rule (the contract's section 6.1) nothing
@@ -72,7 +77,7 @@
  * plan owns. They are written as the note has them.
  */
 
-import type { FactRef, FieldValue, OperationId, PlatformData, PlatformDefinition, ScopeId } from "@generalbusiness/artroom-contract";
+import type { FactRef, FieldValue, KeyId, Observation, OperationId, PlatformData, PlatformDefinition, ScopeId } from "@generalbusiness/artroom-contract";
 import { canonicalize, isFactRef, isMemberRef, isScopeRef, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
 import type { Item, Opening, Operation, Own, PlatformRule, RecordedRef, RuleEffect, RuleGiven, RuleRequest, Rules, StateView } from "@generalbusiness/artroom-derive";
 import { isJudgeEvidence, isObjectId, judgeReservation, type ReservationRead, type Statement } from "./reservation.ts";
@@ -435,7 +440,7 @@ const heldId = (state: Pick<StateView, "page">, slot: "membership" | "rules"): S
  * read it.
  */
 export const destinationMembership = (state: Pick<StateView, "page" | "incarnations">): RecordedRef | null => referenceOf(state, heldId(state, "membership"), "membership");
-/** The same, for the rules scope that a destination observes: the value `branch.rules`. No runtime reads the rules scope before a turn yet, so nothing calls this but a test. */
+/** The same, for the rules scope that a destination observes: the value `branch.rules` (the same table). Guard 1 of an observation of the rules reads it, in a replay (`Platform.rulesScope`). No runtime reads the rules scope before a turn yet. */
 export const destinationRulesScope = (state: Pick<StateView, "page" | "incarnations">): RecordedRef | null => referenceOf(state, heldId(state, "rules"), "rules");
 
 /** Every publication, lowest ID first. No index is by a value, so a search for an operation reads each page, retained final items too (entry ER11). */
@@ -847,17 +852,80 @@ const readDecides: Decides = (given, read) => {
 };
 
 /**
- * What `observed` and the entries in `uses` say for the reservation of one
- * publication, for the rule `judge` (`ReservationRead`, in
- * `reservation.ts`). Null: they are not at hand.
+ * What the entries in `uses` say for the reservation of one publication:
+ * the last row of the table "The rule reads" (section 12.1.5), but for the
+ * key that signed P's `merge` entry, which the rule reads itself. It is the
+ * manifest's entry, each verdict's entry, and the opening and the deciding
+ * entry of each required check, read as a lane's entries. A key is named
+ * by its ID: the rule reads each observation itself, through the judge.
  */
-export type Reads = (given: RuleGiven, publication: Item, statement: Statement) => ReservationRead | null;
+export interface LaneRead {
+  /** As `ReservationRead.manifest`. */
+  manifest: ReservationRead["manifest"];
+  /** One for each verdict of the statement, in its order: whether its entry is that verdict, and the key that signed it. Null: no entry says. */
+  verdicts: readonly { sound: boolean; key: KeyId | null }[];
+  /** For a check, by its name: as `ReservationRead.checks`, with the key that signed the deciding entry. */
+  checks: Readonly<Record<string, { opening: "sound" | "other-configuration" | "unsound"; deciding: boolean; key: KeyId | null }>>;
+}
 
-// I3 merge: the judge of an outcome gives a rule no `observed` and no `uses`, and writes neither (I3 deltas, entries EM3 and EU4), and
-// no text states how an entry of a lane is read by its bytes (entry FA9). So the package's own rule `judge` is given nothing here.
-// It then judges what the evidence and this scope's own records decide, and writes nothing for the rest: the outcome stays
-// offered, the publication stays `queued`, and `branch.judging` stays set. The reader is written when both exist.
+/** The reader of a lane's entries for one reservation. Null: they are not at hand, or no reader is written. */
+export type Reads = (given: RuleGiven, publication: Item, statement: Statement) => LaneRead | null;
+
+// I3 merge: no text states how an entry of a lane is read by its bytes: which field of a `propose-manifest` intent is the base, how
+// the authors of section 3.10 and the completeness of R2's section 5.2 are read, and which entry is a verdict's (I3 deltas, entries
+// FA9 and FC5). So the package's own rule `judge` is given no reader of them. It then judges what the evidence and this scope's
+// own records decide, and writes nothing for the rest: the outcome stays offered, the publication stays `queued`, and
+// `branch.judging` stays set. What the rule reads of `observed` it reads itself, below.
 const NOT_AT_HAND: Reads = () => null;
+
+/**
+ * What `observed` and the entries in `uses` say for one reservation
+ * (`ReservationRead`), as the rule `judge` reads it (section 12.1.5, the
+ * table "The rule reads"). The judge of the outcome gives the rule both
+ * (the contract's section 6.1, items 2 and 4), and the entry retains each
+ * observation that is read here.
+ *
+ * - The merger's key is the key that signed P's `merge` entry: the entry
+ *   that the publication's `operation` names, in `uses`. Its `Observation`
+ *   is read by that key.
+ * - One `RulesObservation`, asked as "rules". The declaration of the
+ *   single-controller exception is its member (the missing form 14, which
+ *   is given).
+ * - The `Observation` of the key behind each approval, and behind the
+ *   deciding result of each check that the observed rules require. A key
+ *   whose observation is not at hand gives null, and its verdict or its
+ *   result is then not counted.
+ *
+ * **Three inputs are filled with the value that fails closed**, because no
+ * form supplies them (I3 deltas, entry FC5): `extents`, null, since a
+ * `RulesContent` has no such member (the contract's part of the missing
+ * form 2); `controllers`, null (the missing form 11); and
+ * `controllersOfAuthors`, null (the missing form 15).
+ *
+ * Null: the lane's entries are not read, or the `merge` entry is not at
+ * hand. The rule then has a fault, and nothing is written.
+ */
+function reservationRead(given: RuleGiven, publication: Item, statement: Statement, lane: LaneRead | null): ReservationRead | null {
+  const operation = publication.refs["operation"];
+  const merge = isFactRef(operation) ? given.uses.find((used) => used.fact.hash === operation.hash)?.entry : undefined;
+  if (lane === null || merge?.input.type !== "act") return null;
+  /** The observation of one key, as the entry will retain it. An observation of a key has no member `subject`. */
+  const keyOf = (key: KeyId | null): Observation | null => {
+    const seen = key === null ? null : given.observed({ key })?.observation;
+    return seen && !("subject" in seen) ? seen : null;
+  };
+  const seen = given.observed({ asked: "rules" })?.observation;
+  const rules = seen && "subject" in seen && seen.subject === "rules" ? seen : null;
+  const required = rules?.content.asked === "rules" ? rules.content.checks.filter((check) => check.required).map((check) => check.name) : [];
+  return {
+    merger: keyOf(merge.input.signed.intent.actor), rules,
+    extents: null, singleControllerException: rules?.content.asked === "rules" && rules.content.singleControllerException === true,
+    manifest: lane.manifest, controllersOfAuthors: null, controllers: null,
+    // Only an approval is counted, and only a required check's result decides: no other key is read, so no other is retained.
+    verdicts: statement.verdicts.map((verdict, n) => ({ sound: lane.verdicts[n]?.sound === true, key: verdict.verdict === "approve" ? keyOf(lane.verdicts[n]?.key ?? null) : null })),
+    checks: Object.fromEntries(Object.entries(lane.checks).map(([name, check]) => [name, { opening: check.opening, deciding: check.deciding, key: required.includes(name) ? keyOf(check.key) : null }])),
+  };
+}
 
 /** The eligibility statement of a publication: the three lists of its `reserve`, in this scope's own entry that recorded the message and opened the item. The rule `collect-list` checked each record when it was delivered. */
 function statementOf(own: Own, publication: Item): Statement {
@@ -895,7 +963,7 @@ const judgeDecides = (reads: Reads): Decides => (given) => {
   // First from the evidence and this scope's own records. Only where that does not decide are `observed` and `uses` read.
   let [read, judged] = [null as ReservationRead | null, judgeReservation({ ...asked, read: null })];
   if (judged.reserved === null) {
-    read = reads(given, publication, asked.statement);
+    read = reservationRead(given, publication, asked.statement, reads(given, publication, asked.statement));
     judged = judgeReservation({ ...asked, read });
   }
   if (judged.reserved === null) throw new Error("what observed and uses say of this reservation is not at hand");
@@ -937,8 +1005,9 @@ const DECIDES: Readonly<Record<string, Decides>> = { [DESTINATION_KINDS.push]: p
  *   outcome that reserves.
  *
  * The judgment is `judgeReservation`, and what the outcome yields is
- * `judgeDecides`. `reads` gives what `observed` and `uses` say. The
- * package's own rule is given none (`NOT_AT_HAND`).
+ * `judgeDecides`. The rule reads `observed` itself (`reservationRead`).
+ * `reads` gives what the lane's entries in `uses` say. The package's own
+ * rule is given none (`NOT_AT_HAND`).
  */
 const judgeRule = (decides: Decides): PlatformRule => ({
   place: "outcome", clock: true,
@@ -1368,9 +1437,9 @@ const WRITTEN: Rules = {
 };
 
 /**
- * The rules of `platform:destination@1`, with a reader of what `observed`
- * and `uses` say for a reservation. A test gives a STAND-IN reader. The
- * production rules are `destinationRules`, below.
+ * The rules of `platform:destination@1`, with a reader of what the lane's
+ * entries in `uses` say for a reservation. A test gives a STAND-IN reader.
+ * The production rules are `destinationRules`, below.
  */
 export function destinationRulesWith(reads: Reads): Rules {
   const judge = judgeDecides(reads);

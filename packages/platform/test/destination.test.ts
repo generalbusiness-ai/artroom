@@ -12,7 +12,8 @@ import { Branch, FOUND, HEAD, NEXT, OTHER, destinationDefinition, fetched, handM
 
 // Every scope here is a `Branch` of test support: a destination scope in memory, below a made-up bureau that stands for the
 // directory. Its rules are the platform package's, with two STAND-IN rules for the marks that the package writes no rule for
-// (`first-head` and `receipt`) and a STAND-IN reader of what `observed` and `uses` say for a reservation. The lane's entries,
+// (`first-head` and `receipt`) and a STAND-IN reader of what a lane's entries say for a reservation. The judge of an outcome is
+// given the observations and the entries at hand, and writes `observed` and `uses` itself. The lane's entries,
 // each observation and every answer of the Git host are made by hand. No Git, no network and no provider is reached.
 
 const WRITTEN = ["write", null, null];
@@ -215,6 +216,11 @@ test("a reserve stays queued before the first head and opens `judge` after it, o
   expect([r.item(p1).state, r.item(p1).values["integration"], r.item(p1).values["reservedAt"], r.branch.refs["slot"], r.branch.refs["judging"], r.opened])
     .toEqual(["reserved", NEXT, at, p1, null, [["push", 3, true], ["mint", 1, true]]]);
   expect(updates(r)).toEqual([["reserved", { operation: one.operation, outcome: "committed", rules: 57 }]]);
+  // The entry retains what its rule read, and the judge wrote it (the contract's sections 4.1 and 16.1): the observation of the key
+  // that signed the `merge` entry, and the one of the rules, in the order of their reads. Its `uses` names the entries at hand.
+  const reservation = r.last.input;
+  expect([reservation.type === "outcome" && reservation.observed?.map((use) => [use.read.n, use.use, "subject" in use.observation ? use.observation.subject : use.observation.key]), r.last.uses.map((use) => use.fact), r.last.clamped])
+    .toEqual([[[1, "fresh", rita.key], [2, "fresh", "rules"]], [one.operation, (r.entries[p1]!.entry.input as { message: { body: { fields: { manifest: unknown } } } }).message.body.fields.manifest], false]);
   // A `judge` has one outcome, `confirmed`: one that is offered as `refused` or `unknown` does not follow.
   expect([said(r.answered(judge, 1, "refused", FOUND)), said(r.lost(judge, 1))]).toEqual([{ result: "conflict", seq: at }, { result: "repeat", seq: at }].map((known) => [known.result, null, null]));
   // While a publication holds the slot, a further `reserve` is queued and opens nothing.
@@ -603,8 +609,24 @@ test("a revocation or a rules change that the reservation's own observation hold
   two.read = reading(two.now, { manifest: { ...reading(two.now).manifest, complete: false } });
   expect([said(two.answered(op(first, 0), 1, "confirmed", FOUND)), two.item(first).values["reason"], two.branch.refs["judging"], two.opened]).toEqual([WRITTEN, "incomplete", two.head.seq - 1, [["judge", 1, true]]]);
 
-  // With nothing at hand, as in this runtime: the judge of an outcome gives a rule no `observed` and no `uses`. The rule writes
-  // what the evidence and this scope's own records decide, and nothing else. The publication then stays `queued`.
+  // An approval is counted from the observation of the key that signed it, which the entry then retains beside the two others.
+  // One whose key has no observation at hand is not counted, and the entry retains none for it.
+  const approving = (key: ReturnType<typeof keyObserved> | null, content: object = {}) => {
+    const b = new Branch(false).ready();
+    b.reserve({ verdicts: [{ review: factRefOf(handMade(b.lane.at, "review-verdict")), reviewer: una.member, verdict: "approve" }] });
+    const publication = b.head.seq;
+    b.read = reading(b.now, { rules: rulesObserved(b.now, { approvals: 1, ...content }), verdicts: [{ sound: true, key }] });
+    const judgment = said(b.answered(op(publication, 0), 1, "confirmed", FOUND));
+    return [judgment, b.item(publication).state, b.item(publication).values["reason"] ?? null, b.last.input.type === "outcome" && b.last.input.observed?.length];
+  };
+  expect([approving(keyObserved(una, t(0))), approving(null)]).toEqual([[WRITTEN, "reserved", null, 3], [WRITTEN, "not-reserved", "rules-not-met", 2]]);
+  // The inputs that no form supplies are filled by the package's rule with the value that fails closed (I3 deltas, entry FC5). The
+  // controllers of the authoring agents are not known, the missing form 15: where `ownerMayReview` is false no review is shown to
+  // be independent, so the same approval does not count.
+  expect(approving(keyObserved(una, t(0)), { ownerMayReview: false })).toEqual([WRITTEN, "not-reserved", "rules-not-met", 3]);
+
+  // With nothing at hand, as in this runtime: no runtime reads an observation for an outcome, and no reader of a lane's entries is
+  // written. The rule writes what the evidence and this scope's own records decide, and nothing else. The publication then stays `queued`.
   expect([judged(null, { over: "entries" }), judged(null, { ...FOUND, head: OTHER }), judged(null, { ...FOUND, present: false, tree: null, firstParent: null, changes: null }), judged(null)].map(({ judgment, state, reason }) => [judgment, state, reason])).toEqual([
     [WRITTEN, "not-reserved", "evidence-too-large"], [WRITTEN, "not-reserved", "out-of-date"], [WRITTEN, "not-reserved", "integration-invalid"], [["unavailable", "unavailable", null], "queued", null],
   ]);

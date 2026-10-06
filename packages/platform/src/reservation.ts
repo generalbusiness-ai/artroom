@@ -15,14 +15,12 @@
  * where the integration commit is not in the repository; and what an
  * outcome yields for a publication that is no longer `queued`.
  *
- * The other two are `observed` and the entries in `uses`. The judge of an
- * outcome gives a rule neither today (I3 deltas, entries EM3 and EU4), and
- * no text states how an entry of a lane is read by its bytes: the note
- * says that a rule reads "the input, the intent and the effects of a
- * fetched entry as they are sealed", and names no member of them. So what
- * the two would say is one explicit input here, `ReservationRead`. The
- * judgment of each check from it is written. The reading of it from
- * `observed` and `uses` is not (entry FA9). Without it this function
+ * The other two are `observed` and the entries in `uses`. What the two say
+ * is one explicit input here, `ReservationRead`. The rule `judge` builds it
+ * (`reservationRead`, in `destination.ts`): it reads each observation
+ * through the judge of the outcome, and takes what a lane's entries say
+ * from a reader, because no text states how an entry of a lane is read by
+ * its bytes (I3 deltas, entries FA9 and FC5). Without it this function
  * answers that it cannot judge, and the rule then writes nothing.
  *
  * **The inputs that no form supplies yet, and the value each is filled
@@ -31,7 +29,7 @@
  * | Input | The missing form | Where absent |
  * |---|---|---|
  * | `extents` | The member `extents` of a `RulesContent` (the contract's part of form 2) | Null: the rules hold no extent. The approvals and the required checks of the rules are asked, and an unmet one is `rules-not-met`, alone. |
- * | `singleControllerException` | The same observation | False: no exception is declared. |
+ * | `singleControllerException` | None: the observed rules state it (the missing form 14, given) | False where the observation holds no such member: no exception is declared. |
  * | `controllers` | Form 11, the count of the holders of `rules.publish` | Null: no exception is judged. |
  * | `controllersOfAuthors` | Form 15, the controller of an authoring agent | Null. No exception is shown by its second clause. And no review is shown to be independent by the second point of section 3.10: where that point is asked, which is when `ownerMayReview` is false and for the extent `rules` always, no review counts. |
  */
