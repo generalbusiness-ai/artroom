@@ -1339,4 +1339,3 @@ export function destinationRulesWith(reads: Reads): Rules {
 
 /** The rules of `platform:destination@1` that this package holds: what a runtime and a verifier run. */
 export const destinationRules: Rules = destinationRulesWith(NOT_AT_HAND);
-
