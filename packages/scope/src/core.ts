@@ -484,6 +484,9 @@ export class Scope {
     const standing = known ? null : await this.#standing({ scope: scope.at, signed, action: act ? actionOf(act) : null, grants: given, window: windowOf(definition, scope.at.kind, intent.kind) });
     // Phase two is in the commit: what that read holds at the commit's head, on the commit's one reading. The judge is given the
     // answer and reads nothing.
+    // I3 merge: the judge of an act takes `observed`, the further observations at hand, and this gives none: no form of platform
+    // data states the subjects that an act observes, so nothing here could say what to read (the contract's point R1-67; I3
+    // deltas, entry FC6). A rule that reads one is given none, and its guard is then not completed.
     const context = (view: StateView, clock: Reading): Omit<JudgeContext, "prepared"> =>
       ({ clock, bounds, facts, own: ownOf(this.#store), snapshot: snapshotsOf(this.#store), texts: texts.sizes, presented: offered, capabilities: this.#ports.capabilities ?? undefined, platform, membership: standing?.membership ?? null, grants: standing === null ? null : heldBy(standing, view, clock), ...(places.length > 0 ? { values } : {}) });
 

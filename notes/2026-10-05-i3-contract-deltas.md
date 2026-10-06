@@ -1621,3 +1621,234 @@ was added.
 
 **What was not run.** No deployment, no provider, no host, no gateway
 and no Git command. The gate was not run.
+
+## 30. The reservation by a publication, and what an outcome's rule reads
+
+Written 2026-10-06, on `request/i3-m3`, by the worker of these two
+parts. Entries have the prefix FC. The authority note is at revision 26
+(`f7175296`), the scope contract at revision 19 (`1ca8a59bf`) and the
+lane forms at revision 15. All three are adopted.
+
+No entry that an earlier source wrote has other bytes. Neither lane
+digest changes, and `packages/lanes` is not touched. No data of a
+platform definition changes. Two things are new in what a scope may
+write, and one in what it stores:
+
+- An outcome entry, and the entry of a result's delivery, may now hold
+  the member `observed`, written by the judge. It is the contract's
+  form of revision 14 (section 4.1), and no judge wrote it before. It
+  is written only where a rule read an observation, and no deployed
+  rule can: nothing gives one at hand (entry FC6). An outcome entry may
+  now name foreign entries in `uses`, where its judge was given some.
+  An entry whose rules read nothing has the bytes it had: witnessed.
+- The store has one more table, `retained_value`. It is made empty when
+  an object starts, beside the tables that exist. No row of another
+  table changes.
+
+### 30.1 Part 1: the reservation by a publication is not built
+
+**Reported first.** The adopted texts do not state enough to build it
+whole, so it is not built, and nothing was invented in its place.
+`covered` is kept as it was: an exemption. It is now counted and held.
+
+What the note states, and is enough for a count: the two rows of the
+destination in section 5.8, 4 entries while `queued` and 68 from the
+reservation on, both reserved "when" the `reserve` is delivered, which
+"is admitted only with the room of this row and the next"; that a
+`reserve` to a full destination "waits", and transport answers "retry";
+that what is not used is released.
+
+What no adopted text states, each needed before a count can be held:
+
+| # | Missing | Why the count cannot be built without it | Owner |
+|---|---|---|---|
+| 1 | How the amount is derived from the folded state. The contract's section 17.1 makes both amounts "functions of the folded state", with one exception for a request's origin entry. What a publication has left of its 68 depends on which of its operations are opened and answered. The folded state gives an operation by its ID, and no slot and no index lists a publication's operations (entry FA5). | Without it a publication's reservation cannot fall as its entries are written, and cannot be released when its last duty ends: the end of that duty is not readable from its item. A count that cannot be released would fill a destination. | The proof plan, with request `cc570904`: "a read of operations by kind, or a slot", as entry FA5 asks. |
+| 2 | The form in which a platform definition declares a reservation of its own. The contract's section 17.5 leaves "the reservations of platform definitions" to the authority note, "in the same form". That note's row P11 says of the form: "No form says it." | `settles` is the one written form, and it reserves for an act that takes its subject out of the listed states in its own entry. A publication's entries are outcomes. | The capacity work under `cc570904`, with the authority note (row P11). |
+| 3 | When a publication's last duty has ended, for one that is final. Its receipt's records are on an item that takes no effect (entry FA6), a mint that is answered late opens a revocation after the publication is final, and an attempt that is `unknown` keeps its operation unsettled (the contract's point R1-38). | The release. | The authority note, with the contract: entries FA6 and ER7. |
+| 4 | The count of reads. The table reserves "1 entry for the read that decides". The rule as built opens a read after each outcome of a push that decides nothing while no attempt is open, and one more by `abort-if-behind` (entry FA14, which asks the note to confirm). The ledger also counts 2 entries for a `judge`, where the table counts 1. | The amount: the table is not an upper bound of what the built rules write. | The authority note: entry FA14. |
+| 5 | What a `resend` reserves. It is new work, and section 5.8 has no row for it. Its push or receipt has one attempt, with a mint, a revocation and perhaps a read. | The amount for an act that the table does not name. | The authority note. |
+| 6 | The rule `receipt`, whose 31 entries are nearly half of the 68. It is not written (entry ER9). | What draws on that part. | The authority note, with the contract: entry ER9. |
+
+The contract's own rule points the same way: its validator refuses, as
+`reserve-unbounded`, a definition in which "settling forms create each
+other's pending states in a cycle" (section 17.2). The destination's
+kinds do, by kind: a `judge` opens a push whose outcome opens the next
+`judge`, and a `read` opens a receipt whose outcome opens a `read`. So
+no closure by kind exists, and only a count by publication can be
+finite.
+
+**What is built instead: the number, held by a test.**
+
+- `publicationRoom`, in `platform/src/destination.ts`, computes the two
+  rows from the stated attempts, as section 5.8 counts them: 4 and 68.
+- The one entry of a publication that is new work is the delivery of
+  its `reserve`. The ledger asks it for the 2 outcome entries of the
+  `judge` that it opens, of which the table counts 1, and for nothing
+  that the outcome opens. So, by the note's own table, **one
+  publication may write 71 entries that no admission reserved**, and 72
+  where its `reserve` opened no `judge`. Each is written by an outcome
+  entry, which is never asked whether it fits. That is beside what
+  rows 4 and 5 above add, which the table does not count.
+- `platform/test/definitions.test.ts` asserts the 4, the 68, the 73 of
+  a new `reserve`, the 71, and that exactly five kinds of the
+  destination state `covered` and no other definition's rule does. So
+  neither the exemption nor the number grows unseen.
+- `OperationRules.covered`, in `derive/src/ledger.ts`, says in capitals
+  that it reserves nothing.
+
+| # | Where the texts differ or are silent | Implemented | Owner, and the question |
+|---|---|---|---|
+| FC1 | The six rows above. | Not built. `covered` is an exemption, counted: 71 entries of each publication, by the note's table. No scope runs under `platform:destination@1`, which lacks two rules. | Request `cc570904`, with the authority note and the proof plan, for rows 1 to 3. The authority note for rows 4 to 6. Until then a destination must not be deployed with a budget that its publications could pass. |
+| FC2 | The sweep of this family, below. Two findings are not a flag. | Not changed. | The builder, with `cc570904`. |
+
+**The sweep: every place where a capacity check is not made, and what
+stands behind it.** Read in `derive/src/reserve.ts`, `ledger.ts`,
+`delivery.ts`, `handlers.ts`, and `scope/src/turn.ts`, `operations.ts`,
+`outbox.ts`, `delivery.ts` and `core.ts`. No test of mine witnesses a
+row but the first of `covered`.
+
+| Where | What is not asked | By | What stands behind it |
+|---|---|---|---|
+| `fits`: a timed entry | Whether it fits | The input's type | Counted in `owed`: the chain of each live item in a timed state. A checked reservation. |
+| `fits`: a diagnosis, and a result's delivery that is no `conflict` | Whether it fits | The input's type | Counted: 2 entries for each pending request, and the largest clause. An effect mark in a clause counts nothing there (entry EJ6; the contract's row on what a mark in a clause reserves, which is open). |
+| `fits`: a delivery of a control | Whether it fits | The input's type | Counted: 1 entry for a provisional scope. The attempt 1 that it opens for each held operation was counted from the genesis. |
+| `fits`: an outcome | Whether it fits | The input's type | Its own entry is counted with its operation. What it opens: the closure that its owner declares, checked in `outcomeOf`; or `covered`, which checks nothing (entry FC1). |
+| `fits`: the judge's `settles` | Whether it fits | A flag of the draft | Derived, and counted: the form declares `settles`, its subject was in a listed state and leaves them; or a pending record of `hold@1` binds the request, and `Owners.reserves` counts that record. A checked reservation. |
+| **A request that an outcome entry sends** | Its 2 entries, and what its clause starts | Nothing: no check exists | **Not reserved by anyone.** `closure` counts the operations that an outcome opens, and no request. The pending request is counted only from the entry that sent it, which was not asked. This holds for the register's `create` of the directory, which section 5.8 puts in the claim's row, and for the three updates of a publication, which are inside the 71. |
+| **The rows of section 5.8 for membership, the register and the directory** | What an active key, an active member, an unused invitation and a claim reserve | Nothing: no form | **Not reserved.** No platform data declares `settles`, and `ownersOf` passes a capability's `reserves` only. It is row 2 of the table above, for every platform definition. |
+| The driver, the outbox, a delivery and a checkpoint, at `scopeEntries` | Nothing is exempt | A floor | An entry that settles is not written at the last position either. It is a stop, and no exemption. |
+
+### 30.2 Part 2: what an outcome's rule reads, and a value beside an intent
+
+**What is built.**
+
+| Part | Built | From | Witness |
+|---|---|---|---|
+| The judge of an outcome | It takes `observed` and `facts`. Each rule of the outcome is given both, as items 2 and 4 of what a rule is given. The entry's input holds each observation that a rule read, in the order of `read.n`, and no member when none was read. Its `uses` names each foreign entry at hand. It is not written clamped when it retains an observation. | The contract's sections 4.1, 6.1 and 16.1 | `derive/test/forms-marks.test.ts`, the test of an outcome's rule and of a result's clause |
+| The judge of a result's delivery | It takes `observed`, the rule of the clause that runs reads it, and the entry holds what was read. | The same | The same test |
+| The replay of both | Each record of `observed` is derived again: guards 1 and 3 to 6, the runs, and the value. The judge is given the recorded observations and the retained copy of each entry in `uses`. | Section 16.1, "Replay" | `replay/test/verify.test.ts`, the test of an outcome's observations. The branch for a result's delivery has no replay witness: entry FC8. |
+| The rules reference | A version may state where its scopes record it: `Platform.rulesScope` and `Coded.rulesScope`. The destination states `branch.rules`, with the incarnation of its retained observations. | The authority note's section 12.1, the table of where the destination records its references | The same replay test, on made-up data |
+| The destination's rule `judge` | It reads its observations itself, through the judge: the key that signed the `merge` entry in `uses`, the rules, the key behind each approval, and the key behind the result of each required check. | Section 12.1.5, the table "The rule reads" | `platform/test/destination.test.ts` |
+| A value beside an intent | The scope reads `values` before the turn, for the places that its pinned data states and the intent sets. It keeps each value that the entry names under its domain and its digest. The acts route passes `values`. | The contract's section 6.2, "What the member bounds, before the turn"; section 9.2; rows I3-32 and I3-33 | `scope/test/values.test.ts`, on real storage, with made-up platform data |
+
+**What it buys, in the witnesses in memory.** `Branch` of test support
+gives the judge of the outcome what is at hand, as a runtime would. The
+reservation entry's `observed` is the judge's, and no test seals one by
+hand. `abort-if-behind` finds the merger's key in it. The update's
+`rules` is read from it. One stand-in of entry FA15 is gone, and one is
+narrower.
+
+**What is not built, exactly.**
+
+- No runtime reads an observation before the turn of an outcome, of a
+  result's delivery or, beyond the signer's own, of an act: entry FC6.
+  So in a deployed scope the rule `judge` still writes only what the
+  evidence and the scope's own records decide.
+- The package has no reader of a lane's entries: entry FC5.
+- No route reads a value, and the replay's HTTP source asks for none:
+  entry FC7.
+- No data of the platform package states a place, so no real act of
+  Artroom reads a value yet: entry EX5 stands.
+
+**The fills that remain in the destination's `judge`.** Each fails
+closed, and each is exactly one missing form.
+
+| Input of the judgment | Filled with | The missing form | Owner |
+|---|---|---|---|
+| `extents` | Null: the rules hold no extent, so no extent is judged from an observation | The member `extents` of a `RulesContent`: the contract's part of form 2 (entry FB2) | The contract |
+| `controllers` | Null: no exception is judged | Form 11, the count of the holders of `rules.publish` | The authority note, with the contract |
+| `controllersOfAuthors` | Null: the exception is not shown by its second clause, and where `ownerMayReview` is false no review counts | Form 15, the observation of an author | The authority note, with R2 |
+
+`singleControllerException` is no longer a fill: the rule reads it from
+the observed rules (form 14, given). It decides nothing while `extents`
+is null. The changed set of form 1 is no fill of the rule: it is the
+member `changes` of the evidence, which no port produces yet. Beside
+the three fills, the manifest, the soundness of each verdict and the
+two entries of each check are read by the stand-in reader of a lane's
+entries, and by nothing in production (entry FC5).
+
+**How far a founding runs.** As far as before: steps 1 to 6 of section
+26, on real scope objects. The creation of the destination is answered
+`retry`, `unsupported-definition`, because `platform:destination@1`
+lacks the rules `first-head` and `receipt`. Nothing of this section
+moves that stop. `scope/test/founding-real.test.ts` says what would
+still stand between a destination that exists and a reservation.
+
+**Every judge, against what a rule may read and what the entry
+retains.** Read in `derive/src/judge.ts`, `genesis.ts`, `delivery.ts`,
+`handlers.ts`, `settle.ts`, `outcomes.ts`, `prepare.ts` and
+`replay/src/verify.ts`.
+
+| Judge | Runs platform rules | Passes `observed` | Passes `values` | Retains what was read | A replay derives it | A runtime supplies it |
+|---|---|---|---|---|---|---|
+| Act | Yes | Yes | Yes | `observed` in the input; the values in the draft, for the scope | Yes: the guards, the window of the act's grant, the value; each placed value | `values`: yes, from this section. `observed`: no (entry FC6) |
+| Outcome | Yes | Yes, from this section | No: none travels beside an outcome | `observed` in the input; `uses` | Yes, from this section: the ten-second window | No (entry FC6) |
+| Delivery of a result | Yes, in the clause | Yes, from this section | No | `observed` in the input | Yes, in source; not witnessed (entry FC8) | No |
+| Delivery of a request or an advisory | Yes, in the handler | No: the input may hold none (section 4.1). A rule that reads one is given none. | No: no value travels beside a message | Nothing | The bytes guard refuses such an entry | Nothing to supply |
+| Delivery of a control | No | No | No | Nothing | Nothing | Nothing |
+| Diagnosis | Yes, in the `undelivered` clause | No: the input may hold none | No | Nothing | Nothing | Nothing |
+| Genesis | Yes | No: the input may hold none | No: a founding takes texts only | Nothing | Nothing | Nothing |
+| Preparation | No: a step is a capability's code | No. Its grant holds the one observation. | No | The grant | Yes, as before | The signer's read, as before |
+| Timed | No: the validator takes no mark in a timed rule | No | No | Nothing | Nothing | Nothing |
+| Checkpoint, settlement | No | No | No | Nothing | Nothing | Nothing |
+
+**Earlier entries that this work answers.** Each line is dated
+2026-10-06. The earlier sections stay as they were written.
+
+- **FA3, still open, and now counted.** The reservation by a publication is not built: entry FC1 says what no text states. The exemption is held to 71 entries of the note's table by a test.
+- **FA9, built for the builder's half.** The judge of an outcome gives a rule `observed` and the entries in `uses`, and writes both. The rule `judge` reads its observations itself. The other half stands: how an entry of a lane is read by its bytes (entry FC5).
+- **FA15, answered in part.** The `observed` of the reservation entry is the judge's. The reader that a test writes is of a lane's entries alone. The rules `first-head` and `receipt` are still stand-ins, and nothing ran on scope objects.
+- **EM3, closed for derive; the runtime half is entry FC6.** The judges of an outcome and of a result's delivery build what is at hand and write `observed`. The scope reads `values` and keeps them. The scope makes no further read of an observation.
+- **EM2, unchanged.** The form is still open, as the contract's point R1-67. Entry FC6 says what waits on it.
+- **EU4, closed for the window of an outcome and of a result's delivery.** Entry FC4 states the rule taken from the texts. The form of EM2 is still asked.
+- **EU5, closed for the destination.** Its version states where it records its rules reference. For any other version an observation of the rules is still `unsupported-definition`.
+- **EM26, closed for `observed` outside an act.** The same checks are made for an outcome and for a result's delivery.
+- **EX6, built in part.** The read before the turn and the table for values are built. The read route and the HTTP source are not: entry FC7.
+- **EZ11, updated.** The scope stores a value, in a table of its own. The read route still serves five kinds.
+- **EQ9, updated.** A rules scope's three marked acts are still not completed or refused on a real scope: no data of `platform:rules@1` states a place, and no observation is read.
+
+| # | Where the texts differ or are silent | Implemented | Owner, and the question |
+|---|---|---|---|
+| FC3 | What the `uses` of an outcome holds. Section 17.2 says "An outcome retains what its owner declares", and no form lets an owner declare a foreign entry. For an act the entry names every foreign entry that a declared field names, read or not. An outcome has no field. | The judge names every foreign entry that it was given, in the order given, and a rule is given each. More than the bound on the foreign entries of one entry leaves the outcome not written. A replay gives the judge the retained copy of each entry that the recorded `uses` name, so it cannot tell an entry that no rule read from one that a rule read. For `observed` it can, and does. | The contract. Does an outcome's `uses` hold exactly the entries that its rules read, as `observed` does, or those that its owner declares, and by which form? |
+| FC4 | The window of a record of `observed` in an outcome and in a result's delivery (entry EU4). No form states it (point R1-67). The authority note's section 3.3 states windows in a table of entries. | Ten seconds, and `fresh`, for both: `WINDOWS.once`. The reason: both rows of that table that are of such an entry state it, "10 seconds (W3), each. `fresh`." for the outcome of `judge` and for the delivery of a license result, and the contract's own table of section 16.1 states the same of both. A replay judges guard 3 and guard 5 so. The value of an observation of the rules needs the rules scope's answer to a read, which no version has (entry FB10): with an anchor for that head it is taken on trust, and without one the replay ends `unsupported-definition`. | The contract, with the authority note: the form of R1-67. Until it exists, a later row with another window would be judged wrongly here. |
+| FC5 | Section 12.1.5, "The rule reads": the entries in `uses`, "each by its bytes", for "the manifest's entry, each verdict's entry, and the opening and the deciding entry of each required check". It names no member of a lane's entry. It also says of the three lists that "nothing in the three lists is a fact that the destination fetches", while section 6.5 counts "each verdict's entry, and two entries for each required check" among what one reservation fetches, and the source's `collect-list` takes `review`, `job`, `decidedBy` and `link` as facts. | The rule reads the signer of the `merge` entry itself: the entry that `publication.operation` names, whose input is an act. Everything else of a lane's entries comes from a reader, `LaneRead`, which the package does not write: the manifest's base, integration commit, tree, reports, authors and completeness; whether each verdict's entry is that verdict, and which key signed it; and what the two entries of each check show. A key is read only for an approval and for a required check. | The authority note, with R2. Which member of which entry holds each fact? Is a verdict's entry the entry that the fact in `review` names, and is it fetched at the reservation? |
+| FC6 | Section 16.1: the scope reads each observation "before its turn", for "the entries that its specification names". The subjects are not operands: "The reservation reads each key behind a counted verdict", which an entry in `uses` gives. The contract leaves the form open (point R1-67): a member of the row, "one more place, for a rule that names the subjects before the turn", or prose alone. | Not built in `scope/src`. `Operations` gives the judge of an outcome no `observed` and no `facts`, and `Scope.submit` gives the judge of an act no `observed`. Each is marked `I3 merge:`. A rule that needs one has a fault or is not completed, which fails closed. Nothing was invented: any reader here would be the undecided place. | The contract, with the authority note: point R1-67. The builder, after it: the read, its numbers in the run, the six guards before the judge, and the answer of a rules scope (entries FB10 and EQ8). |
+| FC7 | Entry EX6. The contract says that a read of one value "asks by the kind, the domain and the digest", and states no form of the route for a domain. No row of the authority note states a field with `value`. | Built: `valuesBeside` and `valuesOf` in `scope/src/core.ts`, the table `retained_value`, and `values` on the acts route. At most as many values are read as the intent sets places, in the order given, and none past the largest `max` among them. A value in the domain of a definition is kept as a `definition`. Not built: the read route, and the replay's HTTP source, so a replay over HTTP of an entry that names a value is still `incomplete`. Not counted: the bytes of a value against a budget, which no source counts (the contract's section 17.5). | The contract, for the route's form. The authority note, for the fields. `cc570904`, for the bytes. |
+| FC8 | A result's delivery that retains an observation. The one row that needs it is the task scope's license result, which is IA's. | Built in derive and in the replay, with the ten-second window. Witnessed in derive. The replay's branch has no witness: no fixture history holds such a delivery, and one was not built for a row that no delivered definition has. | The builder, with the first definition that has such a row. |
+
+**Controls.** One for each new guard, through `scripts/control.mjs`.
+18 were run, and each distinguishes: a test failed by an assertion with
+the one change applied.
+
+| # | The change | Witness |
+|---|---|---|
+| 1 | `covered: true` on the rule `revoke` | `platform test/definitions.test.ts` |
+| 2 | The read of the receipt left out of the 68 | The same |
+| 3 | The outcome's input without `observed` | `derive test/forms-marks.test.ts` |
+| 4 | The outcome's `uses` empty | The same |
+| 5 | An outcome that retains an observation written clamped | The same |
+| 6 | A rule of an outcome given nothing at hand | The same |
+| 7 | A result's delivery without `observed` | The same |
+| 8 | A result's delivery that retains one written clamped | The same |
+| 9 | The replay without the guards of an outcome's `observed` | `replay test/verify.test.ts` |
+| 10 | The replay's judge given no `observed` | The same |
+| 11 | Guard 1 of an observation of the rules | The same |
+| 12 | The incarnation fixed by the entry's own observation | The same |
+| 13 | `controllersOfAuthors` as an empty list | `platform test/destination.test.ts` |
+| 14 | No key read for an approval | The same |
+| 15 | No observation of the merger | The same |
+| 16 | The judge of an act given no `values` | `scope test/values.test.ts` |
+| 17 | The value not kept | The same |
+| 18 | No bound on how many values are read | The same |
+
+**Lines for the merge.**
+
+- `OutcomeContext` gains `observed` and `facts`, and `DeliveryContext` gains `observed`. `runClause` has one more optional argument. A caller that gives none is unchanged.
+- `platform/src/destination.ts`: `Reads` now returns a `LaneRead`, and the rule builds the `ReservationRead`. `publicationRoom` is new. The index exports `publicationRoom` and the type `LaneRead`.
+- `Platform` and the replay's `Coded` gain `rulesScope`. `platform("platform:destination@1")` states it.
+- `Store.retained` and `Store.retainedSize` take an optional `domain`. `SqliteStore` has the table `retained_value`.
+- `support-destination.ts`: `Branch.read` is a `Hand`, and `Branch.outcome` and `answered` take no `observed`.
+- Marked `I3 merge:`: `scope/src/operations.ts`, at the call of `settleOutcome`; `scope/src/core.ts`, in `submit`; `derive/src/marks.ts`, at `AtHand`; `derive/src/ledger.ts`, at `covered`; `platform/src/destination.ts`, at `NOT_AT_HAND`.
+
+**What was not run.** No deployment, no provider, no host, no gateway
+and no Git command. The gate was not run.
