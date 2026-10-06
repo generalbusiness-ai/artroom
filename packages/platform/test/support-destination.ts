@@ -340,7 +340,13 @@ export class Branch extends Ledger {
    * what is at hand, and writes the entry's `observed` and `uses` from what its rules read: nothing here seals either by hand.
    */
   outcome(operation: OperationId, attempt: number, result: "confirmed" | "refused" | "unknown", evidence: Evidence): OutcomeJudgment {
-    const judgment = settleOutcome(this.state, this.definition, { type: "outcome", operation, attempt, result, evidence }, { clock: clockOf(this.state, this.now), bounds: this.bounds, own: this.own, platform: this.rules, ...this.#atHand(operation) });
+    const hand = this.#atHand(operation);
+    const body = evidence.body;
+    // STAND-IN host answer: the test gives the resolved changed set. Its wire body names the separately retained value.
+    const changes = this.state.operation(operation)?.kind === DESTINATION_KINDS.judge && typeof body === "object" && body !== null && !Array.isArray(body) && "changes" in body ? body.changes : null;
+    const inline = typeof changes === "object" && changes !== null && !Array.isArray(changes) && !("over" in changes);
+    const wire = inline ? { ...evidence, body: { ...body as object, changes: valueDigest("artroom-changed-set-1", changes) } } : evidence;
+    const judgment = settleOutcome(this.state, this.definition, { type: "outcome", operation, attempt, result, evidence: wire }, { clock: clockOf(this.state, this.now), bounds: this.bounds, own: this.own, platform: this.rules, ...hand, ...(inline ? { values: [...hand.values ?? [], canonicalize(changes)] } : {}) });
     if (judgment.result === "write") this.seal(judgment.draft);
     return judgment;
   }

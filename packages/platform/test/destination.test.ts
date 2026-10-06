@@ -40,7 +40,7 @@ test("the destination definition validates whole with the platform option; its m
   // with the four slots of the item `receipt`. Its `max` is the `max` of `publication`, plus the number of `receipts-owed`, plus 1.
   expect([Object.entries(destination.items).map(([name, type]) => [name, type.max, type.initial, Object.entries(type.states).map(([state, { final }]) => (final ? `${state}!` : state))]), destination.genesis, Object.keys(destination.acts)]).toEqual([
     [["branch", 1, "empty", ["empty", "ready"]], ["publication", 64, "queued", ["queued", "reserved", "publishing", "unresolved", "published!", "aborted!", "not-reserved!"]], ["receipt", 129, "owed", ["owed", "written!", "conflict!"]]],
-    "establish", ["establish", "adopt-head", "resend", "resend-receipt"],
+    "establish", ["establish", "adopt-head", "resend", "resend-receipt", "add-room", "add-branch-room"],
   ]);
   expect([Object.keys(destination.items["branch"]!.refs), Object.keys(destination.items["branch"]!.values), Object.keys(destination.items["publication"]!.values), destination.items["receipt"]!.refs, Object.entries(destination.items["receipt"]!.values).map(([name, slot]) => [name, slot.fixed, slot.required])]).toEqual([
     ["directory", "claim", "slot", "judging"], ["repository", "name", "import", "membership", "rules", "head", "token"], ["integration", "reason", "withdrawDecided", "reservedAt", "aborting", "token"],
@@ -114,8 +114,8 @@ test("each rule of platform:destination@1 at an act or a handler, as a plain fun
     resolved: { at: b.at, self: b.head.seq + 1, fields: fields as Record<string, FieldValue>, subjects: new Map(Object.entries(subjects)), signer: null, bounds: PROPOSED_BOUNDS },
     observed: () => null, value: () => undefined, placed: () => undefined,
   });
-  const run = (name: string, ...args: unknown[]): unknown => (destinationRules[name] as PlatformRule & { run: (...args: unknown[]) => unknown }).run(...args);
-  const opens = (kind: string, attempts: number, k = 0) => [{ effect: "operation", k, owner: DESTINATION, kind, attempts }, { effect: "attempt", operation: { k }, attempt: 1, result: "opened", selected: null }];
+  const run = (name: string, ...args: unknown[]): unknown => { const held = destinationRules[name] as PlatformRule & { run: (...args: unknown[]) => unknown; bind: (...args: unknown[]) => unknown }; return name === "publication-of" ? held.bind(...args) : held.run(...args); };
+  const opens = (kind: string, attempts: number, k = 0, holder = 0) => [{ effect: "operation", k, owner: DESTINATION, kind, attempts, for: holder }, { effect: "attempt", operation: { k }, attempt: 1, result: "opened", selected: null }];
   const publication = (state: string): Item => ({ ...ready.item(queued), state });
   /** A receipt in that state, made by hand: the rule reads its type and its state alone. */
   const receipt = (state: string): Item => ({ ...ready.item(queued), type: "receipt", state });
@@ -126,29 +126,29 @@ test("each rule of platform:destination@1 at an act or a handler, as a plain fun
   const rows: readonly (readonly [row: string, rule: string, args: readonly unknown[], expected: unknown])[] = [
     // Row 30: with no import the genesis declares the operation and its attempt's mint, held: no attempt. With an import it declares none.
     ["30: no import: `first-head` with 3 attempts stated, and its mint, both held", "declare-first-head", [given(empty, tell, { import: false })],
-      [{ effect: "operation", k: 0, owner: DESTINATION, kind: "first-head", attempts: 3 }, { effect: "operation", k: 1, owner: DESTINATION, kind: "mint", attempts: 1 }]],
+      [{ effect: "operation", k: 0, owner: DESTINATION, kind: "first-head", attempts: 3, for: empty.head.seq + 1 }, { effect: "operation", k: 1, owner: DESTINATION, kind: "mint", attempts: 1, for: empty.head.seq + 1 }]],
     ["30: an import: nothing", "declare-first-head", [given(empty, tell, { import: true })], []],
     // Row 31: the update's state and its commit.
-    ["31: `done` with a commit: `first-head`, its attempt 1 and that attempt's mint", "open-first-head", [given(empty, relate("done"), { commit: HEAD })], [...opens("first-head", 3), ...opens("mint", 1, 1)]],
-    ["31: `failed`: nothing", "open-first-head", [given(empty, relate("failed"), { commit: HEAD })], []],
+    ["31: `done` with a commit: `first-head`, its attempt 1 and that attempt's mint", "open-first-head", [given(empty, relate("done"), { commit: HEAD }, { "also.branch": empty.branch })], [...opens("first-head", 3), ...opens("mint", 1, 1)]],
+    ["31: `failed`: nothing", "open-first-head", [given(empty, relate("failed"), { commit: HEAD }, { "also.branch": empty.branch })], []],
     ["31: `done` that names no commit: nothing", "open-first-head", [given(empty, relate("done"))], []],
     // Row 32, "The next `judge`": the slot is empty, no `judge` is open, the branch is `ready` and a publication is `queued`.
-    ["32: `ready`, nothing queued before: `judge`, and `judging` is the publication that the entry opens", "open-judge", [given(fresh, tell)], [...opens("judge", 1), { effect: "ref", item: 0, slot: "judging", to: fresh.head.seq + 1 }]],
+    ["32: `ready`, nothing queued before: `judge`, and `judging` is the publication that the entry opens", "open-judge", [given(fresh, tell)], [...opens("judge", 1, 0, fresh.head.seq + 1), { effect: "ref", item: 0, slot: "judging", to: fresh.head.seq + 1 }]],
     ["32: a `judge` is open: nothing", "open-judge", [given(ready, tell)], []],
     ["32: the branch is `empty`: nothing", "open-judge", [given(empty, tell)], []],
     // Row 34: the publication by its operation, in any state; and the opening when none is bound.
-    ["34: the publication whose operation the message names", "publication-of", [given(ready, tell, { operation: reserved.operation }), "publication"], queued],
-    ["34: another operation: none", "publication-of", [given(ready, tell, { operation: ready.lane.fact(0) }), "publication"], null],
+    ["34: the publication whose operation the message names", "publication-of", [[ready.item(queued)]], queued],
+    ["34: another operation: none", "publication-of", [[]], null],
     ["34: no publication is bound: one opening, `not-reserved`, \"withdrawn\"", "open-withdrawn", [given(ready, tell, { operation: reserved.operation })], [
       { effect: "open", item: self, type: "publication", state: "queued" }, { effect: "ref", item: self, slot: "operation", to: reserved.operation },
       { effect: "ref", item: self, slot: "lane", to: ready.lane.at }, { effect: "state", item: self, state: "not-reserved" }, { effect: "value", item: self, slot: "reason", value: "withdrawn" },
     ]],
     ["34: a publication is bound: nothing", "open-withdrawn", [given(ready, tell, { operation: reserved.operation }, { "also.publication": publication("queued") })], []],
     // Row 36: one read of the branch.
-    ["36: one read, with 1 attempt", "open-branch-read", [given(ready, tell)], opens("adopt-read", 1)],
+    ["36: one read, with 1 attempt", "open-branch-read", [given(ready, tell, {}, { on: ready.branch })], opens("adopt-read", 1)],
     // Row 37: the same compare-and-swap, with 1 attempt and that attempt's mint. At `resend`: the push of an unresolved publication.
     // At `resend-receipt`, which is on the branch: the write of the receipt that the act names, while it is owed.
-    ["37: `unresolved`: the push, with 1 attempt, and its mint", "reopen-publish", [given(ready, tell, {}, { on: publication("unresolved") })], [...opens("push", 1), ...opens("mint", 1, 1)]],
+    ["37: `unresolved`: the push, with 1 attempt, and its mint", "reopen-publish", [given(ready, tell, {}, { on: publication("unresolved") })], [...opens("push", 1, 0, queued), ...opens("mint", 1, 1, queued)]],
     ["37: a receipt that is `owed`: its write, with 1 attempt, and its mint", "reopen-publish", [given(ready, tell, {}, { on: ready.branch, "also.receipt": receipt("owed") })], [...opens("receipt", 1), ...opens("mint", 1, 1)]],
     ["37: a receipt that is final: nothing", "reopen-publish", [given(ready, tell, {}, { on: ready.branch, "also.receipt": receipt("written") })], []],
     ["37: a publication in any other state: nothing", "reopen-publish", [given(ready, tell, {}, { on: publication("published") })], []],
@@ -169,7 +169,7 @@ test("a founding with no import declares the first head and its mint in the gene
   const b = new Branch(false);
   expect([b.branch.state, b.branch.values["name"], b.branch.values["import"], b.branch.refs["directory"], b.branch.refs["slot"], b.branch.values["head"], b.state.scope()!.status])
     .toEqual(["empty", "main", false, b.bureau.at, null, null, "provisional"]);
-  expect([b.opened, b.state.operation("0:0")]).toEqual([[["first-head", 3, false], ["mint", 1, false]], { id: "0:0", owner: DESTINATION, kind: "first-head", most: 3, attempts: [], selected: null }]);
+  expect([b.opened, b.state.operation("0:0")]).toEqual([[["first-head", 3, false], ["mint", 1, false]], { id: "0:0", owner: DESTINATION, kind: "first-head", most: 3, attempts: [], selected: null, for: 0 }]);
   // The confirmation activates the scope and opens attempt 1 of each held operation (the contract's section 4.3, item 1).
   b.confirmed();
   expect([b.state.scope()!.status, b.last.effects, b.state.operation("0:0")!.attempts, b.state.operation("0:1")!.attempts]).toEqual([
@@ -228,7 +228,7 @@ test("a reserve stays queued before the first head and opens `judge` after it, o
   // that signed the `merge` entry, and the one of the rules, in the order of their reads. Its `uses` names the entries at hand.
   const reservation = r.last.input;
   expect([reservation.type === "outcome" && reservation.observed?.map((use) => [use.read.n, use.use, "subject" in use.observation ? use.observation.subject : use.observation.key]), r.last.uses.map((use) => use.fact), r.last.clamped])
-    .toEqual([[[1, "fresh", rita.key], [2, "fresh", "rules"]], [one.operation, (r.entries[p1]!.entry.input as { message: { body: { fields: { manifest: unknown } } } }).message.body.fields.manifest], false]);
+    .toEqual([[[1, "fresh", rita.key], [2, "fresh", "rules"], [3, "fresh", "holders"]], [one.operation, (r.entries[p1]!.entry.input as { message: { body: { fields: { manifest: unknown } } } }).message.body.fields.manifest], false]);
   // A `judge` has one outcome, `confirmed`: one that is offered as `refused` or `unknown` does not follow.
   expect([said(r.answered(judge, 1, "refused", FOUND)), said(r.lost(judge, 1))]).toEqual([{ result: "conflict", seq: at }, { result: "repeat", seq: at }].map((known) => [known.result, null, null]));
   // While a publication holds the slot, a further `reserve` is queued and opens nothing.
@@ -307,8 +307,9 @@ test("after reservation a withdraw is refused `reserved` and sets nothing; the s
   const pb = w.head.seq;
   expect([said(w.withdraw(a.merge).judgment), w.item(pa).state, w.branch.refs["judging"]]).toEqual([WRITTEN, "not-reserved", pa]);
   // The outcome of that `judge` finds a publication that is not `queued`. It changes nothing of it and sends nothing. `judging`
-  // becomes the next queued publication, whose `judge` is opened. No reader is asked: nothing is at hand, as in the runtime.
+  // becomes the next queued publication, whose `judge` is opened. Its declared rows are read, but no lane reader is asked.
   const revision = w.item(pa).revision;
+  w.read = reading(w.now);
   expect([said(w.answered(judge, 1, "confirmed", FOUND)), w.item(pa).revision, w.last.sends, w.branch.refs["judging"], w.opened]).toEqual([WRITTEN, revision, [], pb, [["judge", 1, true]]]);
 });
 
@@ -885,7 +886,7 @@ test("a revocation or a rules change that the reservation's own observation hold
 
   // The rules, before and after a `publish` that asks one approval more: the reservation is judged under the rules that it observed.
   const stricter = judged({ rules: { ...rulesObserved(t(0), { approvals: 1 }), revision: 58 } });
-  expect([stricter.judgment, stricter.state, stricter.reason, updates(stricter.b)]).toEqual([WRITTEN, "not-reserved", "rules-not-met", [["not-reserved", { operation: stricter.operation, outcome: "refused", reason: "rules-not-met", rules: 58 }]]]);
+  expect([stricter.judgment, stricter.state, stricter.reason, updates(stricter.b)]).toEqual([WRITTEN, "not-reserved", "rules-not-met:source", [["not-reserved", { operation: stricter.operation, outcome: "refused", reason: "rules-not-met:source", rules: 58 }]]]);
   expect(updates(after.b)).toEqual([["reserved", { operation: after.operation, outcome: "committed", rules: 57 }]]);
   // A queued publication behind one that is not reserved is judged next.
   const two = new Branch(false).ready();
@@ -899,23 +900,22 @@ test("a revocation or a rules change that the reservation's own observation hold
   // One whose key has no observation at hand is not counted, and the entry retains none for it.
   const approving = (key: ReturnType<typeof keyObserved> | null, content: object = {}) => {
     const b = new Branch(false).ready();
-    const review = handMade(b.lane.at, "review-verdict");
-    b.reserve({ verdicts: [{ review: factRefOf(review), reviewer: una.member, verdict: "approve" }] }, b.lane, [review]);
+    const review = handMade(b.lane.at, "review-verdict", [], una);
+    b.reserve({ verdicts: [{ review: factRefOf(review), reviewer: una.member, verdict: "approve", extent: "source" }] }, b.lane, [review]);
     const publication = b.head.seq;
     b.read = reading(b.now, { rules: rulesObserved(b.now, { approvals: 1, ...content }), verdicts: [{ sound: true, key }] });
     const judgment = said(b.answered(op(publication, 0), 1, "confirmed", FOUND));
     return [judgment, b.item(publication).state, b.item(publication).values["reason"] ?? null, b.last.input.type === "outcome" && b.last.input.observed?.length];
   };
-  expect([approving(keyObserved(una, t(0))), approving(null)]).toEqual([[WRITTEN, "reserved", null, 3], [WRITTEN, "not-reserved", "rules-not-met", 2]]);
-  // The inputs that no form supplies are filled by the package's rule with the value that fails closed (I3 deltas, entry FC5). The
-  // controllers of the authoring agents are not known, the missing form 15: where `ownerMayReview` is false no review is shown to
-  // be independent, so the same approval does not count.
-  expect(approving(keyObserved(una, t(0)), { ownerMayReview: false })).toEqual([WRITTEN, "not-reserved", "rules-not-met", 3]);
+  expect([approving(keyObserved(una, t(0))), approving(null)]).toEqual([[WRITTEN, "reserved", null, 4], [["unavailable", "authority-unavailable", null], "queued", null, false]]);
+  // The manifest has no authors. Its author row is whole with no subjects, so an independent approval is still counted
+  // when ownerMayReview is false. A missing reviewer key keeps its declared row absent and its reservation pending.
+  expect(approving(keyObserved(una, t(0)), { ownerMayReview: false })).toEqual([WRITTEN, "reserved", null, 4]);
 
   // With nothing at hand, as in this runtime: no runtime reads an observation for an outcome, and no reader of a lane's entries is
   // written. The rule writes what the evidence and this scope's own records decide, and nothing else. The publication then stays `queued`.
   expect([judged(null, { ...FOUND, changes: { over: "paths" } }), judged(null, { ...FOUND, head: OTHER }), judged(null, { ...FOUND, present: false, tree: null, firstParent: null, changes: null }), judged(null)].map(({ judgment, state, reason }) => [judgment, state, reason])).toEqual([
-    [WRITTEN, "not-reserved", "evidence-too-large"], [WRITTEN, "not-reserved", "out-of-date"], [WRITTEN, "not-reserved", "integration-invalid"], [["unavailable", "unavailable", null], "queued", null],
+    [["unavailable", "dependency-unavailable", null], "queued", null], [["unavailable", "dependency-unavailable", null], "queued", null], [["unavailable", "dependency-unavailable", null], "queued", null], [["unavailable", "dependency-unavailable", null], "queued", null],
   ]);
   // Evidence that is not the body of the evidence of `judge` does not follow. From revision 28 that holds for `{ over: "entries" }`
   // too: the count of the entries that a `reserve` names is made at its delivery.
