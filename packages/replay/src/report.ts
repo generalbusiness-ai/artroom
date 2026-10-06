@@ -30,6 +30,7 @@ const RESULTS: Record<Report["result"], string> = {
 export function render(report: Report, why: string | null = null): string {
   const lines = [`Result: ${RESULTS[report.result]}.`];
   if (report.at) lines.push(`At: ${fact(report.at)}.`);
+  if (report.name) lines.push(`Named mismatch: ${report.name}.`);
   if (why !== null) lines.push(`Finding: ${why}.`);
   lines.push(`Mode: ${MODES[report.mode]}`);
   lines.push(`Target: ${scope(report.target.at)}, ${report.result === "consistent" ? "through" : "aiming for"} entry ${report.target.seq} (${report.target.hash}).`);
