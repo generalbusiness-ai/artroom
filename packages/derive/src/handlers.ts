@@ -91,6 +91,41 @@ class UnprovenDecisionBinding extends Error {
 /** The verifier may report this private evidence failure as incomplete. */
 export const isUnprovenDecisionBinding = (error: unknown): error is Error => error instanceof UnprovenDecisionBinding;
 
+/** Detached field bounds, by digest. No code or byte read is needed. */
+function detachedBounds(types: Readonly<Record<string, FieldType & { default?: FieldValue }>>, fields: Readonly<Record<string, FieldValue>>): Map<Digest, number> {
+  const limits = new Map<Digest, number>();
+  const read = (type: FieldType, value: FieldValue | undefined): void => {
+    if (type.type === "text" && type.detached && typeof value === "string") limits.set(value as Digest, Math.min(limits.get(value as Digest) ?? Number.POSITIVE_INFINITY, type.max));
+    else if (type.type === "list" && Array.isArray(value)) for (const element of value) read(type.of, element);
+    else if (type.type === "record" && isObject(value)) for (const [name, member] of Object.entries(type.of)) read(member, own(value, name) as FieldValue | undefined);
+  };
+  for (const [name, type] of Object.entries(types)) read(type, own(fields, name) ?? type.default);
+  return limits;
+}
+
+/** A previous successful check of this same digest can prove its bound after erasure. */
+function priorDetachedBounds(definition: ValidDefinition, context: Reading, at: ScopeRef, before: number): Map<Digest, number> {
+  const limits = new Map<Digest, number>();
+  const keep = (types: Readonly<Record<string, FieldType & { default?: FieldValue }>>, fields: Readonly<Record<string, FieldValue>> | null): void => {
+    for (const [digest, max] of fields ? detachedBounds(types, fields) : []) limits.set(digest, Math.min(limits.get(digest) ?? Number.POSITIVE_INFINITY, max));
+  };
+  if (!context.own) return limits;
+  for (let seq = 0; seq < before; seq++) {
+    const entry = context.own(seq)?.entry;
+    if (!entry || entry.seq !== seq || !same(entry.at, at)) continue;
+    const input = entry.input;
+    if (input?.type === "act") keep(own(definition.declared.acts, input.signed.intent.kind)?.fields ?? {}, input.signed.intent.fields);
+    else if (input?.type === "genesis" && input.decision === "applied") {
+      const fields = own(definition.declared.acts, definition.declared.genesis)!.fields;
+      keep(fields, input.founding ? input.founding.intent.fields : input.source ? creationFields(input.message, input.source, fields) : null);
+    } else if (input?.type === "delivery" && "decision" in input && input.message.class === "request" && (input.decision === "applied" || (input.decision === "superseded" && input.message.type === "tell"))) {
+      const received = bound(definition, input.message, input.from);
+      if (received?.handler) keep(received.handler.fields, received.fields);
+    }
+  }
+  return limits;
+}
+
 /**
  * The binding of a recorded deciding entry, reconstructed by the same
  * field and subject checks as its judge. The refusal's code says nothing
@@ -121,7 +156,12 @@ export function decisionBinding(view: StateView, definition: ValidDefinition, en
   // proves the earlier size checks passed. Only a bare bad-field refusal
   // can still be either an over-max field (no draw) or a later effect
   // refusal (a draw). No later checkpoint may decide between those.
-  if (ready.result === "ready" && ready.bound !== undefined && unknownSizes.size > 0 && input.decision === "refused" && input.reason?.code === "bad-field" && input.reason.name === undefined) throw new UnprovenDecisionBinding(unknownSizes);
+  if (ready.result === "ready" && ready.bound !== undefined && unknownSizes.size > 0 && input.decision === "refused" && input.reason?.code === "bad-field" && input.reason.name === undefined) {
+    const required = detachedBounds(found.handler.fields, ready.j.fields);
+    const proven = priorDetachedBounds(definition, context, scope.at, entry.seq);
+    const unresolved = new Set([...unknownSizes].filter((digest) => (proven.get(digest) ?? Number.POSITIVE_INFINITY) > (required.get(digest) ?? 0)));
+    if (unresolved.size > 0) throw new UnprovenDecisionBinding(unresolved);
+  }
   return ready.result === "ready" && ready.bound !== undefined ? { item: ready.bound, message: found.kind } : null;
 }
 

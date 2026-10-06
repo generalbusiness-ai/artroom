@@ -94,7 +94,7 @@ test("replay and a closing checkpoint preserve the early field refusal and draw 
 });
 
 /** A larger founding field really holds the text before the smaller stop field reads it. Every receiver entry is judged. */
-function redacted(text: string, decision: "bare" | "named" | "other" | "applied" | "invalid" | "spent" = "bare") {
+function redacted(text: string, decision: "bare" | "named" | "other" | "applied" | "invalid" | "spent" | "known" = "bare") {
   const data = structuredClone(DATA);
   const memo = { type: "text", max: 16, detached: true } as const;
   data.items["board"]!.values["memo"] = { fixed: false, required: true, of: memo };
@@ -102,6 +102,7 @@ function redacted(text: string, decision: "bare" | "named" | "other" | "applied"
   data.acts["found"]!.fields = { ...data.acts["found"]!.fields, memo: { ...memo, required: true } };
   data.acts["found"]!.effects = [...data.acts["found"]!.effects, { value: { slot: "memo", from: { field: "memo" } } }];
   data.acts["redact"] = { ...form, step: "transition", on: "board", grant: "redact", guards: [{ state: ["open"] }], effects: [{ redact: { slot: "memo" } }] };
+  if (decision === "known") data.items["job"]!.holds = { decisions: { stop: 2 } };
   data.receives["stop"]!.fields = { note: { type: "text", max: 2, detached: true, required: true }, reject: { type: "bool", required: true } };
   data.receives["stop"]!.guards = decision === "named" ? [{ code: "decline", row: "P15" }] : decision === "other" ? [{ of: "also.job", equals: { a: { const: true }, b: { const: false } } }] : [];
   data.receives["stop"]!.effects = [{ code: "effect", row: "P15" }];
@@ -111,7 +112,7 @@ function redacted(text: string, decision: "bare" | "named" | "other" | "applied"
   };
   const scope = new Deciding(data, rules, text);
   const taking = scope.delivery("start");
-  if (decision === "spent") scope.delivery("stop", { note: textDigest(text), reject: false });
+  if (decision === "spent" || decision === "known") scope.delivery("stop", { note: textDigest(text), reject: false });
   const deciding = scope.delivery("stop", { note: textDigest(text), reject: decision === "invalid" ? "wrong" : decision !== "applied" });
   const count = scope.state.holder(taking.entry.seq);
   const tombstone = scope.did(keys.rita, "redact", { on: 0, expected: { on: scope.item(0).revision } });
@@ -140,7 +141,7 @@ test("erased text leaves the early size refusal and late effect refusal with the
 });
 
 test("ordinary redacted replay keeps applied, named-guard, definitive early-field and zero-remaining-count cases derivable", async () => {
-  for (const decision of ["applied", "named", "other", "invalid", "spent"] as const) {
+  for (const decision of ["applied", "named", "other", "invalid", "spent", "known"] as const) {
     const { scope, options, count } = redacted("ok", decision);
     const replay = await verify(new MemorySource([scope.served()]), options);
     expect([replay.report.result, replay.why, replay.report.coverage.find((coverage) => coverage.scope.scope === scope.at.scope)?.through, count]).toEqual(["consistent", null, scope.head.seq, decision === "invalid" ? { decisions: { stop: 1 } } : null]);
