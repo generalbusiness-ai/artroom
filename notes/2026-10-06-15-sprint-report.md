@@ -30,7 +30,7 @@ platform rows of authority revision 28. Builder paused at 07:10 for a
 restart on another vendor's model, resumed at 08:27, asked the planner for one
 contract decision (answered at 08:40), merged the four branches, filed
 the milestone at `057392c6` at 10:58 under the second planner's request
-`8eb14bd1`, found a replay admission defect during review, repaired it,
+`8eb14bd1`, found a replay defect in composing owners during review, repaired it,
 and refiled the corrected head `4b53c528` at 13:32. Its review, landing
 and gate did not fit before 15:00. The founder's story below is
 therefore the same story as at 07:00, re-run at main to show it still
@@ -77,7 +77,7 @@ What moved, and where it is:
 | The destination's creation | Not decided: `first-head` and `receipt` missing | The two rules written from authority revision 28; the founding completes in the branch's tests (builder's delivery note; not observed by the planner) |
 | A publication judged by its destination | Nothing to judge | A first publication judged against the checked reservation an item holds, with four scripted source entries standing in for the change lane's `reports` field (builder's note) |
 | Reservation of a publication | An exemption with 71 entries unreserved | The checked reservation of contract revision 23; the exemption flag is gone from the generic code |
-| Replay of observations | Grants only | Observation rows derived again; a replay admission owner-composition defect found in review and repaired at `4b53c528` |
+| Replay of observations | Grants only | Observation rows derived again; a replay defect in composing owners, found in review and repaired at `4b53c528` |
 | The lanes' digests | Unchanged | Unchanged; the change lane's update to send `reports` is owed |
 
 ## What landed
@@ -102,7 +102,7 @@ rule (`68c47da1`); both promised.
 ## What did not land and why
 
 - **The fourth I3 milestone.** Filed at `057392c6` (10:58), review found
-  a replay admission owner-composition defect, repaired and refiled at
+  a replay defect in composing owners, repaired and refiled at
   `4b53c528` (13:32). The second planner owns its request (`8eb14bd1`)
   and a tracking request for an unexplained one-run gate failure whose
   later run passed (`bd5a8986`). Builder's restart cost about 80
