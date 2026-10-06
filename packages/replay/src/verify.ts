@@ -47,6 +47,7 @@ import {
 import type { ActJudgment, AncestryCheck, Capabilities, Clock, Fetched, Judgment, Owners, PlatformRules, PreparationJudgment, RecordedRef, Retains, Rules, StateView, TimedJudgment, ValidDefinition, Window } from "@generalbusiness/artroom-derive";
 import { RULE_PROFILES, evaluateRules } from "@generalbusiness/artroom-derive/rule";
 import { PAGE_ENTRIES, PAGE_REPLY_BYTES, RETAINED_REPLY_BYTES, hashOfBytes, type HistorySource, type Stored } from "./source.ts";
+import { View } from "./view.ts";
 
 /**
  * The bounds of one traversal (section 9.4). A limit reached is `incomplete`,
@@ -155,6 +156,29 @@ export interface Coded {
   rulesScope?: ((state: StateView) => RecordedRef | null) | undefined;
 }
 
+/**
+ * A count of the work that a replay does over what it has already checked,
+ * for a caller that wants it: a test counts work here, and never times it
+ * (I3 deltas, section 31). Each member is a number of steps, and a replay
+ * adds to it.
+ *
+ * - `folds`: entries of a source scope that were folded into its view, for
+ *   the values of the observations that other scopes retain of it. Each
+ *   entry of a source is folded there once, so this is at most the entries
+ *   of the sources that were checked.
+ * - `values`: values that the definition of a source scope answered from a
+ *   state of its view. One for each distinct source scope, incarnation,
+ *   head, definition and subject that a replayed entry names.
+ * - `states`: states of a source that were built from its view's log, for
+ *   a head before the one that the view was folded through.
+ * - `runs`: lookups of the run of a retained observation among the runs
+ *   that the scope's earlier entries name. One for each retained
+ *   observation that is not of the run of the entry before it.
+ * - `owed`: lookups of a text that a `redact` effect lists among the texts
+ *   that the scope owes. One for each text that such an effect lists.
+ */
+export interface Tally { folds: number; values: number; states: number; runs: number; owed: number }
+
 /** A report, and in words why its result is not `consistent`. */
 export interface Verification { report: Report; why: string | null }
 
@@ -240,16 +264,16 @@ interface Run {
   busy: boolean;
   /** How many foreign facts lead to this scope from the target, by the shortest chain that was followed. The target is at 0. */
   depth: number;
-  /** Section 9.3: each detached text whose bytes are not at hand, with the entry that names it. A later tombstone of this scope answers for it. */
-  owed: { text: Digest; at: FactRef }[];
+  /** Section 9.3: each detached text whose bytes are not at hand, with the first entry that names it, in the order of the history. A later tombstone of this scope answers for it. */
+  owed: Map<Digest, FactRef>;
   /** Section 16.1: the latest checked entry that retains each read, by its run and its number, with the observation as that entry retains it. */
   reads: Map<string, Retains>;
-  /** The runs of the retained observations, in the order of the history: each run once, at its first entry. */
-  runs: string[];
+  /** The runs of the retained observations: each run that an entry so far names, and the run of the latest such entry. */
+  runs: { seen: Set<string>; last: string | null };
   /** The answer of the pinned platform definition to an observation read, when the replay was given one. */
   observed: Coded["observed"];
-  /** This scope's state folded through one earlier position, for the value of an observation that another scope retains of it. */
-  viewed: { state: MemoryState; through: number } | null;
+  /** This scope's states at its heads, for the value of an observation that another scope retains of it: each checked entry folded once more, as far as an observation names (`View`). */
+  viewed: View | null;
   /** Where a scope under the pinned platform definition records its membership reference, when the replay was given that. */
   membership: Coded["membership"];
   /** Where a scope under the pinned platform definition records its rules reference, when the replay was given that. */
@@ -341,10 +365,18 @@ class Verifier {
    * source of commits, so it makes no claim for such a check: once every other check has run, the result is `incomplete`.
    */
   readonly #unwalked: FactRef[] = [];
+  /**
+   * The value of each observation that was derived from the history of its source: what the source's definition answers, by the
+   * exact source scope, incarnation, head, definition and subject. A later entry that names the same is compared with it, and
+   * nothing is derived again. Every entry is still compared: this holds what the history gives, and never that an entry agreed.
+   */
+  readonly #values = new Map<string, unknown>();
+  readonly #tally: Tally;
   #entries = 0;
   #bytes = 0;
 
-  constructor(source: HistorySource, options: Options) {
+  constructor(source: HistorySource, options: Options, tally: Tally = { folds: 0, values: 0, states: 0, runs: 0, owed: 0 }) {
+    this.#tally = tally;
     this.#source = source;
     this.#mode = options.mode;
     this.#target = options.scope;
@@ -423,7 +455,7 @@ class Verifier {
     if (this.#runs.size >= this.#limits.scopes) throw new Stop("incomplete", `the limit of ${this.#limits.scopes} scopes was reached`);
     const got = await this.#page(id, 0);
     if (!got.ok) return null;
-    const run: Run = { id, said: got.page.scope, head: got.page.head, at: null, named: null, definition: null, platform: null, state: new MemoryState(), sealed: [], read: new Map(), next: 0, busy: false, depth: Number.POSITIVE_INFINITY, owed: [], reads: new Map(), runs: [], observed: undefined, viewed: null, membership: undefined, rulesScope: undefined, snapshots: new Map() };
+    const run: Run = { id, said: got.page.scope, head: got.page.head, at: null, named: null, definition: null, platform: null, state: new MemoryState(), sealed: [], read: new Map(), next: 0, busy: false, depth: Number.POSITIVE_INFINITY, owed: new Map(), reads: new Map(), runs: { seen: new Set(), last: null }, observed: undefined, viewed: null, membership: undefined, rulesScope: undefined, snapshots: new Map() };
     if (!this.#take(run, 0, got.page.entries, got.page.next)) return null;
     this.#runs.set(id, run);
     return run;
@@ -527,15 +559,15 @@ class Verifier {
    * that would pass the limit ends the replay `incomplete`.
    */
   async #settle(): Promise<void> {
-    const owing = () => [...this.#runs.values()].find((run) => run.owed.length > 0);
+    const owing = () => [...this.#runs.values()].find((run) => run.owed.size > 0);
     for (let run = owing(); run; run = owing()) {
       try {
         await this.#advance(run, run.head.seq, run.depth);
       } catch (error) {
         if (!(error instanceof Gap)) throw error;
       }
-      const owed = run.owed[0];
-      if (owed) throw new Stop("incomplete", `a retained input is missing: the detached text ${owed.text}, which no later entry of ${run.id} redacts`, owed.at);
+      const [owed] = run.owed;
+      if (owed) throw new Stop("incomplete", `a retained input is missing: the detached text ${owed[0]}, which no later entry of ${run.id} redacts`, owed[1]);
     }
   }
 
@@ -729,18 +761,22 @@ class Verifier {
   }
 
   /**
-   * The state of a checked scope folded through one earlier position: what
-   * it would answer an observation from at that head. The entries are the
-   * checked ones, folded again. A later position goes on from the last one.
+   * The state of a checked scope at one of its heads: what it would answer
+   * an observation from there. The entries are the checked ones, each
+   * folded once more into the scope's view, in order, as far as the highest
+   * head that an observation names. A head before that is read from the
+   * view's log, and no entry is folded again for it (`View`).
    */
-  #viewAt(source: Run, seq: number): MemoryState {
-    if (!source.viewed || source.viewed.through > seq) source.viewed = { state: new MemoryState(), through: -1 };
-    const view = source.viewed;
-    for (; view.through < seq; view.through++) {
+  #viewAt(source: Run, seq: number): StateView {
+    const view = source.viewed ?? (source.viewed = new View());
+    while (view.through < seq) {
       const next = source.sealed[view.through + 1]!;
-      applyEntry(view.state, source.definition!, next.entry, next.hash);
+      view.fold(source.definition!, next.entry, next.hash);
+      this.#tally.folds++;
     }
-    return view.state;
+    const { state, built } = view.at(seq);
+    if (built) this.#tally.states++;
+    return state;
   }
 
   /**
@@ -751,9 +787,11 @@ class Verifier {
    */
   #inRun(run: Run, use: ObservationUse, where: FactRef): void {
     const id = use.read.run;
-    if (run.runs.at(-1) === id) return;
-    if (run.runs.includes(id)) throw new Stop("mismatch", `run-returned: the entry retains an observation of the run ${id}, and an entry of another run lies between it and that run's earlier entries`, where);
-    run.runs.push(id);
+    if (run.runs.last === id) return;
+    this.#tally.runs++;
+    if (run.runs.seen.has(id)) throw new Stop("mismatch", `run-returned: the entry retains an observation of the run ${id}, and an entry of another run lies between it and that run's earlier entries`, where);
+    run.runs.seen.add(id);
+    run.runs.last = id;
   }
 
   /** After an entry is checked: it is the latest entry that retains each of its reads. */
@@ -772,23 +810,37 @@ class Verifier {
    * by an anchor, which covers the entry and leaves the value on trust.
    * Without the history and with no anchor the report is
    * `missing-dependency`.
+   *
+   * What the history of another scope gives is derived once for each exact
+   * source scope, incarnation, head, definition and subject, and kept
+   * (`#values`). The head is proved for every entry, and every retained
+   * observation is compared with the value, whether it was derived for
+   * this entry or for an earlier one (I3 deltas, section 31).
    */
   async #standing(run: Run, entry: Entry, o: ObservationUse["observation"], where: FactRef, depth: number): Promise<void> {
     const mismatch = (why: string): Stop => new Stop("mismatch", why, where);
-    let view: StateView;
-    let answers: Coded["observed"];
+    const asked: ObservationRequest = !("subject" in o) ? { of: o.of, key: o.key } : o.subject === "member" ? { of: o.of, member: o.member } : { of: o.of, asked: o.content.asked };
+    const unanswered = (): Stop => new Stop("unsupported-definition", `the observed scope ${o.of.scope} pins a definition for which this replay has no answer to an observation`, where);
+    let derived: unknown;
     if (o.of.scope === run.id) {
       if (o.head.seq !== entry.seq - 1 || o.head.hash !== entry.prev || o.at !== entry.time) throw mismatch("a membership scope judges its own act on the head before the entry, at the entry's time, and the retained observation states another");
-      [view, answers] = [run.state, run.observed];
+      if (!run.observed) throw unanswered();
+      // The state that this replay holds at the head before the entry. Nothing is folded for it, and each entry names another head.
+      derived = run.observed(run.state, asked);
     } else {
       const fact: FactRef = { at: o.of, seq: o.head.seq, hash: o.head.hash };
       if (await this.#prove(fact, where, depth) === "anchored") return;
       const source = this.#runs.get(o.of.scope)!;
-      [view, answers] = [this.#viewAt(source, o.head.seq), source.observed];
+      if (!source.observed) throw unanswered();
+      // The head is proved: the source has that incarnation, and that hash at that position. So the key names one state and one question.
+      const key = canonicalize([o.of.scope, o.of.inc, o.head.seq, o.head.hash, source.named, asked]);
+      if (this.#values.has(key)) derived = this.#values.get(key);
+      else {
+        derived = source.observed(this.#viewAt(source, o.head.seq), asked);
+        this.#tally.values++;
+        this.#values.set(key, derived);
+      }
     }
-    if (!answers) throw new Stop("unsupported-definition", `the observed scope ${o.of.scope} pins a definition for which this replay has no answer to an observation`, where);
-    const asked: ObservationRequest = !("subject" in o) ? { of: o.of, key: o.key } : o.subject === "member" ? { of: o.of, member: o.member } : { of: o.of, asked: o.content.asked };
-    const derived = answers(view, asked);
     if (!isObject(derived) || canonicalize({ ...derived, at: o.at }) !== canonicalize(o)) throw mismatch(`the retained observation is not what the history of ${o.of.scope} gives ${"key" in asked ? "that key" : "member" in asked ? "that member" : "the rules"} at its entry ${o.head.seq}`);
   }
 
@@ -1006,7 +1058,7 @@ class Verifier {
     for (const text of inputTexts(definition, input, input.type === "delivery" ? facts.find((f) => f.fact.hash === input.from.hash)?.under : undefined)) {
       const size = await this.#text(run, text);
       texts.set(text, size);
-      if (size === null) run.owed.push({ text, at: where });
+      if (size === null && !run.owed.has(text)) run.owed.set(text, where);
     }
     // Section 6.2: a local fact, and a part of one, are read from this scope's own history: the entries checked so far.
     // Section 9.3: a rule of a platform definition is given only what section 6.1 lists. All of it is in the history, in the retained
@@ -1154,9 +1206,8 @@ class Verifier {
     // what the slot had held. A text that an earlier entry names, and whose bytes are gone, is reported as redacted.
     for (const effect of entry.effects) {
       if (effect.effect !== "redact") continue;
-      const answered = run.owed.filter((owed) => effect.texts.includes(owed.text));
-      if (answered.length === 0) continue;
-      run.owed = run.owed.filter((owed) => !answered.includes(owed));
+      this.#tally.owed += effect.texts.length;
+      if (effect.texts.filter((text) => run.owed.delete(text)).length === 0) continue;
       this.#redacted.push({ tombstone: where, item: effect.item, slot: effect.slot });
       this.#trusts.add("redacted");
     }
@@ -1166,8 +1217,9 @@ class Verifier {
 /**
  * Check the history of `options.scope`, as `source` serves it. Rejects with
  * `SourceError` when that history cannot be read at all. Every other end is
- * a report.
+ * a report. `tally`, when it is given, counts the work of the replay over
+ * what it has already checked (`Tally`).
  */
-export function verify(source: HistorySource, options: Options): Promise<Verification> {
-  return new Verifier(source, options).run();
+export function verify(source: HistorySource, options: Options, tally?: Tally): Promise<Verification> {
+  return new Verifier(source, options, tally).run();
 }

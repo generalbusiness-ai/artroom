@@ -1,11 +1,16 @@
 import { describe, expect, test } from "vitest";
-import { PROPOSED_BOUNDS, type Report } from "@generalbusiness/artroom-contract";
-import { textDigest } from "@generalbusiness/artroom-bytes";
-import { founded, keys, notesDefinition, on, otherLane, t, type Ledger } from "@generalbusiness/artroom-derive/testing";
+import { PROPOSED_BOUNDS, type Entry, type ObservationUse, type Report } from "@generalbusiness/artroom-contract";
+import { canonicalize, textDigest } from "@generalbusiness/artroom-bytes";
+import { grantFrom, observationOf } from "@generalbusiness/artroom-derive";
+import { founded, keys, notesDefinition, on, otherLane, t, type Actor, type Ledger } from "@generalbusiness/artroom-derive/testing";
 import { C, cap, clean } from "../../derive/test/fixtures-hold.ts";
-import { MemorySource, TRUSTS, platformCode, render, verify, type MemoryScope, type Options } from "../src/index.ts";
+import { MEMBERSHIP, RULES_SCOPE as RULES, firstExtents, platform, standingOf } from "../../platform/src/index.ts";
+import { Roster } from "../../platform/test/support.ts";
+import { Rulebook } from "../../platform/test/support-rules.ts";
+import { MemorySource, TRUSTS, platformCode, render, verify, type MemoryScope, type Options, type Tally } from "../src/index.ts";
+import { View } from "../src/view.ts";
 import { Gate, Lane, OWNER, RULES_SCOPE } from "./staging.ts";
-import { entryOf, rewrite, served, sourceOf, world, type World } from "./world.ts";
+import { entryOf, histories as ledgers, rewrite, served, sourceOf, world, type World } from "./world.ts";
 
 /**
  * The fixture histories were written under the test authority of derive's fixtures, a STAND-IN whose grants hold no freshness
@@ -81,7 +86,21 @@ describe("a detached text whose bytes are gone (section 9.3)", () => {
     const within = async (depth: number) => { const { report, why } = await verify(histories(true).source, { mode: "replay", ...AS_RECORDED, scope: whole.T.at.scope, limits: { depth } }); return [report.result, report.at?.seq ?? null, why]; };
     expect([await within(1), await within(2)]).toEqual([["incomplete", 2, "the limit of 1 on the depth of foreign facts was reached"], ["consistent", null, null]]);
   });
+
+  // I3 deltas, section 31, entry FD4. The work is counted, and never timed.
+  test("a tombstone answers for the texts that it lists by one lookup for each: a note that held 30 texts whose bytes are gone, and its one tombstone, are 30 lookups", async () => {
+    const S = founded(notesDefinition, {}, "s");
+    const did = (kind: string, fields: Record<string, string> = {}, beside: object = {}) => { if (S.act(keys.rita, kind, { ...on(S, 0), fields }, beside).result !== "write") throw new Error(`${kind} was not written`); };
+    for (let i = 0; i < 30; i++) did("write", { body: textDigest(`body ${i}`) }, { texts: () => 7 });
+    did("strike");
+    const tally = tallied();
+    const { report } = await verify(new MemorySource([served(S, [S])]), { mode: "replay", scope: S.at.scope, ...AS_RECORDED }, tally);
+    // The earlier code looked for each of the 30 owed texts in the list of 30, and again to remove it: 930 comparisons, counted by reading it.
+    expect([report.result, report.redacted.map((r) => r.tombstone.seq), tally.owed]).toEqual(["consistent", [31], 30]);
+  });
 });
+
+const tallied = (): Tally => ({ folds: 0, values: 0, states: 0, runs: 0, owed: 0 });
 
 /** The first `relation` effect of I.2 says the link is removed. The chain is sealed again, so only the judgment is wrong. */
 const altered = (w: World) => rewrite(w.I, 2, (entry) => { entry.effects[0].state = "removed"; });
@@ -345,5 +364,113 @@ describe("an outcome entry of a platform definition, and where a scope records i
     const g = new Gate(opens as never);
     const [recorded, none] = [await replayed(g, g.served(), g.coded()), await replayed(g, g.served(), g.coded(g.rules, null))];
     expect([recorded.report.result, none.report.result, none.report.at?.seq, none.why]).toEqual(["consistent", "mismatch", 1, "the entry records a grant, and its row or its step names no action, its scope records no membership scope, or no window is stated for it"]);
+  });
+});
+
+/**
+ * The value of an observation, from the history of its source (section 16.1, "Replay"; I3 deltas, section 31). The membership scope
+ * and the rules scope are the platform package's own data and rules, and derive's judges wrote every entry. Three things are
+ * STAND-INS, of the platform package's test support: the office that creates the membership scope, the registrar that creates the
+ * rules scope, and the reads. No scope read membership: each observation is membership's own answer (`standingOf`) from its state
+ * at the head named, written into a grant by the test. So a replay reads the grants as `proven`, and derives each value again.
+ */
+describe("the value of an observation is derived once from the history of its source, and every entry that names it is compared with it", () => {
+  const { rita, una } = keys;
+  /**
+   * A membership scope M with two admins, rita and una. Its head is L when una has joined, and H after 40 more entries. A rules
+   * scope R that records M: `rounds` acts `publish`, as `acts` says who signs each and on which read.
+   *
+   *   M: 0 genesis, 1 confirmation, 2 seat, 3 first-key, 4 invitation, 5 join (L), 6 to 45 invitations (H)      R: 0 genesis, 1 confirmation, then each `publish`
+   */
+  function repository(acts: (at: { m: Roster; L: number; H: number; seen: (who: Actor, head: number, at: string) => ObservationUse["observation"] }, i: number, prior: (n: number) => ObservationUse["prior"]) => { who: Actor; use: ObservationUse }, rounds: number) {
+    const m = new Roster().seated();
+    const invite = (handle: string, role: string) => m.did(rita, "invite-member", { fields: { handle, role, inviteHash: textDigest(handle), inviteEnds: t(3600) } }).seq;
+    if (m.act(una, "join", { fields: { invitation: invite("@una", "admin"), secret: "@una" } }).result !== "write") throw new Error("una did not join");
+    const L = m.head.seq;
+    for (let i = 0; i < 40; i++) invite(`@n${i}`, "member");
+    const H = m.head.seq;
+    const r = new Rulebook(true, m.at.scope);
+    /** STAND-IN for a read: what M answers for that key from its state at that head, as an observation that began at `at`. */
+    const seen = (who: Actor, head: number, at: string) => observationOf(standingOf(m.replay(head + 1), { of: m.at, key: who.key }), at as never)!;
+    const priors = new Map<number, ObservationUse["prior"]>();
+    for (let i = 0; i < rounds; i++) {
+      r.now = t(i + 1);
+      const { who, use } = acts({ m, L, H, seen }, i, (n) => priors.get(n) ?? null);
+      const fields = { approvals: 2, ownerMayReview: true, checks: [], labels: ["bug"], extents: firstExtents({ approvals: 2, checks: [] }) };
+      const judged = r.act(who, "publish", { on: 0, expected: { on: r.item(0).revision }, fields: fields as never }, { grants: [{ grant: grantFrom(use), current: true }], membership: m.at });
+      if (judged.result !== "write") throw new Error(`publish ${i} was not written: ${JSON.stringify(judged)}`);
+      priors.set(use.read.n, r.head);
+    }
+    const all = [r, r.registrar, m, m.office];
+    return { m, r, L, H, scopes: () => all.map((ledger) => served(ledger, all)) };
+  }
+  const replayed = (scopes: MemoryScope[], target: Ledger, tally: Tally) => verify(new MemorySource(scopes, 50), { mode: "replay", scope: target.at.scope, platform }, tally);
+  /** The distinct things that the grants of a history ask a source: the observed scope, its incarnation, the head and the key. */
+  const asked = (history: MemoryScope) => new Set(history.entries.flatMap((_, seq) => { const input = entryOf(history, seq).input; return input.type === "act" ? input.authority.map(({ fresh }) => { const o = fresh!.observation as { of: unknown; head: unknown; key: unknown }; return canonicalize([o.of, o.head, o.key]); }) : []; }));
+
+  /**
+   * una and rita publish in turn, 20 times each, in one run: una on read 1, of head H, and rita on read 2, of head L. Each is `fresh`
+   * once and `reused` after. Then una publishes on a new read, 3, of head H: R.2 to R.41 alternate, and R.42 is the last.
+   */
+  const alternating = () => repository(({ H, L, seen }, i, prior) => {
+    if (i === 40) return { who: una, use: { observation: seen(una, H, t(41)), read: { run: "run-1", n: 3 }, use: "fresh", prior: null } };
+    const [who, head, n] = i % 2 === 0 ? [una, H, 1] as const : [rita, L, 2] as const;
+    return { who, use: { observation: seen(who, head, t(0)), read: { run: "run-1", n }, use: prior(n) ? "reused" : "fresh", prior: prior(n) } as ObservationUse };
+  }, 41);
+
+  test("two admins who alternate `publish` on membership heads L and H: the answer is the earlier code's, and the work is the source's history folded once and one value for each distinct head and key, whatever the number of grants", async () => {
+    const { m, r, L, H, scopes } = alternating();
+    const tally = tallied();
+    const { report, why } = await replayed(scopes(), r, tally);
+    // What the code before this change answered for this history, taken from it: the result, the coverage, the facts and the trusts.
+    expect([L, H, report.result, why, report.coverage.map((covered) => [covered.scope.kind, covered.through]), report.dependencies]).toEqual([
+      5, 45, "consistent", null, [["rules", 42], ["directory", 1], ["membership", 45], ["directory", 1]], { verified: 8, anchored: 0, missing: [] },
+    ]);
+    expect(report.trusts).toEqual([TRUSTS.clock, TRUSTS.head, TRUSTS.sources, TRUSTS.minted, TRUSTS.held, TRUSTS.delivered, TRUSTS.observed, TRUSTS.bounds, platformCode(MEMBERSHIP), platformCode(RULES)]);
+    // The count: 41 grants name two distinct heads and keys. M's 46 entries are folded once, in order, and each value is derived once.
+    // rita's head L is first named when the view is folded through H, so its state is built from the view's log, and no entry is folded again.
+    // The two lookups of a run are R's one run and M's one run: each scope's first entry that retains an observation.
+    const distinct = asked(scopes()[0]!).size;
+    expect([distinct, tally.folds <= m.entries.length, tally.values <= distinct, tally]).toEqual([2, true, true, { ...tallied(), folds: 46, values: 2, states: 1, runs: 2 }]);
+    // The earlier code, on this history, with a counter at the same two places (observed, at 441727709): 966 folds, 46 for each change
+    // of head but the first pair's, and 41 values, one for each grant.
+  });
+
+  test("an entry that names a head and a key whose value is already derived is still compared with it: a standing that membership never gave is the mismatch that it was", async () => {
+    const { m, r, scopes } = alternating();
+    const changed = scopes();
+    // R.42 is on a new read of una's key at H, whose value R.2 derived. It is said to hold another role, which no guard of the grant reads.
+    rewrite(changed[0]!, 42, (entry: { input: { authority: { fresh: { observation: { role: string } } }[] } }) => { entry.input.authority[0]!.fresh.observation.role = "maintainer"; });
+    const tally = tallied();
+    const { report, why } = await replayed(changed, r, tally);
+    // The earlier code's answer for the changed history, taken from it.
+    expect([report.result, report.at?.seq, why, report.coverage[0]?.through, tally.values]).toEqual(["mismatch", 42, `the retained observation is not what the history of ${m.at.scope} gives that key at its entry 45`, 41, 2]);
+  });
+
+  // I3 deltas, section 31, entry FD3.
+  test("40 acts, each on a read of a run of its own: each run is looked up once among the runs seen, and the value of the one head and key is derived once", async () => {
+    const { r, scopes } = repository(({ L, seen }, i) => ({ who: rita, use: { observation: seen(rita, L, t(i + 1)), read: { run: `run-${i}`, n: 1 }, use: "fresh", prior: null } }), 40);
+    const tally = tallied();
+    const { report, why } = await replayed(scopes(), r, tally);
+    // R's 40 runs, and the one run of M's own act below L. The earlier code compared each of R's runs with every run before it: 780
+    // comparisons on this history (observed, with a counter, at 441727709).
+    expect([report.result, why, tally]).toEqual(["consistent", null, { ...tallied(), folds: 6, values: 1, runs: 41 }]);
+  });
+
+  test("a view gives the state of a scope at every head that it was folded through, asked in any order, and it is the state that a fold from the genesis to that head gives", () => {
+    const { una: performer } = keys;
+    const lane = new Lane();
+    lane.prepare(performer, "instance", { hold: lane.hold, task: { ...otherLane, kind: "task" }, instance: "i1" });
+    const note = founded(notesDefinition, {}, "s");
+    for (const [kind, over] of [["write", { fields: { body: textDigest("a body") } }], ["strike", {}]] as const) if (note.act(rita, kind, { ...on(note, 0), ...over }, { texts: () => 6 }).result !== "write") throw new Error(`${kind} was not written`);
+    const { D, P, I } = ledgers();
+    // Between them the histories write every table of a state but the observed heads of another scope, which R's history writes.
+    for (const ledger of [new Roster().seated(), lane, note, D, P, I, alternating().r] as Ledger[]) {
+      const view = new View();
+      for (const { entry, hash } of ledger.entries) view.fold(ledger.definition, entry as Entry, hash);
+      const last = ledger.entries.length - 1;
+      // From the last head down, and then an early head after a late one.
+      for (const seq of [...ledger.entries.map((_, i) => last - i), last, 0]) expect([ledger.definition.declared.name, seq, canonicalize(view.at(seq).state.all())]).toEqual([ledger.definition.declared.name, seq, ledger.replay(seq + 1).snapshot()]);
+    }
   });
 });
