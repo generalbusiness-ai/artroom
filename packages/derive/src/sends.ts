@@ -297,7 +297,9 @@ export function deriveSends(j: Judging, forms: readonly SendForm[], working: Rea
  * forms and the entry's sends are in one order, so each send is matched to
  * the first form, at or after the last one matched, that makes a message of
  * its type and name. A fan-out may have made the next send too. The
- * validator refuses a list in which that could find the wrong clause.
+ * validator refuses a list in which that could find different result
+ * effects or observation rows. Conditional same-name forms with identical
+ * results may match either form (revision 24, amendment 335ef3ea).
  */
 export function formOf(definition: ValidDefinition, forms: readonly SendForm[], entry: { sends: readonly Send[] }, n: number): SendForm | SendMark | null {
   const sent = entry.sends.filter((s) => s.message.class === "request" || s.message.class === "advisory").sort((a, b) => a.n - b.n);

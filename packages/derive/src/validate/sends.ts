@@ -62,8 +62,19 @@ const sources = (d: Defining, v: unknown, path: string, ctx: Ctx, lane: boolean)
 /** Section 16.1, check 1: in platform data a `create`, a `tell` and a `relate` may state rows of `observes`, by clause, beside `result`. */
 const ROWS = (d: Defining): string[] => (d.platform ? ["observes"] : []);
 
-/** True when a result clause list is written with an effect. */
+/** True when any result clause has effects or observation rows. */
 const hasClause = (result: unknown): boolean => isObject(result) && Object.values(result).some((e) => Array.isArray(e) && e.length > 0);
+
+/**
+ * Clause identity under the planner's binding amendment for revision 24
+ * (335ef3ea, request fa6dd29b): both effects and observation rows are work.
+ * Missing clauses and empty lists do the same work. List order is kept.
+ */
+const resultIdentity = (result: unknown, observes: unknown): string => canonicalize(
+  ["applied", "refused", "superseded", "undelivered", "conflict"].map((clause) => [
+    isObject(result) ? result[clause] ?? [] : [], isObject(observes) ? observes[clause] ?? [] : [],
+  ]),
+);
 
 /** The result clauses of one request. Each is its own list of effects, which run in a later entry. Returns what each reserved clause can set. */
 function clauses(d: Defining, v: unknown, path: string, ctx: Ctx, conflict: boolean): ClauseSet[] {
@@ -105,8 +116,8 @@ function alsoRead(v: unknown): string[] {
 export function sends(d: Defining, v: unknown, path: string, ctx: Ctx, top: Rec, requests: Duties["requests"]): number {
   const { bounds, problems, bad, rec, form, list, str } = d;
   const relations = new Set<string>();
-  /** For each kind of message a form makes: whether every form of that kind always makes exactly one send, and whether one has a clause. */
-  const kinds = new Map<string, { always: boolean; clause: boolean }[]>();
+  /** For each message kind: whether its form always sends once, has clause work, and the identity of that work. */
+  const kinds = new Map<string, { always: boolean; clause: boolean; identity: string }[]>();
   let fanOuts = 0;
   let most = 0;
   /**
@@ -202,12 +213,15 @@ export function sends(d: Defining, v: unknown, path: string, ctx: Ctx, top: Rec,
     if (problems.length !== before) return;
     // A request's result names it by its ordinal, and a send that is not made takes none. So the form that made a recorded send is
     // found again from what the message says: its type and its name. Two forms that say the same are told apart only by their
-    // order, which holds when each always makes exactly one send.
+    // order, which holds when each always makes exactly one send. Otherwise
+    // their result effects and observation rows must be identical (revision 24).
     const said = canonicalize(kind);
     const others = kinds.get(said) ?? [];
-    const clause = hasClause(result);
-    if (others.some((o) => (o.clause || clause) && !(o.always && always))) bad("shape", p, "another send of this list makes a message of the same type and name, one of the two is not always made, and one has a result clause: the clause of a result could not be found again");
-    kinds.set(said, [...others, { always, clause }]);
+    const observes = d.platform && isObject(x) ? x["observes"] : undefined;
+    const clause = hasClause(result) || hasClause(observes);
+    const identity = resultIdentity(result, observes);
+    if (others.some((o) => (o.clause || clause) && !(o.always && always) && o.identity !== identity)) bad("ambiguous-send", p, "another send of this list makes a message of the same type and name, one of the two is not always made, and their result effects or observation rows differ: the clause of a result could not be found again");
+    kinds.set(said, [...others, { always, clause, identity }]);
   });
   // A result names its request by ordinal, and a rule's request states no type or name in the data. So the form that made a
   // recorded send is found again, in a list with a mark, by counting (section 6.1, the points on EJ4 and "More than one send

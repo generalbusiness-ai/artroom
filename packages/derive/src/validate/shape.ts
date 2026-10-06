@@ -9,6 +9,7 @@ import type { Bounds } from "@generalbusiness/artroom-contract";
 import { isObject } from "../values.ts";
 
 export type ProblemCode =
+  | "ambiguous-send"    // same-name sends may omit or fan out, and their result effects or observations differ (revision 24)
   | "shape"              // not the shape of the form, or a form or field the contract does not define
   | "bound"              // past a bound of sections 6.1 to 6.4
   | "name"               // a name that resolves to nothing, or to a thing of the wrong type
