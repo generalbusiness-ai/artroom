@@ -109,8 +109,11 @@ rule (`68c47da1`); both promised.
   minutes of the sprint. The review of 4b53c528 is the checker's next
   item; landing follows approval.
 - **Spike J0's second half.** Hugh judged path B good at 07:15 and
-  allowed hosted models; the hosted-model comparison is
-  not run yet, behind the milestone.
+  allowed hosted models. Builder ran the hosted comparison at 14:34
+  (workroom `b5b48995`): one call through a model gateway on the
+  reference phrase, about 5 seconds and a fraction of a cent, returning
+  eight events all on one pitch, so the in-page tracker stays the
+  recommendation. The five hummed phrases by people are still owed.
 - **The jam room note's revision 9** (instrument order, start condition
   and stop rule) waits on the measurement request.
 - **The external identity design** (`046f88ba`) is filed for review by
