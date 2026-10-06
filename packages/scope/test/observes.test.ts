@@ -1,13 +1,16 @@
 import { evictDurableObject, runInDurableObject } from "cloudflare:test";
 import { expect, test } from "vitest";
-import type { Answer, Entry, FactRef, Intent, MemberId, ObservationRequest, ObservationUse, OperationId, PlatformDefinition, Seed, Send } from "@generalbusiness/artroom-contract";
+import type { Answer, Digest, Entry, FactRef, Intent, MemberId, ObservationRequest, ObservationUse, OperationId, PlatformDefinition, RetainedInput, Seed, Send } from "@generalbusiness/artroom-contract";
 import { canonicalize, entryHash, factRefOf, intentDigest, scopeIdOf, signIntent } from "@generalbusiness/artroom-bytes";
 import { timeMs, timeOf, valueDigest } from "@generalbusiness/artroom-derive";
 import { d, keys, membership, otherLane, type Actor } from "@generalbusiness/artroom-derive/testing";
 import { EXTENTS, RULEBOOK, STEP_ROWS, rulebook, signers, weigherRules, weigherWith, type Seen } from "../../derive/test/fixtures-observes.ts";
+import { MEMBERSHIP, platform } from "@generalbusiness/artroom-platform";
+import { MemorySource, TRUSTS, verify, type MemoryScope } from "@generalbusiness/artroom-replay";
 import type { Delivery } from "../src/index.ts";
 import { controls, type Controls } from "../src/testing.ts";
 import { outsideOf, wired } from "./outside.ts";
+import { copied, repository, rewritten } from "./repository.ts";
 import { START, at, objectOf, reader, stubOf } from "./support.ts";
 
 // Scope contract, revisions 20 and 21, sections 5.2 (step 1) and 16.1; source rows I3-40, I3-41 and I3-53; witnesses 18.46 (cases 4,
@@ -264,6 +267,74 @@ test("18.48 cases 6 to 8, and 18.50 cases 4 to 8, a clause of a result on real s
     c.clock.now = timeOf(timeMs(c.clock.now)! + 1000);
     const again = await s.surface.deliver(await asked(10));
     expect([again.answer, records((await s.entries()).at(-1)!).length, (await kept()).length]).toEqual(["recorded", 1, 1]);
+  } finally {
+    wired.delete(s.name);
+  }
+});
+
+// What is real here, beyond the tests above: the membership scope. It is a scope under `platform:membership@1` on a real object of
+// the namespace `PLATFORM`, with the platform package's own rules, and it answers each read by its own method `observe`, from its
+// head. STAND-INS that remain: the observing scope's data and rules are made up; the reference by which it records that membership
+// scope is written by the test, because no genesis of a made-up scope holds one; and the rules scope is scripted.
+test("a scope with rows reads the real membership scope of the platform package: the standing of each member of a list, the standing of a key behind an entry at hand, and the holders of an action; and a replay derives each value again from membership's own history", async () => {
+  const { O, M, ritasInbox, unasInbox } = await repository();
+  const of = await M.at();
+  // The acts of the made-up data are judged on an action that membership's role table gives a member, and the row of the holders
+  // names one that an admin and a member hold.
+  const s = await weighing((data) => {
+    for (const act of Object.values(data.acts) as { grant: string }[]) act.grant = "issue.open";
+    data.outcomes.weigh.observes[2].action = "issue.open";
+  });
+  try {
+    const { c } = s;
+    c.membership = { at: of, answers: (asked) => M.stub.observe(asked) };
+    const member = (handle: string) => ({ membership: of, member: handle as MemberId });
+    // An act with a row: the checkers are una, a member, and rita, who signs. Una's standing is membership's own answer at its
+    // head. Rita is the signer's own member: the grant's observation serves that subject, and `observed` holds no record of it
+    // (witness 18.52, case 10, on a real observation).
+    expect(said(await s.act(rita, "set-checks", { fields: { checks: [{ name: "a", checker: member("@una") }, { name: "b", checker: member("@rita") }] } }))).toEqual(["accepted", null]);
+    const head = (await M.summary()).at;
+    const set = (await s.entries()).at(-1)!;
+    expect([observedIn(set).map((use) => use.observation), set.input.type === "act" && set.input.authority[0]!.fresh.observation]).toMatchObject([
+      [{ subject: "member", of, head, member: "@una", memberState: "active", role: "member", activeKey: true, definition: MEMBERSHIP }],
+      { key: rita.key, member: "@rita", role: "admin", of, head },
+    ]);
+    expect(observedIn(set).length).toBe(1);
+    // An outcome with rows: the key of una, a member; the key of vic, which membership does not hold; and the holders of the action.
+    const facts = { first: decided(c, 41, una, "c1"), second: decided(c, 42, vic, "c2") };
+    const g = await opened(s, facts);
+    await g.offer();
+    const outcome = outcomeOf(await s.entries(), g.operation)!;
+    expect(observedIn(outcome).slice(1).map((use) => use.observation)).toMatchObject([
+      { key: una.key, keyState: "active", member: "@una", role: "member", of, head },
+      { key: vic.key, keyState: "unknown", actions: [], of, head },
+      { subject: "holders", action: "issue.open", count: 2, holders: ["@rita", "@una"], of, head },
+    ]);
+
+    // The replay: the observing scope's history, with the histories of membership and of what membership used. No anchor is given
+    // for membership, so each value is derived from its history at the recorded head: a member, a key, and the holders.
+    const kept = async (kind: RetainedInput["kind"], digest: Digest): Promise<RetainedInput[]> => {
+      const read = await (objectOf(s.name) as unknown as { retained(reader: unknown, kind: string, digest: Digest): Promise<{ ok: true; value: RetainedInput } | { ok: false }> }).retained(reader, kind, digest);
+      return read.ok ? [read.value] : [];
+    };
+    const sealed = await stubOf(s.name).history(reader, "0");
+    if (!sealed.ok) throw new Error("no history");
+    const retained: RetainedInput[] = [];
+    for (const { entry } of sealed.value) for (const use of entry.uses) retained.push(...await kept("entry", use.content));
+    const W: MemoryScope = { scope: s.scope, entries: sealed.value.map(({ entry, hash }) => ({ seq: entry.seq, hash, bytes: canonicalize(entry) })), retained };
+    const data = weigherWith((made) => { for (const act of Object.values(made.acts) as { grant: string }[]) act.grant = "issue.open"; made.outcomes.weigh.observes[2].action = "issue.open"; }).declared;
+    const code = (named: PlatformDefinition) => (named === MADE ? { data: data as never, rules: weigherRules().rules, membership: () => of, rulesScope: () => rulebook }
+      : named === RULEBOOK ? { data: { items: { rules: { values: {} } } } as never, rules: {} } : platform(named));
+    const lane = [...c.foreign.values()].map(({ entry }) => { const fact = factRefOf(entry); return { scope: fact.at.scope, seq: fact.seq, hash: fact.hash }; });
+    const world = async () => [W, await copied(O), await copied(M), await copied(ritasInbox), await copied(unasInbox)];
+    const options = { mode: "replay", scope: s.name, platform: code, anchors: [{ scope: rulebook.scope, seq: 7, hash: d("7") }, ...lane] } as const;
+    const good = await verify(new MemorySource(await world()), options);
+    expect([good.report.result, good.why, good.report.trusts.includes(TRUSTS.observed)]).toEqual(["consistent", null, true]);
+    // The same history, where the record of the holders states one more than membership's history gives at that head.
+    const changed = await world();
+    rewritten(changed[0]!, outcome.seq, (entry: { input: { observed: { observation: { count?: number } }[] } }) => { entry.input.observed[3]!.observation.count = 3; });
+    const found = await verify(new MemorySource(changed), options);
+    expect([found.report.result, found.report.at?.seq, found.why]).toEqual(["mismatch", outcome.seq, `the retained observation is not what the history of ${of.scope} gives the holders of that action at its entry ${head.seq}`]);
   } finally {
     wired.delete(s.name);
   }
