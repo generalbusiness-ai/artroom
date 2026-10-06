@@ -1,0 +1,27 @@
+gs: verifying the durable log; this may take a while
+{
+  "remote": "origin",
+  "ref": "refs/heads/main",
+  "head": "6be14650db44d24339f2ed91ed4eddf272d4199e",
+  "basis": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:88503049b6f3e2557a27bb6f01bf4361248623e7"
+}
+gs: read tracked .gitseq at published head 6be14650db44d24339f2ed91ed4eddf272d4199e: git show 6be14650db44d24339f2ed91ed4eddf272d4199e:.gitseq: exit status 128: fatal: path '.gitseq' does not exist in '6be14650db44d24339f2ed91ed4eddf272d4199e'
+
+Native push exit0: 6be14650d..dd6ec6b32 ->main.
+Remote verification:
+dd6ec6b32f2268c96e137ae0d3d4010ecc643458	refs/heads/main
+
+Actual merge frontier:
+M	packages/bytes/README.md
+
+Before/after package, derive README and plan trees:
+dd6ec6b32f2268c96e137ae0d3d4010ecc643458
+94a5de6dcf0140849a0e47dcdc1d386f58a82737
+7a6968799f4b544b02ae8a7f3fb282b84cc1694c
+6e06ebd18e3cda23f1714c5f30cce8c6ff5b416a
+6e06ebd18e3cda23f1714c5f30cce8c6ff5b416a
+b462d9c9285072c955e7e9f14fffb380108ecb13
+b462d9c9285072c955e7e9f14fffb380108ecb13
+
+Status:
+## main
