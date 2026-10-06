@@ -35,7 +35,7 @@
 
 import type { Bounds, CapabilityName, DecisiveEvidence, Entry, Evidence, FactRef, OperationId, PlatformDefinition, RetainedInput, ScopeRef } from "@generalbusiness/artroom-contract";
 import { isEvidence, isOperationId, isRetainedInput } from "@generalbusiness/artroom-bytes";
-import { settleOutcome, snapshotRead, timeMs, timeOf, type OutcomeOffered, type Owners } from "@generalbusiness/artroom-derive";
+import { settleOutcome, snapshotInput, snapshotRead, timeMs, timeOf, type OutcomeOffered, type Owners } from "@generalbusiness/artroom-derive";
 import { ownOf, type Scope } from "./core.ts";
 import { report } from "./diag.ts";
 import type { Wakes } from "./outbox.ts";
@@ -125,15 +125,24 @@ export const NO_OUTSIDE: Outside = { accepts: () => false, send: () => Promise.r
 
 const UNKNOWN: Evidence = { basis: "none", body: null };
 const keyOf = (operation: OperationId, attempt: number) => `${operation}#${attempt}`;
-/** An answer as the contract's outcome can hold it: a decisive result, and evidence with a basis and a body (`isEvidence`). Anything else is no answer. */
-const isAnswer = (answer: unknown): answer is EffectAnswer => {
+/**
+ * An answer as the contract's outcome can hold it: a decisive result, and evidence with a basis and a body (`isEvidence`). Anything
+ * else is no answer. That the evidence has canonical bytes is the ledger's check, in the turn (`derive/src/ledger.ts`, `settleOutcome`).
+ */
+export const isAnswer = (answer: unknown): answer is EffectAnswer => {
   const a = answer as { result?: unknown; evidence?: unknown; retain?: unknown } | null;
   return typeof a === "object" && a !== null && (a.result === "confirmed" || a.result === "refused") && isEvidence(a.evidence) && a.evidence.basis !== "none" && snapshotsOf(a) !== null;
 };
-/** The snapshots that came with an answer, each checked against the digest it is given under. Null: one of them is no snapshot with that digest. */
+/**
+ * The snapshots that came with an answer, each checked against the digest it is given under. Null: one of them is no snapshot with
+ * that digest, or its bytes are not the snapshot's canonical bytes. The scope stores the bytes as they are given, under the digest,
+ * and a retained input's bytes are canonical JSON text (`RetainedInput`): the same pairs in another order or with other spacing have
+ * the same digest and are not those bytes.
+ */
 const snapshotsOf = (answer: { retain?: unknown }): readonly RetainedInput[] | null => {
   const given = answer.retain === undefined ? [] : answer.retain;
-  return Array.isArray(given) && given.every((input) => isRetainedInput(input) && input.kind === "snapshot" && snapshotRead(input.digest, input.bytes) !== null) ? (given as RetainedInput[]) : null;
+  const canonical = (input: RetainedInput): boolean => { const pairs = snapshotRead(input.digest, input.bytes); return pairs !== null && snapshotInput(pairs)?.bytes === input.bytes; };
+  return Array.isArray(given) && given.every((input) => isRetainedInput(input) && input.kind === "snapshot" && canonical(input)) ? (given as RetainedInput[]) : null;
 };
 
 /** An outcome as the driver offers it: it states no owner and no kind, which the judge sets from the operation (section 4.1). `retain`: the snapshots that came with its answer, which are no part of the input. */

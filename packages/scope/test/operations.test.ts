@@ -2,7 +2,9 @@ import { describe, expect, test } from "vitest";
 import { abortAllDurableObjects } from "cloudflare:test";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { OperationId, Read } from "@generalbusiness/artroom-contract";
-import { checkpointOf, operationId, operationOpening, timeMs, type Opening } from "@generalbusiness/artroom-derive";
+import { canonicalize } from "@generalbusiness/artroom-bytes";
+import { checkpointOf, operationId, operationOpening, snapshotInput, snapshotRead, stagedRefName, timeMs, type Opening } from "@generalbusiness/artroom-derive";
+import { isAnswer } from "../src/operations.ts";
 import { SqliteStore, Turns, Wakes, production, type EffectAnswer, type OperationStatus, type OutcomeRecorded } from "../src/index.ts";
 import { variant } from "@generalbusiness/artroom-derive/testing";
 import { controls } from "../src/testing.ts";
@@ -241,5 +243,15 @@ describe("outside operations at a real scope (scope contract, section 4.3; autho
     c.capability = {};
     await s.restart();
     expect([await surface(s).effect(), out.attempts, (await seen(s, op)).state]).toEqual([1, [`${op}#1`], "settled"]);
+  });
+
+  test("a snapshot that comes with an answer is stored only as its canonical bytes: the same pairs in another order, or with other spacing, have the same digest and are no answer. A plain function, and no scope", () => {
+    const lane = { scope: `sc_${"a".repeat(52)}`, inc: `in_${"a".repeat(26)}` } as never;
+    const pairs = [1, 2].map((root) => ({ ref: stagedRefName(lane, "c".repeat(40), root), target: "c".repeat(40) }));
+    const snapshot = snapshotInput(pairs)!;
+    const answer = (bytes: string) => ({ result: "confirmed", evidence: { basis: "own-answer", body: { read: true } }, retain: [{ ...snapshot, bytes }] });
+    // Each of the three has the pairs of the snapshot, so each is read as a snapshot with that digest. Only the first is its bytes.
+    const given = [snapshot.bytes, ` ${snapshot.bytes}`, canonicalize([...pairs].reverse())];
+    expect([given.map((bytes) => snapshotRead(snapshot.digest, bytes) !== null), given.map((bytes) => isAnswer(answer(bytes)))]).toEqual([[true, true, true], [true, false, false]]);
   });
 });
