@@ -99,7 +99,8 @@ test("the membership definition validates whole with the platform option; every 
 
 // The plan's steps 9 and 9c, as the authority note's revision 25 decides them (its "What revision 25 lets the I3 source do next"):
 // "Then `platform:directory@1` lacks no rule", and the register's one rule that every founding waited on is written.
-test("the register and the directory each lack no rule: every mark of their data has a rule of the kind of its place in the package's table, so a runtime with this package runs both", () => {
+// Steps 9b, 9e and 9f, on the note's revision 26 (I3 deltas, section 27): the destination lacks exactly two rules.
+test("the register and the directory each lack no rule, so a runtime with this package runs both; the destination lacks exactly two, first-head and receipt, so it is not run", () => {
   /** The marks of one definition's data that the package's table has no rule of the right kind for, by name, once each. */
   const lacks = (named: string): string[] | null => {
     const supplied = platform(named)!;
@@ -111,6 +112,9 @@ test("the register and the directory each lack no rule: every mark of their data
     return [...new Set(missing)];
   };
   expect([lacks("platform:register@1"), lacks("platform:directory@1")]).toEqual([[], []]);
+  // The two rules of the destination's outcomes that wait on two details asked of the contract (authority note, section 12.1.5,
+  // "The founding commit, and the receipt"; entry ER9). Every other mark of `platform:destination@1` has its rule.
+  expect([lacks("platform:destination@1"), lacks("platform:membership@1"), lacks("platform:rules@1"), lacks("platform:inbox@1")]).toEqual([["first-head", "receipt"], [], [], []]);
 });
 
 // Authority note, revision 25, section 12.1, "Where the rules scope and the destination record their membership reference" (I3 deltas
