@@ -109,7 +109,11 @@ platform package's, and none of them is a stand-in. Such a test shows
 the rows and the rules as judgments in memory. It shows nothing about a
 founding, about a read of membership, or about how a scope receives and
 keeps a value beside an intent
-(`notes/2026-10-05-i3-contract-deltas.md`, entry EQ9).
+(`notes/2026-10-05-i3-contract-deltas.md`, entry EQ9). That a scope reads
+a value for a place of its pinned data, and keeps it under its domain, is
+`packages/scope/test/values.test.ts`, on real storage, with derive's
+made-up platform data `gate` in place of a definition of Artroom: no data
+of the platform package states a place yet.
 
 The destination has stand-ins of its own, in
 `packages/platform/test/support-destination.ts`. `standInRules` is a rule
@@ -117,12 +121,18 @@ for each of the two marks of the destination's data that the platform
 package has no rule for, `first-head` and `receipt`
 (`notes/2026-10-05-i3-contract-deltas.md`, entries ER9 and FA6): without
 them nothing is created under `platform:destination@1`, in a test as in
-production. `Branch.read` is a stand-in reader: what `observed` and the
-entries in `uses` say for one reservation, written by hand. The rule
-`judge` and its judgment are the package's own, and in the runtime that
-rule is given no reader (entry FA9). `bureau` is a made-up directory that
-creates one destination scope. The lane's and the register's entries,
-each observation and every answer of the Git host are made by hand.
+production. `Branch.read` is what is at hand for one reservation, written
+by hand: the observations that a runtime would read before the turn of
+the outcome of `judge`, and what the lane's entries say. The judge of the
+outcome is given the observations and the entries, and writes the entry's
+`observed` and `uses` itself. The rule `judge`, its judgment and its
+reading of each observation are the package's own. Only the reader of a
+lane's entries is a stand-in: the package has none
+(`notes/2026-10-05-i3-contract-deltas.md`, entries FA9 and FC5), and no
+runtime reads an observation for an outcome (entry FC6). `bureau` is a
+made-up directory that creates one destination scope. The lane's and the
+register's entries, each observation and every answer of the Git host are
+made by hand.
 `Branch` is a destination scope in memory below such a bureau. A test
 that uses one says so. It shows the destination's rows and its 17 real
 rules as judgments in memory: what an outcome entry derives from an

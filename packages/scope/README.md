@@ -358,7 +358,7 @@ the contract's own answer.
 | Route | Answer | Status |
 |---|---|---|
 | `POST /v1/scopes`, body `{ founding, definition, definitions?, texts? }` | `Founded` | 201 accepted; 422 refused; 503 unavailable |
-| `POST /v1/scopes/:scope/acts`, body `{ signed, grants, texts?, presented? }`. `texts`: each detached text that a field of the intent names by digest. `presented`: the facts presented beside the intent, by name | `Answer` | 200 accepted; 403 refused `unauthorized`; 422 refused otherwise; 409 mismatch; 503 unavailable |
+| `POST /v1/scopes/:scope/acts`, body `{ signed, grants, texts?, presented?, values? }`. `texts`: each detached text that a field of the intent names by digest. `presented`: the facts presented beside the intent, by name. `values`: each value that a place of the act names by digest, as its canonical bytes; only an act of a platform definition whose data states a place has one, and no platform definition of this source states one yet | `Answer` | 200 accepted; 403 refused `unauthorized`; 422 refused otherwise; 409 mismatch; 503 unavailable |
 | `POST /v1/scopes/:scope/preparations`, body `{ signed, grants, capability, step }`. One step of a capability, asked for with the signed intent that it prepares for. With no code for the step, as in production, nothing is judged: 503 `unavailable` | `Answer` | as an act |
 | `POST /v1/scopes/:scope/settle`, body `{ signed }` | `Settlement` | as a read |
 | `GET /v1/scopes/:scope` | The summary | 200; 404 `not-found`; 403 `forbidden`; 409 `wrong-incarnation`, `scope-provisional`; 413 `too-large`; 501 `unsupported-definition`; 503 otherwise |
@@ -368,7 +368,7 @@ the contract's own answer.
 | `GET /v1/scopes/:scope/outbox?cursor=` | A page of the outbox | as above |
 | `GET /v1/scopes/:scope/outbox/:duty` | The outbox status of one send, by its duty ID | as above |
 | `GET /v1/scopes/:scope/log?cursor=` | A page of the history as stored: each entry's canonical bytes and hash, for a verifier | as above |
-| `GET /v1/scopes/:scope/retained/:kind/:digest` | One retained input: a `definition`, an `entry`, a `rule` input, a detached `text` or a `snapshot` of staged refs, by digest. A text that was redacted is `not-found`. A `value` is not served: it is kept by its domain and its digest, and no route names a domain (I3 deltas, entry EX6) | as above; 413 past 1 MiB |
+| `GET /v1/scopes/:scope/retained/:kind/:digest` | One retained input: a `definition`, an `entry`, a `rule` input, a detached `text` or a `snapshot` of staged refs, by digest. A text that was redacted is `not-found`. A `value` is not served: the scope keeps each value that an entry names, by its domain and its digest, and no route names a domain (I3 deltas, entries EX6 and FC7) | as above; 413 past 1 MiB |
 
 A body is at most 1 MiB of bytes, counted while it is read: a larger body
 is cancelled and is not held. A body over that, or one that is not a JSON

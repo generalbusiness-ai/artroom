@@ -78,14 +78,17 @@ export interface ValueRead { domain: string; digest: Digest; bytes: string }
  * other judge is given either, because no other input may hold the member
  * (section 4.1): a rule that reads one there is given none.
  *
- * I3 merge: what is still owed is in the scope's runtime. It reads `values`
- * beside an intent where the pinned data states a place, and keeps each. It
- * makes no further read of an observation before any turn: no form states
- * the subjects that an entry observes (the contract's point R1-67; I3
- * deltas, entries EM2 and FC6). A replay is given the retained value of
- * each place that the pinned data states, and none for a row whose rule
- * holds the domain in its own code (`replay/src/verify.ts`; entries EM1 to
- * EM4 and EX5).
+ * The scope's runtime reads `values` beside an intent where the pinned data
+ * states a place, and keeps each (`scope/src/core.ts`).
+ *
+ * I3 merge: what is still owed. The runtime makes no further read of an
+ * observation before any turn: no form states the subjects that an entry
+ * observes (the contract's point R1-67; I3 deltas, entries EM2 and FC6). So
+ * in a deployed scope a rule that reads one is given none, and where its
+ * specification says so its guard is not completed. A replay is given the
+ * retained value of each place that the pinned data states, and none for a
+ * row whose rule holds the domain in its own code (`replay/src/verify.ts`;
+ * entries EM1 to EM4 and EX5).
  */
 export interface AtHand {
   readonly observed: readonly ObservationUse[];

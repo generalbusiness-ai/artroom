@@ -448,6 +448,10 @@ export class Operations {
     const end = await this.#scope.turns.run<OutcomeRecorded>({
       asks: () => [],
       judge: (view, clock) => {
+        // I3 merge: derive's judge of an outcome takes `observed` and `facts`, gives both to a rule of the outcome, and writes what was
+        // read (`settleOutcome`). This driver gives neither. No form of platform data states the subjects that an outcome observes, or
+        // the foreign entries that it fetches, so nothing here could say what to read before this turn (the contract's point R1-67;
+        // I3 deltas, entry FC6). A rule that needs one then has a fault, and its outcome stays offered: the destination's `judge`.
         const judged = settleOutcome(view, definition, input, { clock, bounds, owners: this.#owners, platform: this.#scope.pinned()?.platform ?? undefined, own: ownOf(this.#store) });
         switch (judged.result) {
           case "write":
