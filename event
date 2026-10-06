@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:14d6fa8bc21eccb013ca62a221677a08f3c40f66","text":"Merge retired a covered predecessor; the successor is at scripts/active-source.test.mjs."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:156eb2e0f76fc7c9eec7903a9a69870a79dcb41e","text":"Merge retired a covered predecessor; the successor is at packages/contract/src/observation.ts."}
