@@ -215,7 +215,7 @@ export function reserving(d: Defining, top: Rec, capacity: Pick<Capacity, "deadl
     const clauses = send ? clausesOf(send, at(path, "send")) : [];
     if (send) sends.set(kind, { once: send["once"] === true, clauses });
     const attempts = "attempts" in m ? int(m["attempts"], at(path, "attempts"), 1) : null;
-    if (attempts !== null) stated.set(kind, { attempts, most, send: send ? { once: send["once"] === true, clauses: clauses.map((clause) => clause.starts) } : null, retains: retainedBytes(m["observes"]) + evidenceBytes(d, outcomeValues[kind], path) });
+    if (attempts !== null) stated.set(kind, { attempts, most, send: send ? { once: send["once"] === true, clauses: clauses.map((clause) => clause.starts) } : null, retains: retainedBytes(m["observes"]) + evidenceBytes(d, own(outcomeValues, kind), path) });
     else if ("most" in m) bad("shape", at(path, "most"), "a kind that states what its outcomes may start states its attempts");
     else if (held.has(kind)) bad("holds", path, "a kind that an item holds states its attempts");
   }
@@ -295,8 +295,10 @@ export function reserving(d: Defining, top: Rec, capacity: Pick<Capacity, "deadl
   const byClause = everyClause.map(marksOfClause);
   if (!req || byClause.includes(null)) { bad("reserve-unbounded", "", "a clause of a result holds a mark that lists a kind whose closure is not finite"); return undefined; }
 
-  const kinds: Record<string, KindReserved> = {};
-  const ones: Record<string, Amount> = {};
+  // Every nonempty own name is permitted, including __proto__. Neither
+  // table has an inherited setter that can turn a kind into a prototype.
+  const kinds: Record<string, KindReserved> = Object.create(null);
+  const ones: Record<string, Amount> = Object.create(null);
   for (const kind of Object.keys(kindsWritten)) {
     const of = stated.get(kind);
     const isHeld = held.has(kind);
