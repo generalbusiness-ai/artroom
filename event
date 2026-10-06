@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:0562a53baf123a27709b5346a4b744a61fb90d66"}
+{"kind":"assert","text":"Accepted the earlier scoped open-file diagnostic0562. User said this shell's limit was raised; fresh shell reports8192. Builder changed no persistent settings. Currentnativecommands and finalgate ran successfully, but this does not establish the cause of any prior process's descriptor failure or claim universal repair.","body":{"no_git_artifact":"true","shell_soft_limit":"8192"}}
