@@ -1,0 +1,5 @@
+gs publish session14085 exited1 after durable-log verification.
+remote origin / refs/heads/main / prior head90340e61933e2fb1bc2449bc49b12915130d4712 / sealed basis031ace29d84048d4983cda2381e4cffae14a8130.
+gs: read tracked .gitseq at published head 90340e61933e2fb1bc2449bc49b12915130d4712: git show 90340e61933e2fb1bc2449bc49b12915130d4712:.gitseq: exit status 128: fatal: path '.gitseq' does not exist in '90340e61933e2fb1bc2449bc49b12915130d4712'
+No helper publication or marker/source change. Approved exact68 ordinary fast-forward push then exited0.
+git ls-remote --heads origin refs/heads/main returned68ffd6371e908880b38c2c2c62d5fca9cbdeb57e at2026-10-06T19:54:02Z; localHEAD andorigin/main same68; cleancheckout.
