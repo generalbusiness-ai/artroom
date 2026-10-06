@@ -36,6 +36,7 @@ import type { DeclaredDefinition, Digest, MemberObservation, PlatformData, Platf
 import { isDigest, isMemberRef } from "@generalbusiness/artroom-bytes";
 import { byteOrder, validateDefinition } from "@generalbusiness/artroom-derive";
 import type { Item, RecordedRef, Rules, StateView } from "@generalbusiness/artroom-derive";
+import { isExtents } from "./extents.ts";
 
 /** The name and version that this data and these rules are. */
 export const RULES_SCOPE = "platform:rules@1" satisfies PlatformDefinition;
@@ -74,6 +75,13 @@ const CHECKS = {
   },
 } as const;
 const APPROVALS = { type: "int", min: 0, max: 64 } as const;
+/**
+ * The type of a list of extents: a mark at place 3 (section 12.1.4, "The
+ * rows of the rules scope, changed in revision 25"; row w of the table of
+ * further marks, P28). An extent is a record that holds two lists, and its
+ * name has a stated set of characters. No written type says either.
+ */
+const EXTENT_LIST = { code: "extent-list", row: "P28", type: "code" } as const;
 const RULES = { rules: { item: "rules", one: true } } as const;
 
 export const rulesScope: PlatformData = {
@@ -97,6 +105,9 @@ export const rulesScope: PlatformData = {
         ownerMayReview: { fixed: false, required: true, of: { type: "bool" }, default: false },
         checks: { fixed: false, required: false, of: CHECKS },
         labels: { fixed: false, required: false, of: LABELS },
+        // From revision 25: the extents that the last `publish` stated, whole. Unset until the first `publish`, and a slot whose
+        // type is a mark takes no default: `extentsOf`, below, gives the first definition meanwhile.
+        extents: { fixed: false, required: false, of: EXTENT_LIST },
       },
     },
     // The second row. A lane is created only under a digest that an item of this type holds as `active` (section 12.1.2).
@@ -143,8 +154,9 @@ export const rulesScope: PlatformData = {
       sends: [],
       attention: [],
     },
-    // `publish`: an act. Grant `rules.publish`. It sets the four rule values from the fields. The revision of the rules is this
-    // entry's position. No update is sent to any lane (G11): a lane asks, by `rules-wanted`.
+    // `publish`: an act. Grant `rules.publish`. It sets the rule values from the fields, each of which but the declaration is
+    // required: every `publish` states the rules whole. The revision of the rules is this entry's position. No update is sent to
+    // any lane (G11): a lane asks, by `rules-wanted`.
     publish: {
       step: "transition", on: "rules", grant: "rules.publish",
       also: {},
@@ -153,6 +165,7 @@ export const rulesScope: PlatformData = {
         ownerMayReview: { type: "bool", required: true },
         checks: { ...CHECKS, required: true },
         labels: { ...LABELS, required: true },
+        extents: { ...EXTENT_LIST, required: true },
       },
       guards: [
         // Each check's `configuration` is kept.
@@ -168,6 +181,8 @@ export const rulesScope: PlatformData = {
         { value: { slot: "ownerMayReview", from: { field: "ownerMayReview" } } },
         { value: { slot: "checks", from: { field: "checks" } } },
         { value: { slot: "labels", from: { field: "labels" } } },
+        // A written effect: a value of a marked type is assignable to a slot of the same mark (the contract's section 6.1).
+        { value: { slot: "extents", from: { field: "extents" } } },
       ],
       sends: [],
       attention: [],
@@ -318,6 +333,13 @@ const creates = (declared: DeclaredDefinition): Digest[] => {
  * list. None reads the clock.
  */
 export const rulesScopeRules: Rules = {
+  /**
+   * Row w, the type of the field `extents` of `publish` and of the slot
+   * `rules.extents` (P28). The value is of the type when it is a list of 1
+   * to 8 extents, each inside its bounds (`isExtents`). Otherwise the act
+   * is `bad-field` (case i of section 12.1.4). It reads the value alone.
+   */
+  "extent-list": { place: "type", run: (_given, value) => isExtents(value) },
   /**
    * Row 27, among the guards of `publish` (P19). It reads `observed`: one
    * `MemberObservation` for each check's `checker`, of the membership scope

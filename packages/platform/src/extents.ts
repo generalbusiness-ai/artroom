@@ -23,6 +23,7 @@
  */
 
 import type { MemberId } from "@generalbusiness/artroom-contract";
+import { utf8 } from "@generalbusiness/artroom-bytes";
 import { byteOrder } from "@generalbusiness/artroom-derive";
 
 /** What a change to an extent does when it is published. The order is from the lowest to the highest ("How a change is judged", step 5). */
@@ -39,7 +40,7 @@ export interface Extent {
   class: ExtentClass;
 }
 
-/** The most extents of one rules content ("How a repository changes its extents"). */
+/** The most extents of one rules content ("How a repository changes its extents"; section 12.1.4, the rule `extent-list`). */
 export const EXTENTS_MOST = 8;
 /** The name of the extent that the note's rules for a change to the rules are about. */
 export const RULES_EXTENT = "rules";
@@ -73,6 +74,54 @@ export const firstExtents = (rules: { approvals: number; checks: readonly { name
  */
 export const holdsRulesExtent = (extents: readonly Extent[]): boolean =>
   extents.some((extent) => extent.name === RULES_EXTENT && RULES_PATTERNS.every((pattern) => extent.patterns.includes(pattern)) && extent.approvals >= 1 && extent.approver === CONTROLLER && extent.class === "authority");
+
+// ---------------------------------------------------------------- the bounds of a list of extents
+
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
+/** A text of 1 to `most` bytes, each of which `allowed` takes. */
+const textOf = (value: unknown, most: number, allowed: (byte: number) => boolean = () => true): value is string => {
+  if (typeof value !== "string") return false;
+  const bytes = utf8(value);
+  return bytes.length >= 1 && bytes.length <= most && bytes.every(allowed);
+};
+/** A list of at most `most` values, each of which `each` takes. */
+const listOf = <T>(value: unknown, most: number, each: (element: unknown) => element is T): value is T[] => Array.isArray(value) && value.length <= most && value.every(each);
+const distinct = (values: readonly string[]): boolean => new Set(values).size === values.length;
+/** A lowercase ASCII letter, a digit or a hyphen: the bytes of an extent's name, which a publication's `reason` then holds with no escape. */
+const nameByte = (byte: number): boolean => (byte >= 0x61 && byte <= 0x7a) || (byte >= 0x30 && byte <= 0x39) || byte === 0x2d;
+/** A pattern: no byte below 0x20 and none that is 0x7F; it does not begin or end with `/` and holds no `//`, so no name of it is empty. */
+const isPattern = (value: unknown): value is string =>
+  textOf(value, 256, (byte) => byte >= 0x20 && byte !== 0x7f) && !value.startsWith("/") && !value.endsWith("/") && !value.includes("//");
+const MEMBERS = ["name", "patterns", "approvals", "approver", "checks", "class"] as const;
+
+/**
+ * Whether a value is a list of extents, inside the bounds of section
+ * 12.1.4, "An extent, with its bounds": what the rule `extent-list` asks of
+ * the field `extents` of `publish` and of the slot. A list of 1 to 8
+ * records, each with exactly the six members, and no name twice.
+ *
+ * | Member | Bound |
+ * |---|---|
+ * | `name` | A text of 1 to 64 bytes: lowercase ASCII letters, digits and hyphens |
+ * | `patterns` | 0 to 32 texts of 1 to 256 bytes, each a pattern as above |
+ * | `approvals` | An integer from 0 to 64 |
+ * | `approver` | A text of 1 to 64 bytes: lowercase ASCII letters, digits, hyphens and full stops. It is not compared with the role table: no member holds an unknown action, so such an extent is never met |
+ * | `checks` | 0 to 32 texts of 1 to 128 bytes, with no name twice |
+ * | `class` | `content`, `deployment` or `authority` |
+ *
+ * The numbers are examples that the proof plan owns, as the note has them.
+ */
+export const isExtents = (value: unknown): value is Extent[] =>
+  Array.isArray(value) && value.length >= 1 && value.length <= EXTENTS_MOST
+  && value.every((extent: unknown) =>
+    isRecord(extent) && Object.keys(extent).length === MEMBERS.length && MEMBERS.every((member) => Object.hasOwn(extent, member))
+    && textOf(extent["name"], 64, nameByte)
+    && listOf(extent["patterns"], 32, isPattern)
+    && typeof extent["approvals"] === "number" && Number.isSafeInteger(extent["approvals"]) && extent["approvals"] >= 0 && extent["approvals"] <= 64
+    && textOf(extent["approver"], 64, (byte) => nameByte(byte) || byte === 0x2e)
+    && listOf(extent["checks"], 32, (check): check is string => textOf(check, 128)) && distinct(extent["checks"])
+    && (EXTENT_CLASSES as readonly unknown[]).includes(extent["class"]))
+  && distinct(value.map((extent: Extent) => extent.name));
 
 // ---------------------------------------------------------------- a pattern
 

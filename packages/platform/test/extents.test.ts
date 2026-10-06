@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import type { MemberId } from "@generalbusiness/artroom-contract";
-import { RULES_PATTERNS, actionsIn, classify as touchedBy, firstExtents, holdsRulesExtent, judgeExtents, matches } from "../src/index.ts";
+import { RULES_PATTERNS, actionsIn, classify as touchedBy, firstExtents, holdsRulesExtent, isExtents, judgeExtents, matches } from "../src/index.ts";
 import type { Extent, ExtentsAsked, Holder, Review, Role, TreeLink } from "../src/index.ts";
 
 // Judgments over data that each test writes by hand (authority note, revision 26, section 12.1.4a; the planner's request `42de9e34`).
@@ -237,4 +237,31 @@ test("without the controllers of the authoring agents no agent's change gets the
   expect([said({ touched: bare as never, reviews: each(ada) }).slice(0, 2), said({ touched: classify(FIRST, ["src/app.ts"], []), reviews: each(ada) }).slice(0, 2)]).toEqual([[false, ["rules"]], [true, []]]);
   // A changed set that is given and is empty says that the change touches no path: nothing is asked.
   expect([classify(FIRST, [], []).class, said({ touched: classify(FIRST, [], []) }).slice(0, 2)]).toEqual([null, [true, []]]);
+});
+
+// Section 12.1.4, "An extent, with its bounds": what the rule `extent-list` of `platform:rules@1` asks of a value. The rule at
+// `publish` is witnessed in `rules-scope.test.ts`.
+test("a list of extents is 1 to 8 records of exactly six members, inside the bounds of each: a name of lowercase letters, digits and hyphens, a pattern with no empty name and no control byte, and bounds that count bytes", () => {
+  const [rules, infrastructure, source] = FIRST as [Extent, Extent, Extent];
+  const withSource = (over: Record<string, unknown>) => isExtents([rules, infrastructure, { ...source, ...over }]);
+  const { class: _, ...five } = source;
+  expect([isExtents(FIRST), isExtents([source]), withSource({ name: "a-1" }), withSource({ approver: "rules.publish-2" }), withSource({ patterns: ["a b/**/*.TS"] }), withSource({ approvals: 0 })]).toEqual(Array(6).fill(true));
+  expect([
+    // The list: none, nine, no list, a record that is no extent, a member too many or too few, and a name twice.
+    isExtents([]), isExtents(Array.from({ length: 9 }, (_, n) => ({ ...source, name: `e${n}` }))), isExtents({ 0: source }), isExtents([rules, null]), withSource({ owner: "@ada" }), isExtents([five]), withSource({ name: "rules" }),
+    // A name: an uppercase letter, a full stop, a separator of the `reason` text, and none.
+    withSource({ name: "Source" }), withSource({ name: "a.b" }), withSource({ name: "a,b" }), withSource({ name: "" }),
+    // A pattern: an empty name at either end or within, a control byte, the byte 0x7F, and no text.
+    withSource({ patterns: ["/a"] }), withSource({ patterns: ["a/"] }), withSource({ patterns: ["a//b"] }), withSource({ patterns: ["a\tb"] }), withSource({ patterns: ["a\u007fb"] }), withSource({ patterns: [""] }), withSource({ patterns: "**" }),
+    // The other members.
+    withSource({ approvals: 65 }), withSource({ approvals: 1.5 }), withSource({ approvals: -1 }), withSource({ approver: "Change.review" }), withSource({ approver: "" }),
+    withSource({ checks: ["unit", "unit"] }), withSource({ checks: [""] }), withSource({ class: "secret" }),
+  ].filter((ok) => ok)).toEqual([]);
+  // Each bound is in bytes, at its edge: a name of 64, a pattern of 256 in two-byte letters, a check of 128, and the lists of 32.
+  const many = (n: number) => Array.from({ length: n }, (_, i) => `p${i}`);
+  expect([
+    [withSource({ name: "n".repeat(64) }), withSource({ name: "n".repeat(65) })], [withSource({ patterns: ["é".repeat(128)] }), withSource({ patterns: ["é".repeat(129)] })],
+    [withSource({ checks: ["c".repeat(128)] }), withSource({ checks: ["c".repeat(129)] })], [withSource({ patterns: many(32) }), withSource({ patterns: many(33) })], [withSource({ checks: many(32) }), withSource({ checks: many(33) })],
+    [withSource({ approver: "a".repeat(64) }), withSource({ approver: "a".repeat(65) })],
+  ]).toEqual(Array(6).fill([true, false]));
 });
