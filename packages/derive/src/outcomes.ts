@@ -57,7 +57,7 @@ export function ownersOf(definition: ValidDefinition, platform: PlatformRules | 
       if (!mark || !rule) return null;
       const r = rule.rules;
       /** What a rule of this outcome entry is given: no field, no subject and no signer. */
-      const judging = (view: StateView, outcome: OutcomeInput): Judging => {
+      const judging = (view: StateView, outcome: OutcomeInput, resolved?: { selected: boolean | null; further: boolean }): Judging => {
         const scope = view.scope();
         if (!reading || !scope) throw new RuleFault(`the rule ${mark.code} is asked for an outcome that no judge is deriving`);
         if (rule.clock === true) reading.ran.clock = true;
@@ -67,6 +67,9 @@ export function ownersOf(definition: ValidDefinition, platform: PlatformRules | 
           // Item 2 and item 4 of what a rule is given: `observed`, and each entry in `uses`. Every rule of the one entry reads through
           // the one `beside`, so the entry retains each observation that any of them read, once.
           beside: reading.beside,
+          // Revision 20, "What the judge resolved, for an outcome": the rule of the effects and the rule of the `send` are given
+          // what the ledger derived, and derive neither again.
+          ...(resolved ? { outcome: resolved } : {}),
         };
       };
       const answer = (given: unknown): boolean => {
@@ -84,7 +87,7 @@ export function ownersOf(definition: ValidDefinition, platform: PlatformRules | 
         // The driver asks this outside a commit, so no judge is deriving: the rule reads the state and the scope's own entries only.
         ...(r.unknown ? { unknown: (view: StateView, operation: Operation, attempt: number, own) => run(mark, () => r.unknown!(view, operation, attempt, own)) } : {}),
         // The send of the mark is derived with the entry, whether the rule of the kind derives anything beside it or not.
-        ...(r.derives || mark.send ? { derives: (view: StateView, operation: Operation, outcome: OutcomeInput, selected: boolean | null) => given(mark, judging(view, outcome), kinds, r.derives ? run(mark, () => r.derives!(givenTo(judging(view, outcome)), operation, selected)) : { effects: [], sends: [], opens: [] }) } : {}),
+        ...(r.derives || mark.send ? { derives: (view: StateView, operation: Operation, outcome: OutcomeInput, selected: boolean | null, at) => { const j = judging(view, outcome, { selected, further: at.opens !== null }); return given(mark, j, kinds, r.derives ? run(mark, () => r.derives!(givenTo(j), operation, selected)) : { effects: [], sends: [], opens: [] }); } } : {}),
       };
     },
     ...(owners?.reserves ? { reserves: (view: StateView, pinned: ValidDefinition) => owners.reserves!(view, pinned) } : {}),
