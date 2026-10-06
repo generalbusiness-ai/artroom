@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:b5d09e958256583c631d92ab6778542e855e45f0","text":"Merge retired a covered predecessor; the successor is at packages/platform/tsconfig.test.json."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:b6e942353e4ef63c667cac1c1c3b4dac263440fb","text":"Merge retired a covered predecessor; the successor is at packages/derive/src/capability/ancestry.ts."}
