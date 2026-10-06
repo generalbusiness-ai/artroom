@@ -32,12 +32,12 @@
  * the same key, which records the reuse and the entry before it.
  */
 
-import type { Digest, Entry, Input, KeyId, Observation, ObservationRequest, ObservationUse, RunId, ScopeRef } from "@generalbusiness/artroom-contract";
-import { hex } from "@generalbusiness/artroom-bytes";
-import { WINDOWS, fixedBy, highestHead, judgeGrant, membershipOf, observationOf, observedOf, prefer, revoked, same, type Clock as Reading, type GrantJudgment, type RecordedRef, type Retains, type StateView } from "@generalbusiness/artroom-derive";
+import type { Digest, Entry, Input, KeyId, Observation, ObservationRequest, ObservationUse, ObservedScope, PlatformDefinition, RunId, ScopeRef } from "@generalbusiness/artroom-contract";
+import { canonicalize, hex, isObservationUse, isRecord, parseStrict } from "@generalbusiness/artroom-bytes";
+import { WINDOWS, contentChecked, contentStates, fixedBy, highestHead, judgeGrant, membershipOf, namedBy, observationOf, observedName, observedOf, prefer, revoked, same, subjectName, valueDigest, type Clock as Reading, type ContentStates, type GrantJudgment, type Needed, type RecordedRef, type Retains, type StateView, type ValueRead } from "@generalbusiness/artroom-derive";
 import { isPlatformDefinition } from "@generalbusiness/artroom-bytes";
 import { platform, standingOf } from "@generalbusiness/artroom-platform";
-import type { Asked, Authority, Clock, Random, Standing } from "./ports.ts";
+import type { Asked, Authority, Clock, Further, Random, Standing } from "./ports.ts";
 
 /**
  * One read of a membership scope: the standing of one key, answered from
@@ -67,7 +67,37 @@ export interface Observing {
   membership(scope: ScopeRef): RecordedRef | null;
   /** How the membership scope is read. */
   reader: Membership;
+  /**
+   * The rules scope that this scope records, for an observation of the
+   * rules (the contract's section 16.1, guard 1): where its version says
+   * (`Platform.rulesScope`). Null, or absent: it records none, and nothing
+   * is read for a row of the rules.
+   */
+  rules?(scope: ScopeRef): RecordedRef | null;
+  /**
+   * What the data of a rules definition states of the two members that an
+   * observation of the rules holds only under such a definition (derive's
+   * `contentStates`). Null, or absent: this runtime has no data of that
+   * version, and its answer is then no observation.
+   */
+  content?(named: PlatformDefinition): ContentStates | null;
 }
+
+/**
+ * What the observed scope answers to one read, with the bytes of each value
+ * that its answer names beside it (the contract's section 16.1, "A value
+ * that a row may retain", "At the read"). The contract states no form for
+ * what crosses between the two scopes: this is the form of this port (I3
+ * deltas, entry GA6). A reader that gives the bare record gives no value.
+ */
+export interface Answered { answer: unknown; values: readonly { domain: string; bytes: string }[] }
+const answeredOf = (got: unknown): Answered => {
+  const beside = isRecord(got) && Object.keys(got).length === 2 && "answer" in got && Array.isArray(got["values"]) ? (got["values"] as unknown[]) : null;
+  return beside === null ? { answer: got, values: [] } : { answer: (got as { answer: unknown }).answer, values: beside.filter((value): value is { domain: string; bytes: string } => isRecord(value) && typeof value["domain"] === "string" && typeof value["bytes"] === "string") };
+};
+
+/** One further read of this run that was answered: the observation, its number, the latest entry that retains it, and the values that it names. */
+interface Seen { observation: ObservationUse["observation"]; n: number; last: Retains | null; values: readonly ValueRead[] }
 
 /** One read of this run that was answered: the observation, the read's number, and the latest entry of this scope that retains it. */
 interface Read { observation: Observation; n: number; last: Retains | null }
@@ -77,8 +107,8 @@ interface Read { observation: Observation; n: number; last: Retains | null }
  */
 export function observing(config: Observing): Authority {
   const run: RunId = hex(config.random.bytes(16));
-  // I3 merge: `n` counts the reads of membership and of the rules scope with one counter (section 16.1). A read of the rules scope, and
-  // of a member or another key for the member `observed`, is the platform definitions' (plan steps 23 and 26), and takes its number here.
+  // `n` counts the reads of membership and of the rules scope with one counter (section 16.1): the read of a signer's key, below,
+  // and each further read for a row of `observes` (`further`).
   let count = 0;
   /** At most one observation of each key, for reuse; or the revoked answer of that key, for the run. */
   const kept = new Map<KeyId, Read>();
@@ -86,9 +116,104 @@ export function observing(config: Observing): Authority {
   const retained = new Map<KeyId, number>();
 
   /** How an entry written now would retain that read: `fresh`, or `reused` with the latest entry that retains it. */
-  const useOf = (read: Read): ObservationUse => ({ observation: read.observation, read: { run, n: read.n }, use: read.last ? "reused" : "fresh", prior: read.last ? read.last.entry : null });
+  const useOf = (read: Read | Seen): ObservationUse => ({ observation: read.observation, read: { run, n: read.n }, use: read.last ? "reused" : "fresh", prior: read.last ? read.last.entry : null });
+  /**
+   * The further observations that are kept for reuse, by the name of the subject of each: one for each, the one that was read last.
+   * An observation that was read for a row which states `once` serves the one input that it was read for, and is not kept here.
+   */
+  const reusable = new Map<string, Seen>();
+
+  /**
+   * One read of one subject (section 16.1, "The order before the turn", part 4). Null: no answer. That is so when the reader fails or
+   * gives nothing; when what it gives is not the whole record of that subject, of the scope that this scope records, with exactly
+   * its members; and for the rules, when the record is not the one that the data of its definition states, or it names a value
+   * whose bytes are missing, are over the `max` of the row, do not hash to the digest, or are in a domain that the row does not
+   * state. The scope then keeps no byte of it.
+   */
+  const one = async (scope: ScopeRef, needed: Needed, n: number, seconds: number): Promise<Seen | null> => {
+    const { subject } = needed;
+    const of = "asked" in subject ? (config.rules?.(scope) ?? null) : config.membership(scope);
+    if (!of) return null;
+    const began = config.clock.read();
+    const to: ObservedScope = of.inc === null ? { scope: of.scope, kind: of.kind } : (of as ScopeRef);
+    let got: unknown = null;
+    try {
+      got = await config.reader.observe("holders" in subject ? { of: to, holders: subject.holders, most: subject.most } : { of: to, ...subject }, seconds);
+    } catch {
+      got = null;
+    }
+    const { answer, values: beside } = answeredOf(got);
+    if (!isRecord(answer)) return null;
+    const observation = { ...answer, at: began } as ObservationUse["observation"];
+    if (!isObservationUse({ observation, read: { run, n }, use: "fresh", prior: null }) || !observedOf(observation.of, of) || observedName(observation) !== subjectName(subject)) return null;
+    if ("subject" in observation && observation.subject === "rules" && !contentChecked(observation, config.content?.(observation.definition))) return null;
+    // A value that the answer names: each in a domain that the row states, within that `max`, and by the digest that the record holds.
+    const named = namedBy(observation);
+    const kept: ValueRead[] = [];
+    for (const { domain, bytes } of beside) {
+      const stated = needed.retains.find((record) => record.domain === domain);
+      if (!stated || new TextEncoder().encode(bytes).length > stated.max) return null;
+      let digest: Digest | null = null;
+      try {
+        const value = parseStrict(bytes);
+        digest = canonicalize(value) === bytes ? valueDigest(domain, value) : null;
+      } catch {
+        digest = null;
+      }
+      if (digest === null || !named.includes(digest)) return null;
+      kept.push({ domain, digest, bytes });
+    }
+    if (named.some((digest) => !kept.some((value) => value.digest === digest))) return null;
+    return { observation, n, last: null, values: kept };
+  };
+
+  /** The further observations of one input: what it read, and what is kept for reuse (`Further`, in `ports.ts`). */
+  const further = (scope: ScopeRef): Further => {
+    /** What was read for this input, by the name of its subject; and the subjects that were read for it and gave no answer. */
+    const mine = new Map<string, Seen>();
+    const failed = new Set<string>();
+    let closed = false;
+    const hand = (): Seen[] => [...mine.values(), ...[...reusable.entries()].flatMap(([name, seen]) => (mine.has(name) ? [] : [seen]))];
+    return {
+      async read(needed, seconds) {
+        for (const want of needed) {
+          const name = subjectName(want.subject);
+          // Each read takes the next number of the run, with one counter for membership and for the rules scope, also one that
+          // gets no answer.
+          const n = ++count;
+          const seen = await one(scope, want, n, seconds);
+          if (!seen) { failed.add(name); mine.delete(name); continue; }
+          failed.delete(name);
+          mine.set(name, seen);
+          if (!want.window.once) reusable.set(name, seen);
+        }
+      },
+      observed: () => hand().map(useOf),
+      values: () => hand().flatMap((seen) => seen.values.map((value) => value.bytes)),
+      observing: () => ({
+        membership: config.membership(scope), rules: config.rules?.(scope) ?? null,
+        last: (use) => (use.read.run === run ? (hand().find((seen) => seen.n === use.read.n)?.last ?? null) : null),
+        unread: (subject) => closed || failed.has(subjectName(subject)),
+        ...(config.content ? { content: config.content } : {}),
+      }),
+      close() { closed = true; },
+      sealed({ entry, hash }) {
+        const input = entry.input;
+        const retained = input.type === "act" || input.type === "outcome" || (input.type === "delivery" && "clause" in input) ? (input.observed ?? []) : [];
+        for (const use of retained) {
+          const seen = use.read.run === run ? hand().find((held) => held.n === use.read.n) : undefined;
+          if (!seen) continue;
+          // The last use of the read is this entry. A later entry retains it only as `reused`, on a reading later than this entry's time.
+          seen.last = { entry: { seq: entry.seq, hash }, time: entry.time, observation: seen.observation as Observation };
+          // An observation that was read for one commit has served it.
+          if (reusable.get(observedName(seen.observation)) !== seen) mine.delete(observedName(seen.observation));
+        }
+      },
+    };
+  };
 
   return {
+    further,
     async read(asked: Asked, seconds: number): Promise<Standing | null> {
       const { window, action, scope } = asked;
       // No act of that kind, or no window stated for it: no commit could judge on a read, so none is made.
@@ -246,6 +371,16 @@ export function recordedMembership(config: Pick<Repository, "genesis" | "state">
   return membershipOf(genesis, scope);
 }
 
+/** The rules scope that a scope records, from its folded state, where its platform version says where (`Platform.rulesScope`). Null: it records none. */
+export function recordedRules(config: Pick<Repository, "genesis" | "state">): RecordedRef | null {
+  const named = config.genesis()?.seed.definition;
+  const coded = isPlatformDefinition(named) ? platform(named)?.rulesScope : undefined;
+  return coded && config.state ? coded(config.state) : null;
+}
+
+/** The further observations of a scope that reads none: nothing is at hand, and no subject can be had. */
+const NOTHING_READ: Further = { read: () => Promise.resolve(), observed: () => [], values: () => [], observing: () => ({}), close: () => undefined, sealed: () => undefined };
+
 /**
  * The same reference, when the scope records it with its incarnation. A
  * read session is accepted only when it names that scope and incarnation
@@ -290,6 +425,17 @@ export const fixedMembership = (config: Pick<Repository, "genesis" | "state">, s
  */
 export function repositoryAuthority(config: Repository): Authority {
   const own = ownStanding(config.random);
-  const observed = observing({ clock: config.clock, random: config.random, reader: config.reader, membership: (scope) => recordedMembership(config, scope) });
-  return { read: (asked, seconds) => (asked.scope.kind === "membership" ? own : observed).read(asked, seconds) };
+  const observed = observing({
+    clock: config.clock, random: config.random, reader: config.reader, membership: (scope) => recordedMembership(config, scope),
+    // Where a version's scopes record their rules reference is code of the version, as for the membership reference. The read goes
+    // by the scope ID, through the same namespace. No rules scope answers one yet (I3 deltas, entries FB10 and GA7): the answer is
+    // then none, and each row of the rules is absent.
+    rules: () => recordedRules(config),
+    content: (named) => { const data = platform(named)?.data; return data ? contentStates(data) : null; },
+  });
+  return {
+    read: (asked, seconds) => (asked.scope.kind === "membership" ? own : observed).read(asked, seconds),
+    // A membership scope reads no other scope: an act of it is judged on its own head, and no row of it is read here.
+    further: (scope) => (scope.kind === "membership" ? NOTHING_READ : observed.further!(scope)),
+  };
 }

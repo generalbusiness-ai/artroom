@@ -10,8 +10,8 @@
  */
 
 import { CAPABILITIES, PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { Bounds, Capability, CapabilityName, Digest, Entry, ObservationRequest, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
-import type { Capabilities, Delivered, Owners, Recorded, StateView, Steps, ValidDefinition, Window } from "@generalbusiness/artroom-derive";
+import type { Bounds, Capability, CapabilityName, Digest, Entry, ObservationRequest, PlatformDefinition, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
+import type { Capabilities, ContentStates, Delivered, Owners, Recorded, StateView, Steps, ValidDefinition, Window } from "@generalbusiness/artroom-derive";
 import { observing } from "./authority.ts";
 import type { EffectAnswer, EffectRequest, Outside } from "./operations.ts";
 import type { Authority, Clock, Definitions, Ports, Readers, Resolver, Rules, Transport } from "./ports.ts";
@@ -42,6 +42,20 @@ export function testAuthority(answers: () => boolean = () => true): Authority {
  * read, guards and windows, and nothing about membership.
  */
 export interface MembershipScript { at: ScopeRef; answers(asked: ObservationRequest): unknown }
+
+/**
+ * A scripted rules scope: a STAND-IN for the rules scope that a scope
+ * observes, and for where the scope's version records it. `at` is the
+ * reference that the scope is said to record. `answers` is what that scope
+ * is said to answer: the record, or the record with the bytes of each value
+ * that it names beside it (`Answered`, in `authority.ts`). Nothing judged
+ * it, and no history stands behind its head: no rules scope answers an
+ * observation yet (I3 deltas, entries FB10 and GA7). `states`: what the
+ * data of the definition that the answers name is said to state of the two
+ * members of a rules content. A test that uses it shows the observing
+ * scope's side of a read of the rules, and nothing about a rules scope.
+ */
+export interface RulesScript { at: ScopeRef; definition: PlatformDefinition; states: ContentStates; answers(asked: ObservationRequest): unknown }
 
 /** A test reader port: every reader may read everything. */
 export const testReaders: Readers = { allows: () => true };
@@ -198,6 +212,8 @@ export interface Controls {
    * presented beside an intent are not read. Null: the test authority.
    */
   membership: MembershipScript | null;
+  /** The scripted rules scope, a stand-in. Null: the scope records no rules reference, and nothing is read for a row of the rules. */
+  rulebook: RulesScript | null;
 }
 
 const all = new Map<string, Controls>();
@@ -205,7 +221,7 @@ const all = new Map<string, Controls>();
 /** The controls of the scope with that name, made on first use with a clock at `start`. They outlive a restart of the object. */
 export function controls(name: string, start: Timestamp = "2099-01-01T00:00:00Z"): Controls {
   let made = all.get(name);
-  if (!made) all.set(name, (made = { clock: new ScriptedClock(start), gate: new Gate(), foreign: new Map(), bounds: PROPOSED_BOUNDS, reads: READ_BOUNDS, capability: null, authority: true, platformCode: true, membership: null }));
+  if (!made) all.set(name, (made = { clock: new ScriptedClock(start), gate: new Gate(), foreign: new Map(), bounds: PROPOSED_BOUNDS, reads: READ_BOUNDS, capability: null, authority: true, platformCode: true, membership: null, rulebook: null }));
   return made;
 }
 
@@ -226,9 +242,15 @@ export function testPorts(c: Controls): Partial<Ports> {
   const resolver: Resolver = { read: (fact) => Promise.resolve(c.foreign.get(fact.hash) ?? null) };
   const gated: Rules = { evaluate: async (asked) => { await c.gate.pass(); return rules.evaluate(asked); } };
   // One run for the life of these ports, which is the life of the object: a restart makes new ports, and so a new run that holds nothing.
-  const observed = observing({ clock: c.clock, random, membership: () => c.membership?.at ?? null, reader: { observe: (asked) => Promise.resolve(c.membership?.answers(asked) ?? null) } });
+  // The further observations of a row of `observes` are read by the same real read, over the two scripted scopes: each read is
+  // asked of the one whose kind the request names.
+  const observed = observing({
+    clock: c.clock, random, membership: () => c.membership?.at ?? null, rules: () => c.rulebook?.at ?? null,
+    content: (named) => (c.rulebook && named === c.rulebook.definition ? c.rulebook.states : null),
+    reader: { observe: (asked) => Promise.resolve((asked.of.kind === "rules" ? c.rulebook : c.membership)?.answers(asked) ?? null) },
+  });
   const standIn = testAuthority(() => c.authority);
-  const authority: Authority = { read: (asked, seconds) => (c.membership ? observed : standIn).read(asked, seconds) };
+  const authority: Authority = { read: (asked, seconds) => (c.membership ? observed : standIn).read(asked, seconds), further: (scope) => observed.further!(scope) };
   // The scripted capability owns no operation. A test that needs owners' rules supplies its own stand-in for them.
   return { clock: c.clock, authority, readers: testReaders, resolver, rules: gated, definitions, capabilities: scriptedCapability(() => c.capability), owners: null };
 }

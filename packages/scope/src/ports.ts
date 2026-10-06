@@ -9,8 +9,8 @@
  * are the platform package's, which is code of this runtime.
  */
 
-import type { Digest, Entry, FactRef, Grant, PlatformDefinition, Prepared, RoutingRefusal, ScopeRef, SignedIntent, Timestamp, UnavailableReason } from "@generalbusiness/artroom-contract";
-import { TOKENS_FLOOR, capabilitiesOf, gitRead, holdCapability, timeOf, type Capabilities, type HoldOptions, type Clock as Reading, type Delivered, type Owners, type Presented, type RuleInput, type StateView, type Window } from "@generalbusiness/artroom-derive";
+import type { Digest, Entry, FactRef, Grant, ObservationUse, PlatformDefinition, Prepared, RoutingRefusal, ScopeRef, SignedIntent, Timestamp, UnavailableReason } from "@generalbusiness/artroom-contract";
+import { TOKENS_FLOOR, capabilitiesOf, gitRead, holdCapability, timeOf, type Capabilities, type HoldOptions, type Clock as Reading, type Delivered, type Owners, type Presented, type RuleInput, type StateView, type Needed, type Observing, type Window } from "@generalbusiness/artroom-derive";
 import { evaluateRules } from "@generalbusiness/artroom-derive/rule";
 import { platform, type Platform } from "@generalbusiness/artroom-platform";
 import { toConsole, type DiagnosisSink } from "./diag.ts";
@@ -92,7 +92,45 @@ export interface Standing {
  * Phase two is the method of what phase one returns. So no commit decides
  * on authority without a read that was made for its own input.
  */
-export interface Authority { read(asked: Asked, seconds: number): Promise<Standing | null> }
+export interface Authority {
+  read(asked: Asked, seconds: number): Promise<Standing | null>;
+  /**
+   * The further observations of one input (scope contract, revision 20,
+   * section 16.1, "The subjects that an entry observes"): what the scope
+   * reads before the turn for the rows of `observes` of an act, of an
+   * outcome and of a delivery of a result. One for each input. Absent: this
+   * port reads none. No subject can then be had, and each row that needs one
+   * is absent. The production default has none.
+   */
+  further?(scope: ScopeRef): Further;
+}
+
+/**
+ * The further observations at hand for one input, and the reads that it
+ * asks (section 16.1, "The order before the turn", part 4). Working memory
+ * of one input's turn, as a `Standing` is.
+ *
+ * `read`: one read for each subject that is needed, in the order given,
+ * within `seconds` each. Each takes the next number of the scope's run,
+ * also one that gets no answer. `observed` and `values`: what the commit is
+ * given, each observation as an entry written now would retain it, and the
+ * canonical bytes of each value that came beside one. Nothing here judges
+ * a guard: the judge does, with the window and the use of each row.
+ * `observing`: the two references that the scope records, the latest entry
+ * that retains each read, whether a subject can still be read, and what a
+ * rules definition states. `close`: the scope reads no more for this
+ * input, so each subject with no observation is one that cannot be had.
+ * `sealed`: the commit tells the port, inside its transaction, the entry
+ * that it wrote, which is then the latest that retains each of its reads.
+ */
+export interface Further {
+  read(needed: readonly Needed[], seconds: number): Promise<void>;
+  observed(): readonly ObservationUse[];
+  values(): readonly string[];
+  observing(): Observing;
+  close(): void;
+  sealed(sealed: { entry: Entry; hash: Digest }): void;
+}
 
 /**
  * One foreign entry, by fact reference (section 5.2, step 1, and section
