@@ -177,11 +177,13 @@ export function judgeReservation({ recorded, evidence, statement, read, time }: 
   // The commits of the reports are read from their entries. Where the named reports are not the manifest's selections no commit
   // is read, and the statement is invalid evidence, below.
   if (evidence.tree !== manifest.tree || evidence.firstParent !== manifest.base || (manifest.reports !== null && !manifest.reports.every((commit) => evidence.ancestors.includes(commit)))) return no("integration-invalid");
-  // Check 3: the merger's key holds `change.merge`, by an observation within ten seconds.
+  // Check 3: the merger currently holds `change.merge`, including an active controller where one is recorded, by an
+  // observation within ten seconds. Approval and check-result evidence below retains its historical noncompromise rules.
   const merger = read.merger;
   const [at, now] = [merger ? timeMs(merger.at) : null, timeMs(time)];
   const within = at !== null && now !== null && now >= at && now - at <= WINDOW_MS;
   if (!merger || !within || merger.keyState !== "active" || merger.memberState !== "active" || !merger.actions.includes(LANDING)) return no("authority-lost");
+  if ((merger.controller !== null || merger.controllerActive !== null) && merger.controllerActive !== true) return no("authority-lost");
 
   // Check 4, from the complete statement. A verdict whose entry is not what the statement says is invalid evidence. An approval
   // counts from a key that is observed and is not compromised, whose member is the reviewer.
