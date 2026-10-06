@@ -298,6 +298,40 @@ Not started on this branch: steps 9c, 10, 13, 18, 26 to 28 and 29 to 32.
 Step 9f is listed above because the plan put it in M1. Steps 9c and 10
 wait on entry EJ1, as section 8.2 says.
 
+### 2.3 Added on 2026-10-06: what is built since the second milestone, on `request/i3-m3`
+
+The tables of sections 2.1 and 2.2 are as they were written, and no row
+of them is changed. Six rows of section 2.2 were true then and are no
+longer: those of steps 8a, 12, 8, 9, 9a and 9d, 9b and 9e, and 9f. The
+rows below replace them. The second milestone is the head that landed on
+`origin/main` as `48a2b2851`. Each part below was built on a branch of
+its own, or on `request/i3-m3` itself, and is merged there. The delivery
+note of this third milestone,
+`notes/2026-10-06-i3-third-milestone-delivery.md`, has the witnesses,
+the limits and the one table of the adopted designs. The deltas note,
+sections 26 and 28 to 31, has every question. Its section 27 is the
+second milestone's repairs, which are landed.
+
+| Step | What is built | Commits | Not built, of that step |
+|---|---|---|---|
+| 8, the sending side | The mark of a kind of `outcomes` may hold one `send`. The judge of an outcome runs its rule, and a `create` among its requests has the fourth cause, with the four checks of the opening entry. The evidence check of an outcome is given the state, and an owner states the body of an outcome that is not known. | `2570dcdaf`, `cf043584d` | The member `attempts` of an outcome's mark (entry EY1). The capacity of an outcome entry that sends a request: nothing reserves its 2 entries (the deltas note, section 30.1, the sweep). |
+| 9 | The register and the directory each lack no rule. The register: `create-repository`, the send `create-directory`, the effect mark `claim-active`, the bodies of the outcomes of the two cleanups. The directory: `create-rules`, `create-destination`, `import-spent`, the selection of `import` with the send `import-update`, `activeKey` in `worker-standing`, and the refusal `unsupported-definition` of `definition-active`. No stand-in rule is left. | `745516535`, `f0c349635`, `39e55f84c`, `d24ce3b0d`, `f0f20d3bb`, `fe4fcc5b9`, `49ab80857`, `c696d7e16`, `9fe1e6df6`, `c2d0a6ea0`, `8bb2b17a5` | A production host for the register: no port accepts an operation of `platform:register@1` (entry EY10). The directory's guard `definition-active` is never completed on a deployed scope, so a directory creates no lane (entries EM3 and FC6). The rows of section 5.8 for a claim reserve nothing (section 30.1). |
+| 12, for two more kinds | The production authority reads membership for a rules scope and a destination: the first read asks by membership's scope ID alone, and the entry that retains the answer fixes the incarnation. The replay's reader follows. | `9e2983e46`, `4f7e62008`, `9285e59b9` | The replay's check of the incarnation against the directory's history (entry EY8). A read session at such a scope before its first retained observation (entry EY12). No destination exists, so its half ran on no scope object. |
+| 9c | A founding on real scope objects, from the register's `install` as far as the creation of the destination, with a labelled stand-in for the Git host. The reply to the first attempt is lost, as case c. | `3de4fd1d9`, `c778c9dd4`; the guides, `cd6d08d32`; the deltas, `2464a1a21` | The founding is not whole: the creation of the destination is answered `retry`, `unsupported-definition`. So the plan's M1 is not reached. |
+| 9a and 9d, the extents data (request `42de9e34`) | The rules scope holds a repository's extents and the declaration of the single-controller exception: two slots, two fields of `publish`, the type rule `extent-list`, the guard `extents-hold` with three refusals, and the send mark `rules-update`. `classify` and `judgeExtents` at the authority note's revision 26: a review counts for the extent that it states, and each input that no retained form supplies fails closed. | `e2c155b6f`, `3b03f8381`, `0006bd1d7`, `4f12bec59`, `ebbd8d467`, `fefadac4d`; the deltas, `65402293a`; the merge, `f814e8334` | No rules scope answers an observation of the rules (entry FB10). `RulesContent` has no member `extents` (entry FB2). No changed set is computed and no link is resolved (entry FB6). The pinned `change` lane does not take the update (entry FB5). T37. |
+| 9b | The destination's six slots. `open-judge` opens one `judge` at a time. `collect-list` checks three lists. `adopt-head` states the commit and why. Two guards are named. A rule's reference may name the item that its own entry opens. | `4b54a2596`, `2d34b9cbf`, `e0a403812`, `94949b6dd`, `b9d2494e7`, `aeebfaa0c` | Nothing of its rows. |
+| 9e | `abort-if-behind`, the guard `resend-due`, and `reopen-publish` opens the mint of its attempt. | `5585ef390`, `fe6a23536`, `899e1b8c9` | The half of `resend` for a `published` publication cannot run: the act is refused `final` (entry FA6). |
+| 9f | Six of the eight rules of an outcome: `mint`, `revoke`, `push`, `deciding-read`, `adopt-read` and `judge`, with the send `publication-update` and the judgment of one reservation, `judgeReservation`. The destination has 17 rules. | `754bc8bef`, `632fde9ea`, `5a85e2323`, `2b6b50c35`, `26d155a6b`, `3ec0fd516`, `899467428`, `993f5a212`, `ed4a18eaf`; the witnesses, `1a2431d4e`, `c1218e1bd`; `812aaebbf`; the deltas, `1f5b66cd4`; the merge, `1be8bae1d` | **The rules `first-head` and `receipt`** (entries ER9 and FA6): `platform:destination@1` lacks two rules and nothing is created under it. In a deployed scope `judge` reserves nothing (entries FC5 and FC6). No port sends a request of the destination. **The reservation of room by a publication** (entries FA3 and FC1): `covered` is an exemption, and 71 entries of each publication are reserved by no admission. |
+| 8a, the other judges and the runtime's half for values | The judges of an outcome and of a result's delivery give a rule `observed`, the judge of an outcome gives the entries in `uses`, and the entry retains what was read. The scope reads `values` before the turn for the places that its pinned data states, and keeps each in the table `retained_value`. The acts route passes `values`. | `14b682e22`, `a3d824ecb`, `baed06dc5`, `d30c846a2`; the guides, `ac94e5c0e`; the deltas, `441727709` | No runtime reads an observation before the turn of an outcome, of a result's delivery or, beyond the signer's own, of an act (entry FC6). No route reads a value, and the replay's HTTP source asks for none (entry FC7). No data of the platform package states a place (entry EX5). |
+| 22, for these forms | A replay derives each record of `observed` of an outcome and of a result's delivery again, in the ten-second window. A version may state where its scopes record the rules reference. | `a3d824ecb`, `baed06dc5` | The branch for a result's delivery has no replay witness (entry FC8). The value of an observation of the rules is taken on trust with an anchor, and is `unsupported-definition` without one (entry FC4). The walk of an ancestry record is still not derived (entry EU2). |
+| 22, review finding `e2d4e074` | A replay derives the value of an observation once for each source scope, incarnation, head, definition and subject, and folds each entry of a source once into a view that keeps a log of writes. Four more reads are each one lookup or one number, where each was a search. | `bfde0eec3`, `f9a5ae91c`; the deltas, `c0f7b4521`; the merge of `origin/main`, `ba0d6ae34`, which changed no file | The fourteen rows of the sweep that are recorded and not changed, thirteen of them with an owner (the deltas note, section 31.4). |
+
+Not started on this branch: steps 10, 13, 18, 26 to 28 and 29 to 32.
+Step 10, the removal of the earlier founding, waits on the two rules of
+step 9f, which wait on two details that the authority note asks of the
+scope contract. The contract's revision 20, at `9dbd3039`, is filed for
+review and is not adopted. Nothing here is built on it.
+
 ## 3. The scope table
 
 Every element of sections 11, 11.1 and 11.2, one row each.
