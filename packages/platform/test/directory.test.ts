@@ -55,20 +55,20 @@ test("the directory definition validates whole with the platform option; every m
     [4, "acts.open-task.guards.0", "worker-standing", "P19"], [5, "acts.retry-import.effects.0", "reopen-import", "P16"],
     [5, "receives.index.effects.0", "index-row", "P15"], [5, "receives.index.effects.1", "index-number", "P17"], [7, "outcomes.import", "import", "P16"],
     // Rows s to u of the note's revision 25.
-    [6, "acts.establish.sends.1", "create-rules", "P20"],
+    [6, "acts.establish.sends.1", "create-rules", "P20"], [6, "acts.establish.sends.2", "create-destination", "P20"],
   ];
   // The places that the note's rows state, that no form can say, and whose rule is not written yet. Each is a mark whose row is
   // the entry of the I3 deltas note, and the package has no rule for it. The genesis holds two send marks, which the contract's
   // revision 19 lets a list hold when at most one does not state `always`: both state it (its section 6.1; witness 18.45).
-  const unlisted = [[6, "acts.establish.sends.2", "create-destination", "EP6"], [4, "acts.retry-import.guards.0", "import-spent", "EP7"]];
+  const unlisted = [[4, "acts.retry-import.guards.0", "import-spent", "EP7"]];
   expect(directory.acts["establish"]!.sends.map((send) => ("code" in send ? [send.code, send.always ?? false] : Object.keys(send)))).toEqual([["create"], ["create-rules", true], ["create-destination", true]]);
   expect(valid.marks.map((m) => [m.place, m.path, m.code, m.row]).sort()).toEqual([...listed, ...unlisted].sort());
   const { rules } = platform(DIRECTORY)!;
-  expect([rules === directoryRules, valid.marks.filter((mark) => !Object.hasOwn(rules, mark.code)).map((mark) => mark.code).sort()]).toEqual([true, ["create-destination", "import-spent"]]);
+  expect([rules === directoryRules, valid.marks.filter((mark) => !Object.hasOwn(rules, mark.code)).map((mark) => mark.code).sort()]).toEqual([true, ["import-spent"]]);
   // The whole-scope rule (the contract's section 6.1): a version with a mark and no rule runs nothing. With a stand-in for each of
   // the three, of test support, it can be run, and without any one of them it cannot.
   expect([runnable(valid, rules), runnable(valid, { ...rules, ...directoryStandIns }), ...Object.keys(directoryStandIns).map((lost) => runnable(valid, { ...rules, ...directoryStandIns, [lost]: undefined as never }))])
-    .toEqual([false, true, false, false]);
+    .toEqual([false, true, false]);
 });
 
 // The plan's T50, the directory's table: each rule of `platform:directory@1` as a plain function, from its row of the note's table
@@ -166,7 +166,7 @@ describe("the rules of platform:directory@1, each as a plain function (authority
   test("the table has exactly the rules that the note's table of marks names for the directory and that are written, each of the kind of its place; the evidence of a confirmed import states the imported head", () => {
     expect(Object.entries(directoryRules).map(([name, rule]) => [name, rule.place, "refusals" in rule ? rule.refusals : "most" in rule ? rule.most : null])).toEqual([
       ["open-import", "effect", 2], ["next-number", "effect", 2], ["definition-active", "guard", ["not-activated"]], ["worker-standing", "guard", ["worker-not-active"]], ["reopen-import", "effect", 2],
-      ["index-row", "effect", 32], ["index-number", "effect", 2], ["create-lane", "send", null], ["create-rules", "send", null], ["import", "outcome", null],
+      ["index-row", "effect", 32], ["index-number", "effect", 2], ["create-lane", "send", null], ["create-rules", "send", null], ["create-destination", "send", null], ["import", "outcome", null],
     ]);
     // Row d: basis `own-answer`, so no read is decisive; it selects nothing; another attempt may follow.
     const { rules: outcome } = directoryRules["import"] as { rules: OutcomeRule };
@@ -192,8 +192,8 @@ test("a directory's genesis, by an outcome entry of its register, opens the repo
     { repository: { host: "git.example", namespace: "artroom", name: repositoryName(seedDigest(genesis.seed), 1), id: "r-1" }, branch: "main", founder: rita.key, founderHandle: "@rita", recoveryKey: sam.key, import: null, imported: null, lastNumber: 0 },
   ]);
   // Three creations, in the order membership, rules, destination, each with the digest of the directory's seed as its cause. The
-  // result is at ordinal 0, and the three are sealed as duties and held. The second is by the package's rule `create-rules` and the
-  // third by a STAND-IN rule, at two send marks that both state `always`: each creation is at the position of its form.
+  // result is at ordinal 0, and the three are sealed as duties and held. The second and the third are by the package's rules
+  // `create-rules` and `create-destination`, at two send marks that both state `always`: each creation is at the position of its form.
   const cause = seedDigest(genesis.seed);
   expect(p.last.sends.slice(1).map((send) => { const to = send.to as Seed; return [send.n, to.kind, to.definition, to.ordinal, to.cause === cause, to.creator]; })).toEqual([
     [1, "membership", "platform:membership@1", 0, true, p.at], [2, "rules", "platform:rules@1", 1, true, p.at], [3, "destination", "platform:destination@1", 2, true, p.at],
@@ -203,6 +203,12 @@ test("a directory's genesis, by an outcome entry of its register, opens the repo
   // the contract's `ScopeId` of that seed (the note's revision 25, section 12.1.2: no operand, the rule of the send mark gives it).
   // Its body holds no member `membership`, as the written `create` of membership beside it holds none.
   expect((p.last.sends[2]!.message as { body: unknown }).body).toEqual({ fields: { branch: "main", directory: p.at, membership: scopeIdOf(p.last.sends[1]!.to as Seed) } });
+  // The creation of the destination carries its seven fields: `import` as a truth value, and the scope IDs of its two siblings.
+  const forDestination = (of: Directory) => (of.entries[0]!.entry.sends[3]!.message as { body: unknown }).body;
+  expect([forDestination(p), (forDestination(new Directory({ import: IMPORT, confirmed: false })) as { fields: Record<string, unknown> }).fields["import"]]).toEqual([
+    { fields: { repository: p.item(0).values["repository"], branch: "main", import: false, claim: p.claim, directory: p.at, membership: scopeIdOf(p.last.sends[1]!.to as Seed), rules: scopeIdOf(p.last.sends[2]!.to as Seed) } },
+    true,
+  ]);
   // The real rules scope takes that creation: its genesis is written under `platform:rules@1`, with the package's own rules, and it
   // records the membership scope's ID, which its data requires.
   const founds = () => {

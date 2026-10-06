@@ -22,6 +22,7 @@
  * | `create-lane` | 6, send | a | `open-issue`, `open-pr` |
  * | `import` | 7, outcome | d | The outcomes of an `import` |
  * | `create-rules` | 6, send, with `always` | s (P20) | `establish`: the second send |
+ * | `create-destination` | 6, send, with `always` | t (P20) | `establish`: the third send |
  *
  * `compromised` is data, whole. The three creations of the genesis are held
  * sends of the entry, by the contract's rule for a provisional scope.
@@ -38,7 +39,6 @@
  *
  * | Mark | Place | At | What the row states (deltas entry) |
  * |---|---|---|---|
- * | `create-destination` | 6, send | `establish` | The destination's `create` carries `import` as a truth value, and the scope IDs of membership and of the rules scope, which the directory derives from the seeds that it sends. No form of a send says any of the three (EP6). |
  * | `import-spent` | 4, guard | `retry-import` | "The import's stated attempts are used, and none is `confirmed`." No guard form reads an operation (EP7). |
  *
  * The two send marks of the genesis both state `always`: the scope
@@ -245,11 +245,11 @@ export const directory: PlatformData = {
         // clauses are data.
         { code: "create-rules", row: "P20", always: true, result: { applied: [{ ref: { slot: "rules", from: { sender: true } } }] } },
         // The destination's creation: `repository`, `branch`, `import`, `claim`, `directory`, `membership` and `rules`. Three of
-        // them no form of a send says, and the table of marks lists no rule for the send (entry EP6). Its clauses are data. When
-        // `import` is set, the entry that records its applied result opens the operation `import` (Code P16, row 7). The mark
-        // states `always`, as the other does, so the list holds two marks and each creation is at the position of its form.
-        // I3 merge: this mark has no rule, until the authority note's rows name it and state its derivation.
-        { code: "create-destination", row: "EP6", always: true, result: { applied: [{ ref: { slot: "destination", from: { sender: true } } }, { code: "open-import", row: "P16" }] } },
+        // them no form of a send says: the rule of the send mark gives the request (row t of the table of marks, key P20). Its
+        // clauses are data. When `import` is set, the entry that records its applied result opens the operation `import` (Code
+        // P16, row 7). The mark states `always`, as the other does, so the list holds two marks and each creation is at the
+        // position of its form.
+        { code: "create-destination", row: "P20", always: true, result: { applied: [{ ref: { slot: "destination", from: { sender: true } } }, { code: "open-import", row: "P16" }] } },
       ],
       attention: [],
     },
@@ -661,6 +661,29 @@ export const directoryRules: Rules = {
   "create-rules": {
     place: "send",
     run: (given) => ({ to: sibling(given, "rules"), message: { class: "request", type: "create", body: { fields: { branch: given.resolved.fields["branch"], directory: given.resolved.at, membership: siblingId(given, "membership") } } } }),
+  },
+  /**
+   * Row t, the third send of `establish` (P20), as the note's revision 25
+   * states it. Exactly one request, in every genesis: the `create` of the
+   * destination, to the seed of creation 2. Its seven fields: `repository`,
+   * `branch` and `claim`, each the field; `import`, a truth value, true when
+   * the creation's field `import` is present; `directory`, this scope's own
+   * reference; `membership`, the scope ID of the sibling of creation 0; and
+   * `rules`, the scope ID of the sibling of creation 1. The body holds no
+   * member `membership`, as for `create-rules`.
+   */
+  "create-destination": {
+    place: "send",
+    run: (given) => {
+      const { fields, at } = given.resolved;
+      return {
+        to: sibling(given, "destination"),
+        message: {
+          class: "request", type: "create",
+          body: { fields: { repository: fields["repository"], branch: fields["branch"], import: fields["import"] !== undefined, claim: fields["claim"], directory: at, membership: siblingId(given, "membership"), rules: siblingId(given, "rules") } },
+        },
+      };
+    },
   },
   /**
    * Row d, for the outcomes of `import` (P16). Basis `own-answer`: the

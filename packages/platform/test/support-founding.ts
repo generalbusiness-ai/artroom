@@ -24,8 +24,8 @@
  */
 
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { Digest, Entry, FactRef, PlatformData, Request, ScopeKind, ScopeRef, Seed, Send, SignedIntent } from "@generalbusiness/artroom-contract";
-import { factRefOf, intentDigest, newIncarnation, scopeIdOf, seedDigest, signIntent } from "@generalbusiness/artroom-bytes";
+import type { Digest, Entry, FactRef, PlatformData, Request, ScopeRef, Seed, Send, SignedIntent } from "@generalbusiness/artroom-contract";
+import { factRefOf, intentDigest, newIncarnation, scopeIdOf, signIntent } from "@generalbusiness/artroom-bytes";
 import { PROFILES, clockOf, judgeDelivery, judgeGenesis, judgeOutcome, operationSettled, ownersOf, validateDefinition } from "@generalbusiness/artroom-derive";
 import type { ActJudgment, Judgment, PlatformRules, Rules, Source, ValidDefinition } from "@generalbusiness/artroom-derive";
 import { Ledger, T0, forged, keys, t, type Actor, type Context, type Over } from "@generalbusiness/artroom-derive/testing";
@@ -49,36 +49,11 @@ export const registerPlatform: PlatformRules = { named: REGISTER, rules: registe
  * STAND-INS: a rule for each mark of the directory's data that the note's
  * table of marks does not list.
  *
- * - `create-destination`: the `create` of the destination, as creation 2 of
- *   the genesis, with `import` as a truth value and the scope IDs of
- *   membership and of the rules scope, each the digest of the seed of
- *   creation 0 and of creation 1.
  * - `import-spent`: an `import` operation exists, each has its stated
  *   attempts opened and settled, and `imported` is not set. Its refusal is
  *   `import-not-spent`.
  */
 export const directoryStandIns: Rules = {
-  "create-destination": {
-    place: "send",
-    run: ({ input, resolved }) => {
-      if (input.type !== "genesis") throw new Error("create-destination stands in the genesis");
-      const cause = seedDigest(input.seed);
-      const child = (kind: ScopeKind, name: string, ordinal: number): Seed => ({ v: 1, kind, definition: `platform:${name}@1` as Seed["definition"], creator: resolved.at, cause, ordinal });
-      const { fields } = resolved;
-      return {
-        to: child("destination", "destination", 2),
-        message: {
-          class: "request", type: "create",
-          body: {
-            fields: {
-              repository: fields["repository"], branch: fields["branch"], import: fields["import"] !== undefined, claim: fields["claim"], directory: resolved.at,
-              membership: scopeIdOf(child("membership", "membership", 0)), rules: scopeIdOf(child("rules", "rules", 1)),
-            },
-          },
-        },
-      };
-    },
-  },
   "import-spent": {
     place: "guard", refusals: ["import-not-spent"],
     run: ({ state, own }) => {
