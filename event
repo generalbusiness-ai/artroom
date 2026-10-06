@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:bb0de8cfc12c6345cfca1e37200e843acd216e8a"}
+{"kind":"artifact","text":"notes/2026-10-04-scope-and-replay-contract/admission-read-inventory.md at exact b68ce5e3c2c98e6064fbb8af8859bf4020fcc42c on request/scope-contract-r15, under promise git:sha1…2b59050 on request git:sha1…dfc2ad7","body":{"commit":"b68ce5e3c2c98e6064fbb8af8859bf4020fcc42c","path":"notes/2026-10-04-scope-and-replay-contract/admission-read-inventory.md"}}
