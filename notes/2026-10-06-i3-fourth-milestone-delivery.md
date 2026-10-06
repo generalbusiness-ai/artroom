@@ -149,6 +149,7 @@ production token delivery, browser session or cloud deployment.
 | Checker `ce5512a3`: nominal agent actions could outlive controller eligibility | `6b7fee625` observes actual membership before and after controller removal or last-key loss. Current merger is refused; historical noncompromised approvals and checks still count. Removing the guard distinguishes. |
 | Checker `0f963cd0`: late coded `bad-field` lost its bound draw | `0427af924` shares the original field/subject checks with the fold through retained sidecars. Early failures keep counts; later guard/effect refusals draw one. Counters prove no guard/effect reruns; the old shortcut fails two count assertions. |
 | Checker `5255923a`: a no-account clause could use a final holder's retained cleanup count | `7b674fa8f` faults before an unrelated draw. The result stays offered and the state/head unchanged; nonfinal draws and final own-account cleanup remain valid. The guard-removal control distinguishes. |
+| Erased text could hide whether a bare `bad-field` refusal reached binding | Owner disposition `4157eaa2` and source `1a114ae51` stop before an unproved draw. Two actually judged histories have different counts before erasure and both stop before the deciding entry afterward. Ordinary redacted decisions keep their credit; removing the ambiguity guard fails the coverage assertion. |
 
 The worker reports and the integration logs record these controls as
 `DISTINGUISHES`, by assertions. The tests label their scripted histories,
