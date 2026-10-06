@@ -42,8 +42,25 @@ export type GrantMark = Mark & { grant?: string };
 export type AlsoMark = Mark & { item: string };
 /** Place 3. The data states no shape for the value: the rule says whether a value is of the type. */
 export type TypeMark = Mark & { type: "code" };
-/** Place 6. The rule gives no request or one. Its clauses are the mark's own, as data. */
-export type SendMark = Mark & { result: PlatformClauses };
+/**
+ * Place 6. The rule gives no request or one. Its clauses are the mark's own,
+ * as data. `always`, on a send mark of a written list (revision 19, section
+ * 6.1, "More than one send mark"): the rule returns exactly one request in
+ * every entry of its row, and a rule that returns none there has a fault. A
+ * written list may hold several marks when at most one of them does not
+ * state it.
+ */
+export type SendMark = Mark & { result: PlatformClauses; always?: true };
+
+/**
+ * A place of an act that names a value beside the intent (revision 19,
+ * section 6.2, "How a version states a place"): a field of type `digest`
+ * that states the byte domain of the place, and the bound on one value of
+ * that domain, in canonical bytes. Two fields of one definition that state
+ * one domain state one `max`. In platform data only, and only as the type
+ * of a field of an act.
+ */
+export interface ValuePlace { type: "digest"; value: { domain: string; max: number } }
 
 /** The type of a field or of a slot, in platform data. */
 export type PlatformFieldType = FieldType | TypeMark;
@@ -67,7 +84,7 @@ interface MarkedForms {
 
 export type PlatformAct = Omit<ActType, "grant" | "fields" | keyof MarkedForms> & MarkedForms & {
   grant: string | GrantMark;
-  fields: Record<string, PlatformFieldType & { required: boolean; default?: FieldValue }>;
+  fields: Record<string, (PlatformFieldType | ValuePlace) & { required: boolean; default?: FieldValue }>;
 };
 export type PlatformReceive = Omit<ReceiveType, "fields" | keyof MarkedForms> & MarkedForms & {
   fields: Record<string, PlatformFieldType & { required: boolean }>;

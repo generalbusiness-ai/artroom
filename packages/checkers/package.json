@@ -1,0 +1,27 @@
+{
+  "name": "@generalbusiness/artroom-checkers",
+  "version": "0.1.0-dev.1",
+  "description": "Artroom's checker service: its own read of a job's entry before any run, its durable record of at most one run for a job, the runner's checkout and gateway rule, and the signer that signs a result outside the runner. It is a separate service with its own key, and it is not a scope.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json",
+    "test": "vitest run --config vitest.config.ts"
+  },
+  "dependencies": {
+    "@generalbusiness/artroom-bytes": "0.1.0-dev.1",
+    "@generalbusiness/artroom-contract": "0.1.0-dev.1",
+    "@generalbusiness/artroom-git": "0.1.0-dev.1"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.3",
+    "vitest": "4.1.11"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

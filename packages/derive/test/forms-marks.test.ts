@@ -1,14 +1,16 @@
 import { describe, expect, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { Bounds, OperationId, PlatformDefinition, Request, Send } from "@generalbusiness/artroom-contract";
-import { factRefOf, textDigest } from "@generalbusiness/artroom-bytes";
-import { PROFILES, clockOf, judgeDelivery, settleOutcome, validateDefinition, type ActJudgment, type OutcomeRule, type PlatformRule, type RuleGiven } from "../src/index.ts";
-import { Scope, arriving, forged, keys, otherLane, small, t, type Actor } from "./fixtures.ts";
+import type { Bounds, MemberId, ObservationUse, OperationId, PlatformDefinition, Request, Send } from "@generalbusiness/artroom-contract";
+import { canonicalize, entryHash, factRefOf, isEntry, textDigest } from "@generalbusiness/artroom-bytes";
+import { PROFILES, clockOf, judgeDelivery, settleOutcome, validateDefinition, valueDigest, type ActJudgment, type OutcomeRule, type PlatformRule, type RuleGiven } from "../src/index.ts";
+import { Scope, T0, arriving, d, forged, keys, membership, otherLane, small, t, type Actor } from "./fixtures.ts";
 import { gate, gateRules, gateWith } from "./fixtures-marks.ts";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Change = (d: any) => void;
 const MARK = { code: "fresh", row: "P14" };
+/** A made-up place: a byte domain that the made-up data declares, and its bound on one value. */
+const PLACE = { domain: "gate-proof-1", max: 64 };
 
 /** The problems of a value with one change, as the code and the path of each: with the platform option, or without it. */
 function problems(base: unknown, change: Change, platform: boolean): (readonly [string, string])[] | null {
@@ -62,7 +64,27 @@ describe("a mark in a definition (section 6.1)", () => {
     // The field is then no field, so the effect that copies it names nothing.
     ["a default on a field whose type is a mark", gate, (d) => { d.acts.enter.fields.note.default = 2; }, true, [["shape", "acts.enter.fields.note.default"], ["name", "acts.enter.effects.1.value.from"]]],
     ["a value of another type copied into a slot whose type is a mark", gate, (d) => { d.acts.enter.effects[1].value.from = { field: "secret" }; }, true, [["name", "acts.enter.effects.1.value.from"]]],
-    ["a second send that is a mark", gate, (d) => d.acts.enter.sends.push({ code: "again", row: "P21", result: {} }), true, [["shape", "acts.enter.sends.1"]]],
+    // Revision 19, "More than one send mark" (witness 18.45, case 3): a list may hold several marks when at most one does not state `always`.
+    ["a second send mark, where neither states `always`", gate, (d) => d.acts.enter.sends.push({ code: "again", row: "P21", result: {} }), true, [["shape", "acts.enter.sends.1"]]],
+    ["a second send mark, where one states `always`, passes", gate, (d) => d.acts.enter.sends.push({ code: "again", row: "P21", result: {}, always: true }), true, null],
+    ["three send marks, where two state `always`, pass, and each is listed", gate, (d) => { d.acts.enter.sends[0].always = true; d.acts.enter.sends.push({ code: "again", row: "P21", result: {} }, { code: "third", row: "P21", result: {}, always: true }); }, true, null],
+    ["`always` is true, or is left out", gate, (d) => { d.acts.enter.sends[0].always = false; }, true, [["shape", "acts.enter.sends.0.always"]]],
+    ["a written send that is not always made, beside two marks", gate, (d) => {
+      d.acts.enter.sends[0].always = true;
+      d.acts.enter.sends.push({ code: "again", row: "P21", result: {} }, { index: { fields: {} } });
+    }, true, [["shape", "acts.enter.sends.0"]]],
+    // Revision 19, section 6.2, "How a version states a place" (witness 18.45, case 7): a field of type `digest` of an act may state
+    // `value: { domain, max }`, in platform data only. Two fields that state one domain state one `max`.
+    ["a field of an act that names a value passes", gate, (d) => { d.acts.issue.fields.hash.value = PLACE; }, true, null],
+    ["the same member without the option is unknown: no act of a declared definition has a place", small, (d) => { d.acts.edit.fields.proof = { type: "digest", required: false, value: PLACE }; }, false, [["shape", "acts.edit.fields.proof.value"]]],
+    ["two fields that state one domain with two bounds", gate, (d) => { d.acts.issue.fields.hash.value = PLACE; d.acts.issue.fields.other = { type: "digest", required: false, value: { ...PLACE, max: 65 } }; }, true, [["shape", "acts.issue.fields.other.value.max"]]],
+    ["two fields that state one domain with one bound pass", gate, (d) => { d.acts.issue.fields.hash.value = PLACE; d.acts.issue.fields.other = { type: "digest", required: false, value: PLACE }; }, true, null],
+    ["a place with no bound, and one with no domain", gate, (d) => { d.acts.issue.fields.hash.value = { domain: "gate-proof-1", max: 0 }; d.acts.issue.fields.other = { type: "digest", required: false, value: { domain: "", max: 4 } }; }, true, [
+      ["shape", "acts.issue.fields.hash.value.max"], ["shape", "acts.issue.fields.other.value.domain"], ["name", "acts.issue.effects.0.value.from"],
+    ]],
+    ["a place on a field of another type", gate, (d) => { d.acts.enter.fields.secret.value = PLACE; }, true, [["shape", "acts.enter.fields.secret.value"]]],
+    ["a place on a slot", gate, (d) => { d.items.ticket.values.hash.of = { type: "digest", value: PLACE }; }, true, [["shape", "items.ticket.values.hash.of.value"]]],
+    ["`always` on a written send is no member of it", small, (d) => { d.acts.edit.sends = [{ index: { fields: {} }, always: true }]; }, false, [["shape", "acts.edit.sends.0"]]],
     // A written effect on a name that a mark selects, a required slot that only an effect mark could set, and a clause of the mark's own request all pass.
     ["a required slot that no written effect sets, in a row with an effect mark, passes", gate, (d) => { d.acts.issue.effects = [{ code: "hash-of", row: "P18" }]; }, true, null],
     ["an effect mark in a clause of the send mark passes", gate, (d) => { d.acts.enter.sends[0].result.applied = [{ code: "noted", row: "P16" }]; }, true, null],
@@ -131,6 +153,52 @@ describe("a rule is run at the check of its mark's place (sections 4.2 and 6.1)"
     expect([said(t.act(vic, "enter", fields("two"), { platform: gateRules(), grants: [] })), authority(t)]).toEqual([["write", null, null, null], []]);
     expect([said(t.act(rita, "enter", fields("none"), { platform: gateRules(), grants: null })), said(t.act(rita, "enter", fields("none"), { platform: gateRules(), grants: [] }))])
       .toEqual([["unavailable", "authority-unavailable", null, null], ["refused", "unauthorized", "no-ticket", "the rule by-ticket does not pass this key"]]);
+  });
+
+  // Scope contract, sections 4.1, 6.2 and 16.1; witnesses 18.34 and 18.35. The rule `vouched` is a STAND-IN, as every rule here: it
+  // shows what a rule is given and what the entry then retains, and nothing about a rule of a platform definition.
+  test("a rule reads a further observation and a value beside the intent: the entry retains exactly what was read; without either the act is not completed; an entry whose rules read neither has the bytes it had", () => {
+    const DOMAIN = "artroom-check-configuration-1";
+    const configuration = { image: d("a") };
+    const [bytes, digest] = [canonicalize(configuration), valueDigest(DOMAIN, configuration)];
+    const standing = (member: MemberId, n: number): ObservationUse => ({
+      observation: { subject: "member", of: membership, head: { seq: 40, hash: d("4") }, member, memberState: "active", role: "member", activeKey: true, controller: null, controllerActive: null, definition: "platform:membership@1", at: T0 },
+      read: { run: "r1", n }, use: "fresh", prior: null,
+    });
+    const [vic, una] = [standing("@vic", 7), standing("@una", 8)];
+    /** The guard reads the standing of one member and one value. With either missing it is not completed. */
+    const vouched: PlatformRule = {
+      place: "guard", refusals: ["not-vouched"],
+      run: (given) => {
+        const use = given.observed({ member: "@una" });
+        const value = given.value(DOMAIN, digest, 256);
+        if (!use || value === undefined) return { holds: null, reason: "dependency-unavailable" };
+        return "subject" in use.observation && use.observation.subject === "member" && use.observation.memberState === "active" && canonicalize(value) === bytes ? { holds: true } : { holds: false, name: "not-vouched" };
+      },
+    };
+    const reading = () => gateRules({ fresh: vouched });
+    const fields = (secret: string) => ({ on: 0, expected: { on: 1 }, fields: { secret } });
+
+    // Neither is at hand, then one of the two, then a value that is longer than the bound of its domain: the act is not completed.
+    const s = gated();
+    for (const beside of [{}, { observed: [una] }, { values: [bytes] }, { observed: [una], values: [canonicalize({ image: d("a"), pad: "x".repeat(256) })] }]) {
+      expect(said(s.act(keys.una, "enter", fields("one"), { platform: reading(), ...beside }))).toEqual(["unavailable", "dependency-unavailable", null, null]);
+    }
+    // Both are at hand, with an observation and with bytes that no rule reads. The entry retains the one observation that was read, in
+    // `observed`, and the draft names the one value that was read, for the scope to keep. What no rule read is in neither.
+    const judged = s.act(keys.una, "enter", fields("one"), { platform: reading(), observed: [vic, una], values: ["not canonical ", bytes, canonicalize("another value")] });
+    expect([said(judged), s.last.input.type === "act" && s.last.input.observed, judged.result === "write" && judged.draft.values]).toEqual([["write", null, null, null], [una], [{ domain: DOMAIN, digest, bytes }]]);
+    // The entry is one that the bytes package's guard takes. The same member on an input that may hold none is no entry (witness 18.34, case 8).
+    expect([isEntry(s.last), isEntry({ ...s.last, input: { ...s.last.input, observed: [] } }), isEntry({ ...s.last, input: { type: "timed", item: 2, rule: "lapse", due: T0, observed: [una] } })]).toEqual([true, false, false]);
+    // The fold holds the head of the member that the entry observed (section 16.1, "The fold holds the highest head").
+    expect([s.state.observed(membership, "@una"), s.state.observed(membership, "@vic")]).toEqual([40, null]);
+
+    // The control: the same row with the stand-in rules that read neither. With the same things at hand, and with nothing at hand,
+    // the entry has the same bytes: no member `observed`, and no value to keep.
+    const [a, b] = [gated(), gated()];
+    const first = a.submit(a.intent(keys.una, "enter", fields("one")), { platform: gateRules(), observed: [vic, una], values: [bytes] });
+    b.submit(b.intent(keys.una, "enter", fields("one")), { platform: gateRules() });
+    expect([first.result === "write" && first.draft.values, "observed" in a.last.input, entryHash(a.last)]).toEqual([undefined, false, entryHash(b.last)]);
   });
 
   test("a fault of a rule leaves the act not judged, and nothing is written: an effect outside the eight forms, an effect that conflicts with a written one, an effect on a fixed slot of an item that the entry does not open, a refusal that is not stated, a rule that throws, and a mark with no rule", () => {
@@ -232,6 +300,104 @@ describe("a rule is run at the check of its mark's place (sections 4.2 and 6.1)"
     expect([said(enter(s, una, "one", by([operation(0)], [operation(1), first(1)]))), s.entries.length]).toEqual([["unavailable", "unavailable", null, null], 3]);
     // Section 6.1, "The joined lists are checked as one": the pair is in the entry's effects, each half from another rule.
     expect([said(enter(s, una, "one", by([operation(0)], [first(0)]))), s.last.effects]).toEqual([["write", null, null, null], [{ effect: "state", item: 2, state: "used" }, operation(0), first(0)]]);
+  });
+
+  // Scope contract, revision 19, section 6.2, "How a version states a place" and "The checks, in the commit"; witness 18.45, case 6.
+  test("a field that names a value: the judge matches the value at hand by the domain and the bound that the data states, a rule reads it by its field, and the draft names it for the scope to keep; with none at hand, with bytes that are not canonical, or with a value past the bound, the act is refused `bad-field`", () => {
+    const read: unknown[] = [];
+    const s = new Scope(gateWith((d) => { d.acts.issue.fields.hash.value = PLACE; d.acts.issue.effects.push({ code: "seen", row: "P21" }); }));
+    const platform = gateRules({ seen: { place: "effect", most: 0, run: (given) => { read.push(given.placed("hash"), given.placed("secret")); return []; } } });
+    const proof = { seat: 12, row: "c" };
+    const [digest, bytes] = [valueDigest(PLACE.domain, proof), canonicalize(proof)];
+    const issue = (values: readonly string[] | undefined, hash = digest) => s.act(rita, "issue", { fields: { hash } }, { platform, ...(values === undefined ? {} : { values }) });
+    // No value came; another value came; the bytes are not canonical; the value is past the bound of its domain; and its digest is
+    // of another domain. Each is `bad-field`, at check 7, before any rule of the row is run.
+    const long = { seat: 12, row: "c".repeat(64) };
+    expect([issue(undefined), issue([canonicalize({ seat: 13 })]), issue([JSON.stringify(proof, null, 1)]), issue([canonicalize(long)], valueDigest(PLACE.domain, long)), issue([bytes], valueDigest("gate-other-1", proof))].map(said))
+      .toEqual(Array.from({ length: 5 }, () => ["refused", "bad-field", null, "hash names a value that is not at hand"]));
+    expect(read).toEqual([]);
+    // The value is at hand, among others. The rule reads it by its field, and states no domain and no bound. The draft names the
+    // one value that a place names, with its domain, and no other that came.
+    const written = issue([canonicalize({ seat: 13 }), bytes]);
+    expect([written.result, written.result === "write" && written.draft.values, read]).toEqual(["write", [{ domain: PLACE.domain, digest, bytes }], [proof, undefined]]);
+  });
+
+  // Scope contract, revision 19, section 6.1, "More than one send mark"; witness 18.45, cases 1, 2, 4 and 5. The rules are STAND-INS.
+  test("a list of sends with several marks: each recorded send, and the clause of each result, is found by counting, with k sends or with k less 1; a rule whose mark states `always` and that gives no request has a fault", () => {
+    // Three forms: a written `create`, the mark `refer` and the mark `again`. The clause `applied` of each is one effect mark of its own.
+    const listed = (first: boolean, second: boolean) => gateWith((d) => {
+      d.acts.enter.grant = "gate.enter";
+      d.acts.enter.sends = [
+        { create: { kind: "inbox", definition: "platform:inbox@1", fields: {}, result: { applied: [{ code: "noted-w", row: "P16" }] } } },
+        { code: "refer", row: "P21", result: { applied: [{ code: "noted-a", row: "P16" }] }, ...(first ? { always: true } : {}) },
+        { code: "again", row: "P21", result: { applied: [{ code: "noted-b", row: "P16" }] }, ...(second ? { always: true } : {}) },
+      ];
+    });
+    const tell = (message: string) => ({ to: otherLane, message: { class: "request", type: "tell", body: { message, fields: {} } } }) as const;
+    const gives = (request: ReturnType<typeof tell> | null): PlatformRule => ({ place: "send", run: () => request });
+    /** One `enter` under those marks and rules. Returns the scope, what the judge answered, and the clause that runs for the `applied` result of one recorded send. */
+    const entered = (definition: ReturnType<typeof listed>, refer: ReturnType<typeof tell> | null, again: ReturnType<typeof tell> | null) => {
+      const s = new Scope(definition);
+      s.did(rita, "issue", { fields: { hash: textDigest("one") } });
+      const answer = said(enter(s, una, "one", gateRules({ refer: gives(refer), again: gives(again) })));
+      const asked = s.last.seq;
+      const clauseOf = (n: number): string[] => {
+        const ran: string[] = [];
+        const noting = (name: string): PlatformRule => ({ place: "effect", most: 0, run: () => { ran.push(name); return []; } });
+        const request = { from: s.fact(asked), n };
+        const send: Send = { n: 0, to: s.at, message: { class: "result", of: request, outcome: "applied" } };
+        const source = forged(otherLane, 40 + n, { type: "delivery", ...request, message: s.entries[asked]!.entry.sends[n]!.message as Request, decision: "applied" }, [send]);
+        const arrival = { ...send, from: factRefOf(source.entry) };
+        const judged = judgeDelivery(s.state, s.definition, arrival, { ...arriving(s, arrival, source), platform: gateRules({ "noted-w": noting("w"), "noted-a": noting("a"), "noted-b": noting("b") }) });
+        return [judged.result, ...ran];
+      };
+      const sends = answer[0] === "write" ? s.last.sends.map((made) => [made.n, made.message.class === "request" && (made.message.type === "tell" ? (made.message.body as { message: string }).message : made.message.type)]) : null;
+      return { answer: answer[0], sends, clauseOf };
+    };
+    // Case 1: both marks state `always`, and each form makes one send, at the position of its form. Case 5: the result of the
+    // request at the third position runs the clause of the third form. No send holds a member that says which form made it.
+    const all = entered(listed(true, true), tell("a"), tell("b"));
+    expect([all.answer, all.sends, all.clauseOf(1), all.clauseOf(2)]).toEqual(["write", [[0, "create"], [1, "a"], [2, "b"]], ["write", "a"], ["write", "b"]]);
+    // Case 2: the last mark does not state `always`, and its rule gives none: two sends, those of the first two forms.
+    const less = entered(listed(true, false), tell("a"), null);
+    expect([less.answer, less.sends, less.clauseOf(1)]).toEqual(["write", [[0, "create"], [1, "a"]], ["write", "a"]]);
+    // The counting argument, at k less 1 with a later form: the mark that does not state `always` stands second and gives none.
+    // The send of the third form is one ordinal earlier, and its result runs the third form's clause, and not the second's.
+    const earlier = entered(listed(false, true), null, tell("b"));
+    expect([earlier.answer, earlier.sends, earlier.clauseOf(1)]).toEqual(["write", [[0, "create"], [1, "b"]], ["write", "b"]]);
+    // The same data with every form made: k sends, and the second ordinal is the second form's again.
+    const both = entered(listed(false, true), tell("a"), tell("b"));
+    expect([both.sends, both.clauseOf(1), both.clauseOf(2)]).toEqual([[[0, "create"], [1, "a"], [2, "b"]], ["write", "a"], ["write", "b"]]);
+    // Row I3-38: the bound on the fields of one send holds for a rule's message. At the bound it is sent, and one field more is a
+    // fault of the rule.
+    const wide = (n: number) => ({ to: otherLane, message: { class: "request", type: "tell", body: { message: "a", fields: Object.fromEntries(Array.from({ length: n }, (_, i) => [`f${i}`, i])) } } }) as unknown as ReturnType<typeof tell>;
+    const most = PROPOSED_BOUNDS.sendFields;
+    expect([entered(listed(true, false), wide(most), null).answer, entered(listed(true, false), wide(most + 1), null).answer]).toEqual(["write", "unavailable"]);
+    // Case 4: a mark that states `always`, whose rule gives no request: a fault. The input is not judged, and nothing is written.
+    expect([entered(listed(true, true), null, tell("b")).answer, entered(listed(true, false), tell("a"), null).answer]).toEqual(["unavailable", "write"]);
+  });
+
+  // Scope contract, revision 19, section 6.1, "A rule that decides a further attempt is given the state" (row I3-35; I3 delta ER5).
+  test("the rule that says whether another attempt is allowed is given what every rule is given: it reads the folded state before the outcome entry, and the outcome as the judge set it", () => {
+    const s = new Scope(gateWith((d) => { d.acts.enter.grant = "gate.enter"; }));
+    for (const secret of ["one", "two"]) s.did(rita, "issue", { fields: { hash: textDigest(secret) } });
+    const opens = some(() => [{ effect: "operation", k: 0, owner: OWNER, kind: "probe", attempts: 2 }, { effect: "attempt", operation: { k: 0 }, attempt: 1, result: "opened", selected: null }]);
+    expect(said(enter(s, una, "one", owned({ "key-id": opens })))).toEqual(["write", null, null, null]);
+    const operation = `${s.last.seq}:0` as OperationId;
+    const given: unknown[] = [];
+    /** The outcome `refused` of attempt 1, under a retry rule that allows another attempt while a ticket in that state exists. */
+    const settled = (state: "open" | "used" | "none") => {
+      const retries: OutcomeRule["retries"] = (result, of, rule) => { given.push([result, of.id, rule.input.type === "outcome" && rule.input.kind, rule.resolved.self]); return state !== "none" && rule.state.count("ticket", state) > 0; };
+      const judged = settleOutcome(s.state, s.definition, { type: "outcome", operation, attempt: 1, result: "refused", evidence: { basis: "own-answer", body: {} } },
+        { clock: clockOf(s.state, s.now), bounds: PROPOSED_BOUNDS, own: s.own, platform: owned({ probe: { place: "outcome", rules: { selects: false, read: false, retries } } }) });
+      return judged.result === "write" ? judged.draft.effects.filter((effect) => effect.effect === "attempt").map((effect) => [effect.attempt, effect.result]) : judged.result;
+    };
+    // Ticket 2 is `used` and ticket 3 is `open`. A rule that reads no ticket of a state that the fold holds allows none.
+    expect([settled("open"), settled("used"), settled("none")]).toEqual([[[1, "refused"], [2, "opened"]], [[1, "refused"], [2, "opened"]], [[1, "refused"]]]);
+    expect(given[0]).toEqual(["refused", operation, "probe", s.head.seq + 1]);
+    // The state decides: with no open ticket left, the same rule allows no further attempt.
+    expect(said(enter(s, vic, "two", owned({ "key-id": some(() => []) })))).toEqual(["write", null, null, null]);
+    expect([settled("open"), settled("used")]).toEqual([[[1, "refused"]], [[1, "refused"], [2, "opened"]]]);
   });
 
   test("an item that a rule opens counts against its type's `max` in every entry: an outcome's rule that would pass it has a fault, and a clause's rule that would pass it changes nothing; an outcome's rule sends no more than one entry may", () => {

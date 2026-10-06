@@ -21,3 +21,7 @@ export { attemptOutcome, classifySend, readAnswer } from "./push-outcome.ts";
 export type { AttemptOutcome, Forwarding, PushAnswer, ReadBack, Reported, SendEvidence } from "./push-outcome.ts";
 export { Gateway, GatewayRefusal, MAX_COMMAND_BYTES, readCommands } from "./gateway.ts";
 export type { GatewayOptions, GatewayReason, GrantRecord, GrantRecords, GrantRequest, GrantedUpdate } from "./gateway.ts";
+export { READ_TOKEN_OWNER, TOKEN_KINDS, TOKEN_OWNER, TokenDriver } from "./host.ts";
+export type { AttemptOf, Custody, GitHost, LiveToken, MintAsk, MintReply, RevokeAsk, RevokeReply, TokenAnswer, TokenDriverOptions, TokenFor, TokenRequest } from "./host.ts";
+export { FILE_MODES, SNAPSHOT_BOUNDS, SNAPSHOT_IDENTITY, snapshotCommit, snapshotFiles } from "./snapshot.ts";
+export type { BuiltObject, FileMode, SnapshotBounds, SnapshotCommit, SnapshotFile } from "./snapshot.ts";

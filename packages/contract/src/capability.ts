@@ -11,10 +11,9 @@
  * kind of a preparation entry against. It holds no rule: the rules behind
  * each record, guard, effect and step are the authority note's. The derive
  * package derives them, in `src/capability/` and `src/prepare.ts`, as far
- * as I3 steps 16a to 16c built them. They are not wired in production: the
- * production capabilities port has none (plan step 16). A runtime that has
- * no code for them answers `unsupported-definition` for a definition that
- * needs one.
+ * as I3 steps 16 and 16a to 16c built them, and the production ports of
+ * the scope package hold that code. A runtime that has no code for them
+ * answers `unsupported-definition` for a definition that needs one.
  */
 
 export type CapabilityName = `${"hold" | "git-read"}@${number}`;
@@ -90,12 +89,15 @@ export const CAPABILITIES = {
       license: { with: [["export", "from", "checkpoint", "hold", "instance", "k"]] },
       settle: { with: [["export", "by"]] },
     },
-    // `instance`, `token` and `retry` are the authority note's, section 5.7. Each is asked of the lane that owns the hold or the ledger.
-    steps: { stage: { foreign: true }, check: { foreign: true }, instance: { foreign: false }, token: { foreign: false }, retry: { foreign: false } },
+    // `instance`, `token`, `retire` and `retry` are the authority note's, section 5.7. Each is asked of the lane that owns the hold or the ledger.
+    steps: { stage: { foreign: true }, check: { foreign: true }, instance: { foreign: false }, token: { foreign: false }, retire: { foreign: false }, retry: { foreign: false } },
     reserved: [{ record: "receiver-pin", while: "standing", request: { class: "tell", message: "export-license", number: "k" }, bound: 3, count: "decided" }],
   },
   "git-read@1": {
-    records: {},
+    // The authority note's, sections 3.11 and 5.7: a job's read token is a record "of the same form" as the `token` of `hold@1`, in
+    // the change lane, and belongs to this capability. The snapshot repository of a filtered check has no record here: the note
+    // names none and gives it no states (I3 deltas, entries E4 and EW3).
+    records: { token: { states: ["minting", "live", "revoking", "ended"], final: ["ended"] } },
     guards: {
       ancestry: { with: ["commit", "row", "pin", "selected", "earlier"], refusals: ["ancestry-too-large", "ancestry-stale", "unnamed-work"] },
     },

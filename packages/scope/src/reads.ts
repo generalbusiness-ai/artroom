@@ -6,6 +6,18 @@
  * `complete: false` supports neither.
  *
  * A read is one synchronous pass over storage, so it sees one head.
+ *
+ * Who may read is the readers port's to say, and in production that is a
+ * read session (authority note, section 3.9; `sessions.ts`). A reader that
+ * presents no session is answered `forbidden` by every read here.
+ *
+ * Three reads are of what is no history (authority note, section 12, G13
+ * and G17): `incidents`, a page of the operator's record of this scope; and
+ * the two lists of `waiting`, each a bounded pass over this scope's own
+ * sends. Each answers `at`, the head at which it was read, and is no
+ * statement about that head: the record and the dispatcher's bookkeeping
+ * change with no entry. An age beside a row is for display only, and
+ * nothing here changes because a request is old.
  */
 
 import { ENTRY_READ_BYTES, HISTORY_PAGE_BYTES, HISTORY_PAGE_ENTRIES, OUTBOX_PAGE_DUTIES, RETAINED_INPUT_BYTES, RETAINED_ITEMS_PAGE } from "@generalbusiness/artroom-contract";
@@ -13,8 +25,12 @@ import type { Cursor, Digest, DutyId, Entry, LogPage, OperationId, Read, ReadRef
 import { isDutyId, isOperationId, positionOf } from "@generalbusiness/artroom-bytes";
 import { byteOrder, own, type Item, type ScopeState, type ValidDefinition } from "@generalbusiness/artroom-derive";
 import type { Pinned } from "./core.ts";
+import { waitingIn, type Incident, type OperatorRecord } from "./operator.ts";
 import type { ReadName, Readers } from "./ports.ts";
 import type { Duty, OperationStatus, Sealed, Store, Stored } from "./store.ts";
+
+/** The kinds of retained input that the read route serves by digest. `value` is not among them (I3 deltas, entry EX6). */
+export const READABLE: readonly RetainedInput["kind"][] = ["definition", "entry", "rule", "text", "snapshot"];
 
 /** The bound of each read. The defaults are the contract's table, and for a retained input the history page's byte bound. */
 export interface ReadBounds { retainedItems: number; historyEntries: number; historyBytes: number; entryBytes: number; outboxDuties: number; retainedBytes: number }
@@ -41,17 +57,26 @@ export class Reads {
   readonly #pinned: () => Pinned | null;
   readonly #readers: Readers;
   readonly #bounds: ReadBounds;
+  readonly #record: OperatorRecord | null;
 
-  constructor(store: Store, pinned: () => Pinned | null, readers: Readers, bounds: ReadBounds = READ_BOUNDS) {
+  /** `record`: the operator's record of this scope. Null: it keeps none, and the read of it finds nothing. */
+  constructor(store: Store, pinned: () => Pinned | null, readers: Readers, bounds: ReadBounds = READ_BOUNDS, record: OperatorRecord | null = null) {
     this.#store = store;
     this.#pinned = pinned;
     this.#readers = readers;
     this.#bounds = bounds;
+    this.#record = record;
   }
 
-  /** Who may read is asked first, so a refusal says nothing about what exists. */
+  /**
+   * Who may read is asked first, so a refusal says nothing about what
+   * exists. A reader that may not read is answered `forbidden`. A session
+   * that could not be judged is answered with the port's own name for that:
+   * `sessions-unavailable` or `clock-behind`. Nothing is read in any case.
+   */
   #open(reader: unknown, read: ReadName): { scope: ScopeState; pinned: Pinned } | { ok: false; reason: ReadRefusal } {
-    if (!this.#readers.allows(reader, read)) return no("forbidden");
+    const allowed = this.#readers.allows(reader, read);
+    if (allowed !== true) return no(allowed === false ? "forbidden" : allowed);
     const scope = this.#store.scope();
     const pinned = this.#pinned();
     return scope && pinned ? { scope, pinned } : no("not-found");
@@ -133,11 +158,18 @@ export class Reads {
     return { ok: true, at: open.scope.head, value, complete: !more, ...(more ? { next: String(from + rows.length) } : {}) };
   }
 
-  /** One retained input, by kind and digest (section 9.2). One over the byte bound is `too-large`. */
+  /**
+   * One retained input, by kind and digest (section 9.2). One over the byte bound is `too-large`.
+   *
+   * The kinds are those that a commit of this scope stores, each under its digest alone: `READABLE`. A snapshot of staged refs is
+   * one: the outcome entry that names it stores it in its own commit (`operations.ts`), and a verifier reads it by its digest
+   * before it derives that entry (section 16.4). A `value` is not: it is kept under its domain and its digest, this scope stores
+   * none yet, and no route reads one by its domain (I3 deltas, entry EX6).
+   */
   retained(reader: unknown, kind: RetainedInput["kind"], digest: Digest): Read<RetainedInput> {
     const open = this.#open(reader, "retained");
     if (!("scope" in open)) return open;
-    if (!(kind === "definition" || kind === "entry" || kind === "rule" || kind === "text") || typeof digest !== "string") return no("not-found");
+    if (!READABLE.includes(kind) || typeof digest !== "string") return no("not-found");
     // The size is asked of storage first, so an input over the bound is refused before any of it is read into memory.
     const size = this.#store.retainedSize(kind, digest);
     if (size === null) return no("not-found");
@@ -199,5 +231,39 @@ export class Reads {
     if (!("scope" in read)) return read;
     const found = operationOf(operation) ? this.#store.operationStatus(operation) : null;
     return found ? { ok: true, at: read.scope.head, value: found, complete: true } : no("not-found");
+  }
+
+  /**
+   * A page of the operator's record of this scope (authority note, section
+   * 12, G13), in the order in which its rows were written. The cursor is
+   * the number of the last row of the page before. It is shown on the
+   * repository's admin page: the session of a member whose role holds
+   * `membership.*` may read it, and no other session may.
+   */
+  incidents(reader: unknown, cursor?: Cursor): Read<readonly Incident[]> {
+    const open = this.#open(reader, "incidents");
+    if (!("scope" in open)) return open;
+    const after = position(cursor, null);
+    if (after === undefined) return no("not-found");
+    const page = this.#record?.page(after, this.#bounds.outboxDuties) ?? { incidents: [], more: false };
+    return { ok: true, at: open.scope.head, value: page.incidents, complete: !page.more, ...(page.more ? { next: String(page.incidents.at(-1)!.n) } : {}) };
+  }
+
+  /**
+   * One of the two lists of requests that wait (authority note, section 12,
+   * G17), by the sending scope's own bounded read of its sends. `diagnosed`:
+   * a request with a `delivery-unavailable` diagnosis. `unanswered`: a
+   * request that transport acknowledged and that has no result. One call
+   * passes over one page of the outbox and answers the rows of that page
+   * that are in the list, which may be none. `next` is the last send that
+   * was passed over, and `complete` says that the outbox ended.
+   */
+  waiting(reader: unknown, list: "diagnosed" | "unanswered", cursor?: Cursor): Read<readonly Duty[]> {
+    const open = this.#open(reader, "waiting");
+    if (!("scope" in open)) return open;
+    const at = cursor === undefined ? null : dutyOf(cursor);
+    if ((list !== "diagnosed" && list !== "unanswered") || (cursor !== undefined && !at)) return no("not-found");
+    const page = this.#store.duties(at ? { seq: at[0], n: at[1] } : null, this.#bounds.outboxDuties);
+    return { ok: true, at: open.scope.head, value: page.duties.filter((duty) => waitingIn(duty) === list), complete: !page.more, ...(page.more ? { next: page.duties.at(-1)!.duty } : {}) };
   }
 }

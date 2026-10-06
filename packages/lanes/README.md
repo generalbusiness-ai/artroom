@@ -41,7 +41,7 @@ contract package's types. Its tests and scripts also use `bytes`,
 | `scripts/pin.mjs` | Writes the two byte files and `src/digests.ts` from the values. |
 | `scripts/reference.mjs` | Writes `docs/lanes-reference.md` from the values. With `--check` it writes nothing and exits 1 when the file is stale. |
 | `test/definitions.test.ts` | Three plain tests: the pins, with the generated reference; the counts against the bounds; and validation of both definitions whole. |
-| `test/*.scope.test.ts` | Ten scenarios on real scopes under the two pinned digests, T1 to T9, in the workerd test pool. Each names the stand-ins it uses. |
+| `test/*.scope.test.ts` | Eleven scenarios on real scopes under the two pinned digests, T1 to T9 and T34, in the workerd test pool. Each names the stand-ins it uses. |
 | `test/support/graph.ts`, `worker.ts` | The one fixture of the scenarios, and the test Worker, which is the scope package's `./testing/worker`. |
 | `vitest.scope.config.ts`, `wrangler.test.jsonc` | The configuration that runs the scenarios alone. From the root they run inside the `scope` project. Nothing is deployed from either file. |
 
@@ -62,15 +62,21 @@ not the ones `pin.mjs` writes. If the validator refuses a row as the lane
 forms state it, do not change the row to pass. Record the refusal and
 return it to the owner of the lane forms.
 
-## What does not run
+## What runs, and what does not
 
 Both definitions use forms that need the code of the capabilities `hold@1`
 and `git-read@1`. The derive package holds that code as pure functions,
-and no production port is given it. The validator lists those forms in `ValidDefinition.underived`, and the test
-asserts the list. Under the production wiring a scope is not founded or
-created under either digest: `unsupported-definition`. The scenarios run
-only because their test Worker supplies a scripted capability, which is a
-stand-in. [docs/lanes.md](../../docs/lanes.md) lists what they show and
+and the production ports hold it. The validator lists those forms in `ValidDefinition.underived`, and the test
+asserts the list, and that the code has each form. So a scope can be
+founded or created under either digest. With only the production defaults
+it admits no act and no step, because that authority reads no grant. The
+deployed class reads a lane's grants from the membership scope that the
+lane records, and no test runs a lane there yet
+([docs/lanes.md](../../docs/lanes.md)). A runtime
+that lacks the code answers `unsupported-definition`. The scenarios T3, T4
+and T5b run on the code itself, with a stand-in for the Git host. The
+others use a scripted capability, which is a stand-in.
+[docs/lanes.md](../../docs/lanes.md) lists what they show and
 the rows that cannot run yet.
 
 ## How to test

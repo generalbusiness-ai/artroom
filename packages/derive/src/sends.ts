@@ -106,6 +106,21 @@ export function deriveSends(j: Judging, forms: readonly SendForm[], working: Rea
     return directory;
   };
 
+  /**
+   * Section 6.6, "`membership` in a `create`": the membership scope that this scope records, which the platform puts in every
+   * `create`. A membership scope is its own, and every other scope reads it from its genesis entry (`membershipOf`). Null: the
+   * scope records none, and its creations hold no such member. Undefined: its genesis entry cannot be read now.
+   */
+  const recordedMembership = (): ScopeRef | null | undefined => {
+    if (j.scope.at.kind === "membership") return j.scope.at;
+    // I3 merge: a genesis that creates a scope reads its own membership reference from the creation that it is recording, which
+    // the step of the real directory builds with the scopes that are created beside membership (authority note, section 12.1,
+    // "The membership reference"). Until then a creation that a genesis sends holds no such member.
+    if (j.self === 0) return null;
+    const genesis = j.own?.(0)?.entry.input;
+    return genesis?.type === "genesis" ? membershipOf(genesis, j.scope.at) : undefined;
+  };
+
   const slotType = (item: Item | null | undefined, slot: string): FieldType | null => {
     const type = item ? own(items, item.type) : undefined;
     return own(type?.refs, slot)?.to ?? own(type?.values, slot)?.of ?? null;
@@ -190,6 +205,8 @@ export function deriveSends(j: Judging, forms: readonly SendForm[], working: Rea
     const mark = markOf(form);
     if (mark) {
       const given = run(mark, () => ruleFor(j, mark, "send").run(givenTo(j)));
+      // Revision 19, "More than one send mark": a rule whose mark states `always` returns exactly one request. None is a fault.
+      if (given === null && (mark as SendMark).always === true) throw outside(mark, "no request, where its mark states always");
       if (given === null) continue;
       const request: Send | null = isObject(given) ? { n: next(), to: given.to, message: given.message } : null;
       const body = request && isSend(request) && request.message.class === "request" && isObject(request.message.body) ? request.message.body : null;
@@ -210,6 +227,10 @@ export function deriveSends(j: Judging, forms: readonly SendForm[], working: Rea
         if (relations.has(key)) return { ok: false, reason: "duplicate-relation", detail: `sends.${i}` };
         relations.add(key);
       }
+      // Revision 19, section 6.1 (row I3-38): the bound on the fields of one send holds for a rule's message, as the validator
+      // holds a written one to it. A message with more is a fault of the rule.
+      const carried = message.type === "relate" ? body["detail"] : body["fields"];
+      if (isObject(carried) && Object.keys(carried).length > j.bounds.sendFields) throw outside(mark, `a message of more than ${j.bounds.sendFields} fields`);
       sends.push(request);
       continue;
     }
@@ -221,7 +242,12 @@ export function deriveSends(j: Judging, forms: readonly SendForm[], working: Rea
       // Section 6.6: the platform puts the directory in every `create` of a lane: this scope, when it is one, or the one it records.
       const lanes = form.create.kind !== "lane" ? null : j.scope.at.kind === "directory" ? j.scope.at : recordedDirectory();
       if (lanes === undefined) return { ok: false, unavailable: "unavailable" };
-      sends.push({ n: next(), to: seed, message: { class: "request", type: "create", body: { fields: fields(form.create.fields), ...(lanes ? { directory: lanes } : {}) } } });
+      // Section 6.6: the body of a `create` is `{ fields, directory, membership }`. The membership scope is the one that the creating
+      // scope records. A scope that records none creates without the member, so a creation of a scope that knows no membership
+      // scope has the bytes it had. A membership scope itself is created without it.
+      const membership = form.create.kind === "membership" ? null : recordedMembership();
+      if (membership === undefined) return { ok: false, unavailable: "unavailable" };
+      sends.push({ n: next(), to: seed, message: { class: "request", type: "create", body: { fields: fields(form.create.fields), ...(lanes ? { directory: lanes } : {}), ...(membership ? { membership } : {}) } } });
     } else if ("tell" in form) {
       // Section 6.4: a send whose subject is unbound is not made.
       if (readsUnbound(reading(null), form.tell.to)) continue;
@@ -274,15 +300,17 @@ export function deriveSends(j: Judging, forms: readonly SendForm[], working: Rea
  */
 export function formOf(definition: ValidDefinition, forms: readonly SendForm[], entry: { sends: readonly Send[] }, n: number): SendForm | SendMark | null {
   const sent = entry.sends.filter((s) => s.message.class === "request" || s.message.class === "advisory").sort((a, b) => a.n - b.n);
-  // Platform data, section 6.1, place 6: a rule's request states no type or name in the data. The validator lets a list hold one
-  // mark, and then each written send of it is always made exactly once. So the entry has one send for each written form, in their
-  // order, and one more, at the mark's position, when the rule gave a request.
-  const marked = forms.findIndex((form) => markOf(form) !== null);
-  if (marked !== -1) {
+  // Platform data, section 6.1, place 6: a rule's request states no type or name in the data. In a list with a mark the validator
+  // lets at most one mark not state `always`, and each written send of the list is always made exactly once. So for a list of k
+  // forms the entry records k sends of the list, or k less 1. With k, each form made its send at its own position. With k less 1,
+  // the one mark that does not state `always` made none, and the send of each later form is one position earlier.
+  if (forms.some((form) => markOf(form) !== null)) {
+    const unsure = forms.map((form, i) => (markOf(form) !== null && (form as unknown as SendMark).always !== true ? i : -1)).filter((i) => i !== -1);
     const at = sent.findIndex((s) => s.n === n);
-    const gave = sent.length - (forms.length - 1);
-    if (at === -1 || (gave !== 0 && gave !== 1)) return null;
-    return forms[gave === 1 || at < marked ? at : at + 1] ?? null;
+    if (at === -1 || unsure.length > 1) return null;
+    if (sent.length === forms.length) return forms[at] ?? null;
+    if (sent.length !== forms.length - 1 || unsure.length !== 1) return null;
+    return forms[at < unsure[0]! ? at : at + 1] ?? null;
   }
   const made = (form: SendForm, { to, message }: Send): boolean => {
     if (message.class === "advisory") return "index" in form && message.type === "index";

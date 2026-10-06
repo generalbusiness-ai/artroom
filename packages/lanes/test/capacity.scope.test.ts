@@ -46,6 +46,10 @@ test("T8, pending settlement at full capacity, for an item: a job reserves its d
   // One real change lane with a bound of 16 entries. STAND-INS: the rules are one handwritten entry of a scripted rules peer, and
   // the scripted test capability answers the manifest's guards. Nothing is delivered out of the lane. Not proved: a real checker,
   // what a real rules scope requires, or capacity in any dimension but entries.
+  // This scenario stays on the scripted capability, and the others with a manifest do not (T3 and T5b). Its bound of 16 entries
+  // holds the reservations of a job and of a hold's item, which is what it states. On the capability's code the hold has a
+  // workspace, and a fork that is `creating` alone reserves 42 entries (authority note, section 5.8), so `take-hold` does not fit
+  // this bound. What a lane with a workspace reserves in all is the capacity composition that request `cc570904` owes.
   const g = await graph();
   net.capability = capable;
   const C = await g.change({ ...PROPOSED_BOUNDS, scopeEntries: 16 });

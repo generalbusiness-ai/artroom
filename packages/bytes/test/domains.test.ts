@@ -3,7 +3,7 @@ import { DOMAINS } from "@generalbusiness/artroom-contract";
 import type { Digest, Message, Seed, SignedIntent } from "@generalbusiness/artroom-contract";
 import {
   b64url, canonicalBytes, canonicalize, definitionDigest, deliveryCauseDigest, digestBytes, domainBytes, entryHash, factRefOf, intentDigest,
-  isDutyId, isIncarnation, isKeyId, isMemberId, isOperationId, isPlatformDefinition, isScopeId, isScopeKind, keyIdOfSecret, messageDigest, newIncarnation, scopeIdOf, seedDigest, sign, signIntent, textDigest, unb64url, utf8, verifySignedIntent,
+  isDutyId, isIncarnation, isKeyId, isMemberId, isOperationId, isPlatformDefinition, isRetainedInput, isScopeId, isScopeKind, keyIdOfSecret, messageDigest, newIncarnation, scopeIdOf, seedDigest, sign, signIntent, textDigest, unb64url, utf8, verifySignedIntent,
 } from "../src/index.ts";
 import { cause, definition, directory, entry, intent, message, otherSecret, secret, seed } from "./fixtures.ts";
 
@@ -124,6 +124,7 @@ describe("entries", () => {
 describe("identifiers", () => {
   test("each identifier the contract names has one guard, which takes its one form and nothing near it", () => {
     const key = keyIdOfSecret(new Uint8Array(32).fill(1));
+    const KEPT = textDigest("kept");
     const forms: [(v: unknown) => boolean, unknown[], unknown[]][] = [
       [isKeyId, [key], [key.slice(0, -1), `${key}A`, key.replace("key_", "KEY_"), 7]],
       [isMemberId, ["@a", "@Alice Smith"], ["@", "a", "@\ud800", null]],
@@ -131,6 +132,9 @@ describe("identifiers", () => {
       [isDutyId, ["0.0", "17.2"], ["17", "17.02", "1.2.3", "-1.0", 17.2]],
       [isPlatformDefinition, ["platform:directory@1"], ["platform:lane@1", "platform:directory@01", "directory@1"]],
       [isScopeKind, ["lane", "directory"], ["room", "", null]],
+      // Section 9.2, revision 19: a retained value states its domain, and no other kind states one.
+      [isRetainedInput, [{ kind: "value", domain: "artroom-check-configuration-1", digest: KEPT, bytes: "{}" }, { kind: "snapshot", digest: KEPT, bytes: "[]" }, { kind: "entry", digest: KEPT, bytes: "{}", under: "issue" }],
+        [{ kind: "value", digest: KEPT, bytes: "{}" }, { kind: "value", domain: "", digest: KEPT, bytes: "{}" }, { kind: "definition", domain: "artroom-definition-1", digest: KEPT, bytes: "{}" }, { kind: "values", domain: "d", digest: KEPT, bytes: "{}" }]],
     ];
     for (const [guard, good, bad] of forms) expect([good.map(guard), bad.map(guard)], guard.name).toEqual([good.map(() => true), bad.map(() => false)]);
   });

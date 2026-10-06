@@ -1,11 +1,17 @@
 /** SHA-256, synchronous, and the `Digest` text form (scope contract, section 2.1). */
 
+import { hmac } from "@noble/hashes/hmac.js";
 import { sha256 as nobleSha256 } from "@noble/hashes/sha2.js";
 import type { Digest } from "@generalbusiness/artroom-contract";
 import { hex } from "./encode.ts";
 
 export function sha256(bytes: Uint8Array): Uint8Array {
   return nobleSha256(bytes);
+}
+
+/** HMAC-SHA-256 (RFC 2104), synchronous: the 32 bytes that authenticate `bytes` under `key`. A read session is checked with it. */
+export function hmacSha256(key: Uint8Array, bytes: Uint8Array): Uint8Array {
+  return hmac(nobleSha256, key, bytes);
 }
 
 /** `sha256:` + 64 lowercase hex characters, from the 32 hash bytes. */

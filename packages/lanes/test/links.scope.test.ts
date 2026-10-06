@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import type { Entry, Input, ScopeRef } from "@generalbusiness/artroom-contract";
 import type { Delivered } from "@generalbusiness/artroom-derive";
-import { capable, graph, net, rita, una } from "./support/graph.ts";
+import { graph, net, onCode, rita, una } from "./support/graph.ts";
 
 type Decided = Extract<Input, { type: "delivery"; decision: string }>;
 type Recorded = Extract<Input, { type: "delivery"; clause: string }>;
@@ -38,13 +38,15 @@ test("T5a, a link is the change lane's and the issue keeps a copy of it: set the
   }
 });
 
-test("T5b, a merge closes a linked issue once: the issue closes by its own deciding entry, in either order of the link's updates; a close by hand is kept; a repeat of the publication or of its update, also after a reopen, changes nothing (SCRIPTED: a destination peer's publication, a rules peer and the test capability)", async () => {
-  // Real scopes: a change lane and two issue lanes, with real delivery of every update between them. STAND-INS: the publication is
-  // one handwritten entry of a scripted destination peer, the rules are one of a scripted rules peer, and the scripted test
-  // capability answers the manifest's guards. So this shows what the lanes do once a publication is recorded. It shows nothing
-  // about a real destination: its reservation, its commit, or when and whether it publishes.
+test("T5b, a merge closes a linked issue once: the issue closes by its own deciding entry, in either order of the link's updates; a close by hand is kept; a repeat of the publication or of its update, also after a reopen, changes nothing (the manifest is on the capability's code, with a STAND-IN for the Git host; SCRIPTED: a destination peer's publication and a rules peer)", async () => {
+  // Real scopes: a change lane and two issue lanes, with real delivery of every update between them, on the code of `hold@1` and
+  // `git-read@1` as the production ports hold it. STAND-INS: the publication is one handwritten entry of a scripted destination
+  // peer, the rules are one of a scripted rules peer, and `Host` answers the attempts that the manifest's staging opened, in place
+  // of a Git host. So this shows what the lanes do once a publication is recorded, and that the publication releases the pin of
+  // the manifest that it merged, on the lane's own records. It shows nothing about a real destination: its reservation, its
+  // commit, or when and whether it publishes. Nor about a real host.
   const g = await graph();
-  net.capability = capable;
+  onCode();
   const [G, H, C] = [await g.goal(), await g.goal(), await g.change()];
   const peer = (e: Delivered) => "scope" in e.to && (e.to.scope === g.destination.at.scope || e.to.scope === g.rules.at.scope);
   // Nothing reaches a peer: it has no object. And the update "set" to G is held back, so that "merged" arrives there first.
@@ -53,7 +55,11 @@ test("T5b, a merge closes a linked issue once: the issue closes by its own decid
   const offer = (await C.did(rita, "offer", { fields: { offeree: una.member, terms: "Integrate." } })).fact;
   await C.did(una, "accept", { on: offer.seq, fields: { terms: offer } });
   const hold = (await C.did(una, "take-hold", { fields: { commitment: offer.seq } })).fact.seq;
-  const manifest = (await C.did(una, "propose-manifest", { fields: { hold, instance: "i-1", base: oid("0"), integration: oid("c"), tree: oid("3"), complete: true, selected: [], decisions: [] } })).fact.seq;
+  await C.instance(una, hold, "i-1");
+  const manifest = (await C.stagedDid(una, "propose-manifest", { fields: { hold, instance: "i-1", base: oid("0"), integration: oid("c"), tree: oid("3"), complete: true, selected: [], decisions: [] } })).fact.seq;
+  // The manifest was admitted on a pin that the lane holds for it: `held`, with the entry that opened the manifest.
+  const pins = async () => (await C.state()).records("hold@1", "pin").map((pin) => [pin.state, pin.values["commit"], pin.values["admitted"], pin.values["by"]]);
+  expect(await pins()).toEqual([["held", oid("c"), manifest, null]]);
   const toG = (await C.did(rita, "link-own", { fields: { issue: G.at, how: "keyword" } })).fact.seq;
   const toH = (await C.did(rita, "link-own", { fields: { issue: H.at, how: "manual" } })).fact.seq;
   await g.settle();
@@ -69,6 +75,9 @@ test("T5b, a merge closes a linked issue once: the issue closes by its own decid
   const published = recorded.fact.seq;
   await g.settle();
   expect([(await C.item(merge.seq)).state, (await C.item(merge.seq)).values["commit"], (await C.item(0)).state]).toEqual(["published", oid("9"), "merged"]);
+  // The entry that records the publication releases the pin of the manifest that it merged. The row names the commit alone, and
+  // the pin is found by the manifest's item: the entry that admitted it (authority note, section 5.7).
+  expect(await pins()).toEqual([["released", oid("c"), manifest, published]]);
   expect((await C.entry(published)).sends.map((s) => [s.to, s.message.class, (s.message as { body?: { state?: string } }).body?.state])).toEqual([
     [G.at, "request", "merged"], [H.at, "request", "merged"], [g.office.at, "advisory", undefined], [g.destination.at, "result", undefined],
   ]);

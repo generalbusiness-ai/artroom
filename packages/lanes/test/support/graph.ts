@@ -9,10 +9,12 @@
  * | The definitions | `issue` and `change` of this package. The office creates each lane by its pinned digest, and each lane's handle is checked against the same pin. Real. |
  * | The lanes | Real scopes, written through the turn, the store and the dispatchers of the scope package. |
  * | The acts | Signed by the client's declared handle, and sent to the scope service's own operations. An office is founded over the Worker's HTTP routes, and `over` sends one act over them. |
- * | The office | A made-up directory definition that creates the lanes. A test fixture: the real directory is not delivered. |
+ * | The office | A made-up directory definition that creates the lanes. A test fixture: the real directory is data in the platform package and cannot be created yet. |
  * | The members | The key set of derive's fixtures. Test keys. |
  * | Authority | The scope package's test authority: every presented grant is current. A STAND-IN. It shows nothing about real authority. |
- * | The capability | The scope package's scripted test capability, over `net.capability`. A STAND-IN for the code of `hold@1` and `git-read@1`. By default every capability guard refuses. `capable` makes them hold. It shows nothing about staging, ancestry, pins, licenses or exports. |
+ * | The capability, on its code | `onCode`: the code of `hold@1` and `git-read@1`, as the production ports hold it. Real: the records, the steps, the guards and the outcomes' rules. A scenario that uses it says so. |
+ * | The Git host | `Host`: a STAND-IN for the systems outside the service. It answers each attempt that the capability's code opened: a mint, a revocation, the creation of a staged ref and the ancestry read. No repository exists, and no commit is read. |
+ * | The capability, scripted | The scope package's scripted test capability, over `net.capability`. A STAND-IN for the code of `hold@1` and `git-read@1`. By default every capability guard refuses. `capable` makes them hold. It shows nothing about staging, ancestry, pins, licenses or exports. |
  * | Platform peers | `Peer`: handwritten entries of a rules scope and a destination, read through the namespace's test resolver. SCRIPTED. One shows the lane's side of a delivery and nothing about the peer. |
  * | The clock | One scripted clock for the namespace. It starts in 2099, so no stored alarm fires by itself. |
  * | The scheduler | The dispatchers, run by `settle`; an alarm, run by `alarm`; transport, held or made deaf through `net`. No test waits on the wall clock. |
@@ -25,10 +27,10 @@ import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { Answer, Bounds, DeclaredDefinition, Digest, Duty, Entry, FactRef, FieldValue, Grant, Input, Message, Receipt, ScopeId, ScopeRef, Sealed, Seed, SignedIntent } from "@generalbusiness/artroom-contract";
 import { entryHash, intentDigest, newIncarnation, scopeIdOf, signIntent, textDigest } from "@generalbusiness/artroom-bytes";
 import { ScopeHandle, declaredHandle, found, httpTransport, secretSigner, signedIntent, type AskedOf, type DeclaredHandle, type Kind, type Signed, type Transport } from "@generalbusiness/artroom-client";
-import { MemoryState, alsoItems, applyEntry, isFactRef, timeMs, timeOf, validateDefinition, type Delivered, type Item, type ValidDefinition } from "@generalbusiness/artroom-derive";
+import { MemoryState, alsoItems, applyEntry, isFactRef, snapshotInput, stagedRefName, timeMs, timeOf, validateDefinition, type AncestryCheck, type Delivered, type Item, type StagedRef, type ValidDefinition } from "@generalbusiness/artroom-derive";
 import { grantOf, keys, type Actor } from "@generalbusiness/artroom-derive/testing";
-import type { Checkpointed, Delivery } from "@generalbusiness/artroom-scope";
-import { net, type CapabilityScript } from "@generalbusiness/artroom-scope/testing";
+import type { Checkpointed, Delivery, EffectAnswer, EffectRequest } from "@generalbusiness/artroom-scope";
+import { CODE, net, type CapabilityScript } from "@generalbusiness/artroom-scope/testing";
 import { api, route } from "@generalbusiness/artroom-scope/worker";
 import { DIGESTS, change, definitions, issue } from "../../src/index.ts";
 
@@ -136,7 +138,71 @@ export const capable: CapabilityScript = {
   },
 };
 
-type Remote = { deliver(envelope: Delivered): Promise<Delivery>; dispatch(): Promise<number>; checkpoint(): Promise<Checkpointed> };
+/**
+ * A STAND-IN for the systems outside the service: the Git host of one
+ * canonical repository, and the reader that walks its commits. It answers
+ * the one request of each attempt that the code of `hold@1` opened, from
+ * the sealed entry that opened the operation, as the driver gives it.
+ *
+ * - A mint: a token ID that it counts, with an end time. A revocation: yes.
+ * - The creation of a staged ref: it keeps the ref, and answers with a read
+ *   that shows it.
+ * - The ancestry read: the staged refs that it keeps, as the snapshot, and
+ *   a record that found nothing of other work on the commit or under it.
+ *   No commit exists and none is walked: the record is the answer of a walk
+ *   over a repository where the commit's only parent is published.
+ *
+ * So a scenario with it shows what a lane's records and guards do with
+ * such answers, in the order that real outcomes arrive. It shows nothing
+ * about a real host, a real walk, a fork, or a credential. The creation of a
+ * fork and the read of a head are not answered: their rules are not built
+ * (plan step 18), and those attempts stay recorded and not sent.
+ */
+export class Host {
+  readonly refs: StagedRef[] = [];
+  /** Every request that reached the stand-in, as its owner's kind. */
+  readonly asked: string[] = [];
+  #tokens = 0;
+  accepts(owner: string, kind: string): boolean { return owner === "hold@1" && ["mint", "revoke", "stage", "check"].includes(kind); }
+  send(request: EffectRequest): EffectAnswer | null {
+    this.asked.push(request.kind);
+    const records = request.origin.entry.effects.flatMap((effect) => (effect.effect === "record" ? [effect] : []));
+    if (request.kind === "mint") return { result: "confirmed", evidence: { basis: "own-answer", body: { token: `token-${++this.#tokens}`, ends: soon(600) } } };
+    if (request.kind === "revoke") return { result: "confirmed", evidence: { basis: "own-answer", body: {} } };
+    if (request.kind === "stage") {
+      const root = records.find((r) => r.kind === "root" && r.values["operation"] === request.operation);
+      if (!root) return null;
+      const ref = stagedRefName(request.scope, root.values["commit"] as string, root.key[0] as number);
+      if (!this.refs.some((kept) => kept.ref === ref)) this.refs.push({ ref, target: root.values["commit"] as string });
+      return { result: "confirmed", evidence: { basis: "read", body: { ref, value: root.values["commit"] } } };
+    }
+    const pin = records.find((r) => r.kind === "pin" && r.values["check"] === request.operation);
+    const snapshot = snapshotInput(this.refs);
+    if (!pin || !snapshot) return null;
+    const record: AncestryCheck = {
+      commit: pin.values["commit"] as string, root: { number: pin.values["root"] as number, state: "live" }, head: "0".repeat(40),
+      snapshot: { digest: snapshot.digest, count: this.refs.length }, start: { foreign: null }, stops: [], F: [], visited: 1,
+    };
+    return { result: "confirmed", evidence: { basis: "own-answer", body: { record } }, retain: [snapshot] };
+  }
+}
+
+/**
+ * Run every scope of the namespace on the capability's code, as the
+ * production ports hold it, with a new `Host`, a STAND-IN, for the outside.
+ * The scenario that asked leaves the namespace as `graph` made it.
+ */
+export function onCode(): Host {
+  const host = new Host();
+  net.capability = CODE;
+  net.outside = host;
+  return host;
+}
+
+type Remote = {
+  deliver(envelope: Delivered): Promise<Delivery>; dispatch(): Promise<number>; checkpoint(): Promise<Checkpointed>;
+  prepare(signed: SignedIntent, grants: readonly Grant[], capability: string, step: string): Promise<Answer>; effect(): Promise<number>;
+};
 /** What the graph needs of a scope, whatever its definition: its entries and its dispatcher. */
 type Member = { entry(seq: number): Promise<Entry>; readonly stub: Remote };
 const objectOf = (name: string): DurableObjectStub => env.NET.get(env.NET.idFromName(name));
@@ -230,6 +296,43 @@ export class Node<D extends DeclaredDefinition> {
     if (answer.answer !== "accepted") expect.fail(`${kind} was not accepted: ${JSON.stringify(answer)}`);
     return answer.receipt;
   }
+  /** One step of `hold@1`, asked of this lane with that signed intent, and every grant of the fixture, as `submit` presents them. */
+  prepare(signed: SignedIntent, step: string): Promise<Answer> { return this.stub.prepare(signed, this.grants(), "hold@1", step); }
+  /** Let the operations driver send what is due to the outside stand-in and record each answer, until nothing is due. */
+  async effects(): Promise<void> {
+    for (let made = 1; made > 0;) made = await this.stub.effect();
+  }
+  /**
+   * The step `instance`, by the hold's holder: the signed intent of a step
+   * with no act (authority note, section 5.7). `task` is a reference that no
+   * scope answers: no task scope is delivered.
+   */
+  async instance(who: Actor, hold: number, instance = "i-1"): Promise<Answer> {
+    const fields = { hold, task: { ...this.at, kind: "task" } as ScopeRef, instance };
+    return this.prepare(signIntent({ v: 1, to: this.at, actor: who.key, kind: "hold@1:instance", on: null, expected: {}, fields, idempotencyKey: crypto.randomUUID(), notAfter: soon(60) }, who.secret), "instance");
+  }
+  /**
+   * One act of this lane with its preparation, on the capability's code: the
+   * intent is signed, the lane is asked for the step `stage`, or for the step
+   * `check` when a live root already holds the commit, and the outside
+   * stand-in answers what the step opened. The signed intent is returned,
+   * to be submitted. A step that is refused leaves the act to say why.
+   */
+  async staged<K extends Kind<D>>(who: Actor, kind: K, asked: AskedOf<D, K>): Promise<Signed> {
+    const signed = await this.signed(who, kind, asked);
+    const staged = await this.prepare(signed.signed, "stage");
+    if (staged.answer === "refused" && staged.reason === "guard-failed") await this.prepare(signed.signed, "check");
+    await this.effects();
+    return signed;
+  }
+  /** How an act with its preparation was answered, as `answered` writes it. */
+  async stagedAsks<K extends Kind<D>>(who: Actor, kind: K, asked: AskedOf<D, K>): Promise<string> { return answered(await this.submit(await this.staged(who, kind, asked))); }
+  /** An act with its preparation that must be accepted. */
+  async stagedDid<K extends Kind<D>>(who: Actor, kind: K, asked: AskedOf<D, K>): Promise<Receipt> {
+    const answer = await this.submit(await this.staged(who, kind, asked));
+    if (answer.answer !== "accepted") expect.fail(`${kind} was not accepted: ${JSON.stringify(answer)}`);
+    return answer.receipt;
+  }
   /** An intent that the client's handle would not sign, signed as it is: for a shape that the scope itself must refuse. */
   raw(who: Actor, kind: string, fields: Record<string, FieldValue>): Promise<Answer> {
     const signed: SignedIntent = signIntent({ v: 1, to: this.at, actor: who.key, kind, on: null, expected: {}, fields, idempotencyKey: crypto.randomUUID(), notAfter: soon(60) }, who.secret);
@@ -250,7 +353,7 @@ export class Node<D extends DeclaredDefinition> {
 
 /**
  * A SCRIPTED platform peer: a stand-in for a scope of a platform kind that
- * is not delivered. It has a reference and no object. Each entry is written
+ * the scenario does not run. It has a reference and no object. Each entry is written
  * here by hand, with one send, and nothing judged it. A lane reads it
  * through the namespace's test resolver, as it reads any source entry. So a
  * delivery from a peer shows what the lane does with a verified message
@@ -358,13 +461,15 @@ export const README = "The office of a test repository.";
  * A new graph: an office founded by rita, which retains the two lane
  * declarations for the lanes it creates. Transport is undisturbed, and the
  * scripted capability refuses every guard, until the scenario says
- * otherwise. With no capability at all, as in production, no scope runs
- * under either lane definition: the scope package's founding test shows
- * that.
+ * otherwise: `capable` makes the stand-in's guards hold, and `onCode` runs
+ * the namespace on the capability's code with no stand-in for it. With no
+ * capability code at all, no scope runs under either lane definition: the
+ * scope package's founding test shows that.
  */
 export async function graph(): Promise<Graph> {
   net.hold = net.deaf = null;
   net.capability = {};
+  net.outside = null;
   const founding = await signedIntent(secretSigner(rita.secret), { to: null, kind: "found", fields: { readme: textDigest(README) } }, { now: timeMs(net.clock.now)! });
   // Over the Worker's HTTP route: the founding intent names the digest of the text, and the text travels beside it in the body.
   const { answer, scope } = await found(http, founding, officeDefinition, definitions, reader, { texts: [README] });
@@ -378,6 +483,7 @@ export async function graph(): Promise<Graph> {
     net.hold = net.deaf = null;
     await made.settle();
     net.capability = null;
+    net.outside = null;
   });
   return made;
 }

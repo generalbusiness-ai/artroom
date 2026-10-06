@@ -2,6 +2,13 @@
 // which a scope's object is named by its scope ID and by nothing else, and
 // the SQLite migration of its class. This file is configuration only.
 // Nothing in this repository deploys it.
+//
+// Read sessions need two more bindings, and neither is in this file. An
+// operator sets them: the secret SESSION_SECRET, of at least 32 bytes from a
+// cryptographic random source, from a file or standard input and never as an
+// argument; and the variable DEPLOYMENT, the deployment's name. With either
+// missing the Worker issues no session and accepts none, and no reader may
+// read.
 {
   "name": "artroom-scope",
   "main": "src/worker.ts",

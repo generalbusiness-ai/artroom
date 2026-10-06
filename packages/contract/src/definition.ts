@@ -55,7 +55,7 @@ export type FieldType =
   | { type: "scope"; kind: ScopeKind }
   | { type: "digest" } | { type: "commit" } | { type: "tree" }
   | { type: "record"; of: Record<string, FieldType & { required: boolean }> }   // named members; a member is named after its field with a dot
-  | { type: "list"; of: FieldType; max: number };   // at most 32 elements
+  | { type: "list"; of: FieldType; max: number };   // at most 64 elements from revision 19 (section 6.1)
 
 // ---------------------------------------------------------------- section 6.3
 

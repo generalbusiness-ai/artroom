@@ -39,8 +39,8 @@
  * read in all. It is the caller's own limit and no number of the texts.
  */
 
-import type { Digest, FactRef, ScopeRef } from "@generalbusiness/artroom-contract";
-import { canonicalBytes, digestOfHash, isDigest, isFactRef, isLocalId, isRecord, isScopeRef, sha256, utf8 } from "@generalbusiness/artroom-bytes";
+import type { Digest, FactRef, RetainedInput, ScopeRef } from "@generalbusiness/artroom-contract";
+import { canonicalize, isDigest, isFactRef, isLocalId, isRecord, isScopeRef, parseStrict, snapshotDigest } from "@generalbusiness/artroom-bytes";
 import { byteOrder } from "../values.ts";
 
 /** The ancestry record (authority note, section 6.2, "The record"; scope contract, section 16.4), member for member. */
@@ -70,9 +70,6 @@ export interface StagedRef { ref: string; target: string }
 export const ANCESTRY_BOUNDS = { visited: 4096, stops: 64, F: 64 } as const;
 export interface WalkBounds { visited: number; stops: number; F: number; reads?: number }
 
-/** The byte domain of a snapshot of staged refs (scope contract, section 2.1). */
-// I3 merge: the contract package's `DOMAINS` has no member for this tag yet. Step 16 adds it there, and this constant goes.
-export const SNAPSHOT_DOMAIN = "artroom-snapshot-1";
 const STAGED = "refs/artroom/staged/";
 
 /** The length of a Git object ID that is well formed: 40 for SHA-1, 64 for SHA-256. Null: it is no object ID. */
@@ -99,11 +96,30 @@ export function snapshotOf(pairs: readonly StagedRef[]): { pairs: readonly Stage
   if (!Array.isArray(pairs) || pairs.some((p: unknown) => !isRecord(p) || typeof p["ref"] !== "string" || !p["ref"].startsWith(STAGED) || objectIdLength(p["target"]) === null)) return null;
   const sorted = pairs.map(({ ref, target }) => ({ ref, target })).sort((a, b) => byteOrder(a.ref, b.ref));
   if (sorted.some((p, i) => i > 0 && p.ref === sorted[i - 1]!.ref)) return null;
-  const [head, body] = [utf8(`${SNAPSHOT_DOMAIN}\n`), canonicalBytes(sorted)];
-  const bytes = new Uint8Array(head.length + body.length);
-  bytes.set(head, 0);
-  bytes.set(body, head.length);
-  return { pairs: sorted, digest: digestOfHash(sha256(bytes)), count: sorted.length };
+  return { pairs: sorted, digest: snapshotDigest(sorted), count: sorted.length };
+}
+
+/**
+ * A snapshot as a scope retains it (scope contract, sections 9.2 and 16.4):
+ * the kind `snapshot`, the digest in the domain `artroom-snapshot-1`, and
+ * the pairs in byte order of ref as canonical JSON text. Null: it is no
+ * snapshot. The scope stores it before the entry that names the digest.
+ */
+export function snapshotInput(pairs: readonly StagedRef[]): RetainedInput | null {
+  const snapshot = snapshotOf(pairs);
+  return snapshot && { kind: "snapshot", digest: snapshot.digest, bytes: canonicalize(snapshot.pairs) };
+}
+
+/** The pairs of a retained snapshot, read from its bytes and checked against the digest that it is kept under. Null: the bytes are no snapshot with that digest. */
+export function snapshotRead(digest: Digest, bytes: string): readonly StagedRef[] | null {
+  let pairs: unknown;
+  try {
+    pairs = parseStrict(bytes);
+  } catch {
+    return null;
+  }
+  const snapshot = Array.isArray(pairs) ? snapshotOf(pairs as StagedRef[]) : null;
+  return snapshot?.digest === digest ? snapshot.pairs : null;
 }
 
 /** One of the lane's own roots under the source commitment, as its records hold it. */

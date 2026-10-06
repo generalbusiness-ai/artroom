@@ -10,17 +10,30 @@
  * it.
  */
 
-import type { PlatformData } from "@generalbusiness/artroom-contract";
+import type { ObservationRequest, PlatformData, ScopeRef } from "@generalbusiness/artroom-contract";
+import { destination } from "./destination.ts";
 import { inbox } from "./inbox.ts";
-import type { Rules } from "@generalbusiness/artroom-derive";
+import { membership, standingOf } from "./membership.ts";
+import { register } from "./register.ts";
+import { directory, directoryMembership } from "./directory.ts";
+import type { Rules, StateView } from "@generalbusiness/artroom-derive";
 import { RULES } from "./rules.ts";
+import { rulesScope } from "./rules-scope.ts";
 
-export { inbox };
+export { inbox, membership, register, directory, destination };
+export { FIRST_ACTIONS, MEMBERSHIP, NO_MEMBER, ROLE_LISTS, ROLE_TABLE, actionsIn, isHandle, standingOf, type Role } from "./membership.ts";
+export { CREATION_ATTEMPTS, DIRECTORY_CLAUSES, REGISTER, REPOSITORY, directorySeed, registerRules } from "./register.ts";
+export { DEFINITION_DOMAIN, DIRECTORY, IMPORT_ATTEMPTS, SEEN, directoryMembership, directoryRules } from "./directory.ts";
+export { COLLECT_MOST, DESTINATION, DESTINATION_ATTEMPTS, DESTINATION_KINDS } from "./destination.ts";
 export { RULES };
+export { rulesScope };
+export { CONFIGURATION_BYTES, CONFIGURATION_DOMAIN, RULES_SCOPE, membershipId } from "./rules-scope.ts";
 export type { PlatformName, RuleTable } from "./rules.ts";
+export { CONTROLLER, EXTENTS_MOST, EXTENT_CLASSES, LANDING, RULES_EXTENT, RULES_PATTERNS, classify, firstExtents, holdsRulesExtent, judgeExtents, matches } from "./extents.ts";
+export type { Extent, ExtentClass, ExtentJudged, ExtentsAsked, ExtentsJudged, Holder, Lack, Touched, TreeLink } from "./extents.ts";
 
 /** The platform definitions delivered so far, by name without the version. */
-export const definitions: Readonly<Record<string, PlatformData>> = { "platform:inbox": inbox };
+export const definitions: Readonly<Record<string, PlatformData>> = { "platform:inbox": inbox, "platform:membership": membership, "platform:register": register, "platform:directory": directory, "platform:rules": rulesScope, "platform:destination": destination };
 
 /**
  * One version of a platform definition, as a runtime or a verifier is
@@ -31,6 +44,24 @@ export const definitions: Readonly<Record<string, PlatformData>> = { "platform:i
 export interface Platform {
   readonly data: PlatformData;
   readonly rules: Rules;
+  /**
+   * What a scope under this version answers to an observation read, from
+   * its folded state at one head (authority note, section 3.3): a pure
+   * function of the state and the request. It is code of the version, as
+   * its rules are, so a replay derives the value of a retained observation
+   * with it, from the observed scope's history at the recorded head (the
+   * contract's section 16.1, "Replay"). Absent: a scope under this version
+   * answers no observation.
+   */
+  readonly observed?: (state: StateView, asked: ObservationRequest) => unknown;
+  /**
+   * Where a scope under this version records its membership reference,
+   * when that is not its genesis entry (authority note, section 3.3, "Where
+   * it records its membership reference"): a pure function of its folded
+   * state. A replay reads the reference with it, as the production
+   * authority does. Absent: the genesis entry holds it.
+   */
+  readonly membership?: (state: StateView) => ScopeRef | null;
 }
 
 /**
@@ -43,5 +74,5 @@ export function platform(named: string): Platform | null {
   const name = named.slice(0, cut);
   const data = cut > 0 && named.slice(cut) === "@1" && Object.hasOwn(definitions, name) ? definitions[name] : undefined;
   if (!data) return null;
-  return { data, rules: Object.hasOwn(RULES, name) ? (RULES as Record<string, Rules>)[name]! : {} };
+  return { data, rules: Object.hasOwn(RULES, name) ? (RULES as Record<string, Rules>)[name]! : {}, ...(data === membership ? { observed: standingOf } : {}), ...(data === directory ? { membership: directoryMembership } : {}) };
 }

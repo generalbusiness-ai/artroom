@@ -10,9 +10,10 @@
  */
 
 import type { Digest, Entry, FactRef, Grant, PlatformDefinition, Prepared, RoutingRefusal, ScopeRef, SignedIntent, Timestamp, UnavailableReason } from "@generalbusiness/artroom-contract";
-import { timeOf, type Capabilities, type Clock as Reading, type Delivered, type Owners, type Presented, type RuleInput, type StateView, type Window } from "@generalbusiness/artroom-derive";
+import { TOKENS_FLOOR, capabilitiesOf, gitRead, holdCapability, timeOf, type Capabilities, type HoldOptions, type Clock as Reading, type Delivered, type Owners, type Presented, type RuleInput, type StateView, type Window } from "@generalbusiness/artroom-derive";
 import { evaluateRules } from "@generalbusiness/artroom-derive/rule";
 import { platform, type Platform } from "@generalbusiness/artroom-platform";
+import { toConsole, type DiagnosisSink } from "./diag.ts";
 import { NO_OUTSIDE, type Outside } from "./operations.ts";
 
 /** One reading for each call (section 5.3). The core calls it once in a step 3 and once in a commit. */
@@ -171,10 +172,20 @@ export interface SentTexts { read(from: FactRef, digest: Digest): Promise<TextRe
 /** The reads of section 9.1. */
 /** `log` and `retained` are what a verifier reads (sections 9.2 and 9.4): the stored bytes of entries, and retained inputs. */
 /** `operations` is the read of a scope's outside operations, which the contract does not list (I3 deltas, entry EB9). */
-export type ReadName = "summary" | "items" | "history" | "entry" | "outbox" | "operations" | "log" | "retained";
+/** `incidents` and `waiting` are the reads of the operator's record and of the two lists of waiting requests (authority note, section 12, G13 and G17). */
+export type ReadName = "summary" | "items" | "history" | "entry" | "outbox" | "operations" | "log" | "retained" | "incidents" | "waiting";
 
-/** Who may read. `reader` is whatever the caller presented; sessions are the authority note's. */
-export interface Readers { allows(reader: unknown, read: ReadName): boolean }
+/**
+ * Who may read. `reader` is whatever the caller presented. The production
+ * port is the read sessions of `sessions.ts` (authority note, section 3.9).
+ * True: this reader may make this read. False: it may not, and the read is
+ * answered `forbidden`. A name: a session was presented and could not be
+ * judged, and the read is answered with that name. `sessions-unavailable`:
+ * the scope has no usable session secret (section 5.5). `clock-behind`: the
+ * scope's clock reads earlier than its previous entry's time (section 3.12,
+ * W6). Nothing is read in any of the three cases.
+ */
+export interface Readers { allows(reader: unknown, read: ReadName): boolean | "sessions-unavailable" | "clock-behind" }
 
 export interface Ports {
   clock: Clock; random: Random; authority: Authority; resolver: Resolver; rules: Rules; alarm: Alarm; definitions: Definitions; texts: SentTexts; readers: Readers;
@@ -187,9 +198,11 @@ export interface Ports {
    * capability's records, and the input being judged: derive's
    * `Capabilities`. A value may also hold the rules of a capability's steps
    * (derive's `Steps`), what a hold's entries derive for its workspace, and
-   * the binding of a reserved request. Null: it has none. A scope is not
-   * founded or created under a definition that uses a form with no rule
-   * here: `unsupported-definition`.
+   * the binding of a reserved request, and the most that each piece of the
+   * code derives in one entry. Null: it has none. A scope is not founded or
+   * created under a definition that uses a form with no rule here, or whose
+   * entries, counted with this code, pass the bound on derived effects:
+   * `unsupported-definition`.
    */
   capabilities: Capabilities | null;
   /** The port for effects outside the service: one request of one attempt of an operation (`operations.ts`; section 4.3). */
@@ -201,14 +214,42 @@ export interface Ports {
    * no outcome is judged, and no attempt is sent.
    */
   owners: Owners | null;
+  /**
+   * Where a diagnosis goes (`diag.ts`): one line for a failure at a port
+   * that no entry and no answer describes. It holds fixed words and an
+   * error's name from a fixed list, and never an error's message.
+   */
+  diagnoses: DiagnosisSink;
 }
 
 /**
- * What the production authority reads: no grant. The membership scope
- * cannot be read yet, so no grant is current, and every act that needs one
- * is refused `unauthorized`.
+ * What the default authority port reads: no grant, so every act that needs
+ * one is refused `unauthorized`. The deployed class does not use it: it
+ * supplies `Wiring.authority`, which reads the membership scope that the
+ * scope's genesis records (`authority.ts`, `repositoryAuthority`). This
+ * default is what a scope has when no wiring gives an authority.
  */
 const NO_GRANT: Standing = { held: () => [] };
+
+/**
+ * The two numbers of `hold@1` as this runtime runs the version (authority
+ * note, section 5.7, "The bound on the tokens of one hold"; section 6.2,
+ * "Retiring a root"). Both are the proof plan's, and no text proposes one.
+ * So each is the narrowest value that the texts allow: the floor of the
+ * bound on a hold's tokens, and no retention, under which no root is
+ * retired. They are values of the capability's version and no bound of the
+ * contract's section 7.5, so they are stated here and are no member of
+ * `Bounds` (I3 deltas, entry EL5).
+ */
+export const HOLD_VERSION: HoldOptions = { tokensPerHold: TOKENS_FLOOR, rootRetentionSeconds: null };
+
+/**
+ * The code of the two capability versions, as one value for the two ports
+ * that ask it: the forms and the steps (`capabilities`), and the rules of
+ * the operations that `hold@1` and `git-read@1` own (`owners`). It is derive's code: pure
+ * functions that hold no state and read no port.
+ */
+export const CAPABILITY_CODE = capabilitiesOf(holdCapability(HOLD_VERSION), gitRead());
 
 /**
  * The production defaults. The clock and the random source are the
@@ -216,14 +257,27 @@ const NO_GRANT: Standing = { held: () => [] };
  * the object supplies its own. There is no transport until a namespace
  * supplies one, and no declaration and no sent text can be read until a
  * namespace supplies the scope that retains it. The platform definitions
- * are the platform package's. No code for a capability form is wired here.
- * Derive has the rules of `hold@1` over its records and the guard
- * `ancestry` of `git-read@1` (`holdCapability` and `gitRead`), and this
- * port does not hold them until plan step 16: the I3 deltas note, entries
- * EH6 to EH12, lists what an owner must decide first. Nothing is sent
- * outside the service, and no owner of an
- * outside operation has rules: a host port and the owners' rules replace
- * them (plan steps 19 and 16). Every other port refuses.
+ * are the platform package's.
+ *
+ * The capability code is derive's: `hold@1` over its records, with its
+ * steps and the rules of its operations, and the guard `ancestry` and the
+ * step `job-read` of `git-read@1`, with a read token's mint and
+ * revocation. So a definition that uses those forms is one that this
+ * runtime can pin (section 6.1): the contract's rule is on the code of the
+ * forms that a definition uses, and asks for no peer. What a scope under
+ * such a definition can then do here is little, and each limit is another
+ * port's default:
+ *
+ * - No grant is read, so every act and every step is refused
+ *   `unauthorized`. No hold is opened, and so no operation.
+ * - Nothing is sent outside the service (`NO_OUTSIDE`): an attempt that an
+ *   entry opened would stay recorded and never sent. No Git host is read,
+ *   so no check entry is written and no snapshot is retained.
+ * - A delivery from another scope is judged by its handler, whose
+ *   capability guards read this scope's records, of which there are none.
+ * - No reader may read.
+ *
+ * Every other port refuses.
  */
 export function production(): Ports {
   return {
@@ -239,8 +293,9 @@ export function production(): Ports {
     texts: { read: () => Promise.resolve({ ok: false, reason: "unavailable" }) },
     readers: { allows: () => false },
     transport: null,
-    capabilities: null,
+    capabilities: CAPABILITY_CODE,
     outside: NO_OUTSIDE,
-    owners: null,
+    owners: CAPABILITY_CODE,
+    diagnoses: toConsole,
   };
 }

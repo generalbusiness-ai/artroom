@@ -29,14 +29,18 @@ what a judge drafts, in one storage transaction for each entry.
 | `definitions` | `creates(declared)`: the digests a declaration names in its `create` sends. `namedBy(root, read, validate, limit)`: the declarations a scope retains for its children. |
 | `turn` | `Turns.run(waiting, founding?)`: section 5.2, steps 3 to 7, and section 5.3. `isSigned` and `fetchFacts`: step 1. `Waiting`, `Verdict`, `End`. |
 | `core` | `Scope`: `found`, `submit`, `settle`, `alarm`, `checkpoint`, `pinned`. `receiptOf`. The answers `Founded` and `Checkpointed`. |
-| `reads` | `Reads`: `summary`, `items`, `history`, `entry`, `outbox`, and `duty`, one send's row; `operations` and `operation`, the outside operations with their attempts and outcomes. For a verifier: `log`, a history page as stored bytes, and `retained`, one retained input. `ReadBounds` and `READ_BOUNDS`. |
+| `sessions` | Read sessions: `sessionsOf`, `mintSession`, `openSession`, `sessionReaders` (the production readers port), `issueSession` (membership's answer to a signed request), `credentialInUrl`, and `Streams` with `relay`, the streams of a scope's head. |
+| `limits` | `JoinLimits`: the serving limits of a join at the front of a membership scope. `addressKey`, `isJoin`, `PROPOSED_LIMITS`. |
+| `operator` | `OperatorRecord`: the operator's record of a scope, outside its history. `incidentsOf`, `waitingIn`, and `sendAgain`, the instruction to dispatch a waiting request once more. |
+| `reads` | `Reads`: `summary`, `items`, `history`, `entry`, `outbox`, and `duty`, one send's row; `operations` and `operation`, the outside operations with their attempts and outcomes; `incidents`, a page of the operator's record, and `waiting`, the two lists of requests that wait. For a verifier: `log`, a history page as stored bytes, and `retained`, one retained input. `ReadBounds` and `READ_BOUNDS`. |
 | `delivery` | `Deliveries.deliver(envelope)`: receiving. It reads the source entry through the resolver, checks it against the fact's hash, and runs derive's delivery judge, or its genesis judge for a `create` that reaches an empty store, in the scope's turn. It answers as transport does: `recorded` with a fact, `retry`, `routing` or `source-unverified`. |
 | `outbox` | `Dispatcher.run()`: sending. One pass at a time over the sends that are due: a durable record before each dispatch and after its answer, a retry delay that doubles, and a `diagnosis` input through the turn when a request is given up. `Wakes`: one alarm for the earliest deadline, the next dispatch and the next attempt of an outside operation. |
 | `operations` | `Operations.run()`: the driver of outside effects, beside the dispatcher. An attempt is recorded by its entry, marked durably before its one request leaves, and never sent twice: one that is found marked with no outcome is recorded `unknown`. An answer becomes an `outcome` input through the turn. `Operations.answered()` takes an answer at any later time. `Outside` is the port, and `NO_OUTSIDE`, the default of `production()`, sends nothing. |
-| `authority` | `observing(config)`: the authority port over reads of a membership scope. The read is made before the turn, is counted by run and number, and is kept only in memory: at most one observation for each key, and a revoked answer for the run. `Membership` is the port that reads a membership scope. The production wiring does not use it yet. |
-| `namespace` | `namespace(binding)`: the production `Resolver`, `Transport`, `Definitions` and `SentTexts`, each one RPC call on the object a scope ID names. `membershipIn(binding)`: the read of a membership scope, which no object answers yet. `routed`: the resolver of a name, which refuses a wrong address before any judgment. `sourced`: the answer to a read of one entry. `declaredBy`: the answer to a read of one retained declaration. `sentText`: the answer to a read of one detached text that a send of this scope names. |
-| `object` | `ScopeObject`: the Durable Object class. It wires the store, the ports, the core, receiving, the dispatcher and the reads, and exposes them over RPC: `found`, `submit`, `settle`, `checkpoint`, the reads, `deliver`, `source`, `declared`, `text`, `dispatch` and `effect`. Its `alarm()` runs the alarm's turn, then a dispatch pass, then a pass of the operations driver. With no transport, which is its default, nothing is dispatched. With the outside port of `production()`, which sends nothing, and no owner rules, nothing is sent outside the service. |
-| `worker` (its own entry, `@generalbusiness/artroom-scope/worker`) | `route(request, binding)`: the HTTP routes. `ScopeService`: the same operations over a service binding; it implements the contract's `ScopeApi`, which a client's transport also is. `DeployedScope`: the object class with the namespace as its resolver, its transport and its source of declarations. `api(binding)`: what both call. The default export is the deployed Worker. |
+| `diag` | `diagnosis`, `report` and `redact`: one line of the log for a failure at a port that no entry and no answer describes. A diagnosis holds an event and a step, which are fixed words, and an error's name from a fixed list. It reads no message of a thrown value. `redact` replaces what has the syntax of a credential and cuts to a stated length: a second guard, and not a complete one. |
+| `authority` | `observing(config)`: the authority port over reads of a membership scope. The read is made before the turn, is counted by run and number, and is kept only in memory: at most one observation for each key, and a revoked answer for the run. `Membership` is the port that reads a membership scope. `repositoryAuthority(config)`: the authority of the deployed class. A membership scope judges its own acts on its own head, and every other scope reads the membership scope that it records, with `observing`. A scope that records none reads nothing. |
+| `namespace` | `namespace(binding)`: the production `Resolver`, `Transport`, `Definitions` and `SentTexts`, each one RPC call on the object a scope ID names. `membershipIn(binding)`: the read of a membership scope, which that scope's object answers as `observe`. `routed`: the resolver of a name, which refuses a wrong address before any judgment. `sourced`: the answer to a read of one entry. `declaredBy`: the answer to a read of one retained declaration. `sentText`: the answer to a read of one detached text that a send of this scope names. |
+| `object` | `ScopeObject`: the Durable Object class. It wires the store, the ports, the core, receiving, the dispatcher and the reads, and exposes them over RPC: `found`, `submit`, `settle`, `checkpoint`, the reads, `deliver`, `source`, `declared`, `text`, `dispatch` and `effect`. Its `alarm()` runs the alarm's turn, then a dispatch pass, then a pass of the operations driver. With no transport, which is its default, nothing is dispatched. With the outside port of `production()`, which sends nothing, nothing is sent outside the service. |
+| `worker` (its own entry, `@generalbusiness/artroom-scope/worker`) | `route(request, binding)`: the HTTP routes. `ScopeService`: the same operations over a service binding; it implements the contract's `ScopeApi`, which a client's transport also is. `DeployedScope`: the object class with the namespace as its resolver, its transport and its source of declarations, with `repositoryAuthority` as its authority and read sessions as its readers port. `api(binding)`: what both call. The default export is the deployed Worker. |
 
 `@generalbusiness/artroom-scope/testing` is for tests only: a test
 authority, which is a stand-in that reads no membership scope and calls
@@ -53,7 +57,7 @@ hold, a Git read or a provider. The main entry and `worker.ts` do not import it.
 
 Two more controls of that module serve tests of several scopes. `net.peers`
 holds the entries of scripted peers: stand-ins for scopes of a platform
-kind that is not delivered, such as a rules scope or a destination. A
+kind that a test does not run, such as a rules scope or a destination. A
 receiver reads such an entry as it reads any source entry, and nothing
 judged it. `net.sized` gives one scope of the namespace its own bounds, by
 the name of its object.
@@ -73,21 +77,25 @@ for a few acts
 |---|---|---|
 | `Clock` | One reading for each call. | The runtime's clock. |
 | `Random` | The bytes of a new incarnation. | The runtime's random source. |
-| `Authority` | Two phases. `read`, before the turn: what the judgment of one act's signer needs, within the fetch time limit. `held`, a method of what was read, in the commit: each grant the act may be judged on, and whether it is current at the commit's reading. It is a function of the folded state, that reading and what was read. `sealed`, optional: the commit tells the port the entry that it wrote on that answer. | The read finds no grant, so none is current. Every act that needs one is refused `unauthorized`. |
+| `Authority` | Two phases. `read`, before the turn: what the judgment of one act's signer needs, within the fetch time limit. `held`, a method of what was read, in the commit: each grant the act may be judged on, and whether it is current at the commit's reading. It is a function of the folded state, that reading and what was read. `sealed`, optional: the commit tells the port the entry that it wrote on that answer. | The read finds no grant, so none is current. Every act that needs one is refused `unauthorized`. `DeployedScope` supplies `repositoryAuthority`, which reads the membership scope that the scope records. With none recorded nothing is read, and an act that needs a grant is answered `authority-unavailable`. |
 | `Resolver` | One foreign entry by fact reference, within the fetch time limit: the entry, `absent` when the object at that name does not hold it, or nothing when it cannot be read now. | Nothing can be read. An act that names a foreign entry is answered `dependency-unavailable`. `DeployedScope` supplies the namespace. |
 | `Transport` | One dispatch of one send to the object its address names, answered or not. | None: the sends stay in the outbox. `DeployedScope` supplies the namespace. |
 | `Rules` | The results of prepared rule inputs. | Derive's evaluator, `evaluateRules`. |
 | `Alarm` | The next wake time. | In `production()`, nothing. `ScopeObject` supplies the object's own alarm. |
 | `Definitions` | `read`: a declaration by digest, from the scope that retains it. `platform`: a platform definition by name and version, with the rows of each entry that are code and the rules written for them. | `read`: a digest is unavailable. `DeployedScope` supplies the namespace, which reads a child's declaration from its creator. `platform`: the platform package's definitions. A name it does not hold is `unsupported-definition`. |
 | `SentTexts` | A detached text that a delivered message names by digest, from the scope that sent the message. | Unavailable: a delivery that names one is not decided. `DeployedScope` supplies the namespace, which reads the text from the sender. |
-| `Readers` | Whether a reader may make a read, by the read's name. `operations` and `operation` are asked as `operations`. | Nobody may: every read is `forbidden`. |
-| `capabilities` | The rules of the capability forms this runtime has code for: the records, guards and effects of `hold@1`, and `git-read@1`. Each rule is a pure function of its arguments, the folded state and the input being judged. | None. A scope is not founded or created under a definition that needs one: `unsupported-definition`. The item form of `hold@1`, with its `hold` effect, needs none and runs. |
+| `Readers` | Whether a reader may make a read, by the read's name. `operations` and `operation` are asked as `operations`. It answers yes, no, or one of two names for a session that could not be judged: `sessions-unavailable` and `clock-behind`. | Nobody may: every read is `forbidden`. The deployed class uses read sessions: "Read sessions", below. |
+| `capabilities` | The rules of the capability forms this runtime has code for: the records, guards and effects of `hold@1`, and `git-read@1`. Each rule is a pure function of its arguments, the folded state and the input being judged. | `CAPABILITY_CODE`: derive's code of `hold@1` and `git-read@1`, with the floor of 2 tokens for one hold and no retention of a root. A runtime with none does not found or create a scope under a definition that needs one: `unsupported-definition`. The item form of `hold@1`, with its `hold` effect, needs none and runs. |
 | `outside` | One request of one attempt of an outside operation, and its answer. | `NO_OUTSIDE`: nothing is sent. Each attempt stays recorded and not sent. |
-| `owners` | The rules of the owners of outside operations that this runtime has code for, by owner and kind: derive's `Owners`. | None. No outcome is judged, and no attempt is sent. |
+| `owners` | The rules of the owners of outside operations that this runtime has code for, by owner and kind: derive's `Owners`. | `CAPABILITY_CODE`: the rules of the operations that `hold@1` and `git-read@1` own. No operation is opened in production, and the `outside` port sends nothing, so no attempt is sent. |
+| `diagnoses` | Where a diagnosis goes. | `toConsole`: one JSON line in the runtime's log. |
 
-So a deployed scope can be founded and can create children, and then
-admits no act and answers no read. The authority note's rules and sessions
-each replace one port.
+So a scope with only these defaults can be founded, and then admits no
+act and answers no read. The deployed class, `DeployedScope`, supplies the
+namespace where the table says so, and replaces two more: its authority
+reads the membership scope that a scope records, and its readers port is
+read sessions. Nothing in this
+repository deploys it.
 
 ## Authority, in two phases
 
@@ -140,9 +148,15 @@ run. What it reads is kept in memory only, so a restart leaves none.
   the read and how the entry used it: `fresh`, or `reused` with the entry
   before. The commit tells the port which entry used a read last.
 
-The production port does not use it yet: no scope records its membership
-scope, and no membership scope answers a read. Its read finds no grant,
-and every act that needs one is refused `unauthorized`.
+The production default does not use it: the `authority` of `production()`
+reads no grant, and every act that needs one is refused `unauthorized`.
+The deployed class, `DeployedScope`, uses it, in `repositoryAuthority`: a
+membership scope answers the read (`observe`), and a scope whose genesis
+records a membership scope, such as an inbox, is judged on it. A rules
+scope and a destination record theirs in a way that the authority does
+not read yet, and an act there that needs a grant is answered
+`authority-unavailable` (I3 deltas, entry EM21). Nothing in this
+repository deploys the class.
 
 ## A platform definition
 
@@ -185,11 +199,25 @@ the designs, and is no review of this source.
 - An act of a row whose `grant` is a mark is judged by the mark's rule in
   place of the grant check. When the rule passes, the entry records
   `authority: []`.
-- A creation under a platform name is not built: it is answered
-  `unsupported-definition`.
+- A creation under a platform name pins the runtime's own data and
+  rules, as a founding does. Nothing of the definition is read from the
+  creator. A version that the runtime cannot run whole is answered
+  `unsupported-definition`: transport answers `retry`, and nothing is
+  recorded.
+- The platform package holds the data of `platform:register@1` and of
+  `platform:directory@1`, and each rule of the two that can be written.
+  The register lacks the rule of one mark, and the directory's data holds
+  three marks with no rule (`notes/2026-10-05-i3-contract-deltas.md`,
+  entries EJ1, EP6 and EP7, and section 22). So nothing is founded or created under
+  either by the production wiring.
+- A directory under `platform:directory@1` records its membership
+  reference in its slot `repository.membership`. The production authority
+  reads it there, from the scope's own folded state.
 
 The founding makes a scope of the kind `directory`, as every founding
-does. The kinds of the platform scopes come with their own definitions.
+does. Derive's genesis judge also founds a register, of the kind
+`register`, by an `install` intent under `platform:register`. The scope's
+`found` does not build that seed yet.
 
 ## A child's definition
 
@@ -331,13 +359,53 @@ the contract's own answer.
 | `GET /v1/scopes/:scope/outbox?cursor=` | A page of the outbox | as above |
 | `GET /v1/scopes/:scope/outbox/:duty` | The outbox status of one send, by its duty ID | as above |
 | `GET /v1/scopes/:scope/log?cursor=` | A page of the history as stored: each entry's canonical bytes and hash, for a verifier | as above |
-| `GET /v1/scopes/:scope/retained/:kind/:digest` | One retained input: a `definition`, an `entry`, a `rule` input or a detached `text`, by digest. A text that was redacted is `not-found` | as above; 413 past 1 MiB |
+| `GET /v1/scopes/:scope/retained/:kind/:digest` | One retained input: a `definition`, an `entry`, a `rule` input, a detached `text` or a `snapshot` of staged refs, by digest. A text that was redacted is `not-found`. A `value` is not served: it is kept by its domain and its digest, and no route names a domain (I3 deltas, entry EX6) | as above; 413 past 1 MiB |
 
 A body is at most 1 MiB of bytes, counted while it is read: a larger body
 is cancelled and is not held. A body over that, or one that is not a JSON
 object in UTF-8, is 400. A path that is not percent-encoded UTF-8 is 400.
 A reader is the `Authorization` header, passed to the readers port as it
-is.
+is. A read session is presented as `Session <token>`.
+
+Four more routes serve what is no history:
+
+| Route | Answer | Status |
+|---|---|---|
+| `POST /v1/scopes/:scope/sessions`, body a signed session request `{ request, sig }` | `SessionAnswer`: the token and what it names, or a reason. Marked `cache-control: no-store` | 200; 400 `bad-request`; 403 `unauthorized`; 404 `not-found`; 409 `replayed`; 422 `misaddressed`, `expired`; 429 `rate-limited`; 503 `sessions-unavailable`, `clock-behind` |
+| `GET /v1/scopes/:scope/stream` | Lines of JSON, `{ at }`: the scope's head when the stream opens and after each commit | 200; as a read otherwise |
+| `GET /v1/scopes/:scope/incidents?cursor=` | A page of the operator's record of the scope, for an admin's session | as a read |
+| `GET /v1/scopes/:scope/waiting/:list?cursor=` | One page of the list `diagnosed` or `unanswered` of the requests that wait, for an admin's session | as a read |
+
+A request whose URL holds a credential, in its path or its query, is
+answered 400 `credential-in-url` before anything is routed. A read with a
+session adds two answers: 503 `sessions-unavailable` and 503
+`clock-behind`.
+
+## Read sessions
+
+A read session is a credential: whoever holds the token reads. It signs
+nothing, controls nothing and gets no other credential (authority note,
+section 3.9).
+
+| Question | Answer |
+|---|---|
+| What it binds | The deployment's name; the membership scope with its incarnation, which is the repository; the member and the device key; the reads of the member's role when it was issued; and an end time at most 600 seconds later, written from membership's clock. |
+| How it is issued | A device signs a session request with its own key, to the membership scope. Membership answers from its head: only an active key of an active member gets one. It writes no entry. A request is answered with a session once: membership notes the key and the request's operation identity, outside its history, until the request's `notAfter`. |
+| How it is verified | By HMAC-SHA-256 under the deployment's session secret, over the exact claim bytes, compared in constant time. Then the deployment's name, then the membership reference: a scope accepts a session only for the membership scope that it records itself. Then the scope's own clock against the end time, at every read and before every send on a stream. |
+| Which clock | Two. Membership's clock wrote the end time, and each reading scope compares it with its own. A scope whose clock reads earlier than its previous entry's time answers `clock-behind` and sends nothing. |
+| After a key is revoked or a member is removed | A session already issued is accepted until its end: at most 600 seconds on membership's clock, plus the difference between the two clocks. No new one is issued. Nothing recalls what was read. |
+| A reader with no session | `forbidden`, from every read. |
+| With no secret | The bindings `SESSION_SECRET`, at least 32 bytes, and `DEPLOYMENT`. With either missing, no session is issued and none is accepted: `sessions-unavailable`. No file of this repository holds a secret. |
+| When the secret is replaced | Every session ends at once. |
+| A stream | Its session is checked before every send. There is no timer: a stream whose session has ended is sent nothing, and is closed when its next send is due. A reader that goes away is released at once, by the route. |
+
+A join at a membership scope is served through `limits.ts`: serving
+limits by the caller's address, held in memory, which no guard reads and
+which can never use up, expire or lock an invitation. The operator's
+record of a scope, `operator.ts`, is storage outside the history: the
+runtime writes an incident there, and no judgment reads it. An operator's
+instruction to send a waiting request again is the object's `resend`,
+which has no route.
 
 ## How to test
 
@@ -347,9 +415,11 @@ npm run typecheck --workspace @generalbusiness/artroom-scope
 ```
 
 The tests run in the workerd test pool, against the real Durable Object
-class and real SQLite storage. `test/worker.ts` binds two classes:
-`TestScope`, which is `ScopeObject` with the test ports, and `ScopeObject`
-as deployed. `test/support.ts` holds the one fixture: derive's fixture lane
+class and real SQLite storage. `test/worker.ts` binds four object classes, each in a namespace of its own:
+`TestScope`, which is `ScopeObject` with the test ports; `ScopeObject`
+with every production default; and `NetScope` and `PlatformScope`, which
+are `DeployedScope` with test ports and are described below and in the
+file's header. `test/support.ts` holds the one fixture: derive's fixture lane
 with three small changes, founded as a directory. A restart is the pool's
 `evictDurableObject`.
 

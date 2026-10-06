@@ -20,6 +20,7 @@ entries DJ1, DJ7 and DJ23 to DJ25.
 |---|---|
 | `intent` | `signedIntent(signer, asked, signing?)`: an intent with a fresh idempotency key and a `notAfter` within the lifetime bound, signed. The intent is a detached copy of what was asked, taken before the signer is awaited, so the value returned is the value signed. `Signer`; `secretSigner(secret)`; `webCryptoSigner()`, over a key that cannot be read; `newIdempotencyKey()`. |
 | `handle` | `ScopeHandle`: `submit(signed, grants?, beside?)`, `settle`, the reads `summary`, `items`, `history`, `entry` and `outbox`, `definition`, `text(digest)`, `followReceipt` and `followDuty`. `found(transport, founding, definition, definitions?, reader?, beside?)`. `Transport`, `TransportError`. |
+| `session` | A read session, as a device holds one: `sessionRequest(to, secret, notAfter, operation)` signs a request with the device's key; `requestSession(service, membership, signed)` asks the membership scope over the HTTP route; `Session` keeps the token in memory, gives `reader()` for a `ScopeHandle`, and leaves the token out of its JSON and its text. A session signs nothing. |
 | `declared` | `declaredHandle(scope, definition)`: a `DeclaredHandle` typed from the definition's own data, or a refusal when the scope publishes another definition. `DeclaredHandle`: `intent(signer, kind, asked, signing?)` and `submit(signed, grants?, beside?)`. `ShapeError`. The types `Kind`, `AskedOf`, `ValueOf`, `Members`, `Signed` and `Declared`. The section "A handle from a declared definition" below says what it checks. |
 | `http` | `httpTransport(service, options?)`: the transport over the service's HTTP routes. `options`: `fetch`, `bytes` and `seconds`. `REPLY_BYTES`, `REPLY_SECONDS`. |
 | `binding` | `bindingTransport(service)`: the transport over a service binding to the Worker's entrypoint. |
@@ -65,9 +66,10 @@ names no lane: any declared definition works, and a value written
 The handle checks no guard, no grant and no state, and derives no
 judgment. A shape that passes may still be refused: the scope checks every
 field again, with its own bounds on a member's handle and on a list, and
-then judges the act. In this delivery no production scope runs a
-definition that uses a capability record, which both lane definitions do:
-a founding under one is answered `unsupported-definition`.
+then judges the act. The production ports hold the code of the two
+capability versions, so a scope may be founded under a definition that
+uses a capability record, as both lane definitions do. No grant is read
+in production yet, so each act of such a scope is refused `unauthorized`.
 
 ## What a transport returns
 

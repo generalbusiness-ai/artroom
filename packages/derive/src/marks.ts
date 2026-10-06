@@ -16,13 +16,14 @@
  * and nothing in an entry says that a rule ran.
  */
 
-import type { ActType, AlsoMark, Attempt, Bounds, Effect, Evidence, FactRef, FieldType, FieldValue, Grant, GrantMark, Guard, Mark, MemberRef, Message, OperationId, PlatformDefinition, Request, ScopeRef, Seed, SignedIntent, Timestamp } from "@generalbusiness/artroom-contract";
-import { isFieldValue, isMemberRef } from "@generalbusiness/artroom-bytes";
+import type { ActType, AlsoMark, Attempt, Bounds, CapabilityName, Digest, DomainTag, Effect, Evidence, FactRef, FieldType, FieldValue, Grant, GrantMark, Guard, KeyId, Mark, MemberId, MemberRef, Message, ObservationUse, OperationId, PlatformDefinition, Request, ScopeRef, Seed, SignedIntent, Timestamp } from "@generalbusiness/artroom-contract";
+import { canonicalize, digestBytes, domainBytes, isDigest, isFieldValue, isMemberRef, parseStrict, utf8 } from "@generalbusiness/artroom-bytes";
 import type { Signer } from "./attribution.ts";
 import type { Own } from "./fields.ts";
 import type { Fetched, GuardResult, Judging } from "./guards.ts";
 import type { Opening } from "./ledger.ts";
 import type { Item, Operation, StateView } from "./state.ts";
+import { valuePlaces } from "./validate/fields.ts";
 import type { MarkKind, ValidDefinition } from "./validate/index.ts";
 import { isObject, own } from "./values.ts";
 
@@ -42,8 +43,134 @@ export type JudgedInput =
   | { readonly type: "act"; readonly signed: SignedIntent; readonly grant: Grant | null; readonly presented: Readonly<Record<string, unknown>> }
   | { readonly type: "genesis"; readonly seed: Seed; readonly founding: SignedIntent | null; readonly source: FactRef | null; readonly n: number | null; readonly message: Request | null }
   | { readonly type: "delivery"; readonly from: FactRef; readonly n: number; readonly message: Message }
-  | { readonly type: "outcome"; readonly operation: OperationId; readonly attempt: number; readonly result: "confirmed" | "refused" | "unknown"; readonly evidence: Evidence }
+  | { readonly type: "outcome"; readonly operation: OperationId; readonly attempt: number; readonly owner: CapabilityName | PlatformDefinition; readonly kind: string; readonly result: "confirmed" | "refused" | "unknown"; readonly evidence: Evidence }
   | { readonly type: "diagnosis"; readonly of: { seq: number; n: number }; readonly attempts: readonly Attempt[] };
+
+/**
+ * The subject of a further observation that a rule reads (section 16.1,
+ * "An observation outside a grant"): one key, one member, or what the rules
+ * scope holds, by what was asked of it.
+ */
+export type Observed = { key: KeyId } | { member: MemberId } | { asked: "rules" | "definitions" };
+
+/** A value beside an intent that a rule read (section 6.2): its byte domain, its digest in that domain, and its canonical bytes. */
+export interface ValueRead { domain: string; digest: Digest; bytes: string }
+
+/**
+ * What is at hand for one entry beside its input, and what the rules of its
+ * row read of it (sections 4.1, 6.2 and 16.1).
+ *
+ * `observed`: the further observations that the scope read before the turn
+ * for this input, each with its read and its use, and each already judged
+ * by the guards of section 16.1. A verifier gives the records of the
+ * entry's own `observed`. `values`: each value that came beside the intent,
+ * as its canonical bytes; a verifier gives the values that the entry
+ * retains. `read`: what a rule read of the two, in the order of the reads.
+ *
+ * The entry retains exactly what its rules read. An observation that no
+ * rule reads is not written, and a value that no rule reads is not kept.
+ * So an entry of a row whose rules read neither has the bytes it had.
+ *
+ * I3 merge: the judge of an act is given both and writes `observed`
+ * (`judge.ts`). Three things are owed in modules of other steps, and until
+ * then a rule that reads either is given none there and its guard is not
+ * completed. The judges of a result's delivery and of an outcome build no
+ * `AtHand` and write no `observed` (`delivery.ts`, `handlers.ts` and
+ * `outcomes.ts`). The scope makes no further read before a turn, reads no
+ * `values` from what came beside an intent and keeps no value
+ * (`scope/src/core.ts`, with the store). A replay is given the retained
+ * value of each place that the pinned data states, and none for a row whose
+ * rule holds the domain in its own code (`replay/src/verify.ts`). The I3
+ * deltas note, entries EM1 to EM4 and EX4 to EX6, has the lines.
+ */
+export interface AtHand {
+  readonly observed: readonly ObservationUse[];
+  readonly values: readonly string[];
+  readonly read: { observed: ObservationUse[]; values: ValueRead[] };
+  /**
+   * Section 6.2, "How a version states a place" (revision 19): the places of
+   * the act that name a value, as its pinned data states them, each with the
+   * digest that its field holds in this intent. Empty: the data states none,
+   * as for every act of a declared definition.
+   */
+  readonly places: readonly Placed[];
+}
+
+/** One place of an act, in one intent: the field, the byte domain and the bound that the data states, and the digest that the field holds. */
+export interface Placed { field: string; domain: string; max: number; digest: Digest }
+
+/** What is at hand for one entry: the observations and the values that its judge was given, and the places of its act that name a value. */
+export const atHand = (observed: readonly ObservationUse[] | undefined, values: readonly string[] | undefined, places: readonly Placed[] = []): AtHand =>
+  ({ observed: observed ?? [], values: values ?? [], read: { observed: [], values: [] }, places });
+
+/**
+ * The places of an act that an intent sets (section 6.2): each field that
+ * states `value` in the pinned data and that holds a digest in the fields
+ * as read.
+ */
+export const placesOf = (types: Readonly<Record<string, unknown>> | undefined, fields: Readonly<Record<string, FieldValue>>): Placed[] =>
+  valuePlaces(types).flatMap((place) => { const digest = own(fields, place.field); return isDigest(digest) ? [{ ...place, digest }] : []; });
+
+/**
+ * One value at hand, matched by its digest in one byte domain (section
+ * 6.2). Bytes that are not the canonical form of a JSON value, and a value
+ * that is longer than the bound of its domain, are no value at hand. The
+ * entry retains a value that is matched, once for a domain and a digest.
+ * Undefined: none at hand has that digest.
+ */
+function matched(hand: AtHand | undefined, domain: string, digest: Digest, most: number): unknown {
+  for (const bytes of hand?.values ?? []) {
+    if (typeof bytes !== "string" || utf8(bytes).length > most) continue;
+    let value: unknown;
+    try {
+      value = parseStrict(bytes);
+      if (canonicalize(value) !== bytes || valueDigest(domain, value) !== digest) continue;
+    } catch {
+      continue;
+    }
+    if (hand && !hand.read.values.some((read) => read.domain === domain && read.digest === digest)) hand.read.values.push({ domain, digest, bytes });
+    return value;
+  }
+  return undefined;
+}
+
+/**
+ * Section 6.2, "The checks, in the commit", with the places that the data
+ * states: the name of the first field that names a value and has none at
+ * hand, or null. That is so when no value came under its digest, when the
+ * bytes that came are not the canonical form of a JSON value, and when the
+ * value is longer than the bound of its domain. The input is then refused
+ * `bad-field`. A value that a place names is kept with the entry.
+ */
+export function placeWithoutValue(hand: AtHand | undefined): string | null {
+  for (const place of hand?.places ?? []) if (matched(hand, place.domain, place.digest, place.max) === undefined) return place.field;
+  return null;
+}
+
+/**
+ * What the entry retains of what was at hand: each observation that a rule
+ * read, once, in ascending order of `read.n` (section 4.1), and each value
+ * that a rule read, once for a domain and a digest (section 6.2).
+ */
+export function retainedOf(hand: AtHand | undefined): { observed: readonly ObservationUse[]; values: readonly ValueRead[] } {
+  return { observed: [...(hand?.read.observed ?? [])].sort((a, b) => a.read.n - b.read.n), values: hand?.read.values ?? [] };
+}
+
+/** True when a retained observation is of that subject. An observation of a key has no member `subject`. */
+const isOf = (use: ObservationUse, subject: Observed): boolean => {
+  const o = use.observation;
+  if ("key" in subject) return !("subject" in o) && o.key === subject.key;
+  if ("member" in subject) return "subject" in o && o.subject === "member" && o.member === subject.member;
+  return "subject" in o && o.subject === "rules" && o.content.asked === subject.asked;
+};
+
+/**
+ * The digest of one value in one byte domain (section 6.2, "What a value
+ * is"): over the domain tag, a newline and the value's canonical bytes,
+ * like every digest of the contract. The domain is one that the contract
+ * names, or one that the owner of the value declares (section 2.1).
+ */
+export const valueDigest = (domain: string, value: unknown): Digest => digestBytes(domainBytes(domain as DomainTag, value));
 
 /**
  * What the judge resolved before the rule's place (section 6.1, item 6):
@@ -80,6 +207,17 @@ export interface Resolved {
  * 5. `own`: the scope's own earlier entries, by position.
  * 6. `resolved`: what the judge resolved before the rule's place.
  *
+ * Two readers belong to items 2 and 4. `observed` reads one of the further
+ * observations of the entry's input, by its subject: the member `observed`
+ * of an act, of an outcome and of a delivery of a result (sections 4.1 and
+ * 16.1). Null: the entry would lack it. `value` reads one value beside the
+ * intent, by its byte domain and its digest there, when it is no longer
+ * than `most` bytes, which is the bound that the owner of the domain
+ * states (section 6.2). Undefined: none at hand has that digest. The entry
+ * retains what a rule read through them, and nothing else of the two. A
+ * rule that needs one and is given none answers that its guard is not
+ * completed, `dependency-unavailable`, where its specification says so.
+ *
  * A rule is not given the bytes of a detached text, storage, the network,
  * any clock but that one reading, a random value, the order in which inputs
  * arrived, transport's acknowledgments, the present state of another scope,
@@ -93,6 +231,18 @@ export interface RuleGiven {
   readonly uses: readonly Fetched[];
   readonly own: Own;
   readonly resolved: Resolved;
+  observed(subject: Observed): ObservationUse | null;
+  value(domain: string, digest: Digest, most: number): unknown;
+  /**
+   * Revision 19, section 6.2: the value that one field of the act names,
+   * which the judge matched by the domain and the bound that the pinned
+   * data states for the field. A rule states no domain and no bound of its
+   * own. Undefined: the data states no place at that field, or the intent
+   * leaves the field out. `value`, above, with the domain and the bound in
+   * a rule's code, is a STAND-IN for a row whose data does not state its
+   * places yet.
+   */
+  placed(field: string): unknown;
 }
 
 /** The members of `Effect` that a rule returns (section 6.1, "What a rule returns is in this contract's forms"). */
@@ -129,7 +279,8 @@ export interface OutcomeGives { effects: readonly RuleEffect[]; sends: readonly 
  * Place 7: the judgment of each outcome entry of one kind of operation, at
  * each thing that section 4.3 leaves to the owner. `selects`: the kind
  * selects one result. `read`: a read of the outside system is decisive for
- * it. `retries`: another attempt is allowed. `holds`: the owner's local
+ * it. `retries`: another attempt is allowed; it is given what every rule
+ * is given, with the folded state (revision 19, row I3-35). `holds`: the owner's local
  * guard for a selection; absent, it holds. `wellFormed`: the evidence is
  * well formed; absent, any body is. `derives`: the entry's effects and
  * requests; absent, none. `closure`: the most entries that the operations
@@ -139,7 +290,7 @@ export interface OutcomeRule {
   selects: boolean;
   read: boolean;
   closure?: number;
-  retries(result: "refused" | "unknown", operation: Operation): boolean;
+  retries(result: "refused" | "unknown", operation: Operation, given: RuleGiven): boolean;
   holds?(given: RuleGiven, operation: Operation): boolean;
   wellFormed?(result: "confirmed" | "refused" | "unknown", evidence: Evidence): boolean;
   derives?(given: RuleGiven, operation: Operation, selected: boolean | null): OutcomeGives;
@@ -218,15 +369,30 @@ export function unjudged<T>(judge: () => T): T | { result: "unavailable"; reason
 export const markOf = (v: unknown): Mark | null => (isObject(v) && typeof v["code"] === "string" && typeof v["row"] === "string" ? (v as unknown as Mark) : null);
 
 /** What a judge holds when it gives a rule its six things: the parts of a `Judging` that a rule is given. */
-export type Giving = Pick<Judging, "view" | "clock" | "bounds" | "scope" | "self" | "fields" | "subjects" | "signer" | "facts" | "own" | "source" | "platform" | "judged" | "ran">;
+export type Giving = Pick<Judging, "view" | "clock" | "bounds" | "scope" | "self" | "fields" | "subjects" | "signer" | "facts" | "own" | "source" | "platform" | "judged" | "ran" | "beside">;
 
 /** The six things, and no other (section 6.1). The entries in `uses` are those that the input's fields name, and for a delivery its source entry. */
 export function givenTo(g: Giving): RuleGiven {
   if (!g.judged) throw new RuleFault("a rule is run for an entry whose input the judge did not state");
   const uses = [...(g.source ? [g.source] : []), ...[...g.facts.values()].filter((fact) => fact.fact.hash !== g.source?.fact.hash)];
+  const hand = g.beside;
   return {
     state: g.view, input: g.judged, time: g.clock.asOf, uses, own: g.own ?? (() => null),
     resolved: { at: g.scope.at, self: g.self, fields: g.fields, subjects: g.subjects, signer: g.signer, bounds: g.bounds },
+    // Sections 4.1 and 16.1: an observation that a rule reads is one that the entry retains. The judge notes each read.
+    observed(subject) {
+      const use = hand?.observed.find((at) => isOf(at, subject)) ?? null;
+      if (use && hand && !hand.read.observed.includes(use)) hand.read.observed.push(use);
+      return use;
+    },
+    // Section 6.2: a value is matched by its digest in the domain that its place states. Bytes that are not the canonical form of a
+    // JSON value, and a value that is longer than the bound of its domain, are no value at hand.
+    value: (domain, digest, most) => matched(hand, domain, digest, most),
+    // Revision 19: the value of a place that the data states, by its field. The judge matched it at check 7.
+    placed(field) {
+      const place = hand?.places.find((at) => at.field === field);
+      return place ? matched(hand, place.domain, place.digest, place.max) : undefined;
+    },
   };
 }
 

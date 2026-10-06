@@ -78,11 +78,11 @@ describe("the ancestry walk and the guard `ancestry` (authority note, section 6.
     function checked(record: (s: Staging) => AncestryCheck | null) {
       const s = new Staging();
       s.prepare(una, "instance", { hold: s.hold, task: { ...otherLane, kind: "task" }, instance: "i1" });
-      const report = s.intent(una, "report", { expected: { commitment: s.item(s.commitment).revision }, fields: { commitment: s.commitment, commit: X, hold: s.hold, instance: "i1" } });
+      const report = s.intent(una, "report", { expected: { commitment: s.item(s.commitment).revision }, fields: { commitment: s.commitment, commit: X } });
       s.asked(report, "stage");                                                // entry 7
       const before = cap.guard("git-read@1", "ancestry", { commit: X, row: "report" }, s.given({ intent: intentDigest(report.intent) }));
       s.outcome("7:0", "confirmed", {}, "read");                               // entry 8: the root is live
-      const entry = s.outcome("8:0", "confirmed", { record: record(s) }) as Entry;   // entry 9: the check entry
+      const entry = s.outcome("8:0", "confirmed", { record: record(s) }) as Entry;   // the check entry: entry 9, or later when `record` wrote entries
       const asks = (args: object = {}, given: object = {}) => cap.guard("git-read@1", "ancestry", { commit: X, row: "report", ...args }, s.given({ intent: intentDigest(report.intent), ...given }));
       return { s, before, asks, entry };
     }
@@ -110,6 +110,27 @@ describe("the ancestry walk and the guard `ancestry` (authority note, section 6.
     // The root is no longer `live`: made by hand, as a retirement leaves it.
     own.s.hand(recordEffects("hold@1", [{ kind: "root", key: [1], state: "retiring", values: own.s.state.record("hold@1", "root", [1])!.values }]));
     expect([hidden.asks(), own.asks()]).toEqual(["ancestry-stale", "ancestry-stale"]);
+
+    // Section 6.2, "How the guard finds a selected input". A `selected-report` stop and the basis `input` each name an input by
+    // its fact. The guard finds it in the lane's own items: the item that the fact's entry opened, in the state `selected`, whose
+    // slot `for` holds the source commitment. The row writes no argument for it. `under`: the commitment that the input is for.
+    const second = (s: Staging) => s.did(keys.rita, "offer", { expected: { intent: s.item(0).revision }, fields: { intent: 0 } }).seq;
+    const inputs: { s: Staging; fact: FactRef }[] = [];
+    const using = (under: (s: Staging) => number, named: (fact: FactRef) => FactRef = (fact) => fact) => checked((s) => {
+      const commitment = under(s);
+      const fact = s.fact(s.did(una, "use-input", { expected: { commitment: s.item(commitment).revision }, fields: { commitment } }).seq);
+      inputs.push({ s, fact });
+      const foreign = ref(L2, X, 1);
+      return { ...clean(s.at, X, 1), snapshot: kept([{ ref: ref(s.at, X, 1), target: X }, { ref: foreign, target: X }]), start: { foreign, basis: { kind: "input", input: named(fact) } }, stops: [{ kind: "selected-report", commit: U, input: named(fact) }] };
+    });
+    const selected = using((s) => s.commitment);
+    // Its controls: an input of another commitment, a fact of another scope, a fact with another hash, and an input that is no
+    // longer `selected`. Each is `ancestry-stale`, and the act may be prepared again.
+    const others = [using(second), using((s) => s.commitment, (fact) => ({ ...fact, at: L2 })), using((s) => s.commitment, (fact) => ({ ...fact, hash: d("5") }))];
+    expect([selected.asks(), ...others.map((o) => o.asks())]).toEqual([true, "ancestry-stale", "ancestry-stale", "ancestry-stale"]);
+    inputs[0]!.s.hand([{ effect: "state", item: inputs[0]!.fact.seq, state: "replaced" }]);
+    expect(selected.asks()).toBe("ancestry-stale");
+
     // Carried by another lane's check entry, presented beside the intent: that lane judged its own records in that entry, and
     // only the commit and the row are judged here.
     const pin = own.s.fact(own.entry.seq);

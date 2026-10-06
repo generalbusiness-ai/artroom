@@ -65,3 +65,17 @@ test("the git package depends only on contract and bytes, and only scope, checke
   const named = files.filter((f) => source(f) && !/^packages\/(git|scope|checkers)\/|^packages\/platform\/test\//.test(f));
   assert.deepEqual(named.filter((f) => /artroom-git/.test(text(f))), []);
 });
+
+// The checkers package is the checker service: a separate service with its own key, and not a scope (I3 plan, section 3.1). It
+// depends only on contract, bytes and git. No package names it. The lanes' scenario of a check reads its origin read and its signer
+// by path, in a test, and no source file of any package does.
+test("the checkers package depends only on contract, bytes and git, and no package names it", () => {
+  assert.ok(files.includes("packages/checkers/package.json"), "the checkers package was listed");
+  const source = (f) => f.startsWith("packages/") && !f.endsWith(".md");
+  const inside = files.filter((f) => source(f) && f.startsWith("packages/checkers/"));
+  assert.deepEqual(inside.filter((f) => /artroom-(derive|platform|scope|replay|client|lanes)/.test(text(f))), []);
+  const named = files.filter((f) => source(f) && !f.startsWith("packages/checkers/"));
+  assert.deepEqual(named.filter((f) => /artroom-checkers/.test(text(f))), []);
+  const reaches = files.filter((f) => source(f) && !f.startsWith("packages/checkers/") && /[.\/]\/checkers\//.test(text(f)));
+  assert.deepEqual(reaches, ["packages/lanes/test/checks.scope.test.ts"]);
+});

@@ -23,10 +23,10 @@
  */
 
 import type { Bounds, Digest, Entry, FactRef, Incarnation, ScopeId, Seed, UnavailableReason } from "@generalbusiness/artroom-contract";
-import { canonicalize, isDigest, newIncarnation, parseStrict } from "@generalbusiness/artroom-bytes";
+import { canonicalize, isDigest, isPlatformDefinition, newIncarnation, parseStrict } from "@generalbusiness/artroom-bytes";
 import { creationFields, factsNamed, isEntryOf, isFactRef, isLocalId, isObject, isScopeRef, judgeDelivery, judgeGenesis, messageFacts, messageTexts, own, prepareRules, readFields, textsNamed } from "@generalbusiness/artroom-derive";
-import type { Clock as Reading, Creation, Delivered, DeliveryContext, Fetched, Judgment, StateView, ValidDefinition } from "@generalbusiness/artroom-derive";
-import { NO_INCARNATION, Received, ownOf, retainedFacts, used, type Scope } from "./core.ts";
+import type { Clock as Reading, Creation, Delivered, DeliveryContext, Fetched, Judgment, PlatformRules, StateView, ValidDefinition } from "@generalbusiness/artroom-derive";
+import { NO_INCARNATION, Received, ownOf, retainedFacts, snapshotsOf, used, type Scope } from "./core.ts";
 import { namedBy } from "./definitions.ts";
 import type { DefinitionRead, Delivery, Ports } from "./ports.ts";
 import type { Retained, Store } from "./store.ts";
@@ -59,31 +59,45 @@ export class Deliveries {
    * here. With it come the declarations this scope will retain for its own
    * children, read from the same creator.
    *
-   * `dependency-unavailable`: the creator cannot be read now, or does not
-   * hold the bytes. `unsupported-definition`: the seed names a platform
-   * definition, or the bytes are not a valid declaration with that digest.
-   * Either way nothing is recorded.
+   * A seed that names a platform definition pins the runtime's own code, by
+   * that name and version (section 6.1): its data and its rules, as
+   * `Scope.platform` reads them for a founding. Nothing of it is read from
+   * the creator, and no bytes are retained for it. The declarations that
+   * its data names by digest in `create` sends are read from the creator.
    *
-   * I3 merge: a creation under a platform name is not built. The code
-   * supplies that definition, as `Scope.platform` reads it for a founding,
-   * and the step that makes a platform scope create another asks it here.
+   * `dependency-unavailable`: the creator cannot be read now, or does not
+   * hold the bytes. `unsupported-definition`: the bytes are not a valid
+   * declaration with that digest, or the seed names a platform definition
+   * that this runtime cannot run whole: a version that it lacks, or one
+   * with a mark and no rule. Either way nothing is recorded.
    */
-  async #declared(seed: Seed): Promise<{ valid: ValidDefinition; bytes: string; children: Retained[] } | "dependency-unavailable" | "unsupported-definition"> {
-    if (!isObject(seed) || !isDigest(seed.definition) || !isScopeRef(seed.creator)) return "unsupported-definition";
+  async #declared(seed: Seed): Promise<{ valid: ValidDefinition; bytes: string | null; children: Retained[]; platform: PlatformRules | null } | "dependency-unavailable" | "unsupported-definition"> {
+    if (!isObject(seed) || !isScopeRef(seed.creator)) return "unsupported-definition";
     const { definitions } = this.#ports;
     const creator = seed.creator;
     const seconds = this.#bounds.fetchSeconds;
-    const from = async (digest: typeof seed.definition): Promise<DefinitionRead> => {
+    const from = async (digest: Digest): Promise<DefinitionRead> => {
       const read = await within(() => definitions.read(digest, creator), seconds);
       return read === LATE ? { ok: false, reason: "unavailable" } : read;
     };
-    const read = await from(seed.definition);
-    if (!read.ok) return read.reason === "unsupported-definition" ? "unsupported-definition" : "dependency-unavailable";
-    const valid = this.#scope.validate(read.bytes);
-    if (valid?.digest !== seed.definition) return "unsupported-definition";
+    let valid: ValidDefinition | null;
+    let bytes: string | null = null;
+    let platform: PlatformRules | null = null;
+    if (isPlatformDefinition(seed.definition)) {
+      const supplied = this.#scope.platform(seed.definition);
+      if (!supplied) return "unsupported-definition";
+      ({ definition: valid, platform } = supplied);
+    } else {
+      if (!isDigest(seed.definition)) return "unsupported-definition";
+      const read = await from(seed.definition);
+      if (!read.ok) return read.reason === "unsupported-definition" ? "unsupported-definition" : "dependency-unavailable";
+      valid = this.#scope.validate(read.bytes);
+      if (valid?.digest !== seed.definition) return "unsupported-definition";
+      bytes = read.bytes;
+    }
     const children = await namedBy(valid, from, (text) => this.#scope.validate(text), this.#bounds.namedDefinitions);
     if (!children.ok) return children.reason === "unavailable" ? "dependency-unavailable" : "unsupported-definition";
-    return { valid, bytes: read.bytes, children: children.retain };
+    return { valid, bytes, children: children.retain, platform };
   }
 
   /**
@@ -167,7 +181,7 @@ export class Deliveries {
     if (!texts) return retry("dependency-unavailable");
 
     const context = (clock: Reading): Omit<DeliveryContext, "prepared"> =>
-      ({ clock, bounds, facts, own: ownOf(store), texts: texts.sizes, capabilities: this.#ports.capabilities ?? undefined, platform: this.#scope.pinned()?.platform ?? undefined, source: { entry: source.entry, under: source.under }, origin });
+      ({ clock, bounds, facts, own: ownOf(store), snapshot: snapshotsOf(store), texts: texts.sizes, capabilities: this.#ports.capabilities ?? undefined, platform: (this.#scope.pinned() ?? founding)?.platform ?? undefined, source: { entry: source.entry, under: source.under }, origin });
     /** The definition a section of the turn runs under: the pinned one, or before the genesis the one the seed names. */
     const definition = (): ValidDefinition => this.#scope.pinned()?.definition ?? founding!.valid;
     /** A `create` goes to the genesis judge, which answers a repeat from the genesis when the scope exists. */
@@ -190,7 +204,9 @@ export class Deliveries {
             const retain: Retained[] = [...used(judged.draft, [source, ...facts]), ...texts.retain(definition(), judged.draft, source.under)];
             if (genesis && founding) {
               store.cover(founding.valid.indexes);
-              retain.push({ kind: "definition", digest: founding.valid.digest, bytes: canonicalize(JSON.parse(founding.bytes)) }, ...founding.children);
+              // A platform definition is pinned by its name and version, and no bytes are retained for it.
+              if (founding.bytes !== null) retain.push({ kind: "definition", digest: founding.valid.digest, bytes: canonicalize(JSON.parse(founding.bytes)) });
+              retain.push(...founding.children);
             }
             return {
               verdict: "write", draft: judged.draft, retain,

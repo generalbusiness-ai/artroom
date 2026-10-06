@@ -51,7 +51,7 @@ export function ownersOf(definition: ValidDefinition, platform: PlatformRules | 
         if (rule.clock === true) reading.ran.clock = true;
         return {
           view, definition, bounds: reading.bounds, clock: reading.clock, scope, self: scope.head.seq + 1, kind, fields: {}, fieldTypes: {}, subjects: new Map(), signer: null,
-          facts: new Map(), prepared: [], used: [], own: reading.own, platform, judged: { type: "outcome", operation: outcome.operation, attempt: outcome.attempt, result: outcome.result, evidence: outcome.evidence }, ran: reading.ran,
+          facts: new Map(), prepared: [], used: [], own: reading.own, platform, judged: { type: "outcome", operation: outcome.operation, attempt: outcome.attempt, owner: outcome.owner, kind: outcome.kind, result: outcome.result, evidence: outcome.evidence }, ran: reading.ran,
         };
       };
       const answer = (given: unknown): boolean => {
@@ -60,7 +60,8 @@ export function ownersOf(definition: ValidDefinition, platform: PlatformRules | 
       };
       return {
         selects: r.selects === true, read: r.read === true, ...(r.closure === undefined ? {} : { closure: r.closure }),
-        retries: (result, operation) => answer(run(mark, () => r.retries(result, operation))),
+        // Revision 19, section 6.1 (row I3-35): the rule that decides a further attempt is given what every rule is given.
+        retries: (result, operation, view, outcome) => answer(run(mark, () => r.retries(result, operation, givenTo(judging(view, outcome))))),
         ...(r.holds ? { holds: (view: StateView, operation: Operation, outcome: OutcomeInput) => answer(run(mark, () => r.holds!(givenTo(judging(view, outcome)), operation))) } : {}),
         ...(r.wellFormed ? { wellFormed: (result, evidence) => answer(run(mark, () => r.wellFormed!(result, evidence))) } : {}),
         ...(r.derives ? { derives: (view: StateView, operation: Operation, outcome: OutcomeInput, selected: boolean | null) => given(mark, judging(view, outcome), kinds, run(mark, () => r.derives!(givenTo(judging(view, outcome)), operation, selected))) } : {}),
@@ -80,8 +81,10 @@ export function ownersOf(definition: ValidDefinition, platform: PlatformRules | 
  * An operation that the outcome opens is stated in `opens`, with an owner
  * and a kind that `outcomes` lists. The ledger numbers it, so the effects
  * hold no `operation` and no `attempt`. A creation is not among the
- * requests: no cause is defined for a scope that an outcome entry creates
- * (the authority note's row P2, the fourth cause, which no source builds).
+ * requests: this judge lets no rule send a creation yet. The fourth cause,
+ * for a scope that an outcome entry creates (the authority note's row P2),
+ * is built: a child's genesis checks it (`genesis.ts`, `openerOf`). Only the
+ * sending side waits (I3 deltas note, entry EP1).
  */
 function given(mark: Mark, j: Judging, kinds: Readonly<Record<string, Mark>>, gives: OutcomeGives): OutcomeDerived {
   if (!isObject(gives) || !Array.isArray(gives.effects) || !Array.isArray(gives.sends) || !Array.isArray(gives.opens)) throw outside(mark, "no effects, requests and openings");

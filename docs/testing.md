@@ -54,7 +54,7 @@ restart is shown against the thing that really retries, orders or restarts.
 
 The scripted capability of `@generalbusiness/artroom-scope/testing` is a
 stand-in for the code of `hold@1` and `git-read@1`. The derive package
-has that code, and the production runtime is not given it. A test that uses it says so in its name or its first comment.
+has that code, and the production ports hold it. A test that uses the stand-in says so in its name or its first comment.
 It shows what a definition does once a capability has answered, and
 nothing about a real hold, a Git read or a provider. A step that a test
 scripts in it names an action and a window, and derives nothing. It
@@ -68,6 +68,92 @@ real observation read, with the real guards and windows. A test that uses
 it says so in its name or its first comment. It shows the observing
 scope's side of a read, and nothing about membership.
 
+Membership has two stand-ins of its own, in
+`@generalbusiness/artroom-platform/testing`. `office` is a made-up
+directory that creates one membership scope: it stands for the real
+directory and the register. `Roster` is a membership scope in memory
+below such an office. A test that uses one says so. It shows
+membership's rows and its ten rules, which are all the platform
+package's, and nothing about a founding. `lacking`, of the same module,
+is a control and no stand-in: membership's version less one rule, for
+the rule that a version with a mark and no rule runs nothing.
+`PlatformScope`, of the scope package's test Worker, is the deployed
+class with the production authority and the platform package's own
+rules: a test of real authority runs there, in the namespace `PLATFORM`
+(`packages/scope/test/repository.ts` lists what is real in it).
+
+The register and the directory have stand-ins of their own, in
+`packages/platform/test/support-founding.ts`. `registerStandIns` is a rule
+for the one mark of the register's data that has no rule,
+`create-repository` (`notes/2026-10-05-i3-contract-deltas.md`, entry EJ1).
+`directoryStandIns` is a rule for each of the three marks of the directory's
+data that the platform package has no rule for (entries EP6 and EP7).
+Without them nothing is founded under `platform:register@1` or created
+under `platform:directory@1`, in a test as in production. `Register` is a
+register in memory, founded by an install intent. `Directory` is a
+directory in memory that a scripted register created: the `create` that
+the register's unwritten rule will send is added to its outcome entry by
+hand, and the register's confirmation, the genesis of each child and each
+lane's entry are made by hand. A test that uses one says so. It shows the
+rows and the written rules of the two definitions, and nothing about a
+founding.
+
+The rules scope has four stand-ins, in
+`packages/platform/test/support-rules.ts`. `registrar` is a made-up
+directory that creates one rules scope. `asker` is a made-up lane that
+tells it `rules-wanted`. `Rulebook` is a rules scope in memory below such
+a registrar, whose acts are judged on the test authority of derive's
+fixture set. `standing` is an observation of a member that the test
+writes by hand: no membership scope answered it. A test that uses one
+says so. The data and the three rules of `platform:rules@1` are the
+platform package's, and none of them is a stand-in. Such a test shows
+the rows and the rules as judgments in memory. It shows nothing about a
+founding, about a read of membership, or about how a scope receives and
+keeps a value beside an intent
+(`notes/2026-10-05-i3-contract-deltas.md`, entry EQ9).
+
+The destination has stand-ins of its own, in
+`packages/platform/test/support-destination.ts`. `standInRules` is a rule
+for each of the ten marks of the destination's data that the platform
+package has no rule for (`notes/2026-10-05-i3-contract-deltas.md`,
+entries ER4 to ER9): without them nothing is created under
+`platform:destination@1`, in a test as in production. `bureau` is a
+made-up directory that creates one destination scope. The lane's and the
+register's entries are made by hand. `Branch` is a destination scope in
+memory below such a bureau. A test that uses one says so. It shows the
+destination's rows and its eight real rules, and nothing about an outcome
+entry, a push or a founding.
+
+The token ledger has three stand-ins. `TokenHost` and `Vault`, in
+`packages/git/test/support/tokens.ts`, stand for a Git host's token
+interface and for the gateway's side of the handoff of a plaintext.
+`TokenHost` mints and revokes in memory, with a fault for one request: a
+refusal, a lost request, a lost reply, or a reply out of form. `Stager`,
+in `packages/scope/test/hosted.ts`, answers the one request of an attempt
+of a staging as the test wrote it. The fixture `hosted` of that file runs a
+real scope on the capability's code, with the git package's real
+`TokenDriver` as its port for outside effects. A test that uses one says
+so. Such a test shows what the driver and a scope do with a host's
+answers, and where a plaintext is. It shows nothing about a real host, a
+gateway, a fork or a push. The sealed entries of
+`packages/git/test/host.test.ts` are made by hand, and no scope judged
+them (`notes/2026-10-05-i3-contract-deltas.md`, entry ET12).
+
+A replay of a history that the test authority wrote says so:
+`grants: "as-recorded"`. Its grants hold no freshness proof, and the
+report lists them as trusted. The replay command never takes that option.
+
+The replay package has two histories with stand-ins of their own, in
+`packages/replay/test/staging.ts`. `Lane` is a staging lane and `Gate` a
+scope under made-up platform data. Derive's judges wrote every entry of
+both, with the code of `hold@1` and `git-read@1` or with made-up rules.
+Three things are stand-ins, and the file labels each: the two entries of
+the lane's creator, each observation of membership, and every answer of
+the outside system. A replay of them is given an anchor for each of the
+first two. Their grants hold a freshness proof, so they are replayed as
+`proven`. Such a test shows what a verifier derives from a history. It
+shows nothing about a creation, about membership or about a Git host.
+
 `codeLost`, of the same module, supplies each platform definition with
 its data and with no rule, while a test's control says so
 (`platformCode`). It stands for a runtime that lacks the rules of a
@@ -76,10 +162,24 @@ be run, and nothing about any rule. Without it the platform definitions
 are the platform package's, with their rules, as in production.
 
 A scripted peer, `net.peers` of the same module, is a stand-in for a scope
-of a platform kind that is not delivered, such as a rules scope or a
+of a platform kind that the test does not run, such as a rules scope or a
 destination. The test writes the peer's entry by hand, and nothing judged
 it. A test that uses one says so in the same way. It shows the receiver's
 side of a delivery, and nothing about the peer.
+
+The checker service has three stand-ins, in
+`packages/checkers/test/support.ts`. `Lane` stands for the scope
+namespace: one change lane and its repository's rules scope, with entries
+made by hand that no scope judged, and answers to a submit from a script.
+`MemoryDurable` stands for the service's durable storage. `ScriptedRunner`
+stands for a runner: it returns a stated end and runs nothing. A test that
+uses one says so. Such a test shows the service's own side: what it reads
+before it runs, what it starts, keeps and signs. It shows nothing about a
+lane's judgment, a storage's loss, a container or a real runner. The
+runner's checkout is tested on a real local repository, which is not a
+host. What a real change lane does with the service's signed results is
+one scenario of the lanes, `packages/lanes/test/checks.scope.test.ts`,
+which calls the service's origin read and its signer as functions.
 
 ## Time, size and setup
 
@@ -130,8 +230,8 @@ npm run gate
 It installs only if `package-lock.json` changed since the last install,
 typechecks every workspace, and runs every test: one vitest process for
 the repository (`vitest.config.ts` at the root, one project for each of
-`bytes`, `derive`, `platform`, `git`, `replay`, `client`, `scope` and
-`lanes`), then one script (`scripts/active-source.test.mjs`). The script checks that no
+`bytes`, `derive`, `platform`, `git`, `checkers`, `replay`, `client`,
+`scope` and `lanes`), then one script (`scripts/active-source.test.mjs`). The script checks that no
 active file imports from `parked/` or names a removed format, and that no
 platform package depends on the lanes package or imports from it. It prints the head, the tree and
 each step's elapsed and CPU time. It also fails on a whitespace error in
@@ -142,9 +242,10 @@ with SQLite storage. The others run in Node, as one group at the same time,
 and the `scope` project runs after them, by itself: it has one worker, and
 vitest lets projects share a group only when their worker counts agree. The
 `git` project runs the real `git` program, as a client and as a server, on
-local repositories. Nothing runs twice.
+local repositories, and one file of the `checkers` project runs it for the
+runner's checkout. Nothing runs twice.
 
-The ten lane scenarios, `packages/lanes/test/*.scope.test.ts`, run from
+The eleven lane scenarios, `packages/lanes/test/*.scope.test.ts`, run from
 the root inside the `scope` project: the same test Worker, loaded once.
 The root `vitest.config.ts` adds them, and no file of the scope package
 names the lanes package. The lanes package keeps

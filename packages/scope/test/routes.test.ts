@@ -26,7 +26,7 @@ test("one real route: a founding, an act and a request for a step through the Wo
   expect([first.status, accepted]).toMatchObject([200, { answer: "accepted", receipt: { fact: { at, seq: 1 } } }]);
   expect(await (env.API as unknown as Api).submit(name, body.signed, body.grants)).toEqual(accepted);
 
-  // The preparation route reaches the same turn and its judge. This runtime has no code for a step of `hold@1`, as in production,
+  // The preparation route reaches the same turn and its judge. This test runtime has no code for a step of `hold@1`,
   // so the request is not judged and nothing is written: the summary below is still at entry 1.
   const prepared = await post(`/v1/scopes/${name}/preparations`, { ...body, capability: "hold@1", step: "stage" });
   const unjudged = { answer: "unavailable", reason: "unavailable" };

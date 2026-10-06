@@ -1,0 +1,398 @@
+/**
+ * `platform:rules@1`, as data, with its rules (authority note, revision 21,
+ * sections 3.3, 3.11 and 12.1.4; its table of marks, section 12.1.8, rows 1
+ * and 27 to 29). One rules scope for a repository. It holds the branch
+ * rules, the labels, the check configurations and the active definitions.
+ *
+ * This file is named `rules-scope.ts` because `rules.ts` is the package's
+ * table of rules.
+ *
+ * One member of the data is one row of the note's tables. A cell of the
+ * note that begins "Code" is a mark in this data, at the place where its
+ * rule is run (the scope contract, section 6.1), and the rule is in
+ * `rulesScopeRules`, below. The table of marks gives the rules scope three
+ * rules, each at place 4, a guard:
+ *
+ * | Rule | Row of the table | At | Its mark's `row` |
+ * |---|---|---|---|
+ * | `checkers` | 27 | `publish` | P19 |
+ * | `configuration-bytes` | 28 | `keep-configuration` | P18. The cell names P18 and P21, and a mark states one key. |
+ * | `definition-bytes` | 29 | `activate` | P21 |
+ *
+ * Row 1 has no mark: the membership reference of a scope that is created
+ * beside membership derives nothing of an entry (`membershipId`, below).
+ *
+ * The data holds no mark that the table does not list, so the three rules
+ * are the whole version: a runtime with this package can run
+ * `platform:rules@1`.
+ *
+ * The note's `max`, text lengths and ranges are examples that the proof
+ * plan owns. They are written as the note has them. What the rows leave
+ * unsaid, and what this file holds meanwhile, is in the I3 deltas note,
+ * entries EQ1 to EQ11.
+ */
+
+import type { DeclaredDefinition, Digest, MemberObservation, PlatformData, PlatformDefinition, ScopeId } from "@generalbusiness/artroom-contract";
+import { isDigest, isMemberRef } from "@generalbusiness/artroom-bytes";
+import { byteOrder, validateDefinition } from "@generalbusiness/artroom-derive";
+import type { Item, Rules, StateView } from "@generalbusiness/artroom-derive";
+
+/** The name and version that this data and these rules are. */
+export const RULES_SCOPE = "platform:rules@1" satisfies PlatformDefinition;
+
+/**
+ * The byte domain of a check's configuration (section 3.11). This
+ * definition declares it, as the contract lets the owner of a retained
+ * value do (the contract's sections 2.1 and 6.2; section 12.1.4, "Byte
+ * domain").
+ */
+export const CONFIGURATION_DOMAIN = "artroom-check-configuration-1";
+/** The byte domain of a declared definition, which the contract names (its section 2.1). */
+export const DEFINITION_DOMAIN = "artroom-definition-1";
+/**
+ * The most canonical bytes of one check configuration. The owner of a
+ * domain states the bound on one value (the contract's section 6.2), and no
+ * adopted text gives this one a number: it is the proof plan's. 32 KiB is
+ * the made-up figure of the contract's witness 18.35, held here as a
+ * temporary value (I3 deltas, entry EQ2).
+ */
+export const CONFIGURATION_BYTES = 32 * 1024;
+
+const DIGEST = { type: "digest" } as const;
+const LABELS = { type: "list", of: { type: "text", max: 64 }, max: 32 } as const;
+/** One check of the rules (section 3.11): its name, its configuration's digest, whether it is required, and its checker. */
+const CHECKS = {
+  type: "list", max: 32,
+  of: {
+    type: "record",
+    of: {
+      name: { type: "text", max: 128, required: true },
+      configuration: { type: "digest", required: true },
+      required: { type: "bool", required: true },
+      checker: { type: "member", required: true },
+    },
+  },
+} as const;
+const APPROVALS = { type: "int", min: 0, max: 64 } as const;
+const RULES = { rules: { item: "rules", one: true } } as const;
+
+export const rulesScope: PlatformData = {
+  format: "artroom-definition-1",
+  name: "platform:rules",
+  profile: { name: "restricted", version: 1 },
+  capabilities: [],
+  genesis: "establish",
+  items: {
+    // Section 12.1.4, the first row of the item table. `membership` is the membership scope's ID, and no reference: the directory
+    // creates the two scopes in one genesis and knows no incarnation of membership then (section 12.1, "The membership reference").
+    rules: {
+      many: false, max: 1, initial: "current",
+      states: { current: { final: false } },
+      parties: {},
+      refs: { directory: { fixed: true, required: true, to: { type: "scope", kind: "directory" } } },
+      values: {
+        branch: { fixed: true, required: true, of: { type: "text", max: 256 } },
+        membership: { fixed: true, required: true, of: { type: "text", max: 64 } },
+        approvals: { fixed: false, required: true, of: APPROVALS, default: 1 },
+        ownerMayReview: { fixed: false, required: true, of: { type: "bool" }, default: false },
+        checks: { fixed: false, required: false, of: CHECKS },
+        labels: { fixed: false, required: false, of: LABELS },
+      },
+    },
+    // The second row. A lane is created only under a digest that an item of this type holds as `active` (section 12.1.2).
+    definition: {
+      many: true, max: 16, initial: "active",
+      states: { active: { final: false }, retired: { final: true } },
+      parties: { activator: { fixed: true, required: true, list: false, author: false } },
+      refs: {},
+      values: {
+        digest: { fixed: true, required: true, of: DIGEST },
+        name: { fixed: true, required: true, of: { type: "text", max: 64 } },
+      },
+    },
+    // The third row. A configuration is never edited: a change is new bytes, a new digest and a new item (section 3.11).
+    configuration: {
+      many: true, max: 1000, initial: "kept",
+      states: { kept: { final: false } },
+      parties: { keeper: { fixed: true, required: true, list: false, author: false } },
+      refs: {},
+      values: {
+        digest: { fixed: true, required: true, of: DIGEST },
+        name: { fixed: true, required: true, of: { type: "text", max: 128 } },
+      },
+    },
+  },
+  acts: {
+    // `establish`: genesis, by the directory's `create` (fields `branch`, `directory` and `membership`, section 12.1). It opens
+    // `rules`, with the branch, the directory and membership's scope ID. The other values take their defaults. The note states no
+    // grant for it: a genesis is judged by no signer, so nothing reads this one.
+    establish: {
+      step: "open", on: "rules", grant: "rules.establish",
+      also: {},
+      fields: {
+        branch: { type: "text", max: 256, required: true },
+        directory: { type: "scope", kind: "directory", required: true },
+        membership: { type: "text", max: 64, required: true },
+      },
+      guards: [],
+      effects: [
+        { value: { slot: "branch", from: { field: "branch" } } },
+        { ref: { slot: "directory", from: { field: "directory" } } },
+        { value: { slot: "membership", from: { field: "membership" } } },
+      ],
+      sends: [],
+      attention: [],
+    },
+    // `publish`: an act. Grant `rules.publish`. It sets the four rule values from the fields. The revision of the rules is this
+    // entry's position. No update is sent to any lane (G11): a lane asks, by `rules-wanted`.
+    publish: {
+      step: "transition", on: "rules", grant: "rules.publish",
+      also: {},
+      fields: {
+        approvals: { ...APPROVALS, required: true },
+        ownerMayReview: { type: "bool", required: true },
+        checks: { ...CHECKS, required: true },
+        labels: { ...LABELS, required: true },
+      },
+      guards: [
+        // Each check's `configuration` is kept.
+        {
+          each: { list: { field: "checks" }, as: "k", guards: [{ some: { type: "configuration", states: ["kept"], where: [{ equals: { a: { slot: "digest" }, b: { element: "k.configuration" } } }] } }] },
+          reason: "configuration-unknown",
+        },
+        // Each check's `checker` is a member with the role `checker`, by an observation of membership that the entry retains (Code P19).
+        { code: "checkers", row: "P19" },
+      ],
+      effects: [
+        { value: { slot: "approvals", from: { field: "approvals" } } },
+        { value: { slot: "ownerMayReview", from: { field: "ownerMayReview" } } },
+        { value: { slot: "checks", from: { field: "checks" } } },
+        { value: { slot: "labels", from: { field: "labels" } } },
+      ],
+      sends: [],
+      attention: [],
+    },
+    // `keep-configuration`: an act. Grant `rules.publish`. It opens `configuration`. The bytes come beside the intent, and the
+    // scope retains them under the digest, in the byte domain `artroom-check-configuration-1` (Code P18 and P21).
+    "keep-configuration": {
+      step: "open", on: "configuration", grant: "rules.publish",
+      also: {},
+      fields: { digest: { ...DIGEST, required: true }, name: { type: "text", max: 128, required: true } },
+      guards: [{ code: "configuration-bytes", row: "P18" }],
+      effects: [
+        { value: { slot: "digest", from: { field: "digest" } } },
+        { value: { slot: "name", from: { field: "name" } } },
+        // The note's table gives the item a required party and states no effect for it. It is the signer (I3 deltas, entry EQ5).
+        { party: { slot: "keeper", from: { signer: true } } },
+      ],
+      sends: [],
+      attention: [],
+    },
+    // `activate`: an act. Grant `rules.activate`. It opens `definition`, `active`. The definition's bytes and their named closure
+    // come beside the intent, and the scope retains each under its digest (Code P21).
+    activate: {
+      step: "open", on: "definition", grant: "rules.activate",
+      also: {},
+      fields: { digest: { ...DIGEST, required: true }, name: { type: "text", max: 64, required: true } },
+      guards: [
+        { code: "definition-bytes", row: "P21" },
+        { none: { type: "definition", states: ["active"], where: [{ equals: { a: { slot: "digest" }, b: { field: "digest" } } }] } },
+      ],
+      effects: [
+        { value: { slot: "digest", from: { field: "digest" } } },
+        { value: { slot: "name", from: { field: "name" } } },
+        // As for `keeper`: the signer (entry EQ5).
+        { party: { slot: "activator", from: { signer: true } } },
+      ],
+      sends: [],
+      attention: [],
+    },
+    // `retire-definition`: an act. Grant `rules.activate`.
+    "retire-definition": {
+      step: "transition", on: "definition", grant: "rules.activate",
+      also: {},
+      fields: {},
+      // The note's row states no guard. A `state` effect to a final state needs one that lists no final state, and the item has one
+      // such state (I3 deltas, entry EQ6, as entry EM15 for membership).
+      guards: [{ state: ["active"] }],
+      effects: [{ state: "retired" }],
+      sends: [],
+      attention: [],
+    },
+  },
+  receives: {
+    // `rules-wanted`: a delivery of a `tell`, from a lane. It changes nothing, and sends the lane one `rules` update with the four
+    // rule values. A lane of another repository is answered too (the limit of G7): the values carry no private text.
+    "rules-wanted": {
+      message: "rules-wanted", class: "tell", from: { kind: "lane" }, opens: null,
+      also: RULES,
+      fields: {},
+      guards: [],
+      effects: [],
+      sends: [{
+        relate: {
+          to: { sender: true }, name: "rules", item: { item: "also.rules" }, state: "current",
+          detail: {
+            approvals: { slot: "approvals", of: "also.rules" },
+            checks: { slot: "checks", of: "also.rules" },
+            ownerMayReview: { slot: "ownerMayReview", of: "also.rules" },
+            labels: { slot: "labels", of: "also.rules" },
+          },
+          result: {},
+        },
+      }],
+      attention: [],
+    },
+  },
+  // No timed rule exists. No entry starts a duty beyond its own request and result.
+  timed: {},
+  rules: {},
+  // The rules scope opens no operation.
+  outcomes: {},
+};
+
+// ---------------------------------------------------------------- reading the rules scope's state
+
+const rulesOf = (state: Pick<StateView, "page">): Item | null => state.page("rules", ["current"], null, 1).items[0] ?? null;
+
+/**
+ * Where a rules scope records its membership reference (section 3.3, "Where
+ * it records its membership reference"; section 12.1, "The membership
+ * reference"; row 1 of the table of marks, which has no mark): the
+ * membership scope's ID, in the value `membership` of its item `rules`,
+ * which the genesis sets from the creation's fields and no entry changes.
+ * Null: the state holds no such item.
+ *
+ * The incarnation is not here. The first entry that retains an observation
+ * fixes it, and every later observation must name the same one. That is
+ * guard 1 of an observation, which the scope makes before a rule is run. No
+ * fold holds that first incarnation yet (I3 deltas, entry EQ7).
+ */
+export const membershipId = (state: Pick<StateView, "page">): ScopeId | null => {
+  const id = rulesOf(state)?.values["membership"];
+  return typeof id === "string" ? (id as ScopeId) : null;
+};
+
+// ---------------------------------------------------------------- the rules
+
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
+
+/** The digests that a declaration names in its `create` sends, once each, in byte order: the first step of its named closure (the contract's section 7.2). */
+const creates = (declared: DeclaredDefinition): Digest[] => {
+  const named = new Set<Digest>();
+  for (const from of [...Object.values(declared.acts), ...Object.values(declared.receives)]) {
+    for (const send of from.sends) if ("create" in send && isDigest(send.create.definition)) named.add(send.create.definition);
+  }
+  return [...named].sort(byteOrder);
+};
+
+/**
+ * The rules of `platform:rules@1`, by the name that a mark states (section
+ * 12.1.8, the table of marks, rows 27 to 29). Each is a pure function of
+ * what a rule is given, at place 4: a guard, at its position in the written
+ * list. None reads the clock.
+ */
+export const rulesScopeRules: Rules = {
+  /**
+   * Row 27, among the guards of `publish` (P19). It reads `observed`: one
+   * `MemberObservation` for each check's `checker`, of the membership scope
+   * whose ID the scope records. It holds when each is an active member with
+   * the role `checker`. Otherwise `not-a-checker` (case a of section
+   * 12.1.4). It is not completed when an observation is missing.
+   *
+   * The checks are read in the order of the list, and the first that does
+   * not pass decides. A checker that the field names in another membership
+   * scope, or in another incarnation than the one observed, is no checker
+   * here. An observation of another scope than the recorded one is no
+   * observation of the checker: it is missing (I3 deltas, entry EQ7). The
+   * entry retains each observation that was read, which is at most one for
+   * each of the 32 checks (section 3.3, the table of entries).
+   */
+  checkers: {
+    place: "guard", refusals: ["not-a-checker"],
+    run: (given) => {
+      const recorded = membershipId(given.state);
+      const checks = given.resolved.fields["checks"];
+      if (recorded === null || !Array.isArray(checks)) throw new Error("this rule stands in `publish`, which names its checks, in a scope that has its rules");
+      for (const check of checks) {
+        const checker = isRecord(check) ? check["checker"] : null;
+        if (!isMemberRef(checker)) throw new Error("a check names its checker as a member");
+        if (checker.membership.kind !== "membership" || checker.membership.scope !== recorded) return { holds: false, name: "not-a-checker" };
+        const observation = given.observed({ member: checker.member })?.observation as MemberObservation | undefined;
+        if (!observation || observation.of.kind !== "membership" || observation.of.scope !== recorded) return { holds: null, reason: "dependency-unavailable" };
+        if (observation.of.inc !== checker.membership.inc || observation.memberState !== "active" || observation.role !== "checker") return { holds: false, name: "not-a-checker" };
+      }
+      return { holds: true };
+    },
+  },
+  /**
+   * Row 28, among the guards of `keep-configuration` (P18, P21). It reads
+   * the value beside the intent whose digest, in the domain
+   * `artroom-check-configuration-1`, is the field `digest`. It holds when
+   * such a value is at hand and its `image` is a content digest (section
+   * 3.11). Otherwise `configuration-mismatch`.
+   *
+   * With no such value at hand the code is `bad-field`, as the contract's
+   * section 6.2 states for a place that requires a value and has none: no
+   * value came under the digest, the bytes are not canonical, or the value
+   * is longer than the bound of its domain. With an `image` that is no
+   * digest the code is `guard-failed` (I3 deltas, entries EQ1 and EQ4).
+   */
+  "configuration-bytes": {
+    place: "guard", refusals: ["configuration-mismatch"],
+    run: (given) => {
+      const digest = given.resolved.fields["digest"];
+      if (!isDigest(digest)) throw new Error("this rule stands in `keep-configuration`, which names a digest");
+      const value = given.value(CONFIGURATION_DOMAIN, digest, CONFIGURATION_BYTES);
+      if (value === undefined) return { holds: false, name: "configuration-mismatch", code: "bad-field" };
+      return isRecord(value) && isDigest(value["image"]) ? { holds: true } : { holds: false, name: "configuration-mismatch" };
+    },
+  },
+  /**
+   * Row 29, among the guards of `activate` (P21). It reads the values
+   * beside the intent: the definition's bytes, by the field `digest` in the
+   * domain `artroom-definition-1`, and the bytes of each definition of its
+   * named closure, by the digest that a `create` send names (the contract's
+   * section 7.2). It reads the judge's bounds: the bytes of one definition,
+   * and the definitions of one closure. It holds when the bytes hash to the
+   * digest, validate as a declared definition, without the platform option,
+   * and state the `name` given, and each definition of the closure is
+   * supplied and validates.
+   *
+   * - Not completed, `dependency-unavailable`: the definition, or one of
+   *   its closure, is not supplied. Bytes that do not hash to a digest are
+   *   bytes of no definition that is named, so they are not supplied.
+   * - Refused `unsupported-definition` (case c of section 12.1.4): the
+   *   bytes of the definition, or of one of its closure, do not validate;
+   *   the closure names more definitions than the bound; or the definition
+   *   states another name than the field `name`. The row states that one
+   *   refusal, and no other name is used (I3 deltas, entry EQ3).
+   *
+   * The closure is walked in byte order of the digests, breadth first, so a
+   * runtime and a verifier read the same values in the same order.
+   */
+  "definition-bytes": {
+    place: "guard", refusals: ["unsupported-definition"],
+    run: (given) => {
+      const { digest, name } = given.resolved.fields;
+      const { bounds } = given.resolved;
+      if (!isDigest(digest) || typeof name !== "string") throw new Error("this rule stands in `activate`, which names a digest and a name");
+      const unsupported = { holds: false, name: "unsupported-definition", code: "unsupported-definition" } as const;
+      const seen = new Set<Digest>();
+      const queue: Digest[] = [digest];
+      for (let next = queue.shift(); next !== undefined; next = queue.shift()) {
+        if (seen.has(next)) continue;
+        // The definition itself is not counted among those that it names, as for the closure that a scope retains at its genesis.
+        if (seen.size > bounds.namedDefinitions) return unsupported;
+        seen.add(next);
+        const value = given.value(DEFINITION_DOMAIN, next, bounds.definitionBytes);
+        if (value === undefined) return { holds: null, reason: "dependency-unavailable" };
+        const checked = validateDefinition(value, bounds);
+        if (!checked.ok || checked.definition.digest !== next) return unsupported;
+        if (next === digest && checked.definition.declared.name !== name) return unsupported;
+        queue.push(...creates(checked.definition.declared));
+      }
+      return { holds: true };
+    },
+  },
+};

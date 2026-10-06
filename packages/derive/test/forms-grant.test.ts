@@ -24,7 +24,7 @@ const asked: GrantAsked = { scope: otherLane, membership, key: rita.key, action:
 const prior = { seq: 5, hash: d("5") };
 const reused: ObservationUse = { ...fresh, use: "reused", prior };
 const last = { entry: prior, time: t(10), observation: standing };
-const of = (change: Partial<Observation>, use: ObservationUse = fresh): ObservationUse => ({ ...use, observation: { ...standing, ...change } });
+const of = (change: Partial<Observation>, use: ObservationUse = fresh): ObservationUse & { observation: Observation } => ({ ...use, observation: { ...standing, ...change } });
 const said = (judged: GrantJudgment) => (judged.result === "current" ? "current" : `${judged.result}: ${judged.failed}`);
 
 describe("the grant guard and the commit guards of an observation (authority note, section 3.3; section 16.1; T45)", () => {
@@ -75,8 +75,11 @@ describe("the grant guard and the commit guards of an observation (authority not
 
   test("the window is the definition's: an act that opens a hold is a ten-second kind; a revoked answer stays; and an answer that is not a whole standing is none", () => {
     const window = (kind: Parameters<typeof windowOf>[1], act: string) => windowOf(laneDefinition, kind, act);
-    expect([window("lane", "take-hold"), window("lane", "remark"), window("directory", "remark"), window("destination", "remark"), window("lane", "no-such-act")])
-      .toEqual([WINDOWS.once, WINDOWS.ordinary, WINDOWS.ordinary, null, null]);
+    expect([window("lane", "take-hold"), window("lane", "remark"), window("directory", "remark"), window("destination", "remark"), window("rules", "remark"), window("lane", "no-such-act")])
+      .toEqual([WINDOWS.once, WINDOWS.ordinary, WINDOWS.ordinary, WINDOWS.ordinary, WINDOWS.ordinary, null]);
+    // Nothing is read for an act of membership, which judges on its own head, or of the register, which judges on no grant. The
+    // windows of a task scope are not built.
+    expect([window("membership", "remark"), window("register", "remark"), window("task", "remark")]).toEqual([null, null, null]);
 
     const held = { observation: standing };
     const retired = of({ keyState: "retired", head: { seq: 44, hash: d("6") } });

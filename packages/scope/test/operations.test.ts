@@ -2,7 +2,9 @@ import { describe, expect, test } from "vitest";
 import { abortAllDurableObjects } from "cloudflare:test";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { OperationId, Read } from "@generalbusiness/artroom-contract";
-import { checkpointOf, operationId, operationOpening, timeMs, type Opening } from "@generalbusiness/artroom-derive";
+import { canonicalize } from "@generalbusiness/artroom-bytes";
+import { checkpointOf, operationId, operationOpening, snapshotInput, snapshotRead, stagedRefName, timeMs, type Opening } from "@generalbusiness/artroom-derive";
+import { isAnswer } from "../src/operations.ts";
 import { SqliteStore, Turns, Wakes, production, type EffectAnswer, type OperationStatus, type OutcomeRecorded } from "../src/index.ts";
 import { variant } from "@generalbusiness/artroom-derive/testing";
 import { controls } from "../src/testing.ts";
@@ -47,6 +49,8 @@ async function seen(s: Lane, id: OperationId): Promise<OperationStatus> {
 }
 /** An answer that arrives by itself, after its request: given to the driver of the object in memory, inside the object. */
 const late = (s: Lane, out: OutsideDouble, id: OperationId, attempt: number, answer: EffectAnswer): Promise<OutcomeRecorded> => s.inside(() => out.deliver!(id, attempt, answer));
+/** One turn of the event loop, so that what is already due can happen. It waits for no time to pass. */
+const tick = () => new Promise<void>((resolve) => { setTimeout(resolve, 0); });
 const own = (commit: string): EffectAnswer => ({ result: "confirmed", evidence: { basis: "own-answer", body: { commit } } });
 /** Each attempt's outcomes, as `result at seq`. */
 const outcomes = (status: OperationStatus) => status.operation.attempts.map((a) => a.outcomes.map((o) => `${o.result} at ${o.seq}`));
@@ -74,7 +78,7 @@ describe("outside operations at a real scope (scope contract, section 4.3; autho
     expect(await s.alarm()).toBe(true);
     const unknown = (await s.sealed(2))[0]!;
     expect([out.attempts, unknown.entry.input, unknown.entry.effects]).toEqual([
-      [`${op}#1`], { type: "outcome", operation: op, attempt: 1, result: "unknown", evidence: { basis: "none", body: null } },
+      [`${op}#1`], { type: "outcome", operation: op, attempt: 1, owner: "platform:destination@1", kind: "push", result: "unknown", evidence: { basis: "none", body: null } },
       [{ effect: "attempt", operation: op, attempt: 1, result: "unknown", selected: null }, { effect: "attempt", operation: op, attempt: 2, result: "opened", selected: null }],
     ]);
 
@@ -99,6 +103,10 @@ describe("outside operations at a real scope (scope contract, section 4.3; autho
     expect([await late(s, out, op, 1, own("c1")), await late(s, out, op, 1, own("c9")), await late(s, out, op, 3, own("c3")), (await s.head()).seq]).toEqual([
       { recorded: "repeat", seq: 4 }, { recorded: "conflict", seq: 4 }, { recorded: "refused", detail: "no request of that attempt was sent" }, 4,
     ]);
+    // The plan's T41: the contradiction is an incident (authority note, section 12, G13). It wrote no entry, so it is kept in the operator's
+    // record alone, by the runtime that found it: the scope, the kind, and references to the attempt and to the entry that it contradicts.
+    const incidents = await (s.object as unknown as { incidents(reader: unknown): Promise<Read<readonly { kind: string; scope: unknown; refs: unknown }[]>> }).incidents(reader);
+    expect(incidents.ok && incidents.value.map(({ kind, scope, refs }) => ({ kind, scope, refs }))).toEqual([{ kind: "outcome-conflict", scope: s.at, refs: [{ operation: op, attempt: 1 }, { entry: 4 }] }]);
   });
 
   test("T20: an idle ledger writes nothing; a port that sends nothing leaves the attempt recorded and visible; an outcome is written at a scope with no free room; an operation opens at most its stated attempts and then none by itself; a retry is a new operation", async () => {
@@ -155,7 +163,7 @@ describe("outside operations at a real scope (scope contract, section 4.3; autho
     expect([await late(s, out, op, 1, own("c1")), (await s.head()).seq, outcomes(await seen(s, op)), await s.alarmAt()]).toEqual([{ recorded: "unavailable" }, 9, [["unknown at 8"]], retry]);
     // The wake-up's turn writes the other end. The driver then offers the answer it kept: the late answer, of that operation and attempt, with its evidence.
     expect([await s.alarm(), (await s.sealed(11))[0]?.entry.input, (await seen(s, op)).state, out.attempts, await s.alarmAt()]).toEqual([
-      true, { type: "outcome", operation: op, attempt: 1, result: "confirmed", evidence: { basis: "own-answer", body: { commit: "c1" } } }, "settled", [`${op}#1`], null,
+      true, { type: "outcome", operation: op, attempt: 1, owner: "platform:destination@1", kind: "push", result: "confirmed", evidence: { basis: "own-answer", body: { commit: "c1" } } }, "settled", [`${op}#1`], null,
     ]);
     // Nothing is in hand any more: a pass offers nothing, and the same answer again is a copy.
     expect([await surface(s).effect(), await late(s, out, op, 1, own("c1")), (await s.head()).seq]).toEqual([0, { recorded: "repeat", seq: 11 }, 11]);
@@ -237,5 +245,47 @@ describe("outside operations at a real scope (scope contract, section 4.3; autho
     c.capability = {};
     await s.restart();
     expect([await surface(s).effect(), out.attempts, (await seen(s, op)).state]).toEqual([1, [`${op}#1`], "settled"]);
+  });
+
+  test("a stream that waits is sent the head of an entry that a late answer wrote, when it is committed: no caller's request, no further write and no alarm follows that entry; and the head of a checkpoint in the same way. The test readers, the outside system and the opening entry are stand-ins", async () => {
+    const s = await found();
+    const out = outsideOf(s.name);
+    const [op] = await open(s, pushOf(1)) as [OperationId];
+    // The one attempt is sent and gets no answer: its outcome is `unknown`, in entry 2. It was the last attempt, so nothing is left to send.
+    out.answer(op, 1, null);
+    expect([await s.alarm(), (await s.head()).seq, outcomes(await seen(s, op)), await s.alarmAt()]).toEqual([true, 2, [["unknown at 2"]], null]);
+
+    const text = new TextDecoder();
+    const line = (read: ReadableStreamReadResult<Uint8Array> | null) => (read === null ? "nothing was sent" : read.done ? "the stream ended" : JSON.parse(text.decode(read.value)) as unknown);
+    const stream = await s.inside(async (_state, instance) => {
+      const opened = (instance as { stream(reader: unknown): { id: string; body: ReadableStream<Uint8Array> } }).stream(reader);
+      const from = opened.body.getReader();
+      // The stream begins with the head, entry 2. The next read waits: the reader has been sent that head, and there is no other.
+      const first = line(await from.read());
+      const waiting = from.read();
+      const idle = await Promise.race([waiting, tick().then(() => null)]);
+      // That request's own answer arrives by itself. The driver writes it as entry 3, in a turn that no caller asked for.
+      const recorded = await out.deliver!(op, 1, own("c1"));
+      // Nothing else happens: no call, no write and no alarm. The read that waited has the new head.
+      const sent = await Promise.race([waiting, tick().then(() => null)]);
+      // A checkpoint is the one writer among the object's calls that follows nothing itself. Its entry is told to the stream in the same way.
+      const next = from.read();
+      const checkpoint = await (instance as { checkpoint(): Promise<{ answer: string }> }).checkpoint();
+      const after = await Promise.race([next, tick().then(() => null)]);
+      await from.cancel();
+      return { first, idle: line(idle), recorded: recorded.recorded, sent: line(sent), checkpoint: checkpoint.answer, after: line(after) };
+    });
+    const [second, third, fourth] = (await s.sealed(2)).map((e) => ({ at: { seq: e.entry.seq, hash: e.hash } }));
+    expect([stream, (await s.head()).seq, outcomes(await seen(s, op)), await s.alarmAt()]).toEqual([{ first: second, idle: "nothing was sent", recorded: "written", sent: third, checkpoint: "written", after: fourth }, 4, [["unknown at 2", "confirmed at 3"]], null]);
+  });
+
+  test("a snapshot that comes with an answer is stored only as its canonical bytes: the same pairs in another order, or with other spacing, have the same digest and are no answer. A plain function, and no scope", () => {
+    const lane = { scope: `sc_${"a".repeat(52)}`, inc: `in_${"a".repeat(26)}` } as never;
+    const pairs = [1, 2].map((root) => ({ ref: stagedRefName(lane, "c".repeat(40), root), target: "c".repeat(40) }));
+    const snapshot = snapshotInput(pairs)!;
+    const answer = (bytes: string) => ({ result: "confirmed", evidence: { basis: "own-answer", body: { read: true } }, retain: [{ ...snapshot, bytes }] });
+    // Each of the three has the pairs of the snapshot, so each is read as a snapshot with that digest. Only the first is its bytes.
+    const given = [snapshot.bytes, ` ${snapshot.bytes}`, canonicalize([...pairs].reverse())];
+    expect([given.map((bytes) => snapshotRead(snapshot.digest, bytes) !== null), given.map((bytes) => isAnswer(answer(bytes)))]).toEqual([[true, true, true], [true, false, false]]);
   });
 });

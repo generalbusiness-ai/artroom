@@ -320,7 +320,7 @@ export function runHandler(view: StateView, definition: ValidDefinition, context
   if (new Set([...subjects.values()].map((i) => i.id)).size !== subjects.size) return refused("alias", "two names resolve to one item", uses);
   const j: Judging = {
     view, definition, bounds, clock: context.clock, scope, self: scope.head.seq + 1, kind, fields, fieldTypes: handler.fields, subjects, signer: null,
-    facts, prepared: context.prepared, used: [], asked: context.asked, own: context.own, capabilities: context.capabilities, platform: context.platform, judged, ran: clocked,
+    facts, prepared: context.prepared, used: [], asked: context.asked, own: context.own, snapshot: context.snapshot, capabilities: context.capabilities, platform: context.platform, judged, ran: clocked,
     // Section 6.5: `sender` is the envelope's source scope, `source` reads the source entry, and `update` the update, whose revision is the `seq` of the owner's entry.
     sender: sent?.source.fact.at, source: sent?.source, update: sent?.update ? { state: sent.update.state, item: sent.update.item, revision: sent.source.fact.seq } : undefined,
   };

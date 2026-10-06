@@ -9,8 +9,8 @@
 
 import type { ActType, Answer, Beside, Bounds, CapabilityName, DeclaredDefinition, Digest, DutyId, Entry, FactRef, Founded, Grant, PlatformDefinition, Receipt, RefusalReason, ScopeId, Seed, Settlement, SignedIntent, UnavailableReason } from "@generalbusiness/artroom-contract";
 import { canonicalize, definitionDigest, intentDigest, isDigest, isGrant, isPlatformDefinition, newIncarnation, parseStrict, platformName, textDigest, utf8 } from "@generalbusiness/artroom-bytes";
-import { actionOf, checkpointOf, derivable, factsNamed, ownersOf, inputTexts, isObject, judgeAct, judgeCheckpoint, judgeGenesis, judgePreparation, own, prepareRules, presentedTypes, readFields, runnable, stepsOf, validateDefinition, windowOf } from "@generalbusiness/artroom-derive";
-import type { ActJudgment, Clock as Reading, Draft, Fetched, Founding, GrantDecision, JudgeContext, Own, Owners, PlatformRules, Presented, StateView, Texts, ValidDefinition, Window } from "@generalbusiness/artroom-derive";
+import { actionOf, checkpointOf, counted, derivable, factsNamed, ownersOf, inputTexts, isObject, judgeAct, judgeCheckpoint, judgeGenesis, judgePreparation, own, prepareRules, presentedTypes, readFields, runnable, stepsOf, validateDefinition, windowOf } from "@generalbusiness/artroom-derive";
+import type { ActJudgment, Clock as Reading, Draft, Fetched, Founding, GrantDecision, JudgeContext, Own, Owners, PlatformRules, Presented, Snapshots, StateView, Texts, ValidDefinition, Window } from "@generalbusiness/artroom-derive";
 import { RULE_PROFILES } from "@generalbusiness/artroom-derive/rule";
 import { namedBy } from "./definitions.ts";
 import type { Asked, DefinitionRead, Ports, Standing } from "./ports.ts";
@@ -46,6 +46,9 @@ export function receiptOf({ entry, hash }: Sealed, definition: Digest | Platform
 }
 
 /** This scope's own sealed entry at a position, from its stored history, for the judges (section 6.2, a local fact). */
+/** The snapshots of staged refs that the scope retains, by digest, as the guard `ancestry` reads them (section 16.4). */
+export const snapshotsOf = (store: Store): Snapshots => (digest) => store.retained("snapshot", digest)?.bytes ?? null;
+
 export const ownOf = (store: Store): Own => (seq) => {
   const kept = store.stored(seq);
   return kept ? { entry: JSON.parse(kept.bytes) as Entry, hash: kept.hash } : null;
@@ -169,16 +172,25 @@ export class Scope {
     this.#turns = new Turns(store, ports, bounds, () => { const pinned = this.pinned(); return pinned ? pinned.definition : undefined; }, () => this.owners());
   }
 
+  /** True when this runtime has the code of every form that the definition uses, and each entry of it fits the bound on derived effects with that code. */
+  #derives(definition: ValidDefinition): boolean {
+    const capabilities = this.#ports.capabilities;
+    return derivable(definition, capabilities) && counted(definition, capabilities, this.#bounds) === null;
+  }
+
   /**
    * A declaration, validated as its canonical bytes parse, so a scope reads
-   * one value before and after a restart. Null: it does not validate, or it
+   * one value before and after a restart. Null: it does not validate; or it
    * needs a capability record that this runtime has no code for (section
-   * 6.11). Either way this runtime cannot pin it: `unsupported-definition`.
+   * 6.11); or an entry of it, counted with the most that this runtime's
+   * capability code declares, passes the bound on the derived effects of
+   * one entry (section 6.1, "A declared maximum for everything that
+   * derives"). Each way this runtime cannot pin it: `unsupported-definition`.
    */
   validate(bytes: string): ValidDefinition | null {
     try {
       const checked = validateDefinition(parseStrict(bytes), this.#bounds, RULE_PROFILES);
-      return checked.ok && derivable(checked.definition, this.#ports.capabilities) ? checked.definition : null;
+      return checked.ok && this.#derives(checked.definition) ? checked.definition : null;
     } catch {
       return null;
     }
@@ -211,7 +223,7 @@ export class Scope {
     try {
       const checked = validateDefinition(parseStrict(canonicalize(supplied.data)), this.#bounds, RULE_PROFILES, { platform: true });
       // Section 6.1: the name of a platform definition is its platform name without the version, which is what `under` compares.
-      if (!checked.ok || checked.definition.declared.name !== platformName(named) || !derivable(checked.definition, this.#ports.capabilities)) return null;
+      if (!checked.ok || checked.definition.declared.name !== platformName(named) || !this.#derives(checked.definition)) return null;
       // The marks are in the data, and the validator lists them: no table beside the data says which entries are code.
       // Section 6.1, "A mark with no rule: the whole scope": every mark needs a rule of that name, of the kind of the mark's place.
       if (!runnable(checked.definition, supplied.rules)) return null;
@@ -425,7 +437,7 @@ export class Scope {
     // Phase two is in the commit: what that read holds at the commit's head, on the commit's one reading. The judge is given the
     // answer and reads nothing.
     const context = (view: StateView, clock: Reading): Omit<JudgeContext, "prepared"> =>
-      ({ clock, bounds, facts, own: ownOf(this.#store), texts: texts.sizes, presented: offered, capabilities: this.#ports.capabilities ?? undefined, platform, membership: standing?.membership ?? null, grants: standing === null ? null : heldBy(standing, view, clock) });
+      ({ clock, bounds, facts, own: ownOf(this.#store), snapshot: snapshotsOf(this.#store), texts: texts.sizes, presented: offered, capabilities: this.#ports.capabilities ?? undefined, platform, membership: standing?.membership ?? null, grants: standing === null ? null : heldBy(standing, view, clock) });
 
     const end = await this.#turns.run<Answer>({
       // The walk that finds the rules judges nothing (section 5.2, step 4), so what it is given of phase two decides nothing.
@@ -518,7 +530,7 @@ export class Scope {
     const end = await this.#turns.run<Answer>({
       asks: () => [],
       judge: (view, clock) => {
-        const judged = judgePreparation(view, definition, asked, { clock, bounds, steps, granted: granted(view, clock), membership: standing?.membership ?? null });
+        const judged = judgePreparation(view, definition, asked, { clock, bounds, steps, own: ownOf(this.#store), granted: granted(view, clock), membership: standing?.membership ?? null });
         switch (judged.result) {
           case "write": {
             const head = view.scope()!.head;

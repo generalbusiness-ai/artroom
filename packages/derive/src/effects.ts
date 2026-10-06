@@ -471,8 +471,15 @@ export function deriveEffects(j: Judging, forms: readonly EffectForm[], attentio
   const holds = effects.filter((effect): effect is HoldEffect => effect.effect === "hold");
   if (holds.length > 0 && j.capabilities?.workspace) {
     const k = effects.filter((effect) => effect.effect === "operation").length;
-    effects.push(...j.capabilities.workspace(j.view, j.definition, j.self, k, holds, (id) => [...working.values()].find((held) => held.id === id) ?? null));
-  }
+    const derived = j.capabilities.workspace(j.view, j.definition, j.self, k, holds, (id) => [...working.values()].find((held) => held.id === id) ?? null);
+    // Section 6.1, "In the commit": code that returns more than it declared has a fault, and the input is not judged.
+    const most = j.capabilities.maxima?.filter((m) => m.form === "workspace").reduce((n, m) => n + m.effects, 0);
+    if (most !== undefined && derived.length > holds.length * most) throw new Error(`the workspace of ${holds.length} holds declares at most ${holds.length * most} effects, and it returned ${derived.length}`);
+    effects.push(...derived);
+    // The count of `counted` holds before an entry is derived. An entry that would still pass the bound is refused, by the
+    // bound's name, and nothing is cut short. An entry that cannot be refused never reaches this: its opening was refused.
+    if (records.length + derived.length > j.bounds.derivedEffects) return refuse("entry-too-large", "derivedEffects");
+  } else if (records.length > j.bounds.derivedEffects) return refuse("entry-too-large", "derivedEffects");
 
   // Section 6.3: after the opening effects every required slot must hold a value. The item is the one that the row opens, or in
   // platform data the one that a rule opened.

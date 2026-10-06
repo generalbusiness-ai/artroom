@@ -10,6 +10,7 @@ import { declaredBy, type Recorded } from "./capability.ts";
 import { isEntryOf, updateOf, useOf, type Reading } from "./fields.ts";
 import { bound, runClause, runHandler, type Clause, type Handled, type Sent } from "./handlers.ts";
 import type { Judgment } from "./judge.ts";
+import { heldOpenings } from "./ledger.ts";
 import { unjudged, type JudgedInput } from "./marks.ts";
 import { recordEffects } from "./prepare.ts";
 import type { ScopeState, StateView } from "./state.ts";
@@ -104,7 +105,7 @@ function deliveryJudged(view: StateView, definition: ValidDefinition, delivered:
   const next = nextDue(view, definition, clock.asOf);
   if (next) return { result: "due", next };
 
-  if (message.class === "control") return confirmation(scope, delivered, message, source);
+  if (message.class === "control") return confirmation(view, scope, delivered, message, source);
   if (message.class === "request" && message.type === "create") return unverified("this scope's genesis answered another creation request");
   // Section 7.2: a provisional scope admits its confirmation and a repeat of its creation request; a refused one only the repeat.
   if (scope.status === "provisional") return { result: "unavailable", reason: "scope-provisional" };
@@ -221,9 +222,10 @@ const under = (handler: { from: { under?: string } }, source: Source): boolean =
  * the creator the seed names, the source entry is a delivery of the applied
  * result of the creation request, sent by this scope's genesis, and the
  * control names this genesis. Any other is `source-unverified`. The entry
- * activates the scope and judges no time.
+ * activates the scope and judges no time. It opens attempt 1 of each
+ * operation that the genesis holds (section 4.3, item 1).
  */
-function confirmation(scope: ScopeState, { from, n }: Delivered, message: Control, source: Entry): Judgment {
+function confirmation(view: StateView, scope: ScopeState, { from, n }: Delivered, message: Control, source: Entry): Judgment {
   const genesis: FactRef = { at: scope.at, seq: 0, hash: scope.genesis.hash };
   const recorded = source.input;
   const admitted = message.type === "confirm" && scope.status === "provisional" && scope.creator !== null && scope.genesis.source !== null
@@ -232,7 +234,7 @@ function confirmation(scope: ScopeState, { from, n }: Delivered, message: Contro
     && same(recorded.message.of, { from: scope.genesis.source, n: scope.genesis.n }) && same(recorded.from, genesis)
     && same(message.genesis, genesis);
   if (!admitted) return { result: "source-unverified", detail: "not the creator's confirmation of this genesis" };
-  return { result: "write", draft: { input: { type: "delivery", from, n, message }, uses: [useOf(from, source)], prepared: [], effects: [{ effect: "activate" }], sends: [], judgesTime: false } };
+  return { result: "write", draft: { input: { type: "delivery", from, n, message }, uses: [useOf(from, source)], prepared: [], effects: [{ effect: "activate" }, ...heldOpenings(view)], sends: [], judgesTime: false } };
 }
 
 /**

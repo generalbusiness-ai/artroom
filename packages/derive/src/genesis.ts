@@ -1,13 +1,20 @@
 /**
  * The judge of a genesis (scope contract, sections 7.1 and 7.2): the first
- * entry of a repository's directory, which a founder's signed intent asks
- * for, and of a child, which a `create` send of its creator asks for.
+ * entry of a scope with no creator, which a signed intent asks for, and of
+ * a child, which a `create` send of its creator asks for.
+ *
+ * A scope with no creator is the founding register, which an `install`
+ * intent founds under `platform:register` (section 7.1). The first delivery
+ * founded a directory with no creator, by a `found` intent, as its stand-in
+ * for a register (section 7.2, "Where each scope reads its closure"). That
+ * founding stays, for the scopes of today's tests, and it is never of the
+ * kind `register` or under the register's definition.
  */
 
 import type { Entry, FactRef, FactUse, GrantMark, Incarnation, Prepared, Reason, Request, ScopeId, ScopeRef, Seed, Send, SignedIntent } from "@generalbusiness/artroom-contract";
 import { deliveryCauseDigest, intentDigest, isDigest, isIncarnation, isSeed, messageDigest, scopeIdOf, seedDigest, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import { judgeDelivery, reasonOf, sentBy, type DeliveryContext } from "./delivery.ts";
-import { creationFields, isIntent, readFacts, readFields, useOf } from "./fields.ts";
+import { creationFields, isEntryOf, isIntent, readFacts, readFields, useOf } from "./fields.ts";
 import type { Fetched, Judging } from "./guards.ts";
 import { derive, giving } from "./handlers.ts";
 import { fieldOutsideType, grantByRule, markOf, unjudged, type JudgedInput } from "./marks.ts";
@@ -28,15 +35,48 @@ export interface Founding { name: ScopeId; inc: Incarnation; seed: Seed; foundin
 /** What asks for a child (section 7.2): the delivery of a `create`, which is addressed by its seed. */
 export interface Creation { name: ScopeId; inc: Incarnation; to: Seed; from: FactRef; n: number; message: Request }
 
+/** The name that the founding register's definition states (section 7.1; authority note, section 12.1). */
+const REGISTER = "platform:register";
+
 /**
- * Section 7.2, the three kinds of cause: the seed's cause matches the source
- * entry by the kind of that entry's input, each in its own byte domain.
+ * Section 7.2, "The kinds of cause", the fourth row: the act that opened the
+ * operation of an outcome entry. An operation's ID is the `seq` of the entry
+ * that opened it and its ordinal there (section 4.1), so the outcome names
+ * that entry's position. A foreign entry is read by its fact (section 7.4),
+ * and a position alone names no bytes. So the opening entry is one that the
+ * creation itself names by a fact among its fields, as the register's
+ * `create` names the `found` entry in `claim` (authority note, section
+ * 12.1). The source entry seals that message, and so that fact's hash.
+ *
+ * The entry is of the creator, at that position, earlier than the outcome,
+ * and it holds the `operation` record of that ordinal. Null: no entry at
+ * hand is that one (I3 deltas, entry EP1).
  */
-function causeOf(source: Entry): Seed["cause"] | null {
+function openerOf(source: Entry, message: Request, facts: readonly Fetched[]): Entry | null {
+  if (source.input.type !== "outcome") return null;
+  const [seq, k] = source.input.operation.split(":").map(Number);
+  const fields = isObject(message.body) && isObject(message.body["fields"]) ? Object.values(message.body["fields"]) : [];
+  const named = (fact: FactRef): boolean => fields.some((value) => isFactRef(value) && same(value, fact));
+  const found = facts.find(({ fact, entry }) => same(fact.at, source.at) && fact.seq === seq && fact.seq < source.seq && named(fact) && isEntryOf(entry, fact));
+  return found?.entry.effects.some((effect) => effect.effect === "operation" && effect.k === k) ? found.entry : null;
+}
+
+/**
+ * Section 7.2, the four kinds of cause: the seed's cause matches the source
+ * entry by the kind of that entry's input, each in its own byte domain. For
+ * an outcome it is the digest of the intent of the act that opened the
+ * outcome's operation, in the domain of an act's intent. `facts`: the
+ * foreign entries at hand, among which that act's entry is looked for.
+ */
+function causeOf(source: Entry, message: Request, facts: readonly Fetched[]): Seed["cause"] | null {
   const input = source.input;
   if (input.type === "act") return intentDigest(input.signed.intent);
   if (input.type === "delivery") return deliveryCauseDigest({ v: 1, from: input.from, n: input.n, message: messageDigest(input.message) });
   if (input.type === "genesis") return seedDigest(input.seed);
+  if (input.type === "outcome") {
+    const opener = openerOf(source, message, facts)?.input;
+    return opener?.type === "act" ? intentDigest(opener.signed.intent) : null;
+  }
   return null;
 }
 
@@ -77,8 +117,11 @@ function genesisJudged(view: StateView, definition: ValidDefinition, asked: Foun
     // Section 7.1: the founder's signature commits to the inputs of the seed, and the intent's digest is the seed's cause.
     const intent = asked.founding.intent;
     if (!verifySignedIntent(asked.founding) || !isIntent(intent)) return unverified("not a signed intent");
-    if (seed.creator !== null || seed.kind !== "directory" || seed.ordinal !== 0 || intentDigest(intent) !== seed.cause) return unverified("the seed is not the one this founding intent asks for");
-    if (intent.to !== null || intent.kind !== "found" || intent.on !== null || Object.keys(intent.expected).length > 0) return { result: "refused", reason: "bad-intent", detail: "a founding intent has kind found, and names no scope and no item" };
+    // The register is founded by an `install` intent, under its own definition and no other. A directory with no creator is the
+    // first delivery's stand-in, by a `found` intent. No other kind of scope has no creator.
+    const asks = seed.kind === "register" ? "install" : seed.kind === "directory" ? "found" : null;
+    if (seed.creator !== null || asks === null || (seed.kind === "register") !== (definition.declared.name === REGISTER) || seed.ordinal !== 0 || intentDigest(intent) !== seed.cause) return unverified("the seed is not the one this founding intent asks for");
+    if (intent.to !== null || intent.kind !== asks || intent.on !== null || Object.keys(intent.expected).length > 0) return { result: "refused", reason: "bad-intent", detail: `a founding intent has kind ${asks}, and names no scope and no item` };
     const now = timeMs(clock.reading)!;
     const notAfter = timeMs(intent.notAfter)!;
     if (now >= notAfter) return { result: "refused", reason: "expired", detail: "notAfter" };
@@ -89,7 +132,7 @@ function genesisJudged(view: StateView, definition: ValidDefinition, asked: Foun
     if (!isObject(asked.message) || asked.message.class !== "request" || asked.message.type !== "create") return unverified("not a creation request");
     if (!context.source) return { result: "unavailable", reason: "dependency-unavailable" };
     if (!sentBy(context.source.entry, asked)) return unverified("the source entry holds no create at that ordinal with that seed and that message");
-    if (causeOf(context.source.entry) !== seed.cause) return unverified("the seed's cause does not match the source entry");
+    if (causeOf(context.source.entry, asked.message, context.facts) !== seed.cause) return unverified("the seed's cause does not match the source entry");
     source = { fact: asked.from, entry: context.source.entry, under: context.source.under };
   }
 

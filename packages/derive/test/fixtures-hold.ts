@@ -6,27 +6,21 @@
  * `staging` is the fixture lane with the forms of `hold@1` as the two pinned
  * lane definitions write them, argument for argument: `staged` with a
  * commit and what it is under, `pin-hold` with a commit, and `pin-release`
- * with a slot's commit. `reads` is how this fixture's steps read a request
- * from a signed intent. The texts state no one reading (I3 deltas, entry
- * EF2), so it is the fixture's own.
+ * with a slot's commit. Its `report` has the fields `commit` and
+ * `commitment`, as `report` of `issue` has, and its `propose` has the four
+ * fields of a manifest's source, as `propose-manifest` of `change` has. The
+ * steps read them as the capability's own table says (authority note,
+ * section 5.7, "What a step reads of its signed intent").
  */
 
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { Effect, Entry, Evidence, FieldValue, OperationId, ScopeRef } from "@generalbusiness/artroom-contract";
-import { isScopeRef } from "@generalbusiness/artroom-bytes";
-import { capabilitiesOf, checkpointOf, clockOf, gitRead, holdCapability, judgePreparation, owed, settleOutcome, snapshotOf, stagedRefName, workspaceEffects } from "../src/index.ts";
-import type { AncestryCheck, CapabilityGiven, HoldReads, StagedRef, ValidDefinition } from "../src/index.ts";
+import { RETIRE_ACTION, capabilitiesOf, checkpointOf, clockOf, gitRead, holdCapability, judgePreparation, owed, settleOutcome, snapshotInput, snapshotOf, stagedRefName, workspaceEffects } from "../src/index.ts";
+import type { AncestryCheck, CapabilityGiven, StagedRef, ValidDefinition } from "../src/index.ts";
 import { Scope, grantOf, keys, lane, variant, type Actor, type Context } from "./fixtures.ts";
 
 /** A commit ID: forty of one hex digit. */
 export const C = (digit: string): string => digit.repeat(40);
-
-export const reads: HoldReads = {
-  staged: ({ fields }) => (typeof fields["commit"] === "string" && typeof fields["commitment"] === "number"
-    ? { commit: fields["commit"], under: fields["commitment"], hold: typeof fields["hold"] === "number" ? fields["hold"] : null, instance: typeof fields["instance"] === "string" ? fields["instance"] : null } : null),
-  instance: ({ fields }) => (typeof fields["hold"] === "number" && isScopeRef(fields["task"]) && typeof fields["instance"] === "string" ? { hold: fields["hold"], task: fields["task"], instance: fields["instance"] } : null),
-  token: ({ fields }) => (typeof fields["hold"] === "number" && typeof fields["instance"] === "string" ? { hold: fields["hold"], instance: fields["instance"] } : null),
-};
 
 const commit = { type: "commit" } as const;
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -36,12 +30,18 @@ export const staging: ValidDefinition = variant(lane, (def: any) => {
   def.items.report.values = { commit: { fixed: false, required: false, of: commit } };
   def.items.export = { many: true, max: 4, states: { authorized: { final: false }, done: { final: true } }, initial: "authorized", parties: {}, refs: { hold: { fixed: true, required: true, to: { type: "item", of: "hold" } } }, values: {} };
   const report = def.acts.report;
-  report.fields = { ...report.fields, commit: { ...commit, required: true }, hold: { type: "item", of: "hold", required: false }, instance: { type: "text", max: 128, required: false } };
+  report.fields = { ...report.fields, commit: { ...commit, required: true } };
   report.guards.push({ capability: { name: "hold", guard: "staged", with: { commit: { field: "commit" }, under: { item: "also.commitment" } } } }, { capability: { name: "git-read", guard: "ancestry", with: { commit: { field: "commit" }, row: { const: "report" } } } });
   report.effects.push({ value: { slot: "commit", from: { field: "commit" } } }, { capability: { name: "hold", do: "pin-hold", with: { commit: { field: "commit" } } } });
   def.acts["refuse-report"] = {
     step: "transition", on: "report", grant: "review", also: {}, fields: {}, guards: [{ state: ["reported"] }], sends: [], attention: [],
     effects: [{ state: "refused" }, { capability: { name: "hold", do: "pin-release", with: { commit: { slot: "commit" } } } }],
+  };
+  // A selected input of a commitment, with the state and the slot that `git-read@1` reads by name, as `use-input` of `issue` opens it.
+  def.items.input = { many: true, max: 4, states: { selected: { final: false }, replaced: { final: true } }, initial: "selected", parties: {}, refs: { for: { fixed: true, required: true, to: { type: "item", of: "commitment" } } }, values: {} };
+  def.acts["use-input"] = {
+    step: "open", on: "input", grant: "report", also: { commitment: { item: "commitment", by: "commitment" } }, fields: { commitment: { type: "item", of: "commitment", required: true } },
+    guards: [], effects: [{ ref: { slot: "for", from: { item: "also.commitment" } } }], sends: [], attention: [],
   };
   def.acts.authorize = {
     step: "open", on: "export", grant: "export", also: { hold: { item: "hold", by: "hold" } }, fields: { hold: { type: "item", of: "hold", required: true } },
@@ -58,17 +58,17 @@ export const staging: ValidDefinition = variant(lane, (def: any) => {
   };
 });
 
-/** The snapshots of staged refs that the fixture's scopes retain, by digest: what a scope's store keeps for the guard `ancestry`. */
-export const snapshots = new Map<string, readonly StagedRef[]>();
+/** The snapshots of staged refs that the fixture's scopes retain, by digest: what a scope's store keeps for the guard `ancestry`, as retained bytes. */
+export const snapshots = new Map<string, string>();
 /** Keep one snapshot, as a scope does before the check entry that names its digest. */
 export function kept(pairs: readonly StagedRef[]): AncestryCheck["snapshot"] {
-  const snapshot = snapshotOf(pairs)!;
-  snapshots.set(snapshot.digest, snapshot.pairs);
+  const [snapshot, input] = [snapshotOf(pairs)!, snapshotInput(pairs)!];
+  snapshots.set(input.digest, input.bytes);
   return { digest: snapshot.digest, count: snapshot.count };
 }
 
-/** The code of both capabilities over the fixture lane, with at most two tokens of one hold at once. */
-export const cap = capabilitiesOf(holdCapability({ reads, tokensPerHold: 2 }, () => staging), gitRead({ snapshot: (digest) => snapshots.get(digest) ?? null }));
+/** The code of both capabilities, with at most two tokens of one hold at once, and a root that may be retired ten minutes after it was made live. Both numbers are the fixture's. */
+export const cap = capabilitiesOf(holdCapability({ tokensPerHold: 2, rootRetentionSeconds: 600 }), gitRead());
 
 const said = (j: { result: string; reason?: string; name?: string; detail?: string }): string => [j.result, j.reason ?? "", j.name ?? ""].filter((part) => part !== "").join(" ");
 
@@ -90,7 +90,7 @@ export class Staging extends Scope {
     this.take(keys.una);
   }
 
-  override context(over: Context = {}) { return super.context(this.judged ? { capabilities: cap, ...over } : over); }
+  override context(over: Context = {}) { return super.context({ snapshot: (digest) => snapshots.get(digest) ?? null, ...(this.judged ? { capabilities: cap } : {}), ...over }); }
 
   /** `who` takes a hold under the commitment, and the capability's own effects for that entry are folded. Returns the hold's ID. */
   take(who: Actor): number {
@@ -118,15 +118,21 @@ export class Staging extends Scope {
     return effects.length > 0 ? this.hand(effects) : null;
   }
 
-  /** Ask for one step with a new intent of that kind and those fields. The entry when it is written, or the answer in short. */
+  /**
+   * Ask for one step with a new intent of those fields. Its kind is the
+   * step's own, as `hold@1:instance`, which is the kind of the intent of a
+   * step with no act, unless `over` gives the kind of an act. The entry when
+   * it is written, or the answer in short.
+   */
   prepare(who: Actor, step: string, fields: Record<string, FieldValue>, over: { kind?: string; to?: ScopeRef } = {}): Entry | string {
-    const signed = this.intent(who, over.kind ?? step, { fields, ...(over.to ? { to: over.to } : {}) });
+    const signed = this.intent(who, over.kind ?? `hold@1:${step}`, { fields, ...(over.to ? { to: over.to } : {}) });
     return this.asked(signed, step);
   }
   asked(signed: ReturnType<Scope["intent"]>, step: string): Entry | string {
-    const actions = Object.values(this.definition.declared.acts).map((a) => a.grant);
+    // Every key holds every action of the lane, and the action of the step `retire`: a stand-in for the grants of membership.
+    const actions = [...Object.values(this.definition.declared.acts).map((a) => a.grant), RETIRE_ACTION];
     const j = judgePreparation(this.state, this.definition, { signed, capability: "hold@1", step }, {
-      clock: clockOf(this.state, this.now), bounds: PROPOSED_BOUNDS, steps: cap,
+      clock: clockOf(this.state, this.now), bounds: PROPOSED_BOUNDS, steps: cap, own: this.own,
       granted: ({ key }) => { const who = Object.values(keys).find((k) => k.key === key); return who ? { result: "granted", grant: grantOf(who, this.at, actions) } : { result: "refused" }; },
     });
     return j.result === "write" ? this.seal(j.draft) : j.result === "repeat" ? `repeat ${j.seq}` : said(j);
@@ -145,7 +151,7 @@ export class Staging extends Scope {
   }
   /** What a capability rule is given for an input of this scope, with that intent digest. */
   given(over: Partial<CapabilityGiven> = {}): CapabilityGiven {
-    return { view: this.state, definition: this.definition, scope: { at: this.at, creator: null }, self: this.head.seq + 1, kind: "", fields: {}, signer: null, facts: new Map(), own: this.own, clock: clockOf(this.state, this.now), ...over };
+    return { view: this.state, definition: this.definition, scope: { at: this.at, creator: null }, self: this.head.seq + 1, kind: "", fields: {}, signer: null, facts: new Map(), own: this.own, snapshot: (digest) => snapshots.get(digest) ?? null, clock: clockOf(this.state, this.now), ...over };
   }
   /** The entries that the pending duties reserve, with what the capability declares. */
   reserved(): number { return owed(this.state, this.definition, this.last.input, cap); }

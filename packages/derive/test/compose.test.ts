@@ -1,10 +1,10 @@
 import { describe, expect, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { Attempt, Input, Result, ScopeRef, Seed, Send } from "@generalbusiness/artroom-contract";
-import { deliveryCauseDigest, entryHash, factRefOf, intentDigest, messageDigest, scopeIdOf, seedDigest } from "@generalbusiness/artroom-bytes";
+import { deliveryCauseDigest, entryHash, factRefOf, intentDigest, messageDigest, newIncarnation, scopeIdOf, seedDigest } from "@generalbusiness/artroom-bytes";
 import { MemoryState, applyEntry, checkpointOf, clockOf, entryOf, fits, judgeCheckpoint, judgeDelivery, judgeDiagnosis, judgeGenesis, owed, prepareRules, stateDigest, useOf } from "../src/index.ts";
-import type { Creation, DeliveryContext, Draft, Judged, Source, ValidDefinition } from "../src/index.ts";
-import { Ledger, Scope, arriving, born, creation, d, deliver, deskDefinition, fields, forged, founded, judged, keys, laneDefinition, on, sent, t, ticket, ticketDefinition, variant, type Over } from "./fixtures.ts";
+import type { Creation, DeliveryContext, Draft, Fetched, Judged, Source, ValidDefinition } from "../src/index.ts";
+import { Ledger, Scope, T0, arriving, born, creation, d, deliver, deskDefinition, fields, forged, founded, judged, keys, laneDefinition, on, sent, t, ticket, ticketDefinition, variant, type Over } from "./fixtures.ts";
 
 const { rita, una } = keys;
 const unverified = { result: "source-unverified" };
@@ -116,6 +116,47 @@ describe("founding a directory and creating a child (sections 7.1 and 7.2)", () 
     // The result returns to S and runs the `applied` clause of the `tell`.
     deliver(S, D, 1, 1);
     expect([S.item(2).state, S.state.request(2, 0)!.result]).toEqual(["answered", { seq: 4, clause: "applied" }]);
+  });
+
+  // Section 7.2, "The kinds of cause", the fourth row; witness 18.8, "D.0 checks that R.6 is an outcome whose operation was opened by
+  // an act with that intent digest". The creator's two entries are MADE BY HAND: no rule of a platform definition sends a creation
+  // from an outcome entry yet (I3 deltas, entry EJ1), so nothing judged them. The child's judge is the real one.
+  test("a child that an outcome entry creates: its cause is the intent of the act that opened the outcome's operation, which the creation names by a fact", () => {
+    const D = founded();
+    // D.1 is an act. The copy of it at hand also holds the `operation` record of ordinal 0, as a `found` of a register does.
+    const act = D.did(rita, "open-issue", fields({ title: "A repository" }));
+    const opener = { ...act, effects: [...act.effects, { effect: "operation", k: 0, owner: "platform:register@1", kind: "create-repository", attempts: 3 }] } as typeof act;
+    const claim = factRefOf(opener);
+    const cause = intentDigest((act.input as Extract<Input, { type: "act" }>).signed.intent);
+    // The child's definition: a ticket whose genesis act names the entry that opened the operation.
+    const child = variant(ticket, (t) => { t.acts.file.fields.claim = { type: "fact", kind: ["open-issue"], under: "desk", required: true }; });
+    const seed: Seed = { v: 1, kind: "lane", definition: child.digest, creator: D.at, cause, ordinal: 0 };
+    /** The creation that the outcome entry at D.5 sends at ordinal 0, of an attempt of that operation, as it reaches the child; and the child's judgment with those entries at hand. */
+    const judge = (operation: `${number}:${number}`, facts: readonly Fetched[], to: Seed = seed, named = claim) => {
+      const message = { class: "request", type: "create", body: { fields: { opener: rita.member, title: "By an outcome", claim: named } } } as const;
+      const source = forged(D.at, 5, { type: "outcome", operation, attempt: 1, owner: "platform:register@1", kind: "create-repository", result: "confirmed", evidence: { basis: "own-answer", body: { id: "r1" } } }, [{ n: 0, to, message }]);
+      const s = new Ledger(child);
+      const asked: Creation = { name: scopeIdOf(to), inc: newIncarnation(new Uint8Array(16).fill(20)), to, from: factRefOf(source.entry), n: 0, message };
+      return { s, judgment: judgeGenesis(s.state, child, asked, { clock: clockOf(s.state, T0), bounds: PROPOSED_BOUNDS, facts, prepared: [], source }) };
+    };
+    const atHand: Fetched[] = [{ fact: claim, entry: opener, under: "desk" }];
+
+    // The genesis is written, provisional, and records the outcome entry and the act's entry among what it read.
+    const { s, judgment } = judge("1:0", atHand);
+    if (judgment.result !== "write") throw new Error(`not written: ${JSON.stringify(judgment)}`);
+    s.seal(judgment.draft);
+    expect([s.last.input, s.last.uses.map((use) => use.fact.seq), s.state.scope()!.status]).toMatchObject([{ type: "genesis", seed: { cause }, decision: "applied" }, [5, 1], "provisional"]);
+
+    // The cause is checked against the act that opened the operation, and against nothing else. Each of these writes nothing.
+    const other = { ...seed, cause: seedDigest(seed) };
+    expect([
+      judge("1:0", []).judgment,                // the act's entry is not at hand
+      judge("2:0", atHand).judgment,            // the outcome is of an operation that another entry opened
+      judge("1:1", atHand).judgment,            // the act's entry opened no operation at that ordinal
+      judge("1:0", atHand, other).judgment,     // a seed with another cause, which the outcome entry does send
+      judge("1:0", [{ fact: factRefOf(act), entry: act, under: "desk" }], seed, factRefOf(act)).judgment,   // the entry that the creation names holds no such operation
+      judge("1:0", atHand, seed, factRefOf(act)).judgment,   // that entry is at hand, and the creation does not name it
+    ].map((j) => j.result)).toEqual(Array(6).fill("source-unverified"));
   });
 });
 

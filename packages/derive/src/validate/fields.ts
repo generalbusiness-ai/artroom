@@ -145,14 +145,47 @@ export function memberType(typed: (name: string) => FieldType | null | undefined
   return undefined;
 }
 
-/** The fields an act declares, each with its type. A field that is not one is reported and left out. */
-export function declaredFields(d: Defining, v: unknown, path: string): Map<string, FieldType> {
-  const { bounds, bad, entries, bool } = d;
+/**
+ * The places of an act that name a value beside the intent (section 6.2,
+ * "How a version states a place", revision 19): each field of type `digest`
+ * that states `value`, with the byte domain of the place and the bound on
+ * one value of that domain, in the order of the field names as written.
+ * Only platform data states one, so an act of a declared definition has
+ * none.
+ */
+export function valuePlaces(fields: Readonly<Record<string, unknown>> | undefined): { field: string; domain: string; max: number }[] {
+  return Object.entries(fields ?? {}).flatMap(([field, type]) => {
+    const value = isObject(type) && type["type"] === "digest" && isObject(type["value"]) ? type["value"] : null;
+    return value && typeof value["domain"] === "string" && typeof value["max"] === "number" ? [{ field, domain: value["domain"], max: value["max"] }] : [];
+  });
+}
+
+/**
+ * The fields an act or a handler declares, each with its type. A field that
+ * is not one is reported and left out. `places`: the fields are those of an
+ * act, where platform data may state that a field of type `digest` names a
+ * value: `value: { domain, max }`. Without the platform option the member
+ * is unknown, and is refused as any unknown member is.
+ */
+export function declaredFields(d: Defining, v: unknown, path: string, places = false): Map<string, FieldType> {
+  const { bounds, bad, entries, bool, rec, str, int } = d;
   const fields = new Map<string, FieldType>();
   for (const [f, fv] of entries(v, path, null)) {
     const p = at(path, f);
-    const type = fieldType(d, fv, p, ["required", "default"], false, true, true);
+    const placed = d.platform && places && isObject(fv) && fv["type"] === "digest" && "value" in fv;
+    const type = fieldType(d, fv, p, ["required", "default", ...(placed ? ["value"] : [])], false, true, true);
     if (!type) continue;
+    if (placed) {
+      // `domain` is the byte domain of the place, and `max` the bound on one value of that domain, in canonical bytes. Two fields
+      // of one definition that state one domain state one `max`. A place has no default: no value would come with it.
+      const place = rec((fv as Rec)["value"], at(p, "value"), ["domain", "max"]);
+      const domain = place && str(place["domain"], at(at(p, "value"), "domain"));
+      const max = place && int(place["max"], at(at(p, "value"), "max"), 1);
+      if (domain === null || max === null || domain === undefined || max === undefined) continue;
+      if (d.places.has(domain) && d.places.get(domain) !== max) { bad("shape", at(at(p, "value"), "max"), `another field states the domain ${domain} with the bound ${d.places.get(domain)}; one domain has one bound`); continue; }
+      if ("default" in (fv as Rec)) { bad("shape", at(p, "default"), "a field that names a value has no default: no value would come with it"); continue; }
+      d.places.set(domain, max);
+    }
     const fo = fv as Rec;
     if (bool(fo["required"], at(p, "required")) === null) continue;
     // Section 6.2: an optional field may have a default.

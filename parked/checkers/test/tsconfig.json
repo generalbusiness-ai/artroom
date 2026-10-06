@@ -1,6 +1,0 @@
-{
-  "extends": "../../../tsconfig.base.json",
-  "compilerOptions": { "rootDir": "../..", "lib": ["ES2024", "ESNext.Disposable"], "resolveJsonModule": true, "types": ["node"] },
-  "include": ["./*.ts", "../src/**/*.ts"],
-  "exclude": ["../src/worker.ts", "../src/container.ts", "../src/worker-runtime.d.ts"]
-}

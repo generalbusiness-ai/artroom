@@ -17,6 +17,7 @@ export const DOMAINS = {
   delivery: "artroom-delivery-1",
   definition: "artroom-definition-1",
   text: "artroom-text-1",            // a text, as one JSON string: the digest that names a detached text (section 6.2)
+  snapshot: "artroom-snapshot-1",    // a list of `{ ref, target }` pairs, in byte order of `ref`: the digest of a snapshot of staged refs that an ancestry record names (section 16.4)
 } as const;
 
 export type DomainTag = (typeof DOMAINS)[keyof typeof DOMAINS];

@@ -116,6 +116,10 @@ describe("capability forms (section 6.11), with a stand-in for the capability's 
       ["arguments from two of the sets that the effect takes", (def) => { stage(def).effects[0].capability.with.consumer = { scope: true }; }, "capability"],
       ["a carried part that names no record kind of a listed capability", (def) => { def.acts.check.guards[0].equals.a.part.carried = "ledger.commit"; }, "capability"],
       ["a carried part with no member", (def) => { def.acts.check.guards[0].equals.a.part.carried = "pin"; }, "shape"],
+      // Section 6.2: an act kind and a message name are the kind of no entry that only code writes. Revision 16 adds the prefix
+      // `platform:`, of the outcome entries of a platform definition's operations.
+      ["an act kind that begins with platform:", (def) => { def.acts["platform:register@1:create-repository"] = def.acts.ask; }, "shape"],
+      ["an act kind that has the form of a step kind", (def) => { def.acts["hold@1:check"] = def.acts.ask; }, "shape"],
       ["a capability listed twice", (def) => { def.capabilities = [{ name: "hold", version: 1 }, { name: "hold", version: 1 }]; stage(def).guards.pop(); }, "capability"],
     ];
     const found = rows.map(([name, change, code]) => {

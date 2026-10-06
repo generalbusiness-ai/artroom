@@ -30,6 +30,20 @@ export type Owner = CapabilityName | PlatformDefinition;
 export type OutcomeInput = Extract<Input, { type: "outcome" }>;
 type Result = OutcomeInput["result"];
 
+/**
+ * An outcome as it is offered (section 4.1, "An outcome states its owner and
+ * its kind"). The component that offers it does not choose the operation's
+ * owner or its kind: the judge reads both from the `operation` effect that
+ * opened the operation, which the folded state holds, and sets them in the
+ * input. An offer may state them, as a verifier's does when it derives a
+ * sealed input again. An offer that states other values is `bad-input`.
+ */
+export type OutcomeOffered = Omit<OutcomeInput, "owner" | "kind"> & { owner?: unknown; kind?: unknown };
+
+/** True when the offer states no owner and no kind, or the ones of its operation. */
+export const namesOwn = (operation: Pick<Operation, "owner" | "kind">, outcome: OutcomeOffered): boolean =>
+  (outcome.owner === undefined || outcome.owner === operation.owner) && (outcome.kind === undefined || outcome.kind === operation.kind);
+
 /** Item 1: the operation's ID is the `seq` of the entry that opened it and the record's ordinal there. */
 export const operationId = (seq: number, k: number): OperationId => `${seq}:${k}`;
 
@@ -39,20 +53,62 @@ export interface Opening { owner: Owner; kind: string; attempts: number }
 /** What an owner derives from one outcome beside the ledger's own records: its records, its sends, and the operations it opens, such as a cleanup (item 7). */
 export interface OutcomeDerived { effects: readonly Effect[]; sends: readonly Send[]; opens: readonly Opening[] }
 
+/**
+ * The most that one piece of code returns in one entry (section 6.1, "A
+ * declared maximum for everything that derives"): effects, requests and
+ * operations. Each is a constant of the version, or a constant times a
+ * state bound that the version states.
+ */
+export interface Most { effects: number; requests: number; operations: number }
+
+/**
+ * What an owner's rule is told of the outcome entry that is being derived,
+ * beside the state: `opens`, the number of the attempt that this entry
+ * opens, or null when it opens none; and the pinned definition.
+ */
+export interface OutcomeAt { opens: number | null; definition: ValidDefinition }
+
 /** The owner's rules for one kind of operation. Each is a function of what it is given, and reads nothing else. */
 export interface OperationRules {
   /** Item 7: the kind selects one result, as a founding claim selects one repository. */
   selects: boolean;
   /** Item 4: a read of the outside system is decisive for this kind. Rule 3: it never is for a create. */
   read: boolean;
-  /** Item 2: the owner's retry rule. Rule 7 and section 17.3: it is not given the scope's free room, so it cannot read it. */
-  retries(result: "refused" | "unknown", operation: Operation): boolean;
+  /**
+   * Item 2: the owner's retry rule. Rule 7 and section 17.3: it is not given the scope's free room, so it cannot read it. From the
+   * scope contract's revision 19 (section 6.1, "A rule that decides a further attempt is given the state"; row I3-35) it is given
+   * the folded state before the outcome entry, and the outcome as the judge sets it, as every rule of the entry is.
+   */
+  retries(result: "refused" | "unknown", operation: Operation, view: StateView, outcome: OutcomeInput): boolean;
   /** Item 7: the owner's local guard for a selection. Absent: it holds. */
   holds?(view: StateView, operation: Operation, outcome: OutcomeInput): boolean;
+  /**
+   * Whether the request of that attempt may be sent now (authority note,
+   * section 5.7, "Which entry makes a token": the request of an attempt of a
+   * staging "is sent only when both are `live`"). The runtime's driver asks
+   * it before the attempt is marked as sent. False: the attempt stays
+   * recorded and not sent, and the driver looks at it again after a later
+   * outcome entry. It derives nothing and settles nothing. Absent: it may.
+   */
+  ready?(view: StateView, operation: Operation, attempt: number): boolean;
   /** Item 4: the evidence is well formed for this owner. Absent: any body is. The ledger has checked that the evidence has a basis and a body. */
   wellFormed?(result: Result, evidence: Evidence): boolean;
+  /**
+   * The snapshots that the evidence names by digest (section 16.4): each is
+   * a retained input, and the scope stores its bytes before the entry that
+   * names the digest. Absent: the evidence of this kind names none.
+   */
+  retains?(evidence: Evidence): readonly Digest[];
   /** What the outcome derives beside the ledger's records. Absent: nothing. */
-  derives?(view: StateView, operation: Operation, outcome: OutcomeInput, selected: boolean | null): OutcomeDerived;
+  derives?(view: StateView, operation: Operation, outcome: OutcomeInput, selected: boolean | null, at: OutcomeAt): OutcomeDerived;
+  /**
+   * The most that `derives` returns in one outcome entry of this kind, with
+   * the two effects of each operation that it opens (section 6.1). An
+   * outcome entry cannot be refused, so the count must hold before it is
+   * derived: an outcome that would hold more writes nothing. Absent: the
+   * owner declares none, and nothing is counted.
+   */
+  most?: Most;
   /**
    * Section 17.2, row 5: the owner declares what the outcomes of an
    * operation derive. This is the most entries that the operations which one
@@ -100,8 +156,9 @@ export const reservedBy = (open: Opening, owners: Owners | null | undefined): nu
  * Section 5.8: the entry that opens an operation reserves for every attempt
  * it states, so the number is fixed here and never raised.
  */
-// I3 merge: no judge calls this yet, but the one of an outcome, for what its owner opens. The capability rules, a preparation and
-// the platform rules open their operations with it, each in its own step.
+// The judge of an outcome calls this for what its owner opens, the judge of a preparation for what its step opens, and the code of
+// a hold's workspace for a fork's creation and a revocation.
+// I3 merge: the platform rules open their operations with it, in their own step.
 export function operationOpening(k: number, open: Opening, held = false): Effect[] {
   if (!Number.isSafeInteger(open.attempts) || open.attempts < 1) throw new Error("an operation states at least one attempt");
   const operation: Effect = { effect: "operation", k, owner: open.owner, kind: open.kind, attempts: open.attempts };
@@ -110,17 +167,20 @@ export function operationOpening(k: number, open: Opening, held = false): Effect
 
 /**
  * Item 1: attempt 1 of each operation that a provisional scope's genesis
- * holds, opened by the entry that records the confirmation. `genesis` is the
- * scope's entry 0.
+ * holds, opened by the entry that records the confirmation. The operations
+ * of the genesis, entry 0, are numbered from 0 in the order of its records,
+ * so they are read from the folded state by their IDs. One that has an
+ * attempt already is not held, and is left as it is.
  */
-// I3 merge: the judge of a confirmation does not call this yet. No genesis can declare an operation until an owner's rules exist,
-// so the call has no witness. It comes with the first definition whose genesis opens one (plan step 9b; I3 deltas, entry EB12).
-export function heldOpenings(view: StateView, genesis: Entry): Effect[] {
-  return genesis.effects.flatMap((effect): Effect[] => {
-    if (effect.effect !== "operation") return [];
-    const operation = operationId(genesis.seq, effect.k);
-    return view.operation(operation)?.attempts.length === 0 ? [{ effect: "attempt", operation, attempt: 1, result: "opened", selected: null }] : [];
-  });
+// The judge of a confirmation calls this (`delivery.ts`). The first genesis that holds an operation is the destination's, by its
+// rule `declare-first-head` (plan step 9b; I3 deltas, entries EB12 and ER12).
+export function heldOpenings(view: StateView): Effect[] {
+  const effects: Effect[] = [];
+  for (let k = 0; ; k++) {
+    const operation = view.operation(operationId(0, k));
+    if (!operation) return effects;
+    if (operation.attempts.length === 0) effects.push({ effect: "attempt", operation: operation.id, attempt: 1, result: "opened", selected: null });
+  }
 }
 
 /** The digest of an outcome's evidence, which the folded state keeps so that a second copy of an answer is told from another answer (item 6). */
@@ -195,6 +255,8 @@ export function attemptedBy(operation: Operation, effect: Extract<Effect, { effe
   }
   const input = entry.input;
   if (input.type !== "outcome" || input.operation !== operation.id || input.attempt !== effect.attempt || input.result !== effect.result) return "records a result that is not its own outcome";
+  // Section 4.1: the outcome's owner and kind are those of the operation, which the entry that opened it states.
+  if (input.owner !== operation.owner || input.kind !== operation.kind) return "names another owner or kind than its operation has";
   const attempt = operation.attempts.find((a) => a.attempt === effect.attempt);
   if (!attempt) return "records an outcome of an attempt that no entry opened";
   if (attempt.outcomes.length > 1 || decisive(latest(attempt)) || (attempt.outcomes.length === 1 && effect.result === "unknown")) return "records an outcome of an attempt that has its last one";
@@ -217,7 +279,7 @@ export function attemptedBy(operation: Operation, effect: Extract<Effect, { effe
  * An `unknown` is no answer. Offered for an attempt that has any outcome, it
  * writes nothing: it is answered with the attempt's first outcome.
  */
-export function recordedOutcome(view: StateView, outcome: OutcomeInput): { result: "repeat" | "conflict"; seq: number } | null {
+export function recordedOutcome(view: StateView, outcome: OutcomeOffered): { result: "repeat" | "conflict"; seq: number } | null {
   const outcomes = view.operation(outcome.operation)?.attempts.find((a) => a.attempt === outcome.attempt)?.outcomes ?? [];
   if (outcomes.length === 0) return null;
   if (outcome.result === "unknown") return { result: "repeat", seq: outcomes[0]!.seq };
@@ -245,17 +307,20 @@ const invalid = (detail: string): OutcomeDerivation => ({ result: "refused", rea
  * `recordedOutcome` did not answer. The input is the operation, the attempt's
  * number, the result and the evidence. `selected`, the next attempt and
  * what the owner derives are effects, derived here from the state and never
- * supplied (the closing paragraph of section 4.3).
+ * supplied (the closing paragraph of section 4.3). The input's `owner` and
+ * `kind` are the operation's, read from the state, and an offer that states
+ * others is refused (section 4.1).
  *
  * The scope cannot check that an answer came from the outside system. That
  * is trusted, and a replay reports it as trusted: `own-answer` for an
  * attempt's own answer, `host-read` for a read (section 9.5).
  */
-export function outcomeOf(view: StateView, outcome: OutcomeInput, owners: Owners | undefined): OutcomeDerivation {
+export function outcomeOf(view: StateView, definition: ValidDefinition, outcome: OutcomeOffered, owners: Owners | undefined): OutcomeDerivation {
   const operation = view.operation(outcome.operation);
   const attempt = operation?.attempts.find((a) => a.attempt === outcome.attempt);
   // Item 5, and rule 1: an outcome is of an attempt that an earlier entry opened. No outcome makes an attempt or an operation.
   if (!operation || !attempt) return invalid("no entry opened that attempt of that operation");
+  if (!namesOwn(operation, outcome)) return invalid("the outcome names another owner or kind than its operation has");
   const { result, evidence } = outcome;
   if (!["confirmed", "refused", "unknown"].includes(result)) return invalid("the result is confirmed, refused or unknown");
   // Section 4.1: the evidence of every outcome has a basis and a body, whatever its owner checks. An owner's rule may narrow the
@@ -285,17 +350,22 @@ export function outcomeOf(view: StateView, outcome: OutcomeInput, owners: Owners
 
   // Item 7: `selected` is true when the result is `confirmed`, the slot is empty at this commit and the owner's guard holds. Every
   // other `confirmed` outcome of a selecting operation is recorded as not selected. The order of the outcome entries decides.
-  const selected = rules.selects && result === "confirmed" ? operation.selected === null && (rules.holds?.(view, operation, outcome) ?? true) : null;
+  // What an owner's rule and the entry are given: the input as the judge sets it, with the operation's owner and kind.
+  const input: OutcomeInput = { type: "outcome", operation: operation.id, attempt: attempt.attempt, owner: operation.owner, kind: operation.kind, result, evidence };
+  const selected = rules.selects && result === "confirmed" ? operation.selected === null && (rules.holds?.(view, operation, input) ?? true) : null;
   // Item 2: the outcome entry of attempt n opens attempt n + 1 when its result is `refused` or `unknown`, the owner's retry rule
   // allows another, fewer than the stated number are opened and nothing is selected. Rule 7: none is opened beyond the stated
   // number, and nothing here reads the scope's free room. The room was reserved by the entry that opened the operation.
   const last = attempt.attempt === operation.attempts.length;
-  const next = result !== "confirmed" && last && operation.attempts.length < operation.most && operation.selected === null && rules.retries(result, operation);
-  const derived = rules.derives?.(view, operation, outcome, selected) ?? { effects: [], sends: [], opens: [] };
+  const next = result !== "confirmed" && last && operation.attempts.length < operation.most && operation.selected === null && rules.retries(result, operation, view, input);
+  const derived = rules.derives?.(view, operation, input, selected, { opens: next ? attempt.attempt + 1 : null, definition }) ?? { effects: [], sends: [], opens: [] };
   // Section 17.2, row 5: an outcome entry is never asked whether it fits (section 17.3), so what it opens was reserved with its own
   // operation, as the closure that the owner declares. An owner whose outcome would open more has broken its own declaration:
   // fail closed, and nothing is written.
   if (derived.opens.reduce((entries, open) => entries + reservedBy(open, owners), 0) > (rules.closure ?? 0)) return { result: "unavailable", reason: "unavailable" };
+  // Section 6.1, "An entry that cannot be refused": the same for the most that the owner declares for one outcome entry.
+  const { most } = rules;
+  if (most && (derived.effects.length + 2 * derived.opens.length > most.effects || derived.sends.length > most.requests || derived.opens.length > most.operations)) return { result: "unavailable", reason: "unavailable" };
   const effects: Effect[] = [
     { effect: "attempt", operation: operation.id, attempt: attempt.attempt, result, selected },
     ...(next ? [{ effect: "attempt", operation: operation.id, attempt: attempt.attempt + 1, result: "opened", selected: null } as const] : []),
@@ -303,7 +373,6 @@ export function outcomeOf(view: StateView, outcome: OutcomeInput, owners: Owners
     // Item 7, and rule 2: a cleanup, like a retry, is a new operation with its own identity and its own attempts.
     ...derived.opens.flatMap((open, k) => operationOpening(k, open)),
   ];
-  const input: Input = { type: "outcome", operation: outcome.operation, attempt: outcome.attempt, result, evidence };
   // An outcome judges no time, so it may be written clamped (section 5.3).
   return { result: "write", draft: { input, uses: [], prepared: [], effects, sends: derived.sends, judgesTime: false } };
 }

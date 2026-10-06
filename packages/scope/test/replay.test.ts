@@ -35,7 +35,7 @@ describe("replay of histories the runtime wrote, read through the Worker's read 
     expect((await L.entries()).at(-1)!.uses).toEqual([]);
     expect(await L.act(rita, "remark", { on: 0, fields: { text: "another hash", proof: { ...assigned, hash: head.hash } } })).toMatchObject({ answer: "refused", reason: "fact-mismatch" });
 
-    const { report, why } = await verify(source, { mode: "replay", scope: name, head });
+    const { report, why } = await verify(source, { mode: "replay", scope: name, head, grants: "as-recorded" });
     expect([report.result, why, report.target]).toEqual(["consistent", null, { at: await L.at(), ...head }]);
     expect([report.coverage, report.dependencies]).toEqual([[{ scope: await L.at(), from: 0, through: 6 }], { verified: 0, anchored: 0, missing: [] }]);
     // The caller held the head, so the head is not on trust. What stays on trust is what no history shows.
@@ -51,7 +51,7 @@ describe("replay of histories the runtime wrote, read through the Worker's read 
     expect([kinds(await D.entries()).slice(0, 3), kinds(await P.entries()), kinds(await I.entries())]).toEqual([["genesis", "act", "result"], ["genesis", "control", "act", "result"], ["genesis", "control", "request"]]);
 
     const [d, p, i] = [await D.at(), await P.at(), await I.at()];
-    const replayed = async (node: Node) => (await verify(source, { mode: "replay", scope: node.name, head: (await node.summary()).at })).report;
+    const replayed = async (node: Node) => (await verify(source, { mode: "replay", scope: node.name, head: (await node.summary()).at, grants: "as-recorded" })).report;
     const through = (report: Awaited<ReturnType<typeof replayed>>) => report.coverage.map((c) => [c.scope, c.through]);
     const [desks, links, linked] = [await replayed(D), await replayed(P), await replayed(I)];
     expect([desks.result, links.result, linked.result]).toEqual(["consistent", "consistent", "consistent"]);

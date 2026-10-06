@@ -1,5 +1,5 @@
 /**
- * The seven byte domains (scope contract, section 2.1). Every digest and
+ * The byte domains (scope contract, section 2.1). Every digest and
  * signature is over a domain tag, one newline byte, and the canonical JSON of
  * one value. No value contains its own digest.
  */
@@ -87,6 +87,15 @@ export function definitionDigest(definition: DeclaredDefinition): Digest {
  */
 export function textDigest(text: string): Digest {
   return digest(DOMAINS.text, text);
+}
+
+/**
+ * The digest of a snapshot of staged refs (sections 2.1 and 16.4): over the
+ * list of `{ ref, target }` pairs, which the caller gives in byte order of
+ * `ref`.
+ */
+export function snapshotDigest(pairs: readonly { ref: string; target: string }[]): Digest {
+  return digest(DOMAINS.snapshot, pairs);
 }
 
 const named = (value: unknown, prefix: string, chars: number, bytes: number): boolean =>

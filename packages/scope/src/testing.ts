@@ -11,10 +11,11 @@
 
 import { CAPABILITIES, PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { Bounds, Capability, CapabilityName, Digest, Entry, ObservationRequest, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
-import type { Capabilities, Delivered, Recorded, Steps, Window } from "@generalbusiness/artroom-derive";
+import type { Capabilities, Delivered, Owners, Recorded, StateView, Steps, ValidDefinition, Window } from "@generalbusiness/artroom-derive";
 import { observing } from "./authority.ts";
+import type { EffectAnswer, EffectRequest, Outside } from "./operations.ts";
 import type { Authority, Clock, Definitions, Ports, Readers, Resolver, Rules, Transport } from "./ports.ts";
-import { production } from "./ports.ts";
+import { CAPABILITY_CODE, production } from "./ports.ts";
 import { READ_BOUNDS, type ReadBounds } from "./reads.ts";
 
 /**
@@ -66,17 +67,19 @@ export interface CapabilityScript {
 
 /**
  * A scripted test capability: a stand-in for the code of `hold@1` and
- * `git-read@1`, which derive has and no production port holds. It answers every guard and every
- * effect from the table that the test supplies. The port also gives a rule
- * the folded state and the input, and this stand-in reads neither: no
- * record, no hold, no Git repository and no provider. So it proves nothing about
- * staging, ancestry, pins, licenses or exports: a test that uses it shows
- * only what a definition does once a capability has answered.
+ * `git-read@1`, which derive has and the production ports hold. It answers
+ * every guard and every effect from the table that the test supplies. The
+ * port also gives a rule the folded state and the input, and this stand-in
+ * reads neither: no record, no hold, no Git repository and no provider. So
+ * it proves nothing about staging, ancestry, pins, licenses or exports: a
+ * test that uses it shows only what a definition does once a capability has
+ * answered. It declares no maximum, so nothing of it is counted.
  *
  * `script` is read at every call. While it gives null there is no
- * capability, as in production. With a table, a guard that the table does
- * not script is refused with the first refusal its version declares, and an
- * effect that it does not script changes no record.
+ * capability code, as in a runtime that lacks it. With a table, a guard
+ * that the table does not script is refused with the first refusal its
+ * version declares, and an effect that it does not script changes no
+ * record.
  */
 export function scriptedCapability(script: () => CapabilityScript | null): Capabilities & Steps {
   return {
@@ -88,6 +91,43 @@ export function scriptedCapability(script: () => CapabilityScript | null): Capab
       script()?.guards?.[`${capability}:${guard}`]?.(args) ?? (CAPABILITIES as Record<string, Capability>)[capability]!.guards[guard]!.refusals[0]!,
     effect: (capability, effect, args) => script()?.effects?.[`${capability}:${effect}`]?.(args) ?? [],
   };
+}
+
+/**
+ * In place of a table: the scope runs the capability code of the production
+ * ports, `CAPABILITY_CODE`, and no stand-in for it.
+ */
+export const CODE = "code";
+export type CapabilityChoice = CapabilityScript | typeof CODE | null;
+
+/**
+ * The capability code of a test scope, by what the test chose, read at
+ * every call. A table: the scripted test capability over it, a stand-in,
+ * which owns no operation. `CODE`: the code of the production ports, for
+ * the forms, the steps and the operations of `hold@1`. Null: no capability
+ * code, as in a runtime that lacks it.
+ */
+export function chosenCapability(choice: () => CapabilityChoice): Capabilities & Steps & Owners {
+  const code = CAPABILITY_CODE;
+  const real = () => choice() === CODE;
+  const scripted = scriptedCapability(() => { const chosen = choice(); return chosen === CODE ? null : chosen; });
+  const now = () => (real() ? code : scripted);
+  const both: Capabilities & Steps = {
+    implements: ((form: never, step?: never) => (now().implements as (...asked: unknown[]) => boolean)(...(step === undefined ? [form] : [form, step]))) as Capabilities["implements"] & Steps["implements"],
+    guard: (...asked) => now().guard(...asked),
+    effect: (...asked) => now().effect(...asked),
+    grant: (...asked) => now().grant(...asked),
+    derive: (...asked) => now().derive(...asked),
+  };
+  return {
+    ...both,
+    get workspace() { return real() ? code.workspace : undefined; },
+    get bound() { return real() ? code.bound : undefined; },
+    get maxima() { return real() ? code.maxima : undefined; },
+    rules: (owner: Parameters<Owners["rules"]>[0], kind: string) => (real() ? code.rules(owner, kind) : null),
+    reserves: (view: StateView, definition: ValidDefinition) => (real() ? (code.reserves?.(view, definition) ?? 0) : 0),
+    // The three optional members are read at each use, so that each is absent while the stand-in answers.
+  } as unknown as Capabilities & Steps & Owners;
 }
 
 /**
@@ -146,7 +186,7 @@ export interface Controls {
   foreign: Map<Digest, { entry: Entry; under: string }>;
   bounds: Bounds;
   reads: ReadBounds;
-  /** The table of the scripted test capability, a stand-in. Null: no capability, as in production. */
+  /** The table of the scripted test capability, a stand-in. Null: no capability code, as in a runtime that lacks it. */
   capability: CapabilityScript | null;
   /** False: the read of the test authority, a stand-in, gives nothing, as when membership does not answer. */
   authority: boolean;
@@ -189,7 +229,8 @@ export function testPorts(c: Controls): Partial<Ports> {
   const observed = observing({ clock: c.clock, random, membership: () => c.membership?.at ?? null, reader: { observe: (asked) => Promise.resolve(c.membership?.answers(asked) ?? null) } });
   const standIn = testAuthority(() => c.authority);
   const authority: Authority = { read: (asked, seconds) => (c.membership ? observed : standIn).read(asked, seconds) };
-  return { clock: c.clock, authority, readers: testReaders, resolver, rules: gated, definitions, capabilities: scriptedCapability(() => c.capability) };
+  // The scripted capability owns no operation. A test that needs owners' rules supplies its own stand-in for them.
+  return { clock: c.clock, authority, readers: testReaders, resolver, rules: gated, definitions, capabilities: scriptedCapability(() => c.capability), owners: null };
 }
 
 // ---------------------------------------------------------------- several scopes in one namespace
@@ -207,15 +248,28 @@ export interface Net {
   sized: Map<string, Bounds>;
   hold: ((envelope: Delivered) => boolean) | null;
   deaf: ((envelope: Delivered) => boolean) | null;
-  /** The table of the scripted test capability, a stand-in, for every scope of the namespace. Null: no capability, as in production. */
-  capability: CapabilityScript | null;
+  /**
+   * The capability code of every scope of the namespace. A table: the
+   * scripted test capability, a stand-in. `CODE`: the code of the
+   * production ports, and no stand-in. Null: no capability code, as in a
+   * runtime that lacks it.
+   */
+  capability: CapabilityChoice;
+  /**
+   * A stand-in for the systems outside the service, such as a Git host: it
+   * answers the one request of one attempt of an operation, by the test's
+   * own script. Null: nothing is sent outside, as in production. What it
+   * answers is trusted, as a real answer is, and nothing here checks that a
+   * host would give it.
+   */
+  outside: { accepts(owner: string, kind: string): boolean; send(request: EffectRequest): EffectAnswer | null } | null;
   /** True: a platform definition is as the platform package supplies it, as in production. False: its data with no rule, for every scope of the namespace (`codeLost`). */
   platformCode: boolean;
   /**
    * The entries of scripted platform peers, by the hash of the fact that
    * names each, with the name of the definition that the peer is said to
    * pin. A scripted peer is a stand-in for a scope of a platform kind that
-   * is not delivered, such as a rules scope or a destination. Its entries
+   * the test does not run, such as a rules scope or a destination. Its entries
    * are written by the test, and nothing judged them. A scope of the
    * namespace reads one as it reads any source entry, so a test that uses
    * one shows the receiver's side of a delivery and nothing about the peer.
@@ -223,13 +277,14 @@ export interface Net {
   peers: Map<Digest, { entry: Entry; under: string }>;
 }
 
-export const net: Net = { clock: new ScriptedClock("2099-01-01T00:00:00Z"), bounds: PROPOSED_BOUNDS, sized: new Map(), hold: null, deaf: null, capability: null, platformCode: true, peers: new Map() };
+export const net: Net = { clock: new ScriptedClock("2099-01-01T00:00:00Z"), bounds: PROPOSED_BOUNDS, sized: new Map(), hold: null, deaf: null, capability: null, outside: null, platformCode: true, peers: new Map() };
 
 /**
  * Test ports for a scope in that namespace: the test authority and readers,
- * the shared clock, the given transport behind `hold` and `deaf`, and the
- * scripted test capability over the namespace's table, which is none until
- * a test sets one. The definitions port is not replaced: a child's
+ * the shared clock, the given transport behind `hold` and `deaf`, the
+ * capability code that the namespace chose, which is none until a test
+ * chooses, and the namespace's stand-in for the outside, which sends
+ * nothing until a test sets one. The definitions port is not replaced: a child's
  * declaration is read from the real object. Given the namespace's
  * `resolver`, an entry of a scripted peer is read from `peers`, and every
  * other source entry from the real object.
@@ -245,5 +300,7 @@ export function netPorts(n: Net, transport: Transport, resolver?: Resolver): Par
     },
   };
   const scripted: Partial<Ports> = resolver ? { resolver: { read: (fact, seconds) => { const peer = n.peers.get(fact.hash); return peer ? Promise.resolve(peer) : resolver.read(fact, seconds); } } } : {};
-  return { clock: n.clock, authority: testAuthority(), readers: testReaders, transport: disturbed, capabilities: scriptedCapability(() => n.capability), ...scripted };
+  const capability = chosenCapability(() => n.capability);
+  const outside: Outside = { accepts: (owner, kind) => n.outside?.accepts(owner, kind) ?? false, send: (request) => Promise.resolve(n.outside?.send(request) ?? null) };
+  return { clock: n.clock, authority: testAuthority(), readers: testReaders, transport: disturbed, capabilities: capability, owners: capability, outside, ...scripted };
 }

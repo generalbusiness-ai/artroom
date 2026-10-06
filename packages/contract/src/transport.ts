@@ -33,8 +33,16 @@ export type Founded =
  * digest. The scope computes each digest itself, so a text needs no name. A
  * text that no field names is not kept. `presented`: the facts presented
  * beside the intent, by the names the act declares in `presents`.
+ *
+ * `values`: each value beside the intent that is no text (section 6.2, "A
+ * value beside an intent"), as its canonical bytes, with no name and no
+ * domain tag. A value is one JSON value in one byte domain. A place of the
+ * act, which the specification of a platform definition states with its one
+ * domain, names it by digest, and the scope computes the digest itself. A
+ * value that no place names is not kept. An act of a declared definition
+ * has no such place, and a founding takes `texts` only.
  */
-export interface Beside { texts?: readonly string[]; presented?: Record<string, FactRef> }
+export interface Beside { texts?: readonly string[]; presented?: Record<string, FactRef>; values?: readonly string[] }
 
 export interface ScopeApi {
   /**
