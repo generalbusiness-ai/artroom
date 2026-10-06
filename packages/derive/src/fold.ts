@@ -6,13 +6,15 @@
  *
  * It applies the entry's recorded effects and the bookkeeping that its input
  * and sends imply. It judges nothing: whether the effects are the right ones
- * is the judges' question.
+ * is the judges' question. A bound decision is bookkeeping too: its
+ * binding is derived from the recorded fields and pre-entry local state,
+ * using the pinned selector rule where the definition states one.
  */
 
 import type { Digest, Effect, Entry, ItemType, MemberRef, OperationId } from "@generalbusiness/artroom-contract";
 import { intentDigest, seedDigest } from "@generalbusiness/artroom-bytes";
 import { UNDER, historyOf, withActing, withMembers, withPrincipal, type Signer } from "./attribution.ts";
-import { drawsOf, released } from "./draws.ts";
+import { drawsOf, released, type DrawOptions } from "./draws.ts";
 import { indexRows } from "./binding.ts";
 import { HOLDER, changeHold } from "./hold.ts";
 import { attemptedBy, openedBy, operationId } from "./ledger.ts";
@@ -104,7 +106,7 @@ export function headsOf(proof: unknown): ObservedHead[] {
   return [o["key"], o["member"]].flatMap((subject) => (typeof subject === "string" ? [{ of, subject, seq }] : []));
 }
 
-export function applyEntry(writer: StateWriter, definition: ValidDefinition, entry: Entry, hash: Digest): void {
+export function applyEntry(writer: StateWriter, definition: ValidDefinition, entry: Entry, hash: Digest, options: DrawOptions = {}): void {
   const scope = writer.scope();
   const input = entry.input;
   if (input.type === "genesis" ? scope !== null || entry.seq !== 0 || entry.prev !== null : scope === null || entry.seq !== scope.head.seq + 1 || entry.prev !== scope.head.hash) {
@@ -117,7 +119,7 @@ export function applyEntry(writer: StateWriter, definition: ValidDefinition, ent
   const signer = signerOf(entry);
   // Section 17.2a: what the entry does to the counts of the holders, on the state before it. An entry that draws past a count, or
   // that opens a held operation with no holder, is one that no judge writes.
-  const drawn = drawsOf(writer, definition, entry);
+  const drawn = drawsOf(writer, definition, entry, options);
   if ("fault" in drawn) throw new FoldError(`entry ${entry.seq}, ${drawn.fault}: ${drawn.detail}`);
   /** The holders whose release is asked after this entry: each whose counts, item, operation or request the entry changed. */
   const touched = new Set<number>(drawn.holders.keys());

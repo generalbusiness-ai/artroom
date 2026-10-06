@@ -150,15 +150,16 @@ answer that the test wrote. It shows nothing about a host, a gateway, a
 push, an observation of membership or of the rules, a lane's entry, or a
 founding.
 
-The forms of a bound request have one stand-in, in
-`packages/derive/test/forms-binding.test.ts`: `Jobs.ledger`, for the
-reservation ledger that would hold what an item still holds of its
-`decisions`. The test sets a count when a job is opened and draws 1 for
-an entry that the judge says is bound. The platform data and every rule
-of that file, and of `forms-settles.test.ts`, are made up. A test that
-uses them says so. Such a test shows the judge's side of a binding and
-the amounts of a marker duty. It shows nothing about how a count is
-kept, released or replayed, and nothing about a definition of Artroom.
+The bound-request tests in `packages/derive/test/forms-binding.test.ts`
+use the real holder ledger: counts are taken and added, a bound deciding
+entry draws one even when refused, its requests draw on the holder, and a
+final item releases its decisions. Folding the history derives the same
+counts. The platform data and rules remain made up. The replay witness in
+`packages/replay/test/decisions.test.ts` runs the real verifier on a judged
+receiver history, with the sender's entries written by hand and anchored.
+It checks that the taking entry fits its decision reservation. These tests
+show no behavior of an Artroom platform definition. The marker-duty tests
+in `forms-settles.test.ts` also use made-up platform data and rules.
 
 The rows of `observes` have a made-up definition and two scripted scopes.
 `weigher`, in `packages/derive/test/fixtures-observes.ts`, is made-up

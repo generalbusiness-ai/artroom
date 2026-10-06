@@ -23,6 +23,8 @@ export interface Capacity {
   pending: Record<string, Record<string, number>>;
   pendingCopies: PendingCopy[];
   clauseEntries: number;
+  /** What the written effects of each bound handler can start, by its path. Sends draw on the holder's requests. */
+  decisionEntries: Record<string, number>;
   /** Section 17.2, "A marker duty": the types that some form settles by a mark. Their items are counted one by one (`markers.ts`), so `pending` has no row for them. Absent: none. */
   markers?: Markers;
 }
@@ -120,5 +122,6 @@ export function capacityOf(d: Pick<Defining, "bad" | "duties" | "clauseSets" | "
   const clauseEntries = Math.max(0, ...d.clauseSets.map((c) => starts(c)));
   for (const form of unbounded) d.bad("reserve-unbounded", form.path, "the forms that settle lead back to the state this one settles, so no reservation covers what its settlement can start");
   const marked = unbounded.size === 0 ? markers.data() : null;
-  return { deadlines, pending, pendingCopies, clauseEntries, ...(marked ? { markers: marked } : {}) };
+  const decisionEntries = Object.fromEntries(d.duties.filter((form) => form.path.startsWith("receives.")).map((form) => [form.path, starts(form.sets)]));
+  return { deadlines, pending, pendingCopies, clauseEntries, decisionEntries, ...(marked ? { markers: marked } : {}) };
 }

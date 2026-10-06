@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { FactRef, FieldValue, Input, PlatformDefinition, ScopeKind, ScopeRef, Seed, Send } from "@generalbusiness/artroom-contract";
 import { canonicalBytes, entryHash, factRefOf, newIncarnation, parseStrictBytes, scopeIdOf } from "@generalbusiness/artroom-bytes";
-import { MemoryState, PROFILES, applyEntry, clockOf, decisionsOf, entryOf, fits, indexItems, itemAwaits, judgeDelivery, keyOf, owed, validateDefinition } from "../src/index.ts";
+import { MemoryState, PROFILES, applyEntry, clockOf, decisionCounts, entryOf, fits, indexItems, itemAwaits, judgeDelivery, keyOf, owed, validateDefinition } from "../src/index.ts";
 import type { Counts, Draft, Fetched, Indexed, Judgment, PlatformRule, PlatformRules, RuleEffect, ValidDefinition } from "../src/index.ts";
 import { Scope, arriving, d, forged, keys, on, valid, type Over } from "./fixtures.ts";
 
@@ -13,13 +13,10 @@ import { Scope, arriving, d, forged, keys, on, valid, type Over } from "./fixtur
  * here is made-up platform data, every rule is a STAND-IN, and every number
  * is made up.
  *
- * `Ledger`, below, is a STAND-IN for the reservation ledger of row I3-44:
- * it holds what each job still holds of its `decisions`, sets it when a job
- * is opened, and draws 1 for an entry that the judge says is bound. The
- * source has no such ledger yet. So these tests show the judge's side: the
- * lookup, the selection, the five conditions, and that a bound delivery is
- * settling whatever it decides. They show nothing about how a count is
- * kept, released or replayed, and nothing about the room `dec(m)`.
+ * The scope uses the real reservation ledger: taking entries set each
+ * job's decisions, deciding entries draw on the pre-entry binding, and
+ * final jobs release them. The fixture's admission uses the folded counts.
+ * The platform data and selector rules remain stand-ins.
  */
 
 const lane = (n: number): ScopeRef => {
@@ -112,7 +109,7 @@ function rules(over: Record<string, PlatformRule> = {}) {
       ...over,
     },
   };
-  return { platform, given };
+  return { platform, given, foldPlatform: { ...platform, rules: { ...platform.rules, "job-of": over["job-of"] ?? { place: "also" as const, bind: (items: readonly Indexed[]) => (items.find((item) => !FINAL.includes(item.state)) ?? items.at(-1)!).id } } } };
 }
 
 /** One request as it arrives: the envelope, its source entry, and the foreign entries that its fields name. Made by hand: nothing judged the sender's entries. */
@@ -125,24 +122,20 @@ function ticket(of: ScopeRef, seq = ++made): Fetched {
   return { fact: factRefOf(entry), entry, under: "ticket" };
 }
 
-/** A scope under made-up platform data, with a budget of entries and the stand-in ledger of counts. */
+/** A scope under made-up platform data, with a real reservation ledger and a budget of entries. */
 class Jobs extends Scope {
   budget = 0;
-  /** STAND-IN for the reservation ledger: what each item still holds of `decisions`, by item and message. */
-  readonly ledger = new Map<string, number>();
-  readonly counts: Counts = (item, message) => this.ledger.get(`${item.id} ${message}`) ?? 0;
+  readonly counts: Counts = decisionCounts(this.state);
+  override get foldOptions() { return { bounds: this.bounds, platform: this.using?.foldPlatform }; }
   constructor(definition: ValidDefinition, readonly using = rules()) { super(definition); }
   row() { return [this.head.seq + 1, owed(this.state, this.definition, this.last.input)] as const; }
   free(entries: number) { const [used, reserved] = this.row(); this.budget = used + reserved + entries; return this; }
   commit(j: { result: string; draft?: Draft }): string {
     if (j.result !== "write" || !j.draft) return j.result;
     const [copy, entry] = [this.replay(), entryOf(this.state, j.draft, clockOf(this.state, this.now))];
-    applyEntry(copy, this.definition, entry, entryHash(entry));
+    applyEntry(copy, this.definition, entry, entryHash(entry), this.foldOptions);
     if (!fits(copy, this.definition, { scopeEntries: this.budget }, entry.input, j.draft.settles)) return "retry";
     this.seal(j.draft);
-    // The stand-in ledger: the entry that opens an item sets its counts, and a bound entry draws 1.
-    for (const effect of entry.effects) if (effect.effect === "open") for (const message of ["stop"]) this.ledger.set(`${effect.item} ${message}`, FINAL.includes(this.item(effect.item).state) ? 0 : decisionsOf(this.definition, effect.type, message));
-    if (j.draft.bound) this.ledger.set(`${j.draft.bound.item} ${j.draft.bound.message}`, this.counts(this.item(j.draft.bound.item), j.draft.bound.message) - 1);
     return j.draft.settles ? "settles" : "new work";
   }
   does(kind: string, over: Over = {}) { return this.commit(this.judge(this.intent(keys.una, kind, over))); }
@@ -154,10 +147,10 @@ class Jobs extends Scope {
   }
   judged(a: Arrival, state: MemoryState = this.state, using = this.using): Judgment {
     const arrival = { ...a.send, from: a.from };
-    return judgeDelivery(state, this.definition, arrival, { ...arriving(this, arrival, a.source, a.facts), platform: using.platform, counts: this.counts });
+    return judgeDelivery(state, this.definition, arrival, { ...arriving(this, arrival, a.source, a.facts), platform: using.platform });
   }
   deliver(a: Arrival) { return this.commit(this.judged(a)); }
-  start(from: ScopeRef, t: Fetched) { this.free(1); expect(this.deliver(this.request(from, "start", { ticket: t.fact }, [t]))).toBe("new work"); return this.head.seq; }
+  start(from: ScopeRef, t: Fetched) { this.free(1 + (this.definition.reserving?.holders["job"]?.amount.entries ?? 0)); expect(this.deliver(this.request(from, "start", { ticket: t.fact }, [t]))).toBe("new work"); return this.head.seq; }
   stop(from: ScopeRef, t: Fetched) { return this.request(from, "stop", { ticket: t.fact }, [t]); }
   /** The decision of the last entry, the name of its reason, and how many effects it holds. */
   last3() { const result = this.last.sends.at(-1)!.message as { outcome: string; reason?: { name?: string } }; return [result.outcome, result.reason?.name ?? null, this.last.effects.length]; }
@@ -269,6 +262,52 @@ describe("18.53, at the validator: the index, the binding selector and `bound`",
 });
 
 describe("18.53, in the judge: a bound request finds its item by a selector, at a full scope", () => {
+  test("dec(m) reserves the whole closure of an unheld operation that a bound handler's mark may open", () => {
+    const data = structuredClone(M) as unknown as import("@generalbusiness/artroom-contract").PlatformData;
+    data.outcomes["audit"] = { code: "audit", row: "P16", attempts: 1 };
+    data.receives["stop"]!.effects = [{ code: "open-audit", row: "P16", most: { effects: 0, operations: ["audit"] } }];
+    const definition = valid(validateDefinition(data, PROPOSED_BOUNDS, PROFILES, { platform: true }));
+    // The deciding entry, plus the first outcome and late answer of audit.
+    expect([definition.reserving!.dec["stop"]!.entries, definition.reserving!.holders["job"]!.amount.entries]).toEqual([3, 3]);
+  });
+
+  test("decision reservations are taken, added and drawn by the real ledger; a bound refusal uses its own room and a final holder releases unused decisions", () => {
+    const data = structuredClone(M) as unknown as import("@generalbusiness/artroom-contract").PlatformData;
+    data.items["job"]!.holds = { decisions: { stop: 2 } };
+    data.acts["take"]!.adds = { decisions: { stop: 1 } };
+    data.acts["finish"] = { ...M.acts.take, step: "transition", grant: "finish", guards: [{ state: ["taken"] }], effects: [{ state: "done" }] };
+    const definition = valid(validateDefinition(data, PROPOSED_BOUNDS, PROFILES, { platform: true }));
+    expect([definition.reserving!.dec["stop"]!.entries, definition.reserving!.holders["job"]!.amount.entries, definition.reserving!.adds["take"]!.amount.entries]).toEqual([1, 2, 1]);
+    const G = new Jobs(definition);
+    const t = ticket(Q);
+    const job = G.start(Q, t);
+    expect([G.counts(G.item(job), "stop"), G.state.holder(job)]).toEqual([2, { decisions: { stop: 2 } }]);
+    expect(G.free(2).does("take", on(G, job))).toBe("new work");
+    expect(G.state.holder(job)).toEqual({ decisions: { stop: 3 } });
+    const before = G.row().reduce((a, b) => a + b);
+    G.free(0);
+    expect(G.deliver(G.stop(Q, t))).toBe("settles");
+    expect([G.last3(), G.state.holder(job), G.row().reduce((a, b) => a + b)]).toEqual([["refused", "too-late", 0], { decisions: { stop: 2 } }, before]);
+    expect(G.replay().holder(job)).toEqual(G.state.holder(job));
+    expect(G.free(1).does("finish", on(G, job))).toBe("new work");
+    expect([G.state.holder(job), G.replay().holder(job)]).toEqual([null, null]);
+  });
+
+  test("a request sent by a bound deciding entry draws on its holder's request count and preserves its account for its result", () => {
+    const data = structuredClone(M) as unknown as import("@generalbusiness/artroom-contract").PlatformData;
+    data.items["job"]!.holds = { decisions: { stop: 1 }, requests: 1 };
+    data.receives["stop"]!.sends = [{ tell: { to: { slot: "owner", of: "also.job" }, message: "notice", fields: {}, result: {} } }];
+    const definition = valid(validateDefinition(data, PROPOSED_BOUNDS, PROFILES, { platform: true }));
+    const G = new Jobs(definition);
+    const t = ticket(Q);
+    const job = G.start(Q, t);
+    const before = G.row().reduce((a, b) => a + b);
+    G.free(0);
+    expect(G.deliver(G.stop(Q, t))).toBe("settles");
+    expect([G.state.account(G.head.seq, 0), G.state.holder(job), G.last.sends.map((send) => send.message.class), G.row().reduce((a, b) => a + b)]).toEqual([job, null, ["request", "result"], before]);
+    expect(G.replay().account(G.head.seq, 0)).toBe(job);
+  });
+
   test("18.53 cases 4, 7 and 13: a stop for a job that neither reference of the board names is bound, settles and is applied; a repeat runs no selector; a stop for the final job is new work", () => {
     const { G, t, b, counts, states } = three();
     const [used, reserved] = G.row();
@@ -379,6 +418,7 @@ describe("18.53, in the judge: a bound request finds its item by a selector, at 
     const loaded = new MemoryState();
     loaded.setScope(snapshot.scope!);
     for (const item of snapshot.items) loaded.putItem(item);
+    for (const holder of snapshot.holders ?? []) loaded.putHolder(holder.item, holder.held);
     for (const [type, state, n] of snapshot.counts) loaded.addCount(type, state, n);
     expect([JSON.stringify(snapshot).includes("keyed"), loaded.lookup("job", "ticket", keyOf(fresh.fact, G.at)!, 9)]).toEqual([false, null]);
     indexItems(loaded, m, snapshot.items, G.at);
@@ -389,7 +429,7 @@ describe("18.53, in the judge: a bound request finds its item by a selector, at 
 
     // Case 23, its last sentence. A runtime whose index holds no row for that job answers no lookup: the delivery is not judged.
     const lost = new MemoryState();
-    for (const { entry, hash } of G.entries) applyEntry(lost, entry.effects.some((e) => e.effect === "open" && e.item === job) ? { ...m, keyed: {} } : m, entry, hash);
+    for (const { entry, hash } of G.entries) applyEntry(lost, entry.effects.some((e) => e.effect === "open" && e.item === job) ? { ...m, keyed: {} } : m, entry, hash, G.foldOptions);
     expect([lost.lookup("job", "ticket", keyOf(fresh.fact, G.at)!, 9), G.judged(stop, lost)]).toEqual([null, { result: "unavailable", reason: "unavailable" }]);
   });
 });
@@ -425,12 +465,40 @@ const M51 = {
 };
 
 describe("18.51: a settlement by a mark, and a bound request, at a full scope", () => {
+  test("the decision fold treats a bound subject named __proto__ as an own name", () => {
+    const data = structuredClone(M51) as unknown as import("@generalbusiness/artroom-contract").PlatformData;
+    data.receives["stop"] = JSON.parse(JSON.stringify(data.receives["stop"]).replaceAll("also.job", "also.__proto__"));
+    data.receives["stop"]!.also = Object.fromEntries([["__proto__", { item: "job", by: "job" }]]);
+    const definition = valid(validateDefinition(data, PROPOSED_BOUNDS, PROFILES, { platform: true }));
+    const G = new Jobs(definition);
+    expect(G.free(3).deliver(G.request(Q, "start", {}))).toBe("new work");
+    const job = G.head.seq;
+    expect(G.free(1).does("work", on(G, job))).toBe("new work");
+    G.free(0);
+    expect(G.deliver(G.request(Q, "stop", { job: G.fact(job) }))).toBe("settles");
+    expect([G.last3(), G.state.holder(job), G.replay().holder(job)]).toEqual([["refused", "too-late", 0], null, null]);
+  });
+
+  test("a local fact field that names the holder's opening is normalized identically by the judge and decision fold", () => {
+    const data = structuredClone(M51) as unknown as import("@generalbusiness/artroom-contract").PlatformData;
+    data.receives["stop"]!.fields = { job: { type: "fact", kind: ["start"], under: data.name, required: true } };
+    const definition = valid(validateDefinition(data, PROPOSED_BOUNDS, PROFILES, { platform: true }));
+    const G = new Jobs(definition);
+    expect(G.free(3).deliver(G.request(Q, "start", {}))).toBe("new work");
+    const job = G.head.seq;
+    expect(G.free(1).does("work", on(G, job))).toBe("new work");
+    G.free(0);
+    expect(G.deliver(G.request(Q, "stop", { job: G.fact(job) }))).toBe("settles");
+    expect([G.last3(), G.state.holder(job), G.replay().holder(job)]).toEqual([["refused", "too-late", 0], null, null]);
+  });
+
   const m51 = valid(changed(M51, () => undefined));
   const started = () => {
     const G = new Jobs(m51);
-    // Case 4. New work: its entry, and 1 for the mark. The 1 for the decision is the reservation ledger's, and is not counted here.
+    // Case 4. New work: its entry, 1 for the mark, and 1 for the bound decision.
     expect(G.free(1).deliver(G.request(Q, "start", {}))).toBe("retry");
-    expect(G.free(2).deliver(G.request(Q, "start", {}))).toBe("new work");
+    expect(G.free(2).deliver(G.request(Q, "start", {}))).toBe("retry");
+    expect(G.free(3).deliver(G.request(Q, "start", {}))).toBe("new work");
     const job = G.head.seq;
     const of = (from: ScopeRef, message: string) => G.request(from, message, { job: G.fact(job) });
     return { G, job, of };
@@ -474,11 +542,14 @@ describe("18.51: a settlement by a mark, and a bound request, at a full scope", 
     expect(done.G.free(0).deliver(done.of(Q, "stop"))).toBe("retry");
   });
 
-  test("with no ledger of counts, as in a runtime of this source, no delivery is bound: a stop from the owner is new work", () => {
-    const { G, of } = started();
+  test("an omitted count callback reads the folded holder; an absent holder count fails closed", () => {
+    const { G, of, job } = started();
     const stop = of(Q, "stop");
     const arrival = { ...stop.send, from: stop.from };
     const judged = judgeDelivery(G.state, m51, arrival, { ...arriving(G, arrival, stop.source, []), platform: G.using.platform });
-    expect(judged.result === "write" && [judged.draft.settles, judged.draft.bound]).toEqual([false, undefined]);
+    expect(judged.result === "write" && [judged.draft.settles, judged.draft.bound]).toEqual([true, { item: job, message: "stop" }]);
+    G.state.putHolder(job, null);
+    const without = judgeDelivery(G.state, m51, arrival, { ...arriving(G, arrival, stop.source, []), platform: G.using.platform });
+    expect(without.result === "write" && [without.draft.settles, without.draft.bound]).toEqual([false, undefined]);
   });
 });

@@ -297,7 +297,7 @@ export class Scope {
     this.#store = store;
     this.#ports = ports;
     this.#bounds = bounds;
-    this.#turns = new Turns(store, ports, bounds, () => { const pinned = this.pinned(); return pinned ? pinned.definition : undefined; }, () => this.owners());
+    this.#turns = new Turns(store, ports, bounds, () => { const pinned = this.pinned(); return pinned ? pinned.definition : undefined; }, () => this.owners(), () => this.pinned()?.platform ?? undefined);
   }
 
   /** True when this runtime has the code of every form that the definition uses, and each entry of it fits the bound on derived effects with that code. */

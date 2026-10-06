@@ -20,7 +20,7 @@
 import type { Bounds, FactRef, Head, Prepared, SignedIntent } from "@generalbusiness/artroom-contract";
 import { CanonicalError, canonicalize, entryHash, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import { applyEntry, clockOf, entryOf, fits, isEntryOf, isIntent, judgeTimed, nextDue, timeMs, timeOf } from "@generalbusiness/artroom-derive";
-import type { Clock as Reading, Draft, Due, Fetched, Owners, RuleInput, StateView, ValidDefinition } from "@generalbusiness/artroom-derive";
+import type { Clock as Reading, Draft, Due, Fetched, Owners, PlatformRules, RuleInput, StateView, ValidDefinition } from "@generalbusiness/artroom-derive";
 import type { Ports, Resolver } from "./ports.ts";
 import type { Retained, Sealed, Store } from "./store.ts";
 
@@ -134,14 +134,16 @@ export class Turns {
   readonly #bounds: Bounds;
   readonly #pinned: PinnedDefinition;
   readonly #owners: () => Owners | undefined;
+  readonly #platform: () => PlatformRules | undefined;
 
   /** `owners`: the rules of the owners of outside operations for this scope, with those of its platform definition (`Scope.owners`). */
-  constructor(store: Store, ports: Pick<Ports, "clock" | "rules" | "alarm" | "capabilities">, bounds: Bounds, pinned: PinnedDefinition, owners: () => Owners | undefined) {
+  constructor(store: Store, ports: Pick<Ports, "clock" | "rules" | "alarm" | "capabilities">, bounds: Bounds, pinned: PinnedDefinition, owners: () => Owners | undefined, platform: () => PlatformRules | undefined = () => undefined) {
     this.#store = store;
     this.#ports = ports;
     this.#bounds = bounds;
     this.#pinned = pinned;
     this.#owners = owners;
+    this.#platform = platform;
   }
 
   /**
@@ -343,7 +345,7 @@ export class Turns {
     const hash = entryHash(entry);
     this.#store.append(entry, hash, bytes, size);
     for (const input of retain) this.#store.retain(input);
-    applyEntry(this.#store, definition, entry, hash);
+    applyEntry(this.#store, definition, entry, hash, { bounds: this.#bounds, platform: this.#platform() });
     // Section 6.6: a redaction removes the bytes of each text it lists from the retained inputs, in the commit that seals its tombstone.
     for (const effect of entry.effects) if (effect.effect === "redact") for (const text of effect.texts) this.#store.forget("text", text);
     return { entry, hash };

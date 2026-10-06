@@ -31,7 +31,7 @@
 // which wait for the authority note's rows). Their kinds are counted by the closure that their rules declare, as on main.
 
 import { RETAINED_INPUT_BYTES } from "@generalbusiness/artroom-contract";
-import type { Held } from "@generalbusiness/artroom-contract";
+import type { FieldType, Held } from "@generalbusiness/artroom-contract";
 import { NOTHING, closure, holding, itemOf, largest, one, requestOf, retainedBytes, starts, sum, type Amount, type ClauseStarts, type Counting, type KindStated, type Starts, STARTS_NOTHING } from "../held.ts";
 import { isObject, own } from "../values.ts";
 import type { Capacity } from "./capacity.ts";
@@ -73,6 +73,8 @@ export interface Reserving {
    */
   req: Amount;
   itm: Amount;
+  /** By message: one bound deciding entry and what its handler's effects can start. Its requests draw on the holder. */
+  dec: Readonly<Record<string, Amount>>;
   /** The largest that the marks of one clause of a result can start, which every pending request reserves beside what its written effects start. */
   clause: Amount;
   /** The held kinds that a clause of a request can reach: a final holder keeps their counts while a request of its account is pending. */
@@ -82,7 +84,7 @@ export interface Reserving {
 const CLAUSES = ["applied", "refused", "superseded", "undelivered", "conflict"] as const;
 
 /** Reads the members, makes the checks, and computes the amounts. Undefined: the value is no platform data, or it has no kind and no `holds`. */
-export function reserving(d: Defining, top: Rec, capacity: Pick<Capacity, "deadlines" | "pending" | "clauseEntries">, outcomeValues: Readonly<Record<string, readonly import("../ledger.ts").EvidenceValueDomain[]>> = {}): Reserving | undefined {
+export function reserving(d: Defining, top: Rec, capacity: Pick<Capacity, "deadlines" | "pending" | "clauseEntries" | "decisionEntries">, outcomeValues: Readonly<Record<string, readonly import("../ledger.ts").EvidenceValueDomain[]>> = {}): Reserving | undefined {
   if (!d.platform) return undefined;
   const { bad, rec, int, list, bounds } = d;
   const kindsWritten = isObject(top["outcomes"]) ? top["outcomes"] : {};
@@ -311,12 +313,43 @@ export function reserving(d: Defining, top: Rec, capacity: Pick<Capacity, "deadl
   if (d.problems.length > 0) return undefined;
 
   const itm = itemOf(c, [...opened].filter((type) => !holderTypes.has(type)));
-  const amounts = { one: ones, req, itm };
+  // dec(m): a bound handler opens no item directly and its sends draw on
+  // q. Its written effects can start deadlines/settlements, and an effect
+  // mark can open a kind that no item holds, whose whole closure is here.
+  const retention = (type: FieldType): { facts: number; texts: number } => {
+    if (type.type === "fact") return { facts: 1, texts: 0 };
+    if (type.type === "text") return { facts: 0, texts: type.detached ? Math.min(type.max, bounds.textBytes) : 0 };
+    if (type.type === "list") { const of = retention(type.of); const max = Math.min(type.max, bounds.listElements); return { facts: max * of.facts, texts: max * of.texts }; }
+    if (type.type === "record") return Object.values(type.of).map(retention).reduce((a, b) => ({ facts: a.facts + b.facts, texts: a.texts + b.texts }), { facts: 0, texts: 0 });
+    return { facts: 0, texts: 0 };
+  };
+  const decisions = new Map<string, Amount[]>();
+  for (const binding of d.bindings) {
+    const path = binding.path.slice(0, -".bound".length);
+    const handler = Object.entries(handlersWritten).find(([name]) => at("receives", name) === path)?.[1];
+    if (!isObject(handler)) continue;
+    const written = capacity.decisionEntries[path] ?? 0;
+    // The derived-effect ceiling stands in for the records a handler can
+    // change, as entryBytes stands in for the whole static entry size.
+    let amount: Amount | null = { ...NOTHING, entries: 1 + written, records: bounds.derivedEffects, bytes: (2 + written) * bounds.entryBytes };
+    for (const [i, effect] of (Array.isArray(handler["effects"]) ? handler["effects"] : []).entries()) {
+      if (!marked(effect)) continue;
+      const more = starts(c, mostOf(effect, at(at(path, "effects"), i)), { item: false });
+      amount = amount && more ? sum(amount, more) : null;
+    }
+    if (!amount) { bad("reserve-unbounded", binding.path, "a bound handler's mark lists a kind with no finite closure"); continue; }
+    const retains = Object.values(isObject(handler["fields"]) ? handler["fields"] : {}).map((field) => retention(field as FieldType)).reduce((a, b) => ({ facts: a.facts + b.facts, texts: a.texts + b.texts }), { facts: 0, texts: 0 });
+    amount = sum(amount, { ...NOTHING, bytes: Math.min(retains.facts, Math.max(0, bounds.usesPerEntry - 1)) * bounds.entryBytes + retains.texts });
+    decisions.set(binding.message, [...(decisions.get(binding.message) ?? []), amount]);
+  }
+  if (d.problems.length > 0) return undefined;
+  const dec = Object.fromEntries([...decisions].map(([message, amounts]) => [message, largest(...amounts)]));
+  const amounts = { one: ones, req, itm, dec };
   return {
     kinds,
     holders: Object.fromEntries([...holds].map(([type, of]) => [type, { holds: of, amount: holding(of, amounts) }])),
     adds: Object.fromEntries([...adds].map(([name, of]) => [name, { on: of.on, adds: of.adds, amount: holding(of.adds, amounts) }])),
-    req, itm,
+    req, itm, dec,
     clause: largest(...(byClause as Amount[])),
     reach: reachFrom(everyClause.flatMap((clause) => clause.marks.flatMap((mark) => mark.operations)).filter((k) => held.has(k))),
   };

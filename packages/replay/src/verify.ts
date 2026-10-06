@@ -41,7 +41,7 @@ import { DOMAINS, PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { Bounds, CapabilityName, Digest, Entry, FactRef, Grant, Head, KeyId, Observation, ObservationRequest, ObservationUse, MismatchName, PlatformData, PlatformDefinition, Report, RetainedInput, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
 import { canonicalize, definitionDigest, digestBytes, intentDigest, isDigest, isEntry, isObservationUse, isPlatformDefinition, parseStrict, platformName, scopeIdOf, textDigest, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import {
-  HOLD, HOLD_KINDS, MISMATCHES, MemoryState, WINDOWS, actionOf, agrees, applyEntry, drawsOf, clockOf, contentStates, entryOf, namedBy, observedName, retainsOf, headsOf, highestHead, inputTexts, isAncestryCheck, isFactRef, isLocalId, isObject, isScopeRef, judgeAct, judgeCheckpoint, judgeDelivery,
+  HOLD, HOLD_KINDS, MISMATCHES, MemoryState, WINDOWS, actionOf, agrees, applyEntry, drawsOf, clockOf, contentStates, entryOf, fits, namedBy, observedName, retainsOf, headsOf, highestHead, inputTexts, isAncestryCheck, isFactRef, isLocalId, isObject, isScopeRef, judgeAct, judgeCheckpoint, judgeDelivery,
   judgeDiagnosis, evidenceValues, outcomeValueDomains, fixedBy, judgeGenesis, judgeGrant, judgeOutcome, judgePreparation, judgeTimed, membershipOf, nextDue, observedOf, own, ownersOf, placesOf, ruleAt, same, snapshotRead, stepsOf, timeMs, updateOf, validateDefinition, valueDigest, windowOf,
 } from "@generalbusiness/artroom-derive";
 import type { ActJudgment, AncestryCheck, Capabilities, Clock, Fetched, Judgment, Observing, Owners, PlatformRules, PreparationJudgment, RecordedRef, Retains, Rules, StateView, TimedJudgment, ValidDefinition, Window } from "@generalbusiness/artroom-derive";
@@ -799,7 +799,7 @@ class Verifier {
     const view = source.viewed ?? (source.viewed = new View());
     while (view.through < seq) {
       const next = source.sealed[view.through + 1]!;
-      view.fold(source.definition!, next.entry, next.hash);
+      view.fold(source.definition!, next.entry, next.hash, { bounds: this.#bounds, platform: source.platform ?? undefined });
       this.#tally.folds++;
     }
     const { state, built } = view.at(seq);
@@ -1181,7 +1181,7 @@ class Verifier {
     // from the history. The fold derives each draw and each release, and the checkpoint's digest covers what it keeps. An entry
     // that draws past a count, or that opens an operation of a held kind for no holder, is a mismatch with its own name, whatever
     // a judge would say of its input.
-    const drawn = drawsOf(state, definition, entry);
+    const drawn = drawsOf(state, definition, entry, { bounds, platform: run.platform ?? undefined });
     if ("fault" in drawn) throw mismatch(`${drawn.fault === "past-count" ? "draw-past-count" : "held-without-holder"}: ${drawn.detail}`);
     const copyOf = (fact: FactRef | null) => facts.find((f) => f.fact.hash === fact?.hash) ?? null;
     const sealed = (seq: unknown): Entry | null => (isLocalId(seq) ? (run.sealed[seq]?.entry ?? null) : null);
@@ -1338,7 +1338,8 @@ class Verifier {
       if (canonicalize(derived[part]) !== canonicalize(entry[part])) throw mismatch(`the recorded ${part} are not the ones derived again`);
     }
     if (canonicalize(derived) !== bytes) throw mismatch("the recorded entry is not the one derived again");
-    applyEntry(state, definition, entry, hash);
+    applyEntry(state, definition, entry, hash, { bounds, platform: run.platform ?? undefined });
+    if (!fits(state, definition, bounds, input, judged.draft.settles, this.#owners)) throw mismatch("the taking or new-work entry exceeds the budget of used plus reserved entries");
     // Section 16.1: this entry is now the latest that retains each of its reads, in its grant and in `observed`. A preparation retains one in its grant,
     // and an outcome and a delivery of a result in `observed` alone.
     this.#retains(run, entry, hash, retainedBy(input));

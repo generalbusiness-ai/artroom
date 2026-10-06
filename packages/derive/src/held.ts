@@ -169,13 +169,15 @@ export const itemOf = (c: Counting, types: readonly string[]): Amount => sum({ .
 
 /**
  * What a holder that still holds those counts reserves, in each dimension:
- * the sum over k of c(k) times `one(k)`; q times `req`; and i times `itm`.
+ * the sum over k of c(k) times `one(k)`; q times `req`; i times `itm`;
+ * and each decision count times the amount `dec(m)` of its message.
  * A count of a kind that has no amount counts nothing: the validator refuses
  * the data that states one.
  */
-export function holding(held: Held, amounts: { one: Readonly<Record<string, Amount>>; req: Amount; itm: Amount }): Amount {
+export function holding(held: Held, amounts: { one: Readonly<Record<string, Amount>>; req: Amount; itm: Amount; dec?: Readonly<Record<string, Amount>> }): Amount {
   const byKind = Object.entries(held.operations ?? {}).map(([kind, n]) => times(n, own(amounts.one, kind) ?? NOTHING));
-  return sum(...byKind, times(held.requests ?? 0, amounts.req), times(held.items ?? 0, amounts.itm));
+  const byMessage = Object.entries(held.decisions ?? {}).map(([message, n]) => times(n, own(amounts.dec, message) ?? NOTHING));
+  return sum(...byKind, ...byMessage, times(held.requests ?? 0, amounts.req), times(held.items ?? 0, amounts.itm));
 }
 
 /**

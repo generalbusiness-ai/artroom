@@ -88,7 +88,7 @@ export function heldEntries(view: StateView, definition: ValidDefinition): numbe
   const r = definition.reserving;
   if (!r) return 0;
   const one = Object.fromEntries(Object.entries(r.kinds).filter(([, kind]) => kind.held).map(([name, kind]) => [name, kind.whole]));
-  return view.holders().reduce((entries, holder) => entries + holding(holder.held, { one, req: r.req, itm: r.itm }).entries, 0);
+  return view.holders().reduce((entries, holder) => entries + holding(holder.held, { one, req: r.req, itm: r.itm, dec: r.dec }).entries, 0);
 }
 
 /**
