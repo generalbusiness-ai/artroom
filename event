@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:d5c143271ed291e63d2fa60d02d60da6a7c59bb5","text":"Merge retired a covered predecessor; the successor is at packages/derive/test/forms-records.test.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:d6abc3db1b55b74f0ebb32cd41aa5f828569491d","text":"Merge retired a covered predecessor; the successor is at vitest.config.ts."}
