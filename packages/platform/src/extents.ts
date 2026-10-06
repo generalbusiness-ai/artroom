@@ -70,7 +70,8 @@ export const firstExtents = (rules: { approvals: number; checks: readonly { name
  * refused for, named `rules-extent-required`: the extents hold one named
  * `rules` with the four patterns, at least 1 approval, the approver
  * `rules.publish` and the class `authority`. A repository may add patterns.
- * No mark of `publish` runs this yet (the missing form 3).
+ * The guard `extents-hold` of `publish` runs it (`rules-scope.ts`; the
+ * missing form 3, built for `publish`).
  */
 export const holdsRulesExtent = (extents: readonly Extent[]): boolean =>
   extents.some((extent) => extent.name === RULES_EXTENT && RULES_PATTERNS.every((pattern) => extent.patterns.includes(pattern)) && extent.approvals >= 1 && extent.approver === CONTROLLER && extent.class === "authority");
