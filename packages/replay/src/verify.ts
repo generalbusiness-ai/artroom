@@ -819,7 +819,9 @@ class Verifier {
    */
   async #standing(run: Run, entry: Entry, o: ObservationUse["observation"], where: FactRef, depth: number): Promise<void> {
     const mismatch = (why: string): Stop => new Stop("mismatch", why, where);
-    const asked: ObservationRequest = !("subject" in o) ? { of: o.of, key: o.key } : o.subject === "member" ? { of: o.of, member: o.member } : { of: o.of, asked: o.content.asked };
+    // The holders of an action: the answer lists the first of them, as many as the row's `most` or all. The judge checks the list's
+    // length against the row, so the value is asked here for as many as the record lists.
+    const asked: ObservationRequest = !("subject" in o) ? { of: o.of, key: o.key } : o.subject === "member" ? { of: o.of, member: o.member } : o.subject === "holders" ? { of: o.of, holders: o.action, most: o.holders.length } : { of: o.of, asked: o.content.asked };
     const unanswered = (): Stop => new Stop("unsupported-definition", `the observed scope ${o.of.scope} pins a definition for which this replay has no answer to an observation`, where);
     let derived: unknown;
     if (o.of.scope === run.id) {
@@ -841,7 +843,7 @@ class Verifier {
         this.#values.set(key, derived);
       }
     }
-    if (!isObject(derived) || canonicalize({ ...derived, at: o.at }) !== canonicalize(o)) throw mismatch(`the retained observation is not what the history of ${o.of.scope} gives ${"key" in asked ? "that key" : "member" in asked ? "that member" : "the rules"} at its entry ${o.head.seq}`);
+    if (!isObject(derived) || canonicalize({ ...derived, at: o.at }) !== canonicalize(o)) throw mismatch(`the retained observation is not what the history of ${o.of.scope} gives ${"key" in asked ? "that key" : "member" in asked ? "that member" : "holders" in asked ? "the holders of that action" : "the rules"} at its entry ${o.head.seq}`);
   }
 
   /**

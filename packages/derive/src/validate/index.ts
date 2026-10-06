@@ -25,6 +25,7 @@ import { mark, marked, type Defining, type MarkPlace, type RangeIndex } from "./
 import { acts, receives } from "./handlers.ts";
 import { heldUnderBytes, holdForms, holdTypes } from "./hold.ts";
 import { itemTypes } from "./items.ts";
+import { observes } from "./observes.ts";
 import { at, shapes, type Problem } from "./shape.ts";
 import { timedEntryBytes, timedGraph, timedKinds, timedRules } from "./timed.ts";
 
@@ -77,6 +78,16 @@ export interface ValidDefinition {
    * `marks.ts`). Empty: a declared definition, which holds no mark.
    */
   readonly marks: readonly MarkPlace[];
+  /**
+   * Section 16.1, "The subjects that an entry observes" (revision 20): the
+   * data of a platform definition states rows of `observes`, or the
+   * `origin` of an outcome, somewhere. Then each entry of the definition
+   * retains exactly the observations of the subjects that its rows give,
+   * and an outcome's `uses` is a copy of its origin's. False: no data of
+   * the definition states either, as for every declared definition, and
+   * the older rule stands as a stand-in (`observes.ts`, "The stand-in").
+   */
+  readonly observing: boolean;
 }
 
 export type Validation = { ok: true; definition: ValidDefinition } | { ok: false; problems: readonly Problem[] };
@@ -123,7 +134,7 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
   const d: Defining = {
     ...read, bounds, name: typeof top["name"] === "string" ? top["name"] : null, typeNames: new Set(isObject(top["items"]) ? Object.keys(top["items"]) : []), types: new Map(), rules: new Set(), holds: false, holdTypes: new Set(),
     capabilities: new Map(), underived: [],
-    indexes: [], clauseSets: [], clause: null, duties: [], platform, marks: [], places: new Map(),
+    indexes: [], clauseSets: [], clause: null, duties: [], platform, marks: [], places: new Map(), observing: false,
   };
 
   const profile = rec(top["profile"], "profile", ["name", "version"]);
@@ -172,7 +183,14 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
   // because an outcome has no subject and no field for a written send to read, and each effect of its clauses is an effect mark.
   if (platform) {
     for (const [kind, m] of entries(top["outcomes"], "outcomes", null)) {
-      const o = mark(d, m, at("outcomes", kind), "outcome", [], ["send"]);
+      const o = mark(d, m, at("outcomes", kind), "outcome", [], ["send", "origin", "observes"]);
+      // Revision 20, section 6.1, "The origin of an outcome": one of the two words. With `opening`, nothing more is checked.
+      if (o && "origin" in o) {
+        d.observing = true;
+        if (o["origin"] !== "opening" && o["origin"] !== "rule") bad("shape", at(at("outcomes", kind), "origin"), "is opening or rule");
+      }
+      // Section 16.1, "The subjects that an entry observes": the rows of each outcome entry of an operation of this kind.
+      if (o && "observes" in o) observes(d, o["observes"], at(at("outcomes", kind), "observes"), { where: "outcome" });
       if (!o || !("send" in o)) continue;
       const p = at(at("outcomes", kind), "send");
       const send = marked(o["send"]) ? mark(d, o["send"], p, "send", ["result"]) : bad("shape", p, "an outcome's mark holds at most one send, and it is a mark: an outcome's row writes no send");
@@ -206,7 +224,7 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
   const capacity = capacityOf(d, graph, moves);
   if (problems.length > 0) return { ok: false, problems };
   try {
-    return { ok: true, definition: { declared, digest: definitionDigest(declared), timedTypes: [...timedTypes].sort(), holdTypes: [...d.holdTypes].sort(), indexes: d.indexes, ...capacity, underived: d.underived, marks: d.marks } };
+    return { ok: true, definition: { declared, digest: definitionDigest(declared), timedTypes: [...timedTypes].sort(), holdTypes: [...d.holdTypes].sort(), indexes: d.indexes, ...capacity, underived: d.underived, marks: d.marks, observing: d.observing } };
   } catch {
     return { ok: false, problems: [{ code: "shape", path: "", message: "has no canonical bytes" }] };
   }

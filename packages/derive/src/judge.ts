@@ -19,7 +19,8 @@ import { isIntent, presentedTypes, readFacts, readFields, type Reading } from ".
 import { covers } from "./grant.ts";
 import type { Judging } from "./guards.ts";
 import { alsoItems, derive, giving } from "./handlers.ts";
-import { actionOf, atHand, fieldOutsideType, grantByRule, markOf, placeWithoutValue, placesOf, retainedOf, selectedBy, unjudged, type JudgedInput, type ValueRead } from "./marks.ts";
+import { actionOf, atHand, atHandByRows, fieldOutsideType, grantByRule, markOf, placeWithoutValue, placesOf, retainedOf, selectedBy, unjudged, type JudgedInput, type ValueRead } from "./marks.ts";
+import { listedBy, rowsOfAct, settle, type Listed, type Needed, type Observing } from "./observes.ts";
 import type { Item, StateView } from "./state.ts";
 import { nextDue, type Due } from "./timed.ts";
 import { timeMs, type Clock } from "./time.ts";
@@ -72,7 +73,26 @@ export interface JudgeContext extends Reading {
    * the scope keeps exactly those that a rule read. Absent: none came.
    */
   values?: readonly string[] | undefined;
+  /**
+   * Revision 20, section 16.1, "The subjects that an entry observes": what
+   * the commit holds for the rows of `observes` of this act, beside
+   * `observed` and `values`. Under a definition whose data states rows,
+   * `observed` holds the observations at hand, each not yet judged: the
+   * judge makes the six guards with the window and the use of each row.
+   * `values` then also holds each value that came beside an observation.
+   * Absent: the scope records no rules reference, no earlier entry retains
+   * a read at hand, and no further observation can be had.
+   */
+  observing?: Observing | undefined;
 }
+
+/**
+ * An input that is not judged now. `missing` (revision 20, section 16.1,
+ * "In the commit"): the commit's subject list names these subjects, and no
+ * observation at hand passes the guards for them. The commit stops, nothing
+ * is written, the scope reads what is missing and the turn starts again.
+ */
+export interface Unjudged { result: "unavailable"; reason: UnavailableReason; missing?: readonly Needed[] }
 
 /** What a judged input writes. `seq`, `prev` and `time` are allocated when it is sealed; see `entryOf`. */
 export interface Draft {
@@ -106,7 +126,7 @@ export type Refused = { result: "refused"; reason: RefusalReason; name?: string;
 export type ActJudgment =
   | { result: "write"; draft: Draft }
   | Refused
-  | { result: "unavailable"; reason: UnavailableReason }
+  | Unjudged
   | { result: "mismatch"; reason: MismatchReason }
   | { result: "accepted-before"; seq: number }   // the same intent is already sealed in that entry
   | { result: "due"; next: Due };                // section 5.2, step 6.3: nothing is written; the drain runs first
@@ -123,7 +143,7 @@ export type TimedJudgment =
 export type Judgment =
   | { result: "write"; draft: Draft }
   | { result: "source-unverified"; detail: string }               // a source check failed (sections 7.2 and 7.4)
-  | { result: "unavailable"; reason: UnavailableReason }          // not decided; offered again. For a delivery, transport answers "retry"
+  | Unjudged                                                      // not decided; offered again. For a delivery, transport answers "retry"
   | { result: "repeat"; seq: number }                             // already recorded, by that entry; nothing is added
   | { result: "due"; next: Due }                                  // section 5.2, step 6.3: the drain runs first
   | { result: "routing"; reason: RoutingRefusal }                 // a delivery addressed to another scope or incarnation (section 7.4)
@@ -138,10 +158,27 @@ export type Judgment =
  * judged: `unavailable`, and nothing is written (section 6.1).
  */
 export function judgeAct(view: StateView, definition: ValidDefinition, signed: SignedIntent, context: JudgeContext): ActJudgment {
-  return unjudged(() => actJudged(view, definition, signed, context));
+  return unjudged(() => actJudged(view, definition, signed, context, false));
 }
 
-function actJudged(view: StateView, definition: ValidDefinition, signed: SignedIntent, context: JudgeContext): ActJudgment {
+/**
+ * The subject list of an act, before its turn (section 16.1, "The order
+ * before the turn", part 3): the subjects of the rows of its form that have
+ * no observation at hand, from the state at the head that the scope holds,
+ * the intent and the entries that it names. It is the judge's own
+ * derivation, by checks 1 to 8, and it judges nothing: no grant is read,
+ * and the act's answer is the commit's. Empty: the form states no row,
+ * every subject has an observation at hand, or the act is one that the
+ * commit refuses before its list is derived. The commit derives the list
+ * again, and never trusts this one.
+ */
+export function actNeeds(view: StateView, definition: ValidDefinition, signed: SignedIntent, context: JudgeContext): readonly Needed[] {
+  if (!definition.observing) return [];
+  const planned = unjudged(() => actJudged(view, definition, signed, { ...context, grants: null }, true));
+  return (planned.result === "unavailable" && "missing" in planned ? planned.missing : undefined) ?? [];
+}
+
+function actJudged(view: StateView, definition: ValidDefinition, signed: SignedIntent, context: JudgeContext, plan: boolean): ActJudgment {
   const scope = view.scope();
   if (!scope) return { result: "unavailable", reason: "unavailable" };
   const refused = (reason: RefusalReason, detail: string): Refused => ({ result: "refused", reason, detail, judgedAt: scope.head });
@@ -203,7 +240,10 @@ function actJudged(view: StateView, definition: ValidDefinition, signed: SignedI
   // Sections 4.1 and 6.2: the further observations and the values at hand, which only a rule reads. What a rule reads of them is noted.
   // Revision 19, section 6.2: the places of the act that name a value are in the pinned data, which only platform data states.
   const places = placesOf(act.fields, fields);
-  const beside = context.observed === undefined && context.values === undefined && places.length === 0 ? undefined : atHand(context.observed, context.values, places);
+  // Revision 20, section 16.1: under a definition whose data states rows, nothing is at hand for a rule until the rows of this act are
+  // settled, after check 8. Under any other, the older rule stands as a stand-in: what a rule reads is what the entry retains.
+  const beside = definition.observing ? atHandByRows(context.values, places)
+    : context.observed === undefined && context.values === undefined && places.length === 0 ? undefined : atHand(context.observed, context.values, places);
   const g = { ...giving(view, context, scope, scope.head.seq + 1, judged, clocked, fields, facts), beside };
   // Check 7, with the fields: a place that names a value and has none at hand is refused `bad-field` (section 6.2, "The checks, in
   // the commit"). The value of each place is kept with the entry.
@@ -245,6 +285,25 @@ function actJudged(view: StateView, definition: ValidDefinition, signed: SignedI
   const primary = subjects.get("on");
   if (act.step === "transition" && primary && own(own(declared.items, primary.type)!.states, primary.state)?.final) return refused("final", `item ${primary.id} is ${primary.state}`);
 
+  // Section 16.1, "In the commit" (revision 20): the judge derives the subject list after the fields are read and the names of
+  // `also` are bound, and before the grant is judged. So the list is a function of the intent, the state and the entries that the
+  // input names, and of nothing that an observation shows. A member of another repository names no subject of this scope:
+  // `bad-field`. A row that is over refuses the act `entry-too-large`, which names the bound on the observations of one entry.
+  const rows = definition.observing ? rowsOfAct(act) : [];
+  const recorded = context.observing?.membership ?? context.membership ?? null;
+  let list: Listed[] = [];
+  if (rows.length > 0) {
+    const reading: Judging = { view, definition, bounds, clock, scope, self: scope.head.seq + 1, kind: intent.kind, fields, fieldTypes: act.fields, subjects, signer: null, facts, prepared: [], used: [], own: context.own, intent: digest, presented: shownFacts.fields };
+    const listed = listedBy(reading, rows, recorded);
+    if (listed.foreign) return refused("bad-field", "a row of observes is given a member of another repository, or a value that is no member");
+    const over = listed.rows.find((row) => row.over);
+    if (over) return { ...refused("entry-too-large", `row ${over.n} of observes gives ${over.subjects.length} subjects`), name: "observations" };
+    list = listed.rows;
+  }
+  const settling = { view, bounds, clock, observed: context.observed ?? [], values: context.values ?? [], observing: { ...context.observing, membership: recorded } };
+  // Before the turn, the same derivation says what to read, and judges nothing.
+  if (plan) return { result: "unavailable", reason: "authority-unavailable", missing: settle(list, settling).missing };
+
   // Section 4.2, check 9. Section 6.4: every act of a declared definition needs a current grant for its `grant` action. In platform data the `grant` of a
   // row may be a mark: its rule stands in place of the grant check. A mark may state an action as well, and then check 9 is made
   // as written first: when a current grant of that action is held for the signing key the check holds, the entry records that
@@ -277,6 +336,16 @@ function actJudged(view: StateView, definition: ValidDefinition, signed: SignedI
     signer = answer.member && { member: answer.member, principal: null };
   }
   const granted = presented?.grant ?? null;
+  // Section 16.1: for each subject of the list, one observation at hand that passes the six guards, with the row's window and use.
+  // The signer's own member is served by the grant's observation where that passes the row's window and use. A subject with no such
+  // observation stops the commit: the scope reads what is missing and the turn starts again, and the act is answered
+  // `authority-unavailable` once none can be had. An act is never written with a row over or absent.
+  if (beside && definition.observing) {
+    const settled = settle(list, { ...settling, grant: granted?.fresh ?? null });
+    if (settled.missing.length > 0) return { result: "unavailable", reason: "authority-unavailable", missing: settled.missing };
+    if (list.some((row) => settled.status.get(row.n) !== "whole")) return { result: "unavailable", reason: "authority-unavailable" };
+    beside.rows = { status: rows.map((_, n) => settled.status.get(n) ?? null), listed: settled.listed, retained: settled.retained, values: settled.values };
+  }
 
   const j: Judging = {
     view, definition, bounds, clock, scope, self: scope.head.seq + 1, kind: intent.kind, fields, fieldTypes: act.fields, subjects, signer, facts, prepared: context.prepared, used: [], asked: context.asked,

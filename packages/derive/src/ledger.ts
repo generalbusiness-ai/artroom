@@ -23,6 +23,7 @@ import type { CapabilityName, Digest, Effect, Entry, Evidence, Input, OperationI
 import { canonicalBytes, digestBytes, isEvidence } from "@generalbusiness/artroom-bytes";
 import type { Own } from "./fields.ts";
 import type { Draft } from "./judge.ts";
+import type { FirstStep } from "./marks.ts";
 import type { AttemptState, Operation, OutcomeState, StateView } from "./state.ts";
 import { timeMs, type Clock } from "./time.ts";
 import type { ValidDefinition } from "./validate/index.ts";
@@ -113,6 +114,21 @@ export interface OperationRules {
   retains?(evidence: Evidence): readonly Digest[];
   /** What the outcome derives beside the ledger's records. Absent: nothing. */
   derives?(view: StateView, operation: Operation, outcome: OutcomeInput, selected: boolean | null, at: OutcomeAt): OutcomeDerived;
+  /**
+   * Revision 20, section 6.1, "The origin of an outcome", for a kind of a
+   * platform definition whose data states `origin: "rule"`: the position of
+   * the one earlier entry of the scope whose `uses` the outcome copies, or
+   * null for none. Absent: the owner has no such rule.
+   */
+  origin?(view: StateView, operation: Operation, outcome: OutcomeInput): number | null;
+  /**
+   * Revision 20, section 16.1, for a row of `observes` of the kind that
+   * states `from: "rule"`: the subjects of the row at that position, key
+   * IDs or member IDs. `first`: for a row of the second step, what the rows
+   * of the first step came to (`FirstStep`, in `marks.ts`). Absent: the
+   * owner has no such rule.
+   */
+  subjects?(view: StateView, operation: Operation, outcome: OutcomeInput, row: number, first: FirstStep | null): unknown;
   /**
    * The most that `derives` returns in one outcome entry of this kind, with
    * the two effects of each operation that it opens (section 6.1). An

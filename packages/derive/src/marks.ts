@@ -23,6 +23,7 @@ import type { Own } from "./fields.ts";
 import type { Fetched, GuardResult, Judging } from "./guards.ts";
 import type { Most, Opening } from "./ledger.ts";
 import type { Item, Operation, StateView } from "./state.ts";
+import { observedName, subjectName, type RowStatus } from "./observes.ts";
 import { valuePlaces } from "./validate/fields.ts";
 import type { MarkKind, ValidDefinition } from "./validate/index.ts";
 import { isObject, own } from "./values.ts";
@@ -51,7 +52,7 @@ export type JudgedInput =
  * "An observation outside a grant"): one key, one member, or what the rules
  * scope holds, by what was asked of it.
  */
-export type Observed = { key: KeyId } | { member: MemberId } | { asked: "rules" | "definitions" };
+export type Observed = { key: KeyId } | { member: MemberId } | { asked: "rules" | "definitions" } | { holders: string };
 
 /** A value beside an intent that a rule read (section 6.2): its byte domain, its digest in that domain, and its canonical bytes. */
 export interface ValueRead { domain: string; digest: Digest; bytes: string }
@@ -101,6 +102,19 @@ export interface AtHand {
    * as for every act of a declared definition.
    */
   readonly places: readonly Placed[];
+  /**
+   * Section 16.1, "The subjects that an entry observes" (revision 20), for
+   * an entry of a definition whose data states rows (`observes.ts`).
+   * Absent: the definition states none, and the older rule above stands,
+   * as a STAND-IN. Null: the rows of this entry are not settled yet, as at
+   * checks 7 and 8 of an act, and nothing is at hand. Otherwise: what the
+   * rows came to. The entry then retains `retained` and `values`, read by
+   * a rule or not. `listed` names every subject that a row gives. A rule
+   * that reads an observation of another subject has a fault. `status` is
+   * what a rule is told of each row, by its position: whole, over or
+   * absent.
+   */
+  rows?: { status: readonly (RowStatus | null)[]; listed: ReadonlySet<string>; retained: readonly ObservationUse[]; values: readonly ValueRead[] } | null;
 }
 
 /** One place of an act, in one intent: the field, the byte domain and the bound that the data states, and the digest that the field holds. */
@@ -109,6 +123,9 @@ export interface Placed { field: string; domain: string; max: number; digest: Di
 /** What is at hand for one entry: the observations and the values that its judge was given, and the places of its act that name a value. */
 export const atHand = (observed: readonly ObservationUse[] | undefined, values: readonly string[] | undefined, places: readonly Placed[] = []): AtHand =>
   ({ observed: observed ?? [], values: values ?? [], read: { observed: [], values: [] }, places });
+
+/** The same for an entry of a definition whose data states rows: nothing is at hand until its rows are settled (`AtHand.rows`). */
+export const atHandByRows = (values: readonly string[] | undefined, places: readonly Placed[] = []): AtHand => ({ ...atHand(undefined, values, places), rows: null });
 
 /**
  * The places of an act that an intent sets (section 6.2): each field that
@@ -160,16 +177,17 @@ export function placeWithoutValue(hand: AtHand | undefined): string | null {
  * that a rule read, once for a domain and a digest (section 6.2).
  */
 export function retainedOf(hand: AtHand | undefined): { observed: readonly ObservationUse[]; values: readonly ValueRead[] } {
+  // Revision 20: under rows the entry retains the observation of each subject that a whole row gives, and each value that one of
+  // them names, read or not. A value of a place of the act is kept beside them.
+  if (hand?.rows) {
+    const values = [...hand.rows.values, ...hand.read.values.filter((read) => !hand.rows!.values.some((kept) => kept.domain === read.domain && kept.digest === read.digest))];
+    return { observed: hand.rows.retained, values };
+  }
   return { observed: [...(hand?.read.observed ?? [])].sort((a, b) => a.read.n - b.read.n), values: hand?.read.values ?? [] };
 }
 
 /** True when a retained observation is of that subject. An observation of a key has no member `subject`. */
-const isOf = (use: ObservationUse, subject: Observed): boolean => {
-  const o = use.observation;
-  if ("key" in subject) return !("subject" in o) && o.key === subject.key;
-  if ("member" in subject) return "subject" in o && o.subject === "member" && o.member === subject.member;
-  return "subject" in o && o.subject === "rules" && o.content.asked === subject.asked;
-};
+const isOf = (use: ObservationUse, subject: Observed): boolean => observedName(use.observation) === subjectName(subject);
 
 /**
  * The digest of one value in one byte domain (section 6.2, "What a value
@@ -239,6 +257,14 @@ export interface RuleGiven {
   readonly own: Own;
   readonly resolved: Resolved;
   observed(subject: Observed): ObservationUse | null;
+  /**
+   * Revision 20, section 16.1: what the rows of `observes` of the entry's
+   * form came to, by the position of each row: whole, over or absent. A
+   * rule is told so that a row is over or absent. Null at a position: the
+   * row is of a later step, or is not settled yet. Empty, or absent: the
+   * form states no row.
+   */
+  readonly rows?: readonly (RowStatus | null)[];
   value(domain: string, digest: Digest, most: number): unknown;
   /**
    * Revision 19, section 6.2: the value that one field of the act names,
@@ -313,6 +339,32 @@ export interface OutcomeRule {
   wellFormed?(result: "confirmed" | "refused" | "unknown", evidence: Evidence, given: RuleGiven): boolean;
   unknown?(state: StateView, operation: Operation, attempt: number, own: Own): unknown;
   derives?(given: RuleGiven, operation: Operation, selected: boolean | null): OutcomeGives;
+  /**
+   * Revision 20, section 6.1, "The origin of an outcome", for a kind whose
+   * data states `origin: "rule"`: the position of the one earlier entry of
+   * the scope whose `uses` the outcome copies, or null for none. It is
+   * given the folded state, the outcome as it is offered and the scope's
+   * own earlier entries. It reads no clock and no observation. A position
+   * that is no earlier entry of the scope is a fault.
+   */
+  origin?(given: RuleGiven, operation: Operation): number | null;
+  /**
+   * Revision 20, section 16.1, for a row of `observes` that states `from:
+   * "rule"`: the subjects of that row, a list of key IDs or of member IDs.
+   * `row` is the row's position among the rows of the kind. It is given
+   * what `origin` is given, and each entry in the outcome's `uses`. It
+   * reads no clock and no observation. For a row that states `second`
+   * (revision 21), `first` holds what the rows of the first step came to:
+   * the observation at hand for each subject of a whole row, and for each
+   * other row that it is over or absent.
+   */
+  subjects?(given: RuleGiven, operation: Operation, row: number, first: FirstStep | null): readonly string[];
+}
+
+/** What the rule of a row of the second step is given of the first (section 16.1, "A second step, in an outcome"). */
+export interface FirstStep {
+  observed(subject: Observed): ObservationUse | null;
+  rows: readonly (RowStatus | null)[];
 }
 
 /**
@@ -400,10 +452,18 @@ export function givenTo(g: Giving): RuleGiven {
     resolved: { at: g.scope.at, self: g.self, fields: g.fields, subjects: g.subjects, signer: g.signer, bounds: g.bounds },
     // Sections 4.1 and 16.1: an observation that a rule reads is one that the entry retains. The judge notes each read.
     observed(subject) {
+      // Revision 20, under rows: a rule reads an observation only of a subject on the list. One that reads another has a fault. A
+      // subject of a row that is over or absent has no observation, and the rule reads that it is absent.
+      if (hand?.rows === null) return null;
+      if (hand?.rows) {
+        if (!hand.rows.listed.has(subjectName(subject))) throw new RuleFault("a rule reads an observation of a subject that no row of its form gives");
+        return hand.rows.retained.find((at) => isOf(at, subject)) ?? null;
+      }
       const use = hand?.observed.find((at) => isOf(at, subject)) ?? null;
       if (use && hand && !hand.read.observed.includes(use)) hand.read.observed.push(use);
       return use;
     },
+    rows: hand?.rows?.status ?? [],
     // Section 6.2: a value is matched by its digest in the domain that its place states. Bytes that are not the canonical form of a
     // JSON value, and a value that is longer than the bound of its domain, are no value at hand.
     value: (domain, digest, most) => matched(hand, domain, digest, most),

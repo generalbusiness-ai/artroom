@@ -11,7 +11,8 @@ import { isEntryOf, updateOf, useOf, type Reading } from "./fields.ts";
 import { bound, runClause, runHandler, type Clause, type Handled, type Sent } from "./handlers.ts";
 import type { Judgment } from "./judge.ts";
 import { heldOpenings } from "./ledger.ts";
-import { atHand, retainedOf, unjudged, type JudgedInput } from "./marks.ts";
+import { atHand, atHandByRows, retainedOf, unjudged, type JudgedInput } from "./marks.ts";
+import type { Observing } from "./observes.ts";
 import { recordEffects } from "./prepare.ts";
 import type { ScopeState, StateView } from "./state.ts";
 import { nextDue } from "./timed.ts";
@@ -41,6 +42,15 @@ export interface DeliveryContext extends Reading {
    * a handler of a request or of an advisory is given none. Absent: none.
    */
   observed?: readonly ObservationUse[] | undefined;
+  /**
+   * Revision 20, section 16.1, for a result under a definition whose data
+   * states rows: what the commit holds for the rows of the clause that
+   * runs, beside `observed`, whose records the judge then judges itself by
+   * the six guards with each row's window and use; and the canonical bytes
+   * of each value that came beside an observation.
+   */
+  observing?: Observing | undefined;
+  values?: readonly string[] | undefined;
 }
 
 /** How the resolver of this name answers an address that is not this scope and incarnation (sections 2.3 and 7.4), or null. */
@@ -276,13 +286,18 @@ function result(view: StateView, definition: ValidDefinition, context: DeliveryC
     clause = "conflict";
   }
   // Sections 4.1 and 16.1: a rule of the clause reads a further observation, in platform data, and what it reads is noted.
-  const beside = context.observed === undefined ? undefined : atHand(context.observed, undefined);
-  const ran = runClause(view, definition, context, scope, request, clause, { sender: from.at, ...(message.reason ? { reason: message.reason } : {}), source: { fact: from, entry: source, under: context.source!.under } }, judged, beside);
+  // Revision 20: under a definition whose data states rows, the entry retains what the rows of its clause give, and nothing is at
+  // hand for a rule until they are settled. Under any other, the older rule stands, as a stand-in.
+  const beside = definition.observing ? atHandByRows(context.values) : context.observed === undefined ? undefined : atHand(context.observed, undefined);
+  const given = definition.observing ? { observed: context.observed ?? [], values: context.values ?? [], observing: context.observing } : undefined;
+  const ran = runClause(view, definition, context, scope, request, clause, { sender: from.at, ...(message.reason ? { reason: message.reason } : {}), source: { fact: from, entry: source, under: context.source!.under } }, judged, beside, given);
   if (ran.result === "unavailable") return ran;
   // Section 7.2: the creator confirms the incarnation of the first applied result it records, and no other.
   const confirm: Send[] = clause === "applied" && request.type === "create" ? [{ n: 0, to: from.at, message: { class: "control", type: "confirm", genesis: from } }] : [];
   // Section 4.1: the entry holds each observation that a rule of its clause read, in ascending order of `read.n`, and no member
   // when none was read. Section 16.1: an entry that retains one judges time, and is never written clamped.
-  const retained = retainedOf(beside).observed;
-  return write({ type: "delivery", from, n, message, clause, ...(retained.length > 0 ? { observed: retained } : {}) }, ran.effects, confirm, [], ran.judgesTime || retained.length > 0, ran.uses);
+  const { observed: retained, values } = retainedOf(beside);
+  const written = write({ type: "delivery", from, n, message, clause, ...(retained.length > 0 ? { observed: retained } : {}) }, ran.effects, confirm, [], ran.judgesTime || retained.length > 0, ran.uses);
+  // Section 16.1, "A value that a row may retain": each value that a retained observation names is kept with the entry, apart from it.
+  return written.result === "write" && values.length > 0 ? { ...written, draft: { ...written.draft, values } } : written;
 }

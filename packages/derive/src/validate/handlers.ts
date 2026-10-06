@@ -12,6 +12,7 @@ import { effects, setsSlot } from "./effects.ts";
 import { declaredFields, fieldType } from "./fields.ts";
 import { guards } from "./guards.ts";
 import { holdDoes, opensHold } from "./hold.ts";
+import { observes } from "./observes.ts";
 import { attention, sends } from "./sends.ts";
 import { at, type Rec } from "./shape.ts";
 
@@ -46,7 +47,7 @@ function opens(top: Rec, kind: string, type: string): boolean {
  * of them: its rule reads the input and the state of the entry that it is
  * run in, and no text says how a later entry would select the item again.
  */
-function also(d: Defining, v: unknown, path: string, fields: Map<string, FieldType>, on: Type | null, top: Rec): { types: Map<string, Type>; unsettled: Set<string> } {
+function also(d: Defining, v: unknown, path: string, fields: Map<string, FieldType>, on: Type | null, top: Rec): { types: Map<string, Type>; unsettled: Set<string>; selected: Set<string> } {
   const { bounds, types, bad, rec, form, entries } = d;
   const out = new Map<string, Type>();
   const via = new Map<string, { of: string; slot: unknown; path: string }>();
@@ -107,7 +108,7 @@ function also(d: Defining, v: unknown, path: string, fields: Map<string, FieldTy
     }
     if (!settled) unsettled.add(name);
   }
-  return { types: out, unsettled };
+  return { types: out, unsettled, selected };
 }
 
 /** True when a written list of effects of platform data holds a mark, whose rule may set a slot (section 6.1, place 5). */
@@ -165,7 +166,7 @@ export function acts(d: Defining, v: unknown, timed: Readonly<Record<string, unk
   const { bounds, types, bad, rec, entries, str } = d;
   for (const [name, av] of entries(v, "acts", bounds.acts)) {
     const path = at("acts", name);
-    const o = rec(av, path, ["step", "on", "also", "fields", "grant", "guards", "effects", "sends", "attention"], ["settles", "presents"]);
+    const o = rec(av, path, ["step", "on", "also", "fields", "grant", "guards", "effects", "sends", "attention"], ["settles", "presents", ...(d.platform ? ["observes"] : [])]);
     if (!o) continue;
     const step = o["step"];
     if (step !== "open" && step !== "transition" && step !== "comment") bad("shape", at(path, "step"), "is open, transition or comment");
@@ -198,6 +199,9 @@ export function acts(d: Defining, v: unknown, timed: Readonly<Record<string, unk
     if (step === "comment") for (const k of ["guards", "effects", "sends"]) if (!Array.isArray(o[k]) || o[k].length > 0) bad("shape", at(path, k), "a comment has none");
     if (step === "comment" && ctx.also.size > 0) bad("shape", at(path, "also"), "a comment names no other item");
     guards(d, o["guards"], at(path, "guards"), ctx, true);
+    // Section 16.1, "The subjects that an entry observes": the rows of an act, in platform data. A source reads what a guard of the
+    // act may read, and no name of `also` that a mark binds.
+    if ("observes" in o) observes(d, o["observes"], at(path, "observes"), { where: "act", ctx, selected: named.selected });
     const duties: Duties = { path, settles: "settles" in o ? settling(d, o["settles"], at(path, "settles"), ctx, null) : null, sets: [], requests: [] };
     duties.sets = setsOf(d, step === "open" ? on : null, () => effects(d, o["effects"], at(path, "effects"), ctx, false));
     // A child's genesis sends the platform's one result beside what its act declares.
