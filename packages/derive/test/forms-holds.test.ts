@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import { entryHash } from "@generalbusiness/artroom-bytes";
+import { canonicalBytes, entryHash, parseStrictBytes } from "@generalbusiness/artroom-bytes";
 import { FoldError, MemoryState, NOTHING, applyEntry, evidenceValues, outcomeValueDomains, closure, drawsOf, heldEntries, itemOf, one, outcomes, owed, pendingOf, requestOf, retainedBytes, starts, stateDigest, validateDefinition } from "../src/index.ts";
 import type { Amount, Counting, KindStated, Starts, Rules, OutcomeRule, RuleEffect } from "../src/index.ts";
 import { on, valid } from "./fixtures.ts";
@@ -490,4 +490,40 @@ test("evidence value domains of pinned owner code are counted for each possible 
   // if an answer names none. The holder's amount and one outcome's amount are both derived from the pinned owner declaration.
   expect([counted.kinds["k"]!.whole.bytes - ordinary.kinds["k"]!.whole.bytes, counted.kinds["k"]!.outcome.bytes - ordinary.kinds["k"]!.outcome.bytes, counted.kinds["u"]!.whole.bytes - ordinary.kinds["u"]!.whole.bytes]).toEqual([2 * (262144 + 6 * 64), 262144 + 6 * 64, 6 * 64]);
   expect(validateDefinition(chain, PROPOSED_BOUNDS, undefined, { platform: true, outcomeValues: { k: [{ domain: "changes-1", max: 64 }, { domain: "changes-1", max: 64 }] } }).ok).toBe(false);
+});
+
+/** Rename the held kind in the made-up reservation witness, then load its actual canonical bytes. */
+function namedKind(name: string) {
+  const data = structuredClone(works);
+  data.outcomes = Object.fromEntries([[name, { ...data.outcomes["step"]!, most: { effects: 0, operations: [name, "tidy"] } }], ["tidy", data.outcomes["tidy"]!]]);
+  data.items["job"]!.holds = { operations: Object.fromEntries([[name, 2], ["tidy", 1]]), requests: 1 };
+  data.acts["again"]!.adds = { operations: Object.fromEntries([[name, 1]]) };
+  return parseStrictBytes(canonicalBytes(data)) as typeof works;
+}
+
+test("canonical inherited-name kinds with no own owner domains validate or report ordinary problems; the trusted no-domain adapter never supplies a prototype", () => {
+  const noDomains: Rules = { step: { place: "outcome", rules: { selects: false, read: false, retries: () => false } }, tidy: { place: "outcome", rules: { selects: false, read: false, retries: () => false } } };
+  for (const name of ["__proto__", "constructor", "toString"]) {
+    const data = namedKind(name);
+    expect(Object.hasOwn(data.outcomes, name)).toBe(true);
+    const adapter = outcomeValueDomains(data, noDomains);
+    expect(adapter).toEqual({});
+    expect(Object.hasOwn(adapter!, name)).toBe(false);
+    for (const options of [{ platform: true }, { platform: true, outcomeValues: adapter }, { platform: true, outcomeValues: Object.fromEntries([[name, []]]) }]) {
+      expect(() => validateDefinition(data, PROPOSED_BOUNDS, undefined, options)).not.toThrow();
+      expect(validateDefinition(data, PROPOSED_BOUNDS, undefined, options).ok).toBe(true);
+    }
+    const invalid = Object.fromEntries([[name, [{ domain: "", max: 1 }]]]);
+    expect(() => validateDefinition(data, PROPOSED_BOUNDS, undefined, { platform: true, outcomeValues: invalid })).not.toThrow();
+    const refused = validateDefinition(data, PROPOSED_BOUNDS, undefined, { platform: true, outcomeValues: invalid });
+    expect(refused).toMatchObject({ ok: false, problems: expect.arrayContaining([expect.objectContaining({ code: "shape", path: `outcomes.${name}` })]) });
+  }
+});
+
+test("a canonical held __proto__ kind keeps its own reservation metadata and the same positive amounts as an ordinary name", () => {
+  const ordinary = valid(validateDefinition(namedKind("normal"), PROPOSED_BOUNDS, undefined, { platform: true })).reserving!;
+  const special = valid(validateDefinition(namedKind("__proto__"), PROPOSED_BOUNDS, undefined, { platform: true, outcomeValues: Object.fromEntries([["__proto__", []]]) })).reserving!;
+  expect(Object.hasOwn(special.kinds, "__proto__")).toBe(true);
+  expect([special.kinds["__proto__"]!.held, special.kinds["__proto__"]!.whole, special.holders["job"]!.amount, special.adds["again"]!.amount]).toEqual([true, ordinary.kinds["normal"]!.whole, ordinary.holders["job"]!.amount, ordinary.adds["again"]!.amount]);
+  expect([special.kinds["__proto__"]!.whole.entries, special.holders["job"]!.amount.entries, special.adds["again"]!.amount.entries]).toEqual([2, 8, 2]);
 });
