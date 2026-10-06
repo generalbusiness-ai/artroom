@@ -1,43 +1,16 @@
 /**
- * The judgment of one reservation (authority note, revision 26, section
- * 6.5; section 12.1.5, "The evidence of `judge`, and what the rule reads";
- * section 12.1.4a, "How the rule `judge` judges extents"). It is the part
- * of the rule `judge` of `platform:destination@1` that says whether a
- * publication is reserved, and with which reason it is not. It is a plain
- * function of what its caller gives. It reads no scope, no repository and
- * no clock.
+ * The destination's pure reservation judgment, under adopted authority
+ * revision 28, sections 6.5, 12.1.5 and 12.1.4a.
  *
- * Some rows are of the note's revision 28, at `8b1c3c9d7` (I3 deltas, the
- * entries GD): the statement holds the `reserve`'s six fields, the commits
- * of the selected reports come from the entries that the statement names,
- * three more causes make the statement invalid evidence, and the evidence
- * has no member for a count of entries.
+ * destination.ts builds ReservationRead from the five observation rows,
+ * retained lane entries, the retained extents and the changed-set value.
+ * This function checks the statement against those facts and decides the
+ * reason, the integration commit and any single-controller exception.
  *
- * **What is given, and from where.** The rule reads four things. Two of
- * them every outcome entry has: the evidence, and this scope's own records
- * (the recorded head, and the `reserve` message). The judgment needs
- * nothing else for four answers: `evidence-too-large`; `out-of-date`, where
- * the head that was read is not the recorded head; `integration-invalid`,
- * where the integration commit is not in the repository; and what an
- * outcome yields for a publication that is no longer `queued`.
- *
- * The other two are `observed` and the entries in `uses`. What the two say
- * is one explicit input here, `ReservationRead`. The rule `judge` builds it
- * (`reservationRead`, in `destination.ts`): it reads each observation
- * through the judge of the outcome, and takes what a lane's entries say
- * from a reader, because no text states how an entry of a lane is read by
- * its bytes (I3 deltas, entries FA9 and FC5). Without it this function
- * answers that it cannot judge, and the rule then writes nothing.
- *
- * **The inputs that no form supplies yet, and the value each is filled
- * with where it is absent.** Each fails closed.
- *
- * | Input | The missing form | Where absent |
- * |---|---|---|
- * | `extents` | The member `extents` of a `RulesContent` (the contract's part of form 2) | Null: the rules hold no extent. The approvals and the required checks of the rules are asked, and an unmet one is `rules-not-met`, alone. |
- * | `singleControllerException` | None: the observed rules state it (the missing form 14, given) | False where the observation holds no such member: no exception is declared. |
- * | `controllers` | Form 11, the count of the holders of `rules.publish` | Null: no exception is judged. |
- * | `controllersOfAuthors` | Form 15, the controller of an authoring agent | Null. No exception is shown by its second clause. And no review is shown to be independent by the second point of section 3.10: where that point is asked, which is when `ownerMayReview` is false and for the extent `rules` always, no review counts. |
+ * RecordedJudgeEvidence is the outcome's wire body. JudgeEvidence is its
+ * resolved view, after the declared changed-set domain has been read.
+ * The observation of the holders supplies the membership head recorded
+ * by an exception. Nothing here reads a scope, a store or a host.
  */
 
 import type { Digest, FactRef, MemberId, MemberRef, Observation, RulesObservation, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
@@ -53,7 +26,7 @@ export interface JudgeChanges {
 }
 
 /**
- * The body of the evidence of `judge` (section 12.1.5). Basis `own-answer`:
+ * The resolved evidence of `judge` (section 12.1.5). Basis `own-answer`:
  * the answers of the host to this attempt's reads. From the note's revision
  * 28 it has no member `{ over: "entries" }`: the count of the entries that a
  * `reserve` names is made when the message is delivered, and a message
@@ -132,9 +105,9 @@ export interface ReservationRead {
    * entry that one names opened no report or set no commit.
    */
   manifest: { base: string; integration: string; tree: string; reports: readonly string[] | null; authors: readonly MemberId[]; complete: boolean };
-  /** The controller of each agent among the authors. Null: no retained input says (the missing form 15). */
+  /** The controller of each agent among the authors, from their member observations. Null: no retained input says. */
   controllersOfAuthors: readonly MemberId[] | null;
-  /** Every active member with an active key who holds `rules.publish`. Null: no observation says (the missing form 11). */
+  /** The sole active holder of rules.publish, or an empty list when its count differs from one. Null: no holders observation says. */
   controllers: readonly MemberId[] | null;
   /**
    * One for each verdict of the statement, in its order. `sound`: the
