@@ -540,8 +540,9 @@ export class Scope {
    * consumed: the intent's own turn is still to come.
    *
    * With no code for the step, nothing is judged and nothing is written:
-   * `unavailable`. That is the production wiring, whose capabilities port is
-   * null.
+   * `unavailable`. That is a wiring whose capabilities port is null. The
+   * production ports are no such wiring: they hold the code of `hold@1` and
+   * `git-read@1` (`CAPABILITY_CODE`, in `ports.ts`).
    */
   async prepare(signed: SignedIntent, grants: readonly Grant[], capability: string, step: string): Promise<Answer> {
     const pinned = this.pinned();
