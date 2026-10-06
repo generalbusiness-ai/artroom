@@ -8,7 +8,7 @@
  *
  * Revision 26 is approved by its checker. The planner's adoption of it was
  * not recorded when the rows of revision 25 were built here (I3 deltas,
- * section 27).
+ * the section of the entries FB).
  *
  * This file is named `rules-scope.ts` because `rules.ts` is the package's
  * table of rules.

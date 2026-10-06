@@ -11,8 +11,8 @@
  * extents"), under the rules that it observes for the reservation. That
  * caller is the destination's (`destination.ts`). Each datum that no
  * retained form supplies yet is an explicit input here, and each fails
- * closed when it is not given (I3 deltas, section 23 and entries FB5 to
- * FB8).
+ * closed when it is not given (I3 deltas, section 23 and entries FB6 to
+ * FB9).
  *
  * | What | From the note | The input that no retained form supplies |
  * |---|---|---|
@@ -421,7 +421,7 @@ export interface ExtentsJudged {
  *   true. The first clause needs no such input: it reads the authors and
  *   the merger. Revision 26 lists as open from which retained record the
  *   relation is read for a review (its section 13.16); this is the side
- *   that fails closed (I3 deltas, entry FB6).
+ *   that fails closed (I3 deltas, entry FB7).
  * - *With no count of controllers* (`controllers` is null: the missing
  *   form 11). No exception is judged.
  * - *A class beyond `content`.* The landing actor holds `change.merge`: the
