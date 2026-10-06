@@ -494,6 +494,19 @@ const opening = (kind: string, attempts: number): Opening => ({ owner: DESTINATI
 const bodyOf = (body: unknown, names: readonly string[]): Record<string, FieldValue> | null =>
   (isObject(body) && Object.keys(body).length === names.length && names.every((name) => Object.hasOwn(body, name)) ? body : null);
 
+/**
+ * The `mint` operation of one attempt of a write (section 12.1.5, "What an
+ * operation is for", the row `mint`; entry ER6). The entry that opens an
+ * attempt of a write opens one `mint` with it: with attempt 1, the entry
+ * that opens the operation; with attempt n + 1, the outcome entry of
+ * attempt n. An entry opens at most one attempt of a write, so it opens at
+ * most one `mint`.
+ */
+function mintOf(state: Pick<StateView, "operation">, write: Operation, attempt: number): Operation | null {
+  const at = attempt === 1 ? seqOf(write.id) : write.attempts[attempt - 1]?.opened;
+  return at === undefined ? null : openedIn(state, at).find((operation) => ours(operation, DESTINATION_KINDS.mint)) ?? null;
+}
+
 /** The attempt of a write that a `mint` serves: the same row, read from the mint. Null: the entry that opened the mint opened no attempt of a write. */
 function servedBy(state: Pick<StateView, "operation">, own: Own, mint: Operation): { write: Operation; attempt: number } | null {
   const seq = seqOf(mint.id);
@@ -518,6 +531,59 @@ function subjectOf(state: Pick<StateView, "item" | "page">, own: Own, write: Ope
   const made = write.kind === DESTINATION_KINDS.push ? "reserved" : "published";
   const change = effects.find((effect) => effect.effect === "state" && effect.state === made);
   return change?.effect === "state" ? publicationAt(state, change.item) : null;
+}
+
+/**
+ * The `mint` whose token a `revoke` operation revokes (the row `revoke` of
+ * the same table): "the token of the mint that the slot `token` named
+ * before the entry, or of the mint whose outcome the entry is". It is read
+ * from the entry that opened the revocation.
+ *
+ * - The outcome entry of a mint: that mint.
+ * - The first outcome entry of a write attempt: the mint of that attempt,
+ *   which the slot named.
+ * - The entry of `compromised`: the mint that the last entry before it
+ *   wrote into the publication's slot `token`. The search reads this
+ *   scope's own entries back to `reservedAt` (I3 deltas, entry FA5).
+ */
+function mintRevoked(state: Pick<StateView, "operation" | "item">, own: Own, revoke: Operation): Operation | null {
+  const seq = seqOf(revoke.id);
+  const { input, effects } = ownEntry(own, seq);
+  if (input.type === "outcome") {
+    const of = state.operation(input.operation);
+    if (of && ours(of, DESTINATION_KINDS.mint)) return of;
+    return of && ours(of, ...WRITES) ? mintOf(state, of, input.attempt) : null;
+  }
+  const emptied = effects.find((effect) => effect.effect === "value" && effect.slot === "token" && effect.value === null);
+  const publication = emptied?.effect === "value" ? publicationAt(state, emptied.item) : null;
+  const from = publication?.values["reservedAt"];
+  if (!publication || typeof from !== "number") return null;
+  for (let at = seq - 1; at >= from; at -= 1) {
+    const set = ownEntry(own, at).effects.find((effect) => effect.effect === "value" && effect.item === publication.id && effect.slot === "token");
+    if (set?.effect === "value") return typeof set.value === "string" ? state.operation(set.value as OperationId) : null;
+  }
+  return null;
+}
+
+/**
+ * The context of the request of a revocation: the host's ID of the
+ * credential that it revokes. It is the `token` of the body of the
+ * `confirmed` outcome of the revocation's mint, read from this scope's own
+ * entries and from nothing else. The rule `revoke` checks the body of each
+ * outcome against it, and states it as the body of an outcome that is not
+ * known. A port that sends the request reads the same function, so the
+ * request, the evidence check and the body of an `unknown` outcome name
+ * one ID (authority note, revision 26, "What revision 26 changes for the
+ * I3 source", the row on the body of an outcome's evidence). Null: the
+ * mint has no `confirmed` outcome, and then no outcome of the revocation
+ * is well formed.
+ */
+export function revokedToken(state: Pick<StateView, "operation" | "item">, own: Own, revoke: Operation): string | null {
+  const mint = mintRevoked(state, own, revoke);
+  const confirmed = mint?.attempts[0]?.outcomes.find((outcome) => outcome.result === "confirmed");
+  const input = confirmed ? ownEntry(own, confirmed.seq).input : null;
+  const token = input?.type === "outcome" ? bodyOf(input.evidence.body, ["token", "ends"])?.["token"] : null;
+  return typeof token === "string" ? token : null;
 }
 
 // ---------------------------------------------------------------- the rules
@@ -779,6 +845,31 @@ export const destinationRules: Rules = {
           sends: [], opens: [],
         };
       },
+    },
+  },
+  /**
+   * Row e, the outcome entries of a `revoke` (P16; the row `revoke` of "What
+   * each rule of an outcome yields"). It yields nothing: a failed
+   * revocation is a duty, and decides nothing (section 6.6, step 5).
+   * Another attempt follows `refused` or `unknown`, to 3.
+   *
+   * The body of every outcome is `{ token }`: the same ID as its mint's. A
+   * `token` that is not its mint's is `bad-input`. The ID is the context of
+   * the request, `revokedToken`. The body of an outcome that is not known
+   * is that record too, so it is written, and the ledger opens the next
+   * attempt in its entry.
+   */
+  revoke: {
+    place: "outcome",
+    rules: {
+      selects: false, read: false, most: { effects: 0, requests: 0, operations: 0 },
+      retries: () => true,
+      wellFormed: (_result, evidence, { state, own, input }) => {
+        const [body, operation] = [bodyOf(evidence.body, ["token"]), input.type === "outcome" ? state.operation(input.operation) : null];
+        const token = operation ? revokedToken(state, own, operation) : null;
+        return body !== null && token !== null && body["token"] === token;
+      },
+      unknown: (state, operation, _attempt, own) => { const token = revokedToken(state, own, operation); return token === null ? null : { token }; },
     },
   },
 };
