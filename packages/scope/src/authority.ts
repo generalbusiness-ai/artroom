@@ -428,8 +428,8 @@ export function repositoryAuthority(config: Repository): Authority {
   const observed = observing({
     clock: config.clock, random: config.random, reader: config.reader, membership: (scope) => recordedMembership(config, scope),
     // Where a version's scopes record their rules reference is code of the version, as for the membership reference. The read goes
-    // by the scope ID, through the same namespace. No rules scope answers one yet (I3 deltas, entries FB10 and GA7): the answer is
-    // then none, and each row of the rules is absent.
+    // by the scope ID, through the same namespace. The rules scope answers from its recorded rules, with its publication revision
+    // and extents digest; the namespace supplies the extent bytes beside that observation (`rulesAnswer`, `observedAt`).
     rules: () => recordedRules(config),
     content: (named) => { const data = platform(named)?.data; return data ? contentStates(data) : null; },
   });

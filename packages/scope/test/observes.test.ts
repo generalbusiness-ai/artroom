@@ -18,8 +18,8 @@ import { START, at, objectOf, reader, stubOf } from "./support.ts";
 //
 // STAND-INS, each labelled where it is used. The platform data and its rules are derive's made-up fixture `weigher`, supplied under
 // a name and version that no runtime holds. The membership scope is scripted (`Controls.membership`): the test writes each answer,
-// and no history stands behind its head. The rules scope is scripted too (`Controls.rulebook`): no rules scope answers an
-// observation yet (I3 deltas, entries FB10 and GA7). The lane's entries and the answer of the outside system are made by hand.
+// and no history stands behind its head. The rules scope is scripted too (`Controls.rulebook`): each answer replaces the platform
+// rules scope's own observation answer. The lane's entries and the answer of the outside system are made by hand.
 // What is real: the scope's read before the turn, its numbers in the run, the judge's guards in the commit, the turn that starts
 // again, and the store. These show nothing about a rule of a destination or of a rules scope, or about membership.
 
