@@ -382,6 +382,8 @@ export class Ledger {
   now: Timestamp = T0;
   bounds: Bounds = PROPOSED_BOUNDS;
   #keys = 0;
+  readonly #received = new Map<Digest, Fetched>();
+  remember(facts: readonly Fetched[]): void { for (const fact of facts) this.#received.set(fact.fact.hash, fact); }
 
   constructor(readonly definition: ValidDefinition, readonly under = definition.declared.name) {}
 
@@ -393,7 +395,7 @@ export class Ledger {
   readonly own = (seq: number) => this.entries[seq] ?? null;
   /** The fact of a sealed entry: a view beside it. */
   fact(seq: number): FactRef { return { at: this.at, seq, hash: this.entries[seq]!.hash }; }
-  get foldOptions(): import("../src/index.ts").DrawOptions { return { bounds: this.bounds }; }
+  get foldOptions(): import("../src/index.ts").DrawOptions { return { bounds: this.bounds, own: this.own, facts: [...this.#received.values()] }; }
   fold(entry: Entry): Entry {
     const hash = entryHash(entry);
     applyEntry(this.state, this.definition, entry, hash, this.foldOptions);
@@ -518,6 +520,7 @@ export type Arrival = Partial<Delivered> & { source?: Source | null };
 
 /** The context of a delivery to `to`: the source entry, the foreign entries that were fetched, and for a result this scope's own entry that sent the request. */
 export function arriving(to: Ledger, delivered: Delivered, source: Source | null, facts: readonly Fetched[] = []): DeliveryContext {
+  to.remember([...facts, ...(source ? [{ fact: delivered.from, entry: source.entry, under: source.under }] : [])]);
   const of = delivered.message.class === "result" ? delivered.message.of : null;
   return { clock: clockOf(to.state, to.now), bounds: to.bounds, facts, prepared: [], own: to.own, source, origin: of ? (to.entries[of.from.seq]?.entry ?? null) : null };
 }

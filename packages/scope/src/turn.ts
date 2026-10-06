@@ -18,9 +18,10 @@
  */
 
 import type { Bounds, FactRef, Head, Prepared, SignedIntent } from "@generalbusiness/artroom-contract";
-import { CanonicalError, canonicalize, entryHash, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
+import { CanonicalError, canonicalize, entryHash, parseStrict, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import { applyEntry, clockOf, entryOf, fits, isEntryOf, isIntent, judgeTimed, nextDue, timeMs, timeOf } from "@generalbusiness/artroom-derive";
 import type { Clock as Reading, Draft, Due, Fetched, Owners, PlatformRules, RuleInput, StateView, ValidDefinition } from "@generalbusiness/artroom-derive";
+import { ownOf, retainedFacts, snapshotsOf } from "./core.ts";
 import type { Ports, Resolver } from "./ports.ts";
 import type { Retained, Sealed, Store } from "./store.ts";
 
@@ -345,7 +346,10 @@ export class Turns {
     const hash = entryHash(entry);
     this.#store.append(entry, hash, bytes, size);
     for (const input of retain) this.#store.retain(input);
-    applyEntry(this.#store, definition, entry, hash, { bounds: this.#bounds, platform: this.#platform() });
+    applyEntry(this.#store, definition, entry, hash, {
+      bounds: this.#bounds, platform: this.#platform(), own: ownOf(this.#store), facts: retainedFacts(this.#store, entry), snapshot: snapshotsOf(this.#store),
+      texts: (digest) => { const kept = this.#store.retained("text", digest); if (!kept) return undefined; const text: unknown = parseStrict(kept.bytes); return typeof text === "string" ? utf8(text).length : undefined; },
+    });
     // Section 6.6: a redaction removes the bytes of each text it lists from the retained inputs, in the commit that seals its tombstone.
     for (const effect of entry.effects) if (effect.effect === "redact") for (const text of effect.texts) this.#store.forget("text", text);
     return { entry, hash };

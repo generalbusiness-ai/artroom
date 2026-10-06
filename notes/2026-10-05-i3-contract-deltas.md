@@ -2599,3 +2599,39 @@ rejects the same history when the taking reservation cannot fit. Its
 sender's entries are stand-ins and anchored. Focused controls remove the
 decision draw or omit decisions from `holding`; both distinguish by the
 count and admission assertions. No gate was run on this worker branch.
+
+### Decision refusals: the phase that binds a request
+
+Checker request `0f963cd0` showed that a refused `bad-field` may come from
+a lawful coded guard after binding, or from an effect, as well as from an
+earlier field check. A refusal code is therefore no record of its phase.
+The judge and fold now share the checks before guards: field shapes,
+items and facts, detached text sizes, coded types, all subjects and aliases.
+The fold gets their existing retained inputs, as the judge does. It runs
+type rules and selectors, and runs no guard or effect. A genuine early
+failure keeps the decision count; a later bound refusal draws one. No
+entry or phase field is added. The verifier keeps these checked retained
+inputs for its observation views, which fold the same entries again.
+
+A handler that ran a clock-declaring type, selector or guard cannot write
+a refused entry on a reading behind its history. It answers `clock-behind`,
+as section 5.3 requires. Otherwise the clamped time would erase the
+reading on which its pre-binding type was judged.
+
+Witnesses distinguish an early ill-typed field from a late coded
+`bad-field`, and a late effect with the same unqualified refusal code.
+They use real holder counts and folding, check that guards and effects
+are not rerun by the fold, and preserve early item, local-fact and alias
+failures. A replay ending with a closing checkpoint proves the draw from
+the history. Restoring the old `bad-field` shortcut fails both late-refusal
+count assertions. Focused tests and typechecks pass; no worker gate ran.
+
+One owner question remains open. Revision 23 section 9.3 credits a text
+removed by a tombstone as redacted, not derived again, and DJ10 trusts its
+removed bytes were within the field bound. If a bound handler first
+refused that text for exceeding a smaller maximum, and the same digest
+was held under a larger maximum and later redacted, that credit cannot
+reconstruct the earlier phase or its decision count. The tombstone has
+no size. The existing redacted-text treatment is unchanged here; no new
+`incomplete` restriction, wire metadata or phase record is introduced.
+The R1/R2 owner disposition is still needed for that case.

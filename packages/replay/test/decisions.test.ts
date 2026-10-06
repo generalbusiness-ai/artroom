@@ -1,10 +1,11 @@
 import { expect, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { PlatformData, PlatformDefinition, Request, Seed } from "@generalbusiness/artroom-contract";
+import type { FieldValue, PlatformData, PlatformDefinition, Request, Seed } from "@generalbusiness/artroom-contract";
 import { canonicalize, factRefOf, intentDigest, newIncarnation, scopeIdOf, signIntent } from "@generalbusiness/artroom-bytes";
-import { clockOf, judgeDelivery, judgeGenesis, owed, validateDefinition } from "@generalbusiness/artroom-derive";
+import { checkpointOf, clockOf, judgeCheckpoint, judgeDelivery, judgeGenesis, owed, validateDefinition } from "@generalbusiness/artroom-derive";
 import { Ledger, T0, arriving, forged, keys, otherLane, t, valid } from "@generalbusiness/artroom-derive/testing";
 import { MemorySource, verify } from "../src/index.ts";
+import type { Rules } from "@generalbusiness/artroom-derive";
 import type { MemoryScope } from "../src/index.ts";
 
 /**
@@ -31,20 +32,20 @@ const DATA: PlatformData = {
 
 class Deciding extends Ledger {
   readonly foreign: ReturnType<typeof forged>[] = [];
-  constructor() {
-    super(valid(validateDefinition(DATA, PROPOSED_BOUNDS, undefined, { platform: true })));
+  constructor(readonly data: PlatformData = DATA, readonly rules: Rules = {}) {
+    super(valid(validateDefinition(data, PROPOSED_BOUNDS, undefined, { platform: true })));
     const founding = signIntent({ v: 1, to: null, actor: keys.rita.key, kind: "found", on: null, expected: {}, fields: { opener: keys.rita.member }, idempotencyKey: "decisions", notAfter: t(60) }, keys.rita.secret);
     const seed: Seed = { v: 1, kind: "directory", definition: NAMED, creator: null, cause: intentDigest(founding.intent), ordinal: 0 };
-    const judged = judgeGenesis(this.state, this.definition, { name: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(6)), seed, founding }, { clock: clockOf(this.state, T0), bounds: PROPOSED_BOUNDS, facts: [], prepared: [], source: null, platform: { named: NAMED, rules: {} } });
+    const judged = judgeGenesis(this.state, this.definition, { name: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(6)), seed, founding }, { clock: clockOf(this.state, T0), bounds: PROPOSED_BOUNDS, facts: [], prepared: [], source: null, platform: { named: NAMED, rules: this.rules } });
     if (judged.result !== "write") throw new Error(JSON.stringify(judged));
     this.seal(judged.draft);
   }
-  delivery(message: string) {
-    const request: Request = { class: "request", type: "tell", body: { message, fields: {} } };
+  delivery(message: string, fields: Record<string, FieldValue> = {}) {
+    const request: Request = { class: "request", type: "tell", body: { message, fields } };
     const source = forged(otherLane, this.foreign.length + 1, { type: "checkpoint", through: 0, state: this.definition.digest }, [{ n: 0, to: this.at, message: request }]);
     this.foreign.push(source);
     const arrival = { to: this.at, from: factRefOf(source.entry), n: 0, message: request };
-    const judged = judgeDelivery(this.state, this.definition, arrival, { ...arriving(this, arrival, source), platform: { named: NAMED, rules: {} } });
+    const judged = judgeDelivery(this.state, this.definition, arrival, { ...arriving(this, arrival, source), platform: { named: NAMED, rules: this.rules } });
     if (judged.result !== "write") throw new Error(JSON.stringify(judged));
     const entry = this.seal(judged.draft);
     return { entry, draft: judged.draft, total: this.entries.length + owed(this.state, this.definition, entry.input) };
@@ -67,4 +68,23 @@ test("a bound refusal consumes a real holder decision at a full scope; replay de
   expect([good.report.result, good.why]).toEqual(["consistent", null]);
   const tooSmall = await verify(source, { ...options, bounds: { ...PROPOSED_BOUNDS, scopeEntries: 3 } });
   expect([tooSmall.report.result, tooSmall.report.at?.seq]).toEqual(["mismatch", taking.entry.seq]);
+});
+
+test("replay and a closing checkpoint preserve the early field refusal and draw a late coded bad-field bound refusal", async () => {
+  const data = structuredClone(DATA);
+  data.receives["stop"]!.fields = { ...data.receives["stop"]!.fields, amount: { type: "int", min: 0, max: 1, required: true } };
+  data.receives["stop"]!.guards = [{ code: "decline", row: "P15" }];
+  let guards = 0;
+  const rules: Rules = { decline: { place: "guard", refusals: ["late"], run: () => { guards++; return { holds: false, name: "late", code: "bad-field" }; } } };
+  const scope = new Deciding(data, rules);
+  const taking = scope.delivery("start");
+  const early = scope.delivery("stop", { amount: "wrong" });
+  expect([early.draft.bound, early.draft.settles, scope.state.holder(taking.entry.seq), early.total, guards]).toEqual([undefined, false, { decisions: { stop: 1 } }, 5, 0]);
+  const late = scope.delivery("stop", { amount: 0 });
+  expect([late.draft.bound, late.draft.settles, scope.state.holder(taking.entry.seq), late.total, guards]).toEqual([{ item: taking.entry.seq, message: "stop" }, true, null, 5, 1]);
+  const checkpoint = judgeCheckpoint(scope.state, scope.definition, checkpointOf(scope.state), { clock: clockOf(scope.state, T0), bounds: PROPOSED_BOUNDS });
+  if (checkpoint.result !== "write") throw new Error(JSON.stringify(checkpoint));
+  scope.seal(checkpoint.draft);
+  const replay = await verify(new MemorySource([scope.served()]), { mode: "replay", scope: scope.at.scope, anchors: scope.anchors(), bounds: { ...PROPOSED_BOUNDS, scopeEntries: 5 }, platform: () => ({ data, rules }) });
+  expect([replay.report.result, replay.why, guards]).toEqual(["consistent", null, 2]);
 });

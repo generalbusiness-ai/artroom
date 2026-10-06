@@ -11,15 +11,15 @@ import { entryHash } from "@generalbusiness/artroom-bytes";
 import type { Signer } from "./attribution.ts";
 import { boundTo, decisionCounts, selectedByIndex, selectorOf } from "./binding.ts";
 import { deriveEffects } from "./effects.ts";
-import { creationFields, factsNamed, isLocalFact, messageFields, presentedTypes, readFacts, readFields, textsNamed, updateOf, type Reading, type Update } from "./fields.ts";
+import { creationFields, factsNamed, isEntryOf, isLocalFact, messageFields, presentedTypes, readFacts, readFields, textsNamed, updateOf, type Reading, type Update } from "./fields.ts";
 import { signerOf } from "./fold.ts";
 import { judgeGuards, slotOf, type Fetched, type Judging } from "./guards.ts";
-import { RuleFault, fieldOutsideType, markOf, selectedBy, type AtHand, type Giving, type JudgedInput, type PlatformRules } from "./marks.ts";
+import { RuleFault, fieldOutsideType, markOf, selectedBy, type AtHand, type Giving, type JudgedInput } from "./marks.ts";
 import { listedBy, rowsOfClause, settle, waits, type Needed, type Settled, type Settling } from "./observes.ts";
 import { conditionsReadClock, deriveSends, formOf, readsClock } from "./sends.ts";
 import type { Item, OwnRequest, ScopeState, StateView } from "./state.ts";
 import type { ValidDefinition } from "./validate/index.ts";
-import { isFactRef, isLocalId, isObject, own } from "./values.ts";
+import { isFactRef, isLocalId, isObject, own, same } from "./values.ts";
 
 // ---------------------------------------------------------------- messages and handlers (sections 6.4 and 7.4)
 
@@ -82,56 +82,24 @@ function messageRead(view: StateView, at: ScopeRef, handler: ReceiveType, given:
 }
 
 /**
- * The binding of a recorded deciding entry, on the state before it. Only
- * the source of `bound.of` and its written dependencies are selected. A
- * binding selector receives the same index rows and fields as the judge;
- * no guard or effect is run, and no runtime-only `Draft.bound` is read.
+ * The binding of a recorded deciding entry, reconstructed by the same
+ * field and subject checks as its judge. The refusal's code says nothing
+ * about which phase refused: a guard or an effect can use bad-field too.
+ * Only pre-guard code (type rules and selectors) is run. Retained inputs
+ * supply its source, facts, texts and local history; no guard or effect is
+ * rerun, and no runtime-only Draft.bound is trusted.
  */
-export function decisionBinding(view: StateView, definition: ValidDefinition, entry: Pick<Entry, "seq" | "input">, bounds: Bounds, platform?: PlatformRules): { item: number; message: string } | null {
+export function decisionBinding(view: StateView, definition: ValidDefinition, entry: Pick<Entry, "seq" | "input">, context: Reading): { item: number; message: string } | null {
   const input = entry.input;
   if (input.type !== "delivery" || input.message.class !== "request" || input.message.type !== "tell" || !("decision" in input)) return null;
-  // These failures are before binding (checks 6 to 8), and their entries
-  // are new work, whatever item their ill-typed fields might appear to name.
-  if (input.decision === "refused" && ["bad-field", "unknown-message", "no-item", "fact-mismatch", "alias"].includes(input.reason?.code ?? "")) return null;
   const scope = view.scope();
-  const found = bound(definition, input.message, input.from);
-  if (!scope || !found?.handler || !found.fields) return null;
-  const handler = found.handler;
-  const stated = (handler as unknown as PlatformReceive).bound;
-  if (!stated) return null;
-  const read = messageRead(view, scope.at, handler, found.fields, bounds);
-  if (!read.ok) return null;
-  const also: Record<string, AlsoRule> = Object.create(null);
-  const select = (name: string): void => {
-    if (Object.hasOwn(also, name)) return;
-    const rule = own(handler.also, name);
-    if (!rule) return;
-    also[name] = rule;
-    if ("via" in rule && rule.via.of.startsWith("also.")) select(rule.via.of.slice(5));
-  };
-  select(stated.of.slice(5));
-  const selector = selectorOf(handler);
-  // A local fact is read in normal form by check 7, just as readFacts
-  // supplies it to the judge. Its hash and type were checked before the
-  // recorded deciding entry; a verifier checks them again in its judge.
-  const normal = (type: FieldType | undefined, value: FieldValue): FieldValue => {
-    if (type?.type === "list" && Array.isArray(value)) return value.map((element: FieldValue) => normal(type.of, element));
-    if (type?.type === "record" && isObject(value)) return Object.fromEntries(Object.entries(value).map(([name, member]) => [name, normal(own(type.of, name), member as FieldValue)]));
-    return type?.type === "fact" && isFactRef(value) && isLocalFact(value, scope.at) ? value.seq : value;
-  };
-  const fields = Object.fromEntries(Object.entries(read.fields).map(([name, value]) => [name, normal(own(handler.fields, name), value)]));
-  const selected = alsoItems(view, definition, also, fields, null, undefined, (mark) => {
-    if (mark !== selector) throw new RuleFault("a decision binding reads no other selection rule");
-    return selectedByIndex({ view, scope, fields, platform }, selector!);
-  });
-  if (!selected.ok) return null;
-  const j: Judging = {
-    view, definition, bounds, clock: { reading: scope.time, asOf: scope.time, behind: false }, scope, self: entry.seq,
-    kind: found.kind, fields, fieldTypes: handler.fields, subjects: new Map(selected.items.map(([name, item]) => [`also.${name}`, item])),
-    signer: null, facts: new Map(), prepared: [], used: [], sender: input.from.at,
-  };
-  const item = boundTo(j, handler, found.kind, decisionCounts(view));
-  return item ? { item: item.id, message: found.kind } : null;
+  const source = context.facts.find((fact) => same(fact.fact, input.from));
+  const found = bound(definition, input.message, input.from, source?.under);
+  if (!scope || !found?.handler || !found.fields || !(found.handler as unknown as PlatformReceive).bound) return null;
+  if (!source || !isEntryOf(source.entry, input.from)) throw new RuleFault("a decision binding has no retained source entry");
+  const ready = prepareHandler(view, definition, context, scope, found.handler, found.kind, found.fields, { source, update: null }, { type: "delivery", from: input.from, n: input.n, message: input.message });
+  if (ready.result === "unavailable") throw new RuleFault(`a decision binding cannot reconstruct its field and subject checks: ${ready.reason}`);
+  return ready.result === "ready" && ready.bound !== undefined ? { item: ready.bound, message: found.kind } : null;
 }
 
 /**
@@ -350,8 +318,15 @@ export type Handled = (Exclude<Ran, { result: "unavailable" }> & { uses: FactUse
  * that opens a type which is not `many` opens it only if the scope has none;
  * otherwise `on` is the one that exists. No two names may select one item.
  */
-export function runHandler(view: StateView, definition: ValidDefinition, context: Reading, scope: ScopeState, handler: ReceiveType, kind: string, given: Readonly<Record<string, FieldValue>>, cause: Digest, sent?: Sent, judged?: JudgedInput): Handled {
-  const refused = (reason: RefusalReason, detail: string, uses: FactUse[] = []): Handled => ({ result: "refused", reason, detail, prepared: [], uses });
+type HandlerPreparation =
+  | { result: "ready"; j: Judging; opens: string | null; uses: FactUse[]; bound?: number }
+  | Exclude<Handled, { result: "ran" }>;
+
+/** Checks 7 and 8 only. Both the judge and the fold reconstruct this stage. */
+function prepareHandler(view: StateView, definition: ValidDefinition, context: Reading, scope: ScopeState, handler: ReceiveType, kind: string, given: Readonly<Record<string, FieldValue>>, sent?: Sent, judged?: JudgedInput): HandlerPreparation {
+  const clocked = { clock: false };
+  const refused = (reason: RefusalReason, detail: string, uses: FactUse[] = []): Exclude<Handled, { result: "ran" }> =>
+    (clocked.clock && context.clock.behind ? { result: "unavailable", reason: "clock-behind" } : { result: "refused", reason, detail, prepared: [], uses });
   const { bounds } = context;
   const read = messageRead(view, scope.at, handler, given, bounds);
   if (!read.ok) return refused("bad-field", read.detail);
@@ -363,7 +338,6 @@ export function runHandler(view: StateView, definition: ValidDefinition, context
   if (named.result !== "read") return refused(named.result, named.detail, named.uses);
   const { fields, facts, uses } = named;
   // Platform data: what a rule of this row is given before the row's forms are derived (section 6.1). A handler has no check 9.
-  const clocked = { clock: false };
   const g = judged ? giving(view, context, scope, scope.head.seq + 1, judged, clocked, fields, facts, sent?.source) : null;
   // Section 4.2, check 7: a field whose type is a mark is checked by the mark's rule.
   const outside = g && fieldOutsideType(g, handler.fields);
@@ -396,8 +370,18 @@ export function runHandler(view: StateView, definition: ValidDefinition, context
   // on the state before the entry. It decides nothing of the request.
   const item = boundTo(j, handler, kind, context.counts ?? decisionCounts(view));
   if (item) j.bound = true;
-  const ran = derive(j, handler, opens, cause);
-  return ran.result === "unavailable" ? ran : { ...ran, uses, ...(item ? { bound: item.id } : {}) };
+  if (clocked.clock && context.clock.behind) return { result: "unavailable", reason: "clock-behind" };
+  return { result: "ready", j, opens, uses, ...(item ? { bound: item.id } : {}) };
+}
+
+export function runHandler(view: StateView, definition: ValidDefinition, context: Reading, scope: ScopeState, handler: ReceiveType, kind: string, given: Readonly<Record<string, FieldValue>>, cause: Digest, sent?: Sent, judged?: JudgedInput): Handled {
+  const ready = prepareHandler(view, definition, context, scope, handler, kind, given, sent, judged);
+  if (ready.result !== "ready") return ready;
+  const ran = derive(ready.j, handler, ready.opens, cause);
+  // A clock-declaring rule that refused still judged time (§5.3). Its
+  // original reading cannot be recovered from a clamped recorded time.
+  if (ready.j.ran?.clock && context.clock.behind) return { result: "unavailable", reason: "clock-behind" };
+  return ran.result === "unavailable" ? ran : { ...ran, uses: ready.uses, ...(ready.bound === undefined ? {} : { bound: ready.bound }) };
 }
 
 // ---------------------------------------------------------------- the clause of an earlier send (sections 6.6 and 7.4)

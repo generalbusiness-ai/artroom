@@ -29,6 +29,7 @@ import { isPlatformDefinition } from "@generalbusiness/artroom-bytes";
 import { operationSettled } from "./ledger.ts";
 import { decisionBinding } from "./handlers.ts";
 import type { PlatformRules } from "./marks.ts";
+import type { Reading } from "./fields.ts";
 import type { Account, StateView } from "./state.ts";
 import type { ValidDefinition } from "./validate/index.ts";
 import { isLocalId, own } from "./values.ts";
@@ -69,9 +70,9 @@ const heldOf = (counts: Counts): Held | null => {
   return Object.keys(held).length > 0 ? held : null;
 };
 
-type Drawing = Pick<Entry, "seq" | "input" | "effects" | "sends">;
+type Drawing = Pick<Entry, "seq" | "input" | "effects" | "sends"> & Partial<Pick<Entry, "time" | "clamped">>;
 /** Pinned rules and bounds, needed only when a binding selector is derived. */
-export interface DrawOptions { bounds?: Bounds | undefined; platform?: PlatformRules | undefined }
+export interface DrawOptions extends Partial<Pick<Reading, "facts" | "own" | "texts" | "snapshot">> { bounds?: Bounds | undefined; platform?: PlatformRules | undefined }
 
 /** What that entry does to the counts of the holders, on the state before it; or the fault of an entry that draws past a count, or opens a held operation with no holder. */
 export function drawsOf(view: StateView, definition: ValidDefinition, entry: Drawing, options: DrawOptions = {}, binding?: { item: number; message: string } | null): Drawn | DrawFault {
@@ -80,7 +81,13 @@ export function drawsOf(view: StateView, definition: ValidDefinition, entry: Dra
   if ((!r || (Object.keys(r.holders).length === 0)) && operations.every((effect) => effect.for === undefined)) return NO_DRAW;
   const fault = (name: DrawFault["fault"], detail: string): DrawFault => ({ fault: name, detail });
   const input = entry.input;
-  const decided = binding === undefined ? decisionBinding(view, definition, entry, options.bounds ?? PROPOSED_BOUNDS, options.platform) : binding;
+  const scope = view.scope();
+  const deciding = input.type === "delivery" && input.message.class === "request" && input.message.type === "tell";
+  const decided = binding === undefined && deciding && scope ? decisionBinding(view, definition, entry, {
+    ...options, bounds: options.bounds ?? PROPOSED_BOUNDS, platform: options.platform, facts: options.facts ?? [], prepared: [],
+    own: options.own ? (seq) => seq < entry.seq ? options.own!(seq) : null : undefined,
+    clock: { reading: entry.time ?? scope.time, asOf: entry.time ?? scope.time, behind: entry.clamped === true },
+  }) : binding ?? null;
   const working = new Map<number, Counts>();
   /** The counts of that item, as the entry has moved them so far. Null: the item is no holder. */
   const counts = (item: number): Counts | null => {
