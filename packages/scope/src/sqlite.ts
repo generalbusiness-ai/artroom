@@ -13,9 +13,9 @@
  * the canonical bytes.
  */
 
-import type { CapabilityName, Digest, Entry, FactRef, FieldValue, KeyId, OperationId, ScopeKind, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
+import type { CapabilityName, Digest, Entry, FactRef, FieldValue, Incarnation, KeyId, OperationId, ScopeId, ScopeKind, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
 import { canonicalize } from "@generalbusiness/artroom-bytes";
-import { MemoryState, operationId, operationStanding, pendingOf, slotOf, timeMs } from "@generalbusiness/artroom-derive";
+import { MemoryState, byteOrder, operationId, operationStanding, pendingOf, slotOf, timeMs } from "@generalbusiness/artroom-derive";
 import type { Accepted, Decided, HeldCreation, Item, ObservedHead, Operation, Outstanding, OwnRequest, Page, PreparedStep, RangeIndex, RecordState, RecordsWhere, Relation, ScopeState, StateSnapshot } from "@generalbusiness/artroom-derive";
 import type { Dispatched, Duty, OperationStatus, Outgoing, Retained, Sending, Store, Stored } from "./store.ts";
 
@@ -169,6 +169,10 @@ export class SqliteStore implements Store {
     return orNull<Operation>(this.#one("SELECT value FROM operation WHERE seq = ? AND k = ?", seq, k)?.["value"]);
   }
   observed(of: Pick<ScopeRef, "scope" | "inc">, subject: string): number | null { return this.#folded<ObservedHead>("observed", canonicalize([of.scope, of.inc, subject]))?.seq ?? null; }
+  incarnations(scope: ScopeId): readonly Incarnation[] {
+    const found = this.#all("SELECT DISTINCT json_extract(value, '$.of.inc') AS inc FROM folded WHERE kind = 'observed' AND json_extract(value, '$.of.scope') = ?", scope).map((row) => row["inc"] as Incarnation);
+    return found.sort(byteOrder);
+  }
   texts(item: number, slot: string): readonly Digest[] { return this.#folded<[number, string, Digest[]]>("texts", canonicalize([item, slot]))?.[2] ?? []; }
   prepared(intent: Digest, capability: CapabilityName, step: string): PreparedStep | null {
     const row = this.#one("SELECT seq FROM prepared WHERE intent = ? AND capability = ? AND step = ?", intent, capability, step);

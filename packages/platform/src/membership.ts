@@ -721,7 +721,9 @@ export const NO_MEMBER = "@-" satisfies MemberId;
  */
 export function standingOf(state: Pick<StateView, "scope" | "page" | "item">, asked: ObservationRequest): Omit<Observation, "at"> | Omit<MemberObservation, "at"> | null {
   const scope = state.scope();
-  if (!scope || scope.status !== "active" || scope.at.kind !== "membership" || asked.of.scope !== scope.at.scope || asked.of.inc !== scope.at.inc || asked.of.kind !== scope.at.kind) return null;
+  // A request that states an incarnation is answered by that incarnation only. One that asks by the scope ID alone, as the first read
+  // of a rules scope or of a destination does, is answered by the scope that holds the name: the answer's `of` says which.
+  if (!scope || scope.status !== "active" || scope.at.kind !== "membership" || asked.of.scope !== scope.at.scope || ("inc" in asked.of && asked.of.inc !== scope.at.inc) || asked.of.kind !== scope.at.kind) return null;
   const of: ScopeRef = scope.at;
   const common = { of, head: scope.head, definition: MEMBERSHIP } as const;
   const roster = rosterOf(state);

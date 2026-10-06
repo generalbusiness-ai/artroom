@@ -45,6 +45,15 @@ describe("the grant guard and the commit guards of an observation (authority not
       ["`within` is this scope's own reference, which covers the one scope it names", of({ within: otherLane as never }), {}, "current"],
       ["`within` is the reference of another scope", of({ within: membership as never }), {}, "unauthorized: within"],
       ["`within` is a filter with a member added: no filter, so it covers nothing", of({ within: { membership, task: 4 } as never }), {}, "unauthorized: within"],
+      // Authority note, revision 25, section 12.1, "Guard 1 of an observation, for these two scopes": a rules scope and a destination
+      // record membership's scope ID and, before their first retained observation, no incarnation. Guard 1 then takes an observation
+      // of that ID, of the kind `membership`, and the grant covers the scope by the reference that answered. Once an incarnation is
+      // recorded it is the first case above again: another incarnation is discarded.
+      ["a scope that records the ID and no incarnation: the answer of that ID passes guard 1, and its filter covers the scope", fresh, { membership: { ...membership, inc: null } }, "current"],
+      ["the same scope: an answer of that ID in any incarnation, whose filter names the incarnation that answered", of({ of: reborn, within: { membership: reborn } }), { membership: { ...membership, inc: null } }, "current"],
+      ["the same scope: an answer of another scope ID", fresh, { membership: { ...elsewhere, inc: null } }, "authority-unavailable: of"],
+      ["the same scope: an answer of that ID from a scope of another kind", of({ of: { ...membership, kind: "rules" } }), { membership: { ...membership, inc: null } }, "authority-unavailable: of"],
+      ["the same scope: a filter that names another incarnation than the one that answered", of({ within: { membership: reborn } }), { membership: { ...membership, inc: null } }, "unauthorized: within"],
       ["revoked as retired: refused, also long past the window", of({ keyState: "retired" }), { clock: at(9000) }, "unauthorized: revoked"],
       ["the member removed", of({ memberState: "removed" }), {}, "unauthorized: revoked"],
       ["a key that membership does not hold", of({ keyState: "unknown" }), {}, "unauthorized: key-state"],

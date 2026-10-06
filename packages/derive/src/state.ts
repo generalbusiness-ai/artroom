@@ -6,7 +6,7 @@
  * `Status`, are the contract's, and are exported here again.
  */
 
-import type { CapabilityName, Digest, FactRef, FieldValue, Head, Incarnation, Item, KeyId, OperationId, Party, PlatformDefinition, Request, ScopeKind, ScopeRef, Seed, Status, Timestamp } from "@generalbusiness/artroom-contract";
+import type { CapabilityName, Digest, FactRef, FieldValue, Head, Incarnation, Item, KeyId, OperationId, Party, PlatformDefinition, Request, ScopeId, ScopeKind, ScopeRef, Seed, Status, Timestamp } from "@generalbusiness/artroom-contract";
 import { canonicalBytes, canonicalize, digestBytes } from "@generalbusiness/artroom-bytes";
 import { pendingOf } from "./ledger.ts";
 import { byteOrder } from "./values.ts";
@@ -228,6 +228,12 @@ export interface StateView {
   recordCount(capability: CapabilityName, kind: string, state?: string): number;
   /** The highest head that an entry of this scope retains for that subject of that observed scope, with that incarnation (section 16.1). Null: no entry retains an observation of it. */
   observed(of: Pick<ScopeRef, "scope" | "inc">, subject: string): number | null;
+  /**
+   * The incarnations in `of` of the observations of that scope ID that the entries of this scope retain, once each, in byte order
+   * (authority note, section 12.1, "Where the rules scope and the destination record their membership reference": the folded state
+   * holds a head for each subject that an entry observed, with its `of`). None: no entry retains an observation of that scope ID.
+   */
+  incarnations(scope: ScopeId): readonly Incarnation[];
   /** How many duties are open, for the room they need to settle (section 9.2); see `Outstanding`. */
   outstanding(): Outstanding;
   /** Everything, for a checkpoint. This is the one read that is not bounded. */
@@ -335,6 +341,7 @@ export class MemoryState implements StateWriter {
   recordCount(capability: CapabilityName, kind: string, state?: string) { return this.records(capability, kind, state === undefined ? {} : { states: [state] }).length; }
   #kept() { return [...this.#records.values()].sort((a, b) => keyOrder([a.capability, a.kind, canonicalize(a.key)], [b.capability, b.kind, canonicalize(b.key)])); }
   observed(of: Pick<ScopeRef, "scope" | "inc">, subject: string) { return this.#observed.get(key(of.scope, of.inc, subject))?.seq ?? null; }
+  incarnations(scope: ScopeId) { return [...new Set([...this.#observed.values()].filter((head) => head.of.scope === scope).map((head) => head.of.inc))].sort(byteOrder); }
   outstanding(): Outstanding {
     const open = [...this.#requests.values()].filter((r) => r.result === null);
     const operations = [...this.#operations.values()];

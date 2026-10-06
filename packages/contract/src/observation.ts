@@ -92,11 +92,19 @@ export interface ObservationUse {
  * scope records it, with its incarnation. A request states no other member,
  * and names no asker: the observed scope could not check who asks, and
  * answers the same for every scope of its repository (I3 deltas, entry ED1).
+ *
+ * A rules scope and a destination record the ID of the scope that they
+ * observe and, before their first retained observation, no incarnation.
+ * Their first read asks by the scope ID alone (authority note, revision 25,
+ * section 12.1, "The first read"): `of` then has no member `inc`, and the
+ * answer's `of` holds the incarnation of the scope that answered (I3
+ * deltas, entry EY7).
  */
+export type ObservedScope = ScopeRef | Pick<ScopeRef, "scope" | "kind">;
 export type ObservationRequest =
-  | { of: ScopeRef; key: KeyId }
-  | { of: ScopeRef; member: MemberId }
-  | { of: ScopeRef; asked: "rules" | "definitions" };
+  | { of: ObservedScope; key: KeyId }
+  | { of: ObservedScope; member: MemberId }
+  | { of: ObservedScope; asked: "rules" | "definitions" };
 
 /**
  * What the observed scope answers, from its head (authority note, section
