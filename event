@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:e1d95c9221208b64b87bf9034368accef06f2ac3","text":"Merge retired a covered predecessor with no successor at its old path."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:e32ada8e93c46ff91fdfa283c58a45acb1f37c8f","text":"Merge retired a covered predecessor; the successor is at packages/derive/src/marks.ts."}
