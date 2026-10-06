@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import { entryHash } from "@generalbusiness/artroom-bytes";
 import { FoldError, MemoryState, NOTHING, applyEntry, evidenceValues, outcomeValueDomains, closure, drawsOf, heldEntries, itemOf, one, outcomes, owed, pendingOf, requestOf, retainedBytes, starts, stateDigest, validateDefinition } from "../src/index.ts";
-import type { Amount, Counting, KindStated, Starts, Rules, OutcomeRule } from "../src/index.ts";
+import type { Amount, Counting, KindStated, Starts, Rules, OutcomeRule, RuleEffect } from "../src/index.ts";
 import { on, valid } from "./fixtures.ts";
 import { OWNER, TELL, Works, chain, chainDefinition, changed, opened, works, worksDefinition } from "./fixtures-holds.ts";
 
@@ -12,6 +12,72 @@ const codes = (v: ReturnType<typeof changed>) => (v.ok ? "valid" : v.problems.ma
 const entries = (n: number, more: Partial<Amount> = {}): Amount => ({ ...NOTHING, entries: n, bytes: n * EB, ...more });
 const kind = (attempts: number, most: Partial<Starts> = {}, send: KindStated["send"] = null, retains = 0): KindStated => ({ attempts, most: { effects: 0, operations: [], opens: null, ...most }, send, retains });
 const counting = (kinds: Record<string, KindStated>, held: string[] = [], over: Partial<Counting> = {}): Counting => ({ kinds, held: new Set(held), initial: () => NOTHING, change: NOTHING, entry: EB, written: NOTHING, ...over });
+
+describe("the actual return of an outcome callback stays within its declared data", () => {
+  const started = (most: { effects: number; opens?: string }) => {
+    const definition = valid(changed(works, (data) => {
+      data.items.note = structuredClone(data.items.job);
+      delete data.items.note.holds;
+      data.items.other = structuredClone(data.items.note);
+      data.items.job.values.deadline = { fixed: false, required: false, of: { type: "time" } };
+      data.timed.expire = { on: "job", states: ["open"], deadline: "deadline", effects: [{ state: "done" }], attention: [] };
+      data.items.job.holds.items = 1;
+      data.outcomes.step.most = { ...most, operations: ["step", "tidy"] };
+    }));
+    const scope = new Works(definition);
+    scope.script.begin = ({ resolved }) => opened(0, "step", 1, resolved.self);
+    expect(scope.start()).toBe("written");
+    scope.free(0);
+    return { scope, job: scope.last.seq, operation: scope.opened()[0]! };
+  };
+
+  test("undeclared state and deadline changes, an excess change and an undeclared or different item type leave the outcome offered", () => {
+    const cases: { most: { effects: number; opens?: string }; effects: (job: number, self: number) => RuleEffect[] }[] = [
+      { most: { effects: 0 }, effects: (job) => [{ effect: "state", item: job, state: "done" }] },
+      { most: { effects: 0 }, effects: (job) => [{ effect: "value", item: job, slot: "deadline", value: "2026-10-06T12:00:00Z" }] },
+      { most: { effects: 1 }, effects: (job) => [{ effect: "state", item: job, state: "done" }, { effect: "value", item: job, slot: "deadline", value: "2026-10-06T12:00:00Z" }] },
+      { most: { effects: 0 }, effects: (_job, self) => [{ effect: "open", item: self, type: "note", state: "open" }] },
+      { most: { effects: 0 }, effects: (_job, self) => [{ effect: "open", item: self, type: "job", state: "open" }] },
+      { most: { effects: 0, opens: "note" }, effects: (_job, self) => [{ effect: "open", item: self, type: "other", state: "open" }] },
+    ];
+    for (const example of cases) {
+      const { scope, job, operation } = started(example.most);
+      const before = [scope.entries.length, stateDigest(scope.state.all())];
+      scope.script.derives = (_kind, { resolved }) => ({ effects: example.effects(job, resolved.self), sends: [], opens: [] });
+      expect([scope.outcome(operation, 1, "confirmed"), scope.entries.length, stateDigest(scope.state.all()), pendingOf(scope.state.operation(operation)!)]).toEqual(["unavailable", ...before, { opened: 1, unknown: 0, unopened: 0 }]);
+    }
+  });
+
+  test("a declared ordinary item opening and one declared change are accepted without counting the ledger's attempt record as a change", () => {
+    const { scope, job, operation } = started({ effects: 1, opens: "note" });
+    scope.script.derives = (_kind, { resolved }) => ({ effects: [{ effect: "open", item: resolved.self, type: "note", state: "open" }, { effect: "value", item: job, slot: "deadline", value: "2026-10-06T12:00:00Z" }], sends: [], opens: [] });
+    expect([scope.outcome(operation, 1, "confirmed"), scope.item(scope.last.seq).type, scope.item(job).values["deadline"]]).toEqual(["written", "note", "2026-10-06T12:00:00Z"]);
+  });
+
+  test("a legacy outcome callback cannot open a holder at a full scope, even when no data most is stated", () => {
+    const definition = valid(changed(works, (data) => { data.outcomes.loose = { code: "loose", row: "P16" }; }));
+    const scope = new Works(definition);
+    scope.script.begin = () => opened(0, "loose", 1);
+    expect(scope.start()).toBe("written");
+    const operation = scope.opened()[0]!;
+    scope.free(0);
+    const before = [scope.entries.length, stateDigest(scope.state.all())];
+    scope.script.derives = (_kind, { resolved }) => ({ effects: [{ effect: "open", item: resolved.self, type: "job", state: "open" }], sends: [], opens: [] });
+    expect([scope.outcome(operation, 1, "confirmed"), scope.entries.length, stateDigest(scope.state.all()), pendingOf(scope.state.operation(operation)!)]).toEqual(["unavailable", ...before, { opened: 1, unknown: 0, unopened: 0 }]);
+  });
+
+  test("a stronger bound in the owner's code still refuses a change that the data allows", () => {
+    const { scope, job, operation } = started({ effects: 1 });
+    const rules = scope.rules;
+    const rule = rules.rules["step"];
+    if (!rule || rule.place !== "outcome") throw new Error("the fixture has no outcome rule");
+    rule.rules.most = { effects: 0, operations: 0, requests: 0 };
+    Object.defineProperty(scope, "rules", { value: rules });
+    const before = [scope.entries.length, stateDigest(scope.state.all())];
+    scope.script.derives = () => ({ effects: [{ effect: "value", item: job, slot: "deadline", value: "2026-10-06T12:00:00Z" }], sends: [], opens: [] });
+    expect([scope.outcome(operation, 1, "confirmed"), scope.entries.length, stateDigest(scope.state.all())]).toEqual(["unavailable", ...before]);
+  });
+});
 
 // Scope contract, revision 23, section 17.2, "The closure of an operation", "What a mark may start" and "A request that an outcome
 // sends"; section 17.2a, "What a holder reserves, in full". Rows I3-45, I3-51 and I3-52. Each function, on a counting made by hand.
