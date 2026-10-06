@@ -67,7 +67,9 @@ export function ownersOf(definition: ValidDefinition, platform: PlatformRules | 
         // Revision 19, section 6.1 (row I3-35): the rule that decides a further attempt is given what every rule is given.
         retries: (result, operation, view, outcome) => answer(run(mark, () => r.retries(result, operation, givenTo(judging(view, outcome))))),
         ...(r.holds ? { holds: (view: StateView, operation: Operation, outcome: OutcomeInput) => answer(run(mark, () => r.holds!(givenTo(judging(view, outcome)), operation))) } : {}),
-        ...(r.wellFormed ? { wellFormed: (result, evidence) => answer(run(mark, () => r.wellFormed!(result, evidence))) } : {}),
+        ...(r.wellFormed ? { wellFormed: (result, evidence, view: StateView, outcome: OutcomeInput) => answer(run(mark, () => r.wellFormed!(result, evidence, givenTo(judging(view, outcome))))) } : {}),
+        // The driver asks this outside a commit, so no judge is deriving: the rule reads the state and the scope's own entries only.
+        ...(r.unknown ? { unknown: (view: StateView, operation: Operation, attempt: number, own) => run(mark, () => r.unknown!(view, operation, attempt, own)) } : {}),
         // The send of the mark is derived with the entry, whether the rule of the kind derives anything beside it or not.
         ...(r.derives || mark.send ? { derives: (view: StateView, operation: Operation, outcome: OutcomeInput, selected: boolean | null) => given(mark, judging(view, outcome), kinds, r.derives ? run(mark, () => r.derives!(givenTo(judging(view, outcome)), operation, selected)) : { effects: [], sends: [], opens: [] }) } : {}),
       };

@@ -282,7 +282,10 @@ export interface OutcomeGives { effects: readonly RuleEffect[]; sends: readonly 
  * it. `retries`: another attempt is allowed; it is given what every rule
  * is given, with the folded state (revision 19, row I3-35). `holds`: the owner's local
  * guard for a selection; absent, it holds. `wellFormed`: the evidence is
- * well formed; absent, any body is. `derives`: the entry's effects and
+ * well formed; absent, any body is. It is given what every rule is given,
+ * for a body that names what the scope's own records hold. `unknown`: the
+ * body of the evidence of an `unknown` outcome, which the runtime's driver
+ * offers when no answer came; absent, null. `derives`: the entry's effects and
  * requests; absent, none. `closure`: the most entries that the operations
  * which one outcome entry opens reserve (section 17.2, row 5). `most`: the
  * most that `derives` returns in one outcome entry, with the two effects
@@ -296,7 +299,8 @@ export interface OutcomeRule {
   most?: Most;
   retries(result: "refused" | "unknown", operation: Operation, given: RuleGiven): boolean;
   holds?(given: RuleGiven, operation: Operation): boolean;
-  wellFormed?(result: "confirmed" | "refused" | "unknown", evidence: Evidence): boolean;
+  wellFormed?(result: "confirmed" | "refused" | "unknown", evidence: Evidence, given: RuleGiven): boolean;
+  unknown?(state: StateView, operation: Operation, attempt: number, own: Own): unknown;
   derives?(given: RuleGiven, operation: Operation, selected: boolean | null): OutcomeGives;
 }
 
