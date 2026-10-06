@@ -1,0 +1,1 @@
+node scripts/control.mjs packages/platform/src/destination-reading.ts 'checker !== null && same(signer(deciding), checker)' 'checker !== null && same(signer(deciding), required.checker)' --expect 'with a required passed check' -- packages/scope test/founding-real.test.ts: distinguishes; actual not-reserved vs expected reserved; source restored

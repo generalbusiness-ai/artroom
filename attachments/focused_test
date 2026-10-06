@@ -1,0 +1,1 @@
+npm test --workspace @generalbusiness/artroom-scope -- founding-real: 1 passed; final 1.42s
