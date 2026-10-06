@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:83d3760418d31539a165551984bc4a91d402f6af","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-05-i3-second-milestone-delivery.md."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:85754e8dd65fc26d8ec6e5bb4a5a5d098730be89","text":"Merge retired a covered predecessor; the successor is at packages/derive/src/ledger.ts."}
