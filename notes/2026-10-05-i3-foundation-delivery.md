@@ -558,3 +558,22 @@ the merge of `origin/main` at `b2b62d260`, which brought one plan and no
 source. The commit that adds this section changes notes only. The source and
 the tests are unchanged from the gated head: `packages` is the tree
 `9280c7deaccf9e219e2f051b516f7119472aaa64` at both.
+
+## 13. After review 4db3db9b: the binding
+
+The review `4db3db9b` of head `14eab9dc1` found no fault in the source. Its
+one finding was the binding: the foundation was filed under the promise on
+the whole I3 commission (`bcf5ec17`), which closes on a sealed receipt, so an
+approval there could have recorded I3 as complete.
+
+The planner then filed a request for milestone F alone (`2ae1523e`). This
+note is filed under the promise on that request. The I3 commission
+`bcf5ec17` and every duty that section 3 lists stay open. An approval and a
+landing here record milestone F only.
+
+The workroom binds an artifact to its path and its head, so the same head
+cannot be filed under a second promise. The commit that adds this section
+gives the milestone a head of its own. It changes this note and nothing
+else. The source and the tests are unchanged from the gated head `264aa406d`
+and from the reviewed head `14eab9dc1`: `packages` is the tree
+`9280c7deaccf9e219e2f051b516f7119472aaa64` at all three.
