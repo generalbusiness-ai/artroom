@@ -367,7 +367,7 @@ describe("an outcome entry of a platform definition, and where a scope records i
     expect([await changed((o) => { o.revision = first; }), await changed((o) => { o.content.approvals = 2; })]).toEqual([["mismatch", 3, NOT], ["mismatch", 3, NOT]]);
     // The revision is checked against the entries, and not only against the answer of the version's code: with code that gives the
     // earlier position, and an entry that retains the same, the two agree, and the last `publish` at or before the head is another.
-    const stale = { ...platform(RULES)!, observed: (state: never, asked: never) => ({ ...(platform(RULES)!.observed!(state, asked) as object), revision: first }) };
+    const stale: NonNullable<ReturnType<typeof platform>> = { ...platform(RULES)!, observed: (state, asked) => ({ ...(platform(RULES)!.observed!(state, asked) as object), revision: first }) };
     const history = g.served();
     rewrite(history, 3, (entry) => { (entry.input as never as { observed: [{ observation: { revision: number } }] }).observed[0].observation.revision = first; });
     expect(await under(history, stale)).toEqual(["mismatch", 3, `the state of ${r.at.scope} at its entry ${r.head.seq} gives the revision ${first}, and the last entry of the kind publish at or before it is at ${second}`]);
