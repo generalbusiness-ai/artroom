@@ -1,1 +1,1 @@
-{"kind":"promise","text":"Planner takes the checker's question 92877656 on the jam landing candidate; the ruling is already recorded at b0089fcb."}
+{"kind":"report","text":"Answered: the planner required the exact approved body (ruling b0089fcb). Builder dropped the six-line candidate, filed the note at cc71a9a6 with the blob equal to 0861580e's, the checker approved (00d61f26) and the file landed on main at 3cdc2d52 under request 1086c974. Nothing remains open on this question."}
