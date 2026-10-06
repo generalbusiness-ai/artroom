@@ -116,6 +116,30 @@ cleanup or final-holder account duty is skipped, evicted or delayed. No
 wire, budget defaults, bigint policy, producer metadata, runtime, SQLite or
 replay source changes. No provider/private/browser probe or deployment.
 
-The sole final source gate, complete independent review and normal witnessed
-landing/publication remain with root. No gate or workroom write was performed
-by this source worker; this note records focused producer evidence only.
+## Final gate and review boundary
+
+Root ran the sole source gate at clean source head
+`d3391fe8a2cf7e8f9cdcf2aabac2bc080f713296`, tree
+`86772a77a5a59a7f2a37d3c137ee33d1e7ad5a95`. It passed all typechecks,
+whitespace checks, 722 Vitest tests and six Node checks. Whole-command
+elapsed time was 18.16 seconds, with 37.75 user and 7.72 system seconds.
+The unchanged-lock dependency installation took 1.9 seconds and is included;
+typechecking took 3.6 seconds and tests 12.3 seconds. These are gate phase
+observations, not a workflow speed claim. The log is
+`/tmp/artroom-capacity-s2-gate.log`; detailed logs are under
+`/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.4L987P9W9M`.
+
+The gate's packages tree is `7a6968799f4b544b02ae8a7f3fb282b84cc1694c`;
+its scripts tree is `e761cf5c0ccee256905f3e19e2c5144895451e1a`.
+Only this delivery note was annotated after the gate. Source, tests,
+dependencies and these two trees remain unchanged, so no repeated gate is
+required. Root read the focused, typecheck, control and gate logs directly.
+The shared traversal preserves separate duty sums, alternatives, completed
+marks and the existing cycle diagnosis. It changes no authority, signed
+wire, runtime admission, provider or retention permission.
+
+Complete independent SOURCE review of all nine exact current subjects,
+requester ratification and normal witnessed landing/publication remain owed.
+Every artifact belongs only to S2 producer `67e1d574`; the complete NoGit
+capacity promise cannot serve as this source binding. The source worker ran
+no gate or workroom filing; root performed and records the single gate above.
