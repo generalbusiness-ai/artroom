@@ -189,11 +189,14 @@ export function reserving(d: Defining, top: Rec, capacity: Pick<Capacity, "deadl
     const found: { path: string; starts: ClauseStarts }[] = [];
     for (const clause of CLAUSES) {
       const effects = own(result, clause);
-      if (!Array.isArray(effects)) continue;
+      const rows = own(observes, clause);
+      // A missing effect list is the empty clause at runtime. Its
+      // observation rows still declare values the deciding entry retains.
+      if (!Array.isArray(effects) && rows === undefined) continue;
       const p = at(at(path, "result"), clause);
-      const marks = effects.flatMap((e, i) => (marked(e) ? [mostOf(e, at(p, i))] : []));
+      const marks = (Array.isArray(effects) ? effects : []).flatMap((e, i) => (marked(e) ? [mostOf(e, at(p, i))] : []));
       for (const mark of marks) if (mark.opens !== null && holderTypes.has(mark.opens)) bad("holds", p, `a type that states holds is opened only by new work, and a clause's mark may open ${mark.opens}`);
-      found.push({ path: p, starts: { marks, retains: retainedBytes(own(observes, clause)) } });
+      found.push({ path: p, starts: { marks, retains: retainedBytes(rows) } });
     }
     everyClause.push(...found.map((clause) => clause.starts));
     return found;
