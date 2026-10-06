@@ -21,7 +21,7 @@
 import type { Digest, Entry, ObservationRequest, ObservedScope, RoutingRefusal, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
 import { canonicalize, isDigest, isKeyId, isMemberId, isPlatformDefinition, isScopeId, parseStrict, platformName, scopeIdOf } from "@generalbusiness/artroom-bytes";
 import { isObject, isScopeRef, type Delivered, type ScopeState } from "@generalbusiness/artroom-derive";
-import { MEMBERSHIP, platform, standingOf } from "@generalbusiness/artroom-platform";
+import { MEMBERSHIP, RULES_SCOPE, platform } from "@generalbusiness/artroom-platform";
 import type { Membership } from "./authority.ts";
 import type { Pinned } from "./core.ts";
 import type { Definitions, Delivery, Resolver, SentTexts, Transport } from "./ports.ts";
@@ -30,7 +30,7 @@ import type { Store } from "./store.ts";
 /** What the object at a name answers to a read of one of its entries. `bytes` null: it has no entry at that sequence number. */
 export interface Sourced { at: ScopeRef; under: string; bytes: string | null }
 
-/** The five calls one scope's object takes from another's. `observe` is asked of a membership scope only. */
+/** The five calls one scope's object takes from another's. `observe` is asked of a membership scope or of a rules scope. */
 export interface Peer {
   deliver(envelope: Delivered): Promise<Delivery>;
   source(seq: number): Promise<Sourced | null>;
@@ -128,30 +128,37 @@ export function sentText(store: Store, seq: number, digest: Digest): string | nu
 }
 
 /**
- * What a membership scope answers to an observation read (authority note,
- * section 3.3, step 3; section 12.1.3, "Two things that are answers and no
- * entries"): the standing of one key or of one member, from its folded
- * state at its head. It is the platform package's `standingOf`. Membership
- * writes no entry for a read, and the answer names the scope, the
- * incarnation and the head that gave it.
+ * What a scope answers to an observation read (authority note, section
+ * 3.3, step 3; section 12.1.3, "Two things that are answers and no
+ * entries"; section 12.1.4, "The revision of the rules, and the answer to
+ * an observation"): from its folded state at its head, by the function
+ * `observed` of its pinned platform version. A membership scope answers the
+ * standing of one key or of one member (`standingOf`). A rules scope
+ * answers what it holds, asked as "rules" or as "definitions"
+ * (`rulesAnswer`). The scope writes no entry for a read, and the answer
+ * names the scope, the incarnation and the head that gave it.
  *
- * Null: no answer. The scope is not one under `platform:membership@1` that
- * this runtime can run; it is provisional or refused; it is asked as
- * another scope or incarnation; or the request is none of the forms that
- * the contract's section 16.1 gives, with exactly its members. The request
- * names no asker, and the answer is the same for every scope that asks.
+ * Null: no answer. The scope is under no platform version that this
+ * runtime can run, or under one that answers no observation; it is
+ * provisional or refused; it is asked as another scope or incarnation; or
+ * the request is none of the forms that the contract's section 16.1 gives
+ * for a scope of its kind, with exactly its members. The request names no
+ * asker, and the answer is the same for every scope that asks.
  */
 export function observedAt(store: Store, pinned: Pinned | null, asked: unknown): unknown {
-  if (!pinned?.definition || pinned.named !== MEMBERSHIP) return null;
+  const kind = pinned?.named === MEMBERSHIP ? "membership" : pinned?.named === RULES_SCOPE ? "rules" : null;
+  const answers = pinned?.definition ? platform(pinned.named)?.observed : undefined;
+  if (kind === null || !answers) return null;
   if (!isObject(asked) || Object.keys(asked).length !== 2) return null;
   // `of` is a full reference, or the scope ID and the kind alone: the first read of a scope that records no incarnation yet
   // (authority note, section 12.1, "The first read").
   const named: unknown = asked["of"];
-  const byId = isObject(named) && Object.keys(named).length === 2 && isScopeId(named["scope"]) && named["kind"] === "membership";
+  const byId = isObject(named) && Object.keys(named).length === 2 && isScopeId(named["scope"]) && named["kind"] === kind;
   if (!isScopeRef(named) && !byId) return null;
   const of = named as ObservedScope;
-  if (isKeyId(asked["key"])) return standingOf(store, { of, key: asked["key"] });
-  return isMemberId(asked["member"]) ? standingOf(store, { of, member: asked["member"] }) : null;
+  if (kind === "rules") return asked["asked"] === "rules" || asked["asked"] === "definitions" ? answers(store, { of, asked: asked["asked"] }) : null;
+  if (isKeyId(asked["key"])) return answers(store, { of, key: asked["key"] });
+  return isMemberId(asked["member"]) ? answers(store, { of, member: asked["member"] }) : null;
 }
 
 /**

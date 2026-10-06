@@ -168,6 +168,15 @@ describe("a founding on real scopes under the deployed class (authority note, se
     // The rules scope's first act that needs a grant. It holds membership's scope ID and no incarnation, so its first read asks by the
     // ID alone. The answer's `of` holds the incarnation of the scope that answered, guard 1 takes it, and the entry that retains
     // the observation fixes it: the grant covers this scope by that reference.
+    // Before any `publish` the rules scope answers an observation of the rules with the revision 0 and the values of the genesis
+    // (authority note, revision 28, section 12.1.4; I3 deltas, entries EQ8 and FB10). It is what another scope's object is answered:
+    // one call on the object, by the reference or by the scope ID alone. A membership scope answers no such request.
+    const observes = async (of: object, asked: string) => rulesScope!.stub.observe({ of, asked });
+    const founding = { asked: "rules", approvals: 1, ownerMayReview: false, checks: [], labels: [], singleControllerException: false };
+    expect([await observes(rules, "rules"), await observes({ scope: rules.scope, kind: "rules" }, "definitions"), await membershipScope!.stub.observe({ of: membership, asked: "rules" })]).toEqual([
+      { subject: "rules", of: rules, head: (await rulesScope!.summary()).at, revision: 0, content: founding, definition: "platform:rules@1" },
+      { subject: "rules", of: rules, head: (await rulesScope!.summary()).at, revision: 0, content: { asked: "definitions", active: [] }, definition: "platform:rules@1" }, null,
+    ]);
     expect(await publish(2)).toMatchObject({ answer: "accepted" });
     const first = proof(await rulesScope!.last());
     expect(first).toMatchObject({ observation: { of: membership, key: rita.key, keyState: "active", role: "admin", within: { membership } }, use: "fresh", prior: null });
@@ -181,6 +190,12 @@ describe("a founding on real scopes under the deployed class (authority note, se
     platformNet.secret = null;
     expect(await publish(3)).toMatchObject({ answer: "accepted" });
     expect([proof(await rulesScope!.last()).observation.of, proof(await rulesScope!.last()).use, (await rulesScope!.item(0)).values["approvals"]]).toEqual([membership, "fresh", 3]);
+    // After each `publish` the revision of the answer is the position of that entry, also after the restart, and its head is the
+    // scope's head. A request that states another incarnation of the rules scope's name is answered by nobody.
+    const published = (await rulesScope!.summary()).at;
+    expect([await observes(rules, "rules"), (await rulesScope!.item(0)).refs["published"], await observes({ ...rules, inc: register.inc }, "rules")]).toEqual([
+      { subject: "rules", of: rules, head: published, revision: published.seq, content: { ...founding, approvals: 3 }, definition: "platform:rules@1" }, published.seq, null,
+    ]);
     // A request that states another incarnation of membership's name is answered by nobody, and one by the ID alone is answered.
     const asked = { ...membership, inc: register.inc };
     expect([await membershipScope!.stub.observe({ of: asked, key: rita.key }), await membershipScope!.stub.observe({ of: { scope: membership.scope, kind: "membership" }, key: rita.key })]).toMatchObject([null, { of: membership, key: rita.key }]);

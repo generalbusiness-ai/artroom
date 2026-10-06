@@ -154,6 +154,15 @@ export interface Coded {
    * deltas, entry EU5).
    */
   rulesScope?: ((state: StateView) => RecordedRef | null) | undefined;
+  /**
+   * The kind of the act whose position is the `revision` that an answer of
+   * this version states (authority note, revision 28, section 12.1.4, "What
+   * a replay derives"): for a rules scope, `publish`. With it, the revision
+   * of each value that is derived from a history of this version is checked
+   * against the last entry of that kind at or before the head, or against 0
+   * where the history holds none. A difference is a `mismatch`.
+   */
+  revised?: string | undefined;
 }
 
 /**
@@ -278,6 +287,8 @@ interface Run {
   membership: Coded["membership"];
   /** Where a scope under the pinned platform definition records its rules reference, when the replay was given that. */
   rulesScope: Coded["rulesScope"];
+  /** The kind of the act whose position is the revision of an answer, when the replay was given one, and the positions of the checked entries of that kind, in order. */
+  revised: { kind: string; at: number[] } | null;
   /** Section 16.4: the bytes of each snapshot of staged refs that a checked outcome entry names, by digest, each checked against its digest. */
   snapshots: Map<Digest, string>;
 }
@@ -455,7 +466,7 @@ class Verifier {
     if (this.#runs.size >= this.#limits.scopes) throw new Stop("incomplete", `the limit of ${this.#limits.scopes} scopes was reached`);
     const got = await this.#page(id, 0);
     if (!got.ok) return null;
-    const run: Run = { id, said: got.page.scope, head: got.page.head, at: null, named: null, definition: null, platform: null, state: new MemoryState(), sealed: [], read: new Map(), next: 0, busy: false, depth: Number.POSITIVE_INFINITY, owed: new Map(), reads: new Map(), runs: { seen: new Set(), last: null }, observed: undefined, viewed: null, membership: undefined, rulesScope: undefined, snapshots: new Map() };
+    const run: Run = { id, said: got.page.scope, head: got.page.head, at: null, named: null, definition: null, platform: null, state: new MemoryState(), sealed: [], read: new Map(), next: 0, busy: false, depth: Number.POSITIVE_INFINITY, owed: new Map(), reads: new Map(), runs: { seen: new Set(), last: null }, observed: undefined, viewed: null, membership: undefined, rulesScope: undefined, revised: null, snapshots: new Map() };
     if (!this.#take(run, 0, got.page.entries, got.page.next)) return null;
     this.#runs.set(id, run);
     return run;
@@ -666,6 +677,7 @@ class Verifier {
       }
     }
     run.sealed.push({ entry, hash });
+    if (run.revised && entry.input.type === "act" && entry.input.signed.intent.kind === run.revised.kind) run.revised.at.push(entry.seq);
   }
 
   // ---------------------------------------------------------------- replay of one entry
@@ -722,6 +734,7 @@ class Verifier {
     run.observed = supplied.observed;
     run.membership = supplied.membership;
     run.rulesScope = supplied.rulesScope;
+    run.revised = supplied.revised === undefined ? null : { kind: supplied.revised, at: [] };
     // Section 9.3, "What it trusts": that the rules which it ran are the rules of that name and version.
     this.#coded.add(named);
     return checked.definition;
@@ -837,6 +850,13 @@ class Verifier {
       if (this.#values.has(key)) derived = this.#values.get(key);
       else {
         derived = source.observed(this.#viewAt(source, o.head.seq), asked);
+        // Authority note, section 12.1.4, "What a replay derives": the revision that the folded state gives is the position of the
+        // last entry of the stated kind at or before the head, or 0 where there is none.
+        if (source.revised && isObject(derived)) {
+          let last = 0;
+          for (let i = source.revised.at.length - 1; i >= 0 && last === 0; i--) if (source.revised.at[i]! <= o.head.seq) last = source.revised.at[i]!;
+          if (derived["revision"] !== last) throw mismatch(`the state of ${o.of.scope} at its entry ${o.head.seq} gives the revision ${String(derived["revision"])}, and the last entry of the kind ${source.revised.kind} at or before it is at ${last}`);
+        }
         this.#tally.values++;
         this.#values.set(key, derived);
       }

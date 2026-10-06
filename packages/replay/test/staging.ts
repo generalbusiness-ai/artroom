@@ -186,8 +186,9 @@ export class Gate extends Ledger {
    * judge of the outcome is given one too, of another read, and the outcome entry retains it when the rule `derives` reads it.
    * `placed`: the act `issue` has a field `proof` that names a value, in a made-up domain with a bound of 64 bytes (the contract's
    * revision 19, section 6.2), and the issue of entry 1 names one, which came beside its intent.
+   * `ruled`: the observation of the rules that the judge of the outcome is given, in place of the one written by hand.
    */
-  constructor(derives: NonNullable<OutcomeRule["derives"]>, readonly watched = false, placed = false) {
+  constructor(derives: NonNullable<OutcomeRule["derives"]>, readonly watched = false, placed = false, readonly ruled: ((at: Timestamp) => RulesObservation) | null = null) {
     super(gateWith((data) => {
       data.name = "platform:task";
       data.acts.enter.grant = "gate.enter";
@@ -229,9 +230,9 @@ export class Gate extends Ledger {
     const paul: MemberObservation = { subject: "member", of: membership, head: STANDING, member: "@paul" as MemberId, memberState: "active", role: "member", activeKey: true, controller: null, controllerActive: null, definition: "platform:membership@1", at: this.now };
     return { observation: paul, read: { run: RUN, n: ++this.#reads }, use: "fresh", prior: null };
   }
-  /** STAND-IN: an observation of the rules, written by hand, as one more read of the run. No rules scope answered it. */
+  /** STAND-IN: an observation of the rules, written by hand, as one more read of the run. No rules scope answered it, unless the test gave `ruled`: then it is what that function gives for the time of the read. */
   rulesSeen(): ObservationUse {
-    const rules: RulesObservation = { subject: "rules", of: RULES_SCOPE, head: RULES_HEAD, revision: 7, content: { asked: "rules", approvals: 0, ownerMayReview: true, checks: [], labels: [] }, definition: "platform:rules@1", at: this.now };
+    const rules: RulesObservation = this.ruled?.(this.now) ?? { subject: "rules", of: RULES_SCOPE, head: RULES_HEAD, revision: 7, content: { asked: "rules", approvals: 0, ownerMayReview: true, checks: [], labels: [] }, definition: "platform:rules@1", at: this.now };
     return { observation: rules, read: { run: RUN, n: ++this.#reads }, use: "fresh", prior: null };
   }
   override context(over: Context = {}) {

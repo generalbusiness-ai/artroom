@@ -343,6 +343,36 @@ describe("an outcome entry of a platform definition, and where a scope records i
     ]);
   });
 
+  // Authority note, revision 28, section 12.1.4, "What a replay derives" (I3 deltas, entries EQ8 and FB10). The rules scope is a
+  // `Rulebook` of the platform package's test support, on its own data and rules, below a STAND-IN registrar. The observing scope is
+  // the made-up `Gate`, and the read is a STAND-IN: the test takes the answer of the version's own function from the rules scope's state.
+  test("an observation of the rules is derived again from the history of the rules scope: the value from its state at the head, and the revision against the last entry of the kind `publish` at or before it", async () => {
+    const r = new Rulebook();
+    const publish = (approvals: number) => r.did(keys.rita, "publish", { on: 0, expected: { on: r.item(0).revision }, fields: { approvals, ownerMayReview: true, checks: [], labels: [], extents: firstExtents({ approvals, checks: [] }) } as never }).seq;
+    const [first, second] = [publish(2), publish(3)];
+    const answered = (at: string) => ({ ...(platform(RULES)!.observed!(r.state, { of: r.at, asked: "rules" }) as object), at }) as never;
+    const reads = (given: Parameters<typeof opens>[0] & { observed(subject: object): unknown }) => { if (!given.observed({ asked: "rules" })) throw new Error("the rules are not at hand"); return opens(given); };
+    const g = new Gate(reads as never, true, false, answered);
+    const all = [r, r.registrar];
+    const under = async (history: MemoryScope, rules = platform(RULES)!) => {
+      const coded: Options["platform"] = (named) => g.coded(g.rules, undefined, () => r.at)(named) ?? (named === RULES ? rules : platform(named));
+      const found = await verify(new MemorySource([history, ...all.map((ledger) => served(ledger, all))]), { mode: "replay", scope: g.at.scope, anchors: g.anchors(), platform: coded, ...AS_RECORDED });
+      return [found.report.result, found.report.at?.seq ?? null, found.why];
+    };
+    // The outcome entry retains the answer, with the revision of the second `publish`, and the replay folds the rules scope to that head.
+    expect([first < second, entryOf(g.served(), 3).input, await under(g.served())]).toMatchObject([true, { observed: [{ observation: { subject: "rules", of: r.at, head: r.head, revision: second, content: { approvals: 3 } } }] }, ["consistent", null, null]]);
+    // An entry that retains the revision of the earlier `publish`, or another value: not what the history gives at that head.
+    const changed = (change: (observation: { revision: number; content: { approvals: number } }) => void) => { const history = g.served(); rewrite(history, 3, (entry) => change((entry.input as never as { observed: [{ observation: never }] }).observed[0].observation)); return under(history); };
+    const NOT = `the retained observation is not what the history of ${r.at.scope} gives the rules at its entry ${r.head.seq}`;
+    expect([await changed((o) => { o.revision = first; }), await changed((o) => { o.content.approvals = 2; })]).toEqual([["mismatch", 3, NOT], ["mismatch", 3, NOT]]);
+    // The revision is checked against the entries, and not only against the answer of the version's code: with code that gives the
+    // earlier position, and an entry that retains the same, the two agree, and the last `publish` at or before the head is another.
+    const stale = { ...platform(RULES)!, observed: (state: never, asked: never) => ({ ...(platform(RULES)!.observed!(state, asked) as object), revision: first }) };
+    const history = g.served();
+    rewrite(history, 3, (entry) => { (entry.input as never as { observed: [{ observation: { revision: number } }] }).observed[0].observation.revision = first; });
+    expect(await under(history, stale)).toEqual(["mismatch", 3, `the state of ${r.at.scope} at its entry ${r.head.seq} gives the revision ${first}, and the last entry of the kind publish at or before it is at ${second}`]);
+  });
+
   // Scope contract, revision 19, sections 6.2 and 9.2; witness 18.45, case 8. The data and the rules are STAND-INS.
   test("a value that an entry names is a retained input of the kind `value`, under its domain: a replay with the bytes derives the entry again, and one without them, with other bytes, or with the bytes under another domain is `incomplete` and no mismatch", async () => {
     const g = new Gate(opens as never, false, true);
