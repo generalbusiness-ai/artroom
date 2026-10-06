@@ -1,11 +1,11 @@
 import { describe, expect, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { Digest, Input, SignedIntent } from "@generalbusiness/artroom-contract";
-import { intentDigest, newIncarnation, scopeIdOf, seedDigest } from "@generalbusiness/artroom-bytes";
-import { clockOf, derivable, judgeGenesis, runnable, type OutcomeRule, type PlatformRule, type RuleGiven } from "@generalbusiness/artroom-derive";
+import type { Digest, Entry, Input, SignedIntent } from "@generalbusiness/artroom-contract";
+import { factRefOf, intentDigest, newIncarnation, scopeIdOf, seedDigest } from "@generalbusiness/artroom-bytes";
+import { clockOf, derivable, judgeDelivery, judgeGenesis, runnable, type OutcomeRule, type PlatformRule, type RuleGiven } from "@generalbusiness/artroom-derive";
 import { Ledger, T0, deskDefinition, founded } from "@generalbusiness/artroom-derive/testing";
 import { CREATION_ATTEMPTS, DIRECTORY, REGISTER, directoryIdOf, platform, register, registerRules, repositoryName } from "../src/index.ts";
-import { Register, installing, paul, registerDefinition, registerPlatform, registerSeed, rita, una } from "./support-founding.ts";
+import { Directory, Register, installing, paul, registerDefinition, registerPlatform, registerSeed, rita, una } from "./support-founding.ts";
 
 // The plan's T43, for `platform:register@1` (authority note, section 12.1.1, and its table of marks, section 12.1.8).
 test("the register definition validates whole with the platform option; every mark of the note's table has its rule, so the package's rules run it, and with any one missing they do not", () => {
@@ -18,11 +18,12 @@ test("the register definition validates whole with the platform option; every ma
   expect(Object.values(register.acts).flatMap((act) => act.sends)).toEqual([]);
 
   // The marks, by the rows of the note's table: rows 2 to 6, row r of revision 24, row c of the further marks, one for each kind of
-  // operation, and row k of revision 25: the send of the mark of `create-repository`, which the validator lists as a send.
+  // operation, and rows k and v of revision 25: the send of the mark of `create-repository`, which the validator lists as a send, and the effect
+  // mark in its clause `applied`.
   expect(valid.marks.map((m) => [m.place, m.path, m.code, m.row])).toEqual([
     [1, "acts.install.grant", "install", "P13"], [1, "acts.found.grant", "founding-policy", "P13"], [4, "acts.found.guards.0", "handle-form", "P27"],
     [5, "acts.found.effects.3", "founder-key", "P14"], [5, "acts.found.effects.4", "claim-seed", "P16"], [5, "acts.found.effects.5", "open-create-repository", "P16"],
-    [7, "outcomes.create-repository", "create-repository", "P16"], [6, "outcomes.create-repository.send", "create-directory", "P16"],
+    [7, "outcomes.create-repository", "create-repository", "P16"], [6, "outcomes.create-repository.send", "create-directory", "P16"], [5, "outcomes.create-repository.send.result.applied.0", "claim-active", "P16"],
     [7, "outcomes.revoke-credential", "revoke-credential", "P16"], [7, "outcomes.delete-repository", "delete-repository", "P16"],
   ]);
   // The whole-scope rule (the contract's section 6.1): a version that lacks a rule runs nothing. The package has a rule of the kind
@@ -70,10 +71,10 @@ describe("the rules of platform:register@1, each as a plain function (authority 
   ];
   for (const [row, rule, args, expected] of rows) test(`${rule}, row ${row}`, () => expect(run(rule, ...args)).toEqual(expected));
 
-  test("the table has exactly the rules that are written: six at their places, the outcomes of the three kinds of operation, and the send of the first; only a creation selects, no read is decisive, and each allows another attempt", () => {
+  test("the table has exactly the rules that are written: six at their places, the outcomes of the three kinds of operation, and the send of the first with the mark of its clause; only a creation selects, no read is decisive, and each allows another attempt", () => {
     expect(Object.entries(registerRules).map(([name, rule]) => [name, rule.place, "refusals" in rule ? rule.refusals : "most" in rule ? rule.most : null])).toEqual([
       ["install", "grant", []], ["founding-policy", "grant", []], ["handle-form", "guard", ["bad-handle"]], ["founder-key", "effect", 1], ["claim-seed", "effect", 1], ["open-create-repository", "effect", 2],
-      ["create-repository", "outcome", null], ["create-directory", "send", null], ["revoke-credential", "outcome", null], ["delete-repository", "outcome", null],
+      ["create-repository", "outcome", null], ["create-directory", "send", null], ["claim-active", "effect", 3], ["revoke-credential", "outcome", null], ["delete-repository", "outcome", null],
     ]);
     const kinds = ["create-repository", "revoke-credential", "delete-repository"].map((kind) => (registerRules[kind] as { rules: OutcomeRule }).rules);
     expect(kinds.map((rules) => [rules.selects, rules.read, rules.retries("refused", null as never, null as never), rules.retries("unknown", null as never, null as never), rules.closure ?? 0, rules.most ?? null])).toEqual([
@@ -200,4 +201,37 @@ test("a founding opens one claim and one creation of three attempts; a key outsi
     r.outcome(cleanup, 2, "confirmed", {});
     expect(r.state.operation(cleanup)).toMatchObject({ most: 3, selected: null, attempts: [{ outcomes: [{ result: "refused" }] }, { outcomes: [{ result: "unknown" }, { result: "confirmed" }] }, { outcomes: [{ result: "refused" }] }] });
   }
+});
+
+// Authority note, revision 25, section 12.1.1, "The effect mark `claim-active`", and case e; the scope contract's section 7.2. The
+// directory is a `Directory` of test support, whose genesis the real judge wrote from the register's real outcome entry.
+test("the directory's applied result runs the clause of the outcome's send: the claim is active, with the directory's reference and its genesis, and the register confirms; a result from another incarnation is a conflict, which changes nothing and confirms nothing", () => {
+  const p = new Directory({ confirmed: false });
+  const r = p.register;
+  const claim = p.claim.seq;
+  const sent = claim + 1;
+  const result = p.last.sends[0]!;
+  /** The delivery of a result of the `create`, from that genesis entry, as the register judges it with its own rules. */
+  const recorded = (genesis: Entry) => judgeDelivery(r.state, registerDefinition, { to: result.to, from: factRefOf(genesis), n: 0, message: result.message },
+    { clock: clockOf(r.state, r.now), bounds: r.bounds, facts: [], prepared: [], own: r.own, source: { entry: genesis, under: "platform:directory" }, origin: r.entries[sent]!.entry, platform: registerPlatform });
+  expect([r.item(claim).state, r.item(claim).refs]).toEqual(["pending", { directory: null, genesis: null }]);
+
+  const applied = recorded(p.last);
+  if (applied.result !== "write") throw new Error(`the result was not recorded: ${JSON.stringify(applied)}`);
+  // The clause is found by the kind of the outcome entry that sent the request. Its rule finds the claim from the result's `of`.
+  expect([applied.draft.input, applied.draft.effects, applied.draft.sends]).toMatchObject([
+    { type: "delivery", clause: "applied" },
+    [{ effect: "state", item: claim, state: "active" }, { effect: "ref", item: claim, slot: "directory", to: p.at }, { effect: "ref", item: claim, slot: "genesis", to: p.fact(0) }],
+    [{ n: 0, to: p.at, message: { class: "control", type: "confirm", genesis: p.fact(0) } }],
+  ]);
+  r.seal(applied.draft);
+  expect([r.item(claim).state, r.item(claim).refs]).toEqual(["active", { directory: p.at, genesis: p.fact(0) }]);
+
+  // Case e: the same creation answered `applied` by another incarnation of the directory's name, from a genesis MADE BY HAND. The
+  // `conflict` clause has no effect, and no `confirm` is sent. The claim keeps the incarnation that it holds.
+  const genesis = p.last.input as Extract<Input, { type: "genesis" }>;
+  const other = { ...p.at, inc: newIncarnation(new Uint8Array(16).fill(99)) };
+  const second = recorded({ ...p.last, at: other, input: { ...genesis, inc: other.inc } });
+  expect(second.result === "write" && [second.draft.input, second.draft.effects, second.draft.sends]).toMatchObject([{ type: "delivery", clause: "conflict" }, [], []]);
+  expect(r.item(claim).refs["directory"]).toEqual(p.at);
 });

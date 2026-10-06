@@ -15,16 +15,16 @@
  *   Each does what the note's row says in prose.
  * - `Directory`: a directory that a register in memory created. The
  *   register's `found` entry and its selecting outcome, with the `create`
- *   that its rule sends, are judged with the register's own rules. The
- *   register's entry that records the directory's result, with its
- *   confirmation, and the genesis of each of the directory's three
- *   children, are SCRIPTED: entries made by hand. It shows the directory's
+ *   that its rule sends, are judged with the register's own rules. So
+ *   is the register's entry that records the directory's result, with
+ *   its clause and its confirmation. The genesis of each of the
+ *   directory's three children is SCRIPTED: an entry made by hand. It shows the directory's
  *   rows and rules. A founding on scope objects is the scope package's
  *   (`packages/scope/test/founding-real.test.ts`).
  */
 
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { Digest, Entry, FactRef, PlatformData, Request, Result, ScopeKind, ScopeRef, Seed, Send, SignedIntent } from "@generalbusiness/artroom-contract";
+import type { Digest, Entry, FactRef, PlatformData, Request, ScopeKind, ScopeRef, Seed, Send, SignedIntent } from "@generalbusiness/artroom-contract";
 import { factRefOf, intentDigest, newIncarnation, scopeIdOf, seedDigest, signIntent } from "@generalbusiness/artroom-bytes";
 import { PROFILES, clockOf, judgeDelivery, judgeGenesis, judgeOutcome, operationSettled, ownersOf, validateDefinition } from "@generalbusiness/artroom-derive";
 import type { ActJudgment, Judgment, PlatformRules, Rules, Source, ValidDefinition } from "@generalbusiness/artroom-derive";
@@ -201,10 +201,12 @@ export class Directory extends Ledger {
     this.seal(written(judgeGenesis(this.state, directoryDefinition, { name: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(8)), to: seed, from: R.fact(sent), n: 0, message: create },
       { ...context(), facts: [{ fact: this.claim, entry: R.entries[found]!.entry, under: R.under }], source: { entry: R.entries[sent]!.entry, under: R.under } })));
     if (over.confirmed === false) return;
-    // SCRIPTED: the register's entry that records the directory's result, and its confirmation.
-    const result = this.last.sends[0]!.message as Result;
-    const recorded = scripted(R.at, sent + 1, { type: "delivery", from: this.fact(0), n: 0, message: result, clause: "applied" }, [{ n: 0, to: this.at, message: { class: "control", type: "confirm", genesis: this.fact(0) } }], R.under);
-    this.take(recorded, 0);
+    // The register records the directory's `applied` result, judged with its own rules: the clause `applied` of the send runs the
+    // mark `claim-active`, and the entry sends the confirmation, which makes the directory active.
+    const result = this.last.sends[0]!;
+    R.seal(written(judgeDelivery(R.state, registerDefinition, { to: result.to, from: this.fact(0), n: 0, message: result.message },
+      { clock: clockOf(R.state, R.now), bounds: R.bounds, facts: [], prepared: [], own: R.own, source: { entry: this.last, under: this.under }, origin: R.entries[sent]!.entry, platform: registerPlatform })));
+    this.take({ entry: R.last, under: R.under }, 0);
     for (const kind of over.children ?? ["membership", "rules", "destination"]) this.answered(kind);
   }
 

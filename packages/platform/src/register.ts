@@ -40,7 +40,7 @@
  * plan owns. They are written as the note has them.
  */
 
-import type { Digest, OperationId, PlatformData, PlatformDefinition, ScopeId, Seed } from "@generalbusiness/artroom-contract";
+import type { Digest, FieldValue, OperationId, PlatformData, PlatformDefinition, ScopeId, Seed } from "@generalbusiness/artroom-contract";
 import { base32, intentDigest, isDigest, seedDigest, utf8 } from "@generalbusiness/artroom-bytes";
 import { isObject, type Item, type Opening, type RuleGiven, type Rules, type StateView } from "@generalbusiness/artroom-derive";
 import { handleForm } from "./membership.ts";
@@ -160,9 +160,9 @@ export const register: PlatformData = {
   rules: {},
   // The operation kinds that this definition owns, each with the mark of the rule for its outcome entries (row c of the further marks).
   outcomes: {
-    // Its `send` is the one request of the selecting outcome: the `create` of the directory (row k). The clauses `refused` and
-    // `conflict` have no effect. Each is an incident, which is no effect of an entry.
-    "create-repository": { code: "create-repository", row: "P16", send: { code: "create-directory", row: "P16", result: { applied: [], refused: [], conflict: [] } } },
+    // Its `send` is the one request of the selecting outcome: the `create` of the directory (row k). The clause `applied` holds one
+    // effect mark, `claim-active` (row v). `refused` and `conflict`: no effect. Each is an incident, which is no effect of an entry.
+    "create-repository": { code: "create-repository", row: "P16", send: { code: "create-directory", row: "P16", result: { applied: [{ code: "claim-active", row: "P16" }], refused: [], conflict: [] } } },
     "revoke-credential": { code: "revoke-credential", row: "P16" },
     "delete-repository": { code: "delete-repository", row: "P16" },
   },
@@ -396,6 +396,36 @@ export const registerRules: Rules = {
         branch, founderHandle, recoveryKey, ...(intent.fields["import"] === undefined ? {} : { import: intent.fields["import"] }),
       };
       return { to: seed, message: { class: "request", type: "create", body: { fields } } };
+    },
+  },
+  /**
+   * Row v, the effect mark in the clause `applied` of the send
+   * `create-directory` (P16), as the note's revision 25 states it (section
+   * 12.1.1, "The effect mark `claim-active`"). A clause of a request that an
+   * outcome sent has no subject, so the rule finds the item. It reads the
+   * result's `of`, which names the request by the outcome entry that sent
+   * it; that outcome entry, by its position, for the operation that it
+   * belongs to; and the claim that the operation's opening entry opened.
+   *
+   * Three effects on that claim: `active`; the reference `directory`, which
+   * is the result's sender; and the reference `genesis`, which is the
+   * result's source entry. It names no refusal. Where the claim is not
+   * `pending` the state effect is one that the checks on effects refuse, so
+   * the clause changes nothing, and the result is recorded.
+   */
+  "claim-active": {
+    place: "effect", most: 3,
+    run: (given) => {
+      const input = given.input;
+      if (input.type !== "delivery" || input.message.class !== "result") throw new Error("claim-active stands in the clause of a result");
+      const sent = given.own(input.message.of.from.seq)?.entry.input;
+      const claim = sent?.type === "outcome" ? claimOf(given.state, sent.operation) : null;
+      if (!claim) throw new Error("the request was sent by an outcome of an operation create-repository, which is of a claim");
+      return [
+        { effect: "state", item: claim.id, state: "active" },
+        { effect: "ref", item: claim.id, slot: "directory", to: input.from.at as unknown as FieldValue },
+        { effect: "ref", item: claim.id, slot: "genesis", to: input.from as unknown as FieldValue },
+      ];
     },
   },
   /**
