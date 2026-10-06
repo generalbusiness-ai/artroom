@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:b11184343377d9457dcc800022b8caa95f387aff","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-05-i3-limits-review.md."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:b1ad356a47bd35918f67f81e7c99104940b2f9a5","text":"Merge retired a covered predecessor; the successor is at packages/derive/src/capability/gitread.ts."}
