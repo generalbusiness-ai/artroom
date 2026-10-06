@@ -30,6 +30,7 @@
 // I3 merge: the register and the directory state no `attempts` and no `most` on their kinds (the contract's rows I3-22 and I3-23,
 // which wait for the authority note's rows). Their kinds are counted by the closure that their rules declare, as on main.
 
+import { RETAINED_INPUT_BYTES } from "@generalbusiness/artroom-contract";
 import type { Held } from "@generalbusiness/artroom-contract";
 import { NOTHING, closure, holding, itemOf, largest, one, requestOf, retainedBytes, starts, sum, type Amount, type ClauseStarts, type Counting, type KindStated, type Starts, STARTS_NOTHING } from "../held.ts";
 import { isObject, own } from "../values.ts";
@@ -81,7 +82,7 @@ export interface Reserving {
 const CLAUSES = ["applied", "refused", "superseded", "undelivered", "conflict"] as const;
 
 /** Reads the members, makes the checks, and computes the amounts. Undefined: the value is no platform data, or it has no kind and no `holds`. */
-export function reserving(d: Defining, top: Rec, capacity: Pick<Capacity, "deadlines" | "pending" | "clauseEntries">): Reserving | undefined {
+export function reserving(d: Defining, top: Rec, capacity: Pick<Capacity, "deadlines" | "pending" | "clauseEntries">, outcomeValues: Readonly<Record<string, readonly import("../ledger.ts").EvidenceValueDomain[]>> = {}): Reserving | undefined {
   if (!d.platform) return undefined;
   const { bad, rec, int, list, bounds } = d;
   const kindsWritten = isObject(top["outcomes"]) ? top["outcomes"] : {};
@@ -212,7 +213,7 @@ export function reserving(d: Defining, top: Rec, capacity: Pick<Capacity, "deadl
     const clauses = send ? clausesOf(send, at(path, "send")) : [];
     if (send) sends.set(kind, { once: send["once"] === true, clauses });
     const attempts = "attempts" in m ? int(m["attempts"], at(path, "attempts"), 1) : null;
-    if (attempts !== null) stated.set(kind, { attempts, most, send: send ? { once: send["once"] === true, clauses: clauses.map((clause) => clause.starts) } : null, retains: retainedBytes(m["observes"]) });
+    if (attempts !== null) stated.set(kind, { attempts, most, send: send ? { once: send["once"] === true, clauses: clauses.map((clause) => clause.starts) } : null, retains: retainedBytes(m["observes"]) + evidenceBytes(d, outcomeValues[kind], path) });
     else if ("most" in m) bad("shape", at(path, "most"), "a kind that states what its outcomes may start states its attempts");
     else if (held.has(kind)) bad("holds", path, "a kind that an item holds states its attempts");
   }
@@ -319,4 +320,20 @@ export function reserving(d: Defining, top: Rec, capacity: Pick<Capacity, "deadl
     clause: largest(...(byClause as Amount[])),
     reach: reachFrom(everyClause.flatMap((clause) => clause.marks.flatMap((mark) => mark.operations)).filter((k) => held.has(k))),
   };
+}
+
+/** Every outcome reserves one value at its domain's declared maximum, whether an answer names one or not. */
+function evidenceBytes(d: Defining, domains: readonly import("../ledger.ts").EvidenceValueDomain[] | undefined, path: string): number {
+  if (domains === undefined) return 0;
+  const seen = new Set<string>();
+  let bytes = 0;
+  for (const domain of domains) {
+    if (typeof domain.domain !== "string" || domain.domain.length === 0 || seen.has(domain.domain) || !Number.isSafeInteger(domain.max) || domain.max < 1 || domain.max > RETAINED_INPUT_BYTES) {
+      d.bad("shape", path, "the owner declares distinct evidence value domains, each with a positive bound at most one retained input");
+      continue;
+    }
+    seen.add(domain.domain);
+    bytes += domain.max;
+  }
+  return bytes;
 }

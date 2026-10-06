@@ -22,7 +22,7 @@ import { deriveEffects } from "./effects.ts";
 import type { Reading } from "./fields.ts";
 import type { Fetched, Judging } from "./guards.ts";
 import { overMax } from "./handlers.ts";
-import type { OperationRules, OutcomeDerived, OutcomeInput, Owner, Owners } from "./ledger.ts";
+import type { EvidenceValueDomain, OperationRules, OutcomeDerived, OutcomeInput, Owner, Owners } from "./ledger.ts";
 import { RuleFault, givenTo, outside, ruleAt, run, type AtHand, type OutcomeGives, type PlatformRules, type Rules } from "./marks.ts";
 import { deriveSends } from "./sends.ts";
 import type { Operation, StateView } from "./state.ts";
@@ -77,6 +77,8 @@ export function ownersOf(definition: ValidDefinition, platform: PlatformRules | 
         return given;
       };
       return {
+        ...(r.valueDomains ? { valueDomains: r.valueDomains } : {}),
+        ...(r.values ? { values: (evidence) => run(mark, () => r.values!(evidence)) } : {}),
         selects: r.selects === true, read: r.read === true, ...(r.closure === undefined ? {} : { closure: r.closure }), ...(r.most === undefined ? {} : { most: r.most }),
         // The driver asks this outside a commit, as it asks `unknown`: the rule reads the state only.
         ...(r.ready ? { ready: (view: StateView, operation: Operation, attempt: number) => answer(run(mark, () => r.ready!(view, operation, attempt))) } : {}),
@@ -209,4 +211,12 @@ function openerOf(j: Judging): { cause: Digest; fact: { at: Judging["scope"]["at
   const kept = seq !== undefined && Number.isSafeInteger(seq) && seq < j.self ? j.own?.(seq) : null;
   if (!kept || kept.entry.input.type !== "act" || !kept.entry.effects.some((effect) => effect.effect === "operation" && effect.k === k)) return null;
   return { cause: intentDigest(kept.entry.input.signed.intent), fact: { at: j.scope.at, seq: kept.entry.seq, hash: kept.hash } };
+}
+
+/** Evidence domains come from the rules of the pinned version, beside its data. No untrusted JSON member declares them. */
+export function outcomeValueDomains(data: PlatformData, rules: Rules): Readonly<Record<string, readonly EvidenceValueDomain[]>> {
+  return Object.fromEntries(Object.entries(data.outcomes ?? {}).flatMap(([kind, mark]) => {
+    const domains = ruleAt(rules, mark.code, "outcome")?.rules.valueDomains;
+    return domains ? [[kind, domains]] : [];
+  }));
 }

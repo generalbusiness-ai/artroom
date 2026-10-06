@@ -42,7 +42,7 @@ import type { Bounds, CapabilityName, Digest, Entry, FactRef, Grant, Head, KeyId
 import { canonicalize, definitionDigest, digestBytes, intentDigest, isDigest, isEntry, isObservationUse, isPlatformDefinition, parseStrict, platformName, scopeIdOf, textDigest, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import {
   HOLD, HOLD_KINDS, MISMATCHES, MemoryState, WINDOWS, actionOf, agrees, applyEntry, drawsOf, clockOf, contentStates, entryOf, namedBy, observedName, retainsOf, headsOf, highestHead, inputTexts, isAncestryCheck, isFactRef, isLocalId, isObject, isScopeRef, judgeAct, judgeCheckpoint, judgeDelivery,
-  judgeDiagnosis, fixedBy, judgeGenesis, judgeGrant, judgeOutcome, judgePreparation, judgeTimed, membershipOf, nextDue, observedOf, own, ownersOf, placesOf, ruleAt, same, snapshotRead, stepsOf, timeMs, updateOf, validateDefinition, valueDigest, windowOf,
+  judgeDiagnosis, evidenceValues, outcomeValueDomains, fixedBy, judgeGenesis, judgeGrant, judgeOutcome, judgePreparation, judgeTimed, membershipOf, nextDue, observedOf, own, ownersOf, placesOf, ruleAt, same, snapshotRead, stepsOf, timeMs, updateOf, validateDefinition, valueDigest, windowOf,
 } from "@generalbusiness/artroom-derive";
 import type { ActJudgment, AncestryCheck, Capabilities, Clock, Fetched, Judgment, Observing, Owners, PlatformRules, PreparationJudgment, RecordedRef, Retains, Rules, StateView, TimedJudgment, ValidDefinition, Window } from "@generalbusiness/artroom-derive";
 import { RULE_PROFILES, evaluateRules } from "@generalbusiness/artroom-derive/rule";
@@ -738,7 +738,7 @@ class Verifier {
     if (!supplied) throw new Stop("unsupported-definition", `the scope pins ${named}, which this replay has no code for`, where);
     let checked: ReturnType<typeof validateDefinition> | null = null;
     try {
-      checked = validateDefinition(parseStrict(canonicalize(supplied.data)), this.#bounds, RULE_PROFILES, { platform: true });
+      checked = validateDefinition(parseStrict(canonicalize(supplied.data)), this.#bounds, RULE_PROFILES, { platform: true, outcomeValues: outcomeValueDomains(supplied.data, supplied.rules) });
     } catch { /* data with no canonical bytes is no definition */ }
     if (!checked?.ok || checked.definition.declared.name !== platformName(named)) throw new Stop("unsupported-definition", `the data that this replay was given for ${named} is not a platform definition of that name under the bounds given`, where);
     const needs = checked.definition.underived.find((u) => !this.#capabilities?.implements(u));
@@ -1306,7 +1306,18 @@ class Verifier {
         // ten-second window stands, as a stand-in.
         if (input.observed && !definition.observing) await this.#observed(run, entry, input.observed, WINDOWS.once, where, depth);
         const kindRows = definition.observing ? await this.#hand(run, entry, input.observed, where) : null;
-        judged = judgeOutcome(state, definition, input, { clock, bounds, owners: this.#owners, platform: run.platform ?? undefined, own: reading.own, facts, ...(input.observed ? { observed: input.observed } : {}), ...(kindRows ?? {}) });
+        let named;
+        try { named = evidenceValues(owners.rules(owner, kind), input.evidence); } catch { named = null; }
+        if (named === null) throw mismatch("the evidence names a value outside its owner declaration");
+        const values = [...(kindRows?.values ?? [])];
+        for (const value of named) {
+          const kept = await this.#retained(run, where, "value", value.digest, "the value named by outcome evidence", value.domain);
+          try {
+            if (utf8(kept.bytes).length > value.max || canonicalize(parseStrict(kept.bytes)) !== kept.bytes || valueDigest(value.domain, parseStrict(kept.bytes)) !== value.digest) throw new Error();
+          } catch { throw new Stop("incomplete", `a retained input is not the one named: the outcome evidence value, ${value.digest}`, where); }
+          values.push(kept.bytes);
+        }
+        judged = judgeOutcome(state, definition, input, { clock, bounds, owners: this.#owners, platform: run.platform ?? undefined, own: reading.own, facts, ...(input.observed ? { observed: input.observed } : {}), ...(kindRows ?? {}), values });
         if (kindRows) await this.#byRows(run, entry, judged, kindRows.observed, where, depth);
         break;
       }

@@ -407,3 +407,14 @@ describe("a request that an outcome sends is reserved with its operation (sectio
     expect(s.outcome(w, 2, "confirmed")).toBe("written");
   });
 });
+
+// The definition is the made-up M of the reservation witnesses. Only the pinned owner's declarations are supplied beside it.
+test("evidence value domains of pinned owner code are counted for each possible outcome entry, in a held kind and an unheld closure; a repeated domain is no declaration", () => {
+  const declared = valid(validateDefinition(chain, PROPOSED_BOUNDS, undefined, { platform: true, outcomeValues: { k: [{ domain: "changes-1", max: 262144 }], u: [{ domain: "other-1", max: 64 }] } }));
+  const ordinary = chainDefinition.reserving!;
+  const counted = declared.reserving!;
+  // k has two outcomes; each can open u, whose three attempts have six outcomes. The reservation includes every value, even
+  // if an answer names none. The holder's amount and one outcome's amount are both derived from the pinned owner declaration.
+  expect([counted.kinds["k"]!.whole.bytes - ordinary.kinds["k"]!.whole.bytes, counted.kinds["k"]!.outcome.bytes - ordinary.kinds["k"]!.outcome.bytes, counted.kinds["u"]!.whole.bytes - ordinary.kinds["u"]!.whole.bytes]).toEqual([2 * (262144 + 6 * 64), 262144 + 6 * 64, 6 * 64]);
+  expect(validateDefinition(chain, PROPOSED_BOUNDS, undefined, { platform: true, outcomeValues: { k: [{ domain: "changes-1", max: 64 }, { domain: "changes-1", max: 64 }] } }).ok).toBe(false);
+});
