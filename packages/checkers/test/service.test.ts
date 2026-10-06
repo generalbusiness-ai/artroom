@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import type { SignedIntent } from "@generalbusiness/artroom-contract";
 import { b64url, canonicalize, hex, verifySignedIntent } from "@generalbusiness/artroom-bytes";
-import { CheckerService, Outcomes, configurationDigest, detailsDigest, judge, readConfiguration, type Configuration, type Delivered, type Notice, type RunReport } from "../src/index.ts";
+import { CheckerService, Outcomes, REPORT_BOUNDS, configurationDigest, detailsDigest, environmentDigest, judge, readConfiguration, readReport, type Configuration, type Delivered, type JobRecord, type Notice, type RunReport } from "../src/index.ts";
 import { Lane, MemoryDurable, ScriptedRunner, T0, configuration, digest, lane, newKey, otherLane, refusedFor, report, world } from "./support.ts";
 
 /**
@@ -99,6 +99,13 @@ describe("the checker service (authority note, section 3.11; I3 plan, T35). The 
     const none = made();
     none.scopes.token = refusedFor("");
     expect([await none.deliver(), none.runner.asked.length]).toEqual(["check-error run-lost, admitted", 0]);
+    // The lane's answer to that request is data too. A value that is no answer is no token: the delivery does not fail between the record
+    // of the run and the kept outcome, no runner starts, and the log holds a fixed word and nothing of the value.
+    for (const value of [undefined, "accepted", { answer: "a token: ghp_0123456789" }]) {
+      const odd = made();
+      odd.scopes.prepare = () => Promise.resolve(value as never);
+      expect([await odd.deliver().catch(() => "the delivery failed"), odd.runner.asked.length, odd.log]).toEqual(["check-error run-lost, admitted", 0, ["job-read no-answer"]]);
+    }
   });
 
   test("the result is signed outside the runner, by the checker's key, after the outcome is kept: the runner is given the job and the configuration and no key or token; the signed intent names the job, its tree, its configuration and the digest of what ran", async () => {
@@ -152,6 +159,66 @@ describe("the checker service (authority note, section 3.11; I3 plan, T35). The 
       "error checkout-unconfirmed", "error runner-not-started", "error runner-lost", "error limits-passed", "error report-malformed", "error report-malformed",
       "error image-mismatch",
     ]);
+  });
+
+  test("a report that is not in form is a kept and signed `check-error`, `report-malformed`: the delivery that ran it, a later delivery that finds the same report, and a submit that is sent again all give that answer, with the same record of what ran, and no second run starts", async () => {
+    // Each report has the configuration's image, a confirmed checkout and a complete end, so nothing but its form stands between it and a judgment.
+    const throwing = { ...report() };
+    Object.defineProperty(throwing, "checkout", { enumerable: true, get() { throw new Error("a member that fails when it is read"); } });
+    const sparse: unknown[] = [];
+    sparse.length = 2;
+    const bad: Record<string, unknown> = {
+      "a lone surrogate in a variable": report({ environment: [{ name: "HOME", value: "/work/\ud800" }, configuration.environment[1]!] }),
+      "a lone surrogate in a line": report({ steps: [{ status: 0, line: "\udc00" }, { status: 0, line: "ok" }] }),
+      "a status of negative zero": report({ steps: [{ status: -0, line: "x" }, { status: 0, line: "ok" }] }),
+      "a status that is no integer": report({ steps: [{ status: 0.5, line: "x" }, { status: 0, line: "ok" }] }),
+      "a hole in the variables": report({ environment: sparse as never }),
+      "a member that the form does not have": { ...report(), note: "ok" },
+      "a variable with a third member": report({ environment: configuration.environment.map((v) => ({ ...v, secret: 1 })) as never }),
+      "a step with a third member": report({ steps: [{ status: 0, line: "x" }, { status: 0, line: "ok", passed: true } as never] }),
+      "more steps than a report may hold": report({ steps: Array(REPORT_BOUNDS.steps + 1).fill({ status: 0, line: "ok" }) }),
+      "more variables than a report may hold": report({ environment: Array(REPORT_BOUNDS.variables + 1).fill({ name: "A", value: "" }) }),
+      "a line longer than a report may hold": report({ steps: [{ status: 0, line: "x".repeat(REPORT_BOUNDS.textBytes + 1) }, { status: 0, line: "ok" }] }),
+      "a member that fails when it is read": throwing,
+    };
+    // The record of what ran for such a report: the declared image and nothing of the report.
+    const safe = (m: ReturnType<typeof made>, run: string) => ({ job: m.w.fact, tree: m.w.tree, configuration: configurationDigest(configuration), image: { declared: configuration.image, resolved: null }, environment: environmentDigest([]), steps: [{ name: "1", status: null }, { name: "2", status: null }], run });
+    const kept = (m: ReturnType<typeof made>) => JSON.parse([...m.durable.kept.values()][0]!) as JobRecord;
+    // A delivery that fails is told from one that answers: the service never rejects for what a runner returned.
+    const told = (m: ReturnType<typeof made>) => m.deliver().catch(() => "the delivery failed");
+    for (const [name, value] of Object.entries(bad)) {
+      // The delivery that ran it. The lane refuses the first submit for now, so the kept outcome is sent again at the next delivery.
+      // Both deliveries are of one job, so the two records of what ran can be compared.
+      const w = world();
+      const first = made(w);
+      first.runner.ends = value;
+      first.scopes.answers = [refusedFor("merge-in-progress"), refusedFor("merge-in-progress")];
+      const answers = [await told(first), kept(first).state, await told(first)];
+      const sent = first.scopes.submitted.map((s) => [verifySignedIntent(s), s.intent.kind, s.intent.fields["reason"], s.intent.fields["details"]]);
+      // A later delivery, after the process that ran it ended: the record says `started`, and the runner's own record holds the same report.
+      const later = made(w);
+      await new Outcomes(later.durable).start(later.w.fact, "a-run", null);
+      later.runner.records.set("a-run", value);
+      const found = [await told(later), await told(later), later.runner.asked.length];
+      // The run's name is the one thing that the two records of what ran do not share.
+      const run = first.runner.asked[0]?.run ?? "no run";
+      const again = kept(later).details;
+      expect({ answers, runs: first.runner.asked.length, sent, record: kept(first).details, found, again, same: again === null ? null : { ...again.provenance, run } }, name).toEqual({
+        answers: ["check-error report-malformed, kept, ran", "kept", "check-error report-malformed, admitted"], runs: 1,
+        sent: Array(3).fill([true, "check-error", "report-malformed", detailsDigest({ provenance: safe(first, run) })]),
+        record: { provenance: safe(first, run) },
+        found: ["check-error report-malformed, admitted", "nothing: closed", 0], again: { provenance: safe(later, "a-run") }, same: safe(first, run),
+      });
+    }
+    // One reading: a report whose member gives another value at each read is judged and recorded from the same reading. Here the image is
+    // the configuration's at the first read and another afterwards, and the record of what ran names the image that was judged.
+    const turning = made();
+    let reads = 0;
+    turning.runner.ends = Object.defineProperty({ ...report() }, "image", { enumerable: true, get: () => (reads++ === 0 ? configuration.image : digest("2")) });
+    expect([await told(turning), kept(turning).details!.provenance.image]).toEqual(["check passed, admitted, ran", { declared: configuration.image, resolved: configuration.image }]);
+    // The pure reading: a report in form is read as a new value with the same members, and each of these is no report.
+    const whole = report();
+    expect([readReport(whole), readReport(whole) === whole, Object.values(bad).map((value) => readReport(value)), judge(configuration, bad["a lone surrogate in a variable"])]).toEqual([whole, false, Array(Object.keys(bad).length).fill(null), { act: "check-error", reason: "report-malformed" }]);
   });
 
   test("the configuration is the rules scope's bytes under the job's digest, or nothing runs: bytes that are absent, that hash to another digest, or that are no configuration give `check-error`, `configuration-unavailable`, with no read token and no runner", async () => {

@@ -1,7 +1,10 @@
 # I3, the second milestone: capability code in the production ports, membership, the platform definitions as data, replay, read sessions and the checker's pure parts
 
 Request `bcf5ec17` (the I3 commission). Branch `request/i3-m2`.
-Written 2026-10-05, at head `bf584e0c1` before this note.
+Written 2026-10-05, at head `bf584e0c1` before this note. Changed the
+same day after the review `25e00e2a` of head `d0354e266`: section 13
+holds the repairs, and the sentences that they made false are corrected
+where they stand.
 
 **This is a milestone of I3. It is not I3.** The commission `bcf5ec17`
 stays open, and so does every duty that sections 4 and 9 list. This
@@ -10,14 +13,16 @@ its review `4db3db9b` (the foundation delivery note, section 13). An
 approval and a landing here record this milestone only. This note does
 not hold the ID of that request: the filing names it.
 
-**It lands after milestone F.** F is the head `2ad870f3b` of
-`request/i3-authority-effects`, under review. This branch holds F's whole
-history, merged at `bf584e0c1`, and everything built after it. Against F
-it changes 214 files, with this note (`git diff --name-only
-2ad870f3b...HEAD`, counted): 172 added or changed and 42 deleted.
-Against `origin/main` at `b2b62d260` it changes 274 files: 219 added or
-changed and 55 deleted (the same command, counted). That count holds
-milestone F's files too.
+**It lands after milestone F, which has landed.** F is the head
+`2ad870f3b` of `request/i3-authority-effects`. It landed on `origin/main`
+in the merge `b452882f8`, after this note was first written. This branch
+holds F's whole history, merged at `bf584e0c1`, and `origin/main` at
+`c0500c315`, merged at `082efdf21`, with everything built after F.
+Against `origin/main` it changes 217 files, with this note (`git diff
+--name-only origin/main...HEAD`, counted): 175 added or changed and 42
+deleted. At the reviewed head `d0354e266` the count against F was 214:
+172 and 42. The three more are files that the repairs changed (section
+13.7).
 
 **What a running system gets from it today: nothing is deployed.** No
 file of the repository deploys the scope Worker, no session secret is
@@ -113,7 +118,7 @@ is a deployment.
 | Act at an inbox and have the act judged on a real observation of the signing key, read from the membership scope that the inbox records. After the key is revoked, the next act on a fresh read is refused. Another member's key is not. | The same test | The same |
 | See that a version of membership that lacks any one rule founds nothing. | `membership.test.ts`, second test; `platform/test/definitions.test.ts`, second test | Real scopes; and as a plain function |
 | Replay a history that real scopes wrote under the production authority. Each grant is derived again from its observation, and the observation's value from membership's history. Eight changed copies are each reported by the name of what they break. | `membership.test.ts`, "replay agrees with the runtime" (the plan's T44) | Real scopes wrote the histories. The verifier read them as bytes over the Worker's read routes |
-| Ask a membership scope for a read session with a signed request, and read the scopes of that repository with it, and no other. Open a stream under it. With no secret bound, get no session and no read. | `scope/test/sessions.test.ts`, T15 and T42 | Real scopes, with the real read sessions. The secret is a test secret, made in each test. Both clocks of a session are one scripted clock |
+| Ask a membership scope for a read session with a signed request, and read the scopes of that repository with it, and no other. Open a stream under it. With no secret bound, get no session and no read. Read a retained snapshot by its digest under a session (section 13.4). | `scope/test/sessions.test.ts`, T15, T42 and the snapshot read | Real scopes, with the real read sessions. The secret is a test secret, made in each test. Both clocks of a session are one scripted clock |
 | Send junk-signed joins from one address and be limited, while the invitee joins from another address and an admin's act from the limited address is admitted. | `scope/test/limits.test.ts`, T39, second test | A real membership scope, through the Worker's route. The `busy` case is shown with a stand-in (entry ES15) |
 | Read the operator's record and the two lists of requests that wait, and send one waiting request again. | `scope/test/operator.test.ts`, T41 | Real scopes. An incident that writes an entry is shown on an entry made by hand |
 | Found a scope under a definition that uses the forms of `hold@1`, with every production default. It then refuses every act and step `unauthorized`, opens no operation and lets no reader read. | `scope/test/founding.test.ts`, "a definition that needs a capability record" | A real scope with the production defaults. The definition is a made-up variant of a lane. It is not run on the two pinned values under production wiring |
@@ -182,7 +187,9 @@ the production authority: the lane scenarios use the test authority.
 
 Step numbers are the plan's. Its section 2.2, dated, lists the commits
 of each. Test counts are by `npx vitest list --json`, run once at the
-gated commit and counted by script. Commands run from the repository
+first gated commit and counted by script. The six counts that the repairs
+changed are corrected from the same command at the second gated commit
+(section 13.6). Commands run from the repository
 root, and `--project <p> <name>` stands for
 `npx vitest run --project <p> <name>`.
 
@@ -206,15 +213,16 @@ controls for them, except the three of step 15 that section 6 reports.
 | 9b, 9e | The destination as data, with eight rules at its acts and handlers. A confirmation opens attempt 1 of each operation that the genesis holds | `platform/src/destination.ts`; `derive/src/{delivery,ledger}.ts` | `--project platform destination` (8) | 1: the first held opening left out (entry ER12) |
 | 9f | Nothing | None | None | None |
 | 22 | The replay derives a preparation, an outcome and the checks of an ancestry record | `replay/src/verify.ts` | `--project replay verify` (38): witness 18.4, T24 | 5, from entries EU2, EU3, EU4 (two) and EU6 |
-| 19, 20 | The host port, the token driver, diagnoses and the redactor | `git/src/host.ts`; `scope/src/{diag,operations}.ts` | `--project git host` (3); `--project scope tokens` (1), T19; `--project scope redaction` (2), T14 | 15, in `notes/2026-10-05-i3-host-review.md`, section 6. One was first inconclusive and was run again after the test was strengthened |
-| 15 | Read sessions, the serving limits of a join, the operator's record | `scope/src/{sessions,limits,operator,reads}.ts`; `client/src/session.ts`; `contract/src/session.ts`; `bytes/src/{session,hash}.ts` | `--project scope sessions` (2), T15, T42; `limits` (2), T39; `operator` (2), T41 | None recorded by the step. 3 run for this note (section 6) |
+| 19, 20 | The host port, the token driver, diagnoses and the redactor | `git/src/host.ts`; `scope/src/{diag,operations}.ts` | `--project git host` (4); `--project scope tokens` (1), T19; `--project scope redaction` (2), T14 | 15, in `notes/2026-10-05-i3-host-review.md`, section 6. One was first inconclusive and was run again after the test was strengthened |
+| 15 | Read sessions, the serving limits of a join, the operator's record | `scope/src/{sessions,limits,operator,reads}.ts`; `client/src/session.ts`; `contract/src/session.ts`; `bytes/src/{session,hash}.ts` | `--project scope sessions` (3), T15, T42 and the snapshot read; `limits` (2), T39; `operator` (2), T41 | None recorded by the step. 3 run for this note (section 6) |
 | Rows I3-31 to I3-38 | A list bound of 64; several send marks with `always`; a value place in platform data; the retained kind `value`; what a retry rule is given; the bound on a rule's message. Membership's last three rules | `contract/src/{bounds,platform,read}.ts`; `derive/src/{marks,sends,judge}.ts` and the validator; `platform/src/{membership,register,directory}.ts`; `replay/src/verify.ts` | `--project derive validate` (57), witness 18.44; `forms-marks`, witness 18.45; `--project replay verify`, case 8; `--project lanes` (3), case 7 | 6: three for I3-34, one for I3-33, one each for I3-35 and I3-38 |
-| Extents, request `42de9e34` | Judgments over data: the first three extents, `classify`, `judgeExtents` | `platform/src/extents.ts` | `--project platform extents` (7) | 3, for the planner's decision on a link that leaves the tree. None recorded for the first commit |
-| 24 | The step `job-read`, a job's read token, the files and the commit of a snapshot | `derive/src/capability/gitread.ts`; `contract/src/capability.ts`; `git/src/{host,snapshot}.ts` | `--project derive forms-prepare`, the last two tests; `--project git snapshot` (3); `--project git host`, second test | 6, in `notes/2026-10-05-i3-snapshot-review.md`, section 5 |
-| 25 | The package `packages/checkers`: origin read, configuration, outcome, store, signer, service, the runner's checkout, the runner's boundary | `checkers/src/*`; one statement of `git/src/gateway.ts` | `--project checkers service` (6), T35; `--project checkers runner` (4), T36; `--project scope checks` (1), T34 | 12, in `notes/2026-10-05-i3-checkers-review.md`, section 8 |
+| Extents, request `42de9e34` | Judgments over data: the first three extents, `classify`, `judgeExtents` | `platform/src/extents.ts` | `--project platform extents` (8) | 3, for the planner's decision on a link that leaves the tree. None recorded for the first commit |
+| 24 | The step `job-read`, a job's read token, the files and the commit of a snapshot | `derive/src/capability/gitread.ts`; `contract/src/capability.ts`; `git/src/{host,snapshot}.ts` | `--project derive forms-prepare`, the last two tests; `--project git snapshot` (4); `--project git host`, second test | 6, in `notes/2026-10-05-i3-snapshot-review.md`, section 5 |
+| 25 | The package `packages/checkers`: origin read, configuration, outcome, store, signer, service, the runner's checkout, the runner's boundary | `checkers/src/*`; one statement of `git/src/gateway.ts` | `--project checkers service` (7), T35; `--project checkers runner` (4), T36; `--project scope checks` (1), T34 | 12, in `notes/2026-10-05-i3-checkers-review.md`, section 8 |
 
 The counts of this column sum to 58 recorded controls (55 by the steps
 and 3 for this note), all of which distinguished. The sum is by hand.
+The repairs of section 13 ran 22 more, which are not in this column.
 
 **The planner's decision on a link that leaves the tree** (commit
 `a269c98ba`; entry EV7, parts (a) and (c)). I read the test and found a
@@ -526,7 +534,9 @@ path, and the check allows that one (entry EW11).
 ## 9. Open questions, by owner
 
 The deltas note, sections 14 to 25, holds 157 entries (EL 9, EM 26, EP
-17, EQ 11, ER 13, EU 7, ET 12, ES 16, EX 10, EV 17, EW 19). Section 13,
+17, EQ 11, ER 13, EU 7, ET 12, ES 16, EX 10, EV 17, EW 19). Section 26,
+written with the repairs, adds 11 entries EZ, which the counts below do
+not hold (section 13.5). Section 13,
 the entries EN, is milestone F's. Four entries are closed whole by
 section 22 (EM6, EM7, EM8, EM10) and are left out. The counts below are
 by a script over the last cell of each of the other 153 rows, which
@@ -580,6 +590,11 @@ the repository.
 
 ## 10. The gate and the cost of the tests
 
+This section is about the first gated commit, `bf584e0c1`, which the
+review read. The repairs were gated again, once, at `082efdf21`: section
+13.6 has that run and its counts, and it is the run that stands for the
+head.
+
 **One run of `npm run gate`**, at commit `bf584e0c1`, tree
 `4140980c95ccf7f136e34b0d12f5857b7f80594e`, as printed: install
 skipped; whitespace 0.0 s elapsed; typecheck 3.5 s elapsed and 9.0 s
@@ -621,16 +636,16 @@ ran one collection (`vitest list`), the pins test alone (3 tests, 0.3
 s), and the three controls of section 6, each of which runs one test
 file twice.
 
-**The commits after the gated one change notes only.** The gated commit
+**The commit after that gated one changed notes only.** That gated commit
 is the merge `bf584e0c1`. `git rev-parse <commit>:packages` is
-`434f4a7e5ad735dfcdec056a6264da21cc9bd2f1` at the gated commit and at
-the head that adds this note. The source and the tests are unchanged
-between them.
+`434f4a7e5ad735dfcdec056a6264da21cc9bd2f1` there and at `d0354e266`,
+which added this note. The repairs then changed source: section 13.6 has
+the gated commit that stands now and its tree of `packages`.
 
 The merge `bf584e0c1` itself brought one notes commit of F
 (`2ad870f3b`, section 13 of the foundation delivery note) and no source.
-`origin/main` is at `b2b62d260`, where it was at the last merge, so
-nothing of it was merged again.
+`origin/main` was then at `b2b62d260`, where it was at the last merge, so
+nothing of it was merged again. It has moved since (section 13.6).
 
 ## 11. How each figure was taken
 
@@ -640,7 +655,8 @@ nothing of it was merged again.
 | 15.7 s for the whole gate | Observed, the shell's `time` on that run |
 | Tests and files by project | Count by script over `vitest list --json`, one collection |
 | Tests of one file, in section 3 | The same count |
-| 214, 172 and 42 files against F; 42 deleted; 274, 219 and 55 against `origin/main` | Count by `git diff --name-only`, with `wc -l` |
+| 217, 175 and 42 files against `origin/main`; 214, 172 and 42 against F at the reviewed head | Count by `git diff --name-only`, with `wc -l` |
+| The figures of section 13 | Section 13.8 |
 | Controls by step, and their sum of 58 | By reading the commit messages, the deltas note and three review notes. Summed by hand. Not a count by script |
 | The three controls of section 6 | Observed, each run once |
 | Open questions by owner | Count by script over the deltas tables' last cells |
@@ -687,3 +703,397 @@ Dated notes are history and are not edited. Where one disagrees with the
 code at this head, the code is right. The plan's section 2.2 names
 milestone F by its earlier head `783be9a07`; F's head is now
 `2ad870f3b`, which differs by notes only.
+
+## 13. After review 25e00e2a: the repairs
+
+The review `25e00e2a` read head `d0354e266` and asked for four repairs,
+each with a witness and one gate. This section says what changed. It also
+answers request `88503049`, a documentation follow-up to the same review
+(section 13.5).
+
+**This is still a milestone of I3, and not I3.** Nothing here is deployed.
+The repairs change no entry form and no lane digest: `packages/contract`,
+`packages/bytes`, `packages/derive`, `packages/lanes/src` and
+`packages/lanes/definitions` hold no source change since `d0354e266`
+(`git diff --name-only d0354e266 HEAD`, read: of those packages only
+`packages/bytes/README.md` and `packages/derive/README.md` changed). The
+pins test passed in the gate.
+
+**The source did not contradict the review.** I read each finding at the
+lines that it cites before I changed anything, and found each as stated.
+
+Each control below distinguished by an assertion, with
+`scripts/control.mjs`. Seven did not at their first run, and I say so
+here. Four were inconclusive because the witness failed by a thrown
+error: I changed the witness so that it fails by an assertion, and ran
+them again. One survived, the control of "told whether or not the head
+moved" in section 13.2: the witness had no input that is answered with no
+entry, so I added one, and ran it again. Two were inconclusive because
+the new test of section 13.3 did not pass before the change: a check of
+the test's own compared every pair of 20,000 objects and passed the
+test's time limit. I made that check run on the small lists only, and
+ran them again.
+
+### 13.1 Finding 1: a malformed runner report
+
+**The fault.** `isRunReport` let a report pass whose strings held a lone
+surrogate, or whose status was negative zero. Canonical bytes refuse
+both. The service then failed between the record of the run and the kept
+outcome. The job stayed `started`, and a later delivery met the same
+report.
+
+**The repair** (`packages/checkers/src/outcome.ts`, `service.ts`).
+`readReport` reads a value once into a new plain value: exactly the six
+members, each variable and each step exactly its two; strings well formed
+and bounded; a status a safe integer that is not negative zero; no hole
+in a list; lists bounded. It never throws. The service reads a report
+once and judges and records what ran from that one reading. A report
+that is not in form is `report-malformed`, with a record of what ran that
+holds the declared image, the digest of no variables, and no step that
+ended. The bounds are this package's numbers (entry EZ1).
+
+**Witness.** `checkers/test/service.test.ts`, "a report that is not in
+form". Twelve malformed reports, each with the configuration's image, a
+confirmed checkout and a complete end. For each: the delivery that ran it
+keeps and signs `check-error`, `report-malformed`; a submit that is sent
+again sends the same outcome; a later delivery that finds the same report
+in the runner's own record gives the same answer and the same record of
+what ran; one runner started, and none at the later delivery. One more
+case shows the one reading.
+
+**Controls: 6.** Without the check of well-formed strings; without the
+check of negative zero; without the exact members of a variable; without
+the bound on a list; with a member that fails passed on as a throw; with
+the record of what ran made from a second reading.
+
+**The sweep.** I read every place where a reply of an outside party is
+used in canonical bytes, a digest, a signature or an entry, and every
+place where a throw could fall between "recorded as started" and "outcome
+kept".
+
+| Place | What I found | What I did |
+|---|---|---|
+| `checkers/service.ts`, the lane's answer to the read-token request | A value that was no answer, such as `undefined`, made the delivery throw after the record of the run. The log line held the answer's own word. The next delivery would have signed `run-lost`, so the job was not stranded for good | Fixed, commit `ae6342998`. Witness: `service.test.ts`, "at most one run", the last case. 2 controls |
+| `checkers/service.ts`, `#submit`: the lane's standing and its answers | A value out of form fails inside the `try`, after the outcome is kept: the outcome stays kept and is submitted again | No change. The log of a refusal holds the answer's `reason` (entry EZ2) |
+| `checkers/configuration.ts`, the rules scope's bytes | Parsed strictly and compared with their canonical text before the digest; every member checked and bounded. Before the record of the run | No change |
+| `checkers/job.ts`, the lane's entries | Checked by `isEntry` and by hash before any member is used. A throw is `unreadable`, before the record of the run | No change |
+| `checkers/service.ts`, the runner's own record at a later delivery | The same report, through `readReport`. A read that fails is `waiting`, and concludes nothing | Covered by the repair |
+| `git/host.ts`, a host's reply to a mint or a revocation | The ID and the end time were checked and then read again for the answer. A reply whose member gave another value at a later read could put an unchecked value in an outcome's evidence. A member that failed made `send` reject | Fixed, commit `19310d8cb`. Witness: `git/test/host.test.ts`, "what is checked of a host's reply". 2 controls |
+| `git/host.ts`, `answered`: the request that comes with a late reply | The request is not checked (entry EZ3). The scope's driver checks the operation and the attempt | No change |
+| `git/host.ts`, `judged` and a revocation's ID | Read from the scope's own sealed entry. `Custody.take` is inside a `try` | No change |
+| `scope/operations.ts`, an answer's evidence | `isAnswer` checks a basis and a body. The ledger checks that the evidence has canonical bytes, in the turn, before any rule reads it (`derive/src/ledger.ts`). The seal turns a draft with no canonical bytes into a refusal, and the driver then records `unknown` | No change |
+| `scope/operations.ts`, a snapshot that comes with an answer | Checked by its pairs, which passes any order and spacing, and stored as given. So bytes that are not the snapshot's canonical bytes could be retained under its digest | Fixed, commit `6829fcca2`. Witness: `scope/test/operations.test.ts`, "a snapshot that comes with an answer", a plain function. 1 control. Its size is not bounded (entry EZ4) |
+| `scope/operations.ts`, a throw between the mark "perhaps sent" and the outcome | The mark is durable and the alarm is set before the send. A pass that fails leaves the attempt marked, and the next alarm records `unknown`. That is the ledger's rule 2 | No change |
+| `scope/operations.ts`, a late answer's operation and attempt | Checked by `isOperationId` and as a safe integer, and against the row of an attempt that was sent | No change |
+
+Outside the places that the review named, I noted one more and did not
+change it: the dispatcher writes a transport's acknowledgment without
+reading it by a guard (entry EZ6).
+
+### 13.2 Finding 2: a background commit and the open streams
+
+**The fault.** The object followed the head after a caller's call, before
+it started the two passes in the background, and at the end of its alarm.
+An entry that a pass wrote, or that a late answer of an outside operation
+wrote, was sent to no stream that waited. Nothing guaranteed a later
+alarm.
+
+**The repair** (`packages/scope/src/turn.ts`, `object.ts`).
+`Turns.onSealed` tells one listener after each transaction that moved the
+head, in the turn's own section, so two commits are told in their order.
+A listener that fails changes no entry. The object's listener is what it
+already ran after a call: the operator's record reads the new entries,
+and each open stream is sent the head. The rules of a stream are
+unchanged: the session is checked before every send, a reader that went
+away is sent nothing, at most one line waits unread, and the line is the
+latest head. The calls after each request and each alarm stay. They cost
+nothing when the head has not moved.
+
+**Witnesses.** `scope/test/operations.test.ts`, "a stream that waits": a
+stream is opened inside the object and has read the head. A late answer
+arrives by itself and writes an entry. The read that waited has the new
+head, with no call, no write and no alarm after that entry, and no alarm
+is stored. `scope/test/turn.test.ts`, "a turn tells its listener": a
+timed entry and an input's entry are each told at their own head, in
+order; a turn that writes nothing tells nothing; a listener that fails
+changes no entry.
+
+**Controls: 5.** Without the object's listener; without the telling of a
+timed commit; without the telling of an input's commit; with a failing
+listener passed on as a throw; with the listener told whether or not the
+head moved.
+
+**The sweep.** Every entry is sealed by one function, `Turns.#seal`, in
+one of two transactions (`grep` for `append(` and `transaction(` in
+`packages/scope/src`, read). Both now tell the listener. So the table has
+one mechanism and several ways in.
+
+| Path | Seals an entry | Followed before | Followed now | Witness |
+|---|---|---|---|---|
+| A caller's `found`, `submit` or `prepare` | Yes | After the call | At the commit, and after the call | `sessions.test.ts`, T15, as before |
+| A timed entry, in the drain of any turn | Yes | After the call, or at the end of the alarm, which waits for both passes | At the commit | `turn.test.ts`, "a turn tells its listener" |
+| The alarm's turn | Yes, timed entries | At the end of the alarm | At each commit, and at the end | The same |
+| A delivery from another scope | Yes | After the call | At the commit, and after the call | The mechanism's two witnesses. No test holds a stream open across a delivery |
+| The dispatcher's diagnosis, in a pass in the background | Yes | No, until a later call or alarm | At the commit | The same. No test holds a stream open across a diagnosis |
+| The operations driver's first outcome of an attempt | Yes | No, when the pass ran in the background | At the commit | The same |
+| The driver's answer in hand, offered again | Yes | No | At the commit | The same |
+| A late answer, given to the driver by the port | Yes | No | At the commit | `operations.test.ts`, "a stream that waits" |
+| `checkpoint` | Yes | Never: the object's method followed nothing | At the commit | The same test, its last step |
+| `settle`, the reads, `session`, `observe`, `resend` | No | Not needed | Not needed | By reading |
+| A diagnosis of `diag.ts` | No: a line in the log | Not needed | Not needed | By reading |
+
+Two things wait on a head: the open streams and the operator's record.
+Both are told. I found no third: the serving limits of a join read the
+head for an answer and wait on nothing, and another scope reads this
+one's standing when it asks.
+
+**A limit.** The stream of the first witness is read inside the object's
+isolate. That a line reaches a reader over the Worker's route after a
+background commit is not shown here: T15 shows the route for a commit
+that a caller made.
+
+### 13.3 Finding 3: the snapshot commit's objects
+
+**The fault.** For each tree that it built, `snapshotCommit` scanned
+every object written so far. For 19,999 directories, each with the same
+blob under a name of its own, that is 199,990,000 comparisons of IDs, all
+within the stated bounds.
+
+**The repair** (`packages/git/src/snapshot.ts`). A set of IDs beside the
+ordered list: one lookup for each tree. The order, the IDs and the bytes
+are unchanged. No bound is lowered.
+
+**Witness.** `git/test/snapshot.test.ts`, "the objects of a snapshot
+commit are each written once". The output of four lists has the digest
+that the earlier code gave: the existing case, 300 distinct trees that
+share one blob, 300 directories that are one tree, and the stated bound,
+19,999 directories. I took the four digests once, by running the test
+against the code at `d0354e266`, and they are constants of the test. The
+work is counted as lookups: 3, 301, 301 and 20,000. No time is measured.
+
+**Controls: 2.** With the scan again, which counts one for each object
+that it compares; without the lookup, so that a shared tree is written
+twice.
+
+**The sweep.** Each loop that I read, with the bound that the source
+states and the worst count by reading. "Linear" means one step for each
+unit of the input named.
+
+| Loop | Bound | Worst count | Result |
+|---|---|---|---|
+| `git/snapshot.ts`, the objects of a commit | 20,000 trees | Was 199,990,000 comparisons. Now 20,000 lookups | Fixed, finding 3 |
+| `git/snapshot.ts`, the directories of the files | 20,000 files, 64 parts | 1,280,000 map operations | Linear |
+| `git/snapshot.ts`, the order of one tree's entries | 20,000 entries | A sort: about 300,000 comparisons of names | n log n |
+| `git/snapshot.ts`, `snapshotFiles` | 20,000 trees walked, 64 deep | One read for each tree walked. A tree that several trees name is read again each time | Linear in trees walked (entry EZ8) |
+| `git/reader.ts`, `parseTree` | 8 MiB for one tree | One pass, with a set of names | Linear |
+| `git/reader.ts`, `parseCommit` | 1 MiB, 64 parents | One pass over the header lines | Linear |
+| `git/reader.ts`, `snapshot` of refs | The bound `refs` | A sort, and one pass for a ref that is there twice | n log n |
+| `git/reader.ts`, `closure` | The bound `closureObjects` | Each object once, by a set. One push for each entry of a tree that is read | Linear in the bytes read |
+| `git/gitops.ts`, the checks of a send | 100,000 objects | One pattern for each ID, one pass over the tree's listing | Linear |
+| `git/gitops.ts`, the listing of refs | None before the read | One pass over what the remote answers | Linear (entry EZ9) |
+| `git/host.ts`, the `token` record of an entry | One entry | One pass over its effects | Linear |
+| `platform/extents.ts`, `matches`, a `**` | 256 bytes for a pattern. None for a path | Was one fill of the rest of the path for each name already reached: about 10,000,000 steps for 2,000 names and six `**`. Now one fill for each `**`: 12,006 | Fixed, commit `079e0b65d` |
+| `platform/extents.ts`, `classify`, the links | None for the changed set or the links | Was each judged path against each link and each path that a link resolves to: 4,000,000 for 2,000 paths and 2,000 links that have nothing to do with them. Now two lookups for each such path | Fixed, the same commit |
+| `platform/extents.ts`, `nameMatches` | 256 bytes for a pattern | The product of one pattern name and one path name | Not changed (entry EZ7) |
+| `platform/extents.ts`, a judged path against the patterns | 8 extents, 32 patterns | 256 matches for each judged path | Linear in judged paths |
+| `platform/extents.ts`, `judgeExtents` | 8 extents | Each review once for each touched extent | Linear |
+| `checkers/outcome.ts`, `readReport` and `judge` | 1,024 variables, 1,024 steps | One pass | Linear |
+| `checkers/configuration.ts` | 32 KiB, 64 variables, 32 steps | One pass, with a set of names | Linear |
+| `checkers/job.ts`, the effects of an entry | One entry | Seven passes over its effects | Linear |
+| `checkers/runner.ts`, the checkout | The reader's bounds | The reader's `closure` | As above |
+
+The two loops of `extents.ts` are one commit, because one test witnesses
+both: `platform/test/extents.test.ts`, "the work of a match and of a
+classification". Its answers have the digests that the earlier code gave
+for 11 patterns against 11 paths and for four classifications of a
+generated change of 240 paths in a tree of 180 links and 45 links to
+links. I took the two
+digests once from the code at `d0354e266`. The work is counted in steps.
+**Controls: 2**, one for each loop.
+
+### 13.4 Finding 4: the read of a retained snapshot
+
+**The fault.** The read route admitted four kinds, so a snapshot of
+staged refs was `not-found` though its outcome entry's commit stores it
+and the replay's HTTP source asks for it.
+
+**The repair** (`packages/scope/src/reads.ts`). The route serves the five
+kinds that a commit stores under a digest alone (`READABLE`).
+Authorization, the bound that is asked of storage before anything is
+read, and the two refusals are the same code as before.
+
+**This claims nothing about a replay's result.** The walk of an ancestry
+record is not derived. A history that holds one still replays as
+`incomplete`, and never as `consistent` (entry EU2; section 4, step 22).
+
+**Witness.** `scope/test/sessions.test.ts`, "a retained snapshot is read
+by its digest". A real membership scope in the namespace `PLATFORM`, a
+real read session, the Worker's route and the replay's own `httpSource`.
+The source that presents the session reads the bytes that the commit
+stored. With no session it is `forbidden`. A digest that the scope does
+not retain is `not-found`. A snapshot over the read bound is `too-large`.
+A `value` asked by the route is `not-found`. **The entry that stores the
+two snapshots is made by hand**, and written by a turn of the real commit
+protocol on the object's own storage. No outcome entry names either
+snapshot, and no outside system answered (entry EZ10).
+
+**Controls: 2.** Without `snapshot` among the kinds; without the size
+check.
+
+**The sweep.** Every retained kind of the contract's `RetainedInput`,
+which the bytes package's guard lists the same six of.
+
+| Kind | Stored by a commit of the scope | The read route | The replay's HTTP source asks for it |
+|---|---|---|---|
+| `definition` | Yes: a founding, a child's declaration, a delivered creation (`core.ts`, `definitions.ts`, `delivery.ts`) | Served | Yes |
+| `entry` | Yes: a foreign entry that an input used (`core.ts`) | Served | Yes |
+| `rule` | Yes: the input of each rule result (`turn.ts`) | Served | Yes |
+| `text` | Yes: a detached text, until it is redacted (`core.ts`) | Served | Yes |
+| `snapshot` | Yes: with the outcome entry that names it (`operations.ts`) | **Was refused. Now served** | Yes |
+| `value` | No. Nothing in `packages/scope/src` stores one, and the store has no column for a domain | Not served | No: the source answers `not-found` before any request |
+
+`value` is retained by no commit and asked for by no HTTP source, so it
+is no fault of this kind. Entry EX6 defers the read of a value by its
+domain, by name. That deferral stands (entry EZ11).
+
+### 13.5 Request 88503049: the guides, and the entries EZ
+
+Request `88503049` is a documentation follow-up to the same review.
+Commit `a5e420378` answers it. I checked each of its three corrections
+against the source before I wrote it.
+
+1. `packages/derive/README.md` said in one row that no production port
+   holds a capability rule, and in another that the production ports
+   hold `hold@1`. `production()` gives `CAPABILITY_CODE` to
+   `capabilities` and to `owners`. The row now says that this pure code
+   is wired. It keeps the limits: the defaults read no grant, let no
+   reader read and send nothing outside the service, and the adapters
+   and a deployment are owed.
+2. `docs/scopes.md` said seven inputs and left out `preparation`. It now
+   lists eight, says how a preparation input differs from the evaluation
+   of rules before a commit, and names `judgePreparation` among the
+   judges.
+3. `docs/scopes.md` said that an outcome entry has no fact kind. Its
+   input holds the owner and the kind of its operation, and `kindOf`
+   derives `owner:kind` whatever the result is. The guide now says so,
+   and that matching a kind does not show a completed check: a row that
+   needs one reads the record that the entry carries.
+
+The same family, found by reading `docs/scopes.md`, `docs/testing.md`
+and the seven package READMEs for a stated count or a statement of what
+the production ports hold:
+
+| Where | It said | The source |
+|---|---|---|
+| `docs/scopes.md`, the packages table; `packages/bytes/README.md` | Seven byte domains | Eight, in the contract package's `DOMAINS`: the domain of a snapshot is the eighth |
+| `packages/scope/README.md`, "Running the tests" | The test Worker binds two classes | Four object classes, in four namespaces (`wrangler.test.jsonc`) |
+| `packages/scope/README.md`, the observing authority | No scope records its membership scope, and no membership scope answers a read | The deployed class uses it, and a membership scope answers the read. The production default reads no grant, which the text now says |
+| `packages/scope/README.md`, after the ports table | The deployed class replaces two of the defaults | It supplies the namespace to the ports that the table names, and replaces two more |
+
+The route table of `packages/scope/README.md` now lists the snapshot
+read. I found the other counts true: nine packages and a tenth, the seven
+places of a mark, eleven lane scenarios, nine projects, three tests of
+the `lanes` project, twelve members of an entry. No stated unbuilt limit is removed.
+
+**The entries EZ.** The deltas note has a new section 26 with 11
+entries, EZ1 to EZ11, for what the repairs and their sweeps found and
+did not change. By owner: the builder, 6 (EZ2, EZ3, EZ6, EZ8, EZ9 and
+EZ10); the scope contract, 2 (EZ4 and EZ5); the authority note, 2 (EZ1
+and EZ7); the proof plan with request `cc570904`, 4, each with another
+owner (EZ1, EZ4, EZ7 and EZ8). EZ11 keeps entry EX6 as it is. The count
+is by reading.
+
+### 13.6 The merge and the gate
+
+**The merge.** `origin/main` moved to `c0500c315` after milestone F
+landed in `b452882f8`. I merged it at `082efdf21`. It brought two
+documents, `notes/2026-10-05-23-sprint-report.md` and
+`plans/021-2026-10-05-jam-as-the-late-night-meme.md`, and no source:
+`git rev-parse HEAD:packages` was `166c2676af34078b14c654151c36fd6c0cc9bd63`
+before the merge and after it (run).
+
+**One run of `npm run gate`**, at commit `082efdf21`, tree
+`76ff797a9eefa1f0305917cf67a9d584446ab427`, as printed: install skipped;
+whitespace 0.0 s elapsed; typecheck 3.0 s elapsed and 8.3 s CPU; test 9.6
+s elapsed and 23.8 s CPU. It printed 505 tests passed in vitest and 6 in
+Node's runner. The whole command took 12.9 s elapsed (the shell's
+`time`).
+
+It is one observed run, on a shared machine with other sessions active
+(Apple silicon; load averages 3.67, 4.02 and 4.32 just before it and
+3.44, 3.95 and 4.29 just after), with a warm package cache. It passed at
+its first run. I ran no second gate.
+
+**Counts**, by `npx vitest list --json` at the same commit, counted by
+script: 505 tests in 67 files. That is 8 more tests than at the first
+gate, in the same files.
+
+| Project | Files | Tests | Change |
+|---|---|---|---|
+| `bytes` | 2 | 17 | |
+| `derive` | 21 | 231 | |
+| `platform` | 7 | 93 | 1 more |
+| `git` | 5 | 14 | 2 more |
+| `checkers` | 2 | 11 | 1 more |
+| `replay` | 2 | 43 | |
+| `client` | 2 | 10 | |
+| `lanes` | 1 | 3 | |
+| `scope`, with the eleven lane scenarios in seven files | 25 | 83 | 4 more |
+
+**The commits after the gated one change notes only.** They change this
+note and the deltas note. `git rev-parse <commit>:packages` is
+`166c2676af34078b14c654151c36fd6c0cc9bd63` at the gated commit and at
+the head. The source and the tests are unchanged between them.
+
+**The two gates compared.** The first printed 497 tests, with the test
+step at 11.8 s elapsed and 26.5 s CPU. This one printed 505, at 9.6 s and
+23.8 s. They are two observed runs under different load, and the
+comparison is not controlled. No saving is claimed.
+
+Beside the gate I ran: the test file of each change while I worked; each
+control, which runs one test file twice; and one collection (`vitest
+list`). One test file of the git project and one of the platform
+project each ran once against the earlier code, for the digests.
+
+### 13.7 The files
+
+Against `origin/main`, `git diff --name-only --diff-filter=AM
+origin/main...HEAD` lists 175 files and `--diff-filter=D` lists 42
+(counted). The reviewed head listed 172 and 42 against F. The 42 are the
+same paths. The three more are files that the repairs changed and that
+the milestone had not: `packages/bytes/README.md`,
+`packages/scope/src/turn.ts` and `packages/scope/test/turn.test.ts`.
+
+The repairs changed 22 files under `packages/` and `docs/`
+(`git diff --name-only d0354e266 HEAD -- packages docs`, counted), and
+the two notes. They changed no `package.json` and not the lockfile.
+
+### 13.8 How each figure of this section was taken, and its limits
+
+| Figure | How taken |
+|---|---|
+| The gate's times and its two test counts | Observed, one run, printed by the gate |
+| 12.9 s for the whole gate | Observed, the shell's `time` on that run |
+| Tests and files by project | Count by script over `vitest list --json`, one collection |
+| 22 controls | Counted by reading this section: 6, 2, 2, 1, 5, 2, 2 and 2. Each observed once |
+| The lookups and steps of the two work witnesses | Counted by the code under test, and asserted |
+| 199,990,000, 10,000,000 and 4,000,000 | By reading the earlier loops, and arithmetic. Not measured |
+| The worst counts of the sweep's table | By reading. Not measured |
+| The digests of the earlier code's output | Observed, by running each new test once against the code at `d0354e266` |
+| 175, 42 and 22 files | Count by `git diff --name-only`, with `wc -l` |
+| The 11 entries EZ by owner | By reading |
+
+**One delegated author made the repairs, in one session**, and wrote this
+section. I read the review in full, and each cited source file where the
+review cites it. For the sweeps I read `packages/checkers/src`,
+`packages/git/src/host.ts`, `reader.ts`, `snapshot.ts` and `gitops.ts`,
+`packages/platform/src/extents.ts`, and `packages/scope/src/operations.ts`,
+`object.ts`, `turn.ts`, `outbox.ts` and the retained read of `reads.ts`,
+each in full or in the parts named. I did not read `gateway.ts`,
+`program.ts` or `push-outcome.ts` of the git package for the sweep of
+finding 3: the review did not name them.
+
+**What nobody did:** run anything on a deployment, a host, a container
+or a real runner; read a stream over a network after a background
+commit; replay a lane's history with an ancestry record as `consistent`;
+measure a time for any repaired loop.

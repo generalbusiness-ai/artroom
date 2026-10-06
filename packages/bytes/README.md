@@ -1,8 +1,9 @@
 # @generalbusiness/artroom-bytes
 
 The one implementation of bytes for every Artroom package: canonical JSON,
-SHA-256, text encodings, Ed25519, and the seven byte domains of the scope
-contract (section 2.1). Every export but the two of `take` is synchronous
+SHA-256, text encodings, Ed25519, and the eight byte domains of the
+contract package's `DOMAINS` (scope contract, section 2.1, and the domain
+of a snapshot of staged refs). Every export but the two of `take` is synchronous
 and pure, so a scope can seal an entry inside one storage transaction. The
 two of `take`, `takeBytes` and `within`, are asynchronous: they read a
 stream, set a timer and abort a signal, and no scope calls them.

@@ -172,6 +172,22 @@ function forOf(owner: string, values: Readonly<Record<string, unknown>>): TokenF
   return null;
 }
 
+/**
+ * The named members of a host's reply, each read once, as a new plain value.
+ * What is checked is then what is used: a reply whose member gives another
+ * value at a later read cannot put an unchecked value in an answer. Null:
+ * the reply is no object, or a member failed when it was read. Either is no
+ * answer.
+ */
+function membersOf<K extends string>(reply: unknown, names: readonly K[]): Record<K, unknown> | null {
+  if (typeof reply !== "object" || reply === null) return null;
+  try {
+    return Object.fromEntries(names.map((name) => [name, (reply as Record<string, unknown>)[name]])) as Record<K, unknown>;
+  } catch {
+    return null;
+  }
+}
+
 /** I3 deltas, entry EG7: an answer that nothing was sent, or that the host refused, as plain data. No body holds a host's text. */
 const notSent = (why: string): TokenAnswer => ({ result: "refused", evidence: { basis: "own-answer", body: { send: "not-sent", why } } });
 
@@ -282,7 +298,7 @@ export class TokenDriver {
 
   /** A host's reply to a revocation by ID, as an answer for the scope. */
   #revoking(id: string, reply: unknown): TokenAnswer | null {
-    const revoked = (reply as { revoked?: unknown } | null)?.revoked;
+    const revoked = membersOf(reply, ["revoked"])?.revoked;
     if (revoked === true) return { result: "confirmed", evidence: { basis: "own-answer", body: { token: id } } };
     // Section 5.7, "Evidence of each outside effect": the host's own answer that no such token is live shows that this attempt did nothing.
     if (revoked === false) return { result: "refused", evidence: { basis: "own-answer", body: { token: id, send: "refused", why: "not-live" } } };
@@ -306,12 +322,14 @@ export class TokenDriver {
    * "Evidence of each outside effect"). A reply with no ID in the form
    * above, with no end time, or whose ID is or holds its own plaintext, is
    * no answer: the attempt is `unknown`, and nothing of the reply is kept
-   * (I3 deltas, entry ET5). A token with an ID, an end time and no
+   * (I3 deltas, entry ET5). Each member of the reply is read once
+   * (`membersOf`), so the ID and the end time of the answer are the values
+   * that were checked. A token with an ID, an end time and no
    * plaintext is `confirmed`: the ledger then knows the ID, and can revoke
    * it, and nobody can use it.
    */
   #minting(at: AttemptOf, reply: unknown, owner: string): TokenAnswer | null {
-    const r = reply as { minted?: unknown; id?: unknown; ends?: unknown; plaintext?: unknown } | null;
+    const r = membersOf(reply, ["minted", "id", "ends", "plaintext"]);
     if (r?.minted === false) return { result: "refused", evidence: { basis: "own-answer", body: { send: "refused", why: "host-refused" } } };
     const plaintext = typeof r?.plaintext === "string" ? r.plaintext : "";
     if (r?.minted !== true || typeof r.id !== "string" || !TOKEN_ID.test(r.id) || timeMs(r.ends) === null || (plaintext !== "" && r.id.includes(plaintext))) {

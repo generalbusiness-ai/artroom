@@ -137,6 +137,9 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
     this.#seconds = bounds.dispatchSeconds;
     this.#record = record;
     this.#streams = new Streams(ports.readers, () => store.scope()?.head ?? null);
+    // Every commit that seals an entry is followed at once, whoever asked for its turn: a pass in the background and a late answer
+    // of an outside operation write their entries in no caller's request, and nothing guarantees an alarm after the last of them.
+    this.#scope.turns.onSealed(() => this.#followed());
     this.#limits = new JoinLimits(wiring.limits);
     this.#sessions = wiring.sessions ?? (() => null);
     // The session requests that this scope has answered, each until its `notAfter`: one more table that is no part of the store.
@@ -155,7 +158,8 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
    * After a call that may have committed: a dispatch pass that the caller
    * does not wait for. The commit set the alarm for the same sends, so a
    * pass that is cut short loses nothing. A pass that fails is left to the
-   * alarm.
+   * alarm. An entry that either pass writes is followed when it is
+   * committed (`Turns.onSealed`), and not from here.
    */
   #sent<A>(answer: A): A {
     this.#followed();
@@ -166,8 +170,11 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
 
   /**
    * What is no history follows the commits: the operator's record reads the entries that are new, from its own mark, and each open stream
-   * is sent the head. Neither can change an answer: a failure of either is dropped here. An entry that a pass in the background wrote is
-   * read at the next call.
+   * is sent the head. Neither can change an answer: a failure of either is dropped here. It runs after every commit that seals an entry
+   * (`Turns.onSealed`), so a stream that waits is sent the head of an entry that a pass in the background or a late answer wrote, with
+   * no further call and no alarm. It also runs after each call and each alarm, which costs nothing when the head has not moved: a stream
+   * is sent a head once, and the record reads from its mark. A stream's own rules are unchanged (`sessions.ts`, `Streams`): the session
+   * is checked before every send, a reader that went away is sent nothing, one line waits unread at most, and the line is the latest head.
    */
   #followed(): void {
     try {

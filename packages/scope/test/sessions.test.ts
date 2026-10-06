@@ -1,14 +1,19 @@
 import { describe, expect, test } from "vitest";
-import { abortAllDurableObjects } from "cloudflare:test";
-import type { SessionClaims, SignedSessionRequest } from "@generalbusiness/artroom-contract";
-import { b64url, canonicalBytes, unb64url } from "@generalbusiness/artroom-bytes";
+import { abortAllDurableObjects, runInDurableObject } from "cloudflare:test";
+import { PROPOSED_BOUNDS, RETAINED_INPUT_BYTES } from "@generalbusiness/artroom-contract";
+import type { Digest, SessionClaims, SignedSessionRequest } from "@generalbusiness/artroom-contract";
+import { b64url, canonicalBytes, canonicalize, parseStrict, unb64url, utf8 } from "@generalbusiness/artroom-bytes";
+import { checkpointOf, snapshotInput, snapshotRead, stagedRefName, timeMs, validateDefinition } from "@generalbusiness/artroom-derive";
+import { RULE_PROFILES } from "@generalbusiness/artroom-derive/rule";
+import { platform } from "@generalbusiness/artroom-platform";
+import { httpSource } from "@generalbusiness/artroom-replay";
 import { requestSession, sessionRequest, type Fetch, type Session } from "@generalbusiness/artroom-client";
 import type { Actor } from "@generalbusiness/artroom-derive/testing";
-import { mintSession, sessionsOf } from "../src/index.ts";
+import { SqliteStore, Turns, Wakes, mintSession, production, sessionsOf } from "../src/index.ts";
 import { later, net, soon } from "./net.ts";
 import { office, repository, rita, routed, una, type Platform } from "./repository.ts";
 import { reader } from "./support.ts";
-import { TEST_DEPLOYMENT, platformNet } from "./worker.ts";
+import { TEST_DEPLOYMENT, platformNet, type PlatformScope } from "./worker.ts";
 
 // Every scope here is on real Durable Object storage, in the namespace `PLATFORM`, under the production authority. The read sessions are
 // the real ones of `sessions.ts`, through the Worker's routes, under a TEST SECRET that each test generates. The stand-ins are those that
@@ -166,6 +171,40 @@ describe("read sessions (authority note, sections 3.9, 3.12 row W6, 5.3 and 5.5;
       const ended = kept.from.read();
       await abortAllDurableObjects();
       expect([(await ended).done, await streams(M), await read(M, "", fresh.reader())]).toEqual([true, { open: 0, released: 0 }, [200, "ok"]]);
+    } finally {
+      platformNet.secret = null;
+    }
+  });
+
+  test("a retained snapshot is read by its digest, by a verifier's HTTP source that presents a session: the bytes that the scope's commit stored; with no session it is `forbidden`, one that the scope does not retain is `not-found`, and one over the read bound is `too-large` by its stored size. The entry that stores each snapshot is made by hand", async () => {
+    platformNet.secret = testSecret();
+    try {
+      const { M } = await repository();
+      const m = await M.at();
+      const pairs = (count: number) => Array.from({ length: count }, (_, root) => ({ ref: stagedRefName(m, "c".repeat(40), root + 1), target: "c".repeat(40) }));
+      // Two snapshots of staged refs. The second is over the bound of one retained input.
+      const [small, large] = [snapshotInput(pairs(2))!, snapshotInput(pairs(Math.ceil(RETAINED_INPUT_BYTES / 150)))!];
+      // A STAND-IN for the outcome entry that names a snapshot: an entry made by hand, with both snapshots beside it, written by a turn of
+      // the real commit protocol on the membership scope's own storage. So the seal transaction stored them, as it stores the snapshot of
+      // an outcome entry (`operations.ts`). No entry names either, and no outside system answered: nothing here is an ancestry check.
+      const written = await runInDurableObject(M.object as unknown as DurableObjectStub<PlatformScope>, async (_instance, state) => {
+        const store = new SqliteStore({ exec: (query, ...bindings) => state.storage.sql.exec(query, ...bindings), transaction: (closure) => state.storage.transactionSync(closure) });
+        const checked = validateDefinition(parseStrict(canonicalize(platform("platform:membership@1")!.data)), PROPOSED_BOUNDS, RULE_PROFILES, { platform: true });
+        if (!checked.ok) throw new Error("membership's data is not valid");
+        const wakes = new Wakes(store, { set: (time) => (time === null ? state.storage.deleteAlarm() : state.storage.setAlarm(timeMs(time)!)) }, false);
+        const turns = new Turns(store, { clock: net.clock, rules: production().rules, alarm: wakes.deadline, capabilities: null }, PROPOSED_BOUNDS, () => checked.definition, () => undefined);
+        return turns.run<string>({ asks: () => [], judge: (view) => ({ verdict: "write", retain: [small, large], draft: { input: { type: "checkpoint", ...checkpointOf(view) }, uses: [], prepared: [], effects: [], sends: [], judgesTime: false }, sealed: () => "written", unfit: () => "unfit", full: () => "full" }) });
+      });
+      const held = await session(M, una);
+      // The replay's own source, over the Worker's route. The first presents the session, and the second presents nothing.
+      const source = (reader?: string) => httpSource(SERVICE, { fetch: routed, ...(reader === undefined ? {} : { reader }) });
+      const allow = { bytes: 2 * RETAINED_INPUT_BYTES };
+      const read = (from: ReturnType<typeof source>, digest: Digest) => real(() => from.retained(M.name, "snapshot", digest, allow));
+      const got = await read(source(held.reader()), small.digest);
+      expect([written, got.ok && got.input, got.ok && snapshotRead(small.digest, got.input.bytes), await read(source(), small.digest), await read(source(held.reader()), `sha256:${"0".repeat(64)}`), await read(source(held.reader()), large.digest).then((r) => (r.ok ? "read" : r)), utf8(large.bytes).length > RETAINED_INPUT_BYTES])
+        .toEqual([{ end: "answer", answer: "written" }, small, pairs(2), { ok: false, reason: "forbidden" }, { ok: false, reason: "not-found" }, { ok: false, reason: "too-large" }, true]);
+      // A value is not read by this route: it is kept by its domain and its digest, and no route names a domain (I3 deltas, entry EX6).
+      expect(await real(() => routed(url(M, `/retained/value/${small.digest}`), { headers: { authorization: held.reader() } })).then(async (response) => [response.status, await response.json()])).toEqual([404, { ok: false, reason: "not-found" }]);
     } finally {
       platformNet.secret = null;
     }

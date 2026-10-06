@@ -180,8 +180,12 @@ function order(a: Uint8Array, b: Uint8Array): number {
  *
  * An empty list is the commit of Git's empty tree. Whether a check may run
  * on no files is its caller's question.
+ *
+ * `tally`, when it is given, counts the lookups that find whether a tree is
+ * already written: one for each tree that is built. A test reads it, to show
+ * that the work is bounded by the number of trees. It changes nothing.
  */
-export function snapshotCommit(files: readonly SnapshotFile[], message: string, bounds: SnapshotBounds = SNAPSHOT_BOUNDS): SnapshotCommit {
+export function snapshotCommit(files: readonly SnapshotFile[], message: string, bounds: SnapshotBounds = SNAPSHOT_BOUNDS, tally?: { lookups: number }): SnapshotCommit {
   if (typeof message !== "string" || message === "" || !message.endsWith("\n") || message.includes("\u0000") || !wellFormed(message)) throw new GitRefusal("malformed-commit", "message");
   if (files.length > bounds.files) throw new GitRefusal("too-large", "files");
   const root: Dir = { files: new Map(), dirs: new Map() };
@@ -203,6 +207,13 @@ export function snapshotCommit(files: readonly SnapshotFile[], message: string, 
     dir.files.set(last, { mode: file.mode, id });
   }
   const objects: BuiltObject[] = [];
+  // The IDs of `objects`, beside it: whether a tree is already there is one lookup, whatever the number of trees. The list keeps the
+  // order, which is each tree where it was first built, after the trees that it names.
+  const written = new Set<ObjectId>();
+  const known = (id: ObjectId): boolean => {
+    if (tally) tally.lookups++;
+    return written.has(id);
+  };
   const write = (dir: Dir): ObjectId => {
     const entries = [
       ...[...dir.files].map(([name, f]) => ({ key: utf8.encode(name), line: utf8.encode(`${f.mode} ${name}\0`), id: f.id })),
@@ -210,7 +221,10 @@ export function snapshotCommit(files: readonly SnapshotFile[], message: string, 
     ].sort((a, b) => order(a.key, b.key));
     const data = concat(entries.flatMap((e) => [e.line, bytesOf(e.id)]));
     const id = idOf("tree", data);
-    if (!objects.some((o) => o.id === id)) objects.push({ id, type: "tree", data });
+    if (!known(id)) {
+      written.add(id);
+      objects.push({ id, type: "tree", data });
+    }
     return id;
   };
   const tree = write(root);

@@ -50,7 +50,8 @@ export interface Configuration {
 
 const text = (v: unknown, max: number): v is string => typeof v === "string" && v !== "" && wellFormed(v) && utf8(v).length <= max && !v.includes("\u0000");
 const whole = (v: unknown, min: number, max: number): v is number => typeof v === "number" && Number.isSafeInteger(v) && v >= min && v <= max;
-const exactly = (v: unknown, names: readonly string[]): v is Record<string, unknown> => isRecord(v) && Object.keys(v).length === names.length && names.every((name) => Object.hasOwn(v, name));
+/** A record with exactly these members. `outcome.ts` reads a runner's report with it. */
+export const exactly = (v: unknown, names: readonly string[]): v is Record<string, unknown> => isRecord(v) && Object.keys(v).length === names.length && names.every((name) => Object.hasOwn(v, name));
 const judged = (v: unknown): v is Judged => exactly(v, ["status", "line"]) && whole(v["status"], 0, 255) && text(v["line"], 1024) && !/[\r\n]/.test(v["line"] as string);
 
 /** The digest of a configuration value, in its domain. */
