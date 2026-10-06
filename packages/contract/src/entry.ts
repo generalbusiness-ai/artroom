@@ -131,6 +131,12 @@ export interface Send { n: number; to: ScopeRef | Seed; message: Message }
  * its own entry opens is named `{ k }`, so no entry holds its own position.
  * `selected` is true or false on a `confirmed` result of an operation whose
  * kind selects one result, and null on every other record.
+ *
+ * `for`, on an `operation` (revision 20, section 17.2a): the local ID of the
+ * item whose reservation the operation draws on, or `"self"` for the item
+ * that the same entry opens. An operation of a kind that an item holds
+ * states it, and no other operation does. So an entry under a definition
+ * that states no `holds` has the bytes it had.
  */
 export type Effect =
   | { effect: "open"; item: number; type: string; state: string }
@@ -145,7 +151,8 @@ export type Effect =
   | { effect: "record"; capability: CapabilityName; kind: string; key: readonly FieldValue[];
       state: string; values: Record<string, unknown> }                                  // one change of a capability's record; section 6.11
   | { effect: "activate" }                                                              // section 7.2
-  | { effect: "operation"; k: number; owner: CapabilityName | PlatformDefinition; kind: string; attempts: number }   // section 4.3
+  | { effect: "operation"; k: number; owner: CapabilityName | PlatformDefinition; kind: string; attempts: number;
+      for?: number | "self" }                                                             // section 4.3; `for`: the holder that the operation is for, of a held kind only (section 17.2a)
   | { effect: "attempt"; operation: OperationId | { k: number }; attempt: number;
       result: "opened" | "confirmed" | "refused" | "unknown"; selected: boolean | null }   // section 4.3
   | { effect: "index"; from: FactRef; fields: Record<string, FieldValue> }              // a projection row in the directory
