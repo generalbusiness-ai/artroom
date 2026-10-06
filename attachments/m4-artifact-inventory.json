@@ -1,0 +1,980 @@
+{
+  "head": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+  "nativePaths": 121,
+  "currentArtifacts": 121,
+  "uniqueEvents": 121,
+  "missing": [],
+  "duplicated": [],
+  "bad": [],
+  "primaryIncluded": true,
+  "artifacts": [
+    {
+      "path": "docs/scopes.md",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:17af23f37466a4025060728a5acd77bc78667c77",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "docs/testing.md",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:88a0ebc3d1aa8884f7679339ab07a6ddf30bb053",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "notes/2026-10-05-i3-contract-deltas.md",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:9908816cb7a7292dc4dc6d940bfa12f8322735ea",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "notes/2026-10-06-i3-fourth-milestone-delivery.md",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:84e29afd221a656a676a76a1ce489c2ed88e21f2",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/bytes/README.md",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:1963ee7b0b81b2fbef82d66f1da2bf83bc2ae7b2",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/bytes/src/facttext.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:b438f16d01b2dea17ef1bfda49c8e8439922e531",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/bytes/src/hash.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:5fc9b5bc5eb0e0c852b4f697110b0b64b4621a66",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/bytes/src/index.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:ae64bd53a6eaf72c2a8a4579e5e49bb169bd924f",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/bytes/src/records.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:c981ca9d0c6cc7e4ada5f45333641f54b3aa3451",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/bytes/test/facttext.test.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:569ae7e5a733046be6cca1daece4a06fafcb24aa",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/client/src/binding.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:b2072fa5fa89d43856eb775fa9a937bb2839b4fc",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/client/src/http.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:5f6bc3336b99fd06e0761a1da47e4a6257c987d6",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/contract/src/definition.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:17f8869a06a0450e23d781c21c613f7cedcdef6f",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/contract/src/entry.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:be5712a1abbdab48d4dfdb4214a3080953d2f7c4",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/contract/src/index.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:27172ebb4a085519dcae2d44b31f64b61ee02968",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/contract/src/observation.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:d05b133354f617385669eb26ffe98de5471da4f7",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/contract/src/observes.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:1188711c687087b75c38559aba0ebd84157defc7",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/contract/src/platform.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:dc4ec33088c42c45ddb0eeb3eaf2cc2ae665fdfc",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/contract/src/report.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:afe0ee6ddc8af145a270d2121084614dc933d89f",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/contract/src/transport.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:c34c230b5f9dc1bf95ea062be4a9df54967e42e8",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/derive/README.md",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:7583a9b458da50f2f32e2ea19ba5e122220d5c53",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/derive/src/binding.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:fc8b99647abe2246bed2a330e5f93b3217a4094d",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/derive/src/capability/ancestry.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:e632994ff0bfde4551d58773de4d7684efcca099",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/derive/src/delivery.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:62d3a75c6805e902660ce27844c6de7fd0dde5be",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/derive/src/draws.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:7b70d2fc1e527bceac61eb4e5d4a00d446c1adf6",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/derive/src/effects.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:d2b5915ec557d0cc02e8fef313bff1c5464cbc25",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/derive/src/evidence-values.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:7306b7782399ae53786d15744fd472c904a87b33",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/derive/src/fields.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:0d666331d32781592a7951c53a9a826c95f274f8",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/derive/src/fold.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:3113c65a4057991a93bc474efa36eca5d379738c",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/derive/src/genesis.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:be2d3e8a3597493aa3a5c16c79283612c9b6c8f9",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/derive/src/guards.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:c101c0a6ebf56f7b58f694a0b93b1c7990bb216e",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/derive/src/handlers.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:3e3a4b7e99c3fa88b6fd1040c39336f12f6cfcb9",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/derive/src/held.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:9eca007db9847d9bcb39244124b55e5ec9a3bdda",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/derive/src/index.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:c246aa1c43ee1f542ac32d1420d7a6b198c30ad9",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/derive/src/judge.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:9ac50c52b2840f8d4361e3041365561bb37033a0",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/derive/src/ledger.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:0804fd947ceadfdcfd18b3baa4f53819621913e8",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/derive/src/markers.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:1477e5ca6566b480d83ef8ca8ea3ee5325b6f7bd",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/derive/src/marks.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:1816aef38ded79976fa055818e8e676cfd191706",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/derive/src/observes.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:3c0cc90bfe970849deea853d71551d715d4f3c34",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/derive/src/outcomes.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:418cf10caa746dcf25668eb005d0fbc075a3ebb2",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/derive/src/reserve.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:17262a43b421e589bcc67259a380a7f5d2145214",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/derive/src/sends.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:1c1254175ee248439d432162d56373feb18e7d6e",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/derive/src/settle.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:f0763f55ec3b6e22d617902e6840ff852ff62074",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/derive/src/state.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:b342603c6a708ea70d10bc5c01ce4315a82a980c",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/derive/src/validate/binding.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:7aa973be4b18cb91e42930a20717df1addc2ab30",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/derive/src/validate/capacity.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:76a0d1b6a0b598ee342298205ab7e7cb14de0539",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/derive/src/validate/context.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:57c7cb7fc263f286a5440afd67b97092aa2dedf8",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/derive/src/validate/effects.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:144613996eb3f2ca7c35523074ca3323401d5754",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/derive/src/validate/handlers.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:418cd780eeb5d24db2052557ae5342d33c3d497d",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/derive/src/validate/holds.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:da296e1cd08ef21df9b55a7cc1d62d932bc3f99d",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/derive/src/validate/index.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:8e52bc52dc813d9bd72d6cd35d3db5dd2f346230",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/derive/src/validate/items.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:0e85e59ed9bb11e373b309751bcdd2b1d7a7d7b9",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/derive/src/validate/markers.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:9ca4b735f550262b03aa0b7f2fe0b1fc2bfecc46",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/derive/src/validate/observes.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:108fc24573c4e7c3207b1eb762fb75626109caad",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/derive/src/validate/sends.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:d02926330df868521bfc4dfa66dade7c9fdd500c",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/derive/src/validate/shape.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:9c12040d42652236f05fe378b932366b8a028844",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/derive/test/clause-identity.test.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:2199eae647e4368517f1d0eb9b65456e47e5d511",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/derive/test/fixtures-holds.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:4a1dd1768f29087ab39c505670a9ec42cbc7b330",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/derive/test/fixtures-observes.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:f32b4fb4b1ee73f9d8d1e6b3b6938aee590bddcc",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/derive/test/fixtures.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:9c3208226c84f0ae3a59d54e95eedadb0b3b8075",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/derive/test/forms-binding.test.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:565456daf78914ccc05098cedc17b6cdd3004495",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/derive/test/forms-final-holder.test.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:73b3f28eece2181672c7518e117b68fa96c3bab5",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/derive/test/forms-guards.test.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:33623ccb44e5c7560756f2d5ca59a6a5b60caf16",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/derive/test/forms-holds.test.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:d5e2a1a7cdb9d05e23ed56ca4c1dd4ceb3fed830",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/derive/test/forms-marks.test.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:ff81640f013bb533273cdc38d2f37fb870b803aa",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/derive/test/forms-observes.test.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:100293c6060c8b9f27f84655ad091ba4efeb8ab7",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/derive/test/forms-sends.test.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:e08f43c204654a5662ff41b9e7d6a96a0d95a6ed",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/derive/test/forms-settles.test.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:b0fc4a8d2f5815108532f829978dff42c9dc064c",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/git/test/factref.test.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:9703565ef5669a0a3f2f464c7f6466e0c292b6df",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/lanes/test/definitions.test.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:b28d6760c362c0816924cc82ff486e18722f82ae",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/platform/src/destination-objects.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:a7c17d3f8a05a026e1eef5fb5344c0b2600e9c28",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/platform/src/destination-reading.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:4f8fa0a736307ff285d90c9892e018a8ab579595",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/platform/src/destination.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:c127003abddb79cce52fe8d152e53055e7ebc8fd",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/platform/src/directory.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:92fdfc2a81f7ee283f866eb1e02c6328e65d447e",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/platform/src/index.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:904fea5c847f2453093f4423472780ce53f2ffb4",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/platform/src/membership.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:3284b063813a43752476fa1c29eebd76b2262fb8",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/platform/src/register.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:e54670e5edf0b08901e62b6af0b811d4ae614a35",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/platform/src/reservation.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:2dfe67c45a24b25f1221f0f32e49dcf52bcf3682",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/platform/src/rules-scope.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:da8dfdd8c3b67da9cfb1b42f59940961e78d1506",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/platform/test/definitions.test.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:557e5493da5b13341fa7825a8733e951f2839002",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/platform/test/destination-creates.test.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:36922c940414c7b37ceb9aa528fe4d40d8ab5325",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/platform/test/destination-objects.test.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:993d057b4545436092d406ae98c3386c7f6c0243",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/platform/test/destination-reading.test.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:c95eab43e9a50d4002315093f7140c7313216a92",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/platform/test/destination.test.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:a333c2e0ba4c994c948c263b2f6912ca4d3312a1",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/platform/test/directory.test.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:df476bc65cfe7ba97e549bec6e60a28fc0d26e19",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/platform/test/reservation-authority.test.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:d3aa1975fcdaa3f141b1d96ae49f90ff302af2a8",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/platform/test/rules-scope.test.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:e397d94fdd3a13d092936a265556be3dc9caeb98",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/platform/test/rules.test.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:b5d5f38fdfb2a0332c0e0ee9883438869f0de717",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/platform/test/support-destination.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:e5231bf2231043981d8e89d3c4354a84ac12301d",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/platform/test/support-founding.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:68f410a7840c57e7aeaac3b45404d596681d7779",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/platform/test/support-rules.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:caeb1af2702d116a69b105b67536a41bc5e2e7fc",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/replay/README.md",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:4606c7da98f9a0281262c14c7737875ba45f2bde",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/replay/src/report.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:25c562af6a633f23ff15d506c78c9239ff7e8459",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/replay/src/source.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:d9141d7b9dc41005cdc800625fa159a0b4ef852f",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/replay/src/verify.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:9f8de28992b1f98c9b734799048f1adbd5f48e0d",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/replay/src/view.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:e3b1250013e736d6cbe405c1b754a920b25eb245",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/replay/test/decisions.test.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:ad8623910e5dffb954bd9b4213cc748554ed183a",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/replay/test/staging.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:456960233724d09941dceeaaf6dd7753098a3bf7",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/replay/test/verify.test.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:fbcaa787f39439e6c791e39566fb65751f820628",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/replay/test/weighing.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:77c67ef53f1b17abe2ecf8317de578f30026881d",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/scope/README.md",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:7fc0e3b0d9ca5885a2d16709ea9660c81b573c9e",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/scope/src/authority.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:ba171523363a3b6f40a90c8c372f800cd67c79c2",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/scope/src/core.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:1d5aebe5a2f8a060967e47d108e65eb52b4abd03",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/scope/src/delivery.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:690f2cb48bc1eac29a4e00840610d1c78764f242",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/scope/src/namespace.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:0f7222f4af517329791022b3dbe14130b5aa47dd",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/scope/src/object.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:3ebe6728012453b1b65b8c664f4d1e883d0eb855",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/scope/src/operations.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:9150639ab7a38eb3304f4801715c15ec456e1d02",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/scope/src/ports.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:974957bf7379e67e206b8315a894c5ab3673fb98",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/scope/src/reads.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:73d0b59b973e9a9141b0c5877e36b24f6b2ad99e",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/scope/src/sqlite.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:a785c24838734d3dcda9cdb7e77425ba2fe415d1",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/scope/src/testing.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:510e6994004de207b7f2bd39bc8ceea1de00f252",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/scope/src/turn.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:5e5a9abca9da8188552128f4895ea0a07a060357",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/scope/src/worker.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:3c8e990ce3e24a341ec4271fbb5bd827ed7fdd7b",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/scope/test/founding-real.test.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:d936d780ab15997e5a7e75de53ecc5f412c3bc90",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/scope/test/holds.test.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:d7eaafa6a4ab0f76a17ab7194a297f167407e402",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/scope/test/keyed.test.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:f6086a58d70bb6a1d25f32a389a98becb40da819",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/scope/test/membership.test.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:6c16b6b48bd7e63d08281664d412bb24566b1874",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/scope/test/observes.test.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:a7579859ff6dcb527266b2d7aad83884a7ea73e4",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/scope/test/operations.test.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:6d4826d923de75a9b3e0dfbfc76aa976db957279",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/scope/test/repository.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:781212b07402f6de2edc731aafc3e34fc868f587",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    },
+    {
+      "path": "packages/scope/test/values.test.ts",
+      "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:230007afe9d6d44bf711b20d36515f36dad44a2f",
+      "commit": "057392c6cc851a79ba7ea65ca6e94d460315ddc5",
+      "stale": false,
+      "retired": false,
+      "describes_superseded_world": false
+    }
+  ]
+}
