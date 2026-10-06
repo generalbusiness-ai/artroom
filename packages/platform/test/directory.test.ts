@@ -19,6 +19,9 @@ const WRITTEN = ["write", null, null];
 const sends = (entry: Entry) => entry.sends.map((send) => [send.n, send.message.class, "type" in send.message ? send.message.type : null]);
 /** The canonical bytes of two declared definitions of derive's test fixtures: a desk, whose `create` sends name the ticket's digest. */
 const BYTES = { desk: canonicalize(desk), ticket: canonicalize(ticket) };
+/** A value in the domain of a definition that is no valid definition: its bytes hash to its digest, and no runtime validates them. */
+const broken = { format: "artroom-definition-1", name: "broken" };
+const BROKEN = { bytes: canonicalize(broken), digest: valueDigest("artroom-definition-1", broken) };
 /** An observation of the rules scope, as the entry would retain it: what it holds as `active`, at one head. */
 const rulesObserved = (of: ScopeRef, active: readonly Digest[], n = 1): ObservationUse => {
   const observation: RulesObservation = { subject: "rules", of, head: { seq: 3, hash: definitionDigest(desk) }, revision: 0, content: { asked: "definitions", active: active.map((digest) => ({ digest, name: "ticket" })) }, definition: "platform:rules@1", at: T0 };
@@ -102,6 +105,8 @@ describe("the rules of platform:directory@1, each as a plain function (authority
   const run = (name: string, ...args: unknown[]): unknown => (directoryRules[name] as PlatformRule & { run: (...args: unknown[]) => unknown }).run(...args);
   const UNAVAILABLE = { holds: null, reason: "dependency-unavailable" };
   const HOLDS = { holds: true };
+  const UNSUPPORTED = { holds: false, name: "unsupported-definition", code: "unsupported-definition" };
+
   const opened = (kind: string, attempts: number) => [{ effect: "operation", k: 0, owner: DIRECTORY, kind, attempts }, { effect: "attempt", operation: { k: 0 }, attempt: 1, result: "opened", selected: null }];
 
   // Row 9: the definition is the desk, whose named closure is the desk and the ticket.
@@ -126,6 +131,9 @@ describe("the rules of platform:directory@1, each as a plain function (authority
     ["9: an observation of another scope than `repository.rules` is none", "definition-active", [given(d, "open-issue", asked, hand(activeAt(membership), both))], UNAVAILABLE],
     ["9: the entry would lack the definition's bytes", "definition-active", [given(d, "open-issue", asked, hand(activeAt(rules), [BYTES.ticket]))], UNAVAILABLE],
     ["9: the entry would lack the bytes of a definition of the closure", "definition-active", [given(d, "open-issue", asked, hand(activeAt(rules), [BYTES.desk]))], UNAVAILABLE],
+    // Revision 25, EP15: bytes that hash to their digest and do not validate are refused, and the signer is not told to try again.
+    ["9: bytes that hash to the digest and do not validate", "definition-active", [given(d, "open-issue", { definition: BROKEN.digest }, hand(activeAt(rules, [BROKEN.digest]), [BROKEN.bytes]))], UNSUPPORTED],
+    ["9: a closure that names more definitions than the bound", "definition-active", [{ ...given(d, "open-issue", asked, hand(activeAt(rules), both)), resolved: { ...given(d, "open-issue", asked).resolved, bounds: { ...PROPOSED_BOUNDS, namedDefinitions: 0 } } }], UNSUPPORTED],
     // Row 10: the worker is an active member; an agent's controller is the signer, or the signer is an admin.
     ["10: an active member that is no agent", "worker-standing", [standing({})], HOLDS],
     ["10: a removed member", "worker-standing", [standing({ memberState: "removed" })], { holds: false, name: "worker-not-active" }],
@@ -166,7 +174,7 @@ describe("the rules of platform:directory@1, each as a plain function (authority
 
   test("the table has exactly the rules that the note's table of marks names for the directory and that are written, each of the kind of its place; the evidence of a confirmed import states the imported head", () => {
     expect(Object.entries(directoryRules).map(([name, rule]) => [name, rule.place, "refusals" in rule ? rule.refusals : "most" in rule ? rule.most : null])).toEqual([
-      ["open-import", "effect", 2], ["next-number", "effect", 2], ["definition-active", "guard", ["not-activated"]], ["worker-standing", "guard", ["worker-not-active"]], ["reopen-import", "effect", 2],
+      ["open-import", "effect", 2], ["next-number", "effect", 2], ["definition-active", "guard", ["not-activated", "unsupported-definition"]], ["worker-standing", "guard", ["worker-not-active"]], ["reopen-import", "effect", 2],
       ["import-spent", "guard", ["import-not-spent"]], ["index-row", "effect", 32], ["index-number", "effect", 2], ["create-lane", "send", null], ["create-rules", "send", null], ["create-destination", "send", null], ["import", "outcome", null], ["import-update", "send", null],
     ]);
     // Row d: basis `own-answer`, so no read is decisive; it selects nothing; another attempt may follow.
@@ -257,8 +265,10 @@ test("a lane is created only under a digest that the retained observation of the
     said(d.act(rita, "open-issue", opening(d), { observed: [rulesObserved(rules, [deskDefinition.digest])], values: [BYTES.ticket] })),
     said(d.act(rita, "open-issue", opening(d), { values: [BYTES.ticket] })),
     said(d.act(rita, "open-issue", opening(d), { observed: active(d).observed })),
+    // Revision 25, EP15: a digest that is `active`, whose bytes hash to it and do not validate, is refused under its own code.
+    said(d.act(rita, "open-issue", opening(d, {}, BROKEN.digest), { observed: [rulesObserved(rules, [BROKEN.digest])], values: [BROKEN.bytes] })),
     d.head.seq, d.item(0).values["lastNumber"],
-  ]).toEqual([["refused", "guard-failed", "not-activated"], ["unavailable", "dependency-unavailable", null], ["unavailable", "dependency-unavailable", null], head, 0]);
+  ]).toEqual([["refused", "guard-failed", "not-activated"], ["unavailable", "dependency-unavailable", null], ["unavailable", "dependency-unavailable", null], ["refused", "unsupported-definition", "unsupported-definition"], head, 0]);
 
   // One entry: the row, with the next number, and the one `create` of a lane under that digest, at ordinal 0. Its cause is the
   // act's intent. The entry retains the observation of the rules that its guard read.

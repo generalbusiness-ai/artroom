@@ -479,15 +479,24 @@ export const directoryRules: Rules = {
    * in that observation, and the bytes of the definition and of each
    * definition of its closure are at hand and validate. `not-activated`: the
    * digest is not `active` there, whether it never was or is `retired`.
+   *
+   * `unsupported-definition`, with that name, as the note's revision 25
+   * decides it (section 12.1.2, "The refusals of `definition-active`"; I3
+   * delta EP15): the bytes of the definition, or of one of its closure, hash
+   * to their digest and do not validate in this runtime; or the closure
+   * names more definitions than the bound. It does not pass with time, so
+   * the signer is not told to send the act again.
+   *
    * Not completed, `dependency-unavailable`: the entry would lack the
    * observation, which must be of the rules scope that `repository.rules`
-   * names; or it would lack the bytes of one definition, or bytes that this
-   * runtime validates (section 12.1.2, "Activation and the creator's read").
+   * names; or it would lack the bytes of one definition (section 12.1.2,
+   * "Activation and the creator's read").
    */
   "definition-active": {
-    place: "guard", refusals: ["not-activated"],
+    place: "guard", refusals: ["not-activated", "unsupported-definition"],
     run: (given) => {
       const unavailable = { holds: null, reason: "dependency-unavailable" } as const;
+      const unsupported = { holds: false, name: "unsupported-definition", code: "unsupported-definition" } as const;
       const digest = given.resolved.fields["definition"];
       const rules: unknown = repositoryAt(given).refs["rules"];
       const observation = given.observed({ asked: "definitions" })?.observation as RulesObservation | undefined;
@@ -498,10 +507,14 @@ export const directoryRules: Rules = {
       for (const queue: Digest[] = [digest]; queue.length > 0;) {
         const next = queue.shift()!;
         if (read.has(next)) continue;
-        if (read.size > bounds.namedDefinitions) return unavailable;
+        if (read.size > bounds.namedDefinitions) return unsupported;
         read.add(next);
-        const checked = validateDefinition(given.value(DEFINITION_DOMAIN, next, bounds.definitionBytes), bounds, PROFILES);
-        if (!checked.ok || checked.definition.digest !== next) return unavailable;
+        // A value is at hand only when its bytes hash to the digest in the domain. Without one, the bytes cannot be read now.
+        const bytes = given.value(DEFINITION_DOMAIN, next, bounds.definitionBytes);
+        if (bytes === undefined) return unavailable;
+        const checked = validateDefinition(bytes, bounds, PROFILES);
+        if (!checked.ok) return unsupported;
+        if (checked.definition.digest !== next) return unavailable;
         queue.push(...namedIn(checked.definition.declared));
       }
       return { holds: true };
