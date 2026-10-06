@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at plans/023-2026-10-06-connected-story-current-tasks.md","body":{"commit":"c6ed5dd0dd4facbc7a5065ab273a70f4aac306cb","path":"plans/023-2026-10-06-connected-story-current-tasks.md"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:5a4f72965e19f5f1e6325417e563978afc57eda0","text":"Merge retired a covered predecessor; the successor is at plans/023-2026-10-06-connected-story-current-tasks.md."}
