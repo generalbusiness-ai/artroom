@@ -465,6 +465,20 @@ const M51 = {
 };
 
 describe("18.51: a settlement by a mark, and a bound request, at a full scope", () => {
+  test("the decision fold treats a bound subject named __proto__ as an own name", () => {
+    const data = structuredClone(M51) as unknown as import("@generalbusiness/artroom-contract").PlatformData;
+    data.receives["stop"] = JSON.parse(JSON.stringify(data.receives["stop"]).replaceAll("also.job", "also.__proto__"));
+    data.receives["stop"]!.also = Object.fromEntries([["__proto__", { item: "job", by: "job" }]]);
+    const definition = valid(validateDefinition(data, PROPOSED_BOUNDS, PROFILES, { platform: true }));
+    const G = new Jobs(definition);
+    expect(G.free(3).deliver(G.request(Q, "start", {}))).toBe("new work");
+    const job = G.head.seq;
+    expect(G.free(1).does("work", on(G, job))).toBe("new work");
+    G.free(0);
+    expect(G.deliver(G.request(Q, "stop", { job: G.fact(job) }))).toBe("settles");
+    expect([G.last3(), G.state.holder(job), G.replay().holder(job)]).toEqual([["refused", "too-late", 0], null, null]);
+  });
+
   test("a local fact field that names the holder's opening is normalized identically by the judge and decision fold", () => {
     const data = structuredClone(M51) as unknown as import("@generalbusiness/artroom-contract").PlatformData;
     data.receives["stop"]!.fields = { job: { type: "fact", kind: ["start"], under: data.name, required: true } };

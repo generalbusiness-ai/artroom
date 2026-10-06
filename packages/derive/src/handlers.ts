@@ -101,7 +101,7 @@ export function decisionBinding(view: StateView, definition: ValidDefinition, en
   if (!stated) return null;
   const read = messageRead(view, scope.at, handler, found.fields, bounds);
   if (!read.ok) return null;
-  const also: Record<string, AlsoRule> = {};
+  const also: Record<string, AlsoRule> = Object.create(null);
   const select = (name: string): void => {
     if (Object.hasOwn(also, name)) return;
     const rule = own(handler.also, name);
