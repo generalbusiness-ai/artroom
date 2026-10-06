@@ -113,15 +113,22 @@ keeps a value beside an intent
 
 The destination has stand-ins of its own, in
 `packages/platform/test/support-destination.ts`. `standInRules` is a rule
-for each of the ten marks of the destination's data that the platform
-package has no rule for (`notes/2026-10-05-i3-contract-deltas.md`,
-entries ER4 to ER9): without them nothing is created under
-`platform:destination@1`, in a test as in production. `bureau` is a
-made-up directory that creates one destination scope. The lane's and the
-register's entries are made by hand. `Branch` is a destination scope in
-memory below such a bureau. A test that uses one says so. It shows the
-destination's rows and its eight real rules, and nothing about an outcome
-entry, a push or a founding.
+for each of the two marks of the destination's data that the platform
+package has no rule for, `first-head` and `receipt`
+(`notes/2026-10-05-i3-contract-deltas.md`, entries ER9 and FA6): without
+them nothing is created under `platform:destination@1`, in a test as in
+production. `Branch.read` is a stand-in reader: what `observed` and the
+entries in `uses` say for one reservation, written by hand. The rule
+`judge` and its judgment are the package's own, and in the runtime that
+rule is given no reader (entry FA9). `bureau` is a made-up directory that
+creates one destination scope. The lane's and the register's entries,
+each observation and every answer of the Git host are made by hand.
+`Branch` is a destination scope in memory below such a bureau. A test
+that uses one says so. It shows the destination's rows and its 17 real
+rules as judgments in memory: what an outcome entry derives from an
+answer that the test wrote. It shows nothing about a host, a gateway, a
+push, an observation of membership or of the rules, a lane's entry, or a
+founding.
 
 The token ledger has three stand-ins. `TokenHost` and `Vault`, in
 `packages/git/test/support/tokens.ts`, stand for a Git host's token

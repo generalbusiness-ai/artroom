@@ -1363,3 +1363,112 @@ entry that records its result: request `cc570904`.
 
 **What was not run.** No deployment and no provider. No host: the Git
 host of the witness is a stand-in. The gate was not run.
+
+## 27. Steps 9b, 9e and 9f: the destination, on the authority note's revision 26
+
+Written 2026-10-06, on `request/i3-dest2`, by the worker of those steps.
+Entries have the prefix FA. The scope contract is at revision 19
+(`1ca8a59bf`), which is adopted.
+
+**The basis of this work was approved, and its adoption was not recorded
+when it was built.** It builds the authority note's revision 26, at
+`f7175296`: its section 12.1.5, "The destination, decided in revision
+25", which revision 26 keeps unchanged (Part B of its section 13.15).
+The checker approved revision 26. The planner's adoption was expected
+and was not recorded. Nothing of it is in force for a source until it
+is adopted, and an adoption may change a row. So each rule is a commit
+of its own, whose message names the row that it implements. Section
+numbers below are those of revision 26.
+
+No entry that an earlier source wrote has other bytes. Neither lane
+digest changes, and `packages/lanes` is not touched. The data of
+`platform:destination@1` changes. A platform definition is pinned by
+name and version, no file pins a digest of it, and no scope under it was
+ever written: the version has never been runnable.
+
+**What is built.**
+
+| Part | Built | From | Witness |
+|---|---|---|---|
+| Step 9b | The six slots. `open-judge` opens one `judge` at a time, by `branch.judging`. `collect-list` checks three lists, and a verdict may state `extent`. `adopt-head` has the fields `commit` and `why`. The guards `not-importing` and `not-the-directory`. A refused `withdraw` sets nothing, as built before. | Section 12.1.5: "Six more slots", "The rule `open-judge`", "The three lists of `reserve`", "Small places" | `platform/test/destination.test.ts` |
+| Step 9e | `abort-if-behind`. `resend-due`, refused `resend-not-due`. `reopen-publish` opens the mint of its attempt. | "The rule `abort-if-behind`", "The guard and the effect of `resend`" | The same |
+| Step 9f | The rules `mint`, `revoke`, `push`, `deciding-read` and `adopt-read`. The send `publication-update`. An entry that opens the first head opens its attempt's mint. The judgment of a reservation, `judgeReservation`, and the rule `judge` around it. | "Who opens the mint, the revocation and the deciding read", "The evidence of a write", "What each rule of an outcome yields", "What `seen` decides for a push"; section 6.5 | The same |
+
+**What is not built.**
+
+- The rules `first-head` and `receipt`. They wait on the two details that
+  the note asks of the contract (entry ER9; section 12.1.5, "The founding
+  commit, and the receipt"). They are marks with no rule. So
+  `platform:destination@1` lacks two rules, and nothing is created under
+  it.
+- The reading of `observed` and of the entries in `uses` for the rule
+  `judge` (entry FA9). So in a runtime the rule `judge` reserves nothing.
+- A port that sends a request of the destination. No host, no gateway
+  and no Git command is reached by any test of this work.
+- The reservation of room by a publication (entry FA3).
+
+**How far a founding runs now.** As far as before: steps 1 to 6 of
+section 26, on real scope objects. Step 7 is unchanged in what happens:
+the creation of the destination is not decided, and transport answers
+`retry`, `unsupported-definition`. What changed is why. The runtime
+lacks a rule for two marks of `platform:destination@1`, `first-head` and
+`receipt`, where it lacked ten. `scope/test/founding-real.test.ts` names
+the two. Step 10 is still not built.
+
+**Earlier entries that this work answers.** Each line is dated
+2026-10-06. The earlier sections stay as they were written.
+
+- **ER1, closed.** Revision 26 confirms the eight kinds and the eight rule names, as built.
+- **ER2, closed, on revision 26.** `open-judge` reads `branch.judging`, opens none while a `judge` is open, and sets it. `judge` has 1 attempt, and its one outcome is `confirmed`.
+- **ER3, closed, on revision 26.** Three lists with the mark `collect-list`. The numbers and the members are constants of the rule. A verdict may state `extent`.
+- **ER4, closed for a push, on revision 26.** `resend-due` is written, under the key P29, refused `resend-not-due`. `reopen-publish` opens the mint. The half for a `published` publication cannot run (entry FA6).
+- **ER5, closed, on revision 26.** The four answers are built: the abort is the entry of `compromised`; the live token is the slot `token`; the rule for a further attempt reads `aborting`; the reservation entry is at `reservedAt`.
+- **ER6, closed, on revision 26.** Each rule finds what its operation is for from the opening entry and the six slots. Two searches read more than one entry (entry FA5).
+- **ER7, closed for this note's half, on revision 26.** Who opens the mint, the revocation and the deciding read is built. A read is evidence in a body and settles no attempt. The witness that section 18 could not write is written: the unknown outcome of a push of the destination leaves only its own answer able to follow.
+- **ER8, built in part.** The body of the evidence is checked member for member. The judgment of each check is written. The reading of `observed` and `uses` is not (entry FA9).
+- **ER9, open.** The two rules wait. One more thing stands against `receipt` (entry FA6).
+- **ER10, confirmed.** Nothing changed in the source. Case d is witnessed with free room: written, `refused`, `reserved`, and the mark not set.
+- **ER13, closed, on revision 26.** The two names and the two fields are built. The other four places are confirmed as built.
+- **EX8, closed.** The rule for a further attempt of a push is given the state and reads `aborting`.
+- **EY2, answered.** No rule of this package returns a request from `derives`: each kind that sends has the send mark `publication-update`. The line of `derive/src/outcomes.ts` that still lets a kind with no send mark return requests is left, because no kind needs it and none uses it. The builder may remove it.
+- **EY4, built for the destination.** `revoke` states the body of an outcome that is not known, from the context of its request, and checks every body against the same function. `push` states `{ send: "unknown", seen: "failed" }` (entry FA7).
+- **EM3 and EU4, still owed.** What now waits on them: the rule `judge`, and the key behind a publication, which `abort-if-behind` reads from the `observed` of the reservation entry.
+
+| # | Where the texts differ or are silent | Implemented | Owner, and the question |
+|---|---|---|---|
+| FA1 | Revision 26 was approved and not adopted when this was built. | Built on it, with each rule in its own commit. The header of `platform/src/destination.ts` says so. | The builder: file after the adoption, with whatever it changes. |
+| FA2 | Section 12.1.5, "The send waits for the mint". The ledger's `OperationRules` has `ready`, which the driver asks before it marks an attempt as sent. A platform rule of an outcome had no such member. | `OutcomeRule.ready`, passed through by `ownersOf`. It reads the folded state alone. For a push: the mint of that attempt has an outcome, of any result. Where the mint is `refused` or not known, the port has no token and answers `refused`, `not-sent`. | The builder, to confirm. The port is not built. |
+| FA3 | An outcome entry is never refused for room, so the ledger refuses an outcome whose openings reserve more than the `closure` that its owner declares for the kind. `closure` is one number for a kind, and the count is taken again for each operation that is opened. The kinds of the destination open each other in a circle: a `judge` opens a push, whose outcome opens the next `judge`; a `read` opens a receipt, whose outcome opens a `read`. No finite number is the closure of one, so every such outcome would be left not written. The note reserves by another duty: a publication reserves 4 entries when it is `queued` and 68 when it is `reserved` (section 5.8, the two rows of the destination). | `OperationRules.covered` and `OutcomeRule.covered`: the operations that an outcome of the kind opens are reserved by another duty, and the ledger makes no closure check for it. `mint`, `push`, `deciding-read`, `adopt-read` and `judge` state it. **The count by the publication is not built.** A destination reserves, for each open operation, its own outcome entries and nothing for what they open. So a destination could pass its budget of entries by the operations that outcomes open. Witness: control 13, which removes the exemption, leaves the outcome of `judge` not written. | The builder, with request `cc570904`: the reservation of the two rows of section 5.8, counted from the folded state. Until then the exemption is weaker than the note. No scope runs under the version. |
+| FA4 | Section 12.1.5: `branch.judging` is "set to the `queued` publication with the lowest item ID. That may be the one that the entry itself opens". The effects of a rule are checked against the state before the entry, which does not hold that item, so the reference was refused `bad-field`. | `derive/src/effects.ts`: a rule's value for a slot of the type `item` may be the entry's own position, when the item that the entry opens is of the slot's type. A written effect is checked as before. Witness: the `reserve` that opens `judge`; control 14. | The scope contract, to confirm that a reference may name the item that its own entry opens. |
+| FA5 | Section 12.1.5, "What an operation is for": the push and receipt operations of a publication are read "in the folded state". The folded state gives an operation by its ID alone, and no slot lists a publication's operations. The note asks the proof plan for "a read of operations by kind". The token that `compromised` revokes is "the mint that the slot `token` named before the entry", and the entry holds only the emptying. | Two searches over this scope's own entries. `writesOf` reads from `reservedAt` to the entry that is written, and takes the operations of the reservation entry, of each `resend` on the publication, and of the entry that made it `published`. `mintRevoked` reads back from the entry of `compromised` to `reservedAt` for the last entry that set the slot. Each is as long as the publication's life in entries. As entry ER11. | The proof plan, with request `cc570904`: a read of operations by kind, or a slot. |
+| FA6 | The contract's section 6.6: no effect changes an item that was final before the entry, and an act on a final item is refused `final`. `published` is a final state of `publication`. Section 12.1.5 has three things change a `published` publication, or act on it: the slot `token`, "for an attempt of its push or of its receipt"; the slot `receipt`, which becomes `written` or `conflict`; and `resend` on a `published` publication. It also says that the receipt of the first head changes no slot, so no slot names the token of its attempts. | A mint of a receipt's attempt is never live: its `confirmed` outcome opens the token's revocation at once. Where the first outcome of a push attempt comes for a publication that is already final, the revocation is opened and the slot is not emptied. No other entry opens one for that token. A `resend` on a `published` publication is refused `final`, before its guards: witnessed. `receipt: "owed"` is set in the entry that publishes, which is allowed. | The authority note, with the contract. Where do the receipt's records live, when the publication is final? |
+| FA7 | The evidence of an `unknown` outcome of a write is `{ send: "unknown", seen }`, where `seen` is what the read back saw. The driver offers an `unknown` outcome when its port gives no answer, with the body that the owner's rule states from the scope's own records (entry EY4). A port's answer is `confirmed` or `refused` only, so a port that has a read back and no answer of the send cannot give it. Revision 26 records the duty: the driver must supply deterministic evidence of the request's context. | The rule `push` states `{ send: "unknown", seen: "failed" }`: the send is not known, and no read back is at hand. Nothing is then decided, and the deciding read follows. The pairing is built where a rule compares a body with its request: `revokedToken` gives the token ID of a revocation from this scope's own entries, and the evidence check, the body of an outcome that is not known, and a port all read it. | The builder: an answer of a port that is not known and still holds a body. |
+| FA8 | "The send `publication-update`": the detail is `operation`, `outcome`, `commit`, `reason` and `rules`. Three things are not stated. The relationship state of the update. Which member holds `seen`, for the update `unknown`, "with `seen`". And where `rules`, "the revision of the rules that the destination observed for the reservation", is read after the reservation: no slot holds it. | The state is the publication's state, as the written update of a `withdraw` has it. `seen` is in no member, and is not sent. `rules` is read from the rules observation that the reservation entry retains, at `reservedAt`, and is left out where the entry retains none. The pinned `change` lane has no field `rules` in its handler, so an update with it would be refused there: the lane rows of the lane forms' section 18.4 are owed with it. | The authority note, for the first two. I3, with the lane forms, for the lane rows. |
+| FA9 | "The evidence of `judge`, and what the rule reads": the rule reads `observed`, and the entries in `uses` "each by its bytes". The judge of an outcome gives a rule neither (entries EM3 and EU4). And the note names no member of a lane's entry: which field of a `propose-manifest` intent is the base, how the authors of section 3.10 and the completeness of R2's section 5.2 are read. The evidence also names no commit: the rule trusts that the runtime read the manifest's integration commit. | `judgeReservation`, in `platform/src/reservation.ts`: the judgment of every check from one explicit input, `ReservationRead`, which is what the two would say. The rule `judge` takes a reader of it. **The package's own rule is given none.** It judges what the evidence and this scope's own records decide: a publication that is no longer `queued`, `evidence-too-large`, a head that is not the recorded head, and an integration commit that is not in the repository. For any other outcome it has a fault: nothing is written and the publication stays `queued`. Four inputs that no form supplies are filled with the value that fails closed: `extents`, null; `singleControllerException`, false; `controllers`, null (form 11); `controllersOfAuthors`, null (form 15), under which no review counts where the second point of independence is asked. | The builder, for `observed` and `uses` in the judge of an outcome. The authority note, with R2, for how each fact is read from a lane's entry. |
+| FA10 | Section 6.5, the first table. Five places where it does not say which reason, or what follows. | (1) The head just read is not the recorded head: `out-of-date`. The row says "or section 6.9 when the two differ", and section 6.9 states no outcome for a publication that is not reserved. (2) Within the fourth row, `evidence-invalid` is said before `rules-not-met`. (3) An approval by a key that is compromised, or that is not observed, is not counted. A verdict whose entry is not what the statement says is `evidence-invalid`. (4) With extents, a live request for changes, and a path that no extent holds, are `rules-not-met`, alone. (5) A review counts for the extent that it states: `judgeExtents` is called once for each touched extent, with the reviews that state it, so that file is not changed. | The authority note, to confirm each. |
+| FA11 | "`most`": "the largest is the outcome of `judge` that reserves: 10 effects". By the same table the first outcome of a push attempt that publishes holds more: the revocation and the emptied slot, four effects of `published`, the receipt and its mint, and the next `judge` with `judging`. That is 14. The note also says that the counts beyond the three that it states are owed before each rule is built. | Each rule states what the table gives: `judge` 10, `push` 14, `deciding-read` 11, `adopt-read` 5, `mint` 2, `revoke` 0; `open-judge` 3, `declare-first-head` 2, `open-first-head` 4. | The authority note: the counts, and the sentence on the largest. |
+| FA12 | The row `adopt-read`: "`seen` is that commit: `branch.head` is the commit". The act is admitted only while no publication holds the slot. Its read is answered later, and a `judge` may reserve in between. | Where a publication holds the slot when the read is answered, the outcome changes nothing. Witnessed. | The authority note. Is that the wanted order? |
+| FA13 | "What `seen` decides", the last row: after a commit of another writer, "an admin's `resend` or `adopt-head` is the way forward". `resend-due` holds only when "every attempt that each of its push operations states is opened and has an outcome". After another writer's commit the ledger opens no further attempt, so two of three are never opened. | As the row of `resend-due` states. So a `resend` is not due there, and `adopt-head` is the one way forward. Witnessed. An outcome of a push whose `seen` is `absent` is taken as that last row too. | The authority note. Is a `resend` due when no further attempt can be opened? |
+| FA14 | "The deciding read", and its row. | A read is opened by an outcome of a push only where no attempt of that push is open after the entry. No count is kept of the reads of one publication, so a late answer after the last attempt opens another. Each yields nothing once the publication is final. The rule's evidence check reads the state: a `seen` that is the base, while not every attempt is refused, does not follow. The read of a first head, and of a receipt's ref, is not judged: it waits with `first-head` and `receipt`. The send mark stands at `mint`, `revoke` and `receipt`, as row n lists them, and its rule gives no request there. | The authority note, to confirm. |
+| FA15 | The witnesses of this work run in memory. | `destination.test.ts` uses three labelled stand-ins beside the bureau and the lane: the rules `first-head` and `receipt`; the reader of a reservation; and the `observed` of the reservation entry, which the test seals by hand. Nothing ran on scope objects: the version is not runnable there. | The builder, at the merge with entries EM3 and EU4. |
+
+**Controls.** One for each guard, through `scripts/control.mjs`, on
+`packages/platform test/destination.test.ts`. 24 were run. Each
+distinguishes: a test failed by an assertion with the one change
+applied. Three were run a second time, after their witness was
+strengthened or their text was corrected: 2, 3 and 24. Control 23
+survived once, and distinguishes since the witness of an accepted send
+was added.
+
+**Lines for the merge.**
+
+- `OutcomeRule` gains `ready` and `covered`, and `OperationRules` gains `covered`. A rule that states neither is unchanged.
+- `derive/src/effects.ts`: one line in the check of a rule's effect (entry FA4).
+- `platform/src/destination.ts` exports `destinationRulesWith`, `Reads` and `revokedToken`. `destinationRules` is `destinationRulesWith` with no reader. The package's index exports `revokedToken`, and the judgment and the types of the new file `reservation.ts`.
+- `platform/src/reservation.ts` imports `classify`, `judgeExtents` and four constants from `extents.ts`, and changes nothing there. If `judgeExtents` comes to read a verdict's extent itself, the one call for each touched extent in `judgeReservation` stays right, and may become one call.
+- `support-destination.ts`: `standInRules` holds two rules. `Branch` holds its own rules, with its reader, in place of the exported `rules`.
+- `scope/test/founding-real.test.ts` names the two marks that lack rules. Marked `I3 merge:` there.
+- Between the first commit of this work and the commit of its witnesses, `destination.test.ts` is stale. The commit of `abort-if-behind` holds one helper that nothing reads until the next commit, so the typecheck fails at that one commit.
+
+**What was not run.** No deployment, no provider, no host, no gateway
+and no Git command. The gate was not run.
