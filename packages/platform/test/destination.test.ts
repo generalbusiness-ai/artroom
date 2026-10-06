@@ -1,14 +1,14 @@
 import { expect, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { FieldValue, OperationId, Request } from "@generalbusiness/artroom-contract";
-import { factRefOf } from "@generalbusiness/artroom-bytes";
+import type { Entry, FieldValue, OperationId, Request } from "@generalbusiness/artroom-contract";
+import { canonicalize, factRefOf } from "@generalbusiness/artroom-bytes";
 import { derivable, operationSettled, runnable, type Item, type JudgedInput, type PlatformRule, type RuleGiven } from "@generalbusiness/artroom-derive";
 import { t } from "@generalbusiness/artroom-derive/testing";
-import { COLLECT_MOST, DESTINATION, DESTINATION_KINDS, RECEIPTS_OWED, destination, destinationRules, revokedToken, writeSends } from "../src/destination.ts";
+import { COLLECT_MOST, DESTINATION, DESTINATION_KINDS, NAMED_MOST, RECEIPTS_OWED, REPORTS_MOST, destination, destinationRules, revokedToken, writeSends } from "../src/destination.ts";
 import { firstExtents } from "../src/extents.ts";
 import { platform } from "../src/index.ts";
 import { judgeReservation, type JudgeEvidence, type ReservationRead, type Statement } from "../src/reservation.ts";
-import { Branch, FOUND, HEAD, NEXT, OTHER, RECEIPT, TREE, destinationDefinition, fetched, handMade, keyObserved, reading, rita, rulesObserved, said, standInRules, una } from "./support-destination.ts";
+import { Branch, FOUND, HEAD, NEXT, OTHER, RECEIPT, TREE, destinationDefinition, fetched, handMade, keyObserved, listed, reading, reportMade, rita, rulesObserved, said, standInRules, una } from "./support-destination.ts";
 
 // Every scope here is a `Branch` of test support: a destination scope in memory, below a made-up bureau that stands for the
 // directory. Its rules are the platform package's, with two STAND-IN rules for the marks that the package writes no rule for
@@ -47,6 +47,12 @@ test("the destination definition validates whole with the platform option; its m
     ["directory", "claim", "slot", "judging"], ["repository", "name", "import", "membership", "rules", "head", "token"], ["integration", "reason", "withdrawDecided", "reservedAt", "aborting", "token"],
     { publication: { fixed: true, required: false, to: { type: "item", of: "publication" } } }, [["commit", true, true], ["opening", true, false], ["token", false, false]],
   ]);
+  // The six fields of `reserve` (revision 28, section 6.5): two facts, two written lists of records that name facts, the `collect`
+  // list `links`, and the written list `reports` of at most 32 facts of a `report` under `issue`.
+  const fields = destination.receives["reserve"]!.fields as Record<string, { type: string; max?: number; of?: unknown; required: boolean }>;
+  expect([Object.keys(fields), fields["verdicts"]!.max, fields["jobs"]!.max, fields["reports"], NAMED_MOST, REPORTS_MOST, COLLECT_MOST]).toEqual([
+    ["operation", "manifest", "verdicts", "jobs", "links", "reports"], 64, 64, { type: "list", max: 32, required: true, of: { type: "fact", kind: ["report"], under: "issue" } }, 64, 32, { links: 32 },
+  ]);
   expect([RECEIPTS_OWED, destination.receives["reserve"]!.guards.at(-1), destination.acts["resend"]!.guards[0], destination.acts["resend-receipt"]!.guards[0]]).toEqual([
     64, { count: { type: "receipt", states: ["owed"], max: 64 }, reason: "receipts-owed" }, { state: ["unresolved"] }, { state: ["owed"], of: "also.receipt", reason: "receipt-not-owed" },
   ]);
@@ -57,14 +63,15 @@ test("the destination definition validates whole with the platform option; its m
   // "No entry of the destination sends more than one request and the platform's one result": the one written send is the final update of a `withdraw`.
   expect([...Object.values(destination.acts), ...Object.values(destination.receives)].flatMap((row) => row.sends.map((send) => Object.keys(send)[0]))).toEqual(["relate"]);
 
-  // The marks, by the rows of the note's table: rows 30 to 37, row b at its three fields, row z, place 7, and the send of rows m and n.
+  // The marks, by the rows of the note's table: rows 30 to 37, row b at its one field, row z, place 7, and the send of rows m and n.
   const marks = [
     [5, "acts.establish.effects.7", "declare-first-head", "P16"], [5, "receives.import.effects.0", "open-first-head", "P16"], [5, "receives.reserve.effects.3", "open-judge", "P16"],
     [2, "receives.withdraw.also.publication", "publication-of", "P15"], [5, "receives.withdraw.effects.3", "open-withdrawn", "P15"], [5, "receives.compromised.effects.0", "abort-if-behind", "P19"],
     [5, "acts.adopt-head.effects.0", "open-branch-read", "P16"], [5, "acts.resend.effects.0", "reopen-publish", "P16"], [4, "acts.resend.guards.1", "resend-due", "P29"],
     // From revision 28 the two marks of `resend` each stand at a second row, `resend-receipt`. No mark is added.
     [5, "acts.resend-receipt.effects.0", "reopen-publish", "P16"], [4, "acts.resend-receipt.guards.1", "resend-due", "P29"],
-    [3, "receives.reserve.fields.verdicts", "collect-list", "P25"], [3, "receives.reserve.fields.jobs", "collect-list", "P25"], [3, "receives.reserve.fields.links", "collect-list", "P25"],
+    // From revision 28 the mark `collect-list` stands on one field, `links`, where it stood on three.
+    [3, "receives.reserve.fields.links", "collect-list", "P25"],
     [7, "outcomes.first-head", "first-head", "P16"], [7, "outcomes.judge", "judge", "P19"], [7, "outcomes.push", "push", "P16"], [7, "outcomes.mint", "mint", "P16"],
     [7, "outcomes.revoke", "revoke", "P16"], [7, "outcomes.read", "deciding-read", "P16"], [7, "outcomes.receipt", "receipt", "P16"], [7, "outcomes.adopt-read", "adopt-read", "P16"],
     ...["judge", "push", "mint", "revoke", "read", "receipt"].map((kind) => [6, `outcomes.${kind}.send`, "publication-update", "P16"]),
@@ -115,8 +122,6 @@ test("each rule of platform:destination@1 at an act or a handler, as a plain fun
   /** A receipt in that state, made by hand: the rule reads its type and its state alone. */
   const receipt = (state: string): Item => ({ ...ready.item(queued), type: "receipt", state });
   const self = ready.head.seq + 1;
-  const verdict = { review: reserved.operation, reviewer: rita.member, verdict: "approve" };
-  const job = { job: reserved.operation, name: "combined", state: "passed", decidedBy: reserved.operation };
   const link = { link: reserved.operation, issue: ready.other.at };
   const type = (field: string, value: unknown) => [given(ready, tell), value, { field }];
 
@@ -149,21 +154,13 @@ test("each rule of platform:destination@1 at an act or a handler, as a plain fun
     ["37: a receipt that is `owed`: its write, with 1 attempt, and its mint", "reopen-publish", [given(ready, tell, {}, { on: ready.branch, "also.receipt": receipt("owed") })], [...opens("receipt", 1), ...opens("mint", 1, 1)]],
     ["37: a receipt that is final: nothing", "reopen-publish", [given(ready, tell, {}, { on: ready.branch, "also.receipt": receipt("written") })], []],
     ["37: a publication in any other state: nothing", "reopen-publish", [given(ready, tell, {}, { on: publication("published") })], []],
-    // Row b: each record of a `collect` list, up to the number of its field.
-    ["b: verdicts, up to 256 records", "collect-list", type("verdicts", Array(COLLECT_MOST.verdicts).fill(verdict)), true],
-    ["b: one verdict more", "collect-list", type("verdicts", Array(COLLECT_MOST.verdicts + 1).fill(verdict)), false],
-    ["b: a verdict that states its extent", "collect-list", type("verdicts", [{ ...verdict, extent: "rules" }]), true],
-    ["b: a verdict whose extent is no name of an extent", "collect-list", type("verdicts", [{ ...verdict, extent: "Rules, all" }]), false],
-    ["b: a verdict that is no verdict of the lane", "collect-list", type("verdicts", [{ ...verdict, verdict: "counted" }]), false],
-    ["b: a verdict with a member that the lane does not send", "collect-list", type("verdicts", [{ ...verdict, counted: true }]), false],
-    ["b: a verdict with no reviewer", "collect-list", type("verdicts", [{ review: verdict.review, verdict: "approve" }]), false],
-    ["b: jobs, with a job that nothing decided yet", "collect-list", type("jobs", [job, { job: job.job, name: "lint", state: "requested" }]), true],
-    ["b: one job more than the lane holds", "collect-list", type("jobs", Array(COLLECT_MOST.jobs + 1).fill(job)), false],
-    ["b: a job in a state that is not live", "collect-list", type("jobs", [{ ...job, state: "superseded" }]), false],
+    // Row b: each record of the `collect` list `links`, up to its number. The two other lists have written types now.
     ["b: links", "collect-list", type("links", [link]), true],
     ["b: a link to a scope that is no lane", "collect-list", type("links", [{ ...link, issue: ready.bureau.at }]), false],
-    ["b: a value that is no list", "collect-list", type("verdicts", verdict), false],
-    ["b: a field that the rule is not the type of", "collect-list", type("operation", []), false],
+    ["b: one link more than the lane holds", "collect-list", type("links", Array(COLLECT_MOST.links + 1).fill(link)), false],
+    ["b: a link with a member that the lane does not send", "collect-list", type("links", [{ ...link, label: "x" }]), false],
+    ["b: a value that is no list", "collect-list", type("links", link), false],
+    ["b: a field that the rule is not the type of", "collect-list", type("verdicts", []), false],
   ];
   for (const [row, name, args, expected] of rows) expect(run(name, ...args), `${name}, row ${row}`).toEqual(expected);
 });
@@ -245,9 +242,16 @@ test("a reserve stays queued before the first head and opens `judge` after it, o
   expect([said(r.reserve({ operation: factRefOf(theirs) }, r.lane, [theirs]).judgment), result(r)]).toEqual([WRITTEN, ["refused", "guard-failed", "not-owner"]]);
   expect(publications(r).length).toBe(before);
 
-  // Row b: a list with a record that is no record of the lane's, and a list that is longer than its number.
-  expect([said(r.reserve({ verdicts: [{ verdict: "approve" }] }).judgment), result(r), said(r.reserve({ jobs: Array(COLLECT_MOST.jobs + 1).fill({ job: first.operation, name: "x", state: "passed" }) }).judgment), result(r)])
-    .toEqual([WRITTEN, ["refused", "bad-field", null], WRITTEN, ["refused", "bad-field", null]]);
+  // A message outside the types of its fields: a record with a required member missing, a verdict that is no verdict of the lane,
+  // a list that is longer than its `max`, a link that is no record of the lane's, by the rule `collect-list`, and a message with
+  // no field `reports`.
+  const review = handMade(r.lane.at, "review-verdict");
+  const verdict = { review: factRefOf(review), reviewer: una.member, verdict: "approve" };
+  const outside: Record<string, unknown>[] = [
+    { verdicts: [{ verdict: "approve" }] }, { verdicts: [{ ...verdict, verdict: "counted" }] }, { verdicts: [{ ...verdict, counted: true }] },
+    { jobs: Array(NAMED_MOST + 1).fill({ job: first.operation, name: "x", state: "passed" }) }, { links: [{ link: first.operation }] }, { reports: undefined },
+  ];
+  expect(outside.map((over) => [said(r.reserve(over, r.lane, [review]).judgment), result(r)])).toEqual(outside.map(() => [WRITTEN, ["refused", "bad-field", null]]));
   expect([publications(r).length, p2 > p1]).toEqual([before, true]);
 });
 
@@ -272,7 +276,7 @@ test("a withdraw is decided by the state of the publication: applied while queue
   // Not yet known: a `withdraw` that arrives before its `reserve`. `applied`: the rule opens the publication as `not-reserved`,
   // "withdrawn", and no update is sent. The later `reserve` for that operation is refused, "withdrawn" (section 6.4, the first case).
   const manifest = handMade(b.lane.at, "propose-manifest");
-  const reserve: Request = { class: "request", type: "tell", body: { message: "reserve", fields: { operation: { self: true }, manifest: factRefOf(manifest), verdicts: [], jobs: [], links: [] } } };
+  const reserve: Request = { class: "request", type: "tell", body: { message: "reserve", fields: { operation: { self: true }, manifest: factRefOf(manifest), verdicts: [], jobs: [], links: [], reports: [] } } };
   const early = handMade(b.lane.at, "merge", [{ n: 0, to: b.at, message: reserve }]);
   expect([said(b.withdraw(early).judgment), result(b), b.last.sends.length, publications(b).at(-1)]).toEqual([WRITTEN, ["applied", null, null], 1, [b.head.seq, "not-reserved", "withdrawn", false]]);
   expect([b.item(b.head.seq).refs["operation"], b.item(b.head.seq).refs["lane"]]).toEqual([factRefOf(early), b.lane.at]);
@@ -690,15 +694,87 @@ test("a target that another entry closed takes no token and no further attempt: 
   expect([r.branch.values["head"], adopted(r), r.branch.values["head"]]).toEqual([NEXT, WRITTEN, OTHER]);
 });
 
+// Authority note, revision 28, section 6.5, "`reserve` names each selected report", with cases s and t of section 12.1.5. Every
+// request is built by hand: the pinned `change` lane does not send the field `reports`, and the lane forms owe that row. The issue
+// lane, its `report` entries and the manifest's field `selected` are STAND-INS, made by hand. The binding, the commits and the
+// count are the package's rule and derive's own check of a message against the bound on the foreign entries of one entry.
+test("a reserve names each selected report, bound place by place to the manifest's selections; each report's commit is read from its entry and must be among the ancestors; a statement that is not the manifest's is not reserved, evidence-invalid; a message that names 128 entries or more is refused bad-field", () => {
+  /** One queued publication whose `reserve` names those reports, under a manifest that selects those, and the outcome of its `judge` with those ancestors. */
+  const judged = (named: readonly Entry[], selects: readonly Entry[], ancestors: readonly string[]) => {
+    const b = new Branch(false).ready();
+    const accepted = factRefOf(handMade(b.other.at, "accept-report")) as unknown as FieldValue;
+    const delivered = b.reserve({ reports: named.map((report) => factRefOf(report)) }, b.lane, [...new Set([...named, ...selects])], selects.map((report) => ({ accepted, report: factRefOf(report) as unknown as FieldValue })));
+    const [publication, taken] = [b.head.seq, [said(delivered.judgment), result(b)]];
+    b.read = reading(b.now);
+    const judgment = said(b.answered(op(publication, 0), 1, "confirmed", { ...FOUND, ancestors }));
+    return { b, publication, taken, answer: [judgment, b.item(publication).state, b.item(publication).values["reason"] ?? null] };
+  };
+  const issue = new Branch(true).other.at;
+  const [A, B, C] = [reportMade(issue, OTHER), reportMade(issue, TREE), reportMade(issue, RECEIPT)];
+  const TAKEN = [WRITTEN, ["applied", null, null]];
+  const INVALID = [WRITTEN, "not-reserved", "evidence-invalid"];
+
+  // The reports are the manifest's selections, in their order, and each commit is among the ancestors that the host showed: reserved.
+  // The entry that recorded the `reserve` names each report's entry in `uses`, and so does the outcome of `judge`, which read them.
+  const good = judged([A, B], [A, B], [OTHER, TREE]);
+  const names = (entry: { uses: readonly { fact: unknown }[] }) => [A, B].every((report) => entry.uses.some((use) => canonicalize(use.fact) === canonicalize(factRefOf(report))));
+  expect([good.taken, good.answer, names(good.b.entries[good.publication]!.entry), names(good.b.last)]).toEqual([TAKEN, [WRITTEN, "reserved", null], true, true]);
+  // Check 2, its last clause: a report's commit that the host did not show to be an ancestor. The commit is read from the entry.
+  expect([judged([A, B], [A, B], [OTHER]).answer, judged([A, B], [A, B], []).answer]).toEqual(Array(2).fill([WRITTEN, "not-reserved", "integration-invalid"]));
+  // A commit among the ancestors that no named report holds does not follow: the member holds the reports' commits and no other.
+  expect(judged([A], [A], [OTHER, TREE]).answer).toEqual([BAD_INPUT, "queued", null]);
+  // Case t: the named reports differ from the manifest's selections by one more, one fewer, another fact, or another order. Each
+  // message is taken at its delivery, and the outcome of `judge` makes the publication `not-reserved`, `evidence-invalid`.
+  const differing = [judged([A, B], [A], [OTHER, TREE]), judged([A], [A, B], [OTHER]), judged([A, C], [A, B], [OTHER, RECEIPT]), judged([B, A], [A, B], [OTHER, TREE])];
+  expect(differing.map((one) => [one.taken, one.answer])).toEqual(differing.map(() => [TAKEN, INVALID]));
+  // An entry that opened a report and set no commit, and one that opened no report.
+  const [bare, none] = [reportMade(issue, null), handMade(issue, "report")];
+  expect([judged([bare], [bare], []).answer, judged([none], [none], []).answer]).toEqual([INVALID, INVALID]);
+  // One fact twice in `reports` is taken only where the manifest's `selected` holds it twice at the same places.
+  expect([judged([A, A], [A, A], [OTHER]).answer, judged([A, A], [A, B], [OTHER]).answer]).toEqual([[WRITTEN, "reserved", null], INVALID]);
+
+  // Where each named entry must come from. The scope of a report is part of its fact, and the binding is exact. An element that is
+  // no `report` entry, and a `report` entry of a scope that does not pin `issue`, are no report of an issue lane: `evidence-invalid`.
+  // This source's delivery does not check the kind and the definition of a fact that a list names, so the message is taken first
+  // (I3 deltas, entry GD11). An entry that is not at hand leaves the delivery not decided.
+  const d = new Branch(false).ready();
+  const [other, local] = [handMade(issue, "accept-report", [], rita, {}, (seq) => [{ effect: "open", item: seq, type: "report", state: "reported" }, { effect: "value", item: seq, slot: "commit", value: OTHER }]), reportMade(d.lane.at, OTHER)];
+  expect([judged([other], [other], []), judged([local], [local], [])].map((one) => [one.taken, one.answer])).toEqual(Array(2).fill([TAKEN, INVALID]));
+  expect([said(d.reserve({ reports: [factRefOf(A)] }).judgment), d.state.count("publication", "queued")]).toEqual([["unavailable", "dependency-unavailable", null], 0]);
+
+  // Case s, the count, at the bound on the foreign entries of one entry, 128, once. A message names 2 + v + j + d + r entries, where
+  // the 2 are P's `merge` entry and the manifest's. This source's check counts the source entry of the delivery, and then each
+  // fact that a field names, the field `operation` among them, which names the source entry again. So a message that names 127 is
+  // taken, and one that names 128 is refused `bad-field`, and opens no publication. The note takes 128 and refuses 129: whether
+  // the check counts that field again is asked of the contract, and the two readings differ by one entry (I3 deltas, entry GD12).
+  const counted = (v: number, decided: number, undecided: number, r: number) => {
+    const b = new Branch(false).ready();
+    const of = listed(b.lane.at, b.other.at, v, decided, undecided, r);
+    const taken = said(b.reserve(of.fields, b.lane, of.entries, of.selected).judgment);
+    return { b, of, answer: [2 + v + 2 * decided + undecided + r, taken, result(b), b.state.count("publication", "queued")] };
+  };
+  const REFUSED = [WRITTEN, ["refused", "bad-field", null], 0];
+  const most = counted(64, 15, 0, 31);
+  expect([most.answer, counted(64, 15, 0, 32).answer, counted(64, 16, 0, 32).answer, counted(29, 32, 0, 32).answer, counted(30, 32, 0, 32).answer]).toEqual([[127, ...TAKEN, 1], [128, ...REFUSED], [130, ...REFUSED], [127, ...TAKEN, 1], [128, ...REFUSED]]);
+  // The entry that records the largest message retains each entry that it names, and the outcome of its `judge` is given the same
+  // entries and reads the commits of the 31 reports from them.
+  const publication = most.b.head.seq;
+  most.b.read = reading(most.b.now, { verdicts: most.of.fields.verdicts.map(() => ({ sound: true, key: null })) });
+  expect([most.b.entries[publication]!.entry.uses.length, said(most.b.answered(op(publication, 0), 1, "confirmed", { ...FOUND, ancestors: most.of.commits })), most.b.item(publication).state, most.b.last.uses.length]).toEqual([127, WRITTEN, "reserved", 127]);
+});
+
 // Section 6.5, each reason by its name, as the plain judgment of one reservation. What `observed` and `uses` say is the STAND-IN
 // `reading`: written by hand, and answered by no scope.
 test("judgeReservation gives each reason of section 6.5 by name, in the order of its table, and judges only evidence-too-large, a moved head and a missing integration commit without what observed and uses say", () => {
   const NOW = t(100);
-  const verdict = (who: typeof rita, over: Record<string, unknown> = {}) => ({ review: factRefOf(handMade(new Branch(true).lane.at, "review-verdict")), reviewer: who.member, verdict: "approve", ...over }) as Statement["verdicts"][number];
-  const job = (name: string, state: string) => ({ job: factRefOf(handMade(new Branch(true).lane.at, "request-check")), name, state }) as Statement["jobs"][number];
-  const judged = (read: Partial<ReservationRead> | null = {}, evidence: Partial<JudgeEvidence> | { over: "entries" } = {}, statement: Partial<Statement> = {}, recorded: string | null = HEAD) => {
+  /** P, the lane whose `merge` the statement is of, and another lane. Each fact is of an entry made by hand. */
+  const [P, elsewhere] = [new Branch(true).lane.at, new Branch(true).other.at];
+  const made = (kind: string, at = P) => factRefOf(handMade(at, kind));
+  const verdict = (who: typeof rita, over: Record<string, unknown> = {}) => ({ review: made("review-verdict"), reviewer: who.member, verdict: "approve", ...over }) as Statement["verdicts"][number];
+  const job = (name: string, state: string, over: Record<string, unknown> = {}) => ({ job: made("request-check"), name, state, ...over }) as Statement["jobs"][number];
+  const judged = (read: Partial<ReservationRead> | null = {}, evidence: Partial<JudgeEvidence> = {}, statement: Partial<Statement> = {}, recorded: string | null = HEAD) => {
     const answer = judgeReservation({
-      recorded, evidence: ("over" in evidence ? evidence : { ...FOUND, ...evidence }) as JudgeEvidence, statement: { verdicts: [], jobs: [], links: [], ...statement },
+      recorded, evidence: { ...FOUND, ...evidence } as JudgeEvidence, statement: { operation: made("merge"), manifest: made("propose-manifest"), verdicts: [], jobs: [], links: [], reports: [], ...statement },
       read: read === null ? null : reading(NOW, read), time: NOW,
     });
     return answer.reserved === true ? `reserved${answer.reason === null ? "" : `, ${answer.reason}`}` : answer.reserved === null ? "not judged" : answer.reason;
@@ -707,11 +783,11 @@ test("judgeReservation gives each reason of section 6.5 by name, in the order of
   const sound = { sound: true, key: keyObserved(una, NOW) };
   const passed = { opening: "sound", deciding: true, key: keyObserved(una, NOW) } as const;
   const one = rulesObserved(NOW, { approvals: 1 });
+  const twice = verdict(una);
 
   const cases: readonly (readonly [name: string, answer: string, expected: string])[] = [
     ["nothing stands against it", judged(), "reserved"],
-    // `evidence-too-large` (G5): judged from the evidence alone.
-    ["the count of entries to fetch is over the bound", judged(null, { over: "entries" }), "evidence-too-large"],
+    // `evidence-too-large` (G5): judged from the evidence alone. The count of entries has no case here: it is made at the delivery.
     ["the changed set is over its bound", judged(null, { changes: { over: "paths" } }), "evidence-too-large"],
     // `out-of-date`: the head just read is not the recorded head, by this scope's own records; or the manifest's base is not the head.
     ["another writer moved the branch since the recorded head", judged(null, { head: OTHER }), "out-of-date"],
@@ -736,6 +812,16 @@ test("judgeReservation gives each reason of section 6.5 by name, in the order of
     ["a required check's deciding entry does not hold checks 4 to 7", judged({ rules: rulesObserved(NOW, required), checks: { combined: { ...passed, deciding: false } } }, {}, { jobs: [job("combined", "passed")] }), "evidence-invalid"],
     ["a required check's result is by a compromised key", judged({ rules: rulesObserved(NOW, required), checks: { combined: { ...passed, key: keyObserved(una, NOW, { keyState: "compromised" }) } } }, {}, { jobs: [job("combined", "passed")] }), "evidence-invalid"],
     ["invalid evidence is said before a rule that is not met", judged({ rules: one, verdicts: [{ sound: false, key: null }] }, {}, { verdicts: [verdict(una)] }), "evidence-invalid"],
+    // From revision 28, three more causes (section 6.5, "`reserve` names each selected report"): the named reports are not the
+    // manifest's selections; an entry that the statement names is not P's; and one entry is named twice in a list.
+    ["the named reports are not the manifest's selections", judged({ manifest: { ...reading(NOW).manifest, reports: null } }), "evidence-invalid"],
+    ["the same, said after a tree that is not the one named", judged({ manifest: { ...reading(NOW).manifest, reports: null } }, { tree: OTHER }), "integration-invalid"],
+    ["the manifest's entry is of another lane than P", judged({}, {}, { manifest: made("propose-manifest", elsewhere) }), "evidence-invalid"],
+    ["a verdict's entry is of another lane than P", judged({ verdicts: [sound] }, {}, { verdicts: [verdict(una, { review: made("review-verdict", elsewhere) })] }), "evidence-invalid"],
+    ["a job's deciding entry is of another lane than P", judged({}, {}, { jobs: [job("lint", "passed", { decidedBy: made("check", elsewhere) })] }), "evidence-invalid"],
+    ["two verdicts name one review", judged({ verdicts: [sound, sound] }, {}, { verdicts: [twice, { ...twice, verdict: "request-changes" }] }), "evidence-invalid"],
+    ["two jobs name one deciding entry", judged({}, {}, { jobs: [job("lint", "passed", { decidedBy: twice.review }), job("unit", "passed", { decidedBy: twice.review })] }), "evidence-invalid"],
+    ["two jobs, each with its own entries, that no rule requires", judged({}, {}, { jobs: [job("lint", "passed", { decidedBy: made("check") }), job("unit", "requested")] }), "reserved"],
     // `rules-not-met`.
     ["a live request for changes", judged({ verdicts: [sound] }, {}, { verdicts: [verdict(una, { verdict: "request-changes" })] }), "rules-not-met"],
     ["fewer approvals than the rules ask", judged({ rules: one }), "rules-not-met"],
@@ -817,7 +903,8 @@ test("a revocation or a rules change that the reservation's own observation hold
   // One whose key has no observation at hand is not counted, and the entry retains none for it.
   const approving = (key: ReturnType<typeof keyObserved> | null, content: object = {}) => {
     const b = new Branch(false).ready();
-    b.reserve({ verdicts: [{ review: factRefOf(handMade(b.lane.at, "review-verdict")), reviewer: una.member, verdict: "approve" }] });
+    const review = handMade(b.lane.at, "review-verdict");
+    b.reserve({ verdicts: [{ review: factRefOf(review), reviewer: una.member, verdict: "approve" }] }, b.lane, [review]);
     const publication = b.head.seq;
     b.read = reading(b.now, { rules: rulesObserved(b.now, { approvals: 1, ...content }), verdicts: [{ sound: true, key }] });
     const judgment = said(b.answered(op(publication, 0), 1, "confirmed", FOUND));
@@ -831,9 +918,10 @@ test("a revocation or a rules change that the reservation's own observation hold
 
   // With nothing at hand, as in this runtime: no runtime reads an observation for an outcome, and no reader of a lane's entries is
   // written. The rule writes what the evidence and this scope's own records decide, and nothing else. The publication then stays `queued`.
-  expect([judged(null, { over: "entries" }), judged(null, { ...FOUND, head: OTHER }), judged(null, { ...FOUND, present: false, tree: null, firstParent: null, changes: null }), judged(null)].map(({ judgment, state, reason }) => [judgment, state, reason])).toEqual([
+  expect([judged(null, { ...FOUND, changes: { over: "paths" } }), judged(null, { ...FOUND, head: OTHER }), judged(null, { ...FOUND, present: false, tree: null, firstParent: null, changes: null }), judged(null)].map(({ judgment, state, reason }) => [judgment, state, reason])).toEqual([
     [WRITTEN, "not-reserved", "evidence-too-large"], [WRITTEN, "not-reserved", "out-of-date"], [WRITTEN, "not-reserved", "integration-invalid"], [["unavailable", "unavailable", null], "queued", null],
   ]);
-  // Evidence that is not the body of the evidence of `judge` does not follow.
-  expect(judged({}, { ...FOUND, counted: 3 }).judgment).toEqual(BAD_INPUT);
+  // Evidence that is not the body of the evidence of `judge` does not follow. From revision 28 that holds for `{ over: "entries" }`
+  // too: the count of the entries that a `reserve` names is made at its delivery.
+  expect([judged({}, { ...FOUND, counted: 3 }).judgment, judged({}, { over: "entries" }).judgment]).toEqual([BAD_INPUT, BAD_INPUT]);
 });

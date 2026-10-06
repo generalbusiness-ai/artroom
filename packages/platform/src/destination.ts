@@ -19,7 +19,12 @@
  * read for an operation ("Where a receipt's records stand", and "The rows
  * that change, and three new acts"); the rules T1 to T8 of a token, and
  * the guards that `adopt-read` reads again ("A token whose write can no
- * longer act, and who cleans it up"). The rows
+ * longer act, and who cleans it up"); and the field `reports` of `reserve`
+ * with the written types of `verdicts` and `jobs`, the binding of the
+ * reports to the manifest's selections, and each report's commit from its
+ * entry (section 6.5, "`reserve` names each selected report"). The pinned
+ * `change` lane does not send `reports` yet: that row is the lane forms'.
+ * The rows
  * of that revision that need `observes`, `holds`, `adds`, `for`, `origin`,
  * an index or the text of a fact are not built here.
  *
@@ -41,7 +46,7 @@
  * | `open-branch-read` | 5, effect | 36 | `adopt-head` |
  * | `reopen-publish` | 5, effect | 37 | `resend` and `resend-receipt`: the write, and its attempt's `mint` |
  * | `resend-due` | 4, guard | z | `resend` and `resend-receipt`, refused `resend-not-due` |
- * | `collect-list` | 3, type | b | `reserve`, the fields `verdicts`, `jobs` and `links`; a verdict may state `extent` |
+ * | `collect-list` | 3, type | b | `reserve`, the field `links`. From revision 28 `verdicts` and `jobs` have written types |
  * | `mint` | 7, outcome | e | The kind `mint` |
  * | `revoke` | 7, outcome | e | The kind `revoke` |
  * | `push` | 7, outcome | e | The kind `push` |
@@ -59,7 +64,10 @@
  * outcome, because no form states the subjects (the contract's point
  * R1-67; I3 deltas, entry FC6). And no text states how an entry of a lane
  * is read by its bytes, so the package has no reader of the manifest, the
- * verdicts and the checks (entries FA9 and FC5). So the rule decides what
+ * verdicts and the checks (entries FA9 and FC5). Two reads are stated
+ * exactly, and the rule makes them itself: the field `selected` of the
+ * manifest's intent, and the commit that a `report` entry set
+ * (`reportsBound`). So the rule decides what
  * the evidence and this scope's own records decide: a publication that is
  * no longer `queued`, `evidence-too-large`, a head that is not the
  * recorded head, and an integration commit that is not in the repository.
@@ -93,7 +101,7 @@
  */
 
 import type { FactRef, FieldValue, KeyId, Observation, OperationId, PlatformData, PlatformDefinition, ScopeId } from "@generalbusiness/artroom-contract";
-import { canonicalize, isFactRef, isMemberRef, isScopeRef, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
+import { canonicalize, isFactRef, isScopeRef, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
 import type { Item, Opening, Operation, Own, PlatformRule, RecordedRef, RuleEffect, RuleGiven, RuleRequest, Rules, StateView } from "@generalbusiness/artroom-derive";
 import { isJudgeEvidence, isObjectId, judgeReservation, type ReservationRead, type Statement } from "./reservation.ts";
 import { referenceOf } from "./rules-scope.ts";
@@ -164,15 +172,32 @@ export function publicationRoom(attempts: { push: number; mint: number; revoke: 
 }
 
 /**
- * The most records of each `collect` list of a `reserve` (row b; section
- * 12.1.5, "The three lists of `reserve`"). They are constants of version 1
- * of the rule `collect-list`. They equal the `max` of the types `review`,
- * `job` and `link` of the pinned `change` lane. The rule does not read them
- * from the sender's pinned definition: a rule is given no definition of
- * another scope. If the lane's row or a `max` changes, this changes with
- * it, in a revision of the note (entry ER3).
+ * The most records of the `collect` list of a `reserve` that keeps the
+ * mark `collect-list` (row b; section 12.1.5, "The three lists of
+ * `reserve`"): `links`. It is a constant of version 1 of the rule. It
+ * equals the `max` of the type `link` of the pinned `change` lane. The
+ * rule does not read it from the sender's pinned definition: a rule is
+ * given no definition of another scope. If the lane's row or its `max`
+ * changes, this changes with it, in a revision of the note (entry ER3).
+ * From the note's revision 28 the lists `verdicts` and `jobs` have written
+ * types, with at most 64 records each (section 6.5, "The fields of
+ * `reserve`").
  */
-export const COLLECT_MOST = { verdicts: 256, jobs: 64, links: 32 } as const;
+export const COLLECT_MOST = { links: 32 } as const;
+
+/**
+ * The most reports that a `reserve` names: the `max` of its field `reports`,
+ * which is the `max` of the field `selected` of the pinned `change` lane's
+ * `propose-manifest` (section 6.5, "`reserve` names each selected report").
+ */
+export const REPORTS_MOST = 32;
+
+/**
+ * The most records of each of the two lists of a `reserve` that name
+ * facts: the contract's bound on the elements of a written list (section
+ * 6.5, "A list of at most 64 verdicts").
+ */
+export const NAMED_MOST = 64;
 
 /**
  * The most receipts that may be `owed` when a `reserve` is admitted: the
@@ -200,6 +225,46 @@ const FROM_DIRECTORY = { kind: "directory", under: "platform:directory" } as con
 const HELD: readonly string[] = ["reserved", "publishing", "unresolved"];
 /** Every state of a publication, final or not: a publication that exists for an operation, whatever became of it. */
 const EVERY = ["queued", "reserved", "publishing", "unresolved", "published", "aborted", "not-reserved"] as const;
+/**
+ * The written types of the two lists of a `reserve` that name facts, and of
+ * its field `reports` (authority note, revision 28, section 6.5, "The
+ * fields of `reserve`" and "`reserve` names each selected report"). The
+ * kinds are those of the pinned `change` lane, and of the pinned `issue`
+ * lane for a report: the act that opens a `review`, the act that opens a
+ * `job`, the three kinds of a job's reference `decidedBy`, and the act
+ * that opens a `report`. If a row of a lane changes, these change with it,
+ * in a revision of the note. A list has at most 64 records, which is the
+ * contract's bound on the elements of a written list.
+ */
+const VERDICTS = {
+  type: "list", max: NAMED_MOST, required: true,
+  of: {
+    type: "record",
+    of: {
+      review: { type: "fact", kind: ["review-verdict"], under: "change", required: true },
+      reviewer: { type: "member", required: true },
+      verdict: { type: "enum", of: ["approve", "request-changes"], required: true },
+      // The one extent that the verdict counts for. A name that is no extent of the observed rules counts for none (section 12.1.4a).
+      extent: { type: "text", max: 64, required: false },
+    },
+  },
+} as const;
+const JOBS = {
+  type: "list", max: NAMED_MOST, required: true,
+  of: {
+    type: "record",
+    of: {
+      job: { type: "fact", kind: ["request-check"], under: "change", required: true },
+      name: { type: "text", max: 128, required: true },
+      state: { type: "enum", of: ["requested", "passed", "failed", "errored", "timed-out"], required: true },
+      // A job that is `requested` has no deciding entry, and names one entry.
+      decidedBy: { type: "fact", kind: ["check", "check-error", "timed:job-deadline"], under: "change", required: false },
+    },
+  },
+} as const;
+/** A `report` entry of an issue lane: the act of the pinned `issue` lane that opens a `report`, whose item type has that name too. */
+const REPORT = { kind: "report", under: "issue" } as const;
+const REPORTS = { type: "list", max: REPORTS_MOST, required: true, of: { type: "fact", kind: [REPORT.kind], under: REPORT.under } } as const;
 /** The type of a `collect` list of a `reserve` (Code P25; row b). */
 const COLLECTED = { code: "collect-list", row: "P25", type: "code", required: true } as const;
 /** The send of the mark of an outcome's kind: the `relate`, `publication`, to the lane. Its clauses are empty (rows m and n). */
@@ -382,10 +447,16 @@ export const destination: PlatformData = {
       fields: {
         operation: { ...OPERATION, required: true },
         manifest: { ...MANIFEST, required: true },
-        verdicts: COLLECTED,
-        jobs: COLLECTED,
-        // The third list, with the same mark (revision 25, "The three lists of `reserve`"; entry ER3).
+        // From revision 28 (section 6.5, "The fields of `reserve`"): the two lists that name facts have written types, so that
+        // each entry that they name is fetched at the delivery, counted against the bound on the foreign entries of one entry, and
+        // retained with the entry that records the message.
+        verdicts: VERDICTS,
+        jobs: JOBS,
+        // The third list keeps the mark (revision 25, "The three lists of `reserve`"; entry ER3). It names no fact to fetch.
         links: COLLECTED,
+        // The sixth field (section 6.5, "`reserve` names each selected report"): the `report` entry of each selected report, in the
+        // order of the manifest's selections. The list may be empty, and is still present.
+        reports: REPORTS,
       },
       guards: [
         OWNER,
@@ -621,24 +692,15 @@ const isObject = (value: unknown): value is Record<string, FieldValue> => typeof
 /** True when the record has each required member, no member that is not named, and each member that it has is of its kind. */
 const record = (value: unknown, required: Readonly<Record<string, (member: unknown) => boolean>>, optional: Readonly<Record<string, (member: unknown) => boolean>> = {}): boolean =>
   isObject(value) && Object.keys(required).every((name) => Object.hasOwn(value, name)) && Object.entries(value).every(([name, member]) => (required[name] ?? optional[name])?.(member) === true);
-const oneOf = (names: readonly string[]) => (value: unknown): boolean => typeof value === "string" && names.includes(value);
-
-/** The name of one extent, as a verdict states it: lowercase letters, digits and hyphens, at most 64 bytes (section 12.1.4a, "The exact text of `reason`"). */
-const isExtentName = (value: unknown): boolean => typeof value === "string" && /^[a-z0-9-]{1,64}$/.test(value);
 
 /**
- * One record of each `collect` list of a `reserve`, as the lane's `merge`
- * row sends it (R2 section 4.2; the eligibility statement of section 6.3).
- * An item of the lane is named by the fact of the entry that opened it,
- * which is how a send carries a local item. A job that is `requested` has
- * no deciding entry, so `decidedBy` may be absent. A verdict may state the
- * one extent that it counts for (the lane forms' revision 15; section
- * 12.1.4a, "Which reviews count for an extent"). The pinned lane of today
- * sends none.
+ * One record of the `collect` list `links` of a `reserve`, as the lane's
+ * `merge` row sends it (R2 section 4.2). An item of the lane is named by
+ * the fact of the entry that opened it, which is how a send carries a
+ * local item. The rule fetches nothing for it, and the rule `judge` reads
+ * nothing of a link's entry.
  */
 const COLLECTED_RECORD: Readonly<Record<keyof typeof COLLECT_MOST, (value: unknown) => boolean>> = {
-  verdicts: (value) => record(value, { review: isFactRef, reviewer: isMemberRef, verdict: oneOf(["approve", "request-changes"]) }, { extent: isExtentName }),
-  jobs: (value) => record(value, { job: isFactRef, name: (name) => typeof name === "string" && utf8(name).length <= 128, state: oneOf(["requested", "passed", "failed", "errored", "timed-out"]) }, { decidedBy: isFactRef }),
   links: (value) => record(value, { link: isFactRef, issue: (issue) => isScopeRef(issue) && issue.kind === "lane" }),
 };
 
@@ -1026,8 +1088,8 @@ const readDecides: Decides = (given, read) => {
  * by its ID: the rule reads each observation itself, through the judge.
  */
 export interface LaneRead {
-  /** As `ReservationRead.manifest`. */
-  manifest: ReservationRead["manifest"];
+  /** As `ReservationRead.manifest`, but for the commits of the selected reports, which the rule derives itself (`reportCommits`). */
+  manifest: Omit<ReservationRead["manifest"], "reports">;
   /** One for each verdict of the statement, in its order: whether its entry is that verdict, and the key that signed it. Null: no entry says. */
   verdicts: readonly { sound: boolean; key: KeyId | null }[];
   /** For a check, by its name: as `ReservationRead.checks`, with the key that signed the deciding entry. */
@@ -1068,8 +1130,12 @@ const NOT_AT_HAND: Reads = () => null;
  * form 2); `controllers`, null (the missing form 11); and
  * `controllersOfAuthors`, null (the missing form 15).
  *
- * Null: the lane's entries are not read, or the `merge` entry is not at
- * hand. The rule then has a fault, and nothing is written.
+ * The commits of the selected reports are read from the entries that the
+ * field `reports` names (`reportsBound`), and no longer from a reader.
+ *
+ * Null: the lane's entries are not read; or the `merge` entry, the
+ * manifest's entry or the entry of a named report is not at hand. The rule
+ * then has a fault, and nothing is written.
  */
 function reservationRead(given: RuleGiven, publication: Item, statement: Statement, lane: LaneRead | null): ReservationRead | null {
   const operation = publication.refs["operation"];
@@ -1083,23 +1149,90 @@ function reservationRead(given: RuleGiven, publication: Item, statement: Stateme
   const seen = given.observed({ asked: "rules" })?.observation;
   const rules = seen && "subject" in seen && seen.subject === "rules" ? seen : null;
   const required = rules?.content.asked === "rules" ? rules.content.checks.filter((check) => check.required).map((check) => check.name) : [];
+  const reports = reportsBound(given, statement);
+  if (reports === undefined) return null;
   return {
     merger: keyOf(merge.input.signed.intent.actor), rules,
     extents: null, singleControllerException: rules?.content.asked === "rules" && rules.content.singleControllerException === true,
-    manifest: lane.manifest, controllersOfAuthors: null, controllers: null,
+    manifest: { ...lane.manifest, reports }, controllersOfAuthors: null, controllers: null,
     // Only an approval is counted, and only a required check's result decides: no other key is read, so no other is retained.
     verdicts: statement.verdicts.map((verdict, n) => ({ sound: lane.verdicts[n]?.sound === true, key: verdict.verdict === "approve" ? keyOf(lane.verdicts[n]?.key ?? null) : null })),
     checks: Object.fromEntries(Object.entries(lane.checks).map(([name, check]) => [name, { opening: check.opening, deciding: check.deciding, key: required.includes(name) ? keyOf(check.key) : null }])),
   };
 }
 
-/** The eligibility statement of a publication: the three lists of its `reserve`, in this scope's own entry that recorded the message and opened the item. The rule `collect-list` checked each record when it was delivered. */
+/**
+ * The eligibility statement of a publication: the fields of its `reserve`,
+ * in this scope's own entry that recorded the message and opened the item.
+ * The written types of the message, and the rule `collect-list` for its
+ * links, checked each record when it was delivered. `operation` and
+ * `manifest` are read from the two references that the entry set from the
+ * fields, where the operation is the fact of the source entry.
+ */
 function statementOf(own: Own, publication: Item): Statement {
   const input = ownEntry(own, publication.id).input;
   const body = input.type === "delivery" && input.message.class === "request" && isObject(input.message.body) ? input.message.body : null;
   const fields = body !== null && body["message"] === "reserve" && isObject(body["fields"]) ? body["fields"] : null;
-  if (fields === null) throw new Error("a queued publication was opened by the delivery of its reserve");
-  return { verdicts: fields["verdicts"], jobs: fields["jobs"], links: fields["links"] } as unknown as Statement;
+  const [operation, manifest] = [publication.refs["operation"], publication.refs["manifest"]];
+  if (fields === null || !isFactRef(operation) || !isFactRef(manifest)) throw new Error("a queued publication was opened by the delivery of its reserve");
+  return { operation, manifest, verdicts: fields["verdicts"], jobs: fields["jobs"], links: fields["links"], reports: fields["reports"] } as unknown as Statement;
+}
+
+/**
+ * The commit of each report that the field `reports` of a `reserve` names,
+ * in its order (authority note, revision 28, section 6.5, "`reserve` names
+ * each selected report", the point "The commit of a report"). The rule
+ * reads the entry that an element names, in `uses`: the commit that the
+ * entry's recorded effects set in the slot `commit` of the report that the
+ * entry opened. Null, for one element: the entry opened no report, or set
+ * no commit. Undefined: the entry of an element is not at hand.
+ *
+ * An entry that is no `report` entry of a scope under `issue` opened no
+ * report of an issue lane, so it gives null too. The note has the contract
+ * refuse such a message at its delivery, `bad-field`, when it fetches a
+ * fact under a written type. This source's delivery checks the kind and
+ * the definition of a fact only where a slot or a guard reads it, and not
+ * for an element of a list (I3 deltas, entry GD11). So the rule reads both
+ * here, and the publication ends `not-reserved`, `evidence-invalid`.
+ */
+function reportCommits({ uses }: Pick<RuleGiven, "uses">, statement: Statement): readonly (string | null)[] | undefined {
+  const commits: (string | null)[] = [];
+  for (const named of statement.reports) {
+    const used = uses.find((fetched) => fetched.fact.hash === named.hash);
+    if (!used) return undefined;
+    const { entry } = used;
+    const opens = used.under === REPORT.under && entry.input.type === "act" && entry.input.signed.intent.kind === REPORT.kind
+      && entry.effects.some((effect) => effect.effect === "open" && effect.item === entry.seq && effect.type === REPORT.kind);
+    const set = entry.effects.find((effect) => effect.effect === "value" && effect.item === entry.seq && effect.slot === "commit");
+    commits.push(opens && set?.effect === "value" && isObjectId(set.value) ? set.value : null);
+  }
+  return commits;
+}
+
+/**
+ * The reports of a `reserve`, bound to the manifest's selections, exactly
+ * (the same block, "The reports are bound to the manifest's selections,
+ * exactly"). The rule reads the manifest's entry, in `uses`: the field
+ * `selected` of its signed intent, a list of records `{ accepted, report
+ * }`. It asks two things. The list `reports` has as many elements as
+ * `selected` has records. And for each place, the element of `reports` is
+ * the same fact as the member `report` of the record of `selected`: the
+ * whole fact reference, compared by its text, byte for byte.
+ *
+ * It gives the commit of each report, in that order. Null: the statement
+ * is not what the manifest says, or an entry that an element names opened
+ * no report or set no commit. The publication then ends `not-reserved`,
+ * `evidence-invalid`. Undefined: the manifest's entry, or the entry of a
+ * named report, is not at hand.
+ */
+function reportsBound(given: Pick<RuleGiven, "uses">, statement: Statement): readonly string[] | null | undefined {
+  const manifest = given.uses.find((used) => used.fact.hash === statement.manifest.hash)?.entry;
+  const commits = reportCommits(given, statement);
+  if (!manifest || commits === undefined) return undefined;
+  const selected = manifest.input.type === "act" ? manifest.input.signed.intent.fields["selected"] : null;
+  if (!Array.isArray(selected) || selected.length !== statement.reports.length) return null;
+  const same = selected.every((record, place) => isObject(record) && isFactRef(record["report"]) && canonicalize(record["report"]) === canonicalize(statement.reports[place]!));
+  return same && commits.every((commit): commit is string => commit !== null) ? commits : null;
 }
 
 /**
@@ -1184,7 +1317,16 @@ const judgeRule = (decides: Decides): PlatformRule => ({
   rules: {
     selects: false, read: false, covered: true, most: { effects: 10, requests: 1, operations: 2 },
     retries: () => false,
-    wellFormed: (result, evidence) => result === "confirmed" && isJudgeEvidence(evidence.body),
+    wellFormed: (result, evidence, given) => {
+      if (result !== "confirmed" || !isJudgeEvidence(evidence.body)) return false;
+      // From revision 28: the member `ancestors` holds those of the reports' commits that the host showed to be ancestors, and no
+      // other commit. One that no named report holds does not follow. Where the publication is not `queued` nothing of the
+      // evidence is read, and where a named entry is not at hand the rule has a fault in `derives`: neither is judged here.
+      const publication = publicationAt(given.state, branchOf(given.state)?.refs["judging"]);
+      const commits = publication?.state === "queued" ? reportCommits(given, statementOf(given.own, publication)) : undefined;
+      const held = evidence.body.ancestors;
+      return commits === undefined || held.every((commit) => commits.includes(commit));
+    },
     derives: (given, judge) => { const { effects, opens } = decides(given, judge); return { effects, sends: [], opens }; },
   },
 });
@@ -1410,15 +1552,13 @@ const WRITTEN: Rules = {
     },
   },
   /**
-   * Row b, the type of the fields `verdicts`, `jobs` and `links` of
-   * `reserve` (P25; section 12.1.5, "The three lists of `reserve`"). A
-   * `collect` list may hold more than the 32 elements of a declared list.
-   * The value is of the type when it is a list of at most the number of
-   * its field, and each element is one record of that list: a verdict
-   * `review`, `reviewer`, `verdict` and, when it states one, `extent`; a
-   * job `job`, `name`, `state` and, when something decided it,
-   * `decidedBy`; a link `link`, `issue`. A record with another member, or
-   * with a required one missing, and a list with more records, make the
+   * Row b, the type of the field `links` of `reserve` (P25; section 12.1.5,
+   * "The three lists of `reserve`"). From the note's revision 28 the mark
+   * stands on that one field, where it stood on three: `verdicts` and
+   * `jobs` have written types. A `collect` list may hold more than a
+   * declared list. The value is of the type when it is a list of at most
+   * 32 records, each with `link` and `issue`. A record with another member,
+   * or with a required one missing, and a list with more records, make the
    * message `bad-field`.
    */
   "collect-list": {

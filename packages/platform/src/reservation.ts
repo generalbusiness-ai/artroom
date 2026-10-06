@@ -7,6 +7,12 @@
  * function of what its caller gives. It reads no scope, no repository and
  * no clock.
  *
+ * Some rows are of the note's revision 28, at `8b1c3c9d7` (I3 deltas, the
+ * entries GD): the statement holds the `reserve`'s six fields, the commits
+ * of the selected reports come from the entries that the statement names,
+ * three more causes make the statement invalid evidence, and the evidence
+ * has no member for a count of entries.
+ *
  * **What is given, and from where.** The rule reads four things. Two of
  * them every outcome entry has: the evidence, and this scope's own records
  * (the recorded head, and the `reserve` message). The judgment needs
@@ -35,7 +41,7 @@
  */
 
 import type { FactRef, MemberId, MemberRef, Observation, RulesObservation, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
-import { timeMs } from "@generalbusiness/artroom-bytes";
+import { canonicalize, timeMs } from "@generalbusiness/artroom-bytes";
 import { byteOrder } from "@generalbusiness/artroom-derive";
 import { LANDING, RULES_EXTENT, classify, judgeExtents, type Extent, type ExtentsAsked, type Review, type TreeLink } from "./extents.ts";
 
@@ -46,23 +52,37 @@ export interface JudgeChanges {
   unreadable: number;                       // changed paths that are no text
 }
 
-/** The body of the evidence of `judge` (section 12.1.5). Basis `own-answer`: the answers of the host to this attempt's reads. */
-export type JudgeEvidence =
-  | { over: "entries" }                     // the count of entries to fetch is over the bound: nothing was fetched or read (G5)
-  | {
-    head: string | null;                    // the branch ref at the host: a commit ID, or null when the ref is absent
-    present: boolean;                       // the integration commit and its whole closure are in the canonical repository
-    tree: string | null;                    // the tree of the integration commit; null when `present` is false
-    firstParent: string | null;             // its first parent; null when it has none, or when `present` is false
-    ancestors: readonly string[];           // the commits of the selected reports that are its ancestors
-    changes: JudgeChanges | { over: "paths" | "links" | "bytes" } | null;   // null when `present` is false
-  };
+/**
+ * The body of the evidence of `judge` (section 12.1.5). Basis `own-answer`:
+ * the answers of the host to this attempt's reads. From the note's revision
+ * 28 it has no member `{ over: "entries" }`: the count of the entries that a
+ * `reserve` names is made when the message is delivered, and a message
+ * over the bound is refused `bad-field` there (section 6.5, "The count,
+ * with reports").
+ */
+export interface JudgeEvidence {
+  head: string | null;                    // the branch ref at the host: a commit ID, or null when the ref is absent
+  present: boolean;                       // the integration commit and its whole closure are in the canonical repository
+  tree: string | null;                    // the tree of the integration commit; null when `present` is false
+  firstParent: string | null;             // its first parent; null when it has none, or when `present` is false
+  ancestors: readonly string[];           // those of the selected reports' commits that the host showed to be its ancestors, and no other commit
+  changes: JudgeChanges | { over: "paths" | "links" | "bytes" } | null;   // null when `present` is false
+}
 
-/** The eligibility statement, as the message of the publication's `reserve` holds it (section 6.3): the three lists that `collect-list` checked. */
+/**
+ * The eligibility statement, as the message of the publication's `reserve`
+ * holds it (section 6.3): its six fields. `operation` is P's `merge` entry,
+ * which is the source entry of the delivery. `reports` names the `report`
+ * entry of each selected report, in the order of the manifest's selections
+ * (the note's revision 28, section 6.5).
+ */
 export interface Statement {
+  operation: FactRef;
+  manifest: FactRef;
   verdicts: readonly { review: FactRef; reviewer: MemberRef; verdict: "approve" | "request-changes"; extent?: string }[];
   jobs: readonly { job: FactRef; name: string; state: "requested" | "passed" | "failed" | "errored" | "timed-out"; decidedBy?: FactRef }[];
   links: readonly { link: FactRef; issue: ScopeRef }[];
+  reports: readonly FactRef[];
 }
 
 /**
@@ -79,8 +99,15 @@ export interface ReservationRead {
   extents: readonly Extent[] | null;
   /** The observed rules' declaration of the single-controller exception. */
   singleControllerException: boolean;
-  /** The manifest's entry, in `uses`: its base, integration commit and tree; the commits of its selected reports; its authors (section 3.10); and whether it is complete (R2 section 5.2). */
-  manifest: { base: string; integration: string; tree: string; reports: readonly string[]; authors: readonly MemberId[]; complete: boolean };
+  /**
+   * The manifest's entry, in `uses`: its base, integration commit and tree;
+   * its authors (section 3.10); and whether it is complete (R2 section
+   * 5.2). `reports`: the commit of each selected report, from the `report`
+   * entry that the statement names for it, in `uses`. Null: the named
+   * reports are not the manifest's selections, place for place, or an
+   * entry that one names opened no report or set no commit.
+   */
+  manifest: { base: string; integration: string; tree: string; reports: readonly string[] | null; authors: readonly MemberId[]; complete: boolean };
   /** The controller of each agent among the authors. Null: no retained input says (the missing form 15). */
   controllersOfAuthors: readonly MemberId[] | null;
   /** Every active member with an active key who holds `rules.publish`. Null: no observation says (the missing form 11). */
@@ -136,8 +163,8 @@ const WINDOW_MS = 10_000;
  */
 export function judgeReservation({ recorded, evidence, statement, read, time }: ReservationAsked): Reservation {
   const no = (reason: string): Reservation => ({ reserved: false, reason });
-  // G5: the count of entries to fetch, or the member `changes`, is over its bound. Nothing more is judged.
-  if ("over" in evidence || (evidence.changes !== null && "over" in evidence.changes)) return no("evidence-too-large");
+  // G5: the member `changes` is over its bound. Nothing more is judged.
+  if (evidence.changes !== null && "over" in evidence.changes) return no("evidence-too-large");
   // Check 1, as far as this scope's own records say: the head just read is G's recorded head. Where the two differ another
   // writer moved the branch (section 6.9), and nothing is reserved.
   if (evidence.head === null || evidence.head !== recorded) return no("out-of-date");
@@ -150,7 +177,9 @@ export function judgeReservation({ recorded, evidence, statement, read, time }: 
   // Check 1: the manifest's base equals the head just read.
   if (manifest.base !== evidence.head) return no("out-of-date");
   // Check 2: its tree is the one named; the base is its first parent; each selected report's commit is its ancestor.
-  if (evidence.tree !== manifest.tree || evidence.firstParent !== manifest.base || !manifest.reports.every((commit) => evidence.ancestors.includes(commit))) return no("integration-invalid");
+  // The commits of the reports are read from their entries. Where the named reports are not the manifest's selections no commit
+  // is read, and the statement is invalid evidence, below.
+  if (evidence.tree !== manifest.tree || evidence.firstParent !== manifest.base || (manifest.reports !== null && !manifest.reports.every((commit) => evidence.ancestors.includes(commit)))) return no("integration-invalid");
   // Check 3: the merger's key holds `change.merge`, by an observation within ten seconds.
   const merger = read.merger;
   const [at, now] = [merger ? timeMs(merger.at) : null, timeMs(time)];
@@ -159,7 +188,14 @@ export function judgeReservation({ recorded, evidence, statement, read, time }: 
 
   // Check 4, from the complete statement. A verdict whose entry is not what the statement says is invalid evidence. An approval
   // counts from a key that is observed and is not compromised, whose member is the reviewer.
-  let invalid = statement.verdicts.some((_, n) => read.verdicts[n]?.sound !== true);
+  // The statement is not the lane's, and so invalid evidence, in three more cases (section 6.5, "`reserve` names each selected
+  // report"). The named reports are not the manifest's selections. An entry that the statement names is not P's, in P's
+  // incarnation, which is the scope of `operation`. Or two records of `verdicts` name one `review`, or two records of `jobs` name
+  // one `job` or one `decidedBy`: the lane's `collect` gives one record for an item, and a deciding entry sets one job.
+  const [own, twice] = [(fact: FactRef) => fact.at.scope === statement.operation.at.scope && fact.at.inc === statement.operation.at.inc, (facts: readonly FactRef[]) => new Set(facts.map((fact) => canonicalize(fact))).size !== facts.length];
+  const [reviews, jobs, deciding] = [statement.verdicts.map((verdict) => verdict.review), statement.jobs.map((job) => job.job), statement.jobs.flatMap((job) => (job.decidedBy ? [job.decidedBy] : []))];
+  let invalid = manifest.reports === null || ![statement.manifest, ...reviews, ...jobs, ...deciding].every(own) || twice(reviews) || twice(jobs) || twice(deciding)
+    || statement.verdicts.some((_, n) => read.verdicts[n]?.sound !== true);
   const changesAsked = statement.verdicts.some((verdict) => verdict.verdict === "request-changes");
   const approvals = statement.verdicts.flatMap((verdict, n) => {
     const key = read.verdicts[n]?.key ?? null;
@@ -251,7 +287,6 @@ const isPath = (value: unknown): boolean => typeof value === "string";
  */
 export function isJudgeEvidence(value: unknown): value is JudgeEvidence {
   if (!isRecord(value)) return false;
-  if (Object.hasOwn(value, "over")) return members(value, ["over"]) && value["over"] === "entries";
   if (!members(value, ["head", "present", "tree", "firstParent", "ancestors", "changes"])) return false;
   const { head, present, tree, firstParent, ancestors, changes } = value;
   if (!(head === null || isObjectId(head)) || typeof present !== "boolean" || !Array.isArray(ancestors) || !ancestors.every(isObjectId)) return false;

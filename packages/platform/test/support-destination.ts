@@ -241,14 +241,47 @@ export const bureau: DeclaredDefinition = {
 const bureauDefinition = checked(validateDefinition(bureau, PROPOSED_BOUNDS));
 
 let made = 0;
-/** An entry made by hand at a scope: it has a hash, and nothing judged it. `kind`: the kind of the act that it says it recorded. */
-export function handMade(at: ScopeRef, kind: string, sends: readonly Send[] = [], who: Actor = rita): Entry {
-  const signed = signIntent({ v: 1, to: at, actor: who.key, kind, on: null, expected: {}, fields: {}, idempotencyKey: `made-${made}`, notAfter: t(60) }, who.secret);
+/**
+ * An entry made by hand at a scope: it has a hash, and nothing judged it. `kind`: the kind of the act that it says it recorded.
+ * `fields`: the fields of its intent. `effects`: what it says it derived, given its own position.
+ */
+export function handMade(at: ScopeRef, kind: string, sends: readonly Send[] = [], who: Actor = rita, fields: Record<string, FieldValue> = {}, effects: (seq: number) => Entry["effects"] = () => []): Entry {
+  const signed = signIntent({ v: 1, to: at, actor: who.key, kind, on: null, expected: {}, fields, idempotencyKey: `made-${made}`, notAfter: t(60) }, who.secret);
   const input: Input = { type: "act", signed, authority: [], presented: {} };
-  return { v: 1, at, seq: 100 + made++, prev: d("0"), time: T0, clamped: false, epoch: 0, input, uses: [], prepared: [], effects: [], sends };
+  const seq = 100 + made++;
+  return { v: 1, at, seq, prev: d("0"), time: T0, clamped: false, epoch: 0, input, uses: [], prepared: [], effects: effects(seq), sends };
 }
+/**
+ * STAND-IN for a `report` entry of an issue lane, made by hand: it says that it opened a report and set its `commit`, as the
+ * pinned `issue` lane's act `report` records it. `commit` null: it says that it opened a report and set none.
+ */
+export const reportMade = (at: ScopeRef, commit: string | null): Entry =>
+  handMade(at, "report", [], rita, {}, (seq) => [{ effect: "open", item: seq, type: "report", state: "reported" }, ...(commit === null ? [] : [{ effect: "value", item: seq, slot: "commit", value: commit } as const])]);
 /** An entry of another scope as it is fetched before a turn, with the name of the definition that its scope pins. */
 export const fetched = (entry: Entry, under: string): Fetched => ({ fact: factRefOf(entry), entry, under });
+
+/**
+ * STAND-IN for what a lane's `merge` lists in its `reserve`, made by hand: `v` verdicts, each with the entry of its review;
+ * `decided` jobs that state `decidedBy`, and `undecided` jobs that state none, each with the entry that opened it; and `r` reports
+ * of an issue lane, each with a commit of its own. It gives the fields of the message, the entries that they name, the field
+ * `selected` of a manifest that selects exactly those reports, and the reports' commits.
+ */
+export function listed(lane: ScopeRef, issue: ScopeRef, v: number, decided: number, undecided: number, r: number) {
+  const made = (count: number, kind: string) => Array.from({ length: count }, () => handMade(lane, kind));
+  const [reviews, opened, deciding] = [made(v, "review-verdict"), made(decided + undecided, "request-check"), made(decided, "check")];
+  const commits = Array.from({ length: r }, (_, n) => (n + 1).toString(16).padStart(40, "1"));
+  const reports = commits.map((commit) => reportMade(issue, commit));
+  const accepted = factRefOf(handMade(issue, "accept-report")) as unknown as FieldValue;
+  return {
+    fields: {
+      verdicts: reviews.map((review) => ({ review: factRefOf(review), reviewer: una.member, verdict: "approve" })),
+      jobs: opened.map((job, n) => ({ job: factRefOf(job), name: `job-${n}`, state: n < decided ? "passed" : "requested", ...(n < decided ? { decidedBy: factRefOf(deciding[n]!) } : {}) })),
+      reports: reports.map((report) => factRefOf(report)),
+    },
+    entries: [...reviews, ...opened, ...deciding, ...reports], reports, commits,
+    selected: reports.map((report) => ({ accepted, report: factRefOf(report) as unknown as FieldValue })) as FieldValue[],
+  };
+}
 
 /** STAND-IN: the register's `found` entry that a claim names, made by hand. */
 const register: ScopeRef = (() => {
@@ -274,11 +307,12 @@ export class Branch extends Ledger {
   readonly other = new Scope(laneDefinition, keys.una.member, true, 1);
   /** STAND-IN: what is at hand for the next reservation that the rule `judge` judges. Null: nothing is at hand, as in the runtime. */
   read: Hand | null = null;
-  /** STAND-IN: the `merge` entry and the manifest's entry of each publication, made by hand, as they are fetched for the outcome of its `judge`. */
-  readonly #named = new Map<number, readonly Entry[]>();
+  /** STAND-IN: the entries that the `reserve` of each publication names, made by hand, as they are fetched for the outcome of its `judge`: the `merge` entry, the manifest's entry and each other entry. */
+  readonly #fetched = new Map<number, readonly Fetched[]>();
   /** STAND-IN reader of a lane's entries: what the hand-written record says of them, with each key by its ID. No entry is read. */
   readonly #lane = (): LaneRead | null => this.read && {
-    manifest: this.read.manifest,
+    // The commits of the selected reports are not the reader's: the package's rule derives them from the entries that `reserve` names.
+    manifest: { base: this.read.manifest.base, integration: this.read.manifest.integration, tree: this.read.manifest.tree, authors: this.read.manifest.authors, complete: this.read.manifest.complete },
     verdicts: this.read.verdicts.map(({ sound, key }) => ({ sound, key: key?.key ?? null })),
     checks: Object.fromEntries(Object.entries(this.read.checks).map(([name, check]) => [name, { opening: check.opening, deciding: check.deciding, key: check.key?.key ?? null }])),
   };
@@ -334,14 +368,20 @@ export class Branch extends Ledger {
   /**
    * STAND-IN for a lane's `merge` entry and its `reserve` (R2 section 4.2):
    * the entry is the operation, and it names a manifest entry that is made
-   * by hand too. `over`: fields of the message that a test changes. `named`:
-   * the other entries of a lane that those fields name, as they are fetched.
+   * by hand too. `over`: fields of the message that a test changes, where
+   * `undefined` leaves a field out. `named`:
+   * the other entries that those fields name, as they are fetched: an entry
+   * of the lane under `change`, and a `report` entry under `issue`.
+   * `selected`: the field `selected` of the manifest's intent, as the pinned
+   * `change` lane's `propose-manifest` holds it.
    */
-  reserve(over: Record<string, unknown> = {}, sender: Scope = this.lane, named: readonly Entry[] = []): { judgment: Judgment; operation: FactRef; merge: Entry } {
-    const manifest = handMade(sender.at, "propose-manifest");
-    const message: Request = { class: "request", type: "tell", body: { message: "reserve", fields: { operation: { self: true }, manifest: factRefOf(manifest), verdicts: [], jobs: [], links: [], ...over } } };
-    const { judgment, entry } = this.from(sender.at, "change", "merge", message, [manifest, ...named].map((entry) => fetched(entry, "change")));
-    if (judgment.result === "write" && this.item(this.head.seq)?.type === "publication") this.#named.set(this.head.seq, [entry, manifest]);
+  reserve(over: Record<string, unknown> = {}, sender: Scope = this.lane, named: readonly Entry[] = [], selected: readonly FieldValue[] = []): { judgment: Judgment; operation: FactRef; merge: Entry } {
+    const manifest = handMade(sender.at, "propose-manifest", [], rita, { selected });
+    const message: Request = { class: "request", type: "tell", body: { message: "reserve", fields: Object.fromEntries(Object.entries({ operation: { self: true }, manifest: factRefOf(manifest), verdicts: [], jobs: [], links: [], reports: [], ...over }).filter(([, value]) => value !== undefined)) as Record<string, FieldValue> } };
+    // A `report` entry of another scope than the sender is read as an entry of an issue lane. Every other entry is read as the lane's.
+    const facts = [manifest, ...named].map((entry) => fetched(entry, entry.input.type === "act" && entry.input.signed.intent.kind === "report" && entry.at.scope !== sender.at.scope ? "issue" : "change"));
+    const { judgment, entry } = this.from(sender.at, "change", "merge", message, facts);
+    if (judgment.result === "write" && this.item(this.head.seq)?.type === "publication") this.#fetched.set(this.head.seq, [fetched(entry, "change"), ...facts]);
     return { judgment, operation: factRefOf(entry), merge: entry };
   }
 
@@ -369,7 +409,7 @@ export class Branch extends Ledger {
     const once = keys.filter((seen, n) => keys.findIndex((other) => other.key === seen.key) === n);
     const [merger, ...others] = this.read.merger ? once : [null, ...once];
     const seen = [merger, this.read.rules, ...others].filter((observation): observation is Observation | RulesObservation => observation !== null);
-    return { observed: seen.map((observation, n) => retained(observation, n + 1)), facts: (this.#named.get(judging) ?? []).map((entry) => fetched(entry, "change")) };
+    return { observed: seen.map((observation, n) => retained(observation, n + 1)), facts: this.#fetched.get(judging) ?? [] };
   }
 
   /**
