@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:f456b67c8e743b8b6a90a1621f77cb6161d774b1"}
+{"kind":"artifact","text":"Merge published the current artifact at packages/git/src/index.ts","body":{"commit":"b452882f83fabdd3fb3bc5df356dd8a7a5b6cc1e","path":"packages/git/src/index.ts"}}
