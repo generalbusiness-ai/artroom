@@ -1294,6 +1294,8 @@ class Verifier {
         // Section 9.3, point E13, and section 9.4: an outcome entry of an operation whose rules the verifier does not derive is
         // `unsupported-definition` at that entry, and never `consistent`.
         if (!owners?.rules(owner, kind)) throw new Stop("unsupported-definition", `entry ${entry.seq} is an outcome, and this replay has no rules of the owner of its operation`, where);
+        const valueOwner = owners.rules(owner, kind);
+        if (valueOwner?.values !== undefined && valueOwner.valueDomains === undefined) throw new Stop("unsupported-definition", "the outcome owner has a value reader but no static domain declaration for this pinned version and kind", where);
         this.#trusts.add("outcomes");
         await this.#snapshots(run, input, owners, owner, kind, where);
         // Sections 4.1 and 16.1, "Replay": each observation that the outcome retains, of the ten-second kind, is derived again. The

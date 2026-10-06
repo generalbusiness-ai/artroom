@@ -35,7 +35,7 @@
 
 import type { Bounds, CapabilityName, DecisiveEvidence, Entry, Evidence, FactRef, FactUse, OperationId, PlatformDefinition, RetainedInput, ScopeRef } from "@generalbusiness/artroom-contract";
 import { canonicalize, isEvidence, isOperationId, isRetainedInput, parseStrict, utf8 } from "@generalbusiness/artroom-bytes";
-import { clockOf, evidenceValues, valueDigest, settleOutcome, snapshotInput, snapshotRead, timeMs, timeOf, type Clock as Reading, type Fetched, type OutcomeOffered, type Owners } from "@generalbusiness/artroom-derive";
+import { clockOf, recordedOutcome, evidenceValues, valueDigest, settleOutcome, snapshotInput, snapshotRead, timeMs, timeOf, type Clock as Reading, type Fetched, type OutcomeOffered, type Owners } from "@generalbusiness/artroom-derive";
 import { ownOf, valuesOf, type Scope } from "./core.ts";
 import { report } from "./diag.ts";
 import type { Wakes } from "./outbox.ts";
@@ -437,12 +437,19 @@ export class Operations {
     const definition = this.#scope.pinned()?.definition;
     if (!definition) return { recorded: "unavailable" };
     const bounds = this.#bounds;
+    const known = recordedOutcome(this.#store, input);
+    if (known) {
+      if (input.result !== "unknown") this.#judged(input.operation, input.attempt, null);
+      if (known.result === "conflict") this.#conflict?.(input.operation, input.attempt, known.seq);
+      return { recorded: known.result, seq: known.seq };
+    }
     const said = (answer: OutcomeRecorded) => ({ verdict: "answer", answer }) as const;
     // Section 16.4: a snapshot that the evidence names is stored before the entry that names its digest. So each one is given
     // with the answer, or the scope retains it already. Otherwise this is no answer.
     const operation = this.#store.operation(input.operation);
     const retain = input.retain ?? [];
     const rules = operation && this.#scope.owners()?.rules(operation.owner, operation.kind);
+    if (rules?.values !== undefined && rules.valueDomains === undefined) return { recorded: "unavailable" };
     const named = rules?.retains?.(input.evidence) ?? [];
     let values: ReturnType<typeof evidenceValues>;
     try { values = evidenceValues(rules, input.evidence); } catch { values = null; }

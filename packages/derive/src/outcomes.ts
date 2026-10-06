@@ -214,7 +214,8 @@ function openerOf(j: Judging): { cause: Digest; fact: { at: Judging["scope"]["at
 }
 
 /** Evidence domains come from the rules of the pinned version, beside its data. No untrusted JSON member declares them. */
-export function outcomeValueDomains(data: PlatformData, rules: Rules): Readonly<Record<string, readonly EvidenceValueDomain[]>> {
+export function outcomeValueDomains(data: PlatformData, rules: Rules): Readonly<Record<string, readonly EvidenceValueDomain[]>> | null {
+  if (Object.values(data.outcomes ?? {}).some((mark) => { const rule = ruleAt(rules, mark.code, "outcome")?.rules; return rule?.values !== undefined && rule.valueDomains === undefined; })) return null;
   return Object.fromEntries(Object.entries(data.outcomes ?? {}).flatMap(([kind, mark]) => {
     const domains = ruleAt(rules, mark.code, "outcome")?.rules.valueDomains;
     return domains ? [[kind, domains]] : [];

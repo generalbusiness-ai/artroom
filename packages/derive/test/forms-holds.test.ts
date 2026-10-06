@@ -1,8 +1,8 @@
 import { describe, expect, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import { entryHash } from "@generalbusiness/artroom-bytes";
-import { FoldError, MemoryState, NOTHING, applyEntry, closure, drawsOf, heldEntries, itemOf, one, outcomes, owed, pendingOf, requestOf, retainedBytes, starts, stateDigest, validateDefinition } from "../src/index.ts";
-import type { Amount, Counting, KindStated, Starts } from "../src/index.ts";
+import { FoldError, MemoryState, NOTHING, applyEntry, evidenceValues, outcomeValueDomains, closure, drawsOf, heldEntries, itemOf, one, outcomes, owed, pendingOf, requestOf, retainedBytes, starts, stateDigest, validateDefinition } from "../src/index.ts";
+import type { Amount, Counting, KindStated, Starts, Rules, OutcomeRule } from "../src/index.ts";
 import { on, valid } from "./fixtures.ts";
 import { OWNER, TELL, Works, chain, chainDefinition, changed, opened, works, worksDefinition } from "./fixtures-holds.ts";
 
@@ -409,7 +409,14 @@ describe("a request that an outcome sends is reserved with its operation (sectio
 });
 
 // The definition is the made-up M of the reservation witnesses. Only the pinned owner's declarations are supplied beside it.
-test("evidence value domains of pinned owner code are counted for each possible outcome entry, in a held kind and an unheld closure; a repeated domain is no declaration", () => {
+test("evidence value domains of pinned owner code are counted for each possible outcome entry, in a held kind and an unheld closure; a repeated or missing domain declaration is refused before admission", () => {
+  const noValues: { place: "outcome"; rules: OutcomeRule } = { place: "outcome", rules: { selects: false, read: false, retries: () => false } } as const;
+  const missing = { ...noValues, rules: { ...noValues.rules, values: () => [] } };
+  const rules: Rules = { k: missing, u: noValues };
+  const declaration = outcomeValueDomains(chain, rules);
+  expect(validateDefinition(chain, PROPOSED_BOUNDS, undefined, { platform: true, outcomeValues: declaration }).ok).toBe(false);
+  expect(evidenceValues(missing.rules, { basis: "none", body: null })).toBeNull();
+  expect(evidenceValues(noValues.rules, { basis: "none", body: null })).toEqual([]);
   const declared = valid(validateDefinition(chain, PROPOSED_BOUNDS, undefined, { platform: true, outcomeValues: { k: [{ domain: "changes-1", max: 262144 }], u: [{ domain: "other-1", max: 64 }] } }));
   const ordinary = chainDefinition.reserving!;
   const counted = declared.reserving!;

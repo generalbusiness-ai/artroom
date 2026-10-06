@@ -140,16 +140,18 @@ export function settleOutcome(view: StateView, definition: ValidDefinition, outc
   // be a copy of a recorded answer. Nothing is written.
   const operation = view.operation(outcome.operation);
   if (operation && !namesOwn(operation, outcome)) return invalid("the outcome names another owner or kind than its operation has");
-  // Evidence values are matched before any rule reads them, and kept even when no rule reads one.
-  const names = unjudged(() => evidenceValues(operation ? ownersOf(definition, context.platform, context.owners)?.rules(operation.owner, operation.kind) : null, outcome.evidence));
+  const known = recordedOutcome(view, outcome);
+  if (known) return known;
+  // New evidence values are matched before any rule reads them, and kept even when no rule reads one.
+  const valueOwner = operation ? ownersOf(definition, context.platform, context.owners)?.rules(operation.owner, operation.kind) : null;
+  if (valueOwner?.values !== undefined && valueOwner.valueDomains === undefined) return { result: "unavailable", reason: "unavailable" };
+  const names = unjudged(() => evidenceValues(valueOwner, outcome.evidence));
   if (names === null) return invalid("the evidence names a value outside its owner declaration");
   if ("result" in names) return names;
   const places = names.map((value, n) => ({ ...value, field: `evidence:${n}` }));
   const values = atHand(undefined, context.values, places);
   if (placeWithoutValue(values) !== null) return invalid("the evidence names a value whose canonical bytes were not given under its digest and bound");
   const kept = retainedOf(values).values;
-  const known = recordedOutcome(view, outcome);
-  if (known) return known;
   const admit = admitted(view, definition, context);
   if (!("scope" in admit)) return admit;
   // The owner of the operation may be the platform definition that this scope pins. Its rule for outcome entries of this kind is

@@ -3,13 +3,15 @@ import { evictDurableObject, runInDurableObject } from "cloudflare:test";
 import { expect, test } from "vitest";
 import type { Answer, Digest, Intent, PlatformDefinition, Seed, RetainedInput, OperationId, Read } from "@generalbusiness/artroom-contract";
 import { canonicalize, intentDigest, scopeIdOf, signIntent, textDigest } from "@generalbusiness/artroom-bytes";
-import { valueDigest, type OutcomeRule } from "@generalbusiness/artroom-derive";
+import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
+import { clockOf, settleOutcome, validateDefinition, valueDigest, type OutcomeRule } from "@generalbusiness/artroom-derive";
 import { grantOf } from "@generalbusiness/artroom-derive/testing";
 import { gateRules, gateWith } from "../../derive/test/fixtures-marks.ts";
 import { controls } from "../src/testing.ts";
 import { outsideOf, wired } from "./outside.ts";
 import { httpSource, verify } from "@generalbusiness/artroom-replay";
 import { route } from "../src/worker.ts";
+import { SqliteStore } from "../src/sqlite.ts";
 import type { LateAnswers } from "../src/operations.ts";
 import { START, at, objectOf, reader, rita, stubOf } from "./support.ts";
 
@@ -117,5 +119,19 @@ test("an owner's evidence value on real storage and through the read routes: bad
     expect([good.report.result, good.why]).toEqual(["consistent", null]);
     const missing = await verify({ ...source, retained: async (...args) => args[1] === "value" ? { ok: false as const, reason: "not-found" } : source.retained(...args) }, options);
     expect([missing.report.result, missing.report.at?.seq, missing.why]).toEqual(["incomplete", before.at.seq + 1, expect.stringContaining("the value named by outcome evidence")]);
+    // Section 4.3: once a decisive outcome is recorded, answering a copy or contradiction needs no new value read. Even a lost
+    // retained value cannot make either answer unavailable or bad-input. The pure judge and the real driver agree.
+    const again = await runInDurableObject(objectOf(name), (_instance, state) => {
+      state.storage.sql.exec("DELETE FROM retained_value WHERE domain = ? AND digest = ?", DOMAIN, input.digest);
+      const store = new SqliteStore({ exec: (query, ...bindings) => state.storage.sql.exec(query, ...bindings), transaction: (closure) => state.storage.transactionSync(closure) });
+      const definition = validateDefinition(data, PROPOSED_BOUNDS, undefined, { platform: true });
+      if (!definition.ok) return expect.fail("the fixture definition no longer validates");
+      const context = { clock: clockOf(store, START), bounds: PROPOSED_BOUNDS, platform: { named: MADE, rules: code.rules } };
+      const offered = { type: "outcome", operation, attempt: 1, result: "confirmed", evidence: { basis: "own-answer", body: { proof: input.digest } } } as const;
+      return [settleOutcome(store, definition.definition, offered, context), settleOutcome(store, definition.definition, { ...offered, owner: "platform:destination@1" }, context)];
+    });
+    expect(again).toEqual([{ result: "repeat", seq: before.at.seq + 1 }, { result: "refused", reason: "bad-input", detail: "the outcome names another owner or kind than its operation has" }]);
+    expect([await late(input.digest), await late(valueDigest(DOMAIN, { seat: 13 })), await kept()]).toEqual([{ recorded: "repeat", seq: before.at.seq + 1 }, { recorded: "conflict", seq: before.at.seq + 1 }, []]);
+
   } finally { wired.delete(name); }
 });
