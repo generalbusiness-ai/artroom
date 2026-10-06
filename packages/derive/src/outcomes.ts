@@ -171,6 +171,17 @@ function given(mark: OutcomeMark, j: Judging, kinds: Readonly<Record<string, Out
   const joining: Judging = { ...j, platform: { named: j.platform!.named, rules: Object.fromEntries(rules) } };
   const joined = deriveEffects(joining, [{ code: "effects", row: mark.row } as unknown as EffectForm], [], null);
   if (!joined.ok) throw outside(mark, `effects that the entry cannot hold: ${"reason" in joined ? joined.reason : joined.unavailable}`);
+  // The synthetic rule joins and validates the callback's effects; its
+  // length is no declaration of what the originating outcome may start.
+  // For a kind counted by its data, ordinary changes draw on most.effects
+  // and an item opening is the one type of most.opens. The ledger's own
+  // attempt records and the separately listed operation openings are not
+  // ordinary changes and keep their existing accounting.
+  if (mark.attempts !== undefined && joined.effects.filter((effect) => effect.effect !== "open").length > (mark.most?.effects ?? 0)) throw outside(mark, "more changes than its data states");
+  if (joined.opened && mark.attempts !== undefined && joined.opened.type !== mark.most?.opens) throw outside(mark, "an item opening that its data does not state");
+  // Section 17.2a, check 2: taking a holder is new work. No outcome,
+  // including a legacy kind counted by its owner's code, opens one.
+  if (joined.opened && Object.hasOwn(own((j.definition.declared as unknown as PlatformData).items, joined.opened.type)!, "holds")) throw outside(mark, "an opening of a holder in an outcome");
   // Section 6.3: `max` bounds the live items of a type, whatever opens the item. An act or a handler is refused `type-full`.
   if (joined.opened && overMax(j.view, j.definition, joined.opened.type, joined.opened.state) !== null) throw outside(mark, "effects that the entry cannot hold: type-full");
   const requests = deriveSends(joining, sends.map((_, n) => ({ code: `send.${n}`, row: mark.row }) as unknown as SendForm), joined.working, NO_CAUSE, 0, undefined, joined.opened !== null);
