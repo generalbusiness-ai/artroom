@@ -85,7 +85,8 @@ export function isRecordedJudgeEvidence(value: unknown): value is RecordedJudgeE
 export function isJudgeChanges(changes: unknown): changes is JudgeChanges {
   if (!isRecord(changes) || Object.hasOwn(changes, "over")) return false;
   return isJudgeEvidence({ head: null, present: true, tree: "a".repeat(40), firstParent: null, ancestors: [], changes })
-    && (changes["paths"] as unknown[]).length <= DESTINATION_CHANGED_SET.paths && (changes["links"] as unknown[]).length <= DESTINATION_CHANGED_SET.links;
+    && (changes["paths"] as string[]).length <= DESTINATION_CHANGED_SET.paths && (changes["links"] as unknown[]).length <= DESTINATION_CHANGED_SET.links
+    && (changes["paths"] as string[]).every((path, n, paths) => n === 0 || byteOrder(paths[n - 1]!, path) < 0);
 }
 
 /**

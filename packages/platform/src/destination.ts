@@ -1110,7 +1110,7 @@ const READ_LANE: Reads = (given, _publication, statement) => {
  *   single-controller exception is its member (the missing form 14, which
  *   is given).
  * - The `Observation` of the key behind each approval, and behind the
- *   deciding result of each check that the observed rules require. A key
+ *   deciding result of each passed live job of a listed check. A key
  *   whose observation is not at hand gives null, and its verdict or its
  *   result is then not counted.
  *
@@ -1148,9 +1148,9 @@ function reservationRead(given: RuleGiven, publication: Item, statement: Stateme
     controllersOfAuthors: lane.manifest.authors.flatMap((member) => { const seen = given.observed({ member })?.observation; return seen && "subject" in seen && seen.subject === "member" && seen.controller !== null ? [seen.controller] : []; }),
     controllers: (() => { const seen = given.observed({ holders: "rules.publish" })?.observation; return seen && "subject" in seen && seen.subject === "holders" ? (seen.count === 1 ? seen.holders : []) : null; })(),
     controllersHead: (() => { const seen = given.observed({ holders: "rules.publish" })?.observation; return seen && "subject" in seen && seen.subject === "holders" ? seen.head.seq : undefined; })(),
-    // Only an approval is counted, and only a required check's result decides: no other key is read, so no other is retained.
+    // Only approving verdicts and unique passed jobs of listed checks give keys to the second step.
     verdicts: statement.verdicts.map((verdict, n) => ({ sound: lane.verdicts[n]?.sound === true, key: verdict.verdict === "approve" ? keyOf(lane.verdicts[n]?.key ?? null) : null })),
-    checks: Object.fromEntries(Object.entries(lane.checks).map(([name, check]) => [name, { opening: check.opening, deciding: check.deciding, key: required.includes(name) ? keyOf(check.key) : null }])),
+    checks: Object.fromEntries(Object.entries(lane.checks).map(([name, check]) => [name, { opening: check.opening, deciding: check.deciding, key: required.includes(name) && statement.jobs.filter((job) => job.name === name).length === 1 && statement.jobs.find((job) => job.name === name)?.state === "passed" ? keyOf(check.key) : null }])),
   };
 }
 
@@ -1329,7 +1329,7 @@ const judgeRule = (decides: Decides): PlatformRule => ({
     },
     retries: () => false,
     wellFormed: (result, evidence, given) => {
-      if (result !== "confirmed" || !isRecordedJudgeEvidence(evidence.body)) return false;
+      if (result !== "confirmed" || !isRecordedJudgeEvidence(evidence.body) || evidence.body.ancestors.length > REPORTS_MOST) return false;
       // From revision 28: the member `ancestors` holds those of the reports' commits that the host showed to be ancestors, and no
       // other commit. One that no named report holds does not follow. Where the publication is not `queued` nothing of the
       // evidence is read, and where a named entry is not at hand the rule has a fault in `derives`: neither is judged here.
