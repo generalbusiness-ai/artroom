@@ -278,9 +278,11 @@ describe("18.47: a reservation that an item holds is taken once, drawn down and 
     const sent = s.last.seq;
     // The job is final and its one operation is settled. Its request is pending, and a clause of it can reach `tidy`: that count stays.
     expect([s.state.holder(job), s.definition.reserving!.reach]).toEqual([{ operations: { tidy: 1 } }, ["tidy"]]);
-    // A mark that states `most` opens one operation of each kind that it lists, and no other: a `step` there is a fault of the rule.
-    s.script.after = () => opened(0, "step", 1, job);
-    expect(s.answered(sent)).toBe("unavailable");
+    // A mark that states `most` opens one operation of each kind that it lists, and no other. At a job that is not final and still
+    // holds a `step`, a clause whose rule opens a `step` has a fault: the count would allow it, and the mark does not list it.
+    const live = new Works(s.definition);
+    live.script = { ...s.script, after: () => opened(0, "step", 1, live.entries[2]!.entry.seq) };
+    expect([live.start(), live.outcome(live.opened()[0]!, 1, "confirmed"), live.state.holder(2), live.answered(live.last.seq)]).toEqual(["written", "written", { operations: { step: 1, tidy: 1 } }, "unavailable"]);
     // The result arrives at a scope with no free room. Its clause opens the `tidy` for the job: the account of the delivery is the job.
     s.script.after = () => opened(0, "tidy", 1, job);
     const before = s.free(0).total();
@@ -341,8 +343,13 @@ describe("18.49: a held kind opens a kind that no item holds, at capacity (secti
     // Used plus reserved for the job was 14, and is 1 and 6. It did not grow.
     expect([before - base, s.outcome(k, 1, "confirmed"), s.total() - base, s.last.effects.filter((effect) => effect.effect === "operation")]).toEqual([14, "written", 1 + 6, [{ effect: "operation", k: 0, owner: OWNER, kind: "u", attempts: 3 }]]);
     const u = s.opened()[0]!;
-    // Case 6: settling entries of the operation of `u`, which reserved 6. The budget is the one of case 5: no room beside it.
+    // A kind that is counted by its data sends only the request of its `send`. The kind `u` has none, and no item holds it, so a
+    // request of its rule's own would be reserved by nobody: a fault.
     s.script.retries = true;
+    s.script.derives = () => ({ effects: [], sends: [TELL], opens: [] });
+    expect(s.outcome(u, 1, "refused")).toBe("unavailable");
+    opensU(s);
+    // Case 6: settling entries of the operation of `u`, which reserved 6. The budget is the one of case 5: no room beside it.
     expect([s.outcome(u, 1, "refused"), s.outcome(u, 2, "unknown"), s.outcome(u, 3, "refused"), s.outcome(u, 2, "confirmed"), s.total() <= before, s.state.operation(u)!.attempts.length]).toEqual(["written", "written", "written", "written", true, 3]);
     expect(s.total() - base).toBe(1 + 4);
   });
@@ -358,9 +365,12 @@ describe("18.49: a held kind opens a kind that no item holds, at capacity (secti
     const m = started().s;
     const twice = (opens: { kind: string; attempts: number }[]) => { m.script.derives = () => ({ effects: [], sends: [], opens: opens.map((open) => ({ owner: OWNER, ...open })) }); return m.outcome(m.opened(m.entries[2]!.entry)[0]!, 1, "confirmed"); };
     expect([twice([{ kind: "u", attempts: 3 }, { kind: "u", attempts: 3 }]), twice([{ kind: "u", attempts: 4 }])]).toEqual(["unavailable", "unavailable"]);
-    // A kind that is counted by its data sends only the request of its `send`: a request of the rule's own was reserved by nobody.
-    m.script.derives = () => ({ effects: [], sends: [TELL], opens: [] });
-    expect(m.outcome(m.opened(m.entries[2]!.entry)[0]!, 1, "confirmed")).toBe("unavailable");
+    // One of each listed kind: `w` has 1 attempt and a send, so one operation of it reserves 6 entries where two of them would
+    // count 4 by their attempts alone. A rule that opens two is a fault, although the closure of `k` has the room by that count.
+    const w = new Works(valid(changed(chain, (d) => { d.outcomes.w = { code: "u", row: "P16", attempts: 1, send: { code: "report", row: "P16", result: {} } }; d.outcomes.k.most.operations = ["u", "w"]; })));
+    w.script.begin = ({ resolved }) => opened(0, "k", 1, resolved.self);
+    w.script.derives = () => ({ effects: [], sends: [], opens: [{ owner: OWNER, kind: "w", attempts: 1 }, { owner: OWNER, kind: "w", attempts: 1 }] });
+    expect([w.definition.reserving!.kinds["w"]!.whole.entries, w.start(), w.outcome(w.opened()[0]!, 1, "confirmed")]).toEqual([6, "written", "unavailable"]);
     expect(twice([{ kind: "u", attempts: 2 }])).toBe("written");
   });
 });
