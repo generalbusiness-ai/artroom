@@ -140,6 +140,16 @@ answer that the test wrote. It shows nothing about a host, a gateway, a
 push, an observation of membership or of the rules, a lane's entry, or a
 founding.
 
+The forms of a bound request have one stand-in, in
+`packages/derive/test/forms-binding.test.ts`: `Jobs.ledger`, for the
+reservation ledger that would hold what an item still holds of its
+`decisions`. The test sets a count when a job is opened and draws 1 for
+an entry that the judge says is bound. The platform data and every rule
+of that file, and of `forms-settles.test.ts`, are made up. A test that
+uses them says so. Such a test shows the judge's side of a binding and
+the amounts of a marker duty. It shows nothing about how a count is
+kept, released or replayed, and nothing about a definition of Artroom.
+
 The token ledger has three stand-ins. `TokenHost` and `Vault`, in
 `packages/git/test/support/tokens.ts`, stand for a Git host's token
 interface and for the gateway's side of the handoff of a plaintext.
