@@ -33,6 +33,7 @@
 import { RETAINED_INPUT_BYTES } from "@generalbusiness/artroom-contract";
 import type { FieldType, Held } from "@generalbusiness/artroom-contract";
 import { NOTHING, closure, holding, itemOf, largest, one, requestOf, retainedBytes, starts, sum, type Amount, type ClauseStarts, type Counting, type KindStated, type Starts, STARTS_NOTHING } from "../held.ts";
+import { markerAmounts } from "../markers.ts";
 import { isObject, own } from "../values.ts";
 import type { Capacity } from "./capacity.ts";
 import { marked, type Defining } from "./context.ts";
@@ -84,7 +85,7 @@ export interface Reserving {
 const CLAUSES = ["applied", "refused", "superseded", "undelivered", "conflict"] as const;
 
 /** Reads the members, makes the checks, and computes the amounts. Undefined: the value is no platform data, or it has no kind and no `holds`. */
-export function reserving(d: Defining, top: Rec, capacity: Pick<Capacity, "deadlines" | "pending" | "clauseEntries" | "decisionEntries">, outcomeValues: Readonly<Record<string, readonly import("../ledger.ts").EvidenceValueDomain[]>> = {}): Reserving | undefined {
+export function reserving(d: Defining, top: Rec, capacity: Pick<Capacity, "deadlines" | "pending" | "markers" | "clauseEntries" | "decisionEntries">, outcomeValues: Readonly<Record<string, readonly import("../ledger.ts").EvidenceValueDomain[]>> = {}): Reserving | undefined {
   if (!d.platform) return undefined;
   const { bad, rec, int, list, bounds } = d;
   const kindsWritten = isObject(top["outcomes"]) ? top["outcomes"] : {};
@@ -258,9 +259,11 @@ export function reserving(d: Defining, top: Rec, capacity: Pick<Capacity, "deadl
 
   if (kindsWritten && Object.keys(kindsWritten).length === 0 && holderTypes.size === 0 && adds.size === 0) return undefined;
 
-  // What an item in a state reserves, in entries, as the validator derived it: the chain of its deadline and what it awaits.
+  // Rule 11 of "A marker duty": an unnamed item reserves the whole sum of rule 6, with no mark completed. A marked type has no
+  // row in pending: its state duty and each marker duty are counted together by the shared calculator, beside its deadline.
+  const markedAmounts = capacity.markers ? markerAmounts(capacity.markers) : null;
   const inState = (type: string, state: string): Amount => {
-    const entries = (own(own(capacity.deadlines, type), state) ?? 0) + (own(own(capacity.pending, type), state) ?? 0);
+    const entries = (own(own(capacity.deadlines, type), state) ?? 0) + (own(capacity.markers, type) ? markedAmounts!.awaits(type, state, []) : (own(own(capacity.pending, type), state) ?? 0));
     return { ...NOTHING, entries, bytes: entries * bounds.entryBytes };
   };
   const everyState = [...d.types.values()].flatMap((type) => [...type.states.keys()].map((state) => inState(type.name, state)));

@@ -52,6 +52,7 @@ export function capacityOf(d: Pick<Defining, "bad" | "duties" | "clauseSets" | "
   }
   const done = new Map<string, number>();
   const open = new Set<string>();
+  const forms: Duties[] = [];
 
   /**
    * Row 3: what an item of that type in that state reserves for its
@@ -67,7 +68,12 @@ export function capacityOf(d: Pick<Defining, "bad" | "duties" | "clauseSets" | "
     const known = done.get(k);
     if (known !== undefined) return known;
     // The closure is not finite: settling forms create one another's pending states in a cycle.
-    if (open.has(k)) { for (const form of settlers.get(k) ?? []) unbounded.add(form); return 0; }
+    if (open.has(k)) {
+      // A cycle may return through a timed state that no form settles (GC8). The forms whose closures are being counted still
+      // reach that cycle, so refuse them rather than letting an empty list of settlers turn a nonfinite closure into zero.
+      for (const form of settlers.get(k) ?? forms) unbounded.add(form);
+      return 0;
+    }
     open.add(k);
     let most = Math.max(0, ...(settlers.get(k) ?? []).map(entriesOf));
     for (const rule of moves) if (rule.type === type && rule.states.includes(state)) most = Math.max(most, awaits(type, rule.to));
@@ -100,7 +106,10 @@ export function capacityOf(d: Pick<Defining, "bad" | "duties" | "clauseSets" | "
   const requestsOf = (form: Duties): number => form.requests.reduce((n, request) => n + request.most * (2 + Math.max(0, ...request.clauses.map((c) => starts(c)))), 0);
   const entriesOf = (form: Duties): number => {
     const settled = form.settles && "subject" in form.settles ? form.settles : undefined;
-    return 1 + starts(form.sets, settled) + requestsOf(form);
+    forms.push(form);
+    const entries = 1 + starts(form.sets, settled) + requestsOf(form);
+    forms.pop();
+    return entries;
   };
 
   // Collected by type and state in maps, so no write reaches a prototype: a name is an own name of the record built from them.

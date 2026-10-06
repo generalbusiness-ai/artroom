@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { DeclaredDefinition, PlatformData, PlatformDefinition } from "@generalbusiness/artroom-contract";
-import { entryHash, factRefOf } from "@generalbusiness/artroom-bytes";
+import { canonicalBytes, entryHash, factRefOf, parseStrictBytes } from "@generalbusiness/artroom-bytes";
 import { PROFILES, applyEntry, clockOf, entryOf, fits, itemAwaits, judgeDelivery, markerAmounts, owed, validateDefinition } from "../src/index.ts";
 import type { Draft, PlatformRules, RuleEffect, ValidDefinition } from "../src/index.ts";
 import { Scope, arriving, directory, fields, forged, keys, on, valid, type Over } from "./fixtures.ts";
@@ -179,6 +179,54 @@ describe("18.54: two marks on one item, and a state settlement beside them", () 
 });
 
 describe("the form `{ of, sets, in }` at the validator", () => {
+  test("a canonical settling closure that returns through a timed state with no settler is refused; the finite path retains its whole duty", () => {
+    // Made-up data. Settling the root's mark can put a job in held. Its timer leads to open, where close either ends it or
+    // puts it back in held. The timed graph alone is acyclic, and no form settles held; the repeated job duty is not finite.
+    const load = (to: "held" | "done") => {
+      const data = structuredClone(M);
+      for (const name of ["mark-a", "mark-a-far", "mark-b"]) delete data.acts[name];
+      data.items["root"]!.values["flag"] = { ...MARK };
+      data.items["job"]!.values["until"] = { fixed: false, required: false, of: { type: "time" } };
+      data.acts["close"]!.effects = [{ state: to }];
+      data.acts["trigger"] = act({
+        step: "transition", on: "root", grant: "trigger", settles: { of: "on", sets: "flag", in: ["open"] },
+        also: { job: { item: "job", by: "job" } }, fields: { job: { type: "item", of: "job", required: true } },
+        guards: [{ state: ["open", "held"], of: "also.job" }], effects: [set("flag"), { state: "held", of: "also.job" }],
+      }) as unknown as DeclaredDefinition["acts"][string];
+      data.timed["resume"] = { on: "job", states: ["held"], deadline: "until", effects: [{ state: "open" }], attention: [] };
+      return validateDefinition(parseStrictBytes(canonicalBytes(data)), PROPOSED_BOUNDS);
+    };
+    const finite = load("done");
+    expect(finite.ok).toBe(true);
+    if (finite.ok) expect([finite.definition.pending, markerAmounts(finite.definition.markers!).awaits("root", "open", [])]).toEqual([{ job: { open: 1, held: 1 } }, 3]);
+    const cyclic = load("held");
+    expect(cyclic).toMatchObject({ ok: false, problems: expect.arrayContaining([expect.objectContaining({ code: "reserve-unbounded", path: "acts.close" })]) });
+  });
+
+  test("canonical holder amounts count an unnamed item's deadline, state duty and every pending mark in initial, changed and clause states", () => {
+    // Made-up platform data: pulse can change one item and open one job. The opening draws on the holder's item count.
+    // A job in open reserves its deadline (1), mark a (the larger alternative, 3), mark b (1), and its state settlement (1).
+    const data = structuredClone(M) as unknown as PlatformData;
+    data.name = "platform:marks";
+    data.items["root"]!.holds = { operations: { pulse: 1 }, requests: 1, items: 1 };
+    data.items["job"]!.values["until"] = { fixed: false, required: false, of: { type: "time" } };
+    data.timed["pause"] = { on: "job", states: ["open"], deadline: "until", effects: [{ state: "held" }], attention: [] };
+    data.acts["start"]!.sends = [{ tell: { to: { slot: "desk" }, message: "resume", fields: {}, result: { applied: [{ state: "open" }] } } }];
+    data.outcomes = {
+      pulse: { code: "pulse", row: "X1", attempts: 1, most: { effects: 1, opens: "job" } },
+      spawn: { code: "spawn", row: "X2", attempts: 1, most: { effects: 0, opens: "job" } },
+    };
+    const checked = validateDefinition(parseStrictBytes(canonicalBytes(data)), PROPOSED_BOUNDS, PROFILES, { platform: true });
+    expect(checked.ok).toBe(true);
+    if (!checked.ok) return;
+    const definition = checked.definition;
+    const r = definition.reserving!;
+    expect([definition.pending, definition.clauseEntries, r.itm.entries, r.req.entries, r.kinds["pulse"]!.whole.entries, r.kinds["spawn"]!.whole.entries]).toEqual([{}, 6, 6, 8, 14, 14]);
+    expect([r.holders["root"]!.amount.entries, r.holders["root"]!.amount.bytes, r.holders["root"]!.amount.items, r.holders["root"]!.amount.requests]).toEqual([28, 29 * PROPOSED_BOUNDS.entryBytes, 1, 1]);
+    // The shared marker sum already includes the state duty. Adding the pending table again would double-count it.
+    expect(markerAmounts(definition.markers!).awaits("job", "open", [])).toBe(5);
+  });
+
   test("18.51 cases 2 and 3, and the grammar: the mark is a required truth value with the default false that is not fixed, `in` lists no final state, and no written effect sets the mark but to true", () => {
     const settles = (change: Record<string, unknown>) => (d: { acts: Record<string, { settles: unknown }> }) => { d.acts["mark-b"]!.settles = { of: "on", sets: "b", in: ["open", "held"], ...change }; };
     // Case 2: `in` lists a final state.
