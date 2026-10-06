@@ -257,10 +257,11 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
   if (problems.length > 0) return { ok: false, problems };
   // Section 17.2a: a reservation that an item holds, and what each kind of `outcomes` reserves. In platform data only.
   const reserved = reserving(d, top, capacity);
+  const { decisionEntries: _decisionEntries, ...persistedCapacity } = capacity;
   if (problems.length > 0) return { ok: false, problems };
   try {
     const keyed = [...d.types.values()].flatMap((type): [string, readonly string[]][] => (type.indexes ? [[type.name, type.indexes]] : []));
-    return { ok: true, definition: { declared, digest: definitionDigest(declared), timedTypes: [...timedTypes].sort(), holdTypes: [...d.holdTypes].sort(), indexes: d.indexes, ...capacity, underived: d.underived, marks: d.marks, observing: d.observing, ...(reserved ? { reserving: reserved } : {}), ...(keyed.length > 0 ? { keyed: Object.fromEntries(keyed) } : {}) } };
+    return { ok: true, definition: { declared, digest: definitionDigest(declared), timedTypes: [...timedTypes].sort(), holdTypes: [...d.holdTypes].sort(), indexes: d.indexes, ...persistedCapacity, underived: d.underived, marks: d.marks, observing: d.observing, ...(reserved ? { reserving: reserved } : {}), ...(keyed.length > 0 ? { keyed: Object.fromEntries(keyed) } : {}) } };
   } catch {
     return { ok: false, problems: [{ code: "shape", path: "", message: "has no canonical bytes" }] };
   }

@@ -6,15 +6,15 @@
  * send is run again from the entry that sent it.
  */
 
-import type { ActType, Advisory, AlsoMark, AlsoRule, Bounds, Digest, Effect, EffectForm, Entry, FactRef, FactUse, FieldType, FieldValue, Guard, Input, Notify, PlatformData, Prepared, Reason, ReceiveType, RefusalReason, Request, ResultClauses, ScopeRef, Send, SendForm, SendMark, Settles, UnavailableReason } from "@generalbusiness/artroom-contract";
+import type { ActType, Advisory, AlsoMark, AlsoRule, Bounds, Digest, Effect, EffectForm, Entry, FactRef, FactUse, FieldType, FieldValue, Guard, Input, Notify, PlatformData, PlatformReceive, Prepared, Reason, ReceiveType, RefusalReason, Request, ResultClauses, ScopeRef, Send, SendForm, SendMark, Settles, UnavailableReason } from "@generalbusiness/artroom-contract";
 import { entryHash } from "@generalbusiness/artroom-bytes";
 import type { Signer } from "./attribution.ts";
-import { boundTo, selectedByIndex, selectorOf } from "./binding.ts";
+import { boundTo, decisionCounts, selectedByIndex, selectorOf } from "./binding.ts";
 import { deriveEffects } from "./effects.ts";
 import { creationFields, factsNamed, isLocalFact, messageFields, presentedTypes, readFacts, readFields, textsNamed, updateOf, type Reading, type Update } from "./fields.ts";
 import { signerOf } from "./fold.ts";
 import { judgeGuards, slotOf, type Fetched, type Judging } from "./guards.ts";
-import { fieldOutsideType, markOf, selectedBy, type AtHand, type Giving, type JudgedInput } from "./marks.ts";
+import { RuleFault, fieldOutsideType, markOf, selectedBy, type AtHand, type Giving, type JudgedInput, type PlatformRules } from "./marks.ts";
 import { listedBy, rowsOfClause, settle, waits, type Needed, type Settled, type Settling } from "./observes.ts";
 import { conditionsReadClock, deriveSends, formOf, readsClock } from "./sends.ts";
 import type { Item, OwnRequest, ScopeState, StateView } from "./state.ts";
@@ -79,6 +79,59 @@ function messageRead(view: StateView, at: ScopeRef, handler: ReceiveType, given:
     return type?.type === "item" && isFactRef(v) && isLocalFact(v, at) && view.item(v.seq)?.opened === v.hash ? v.seq : v;
   };
   return readFields(handler.fields, Object.fromEntries(Object.entries(given).map(([name, v]) => [name, local(own(handler.fields, name), v)])), bounds);
+}
+
+/**
+ * The binding of a recorded deciding entry, on the state before it. Only
+ * the source of `bound.of` and its written dependencies are selected. A
+ * binding selector receives the same index rows and fields as the judge;
+ * no guard or effect is run, and no runtime-only `Draft.bound` is read.
+ */
+export function decisionBinding(view: StateView, definition: ValidDefinition, entry: Pick<Entry, "seq" | "input">, bounds: Bounds, platform?: PlatformRules): { item: number; message: string } | null {
+  const input = entry.input;
+  if (input.type !== "delivery" || input.message.class !== "request" || input.message.type !== "tell" || !("decision" in input)) return null;
+  // These failures are before binding (checks 6 to 8), and their entries
+  // are new work, whatever item their ill-typed fields might appear to name.
+  if (input.decision === "refused" && ["bad-field", "unknown-message", "no-item", "fact-mismatch", "alias"].includes(input.reason?.code ?? "")) return null;
+  const scope = view.scope();
+  const found = bound(definition, input.message, input.from);
+  if (!scope || !found?.handler || !found.fields) return null;
+  const handler = found.handler;
+  const stated = (handler as unknown as PlatformReceive).bound;
+  if (!stated) return null;
+  const read = messageRead(view, scope.at, handler, found.fields, bounds);
+  if (!read.ok) return null;
+  const also: Record<string, AlsoRule> = {};
+  const select = (name: string): void => {
+    if (Object.hasOwn(also, name)) return;
+    const rule = own(handler.also, name);
+    if (!rule) return;
+    also[name] = rule;
+    if ("via" in rule && rule.via.of.startsWith("also.")) select(rule.via.of.slice(5));
+  };
+  select(stated.of.slice(5));
+  const selector = selectorOf(handler);
+  // A local fact is read in normal form by check 7, just as readFacts
+  // supplies it to the judge. Its hash and type were checked before the
+  // recorded deciding entry; a verifier checks them again in its judge.
+  const normal = (type: FieldType | undefined, value: FieldValue): FieldValue => {
+    if (type?.type === "list" && Array.isArray(value)) return value.map((element: FieldValue) => normal(type.of, element));
+    if (type?.type === "record" && isObject(value)) return Object.fromEntries(Object.entries(value).map(([name, member]) => [name, normal(own(type.of, name), member as FieldValue)]));
+    return type?.type === "fact" && isFactRef(value) && isLocalFact(value, scope.at) ? value.seq : value;
+  };
+  const fields = Object.fromEntries(Object.entries(read.fields).map(([name, value]) => [name, normal(own(handler.fields, name), value)]));
+  const selected = alsoItems(view, definition, also, fields, null, undefined, (mark) => {
+    if (mark !== selector) throw new RuleFault("a decision binding reads no other selection rule");
+    return selectedByIndex({ view, scope, fields, platform }, selector!);
+  });
+  if (!selected.ok) return null;
+  const j: Judging = {
+    view, definition, bounds, clock: { reading: scope.time, asOf: scope.time, behind: false }, scope, self: entry.seq,
+    kind: found.kind, fields, fieldTypes: handler.fields, subjects: new Map(selected.items.map(([name, item]) => [`also.${name}`, item])),
+    signer: null, facts: new Map(), prepared: [], used: [], sender: input.from.at,
+  };
+  const item = boundTo(j, handler, found.kind, decisionCounts(view));
+  return item ? { item: item.id, message: found.kind } : null;
 }
 
 /**
@@ -341,7 +394,7 @@ export function runHandler(view: StateView, definition: ValidDefinition, context
   };
   // Section 17.2a: whether the delivery is bound is derived here, after the names are bound and before any guard of the handler,
   // on the state before the entry. It decides nothing of the request.
-  const item = boundTo(j, handler, kind, context.counts);
+  const item = boundTo(j, handler, kind, context.counts ?? decisionCounts(view));
   if (item) j.bound = true;
   const ran = derive(j, handler, opens, cause);
   return ran.result === "unavailable" ? ran : { ...ran, uses, ...(item ? { bound: item.id } : {}) };

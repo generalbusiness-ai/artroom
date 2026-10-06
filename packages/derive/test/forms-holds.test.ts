@@ -87,10 +87,10 @@ describe("the validator's checks of `holds`, `adds` and what a mark may start (s
       codes(changed(works, (d) => { d.items.job.holds.requests = 0; })),
       codes(changed(works, (d) => { d.items.job.holds.operations.step = PROPOSED_BOUNDS.listElements + 1; })),
       codes(changed(works, (d) => { d.acts.finish.adds = { operations: { step: 1 } }; delete d.items.job.holds; delete d.acts.again.adds; d.outcomes.step.most.operations = ["tidy"]; })),
-      codes(changed(works, (d) => { d.items.job.holds.decisions = { stop: 1 }; })),
+      codes(changed(works, (d) => { d.items.job.holds.unknown = 1; })),
       // A kind that an item holds is counted by its data, so it states its attempts.
       codes(changed(works, (d) => { delete d.outcomes.tidy.attempts; })),
-    ]).toEqual([["holds items.job.holds.operations.polish"], ["holds items.job.holds.requests"], ["holds items.job.holds.operations.step"], ["holds acts.finish.adds"], ["holds items.job.holds.decisions"], ["holds outcomes.tidy", "shape outcomes.step.most.operations"]]);
+    ]).toEqual([["holds items.job.holds.operations.polish"], ["holds items.job.holds.requests"], ["holds items.job.holds.operations.step"], ["holds acts.finish.adds"], ["shape items.job.holds.unknown"], ["holds outcomes.tidy", "shape outcomes.step.most.operations"]]);
     // The members are platform data: a declared definition that states one is refused, as any member that the validator does not know.
     const { outcomes: _, ...declared } = structuredClone(works);
     const { holds: __, ...job } = declared.items["job"]!;

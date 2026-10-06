@@ -15,13 +15,10 @@
  * - The binding: whether a delivery is bound, by the five conditions of
  *   the table of section 17.2a, on the state before its entry.
  *
- * I3 merge: the fifth condition reads the item's count for the message,
- * and a bound delivery draws 1 from it. The count is part of what a holder
- * still holds, which is the reservation ledger's (row I3-44). Until that
- * ledger gives the count, `Counts` is absent in a runtime and no delivery
- * is bound there: each is new work, which is never less safe. The judge
- * says in `Draft.bound` which item an entry is bound to, so that the
- * ledger's fold can draw from it.
+ * The fifth condition reads the item's folded count for the message. The
+ * fold derives the binding again before its effects, draws 1 and releases
+ * the decisions when the holder becomes final. `Draft.bound` is only the
+ * judge's explanation: no entry records it, and no fold trusts it.
  */
 
 import type { BindingMark, Bound, FieldValue, PlatformReceive, ReceiveType, ScopeRef } from "@generalbusiness/artroom-contract";
@@ -29,7 +26,7 @@ import { CanonicalError, canonicalize } from "@generalbusiness/artroom-bytes";
 import type { Judging } from "./guards.ts";
 import { RuleFault, markOf, outside, ruleFor, run, type Giving } from "./marks.ts";
 import { equal, operand } from "./operand.ts";
-import type { Item, StateWriter } from "./state.ts";
+import type { Item, StateView, StateWriter } from "./state.ts";
 import type { ValidDefinition } from "./validate/index.ts";
 import { isFactRef, own, same } from "./values.ts";
 
@@ -140,6 +137,10 @@ export function selectedByIndex(g: Pick<Giving, "view" | "scope" | "fields" | "p
  * the count"). A judge that is given none binds no delivery.
  */
 export type Counts = (item: Item, message: string) => number;
+
+/** The count on the folded holder, as runtime and replay both read it. */
+export const decisionCounts = (view: Pick<StateView, "holder">): Counts =>
+  (item, message) => own(view.holder(item.id)?.decisions, message) ?? 0;
 
 /**
  * Whether a delivery is bound, on the state before its entry (the table of

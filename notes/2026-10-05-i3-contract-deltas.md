@@ -2560,3 +2560,42 @@ passed in 10.4 seconds elapsed and 26.7 CPU seconds, one observed run, on
 an Apple M5 Max with 18 cores, a load average of 4 from other sessions,
 and warm caches. The gate was not run. No deployment, no provider, no
 host and no gateway.
+
+## Fourth milestone integration: the decision ledger
+
+The merge joins `holds.decisions` to the holder ledger of I3-44. Counts
+are taken and added, and the fold derives a bound decision from its
+recorded message on the state before the entry. It runs only the source
+of `bound.of` and its written dependencies, with the pinned selector
+where the data states one. It trusts no `Draft.bound` and writes no new
+entry member. A bound refusal draws one decision without any handler
+effect. Its request sends draw on its account. A final holder releases
+all remaining decisions. The SQLite holder row already stores `Held` as
+JSON, so this requires no schema migration.
+
+`dec(m)` counts one deciding entry, the duties that its written effects
+can start and the closures of unheld kinds that its effect marks list.
+It counts no directly opened item and no request that draws on the
+holder. For bytes, `entryBytes` stands in for its static entry, its source
+and each declared foreign fact; detached fields count their declared
+maxima. For records, `derivedEffects` stands in for the handler's largest
+changes. As with the other reservation amounts, what an item in a state
+can start is still known in entries only (GB2; request `cc570904`). This
+completes I3-55's counts, draw and replay in entries; the other four
+dimensions still share that existing limitation.
+
+The runtime's judge reads the count from the folded holder when no
+fixture callback is supplied. Scope turns pass pinned rules to the fold;
+the verifier and its observation views do the same. The verifier now
+checks the shared `fits` rule after folding: before this merge it checked
+no entry budget. A taking entry above used plus reserved is a mismatch.
+Settling and conflict admission retain the shared rule's conditions.
+
+Witnesses: `forms-binding.test.ts` uses the real ledger, including two
+added witnesses for additions, refusals, release and outgoing accounts,
+and one for an unheld closure in `dec(m)`. `replay/test/decisions.test.ts`
+has a judged bound refusal with no handler effect at a full scope and
+rejects the same history when the taking reservation cannot fit. Its
+sender's entries are stand-ins and anchored. Focused controls remove the
+decision draw or omit decisions from `holding`; both distinguish by the
+count and admission assertions. No gate was run on this worker branch.

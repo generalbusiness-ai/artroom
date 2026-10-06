@@ -20,7 +20,7 @@
 import type { Digest, Entry, KeyId } from "@generalbusiness/artroom-contract";
 import { canonicalize } from "@generalbusiness/artroom-bytes";
 import { MemoryState, applyEntry } from "@generalbusiness/artroom-derive";
-import type { StateView, ValidDefinition } from "@generalbusiness/artroom-derive";
+import type { DrawOptions, StateView, ValidDefinition } from "@generalbusiness/artroom-derive";
 
 /** One write of one record: the position of the entry that made it, and the write, to make again on another state. */
 interface Write { from: number; again: (state: MemoryState) => void }
@@ -39,9 +39,9 @@ export class View extends MemoryState {
   get through(): number { return this.#through; }
 
   /** Fold the next entry of the scope. */
-  fold(definition: ValidDefinition, entry: Entry, hash: Digest): void {
+  fold(definition: ValidDefinition, entry: Entry, hash: Digest, options: DrawOptions = {}): void {
     this.#writing = entry.seq;
-    applyEntry(this, definition, entry, hash);
+    applyEntry(this, definition, entry, hash, options);
     this.#through = entry.seq;
   }
 

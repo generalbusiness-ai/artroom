@@ -53,7 +53,7 @@ export interface Reading {
   snapshot?: Snapshots | undefined;     // the snapshots of staged refs that this scope retains (section 16.4). Without it an ancestry record of this scope's own is not judged to fit
   capabilities?: Capabilities | undefined;   // the rules of the capabilities this runtime has code for (section 6.11). Without them a capability form is not judged
   platform?: PlatformRules | undefined;      // the rules of the platform definition that the scope pins (section 6.1). Without them an input of a row with a mark is not judged
-  counts?: Counts | undefined;               // what each item still holds of its `decisions` (section 17.2a). Without it no delivery is bound, and each is new work
+  counts?: Counts | undefined;               // what each item still holds of its `decisions` (section 17.2a). Absent: reads the counts from the folded holder
 }
 
 /** The shape of section 2.1, which the bytes package guards beside the contract's other fixed records. */

@@ -393,9 +393,10 @@ export class Ledger {
   readonly own = (seq: number) => this.entries[seq] ?? null;
   /** The fact of a sealed entry: a view beside it. */
   fact(seq: number): FactRef { return { at: this.at, seq, hash: this.entries[seq]!.hash }; }
+  get foldOptions(): import("../src/index.ts").DrawOptions { return { bounds: this.bounds }; }
   fold(entry: Entry): Entry {
     const hash = entryHash(entry);
-    applyEntry(this.state, this.definition, entry, hash);
+    applyEntry(this.state, this.definition, entry, hash, this.foldOptions);
     this.entries.push({ entry, hash });
     return entry;
   }
@@ -451,7 +452,7 @@ export class Ledger {
   /** The first `count` entries, or all, folded again into a new state, as a verifier does. */
   replay(count = this.entries.length): MemoryState {
     const fresh = new MemoryState();
-    for (const { entry, hash } of this.entries.slice(0, count)) applyEntry(fresh, this.definition, entry, hash);
+    for (const { entry, hash } of this.entries.slice(0, count)) applyEntry(fresh, this.definition, entry, hash, this.foldOptions);
     return fresh;
   }
 }
