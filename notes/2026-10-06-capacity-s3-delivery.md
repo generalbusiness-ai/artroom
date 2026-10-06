@@ -136,7 +136,29 @@ holder account or unknown cleanup duty is skipped, evicted or delayed.
 No runtime, Used, wire, configuration, quota or producer metadata change.
 No provider/private/browser/process probe, deployment or package release.
 
-This worker ran no gate and made no workroom filing. Root owns the sole
-gate after reconciliation, complete independent review and normal witnessed
-landing/publication. Artifacts for this slice belong only to producer
-`a1256c14`, not the full capacity or S2 promises.
+## Final gate and exact delivery
+
+Root ran the sole gate at clean source head
+`4a9a0d4af73824d318d6fd4b13deca614fc81469`, tree
+`ae45cd1f6d8eb63af2fc16499f3e8587c2448138`, after reconciliation with
+S2's witnessed main landing. All typechecks and whitespace checks passed,
+as did 722 Vitest tests and six Node checks. Whole-command elapsed time was
+17.85 seconds, with 37.41 user and 7.49 system seconds. It includes the
+unchanged-lock dependency installation (1.9 seconds); typechecking took
+3.5 seconds and tests 12.2 seconds. The log is
+`/tmp/artroom-capacity-s3-gate.log`, with detailed logs under
+`/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.9uJ7pzNVtZ`.
+These are gate observations, not whole-workflow performance claims.
+
+The packages tree is `c091a63b2beef930c246e68185a99d1a43163948`, matching
+the focused-tested worker source before and after reconciliation; the scripts
+tree is `e761cf5c0ccee256905f3e19e2c5144895451e1a`. Only this note was
+annotated after the gate. Source, tests, dependencies and these two trees
+remain unchanged, so the gate is not repeated. Root read the source/test
+delta and the actual focused, typecheck, control, setup and gate logs.
+
+Complete independent exact SOURCE review and witnessed landing/publication
+remain owed. The source worker ran no gate or workroom filing; root performed
+the one final gate. All six current artifacts belong only to S3 producer
+`a1256c14`, with the primary note filed last and named first in the normal
+invitation. Neither the full capacity promise nor S2 serves as this binding.
