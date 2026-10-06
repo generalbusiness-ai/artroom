@@ -5,13 +5,6 @@
  * Everything here but `Branch` is a STAND-IN, and each is labelled where
  * it is used.
  *
- * - `standInRules`: a rule for each of the two marks of the destination's
- *   data that the platform package writes no rule for, `first-head` and
- *   `receipt` (I3 deltas, entries ER9 and FA6). The package cannot run
- *   `platform:destination@1`. With these a test can judge its rows. The
- *   outcome of `first-head` makes the branch `ready` at the commit that the
- *   read back saw. The outcome of `receipt` derives nothing. They show
- *   nothing about how the note's two rows will be written.
  * - What is at hand for a reservation, `Branch.read`: the observations
  *   that a runtime would have read before the turn of the outcome of
  *   `judge`, and what the lane's entries in `uses` say. The test writes
@@ -35,103 +28,25 @@
  * `Branch` is a destination scope in memory, below such a bureau. Its
  * genesis, its confirmation, its deliveries, its acts and its outcomes are
  * judged by derive's real judges, with the destination's own rules, the
- * two stand-in rules and the stand-in reader of a lane's entries.
+ * stand-in reader of a lane's entries.
  */
 
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { DeclaredDefinition, Entry, Evidence, FactRef, FieldValue, Input, Observation, ObservationUse, OperationId, Request, RulesObservation, ScopeRef, Seed, Send, Timestamp } from "@generalbusiness/artroom-contract";
 import { factRefOf, intentDigest, newIncarnation, scopeIdOf, signIntent } from "@generalbusiness/artroom-bytes";
 import { PROFILES, clockOf, judgeDelivery, judgeGenesis, settleOutcome, validateDefinition } from "@generalbusiness/artroom-derive";
-import type { ActJudgment, Fetched, Item, Judgment, Opening, Operation, OutcomeJudgment, PlatformRule, PlatformRules, RuleEffect, RuleGiven, Rules, Source, StateView, ValidDefinition } from "@generalbusiness/artroom-derive";
+import type { ActJudgment, Fetched, Judgment, OutcomeJudgment, PlatformRules, Source, ValidDefinition } from "@generalbusiness/artroom-derive";
 import { Ledger, Scope, T0, creation, d, keys, laneDefinition, sent, t, type Actor, type Context, type Over } from "@generalbusiness/artroom-derive/testing";
-import { DESTINATION, DESTINATION_KINDS, closed, destination, destinationRulesWith, readFor, targetOf, tokenStep, type LaneRead } from "../src/destination.ts";
+import { DESTINATION, DESTINATION_KINDS, destination, destinationReceipt, destinationRulesWith, type LaneRead } from "../src/destination.ts";
 import type { JudgeEvidence, ReservationRead } from "../src/reservation.ts";
 
 export const { rita, una } = keys;
 /** Three commits and a tree, as text: the first head, an integration commit, a commit that another writer made, and the integration commit's tree. */
 export const [HEAD, NEXT, OTHER, TREE] = ["a".repeat(40), "b".repeat(40), "c".repeat(40), "d".repeat(40)];
 
-const branchOf = (state: StateView) => state.page("branch", ["empty", "ready"], null, 1).items[0]!;
 
-/** STAND-IN: the commit of every receipt in these tests. The note's rule computes the ID from the receipt's file. Nothing here computes one. */
+/** A made-up commit used only as report data in the hand-written lane entries. */
 export const RECEIPT = "e".repeat(40);
-
-const seenOf = (input: { type: string; evidence?: Evidence }): unknown => (input.type === "outcome" && typeof input.evidence?.body === "object" && input.evidence.body !== null ? (input.evidence.body as { seen?: unknown }).seen : null);
-const writeOf = (state: StateView, own: RuleGiven["own"], read: Operation): Operation | null => {
-  const input = own(Number(read.id.split(":")[0]))?.entry.input;
-  return input?.type === "outcome" ? state.operation(input.operation) : null;
-};
-/** STAND-IN for the column `receipt` of the note's row, by what was seen, for a receipt that is `owed`: the stand-in commit is `written`, and another commit is `conflict`. */
-const receiptSeen = (receipt: Item | null, seen: unknown): RuleEffect[] =>
-  (receipt?.state !== "owed" || typeof seen !== "string" || seen === "absent" || seen === "failed" ? [] : [{ effect: "state", item: receipt.id, state: seen === RECEIPT ? "written" : "conflict" }]);
-
-/**
- * STAND-INS: a rule for each of the two marks of the destination's data
- * that the package writes no rule for. Neither is the note's rule: no
- * commit is computed, and the further attempts get no mint.
- *
- * What is the package's own in them: the token of an attempt, by rule T4
- * (`tokenStep`), and whether another attempt is allowed, by rule T8
- * (`closed`, of the write's target, `targetOf`).
- */
-export const standInRules: Rules = {
-  // The branch becomes `ready` at the commit that the read back saw, where it is `empty`. Nothing is checked of the commit, and no
-  // receipt is opened.
-  "first-head": {
-    place: "outcome",
-    rules: {
-      selects: false, read: false, covered: true,
-      retries: (_result, write, given) => !closed(targetOf(given.state, given.own, write)),
-      derives: (given, write) => {
-        const { state, input } = given;
-        const [token, branch] = [tokenStep(given, write), branchOf(state)];
-        const seen = input.type === "outcome" && input.result === "confirmed" ? seenOf(input) : null;
-        const ready: RuleEffect[] = typeof seen !== "string" || branch.state !== "empty" ? [] : [{ effect: "state", item: branch.id, state: "ready" }, { effect: "value", item: branch.id, slot: "head", value: seen }];
-        return { effects: [...token.effects, ...ready], sends: [], opens: token.opens };
-      },
-    },
-  },
-  // The receipt becomes `written` when the read back saw the stand-in commit, and `conflict` when it saw another. `absent` allows
-  // another attempt. After the last attempt, and after a read back that failed, one read of the receipt's ref is opened.
-  receipt: {
-    place: "outcome",
-    rules: {
-      selects: false, read: false, covered: true,
-      retries: (_result, write, given) => !closed(targetOf(given.state, given.own, write)) && seenOf(given.input) === "absent",
-      unknown: () => ({ send: "unknown", seen: "failed" }),
-      derives: (given, write) => {
-        const { state, own, input } = given;
-        const [token, receipt, seen] = [tokenStep(given, write), targetOf(state, own, write), seenOf(input)];
-        const read = receipt?.state === "owed" && input.type === "outcome" && (seen === "failed" || (seen === "absent" && input.attempt === write.most))
-          && !write.attempts.some((attempt) => attempt.outcomes.some((outcome) => [0, 1].some((k) => state.operation(`${outcome.seq}:${k}`)?.kind === DESTINATION_KINDS.read)));
-        const one: Opening = { owner: DESTINATION, kind: DESTINATION_KINDS.read, attempts: 1 };
-        const opens: Opening[] = [...token.opens, ...(read ? [one] : [])];
-        return { effects: [...token.effects, ...receiptSeen(receipt, seen)], sends: [], opens };
-      },
-    },
-  },
-};
-
-/**
- * STAND-IN: the package's rule `deciding-read`, but for the read of a
- * receipt's ref, whose outcome the note's row `receipt` judges and the
- * package's rule does not: there it is the stand-in column `receiptSeen`.
- * It sets the receipt's state and touches no slot `token` (rule T6).
- */
-const readRule = (packaged: PlatformRule): PlatformRule => {
-  if (packaged.place !== "outcome") throw new Error("deciding-read is a rule of an outcome");
-  return {
-    place: "outcome",
-    rules: {
-      ...packaged.rules,
-      derives: (given, read, selected) => {
-        if (readFor(given.state, given.own, read) !== "receipt") return packaged.rules.derives!(given, read, selected);
-        const write = writeOf(given.state, given.own, read);
-        return { effects: receiptSeen(write && targetOf(given.state, given.own, write), seenOf(given.input)), sends: [], opens: [] };
-      },
-    },
-  };
-};
 
 /** STAND-IN: a membership scope and a rules scope that the hand-written observations name. Neither exists. */
 const observedScope = (kind: "membership" | "rules", fill: number): ScopeRef => {
@@ -316,10 +231,10 @@ export class Branch extends Ledger {
     verdicts: this.read.verdicts.map(({ sound, key }) => ({ sound, key: key?.key ?? null })),
     checks: Object.fromEntries(Object.entries(this.read.checks).map(([name, check]) => [name, { opening: check.opening, deciding: check.deciding, key: check.key?.key ?? null }])),
   };
-  /** The destination's rules, with the stand-in reader of a lane's entries and the two stand-in rules: what a judge of these tests is given. */
+  /** The destination's rules, with the stand-in reader of a lane's entries: what a judge of these tests is given. */
   readonly rules: PlatformRules = (() => {
     const packaged = destinationRulesWith(this.#lane);
-    return { named: DESTINATION, rules: { ...packaged, ...standInRules, "deciding-read": readRule(packaged["deciding-read"]!) } };
+    return { named: DESTINATION, rules: packaged };
   })();
 
   constructor(importing: boolean) {
@@ -391,7 +306,7 @@ export class Branch extends Ledger {
     return this.from(sender.at, "change", "cancel-merge", message, [fetched(merge, "change")], again);
   }
 
-  /** An act, judged with the destination's rules and the stand-ins. Every key of the fixture set holds every action here. */
+  /** An act, judged with the destination's rules. Every key of the fixture set holds every action here. */
   override act(who: Actor, kind: string, over: Over = {}, context: Context = {}): ActJudgment {
     return super.act(who, kind, over, { platform: this.rules, ...context });
   }
@@ -433,11 +348,18 @@ export class Branch extends Ledger {
     return this.outcome(operation, attempt, "unknown", { basis: "none", body } as Evidence);
   }
 
-  /** The branch has its first head, by the STAND-IN outcome of `first-head`: its own answer, with a read back that shows the commit. The operation is the one that the genesis declared. */
+  /** The synthetic base HEAD is adopted through the real adopt-head and adopt-read rows. No first-head write is claimed here. */
   ready(): this {
     this.confirmed();
-    if (this.answered("0:0", 1, "confirmed", { send: "accepted", seen: HEAD }).result !== "write") throw new Error("the stand-in first head was not written");
+    const adopted = this.act(rita, "adopt-head", { on: 0, expected: { on: this.branch.revision }, fields: { commit: HEAD, why: "fixture's hand-written branch base" } });
+    const operation = `${this.head.seq}:0` as OperationId;
+    if (adopted.result !== "write" || this.answered(operation, 1, "confirmed", { seen: HEAD }).result !== "write") throw new Error("the fixture's head was not adopted");
     return this;
+  }
+
+  /** The receipt commit that the production rule computes from this history, with the stated repository format. */
+  receiptCommit(id: number, format: "sha1" | "sha256" = "sha1"): string {
+    return destinationReceipt(this.state, this.own, this.item(id), format).commit;
   }
 
   /**

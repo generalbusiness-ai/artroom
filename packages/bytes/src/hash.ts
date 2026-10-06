@@ -2,11 +2,17 @@
 
 import { hmac } from "@noble/hashes/hmac.js";
 import { sha256 as nobleSha256 } from "@noble/hashes/sha2.js";
+import { sha1 as nobleSha1 } from "@noble/hashes/legacy.js";
 import type { Digest } from "@generalbusiness/artroom-contract";
 import { hex } from "./encode.ts";
 
 export function sha256(bytes: Uint8Array): Uint8Array {
   return nobleSha256(bytes);
+}
+
+/** SHA-1, for the names of Git objects in a repository that uses that object format. Never an Artroom entry digest. */
+export function sha1(bytes: Uint8Array): Uint8Array {
+  return nobleSha1(bytes);
 }
 
 /** HMAC-SHA-256 (RFC 2104), synchronous: the 32 bytes that authenticate `bytes` under `key`. A read session is checked with it. */
