@@ -141,7 +141,7 @@ export function bound(d: Defining, v: unknown, path: string, handler: { tell: bo
     for (const side of sides ? ["a", "b"] : []) {
       const x = sides![side];
       const q = at(at(p, f![0]), side);
-      const k = isObject(x) && Object.keys(x).length > 0 ? Object.keys(x)[0]! : "";
+      const k = isObject(x) ? Object.keys(x).find((key) => OPERANDS.includes(key)) ?? "" : "";
       const exact = isObject(x) && (k === "sender" ? x["sender"] === true && Object.keys(x).length === 1
         : k === "field" ? Object.keys(x).length === 1 && typeof x["field"] === "string" && handler.fields.has(x["field"])
         : Object.keys(x).length === 2 && x["of"] === o["of"] && typeof x["slot"] === "string" && t.slots.has(x["slot"]));

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { FactRef, FieldValue, Input, PlatformDefinition, ScopeKind, ScopeRef, Seed, Send } from "@generalbusiness/artroom-contract";
-import { entryHash, factRefOf, newIncarnation, scopeIdOf } from "@generalbusiness/artroom-bytes";
+import { canonicalBytes, entryHash, factRefOf, newIncarnation, parseStrictBytes, scopeIdOf } from "@generalbusiness/artroom-bytes";
 import { MemoryState, PROFILES, applyEntry, clockOf, decisionsOf, entryOf, fits, indexItems, itemAwaits, judgeDelivery, keyOf, owed, validateDefinition } from "../src/index.ts";
 import type { Counts, Draft, Fetched, Indexed, Judgment, PlatformRule, PlatformRules, RuleEffect, ValidDefinition } from "../src/index.ts";
 import { Scope, arriving, d, forged, keys, on, valid, type Over } from "./fixtures.ts";
@@ -184,6 +184,15 @@ describe("18.53, at the validator: the index, the binding selector and `bound`",
     expect(refusals(M, (data) => { data.receives.stop.fields.job = { type: "item", of: "job", required: true }; data.receives.stop.also.job = { item: "job", by: "job" }; })).toEqual([]);
   });
 
+  test("a binding definition loaded from canonical bytes accepts bound slot operands in equals and differs", () => {
+    const data = structuredClone(M);
+    const bound: { of: string; where: unknown[] } = data.receives.stop.bound;
+    bound.where = [OWNER, { differs: { a: { slot: "ticket", of: "also.job" }, b: { field: "ticket" } } }];
+    // Canonical bytes put `of` before `slot`: member order does not change what the operand reads.
+    const loaded = parseStrictBytes(canonicalBytes(data));
+    expect(validateDefinition(loaded, PROPOSED_BOUNDS, PROFILES, { platform: true })).toMatchObject({ ok: true });
+  });
+
   test("18.53 cases 2, 3 and 18 to 20: a source of `bound.of` that may not bind a request is refused `bound-source`", () => {
     const mark = (change: Record<string, unknown>, drop: string[] = []) => (data: typeof M) => {
       const stated: Record<string, unknown> = { ...JOB_OF, ...change };
@@ -245,7 +254,7 @@ describe("18.53, at the validator: the index, the binding selector and `bound`",
     expect(stop((handler) => { handler.bound.of = "also.none"; })).toEqual(expect.arrayContaining(["name receives.stop.bound.of"]));
     // A `where` reads the sender, a field of the message and a slot of the bound item, by `equals` and `differs`, and nothing else.
     expect(stop((handler) => { handler.bound.where = [OWNER, { differs: { a: { field: "ticket" }, b: { slot: "ticket", of: "also.job" } } }]; })).toEqual([]);
-    for (const operand of [{ const: 1 }, { scope: true }, { field: "none" }, { slot: "owner" }, { slot: "none", of: "also.job" }, { field: "ticket", part: "scope" }, { source: "ref" }]) {
+    for (const operand of [{ const: 1 }, { scope: true }, { field: "none" }, { slot: "owner" }, { slot: "none", of: "also.job" }, { slot: "owner", of: "also.other" }, { slot: "owner", of: "also.job", extra: true }, { field: "ticket", part: "scope" }, { source: "ref" }]) {
       expect(stop((handler) => { handler.bound.where = [{ equals: { a: { sender: true }, b: operand } }]; }), JSON.stringify(operand)).toEqual(["shape receives.stop.bound.where.0.equals.b"]);
     }
     expect(stop((handler) => { handler.bound.where = [{ state: ["queued"] }]; })).toEqual(["shape receives.stop.bound.where.0"]);
