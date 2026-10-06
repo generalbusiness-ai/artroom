@@ -1396,3 +1396,110 @@ pinned digest moves.
 **What was not run.** Nothing was run on a deployment, a host, a
 container or a real runner. The streams of finding 2 were read inside the
 object's own isolate, and not over a network.
+
+## 28. Request `42de9e34`, the data side: the rules scope holds extents
+
+Written 2026-10-05, on `request/i3-extdata`, by the worker of that part.
+Entries have the prefix FB. The scope contract is at revision 19
+(`1ca8a59bf`), which is adopted. The lane forms note is at revision 15
+(`f4889d47`), which is adopted.
+
+**The basis of this work is approved, and its adoption was not recorded
+when it was built.** It builds the authority note's revision 26, at
+`f7175296`: sections 12.1.4 and 12.1.4a, rows w, x and y of the table of
+further marks, and the rows of steps 9a and 9d in "What revision 25 lets
+the I3 source do next" as revision 26 corrects them. The checker approved
+that revision. The planner's adoption of it is expected and was not
+recorded when this was written. So each row is a commit of its own, whose
+message names the row that it implements. Section numbers below are those
+of revision 26.
+
+No entry that an earlier source wrote has other bytes. Neither lane digest
+changes, and no file under `packages/lanes` changes: the lane side of
+extents is a later change with its own digest. The data of
+`platform:rules@1` changes: entry FB11.
+
+**What is built.**
+
+| Part | Built | Row of revision 26 | Witness |
+|---|---|---|---|
+| The slot and the field `extents`, and the type rule `extent-list` | `rules-scope.ts`; `isExtents` in `extents.ts` | Section 12.1.4, "Two more value slots", "Two more fields", "An extent, with its bounds"; row w; the missing form 2 | `rules-scope.test.ts`, the test of the extents, with case i; `extents.test.ts`, the test of a list of extents |
+| The guard `extents-hold`, with its three refusals | `rules-scope.ts` | Section 12.1.4, "The three checks of `extents-hold`"; row x; the missing form 3 | `rules-scope.test.ts`, the test of the extents, cases f, g and h |
+| The slot and the field `singleControllerException`, and the member of `RulesContent` | `rules-scope.ts`; `packages/contract/src/observation.ts`; `packages/bytes/src/records.ts` | Section 12.1.4, the same two tables; the missing form 14; the contract's row I3-36 | `rules-scope.test.ts`, the test of the declaration, with case j |
+| The send mark `rules-update` | `rules-scope.ts` | Section 12.1.4, "The `rules` update"; row y | `rules-scope.test.ts`, the test of `rules-wanted`, cases d and k |
+| The first definition before a first `publish` | `extentsOf` in `rules-scope.ts`, with `firstExtents` | Section 12.1.4, "Before the first `publish`" | The same test, case k |
+| A review counts for the extent that it states | `judgeExtents` | Section 12.1.4a, "Which reviews count for an extent" | `extents.test.ts`, the test of the mixed change |
+| The inputs that no retained form supplies fail closed; a path that is no text | `classify`, `judgeExtents` | Section 12.1.4a, "A path that is no text", "What makes the relation replayable", and the missing forms 1, 11 and 15 | `extents.test.ts`, the test of the inputs |
+
+`firstExtents` and `holdsRulesExtent` were compared with the note's row
+"The first definition" and with "Its fixed minimum", member for member,
+and are not changed. `matches` was compared with "A pattern, in two
+cases" and is not changed; one more assertion shows `a**b`.
+
+**What is not built.**
+
+- No rules scope answers an observation of the rules: entry FB10. So no
+  `publish` is "observed back" by an observation. What is shown is the
+  scope's own state and the `rules` update.
+- `RulesContent` has no member `extents`: entry FB2.
+- Nothing here calls `classify` or `judgeExtents`. The destination's rule
+  `judge` will, and it is another worker's.
+- No changed set is computed, no link is resolved, no observation counts
+  the holders of an action, and no entry retains an observation of an
+  authoring agent. Each is an input: entries FB6 and FB7.
+- The pinned `change` lane does not take the update: entry FB5.
+
+Controls, each by `scripts/control.mjs` and each distinguishes: 18 in
+all. One for the stated extent of a review; six for the inputs that fail
+closed; one for the rule `extent-list` and one for a bound of `isExtents`;
+three for `extents-hold`, one for each check; two for the declaration, of
+which one shows that the record check takes no member `extents`; four for
+`rules-update` and `extentsOf`.
+
+| # | Where the texts differ or are silent | Implemented | Owner, and the question |
+|---|---|---|---|
+| FB1 | The rule `extent-list`. The note bounds each text in bytes and each list by a count. It does not say how a value that is no list, a record with a seventh member, or a number that is no integer is answered. | `isExtents`: a list of 1 to 8 records, each with exactly the six members. A text is counted in the bytes of its UTF-8 form. `approvals` is a safe integer from 0 to 64. Anything else is not of the type, and the act is `bad-field`, with no name. A `publish` with no field `extents` is `bad-field` too: the field is required. The bound "a `publish` that would not fit an entry is refused by that limit" is the scope's and is not witnessed here. | The authority note, to confirm. The proof plan, for the numbers. |
+| FB2 | The member `extents` of a `RulesContent` that was asked as "rules". The note asks the contract for it (its ask 1), and the contract's revision 19 does not state it. | Not added. The type has no such member, and the record check of an observation refuses a content that holds one, so no entry retains an observation of the rules with extents. What a reader of the rules gets meanwhile: from an observation, nothing of the extents, and today no observation at all (entry FB10); from the rules scope's own state, the extents whole, by `extentsOf`, which is code of the version for the answer to use when the member exists; and for a lane, the `rules` update, with five members of each extent and no pattern. So the destination judges no extent from an observation, as the note says. | The contract, for the type and for the size of `content` (its point R1-61). |
+| FB3 | The contract says that the record which was asked as "rules" holds `singleControllerException` "under a rules definition whose item `rules` states a value of that name", and has no such member under another. The source has one type `RulesContent` for every definition. | The member is optional in the type and in the record check, and is a truth value where it is present. `platform:rules@1` states the value from its genesis, so an answer under it always holds the member; no answer exists yet (entry FB10). `judgeExtents` takes anything but `true` as no declaration. | The contract, to confirm that one type with an optional member is its "two fixed records". |
+| FB4 | The rule `extents-hold`. The note says that it reads the fields `extents` and `checks`, "as read", and that the first check that fails gives its name. | As written. Check 3 compares each name of an extent's `checks` with the member `name` of each record of the field `checks`. The guard stands third, after the written guard and `checkers`. Where `checkers` is not completed and `extents-hold` would refuse, the judge answered the refusal: that is the judge's order of a refusal and a guard that is not completed, it was seen once while the witness was written, and no test here states it. | None. |
+| FB5 | The mark `rules-update`. The note says "the mark `rules-update`, with empty clauses" and "one request, in every entry of the row". It says that `checks` is left out before the first `publish`, and gives `labels` as "the slot". The slot `labels` is unset before the first `publish` too, and a message holds no absent value. | The mark is `{ code: "rules-update", row: "P28", result: {}, always: true }`: `always` is the contract's form for "exactly one request in every entry of its row". The rule gives one `relate` to the scope of the delivery's `from`, named `rules`, of the item `rules`, in the state `current`. `labels` and `checks` are each left out while unset, as the written `relate` of the earlier row left them out. `extents` is five members of each extent of `extentsOf`. The pinned `change` lane still takes none of this: its handler declares three fields, and no pinned lane sends `rules-wanted` (entry EQ10 stands until the lane rows of the lane forms' section 18.4 are built, with their digest). | The authority note, to confirm `always` and `labels`. The I3 source, for the lane side. |
+| FB6 | The missing form 1. No retained input holds the changed set, the link rows or the count of paths that are no text. "A path that is no text" says that such a change is not met, with `rules` named. | Three explicit inputs of `classify`: `changed`, `links` and, new, `unreadable`. `Touched` has one more member, `unreadable`. A count that is not 0 makes `rules` unmet, with the class `authority`, and no review and no exception meets it. A caller that gives null for the changed set or the links, or gives no count, gets `unreadable: null`, which `judgeExtents` reads as not met too; so does a `Touched` with no such member. To fail closed a caller gives null. A changed set that is given and is empty says that the change touches no path, and nothing is asked. | The authority note's next revision, with the proof plan and IA, for the form. The builder, at the merge: a call of `classify` with three arguments is now judged as not stated. |
+| FB7 | The missing form 15, and the open row of section 13.16: from which retained record the destination reads the controller of an authoring agent, for the exception's second clause and where it refuses a review. | `controllersOfAuthors` is a list or null. Null says that nothing shows the relation. Then the exception is not passed by the second clause: an agent's change under the one controller is not met, `rules`. The first clause still holds from the authors and the merger. And no review counts where a controller's would be refused: for the `rules` extent always, and for every other extent unless `ownerMayReview` is true. That is the side that fails closed, and it is wide: under the default `ownerMayReview: false` a caller that gives null counts no review at all. An empty list is a statement that no author is an agent with a controller. Only a caller that holds an observation of each author may make it. | The authority note's next revision, with R2, for the retained record. The builder, for what the destination's rule gives meanwhile. |
+| FB8 | "Which reviews count for an extent": a verdict states one extent, or none. | `ExtentsAsked.reviews` is a list of `Review`: a `Holder` with the member `extent`. A review counts for an extent only when it states that extent's name. One with null, with no member, or with a name that no extent has counts for none. | None. The builder, at the merge: the type of `reviews` has one more required member. |
+| FB9 | "A link that leaves the tree is never met, by a review or by the exception", and the order of the names in `reason`. | Where a path is refused or is no text, `rules` is not met and its `exception` is null, whatever the three conditions say. `unmet` is in the order of the rules, and holds `rules` at its place also where the change touches no path of that extent. For rules with no extent named `rules`, which no rules scope can hold, the name is last. A path that no extent holds still names no extent, as section 23 has it: under a rules scope none can arise. | The authority note, to confirm the place of `rules` in the text where the change touches no path of it. |
+| FB10 | Entry EQ8: the answer of a rules scope to an observation needs the position of the last `publish`, which no slot holds. Revision 26 lists EQ8 among the entries that it carries with nothing decided. | Not built, as before. `platform("platform:rules@1")` has no `observed`. The declaration and the extents are in the folded state for that answer to read: the value `singleControllerException`, and `extentsOf`. | The authority note, for the source of the revision. |
+| FB11 | The rows of `platform:rules@1` change under one name and version. The note says that no deployed scope runs under it, so no second version is named. | The data's digest changes. The folded state of a rules scope has two more values from its genesis: `extents`, unset, and `singleControllerException`, false. The entry of `rules-wanted` sends an update with more members. A `publish` with the four older fields alone is refused `bad-field`. No file pins a digest of this data, and no source wrote a rules scope's history that a replay must read again. The one caller that changed is the real founding's `publish`, in `packages/scope/test/founding-real.test.ts`, which states the extents of the first definition. | None. |
+
+**Earlier entries that this work answers, each dated 2026-10-05.** The
+tables of sections 17 and 23 are as they were written.
+
+- **EV2** (the missing form 2). Built as rows: the slot, the field and
+  the bounds, by the rule `extent-list`. The member of `RulesContent`
+  stays owed by the contract: entry FB2.
+- **EV3** (the missing form 3). Built for `publish`: the marks
+  `extent-list` and `extents-hold`, and the refusal
+  `rules-extent-required` with two more. The part of `judge` is the
+  destination's.
+- **EV11** (the missing form 14). Built: the slot, the field and the
+  member of `RulesContent`. `publish` has no guard on the number of
+  controllers.
+- **EV12**. `firstExtents` is the default before a first `publish`, by
+  `extentsOf`.
+- **EV13**. Confirmed as built. The rule `extent-list` refuses a pattern
+  with an empty name. A path that is no text is an input: entry FB6.
+- **EV14**. `publish` refuses a list that has not exactly one extent with
+  no pattern, named `catch-all-required`. `classify` assumes it and still
+  fails closed for a list that is no such list.
+- **EV15**. Confirmed: the checks of the `rules` extent stand under the
+  exception. A refused path is not met by the exception: entry FB9.
+- **EV7**, reading (b). Decided by the planner as the stricter reading,
+  and `judgeExtents` holds it: entry FB9.
+- **EV1**. The type `Changes` of the note has the three inputs of
+  `classify`, of which `unreadable` is new here: entry FB6. Nothing
+  computes them.
+- **EV17**. The header of `rules-scope.ts` names revision 26.
+- **EQ5**. `publish` has six fields. Five are required, and the
+  declaration is optional with the default false.
+- **EQ8**. Carried by revision 26, and not built: entry FB10.
+- **EQ10**. The update's detail has up to six members. The lane's side is
+  not built: entry FB5.

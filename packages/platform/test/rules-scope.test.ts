@@ -1,15 +1,16 @@
 import { expect, test } from "vitest";
 import { PROPOSED_BOUNDS, type DeclaredDefinition } from "@generalbusiness/artroom-contract";
-import { canonicalize, definitionDigest, newIncarnation } from "@generalbusiness/artroom-bytes";
+import { canonicalize, definitionDigest, isObservationUse, newIncarnation } from "@generalbusiness/artroom-bytes";
 import { PROFILES, derivable, runnable, validateDefinition, valueDigest } from "@generalbusiness/artroom-derive";
 import type { ActJudgment, Judgment } from "@generalbusiness/artroom-derive";
 import { d, desk, deskDefinition, directory, keys, membership, ticket, ticketDefinition } from "@generalbusiness/artroom-derive/testing";
-import { CONFIGURATION_BYTES, CONFIGURATION_DOMAIN, DEFINITION_DOMAIN, RULES_SCOPE, membershipId, platform, rulesScope } from "../src/index.ts";
+import { CONFIGURATION_BYTES, CONFIGURATION_DOMAIN, DEFINITION_DOMAIN, RULES_SCOPE, extentsOf, firstExtents, membershipId, platform, rulesScope } from "../src/index.ts";
+import type { Extent } from "../src/index.ts";
 import { rulesScopeRules } from "../src/rules-scope.ts";
 import { BRANCH, Rulebook, lanePointingAt, memberOf, standing } from "./support-rules.ts";
 
 // Every scope here is a `Rulebook` of test support: a rules scope in memory, below a STAND-IN registrar, whose acts are judged on the
-// test authority of derive's fixture set. The data and the three rules that are tested are the platform package's, and no rule is a
+// test authority of derive's fixture set. The data and the six rules that are tested are the platform package's, and no rule is a
 // stand-in. An observation is written by hand (`standing`): nothing here shows a read of membership.
 
 const { rita } = keys;
@@ -27,12 +28,14 @@ const configuration = (name: string, image: unknown = d("a")) => {
 const [unit, lint] = [configuration("unit"), configuration("lint")];
 const check = (of: { name: string; digest: string }, checker = memberOf("@check"), required = true) => ({ name: of.name, configuration: of.digest, required, checker });
 const keep = (r: Rulebook, of: { name: string; digest: string; bytes: string }, values: readonly string[] = [of.bytes]) => r.act(rita, "keep-configuration", { fields: { digest: of.digest, name: of.name } }, { values });
+/** The extents of the first definition for rules that ask 2 approvals and name no check: what a `publish` of these tests states unless it says otherwise. */
+const FIRST = firstExtents({ approvals: 2, checks: [] });
 const publish = (r: Rulebook, checks: readonly unknown[], observed: readonly ReturnType<typeof standing>[] = [], over: Record<string, unknown> = {}) =>
-  r.act(rita, "publish", { on: 0, expected: { on: r.item(0).revision }, fields: { approvals: 2, ownerMayReview: true, checks, labels: ["bug"], ...over } as never }, { observed });
+  r.act(rita, "publish", { on: 0, expected: { on: r.item(0).revision }, fields: { approvals: 2, ownerMayReview: true, checks, labels: ["bug"], extents: FIRST, ...over } as never }, { observed });
 const activate = (r: Rulebook, digest: string, name: string, values: readonly string[]) => r.act(rita, "activate", { fields: { digest, name } }, { values });
 
-// The plan's T43, for `platform:rules@1` (authority note, revision 21, section 12.1.4, and its table of marks, section 12.1.8).
-test("the rules definition validates whole with the platform option; its three marks are those of the note's table, each with its rule, so the package's rules run it; without any one of them they do not", () => {
+// The plan's T43, for `platform:rules@1` (authority note, revision 26, section 12.1.4, and its table of marks, section 12.1.8).
+test("the rules definition validates whole with the platform option; its marks are those of the note's table, each with its rule, so the package's rules run it; without any one of them they do not", () => {
   const checked = validateDefinition(JSON.parse(JSON.stringify(rulesScope)), PROPOSED_BOUNDS, PROFILES, { platform: true });
   if (!checked.ok) throw new Error(`the rules definition is refused: ${JSON.stringify(checked.problems)}`);
   expect(checked.definition.digest).toBe(definitionDigest(rulesScope as unknown as DeclaredDefinition));
@@ -44,37 +47,44 @@ test("the rules definition validates whole with the platform option; its three m
   // The item table, by its bounds and states: one `rules`, 16 live definitions, 1000 configurations. A retired definition is final.
   expect(Object.entries(rulesScope.items).map(([name, item]) => [name, item.many, item.max, item.initial, Object.entries(item.states).filter(([, state]) => state.final).map(([state]) => state)]))
     .toEqual([["rules", false, 1, "current", []], ["definition", true, 16, "active", ["retired"]], ["configuration", true, 1000, "kept", []]]);
-  // No act sends a request, and no update goes to any lane from `publish` (G11). The one send is the handler's `relate` to its sender.
-  expect([Object.values(rulesScope.acts).flatMap((act) => act.sends), Object.values(rulesScope.receives).flatMap((h) => h.sends.map((send) => Object.keys(send)[0]))]).toEqual([[], ["relate"]]);
+  // No act sends a request, and no update goes to any lane from `publish` (G11). The one send is the handler's: the mark
+  // `rules-update`, with empty clauses, whose rule gives one request in every entry of the row.
+  expect([Object.values(rulesScope.acts).flatMap((act) => act.sends), Object.values(rulesScope.receives).flatMap((h) => h.sends)]).toEqual([[], [{ code: "rules-update", row: "P28", result: {}, always: true }]]);
 
   // Without the option it is no declared definition, and under a declared name each mark is a form that the contract does not define.
   const { outcomes: _, ...rows } = rulesScope;
   const refused = (value: unknown) => { const checked = validateDefinition(value, PROPOSED_BOUNDS); return checked.ok ? null : checked.problems.map((p) => [p.code, p.path]); };
   expect([refused(rulesScope), refused(rows), refused({ ...rows, name: "rules" })]).toEqual([
-    [["shape", "outcomes"]], [["shape", "name"]], [["shape", "acts.publish.guards.1"], ["shape", "acts.keep-configuration.guards.0"], ["shape", "acts.activate.guards.0"]],
+    [["shape", "outcomes"]], [["shape", "name"], ["shape", "items.rules.values.extents.of"]], [["shape", "items.rules.values.extents.of"]],
   ]);
 
-  // The marks, by the rows of the note's table: rows 27, 28 and 29, each at place 4. Row 1 derives nothing of an entry and has no mark.
-  expect(checked.definition.marks.map((m) => [m.place, m.path, m.code, m.row])).toEqual([
-    [4, "acts.publish.guards.1", "checkers", "P19"], [4, "acts.keep-configuration.guards.0", "configuration-bytes", "P18"], [4, "acts.activate.guards.0", "definition-bytes", "P21"],
+  // The marks, by the rows of the note's table: rows 27, 28 and 29, each at place 4, and rows w, x and y of the further marks: the
+  // type of the slot and of the field at place 3, a guard at place 4 and the send at place 6. Row 1 derives nothing of an entry and
+  // has no mark.
+  expect(checked.definition.marks.map((m) => [m.place, m.path, m.code, m.row]).sort()).toEqual([
+    [3, "acts.publish.fields.extents", "extent-list", "P28"], [3, "items.rules.values.extents.of", "extent-list", "P28"],
+    [4, "acts.activate.guards.0", "definition-bytes", "P21"], [4, "acts.keep-configuration.guards.0", "configuration-bytes", "P18"], [4, "acts.publish.guards.1", "checkers", "P19"],
+    [4, "acts.publish.guards.2", "extents-hold", "P28"], [6, "receives.rules-wanted.sends.0", "rules-update", "P28"],
   ]);
-  // The table has exactly the three rules that the note names, each a guard with the refusal names that its row states.
-  expect(Object.entries(rulesScopeRules).map(([name, rule]) => [name, rule.place, "refusals" in rule ? rule.refusals : null, rule.clock ?? false])).toEqual([
+  // The table has exactly the rules that the note names, each of the kind of its place, with the refusal names that its row states.
+  expect(Object.entries(rulesScopeRules).map(([name, rule]) => [name, rule.place, "refusals" in rule ? rule.refusals : null, rule.clock ?? false]).sort()).toEqual([
     ["checkers", "guard", ["not-a-checker"], false], ["configuration-bytes", "guard", ["configuration-mismatch"], false], ["definition-bytes", "guard", ["unsupported-definition"], false],
+    ["extent-list", "type", null, false], ["extents-hold", "guard", ["rules-extent-required", "catch-all-required", "extent-check-unknown"], false],
+    ["rules-update", "send", null, false],
   ]);
   // The whole-scope rule (the contract's section 6.1): the package's own rules run the version, with no stand-in. Without any one of
   // the three, or with a rule of another place under a name, it is not runnable.
   const supplied = platform(RULES_SCOPE)!;
   expect([supplied.data, supplied.rules, platform("platform:rules@2")]).toEqual([rulesScope, rulesScopeRules, null]);
   expect([runnable(checked.definition, supplied.rules), ...Object.keys(rulesScopeRules).map((lost) => runnable(checked.definition, { ...supplied.rules, [lost]: undefined as never })), runnable(checked.definition, { ...supplied.rules, checkers: { place: "send", run: () => null } })])
-    .toEqual([true, false, false, false, false]);
+    .toEqual([true, ...Object.keys(rulesScopeRules).map(() => false), false]);
 });
 
 // Section 12.1.4, the row `establish`; section 12.1, "The membership reference", and row 1 of the table of marks (I3 deltas, entry EM21).
 test("the genesis opens the rules with the branch, the directory and membership's scope ID, and the other values at their defaults; the scope records that ID and no incarnation; a provisional rules scope admits no act", () => {
   const r = new Rulebook();
   const rules = r.item(0);
-  expect([rules.type, rules.state, rules.values, rules.refs]).toEqual(["rules", "current", { branch: BRANCH, membership: membership.scope, approvals: 1, ownerMayReview: false, checks: null, labels: null }, { directory: r.registrar.at }]);
+  expect([rules.type, rules.state, rules.values, rules.refs]).toEqual(["rules", "current", { branch: BRANCH, membership: membership.scope, approvals: 1, ownerMayReview: false, checks: null, labels: null, extents: null, singleControllerException: false }, { directory: r.registrar.at }]);
   expect([membershipId(r.state), membershipId(r.registrar.state)]).toEqual([membership.scope, null]);
   // The creation's fields hold the ID as a text, which fits the slot: a scope ID is at most 64 bytes.
   expect(membership.scope.length).toBeLessThanOrEqual(64);
@@ -141,7 +151,7 @@ test("publish sets the rules when each check's configuration is kept and each ch
   const extra = standing("@other", 3);
   expect(said(publish(r, [...checks, { ...check(unit), name: "unit-again" }], [checkB, extra, checkA]))).toEqual(WRITTEN);
   expect([r.item(0).values, r.last.input.type === "act" && r.last.input.observed]).toEqual([
-    { branch: BRANCH, membership: membership.scope, approvals: 2, ownerMayReview: true, checks: [...checks, { ...check(unit), name: "unit-again" }], labels: ["bug"] }, [checkA, checkB],
+    { branch: BRANCH, membership: membership.scope, approvals: 2, ownerMayReview: true, checks: [...checks, { ...check(unit), name: "unit-again" }], labels: ["bug"], extents: FIRST, singleControllerException: false }, [checkA, checkB],
   ]);
   // Rules with no check read no observation: the entry has no member `observed`.
   expect([said(publish(r, [], [checkA])), "observed" in r.last.input, r.item(0).values["checks"]]).toEqual([WRITTEN, false, []]);
@@ -190,18 +200,88 @@ test("activate opens an active definition when its bytes and its whole named clo
   expect([said(r.act(rita, "retire-definition", { on: item.id, expected: { on: item.revision } })), r.item(item.id).state, again()]).toEqual([WRITTEN, "retired", WRITTEN]);
 });
 
-// Section 12.1.4, the row `rules-wanted` and case d. The lane is a STAND-IN: a made-up definition that sends the `tell`.
-test("rules-wanted from a lane is applied by one entry that changes nothing: the rules update to the sender at ordinal 0, with the four rule values, and the result at ordinal 1", () => {
+// Section 12.1.4, the row `rules-wanted` with the send mark `rules-update`, and cases d and k. The lane is a STAND-IN: a made-up
+// definition that sends the `tell`.
+test("rules-wanted from a lane is applied by one entry that changes nothing: the rules update to the sender at ordinal 0 and the result at ordinal 1; before a first publish the update and the scope give the three extents of the first definition, and after one the extents that it stated, without their patterns in the update", () => {
   const r = new Rulebook();
-  keep(r, unit);
-  publish(r, [check(unit)], [standing("@check", 7)]);
   const lane = lanePointingAt(r.at);
-  lane.did(rita, "want", { on: 0, expected: { on: lane.item(0).revision } });
+  /** The lane asks, the rules scope takes the delivery, and what its entry sends: the update's body, and the result. */
+  const asked = () => {
+    lane.did(rita, "want", { on: 0, expected: { on: lane.item(0).revision } });
+    const [before, judged] = [r.item(0), said(r.receive(lane, lane.head.seq))];
+    const sends = r.last.sends.map((send) => [send.n, send.to, send.message.class, send.message.class === "request" ? [send.message.type, send.message.body] : send.message.class === "result" ? send.message.outcome : null]);
+    return [judged, r.last.effects, JSON.stringify(r.item(0)) === JSON.stringify(before), sends];
+  };
+  const update = (detail: Record<string, unknown>) => [WRITTEN, [], true, [[0, lane.at, "request", ["relate", { name: "rules", item: r.fact(0), state: "current", detail }]], [1, lane.at, "result", "applied"]]];
+  const projected = (extents: readonly Extent[]) => extents.map(({ patterns: _, ...five }) => five);
+
+  // Case k: before any `publish`. The slot `extents` is unset, and a repository has the three extents of the first definition all
+  // the same, from the `approvals` of the genesis. The update has no member `checks`, and none for the labels, which are unset too.
+  const first = firstExtents({ approvals: 1, checks: [] });
+  expect([r.item(0).values["extents"], extentsOf(r.state), first.map((extent) => extent.name)]).toEqual([null, first, ["rules", "infrastructure", "source"]]);
+  expect(asked()).toEqual(update({ approvals: 1, ownerMayReview: false, singleControllerException: false, extents: projected(first) }));
+
+  // Case d, after a `publish` that states a repository's own extents and declares the exception. The scope holds them whole, with
+  // their patterns. The update carries five members of each, in their order, and no pattern: a lane reads no path.
+  keep(r, unit);
+  const own: Extent[] = [first[0]!, { name: "deploy", patterns: ["deploy/**"], approvals: 2, approver: "change.merge", checks: ["unit"], class: "deployment" }, { ...first[2]!, name: "code", checks: ["unit"] }];
+  expect(said(publish(r, [check(unit)], [standing("@check", 7)], { extents: own, singleControllerException: true }))).toEqual(WRITTEN);
+  expect([extentsOf(r.state), extentsOf(r.registrar.state)]).toEqual([own, null]);
+  expect(asked()).toEqual(update({ approvals: 2, checks: [check(unit)], ownerMayReview: true, labels: ["bug"], singleControllerException: true, extents: projected(own) }));
+});
+
+// Section 12.1.4, "The rows of the rules scope, changed in revision 25", cases f to j: the missing forms 2, 3 and 14 of section 12.1.4a.
+test("publish keeps the extents that it states, whole, and the scope holds them; a list outside the bounds of an extent is refused bad-field; one without the fixed minimum of the rules extent, without exactly one extent that has no pattern, or with a check that the act does not hold is refused by name", () => {
+  const r = new Rulebook();
+  // A repository's own extents: one more pattern in `rules`, a layer of its own, and the extent with no pattern under another name.
+  const [rules, infrastructure] = FIRST as [Extent, Extent, Extent];
+  const own: Extent[] = [
+    { ...rules, patterns: [...rules.patterns, "policy/**"] }, infrastructure,
+    { name: "docs", patterns: ["docs/**", "**/*.md"], approvals: 0, approver: "change.review", checks: [], class: "content" },
+    { name: "code", patterns: [], approvals: 2, approver: "change.review", checks: [], class: "content" },
+  ];
+  expect([said(publish(r, [], [], { extents: own })), r.item(0).values["extents"]]).toEqual([WRITTEN, own]);
+  // Every `publish` states the rules whole: one with no field `extents` is refused, and the extents stay.
+  const { extents: _, ...older } = { approvals: 2, ownerMayReview: true, checks: [], labels: [], extents: null };
+  expect([said(r.act(rita, "publish", { on: 0, expected: { on: r.item(0).revision }, fields: older })), r.item(0).values["extents"]]).toEqual([["refused", "bad-field", null], own]);
+  // Case i: a name with an uppercase letter, and nine extents. The type is the rule `extent-list`, at check 7.
+  const nine = [...own, ...["a", "b", "c", "d", "e"].map((name) => ({ ...own[2]!, name }))];
+  expect([said(publish(r, [], [], { extents: [{ ...rules }, infrastructure, { ...own[3]!, name: "Code" }] })), said(publish(r, [], [], { extents: nine })), said(publish(r, [], [], { extents: nine.slice(0, 8) })), r.item(0).values["extents"]])
+    .toEqual([["refused", "bad-field", null], ["refused", "bad-field", null], WRITTEN, nine.slice(0, 8)]);
+
+  // The rule `extents-hold`, the third guard: three checks in order, each refused `guard-failed` under its name.
   const before = r.item(0);
-  expect(said(r.receive(lane, lane.head.seq))).toEqual(WRITTEN);
-  expect([r.last.effects, r.item(0)]).toEqual([[], before]);
-  expect(r.last.sends.map((send) => [send.n, send.to, send.message.class, send.message.class === "request" ? [send.message.type, send.message.body] : send.message.class === "result" ? send.message.outcome : null])).toEqual([
-    [0, lane.at, "request", ["relate", { name: "rules", item: r.fact(0), state: "current", detail: { approvals: 2, checks: [check(unit)], ownerMayReview: true, labels: ["bug"] } }]],
-    [1, lane.at, "result", "applied"],
-  ]);
+  const refusedAs = (name: string) => ["refused", "guard-failed", name];
+  const stated = (extents: readonly unknown[], checks: readonly unknown[] = [], observed: readonly ReturnType<typeof standing>[] = []) => said(publish(r, checks, observed, { extents }));
+  const [, , docs, code] = own as [Extent, Extent, Extent, Extent];
+  // Case f: no extent named `rules`; one that lacks a pattern of the four; one that lowers the approvals, or names another approver or class.
+  const lesser = (over: Partial<Extent>) => stated([{ ...rules, ...over }, infrastructure, code]);
+  expect([stated([infrastructure, code]), lesser({ patterns: rules.patterns.slice(1) }), lesser({ approvals: 0 }), lesser({ approver: "change.merge" }), lesser({ class: "deployment" }), stated([{ ...rules, name: "policy" }, infrastructure, code])])
+    .toEqual(Array(6).fill(refusedAs("rules-extent-required")));
+  // Case g: two extents with no pattern, or none.
+  expect([stated([rules, { ...docs, patterns: [] }, code]), stated([rules, infrastructure, docs])]).toEqual(Array(2).fill(refusedAs("catch-all-required")));
+  // Case h: an extent names a check that the same act does not hold. With the check in the act it is written.
+  keep(r, unit);
+  const [checked, seen] = [[rules, infrastructure, { ...code, checks: ["unit"] }], [standing("@check", 7)]];
+  expect([stated(checked), stated(checked, [check(lint)], seen), r.item(0)]).toEqual([refusedAs("extent-check-unknown"), ["refused", "guard-failed", "configuration-unknown"], before]);
+  expect([stated(checked, [check(unit)], seen), r.item(0).values["extents"]]).toEqual([WRITTEN, checked]);
+  // The first check that fails gives its name: a list with no `rules` extent and no extent without a pattern, and one with no extent
+  // without a pattern and an unknown check.
+  expect([stated([infrastructure, docs]), stated([rules, infrastructure, { ...docs, checks: ["absent"] }])]).toEqual([refusedAs("rules-extent-required"), refusedAs("catch-all-required")]);
+});
+
+// Section 12.1.4, case j, and section 12.1.4a, "Which rules declare it" (the missing form 14); the contract's revision 19, row I3-36.
+test("the declaration of the single-controller exception is false from the genesis, a publish sets it, and a publish that does not state it withdraws it; the record of an observation of the rules takes the declaration, and takes no extents", () => {
+  const r = new Rulebook();
+  const declared = () => r.item(0).values["singleControllerException"];
+  // `publish` has no guard on the number of controllers: the declaration may be made at any time, and gives nobody anything by itself.
+  expect([declared(), said(publish(r, [], [], { singleControllerException: true })), declared()]).toEqual([false, WRITTEN, true]);
+  // Case j: a `publish` with no such field, after one that declared it. Written, and the value is false.
+  expect([said(publish(r, [])), declared(), said(publish(r, [], [], { singleControllerException: "yes" }))[1]]).toEqual([WRITTEN, false, "bad-field"]);
+
+  // What an entry may retain of the rules: the fixed record of the contract, with the declaration under this definition. A record
+  // with a member `extents` is no observation: the contract states no such member, so no observation carries the extents.
+  const content = { asked: "rules", approvals: 1, ownerMayReview: false, checks: [], labels: [] };
+  const use = (over: Record<string, unknown>) => isObservationUse({ observation: { subject: "rules", of: r.at, head: r.head, revision: 0, content: { ...content, ...over }, definition: RULES_SCOPE, at: standing("@check", 1).observation.at }, read: { run: "r1", n: 1 }, use: "fresh", prior: null });
+  expect([use({}), use({ singleControllerException: true }), use({ singleControllerException: "yes" }), use({ singleControllerException: false, extents: FIRST })]).toEqual([true, true, false, false]);
 });
