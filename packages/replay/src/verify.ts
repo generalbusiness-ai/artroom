@@ -1348,7 +1348,7 @@ class Verifier {
     if (canonicalize(derived) !== bytes) throw mismatch("the recorded entry is not the one derived again");
     applyEntry(state, definition, entry, hash, foldInputs);
     if (input.type === "delivery" && input.message.class === "request") run.foldInputs.set(entry.seq, foldInputs);
-    if (!fits(state, definition, bounds, input, judged.draft.settles, this.#owners)) throw mismatch("the taking or new-work entry exceeds the budget of used plus reserved entries");
+    if (!fits(state, definition, bounds, input, judged.draft.settles, ownersOf(definition, run.platform, this.#owners))) throw mismatch("the taking or new-work entry exceeds the budget of used plus reserved entries");
     // Section 16.1: this entry is now the latest that retains each of its reads, in its grant and in `observed`. A preparation retains one in its grant,
     // and an outcome and a delivery of a result in `observed` alone.
     this.#retains(run, entry, hash, retainedBy(input));
