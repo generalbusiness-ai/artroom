@@ -239,6 +239,8 @@ export class Branch extends Ledger {
     return { named: DESTINATION, rules: packaged };
   })();
 
+  override get foldOptions() { return { bounds: this.bounds, platform: this.rules }; }
+
   constructor(importing: boolean) {
     super(destinationDefinition, "platform:destination");
     const facts = [fetched(claim, "platform:register")];

@@ -81,7 +81,7 @@ test("a repeated imported done update while the first head is unresolved opens n
 test("a publication reserves its own operations, keeps the receipt and cleanup after publication, and releases its remaining reservation only after its duties settle", () => {
   const b = new Branch(false).ready();
   const { publication, push, mint } = b.reserved();
-  expect(b.state.holder(publication)).toEqual({ operations: { mint: 5, revoke: 6, read: 3, receipt: 1 }, requests: 2, items: 1 });
+  expect(b.state.holder(publication)).toEqual({ decisions: { withdraw: 1 }, operations: { mint: 5, revoke: 6, read: 3, receipt: 1 }, requests: 2, items: 1 });
   expect(b.state.operation(push)!.for).toBe(publication);
   expect(said(b.answered(push, 1, "confirmed", { send: "accepted", seen: NEXT }))).toEqual(WRITTEN);
   const [receipt, opened] = [b.head.seq, kinds(b)];
