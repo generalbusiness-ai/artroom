@@ -242,3 +242,15 @@ together, and the scope project passed all 93 tests in 30 files. These
 checks did not establish the cause. The witness now asserts that both
 notices are recorded before reading their facts, so a recurrence reports
 the actual delivery answer. No retry or larger timeout was added.
+
+The gate at `436026fec9372aea3f54b3c0e0328a35638284c1`, tree
+`525cdae2a2b7e08e2730c3f7ea125601305334c0`, passed whitespace,
+all workspace typechecks, 714 Vitest tests and six Node tests. The
+checkout was clean and installation was skipped against the unchanged
+lockfile. Typecheck took 3.4 seconds elapsed and 9.6 CPU; tests took
+12.2 seconds elapsed and 33.6 CPU. The whole command took 15.85 seconds
+elapsed, 36.46 user CPU and 6.97 system CPU. Logs are
+`/tmp/artroom-i3-m4-admission-gate.log` and
+`/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.236Ce8Bbdp`.
+This annotation changes this note only. The preceding failed run remains
+an unexplained failure, rather than a credited functional repair.
