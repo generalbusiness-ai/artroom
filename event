@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:60b33e83b5a48658e722667b5d44a8bbfad05908","text":"Merge retired a covered predecessor; the successor is at packages/derive/src/settle.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:6297c3326bcb16cf8df181cb3c9559344b46c854","text":"Merge retired a covered predecessor; the successor is at packages/derive/test/forms-ancestry.test.ts."}
