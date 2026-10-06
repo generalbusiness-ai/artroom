@@ -527,3 +527,31 @@ test("a canonical held __proto__ kind keeps its own reservation metadata and the
   expect([special.kinds["__proto__"]!.held, special.kinds["__proto__"]!.whole, special.holders["job"]!.amount, special.adds["again"]!.amount]).toEqual([true, ordinary.kinds["normal"]!.whole, ordinary.holders["job"]!.amount, ordinary.adds["again"]!.amount]);
   expect([special.kinds["__proto__"]!.whole.entries, special.holders["job"]!.amount.entries, special.adds["again"]!.amount.entries]).toEqual([2, 8, 2]);
 });
+
+test("canonical observation-only result clauses reserve their declared value bytes identically with missing or empty effects", () => {
+  const MAX = 321;
+  const load = (clause: "applied" | "refused" | "superseded", effects: "missing" | "empty" | "invalid", retains = true) => {
+    const data = structuredClone(works);
+    data.items["job"]!.refs["peer"] = { fixed: false, required: false, to: { type: "scope", kind: "lane" } };
+    data.acts["again"]!.adds = { operations: { step: 1 }, requests: 1 };
+    data.acts["again"]!.sends = [{ tell: {
+      to: { slot: "peer" }, message: "observe", fields: {},
+      result: effects === "missing" ? {} : { [clause]: effects === "empty" ? [] : "not a list" },
+      observes: { [clause]: [{ of: "rules", window: 10, use: "once", without: "wait", retains: retains ? [{ domain: "clause-value-1", max: MAX }] : [] }] },
+    } } as unknown as typeof data.acts[string]["sends"][number]];
+    return validateDefinition(parseStrictBytes(canonicalBytes(data)), PROPOSED_BOUNDS, undefined, { platform: true });
+  };
+  for (const clause of ["applied", "refused", "superseded"] as const) {
+    const missing = valid(load(clause, "missing")).reserving!;
+    const empty = valid(load(clause, "empty")).reserving!;
+    const baseline = valid(load(clause, "missing", false)).reserving!;
+    expect(missing).toEqual(empty);
+    expect([missing.req.bytes, missing.clause.bytes, missing.holders["job"]!.amount.bytes, missing.adds["again"]!.amount.bytes]).toEqual([3 * EB + MAX, MAX, 9 * EB + MAX, 5 * EB + MAX]);
+    expect([missing.req.bytes - baseline.req.bytes, missing.clause.bytes - baseline.clause.bytes, missing.holders["job"]!.amount.bytes - baseline.holders["job"]!.amount.bytes, missing.adds["again"]!.amount.bytes - baseline.adds["again"]!.amount.bytes]).toEqual([MAX, MAX, MAX, MAX]);
+    // The held outcome's own send has no observation rows in its admitted
+    // form. Its per-kind request remains the same; its account uses req.
+    expect([missing.kinds["step"]!.request, empty.kinds["step"]!.request]).toEqual([entries(2, { bytes: 3 * EB, requests: 1 }), entries(2, { bytes: 3 * EB, requests: 1 })]);
+    expect(() => load(clause, "invalid")).not.toThrow();
+    expect(load(clause, "invalid")).toMatchObject({ ok: false, problems: expect.arrayContaining([expect.objectContaining({ code: "shape", path: `acts.again.sends.0.tell.result.${clause}` })]) });
+  }
+});
