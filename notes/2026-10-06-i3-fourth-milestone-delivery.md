@@ -1,7 +1,7 @@
 # I3, fourth milestone: a complete founding and the first publication judged by its destination
 
 Branch `request/i3-m4`, under the full I3 commission `bcf5ec17`.
-Written 2026-10-06. Source before this note: `8b744c3cc`.
+Written 2026-10-06. Source before the initial draft: `8b744c3cc`.
 
 This is one milestone. It leaves the complete I3 commission, provider,
 browser, application and proof duties open. It claims no deployment and
@@ -87,8 +87,10 @@ checker from real membership and publish it. A signer named as checker
 is served by her grant and is correctly refused because her role is
 admin, not checker.
 
-The test writes a manifest and merge by hand. No change lane judged
-these two source entries. The real destination receives and retains
+The test writes a manifest, check opening, passed check and merge by
+hand. No change lane or runner judged these four source entries. Real
+membership enrolls the checker's key, and the published source extent
+requires the configured `unit` check. The real destination receives and retains
 them, reads their bytes with its production lane reader, observes real
 membership and rules, retains extents and changed-set bytes, and judges
 the publication reserved. The host stand-in then answers the push,
@@ -99,8 +101,8 @@ in the final publication.
 
 The verifier reads all five real histories over the actual HTTP read
 surface and reports each consistent with grants derived as `proven`.
-Only the two scripted lane entries are anchors. Progress messages to
-that scripted lane remain pending; this scenario does not show a real
+Only the four scripted lane entries are anchors. Three source-target
+duties remain pending; this scenario does not show a real
 lane receiving them or full holder release. The separate in-memory
 publication scenario settles the scripted lane's outgoing results and
 shows the final reservation released then.
@@ -111,7 +113,7 @@ are real; the former first-head and receipt substitute rules are gone.
 The production lane reader has separate made-up-record witnesses, and
 the real-scope story above reads actual retained bytes with that reader.
 The object-format witnesses use real local Git, independently of the
-host stand-in. No result here credits a real Git host adapter, gateway,
+host stand-in. No result here credits a real Git host adapter, runner, gateway,
 production token delivery, browser session or cloud deployment.
 
 ## 4. Corrections and distinguishing witnesses
