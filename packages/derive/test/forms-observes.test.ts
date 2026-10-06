@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { PROPOSED_BOUNDS, RETAINED_INPUT_BYTES } from "@generalbusiness/artroom-contract";
-import type { FactUse, Input, KeyId, MemberId, ObservationUse, OperationId, Send } from "@generalbusiness/artroom-contract";
+import type { FactUse, Input, KeyId, MemberId, Observation, ObservationUse, OperationId, Send } from "@generalbusiness/artroom-contract";
 import { canonicalize, entryHash, factRefOf, isEntry, isObservationUse, signIntent } from "@generalbusiness/artroom-bytes";
 import { PROFILES, actNeeds, clockOf, contentChecked, contentStates, judgeDelivery, observationBytes, retainable, retainableByRequest, rowsOfAct, rowsOfKind, settleOutcome, validateDefinition, valueDigest, type ActJudgment, type Fetched, type Judgment, type Observing, type OutcomeJudgment, type RuleGiven, type Subject } from "../src/index.ts";
 import { Scope, T0, arriving, forged, grantOf, keys, membership, otherLane, t } from "./fixtures.ts";
@@ -247,6 +247,31 @@ describe("an outcome with rows, and its origin (sections 6.1 and 16.1; witness 1
     settleOutcome(on.s.state, on.s.definition, { type: "outcome", operation: on.operation, attempt: 1, result: "confirmed", evidence: { basis: "own-answer", body: {} } },
       { clock: clockOf(on.s.state, at), bounds: PROPOSED_BOUNDS, own: on.s.own, platform: weigherRules(seen, first), observed: hand, retained, observing: observing(over) });
   const blank = (): Seen => ({ rows: [], read: [], named: [] });
+
+  test("a shared subject keeps one record for both phases: a fresh short-window read wins over an earlier reused read; without it only the looser row is whole", () => {
+    const g = made((data) => { data.outcomes.weigh.observes = [
+      { of: "key", from: "rule", max: 1, window: 300, use: "reuse", without: "write" },
+      { of: "key", from: "rule", max: 1, second: true, window: 10, use: "once", without: "write" },
+    ]; });
+    const prior = { seq: g.origin.seq, hash: entryHash(g.origin) };
+    const old: ObservationUse = { ...keySeen(k1, "@una", 1), use: "reused", prior };
+    const fresh = keySeen(k1, "@una", 2, t(55));
+    const run = (hand: readonly ObservationUse[]) => {
+      const reads: (number | null)[] = [];
+      const judged = settleOutcome(g.s.state, g.s.definition, { type: "outcome", operation: g.operation, attempt: 1, result: "confirmed", evidence: { basis: "own-answer", body: {} } }, {
+        clock: clockOf(g.s.state, t(60)), bounds: PROPOSED_BOUNDS, own: g.s.own, retained, observed: hand,
+        observing: observing({ last: (use) => use.read.n === 1 ? { entry: prior, time: t(1), observation: old.observation as Observation } : null }),
+        platform: weigherRules(blank(), () => [k1], { subjects: () => [k1], derives: (given) => { reads.push(given.observed({ key: k1 })?.read.n ?? null); return { effects: [], sends: [], opens: [] }; } }),
+      });
+      return { judged, reads };
+    };
+    for (const hand of [[old, fresh], [fresh, old], [fresh]]) {
+      const { judged, reads } = run(hand);
+      expect([judged.result, numbers(judged), reads, judged.result === "write" && [...judged.draft.rows!.status.values()]]).toEqual(["write", [2], [2], ["whole", "whole"]]);
+    }
+    const { judged, reads } = run([old]);
+    expect([judged.result, numbers(judged), reads, judged.result === "write" && [...judged.draft.rows!.status.values()]]).toEqual(["write", [1], [1], ["whole", "absent"]]);
+  });
 
   test("18.46 cases 7 to 12: the outcome's `uses` is a copy of its origin's and nothing is fetched; `observed` holds one fresh record for each subject of a whole row; an age that equals the window is outside it; a row that is over is told to the rule; `write` writes without the row and `wait` does not write; and a subject that the commit's list adds stops the commit", () => {
     const g = made();

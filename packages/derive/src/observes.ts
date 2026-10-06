@@ -378,6 +378,51 @@ export function settle(rows: readonly Listed[], g: Settling): Settled {
   const served = new Set<string>();
   const unserved = new Map<ObservationUse, Unserved>();
   const reading = timeMs(g.clock.reading)!;
+  const grantServes = (subject: Subject, row: Observe): boolean => {
+    const grant = g.grant?.observation;
+    if (!grant || "subject" in grant || !("member" in subject) || grant.member !== subject.member || !membership || !observedOf(grant.of, membership)) return false;
+    const age = reading - (timeMs(grant.at) ?? Infinity);
+    return age >= 0 && age < row.window * 1000 && (row.use !== "once" || g.grant!.use === "fresh");
+  };
+  // Every row must judge the same record of a shared subject. Prefer the
+  // record that serves the most rows, so a fresh read inside the shortest
+  // window serves both a strict and a looser row. If only a looser record
+  // exists, that row may still be whole while the stricter row is absent.
+  const giving = new Map<string, { subject: Subject; rows: Listed[] }>();
+  for (const listed of rows) if (!listed.over) for (const subject of listed.subjects) {
+    const name = subjectName(subject);
+    const group = giving.get(name) ?? { subject, rows: [] };
+    group.rows.push(listed);
+    giving.set(name, group);
+  }
+  const bySubject = new Map<string, ObservationUse[]>();
+  for (const use of g.observed) {
+    const name = observedName(use.observation);
+    const group = bySubject.get(name) ?? [];
+    group.push(use);
+    bySubject.set(name, group);
+  }
+  const answers = new Map<number, Map<ObservationUse, ReturnType<typeof serves>>>();
+  const chosen = new Map<string, ObservationUse | "grant">();
+  for (const [name, group] of giving) {
+    let best: ObservationUse | undefined;
+    let score = 0;
+    for (const use of bySubject.get(name) ?? []) {
+      let count = 0;
+      for (const { n, row } of group.rows) {
+        const recorded = row.of === "rules" || row.of === "definitions" ? rules : membership;
+        const answer = serves(use, row, g, recorded);
+        const rowAnswers = answers.get(n) ?? new Map();
+        rowAnswers.set(use, answer);
+        answers.set(n, rowAnswers);
+        if (typeof answer !== "string") count += 1;
+      }
+      if (count > score || (count > 0 && count === score && use.read.n > (best?.read.n ?? -1))) { best = use; score = count; }
+    }
+    const grantRows = group.rows.filter(({ row }) => grantServes(group.subject, row)).length;
+    if (grantRows > 0 && grantRows >= score) chosen.set(name, "grant");
+    else if (best) chosen.set(name, best);
+  }
   for (const { n, row, subjects, over } of rows) {
     for (const subject of subjects) listedNames.add(subjectName(subject));
     if (over) { status.set(n, "over"); continue; }
@@ -386,19 +431,13 @@ export function settle(rows: readonly Listed[], g: Settling): Settled {
     let whole = true;
     for (const subject of subjects) {
       const name = subjectName(subject);
-      // The signer's own member: the grant's observation serves it, and `observed` holds no record of it.
-      const grant = g.grant?.observation;
-      if (grant && !("subject" in grant) && "member" in subject && grant.member === subject.member && membership && observedOf(grant.of, membership)) {
-        const age = reading - (timeMs(grant.at) ?? Infinity);
-        if (age >= 0 && age < row.window * 1000 && (row.use !== "once" || g.grant!.use === "fresh")) { served.add(name); continue; }
-      }
+      const picked = chosen.get(name);
+      if (picked === "grant" && grantServes(subject, row)) { served.add(name); continue; }
       let serving: (typeof found)[number] | null = null;
-      for (const use of g.observed) {
-        if (observedName(use.observation) !== name) continue;
-        const answer = serves(use, row, g, recorded);
+      for (const use of bySubject.get(name) ?? []) {
+        const answer = answers.get(n)?.get(use) ?? serves(use, row, g, recorded);
         if (typeof answer === "string") { if (!unserved.has(use)) unserved.set(use, answer); continue; }
-        serving = { name, use, values: answer.values };
-        break;
+        if (use === picked) serving = { name, use, values: answer.values };
       }
       if (serving) { found.push(serving); continue; }
       whole = false;
