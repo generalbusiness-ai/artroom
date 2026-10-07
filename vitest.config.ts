@@ -21,8 +21,8 @@ import { defineConfig } from "vitest/config";
  * `packages/page/test/*.scope.test.ts`, run here the same way, and have no
  * Worker of their own.
  */
-const project = (name: string, dir: string, config: string, group: number, more: string[] = []) =>
-  ({ extends: `./packages/${dir}/${config}`, test: { name, root: `./packages/${dir}`, ...(more.length > 0 ? { include: ["test/**/*.test.ts", ...more] } : {}), sequence: { groupOrder: group } } });
+const project = (name: string, dir: string, config: string, group: number, more: string[] = [], options: object = {}) =>
+  ({ extends: `./packages/${dir}/${config}`, test: { name, root: `./packages/${dir}`, ...(more.length > 0 ? { include: ["test/**/*.test.ts", ...more] } : {}), sequence: { groupOrder: group }, ...options } });
 
 export default defineConfig({
   test: {
@@ -34,7 +34,10 @@ export default defineConfig({
       project("checkers", "checkers", "vitest.config.ts", 0),
       project("replay", "replay", "vitest.config.ts", 0),
       project("client", "client", "vitest.config.ts", 0),
-      project("scope", "scope", "vitest.config.ts", 1, ["../lanes/test/**/*.scope.test.ts", "../cli/test/**/*.scope.test.ts", "../page/test/**/*.scope.test.ts"]),
+      project("scope", "scope", "vitest.config.ts", 1, ["../lanes/test/**/*.scope.test.ts", "../cli/test/**/*.scope.test.ts", "../page/test/**/*.scope.test.ts"], {
+        // The page's recorder for its screenshots runs only when asked: `PAGE_RECORD=1` (packages/page/test/screens.mjs).
+        provide: { pageRecord: process.env["PAGE_RECORD"] === "1" },
+      }),
       project("lanes", "lanes", "vitest.config.ts", 0),
       project("cli", "cli", "vitest.config.ts", 0),
       project("page", "page", "vitest.config.ts", 0),
