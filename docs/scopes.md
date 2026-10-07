@@ -640,9 +640,15 @@ Who may read is decided by a port, `Readers`. In a deployment that port
 is a read session: a token that a membership scope issues to a device key
 of an active member, for the scopes of that one repository, for at most
 ten minutes. A scope checks it under the deployment's session secret, with
-no call to membership. A reader with no session reads nothing, and a
-deployment with no secret bound issues and accepts no session. The scope
-package's guide says what a session binds and how it ends.
+no call to membership. A deployment with no secret bound issues and
+accepts no session. A reader with no session may present a signed read: a
+read of one scope signed by a key that signed an entry of that scope
+within the authority window of an intent. It reads the summary, the
+genesis and that key's own entries, and nothing else. So the operator key
+that signed `install` reads the register, and a founder's key reads the
+directory, where membership's reference is, before it holds a session. A
+reader with neither reads nothing. The scope package's guide says what a
+session binds, how it ends, and the form of a signed read.
 
 ## Replay, and what a report means
 

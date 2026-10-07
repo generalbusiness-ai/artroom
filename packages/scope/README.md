@@ -441,10 +441,28 @@ section 3.9).
 | How it is verified | By HMAC-SHA-256 under the deployment's session secret, over the exact claim bytes, compared in constant time. Then the deployment's name, then the membership reference: a scope accepts a session only for the membership scope that it records itself. Then the scope's own clock against the end time, at every read and before every send on a stream. |
 | Which clock | Two. Membership's clock wrote the end time, and each reading scope compares it with its own. A scope whose clock reads earlier than its previous entry's time answers `clock-behind` and sends nothing. |
 | After a key is revoked or a member is removed | A session already issued is accepted until its end: at most 600 seconds on membership's clock, plus the difference between the two clocks. No new one is issued. Nothing recalls what was read. |
-| A reader with no session | `forbidden`, from every read. |
+| A reader with no session | `forbidden`, from every read, unless it presents a signed read: "Signed reads", below. |
 | With no secret | The bindings `SESSION_SECRET`, at least 32 bytes, and `DEPLOYMENT`. With either missing, no session is issued and none is accepted: `sessions-unavailable`. No file of this repository holds a secret. |
 | When the secret is replaced | Every session ends at once. |
 | A stream | Its session is checked before every send. There is no timer: a stream whose session has ended is sent nothing, and is closed when its next send is due. A reader that goes away is released at once, by the route. |
+
+## Signed reads
+
+A reader with no session may present a signed read instead
+(`signed-reads.ts`; the planner's decisions 61cc5e50 and c6499e91). It is
+how a key learns enough to ask for a session: the operator key that signed
+`install` reads the register, and the key that signed a claim's `found`
+reads the register's summary and the directory's genesis and summary,
+where membership's reference is.
+
+| Question | Answer |
+|---|---|
+| The request | `Authorization: Signed <base64url>`: the unpadded base64url of the canonical JSON of `{ request, sig }`. `request` is `{ v: 1, to, actor, read, arg, notAfter }`: the scope ID, the key, the read (`summary`, `history`, `entry` or `log`), its argument (`"summary"`; a page's cursor, `"0"` for the first; an entry's position) and a time. |
+| The signature | Ed25519 by `actor`, as an intent is signed, over the tag `artroom-read-1`, a newline and the canonical JSON of `request`. |
+| The window | The scope's `intentLifetimeSeconds`, 900 by default, on the scope's own clock: the reading is before `notAfter`, and `notAfter` is at most that far ahead. |
+| Who may read | A key that signed an entry of this scope whose time is within that window of the reading: the actor of an act or a preparation; for a genesis that took effect, the actor of its founding intent, or of the intent whose digest is the seed's cause in an entry that the genesis retains. |
+| What it reads | The summary, the genesis, and the key's own entries: `entry` for one of them, and `history` and `log` pages that hold only those and the genesis, with the `next` and `complete` of the unfiltered page. |
+| Every other case | `forbidden`, and nothing is written: another read, another argument, another scope, a key that signed nothing there, a signature that is not the key's, a time outside the window. A clock behind the previous entry's time: `clock-behind`. No stream. |
 
 A join at a membership scope is served through `limits.ts`: serving
 limits by the caller's address, held in memory, which no guard reads and
