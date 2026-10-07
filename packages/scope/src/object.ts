@@ -46,7 +46,7 @@ import { production, type Alarm, type Authority, type Clock, type Delivery, type
 import { SessionRequests, Streams, issueSession, type Opened, type Sessions, type StreamRefusal } from "./sessions.ts";
 import { READ_BOUNDS, Reads, type ReadBounds, type Summary } from "./reads.ts";
 import { SqliteStore } from "./sqlite.ts";
-import type { Duty, OperationStatus, Sealed } from "./store.ts";
+import type { Duty, OperationStatus, Sealed, Store } from "./store.ts";
 
 /**
  * What a deployment gives a scope in place of a default. `authority`: the
@@ -76,6 +76,8 @@ export interface Given extends Pick<Ports, "clock" | "random"> {
 export interface OutsideGiven extends Given {
   /** One sealed entry of this scope, or null. No other scope is read. */
   own(seq: number): Sealed | null;
+  /** One input already retained by this scope. No network read or storage write. */
+  retained: Store["retained"];
 }
 export interface Wiring {
   ports?: Partial<Ports>; bounds?: Bounds; reads?: ReadBounds;
@@ -144,6 +146,7 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
     };
     const outside = wiring.outside?.({
       ...made, state: outsideState,
+      retained: (...args) => store.retained(...args),
       own: (seq) => {
         const kept = Number.isSafeInteger(seq) && seq >= 0 ? store.stored(seq) : null;
         return kept ? { entry: JSON.parse(kept.bytes) as Entry, hash: kept.hash } : null;

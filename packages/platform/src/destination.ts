@@ -460,7 +460,7 @@ export const destination: PlatformData = {
 
 
 /** The one branch item of a destination scope. */
-const branchOf = (state: Pick<StateView, "page">): Item | null => state.page("branch", ["empty", "ready"], null, 1).items[0] ?? null;
+export const branchOf = (state: Pick<StateView, "page">): Item | null => state.page("branch", ["empty", "ready"], null, 1).items[0] ?? null;
 
 /** The scope ID that the item `branch` holds in that value: a text that the genesis set from the creation's fields, and that no entry changes. */
 const heldId = (state: Pick<StateView, "page">, slot: "membership" | "rules"): ScopeId | null => {
@@ -622,13 +622,13 @@ const bodyOf = (body: unknown, names: readonly string[]): Record<string, FieldVa
  * attempt n. An entry opens at most one attempt of a write, so it opens at
  * most one `mint`.
  */
-function mintOf(state: Pick<StateView, "operation">, write: Operation, attempt: number): Operation | null {
+export function mintOf(state: Pick<StateView, "operation">, write: Operation, attempt: number): Operation | null {
   const at = attempt === 1 ? seqOf(write.id) : write.attempts[attempt - 1]?.opened;
   return at === undefined ? null : openedIn(state, at).find((operation) => ours(operation, DESTINATION_KINDS.mint)) ?? null;
 }
 
 /** The attempt of a write that a `mint` serves: the same row, read from the mint. Null: the entry that opened the mint opened no attempt of a write. */
-function servedBy(state: Pick<StateView, "operation">, own: Own, mint: Operation): { write: Operation; attempt: number } | null {
+export function servedBy(state: Pick<StateView, "operation">, own: Own, mint: Operation): { write: Operation; attempt: number } | null {
   const seq = seqOf(mint.id);
   const here = openedIn(state, seq).find((operation) => ours(operation, ...WRITES));
   if (here) return { write: here, attempt: 1 };
@@ -1165,7 +1165,7 @@ function reservationRead(given: RuleGiven, publication: Item, statement: Stateme
  * `manifest` are read from the two references that the entry set from the
  * fields, where the operation is the fact of the source entry.
  */
-function statementOf(own: Own, publication: Item): Statement {
+export function statementOf(own: Own, publication: Item): Statement {
   const input = ownEntry(own, publication.id).input;
   const body = input.type === "delivery" && input.message.class === "request" && isObject(input.message.body) ? input.message.body : null;
   const fields = body !== null && body["message"] === "reserve" && isObject(body["fields"]) ? body["fields"] : null;
