@@ -111,7 +111,7 @@ export class GitHubProvider implements RegisterProvider, DestinationProvider {
     const source = await this.#source(repository);
     // The actual complete Git advertisement is checked; the source rejects
     // SHA-256 and implements Git's implicit SHA-1 format when none is stated.
-    await source.refs("refs/", this.#bounds.refs);
+    await source.refs("refs/heads/", this.#bounds.refs);
     return "sha1";
   }
   async ref(repository: DestinationRepository, ref: string): Promise<string | null> {

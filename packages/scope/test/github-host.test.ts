@@ -126,6 +126,9 @@ test("scripted GitHub provider creation loss and mismatched cleanup stay pending
   expect(requests[1]!.authorization).toBe(`Bearer ${token}`);
   expect(requests[2]!.authorization).toBe(`Basic ${btoa(`x-access-token:${token}`)}`);
   expect(requests.every((request) => request.redirect === "manual" && !request.url.includes(token))).toBe(true);
+  const format = await provider.format(repository).then((value) => value, () => "pending");
+  expect(format).toBe("sha1");
+  expect(requests.slice(-2).map((request) => request.authorization)).toEqual([`Bearer ${token}`, `Basic ${btoa(`x-access-token:${token}`)}`]);
   readToken = undefined;
   expect(await provider.ref(repository, "refs/heads/main")).toBe("1".repeat(40));
   expect(requests.slice(-2).map((request) => request.authorization)).toEqual([null, null]);
