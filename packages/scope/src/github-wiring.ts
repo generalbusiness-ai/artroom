@@ -4,14 +4,14 @@
  * Missing or invalid configuration leaves every outside effect unsent.
  * No configuration, key, token or plaintext belongs in a scope's history.
  */
-import type { Entry, FieldValue, ScopeId } from "@generalbusiness/artroom-contract";
-import { canonicalize, entryHash, isDigest, isFactRef, isOperationId, isScopeId, parseStrict, timeMs } from "@generalbusiness/artroom-bytes";
-import { isEntryOf, valueDigest } from "@generalbusiness/artroom-derive";
-import { DESTINATION, DESTINATION_KINDS, REGISTER, destinationBranch, destinationWrite, directoryIdOf } from "@generalbusiness/artroom-platform";
+import type { ScopeId } from "@generalbusiness/artroom-contract";
+import { isScopeId, parseStrict, timeMs } from "@generalbusiness/artroom-bytes";
+import { DESTINATION, REGISTER } from "@generalbusiness/artroom-platform";
 import type { GitHubAccount, GitHubInstallationToken } from "@generalbusiness/artroom-git/github";
 import { CredentialStore } from "./credential-store.ts";
-import { DestinationHost, type DestinationBinding, type DestinationRepository } from "./destination-host.ts";
+import { DestinationHost } from "./destination-host.ts";
 import { GitHubProvider } from "./github-host.ts";
+import { credentialHandle, exact, hostBound } from "./host-wiring.ts";
 import type { OutsideGiven } from "./object.ts";
 import { NO_OUTSIDE, type EffectRequest, type Outside } from "./operations.ts";
 import { RegisterHost } from "./register-host.ts";
@@ -35,11 +35,6 @@ interface Configuration {
 interface Cleanup { name: string; token: GitHubInstallationToken }
 const positive = (value: unknown): value is number => typeof value === "number" && Number.isSafeInteger(value) && value > 0;
 const secret = (value: unknown): value is string => typeof value === "string" && /^[A-Za-z0-9_.-]{1,4096}$/.test(value);
-const same = (a: unknown, b: unknown): boolean => canonicalize(a) === canonicalize(b);
-function exact(value: unknown, keys: readonly string[]): Record<string, unknown> | null {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
-  return Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key)) ? value as Record<string, unknown> : null;
-}
 function configuration(raw: string | undefined): Configuration | null {
   if (!raw || raw.length > 4096) return null;
   const value = exact(parseStrict(raw), ["issuer", "installationId", "account", "maxBytes", "registerScope", "privateRepositories", "publicReads", "credentialIdentity"]);
@@ -61,44 +56,6 @@ function cleanupTokens(raw: string | undefined): ReadonlyMap<string, Cleanup> | 
   return cleanup;
 }
 
-/** The creator is the actual directory derived by this verified register claim,
- * not an independently founded directory that merely cites the same claim. */
-function destinationBirth(given: OutsideGiven, registerScope: ScopeId): boolean {
-  try {
-    const genesis = given.own(0)?.entry;
-    const branch = destinationBranch(given.state);
-    const claim = branch?.refs["claim"];
-    if (genesis?.input.type !== "genesis" || genesis.input.seed.creator?.kind !== "directory" || !same(branch?.refs["directory"], genesis.input.seed.creator) || !isFactRef(claim) || claim.at.kind !== "register" || claim.at.scope !== registerScope) return false;
-    const use = genesis.uses.find((use) => same(use.fact, claim));
-    const retained = use ? given.retained("entry", use.content) : null;
-    if (!retained) return false;
-    const opening = parseStrict(retained.bytes) as unknown as Entry;
-    if (!isEntryOf(opening, claim) || opening.input.type !== "act" || opening.input.signed.intent.kind !== "found") return false;
-    const seeds = opening.effects.filter((effect) => effect.effect === "value" && effect.item === claim.seq && effect.slot === "seed");
-    const seed = seeds.length === 1 && seeds[0]?.effect === "value" ? seeds[0].value : null;
-    return isDigest(seed) && directoryIdOf(seed) === genesis.input.seed.creator.scope;
-  } catch { return false; }
-}
-
-/**
- * A deterministic local handle backed by the scope's already sealed mint.
- * The explicit adapter-attempt choice does NOT identify a GitHub-issued token
- * ID. The sealed operation/current incarnation is its durable binding before
- * the mint request; the host reply's plaintext later enters private custody.
- */
-function credentialHandle(given: OutsideGiven, repository: DestinationRepository, binding: DestinationBinding): string {
-  const scope = given.scope();
-  const mint = given.state.operation(binding.mint);
-  const origin = isOperationId(binding.mint) ? given.own(Number(binding.mint.split(":")[0])) : null;
-  const write = mint ? destinationWrite(given.state, given.own, mint) : null;
-  const recorded = destinationBranch(given.state)?.values["repository"];
-  if (!scope || scope.at.kind !== "destination" || given.genesis()?.seed.definition !== DESTINATION || !same(scope.at, binding.scope) || !mint || mint.owner !== DESTINATION || mint.kind !== DESTINATION_KINDS.mint || binding.attempt !== 1 || !origin || entryHash(origin.entry) !== origin.hash || !same(origin.entry.at, scope.at) || !write || write.write.id !== binding.write || write.attempt !== binding.writeAttempt || !same(recorded, repository)) throw new Error("GitHub credential binding");
-  const effect = origin.entry.effects.find((effect) => effect.effect === "operation" && effect.k === Number(binding.mint.split(":")[1]));
-  if (effect?.effect !== "operation" || effect.owner !== DESTINATION || effect.kind !== DESTINATION_KINDS.mint || !mint.attempts.some((attempt) => attempt.attempt === binding.attempt)) throw new Error("GitHub credential binding");
-  const digest = valueDigest("artroom.github.credential-attempt.v1", { scope: scope.at, operation: mint.id, attempt: binding.attempt, origin: origin.hash, repository, write: binding.write, writeAttempt: binding.writeAttempt } as unknown as FieldValue);
-  return `adapter:${digest}`;
-}
-
 /** Factory for one object life. Its scope/state reads stay live across genesis and later entries. */
 export function gitHubOutside(given: OutsideGiven, sql: Pick<SqlStorage, "exec">, env: GitHubBindings, fetch?: (request: Request) => Promise<Response>): Outside {
   try {
@@ -114,26 +71,14 @@ export function gitHubOutside(given: OutsideGiven, sql: Pick<SqlStorage, "exec">
       app: { issuer: config.issuer, privateKey: key, installationId: config.installationId, account: config.account, now: () => timeMs(given.clock.read()) ?? NaN, ...(fetch === undefined ? {} : { fetch }) },
       host, namespace, maxBytes: config.maxBytes,
       readCredential: async () => config.publicReads ? undefined : read!,
-      credentialHandle: async (repository, binding) => credentialHandle(given, repository, binding),
+      credentialHandle: async (repository, binding) => credentialHandle(given, repository, binding, "artroom.github.credential-attempt.v1", "GitHub credential binding"),
       ...(creation === undefined ? {} : { creation: { plaintext: creation, private: config.privateRepositories } }),
       cleanupRepository: async (id) => cleanups.get(id) ?? null,
     });
     const register = new RegisterHost(given, { host, namespace, provider });
     const custody = new CredentialStore(sql, () => given.scope()?.at ?? null);
     const destination = new DestinationHost(given, { host, namespace, provider, custody });
-    const bound = (owner: string): boolean => {
-      const scope = given.scope();
-      const genesis = given.genesis();
-      if (owner === REGISTER && scope?.at.kind === "register" && scope.at.scope === config.registerScope && genesis?.seed.definition === REGISTER) {
-        const item = given.state.page("register", ["open"], null, 1).items[0];
-        return item?.values["host"] === host && item.values["namespace"] === namespace;
-      }
-      if (owner === DESTINATION && scope?.at.kind === "destination" && genesis?.seed.definition === DESTINATION) {
-        const repository = destinationBranch(given.state)?.values["repository"] as Record<string, unknown> | undefined;
-        return destinationBirth(given, config.registerScope) && repository?.["host"] === host && repository["namespace"] === namespace;
-      }
-      return false;
-    };
+    const bound = hostBound(given, config.registerScope, host, namespace);
     // accepts names a kind, not one operation. A nonempty cleanup map enables
     // that kind; a missing exact ID/name within it still yields no answer.
     // With no cleanup map, deletion stays recorded and unmarked.
