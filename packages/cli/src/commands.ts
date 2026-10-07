@@ -138,14 +138,14 @@ function scopeNamed(config: Config, named: string | undefined): ScopeId {
 // ---------------------------------------------------------------- a definition, as this command reads it
 
 /** The parts of an act's declaration that this command reads. A platform definition's grant, `also` name or field type may be a mark, whose rule the scope runs. */
-interface ActShape {
+export interface ActShape {
   step: "open" | "transition" | "comment";
   on: string | null;
   grant: string | { code: string; grant?: string };
   also: Record<string, { item: string; one?: true; by?: string; code?: string }>;
   fields: Record<string, { type?: string; code?: string; required?: boolean }>;
 }
-interface DefinitionShape { name: string; genesis: string; acts: Record<string, ActShape> }
+export interface DefinitionShape { name: string; genesis: string; acts: Record<string, ActShape> }
 
 /** The definition a scope pins: a platform one from the platform package, a declared one as the scope retains it. */
 async function definitionOf(handle: ScopeHandle, summary: Summary): Promise<{ shape: DefinitionShape; declared: DeclaredDefinition | null; named: Digest | PlatformDefinition }> {
@@ -166,7 +166,7 @@ const grantName = (act: ActShape): string | null => (typeof act.grant === "strin
  * text that describes an act, so the line is made from what the declaration
  * states: its step, its item and what may sign it.
  */
-function describe(kind: string, act: ActShape): string {
+export function describe(kind: string, act: ActShape): string {
   const what = act.step === "open" ? `opens a ${act.on}` : act.step === "transition" ? `moves a ${act.on}` : act.on === null ? "comments on no item" : `comments on a ${act.on}`;
   const who = typeof act.grant === "string" ? `needs ${act.grant}` : `the rule ${act.grant.code} decides who may sign${act.grant.grant ? `, with ${act.grant.grant}` : ""}`;
   return `${kind}: ${what}; ${who}. Fields: ${fieldsLine(act)}.`;
@@ -178,7 +178,7 @@ function describe(kind: string, act: ActShape): string {
  * field names. A name that a rule selects has no key: the scope resolves it.
  * The scope checks every revision again and refuses one that moved.
  */
-function expectedOf(act: ActShape, items: readonly Item[], target: number | null, fields: Record<string, FieldValue>): Record<string, number> {
+export function expectedOf(act: ActShape, items: readonly Item[], target: number | null, fields: Record<string, FieldValue>): Record<string, number> {
   const expected: Record<string, number> = {};
   const revision = (id: number | null | undefined) => items.find((item) => item.id === id)?.revision;
   if (act.step === "transition" && target !== null) {
@@ -198,7 +198,7 @@ function expectedOf(act: ActShape, items: readonly Item[], target: number | null
  * a record and a reference are read as JSON. `@handle` for a member is that
  * member of this repository's membership.
  */
-function valueOf(config: Config, field: { type?: string } | undefined, text: string): FieldValue {
+export function valueOf(config: Pick<Config, "repository">, field: { type?: string } | undefined, text: string): FieldValue {
   switch (field?.type) {
     case "text": case "digest": case "time": case "enum": case "commit": case "tree": return text;
     case "int": case "item": return /^-?\d+$/.test(text) ? Number(text) : text;
@@ -395,14 +395,36 @@ export function join(ctx: Context, text: string): Promise<Outcome> {
   });
 }
 
+/** A caller's role in membership, the actions that role holds, and the caller's handle. */
+export interface Standing { role: Role; actions: readonly string[]; handle: string }
+
 /** The caller's role and the actions it holds, as membership's summary has them now; null when the key is no active member's. */
-function standing(items: readonly Item[], key: KeyId): { role: Role; actions: readonly string[]; handle: string } | null {
+export function standing(items: readonly Item[], key: KeyId): Standing | null {
   const own = items.find((item) => item.type === "key" && item.state === "active" && item.values["id"] === key);
   const member = own && items.find((item) => item.type === "member" && item.id === own.refs["member"] && item.state === "active");
   const roster = items.find((item) => item.type === "roster");
   const role = member?.values["role"] as Role | undefined;
   if (!member || !roster || !role) return null;
   return { role, actions: (roster.values[ROLE_LISTS[role]] as readonly string[] | null) ?? [], handle: String(member.values["handle"]) };
+}
+
+/**
+ * The acts of a definition that a caller may sign now: each whose grant
+ * action the caller's role holds, and each that a rule decides, which is
+ * always listed. The genesis act is no act on a scope that exists.
+ * `hidden`: how many need an action the role does not hold. The scope can
+ * still refuse a listed act on its guards or its state.
+ */
+export function heldActs(shape: DefinitionShape, held: Standing | null): { acts: [kind: string, act: ActShape][]; hidden: number } {
+  const acts: [string, ActShape][] = [];
+  let hidden = 0;
+  for (const [kind, act] of Object.entries(shape.acts)) {
+    if (kind === shape.genesis) continue;
+    const action = grantName(act);
+    if (typeof act.grant !== "string" || (action !== null && held?.actions.includes(action))) acts.push([kind, act]);
+    else hidden++;
+  }
+  return { acts, hidden };
 }
 
 /**
@@ -419,14 +441,8 @@ export function acts(ctx: Context, named?: string): Promise<Outcome> {
     const { shape, named: definition } = await definitionOf(handle, await summaryOf(handle));
     const key = keyIdOfSecret(await signerOf(ctx, config));
     const held = config.repository ? standing((await summaryOf(await handleOf(ctx, config, config.repository.membership.scope, reader))).items, key) : null;
-    const shown: string[] = [];
-    let hidden = 0;
-    for (const [kind, act] of Object.entries(shape.acts)) {
-      if (kind === shape.genesis) continue;
-      const action = grantName(act);
-      if (typeof act.grant !== "string" || (action !== null && held?.actions.includes(action))) shown.push(`  ${describe(kind, act)}`);
-      else hidden++;
-    }
+    const { acts: listed, hidden } = heldActs(shape, held);
+    const shown = listed.map(([kind, act]) => `  ${describe(kind, act)}`);
     const who = held ? `${held.handle} (${held.role})` : `key ${key}, which is no active member's`;
     return done(`Acts on ${scope} (${definition}) for ${who}:`, ...shown, ...(hidden > 0 ? [`Not shown: ${hidden} that need an action your role does not hold.`] : []));
   });
