@@ -78,7 +78,11 @@ const isHead = (v: unknown): v is Head => isObject(v) && isLocalId(v["seq"]) && 
  * A source over a scope service's read routes: `GET
  * /v1/scopes/:scope/log?cursor=` and `GET
  * /v1/scopes/:scope/retained/:kind/:digest`. `reader` is sent as the
- * `Authorization` header.
+ * `Authorization` header: a text, such as a read session, for every read;
+ * or a function that gives the header for each read, by the scope, the
+ * read's name and its argument (the cursor of `log`, or the digest of
+ * `retained`), such as a client's signed read. A function that gives
+ * undefined sends no header for that read.
  *
  * A reply is read as raw bytes, chunk by chunk, by the bytes package's
  * bounded reader (`takeBytes` and `within`), which the client's HTTP
@@ -91,14 +95,18 @@ const isHead = (v: unknown): v is Head => isObject(v) && isLocalId(v["seq"]) && 
  * and its connection; that is outside this source's control. A reply that is
  * not UTF-8, or not the route's JSON answer, is `unavailable`.
  */
-export function httpSource(service: string, options: { fetch?: Fetch; reader?: string; seconds?: number } = {}): HistorySource {
+/** What gives the `Authorization` header of one read, for a source whose reader is not one text. */
+export type ReaderFor = (scope: ScopeId, read: "log" | "retained", arg: string) => string | undefined | Promise<string | undefined>;
+
+export function httpSource(service: string, options: { fetch?: Fetch; reader?: string | ReaderFor; seconds?: number } = {}): HistorySource {
   const base = service.replace(/\/+$/, "");
   const send = options.fetch ?? (globalThis as { fetch?: Fetch }).fetch;
   const seconds = options.seconds ?? READ_SECONDS;
-  const get = async (path: string, most: number): Promise<{ body: Record<string, unknown>; bytes: number } | Unread> => {
+  const get = async (path: string, most: number, asked: [scope: ScopeId, read: "log" | "retained", arg: string]): Promise<{ body: Record<string, unknown>; bytes: number } | Unread> => {
     if (!send) return unread("unavailable");
     const read = async (signal: Expiry): Promise<{ body: Record<string, unknown>; bytes: number } | Unread> => {
-      const response = await send(`${base}${path}`, { method: "GET", headers: options.reader === undefined ? {} : { authorization: options.reader }, signal: signal as never });
+      const reader = typeof options.reader === "function" ? await options.reader(...asked) : options.reader;
+      const response = await send(`${base}${path}`, { method: "GET", headers: reader === undefined ? {} : { authorization: reader }, signal: signal as never });
       if (!response.body) return unread("unavailable");
       const all = await takeBytes(response.body, most, signal);
       // The read expired: its result is already `timeout`, and nothing is decoded or parsed here.
@@ -118,7 +126,7 @@ export function httpSource(service: string, options: { fetch?: Fetch; reader?: s
   };
   return {
     async page(scope, from, allow) {
-      const got = await get(`/v1/scopes/${scope}/log?cursor=${from}`, Math.min(allow.bytes, PAGE_REPLY_BYTES));
+      const got = await get(`/v1/scopes/${scope}/log?cursor=${from}`, Math.min(allow.bytes, PAGE_REPLY_BYTES), [scope, "log", String(from)]);
       if (!("body" in got)) return got;
       const { at, value, complete, next } = got.body;
       if (!isHead(at) || !isObject(value) || !isScopeRef(value["scope"]) || !Array.isArray(value["entries"])) return unread("unavailable");
@@ -132,7 +140,7 @@ export function httpSource(service: string, options: { fetch?: Fetch; reader?: s
     },
     async retained(scope, kind, digest, allow, domain) {
       if (kind === "value" && (typeof domain !== "string" || domain.length === 0)) return unread("not-found");
-      const got = await get(`/v1/scopes/${scope}/retained/${kind}/${encodeURIComponent(digest)}${domain === undefined ? "" : `?domain=${encodeURIComponent(domain)}`}`, Math.min(allow.bytes, RETAINED_REPLY_BYTES));
+      const got = await get(`/v1/scopes/${scope}/retained/${kind}/${encodeURIComponent(digest)}${domain === undefined ? "" : `?domain=${encodeURIComponent(domain)}`}`, Math.min(allow.bytes, RETAINED_REPLY_BYTES), [scope, "retained", digest]);
       if (!("body" in got)) return got;
       const value = got.body["value"];
       if (!isObject(value) || (kind === "value" && value["domain"] !== domain) || typeof value["bytes"] !== "string" || (value["under"] !== undefined && typeof value["under"] !== "string")) return unread("unavailable");

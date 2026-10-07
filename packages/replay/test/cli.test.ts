@@ -109,3 +109,23 @@ test("the executable runs under the Node that runs these tests: with no argument
   const ran = spawnSync(process.execPath, [fileURLToPath(new URL("../src/bin.ts", import.meta.url))], { encoding: "utf8" });
   expect([ran.status, ran.stdout, ran.stderr]).toEqual([2, "", expect.stringMatching(/^give the service URL and the scope ID\nusage: artroom-replay /)]);
 });
+
+// Invariant: a target whose history the service refuses is no crash and no report: the read error says "cannot be read" and the
+// service's own reason, and the command exits 2. A reader given as a function is asked for each read, by scope, read and argument.
+test("a history the service refuses to read is a read error that names the service's reason, and the command exits 2 with it; a reader function gives the header of each read", async () => {
+  const w = world();
+  const id = w.I.scope.scope;
+  const asked: string[] = [];
+  const forbidding: Fetch = (url, init) => {
+    asked.push(`${url.replace("https://scopes.test", "")} ${init?.headers?.["authorization"] ?? "-"}`);
+    return Promise.resolve({ status: 403, body: new Response(JSON.stringify({ ok: false, reason: "forbidden" })).body });
+  };
+  const reader = (scope: ScopeId, read: "log" | "retained", arg: string) => `Signed ${scope}:${read}:${arg}`;
+  const refused = verify(httpSource("https://scopes.test", { fetch: forbidding, reader }), { mode: "integrity", scope: id });
+  await expect(refused).rejects.toThrow(SourceError);
+  await expect(refused).rejects.toMatchObject({ reason: "forbidden", message: `the history of ${id} cannot be read: forbidden` });
+  expect(asked).toEqual([`/v1/scopes/${id}/log?cursor=0 Signed ${id}:log:0`]);
+  const err: string[] = [];
+  const code = await main(["https://scopes.test", id], { out: () => undefined, err: (text) => err.push(text), fetch: forbidding });
+  expect([code, err]).toEqual([2, [`read error: the history of ${id} cannot be read: forbidden`]]);
+});

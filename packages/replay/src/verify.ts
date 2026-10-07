@@ -191,9 +191,18 @@ export interface Tally { folds: number; values: number; states: number; runs: nu
 /** A report, and in words why its result is not `consistent`. */
 export interface Verification { report: Report; why: string | null }
 
-/** The target's history could not be read at all, so there is nothing to report on. */
+/**
+ * The target's history could not be read at all, so there is nothing to
+ * report on. When the source said why, the message ends `cannot be read:`
+ * and the source's reason, such as `forbidden`, and `reason` holds it.
+ */
 export class SourceError extends Error {
   override readonly name = "SourceError";
+  readonly reason: string | null;
+  constructor(message: string, reason: string | null = null) {
+    super(message);
+    this.reason = reason;
+  }
 }
 
 /** What the report lists under `trusts`, in the order it lists them. */
@@ -423,7 +432,7 @@ class Verifier {
     const target = await this.#open(this.#target).catch((error: unknown) => {
       throw error instanceof Stop ? new SourceError(`the history of ${this.#target} was not read: ${error.why}`) : error;
     });
-    if (!target) throw new SourceError(`the history of ${this.#target} cannot be read`);
+    if (typeof target === "string") throw new SourceError(`the history of ${this.#target} cannot be read: ${target}`, target);
     this.#trusts.add("clock");
     if (this.#mode === "integrity") { this.#trusts.add("judgments"); this.#trusts.add("facts"); } else this.#trusts.add("bounds");
     if (!this.#expected) this.#trusts.add("head");
@@ -478,13 +487,13 @@ class Verifier {
 
   // ---------------------------------------------------------------- reading
 
-  /** Start on a scope: its first page. Null: the source holds no such history, or it cannot be read. */
-  async #open(id: ScopeId): Promise<Run | null> {
+  /** Start on a scope: its first page. A text: the source holds no such history, or it cannot be read, and why. */
+  async #open(id: ScopeId): Promise<Run | string> {
     if (this.#runs.size >= this.#limits.scopes) throw new Stop("incomplete", `the limit of ${this.#limits.scopes} scopes was reached`);
     const got = await this.#page(id, 0);
-    if (!got.ok) return null;
+    if (!got.ok) return got.reason;
     const run: Run = { id, said: got.page.scope, head: got.page.head, at: null, named: null, definition: null, platform: null, state: new MemoryState(), sealed: [], foldInputs: new Map(), read: new Map(), next: 0, busy: false, depth: Number.POSITIVE_INFINITY, owed: new Map(), reads: new Map(), runs: { seen: new Set(), last: null }, observed: undefined, viewed: null, membership: undefined, rulesScope: undefined, revised: null, snapshots: new Map() };
-    if (!this.#take(run, 0, got.page.entries, got.page.next)) return null;
+    if (!this.#take(run, 0, got.page.entries, got.page.next)) return "the source's first page is not the entries from the genesis in order";
     this.#runs.set(id, run);
     return run;
   }
@@ -778,7 +787,8 @@ class Verifier {
       return "anchored";
     }
     if (depth >= this.#limits.depth) throw new Stop("incomplete", `the limit of ${this.#limits.depth} on the depth of foreign facts was reached`, user);
-    const source = run ?? await this.#open(fact.at.scope);
+    const opened = run ?? await this.#open(fact.at.scope);
+    const source = typeof opened === "string" ? null : opened;
     if (!source) throw new Stop("missing-dependency", `the history of the source scope ${fact.at.scope} cannot be read, and no anchor names its entry ${fact.seq}`, user, fact);
     try {
       await this.#advance(source, fact.seq, depth + 1, { hash: fact.hash, user });
