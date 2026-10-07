@@ -156,7 +156,7 @@ test("destination data validates whole with finite reservations, a bound indexed
   const checked = validateDefinition(destination.data, PROPOSED_BOUNDS, PROFILES, { platform: true, outcomeValues: outcomeValueDomains(destination.data, destination.rules) });
   if (!checked.ok) throw new Error(JSON.stringify(checked.problems));
   expect([checked.definition.observing, checked.definition.keyed, runnable(checked.definition, destination.rules)]).toEqual([true, { publication: ["operation"] }, true]);
-  expect(Object.keys(checked.definition.reserving!.kinds).sort()).toEqual(["adopt-read", "first-head", "judge", "mint", "push", "read", "receipt", "revoke"]);
+  expect(Object.keys(checked.definition.reserving!.kinds).sort()).toEqual(["adopt-read", "first-head", "judge", "mint", "mint-read", "push", "read", "receipt", "revoke"]);
   const rules = Object.values(destination.rules).filter((rule) => rule.place === "outcome");
   expect(rules.filter((rule) => rule.rules.closure !== undefined && !Number.isFinite(rule.rules.closure))).toEqual([]);
   expect(checked.definition.reserving!.holders["publication"]?.holds).toEqual({ operations: { judge: 1, push: 1, mint: 6, revoke: 6, read: 3, receipt: 1 }, requests: 3, items: 1, decisions: { withdraw: 1 } });

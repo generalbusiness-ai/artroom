@@ -44,7 +44,7 @@ export const DESTINATION = "platform:destination@1" satisfies PlatformDefinition
  * source's (I3 deltas, entry ER1). `mint` and `revoke` are the names that
  * `hold@1` uses for the same two effects.
  */
-export const DESTINATION_KINDS = { firstHead: "first-head", judge: "judge", push: "push", mint: "mint", revoke: "revoke", read: "read", receipt: "receipt", adoptRead: "adopt-read" } as const;
+export const DESTINATION_KINDS = { firstHead: "first-head", judge: "judge", push: "push", mint: "mint", revoke: "revoke", read: "read", receipt: "receipt", adoptRead: "adopt-read", mintRead: "mint-read" } as const;
 
 /**
  * The most attempts that an opening states (section 12, G3, proposed for
@@ -55,7 +55,15 @@ export const DESTINATION_KINDS = { firstHead: "first-head", judge: "judge", push
  * the rules of their outcomes"): `judge`, `mint`, the kind `read` and
  * `adopt-read` have 1, and `revoke` has 3.
  */
-export const DESTINATION_ATTEMPTS = { firstHead: 3, judge: 1, push: 3, mint: 1, revoke: 3, read: 1, receipt: 3, adoptRead: 1, resend: 1 } as const;
+export const DESTINATION_ATTEMPTS = { firstHead: 3, judge: 1, push: 3, mint: 1, revoke: 3, read: 1, receipt: 3, adoptRead: 1, resend: 1, mintRead: 1 } as const;
+
+/**
+ * The lifetime of a member's read token, in hours: the field `hours` of the
+ * act `read-token` (the planner's decision for I5, "a member reads the
+ * repository"). The host mints a read credential for the room's one
+ * repository with that lifetime.
+ */
+export const READ_TOKEN_HOURS = { min: 1, max: 24 } as const;
 
 /**
  * The most records of the `collect` list of a `reserve` that keeps the
@@ -313,6 +321,21 @@ export const destination: PlatformData = {
       sends: [],
       attention: [],
     },
+    // `read-token`: an act on the branch (the planner's decision for I5). Any active member may sign it: its grant,
+    // `destination.read-token`, is in every role's list. It opens one host operation, `mint-read`, whose outcome records the
+    // read credential by the host adapter's nonsecret handle and its end. The plaintext goes to private custody, and the
+    // session of the signing key reads it once (`credential`, a read of the scope package). No slot of any item is set.
+    "read-token": {
+      step: "transition", on: "branch", grant: "destination.read-token",
+      adds: { operations: { [DESTINATION_KINDS.mintRead]: 1 } },
+      also: {},
+      fields: { hours: { type: "int", min: READ_TOKEN_HOURS.min, max: READ_TOKEN_HOURS.max, required: true } },
+      guards: [],
+      // Code P16: opens one `mint-read`, with 1 attempt.
+      effects: [{ code: "open-read-token", row: "P16" }],
+      sends: [],
+      attention: [],
+    },
     "add-room": {
       step: "transition", on: "publication", grant: "ledger.retry", also: {}, fields: {},
       guards: [{ state: ["queued", "reserved", "publishing", "unresolved"] }], effects: [], sends: [], attention: [],
@@ -454,6 +477,7 @@ export const destination: PlatformData = {
     [DESTINATION_KINDS.read]: { code: "deciding-read", row: "P16", send: UPDATE, attempts: DESTINATION_ATTEMPTS.read, most: { effects: 13, operations: ["receipt", "mint", "judge"], opens: "receipt" } },
     [DESTINATION_KINDS.receipt]: { code: "receipt", row: "P16", send: UPDATE, attempts: DESTINATION_ATTEMPTS.receipt, most: { effects: 5, operations: ["revoke", "mint", "read"] } },
     [DESTINATION_KINDS.adoptRead]: { code: "adopt-read", row: "P16", attempts: DESTINATION_ATTEMPTS.adoptRead, most: { effects: 5, operations: ["judge"] } },
+    [DESTINATION_KINDS.mintRead]: { code: "mint-read", row: "P16", attempts: DESTINATION_ATTEMPTS.mintRead, most: { effects: 0, operations: [] } },
   },
 };
 
@@ -1527,6 +1551,16 @@ const WRITTEN: Rules = {
     run: ({ resolved }) => opened(0, DESTINATION_KINDS.adoptRead, DESTINATION_ATTEMPTS.adoptRead, resolved.subjects.get("on")!.id),
   },
   /**
+   * Among the effects of `read-token` (P16; the planner's decision for I5).
+   * It reads nothing more. An `operation` effect: one `mint-read` for the
+   * branch, and its attempt 1. The host reads the lifetime from the act's
+   * field `hours`, in the entry that opened the operation.
+   */
+  "open-read-token": {
+    place: "effect", most: 2,
+    run: ({ resolved }) => opened(0, DESTINATION_KINDS.mintRead, DESTINATION_ATTEMPTS.mintRead, resolved.subjects.get("on")!.id),
+  },
+  /**
    * Row z, the second guard of `resend` and of `resend-receipt` (P29;
    * section 12.1.5, "The guard and the effect of `resend`", and "The rows
    * that change, and three new acts"; entry ER4). One rule stands at both
@@ -1651,6 +1685,29 @@ const WRITTEN: Rules = {
           sends: [], opens: [],
         };
       },
+    },
+  },
+  /**
+   * The outcome entries of a `mint-read` (P16; the planner's decision for
+   * I5). It yields nothing: the credential is for the member who signed
+   * `read-token`, and no item holds it. A read token is not revoked by an
+   * operation: it ends at its end.
+   *
+   * The body of a `confirmed` outcome is `{ token, ends }`, as a `mint`'s:
+   * the host adapter's nonsecret handle of the credential, a text of at most
+   * 256 bytes, and the time at which it ends. Never the secret. Of a
+   * `refused` or an `unknown` one it is an empty record. It has 1 attempt.
+   */
+  "mint-read": {
+    place: "outcome",
+    rules: {
+      selects: false, read: false, most: { effects: 0, requests: 0, operations: 0 },
+      retries: () => false,
+      wellFormed: (result, evidence) => {
+        const body = bodyOf(evidence.body, result === "confirmed" ? ["token", "ends"] : []);
+        return body !== null && (result !== "confirmed" || (typeof body["token"] === "string" && body["token"].length > 0 && utf8(body["token"]).length <= 256 && timeMs(body["ends"]) !== null));
+      },
+      unknown: () => ({}),
     },
   },
   /**

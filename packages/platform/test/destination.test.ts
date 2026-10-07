@@ -35,12 +35,12 @@ const TOKEN = { token: "host-token-1", ends: t(600) };
 test("the destination definition validates whole with the platform option; its marks and its outcome kinds are listed; every mark has a rule, so the package's rules run it; it names no fence", () => {
   const checked = destinationDefinition;
   expect([checked.underived, derivable(checked, null), destination.capabilities, destination.rules, destination.timed]).toEqual([[], true, [], {}, {}]);
-  // Section 12.1.5: three item types, with their states; the genesis `establish` and three acts; four handlers. From revision 28 a
+  // Section 12.1.5: three item types, with their states; the genesis `establish` and its acts, with the I5 act `read-token`; four handlers. From revision 28 a
   // receipt is an item of its own, and the slot `publication.receipt` is withdrawn: five of the six slots of revision 25 stand,
   // with the four slots of the item `receipt`. Its `max` is the `max` of `publication`, plus the number of `receipts-owed`, plus 1.
   expect([Object.entries(destination.items).map(([name, type]) => [name, type.max, type.initial, Object.entries(type.states).map(([state, { final }]) => (final ? `${state}!` : state))]), destination.genesis, Object.keys(destination.acts)]).toEqual([
     [["branch", 1, "empty", ["empty", "ready"]], ["publication", 64, "queued", ["queued", "reserved", "publishing", "unresolved", "published!", "aborted!", "not-reserved!"]], ["receipt", 129, "owed", ["owed", "written!", "conflict!"]]],
-    "establish", ["establish", "adopt-head", "resend", "resend-receipt", "add-room", "add-branch-room"],
+    "establish", ["establish", "adopt-head", "resend", "resend-receipt", "read-token", "add-room", "add-branch-room"],
   ]);
   expect([Object.keys(destination.items["branch"]!.refs), Object.keys(destination.items["branch"]!.values), Object.keys(destination.items["publication"]!.values), destination.items["receipt"]!.refs, Object.entries(destination.items["receipt"]!.values).map(([name, slot]) => [name, slot.fixed, slot.required])]).toEqual([
     ["directory", "claim", "slot", "judging"], ["repository", "name", "import", "membership", "rules", "head", "token"], ["integration", "reason", "withdrawDecided", "reservedAt", "aborting", "token"],
@@ -67,6 +67,8 @@ test("the destination definition validates whole with the platform option; its m
     [5, "acts.establish.effects.7", "declare-first-head", "P16"], [5, "receives.import.effects.0", "open-first-head", "P16"], [5, "receives.reserve.effects.3", "open-judge", "P16"],
     [2, "receives.withdraw.also.publication", "publication-of", "P15"], [5, "receives.withdraw.effects.3", "open-withdrawn", "P15"], [5, "receives.compromised.effects.0", "abort-if-behind", "P19"],
     [5, "acts.adopt-head.effects.0", "open-branch-read", "P16"], [5, "acts.resend.effects.0", "reopen-publish", "P16"], [4, "acts.resend.guards.1", "resend-due", "P29"],
+    // The I5 act `read-token` and the outcome of its `mint-read`.
+    [5, "acts.read-token.effects.0", "open-read-token", "P16"], [7, "outcomes.mint-read", "mint-read", "P16"],
     // From revision 28 the two marks of `resend` each stand at a second row, `resend-receipt`. No mark is added.
     [5, "acts.resend-receipt.effects.0", "reopen-publish", "P16"], [4, "acts.resend-receipt.guards.1", "resend-due", "P29"],
     // From revision 28 the mark `collect-list` stands on one field, `links`, where it stood on three.
@@ -78,18 +80,18 @@ test("the destination definition validates whole with the platform option; its m
   expect(checked.marks.map((m) => [m.place, m.path, m.code, m.row]).sort()).toEqual(marks.sort());
   // The kinds of operation that the definition owns. The fence of section 6.8 is not adopted: the data names none.
   expect([Object.keys(destination.outcomes), Object.values(DESTINATION_KINDS), JSON.stringify(destination).includes("fence")]).toEqual([
-    ["first-head", "judge", "push", "mint", "revoke", "read", "receipt", "adopt-read"], Object.keys(destination.outcomes), false,
+    ["first-head", "judge", "push", "mint", "revoke", "read", "receipt", "adopt-read", "mint-read"], Object.keys(destination.outcomes), false,
   ]);
 
-  // The whole-scope rule (the contract's section 6.1): a version with a mark and no rule runs nothing. The package has 19 rules,
+  // The whole-scope rule (the contract's section 6.1): a version with a mark and no rule runs nothing. The package has 21 rules,
   // each of the kind of its place, with the most effects that each states. Every mark has its rule.
   const { rules } = platform(DESTINATION)!;
   expect(rules).toBe(destinationRules);
   expect(Object.entries(rules).map(([name, held]) => [name, held.place, "most" in held ? held.most : held.place === "outcome" ? (held.rules.most?.effects ?? null) : null])).toEqual([
     ["declare-first-head", "effect", 2], ["open-first-head", "effect", 4], ["open-judge", "effect", 3], ["publication-of", "also", null], ["open-withdrawn", "effect", 5],
-    ["abort-if-behind", "effect", 6], ["open-branch-read", "effect", 2], ["resend-due", "guard", null], ["reopen-publish", "effect", 4], ["collect-list", "type", null],
+    ["abort-if-behind", "effect", 6], ["open-branch-read", "effect", 2], ["open-read-token", "effect", 2], ["resend-due", "guard", null], ["reopen-publish", "effect", 4], ["collect-list", "type", null],
     // `most`, counted again (revision 28; I3 deltas, entry FA11): a push that publishes yields 16 effects, and a read that publishes 13.
-    ["mint", "outcome", 2], ["revoke", "outcome", 0], ["push", "outcome", 16], ["first-head", "outcome", 15], ["receipt", "outcome", 5], ["deciding-read", "outcome", 13], ["adopt-read", "outcome", 5], ["judge", "outcome", 10], ["publication-update", "send", null],
+    ["mint", "outcome", 2], ["mint-read", "outcome", 0], ["revoke", "outcome", 0], ["push", "outcome", 16], ["first-head", "outcome", 15], ["receipt", "outcome", 5], ["deciding-read", "outcome", 13], ["adopt-read", "outcome", 5], ["judge", "outcome", 10], ["publication-update", "send", null],
   ]);
   const lacking = [...new Set(checked.marks.filter((mark) => !Object.hasOwn(rules, mark.code)).map((mark) => mark.code))];
   expect(lacking).toEqual([]);
@@ -146,6 +148,8 @@ test("each rule of platform:destination@1 at an act or a handler, as a plain fun
     ["34: a publication is bound: nothing", "open-withdrawn", [given(ready, tell, { operation: reserved.operation }, { "also.publication": publication("queued") })], []],
     // Row 36: one read of the branch.
     ["36: one read, with 1 attempt", "open-branch-read", [given(ready, tell, {}, { on: ready.branch })], opens("adopt-read", 1)],
+    // The I5 act `read-token`: one `mint-read` for the branch, with 1 attempt.
+    ["I5: one mint-read, with 1 attempt", "open-read-token", [given(ready, tell, { hours: 1 }, { on: ready.branch })], opens("mint-read", 1)],
     // Row 37: the same compare-and-swap, with 1 attempt and that attempt's mint. At `resend`: the push of an unresolved publication.
     // At `resend-receipt`, which is on the branch: the write of the receipt that the act names, while it is owed.
     ["37: `unresolved`: the push, with 1 attempt, and its mint", "reopen-publish", [given(ready, tell, {}, { on: publication("unresolved") })], [...opens("push", 1, 0, queued), ...opens("mint", 1, 1, queued)]],
@@ -522,6 +526,32 @@ test("adopt-head names a commit and why, and opens one read of the branch only w
   const read = op(racing.head.seq, 0);
   racing.reserved();
   expect([said(racing.answered(read, 1, "confirmed", { seen: OTHER })), racing.branch.values["head"], racing.last.effects.length]).toEqual([WRITTEN, HEAD, 1]);
+});
+
+// The I5 decision: `read-token` takes `hours`, 1 to 24, and opens one `mint-read`; its outcome records a handle and an end, never a
+// secret, and changes no item. The test authority grants every act here: the real grant is shown on real scopes, in the scope package.
+test("read-token takes hours from 1 to 24 and opens one mint-read; its confirmed outcome is exactly a handle and an end, and changes no item", () => {
+  const r = new Branch(false).ready();
+  const token = (hours: FieldValue) => said(r.act(una, "read-token", { on: 0, expected: { on: r.branch.revision }, fields: { hours } }));
+  // Out of bounds, and missing: refused by the field's type, and nothing is written.
+  const before = r.head.seq;
+  expect([token(0), token(25), token("1"), said(r.act(una, "read-token", { on: 0, expected: { on: r.branch.revision }, fields: {} })), r.head.seq]).toEqual([
+    ["refused", "bad-field", null], ["refused", "bad-field", null], ["refused", "bad-field", null], ["refused", "bad-field", null], before,
+  ]);
+  // Control: within bounds the act is written and opens one `mint-read` with 1 attempt, for the branch.
+  const branch = canonicalize(r.branch);
+  expect([token(24), r.opened]).toEqual([WRITTEN, [["mint-read", 1, true]]]);
+  const mintRead = op(r.head.seq, 0);
+  expect(r.state.operation(mintRead)?.for).toBe(0);
+  // A body with any other member, or a secret beside the handle, does not follow.
+  expect(said(r.answered(mintRead, 1, "confirmed", { token: "read:1", ends: t(3600), plaintext: "secret" }))).toEqual(BAD_INPUT);
+  expect(said(r.answered(mintRead, 1, "confirmed", { token: "", ends: t(3600) }))).toEqual(BAD_INPUT);
+  expect([said(r.answered(mintRead, 1, "confirmed", { token: "read:1", ends: t(3600) })), r.last.effects.filter((effect) => effect.effect !== "outcome" && effect.effect !== "attempt"), outcomesOf(r, mintRead)]).toEqual([WRITTEN, [], [["confirmed"]]]);
+  // The branch is as it was, but for the act's revision: no slot holds a read credential.
+  expect({ ...JSON.parse(branch), revision: r.branch.revision }).toEqual(r.branch);
+  // A refused mint is an empty record.
+  expect(token(1)).toEqual(WRITTEN);
+  expect(said(r.answered(op(r.head.seq, 0), 1, "refused", {}))).toEqual(WRITTEN);
 });
 
 /** The operations that the entry at that position opened, by kind. An entry of these tests opens at most one of a kind. */

@@ -118,6 +118,8 @@ export const ROLE_TABLE: readonly (readonly [actions: readonly string[], roles: 
   [["destination.adopt", "ledger.retry"], ["admin"]],
   [["task.operate"], ["admin", "maintainer", "member", "agent"]],
   [["inbox.own"], ["admin", "maintainer", "member", "agent", "checker"]],
+  // The planner's decision for I5: any active member may sign the destination's `read-token`, so the grant names every role.
+  [["destination.read-token"], ["admin", "maintainer", "member", "agent", "checker"]],
 ];
 
 /** The actions that the table of section 3.2 gives one role, in the order of its rows. */
@@ -140,11 +142,12 @@ export const FIRST_ACTIONS: { readonly [role in Role]: readonly string[] } = {
   admin: [
     ...ISSUE_WORK, ...ISSUE_PLAN, ...CHANGE_WORK, "change.review", ...CHANGE_MERGE, "work.export", "task.control", "task.read-private",
     "membership.invite", "membership.manage", "rules.publish", "rules.activate", "destination.adopt", "ledger.retry", "task.operate", "inbox.own",
+    "destination.read-token",
   ],
-  maintainer: [...ISSUE_WORK, ...ISSUE_PLAN, ...CHANGE_WORK, "change.review", ...CHANGE_MERGE, "task.operate", "inbox.own"],
-  member: [...ISSUE_WORK, ...CHANGE_WORK, "change.review", "work.export", "task.control", "task.read-private", "task.operate", "inbox.own"],
-  agent: [...ISSUE_WORK, ...CHANGE_WORK, "task.operate", "inbox.own"],
-  checker: ["change.check", "inbox.own"],
+  maintainer: [...ISSUE_WORK, ...ISSUE_PLAN, ...CHANGE_WORK, "change.review", ...CHANGE_MERGE, "task.operate", "inbox.own", "destination.read-token"],
+  member: [...ISSUE_WORK, ...CHANGE_WORK, "change.review", "work.export", "task.control", "task.read-private", "task.operate", "inbox.own", "destination.read-token"],
+  agent: [...ISSUE_WORK, ...CHANGE_WORK, "task.operate", "inbox.own", "destination.read-token"],
+  checker: ["change.check", "inbox.own", "destination.read-token"],
 };
 
 /**

@@ -24,7 +24,7 @@ export { inbox, membership, register, directory, destination };
 export { ACTIONS_MOST, FIRST_ACTIONS, MEMBERSHIP, NO_MEMBER, ROLE_LISTS, ROLE_TABLE, actionsIn, isActions, isHandle, standingOf, type Role } from "./membership.ts";
 export { CREATION_ATTEMPTS, REGISTER, REPOSITORY, directoryIdOf, directorySeed, registerRules, repositoryName } from "./register.ts";
 export { DEFINITION_DOMAIN, DIRECTORY, IMPORT_ATTEMPTS, SEEN, directoryMembership, directoryRules, directoryRulesScope } from "./directory.ts";
-export { COLLECT_MOST, DESTINATION, DESTINATION_ATTEMPTS, DESTINATION_KINDS, destinationMembership, destinationRulesScope, destinationReceipt, firstHeadCommit, revokedToken } from "./destination.ts";
+export { COLLECT_MOST, DESTINATION, DESTINATION_ATTEMPTS, DESTINATION_KINDS, READ_TOKEN_HOURS, destinationMembership, destinationRulesScope, destinationReceipt, firstHeadCommit, revokedToken } from "./destination.ts";
 export { foundingObjects, receiptObjects, receiptRef, importRef, type DestinationObject, type DestinationCommit, type ObjectFormat } from "./destination-objects.ts";
 export type { LaneRead } from "./destination.ts";
 // The host port reads the same recorded operation context as the rules.

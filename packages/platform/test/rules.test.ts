@@ -196,11 +196,11 @@ test("membership answers an observation from its head: the key's state, its memb
   const m = new Roster().seated();
   const of = m.at;
   const common = { of, head: m.head, definition: MEMBERSHIP, within: { membership: of }, controller: null, controllerActive: null, notAfter: null };
-  // The first table (section 3.2, "The table, counted"): an admin has 34 actions, a maintainer 25, a member 22, an agent 18 and a
-  // checker 2. The lists of the rule `role-table` are the note's counted lists, and each is what the note's table gives the role,
+  // The first table (section 3.2, "The table, counted"), with the I5 row `destination.read-token` for every role: an admin has 35
+  // actions, a maintainer 26, a member 23, an agent 19 and a checker 3. The lists of the rule `role-table` are the note's counted lists, and each is what the note's table gives the role,
   // row for row, in its order. No name is left out, so an admin holds `task.control`.
   const roles = Object.keys(ROLE_LISTS) as Role[];
-  expect(roles.map((role) => [role, FIRST_ACTIONS[role].length])).toEqual([["admin", 34], ["maintainer", 25], ["member", 22], ["agent", 18], ["checker", 2]]);
+  expect(roles.map((role) => [role, FIRST_ACTIONS[role].length])).toEqual([["admin", 35], ["maintainer", 26], ["member", 23], ["agent", 19], ["checker", 3]]);
   expect(roles.map((role) => FIRST_ACTIONS[role])).toEqual(roles.map(actionsIn));
   // The roster that `establish` opened holds exactly those five lists, set by the rule.
   expect(roles.map((role) => m.item(0).values[ROLE_LISTS[role]])).toEqual(roles.map((role) => FIRST_ACTIONS[role]));
