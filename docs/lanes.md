@@ -36,7 +36,7 @@ The counts, as `packages/lanes/test/definitions.test.ts` asserts them:
 | Definition | Item types | Acts | Timed rules | Handlers | Canonical bytes |
 |---|---|---|---|---|---|
 | `issue` | 12 | 50 | 1 | 7 | 46,160 |
-| `change` | 14 | 53 | 2 | 4 | 58,349 |
+| `change` | 14 | 54 | 2 | 4 | 59,715 |
 
 Neither definition declares a rule expression. Both list two capabilities,
 `hold@1` and `git-read@1`.

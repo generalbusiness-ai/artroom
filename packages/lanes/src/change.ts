@@ -16,6 +16,12 @@
  * `notes/2026-10-07-i5-lane-wiring-delivery.md` lists them for the lane
  * forms' owner.
  *
+ * Rows marked "i5 edit" are not rows of an adopted revision either. They are
+ * the smallest form of plan 025's "edit a page": the act `propose-file`, the
+ * manifest's slots `path`, `digest` and `size`, and the manifest's
+ * integration commit and tree made optional. The
+ * note `notes/2026-10-07-i5-edit-page-delivery.md` lists them.
+ *
  * Some values are the lane forms' examples, and some names are assumed
  * (their section 3): a hold's 3,600 seconds, a job's 1,800 seconds, the text maxima and integer
  * ranges, the refusal names, and the platform definition names.
@@ -66,8 +72,15 @@ export const change = {
       },
       values: {
         base: { fixed: true, required: true, of: { type: "commit" } },
-        integration: { fixed: true, required: true, of: { type: "commit" } },
-        tree: { fixed: true, required: true, of: { type: "tree" } },
+        // i5 edit: a one-file manifest names no integration commit and no tree. The destination writes the file into the published
+        // tree and names both when it reserves the publication.
+        integration: { fixed: true, required: false, of: { type: "commit" } },
+        tree: { fixed: true, required: false, of: { type: "tree" } },
+        // i5 edit: a one-file manifest, which `propose-file` opens: the path in the repository, and the digest and the size of the
+        // file's bytes. The bytes are in the field `content` of that act's intent, which no slot holds.
+        path: { fixed: true, required: false, of: { type: "text", max: 1024 } },
+        digest: { fixed: true, required: false, of: { type: "digest" } },
+        size: { fixed: true, required: false, of: { type: "int", min: 0, max: 65536 } },
         selected: {
           fixed: true,
           required: false,
@@ -804,6 +817,41 @@ export const change = {
           },
         },
       ],
+      attention: [],
+    },
+
+    // i5 edit: a one-file version of the change (plan 025, section 2, "Edit a page"). The signer is the proposal's author, and it is
+    // the only version: no hold, no workspace and no report, for the room, not the person, writes the repository. The file's bytes
+    // are the field `content`, a text in the signed intent: a detached text would be kept by the lane alone, for a message to a
+    // scope that is no lane carries none (section 6.2). The destination reads them from this entry, which `reserve` names as the
+    // manifest, checks them against `digest` and `size`, judges the path, writes the file into the published tree and names the
+    // commit.
+    "propose-file": {
+      step: "open", on: "manifest", grant: "change.propose",
+      also: { proposal: { item: "proposal", one: true } },
+      fields: {
+        base: { type: "commit", required: true },
+        path: { type: "text", max: 1024, required: true },
+        digest: { type: "digest", required: true },
+        size: { type: "int", min: 0, max: 65536, required: true },
+        content: { type: "text", max: 65536, required: true },
+      },
+      guards: [
+        { state: ["draft", "open"], of: "also.proposal" },
+        { signer: ["author"], of: "also.proposal" },
+        { none: { type: "merge", states: ["intended", "committed", "unknown"] }, reason: "merge-in-progress" },
+        { none: { type: "manifest", states: ["current", "superseded"] }, reason: "one-version" },
+      ],
+      effects: [
+        { party: { slot: "integrator", from: { signer: true } } },
+        { party: { slot: "authors", from: [{ signer: true }] } },
+        { value: { slot: "base", from: { field: "base" } } },
+        { value: { slot: "path", from: { field: "path" } } },
+        { value: { slot: "digest", from: { field: "digest" } } },
+        { value: { slot: "size", from: { field: "size" } } },
+        { value: { slot: "complete", from: { const: true } } },
+      ],
+      sends: [],
       attention: [],
     },
 
