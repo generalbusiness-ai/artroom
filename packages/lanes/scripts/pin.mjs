@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-// Pin the two lane definitions: write the canonical bytes of each to
-// definitions/, and their digests to src/digests.ts, from the values in src/.
+// Pin the two lane definitions and the two of the demo profile: write the
+// canonical bytes of each to definitions/, and their digests to
+// src/digests.ts, from the values in src/.
 //
 //   node packages/lanes/scripts/pin.mjs
 //
@@ -16,11 +17,12 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { canonicalize, definitionDigest } from "@generalbusiness/artroom-bytes";
 import { change } from "../src/change.ts";
+import { changeDemo, issueDemo } from "../src/demo.ts";
 import { LANE_FORMS } from "../src/digests.ts";
 import { issue } from "../src/issue.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const pinned = Object.entries({ issue, change }).map(([name, definition]) => {
+const pinned = Object.entries({ issue, change, "issue-demo": issueDemo, "change-demo": changeDemo }).map(([name, definition]) => {
   const bytes = canonicalize(definition);
   writeFileSync(join(root, "definitions", `${name}.json`), bytes);
   return { name, digest: definitionDigest(definition), size: Buffer.byteLength(bytes) };
@@ -28,9 +30,9 @@ const pinned = Object.entries({ issue, change }).map(([name, definition]) => {
 
 const digest = (name) => pinned.find((p) => p.name === name).digest;
 writeFileSync(join(root, "src", "digests.ts"), `/**
- * The pinned digests of the two lane definitions, and the text they were
- * written from. \`scripts/pin.mjs\` writes this file from the values in
- * \`issue.ts\` and \`change.ts\`. A digest is exact for one value: any change
+ * The pinned digests of the two lane definitions and of the demo profile,
+ * and the text they were written from. \`scripts/pin.mjs\` writes this file
+ * from the values in \`issue.ts\`, \`change.ts\` and \`demo.ts\`. A digest is exact for one value: any change
  * of a row, a name or a number is a new definition with a new digest, and a
  * scope that pinned the earlier one keeps it.
  */
@@ -44,6 +46,12 @@ export const LANE_FORMS = { revision: ${LANE_FORMS.revision}, commit: "${LANE_FO
 export const DIGESTS = {
   issue: "${digest("issue")}",
   change: "${digest("change")}",
+} as const satisfies Record<string, Digest>;
+
+/** The definition digest of each definition of the demo profile (\`demo.ts\`): \`definitions/issue-demo.json\` and \`definitions/change-demo.json\`. */
+export const DEMO_DIGESTS = {
+  issue: "${digest("issue-demo")}",
+  change: "${digest("change-demo")}",
 } as const satisfies Record<string, Digest>;
 `);
 for (const p of pinned) console.log(`${p.name}  ${p.digest}  ${p.size} canonical bytes`);
