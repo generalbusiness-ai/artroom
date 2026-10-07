@@ -14,7 +14,12 @@ import { COMMAND_MS } from "./program.ts";
 import type { SmartHttpOptions } from "./http.ts";
 
 export interface DecodedObject { id: ObjectId; type: ObjectType; data: Uint8Array }
-export interface PackReadOptions { maxBytes: number; bounds?: ReadBounds }
+/**
+ * `flushAfter`: one flush packet (`0000`) may follow the pack's trailer, as an
+ * upload-pack answer of the hosting's own Git service sends it. Any other byte
+ * after the trailer is refused.
+ */
+export interface PackReadOptions { maxBytes: number; bounds?: ReadBounds; flushAfter?: boolean }
 const fail = (what: string) => new GitRefusal("unreadable", what);
 const large = (what: string) => new GitRefusal("too-large", what);
 const utf8 = new TextEncoder();
@@ -226,20 +231,23 @@ function applyDelta(raw: Uint8Array, base: DecodedObject, limit: number): Uint8A
 }
 
 interface Entry { offset: number; raw: Uint8Array; object?: DecodedObject; dependents: Entry[]; baseId?: string }
-/** A full, self-contained SHA-1 pack; delta resolution is linear by dependencies. */
+/**
+ * A full, self-contained SHA-1 pack; delta resolution is linear by
+ * dependencies. The pack is read by its own structure: the header, the
+ * counted objects, then the 20-byte trailer, which is checked where the
+ * objects end, not at the end of the input.
+ */
 export async function decodePack(input: Uint8Array, options: PackReadOptions): Promise<DecodedObject[]> {
   const { bounds, maxBytes } = checked(options);
   if (input.length > maxBytes) throw large("pack bytes");
   const pack = new Uint8Array(input);
   if (pack.length < 32 || ascii(pack.subarray(0, 4)) !== "PACK") throw fail("pack header");
-  const content = pack.subarray(0, pack.length - 20);
-  if (hex(sha1(content)) !== hex(pack.subarray(pack.length - 20))) throw new GitRefusal("hash-mismatch", "pack trailer");
   const header = new DataView(pack.buffer);
   const version = header.getUint32(4);
   const count = header.getUint32(8);
   if (version !== 2 && version !== 3) throw fail("pack version");
   if (count > bounds.closureObjects) throw large("pack objects");
-  const cursor = new Cursor(content, 12);
+  const cursor = new Cursor(pack, 12);
   const offsets = new Map<number, Entry>();
   const waiting = new Map<string, Entry[]>();
   const ready: Entry[] = [];
@@ -267,12 +275,12 @@ export async function decodePack(input: Uint8Array, options: PackReadOptions): P
       baseOffset = offset - distance;
       if (distance === 0 || !offsets.has(baseOffset)) throw fail("delta offset");
     } else if (kind === 7) {
-      if (cursor.at + 20 > content.length) throw fail("delta base");
-      baseId = objectId(hex(content.subarray(cursor.at, cursor.at + 20)), "delta base");
+      if (cursor.at + 20 > pack.length) throw fail("delta base");
+      baseId = objectId(hex(pack.subarray(cursor.at, cursor.at + 20)), "delta base");
       cursor.at += 20;
     }
-    const end = zlibEnd(content, cursor.at, size);
-    const raw = await readBytes(new Blob([content.slice(cursor.at, end)]).stream().pipeThrough(new DecompressionStream("deflate")), size);
+    const end = zlibEnd(pack, cursor.at, size);
+    const raw = await readBytes(new Blob([pack.slice(cursor.at, end)]).stream().pipeThrough(new DecompressionStream("deflate")), size);
     if (raw.length !== size) throw new GitRefusal("wrong-size", "pack entry");
     cursor.at = end;
     inflated += size;
@@ -287,7 +295,12 @@ export async function decodePack(input: Uint8Array, options: PackReadOptions): P
     offsets.set(offset, entry);
     entries.push(entry);
   }
-  if (cursor.at !== content.length) throw fail("pack trailing data");
+  // The trailer is the SHA-1 of every byte before it, where the counted objects end.
+  const end = cursor.at;
+  if (end + 20 > pack.length) throw fail("pack trailer");
+  if (hex(sha1(pack.subarray(0, end))) !== hex(pack.subarray(end, end + 20))) throw new GitRefusal("hash-mismatch", "pack trailer");
+  const after = pack.subarray(end + 20);
+  if (after.length !== 0 && !(options.flushAfter === true && after.length === 4 && ascii(after) === "0000")) throw fail("pack trailing data");
   const resolved = new Map<string, DecodedObject>();
   let constructed = ready.reduce((n, entry) => n + entry.object!.data.length, 0);
   for (let i = 0; i < ready.length; i++) {
@@ -415,7 +428,7 @@ export class SmartHttpSource implements GitSource {
       const answer = await this.#request("git-upload-pack", "application/x-git-upload-pack-result", body);
       const nak = readPacket(answer, 0);
       if (nak.line !== "NAK") throw fail("upload negotiation");
-      const objects = await decodePack(answer.subarray(nak.next), this.#options);
+      const objects = await decodePack(answer.subarray(nak.next), { ...this.#options, flushAfter: true });
       if (!objects.some((o) => o.id === id)) throw fail("wanted object omitted");
       const additions = objects.filter((o) => !this.#objects.has(o.id));
       const bytes = additions.reduce((n, o) => n + o.data.length, 0);
