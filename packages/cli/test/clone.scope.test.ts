@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import type { Digest, Item, OperationId, Read } from "@generalbusiness/artroom-contract";
-import { b64url, canonicalize, timeMs } from "@generalbusiness/artroom-bytes";
+import { b64url, canonicalize, timeMs, timeOf } from "@generalbusiness/artroom-bytes";
 import type { Fetch } from "@generalbusiness/artroom-client";
 import { repositoryName } from "@generalbusiness/artroom-platform";
 import { net } from "@generalbusiness/artroom-scope/testing";
@@ -165,6 +165,11 @@ async function story(): Promise<void> {
     ok(await run(vic, "claim", "hub", "--handle", "@vic"));
     const hub = ((await new Platform((await vic.store.config())!.repository!.destination).item(0)).values["repository"]) as { name: string };
     expect(await run(vic, "remote")).toEqual({ code: 0, lines: ["Host: github.com", "Namespace: generalbusiness-ai", `Name: ${hub.name}`, `Remote URL: https://github.com/generalbusiness-ai/${hub.name}.git`] });
+    // The gap of the delivery note's section 5: a destination with no act yet accepts no session, and the founder's signed read
+    // lasts the intent window after the claim. Past it, nobody reads the destination, and neither command can go on.
+    net.clock.now = timeOf(timeMs(net.clock.now)! + 16 * 60_000);
+    const destination = (await vic.store.config())!.repository!.destination;
+    expect([await run(vic, "remote"), await run({ ...vic, git: recordingGit() }, "clone")]).toEqual([{ code: 1, lines: [`Cannot read ${destination}: forbidden.`] }, { code: 1, lines: [`Cannot read ${destination}: forbidden.`] }]);
   } finally {
     wired.delete(H.name);
   }
