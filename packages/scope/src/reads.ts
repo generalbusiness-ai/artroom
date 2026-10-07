@@ -13,10 +13,15 @@
  * genesis, the entries of a key that signed an entry of this scope, or the
  * root of its genesis's cause chain, within the authority window of an
  * intent, the entries whose cause chain leads to an entry that key signed,
- * and the retained inputs that those entries name. A session of a
- * membership scope reads a register the same way, by the claim that caused
- * its directory (`chainedSession`). A reader that presents neither is
- * answered `forbidden` by every read here.
+ * and the retained inputs that those entries name.
+ *
+ * A register holds no secret, and a verifier folds it from its genesis, so
+ * it is read whole (the planner's decision ca8ad1cf): its summary, every
+ * entry and its retained inputs, by a signed read of a key that signed an
+ * entry of it within the window, and by a session of a membership scope
+ * that one of its claims created, with no window but the session's end
+ * (`registerSession`). A reader that presents neither is answered
+ * `forbidden` by every read here.
  *
  * Three reads are of what is no history (authority note, section 12, G13
  * and G17): `incidents`, a page of the operator's record of this scope; and
@@ -61,10 +66,10 @@ const dutyOf = (duty: unknown): [seq: number, n: number] | null => (isDutyId(dut
 const operationOf = (id: unknown): [seq: number, k: number] | null => (isOperationId(id) ? (id.split(":").map(Number) as [number, number]) : null);
 
 /**
- * A reader that reads part of the scope: a signed read's key, with the earliest time of a root that leads it to an entry; or a
- * session at a register, with the position of the claim that its membership's directory came from.
+ * A reader that reads part of the scope: a signed read's key, with the earliest time of a root that leads it to an entry. A signed
+ * read at a register, and a session, read the scope whole.
  */
-type Limit = { key: KeyId; since: number } | { claim: number };
+type Limit = { key: KeyId; since: number };
 
 export class Reads {
   readonly #store: Store;
@@ -96,10 +101,11 @@ export class Reads {
   /**
    * A reader that presents a signed read is judged by that alone, and never
    * by the readers port: only the reads of `SIGNED_READS`, with `arg` as
-   * the argument that the request must name. A session that the port
-   * refuses is asked of its `chained` check. `limit`: what such a reader
-   * reads of the entries (`#mine`). Null: a session or the readers port
-   * allowed the read whole.
+   * the argument that the request must name. At a register it reads the
+   * whole scope. A session that the port refuses is asked of its
+   * `register` check: at a register, it reads the whole scope if one of the
+   * register's claims created its membership. `limit`: what a signed read
+   * reads of the entries elsewhere (`#mine`). Null: the read is whole.
    */
   #open(reader: unknown, read: ReadName, arg?: string): { scope: ScopeState; pinned: Pinned; limit: Limit | null } | { ok: false; reason: ReadRefusal } {
     let limit: Limit | null = null;
@@ -108,15 +114,15 @@ export class Reads {
       // A read that a signed read cannot name has no argument here, and no request names it: it is refused by the check.
       const checked = checkSignedRead(this.#signed, this.#store, reader as string, read, arg ?? "");
       if (!("key" in checked)) return no(checked.refused === false ? "forbidden" : checked.refused);
-      limit = checked;
+      // A register holds no secret: a key it admits reads it whole (decision ca8ad1cf).
+      limit = this.#store.scope()?.at.kind === "register" ? null : checked;
     } else {
       const allowed = this.#readers.allows(reader, read);
       if (allowed !== true) {
-        const chained = allowed === false ? (this.#readers.chained?.(reader, read) ?? false) : allowed;
-        if (typeof chained !== "object") return no(chained === false ? "forbidden" : chained);
-        const claim = this.#signed?.chains?.claimOf(chained.membership.scope) ?? null;
-        if (claim === null) return no("forbidden");
-        limit = { claim };
+        const session = allowed === false ? (this.#readers.register?.(reader, read) ?? false) : allowed;
+        if (typeof session !== "object") return no(session === false ? "forbidden" : session);
+        // A session of a membership that none of this register's claims created reads nothing here.
+        if ((this.#signed?.chains?.claimOf(session.membership.scope) ?? null) === null) return no("forbidden");
       }
     }
     const scope = this.#store.scope();
@@ -124,16 +130,14 @@ export class Reads {
     return scope && pinned ? { scope, pinned, limit } : no("not-found");
   }
   /**
-   * Whether a reader with that limit may have this stored entry: every reader but a limited one; a limited one, the genesis, and a
-   * signed read's key its own entries and those whose chain leads to one of them at `since` or later; a session at a register, the
-   * entries whose chain leads to its claim. An entry whose root is not found yet is no limited reader's.
+   * Whether a reader with that limit may have this stored entry: every reader but a limited one; a limited one, the genesis, its
+   * key's own entries and those whose chain leads to one of them at `since` or later. An entry whose root is not found yet is no
+   * limited reader's.
    */
   #mine(limit: Limit | null, row: Stored): boolean {
     if (limit === null || row.seq === 0) return true;
     const entry = JSON.parse(row.bytes) as Entry;
-    const root = this.#signed?.chains?.at(row.seq);
-    if ("key" in limit) return signerOf(entry) === limit.key || leads(root, limit.key, limit.since);
-    return !!root && root.scope === entry.at.scope && root.seq === limit.claim;
+    return signerOf(entry) === limit.key || leads(this.#signed?.chains?.at(row.seq), limit.key, limit.since);
   }
   /** Whether an entry that a reader with that limit may have names this digest: a retained input that it carries. */
   #carried(limit: Limit, head: number, digest: Digest): boolean {

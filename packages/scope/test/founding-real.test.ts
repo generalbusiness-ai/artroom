@@ -205,8 +205,9 @@ describe("a founding on real scopes under the deployed class (authority note, se
     const issued = await real(async () => requestSession(SERVICE, membershipScope!.name, sessionRequest(learned!, rita.secret, soon(60), "founding-real"), { fetch: routed as unknown as Fetch }));
     if (!issued.ok) throw new Error(`no session: ${issued.reason}`);
     const reads = async (node: Platform) => (await real(() => routed(`${SERVICE}/v1/scopes/${node.name}`, { headers: { authorization: issued.session.reader() } }))).status;
-    // The directory records the reference with its incarnation, and the rules scope records the ID alone: no session is accepted there yet.
-    expect([await reads(D), await reads(rulesScope!)]).toEqual([200, 403]);
+    // The directory records the reference with its incarnation, and the rules scope records the ID alone. A session of that ID is
+    // accepted at both (the planner's decision ca8ad1cf).
+    expect([await reads(D), await reads(rulesScope!)]).toEqual([200, 200]);
     const publish = async (approvals: number) => rulesScope!.act(rita, "publish", { on: 0, expected: await rulesScope!.expected({ on: 0 }), fields: { approvals, ownerMayReview: false, checks: [], labels: [], extents: firstExtents({ approvals, checks: [] }) as never } });
     // The rules scope's first act that needs a grant. It holds membership's scope ID and no incarnation, so its first read asks by the
     // ID alone. The answer's `of` holds the incarnation of the scope that answered, guard 1 takes it, and the entry that retains
@@ -224,7 +225,7 @@ describe("a founding on real scopes under the deployed class (authority note, se
     const first = proof(await rulesScope!.last());
     expect(first).toMatchObject({ observation: { of: membership, key: rita.key, keyState: "active", role: "admin", within: { membership } }, use: "fresh", prior: null });
     // From then on the incarnation is a function of the folded state: the rules scope records the reference with it, and accepts the
-    // session. A later read states it: after a restart the object holds no observation in memory, records the same reference from
+    // session of that incarnation. A later read states it: after a restart the object holds no observation in memory, records the same reference from
     // its store, reads again, and is answered by the same incarnation.
     expect(await reads(rulesScope!)).toBe(200);
     await rulesScope!.restart();

@@ -382,15 +382,6 @@ export function recordedRules(config: Pick<Repository, "genesis" | "state">): Re
 const NOTHING_READ: Further = { read: () => Promise.resolve(), observed: () => [], values: () => [], observing: () => ({}), close: () => undefined, sealed: () => undefined };
 
 /**
- * The same reference, when the scope records it with its incarnation. A
- * read session is accepted only when it names that scope and incarnation
- * (section 3.9; `sessions.ts`). Null also for a rules scope or a
- * destination that records no incarnation yet: no session is accepted
- * there before its first retained observation.
- */
-export const fixedMembership = (config: Pick<Repository, "genesis" | "state">, scope: ScopeRef): ScopeRef | null => fixedBy(recordedMembership(config, scope), null);
-
-/**
  * The production authority of one scope of a repository (authority note,
  * section 3.3, "Where it records its membership reference").
  *

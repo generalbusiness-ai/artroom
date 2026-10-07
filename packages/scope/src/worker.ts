@@ -71,7 +71,7 @@ import type { Answer, Beside, Cursor, DeclaredDefinition, Digest, DutyId, Grant,
 import { definitionDigest, intentDigest, isScopeId, positionOf, scopeIdOf } from "@generalbusiness/artroom-bytes";
 import { isObject, type Item } from "@generalbusiness/artroom-derive";
 import { foundedKind, type Founded } from "./core.ts";
-import { fixedMembership, repositoryAuthority } from "./authority.ts";
+import { recordedMembership, repositoryAuthority } from "./authority.ts";
 import { membershipIn, namespace, type Binding } from "./namespace.ts";
 import { ScopeObject, type OutsideGiven, type Wiring } from "./object.ts";
 import type { Incident } from "./operator.ts";
@@ -325,10 +325,14 @@ export function outsideOf(given: OutsideGiven, sql: Pick<SqlStorage, "exec">, en
  * The two parts of a wiring that read sessions need, over one source of the
  * session configuration, which is asked at every use. The readers port
  * accepts a session only for the membership scope that the scope itself
- * records: the reference that its authority reads, with its incarnation (`fixedMembership`).
+ * records: the reference that its authority reads (`recordedMembership`),
+ * with its incarnation where the scope records one. A rules scope and a
+ * destination record membership's scope ID from their genesis, so they
+ * accept its sessions from their first entry (the planner's decision
+ * ca8ad1cf).
  */
 export function sessionWiring(sessions: () => Sessions | null): Required<Pick<Wiring, "readers" | "sessions">> {
-  return { readers: (given) => sessionReaders({ sessions, clock: given.clock, scope: given.scope, membership: (scope) => fixedMembership(given, scope) }), sessions };
+  return { readers: (given) => sessionReaders({ sessions, clock: given.clock, scope: given.scope, membership: (scope) => recordedMembership(given, scope) }), sessions };
 }
 
 /**

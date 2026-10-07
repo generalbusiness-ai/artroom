@@ -72,12 +72,17 @@
  * meets each entry once. Every other read is `forbidden`, and so is a
  * stream: a stream is opened by a session only.
  *
- * A session of a membership scope reads a register in the same way
- * (`sessions.ts`, `chainedSession`): the genesis, the register's entries
- * whose chain leads to the claim that caused the directory which created
- * that membership scope, and the retained inputs they name. So the
- * founder's command, with a signed read or with its session, verifies the
- * register, the directory and its children.
+ * **At a register** (the planner's decision ca8ad1cf) the admitted key
+ * reads the whole scope: its summary, every entry and every retained input.
+ * A register holds no secret, and a verifier folds a history from its
+ * genesis, with no hole. A session of a membership scope that one of the
+ * register's claims created reads it whole too (`sessions.ts`,
+ * `registerSession`), with no window. So co-founders on one register read
+ * each other's claims.
+ *
+ * A session of a scope's own membership reads the destination, the rules
+ * scope and the directory whole, as it reads membership, including the
+ * entries that no member signed (`sessions.ts`, `checkSession`).
  *
  * A signed read is no credential beyond itself: whoever holds one can make
  * that one read, with that argument, until its `notAfter`, and nothing

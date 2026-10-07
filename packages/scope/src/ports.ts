@@ -227,11 +227,11 @@ export type ReadName = "summary" | "items" | "history" | "entry" | "outbox" | "o
 export interface Readers {
   allows(reader: unknown, read: ReadName): boolean | "sessions-unavailable" | "clock-behind";
   /**
-   * For a reader that `allows` refused: a session of a membership scope at a scope that reads by the cause chain, the register
-   * (`sessions.ts`, `chainedSession`). The membership scope: the reader reads the entries that the chain gives it. False, or a
-   * name, as for `allows`. Absent: no reader reads by the chain.
+   * For a reader that `allows` refused: a session of a membership scope at a register, which records no membership
+   * (`sessions.ts`, `registerSession`). The membership scope: the reader reads the register whole if one of its claims created
+   * that membership. False, or a name, as for `allows`. Absent: no session reads a register.
    */
-  chained?(reader: unknown, read: ReadName): { membership: ScopeRef } | false | "sessions-unavailable" | "clock-behind";
+  register?(reader: unknown, read: ReadName): { membership: ScopeRef } | false | "sessions-unavailable" | "clock-behind";
   /**
    * The key whose session this reader presents, where `allows` lets it make that read. False, or a name, as for `allows`.
    * Absent: no reader is known by its key, and a read that needs one is `forbidden`.
