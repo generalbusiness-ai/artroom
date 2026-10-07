@@ -117,7 +117,7 @@ export class Roster extends Ledger {
    * answer is no observation.
    */
   held(key: KeyId): Presented[] {
-    const observation = observationOf(standingOf(this.state, { of: this.at, key }), this.now);
+    const observation = observationOf(standingOf(this.state, { of: this.at, key }, MEMBERSHIP), this.now);
     const use: ObservationUse | null = observation && { observation, read: { run: "r1", n: ++this.#reads }, use: "fresh", prior: null };
     return use ? [{ grant: grantFrom(use), current: true }] : [];
   }

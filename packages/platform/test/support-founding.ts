@@ -23,7 +23,7 @@ import { factRefOf, intentDigest, newIncarnation, scopeIdOf, signIntent } from "
 import { PROFILES, clockOf, judgeDelivery, judgeGenesis, judgeOutcome, ownersOf, validateDefinition } from "@generalbusiness/artroom-derive";
 import type { ActJudgment, Judgment, PlatformRules, Source, ValidDefinition } from "@generalbusiness/artroom-derive";
 import { Ledger, T0, forged, keys, t, type Actor, type Context, type Over } from "@generalbusiness/artroom-derive/testing";
-import { DIRECTORY, REGISTER, directory, directoryRules, directorySeed, register, registerRules, repositoryName } from "../src/index.ts";
+import { DIRECTORY, REGISTER, directoryRules, directorySeed, platform, registerRules, repositoryName } from "../src/index.ts";
 
 export const { rita, una, vic, paul, sam } = keys;
 
@@ -32,9 +32,9 @@ const checked = (data: PlatformData): ValidDefinition => {
   if (!result.ok) throw new Error(`${data.name} is refused: ${JSON.stringify(result.problems)}`);
   return result.definition;
 };
-/** The register's and the directory's data, validated as a runtime validates them. */
-export const registerDefinition = checked(register);
-export const directoryDefinition = checked(directory);
+/** The register's and the directory's data, of the newest version of each, validated as a runtime validates them. */
+export const registerDefinition = checked(platform(REGISTER)!.data);
+export const directoryDefinition = checked(platform(DIRECTORY)!.data);
 
 /** The register's rules, as the package supplies them: what a judge of these tests is given. */
 export const registerPlatform: PlatformRules = { named: REGISTER, rules: registerRules };

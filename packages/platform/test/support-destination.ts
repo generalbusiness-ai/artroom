@@ -37,7 +37,7 @@ import { canonicalize, factRefOf, intentDigest, newIncarnation, scopeIdOf, signI
 import { PROFILES, clockOf, contentStates, valueDigest, outcomeValueDomains, judgeDelivery, judgeGenesis, settleOutcome, validateDefinition } from "@generalbusiness/artroom-derive";
 import type { ActJudgment, Fetched, Judgment, OutcomeJudgment, Observing, PlatformRules, Source, ValidDefinition } from "@generalbusiness/artroom-derive";
 import { Ledger, Scope, T0, creation, d, keys, laneDefinition, sent, t, type Actor, type Context, type Over } from "@generalbusiness/artroom-derive/testing";
-import { DESTINATION, DESTINATION_KINDS, destination, destinationReceipt, destinationRules, destinationRulesWith, type LaneRead } from "../src/destination.ts";
+import { DESTINATION, DESTINATION_KINDS, destination2, destinationReceipt, destinationRules2, destinationRulesWith, type LaneRead } from "../src/destination.ts";
 import { firstExtents } from "../src/extents.ts";
 import { rulesScope } from "../src/rules-scope.ts";
 import type { JudgeEvidence, ReservationRead } from "../src/reservation.ts";
@@ -102,7 +102,7 @@ const checked = (result: ReturnType<typeof validateDefinition>): ValidDefinition
   return result.definition;
 };
 /** The destination's data, validated as a runtime validates it. */
-export const destinationDefinition = checked(validateDefinition(JSON.parse(JSON.stringify(destination)), PROPOSED_BOUNDS, PROFILES, { platform: true, outcomeValues: outcomeValueDomains(destination, destinationRules) }));
+export const destinationDefinition = checked(validateDefinition(JSON.parse(JSON.stringify(destination2)), PROPOSED_BOUNDS, PROFILES, { platform: true, outcomeValues: outcomeValueDomains(destination2, destinationRules2) }));
 
 const REPOSITORY = { host: "git.example", namespace: "artroom", name: "demo", id: "r1" };
 const NAME = { type: "text", max: 256 } as const;
@@ -136,6 +136,7 @@ export const bureau: DeclaredDefinition = {
         claim: { type: "fact", kind: ["found"], under: "platform:register", required: true },
         membership: { type: "text", max: 64, required: true },
         rules: { type: "text", max: 64, required: true },
+        founderHandle: { ...NAME, required: true },
       },
       guards: [], effects: [],
       sends: [{
@@ -143,7 +144,7 @@ export const bureau: DeclaredDefinition = {
           kind: "destination", definition: DESTINATION,
           fields: {
             repository: { field: "repository" }, branch: { field: "branch" }, import: { field: "import" }, claim: { field: "claim" },
-            directory: { scope: true }, membership: { field: "membership" }, rules: { field: "rules" },
+            directory: { scope: true }, membership: { field: "membership" }, rules: { field: "rules" }, founderHandle: { field: "founderHandle" },
           },
           result: { applied: [{ ref: { slot: "destination", from: { sender: true } } }] },
         },
@@ -248,7 +249,7 @@ export class Branch extends Ledger {
     this.bureau = new Ledger(bureauDefinition, "platform:directory");
     const founding = signIntent({
       v: 1, to: null, actor: rita.key, kind: "found", on: null, expected: {}, idempotencyKey: `found-${importing}`, notAfter: t(60),
-      fields: { repository: REPOSITORY, branch: "main", import: importing, claim: factRefOf(claim) as unknown as FieldValue, membership: MEMBERSHIP.scope, rules: RULES.scope },
+      fields: { repository: REPOSITORY, branch: "main", import: importing, claim: factRefOf(claim) as unknown as FieldValue, membership: MEMBERSHIP.scope, rules: RULES.scope, founderHandle: "@rita" },
     }, rita.secret);
     const seed: Seed = { v: 1, kind: "directory", definition: bureauDefinition.digest, creator: null, cause: intentDigest(founding.intent), ordinal: 0 };
     this.bureau.seal(written(judgeGenesis(this.bureau.state, bureauDefinition, { name: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(1)), seed, founding }, { clock: clockOf(this.bureau.state, T0), bounds: PROPOSED_BOUNDS, facts, prepared: [], source: null })));
@@ -361,7 +362,7 @@ export class Branch extends Ledger {
   /** An attempt that no answer came for: the outcome that the driver offers, with the body that the owner's rule states for it. */
   lost(operation: OperationId, attempt: number): OutcomeJudgment {
     const of = this.state.operation(operation)!;
-    const rule = this.rules.rules[destination.outcomes[of.kind]!.code]!;
+    const rule = this.rules.rules[destination2.outcomes[of.kind]!.code]!;
     const body = rule.place === "outcome" ? (rule.rules.unknown?.(this.state, of, attempt, this.own) ?? null) : null;
     return this.outcome(operation, attempt, "unknown", { basis: "none", body } as Evidence);
   }

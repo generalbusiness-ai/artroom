@@ -32,7 +32,7 @@
  */
 
 import type { Rules } from "@generalbusiness/artroom-derive";
-import { destinationRules } from "./destination.ts";
+import { destinationRules2 } from "./destination.ts";
 import { inboxRules } from "./inbox.ts";
 import { membershipRules } from "./membership.ts";
 import { registerRules } from "./register.ts";
@@ -46,6 +46,8 @@ export type PlatformName = "platform:register" | "platform:directory" | "platfor
 export type RuleTable = { readonly [name in PlatformName]?: Rules };
 
 /**
+ * The rules of the newest version of each definition (`NEWEST` of
+ * `index.ts`; every version that this package serves is in `VERSIONS`).
  * The rules that are written: those of the inbox, and the ten of membership
  * that the authority note's table of marks names (revision 24). They are
  * the whole of membership's version, so `platform:membership@1` is
@@ -60,7 +62,7 @@ export const RULES: RuleTable = {
   "platform:register": registerRules, "platform:directory": directoryRules,
   // The six rules of the rules scope are the whole of its version, so `platform:rules@1` is runnable (`rules-scope.ts`).
   "platform:rules": rulesScopeRules,
-  // Every destination mark has its rule, including `first-head` and `receipt`, so `platform:destination@1` is runnable
+  // Every destination mark has its rule, including `first-head` and `receipt`, so `platform:destination@2` is runnable
   // (`destination.ts`). The real-scope founding and publication witness uses a scripted Git host (`scope/test/founding-real.test.ts`).
-  "platform:destination": destinationRules,
+  "platform:destination": destinationRules2,
 };

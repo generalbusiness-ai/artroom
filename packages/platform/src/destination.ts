@@ -1,5 +1,5 @@
 /**
- * platform:destination@1 is the single writer of one published branch.
+ * platform:destination@1 and @2 are the single writer of one published branch.
  * Its rows implement adopted authority revision 28 (8b1c3c9d7), sections
  * 3.3, 5.8, 6.1–6.10, 12.1.5 and 12.2, under scope contract revision 23.
  *
@@ -31,9 +31,20 @@ import { referenceOf } from "./rules-scope.ts";
 import { isExtents } from "./extents.ts";
 import { decidingKeys, manifestAuthors, readLane } from "./destination-reading.ts";
 import { foundingObjects, receiptObjects, receiptRef, type DestinationCommit, type ObjectFormat } from "./destination-objects.ts";
+import { isOf, pinnedBy, pinnedOf } from "./versions.ts";
 
-/** The name and version that this data and these rules are. An operation that the destination opens states it as its owner (the contract's section 4.3). */
-export const DESTINATION = "platform:destination@1" satisfies PlatformDefinition;
+/**
+ * The versions of the destination that this package serves. An operation
+ * that a destination opens states the scope's own version as its owner (the
+ * contract's section 4.3). Version 2 adds the act `read-token`, with its
+ * operation `mint-read`, and the founder's handle, which its founding
+ * commit names in a README (`destination2`, below).
+ */
+export const DESTINATION_1 = "platform:destination@1" satisfies PlatformDefinition;
+/** The newest version of the destination: the one that a directory of the newest version creates. */
+export const DESTINATION = "platform:destination@2" satisfies PlatformDefinition;
+/** The name of the destination, without a version: what an operation's owner is compared with. */
+const NAME_OF = "platform:destination";
 
 /**
  * The kinds of operation that the destination owns: the member `outcomes`
@@ -321,21 +332,6 @@ export const destination: PlatformData = {
       sends: [],
       attention: [],
     },
-    // `read-token`: an act on the branch (the planner's decision for I5). Any active member may sign it: its grant,
-    // `destination.read-token`, is in every role's list. It opens one host operation, `mint-read`, whose outcome records the
-    // read credential by the host adapter's nonsecret handle and its end. The plaintext goes to private custody, and the
-    // session of the signing key reads it once (`credential`, a read of the scope package). No slot of any item is set.
-    "read-token": {
-      step: "transition", on: "branch", grant: "destination.read-token",
-      adds: { operations: { [DESTINATION_KINDS.mintRead]: 1 } },
-      also: {},
-      fields: { hours: { type: "int", min: READ_TOKEN_HOURS.min, max: READ_TOKEN_HOURS.max, required: true } },
-      guards: [],
-      // Code P16: opens one `mint-read`, with 1 attempt.
-      effects: [{ code: "open-read-token", row: "P16" }],
-      sends: [],
-      attention: [],
-    },
     "add-room": {
       step: "transition", on: "publication", grant: "ledger.retry", also: {}, fields: {},
       guards: [{ state: ["queued", "reserved", "publishing", "unresolved"] }], effects: [], sends: [], attention: [],
@@ -477,6 +473,55 @@ export const destination: PlatformData = {
     [DESTINATION_KINDS.read]: { code: "deciding-read", row: "P16", send: UPDATE, attempts: DESTINATION_ATTEMPTS.read, most: { effects: 13, operations: ["receipt", "mint", "judge"], opens: "receipt" } },
     [DESTINATION_KINDS.receipt]: { code: "receipt", row: "P16", send: UPDATE, attempts: DESTINATION_ATTEMPTS.receipt, most: { effects: 5, operations: ["revoke", "mint", "read"] } },
     [DESTINATION_KINDS.adoptRead]: { code: "adopt-read", row: "P16", attempts: DESTINATION_ATTEMPTS.adoptRead, most: { effects: 5, operations: ["judge"] } },
+  },
+};
+
+/**
+ * `platform:destination@2`: version 1 with three changes.
+ *
+ * - The act `read-token` (the planner's decision for I5), with the kind of
+ *   operation `mint-read` that it opens and the rules of both
+ *   (`WRITTEN_2`).
+ * - The genesis takes the founder's handle, which the directory's creation
+ *   of version 2 sends, and keeps it in `branch.founderHandle`.
+ * - The founding commit writes one file, `README.md`, in place of the empty
+ *   tree (`firstHeadCommit`): a heading with the repository's name and one
+ *   sentence that names the founder's handle and the directory.
+ */
+const branch1 = destination.items["branch"]!;
+const establish1 = destination.acts["establish"]!;
+export const destination2: PlatformData = {
+  ...destination,
+  items: {
+    ...destination.items,
+    branch: { ...branch1, values: { ...branch1.values, founderHandle: { fixed: true, required: true, of: NAME } } },
+  },
+  acts: {
+    ...destination.acts,
+    establish: {
+      ...establish1,
+      fields: { ...establish1.fields, founderHandle: { ...NAME, required: true } },
+      // The founder's handle, before the mark `declare-first-head`, which stays the last effect.
+      effects: [...establish1.effects.slice(0, -1), { value: { slot: "founderHandle", from: { field: "founderHandle" } } }, ...establish1.effects.slice(-1)],
+    },
+    // `read-token`: an act on the branch (the planner's decision for I5). Any active member may sign it: its grant,
+    // `destination.read-token`, is in every role's list. It opens one host operation, `mint-read`, whose outcome records the
+    // read credential by the host adapter's nonsecret handle and its end. The plaintext goes to private custody, and the
+    // session of the signing key reads it once (`credential`, a read of the scope package). No slot of any item is set.
+    "read-token": {
+      step: "transition", on: "branch", grant: "destination.read-token",
+      adds: { operations: { [DESTINATION_KINDS.mintRead]: 1 } },
+      also: {},
+      fields: { hours: { type: "int", min: READ_TOKEN_HOURS.min, max: READ_TOKEN_HOURS.max, required: true } },
+      guards: [],
+      // Code P16: opens one `mint-read`, with 1 attempt.
+      effects: [{ code: "open-read-token", row: "P16" }],
+      sends: [],
+      attention: [],
+    },
+  },
+  outcomes: {
+    ...destination.outcomes,
     [DESTINATION_KINDS.mintRead]: { code: "mint-read", row: "P16", attempts: DESTINATION_ATTEMPTS.mintRead, most: { effects: 0, operations: [] } },
   },
 };
@@ -580,7 +625,7 @@ function pushesOf(state: Pick<StateView, "operation">, own: Own, publication: It
   for (let seq = from; seq < before; seq += 1) {
     const { input } = ownEntry(own, seq);
     const about = seq === from || (input.type === "act" && input.signed.intent.kind === "resend" && input.signed.intent.on === publication.id);
-    if (about) found.push(...openedIn(state, seq).filter((operation) => operation.owner === DESTINATION && operation.kind === DESTINATION_KINDS.push));
+    if (about) found.push(...openedIn(state, seq).filter((operation) => isOf(operation.owner, NAME_OF) && operation.kind === DESTINATION_KINDS.push));
   }
   return found;
 }
@@ -598,14 +643,14 @@ function receiptWrites(state: Pick<StateView, "operation">, own: Own, receipt: I
   for (let seq = receipt.id; seq < before; seq += 1) {
     const { input } = ownEntry(own, seq);
     const about = seq === receipt.id || (input.type === "act" && input.signed.intent.kind === "resend-receipt" && input.signed.intent.fields["receipt"] === receipt.id);
-    if (about) found.push(...openedIn(state, seq).filter((operation) => operation.owner === DESTINATION && operation.kind === DESTINATION_KINDS.receipt));
+    if (about) found.push(...openedIn(state, seq).filter((operation) => isOf(operation.owner, NAME_OF) && operation.kind === DESTINATION_KINDS.receipt));
   }
   return found;
 }
 
 /** An operation that this entry opens, at its ordinal among the operations of the entry, with its attempt 1 (the contract's section 4.3, items 1 and 2). */
-const opened = (k: number, kind: string, attempts: number, holder: number): RuleEffect[] => [
-  { effect: "operation", k, owner: DESTINATION, kind, attempts, for: holder },
+const opened = (given: Pick<RuleGiven, "input" | "own">, k: number, kind: string, attempts: number, holder: number): RuleEffect[] => [
+  { effect: "operation", k, owner: pinnedBy(given), kind, attempts, for: holder },
   { effect: "attempt", operation: { k }, attempt: 1, result: "opened", selected: null },
 ];
 
@@ -632,9 +677,9 @@ const COLLECTED_RECORD: Readonly<Record<keyof typeof COLLECT_MOST, (value: unkno
 
 /** A write: an operation of the kind `first-head`, `push` or `receipt` (section 12.1.5, "The kinds of operation"). */
 const WRITES: readonly string[] = [DESTINATION_KINDS.firstHead, DESTINATION_KINDS.push, DESTINATION_KINDS.receipt];
-const ours = (operation: Operation, ...kinds: readonly string[]): boolean => operation.owner === DESTINATION && kinds.includes(operation.kind);
+const ours = (operation: Operation, ...kinds: readonly string[]): boolean => isOf(operation.owner, NAME_OF) && kinds.includes(operation.kind);
 /** An operation that the outcome entry opens. The ledger numbers it and opens its attempt 1. */
-const opening = (kind: string, attempts: number, holder: number): Opening => ({ owner: DESTINATION, kind, attempts, for: holder });
+const opening = (given: Pick<RuleGiven, "input" | "own">, kind: string, attempts: number, holder: number): Opening => ({ owner: pinnedBy(given), kind, attempts, for: holder });
 /** The body of an outcome's evidence, when it is a record with exactly those members. */
 const bodyOf = (body: unknown, names: readonly string[]): Record<string, FieldValue> | null =>
   (isObject(body) && Object.keys(body).length === names.length && names.every((name) => Object.hasOwn(body, name)) ? body : null);
@@ -735,7 +780,7 @@ export function tokenStep(given: Pick<RuleGiven, "state" | "own" | "input">, wri
   if (!first || target === null || mint === null || target.values["token"] !== mint.id) return { effects: [], opens: [] };
   return {
     effects: isFinal(target) ? [] : [{ effect: "value", item: target.id, slot: "token", value: null }],
-    opens: [opening(DESTINATION_KINDS.revoke, DESTINATION_ATTEMPTS.revoke, write.for!)],
+    opens: [opening(given, DESTINATION_KINDS.revoke, DESTINATION_ATTEMPTS.revoke, write.for!)],
   };
 }
 
@@ -848,11 +893,11 @@ function updateRequest({ own, resolved }: RuleGiven, update: Update): RuleReques
 }
 
 /** "The next `judge`", as an outcome's rule yields it: the reference `branch.judging` and the operation. `emptied`: the entry empties `judging`, so it is emptied where no `judge` follows. */
-function andNext(state: Pick<StateView, "page">, after: Parameters<typeof nextJudge>[1], emptied = false): Pick<Decided, "effects" | "opens"> {
+function andNext(given: Pick<RuleGiven, "input" | "own">, state: Pick<StateView, "page">, after: Parameters<typeof nextJudge>[1], emptied = false): Pick<Decided, "effects" | "opens"> {
   const [branch, publication] = [branchOf(state), nextJudge(state, after)];
   if (!branch) throw new Error("a destination holds its branch item");
   if (publication === null) return { effects: emptied ? [{ effect: "ref", item: branch.id, slot: "judging", to: null }] : [], opens: [] };
-  return { effects: [{ effect: "ref", item: branch.id, slot: "judging", to: publication }], opens: [opening(DESTINATION_KINDS.judge, DESTINATION_ATTEMPTS.judge, publication)] };
+  return { effects: [{ effect: "ref", item: branch.id, slot: "judging", to: publication }], opens: [opening(given, DESTINATION_KINDS.judge, DESTINATION_ATTEMPTS.judge, publication)] };
 }
 
 /** One attempt of a push, as the outcome entry that is written leaves it: the operation, the attempt, the result, and whether the ledger opens the next attempt in the entry. */
@@ -894,23 +939,23 @@ function seenDecides(given: RuleGiven, publication: Item, seen: unknown, at: Pus
   // The publication's `integration`: `published`. The entry opens the item `receipt`, `owed`, with the publication and the commit,
   // and its first `receipt` operation with that attempt's `mint`. So the receipt's ID is the position of this entry.
   if (isObjectId(seen) && seen === integration) {
-    const next = andNext(state, { slot: true });
+    const next = andNext(given, state, { slot: true });
     return {
       effects: [
         { effect: "state", item: id, state: "published" }, { effect: "ref", item: branch.id, slot: "slot", to: null }, { effect: "value", item: branch.id, slot: "head", value: seen },
         { effect: "open", item: resolved.self, type: "receipt", state: "owed" }, { effect: "ref", item: resolved.self, slot: "publication", to: id }, { effect: "value", item: resolved.self, slot: "commit", value: seen },
         ...next.effects,
       ],
-      opens: [opening(DESTINATION_KINDS.receipt, DESTINATION_ATTEMPTS.receipt, id), opening(DESTINATION_KINDS.mint, DESTINATION_ATTEMPTS.mint, id), ...next.opens],
+      opens: [opening(given, DESTINATION_KINDS.receipt, DESTINATION_ATTEMPTS.receipt, id), opening(given, DESTINATION_KINDS.mint, DESTINATION_ATTEMPTS.mint, id), ...next.opens],
       update: { publication, state: "published", outcome: "published", commit: seen },
     };
   }
   if (isObjectId(seen) && seen === base) {
     // The base, and the ledger opens a further attempt in this entry: `unresolved`, and the `mint` of attempt n + 1.
-    if (at?.next) return unresolved([opening(DESTINATION_KINDS.mint, DESTINATION_ATTEMPTS.mint, id)]);
+    if (at?.next) return unresolved([opening(given, DESTINATION_KINDS.mint, DESTINATION_ATTEMPTS.mint, id)]);
     // The base; no attempt is open; and every attempt has a `refused` outcome: `aborted`.
     if (everyRefused(given, publication, at)) {
-      const [compromised, next] = [publication.values["aborting"] === true, andNext(state, { slot: true })];
+      const [compromised, next] = [publication.values["aborting"] === true, andNext(given, state, { slot: true })];
       const reason = compromised ? "compromised" : "host-refused";
       return {
         effects: [{ effect: "state", item: id, state: "aborted" }, { effect: "ref", item: branch.id, slot: "slot", to: null }, { effect: "value", item: id, slot: "reason", value: reason }, ...next.effects],
@@ -925,7 +970,7 @@ function seenDecides(given: RuleGiven, publication: Item, seen: unknown, at: Pus
   if (seen === "failed" || (isObjectId(seen) && seen === base)) {
     const open = at !== null && at.push.attempts.some((attempt) => attempt.attempt !== at.attempt && attempt.outcomes.length === 0);
     // One read for an operation: none is opened where an outcome of this push has opened one (entry FA14).
-    return unresolved(at !== null && !open && !readOpened(state, at.push) ? [opening(DESTINATION_KINDS.read, DESTINATION_ATTEMPTS.read, id)] : []);
+    return unresolved(at !== null && !open && !readOpened(state, at.push) ? [opening(given, DESTINATION_KINDS.read, DESTINATION_ATTEMPTS.read, id)] : []);
   }
   // Any other commit, or a ref that is absent: another writer (section 6.9). The slot stays held. No attempt and no read is opened.
   return unresolved([]);
@@ -982,10 +1027,24 @@ export function firstHeadCommit(state: Pick<StateView, "page">, own: Own, write:
     if (!isObjectId(commit)) throw new Error("an imported first head names its commit in the update");
     return commit;
   }
-  const claim = branch.refs["claim"];
-  if (!isFactRef(claim)) throw new Error("a founding first head holds its verified claim");
+  return foundingOf(state, own, format).commit;
+}
+
+/**
+ * The founding commit and its objects, by the version that the scope
+ * pinned at its genesis. Version 1: the empty tree. Version 2: one file,
+ * `README.md`, with the repository's name, the founder's handle and the
+ * directory's scope ID, each held by the branch since the genesis.
+ */
+export function foundingOf(state: Pick<StateView, "page">, own: Own, format: ObjectFormat): DestinationCommit {
+  const branch = branchOf(state);
+  const claim = branch?.refs["claim"];
+  if (!branch || !isFactRef(claim)) throw new Error("a founding first head holds its verified claim");
   const genesis = ownEntry(own, 0);
-  return foundingObjects(format, genesis.at.scope, genesis.time, claim).commit;
+  if (pinnedOf(own) === DESTINATION_1) return foundingObjects(format, genesis.at.scope, genesis.time, claim);
+  const [repository, handle, directory] = [branch.values["repository"] as { name?: unknown } | null, branch.values["founderHandle"], branch.refs["directory"]];
+  if (typeof repository?.name !== "string" || typeof handle !== "string" || !isScopeRef(directory)) throw new Error("a founding of version 2 holds the repository's name, the founder's handle and the directory");
+  return foundingObjects(format, genesis.at.scope, genesis.time, claim, { name: repository.name, handle, directory: directory.scope });
 }
 
 /** A receipt's recorded file, commit objects and public ref. Every fact is an own entry or a verified reference held by an item. */
@@ -1027,19 +1086,19 @@ function firstHeadSeen(given: RuleGiven, write: Operation, seen: unknown, fromRe
   if (closed(branch)) return NOTHING;
   const format = formatOf(seen);
   if (format !== null && seen === firstHeadCommit(state, own, write, format)) {
-    const next = andNext(state, { ready: true });
+    const next = andNext(given, state, { ready: true });
     return {
       effects: [
         { effect: "state", item: branch.id, state: "ready" }, { effect: "value", item: branch.id, slot: "head", value: seen as string },
         { effect: "open", item: resolved.self, type: "receipt", state: "owed" }, { effect: "value", item: resolved.self, slot: "commit", value: seen as string },
         { effect: "value", item: resolved.self, slot: "opening", value: seqOf(write.id) }, ...next.effects,
       ],
-      opens: [opening(DESTINATION_KINDS.receipt, DESTINATION_ATTEMPTS.receipt, write.for!), opening(DESTINATION_KINDS.mint, DESTINATION_ATTEMPTS.mint, write.for!), ...next.opens], update: null,
+      opens: [opening(given, DESTINATION_KINDS.receipt, DESTINATION_ATTEMPTS.receipt, write.for!), opening(given, DESTINATION_KINDS.mint, DESTINATION_ATTEMPTS.mint, write.for!), ...next.opens], update: null,
     };
   }
   if (fromRead) return NOTHING;
-  if (seen === "absent" && nextWrite(given, write, true)) return { effects: [], opens: [opening(DESTINATION_KINDS.mint, DESTINATION_ATTEMPTS.mint, write.for!)], update: null };
-  return seen === "failed" && !readOpened(state, write) ? { effects: [], opens: [opening(DESTINATION_KINDS.read, DESTINATION_ATTEMPTS.read, write.for!)], update: null } : NOTHING;
+  if (seen === "absent" && nextWrite(given, write, true)) return { effects: [], opens: [opening(given, DESTINATION_KINDS.mint, DESTINATION_ATTEMPTS.mint, write.for!)], update: null };
+  return seen === "failed" && !readOpened(state, write) ? { effects: [], opens: [opening(given, DESTINATION_KINDS.read, DESTINATION_ATTEMPTS.read, write.for!)], update: null } : NOTHING;
 }
 
 /** The receipt column. Its read never touches a token; its write runs T4 before this function. */
@@ -1051,9 +1110,9 @@ function receiptSeen(given: RuleGiven, write: Operation, seen: unknown, fromRead
   const format = formatOf(seen);
   if (format !== null) return { effects: [{ effect: "state", item: receipt.id, state: seen === destinationReceipt(state, own, receipt, format).commit ? "written" : "conflict" }], opens: [], update: null };
   if (fromRead) return NOTHING;
-  if (seen === "absent" && nextWrite(given, write, true)) return { effects: [], opens: [opening(DESTINATION_KINDS.mint, DESTINATION_ATTEMPTS.mint, write.for!)], update: null };
+  if (seen === "absent" && nextWrite(given, write, true)) return { effects: [], opens: [opening(given, DESTINATION_KINDS.mint, DESTINATION_ATTEMPTS.mint, write.for!)], update: null };
   const last = given.input.type === "outcome" && given.input.attempt === write.most;
-  return (seen === "failed" || (seen === "absent" && last)) && !readOpened(state, write) ? { effects: [], opens: [opening(DESTINATION_KINDS.read, DESTINATION_ATTEMPTS.read, write.for!)], update: null } : NOTHING;
+  return (seen === "failed" || (seen === "absent" && last)) && !readOpened(state, write) ? { effects: [], opens: [opening(given, DESTINATION_KINDS.read, DESTINATION_ATTEMPTS.read, write.for!)], update: null } : NOTHING;
 }
 
 const createDecides = (column: typeof firstHeadSeen): Decides => (given, write) => {
@@ -1275,9 +1334,9 @@ const judgeDecides = (reads: Reads): Decides => (given) => {
   const branch = branchOf(state);
   const publication = publicationAt(state, branch?.refs["judging"]);
   if (!branch || !publication || input.type !== "outcome") throw new Error("a judge is of the publication that branch.judging names");
-  if (publication.state !== "queued") return { ...andNext(state, { judging: true }, true), update: null };
+  if (publication.state !== "queued") return { ...andNext(given, state, { judging: true }, true), update: null };
   if (given.rows?.[3] === "over" || given.rows?.[4] === "over") {
-    const next = andNext(state, { judging: true, ended: publication.id }, true);
+    const next = andNext(given, state, { judging: true, ended: publication.id }, true);
     return { effects: [{ effect: "state", item: publication.id, state: "not-reserved" }, { effect: "value", item: publication.id, slot: "reason", value: "evidence-too-large" }, ...next.effects], opens: next.opens, update: { publication, state: "not-reserved", outcome: "refused", reason: "evidence-too-large" } };
   }
   const recorded = input.evidence.body;
@@ -1296,7 +1355,7 @@ const judgeDecides = (reads: Reads): Decides => (given) => {
   if (judged.reserved === null) throw new Error("what observed and uses say of this reservation is not at hand");
   const rules = read?.rules?.revision ?? null;
   if (!judged.reserved) {
-    const next = andNext(state, { judging: true, ended: publication.id }, true);
+    const next = andNext(given, state, { judging: true, ended: publication.id }, true);
     return {
       effects: [{ effect: "state", item: publication.id, state: "not-reserved" }, { effect: "value", item: publication.id, slot: "reason", value: judged.reason }, ...next.effects],
       opens: next.opens,
@@ -1309,7 +1368,7 @@ const judgeDecides = (reads: Reads): Decides => (given) => {
       { effect: "value", item: publication.id, slot: "integration", value: judged.integration }, { effect: "value", item: publication.id, slot: "reservedAt", value: resolved.self },
       ...(judged.reason === null ? [] : [{ effect: "value", item: publication.id, slot: "reason", value: judged.reason } as const]),
     ],
-    opens: [opening(DESTINATION_KINDS.push, DESTINATION_ATTEMPTS.push, publication.id), opening(DESTINATION_KINDS.mint, DESTINATION_ATTEMPTS.mint, publication.id)],
+    opens: [opening(given, DESTINATION_KINDS.push, DESTINATION_ATTEMPTS.push, publication.id), opening(given, DESTINATION_KINDS.mint, DESTINATION_ATTEMPTS.mint, publication.id)],
     update: { publication, state: "reserved", outcome: "committed", ...(judged.reason === null ? {} : { reason: judged.reason }), rules },
   };
 };
@@ -1429,9 +1488,9 @@ const WRITTEN: Rules = {
    */
   "declare-first-head": {
     place: "effect", most: 2,
-    run: ({ resolved }) => (resolved.fields["import"] === false ? [
-      { effect: "operation", k: 0, owner: DESTINATION, kind: DESTINATION_KINDS.firstHead, attempts: DESTINATION_ATTEMPTS.firstHead, for: resolved.self },
-      { effect: "operation", k: 1, owner: DESTINATION, kind: DESTINATION_KINDS.mint, attempts: DESTINATION_ATTEMPTS.mint, for: resolved.self },
+    run: (given) => (given.resolved.fields["import"] === false ? [
+      { effect: "operation", k: 0, owner: pinnedBy(given), kind: DESTINATION_KINDS.firstHead, attempts: DESTINATION_ATTEMPTS.firstHead, for: given.resolved.self },
+      { effect: "operation", k: 1, owner: pinnedBy(given), kind: DESTINATION_KINDS.mint, attempts: DESTINATION_ATTEMPTS.mint, for: given.resolved.self },
     ] : []),
   },
   /**
@@ -1443,14 +1502,15 @@ const WRITTEN: Rules = {
    */
   "open-first-head": {
     place: "effect", most: 4,
-    run: ({ state: view, own, input, resolved }) => {
+    run: (given) => {
+      const { state: view, own, input, resolved } = given;
       if (input.type !== "delivery" || input.message.class !== "request" || input.message.type !== "relate") throw new Error("open-first-head stands in a `relate` handler, and reads its update");
       const state = isObject(input.message.body) ? input.message.body["state"] : null;
       const branch = branchOf(view)!;
       for (let seq = branch.id; seq < resolved.self; seq += 1) {
-        if (own(seq)?.entry.effects.some((effect) => effect.effect === "operation" && effect.owner === DESTINATION && effect.kind === DESTINATION_KINDS.firstHead)) return [];
+        if (own(seq)?.entry.effects.some((effect) => effect.effect === "operation" && isOf(effect.owner, NAME_OF) && effect.kind === DESTINATION_KINDS.firstHead)) return [];
       }
-      return state === "done" && typeof resolved.fields["commit"] === "string" ? [...opened(0, DESTINATION_KINDS.firstHead, DESTINATION_ATTEMPTS.firstHead, branchOf(view)!.id), ...opened(1, DESTINATION_KINDS.mint, DESTINATION_ATTEMPTS.mint, branchOf(view)!.id)] : [];
+      return state === "done" && typeof resolved.fields["commit"] === "string" ? [...opened(given, 0, DESTINATION_KINDS.firstHead, DESTINATION_ATTEMPTS.firstHead, branchOf(view)!.id), ...opened(given, 1, DESTINATION_KINDS.mint, DESTINATION_ATTEMPTS.mint, branchOf(view)!.id)] : [];
     },
   },
   /**
@@ -1466,9 +1526,10 @@ const WRITTEN: Rules = {
    */
   "open-judge": {
     place: "effect", most: 3,
-    run: ({ state, resolved }) => {
+    run: (given) => {
+      const { state, resolved } = given;
       const [branch, publication] = [branchOf(state), nextJudge(state, { opens: resolved.self })];
-      return branch && publication !== null ? [...opened(0, DESTINATION_KINDS.judge, DESTINATION_ATTEMPTS.judge, publication), { effect: "ref", item: branch.id, slot: "judging", to: publication }] : [];
+      return branch && publication !== null ? [...opened(given, 0, DESTINATION_KINDS.judge, DESTINATION_ATTEMPTS.judge, publication), { effect: "ref", item: branch.id, slot: "judging", to: publication }] : [];
     },
   },
   /**
@@ -1527,7 +1588,8 @@ const WRITTEN: Rules = {
    */
   "abort-if-behind": {
     place: "effect", most: 6,
-    run: ({ state, own, resolved }) => {
+    run: (given) => {
+      const { state, own, resolved } = given;
       const publication = publicationAt(state, branchOf(state)?.refs["slot"]);
       const [key, at] = [resolved.fields["key"], publication?.values["reservedAt"]];
       if (!publication || !HELD.includes(publication.state) || publication.values["aborting"] === true || typeof key !== "string" || typeof at !== "number") return [];
@@ -1537,8 +1599,8 @@ const WRITTEN: Rules = {
       const live = (publication.values["token"] ?? null) !== null;
       return [
         { effect: "value", item: publication.id, slot: "aborting", value: true },
-        ...(live ? [...opened(0, DESTINATION_KINDS.revoke, DESTINATION_ATTEMPTS.revoke, publication.id), { effect: "value", item: publication.id, slot: "token", value: null } as const] : []),
-        ...opened(live ? 1 : 0, DESTINATION_KINDS.read, DESTINATION_ATTEMPTS.read, publication.id),
+        ...(live ? [...opened(given, 0, DESTINATION_KINDS.revoke, DESTINATION_ATTEMPTS.revoke, publication.id), { effect: "value", item: publication.id, slot: "token", value: null } as const] : []),
+        ...opened(given, live ? 1 : 0, DESTINATION_KINDS.read, DESTINATION_ATTEMPTS.read, publication.id),
       ];
     },
   },
@@ -1548,17 +1610,7 @@ const WRITTEN: Rules = {
    */
   "open-branch-read": {
     place: "effect", most: 2,
-    run: ({ resolved }) => opened(0, DESTINATION_KINDS.adoptRead, DESTINATION_ATTEMPTS.adoptRead, resolved.subjects.get("on")!.id),
-  },
-  /**
-   * Among the effects of `read-token` (P16; the planner's decision for I5).
-   * It reads nothing more. An `operation` effect: one `mint-read` for the
-   * branch, and its attempt 1. The host reads the lifetime from the act's
-   * field `hours`, in the entry that opened the operation.
-   */
-  "open-read-token": {
-    place: "effect", most: 2,
-    run: ({ resolved }) => opened(0, DESTINATION_KINDS.mintRead, DESTINATION_ATTEMPTS.mintRead, resolved.subjects.get("on")!.id),
+    run: (given) => opened(given, 0, DESTINATION_KINDS.adoptRead, DESTINATION_ATTEMPTS.adoptRead, given.resolved.subjects.get("on")!.id),
   },
   /**
    * Row z, the second guard of `resend` and of `resend-receipt` (P29;
@@ -1605,11 +1657,12 @@ const WRITTEN: Rules = {
    */
   "reopen-publish": {
     place: "effect", most: 4,
-    run: ({ resolved }) => {
+    run: (given) => {
+      const { resolved } = given;
       const [on, receipt] = [resolved.subjects.get("on"), resolved.subjects.get("also.receipt")];
       const kind = receipt?.type === "receipt" ? (receipt.state === "owed" ? DESTINATION_KINDS.receipt : null) : on?.type === "publication" ? (on.state === "unresolved" ? DESTINATION_KINDS.push : null) : undefined;
       if (kind === undefined) throw new Error("reopen-publish stands in a row whose primary item is a publication, or which names a receipt");
-      return kind === null ? [] : [...opened(0, kind, DESTINATION_ATTEMPTS.resend, on!.id), ...opened(1, DESTINATION_KINDS.mint, DESTINATION_ATTEMPTS.mint, on!.id)];
+      return kind === null ? [] : [...opened(given, 0, kind, DESTINATION_ATTEMPTS.resend, on!.id), ...opened(given, 1, DESTINATION_KINDS.mint, DESTINATION_ATTEMPTS.mint, on!.id)];
     },
   },
   /**
@@ -1673,41 +1726,19 @@ const WRITTEN: Rules = {
         return body !== null && (result !== "confirmed" || (typeof body["token"] === "string" && body["token"].length > 0 && utf8(body["token"]).length <= 256 && timeMs(body["ends"]) !== null));
       },
       unknown: () => ({}),
-      derives: ({ state, own, input }, mint) => {
+      derives: (given, mint) => {
+        const { state, own, input } = given;
         if (input.type !== "outcome" || input.result !== "confirmed") return { effects: [], sends: [], opens: [] };
         const served = servedBy(state, own, mint);
         if (!served) throw new Error("a mint is of one attempt of a write");
         const target = targetOf(state, own, served.write);
         const attempt = served.write.attempts.find((opened) => opened.attempt === served.attempt);
-        if (target === null || closed(target) || (attempt?.outcomes.length ?? 0) > 0) return { effects: [], sends: [], opens: [opening(DESTINATION_KINDS.revoke, DESTINATION_ATTEMPTS.revoke, mint.for!)] };
+        if (target === null || closed(target) || (attempt?.outcomes.length ?? 0) > 0) return { effects: [], sends: [], opens: [opening(given, DESTINATION_KINDS.revoke, DESTINATION_ATTEMPTS.revoke, mint.for!)] };
         return {
           effects: [{ effect: "value", item: target.id, slot: "token", value: mint.id }, ...(target.type === "publication" && target.state === "reserved" ? [{ effect: "state", item: target.id, state: "publishing" } as const] : [])],
           sends: [], opens: [],
         };
       },
-    },
-  },
-  /**
-   * The outcome entries of a `mint-read` (P16; the planner's decision for
-   * I5). It yields nothing: the credential is for the member who signed
-   * `read-token`, and no item holds it. A read token is not revoked by an
-   * operation: it ends at its end.
-   *
-   * The body of a `confirmed` outcome is `{ token, ends }`, as a `mint`'s:
-   * the host adapter's nonsecret handle of the credential, a text of at most
-   * 256 bytes, and the time at which it ends. Never the secret. Of a
-   * `refused` or an `unknown` one it is an empty record. It has 1 attempt.
-   */
-  "mint-read": {
-    place: "outcome",
-    rules: {
-      selects: false, read: false, most: { effects: 0, requests: 0, operations: 0 },
-      retries: () => false,
-      wellFormed: (result, evidence) => {
-        const body = bodyOf(evidence.body, result === "confirmed" ? ["token", "ends"] : []);
-        return body !== null && (result !== "confirmed" || (typeof body["token"] === "string" && body["token"].length > 0 && utf8(body["token"]).length <= 256 && timeMs(body["ends"]) !== null));
-      },
-      unknown: () => ({}),
     },
   },
   /**
@@ -1845,13 +1876,14 @@ const WRITTEN: Rules = {
       selects: false, read: false, most: { effects: 5, requests: 0, operations: 1 },
       retries: () => false,
       wellFormed: (result, evidence) => { const seen = bodyOf(evidence.body, ["seen"])?.["seen"]; return result === "confirmed" && (seen === "absent" || isObjectId(seen)); },
-      derives: ({ state, own, input }, read) => {
+      derives: (given, read) => {
+        const { state, own, input } = given;
         const [branch, act] = [branchOf(state), ownEntry(own, seqOf(read.id)).input];
         if (!branch || input.type !== "outcome" || act.type !== "act") throw new Error("an adopt-read is of the act adopt-head on the branch");
         const [seen, commit] = [bodyOf(input.evidence.body, ["seen"])?.["seen"], act.signed.intent.fields["commit"]];
         const holds = (branch.refs["slot"] ?? null) === null && HELD.every((held) => state.count("publication", held) === 0);
         if (!isObjectId(seen) || seen !== commit || !holds) return { effects: [], sends: [], opens: [] };
-        const next = andNext(state, { ready: true });
+        const next = andNext(given, state, { ready: true });
         return {
           effects: [{ effect: "value", item: branch.id, slot: "head", value: seen }, ...(branch.state === "ready" ? [] : [{ effect: "state", item: branch.id, state: "ready" } as const]), ...next.effects],
           sends: [], opens: next.opens,
@@ -1861,15 +1893,55 @@ const WRITTEN: Rules = {
   },
 };
 
+/** The rules that version 2 adds: those of the act `read-token` and of its operation `mint-read`. */
+const WRITTEN_2: Rules = {
+  /**
+   * Among the effects of `read-token` (P16; the planner's decision for I5).
+   * It reads nothing more. An `operation` effect: one `mint-read` for the
+   * branch, and its attempt 1. The host reads the lifetime from the act's
+   * field `hours`, in the entry that opened the operation.
+   */
+  "open-read-token": {
+    place: "effect", most: 2,
+    run: (given) => opened(given, 0, DESTINATION_KINDS.mintRead, DESTINATION_ATTEMPTS.mintRead, given.resolved.subjects.get("on")!.id),
+  },
+  /**
+   * The outcome entries of a `mint-read` (P16; the planner's decision for
+   * I5). It yields nothing: the credential is for the member who signed
+   * `read-token`, and no item holds it. A read token is not revoked by an
+   * operation: it ends at its end.
+   *
+   * The body of a `confirmed` outcome is `{ token, ends }`, as a `mint`'s:
+   * the host adapter's nonsecret handle of the credential, a text of at most
+   * 256 bytes, and the time at which it ends. Never the secret. Of a
+   * `refused` or an `unknown` one it is an empty record. It has 1 attempt.
+   */
+  "mint-read": {
+    place: "outcome",
+    rules: {
+      selects: false, read: false, most: { effects: 0, requests: 0, operations: 0 },
+      retries: () => false,
+      wellFormed: (result, evidence) => {
+        const body = bodyOf(evidence.body, result === "confirmed" ? ["token", "ends"] : []);
+        return body !== null && (result !== "confirmed" || (typeof body["token"] === "string" && body["token"].length > 0 && utf8(body["token"]).length <= 256 && timeMs(body["ends"]) !== null));
+      },
+      unknown: () => ({}),
+    },
+  },
+};
+
 /**
- * The rules of `platform:destination@1`, with a reader of what the lane's
- * entries in `uses` say for a reservation. A test gives a STAND-IN reader.
- * The production rules are `destinationRules`, below.
+ * The rules of one version of the destination, with a reader of what the
+ * lane's entries in `uses` say for a reservation. A test gives a STAND-IN
+ * reader. The production rules are `destinationRules` and
+ * `destinationRules2`, below.
  */
-export function destinationRulesWith(reads: Reads): Rules {
+export function destinationRulesWith(reads: Reads, version: 1 | 2 = 2): Rules {
   const judge = judgeDecides(reads);
-  return { ...WRITTEN, judge: judgeRule(judge), "publication-update": updateRule({ ...DECIDES, [DESTINATION_KINDS.judge]: judge }) };
+  return { ...WRITTEN, ...(version === 1 ? {} : WRITTEN_2), judge: judgeRule(judge), "publication-update": updateRule({ ...DECIDES, [DESTINATION_KINDS.judge]: judge }) };
 }
 
 /** The rules of `platform:destination@1` that this package holds: what a runtime and a verifier run. */
-export const destinationRules: Rules = destinationRulesWith(READ_LANE);
+export const destinationRules: Rules = destinationRulesWith(READ_LANE, 1);
+/** The rules of `platform:destination@2`. */
+export const destinationRules2: Rules = destinationRulesWith(READ_LANE, 2);
