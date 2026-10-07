@@ -47,7 +47,7 @@ test("real RSA JWT and scripted GitHub HTTP expose one restricted mint and exact
   ]);
   expect(await requests[1]!.json()).toEqual({ repository_ids: [71], permissions: { contents: "write" } });
   expect(requests[2]!.headers.get("authorization")).toBe(`Bearer ${TOKEN}`);
-  expect(requests.every((request) => request.redirect === "error" && request.credentials === "omit" && request.signal instanceof AbortSignal && new URL(request.url).origin === "https://api.github.com" && !request.url.includes(TOKEN) && !new URL(request.url).search)).toBe(true);
+  expect(requests.every((request) => request.redirect === "manual" && request.credentials === "omit" && request.signal instanceof AbortSignal && new URL(request.url).origin === "https://api.github.com" && !request.url.includes(TOKEN) && !new URL(request.url).search)).toBe(true);
   expect(JSON.stringify(client)).toBe("{}");
 });
 

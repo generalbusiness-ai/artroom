@@ -157,8 +157,8 @@ export class GitHubApp {
   }
 
   /** A 404 means GitHub did not expose it; it is not proof of nonexistence. */
-  async repository(name: string, plaintext: string): Promise<GitHubRepository | null> {
-    const answer = await this.#request(this.#repoPath(name), "GET", credential(plaintext), 200, undefined, true);
+  async repository(name: string, plaintext?: string): Promise<GitHubRepository | null> {
+    const answer = await this.#request(this.#repoPath(name), "GET", plaintext === undefined ? undefined : credential(plaintext), 200, undefined, true);
     return answer === null ? null : this.#repository(answer, name);
   }
 
@@ -214,7 +214,7 @@ export class GitHubApp {
     return { id, owner, name, private: repository["private"], htmlUrl, gitUrl };
   }
 
-  async #request(path: string, method: "GET" | "POST" | "DELETE", token: string, status: number, body?: unknown, missing = false): Promise<unknown> {
+  async #request(path: string, method: "GET" | "POST" | "DELETE", token: string | undefined, status: number, body?: unknown, missing = false): Promise<unknown> {
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout> | undefined;
     const deadline = new Promise<never>((_, reject) => {
@@ -224,9 +224,13 @@ export class GitHubApp {
     let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
     try {
       const url = `https://api.github.com${path}`;
-      const headers = new Headers({ accept: "application/vnd.github+json", authorization: `Bearer ${token}`, "x-github-api-version": "2022-11-28", "user-agent": "Artroom-GitHub-App" });
+      const headers = new Headers({ accept: "application/vnd.github+json", "x-github-api-version": "2022-11-28", "user-agent": "Artroom-GitHub-App" });
+      if (token !== undefined) headers.set("authorization", `Bearer ${token}`);
       if (body !== undefined) headers.set("content-type", "application/json");
-      const request = new Request(url, { method, headers, credentials: "omit", redirect: "error", signal: controller.signal, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+      // workerd implements manual, not error: no redirect is followed, and
+      // the status/URL checks below refuse every redirect response.
+      const init: RequestInit & { credentials: "omit" } = { method, headers, credentials: "omit", redirect: "manual", signal: controller.signal, ...(body === undefined ? {} : { body: JSON.stringify(body) }) };
+      const request = new Request(url, init);
       const pending = this.#fetch(request);
       // Dispose a late response even if a supplied transport ignores abort.
       void pending.then((late) => { if (controller.signal.aborted) void late.body?.cancel().catch(() => undefined); }, () => undefined);
@@ -251,13 +255,13 @@ export class GitHubApp {
       const bytes = new Uint8Array(size);
       let at = 0;
       for (const chunk of chunks) { bytes.set(chunk, at); at += chunk.length; }
-      try { return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)) as unknown; }
+      try { return JSON.parse(new TextDecoder("utf-8", { fatal: true, ignoreBOM: false }).decode(bytes)) as unknown; }
       catch { return fail("response"); }
     } catch (error) {
       if (error instanceof GitHubFailure) throw error;
       return fail(controller.signal.aborted ? "timeout" : "request");
     } finally {
-      clearTimeout(timer);
+      if (timer !== undefined) clearTimeout(timer);
       if (reader !== undefined) { void reader.cancel().catch(() => undefined); reader.releaseLock(); }
       else { void response?.body?.cancel().catch(() => undefined); }
     }
