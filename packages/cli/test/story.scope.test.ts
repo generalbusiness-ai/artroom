@@ -114,11 +114,12 @@ describe("the artroom command on real scopes. The Git host and the scheduler are
     expect(added.lines).toEqual([`Took effect: entry ${M.name}:${seq}, hash ${sealed.hash.slice(0, 19)}.`]);
     expect((await M.item(seq)).values).toMatchObject({ handle: "@check", kind: "checker" });
 
-    // act, refused: una opens an issue under a definition that the real rules scope has never activated. The scope refuses it by
-    // the guard's name, and writes nothing.
+    // act, refused: una opens an issue under a definition that the real rules scope has never activated, and the command sends no
+    // definition bytes beside it. Since the definition's bytes have a stated value place (lane wiring, commit c6fe198), the scope
+    // refuses the missing value `bad-field` before any guard runs, and writes nothing.
     const before = (await D.summary()).at;
     const refused = await run(una, "act", "open-issue", "--on", "directory", "--set", `definition=${textDigest("a definition no rules scope activated")}`, "--set", "title=An inactive definition", "--set", "conditions=[]");
-    expect(refused).toEqual({ code: 1, lines: [`Refused: guard-failed (not-activated), judged at entry ${D.name}:${before.seq}. Nothing was written.`] });
+    expect(refused).toEqual({ code: 1, lines: [`Refused: bad-field, judged at entry ${D.name}:${before.seq}. Nothing was written.`] });
     expect((await D.summary()).at).toEqual(before);
 
     // log, show and verify with una's real read session, under a TEST SECRET: the command asks membership for one with her key.

@@ -92,7 +92,7 @@ scope's summary; the scope checks it again.
 
 ```
 Took effect: entry sc_p6xp2lmd...:8, hash sha256:2cd70f9ada97.
-Refused: guard-failed (not-activated), judged at entry sc_hs5f27fz...:4. Nothing was written.
+Refused: bad-field, judged at entry sc_hs5f27fz...:4. Nothing was written.
 ```
 
 **`artroom log <scope> [--limit n]`** and **`artroom show <entry>`**
@@ -131,9 +131,10 @@ register.
 - Nothing is deployed, so the command has run only against the test
   Worker. Its tests use a stand-in for the Git host and drive the
   scopes' dispatchers in place of a deployment's alarms.
-- The lanes' acts arrive with the lane wiring branch. Until then the
-  directory refuses `open-issue` and `open-pr`, because the rules scope
-  has activated no lane definition.
+- `act` sends no value beside an act. The directory's `open-issue` and
+  `open-pr` need the lane definition's bytes beside the act, at the
+  field `definition`, so the directory refuses both `bad-field` when the
+  command sends them.
 - `invite --acts` is refused: membership's `invite-member` has no list of
   acts for one member.
 - On a deployment with read sessions, `claim` cannot read the register or
