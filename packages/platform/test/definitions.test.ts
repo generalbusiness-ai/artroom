@@ -152,7 +152,7 @@ test("a rules scope and a destination record the scope ID of membership as a val
 // Scope contract revision 23, section 17.2a, and authority revision 28, section 5.8. Each destination operation is counted by
 // its branch or publication. Its data gives finite reservations, the bound withdraw and the complete observation rows.
 test("destination data validates whole with finite reservations, a bound indexed withdraw and the five adopted judge observation rows", () => {
-  const destination = platform("platform:destination@1")!;
+  const destination = platform("platform:destination@2")!;
   const checked = validateDefinition(destination.data, PROPOSED_BOUNDS, PROFILES, { platform: true, outcomeValues: outcomeValueDomains(destination.data, destination.rules) });
   if (!checked.ok) throw new Error(JSON.stringify(checked.problems));
   expect([checked.definition.observing, checked.definition.keyed, runnable(checked.definition, destination.rules)]).toEqual([true, { publication: ["operation"] }, true]);

@@ -36,7 +36,7 @@ import type { Digest, Entry, Input, KeyId, Observation, ObservationRequest, Obse
 import { canonicalize, hex, isObservationUse, isRecord, parseStrict } from "@generalbusiness/artroom-bytes";
 import { WINDOWS, contentChecked, contentStates, fixedBy, highestHead, judgeGrant, membershipOf, namedBy, observationOf, observedName, observedOf, prefer, revoked, same, subjectName, valueDigest, type Clock as Reading, type ContentStates, type GrantJudgment, type Needed, type RecordedRef, type Retains, type StateView, type ValueRead } from "@generalbusiness/artroom-derive";
 import { isPlatformDefinition } from "@generalbusiness/artroom-bytes";
-import { platform, standingOf } from "@generalbusiness/artroom-platform";
+import { isOf, platform, standingOf } from "@generalbusiness/artroom-platform";
 import type { Asked, Authority, Clock, Further, Random, Standing } from "./ports.ts";
 
 /**
@@ -315,7 +315,7 @@ export function observing(config: Observing): Authority {
  * entries hold one read as `fresh`. An act whose row names no action is
  * judged on no grant, and nothing is built for it.
  */
-export function ownStanding(random: Random): Authority {
+export function ownStanding(random: Random, genesis: Repository["genesis"]): Authority {
   const run: RunId = hex(random.bytes(16));
   let count = 0;
   return {
@@ -327,7 +327,9 @@ export function ownStanding(random: Random): Authority {
       return Promise.resolve({
         membership: scope,
         held(view, clock) {
-          const observation = observationOf(standingOf(view, { of: scope, key }), clock.reading);
+          // The answer states the version of membership that the scope pinned at its genesis.
+          const named = genesis()?.seed.definition;
+          const observation = isOf(named, "platform:membership") ? observationOf(standingOf(view, { of: scope, key }, named), clock.reading) : null;
           // No answer: the scope is not an active membership scope at this head, so no grant rests on it (section 12.1.3, case e).
           if (!observation) return null;
           const use: ObservationUse = { observation, read: { run, n }, use: "fresh", prior: null };
@@ -415,7 +417,7 @@ const NOTHING_READ: Further = { read: () => Promise.resolve(), observed: () => [
  * the membership scope answers, and nothing a caller brings.
  */
 export function repositoryAuthority(config: Repository): Authority {
-  const own = ownStanding(config.random);
+  const own = ownStanding(config.random, config.genesis);
   const observed = observing({
     clock: config.clock, random: config.random, reader: config.reader, membership: (scope) => recordedMembership(config, scope),
     // Where a version's scopes record their rules reference is code of the version, as for the membership reference. The read goes

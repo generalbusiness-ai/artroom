@@ -4,7 +4,8 @@ import type { Entry, FieldValue, OperationId, Request } from "@generalbusiness/a
 import { canonicalize, factRefOf, parseStrict } from "@generalbusiness/artroom-bytes";
 import { derivable, operationSettled, runnable, type Item, type JudgedInput, type PlatformRule, type RuleGiven } from "@generalbusiness/artroom-derive";
 import { t } from "@generalbusiness/artroom-derive/testing";
-import { COLLECT_MOST, DESTINATION, DESTINATION_KINDS, NAMED_MOST, RECEIPTS_OWED, REPORTS_MOST, destination, destinationRules, revokedToken, writeSends } from "../src/destination.ts";
+// The data and the rules of the newest version, `platform:destination@2`, which every test here founds on.
+import { COLLECT_MOST, DESTINATION, DESTINATION_KINDS, NAMED_MOST, RECEIPTS_OWED, REPORTS_MOST, destination2 as destination, destinationRules2 as destinationRules, revokedToken, writeSends } from "../src/destination.ts";
 import { firstExtents } from "../src/extents.ts";
 import { platform } from "../src/index.ts";
 import { judgeReservation, type JudgeEvidence, type ReservationRead, type Statement } from "../src/reservation.ts";
@@ -31,7 +32,7 @@ const outcomesOf = (b: Branch, operation: OperationId) => b.state.operation(oper
 const rule = (name: string) => { const found = destinationRules[name]!; if (found.place !== "outcome") throw new Error(`${name} is no rule of an outcome`); return found.rules; };
 const TOKEN = { token: "host-token-1", ends: t(600) };
 
-// The plan's T43, for `platform:destination@1` (authority note, revision 26, section 12.1.5, and its table of marks, section 12.1.8).
+// The plan's T43, for `platform:destination@2` (authority note, revision 26, section 12.1.5, and its table of marks, section 12.1.8).
 test("the destination definition validates whole with the platform option; its marks and its outcome kinds are listed; every mark has a rule, so the package's rules run it; it names no fence", () => {
   const checked = destinationDefinition;
   expect([checked.underived, derivable(checked, null), destination.capabilities, destination.rules, destination.timed]).toEqual([[], true, [], {}, {}]);
@@ -40,10 +41,10 @@ test("the destination definition validates whole with the platform option; its m
   // with the four slots of the item `receipt`. Its `max` is the `max` of `publication`, plus the number of `receipts-owed`, plus 1.
   expect([Object.entries(destination.items).map(([name, type]) => [name, type.max, type.initial, Object.entries(type.states).map(([state, { final }]) => (final ? `${state}!` : state))]), destination.genesis, Object.keys(destination.acts)]).toEqual([
     [["branch", 1, "empty", ["empty", "ready"]], ["publication", 64, "queued", ["queued", "reserved", "publishing", "unresolved", "published!", "aborted!", "not-reserved!"]], ["receipt", 129, "owed", ["owed", "written!", "conflict!"]]],
-    "establish", ["establish", "adopt-head", "resend", "resend-receipt", "read-token", "add-room", "add-branch-room"],
+    "establish", ["establish", "adopt-head", "resend", "resend-receipt", "add-room", "add-branch-room", "read-token"],
   ]);
   expect([Object.keys(destination.items["branch"]!.refs), Object.keys(destination.items["branch"]!.values), Object.keys(destination.items["publication"]!.values), destination.items["receipt"]!.refs, Object.entries(destination.items["receipt"]!.values).map(([name, slot]) => [name, slot.fixed, slot.required])]).toEqual([
-    ["directory", "claim", "slot", "judging"], ["repository", "name", "import", "membership", "rules", "head", "token"], ["integration", "reason", "withdrawDecided", "reservedAt", "aborting", "token"],
+    ["directory", "claim", "slot", "judging"], ["repository", "name", "import", "membership", "rules", "head", "token", "founderHandle"], ["integration", "reason", "withdrawDecided", "reservedAt", "aborting", "token"],
     { publication: { fixed: true, required: false, to: { type: "item", of: "publication" } } }, [["commit", true, true], ["opening", true, false], ["token", false, false]],
   ]);
   // The six fields of `reserve` (revision 28, section 6.5): two facts, two written lists of records that name facts, the `collect`
@@ -64,7 +65,7 @@ test("the destination definition validates whole with the platform option; its m
 
   // The marks, by the rows of the note's table: rows 30 to 37, row b at its one field, row z, place 7, and the send of rows m and n.
   const marks = [
-    [5, "acts.establish.effects.7", "declare-first-head", "P16"], [5, "receives.import.effects.0", "open-first-head", "P16"], [5, "receives.reserve.effects.3", "open-judge", "P16"],
+    [5, "acts.establish.effects.8", "declare-first-head", "P16"], [5, "receives.import.effects.0", "open-first-head", "P16"], [5, "receives.reserve.effects.3", "open-judge", "P16"],
     [2, "receives.withdraw.also.publication", "publication-of", "P15"], [5, "receives.withdraw.effects.3", "open-withdrawn", "P15"], [5, "receives.compromised.effects.0", "abort-if-behind", "P19"],
     [5, "acts.adopt-head.effects.0", "open-branch-read", "P16"], [5, "acts.resend.effects.0", "reopen-publish", "P16"], [4, "acts.resend.guards.1", "resend-due", "P29"],
     // The I5 act `read-token` and the outcome of its `mint-read`.
@@ -89,9 +90,12 @@ test("the destination definition validates whole with the platform option; its m
   expect(rules).toBe(destinationRules);
   expect(Object.entries(rules).map(([name, held]) => [name, held.place, "most" in held ? held.most : held.place === "outcome" ? (held.rules.most?.effects ?? null) : null])).toEqual([
     ["declare-first-head", "effect", 2], ["open-first-head", "effect", 4], ["open-judge", "effect", 3], ["publication-of", "also", null], ["open-withdrawn", "effect", 5],
-    ["abort-if-behind", "effect", 6], ["open-branch-read", "effect", 2], ["open-read-token", "effect", 2], ["resend-due", "guard", null], ["reopen-publish", "effect", 4], ["collect-list", "type", null],
+    ["abort-if-behind", "effect", 6], ["open-branch-read", "effect", 2], ["resend-due", "guard", null], ["reopen-publish", "effect", 4], ["collect-list", "type", null],
     // `most`, counted again (revision 28; I3 deltas, entry FA11): a push that publishes yields 16 effects, and a read that publishes 13.
-    ["mint", "outcome", 2], ["mint-read", "outcome", 0], ["revoke", "outcome", 0], ["push", "outcome", 16], ["first-head", "outcome", 15], ["receipt", "outcome", 5], ["deciding-read", "outcome", 13], ["adopt-read", "outcome", 5], ["judge", "outcome", 10], ["publication-update", "send", null],
+    ["mint", "outcome", 2], ["revoke", "outcome", 0], ["push", "outcome", 16], ["first-head", "outcome", 15], ["receipt", "outcome", 5], ["deciding-read", "outcome", 13], ["adopt-read", "outcome", 5],
+    // The two rules that version 2 adds.
+    ["open-read-token", "effect", 2], ["mint-read", "outcome", 0],
+    ["judge", "outcome", 10], ["publication-update", "send", null],
   ]);
   const lacking = [...new Set(checked.marks.filter((mark) => !Object.hasOwn(rules, mark.code)).map((mark) => mark.code))];
   expect(lacking).toEqual([]);
@@ -101,7 +105,7 @@ test("the destination definition validates whole with the platform option; its m
 
 // The plan's T50, the destination's first table: each rule of `platform:destination@1` at an act or a handler, as a plain function,
 // from its row of the note's table of marks (section 12.1.8). A rule is called with what a judge gives it.
-test("each rule of platform:destination@1 at an act or a handler, as a plain function, gives what its row of the table of marks states (authority note, section 12.1.8)", () => {
+test("each rule of platform:destination@2 at an act or a handler, as a plain function, gives what its row of the table of marks states (authority note, section 12.1.8)", () => {
   /** A destination with its first head and no publication; and one whose one queued publication has its `judge` open. */
   const fresh = new Branch(false).ready();
   const ready = new Branch(false).ready();

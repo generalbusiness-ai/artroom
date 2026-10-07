@@ -14,9 +14,9 @@
  */
 
 import { runInDurableObject } from "cloudflare:test";
-import type { Entry, FactRef, OperationId } from "@generalbusiness/artroom-contract";
+import type { Entry, OperationId } from "@generalbusiness/artroom-contract";
 import { timeMs, timeOf } from "@generalbusiness/artroom-bytes";
-import { destinationReceipt, foundingObjects, revokedToken } from "@generalbusiness/artroom-platform";
+import { destinationReceipt, foundingOf, revokedToken } from "@generalbusiness/artroom-platform";
 import { targetOf } from "../../platform/src/destination.ts";
 import { SqliteStore } from "../src/index.ts";
 import { net } from "../src/testing.ts";
@@ -24,12 +24,12 @@ import { outsideOf, wired } from "./outside.ts";
 import type { Platform } from "./repository.ts";
 
 /**
- * Drive the founding publication of the destination `G`, which the claim at `claim` caused, to its end: the branch is `ready` at
- * the first head, and the receipt is written. The STAND-IN host is wired for the destination while this runs, and unwired after.
+ * Drive the founding publication of the destination `G` to its end: the branch is `ready` at the first head, and the receipt is
+ * written. The first head is the founding commit of the destination's own version, from its own records (`foundingOf`). The
+ * STAND-IN host is wired for the destination while this runs, and unwired after.
  */
-export async function foundingPublication(G: Platform, claim: FactRef): Promise<void> {
+export async function foundingPublication(G: Platform): Promise<void> {
   const host = outsideOf(G.name);
-  const firstHead = foundingObjects("sha1", G.name, (await G.entries())[0]!.time, claim).commit;
   let driving = "";
   wired.set(G.name, () => ({ outside: { accepts: (_owner, kind) => kind === driving, send: (request) => host.send(request) } }));
   const drive = async (kind: string) => {
@@ -40,7 +40,7 @@ export async function foundingPublication(G: Platform, claim: FactRef): Promise<
         const body = kind === "mint" ? { token: `token-${operation.id}`, ends: timeOf(timeMs(net.clock.now)! + 60_000) }
           : kind === "revoke" ? { token: revokedToken(store, own, operation) }
           : kind === "receipt" ? { send: "accepted", seen: destinationReceipt(store, own, targetOf(store, own, operation)!, "sha1").commit }
-          : { send: "accepted", seen: firstHead };
+          : { send: "accepted", seen: foundingOf(store, own, "sha1").commit };
         return { operation: operation.id as OperationId, attempt: attempt.attempt, body };
       }));
     });

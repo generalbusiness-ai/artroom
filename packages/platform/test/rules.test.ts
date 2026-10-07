@@ -206,17 +206,17 @@ test("membership answers an observation from its head: the key's state, its memb
   expect(roles.map((role) => m.item(0).values[ROLE_LISTS[role]])).toEqual(roles.map((role) => FIRST_ACTIONS[role]));
   const admin = [...FIRST_ACTIONS.admin];
   expect(admin.includes("task.control")).toBe(true);
-  expect(standingOf(m.state, { of, key: rita.key })).toEqual({ ...common, key: rita.key, keyState: "active", member: "@rita", memberState: "active", role: "admin", actions: admin });
+  expect(standingOf(m.state, { of, key: rita.key }, MEMBERSHIP)).toEqual({ ...common, key: rita.key, keyState: "active", member: "@rita", memberState: "active", role: "admin", actions: admin });
   // The holders of an action (the contract's section 16.1; row I3-42): each active member with an active key whose role holds it.
-  const holders = (action: string, most = 2) => { const answer = standingOf(m.state, { of, holders: action, most }); return answer && "holders" in answer ? [answer.count, answer.holders] : null; };
-  expect([standingOf(m.state, { of, holders: "issue.open", most: 2 }), holders("no.such")]).toEqual([{ of, head: m.head, definition: MEMBERSHIP, subject: "holders", action: "issue.open", count: 1, holders: ["@rita"] }, [0, []]]);
+  const holders = (action: string, most = 2) => { const answer = standingOf(m.state, { of, holders: action, most }, MEMBERSHIP); return answer && "holders" in answer ? [answer.count, answer.holders] : null; };
+  expect([standingOf(m.state, { of, holders: "issue.open", most: 2 }, MEMBERSHIP), holders("no.such")]).toEqual([{ of, head: m.head, definition: MEMBERSHIP, subject: "holders", action: "issue.open", count: 1, holders: ["@rita"] }, [0, []]]);
   // A key that no item holds: `unknown`, with no member and no action. An invited member is no member yet.
   const member = invited(m);
-  expect(standingOf(m.state, { of, key: una.key })).toEqual({ ...common, head: m.head, key: una.key, keyState: "unknown", member: NO_MEMBER, memberState: "active", role: "", actions: [] });
-  expect(standingOf(m.state, { of, member: "@una" })).toMatchObject({ subject: "member", memberState: "unknown", role: null, activeKey: null });
+  expect(standingOf(m.state, { of, key: una.key }, MEMBERSHIP)).toEqual({ ...common, head: m.head, key: una.key, keyState: "unknown", member: NO_MEMBER, memberState: "active", role: "", actions: [] });
+  expect(standingOf(m.state, { of, member: "@una" }, MEMBERSHIP)).toMatchObject({ subject: "member", memberState: "unknown", role: null, activeKey: null });
   join(m, una, member);
-  expect(standingOf(m.state, { of, key: una.key })).toMatchObject({ head: m.head, keyState: "active", member: "@una", memberState: "active", role: "member", actions: actionsIn("member") });
-  expect(standingOf(m.state, { of, member: "@una" })).toEqual({ of, head: m.head, definition: MEMBERSHIP, subject: "member", member: "@una", memberState: "active", role: "member", activeKey: true, controller: null, controllerActive: null });
+  expect(standingOf(m.state, { of, key: una.key }, MEMBERSHIP)).toMatchObject({ head: m.head, keyState: "active", member: "@una", memberState: "active", role: "member", actions: actionsIn("member") });
+  expect(standingOf(m.state, { of, member: "@una" }, MEMBERSHIP)).toEqual({ of, head: m.head, definition: MEMBERSHIP, subject: "member", member: "@una", memberState: "active", role: "member", activeKey: true, controller: null, controllerActive: null });
 
   // Two hold the action now. The answer lists the first of them in byte order of member ID, as many as `most`, and counts all.
   expect([holders("issue.open"), holders("issue.open", 1), holders("rules.publish")]).toEqual([[2, ["@rita", "@una"]], [2, ["@rita"]], [1, ["@rita"]]]);
@@ -235,11 +235,11 @@ test("membership answers an observation from its head: the key's state, its memb
   const granted = [...new Set(Object.values(definitions).flatMap((data) => Object.values(data.acts).flatMap((act) => (typeof act.grant === "string" ? [act.grant] : "grant" in act.grant && typeof act.grant.grant === "string" ? [act.grant.grant] : []))))];
   expect([said(set(names(64))), ["membership.manage", "rules.publish", "ledger.retry"].every((name) => granted.includes(name)), granted.every((name) => isActions([name])), roles.every((role) => isActions(FIRST_ACTIONS[role])), isActions(ROLE_TABLE.flatMap(([actions]) => actions))]).toEqual([WRITTEN, true, true, true, true]);
   expect(said(set(["inbox.own"]))).toEqual(WRITTEN);
-  expect(standingOf(m.state, { of, key: una.key })).toMatchObject({ actions: ["inbox.own"] });
+  expect(standingOf(m.state, { of, key: una.key }, MEMBERSHIP)).toMatchObject({ actions: ["inbox.own"] });
   expect([holders("issue.open"), holders("inbox.own")]).toEqual([[1, ["@rita"]], [2, ["@rita", "@una"]]]);
   // An agent's controller is active while that member is active and has an active key.
   m.did(rita, "add-member", { fields: { handle: "@bot", kind: "agent", controller: { membership: of, member: "@una" } } });
-  expect(standingOf(m.state, { of, member: "@bot" })).toMatchObject({ role: "agent", activeKey: false, controller: "@una", controllerActive: true });
+  expect(standingOf(m.state, { of, member: "@bot" }, MEMBERSHIP)).toMatchObject({ role: "agent", activeKey: false, controller: "@una", controllerActive: true });
   // An agent's role holds `issue.open`, and this agent has no active key: it is no holder.
   expect(holders("issue.open", 8)).toEqual([1, ["@rita"]]);
   expect([said(m.act(rita, "add-member", { fields: { handle: "@bot2", kind: "agent" } })), said(m.act(rita, "add-member", { fields: { handle: "@Bad", kind: "checker" } }))])
@@ -248,11 +248,11 @@ test("membership answers an observation from its head: the key's state, its memb
   // Row 23: after a removal an observation of any key of that member answers that the member is removed. The key item does not change.
   const key = m.item(member + 1);
   m.did(rita, "remove-member", { on: member, expected: { on: m.item(member).revision } });
-  expect([standingOf(m.state, { of, key: una.key }), m.item(key.id).state]).toMatchObject([{ keyState: "active", memberState: "removed" }, "active"]);
-  expect(standingOf(m.state, { of, member: "@bot" })).toMatchObject({ controllerActive: false });
+  expect([standingOf(m.state, { of, key: una.key }, MEMBERSHIP), m.item(key.id).state]).toMatchObject([{ keyState: "active", memberState: "removed" }, "active"]);
+  expect(standingOf(m.state, { of, member: "@bot" }, MEMBERSHIP)).toMatchObject({ controllerActive: false });
 
   // Another scope or incarnation than this one, and a question for the rules: no answer. Case e: a provisional membership answers none.
-  expect([standingOf(m.state, { of: m.office.at, key: rita.key }), standingOf(m.state, { of: { ...of, inc: m.office.at.inc }, key: rita.key }), standingOf(m.state, { of, asked: "rules" })]).toEqual([null, null, null]);
+  expect([standingOf(m.state, { of: m.office.at, key: rita.key }, MEMBERSHIP), standingOf(m.state, { of: { ...of, inc: m.office.at.inc }, key: rita.key }, MEMBERSHIP), standingOf(m.state, { of, asked: "rules" }, MEMBERSHIP)]).toEqual([null, null, null]);
   const provisional = new Roster();
-  expect([standingOf(provisional.replay(1), { of: provisional.at, key: rita.key }), provisional.replay(1).scope()?.status]).toEqual([null, "provisional"]);
+  expect([standingOf(provisional.replay(1), { of: provisional.at, key: rita.key }, MEMBERSHIP), provisional.replay(1).scope()?.status]).toEqual([null, "provisional"]);
 });

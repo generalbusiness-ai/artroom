@@ -10,22 +10,23 @@
  * it.
  */
 
-import type { ObservationRequest, PlatformData } from "@generalbusiness/artroom-contract";
-import { destination, destinationMembership, destinationRulesScope } from "./destination.ts";
-import { inbox } from "./inbox.ts";
-import { membership, standingOf } from "./membership.ts";
-import { register } from "./register.ts";
-import { directory, directoryMembership, directoryRulesScope } from "./directory.ts";
+import type { ObservationRequest, PlatformData, PlatformDefinition } from "@generalbusiness/artroom-contract";
+import { DESTINATION, destination, destination2, destinationMembership, destinationRules, destinationRules2, destinationRulesScope } from "./destination.ts";
+import { inbox, inboxRules } from "./inbox.ts";
+import { MEMBERSHIP, MEMBERSHIP_1, membership, membershipRules, standingOf } from "./membership.ts";
+import { DIRECTORY, REGISTER, register, registerRules } from "./register.ts";
+import { directory, directory2, directoryMembership, directoryRules, directoryRulesScope } from "./directory.ts";
 import type { RecordedRef, Rules, StateView } from "@generalbusiness/artroom-derive";
 import { RULES } from "./rules.ts";
-import { PUBLISH, rulesAnswer, rulesMembership, rulesObservedValues, rulesScope } from "./rules-scope.ts";
+import { PUBLISH, RULES_SCOPE, RULES_SCOPE_1, rulesAnswer, rulesMembership, rulesObservedValues, rulesScope, rulesScope2, rulesScopeRules } from "./rules-scope.ts";
 
-export { inbox, membership, register, directory, destination };
-export { ACTIONS_MOST, FIRST_ACTIONS, MEMBERSHIP, NO_MEMBER, ROLE_LISTS, ROLE_TABLE, actionsIn, isActions, isHandle, standingOf, type Role } from "./membership.ts";
-export { CREATION_ATTEMPTS, REGISTER, REPOSITORY, directoryIdOf, directorySeed, registerRules, repositoryName } from "./register.ts";
-export { DEFINITION_DOMAIN, DIRECTORY, IMPORT_ATTEMPTS, SEEN, directoryMembership, directoryRules, directoryRulesScope } from "./directory.ts";
-export { COLLECT_MOST, DESTINATION, DESTINATION_ATTEMPTS, DESTINATION_KINDS, READ_TOKEN_HOURS, destinationMembership, destinationRulesScope, destinationReceipt, firstHeadCommit, revokedToken } from "./destination.ts";
-export { foundingObjects, receiptObjects, receiptRef, importRef, type DestinationObject, type DestinationCommit, type ObjectFormat } from "./destination-objects.ts";
+export { inbox, membership, register, directory, directory2, destination, destination2 };
+export { isOf, pinnedBy, pinnedOf, versionOf } from "./versions.ts";
+export { ACTIONS_MOST, FIRST_ACTIONS, FIRST_ACTIONS_OF, MEMBERSHIP, MEMBERSHIP_1, NO_MEMBER, ROLE_LISTS, ROLE_TABLE, ROLE_TABLE_OF, actionsIn, isActions, isHandle, standingOf, type Role } from "./membership.ts";
+export { CREATION_ATTEMPTS, DIRECTORY_OF, REGISTER, REPOSITORY, directoryIdOf, directorySeed, registerRules, repositoryName } from "./register.ts";
+export { DEFINITION_DOMAIN, DIRECTORY, IMPORT_ATTEMPTS, SEEN, SIBLINGS_OF, directoryMembership, directoryRules, directoryRulesScope } from "./directory.ts";
+export { COLLECT_MOST, DESTINATION, DESTINATION_1, DESTINATION_ATTEMPTS, DESTINATION_KINDS, READ_TOKEN_HOURS, destinationMembership, destinationRulesScope, destinationReceipt, firstHeadCommit, foundingOf, revokedToken } from "./destination.ts";
+export { foundingObjects, readmeText, receiptObjects, receiptRef, importRef, type Readme, type DestinationObject, type DestinationCommit, type ObjectFormat } from "./destination-objects.ts";
 export { EDIT_PATH_BYTES, editCommit, editObjects, editPath } from "./destination-objects.ts";
 export { PROPOSE_FILE, fileOf } from "./destination-reading.ts";
 export type { LaneRead } from "./destination.ts";
@@ -36,13 +37,10 @@ export { DESTINATION_CHANGED_SET, NOT_RESERVED, fileSound, isJudgeChanges, isJud
 export type { JudgeChanges, JudgeEvidence, RecordedJudgeEvidence, Reservation, ReservationAsked, ReservationRead, Statement } from "./reservation.ts";
 export { RULES };
 export { rulesScope };
-export { CONFIGURATION_BYTES, CONFIGURATION_DOMAIN, PUBLISH, RULES_EXTENTS_VALUE, RULES_SCOPE, extentsOf, membershipId, referenceOf, revisionOf, rulesAnswer, rulesMembership, rulesObservedValues } from "./rules-scope.ts";
+export { CONFIGURATION_BYTES, CONFIGURATION_DOMAIN, PUBLISH, RULES_EXTENTS_VALUE, RULES_SCOPE, RULES_SCOPE_1, extentsOf, membershipId, referenceOf, revisionOf, rulesAnswer, rulesMembership, rulesObservedValues } from "./rules-scope.ts";
 export type { PlatformName, RuleTable } from "./rules.ts";
 export { CONTROLLER, EXTENTS_MOST, EXTENT_CLASSES, LANDING, RULES_EXTENT, RULES_PATTERNS, classify, firstExtents, holdsRulesExtent, isExtents, judgeExtents, matches } from "./extents.ts";
 export type { Extent, ExtentClass, ExtentJudged, ExtentsAsked, ExtentsJudged, Holder, Lack, Review, Touched, TreeLink } from "./extents.ts";
-
-/** The platform definitions delivered so far, by name without the version. */
-export const definitions: Readonly<Record<string, PlatformData>> = { "platform:inbox": inbox, "platform:membership": membership, "platform:register": register, "platform:directory": directory, "platform:rules": rulesScope, "platform:destination": destination };
 
 /**
  * One version of a platform definition, as a runtime or a verifier is
@@ -97,14 +95,45 @@ export interface Platform {
 }
 
 /**
+ * Every version of every platform definition that this package has
+ * shipped, by its pinned name (the planner's decision of 2026-10-07: a
+ * changed definition carries a new version, and a scope is judged and
+ * replayed by the version that its genesis pinned, for as long as it
+ * exists). Version 1 of each is as it shipped first. Version 2 of the
+ * register, the directory, membership, the rules scope and the destination
+ * holds the changes of the I5 demo: the place of a definition's bytes on
+ * the acts that name one, the destination's act `read-token` and the role
+ * row that grants it, and a founding commit with a README. The inbox has
+ * one version. A version that is not listed here is one that this package
+ * cannot run.
+ */
+export const VERSIONS: Readonly<Record<string, Platform>> = {
+  "platform:inbox@1": { data: inbox, rules: inboxRules },
+  "platform:register@1": { data: register, rules: registerRules },
+  "platform:register@2": { data: register, rules: registerRules },
+  "platform:directory@1": { data: directory, rules: directoryRules, membership: directoryMembership, rulesScope: directoryRulesScope },
+  "platform:directory@2": { data: directory2, rules: directoryRules, membership: directoryMembership, rulesScope: directoryRulesScope },
+  "platform:membership@1": { data: membership, rules: membershipRules, observed: (state, asked) => standingOf(state, asked, MEMBERSHIP_1) },
+  "platform:membership@2": { data: membership, rules: membershipRules, observed: (state, asked) => standingOf(state, asked, MEMBERSHIP) },
+  "platform:rules@1": { data: rulesScope, rules: rulesScopeRules, observed: (state, asked) => rulesAnswer(state, asked, RULES_SCOPE_1), observedValues: rulesObservedValues, revised: PUBLISH, membership: rulesMembership },
+  "platform:rules@2": { data: rulesScope2, rules: rulesScopeRules, observed: (state, asked) => rulesAnswer(state, asked, RULES_SCOPE), observedValues: rulesObservedValues, revised: PUBLISH, membership: rulesMembership },
+  "platform:destination@1": { data: destination, rules: destinationRules, membership: destinationMembership, rulesScope: destinationRulesScope },
+  "platform:destination@2": { data: destination2, rules: destinationRules2, membership: destinationMembership, rulesScope: destinationRulesScope },
+};
+
+/** The newest version of each platform definition, by name without the version: the one under which a new scope is founded. */
+export const NEWEST: Readonly<Record<string, PlatformDefinition>> = {
+  "platform:inbox": "platform:inbox@1", "platform:membership": MEMBERSHIP, "platform:register": REGISTER, "platform:directory": DIRECTORY, "platform:rules": RULES_SCOPE, "platform:destination": DESTINATION,
+};
+
+/** The data of the newest version of each platform definition, by name without the version. */
+export const definitions: Readonly<Record<string, PlatformData>> = Object.fromEntries(Object.entries(NEWEST).map(([name, named]) => [name, VERSIONS[named]!.data]));
+
+/**
  * The definition that a platform name and version pin (the contract's
- * section 6.1), such as `platform:inbox@1`. Every definition here is version
- * 1. Null: this package holds no definition of that name and version.
+ * section 6.1), such as `platform:inbox@1` or `platform:destination@2`.
+ * Null: this package holds no definition of that name and version.
  */
 export function platform(named: string): Platform | null {
-  const cut = named.lastIndexOf("@");
-  const name = named.slice(0, cut);
-  const data = cut > 0 && named.slice(cut) === "@1" && Object.hasOwn(definitions, name) ? definitions[name] : undefined;
-  if (!data) return null;
-  return { data, rules: Object.hasOwn(RULES, name) ? (RULES as Record<string, Rules>)[name]! : {}, ...(data === membership ? { observed: standingOf } : data === rulesScope ? { observed: rulesAnswer, observedValues: rulesObservedValues, revised: PUBLISH } : {}), ...(data === directory ? { membership: directoryMembership, rulesScope: directoryRulesScope } : data === rulesScope ? { membership: rulesMembership } : data === destination ? { membership: destinationMembership, rulesScope: destinationRulesScope } : {}) };
+  return Object.hasOwn(VERSIONS, named) ? VERSIONS[named]! : null;
 }

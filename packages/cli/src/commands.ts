@@ -32,7 +32,7 @@ import {
   ScopeHandle, TransportError, declaredHandle, found, httpTransport, requestSession, secretSigner, sessionRequest, signedIntent, signedLogReader, signedReads,
   type Fetch, type ReadSigning, type Signing, type Transport,
 } from "@generalbusiness/artroom-client";
-import { DESTINATION, DIRECTORY, MEMBERSHIP, READ_TOKEN_HOURS, REGISTER, ROLE_LISTS, platform, type Role } from "@generalbusiness/artroom-platform";
+import { DIRECTORY_OF, MEMBERSHIP, READ_TOKEN_HOURS, REGISTER, ROLE_LISTS, isOf, platform, type Role } from "@generalbusiness/artroom-platform";
 import { SourceError, httpSource, render, verify as replay, type HistorySource } from "@generalbusiness/artroom-replay";
 import type { Config, Repository, Store } from "./store.ts";
 
@@ -281,7 +281,10 @@ async function createdBy(handle: ScopeHandle, seq: number): Promise<{ n: number;
 
 // ---------------------------------------------------------------- the commands
 
-/** `artroom install <base-url>`: found the register. Its host and namespace are where the Git host keeps the repositories. */
+/**
+ * `artroom install <base-url>`: found the register, at the newest version of the register that this command's platform package
+ * ships. Its host and namespace are where the Git host keeps the repositories.
+ */
 export function install(ctx: Context, service: string, options: { host?: string; namespace?: string } = {}): Promise<Outcome> {
   return run(async () => {
     const before = await ctx.store.config();
@@ -293,7 +296,7 @@ export function install(ctx: Context, service: string, options: { host?: string;
     const { answer } = await found(transportOf(ctx, service), signed, REGISTER);
     const receipt = accepted(answer, null, "Installed").receipt;
     await ctx.store.save({ v: 1, service, key: "operator", register: receipt.fact.at });
-    return done(`Installed: register ${receipt.fact.at.scope}.`, `The operator key ${signer.key} is kept in the config directory, readable only by you. It is the one founder key.`);
+    return done(`Installed: register ${receipt.fact.at.scope}, under ${REGISTER}.`, `The operator key ${signer.key} is kept in the config directory, readable only by you. It is the one founder key.`);
   });
 }
 
@@ -328,18 +331,20 @@ export function claim(ctx: Context, name: string, options: { handle?: string; br
     const signer = secretSigner(secret);
     const R = await handleOf(ctx, config, register.scope, null);
     const pending = config.claim?.register === register.scope && !options.again ? config.claim : null;
+    // The register's version, which its genesis pinned: it decides the directory's version, and so the versions of the room.
+    const registered = await summaryOf(R);
+    const directoryDefinition = DIRECTORY_OF[registered.definition] ?? stop(failed(`The register ${register.scope} is under ${registered.definition}, which this command does not know.`));
     let cause: Digest;
     let handle: string;
     if (pending) {
-      // Nothing is signed. The read's answer does not matter: a register that restarted sends what it recorded at its first call.
-      await R.summary();
+      // Nothing is signed. The read above was the first call: a register that restarted sends what it recorded at that call.
       [cause, handle] = [pending.intent, pending.handle];
     } else {
       const recovery = keyIdOfSecret(await keyOf(ctx, "recovery"));
       handle = options.handle ?? "@founder";
-      const shape = platform(REGISTER)!.data as unknown as DefinitionShape;
+      const shape = platform(registered.definition)!.data as unknown as DefinitionShape;
       const fields = { branch: options.branch ?? "main", founderHandle: handle, recoveryKey: recovery };
-      const signed = await signedIntent(signer, { to: register, kind: "found", fields, expected: expectedOf(shape.acts["found"]!, (await summaryOf(R)).items, null, fields) }, signing(ctx));
+      const signed = await signedIntent(signer, { to: register, kind: "found", fields, expected: expectedOf(shape.acts["found"]!, registered.items, null, fields) }, signing(ctx));
       cause = intentDigest(signed.intent);
       const { claim: _, ...without } = config;
       await ctx.store.save({ ...without, claim: { register: register.scope, intent: cause, handle } });
@@ -354,7 +359,7 @@ export function claim(ctx: Context, name: string, options: { handle?: string; br
     const resume = `run artroom claim ${name} again to go on waiting for this claim, or with --again to sign a new one, which creates a second repository.`;
 
     // The register's rule fixes the directory's seed from the claim's own intent (`directorySeed`).
-    const seed: Seed = { v: 1, kind: "directory", definition: DIRECTORY, creator: register, cause, ordinal: 0 };
+    const seed: Seed = { v: 1, kind: "directory", definition: directoryDefinition, creator: register, cause, ordinal: 0 };
     const D = await handleOf(ctx, config, scopeIdOf(seed), null);
     const children: ScopeId[] = [];
     const directory = await waitFor(ctx, () => [register.scope, D.scope, ...children], () => active(D), "the directory", resume);
@@ -384,13 +389,15 @@ export function claim(ctx: Context, name: string, options: { handle?: string; br
     await ctx.store.save({ ...rest, repository, handle });
     return done(
       `Claimed ${name}: directory ${repository.directory.scope}, membership ${repository.membership.scope}, rules ${repository.rules}, destination ${repository.destination}; each created and confirmed.`,
+      `Definitions: ${directoryDefinition}, ${summaries.map((summary) => summary.definition).join(", ")}.`,
       `You are ${handle}, an admin, on key ${signer.key}${inbox ? `; your inbox is ${inbox}` : ""}.`,
     );
   });
 }
 
 /** What an invitation link carries. Its secret is the invitation's, which `join` presents once; it is no signing key. */
-interface Link { v: 1; service: string; repository: Omit<Repository, "inbox">; invitation: number; secret: string; handle: string }
+/** `definition`: the version of membership that the invitation is in. A link made before it was carried names none. */
+interface Link { v: 1; service: string; repository: Omit<Repository, "inbox">; invitation: number; secret: string; handle: string; definition?: string }
 const LINK = "artroom-invite:";
 
 /**
@@ -416,7 +423,7 @@ export function invite(ctx: Context, member: string, options: { role?: string; a
     const signed = await signedIntent(signer, { to: repository.membership, kind: "invite-member", fields, expected: expectedOf(shape.acts["invite-member"]!, summary.items, null, fields) }, signing(ctx));
     const invitation = accepted(await M.submit(signed), M.scope, "Invited").receipt.fact.seq;
     const { inbox: _inbox, ...shared } = repository;
-    const link: Link = { v: 1, service: config.service, repository: shared, invitation, secret, handle: member };
+    const link: Link = { v: 1, service: config.service, repository: shared, invitation, secret, handle: member, definition: summary.definition };
     return done(
       `Invited ${member} as ${options.role}: invitation ${repository.membership.scope}:${invitation}, until ${fields.inviteEnds}.`,
       `Link for ${member} only (it holds the invitation's secret): ${LINK}${b64url(utf8(JSON.stringify(link)))}`,
@@ -445,9 +452,9 @@ export function join(ctx: Context, text: string): Promise<Outcome> {
     const signer = secretSigner(secret);
     const config: Config = { v: 1, service: link.service, key: "device", repository: link.repository };
     const M = await handleOf(ctx, config, link.repository.membership.scope, null);
-    // The new key has signed nothing yet, so it reads nothing in membership before the join. Membership is the directory's
-    // `platform:membership@1`, whose `join` names its member by a mark, which has no key in `expected`: no revision is read.
-    const shape = platform(MEMBERSHIP)!.data as unknown as DefinitionShape;
+    // The new key has signed nothing yet, so it reads nothing in membership before the join. The link names membership's version;
+    // a link that names none is of the newest. Its `join` names its member by a mark, which has no key in `expected`: no revision is read.
+    const shape = (platform(link.definition ?? MEMBERSHIP) ?? stop(failed(`The invitation is in ${link.definition}, which this command does not know.`))).data as unknown as DefinitionShape;
     const fields = { invitation: link.invitation, secret: link.secret };
     const signed = await signedIntent(signer, { to: link.repository.membership, kind: "join", fields, expected: expectedOf(shape.acts["join"]!, [], null, fields) }, signing(ctx));
     const seq = accepted(await M.submit(signed), M.scope, "Joined").receipt.fact.seq;
@@ -646,7 +653,7 @@ async function destinationOf(ctx: Context, config: Config): Promise<{ summary: S
   let read = await (await handleOf(ctx, config, scope, reader)).summary();
   if (!read.ok && read.reason === "forbidden" && reader !== null) read = await (await handleOf(ctx, config, scope, null)).summary();
   if (!read.ok) return stop(failed(`Cannot read ${scope}: ${read.reason}.`));
-  if (read.value.definition !== DESTINATION) return stop(failed(`${scope} is no destination.`));
+  if (!isOf(read.value.definition, "platform:destination")) return stop(failed(`${scope} is no destination.`));
   const branch = read.value.items.find((item) => item.type === "branch");
   const repository = branch?.values["repository"] as Recorded | undefined;
   if (!branch || !repository || typeof repository.host !== "string" || typeof repository.name !== "string") return stop(failed(`The destination ${scope} records no repository.`));
@@ -819,7 +826,7 @@ export function edit(ctx: Context, path: string, options: { file?: string; title
 
     // The change lane, opened by the directory.
     const D = await handleOf(ctx, config, repository.directory.scope, reader);
-    const shape = platform(DIRECTORY)!.data as unknown as DefinitionShape;
+    const shape = (await definitionOf(D, await summaryOf(D))).shape;
     const fields = { definition: change.digest, title: options.title ?? `Edit ${path}`, draft: false };
     const signed = await signedIntent(signer, { to: repository.directory, kind: "open-pr", fields, expected: expectedOf(shape.acts["open-pr"]!, (await summaryOf(D)).items, null, fields) }, signing(ctx));
     const opened = accepted(await D.submit(signed, [], { values: [change.bytes] }), D.scope, "Opened").receipt.fact.seq;

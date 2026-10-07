@@ -8,9 +8,9 @@
  * the time of the entry that reserved it, and sends them with the base's closure.
  * Every provider sends them the same way. */
 import type { Entry, FactRef, FieldValue, KeyId, OperationId, RetainedInput, ScopeRef } from "@generalbusiness/artroom-contract";
-import { canonicalize, entryHash, isFactRef, isOperationId, parseStrict, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
+import { canonicalize, entryHash, isOperationId, parseStrict, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
 import { isEntryOf, valueDigest, type Item, type Operation } from "@generalbusiness/artroom-derive";
-import { DESTINATION, DESTINATION_KINDS, READ_TOKEN_HOURS, destinationBranch, destinationMint, destinationRead, destinationReceipt, destinationRevokedMint, destinationSends, destinationStatement, destinationTarget, destinationWrite, editObjects, editPath, fileOf, fileSound, firstHeadCommit, foundingObjects, isRecordedJudgeEvidence, revokedToken, type DestinationObject, type EditFile, type ObjectFormat, type RecordedJudgeEvidence } from "@generalbusiness/artroom-platform";
+import { DESTINATION_KINDS, READ_TOKEN_HOURS, destinationBranch, destinationMint, destinationRead, destinationReceipt, destinationRevokedMint, destinationSends, destinationStatement, destinationTarget, destinationWrite, editObjects, editPath, fileOf, fileSound, firstHeadCommit, foundingOf, isOf, isRecordedJudgeEvidence, revokedToken, type DestinationObject, type EditFile, type ObjectFormat, type RecordedJudgeEvidence } from "@generalbusiness/artroom-platform";
 import { GitRefusal, READ_BOUNDS, Reader, type GitSource } from "@generalbusiness/artroom-git";
 import type { CredentialPosition, CredentialStore, RevocationPosition } from "./credential-store.ts";
 import type { OutsideGiven } from "./object.ts";
@@ -50,6 +50,8 @@ export interface DestinationHostOptions { host: string; namespace: string; provi
 const READ_HANDLE = "artroom.read-credential.v1";
 /** The kinds whose confirmed outcome puts a plaintext in custody: a write's token, and a member's read token. */
 const MINTS: readonly string[] = [DESTINATION_KINDS.mint, DESTINATION_KINDS.mintRead];
+/** The destination, without its version: every version that the platform package serves is written by this host. */
+const OWNER = "platform:destination";
 
 const sameScope = (a: ScopeRef, b: ScopeRef) => canonicalize(a) === canonicalize(b);
 const objectId = (v: unknown): v is string => typeof v === "string" && /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(v);
@@ -71,10 +73,10 @@ export class DestinationHost implements Outside {
   #revokeCursor: RevocationPosition | null = null;
   constructor(given: OutsideGiven, options: DestinationHostOptions) { this.#given = given; this.#options = options; }
 
-  accepts(owner: string, kind: string): boolean { return owner === DESTINATION && (Object.values(DESTINATION_KINDS) as string[]).includes(kind); }
+  accepts(owner: string, kind: string): boolean { return isOf(owner, OWNER) && (Object.values(DESTINATION_KINDS) as string[]).includes(kind); }
   /** Repeating these reads never repeats a host mutation. The driver keeps the same attempt. */
   readonly recovery = {
-    accepts: (owner: string, kind: string): boolean => owner === DESTINATION && [DESTINATION_KINDS.judge, DESTINATION_KINDS.read, DESTINATION_KINDS.adoptRead].includes(kind as "judge" | "read" | "adopt-read"),
+    accepts: (owner: string, kind: string): boolean => isOf(owner, OWNER) && [DESTINATION_KINDS.judge, DESTINATION_KINDS.read, DESTINATION_KINDS.adoptRead].includes(kind as "judge" | "read" | "adopt-read"),
     read: (request: EffectRequest): Promise<EffectAnswer | null> => this.recovery.accepts(request.owner, request.kind) ? this.send(request) : Promise.resolve(null),
   };
 
@@ -90,7 +92,7 @@ export class DestinationHost implements Outside {
     this.#revokeCursor = revocations.more && lastRevoke ? { revoke: lastRevoke.revoke, attempt: lastRevoke.attempt } : null;
     for (const expected of revocations.items) {
       const operation = this.#given.state.operation(expected.revoke);
-      if (operation?.owner !== DESTINATION || operation.kind !== DESTINATION_KINDS.revoke) continue;
+      if (!isOf(operation?.owner, OWNER) || operation.kind !== DESTINATION_KINDS.revoke) continue;
       const origin = this.#given.own(Number(expected.revoke.split(":")[0]));
       if (!origin || !this.#bound({ scope: scope.at, operation: expected.revoke, attempt: expected.attempt, owner: operation.owner, kind: operation.kind, origin })) continue;
       const mint = destinationRevokedMint(this.#given.state, this.#given.own, operation);
@@ -114,7 +116,7 @@ export class DestinationHost implements Outside {
     this.#replyCursor = page.more && last ? { mint: last.mint, attempt: last.attempt } : null;
     for (const held of page.items) {
       const operation = this.#given.state.operation(held.mint);
-      if (operation?.owner !== DESTINATION || !MINTS.includes(operation.kind) || !text(held.id) || timeMs(held.ends) === null) continue;
+      if (!isOf(operation?.owner, OWNER) || !MINTS.includes(operation.kind) || !text(held.id) || timeMs(held.ends) === null) continue;
       const origin = this.#given.own(Number(held.mint.split(":")[0]));
       if (!origin || !this.#bound({ scope: scope.at, operation: held.mint, attempt: held.attempt, owner: operation.owner, kind: operation.kind, origin })) continue;
       answers.push({ operation: held.mint, attempt: held.attempt, answer: answer("confirmed", { token: held.id, ends: held.ends }) });
@@ -182,13 +184,13 @@ export class DestinationHost implements Outside {
   judged(at: { scope: ScopeRef; operation: OperationId; attempt: number }, sealed: Sealed | null): void {
     const scope = this.#given.scope();
     const operation = this.#given.state.operation(at.operation);
-    if (!scope || !sameScope(scope.at, at.scope) || operation?.owner !== DESTINATION || (!MINTS.includes(operation.kind) && operation.kind !== DESTINATION_KINDS.revoke)) return;
+    if (!scope || !sameScope(scope.at, at.scope) || !isOf(operation?.owner, OWNER) || (!MINTS.includes(operation.kind) && operation.kind !== DESTINATION_KINDS.revoke)) return;
     // A repeat/conflict notification carries no new entry. Keep custody backed
     // by the exact confirmed outcome this scope previously committed.
     const outcome = sealed ?? this.#confirmation(operation, at.attempt);
     const recorded = outcome ? this.#given.own(outcome.entry.seq) : null;
     const input = recorded?.entry.input;
-    const valid = outcome && recorded?.hash === outcome.hash && canonicalize(recorded.entry) === canonicalize(outcome.entry) && sameScope(recorded.entry.at, at.scope) && input?.type === "outcome" && input.operation === at.operation && input.attempt === at.attempt && input.owner === DESTINATION && input.kind === operation.kind && input.result === "confirmed" && input.evidence.basis === "own-answer";
+    const valid = outcome && recorded?.hash === outcome.hash && canonicalize(recorded.entry) === canonicalize(outcome.entry) && sameScope(recorded.entry.at, at.scope) && input?.type === "outcome" && input.operation === at.operation && input.attempt === at.attempt && isOf(input.owner, OWNER) && input.kind === operation.kind && input.result === "confirmed" && input.evidence.basis === "own-answer";
     if (operation.kind === DESTINATION_KINDS.revoke) {
       const body = valid && input.type === "outcome" ? members(input.evidence.body, ["token"]) : null;
       const mint = body ? destinationRevokedMint(this.#given.state, this.#given.own, operation) : null;
@@ -210,7 +212,7 @@ export class DestinationHost implements Outside {
       if (!text(handle) || !this.#given.scope()) return null;
       const held = this.#options.custody.held(handle);
       const operation = held ? this.#given.state.operation(held.mint) : null;
-      if (!held || held.state !== "live" || operation?.owner !== DESTINATION || operation.kind !== DESTINATION_KINDS.mintRead) return null;
+      if (!held || held.state !== "live" || !isOf(operation?.owner, OWNER) || operation.kind !== DESTINATION_KINDS.mintRead) return null;
       const confirmed = this.#confirmation(operation, held.attempt)?.entry.input;
       const body = confirmed?.type === "outcome" ? members(confirmed.evidence.body, ["token", "ends"]) : null;
       const opening = this.#given.own(Number(operation.id.split(":")[0]))?.entry.input;
@@ -240,12 +242,12 @@ export class DestinationHost implements Outside {
     const confirmed = operation.attempts.find((opened) => opened.attempt === attempt)?.outcomes.find((outcome) => outcome.result === "confirmed");
     const sealed = confirmed ? this.#given.own(confirmed.seq) : null;
     const input = sealed?.entry.input;
-    return scope && sealed && sameScope(sealed.entry.at, scope.at) && entryHash(sealed.entry) === sealed.hash && input?.type === "outcome" && input.operation === operation.id && input.attempt === attempt && input.owner === DESTINATION && input.kind === operation.kind && input.result === "confirmed" && input.evidence.basis === "own-answer" ? sealed : null;
+    return scope && sealed && sameScope(sealed.entry.at, scope.at) && entryHash(sealed.entry) === sealed.hash && input?.type === "outcome" && input.operation === operation.id && input.attempt === attempt && isOf(input.owner, OWNER) && input.kind === operation.kind && input.result === "confirmed" && input.evidence.basis === "own-answer" ? sealed : null;
   }
 
   #bound(request: EffectRequest): { operation: Operation; repository: DestinationRepository; ref: string } | null {
     const scope = this.#given.scope();
-    if (!scope || scope.at.kind !== "destination" || !sameScope(scope.at, request.scope) || this.#given.genesis()?.seed.definition !== DESTINATION || !this.accepts(request.owner, request.kind) || !isOperationId(request.operation) || !Number.isSafeInteger(request.attempt) || request.attempt < 1) return null;
+    if (!scope || scope.at.kind !== "destination" || !sameScope(scope.at, request.scope) || this.#given.genesis()?.seed.definition !== request.owner || !this.accepts(request.owner, request.kind) || !isOperationId(request.operation) || !Number.isSafeInteger(request.attempt) || request.attempt < 1) return null;
     const operation = this.#given.state.operation(request.operation);
     if (!operation || operation.owner !== request.owner || operation.kind !== request.kind || !operation.attempts.some((attempt) => attempt.attempt === request.attempt)) return null;
     const [seq, k] = request.operation.split(":").map(Number);
@@ -297,12 +299,10 @@ export class DestinationHost implements Outside {
       requireParentless = true;
     } else if (write.kind === DESTINATION_KINDS.firstHead) {
       commit = firstHeadCommit(state, own, write, format);
-      const claim = destinationBranch(state)?.refs["claim"];
-      const genesis = own(0)?.entry;
-      if (!genesis || !isFactRef(claim)) return null;
-      const founding = foundingObjects(format, genesis.at.scope, genesis.time, claim);
+      // The founding commit of the scope's own version: the empty tree at version 1, a README at version 2.
+      const founding = foundingOf(state, own, format);
       objects = commit === founding.commit ? founding.objects : await this.#options.provider.objects(repository, commit);
-      if (commit === founding.commit) { expectedTree = founding.objects[0]!.id; requireParentless = true; }
+      if (commit === founding.commit) { expectedTree = founding.objects.find((object) => object.kind === "tree")!.id; requireParentless = true; }
     } else {
       const head = destinationBranch(state)?.values["head"];
       const integration = target?.values["integration"];
@@ -312,7 +312,7 @@ export class DestinationHost implements Outside {
       // The confirmed reservation compared this tree with its retained manifest.
       const reservedAt = target?.values["reservedAt"];
       const reserved = typeof reservedAt === "number" ? own(reservedAt)?.entry.input : null;
-      const evidence = reserved?.type === "outcome" && reserved.owner === DESTINATION && reserved.kind === DESTINATION_KINDS.judge && reserved.result === "confirmed" && isRecordedJudgeEvidence(reserved.evidence.body) ? reserved.evidence.body : null;
+      const evidence = reserved?.type === "outcome" && isOf(reserved.owner, OWNER) && reserved.kind === DESTINATION_KINDS.judge && reserved.result === "confirmed" && isRecordedJudgeEvidence(reserved.evidence.body) ? reserved.evidence.body : null;
       const tree = evidence?.tree;
       if (!objectId(tree)) return null;
       expectedTree = tree;

@@ -3,7 +3,7 @@ import type { FactRef } from "@generalbusiness/artroom-contract";
 import { textDigest } from "@generalbusiness/artroom-bytes";
 import { observationOf } from "@generalbusiness/artroom-derive";
 import { d, otherLane, t } from "@generalbusiness/artroom-derive/testing";
-import { standingOf } from "../src/membership.ts";
+import { MEMBERSHIP, standingOf } from "../src/membership.ts";
 import { judgeReservation, type Statement } from "../src/reservation.ts";
 import { FOUND, HEAD, NEXT, reading, rulesObserved } from "./support-destination.ts";
 import { Roster, paul, rita, una } from "./support.ts";
@@ -21,7 +21,7 @@ for (const loses of ["last active key", "membership"] as const) test(`a customiz
   const invitation = m.did(rita, "invite-key", { fields: { member: agent, kind: "agent", inviteHash: textDigest("agent invitation"), inviteEnds: t(600) }, expected: { member: m.item(agent).revision } }).seq;
   m.did(una, "enrol", { on: 0, expected: { on: m.item(0).revision, member: m.item(agent).revision }, fields: { invitation, secret: "agent invitation" } });
   m.did(rita, "set-actions", { on: 0, expected: { on: m.item(0).revision }, fields: { role: "agent", actions: ["change.merge", "change.review", "change.check"] } });
-  const observed = (key: typeof una.key) => observationOf(standingOf(m.state, { of: m.at, key }), m.now)!;
+  const observed = (key: typeof una.key) => observationOf(standingOf(m.state, { of: m.at, key }, MEMBERSHIP), m.now)!;
   const judge = (read = reading(m.now, { merger: observed(una.key) }), named = statement) => judgeReservation({ recorded: HEAD, evidence: FOUND, statement: named, read, time: m.now });
   const before = observed(una.key);
   expect(before).toMatchObject({ keyState: "active", memberState: "active", role: "agent", controller: "@paul", controllerActive: true, actions: ["change.merge", "change.review", "change.check"] });

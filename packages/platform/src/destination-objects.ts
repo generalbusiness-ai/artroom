@@ -32,18 +32,38 @@ function commitObject(format: ObjectFormat, scope: ScopeId, time: Timestamp, tre
   return object(format, "commit", utf8(`tree ${tree}\nauthor ${identity}\ncommitter ${identity}\n\n${sentence}\n\n${word} ${text}\n`));
 }
 
-/** The empty tree and the parentless founding commit. The time is the destination's genesis entry's. */
-export function foundingObjects(format: ObjectFormat, scope: ScopeId, time: Timestamp, claim: FactRef): DestinationCommit {
-  const tree = object(format, "tree", new Uint8Array());
+/**
+ * What the founding commit of `platform:destination@2` names in its one
+ * file: the repository's name, the founder's handle and the scope ID of the
+ * room's directory. None of them is a secret.
+ */
+export interface Readme { name: string; handle: string; directory: ScopeId }
+
+/** The text of `README.md` in a founding commit of version 2: the repository's name as a heading, and one sentence. */
+export const readmeText = (readme: Readme): string => `# ${readme.name}\n\nFounded by ${readme.handle} through the room ${readme.directory}.\n`;
+
+/** A tree of one file, `README.md` or `receipt.json`, with that blob. */
+function oneFile(format: ObjectFormat, name: string, blob: DestinationObject): DestinationObject {
+  const rawId = Uint8Array.from(blob.id.match(/../g)!, (pair) => Number.parseInt(pair, 16));
+  return object(format, "tree", concat(utf8(`100644 ${name}\0`), rawId));
+}
+
+/**
+ * The parentless founding commit. The time is the destination's genesis
+ * entry's. Version 1 (`readme` null): the empty tree. Version 2: a tree of
+ * one file, `README.md` (`readmeText`).
+ */
+export function foundingObjects(format: ObjectFormat, scope: ScopeId, time: Timestamp, claim: FactRef, readme: Readme | null = null): DestinationCommit {
+  const blob = readme === null ? null : object(format, "blob", utf8(readmeText(readme)));
+  const tree = blob === null ? object(format, "tree", new Uint8Array()) : oneFile(format, "README.md", blob);
   const commit = commitObject(format, scope, time, tree.id, "Found this repository.", "claim", claim);
-  return { commit: commit.id, objects: [tree, commit] };
+  return { commit: commit.id, objects: [...(blob === null ? [] : [blob]), tree, commit] };
 }
 
 /** The canonical receipt file, its tree and its parentless commit. The time is the entry that opened the receipt item. */
 export function receiptObjects(format: ObjectFormat, scope: ScopeId, time: Timestamp, operation: FactRef, receipt: unknown): DestinationCommit {
   const blob = object(format, "blob", utf8(canonicalize(receipt)));
-  const rawId = Uint8Array.from(blob.id.match(/../g)!, (pair) => Number.parseInt(pair, 16));
-  const tree = object(format, "tree", concat(utf8("100644 receipt.json\0"), rawId));
+  const tree = oneFile(format, "receipt.json", blob);
   const commit = commitObject(format, scope, time, tree.id, "Receipt.", "operation", operation);
   return { commit: commit.id, objects: [blob, tree, commit] };
 }

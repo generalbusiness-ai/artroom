@@ -101,12 +101,15 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
   const [D, G] = [new Platform(repository.directory.scope), new Platform(repository.destination)];
   known.push(G);
   await pause([]);
-  // The founding head, pushed by the destination through the port: an empty tree. The site has no README yet.
-  const first = foundingObjects("sha1", G.name, (await G.entries())[0]!.time, (await G.item(0)).refs["claim"] as never).commit;
+  // The founding head, pushed by the destination through the port: one README.md that names the repository, the founder and the directory
+  // (`platform:destination@2`).
+  const first = foundingObjects("sha1", G.name, (await G.entries())[0]!.time, (await G.item(0)).refs["claim"] as never, { name: ((await G.item(0)).values["repository"] as { name: string }).name, handle: "@rita", directory: D.name }).commit;
   expect([(await G.item(0)).values["head"], host.refs.get("refs/heads/main")]).toEqual([first, first]);
   const siteEnv: SiteEnv = { SCOPES: env.PLATFORM, ...bindings() };
   const page = async (path: string) => { const response = await site(new Request(`${SERVICE}/site/${D.name}/HEAD/${path}`), siteEnv, host.fetch); return { status: response.status, body: await response.text() }; };
-  expect(await page("README.md")).toEqual({ status: 404, body: "not-found: no file is at that path\n" });
+  // The site already serves the founding README, which the first edit replaces.
+  const founded = await page("README.md");
+  expect([founded.status, founded.body.includes("Founded by")]).toEqual([200, true]);
 
   // paul, a maintainer: he holds change.merge and not rules.publish.
   const link = ok(await run(rita, "invite", "@paul", "--role", "maintainer")).lines[1]!.split(": ")[1]!;
