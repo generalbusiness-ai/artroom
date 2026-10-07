@@ -19,6 +19,7 @@
     "@generalbusiness/artroom-bytes": "0.1.0-dev.1",
     "@generalbusiness/artroom-contract": "0.1.0-dev.1",
     "@generalbusiness/artroom-derive": "0.1.0-dev.1",
+    "@generalbusiness/artroom-git": "0.1.0-dev.1",
     "@generalbusiness/artroom-platform": "0.1.0-dev.1"
   },
   "devDependencies": {
