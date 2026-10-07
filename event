@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at plans/README.md","body":{"commit":"52c3769b5569eb7e49a790771e767d9ffcc53736","path":"plans/README.md"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:abd4208cc4839ed539cffc500c09de781e30fc7c","text":"Merge retired a covered predecessor; the successor is at plans/026-2026-10-06-manual-inventory-review-binding.md."}
