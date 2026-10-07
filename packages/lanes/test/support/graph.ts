@@ -213,11 +213,12 @@ export const answered = (answer: Answer): string =>
 
 /** One real scope of the graph, with the client's handle on it: typed from the definition's own data, and checked against the digest the scope publishes. */
 export class Node<D extends DeclaredDefinition> {
-  constructor(readonly handle: DeclaredHandle<D>, readonly valid: ValidDefinition) {}
+  /** `space`: the namespace of the scope's object. `NET` for the fixture's own graph; `PLATFORM` for a lane of a room (`room.ts`). */
+  constructor(readonly handle: DeclaredHandle<D>, readonly valid: ValidDefinition, readonly space: DurableObjectNamespace = env.NET) {}
 
   get name(): ScopeId { return this.handle.scope.scope; }
   get at(): ScopeRef { return this.handle.at; }
-  get object(): DurableObjectStub { return objectOf(this.name); }
+  get object(): DurableObjectStub { return this.space.get(this.space.idFromName(this.name)); }
   get stub(): Remote { return this.object as unknown as Remote; }
 
   /** The history read so far, and the state it folds to. Each read asks only for the entries after these, one read at a time. */

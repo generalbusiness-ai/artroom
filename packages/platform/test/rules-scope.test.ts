@@ -165,10 +165,13 @@ test("activate opens an active definition when its bytes and its whole named clo
   const [deskDigest, ticketDigest] = [deskDefinition.digest, ticketDefinition.digest];
   const UNSUPPORTED = ["refused", "unsupported-definition", "unsupported-definition"];
   const NOT_COMPLETED = ["unavailable", "dependency-unavailable", null];
+  const BAD_FIELD = ["refused", "bad-field", null];
   const start = r.entries.length;
 
-  // Not completed: the definition's own bytes are not supplied, or a definition of its closure is not.
-  expect([said(activate(r, deskDigest, "desk", [])), said(activate(r, deskDigest, "desk", [ticketBytes])), said(activate(r, deskDigest, "desk", [deskBytes]))]).toEqual(Array(3).fill(NOT_COMPLETED));
+  // The definition's own bytes are not supplied at the place that `digest` states: refused `bad-field`, as the contract refuses any
+  // place without its value (section 6.2, revision 19). Only the one place is read, so the closure's bytes cannot come in its stead.
+  // A definition of its closure is not supplied: not completed.
+  expect([said(activate(r, deskDigest, "desk", [])), said(activate(r, deskDigest, "desk", [ticketBytes])), said(activate(r, deskDigest, "desk", [deskBytes]))]).toEqual([BAD_FIELD, BAD_FIELD, NOT_COMPLETED]);
   // Case c: bytes that hash to the digest and do not validate. A definition from an input is validated without the platform option,
   // so no author gets a platform name by an activation (section 13.8). The rules scope's own data is such bytes.
   const offered = (value: unknown) => ({ bytes: canonicalize(value), digest: valueDigest(DEFINITION_DOMAIN, value) });

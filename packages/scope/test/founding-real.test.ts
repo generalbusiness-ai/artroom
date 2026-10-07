@@ -5,7 +5,7 @@ import type { Answer, Entry, Intent, Observation, ObservationUse, OperationId, R
 import { b64url, canonicalize, entryHash, factRefOf, intentDigest, scopeIdOf, seedDigest, signIntent, textDigest } from "@generalbusiness/artroom-bytes";
 import { requestSession, secretSigner, sessionRequest, signedReader, type Fetch } from "@generalbusiness/artroom-client";
 import { PROFILES, grantFrom, ruleAt, validateDefinition, valueDigest, type Item } from "@generalbusiness/artroom-derive";
-import { d, keys, otherLane } from "@generalbusiness/artroom-derive/testing";
+import { d, keys, otherLane, ticket, ticketDefinition } from "@generalbusiness/artroom-derive/testing";
 import { CONFIGURATION_DOMAIN, DESTINATION, DESTINATION_CHANGED_SET, DIRECTORY, REGISTER, destinationReceipt, firstExtents, foundingObjects, platform, repositoryName, revokedToken, RULES_EXTENTS_VALUE } from "@generalbusiness/artroom-platform";
 import { httpSource, verify } from "@generalbusiness/artroom-replay";
 import { targetOf } from "../../platform/src/destination.ts";
@@ -245,7 +245,9 @@ describe("a founding on real scopes under the deployed class (authority note, se
 
     // Revision 28, section 3.3, rows 8 to 10: the deployed authority reads the real rules scope and membership before the turn.
     // A definition that the real rules scope has never activated is refused by name, rather than left waiting for an observation.
-    expect(await D.act(rita, "open-issue", { expected: await D.expected({ repository: 0 }), fields: { definition: d("e"), title: "An inactive definition", conditions: [] } })).toMatchObject({ answer: "refused", reason: "guard-failed", name: "not-activated" });
+    // The definition's bytes travel beside the act, at the place that `definition` states: derive's made-up `ticket`.
+  const inactive = await D.intent(rita, "open-issue", { expected: await D.expected({ repository: 0 }), fields: { definition: ticketDefinition.digest, title: "An inactive definition", conditions: [] } });
+  expect(await D.stub.submit(inactive, [], { values: [canonicalize(ticket)] })).toMatchObject({ answer: "refused", reason: "guard-failed", name: "not-activated" });
     // Membership answers the unknown worker as unknown. No task is opened and no task creation is dispatched.
     const beforeTask = (await D.summary()).at;
     expect(await D.act(rita, "open-task", { expected: await D.expected({ repository: 0 }), fields: { worker: { membership, member: "@missing" }, controller: { membership, member: "@rita" }, lane: { ...directory, kind: "lane" } } })).toMatchObject({ answer: "refused", reason: "guard-failed", name: "worker-not-active" });

@@ -65,7 +65,7 @@ test("T5b, a merge closes a linked issue once: the issue closes by its own decid
   await g.settle();
   // H is closed by hand before the merge.
   const hand = (await H.did(rita, "close-own", { on: 0, fields: { reason: "not-planned" } })).fact.seq;
-  const merge = (await C.did(rita, "merge", { fields: { manifest } })).fact;
+  const merge = (await C.did(rita, "merge", { fields: { manifest, reports: [] } })).fact;
   await g.settle();
 
   // SCRIPTED: the destination publishes. The change lane records it once, and tells each issue whose link is set.

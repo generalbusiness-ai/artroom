@@ -81,7 +81,7 @@ test("T3, a manifest and its evidence: it is complete only by the plan's recorde
   const verdict = { fields: { manifest: m1, verdict: "approve" } } as const;
   expect([await C.asks(vic, "review-verdict", verdict), await C.asks(una, "review-verdict", verdict), await C.asks(paul, "review-verdict", verdict)]).toEqual(Array(3).fill("guard-failed: author-cannot-review"));
   // Merge. Each refusal is named, in the order of the guards: no rules yet; then no approval; then the required check has not passed.
-  const merges = (manifest = m1) => C.asks(rita, "merge", { fields: { manifest } });
+  const merges = (manifest = m1, reports = [ra, rb]) => C.asks(rita, "merge", { fields: { manifest, reports } });
   expect(await merges()).toBe("guard-failed: rules-unknown");
   // SCRIPTED: the rules, as one update from the rules peer that the change lane names. One approval, and one required check by paul.
   const configuration = textDigest("ci.yml");
@@ -100,8 +100,10 @@ test("T3, a manifest and its evidence: it is complete only by the plan's recorde
   const check = (await C.did(paul, "check", { fields: answer })).fact;
 
   // Now the merge is admitted. Its entry carries the exact statement it rests on, to the destination: this manifest, each live
-  // verdict and each job with the entry that decided it, and the links that are set.
-  const merged = await C.did(rita, "merge", { fields: { manifest: m1 } });
+  // verdict and each job with the entry that decided it, the links that are set, and the report entry of each selection.
+  // The merger names the report entry of each selection. A list that leaves one out, or names another entry, is refused.
+  expect([await merges(m1, [ra]), await merges(m1, [ra, claim])]).toEqual(["guard-failed: reports-not-selected", "guard-failed: reports-not-selected"]);
+  const merged = await C.did(rita, "merge", { fields: { manifest: m1, reports: [ra, rb] } });
   expect((await C.entry(merged.fact.seq)).sends).toEqual([{
     n: 0, to: g.destination.at,
     message: {
@@ -112,6 +114,7 @@ test("T3, a manifest and its evidence: it is complete only by the plan's recorde
           operation: { self: true }, manifest: await C.fact(m1), links: [],
           verdicts: [{ review, reviewer: sam.member, verdict: "approve" }],
           jobs: [{ job, name: "ci", state: "passed", decidedBy: check }],
+          reports: [ra, rb],
         },
       },
     },

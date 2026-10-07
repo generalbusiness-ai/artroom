@@ -62,6 +62,7 @@
  */
 
 import type { Digest, FactRef, FieldValue, Grant, MemberObservation, MemberRef, PlatformData, RulesObservation, ScopeId, ScopeRef, Seed } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import { intentDigest, isDigest, scopeIdOf, seedDigest } from "@generalbusiness/artroom-bytes";
 import { PROFILES, isObject, isScopeRef, same, validateDefinition, type Item, type Operation, type RuleEffect, type RuleGiven, type Rules, type StateView } from "@generalbusiness/artroom-derive";
 import { CREATION_ATTEMPTS, DIRECTORY, REPOSITORY } from "./register.ts";
@@ -94,7 +95,9 @@ export const SEEN = ["title", "state", "draft", "merge", "labels", "assignees"] 
 /** The fields of the two acts that open a lane, beside those of the lane's own genesis. */
 const opening = {
   // The definition under which the lane is created: a digest that the rules scope holds as `active`.
-  definition: { type: "digest", required: true },
+  // Its bytes come beside the intent at this stated place, in the domain of a definition, so that the runtime reads them for the
+  // guard `definition-active` and the entry retains them for the lane it creates (the contract's section 6.2, revision 19).
+  definition: { type: "digest", required: true, value: { domain: DEFINITION_DOMAIN, max: PROPOSED_BOUNDS.definitionBytes } },
   title: { ...NAME, required: true },
   // A detached text, which travels beside the intent and reaches the lane by its digest.
   body: { type: "text", max: 65536, detached: true, required: false },
