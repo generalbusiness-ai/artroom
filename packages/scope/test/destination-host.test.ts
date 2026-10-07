@@ -125,12 +125,40 @@ describe("destination outside adapter; scripted host, platform judgments in memo
       expect(canonicalize(f.branch.entries)).not.toContain("private-token");
       // A restarted adapter's cleanup reads only the exact recorded mint, using retained custody.
       const revoke = f.branch.entries.flatMap(({ entry }) => entry.effects.flatMap((effect) => effect.effect === "operation" && effect.kind === "revoke" ? [`${entry.seq}:${effect.k}` as OperationId] : []))[0]!;
+      const blockedCustody = new CredentialStore(state.storage.sql, () => f.branch.at);
+      blockedCustody.expectRevoke = () => false;
+      const blockedCleanup = new DestinationHost(f.given, { ...f.options, custody: blockedCustody });
+      expect(await blockedCleanup.send(f.request(revoke))).toBeNull();
+      expect(f.provider.calls.filter((call) => call.kind === "revoke")).toHaveLength(0);
       const restarted = new DestinationHost(f.given, { ...f.options, custody: new CredentialStore(state.storage.sql, () => f.branch.at) });
       const revoked = await restarted.send(f.request(revoke));
+      expect(f.custody.revocations(null, 1)).toEqual({ items: [{ revoke, attempt: 1, mint, mintAttempt: 1, id: "provider-token-1" }], more: false });
       expect(revoked).toMatchObject({ result: "confirmed", evidence: { body: { token: "provider-token-1" } } });
       expect(f.custody.read(mint, 1)).toMatchObject({ state: "live", plaintext: "private-token-1" });
-      f.record(revoke, revoked!);
+      expect(f.branch.lost(revoke, 1).result).toBe("write");
+      expect(restarted.replies(1)).toEqual({ answers: [], more: false });
+      restarted.judged({ scope: f.branch.at, operation: revoke, attempt: 1 }, null);
+      expect(f.custody.read(mint, 1)).toMatchObject({ state: "live", plaintext: "private-token-1" });
+      const unknownRevoke = f.branch.own(f.branch.last.seq)!;
+      const unknownBytes = canonicalize(unknownRevoke);
+      // The late public confirmation commits, then its private callback is lost.
+      expect(f.branch.outcome(revoke, 1, revoked!.result, revoked!.evidence).result).toBe("write");
+      const reconciling = new DestinationHost(f.given, { ...f.options, custody: new CredentialStore(state.storage.sql, () => f.branch.at) });
+      const deleteCount = f.provider.calls.filter((call) => call.kind === "revoke").length;
+      const confirmedRevoke = reconciling.replies(1);
+      expect(confirmedRevoke).toEqual({ answers: [{ operation: revoke, attempt: 1, answer: revoked }], more: false });
+      expect(f.provider.calls.filter((call) => call.kind === "revoke")).toHaveLength(deleteCount);
+      expect(f.custody.read(mint, 1)).toMatchObject({ state: "live", plaintext: "private-token-1" });
+      const confirmedHead = f.branch.head;
+      const repeatedRevoke = confirmedRevoke.answers[0]!.answer;
+      expect(f.branch.outcome(revoke, 1, repeatedRevoke.result, repeatedRevoke.evidence).result).toBe("repeat");
+      expect(f.branch.head).toEqual(confirmedHead);
+      reconciling.judged({ scope: f.branch.at, operation: revoke, attempt: 1 }, null);
       expect(f.custody.read(mint, 1)).toMatchObject({ state: "revoked", plaintext: null });
+      expect(reconciling.replies(1)).toEqual({ answers: [], more: false });
+      expect(canonicalize(f.branch.own(unknownRevoke.entry.seq))).toBe(unknownBytes);
+      expect(f.branch.state.operation(revoke)!.attempts[0]!.outcomes.map((outcome) => outcome.result)).toEqual(["unknown", "confirmed"]);
+      expect(f.provider.calls.filter((call) => call.kind === "revoke")).toHaveLength(deleteCount);
     });
   });
 
