@@ -62,23 +62,31 @@ which makes the founder the first admin. `<name>` is a label for this
 output only: the register's `found` act has no name field (see "What it
 does not do yet").
 
-Before it sends the `found`, the command saves a pending claim in the
-config: the register, the digest of the signed intent and the handle.
-None of these is a secret. If the register refuses the claim, or answers
-that it is unavailable, nothing was written and the pending claim is
-removed. If the command gives up waiting, the claim stays pending:
+Before each founding step, the command saves its exact signed envelope:
+`found`, then `seat`, then `first-key`. It saves accepted fact references
+as each step completes. These records contain no private signing key.
+A refusal, unavailable reply or lost answer leaves the request pending;
+a later run keeps the same signature and deadline. An accepted marker is
+checked against the receipt for that exact envelope before reuse.
 
 ```
 Gave up waiting for the directory after 120 reads. What was asked may still take effect; run artroom claim demo again to go on waiting for this claim, or with --again to sign a new one, which creates a second repository.
 ```
 
-Run `artroom claim <name>` again to go on. It signs nothing: it reads
-the register once, which starts a register that was restarted since the
-claim, and waits for the directory that the pending claim's digest names.
-`--handle` is then ignored: the handle is the one the claim signed.
-`--again` signs a new `found`. Each `found` that takes effect creates a
-repository, so use it only when the first claim was refused or will never
-take effect.
+Run `artroom claim <name>` again to continue the saved claim. The command
+reads or retries the exact saved steps, then waits for their confirmed
+scopes. It checks child identities against the actual directory seed and
+full reference. It does not extend a saved deadline or invent a replacement
+request. `--handle` is ignored on resume: the handle is the one already
+signed. Older digest-only state resumes only when the retained founding
+and enrollment records prove the exact signed steps; otherwise it stops
+without a new submission.
+
+`--again` deliberately replaces the pending claim with a new signed
+`found`. Each `found` that takes effect creates a repository, so an earlier
+unknown claim may still produce another repository. Use this option only
+when deliberately starting another claim. An expired envelope stays saved
+until this explicit replacement.
 
 ```
 Claimed demo: directory sc_hs5f27fz..., membership sc_p6xp2lmd..., rules sc_sfbjwioy..., destination sc_e5xgdizd...; each created and confirmed.

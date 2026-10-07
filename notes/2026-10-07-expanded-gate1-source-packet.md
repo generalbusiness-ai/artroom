@@ -257,6 +257,34 @@ name the exact implementation request, receipt consequences, final head and
 source trees, and cover the full later delta above. This packet closes no
 commission and grants no approval.
 
+## Final documentation reconciliation
+
+Builder corrected current `docs/cli.md` claim guidance to match the gated
+implementation: exact saved envelopes and accepted markers, unchanged
+deadlines, preserved refused/unavailable steps, checked child references,
+legacy retained-record recovery and explicit `--again` replacement. The
+cloud live-operations note now labels its narrower claims as historical.
+These are documentation-only successors; no executable source changed.
+The snapshot table below remains historical; final filing includes these
+updated documents and the evidence notes at its exact head.
+
+## Committed evidence and main-plan preservation
+
+Builder committed the delivery update, full live witness and this packet in
+`148c32906`, then merged published main at
+`840496120d519d280b743d72af7dff396cf1c606`. That merge adds only the unchanged
+110-line published-pages plan from `e5c641bd`; it preserves the plan rather
+than deleting it. Packages and scripts still exactly match the gated trees.
+Compared with the historical inventory snapshot, the only additions are
+that plan and the two new evidence notes; the delivery note is updated.
+The final review invitation names the final notes-only successor head.
+
+The committed live witness gives raw safe evidence paths and SHA-256 values;
+builder read all six reports and the deploy/configuration/install/claim logs
+in full. Durable result `76b016bcf9ac18b542f9f45814cc495b9fa0fb55` and binding
+request `48ea69f70c696ac0d5ccd47ba7952d42633086fa` remain producer statements,
+not source approval. Planner promised the binding decision at `fbec8162`.
+
 ## Complete native path inventory
 
 The snapshot table below covers every tracked addition, modification and
