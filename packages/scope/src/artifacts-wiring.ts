@@ -98,6 +98,7 @@ export function artifactsOutside(given: OutsideGiven, sql: Pick<SqlStorage, "exe
       accepts, send,
       judged: (at, sealed) => destination.judged(at, sealed),
       replies: (limit) => bound(DESTINATION) ? destination.replies(limit) : { answers: [], more: false },
+      credential: (handle, key) => bound(DESTINATION) ? destination.credential(handle, key) : null,
     };
   } catch { return NO_OUTSIDE; }
 }

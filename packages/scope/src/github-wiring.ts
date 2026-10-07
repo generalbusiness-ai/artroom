@@ -101,6 +101,7 @@ export function gitHubOutside(given: OutsideGiven, sql: Pick<SqlStorage, "exec">
       judged: (at, sealed) => destination.judged(at, sealed),
       recovery: { accepts: (owner, kind) => accepts(owner, kind) && destination.recovery.accepts(owner, kind), read: (request) => accepts(request.owner, request.kind) ? destination.recovery.read(request) : Promise.resolve(null) },
       replies: (limit) => bound(DESTINATION) ? destination.replies(limit) : { answers: [], more: false },
+      credential: (handle, key) => bound(DESTINATION) ? destination.credential(handle, key) : null,
     };
   } catch { return NO_OUTSIDE; }
 }

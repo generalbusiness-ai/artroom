@@ -43,6 +43,7 @@
  * | `GET /v1/scopes/:scope/stream` | A stream of the scope's head, one line of JSON for each, for a read session. |
  * | `GET /v1/scopes/:scope/incidents?cursor=` | A page of the operator's record of the scope, for the session of an admin. |
  * | `GET /v1/scopes/:scope/waiting/:list?cursor=` | One page of the list `diagnosed` or `unanswered` of the requests that wait, for the session of an admin. |
+ * | `GET /v1/scopes/:destination/credential/:handle` | A member's read token, once, for the session of the key that signed its `read-token` act. The answer holds a credential, and is marked not to be stored. |
  *
  * A reader presents a read session in the `Authorization` header, as
  * `Session <token>`, set from memory. A reader with no session may present
@@ -77,6 +78,7 @@ import type { Incident } from "./operator.ts";
 import type { Summary } from "./reads.ts";
 import { credentialInUrl, relay, sessionReaders, sessionsOf, type Opened, type Sessions, type StreamRefusal } from "./sessions.ts";
 import type { Duty, Sealed } from "./store.ts";
+import type { ReadCredential } from "./destination-host.ts";
 import { gitHubOutside, type GitHubBindings } from "./github-wiring.ts";
 import { ARTIFACTS_HOST, artifactsOutside, type ArtifactsBindings } from "./artifacts-wiring.ts";
 import { recordedHost } from "./host-wiring.ts";
@@ -110,6 +112,7 @@ interface Remote {
   release(id: string): Promise<void>;
   incidents(reader: unknown, cursor?: Cursor): Promise<Read<readonly Incident[]>>;
   waiting(reader: unknown, list: "diagnosed" | "unanswered", cursor?: Cursor): Promise<Read<readonly Duty[]>>;
+  credential(reader: unknown, handle: string): Promise<Read<ReadCredential>>;
 }
 
 const MISSING = { ok: false, reason: "not-found" } as const;
@@ -121,6 +124,8 @@ export interface Api extends ScopeApi {
   stream(scope: string, reader: unknown): Promise<ReadableStream<Uint8Array> | StreamRefusal | typeof MISSING>;
   incidents(scope: string, reader: unknown, cursor?: Cursor): Promise<Read<readonly Incident[]>>;
   waiting(scope: string, reader: unknown, list: "diagnosed" | "unanswered", cursor?: Cursor): Promise<Read<readonly Duty[]>>;
+  /** A member's read token at a destination, once (I5). */
+  credential(scope: string, reader: unknown, handle: string): Promise<Read<ReadCredential>>;
 }
 
 
@@ -172,6 +177,7 @@ export function api(binding: Binding, address: string | null = null): Api {
     },
     async incidents(scope: string, reader: unknown, cursor?: Cursor): Promise<Read<readonly Incident[]>> { return (await at(scope)?.incidents(reader, cursor)) ?? MISSING; },
     async waiting(scope: string, reader: unknown, list: "diagnosed" | "unanswered", cursor?: Cursor): Promise<Read<readonly Duty[]>> { return (await at(scope)?.waiting(reader, list, cursor)) ?? MISSING; },
+    async credential(scope: string, reader: unknown, handle: string): Promise<Read<ReadCredential>> { return (await at(scope)?.credential(reader, handle)) ?? MISSING; },
   };
 }
 
@@ -273,6 +279,11 @@ export async function route(request: Request, binding: Binding): Promise<Respons
   if (what === "retained") return read(await scopes.retained(scope, reader, which as RetainedInput["kind"], last as Digest, url.searchParams.get("domain") ?? undefined));
   if (what === "incidents") return read(await scopes.incidents(scope, reader, cursor));
   if (what === "waiting" && (which === "diagnosed" || which === "unanswered")) return read(await scopes.waiting(scope, reader, which, cursor));
+  if (what === "credential" && which !== undefined) {
+    // The answer holds a credential: it is marked so that nothing between here and the device stores it.
+    const answer = await scopes.credential(scope, reader, which);
+    return new Response(JSON.stringify(answer), { status: answer.ok ? 200 : READ_STATUS[answer.reason], headers: { "content-type": "application/json", "cache-control": "no-store" } });
+  }
   if (what === "stream") {
     const stream = await scopes.stream(scope, reader);
     // The body is the reader's side of the scope's stream. A reader that goes away cancels it, and the scope releases the subscription at once.
@@ -305,6 +316,7 @@ export function outsideOf(given: OutsideGiven, sql: Pick<SqlStorage, "exec">, en
       read: (request) => pick().recovery?.read(request) ?? Promise.resolve(null),
     },
     replies: (limit) => pick().replies?.(limit) ?? { answers: [], more: false },
+    credential: (handle, key) => pick().credential?.(handle, key) ?? null,
   };
 }
 

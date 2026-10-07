@@ -1,9 +1,9 @@
 /** Destination outside effects. Provider calls happen outside the scope's commit;
  * platform rules alone judge their evidence. Plaintexts stay in private custody. */
-import type { Entry, FactRef, FieldValue, OperationId, RetainedInput, ScopeRef } from "@generalbusiness/artroom-contract";
+import type { Entry, FactRef, FieldValue, KeyId, OperationId, RetainedInput, ScopeRef } from "@generalbusiness/artroom-contract";
 import { canonicalize, entryHash, isFactRef, isOperationId, parseStrict, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
-import { isEntryOf, type Operation } from "@generalbusiness/artroom-derive";
-import { DESTINATION, DESTINATION_KINDS, destinationBranch, destinationMint, destinationRead, destinationReceipt, destinationRevokedMint, destinationSends, destinationStatement, destinationTarget, destinationWrite, firstHeadCommit, foundingObjects, isRecordedJudgeEvidence, revokedToken, type DestinationObject, type ObjectFormat, type RecordedJudgeEvidence } from "@generalbusiness/artroom-platform";
+import { isEntryOf, valueDigest, type Operation } from "@generalbusiness/artroom-derive";
+import { DESTINATION, DESTINATION_KINDS, READ_TOKEN_HOURS, destinationBranch, destinationMint, destinationRead, destinationReceipt, destinationRevokedMint, destinationSends, destinationStatement, destinationTarget, destinationWrite, firstHeadCommit, foundingObjects, isRecordedJudgeEvidence, revokedToken, type DestinationObject, type ObjectFormat, type RecordedJudgeEvidence } from "@generalbusiness/artroom-platform";
 import type { CredentialPosition, CredentialStore, RevocationPosition } from "./credential-store.ts";
 import type { OutsideGiven } from "./object.ts";
 import type { EffectAnswer, EffectRequest, Outside } from "./operations.ts";
@@ -24,8 +24,23 @@ export interface DestinationProvider {
   /** Validate object closure and ancestry at the actual send boundary. Own reply: {send:...}. */
   send(request: { repository: DestinationRepository; ref: string; old: string | null; commit: string; objects: readonly DestinationObject[]; expectedTree?: string; requireParentless: boolean; token: string; binding: DestinationBinding; allowed(): boolean }): Promise<unknown>;
   inspect(context: DestinationInspection): Promise<{ evidence: RecordedJudgeEvidence; retain?: readonly RetainedInput[] }>;
+  /**
+   * One read credential for the repository, for a member's `read-token`: `handle` is the host's nonsecret name for it, chosen
+   * before the request; `seconds` the lifetime that the act asked for. Own reply: {id, ends, plaintext}, or {minted:false}.
+   * No request is retried here.
+   */
+  mintRead(repository: DestinationRepository, request: { handle: string; seconds: number }): Promise<unknown>;
+  /** The repository's remote URL at this host, as a person clones it. */
+  remote(repository: DestinationRepository): string;
 }
-export interface DestinationHostOptions { host: string; namespace: string; provider: DestinationProvider; custody: Pick<CredentialStore, "put" | "reply" | "live" | "read" | "judged" | "revoked" | "pending" | "expectRevoke" | "revocations"> }
+/** What the one-time credential read answers: the plaintext, its end, and the remote URL it opens. */
+export interface ReadCredential { token: string; ends: string; remote: string }
+export interface DestinationHostOptions { host: string; namespace: string; provider: DestinationProvider; custody: Pick<CredentialStore, "put" | "reply" | "live" | "read" | "judged" | "revoked" | "pending" | "expectRevoke" | "revocations" | "held" | "take"> }
+
+/** The byte domain of the nonsecret handle of a member's read credential. */
+const READ_HANDLE = "artroom.read-credential.v1";
+/** The kinds whose confirmed outcome puts a plaintext in custody: a write's token, and a member's read token. */
+const MINTS: readonly string[] = [DESTINATION_KINDS.mint, DESTINATION_KINDS.mintRead];
 
 const sameScope = (a: ScopeRef, b: ScopeRef) => canonicalize(a) === canonicalize(b);
 const objectId = (v: unknown): v is string => typeof v === "string" && /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(v);
@@ -90,7 +105,7 @@ export class DestinationHost implements Outside {
     this.#replyCursor = page.more && last ? { mint: last.mint, attempt: last.attempt } : null;
     for (const held of page.items) {
       const operation = this.#given.state.operation(held.mint);
-      if (operation?.owner !== DESTINATION || operation.kind !== DESTINATION_KINDS.mint || !text(held.id) || timeMs(held.ends) === null) continue;
+      if (operation?.owner !== DESTINATION || !MINTS.includes(operation.kind) || !text(held.id) || timeMs(held.ends) === null) continue;
       const origin = this.#given.own(Number(held.mint.split(":")[0]));
       if (!origin || !this.#bound({ scope: scope.at, operation: held.mint, attempt: held.attempt, owner: operation.owner, kind: operation.kind, origin })) continue;
       answers.push({ operation: held.mint, attempt: held.attempt, answer: answer("confirmed", { token: held.id, ends: held.ends }) });
@@ -103,6 +118,17 @@ export class DestinationHost implements Outside {
       const context = this.#bound(request);
       if (!context) return null;
       const { operation, repository, ref } = context;
+      if (operation.kind === DESTINATION_KINDS.mintRead) {
+        const hours = this.#hours(operation);
+        if (hours === null) return null;
+        const id = this.#readHandle(request);
+        const reply = await this.#options.provider.mintRead(repository, { handle: id, seconds: hours * 3600 });
+        if (members(reply, ["minted"])?.["minted"] === false) return answer("refused", {});
+        const body = members(reply, ["id", "ends", "plaintext"]);
+        if (!body || body["id"] !== id || typeof body["ends"] !== "string" || timeMs(body["ends"]) === null || typeof body["plaintext"] !== "string" || body["plaintext"].length === 0 || utf8(body["plaintext"]).length > 4096) return null;
+        const held = this.#options.custody.put({ id, ends: body["ends"], plaintext: body["plaintext"], mint: operation.id, attempt: request.attempt });
+        return held === "stored" || held === "repeat" ? answer("confirmed", { token: id, ends: body["ends"] }) : null;
+      }
       if (operation.kind === DESTINATION_KINDS.mint) {
         const served = destinationWrite(this.#given.state, this.#given.own, operation);
         if (!served) return null;
@@ -145,7 +171,7 @@ export class DestinationHost implements Outside {
   judged(at: { scope: ScopeRef; operation: OperationId; attempt: number }, sealed: Sealed | null): void {
     const scope = this.#given.scope();
     const operation = this.#given.state.operation(at.operation);
-    if (!scope || !sameScope(scope.at, at.scope) || operation?.owner !== DESTINATION || (operation.kind !== DESTINATION_KINDS.mint && operation.kind !== DESTINATION_KINDS.revoke)) return;
+    if (!scope || !sameScope(scope.at, at.scope) || operation?.owner !== DESTINATION || (!MINTS.includes(operation.kind) && operation.kind !== DESTINATION_KINDS.revoke)) return;
     // A repeat/conflict notification carries no new entry. Keep custody backed
     // by the exact confirmed outcome this scope previously committed.
     const outcome = sealed ?? this.#confirmation(operation, at.attempt);
@@ -160,6 +186,42 @@ export class DestinationHost implements Outside {
     }
     const body = valid && input.type === "outcome" ? members(input.evidence.body, ["token", "ends"]) : null;
     this.#options.custody.judged(at.operation, at.attempt, body && text(body["token"]) && typeof body["ends"] === "string" && timeMs(body["ends"]) !== null ? { id: body["token"], ends: body["ends"] } : null);
+  }
+
+  /**
+   * The one-time read of a member's read credential (the planner's decision for I5). It answers only for a `mint-read` whose
+   * confirmed own answer this scope committed, naming that handle; only to the key that signed the `read-token` that opened it;
+   * only before its end; and only once: the plaintext leaves custody as it is answered. Every other case is null, and a read
+   * after the end drops the plaintext. It writes no entry.
+   */
+  credential(handle: string, key: KeyId): ReadCredential | null {
+    try {
+      if (!text(handle) || !this.#given.scope()) return null;
+      const held = this.#options.custody.held(handle);
+      const operation = held ? this.#given.state.operation(held.mint) : null;
+      if (!held || held.state !== "live" || operation?.owner !== DESTINATION || operation.kind !== DESTINATION_KINDS.mintRead) return null;
+      const confirmed = this.#confirmation(operation, held.attempt)?.entry.input;
+      const body = confirmed?.type === "outcome" ? members(confirmed.evidence.body, ["token", "ends"]) : null;
+      const opening = this.#given.own(Number(operation.id.split(":")[0]))?.entry.input;
+      if (body?.["token"] !== handle || body["ends"] !== held.ends || opening?.type !== "act" || opening.signed.intent.kind !== "read-token" || opening.signed.intent.actor !== key) return null;
+      const branch = destinationBranch(this.#given.state);
+      const repository = members(branch?.values["repository"], ["host", "namespace", "name", "id"]);
+      if (!repository || repository["host"] !== this.#options.host || repository["namespace"] !== this.#options.namespace) return null;
+      const remote = this.#options.provider.remote(repository as unknown as DestinationRepository);
+      const taken = this.#options.custody.take(handle, this.#given.clock.read());
+      return taken ? { token: taken.plaintext, ends: taken.ends, remote } : null;
+    } catch { return null; }
+  }
+
+  /** The lifetime that the `read-token` act asked for, in hours, from the entry that opened the `mint-read`. */
+  #hours(operation: Operation): number | null {
+    const input = this.#given.own(Number(operation.id.split(":")[0]))?.entry.input;
+    const hours = input?.type === "act" && input.signed.intent.kind === "read-token" ? input.signed.intent.fields["hours"] : null;
+    return typeof hours === "number" && Number.isSafeInteger(hours) && hours >= READ_TOKEN_HOURS.min && hours <= READ_TOKEN_HOURS.max ? hours : null;
+  }
+  /** A read credential's nonsecret handle, fixed by the sealed operation and its attempt before the request leaves. */
+  #readHandle(request: EffectRequest): string {
+    return `read:${valueDigest(READ_HANDLE, { scope: request.scope, operation: request.operation, attempt: request.attempt, origin: request.origin.hash } as unknown as FieldValue)}`;
   }
 
   #confirmation(operation: Operation, attempt: number): Sealed | null {

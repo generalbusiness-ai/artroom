@@ -34,6 +34,8 @@ class Provider implements DestinationProvider {
     return Promise.resolve(this.sendReply);
   }
   inspect(context: DestinationInspection) { this.calls.push({ kind: "inspect", body: context }); return Promise.resolve({ evidence: this.evidence }); }
+  mintRead(_repository: DestinationRepository, request: { handle: string; seconds: number }): Promise<unknown> { this.calls.push({ kind: "mint-read", body: request }); return Promise.resolve({ id: request.handle, ends: t(3600), plaintext: "private-read-1" }); }
+  remote(repository: DestinationRepository): string { return `https://${repository.host}/${repository.namespace}/${repository.name}.git`; }
 }
 
 /** Branch's rules judge real entries in memory. Its creator and lane reader are labelled stand-ins.

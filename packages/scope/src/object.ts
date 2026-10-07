@@ -109,6 +109,9 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
   readonly #requests: SessionRequests;
   /** The roots of this scope's cause chains, each found once (`signed-reads.ts`). */
   readonly #chains: Chains;
+  /** The outside port as wired, for the one-time read of a member's read credential (`credential`). */
+  readonly #outside: Outside;
+  readonly #readers: Readers;
   /** True until this object's first turn: its first call or its alarm (`#first`). In memory, so a restart sets it again. */
   #fresh = true;
 
@@ -180,6 +183,8 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
     this.#dispatcher = given.transport ? new Dispatcher(this.#scope, store, { transport: given.transport, clock: ports.clock, capabilities: ports.capabilities }, wakes, bounds) : null;
     this.#operations = new Operations(this.#scope, store, ports, wakes, bounds, (operation, attempt, seq) => { record.found("outcome-conflict", [{ operation, attempt }, { entry: seq }]); });
     this.#clock = ports.clock;
+    this.#outside = ports.outside;
+    this.#readers = ports.readers;
     this.#transport = given.transport;
     this.#seconds = bounds.dispatchSeconds;
     this.#record = record;
@@ -335,4 +340,19 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
   async retained(reader: unknown, kind: RetainedInput["kind"], digest: Digest, domain?: string): Promise<Read<RetainedInput>> { this.#first(); await this.#rooted(reader); return this.#reads.retained(reader, kind, digest, domain); }
   incidents(reader: unknown, cursor?: Cursor): Read<readonly Incident[]> { this.#first(); return this.#reads.incidents(reader, cursor); }
   waiting(reader: unknown, list: "diagnosed" | "unanswered", cursor?: Cursor): Read<readonly Duty[]> { this.#first(); return this.#reads.waiting(reader, list, cursor); }
+
+  /**
+   * The one-time read of a member's read token at a destination, by its handle (the planner's decision for I5). Only a session
+   * may read it, and only the session of the key that signed the `read-token` act whose `mint-read` minted it; the outside port
+   * judges the rest, and drops the plaintext as it answers. A second read, another key's session, a read after the end, a
+   * handle that names nothing and a scope that is no destination are each `forbidden`. Nothing is written.
+   */
+  credential(reader: unknown, handle: unknown): Read<{ token: string; ends: string; remote: string }> {
+    this.#first();
+    const key = this.#readers.holder?.(reader, "credential") ?? false;
+    if (key === "sessions-unavailable" || key === "clock-behind") return { ok: false, reason: key };
+    const scope = this.#store.scope();
+    const answer = key !== false && typeof handle === "string" && scope?.at.kind === "destination" ? this.#outside.credential?.(handle, key) ?? null : null;
+    return answer && scope ? { ok: true, at: scope.head, value: answer, complete: true } : { ok: false, reason: "forbidden" };
+  }
 }

@@ -102,6 +102,18 @@ export class GitHubProvider implements RegisterProvider, DestinationProvider {
     // Lost replies or failed custody remain pending; this port never remints.
     return { id, ends: token.expiresAt, plaintext: token.plaintext };
   }
+  /**
+   * A member's read token: an installation token restricted to the repository's ID with contents read. GitHub fixes its
+   * lifetime, one hour, and states its expiry, which is the end recorded; `seconds` is not sent.
+   */
+  async mintRead(repository: DestinationRepository, request: { handle: string; seconds: number }): Promise<unknown> {
+    repository = { ...repository };
+    this.#remote(repository);
+    const id = handle(request.handle);
+    const token = await this.#app.mintInstallationToken({ repositoryIds: [numericId(repository.id)], permissions: { contents: "read" } });
+    return { id, ends: token.expiresAt, plaintext: token.plaintext };
+  }
+  remote(repository: DestinationRepository): string { return this.#remote({ ...repository }); }
   async revoke(id: string, plaintext: string): Promise<unknown> {
     handle(id);
     await this.#app.revokeToken(plaintext);

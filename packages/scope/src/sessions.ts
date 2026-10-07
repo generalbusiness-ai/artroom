@@ -56,8 +56,11 @@
  * **A reader with no session** gets `forbidden` from every read, and no
  * stream.
  *
- * **What a session cannot do.** It signs nothing, controls nothing and gets
- * no credential. Nothing here takes a session as authority for an act.
+ * **What a session cannot do.** It signs nothing and controls nothing.
+ * Nothing here takes a session as authority for an act. The one credential
+ * it reads is a read token that its own key asked for by a signed
+ * `read-token` act, once (the planner's decision for I5): the destination
+ * judges that, by the session's key.
  *
  * Nothing here logs, stores or returns the secret, and no refusal holds a
  * token or a part of one.
@@ -101,8 +104,11 @@ export function sessionsOf(secret: unknown, deployment: unknown): Sessions | nul
 
 // ---------------------------------------------------------------- the token
 
-/** The reads of the contract's section 9.1, which every session is given. */
-const MEMBER_READS: readonly ReadName[] = ["summary", "items", "history", "entry", "outbox", "operations", "log", "retained"];
+/**
+ * The reads of the contract's section 9.1, which every session is given, and `credential`: the one-time read of a read token
+ * that the session's own key asked for by `read-token` (the planner's decision for I5). The destination checks the key.
+ */
+const MEMBER_READS: readonly ReadName[] = ["summary", "items", "history", "entry", "outbox", "operations", "log", "retained", "credential"];
 /** The reads of the repository's admin page (section 12, G13 and G17). */
 const ADMIN_READS: readonly ReadName[] = ["incidents", "waiting"];
 const READ_NAMES: ReadonlySet<string> = new Set<string>([...MEMBER_READS, ...ADMIN_READS]);
@@ -240,6 +246,10 @@ export function sessionReaders(config: SessionReading): Readers {
       return "claims" in checked ? checked.claims.reads.includes(read) : checked.refused;
     },
     chained: (reader, read) => chainedSession(config, reader, read),
+    holder(reader, read) {
+      const checked = checkSession(config, reader);
+      return "claims" in checked ? (checked.claims.reads.includes(read) ? checked.claims.key : false) : checked.refused;
+    },
   };
 }
 

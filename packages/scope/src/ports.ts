@@ -9,7 +9,7 @@
  * are the platform package's, which is code of this runtime.
  */
 
-import type { Digest, Entry, FactRef, Grant, ObservationUse, PlatformDefinition, Prepared, RoutingRefusal, ScopeRef, SignedIntent, Timestamp, UnavailableReason } from "@generalbusiness/artroom-contract";
+import type { Digest, Entry, FactRef, Grant, KeyId, ObservationUse, PlatformDefinition, Prepared, RoutingRefusal, ScopeRef, SignedIntent, Timestamp, UnavailableReason } from "@generalbusiness/artroom-contract";
 import { TOKENS_FLOOR, capabilitiesOf, gitRead, holdCapability, timeOf, type Capabilities, type HoldOptions, type Clock as Reading, type Delivered, type Owners, type Presented, type RuleInput, type StateView, type Needed, type Observing, type Window } from "@generalbusiness/artroom-derive";
 import { evaluateRules } from "@generalbusiness/artroom-derive/rule";
 import { platform, type Platform } from "@generalbusiness/artroom-platform";
@@ -211,7 +211,8 @@ export interface SentTexts { read(from: FactRef, digest: Digest): Promise<TextRe
 /** `log` and `retained` are what a verifier reads (sections 9.2 and 9.4): the stored bytes of entries, and retained inputs. */
 /** `operations` is the read of a scope's outside operations, which the contract does not list (I3 deltas, entry EB9). */
 /** `incidents` and `waiting` are the reads of the operator's record and of the two lists of waiting requests (authority note, section 12, G13 and G17). */
-export type ReadName = "summary" | "items" | "history" | "entry" | "outbox" | "operations" | "log" | "retained" | "incidents" | "waiting";
+/** `credential` is the one-time read of a member's read token at a destination (the planner's decision for I5). */
+export type ReadName = "summary" | "items" | "history" | "entry" | "outbox" | "operations" | "log" | "retained" | "incidents" | "waiting" | "credential";
 
 /**
  * Who may read. `reader` is whatever the caller presented. The production
@@ -231,6 +232,11 @@ export interface Readers {
    * name, as for `allows`. Absent: no reader reads by the chain.
    */
   chained?(reader: unknown, read: ReadName): { membership: ScopeRef } | false | "sessions-unavailable" | "clock-behind";
+  /**
+   * The key whose session this reader presents, where `allows` lets it make that read. False, or a name, as for `allows`.
+   * Absent: no reader is known by its key, and a read that needs one is `forbidden`.
+   */
+  holder?(reader: unknown, read: ReadName): KeyId | false | "sessions-unavailable" | "clock-behind";
 }
 
 export interface Ports {
