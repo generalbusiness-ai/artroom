@@ -24,7 +24,7 @@
  */
 
 import { ENTRY_READ_BYTES, HISTORY_PAGE_BYTES, HISTORY_PAGE_ENTRIES, OUTBOX_PAGE_DUTIES, RETAINED_INPUT_BYTES, RETAINED_ITEMS_PAGE } from "@generalbusiness/artroom-contract";
-import type { Cursor, Digest, DutyId, Entry, KeyId, LogPage, OperationId, Read, ReadRefusal, RetainedInput, SignedReadName, Summary } from "@generalbusiness/artroom-contract";
+import type { Cursor, Digest, DutyId, Entry, KeyId, LogPage, OperationId, Read, ReadRefusal, RetainedInput, Summary } from "@generalbusiness/artroom-contract";
 import { isDutyId, isOperationId, positionOf } from "@generalbusiness/artroom-bytes";
 import { byteOrder, own, type Item, type ScopeState, type ValidDefinition } from "@generalbusiness/artroom-derive";
 import type { Pinned } from "./core.ts";
@@ -93,8 +93,9 @@ export class Reads {
   #open(reader: unknown, read: ReadName, arg?: string): { scope: ScopeState; pinned: Pinned; signer: KeyId | null } | { ok: false; reason: ReadRefusal } {
     let signer: KeyId | null = null;
     if (presentsSignedRead(reader)) {
-      if (!this.#signed || arg === undefined) return no("forbidden");
-      const checked = checkSignedRead(this.#signed, this.#store, reader as string, read as SignedReadName, arg);
+      if (!this.#signed) return no("forbidden");
+      // A read that a signed read cannot name has no argument here, and no request names it: it is refused by the check.
+      const checked = checkSignedRead(this.#signed, this.#store, reader as string, read, arg ?? "");
       if (!("key" in checked)) return no(checked.refused === false ? "forbidden" : checked.refused);
       signer = checked.key;
     } else {

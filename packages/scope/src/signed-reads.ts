@@ -51,7 +51,7 @@
 import type { Entry, KeyId, SignedRead, SignedReadName } from "@generalbusiness/artroom-contract";
 import { canonicalize, intentDigest, isKeyId, isScopeId, isSignature, parseStrict, unb64url, verifySignedRead } from "@generalbusiness/artroom-bytes";
 import { isObject, timeMs, type ScopeState } from "@generalbusiness/artroom-derive";
-import type { Clock } from "./ports.ts";
+import type { Clock, ReadName } from "./ports.ts";
 import type { Store } from "./store.ts";
 
 /** How a reader presents a signed read: the `Authorization` header's value. */
@@ -117,7 +117,7 @@ export function signerOf(entry: Entry, store: Pick<Store, "retained">): KeyId | 
  * `key`: the read may be made, by that key. `read` and `arg` are the read
  * that is asked and its argument, as the request must name them.
  */
-export function checkSignedRead(config: SignedReading, store: Pick<Store, "scope" | "stored" | "retained">, reader: string, read: SignedReadName, arg: string): { key: KeyId } | { refused: false | "clock-behind" } {
+export function checkSignedRead(config: SignedReading, store: Pick<Store, "scope" | "stored" | "retained">, reader: string, read: ReadName, arg: string): { key: KeyId } | { refused: false | "clock-behind" } {
   const signed = openSignedRead(reader);
   if (!signed || !verifySignedRead(signed)) return { refused: false };
   const scope: ScopeState | null = store.scope();
