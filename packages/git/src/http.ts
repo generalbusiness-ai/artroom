@@ -186,7 +186,13 @@ export class SmartHttpGit {
   }
 
   async discover(): Promise<ReceiveAdvertisement> {
-    const lines = packets(await this.#request("info/refs?service=git-receive-pack", "application/x-git-receive-pack-advertisement", AbortSignal.timeout(this.#timeoutMs)));
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this.#timeoutMs);
+    let response: Uint8Array;
+    try {
+      response = await this.#request("info/refs?service=git-receive-pack", "application/x-git-receive-pack-advertisement", controller.signal);
+    } finally { clearTimeout(timer); }
+    const lines = packets(response);
     if (lines[0] !== "# service=git-receive-pack" || lines[1] !== null || lines.length < 4 || lines.at(-1) !== null) throw bad("advertisement");
     const refs: RefTarget[] = [];
     const capabilities: string[] = [];
@@ -245,10 +251,11 @@ export class SmartHttpGit {
     // have changed while they ran; do not turn an earlier check into a send.
     try { if (update.beforeSend && !update.beforeSend()) return NOT_RUN("unreadable"); }
     catch { return NOT_RUN("unreadable"); }
-    const signal = AbortSignal.timeout(this.#timeoutMs);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this.#timeoutMs);
     const unknown: PushAnswer = { ran: true, refusal: null, exit: null, timedOut: false, reported: null, others: false, code: null };
     try {
-      const lines = packets(await this.#request("git-receive-pack", "application/x-git-receive-pack-result", signal, body));
+      const lines = packets(await this.#request("git-receive-pack", "application/x-git-receive-pack-result", controller.signal, body));
       // Plain report-status only: exactly one unpack line, one status, one flush.
       if (lines.length !== 3 || !lines[0]?.startsWith("unpack ") || lines[0].length <= 7) return unknown;
       const status = lines[1];
@@ -258,6 +265,7 @@ export class SmartHttpGit {
       }
       if (status?.startsWith(`ng ${update.ref} `) && status.length > update.ref.length + 4) return { ...unknown, exit: 1, reported: "remote-rejected" };
       return unknown;
-    } catch { return { ...unknown, timedOut: signal.aborted }; }
+    } catch { return { ...unknown, timedOut: controller.signal.aborted }; }
+    finally { clearTimeout(timer); }
   }
 }

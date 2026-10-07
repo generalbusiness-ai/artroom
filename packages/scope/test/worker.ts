@@ -31,7 +31,7 @@
 
 import { platform } from "@generalbusiness/artroom-platform";
 import { lacking } from "@generalbusiness/artroom-platform/testing";
-import { ScopeObject, type Wiring } from "../src/index.ts";
+import { ScopeObject, type Outside, type OutsideGiven, type Wiring } from "../src/index.ts";
 import { sessionsOf, type LimitConfig } from "../src/index.ts";
 import { codeLost, controls, net, netPorts, testPorts } from "../src/testing.ts";
 import { DeployedScope, ScopeService, route, sessionWiring, type Env } from "../src/worker.ts";
@@ -75,6 +75,9 @@ export class NetScope extends DeployedScope<NetEnv> {
  * when a scope's object starts. Null: the proposed ones.
  */
 export const platformNet: { without: string | null; sessions: boolean; secret: string | null; limits: LimitConfig | null } = { without: null, sessions: false, secret: null, limits: null };
+/** Test-only, name-bound outside factories. ScopeObject supplies its live
+ * readonly store facade after storage exists; no default port is changed. */
+export const platformOutside = new Map<string, (given: OutsideGiven, sql: Pick<SqlStorage, "exec">) => Outside>();
 /** The name of the test deployment, which a session's token names. */
 export const TEST_DEPLOYMENT = "artroom-scope-test";
 
@@ -87,8 +90,10 @@ export class PlatformScope extends DeployedScope<PlatformEnv> {
     const { resolver, definitions, transport } = deployed.ports as Required<NonNullable<Wiring["ports"]>>;
     // With a test secret the session configuration is the test's. With none it is the deployed one, from this Worker's bindings.
     const session = sessionWiring(() => (platformNet.secret === null ? deployed.sessions!() : sessionsOf(platformNet.secret, TEST_DEPLOYMENT)));
+    const outside = platformOutside.get(name ?? "");
     return {
       ...deployed,
+      ...(outside ? { outside: (given: OutsideGiven) => outside(given, this.ctx.storage.sql) } : {}),
       sessions: session.sessions,
       readers: (given) => {
         const real = session.readers(given);

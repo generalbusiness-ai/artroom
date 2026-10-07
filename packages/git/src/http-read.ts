@@ -348,12 +348,14 @@ export class SmartHttpSource implements GitSource {
     if (!Number.isSafeInteger(this.#timeoutMs) || this.#timeoutMs <= 0) throw large("read deadline");
   }
   async #request(path: string, media: string, body?: Uint8Array): Promise<Uint8Array> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this.#timeoutMs);
     try {
       const url = `${this.#remote}/${path}`;
       const headers = new Headers({ accept: media, "cache-control": "no-cache" });
       if (this.#authorization !== undefined) headers.set("authorization", this.#authorization);
       if (body !== undefined) headers.set("content-type", "application/x-git-upload-pack-request");
-      const init: RequestInit & { credentials: "omit" } = { method: body === undefined ? "GET" : "POST", headers, redirect: "manual", credentials: "omit", signal: AbortSignal.timeout(this.#timeoutMs), ...(body === undefined ? {} : { body }) };
+      const init: RequestInit & { credentials: "omit" } = { method: body === undefined ? "GET" : "POST", headers, redirect: "manual", credentials: "omit", signal: controller.signal, ...(body === undefined ? {} : { body }) };
       const response = await this.#fetch(new Request(url, init));
       if (response.status !== 200 || response.redirected || (response.url !== "" && response.url !== url) || response.headers.get("content-type")?.split(";", 1)[0]?.trim() !== media) {
         await response.body?.cancel().catch(() => undefined);
@@ -363,7 +365,7 @@ export class SmartHttpSource implements GitSource {
     } catch (e) {
       if (e instanceof GitRefusal) throw e;
       throw fail("HTTP read request");
-    }
+    } finally { clearTimeout(timer); }
   }
   async #advertisement(): Promise<Advertisement> {
     const data = await this.#request("info/refs?service=git-upload-pack", "application/x-git-upload-pack-advertisement");
