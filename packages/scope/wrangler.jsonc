@@ -9,6 +9,24 @@
 // argument; and the variable DEPLOYMENT, the deployment's name. With either
 // missing the Worker issues no session and accepts none, and no reader may
 // read.
+//
+// Git hosts. A register names its host at install (`host`, `namespace`), and
+// the Worker routes each host operation by that recorded host. With no host
+// configured, every outside effect stays recorded and unsent.
+//
+// - The hosting's own Git service, for a register installed with
+//   `--host artifacts --namespace artroom-demo`: the `artifacts` binding
+//   below, and the variable ARTIFACTS_CONFIG, nonsecret JSON with exactly
+//   the fields registerScope (the install's register scope ID), namespace
+//   ("artroom-demo"), host (the service's hostname in its remote URLs),
+//   maxBytes and credentialIdentity ("adapter-attempt"). No outside
+//   credential is needed. docs/hosts.md says more.
+// - GitHub, for a register installed with `--host github.com`: the
+//   variable GITHUB_APP_CONFIG and the secrets GITHUB_APP_PRIVATE_KEY,
+//   GITHUB_CREATION_TOKEN and GITHUB_READ_TOKEN (see
+//   src/github-wiring.ts).
+//
+// An operator sets the variables and secrets; this file holds no value.
 {
   "name": "artroom-scope",
   "main": "src/worker.ts",
@@ -17,5 +35,8 @@
   "durable_objects": {
     "bindings": [{ "name": "SCOPES", "class_name": "DeployedScope" }]
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["DeployedScope"] }]
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["DeployedScope"] }],
+  // The hosting's own Git service: one namespace, reached by the binding
+  // ARTIFACTS. It takes effect only with ARTIFACTS_CONFIG set as above.
+  "artifacts": [{ "binding": "ARTIFACTS", "namespace": "artroom-demo", "remote": true }]
 }

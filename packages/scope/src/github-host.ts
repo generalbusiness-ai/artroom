@@ -11,7 +11,7 @@ import { byteOrder, valueDigest } from "@generalbusiness/artroom-derive";
 import { DESTINATION_CHANGED_SET, type DestinationObject, type JudgeChanges, type RecordedJudgeEvidence, type TreeLink } from "@generalbusiness/artroom-platform";
 import { GitRefusal, READ_BOUNDS, SNAPSHOT_BOUNDS, Reader, objectId, refName, type GitSource, type ReadBounds, type StoredObject } from "@generalbusiness/artroom-git";
 import { GitHubApp, type GitHubAppOptions, type GitHubInstallationToken } from "@generalbusiness/artroom-git/github";
-import { SmartHttpGit, type RawGitObject } from "@generalbusiness/artroom-git/http";
+import { SmartHttpGit, type RawGitObject, type SmartHttpOptions } from "@generalbusiness/artroom-git/http";
 import { SmartHttpSource } from "@generalbusiness/artroom-git/http-read";
 import type { DestinationBinding, DestinationInspection, DestinationProvider, DestinationRepository } from "./destination-host.ts";
 import type { RegisterProvider } from "./register-host.ts";
@@ -134,27 +134,7 @@ export class GitHubProvider implements RegisterProvider, DestinationProvider {
   async send(request: Parameters<DestinationProvider["send"]>[0]): Promise<unknown> {
     request = { ...request, repository: { ...request.repository }, binding: { ...request.binding, scope: { ...request.binding.scope } } };
     const remote = this.#remote(request.repository);
-    const objects: RawGitObject[] = request.objects.map((object) => ({ id: object.id, type: object.kind, data: new Uint8Array(object.body) }));
-    const supplied = new Map(objects.map((object) => [object.id, object]));
-    if (supplied.size !== objects.length || objects.reduce((size, object) => size + object.data.length, 0) > this.#options.maxBytes) return bad();
-    const source: GitSource = {
-      object: async (id): Promise<StoredObject | null> => {
-        const object = supplied.get(id);
-        return object ? { type: object.type, size: object.data.length, data: new Uint8Array(object.data) } : null;
-      },
-      ref: async () => bad(), refs: async () => bad(),
-    };
-    const reader = new Reader(source, this.#bounds);
-    const commit = await reader.commit(request.commit);
-    if ((request.old !== null && commit.parents[0] !== request.old) || (request.requireParentless && commit.parents.length !== 0) || (request.expectedTree !== undefined && commit.tree !== request.expectedTree)) return bad();
-    const stop = request.old === null ? new Set<string>() : new Set([objectId(request.old, "old")]);
-    if (!(await reader.closure(request.commit, stop)).complete) return bad();
-    const transport = new SmartHttpGit({ ...this.#transport(remote), authorization: gitAuthorization(request.token) });
-    const result = await transport.send({ ref: request.ref, old: request.old, new: request.commit, objects, beforeSend: request.allowed });
-    if (!result.ran || result.reported === "stale") return { send: "not-sent" };
-    if (result.exit === 1 && result.reported === "remote-rejected" && !result.timedOut) return { send: "refused" };
-    if (result.exit === 0 && (result.reported === "created" || result.reported === "updated") && !result.timedOut && await this.ref(request.repository, request.ref) === request.commit) return { send: "accepted" };
-    return null; // An applied ref cannot settle a lost or incomplete own answer.
+    return sendOnce(request, { ...this.#transport(remote), authorization: gitAuthorization(request.token) }, () => this.ref(request.repository, request.ref));
   }
   async inspect(context: DestinationInspection): Promise<{ evidence: RecordedJudgeEvidence; retain?: readonly RetainedInput[] }> {
     context = { ...context, repository: { ...context.repository }, reports: [...context.reports] };
@@ -179,6 +159,37 @@ export class GitHubProvider implements RegisterProvider, DestinationProvider {
     if (seen === null || seen.id !== numericId(repository.id)) return bad();
     return new SmartHttpSource({ ...this.#transport(remote), ...(plaintext === undefined ? {} : { authorization: gitAuthorization(plaintext) }) });
   }
+}
+
+/**
+ * The one push of a destination write: the supplied objects are checked for
+ * closure, parent and tree before one compare-and-swap through the smart-HTTP
+ * receive-pack client. Only the push's own whole answer, confirmed by the
+ * read-back, is "accepted". An applied ref cannot settle a lost or incomplete
+ * own answer. Nothing is retried.
+ */
+export async function sendOnce(request: Parameters<DestinationProvider["send"]>[0], transport: SmartHttpOptions, readBack: () => Promise<string | null>): Promise<unknown> {
+  const bounds = transport.bounds ?? READ_BOUNDS;
+  const objects: RawGitObject[] = request.objects.map((object) => ({ id: object.id, type: object.kind, data: new Uint8Array(object.body) }));
+  const supplied = new Map(objects.map((object) => [object.id, object]));
+  if (supplied.size !== objects.length || objects.reduce((size, object) => size + object.data.length, 0) > transport.maxBytes) return bad();
+  const source: GitSource = {
+    object: async (id): Promise<StoredObject | null> => {
+      const object = supplied.get(id);
+      return object ? { type: object.type, size: object.data.length, data: new Uint8Array(object.data) } : null;
+    },
+    ref: async () => bad(), refs: async () => bad(),
+  };
+  const reader = new Reader(source, bounds);
+  const commit = await reader.commit(request.commit);
+  if ((request.old !== null && commit.parents[0] !== request.old) || (request.requireParentless && commit.parents.length !== 0) || (request.expectedTree !== undefined && commit.tree !== request.expectedTree)) return bad();
+  const stop = request.old === null ? new Set<string>() : new Set([objectId(request.old, "old")]);
+  if (!(await reader.closure(request.commit, stop)).complete) return bad();
+  const result = await new SmartHttpGit(transport).send({ ref: request.ref, old: request.old, new: request.commit, objects, beforeSend: request.allowed });
+  if (!result.ran || result.reported === "stale") return { send: "not-sent" };
+  if (result.exit === 1 && result.reported === "remote-rejected" && !result.timedOut) return { send: "refused" };
+  if (result.exit === 0 && (result.reported === "created" || result.reported === "updated") && !result.timedOut && await readBack() === request.commit) return { send: "accepted" };
+  return null; // An applied ref cannot settle a lost or incomplete own answer.
 }
 
 interface FlatFile { id: string; mode: string; path: string | null }

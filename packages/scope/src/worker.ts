@@ -80,6 +80,9 @@ import { credentialInUrl, relay, sessionReaders, sessionsOf, type Opened, type S
 import type { Duty, Sealed } from "./store.ts";
 import { gitHubOutside, type GitHubBindings } from "./github-wiring.ts";
 import { within } from "./turn.ts";
+import { ARTIFACTS_HOST, artifactsOutside, type ArtifactsBindings } from "./artifacts-wiring.ts";
+import { recordedHost } from "./host-wiring.ts";
+import { NO_OUTSIDE, type Outside } from "./operations.ts";
 
 /**
  * The bindings of the deployed Worker (`wrangler.jsonc`): the one scope
@@ -88,7 +91,7 @@ import { within } from "./turn.ts";
  * the operator sets it, and no file of this repository holds one.
  * `DEPLOYMENT` is the deployment's name, which a session's token names.
  */
-export interface Env extends GitHubBindings { SCOPES: DurableObjectNamespace; SESSION_SECRET?: string; DEPLOYMENT?: string }
+export interface Env extends GitHubBindings, ArtifactsBindings { SCOPES: DurableObjectNamespace; SESSION_SECRET?: string; DEPLOYMENT?: string }
 
 /** A scope's surface as a caller over RPC has it. */
 interface Remote {
@@ -283,6 +286,31 @@ export async function route(request: Request, binding: Binding): Promise<Respons
 // ---------------------------------------------------------------- the deployed classes
 
 /**
+ * The outside port of a deployment: one wiring for each Git host that is
+ * configured, GitHub and the hosting's own Git service, and each call routed
+ * by the host that the object's own history records, the register's or its
+ * destination's. A scope whose recorded host matches no configured wiring,
+ * or that records none, gets `NO_OUTSIDE`. Each wiring still checks its own
+ * authority.
+ */
+export function outsideOf(given: OutsideGiven, sql: Pick<SqlStorage, "exec">, env: GitHubBindings & ArtifactsBindings, fetch?: (request: Request) => Promise<Response>): Outside {
+  const hosts = new Map<string, Outside>();
+  if (env.GITHUB_APP_CONFIG) hosts.set("github.com", gitHubOutside(given, sql, env, fetch));
+  if (env.ARTIFACTS_CONFIG) hosts.set(ARTIFACTS_HOST, artifactsOutside(given, sql, env, fetch));
+  const pick = (): Outside => hosts.get(recordedHost(given) ?? "") ?? NO_OUTSIDE;
+  return {
+    accepts: (owner, kind) => pick().accepts(owner, kind),
+    send: (request) => pick().send(request),
+    judged: (at, sealed) => pick().judged?.(at, sealed),
+    recovery: {
+      accepts: (owner, kind) => pick().recovery?.accepts(owner, kind) ?? false,
+      read: (request) => pick().recovery?.read(request) ?? Promise.resolve(null),
+    },
+    replies: (limit) => pick().replies?.(limit) ?? { answers: [], more: false },
+  };
+}
+
+/**
  * The two parts of a wiring that read sessions need, over one source of the
  * session configuration, which is asked at every use. The readers port
  * accepts a session only for the membership scope that the scope itself
@@ -306,8 +334,9 @@ export function sessionWiring(sessions: () => Sessions | null, binding?: Binding
  * `sessionReaders`: a read session, checked under the deployment's secret
  * against the membership reference that the scope itself records, which is
  * the one that its authority reads, and against the scope's own clock. A
- * membership scope also issues sessions. Explicit GitHub configuration enables
- * the outside factory; with none bound, outside effects remain unsent.
+ * membership scope also issues sessions. Explicit configuration of GitHub or
+ * of the hosting's own Git service (`ARTIFACTS_CONFIG`) enables the outside
+ * factory (`outsideOf`); with neither, outside effects remain unsent.
  *
  * With no secret bound, or a short one, the session configuration is null
  * at every use: no session is issued, none is accepted, and no reader may
@@ -320,7 +349,7 @@ export class DeployedScope<E extends Env = Env> extends ScopeObject<E> {
     return {
       ports: namespace(this.scopes()),
       authority: (given) => repositoryAuthority({ ...given, reader: membershipIn(this.scopes()) }),
-      ...(this.env.GITHUB_APP_CONFIG ? { outside: (given: OutsideGiven) => gitHubOutside(given, this.ctx.storage.sql, this.env) } : {}),
+      ...(this.env.GITHUB_APP_CONFIG || this.env.ARTIFACTS_CONFIG ? { outside: (given: OutsideGiven) => outsideOf(given, this.ctx.storage.sql, this.env) } : {}),
       ...sessionWiring(() => sessionsOf(this.env.SESSION_SECRET, this.env.DEPLOYMENT), this.scopes()),
     };
   }
