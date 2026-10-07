@@ -636,25 +636,43 @@ The contract's `ScopeApi` is all of these as one interface. The Worker
 serves it twice: over HTTP (`route`, with the routes listed in the scope
 package's guide) and over a service binding (`ScopeService`).
 
-Who may read is decided by a port, `Readers`. In a deployment that port
-is a read session: a token that a membership scope issues to a device key
-of an active member, for the scopes of that one repository, for at most
-ten minutes. A scope checks it under the deployment's session secret, with
-no call to membership. A deployment with no secret bound issues and
-accepts no session. A reader with no session may present a signed read: a
-read of one scope signed by a key that signed an entry of that scope, or
-the entry at the root of its genesis's cause chain, within the authority
-window of an intent. It reads the summary, the genesis, that key's own
-entries, the entries whose cause chain leads within four causes to one of
-those (an outcome to the act that opened its operation, a delivery to
-the entry that sent it, a child's genesis to what created it), and the
-retained inputs that those entries name. So the operator key that signed
-`install` reads the register, and a founder's key reads the register's
-record of its claim, the directory and its three children, before it
-holds a session. A session of a membership scope reads the register in
-the same way, by the claim that caused its directory. A reader with
-neither reads nothing. The scope package's guide says what a
-session binds, how it ends, and the form of a signed read.
+Who may read is decided by a port, `Readers`. In a deployment a reader
+presents one of two things: a read session or a signed read. A reader that
+presents neither reads nothing, and a refusal writes nothing.
+
+A **read session** is a token that a membership scope issues to a device
+key of an active member, for at most ten minutes. A scope checks it under
+the deployment's session secret, with no call to membership. A deployment
+with no secret bound issues and accepts no session. A session reads, in
+whole, every scope of its own room: membership, the directory, the rules
+scope, the destination and each inbox. It reads the summary, the items,
+every entry and the retained inputs, including the entries that no member
+signed, such as the host's outcomes and the receipt at the destination.
+Each scope knows its membership from its genesis: the directory's
+`create` names membership's scope ID. Until an entry of the scope retains
+an observation of membership, the scope compares the session's scope ID
+and kind; from then on it compares the incarnation too. A session also
+reads its **register** in whole (its summary, every entry and its
+retained inputs, but not its items) when one of the register's claims
+created that membership. There is no window: the session's own end
+bounds it. So co-founders on one register read each other's claims. A
+session of another room reads none of these scopes.
+
+A **signed read** is one read of one scope, signed by a key, for a key
+that holds no session yet. The scope answers it only if the key signed an
+entry of that scope, or the entry at the root of its genesis's cause
+chain, within the authority window of an intent (900 seconds). At a
+register such a key reads the summary, every entry and every retained
+input: a register holds no secret, and a verifier folds a history from
+its genesis with no gap. At every other scope it reads the summary, the
+genesis, that key's own entries, the entries whose cause chain leads
+within four causes to one of those (an outcome to the act that opened its
+operation, a delivery to the entry that sent it, a child's genesis to
+what created it), and the retained inputs that those entries name. So the
+operator key that signed `install` reads the register, and a founder's
+key reads the directory and its three children until the founder takes a
+seat and holds a session. The scope package's guide says what a session
+binds, how it ends, and the form of a signed read.
 
 One read answers a credential. A member's `read-token` act at the
 destination opens a `mint-read` host operation, whose outcome records the

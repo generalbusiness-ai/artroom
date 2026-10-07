@@ -172,11 +172,12 @@ alone. Guard 1 takes an answer of that ID and of the kind `membership`,
 and the entry that retains it fixes the incarnation. From then on the
 read states the incarnation, and the recorded reference is checked again
 inside the commit (I3 deltas, section 26, entries EM21 and EY7 to EY9).
-Two limits on the recorded membership reference remain. Such a scope
-accepts no read session before an entry of it retains an observation of
-membership (entry EY12). A scope whose entries retain more than one
-incarnation of that ID records no reference, and an act there that needs a
-grant is answered
+Such a scope accepts a read session of that ID from its first entry: until
+an entry retains an observation of membership, the session's scope ID and
+kind are compared, and from then on its incarnation too (the planner's
+decision ca8ad1cf, which replaces the limit of entry EY12). A scope whose
+entries retain more than one incarnation of that ID records no reference,
+accepts no session, and answers an act that needs a grant
 `authority-unavailable` (entry EY9).
 
 `platform:destination@1` now has a rule for every mark, including
@@ -460,11 +461,12 @@ where membership's reference is.
 
 | Question | Answer |
 |---|---|
-| The request | `Authorization: Signed <base64url>`: the unpadded base64url of the canonical JSON of `{ request, sig }`. `request` is `{ v: 1, to, actor, read, arg, notAfter }`: the scope ID, the key, the read (`summary`, `history`, `entry` or `log`), its argument (`"summary"`; a page's cursor, `"0"` for the first; an entry's position) and a time. |
+| The request | `Authorization: Signed <base64url>`: the unpadded base64url of the canonical JSON of `{ request, sig }`. `request` is `{ v: 1, to, actor, read, arg, notAfter }`: the scope ID, the key, the read (`summary`, `history`, `entry`, `log` or `retained`), its argument (`"summary"`; a page's cursor, `"0"` for the first; an entry's position; a retained input's digest) and a time. |
 | The signature | Ed25519 by `actor`, as an intent is signed, over the tag `artroom-read-1`, a newline and the canonical JSON of `request`. |
 | The window | The scope's `intentLifetimeSeconds`, 900 by default, on the scope's own clock: the reading is before `notAfter`, and `notAfter` is at most that far ahead. |
 | Who may read | A key that signed an entry of this scope whose time is within that window of the reading: the actor of an act or a preparation; for a genesis that took effect, the actor of its founding intent, or of the intent whose digest is the seed's cause in an entry that the genesis retains. |
-| What it reads | The summary, the genesis, and the key's own entries: `entry` for one of them, and `history` and `log` pages that hold only those and the genesis, with the `next` and `complete` of the unfiltered page. |
+| What it reads | At a register: the summary, every entry and every retained input (the planner's decision ca8ad1cf). At any other scope: the summary, the genesis, the key's own entries, the entries whose cause chain leads within four causes to one of them, and the retained inputs those entries name: `entry` for one of them, `retained` for one of those inputs, and `history` and `log` pages that hold only those and the genesis, with the `next` and `complete` of the unfiltered page. |
+| A session at a register | A register records no membership. It accepts a session of a membership scope that one of its claims created, and that session reads the summary, every entry and every retained input, with no window but the session's end (`registerSession`). |
 | Every other case | `forbidden`, and nothing is written: another read, another argument, another scope, a key that signed nothing there, a signature that is not the key's, a time outside the window. A clock behind the previous entry's time: `clock-behind`. No stream. |
 
 A join at a membership scope is served through `limits.ts`: serving
