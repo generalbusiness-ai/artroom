@@ -15,8 +15,9 @@
  * First-head and receipt rules compare the commit IDs built by
  * destination-objects.ts from the contract's fact text and ref names. The
  * port must supply the repository's object format before writing.
- * No production port writes destination operations yet. In-memory tests
- * use labelled host answers; object witnesses also use real local Git.
+ * The scope package's configured GitHub port writes these operations outside
+ * the commit. In-memory tests use labelled host answers; object witnesses
+ * also use real local Git. A deployed provider run remains unverified.
  *
  * Section 6.8's proposed fence has no operation here. The bounds are the
  * authority's proposals, to be measured by the proof plan.
