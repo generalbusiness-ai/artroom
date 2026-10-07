@@ -4,7 +4,7 @@ import type { Entry, FactRef, FieldValue, OperationId, RetainedInput, ScopeRef }
 import { canonicalize, entryHash, isFactRef, isOperationId, parseStrict, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
 import { isEntryOf, type Operation } from "@generalbusiness/artroom-derive";
 import { DESTINATION, DESTINATION_KINDS, destinationBranch, destinationMint, destinationRead, destinationReceipt, destinationRevokedMint, destinationSends, destinationStatement, destinationTarget, destinationWrite, firstHeadCommit, foundingObjects, isRecordedJudgeEvidence, revokedToken, type DestinationObject, type ObjectFormat, type RecordedJudgeEvidence } from "@generalbusiness/artroom-platform";
-import type { CredentialStore } from "./credential-store.ts";
+import type { CredentialPosition, CredentialStore } from "./credential-store.ts";
 import type { OutsideGiven } from "./object.ts";
 import type { EffectAnswer, EffectRequest, Outside } from "./operations.ts";
 import type { Sealed } from "./store.ts";
@@ -25,7 +25,7 @@ export interface DestinationProvider {
   send(request: { repository: DestinationRepository; ref: string; old: string | null; commit: string; objects: readonly DestinationObject[]; expectedTree?: string; requireParentless: boolean; token: string; binding: DestinationBinding; allowed(): boolean }): Promise<unknown>;
   inspect(context: DestinationInspection): Promise<{ evidence: RecordedJudgeEvidence; retain?: readonly RetainedInput[] }>;
 }
-export interface DestinationHostOptions { host: string; namespace: string; provider: DestinationProvider; custody: Pick<CredentialStore, "put" | "reply" | "live" | "read" | "judged" | "revoked"> }
+export interface DestinationHostOptions { host: string; namespace: string; provider: DestinationProvider; custody: Pick<CredentialStore, "put" | "reply" | "live" | "read" | "judged" | "revoked" | "pending"> }
 
 const sameScope = (a: ScopeRef, b: ScopeRef) => canonicalize(a) === canonicalize(b);
 const objectId = (v: unknown): v is string => typeof v === "string" && /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(v);
@@ -43,6 +43,7 @@ const answer = (result: EffectAnswer["result"], body: unknown, basis: "own-answe
 export class DestinationHost implements Outside {
   readonly #given: OutsideGiven;
   readonly #options: DestinationHostOptions;
+  #replyCursor: CredentialPosition | null = null;
   constructor(given: OutsideGiven, options: DestinationHostOptions) { this.#given = given; this.#options = options; }
 
   accepts(owner: string, kind: string): boolean { return owner === DESTINATION && (Object.values(DESTINATION_KINDS) as string[]).includes(kind); }
@@ -51,6 +52,26 @@ export class DestinationHost implements Outside {
     accepts: (owner: string, kind: string): boolean => owner === DESTINATION && [DESTINATION_KINDS.judge, DESTINATION_KINDS.read, DESTINATION_KINDS.adoptRead].includes(kind as "judge" | "read" | "adopt-read"),
     read: (request: EffectRequest): Promise<EffectAnswer | null> => this.recovery.accepts(request.owner, request.kind) ? this.send(request) : Promise.resolve(null),
   };
+
+  /** One indexed page of retained own mint replies. Retrieval sends nothing. */
+  replies(limit: number): { answers: { operation: OperationId; attempt: number; answer: EffectAnswer }[]; more: boolean } {
+    const scope = this.#given.scope();
+    if (!scope || !Number.isSafeInteger(limit) || limit < 1) return { answers: [], more: false };
+    const page = this.#options.custody.pending(this.#replyCursor, limit);
+    const last = page.items.at(-1);
+    // Operation IDs sort as text. A completed walk starts afresh on the next
+    // pass so a later mint whose text sorts earlier is still found.
+    this.#replyCursor = page.more && last ? { mint: last.mint, attempt: last.attempt } : null;
+    const answers: { operation: OperationId; attempt: number; answer: EffectAnswer }[] = [];
+    for (const held of page.items) {
+      const operation = this.#given.state.operation(held.mint);
+      if (operation?.owner !== DESTINATION || operation.kind !== DESTINATION_KINDS.mint || !text(held.id) || timeMs(held.ends) === null) continue;
+      const origin = this.#given.own(Number(held.mint.split(":")[0]));
+      if (!origin || !this.#bound({ scope: scope.at, operation: held.mint, attempt: held.attempt, owner: operation.owner, kind: operation.kind, origin })) continue;
+      answers.push({ operation: held.mint, attempt: held.attempt, answer: answer("confirmed", { token: held.id, ends: held.ends }) });
+    }
+    return { answers, more: page.more && page.items.length > 0 };
+  }
 
   async send(request: EffectRequest): Promise<EffectAnswer | null> {
     try {

@@ -81,7 +81,15 @@ describe("destination outside adapter; scripted host, platform judgments in memo
       expect(minted).toEqual({ result: "confirmed", evidence: { basis: "own-answer", body: { token: "provider-token-1", ends: t(60) } } });
       expect(f.custody.read(mint, 1)).toMatchObject({ state: "held", plaintext: "private-token-1" });
       expect(await f.host.send(f.request(write))).toMatchObject({ result: "refused", evidence: { body: { send: "not-sent" } } });
-      f.record(mint, minted!);
+      // Simulate loss after the provider reply was kept, before its outcome.
+      expect(f.branch.lost(mint, 1).result).toBe("write");
+      const resumed = new DestinationHost(f.given, { ...f.options, custody: new CredentialStore(state.storage.sql, () => f.branch.at) });
+      const beforeRecovery = f.provider.calls.length;
+      const retainedMint = resumed.replies(1);
+      expect(retainedMint).toEqual({ answers: [{ operation: mint, attempt: 1, answer: minted }], more: false });
+      expect(f.provider.calls).toHaveLength(beforeRecovery);
+      expect(canonicalize(retainedMint)).not.toContain("private-token-1");
+      f.record(mint, retainedMint.answers[0]!.answer);
       f.host.judged({ scope: f.branch.at, operation: mint, attempt: 1 }, null);
       expect(f.custody.live(mint, 1, f.branch.now)).toMatchObject({ state: "live", plaintext: "private-token-1" });
       const written = await f.host.send(f.request(write));
@@ -98,7 +106,16 @@ describe("destination outside adapter; scripted host, platform judgments in memo
       const receipt = destinationReceipt(f.branch.state, f.branch.own, receiptItem, "sha1");
       f.provider.mintReply = { id: "provider-token-2", ends: t(60), plaintext: "private-token-2" };
       const receiptMinted = await f.host.send(f.request(receiptMint));
-      f.record(receiptMint, receiptMinted!);
+      // Simulate a committed confirmation whose private judged callback was lost.
+      expect(f.branch.outcome(receiptMint, 1, receiptMinted!.result, receiptMinted!.evidence).result).toBe("write");
+      expect(f.custody.live(receiptMint, 1, f.branch.now)).toBeNull();
+      const repeatedMint = resumed.replies(1);
+      expect(repeatedMint).toEqual({ answers: [{ operation: receiptMint, attempt: 1, answer: receiptMinted }], more: false });
+      const previousHead = f.branch.head;
+      expect(f.branch.outcome(receiptMint, 1, repeatedMint.answers[0]!.answer.result, repeatedMint.answers[0]!.answer.evidence).result).toBe("repeat");
+      expect(f.branch.head).toEqual(previousHead);
+      resumed.judged({ scope: f.branch.at, operation: receiptMint, attempt: 1 }, null);
+      expect(resumed.replies(1)).toEqual({ answers: [], more: false });
       const receiptWritten = await f.host.send(f.request(receiptWrite));
       const receiptSent = f.provider.calls.filter((call) => call.kind === "send").at(-1)!.body as Parameters<DestinationProvider["send"]>[0];
       expect({ commit: receiptSent.commit, objects: receiptSent.objects, ref: receiptSent.ref }).toEqual({ commit: receipt.commit, objects: receipt.objects, ref: receipt.ref });
@@ -187,6 +204,9 @@ describe("destination outside adapter; scripted host, platform judgments in memo
       for (const request of forged) expect(await f.host.send(request)).toBeNull();
       const elsewhere = new DestinationHost(f.given, { ...f.options, namespace: "another" });
       expect(await elsewhere.send(request)).toBeNull();
+      expect(f.provider.calls).toEqual([]);
+      f.custody.put({ id: "wrong-operation", mint: operation(f.branch, "first-head"), attempt: 1, ends: t(60), plaintext: "private-invalid" });
+      expect(f.host.replies(1)).toEqual({ answers: [], more: false });
       expect(f.provider.calls).toEqual([]);
       for (const reply of [{ id: "provider-token-1", ends: t(60), plaintext: "secret", extra: true }, { id: "provider-token-1", ends: "bad", plaintext: "secret" }, null]) {
         f.provider.mintReply = reply;
