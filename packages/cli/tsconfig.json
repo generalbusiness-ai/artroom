@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "../..",
+    // The commands run under Node and in the Workers runtime; `main.ts` and `files.ts` are Node's alone.
+    "skipLibCheck": true,
+    "types": ["node"]
+  },
+  "include": ["src"]
+}
