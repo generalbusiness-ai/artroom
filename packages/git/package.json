@@ -9,7 +9,8 @@
     ".": "./src/index.ts",
     "./node": "./src/node.ts",
     "./http": "./src/http.ts",
-    "./github": "./src/github.ts"
+    "./github": "./src/github.ts",
+    "./http-read": "./src/http-read.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json",
