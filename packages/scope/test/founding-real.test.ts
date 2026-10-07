@@ -1,15 +1,15 @@
 import { runInDurableObject } from "cloudflare:test";
 import { describe, expect, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { Answer, Entry, Intent, Observation, ObservationUse, OperationId, Read, Seed } from "@generalbusiness/artroom-contract";
+import type { Answer, Entry, Intent, Observation, ObservationUse, OperationId, Read, ScopeRef, Seed, SignedReadName } from "@generalbusiness/artroom-contract";
 import { b64url, canonicalize, entryHash, factRefOf, intentDigest, scopeIdOf, seedDigest, signIntent, textDigest } from "@generalbusiness/artroom-bytes";
-import { requestSession, sessionRequest, type Fetch } from "@generalbusiness/artroom-client";
+import { requestSession, secretSigner, sessionRequest, signedReader, type Fetch } from "@generalbusiness/artroom-client";
 import { PROFILES, grantFrom, ruleAt, validateDefinition, valueDigest, type Item } from "@generalbusiness/artroom-derive";
 import { d, keys, otherLane } from "@generalbusiness/artroom-derive/testing";
 import { CONFIGURATION_DOMAIN, DESTINATION, DESTINATION_CHANGED_SET, DIRECTORY, REGISTER, destinationReceipt, firstExtents, foundingObjects, platform, repositoryName, revokedToken, RULES_EXTENTS_VALUE } from "@generalbusiness/artroom-platform";
 import { httpSource, verify } from "@generalbusiness/artroom-replay";
 import { targetOf } from "../../platform/src/destination.ts";
-import { SqliteStore } from "../src/index.ts";
+import { SqliteStore, type Sealed, type Summary } from "../src/index.ts";
 import { net } from "../src/testing.ts";
 import { soon } from "./net.ts";
 import { outsideOf, wired } from "./outside.ts";
@@ -132,6 +132,31 @@ describe("a founding on real scopes under the deployed class (authority note, se
       values: { repository: { host: "git.example", namespace: "artroom", name, id: "repo-7" }, branch: "main", founder: rita.key, founderHandle: "@rita", recoveryKey: sam.key },
     });
 
+    // Before any session (the planner's decisions 61cc5e50 and c6499e91): the founder's claim key reads, by signed reads, the
+    // register's summary and the directory's genesis and summary. The readers are the real read sessions, under a TEST SECRET, which
+    // refuse the same read with no header. The install's key signed nothing in the directory, and may not read it. From the
+    // directory's repository item the founder learns membership's reference, which its session request below names.
+    platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32)));
+    platformNet.sessions = true;
+    let learned: ScopeRef | null = null;
+    try {
+      const signedGet = async <T>(node: Platform, path: string, read: SignedReadName, arg: string, who = rita): Promise<{ status: number; body: Read<T> }> => {
+        const response = await routed(`${SERVICE}/v1/scopes/${node.name}${path}`, { headers: { authorization: await signedReader(secretSigner(who.secret), node.name, read, arg, { now: () => Date.parse(net.clock.now) }) } });
+        return { status: response.status, body: await response.json() };
+      };
+      const genesis = await signedGet<Sealed>(D, "/entries/0", "entry", "0");
+      const directorySummary = await signedGet<Summary>(D, "", "summary", "summary");
+      expect([
+        (await routed(`${SERVICE}/v1/scopes/${D.name}`)).status, (await signedGet(R, "", "summary", "summary")).status, (await signedGet(R, "", "summary", "summary", paul)).status,
+        genesis.status, genesis.body.ok && genesis.body.value.entry.input.type, directorySummary.status, (await signedGet(D, "", "summary", "summary", paul)).status,
+      ]).toEqual([403, 200, 200, 200, "genesis", 200, 403]);
+      learned = directorySummary.body.ok ? directorySummary.body.value.items.find((item) => item.type === "repository")!.refs["membership"] as ScopeRef : null;
+    } finally {
+      platformNet.sessions = false;
+      platformNet.secret = null;
+    }
+    expect(learned).toEqual(membership);
+
     // Every declared mark has its production rule, so the third child is created and confirmed too. No duty is held or waiting.
     expect([lacking(REGISTER), lacking(DIRECTORY), lacking("platform:membership@1"), lacking("platform:rules@1"), lacking(DESTINATION)]).toEqual([[], [], [], [], []]);
     expect(((await D.stub.outbox(reader)) as { value: readonly { acknowledged: unknown }[] }).value.every((duty) => duty.acknowledged !== null)).toBe(true);
@@ -177,7 +202,7 @@ describe("a founding on real scopes under the deployed class (authority note, se
     // answered at the rules scope shows what that scope records, as its own store holds it.
     platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32)));
     const real = async <T>(run: () => Promise<T>): Promise<T> => { platformNet.sessions = true; try { return await run(); } finally { platformNet.sessions = false; } };
-    const issued = await real(async () => requestSession(SERVICE, membershipScope!.name, sessionRequest(membership, rita.secret, soon(60), "founding-real"), { fetch: routed as unknown as Fetch }));
+    const issued = await real(async () => requestSession(SERVICE, membershipScope!.name, sessionRequest(learned!, rita.secret, soon(60), "founding-real"), { fetch: routed as unknown as Fetch }));
     if (!issued.ok) throw new Error(`no session: ${issued.reason}`);
     const reads = async (node: Platform) => (await real(() => routed(`${SERVICE}/v1/scopes/${node.name}`, { headers: { authorization: issued.session.reader() } }))).status;
     // The directory records the reference with its incarnation, and the rules scope records the ID alone: no session is accepted there yet.
