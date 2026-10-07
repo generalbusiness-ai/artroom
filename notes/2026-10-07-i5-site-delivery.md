@@ -324,3 +324,94 @@ tree of the gated head, and the note's commit gives the second tree.
   60 seconds (`MAX_AGE`).
 - Plain English, no em-dashes; in documents no product is named but
   GitHub, and the other host is "the hosting's own Git service".
+
+## 8 After the first live run: the failed step is named
+
+The first live run (planner/i5-demo-host at `9f79067e`) answered 502
+`unreadable` at `/site/<directory>/HEAD/` and at `/README.md`, with no
+cause in the log. Commit `c42c790` names the cause. [code]
+
+**Header and log.** Every catch in `site()` now logs one line with
+`console.error` and adds the header `x-site-step` to the refusal. The
+body is unchanged. The line is:
+
+```
+site <step>: <error class>: <message>[; last request: <METHOD> <origin><path> -> <status> <content-type>]
+```
+
+| Step | What failed |
+|---|---|
+| `room` | Reading the directory's genesis entry (`roomOf`). |
+| `open` | `binding.get(name)`. |
+| `info` | `info()`, or its remote is not the expected one. The message says what type the reported remote had, not its value. |
+| `token` | `createToken("read", 120)`, or its answer holds no token. The message lists the answer's field names, not their values. |
+| `refs` | Reading the ref advertisement (`info/refs`), or a ref name the route refuses. |
+| `objects` | Reading the commit, a tree or a blob (`git-upload-pack`). |
+| `render` | Converting the markdown. |
+
+`last request` is the last request the smart-HTTP source sent and what
+came back, so a `refs` or `objects` failure shows the service's status
+and content type. Redacted: the minted token's plaintext and
+`GITHUB_READ_TOKEN` wherever they appear; any value after `Bearer`,
+`Basic`, `token` or `authorization`; a URL's user part; and a URL's
+query. No request header is logged. The two catches inside the helpers
+`parse` and `resolveAddress` are not failures of a read and log nothing.
+[code]
+
+**Forms of the binding's answers that are accepted** [code]:
+
+- The minted token: the field `plaintext`, else the field `token`. Each
+  must be a string of 1 to 4,096 printable ASCII characters.
+- The remote that `info()` reports: compared with the expected
+  `https://<host>/git/<namespace>/<name>.git` after both have any
+  trailing `/` removed and then a final `.git` removed. So `.../<name>`,
+  `.../<name>/`, `.../<name>.git` and `.../<name>.git/` are all accepted.
+  Another host, namespace or name is refused at the step `info`, before a
+  token is minted. The site still reads from the `.git` form that it
+  builds, as the destinations do.
+
+`artifacts-host.ts`, which the destinations use, still accepts only
+`plaintext` and the exact remote; it is not this branch's file. The
+founding commit was pushed and read back live through it, so those two
+shapes held for it on this service [inferred]. That suggests the failure
+is not in `open`, `info` or `token`. The most likely step is `objects`:
+the founding write never sends `git-upload-pack`, and the site is the
+first live caller of it [inferred]. The header will say which.
+
+**An empty tree at `/`.** A commit whose tree is empty, such as the
+founding commit `517e108`, answers 200 with a page titled with the ref
+that says "The repository has no files at this commit." An empty folder
+below the root says "This folder has no files at this commit." Neither
+is a refusal. [code, and test 11]
+
+**Tests**, added to `packages/scope/test/site-route.test.ts`, all passed
+[run]:
+
+9. "binding answers: a token named token, and a remote reported with or
+   without .git and a trailing slash, each read the page; another remote
+   is refused at the step info (STAND-IN host)"
+10. "a failure at each step answers the same refusal with x-site-step and
+   logs one redacted line naming the step (STAND-IN host)". It covers
+   `open`, `info`, `token`, `refs` and `objects`, and checks redaction.
+   No test makes `room` or `render` fail.
+11. "an empty tree: the root of a commit with no files answers a page
+   that says so (STAND-IN host)"
+
+Controls, as in section 1, each distinguishes [run]: the `token` field
+not read (test 9); the remote compared exactly (test 9); no
+`x-site-step` header (tests 9 and 10); the step not moved to `objects`
+before the tree read (test 10); the empty page not given (test 11).
+
+**Gate**, one run of `npm run gate` at `c42c7908a471` (tree
+`6dc9e8e3e23d`), same container, 4 processors, no other load [run]:
+whitespace exit 0 (0.0 s); typecheck exit 0, 11.0 s elapsed, 34.7 s CPU;
+test exit 1, 66.0 s elapsed, 107.0 s CPU. Vitest: 104 files, 103 passed
+and 1 failed; 779 tests, 778 passed and 1 failed, T36 of
+`packages/checkers/test/runner.test.ts` as before. This run reported no
+`EPIPE` errors. `scripts/active-source.test.mjs`, run on its own at the
+same head: 6 passed, 0 failed. This note's commit changes only this
+note.
+
+**For the redeploy:** request `/site/<directory>/HEAD/` again and read
+`x-site-step` from the answer and the `site <step>:` line from the
+Worker's log.
