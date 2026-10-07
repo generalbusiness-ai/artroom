@@ -104,7 +104,9 @@ Link for @una only (it holds the invitation's secret): artroom-invite:eyJ2Ijox..
 ```
 
 **`artroom join <link>`** is membership's `join`, signed by a new key
-that the command makes and keeps. It waits for the member's inbox.
+that the command makes and keeps. It waits for the member's inbox. It keeps
+the signed join before sending it, so a run that fails after that goes on
+from the same join when you run it again with the same link.
 
 ```
 Joined as @una on key key_H1bY2Hml....

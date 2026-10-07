@@ -530,7 +530,13 @@ function linkOf(text: string): Link | null {
   }
 }
 
-/** `artroom join <link>`: membership's `join`, signed by a new key kept here. Prints the inbox that membership creates for the member. */
+/**
+ * `artroom join <link>`: membership's `join`, signed by a new key kept here. Prints the inbox that membership creates for the member.
+ *
+ * **Resume.** The exact signed join is kept before it is sent, and its accepted fact once the scope answers. A later run of the
+ * same link sends those bytes again, or, with the fact kept, goes straight to the inbox that entry created. It never signs a
+ * second join: membership would refuse the enrolled key as in use, and the invitation is spent.
+ */
 export function join(ctx: Context, text: string): Promise<Outcome> {
   return run(async () => {
     const link = linkOf(text) ?? stop(usage("That is not an invitation link from artroom invite."));
@@ -538,18 +544,35 @@ export function join(ctx: Context, text: string): Promise<Outcome> {
     if (before?.repository) return usage(`This config directory has a repository already: directory ${before.repository.directory.scope}.`);
     const secret = await keyOf(ctx, "device");
     const signer = secretSigner(secret);
-    const config: Config = { v: 1, service: link.service, key: "device", repository: link.repository };
-    const M = await handleOf(ctx, config, link.repository.membership.scope, null);
-    // The new key has signed nothing yet, so it reads nothing in membership before the join. Membership is the directory's
-    // `platform:membership@1`, whose `join` names its member by a mark, which has no key in `expected`: no revision is read.
-    const shape = platform(MEMBERSHIP)!.data as unknown as DefinitionShape;
-    const fields = { invitation: link.invitation, secret: link.secret };
-    const signed = await signedIntent(signer, { to: link.repository.membership, kind: "join", fields, expected: expectedOf(shape.acts["join"]!, [], null, fields) }, signing(ctx));
-    const seq = accepted(await M.submit(signed), M.scope, "Joined").receipt.fact.seq;
+    const base: Config = { v: 1, service: link.service, key: "device" };
+    const M = await handleOf(ctx, { ...base, repository: link.repository }, link.repository.membership.scope, null);
+    let pending = before?.join;
+    if (pending) {
+      const mine = pending.step.signed.intent;
+      if (canonicalize(pending.repository.membership) !== canonicalize(link.repository.membership) || mine.fields["invitation"] !== link.invitation || mine.fields["secret"] !== link.secret || pending.handle !== link.handle || !validStep(pending.step, link.repository.membership, signer.key, "join")) {
+        return failed("A join is pending here for another invitation or key; nothing was submitted.");
+      }
+    } else {
+      // The new key has signed nothing yet, so it reads nothing in membership before the join. Membership is the directory's
+      // `platform:membership@1`, whose `join` names its member by a mark, which has no key in `expected`: no revision is read.
+      const shape = platform(MEMBERSHIP)!.data as unknown as DefinitionShape;
+      const fields = { invitation: link.invitation, secret: link.secret };
+      const signed = await signedIntent(signer, { to: link.repository.membership, kind: "join", fields, expected: expectedOf(shape.acts["join"]!, [], null, fields) }, signing(ctx));
+      pending = { repository: link.repository, handle: link.handle, step: { signed } };
+      await ctx.store.save({ ...base, join: pending });
+    }
+    let step = pending.step;
+    if (!step.accepted) {
+      const receipt = accepted(await M.submit(step.signed), M.scope, "Joined").receipt;
+      if (!isFactRef(receipt.fact) || canonicalize(receipt.fact.at) !== canonicalize(link.repository.membership) || receipt.intent !== intentDigest(step.signed.intent)) throw new TransportError("The accepted reply does not match the saved join; it remains pending.");
+      step = { signed: step.signed, accepted: receipt.fact };
+      await ctx.store.save({ ...base, join: { ...pending, step } });
+    }
+    const seq = step.accepted!.seq;
     const inbox = (await createdBy(M, seq)).find((m) => m.seed.kind === "inbox")?.scope ?? stop(failed(`Joined, but entry ${M.scope}:${seq} creates no inbox.`));
-    const I = await handleOf(ctx, config, inbox, null);
-    await waitFor(ctx, () => [M.scope, inbox], () => active(I), "your inbox");
-    await ctx.store.save({ ...config, repository: { ...link.repository, inbox }, handle: link.handle });
+    const I = await handleOf(ctx, { ...base, repository: link.repository }, inbox, null);
+    await waitFor(ctx, () => [M.scope, inbox], () => active(I), "your inbox", "run artroom join with the same link again to go on waiting for it.");
+    await ctx.store.save({ ...base, repository: { ...link.repository, inbox }, handle: link.handle });
     return done(`Joined as ${link.handle} on key ${signer.key}.`, `Your inbox: ${inbox}.`);
   });
 }

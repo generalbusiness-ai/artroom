@@ -39,6 +39,12 @@ export interface PendingClaim {
   firstKey?: ClaimStep;
 }
 
+/**
+ * A join that `join` has signed and not seen through yet. The signed `join` carries the invitation's secret, as the accepted
+ * entry will; no signing key is here. A later `join` of the same link sends these bytes again, never a new signature.
+ */
+export interface PendingJoin { repository: Omit<Repository, "inbox">; handle: string; step: ClaimStep }
+
 export interface Config {
   v: 1;
   /** The scope service's base URL. */
@@ -50,6 +56,8 @@ export interface Config {
   repository?: Repository;
   /** A claim that `claim` submitted and has not seen through yet. A later `claim` goes on from it. */
   claim?: PendingClaim;
+  /** A join that `join` signed and has not seen through yet. A later `join` of the same link goes on from it. */
+  join?: PendingJoin;
   /** The caller's handle in membership, once it has one. */
   handle?: string;
 }
