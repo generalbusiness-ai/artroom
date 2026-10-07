@@ -58,7 +58,8 @@ Nothing yet checks the installation's authority to install. The Git host in
 the witness is a stand-in. Nothing is deployed. The destination now
 carries every rule needed to answer its creation; a missing rule is still
 refused for the whole pinned
-version. The remaining I3 work and a real Git host adapter are not delivered.
+version. A configured GitHub adapter is authored; its deployed validation
+and the remaining I3 work are not delivered.
 
 ## Identity and incarnation
 
@@ -85,8 +86,9 @@ A position, `seq`, means something only inside its own scope. Across
 scopes an entry is always named by a whole fact reference.
 
 Every digest and signature is over a domain tag, a newline and the
-canonical JSON of one value. The seven tags are in `DOMAINS`. The seventh,
-`artroom-text-1`, is for the digest that names a detached text. No value
+canonical JSON of one value. The eight tags are in `DOMAINS`, including
+`artroom-text-1` for detached text and `artroom-snapshot-1` for staged-ref snapshots.
+Sessions have their separate `SESSION_DOMAINS` tags. No value
 contains its own digest: an entry has no field for its own hash.
 
 `@generalbusiness/artroom-bytes` has the one implementation of each:
