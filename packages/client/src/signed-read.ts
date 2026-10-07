@@ -75,7 +75,16 @@ export function signedReads(transport: Transport, signer: Signer, signing: ReadS
   const as = async (reader: unknown, scope: string, read: SignedReadName, at?: string | number): Promise<unknown> =>
     (typeof reader === "string" ? reader : signedReader(signer, scope as ScopeId, read, readArgument(read, at), signing));
   return {
-    ...transport,
+    // Delegate with the original receiver, including prototype methods and
+    // methods that read class-private fields; object spread loses those.
+    found: (...args) => transport.found(...args),
+    submit: (...args) => transport.submit(...args),
+    prepare: (...args) => transport.prepare(...args),
+    settle: (...args) => transport.settle(...args),
+    items: (...args) => transport.items(...args),
+    outbox: (...args) => transport.outbox(...args),
+    duty: (...args) => transport.duty(...args),
+    retained: (...args) => transport.retained(...args),
     summary: async (scope, reader) => transport.summary(scope, await as(reader, scope, "summary")),
     history: async (scope, reader, cursor) => transport.history(scope, await as(reader, scope, "history", cursor), cursor),
     entry: async (scope, reader, seq) => transport.entry(scope, await as(reader, scope, "entry", seq), seq),

@@ -2,7 +2,7 @@ import { expect, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { SignedRead } from "@generalbusiness/artroom-contract";
 import { canonicalize, keyIdOfSecret, parseStrict, unb64url, verifySignedRead } from "@generalbusiness/artroom-bytes";
-import { httpTransport, secretSigner, signedLogReader, signedReader, signedReads, type Fetch } from "../src/index.ts";
+import { httpTransport, secretSigner, signedIntent, signedLogReader, signedReader, signedReads, type Fetch, type Transport } from "../src/index.ts";
 
 const secret = new Uint8Array(32).fill(7);
 const scope = `sc_${"a".repeat(52)}` as const;
@@ -32,9 +32,10 @@ test("a signed read is the scope, the read, its argument and a notAfter, signed 
 // Invariant: with no reader, the four reads go out signed, each naming its own read and argument; a session's reader goes out as it is.
 test("a transport with signed reads signs summary, history, entry and log with their arguments when no reader is presented, and sends a presented session unchanged", async () => {
   const sent: { path: string; authorization: string | undefined }[] = [];
+  const refused = { answer: "refused", reason: "unauthorized", judgedAt: { seq: 0, hash: `sha256:${"b".repeat(64)}` } };
   const fetch: Fetch = (url, init) => {
     sent.push({ path: url.replace(`https://scopes.test/v1/scopes/${scope}`, ""), authorization: init?.headers?.["authorization"] });
-    return Promise.resolve({ status: 403, body: new Response(JSON.stringify({ ok: false, reason: "forbidden" })).body });
+    return Promise.resolve({ status: 403, body: new Response(JSON.stringify(init?.method === "POST" ? refused : { ok: false, reason: "forbidden" })).body });
   };
   const reads = signedReads(httpTransport("https://scopes.test", { fetch }), secretSigner(secret), { now });
   await reads.summary(scope, null);
@@ -50,4 +51,25 @@ test("a transport with signed reads signs summary, history, entry and log with t
   // The replay source's reader: a signed read for a page of the log, and no header for a retained input.
   const log = signedLogReader(secretSigner(secret), { now });
   expect([opened((await log(scope, "log", "0"))!).request.read, await log(scope, "retained", `sha256:${"b".repeat(64)}`)]).toEqual(["log", undefined]);
+  // A valid transport may keep its methods on the prototype and depend on
+  // a class-private receiver. The wrapper must keep its non-read methods.
+  class ServiceTransport implements Transport {
+    readonly #http = httpTransport("https://scopes.test", { fetch });
+    found = this.#http.found;
+    prepare = this.#http.prepare;
+    settle = this.#http.settle;
+    summary = this.#http.summary;
+    items = this.#http.items;
+    history = this.#http.history;
+    entry = this.#http.entry;
+    outbox = this.#http.outbox;
+    duty = this.#http.duty;
+    log = this.#http.log;
+    retained = this.#http.retained;
+    submit(...args: Parameters<Transport["submit"]>) { return this.#http.submit(...args); }
+  }
+  const service = signedReads(new ServiceTransport(), secretSigner(secret), { now });
+  const intent = await signedIntent(secretSigner(secret), { to: { scope, kind: "register", inc: `in_${"a".repeat(26)}` }, kind: "found" }, { now: now() });
+  const forwarded = await (async () => service.submit(scope, intent, []))().catch(() => null);
+  expect([forwarded, sent.at(-1)]).toEqual([refused, { path: "/acts", authorization: undefined }]);
 });

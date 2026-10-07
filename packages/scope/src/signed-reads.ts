@@ -56,8 +56,9 @@
  * a chain that needs more has no root. Each entry of the chain is read
  * from this scope's retained entries, or else from its own scope through
  * the resolver port, and is the entry that the fact names, by its hash.
- * The root is fixed by the history, so a scope finds it once, before a
- * signed read, and keeps it. The window is measured at the root entry's
+ * The root is fixed by the history, so a scope finds it once when a valid
+ * read needs the chain, and keeps it. Request checks and local signer
+ * eligibility precede any resolver work. The window is measured at the root entry's
  * time: the key reads the chain's scopes only while its own entry there
  * is within the window of the reading.
  *
@@ -175,7 +176,12 @@ export async function rootOf(genesis: Entry, read: (use: FactUse) => Promise<Ent
  * `key`: the read may be made, by that key. `read` and `arg` are the read
  * that is asked and its argument, as the request must name them.
  */
-export function checkSignedRead(config: SignedReading, store: Pick<Store, "scope" | "stored">, reader: string, read: ReadName, arg: string): { key: KeyId } | { refused: false | "clock-behind" } {
+/**
+ * Request checks and local signer eligibility, without resolving a cause.
+ * `root`: only a valid request whose key has no recent local entry needs
+ * the chain. Its original eligibility threshold is used by the full check.
+ */
+export function checkLocalSignedRead(config: SignedReading, store: Pick<Store, "scope" | "stored">, reader: string, read: ReadName, arg: string): { key: KeyId } | { refused: false | "clock-behind" } | { root: { actor: KeyId; since: number } } {
   const signed = openSignedRead(reader);
   if (!signed || !verifySignedRead(signed)) return { refused: false };
   const scope: ScopeState | null = store.scope();
@@ -194,7 +200,14 @@ export function checkSignedRead(config: SignedReading, store: Pick<Store, "scope
     if ((timeMs(entry.time) ?? -Infinity) < reading - window) break;
     if (signerOf(entry) === actor) return { key: actor };
   }
+  return { root: { actor, since: reading - window } };
+}
+
+/** The full check, using a resolved root only when local eligibility needs it. */
+export function checkSignedRead(config: SignedReading, store: Pick<Store, "scope" | "stored">, reader: string, read: ReadName, arg: string): { key: KeyId } | { refused: false | "clock-behind" } {
+  const checked = checkLocalSignedRead(config, store, reader, read, arg);
+  if (!("root" in checked)) return checked;
   // The root of the cause chain, measured at its own time.
   const root = config.root?.() ?? null;
-  return root && root.actor === actor && (timeMs(root.time) ?? -Infinity) >= reading - window ? { key: actor } : { refused: false };
+  return root && root.actor === checked.root.actor && (timeMs(root.time) ?? -Infinity) >= checked.root.since ? { key: checked.root.actor } : { refused: false };
 }

@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+import { env } from "cloudflare:test";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { Entry, FactRef, Intent, OperationId, ReadRequest, ScopeId, ScopeRef, Sealed, Seed, SignedReadName } from "@generalbusiness/artroom-contract";
 import { b64url, canonicalBytes, entryHash, intentDigest, scopeIdOf, seedDigest, signIntent, signRead } from "@generalbusiness/artroom-bytes";
@@ -8,6 +9,7 @@ import { d, keys, otherLane, t, type Actor } from "@generalbusiness/artroom-deri
 import { DIRECTORY, REGISTER, platform, repositoryName } from "@generalbusiness/artroom-platform";
 import { httpSource, verify } from "@generalbusiness/artroom-replay";
 import { CHAIN_STEPS, rootOf } from "../src/signed-reads.ts";
+import { namespace } from "../src/namespace.ts";
 import { net } from "../src/testing.ts";
 import { soon } from "./net.ts";
 import { outsideOf, wired } from "./outside.ts";
@@ -146,16 +148,45 @@ describe("signed reads on real registers (the planner's decisions 61cc5e50, c649
     const { D, children } = await founded(PROPOSED_BOUNDS.dispatchRetrySeconds);
     const [M, Ru, G] = children as [Platform, Platform, Platform];
     expect(await Promise.all(children.map(async (node) => (await node.summary()).value.scope.kind))).toEqual(["membership", "rules", "destination"]);
+    // A cold child needs an ancestor from the real namespace to find its
+    // root. Invalid requests must fail before making any resolver call.
+    const calls: FactRef[] = [];
+    const resolver = namespace(env.PLATFORM).resolver;
+    wired.set(M.name, () => ({ transport: null, resolver: { read: (fact, seconds) => { calls.push(fact); return resolver.read(fact, seconds); } } }));
+    await M.restart();
+    const request: ReadRequest = { v: 1, to: M.name, actor: rita.key, read: "summary", arg: "summary", notAfter: soon(60) };
+    const header = (request: ReadRequest, secret = rita.secret) => `Signed ${b64url(canonicalBytes(signRead(request, secret)))}`;
+    expect([
+      (await get(M.name, "Signed not-a-read")).status,
+      (await get(M.name, header(request, paul.secret))).status,
+      (await get(M.name, header({ ...request, to: D.name }))).status,
+      (await get(`${M.name}/entries/0`, header({ ...request, read: "entry", arg: "1" }))).status,
+      (await get(M.name, header({ ...request, notAfter: net.clock.now }))).status,
+      (await get(M.name, header({ ...request, notAfter: soon(PROPOSED_BOUNDS.intentLifetimeSeconds + 1) }))).status,
+      calls,
+    ]).toEqual([403, 403, 403, 403, 403, 403, []]);
+    const now = net.clock.now;
+    try {
+      net.clock.now = timeOf(timeMs(now)! - 1000);
+      expect([(await get(M.name, await signed(rita, M.name, "summary", "summary"))).status, calls]).toEqual([503, []]);
+    } finally { net.clock.now = now; }
     // For each of the four scopes: the summary, the genesis, and a history that holds the genesis only.
     const reads = async (who: Actor, node: Platform) => {
       const history = await get(`${node.name}/history`, await signed(who, node.name, "history", "0"));
       return [(await get(node.name, await signed(who, node.name, "summary", "summary"))).status, (await get(`${node.name}/entries/0`, await signed(who, node.name, "entry", "0"))).status, history.status, history.status === 200 ? seqs(history.body) : null];
     };
     expect(await Promise.all([D, M, Ru, G].map((node) => reads(rita, node)))).toEqual([D, M, Ru, G].map(() => [200, 200, 200, [0]]));
+    expect(calls.length).toBeGreaterThan(0); // positive control: the valid chain read reaches the real ancestor
     // Control: the same reads with no header, and by the install's key, are forbidden.
     expect(await Promise.all([D, M, Ru, G].map(async (node) => [(await get(node.name)).status, ...(await reads(paul, node))]))).toEqual([D, M, Ru, G].map(() => [403, 403, 403, 403, null]));
     // The root's key reads the summary and the genesis only: an entry after the genesis, which it did not sign, is forbidden.
     expect([(await get(`${D.name}/entries/1`, await signed(rita, D.name, "entry", "1"))).status, (await get(`${M.name}/entries/1`, await signed(rita, M.name, "entry", "1"))).status]).toEqual([403, 403]);
+    // A recent local signer needs no chain, even after restart. Keep the
+    // child's dispatcher off so only read authorization can call resolver.
+    expect(await M.act(rita, "seat", { expected: await M.expected({ roster: 0 }) })).toMatchObject({ answer: "accepted" });
+    await M.restart();
+    calls.length = 0;
+    expect([(await get(M.name, await signed(rita, M.name, "summary", "summary"))).status, calls]).toEqual([200, []]);
   });
 
   test("the window of a read by the cause chain is measured at the root entry: the claim, not the genesis that the claim caused", async () => {
