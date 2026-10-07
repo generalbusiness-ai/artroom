@@ -7,6 +7,15 @@
  * broken over lines. A comment names the section a group of rows comes from.
  * The rows that both definitions share are in `shared.ts`.
  *
+ * Rows marked "i5 wiring" are not rows of an adopted lane forms revision. They
+ * are what the change lane needs to run against the real rules scope and
+ * destination (request i5, plan 024, gate 2): the field `reports` of `merge`
+ * and its send, which authority revision 28 asks of a `reserve`; the act
+ * `ask-rules`; the fields of the rules scope's `rules` update that the lane
+ * did not declare; and the extent that a review counts for. The note
+ * `notes/2026-10-07-i5-lane-wiring-delivery.md` lists them for the lane
+ * forms' owner.
+ *
  * Some values are the lane forms' examples, and some names are assumed
  * (their section 3): a hold's 3,600 seconds, a job's 1,800 seconds, the text maxima and integer
  * ranges, the refusal names, and the platform definition names.
@@ -85,6 +94,8 @@ export const change = {
       refs: { manifest: { fixed: true, required: true, to: { type: "item", of: "manifest" } } },
       values: {
         verdict: { fixed: true, required: true, of: { type: "enum", of: ["approve", "request-changes"] } },
+        // i5 wiring: the one extent of the rules that the verdict counts for (authority revision 28, section 12.1.4a).
+        extent: { fixed: true, required: false, of: { type: "text", max: 64 } },
         body: { fixed: false, required: false, of: { type: "text", max: 65536, detached: true } },
         dismissal: { fixed: false, required: false, of: { type: "text", max: 4096 } },
       },
@@ -200,6 +211,25 @@ export const change = {
         },
         ownerMayReview: { fixed: false, required: true, of: { type: "bool" } },
         revision: { fixed: false, required: true, of: { type: "int", min: 0, max: 1000000000 } },
+        // i5 wiring: the extents of the published rules, as the rules scope's update projects them: no patterns, for a lane reads no path.
+        extents: {
+          fixed: false,
+          required: false,
+          of: {
+            type: "list",
+            of: {
+              type: "record",
+              of: {
+                name: { type: "text", max: 64, required: true },
+                approvals: { type: "int", min: 0, max: 64, required: true },
+                approver: { type: "text", max: 64, required: true },
+                checks: { type: "list", of: { type: "text", max: 128 }, max: 32, required: true },
+                class: { type: "enum", of: ["content", "deployment", "authority"], required: true },
+              },
+            },
+            max: 8,
+          },
+        },
       },
     },
     commitment: {
@@ -385,6 +415,18 @@ export const change = {
       guards: [{ state: ["closed"] }],
       effects: [{ state: "open" }],
       sends: [{ index: { fields: { state: { const: "open" }, draft: { const: false } } } }],
+      attention: [],
+    },
+
+    // i5 wiring: ask the rules scope that the proposal names for its rules. Its handler `rules-wanted` answers with one `rules`
+    // update (authority revision 28, section 12.1.4; G11: a rules scope sends no update to a lane that did not ask).
+    "ask-rules": {
+      step: "transition", on: "proposal", grant: "change.propose",
+      also: {},
+      fields: {},
+      guards: [],
+      effects: [],
+      sends: [{ tell: { to: { slot: "rulesScope", of: "on" }, message: "rules-wanted", fields: {}, result: {} } }],
       attention: [],
     },
 
@@ -827,6 +869,10 @@ export const change = {
         request: { type: "item", of: "review-request", required: false },
         verdict: { type: "enum", of: ["approve", "request-changes"], required: true },
         body: { type: "text", max: 65536, detached: true, required: false },
+        // i5 wiring: the extent that the verdict counts for, by its name in the rules that the rules scope published. The lane does
+        // not check the name: a fifth subject of the act is over the bound of four. The destination counts a name that is no extent
+        // of the rules it observes for none (authority revision 28, section 12.1.4a).
+        extent: { type: "text", max: 64, required: false },
       },
       guards: [
         { state: ["current"], of: "also.manifest" },
@@ -851,6 +897,7 @@ export const change = {
         { party: { slot: "reviewer", from: { signer: true } } },
         { ref: { slot: "manifest", from: { item: "also.manifest" } } },
         { value: { slot: "verdict", from: { field: "verdict" } } },
+        { value: { slot: "extent", from: { field: "extent" } } },
         { value: { slot: "body", from: { field: "body" } } },
         { state: "superseded", of: "also.earlier" },
         { state: "met", of: "also.request" },
@@ -1179,7 +1226,13 @@ export const change = {
         manifest: { item: "manifest", by: "manifest" },
         rules: { item: "rules", one: true },
       },
-      fields: { manifest: { type: "item", of: "manifest", required: true } },
+      fields: {
+        manifest: { type: "item", of: "manifest", required: true },
+        // i5 wiring: the `report` entry of each report that the manifest selects, in the order of its selections (authority revision
+        // 28, section 6.5, "`reserve` names each selected report"). No operand maps a list, so the merger names them, and the guard
+        // `reports-not-selected` binds them to the selections. The destination checks the order and the count again, exactly.
+        reports: { type: "list", of: { type: "fact", kind: ["report"], under: "issue" }, max: 32, required: true },
+      },
       guards: [
         { state: ["open"], of: "also.proposal", reason: "draft" },
         { state: ["current"], of: "also.manifest", reason: "newer-version" },
@@ -1224,6 +1277,23 @@ export const change = {
           },
           reason: "required-check-not-passed",
         },
+        // i5 wiring: each named report is a selection's report, and each selection's report is named.
+        {
+          each: {
+            list: { field: "reports" },
+            as: "r",
+            guards: [{ has: { list: { slot: "selected", of: "also.manifest" }, as: "s", where: [{ equals: { a: { element: "s.report" }, b: { element: "r" } } }] } }],
+          },
+          reason: "reports-not-selected",
+        },
+        {
+          each: {
+            list: { slot: "selected", of: "also.manifest" },
+            as: "s",
+            guards: [{ has: { list: { field: "reports" }, as: "r", where: [{ equals: { a: { element: "r" }, b: { element: "s.report" } } }] } }],
+          },
+          reason: "reports-not-selected",
+        },
       ],
       effects: [
         { party: { slot: "merger", from: { signer: true } } },
@@ -1240,7 +1310,7 @@ export const change = {
               verdicts: {
                 collect: {
                   items: { type: "review", states: ["submitted"], where: [{ equals: { a: { slot: "manifest" }, b: { item: "also.manifest" } } }] },
-                  fields: { review: "item", reviewer: "reviewer", verdict: "verdict" },
+                  fields: { review: "item", reviewer: "reviewer", verdict: "verdict", extent: "extent" },
                 },
               },
               jobs: {
@@ -1254,6 +1324,8 @@ export const change = {
                 },
               },
               links: { collect: { items: { type: "link", states: ["set"] }, fields: { link: "item", issue: "issue" } } },
+              // i5 wiring: the sixth field of `reserve`.
+              reports: { field: "reports" },
             },
             result: {
               refused: [
@@ -1453,15 +1525,36 @@ export const change = {
             },
           },
           max: 32,
-          required: true,
+          // i5 wiring: optional, for the rules scope leaves it out before its first `publish`.
+          required: false,
         },
         ownerMayReview: { type: "bool", required: true },
+        // i5 wiring: the other members of the rules scope's `rules` update (its rule `rules-update`). Before the first `publish` it
+        // leaves out `checks` and `labels`. A lane that declared none of these refused the real update, `bad-field`.
+        labels: { type: "list", of: { type: "text", max: 64 }, max: 32, required: false },
+        singleControllerException: { type: "bool", required: false },
+        extents: {
+          type: "list",
+          of: {
+            type: "record",
+            of: {
+              name: { type: "text", max: 64, required: true },
+              approvals: { type: "int", min: 0, max: 64, required: true },
+              approver: { type: "text", max: 64, required: true },
+              checks: { type: "list", of: { type: "text", max: 128 }, max: 32, required: true },
+              class: { type: "enum", of: ["content", "deployment", "authority"], required: true },
+            },
+          },
+          max: 8,
+          required: false,
+        },
       },
       guards: [{ equals: { a: { sender: true }, b: { slot: "rulesScope", of: "also.proposal" } }, reason: "not-the-rules-scope" }],
       effects: [
         { value: { slot: "approvals", from: { field: "approvals" } } },
         { value: { slot: "checks", from: { field: "checks" } } },
         { value: { slot: "ownerMayReview", from: { field: "ownerMayReview" } } },
+        { value: { slot: "extents", from: { field: "extents" } } },
         { value: { slot: "revision", from: { update: "revision" } } },
         { ref: { slot: "source", from: { source: "ref" } } },
       ],

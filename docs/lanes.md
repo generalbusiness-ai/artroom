@@ -36,7 +36,7 @@ The counts, as `packages/lanes/test/definitions.test.ts` asserts them:
 | Definition | Item types | Acts | Timed rules | Handlers | Canonical bytes |
 |---|---|---|---|---|---|
 | `issue` | 12 | 50 | 1 | 7 | 46,160 |
-| `change` | 14 | 52 | 2 | 4 | 56,293 |
+| `change` | 14 | 53 | 2 | 4 | 58,349 |
 
 Neither definition declares a rule expression. Both list two capabilities,
 `hold@1` and `git-read@1`.
@@ -372,7 +372,7 @@ entries, and `net.sized` gives one lane a small budget of entries for the
 two capacity scenarios.
 
 One run of the ten scenarios T1 to T9 writes 21 of the 50 act kinds of `issue` and
-12 of the 52 of `change`, and runs 2 of 7 and 2 of 4 handlers (counted by
+12 of the 52 of `change` as they then were, and runs 2 of 7 and 2 of 4 handlers (counted by
 a script over one run; `notes/2026-10-05-i2-contract-deltas.md`, section
 20, lists them). The counts are the same after I3 step 16. Of those rows,
 these now run on the capability's code: `report` of `issue`, and
