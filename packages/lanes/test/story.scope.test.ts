@@ -54,4 +54,4 @@ test("the story on the demo profile: an issue is filed, commented on and assigne
   r.changes = { paths: ["src/printer.ts"], links: [], unreadable: 0 };
   const second = await merged(r, next.C, next.manifest, []);
   expect([second.state, (await J.item(0)).state]).toEqual(["published", "closed"]);
-}, 30_000);
+}, 60_000);

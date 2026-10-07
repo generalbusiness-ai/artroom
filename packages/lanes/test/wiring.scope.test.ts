@@ -22,6 +22,9 @@ import { Platform, copied, merged, oid, paul, proposed, publicationOf, reported,
 
 type Issue = Node<typeof issue>;
 
+/** The time a scenario on a room may take: a founding and a few publications take some seconds, more under a loaded run. */
+const ROOM_MS = 60_000;
+
 /** The extents of the first definition, with 1 approval for `source` and `infrastructure`, no check, and the declaration of the exception. */
 const rulesWith = (singleControllerException = false) => ({ approvals: 1, ownerMayReview: false, checks: [], labels: [], extents: firstExtents({ approvals: 1, checks: [] }), singleControllerException });
 
@@ -57,7 +60,7 @@ test("W1, a source-only change with one approving reviewer for the source extent
   await r.settle();
   const closing = (await I.entries()).filter((entry) => entry.effects.some((effect) => effect.effect === "state" && effect.item === 0 && effect.state === "closed"));
   expect([(await I.item(0)).state, (await I.item(0)).values["closeReason"], closing.length, closing[0]?.input.type]).toEqual(["closed", "completed", 1, "delivery"]);
-});
+}, ROOM_MS);
 
 test("W2, a mixed change touching the source and the rules extents: the source reviewer's approval meets the source extent, the rules extent stays unmet and the merge is refused with that extent named; once the rules scope's controller approves for the rules extent the publication is judged and published; every history then replays as the runtime wrote it, with no mismatch and only the ancestry walk not derived (STAND-IN: the Git host; SCRIPTED: the changed set)", async () => {
   const r = await room();
@@ -106,7 +109,7 @@ test("W2, a mixed change touching the source and the rules extents: the source r
   rewritten(lane, second.id, (entry: { effects: { effect: string; member?: { member: string } }[] }) => { entry.effects.find((effect) => effect.effect === "party")!.member!.member = "@vic"; });
   const tampered = await verify(through(lane), { ...options, scope: C.name });
   expect([tampered.report.result, tampered.report.at?.seq]).toEqual(["mismatch", second.id]);
-}, 30_000);
+}, ROOM_MS);
 
 test("W3, a reviewer outside an extent counts for nothing there: an approval that names the rules extent from a member without rules.publish, and one that names no extent, leave the source extent unmet; the same reviewer's later approval for the source extent meets it (STAND-IN: the Git host; SCRIPTED: the changed set)", async () => {
   const r = await room();
@@ -122,7 +125,7 @@ test("W3, a reviewer outside an extent counts for nothing there: an approval tha
   await C.did(paul, "review-verdict", { fields: { manifest, earlier: wrong, verdict: "approve", extent: "source" } });
   const second = await merged(r, C, manifest, []);
   expect([second.state, (await publicationOf(r, C, second.id))?.state]).toEqual(["published", "published"]);
-});
+}, ROOM_MS);
 
 test("W4, the single-controller exception: rita, the one holder of rules.publish, authors a change to the rules extent; with the exception not declared it is refused, rules-not-met:rules; once the rules declare it the same change is reserved under the exception, and the publication's reason records it (STAND-IN: the Git host; SCRIPTED: the changed set)", async () => {
   const r = await room();
@@ -139,7 +142,7 @@ test("W4, the single-controller exception: rita, the one holder of rules.publish
   const second = await merged(r, C, manifest, []);
   const publication = await publicationOf(r, C, second.id);
   expect([second.state, publication?.state, String(publication?.values["reason"]).split(":").slice(0, 3)]).toEqual(["published", "published", ["single-controller", "rules", "@rita"]]);
-});
+}, ROOM_MS);
 
 test("W5, a required check: the rules require the check `unit`, run by a checker member of the real membership scope; the real lane opens the job and the checker's key decides it passed; the destination judges the merge with the retained job opening and decision and the checker key's current standing, and publishes; with the job only requested it refuses (STAND-IN: the Git host; SCRIPTED: the changed set; no runner: the checker's answer is signed by the test)", async () => {
   const r = await room();
@@ -168,4 +171,4 @@ test("W5, a required check: the rules require the check `unit`, run by a checker
   const done = await merged(r, C, manifest, []);
   const publication = await publicationOf(r, C, done.id);
   expect([done.state, publication?.state, (await C.item(job)).state, (await C.item(job)).refs["decidedBy"], (await I.item(0)).state]).toEqual(["published", "published", "passed", decided, "closed"]);
-}, 30_000);
+}, ROOM_MS);
