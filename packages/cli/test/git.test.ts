@@ -10,7 +10,7 @@ import { nodeGit } from "../src/git.ts";
 // The `git` here is a STAND-IN: a shell script on the PATH that records its arguments and the three variables of git's environment
 // configuration, and exits 0. No repository is cloned.
 test("the Node runner passes the header only through git's environment configuration, never in the arguments; with no git on the PATH it answers null", async () => {
-  const bin = mkdtempSync(join(tmpdir(), "artroom-git-"));
+  const bin = mkdtempSync(join(tmpdir(), "artroom-clone-"));
   const record = join(bin, "record");
   writeFileSync(join(bin, "git"), `#!/bin/sh\nprintf '%s\\n' "$@" > "${record}.args"\nprintf '%s|%s|%s\\n' "$GIT_CONFIG_COUNT" "$GIT_CONFIG_KEY_0" "$GIT_CONFIG_VALUE_0" > "${record}.env"\nexit 0\n`);
   chmodSync(join(bin, "git"), 0o755);
