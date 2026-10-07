@@ -139,7 +139,7 @@ async function story(): Promise<void> {
   expect(added.lines).toEqual([`Took effect: entry ${M.name}:${seq}, hash ${sealed.hash.slice(0, 19)}.`]);
   expect((await M.item(seq)).values).toMatchObject({ handle: "@check", kind: "checker" });
   // Let this accepted act's inbox creation settle before comparing the head around the next, refused act.
-  await settle(M, ...sealed.sends.flatMap((send) => ("creator" in send.to ? [new Platform(scopeIdOf(send.to as Seed))] : [])));
+  await settle(M, ...sealed.entry.sends.flatMap((send) => ("creator" in send.to ? [new Platform(scopeIdOf(send.to as Seed))] : [])));
 
   // act, refused: the admin tries to add the checker handle already held by the member above. Membership refuses it by the
   // guard's name, and writes nothing. This complete act tests a named judgment rather than missing definition bytes.
