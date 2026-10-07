@@ -415,3 +415,88 @@ note.
 **For the redeploy:** request `/site/<directory>/HEAD/` again and read
 `x-site-step` from the answer and the `site <step>:` line from the
 Worker's log.
+
+## 9 The live cause: a flush packet after the pack
+
+With section 8 deployed, `GET /site/<directory>/HEAD/README.md` answered
+502 with `x-site-step: objects` and the log line `site objects:
+GitRefusal: hash-mismatch: pack trailer; last request: POST
+.../git-upload-pack -> 200 application/x-git-upload-pack-result`. The
+planner captured the service's answers as fixtures
+(`packages/git/test/fixtures/own-host/`, their commit `2a31591`,
+cherry-picked here from `planner/site-fixture`). [run, by the planner]
+
+**The finding.** The service's upload-pack answer is `0008NAK\n`, a pack
+of 2 objects (368 bytes with its trailer), and then one flush packet
+`0000`. The read client (`packages/git/src/http-read.ts`, `decodePack`)
+took every byte after `NAK` as the pack and compared the last 20 bytes
+with the SHA-1 of the rest. Those 20 bytes ended in `0000`, so it refused
+`hash-mismatch: pack trailer`. [code, and the control below]
+
+**The fix**, commit `e380dcf` [code]:
+
+- `decodePack` reads the pack by its own structure: the header, then the
+  number of objects the header states, then the 20-byte trailer. It
+  checks the trailer where the objects end, against the SHA-1 of every
+  byte before it.
+- After the trailer, nothing may follow, except one flush packet `0000`
+  where the caller sets `flushAfter`. `SmartHttpSource` sets it for an
+  upload-pack answer. Any other byte after the trailer, or a second flush
+  packet, is refused as `unreadable: pack trailing data`.
+- A pack that ends before its trailer is refused as `unreadable: pack
+  trailer`. A wrong trailer is still `hash-mismatch: pack trailer`. The
+  bounds on size and object count are unchanged. The objects are now
+  inflated before the trailer is checked, still within those bounds.
+- `decodePack`'s other callers (the receive tests, which decode a pushed
+  pack) pass no `flushAfter`, so they still refuse any trailing byte.
+
+**Side-band.** The client never asks for it. Its request is `want <id>`,
+with ` ofs-delta` only when the service advertises that, then `done`. The
+captured request has no capability at all, and the service answered
+without side-band. So side-band is not handled, and nothing is changed
+for it. If the client ever asks for side-band, the answer must be
+demultiplexed first. [code, and the fixture]
+
+**Tests**, in the `git` project, new file
+`packages/git/test/own-host.test.ts` [run]:
+
+12. "own host, captured answers: the founding commit 517e108 and its empty
+    tree are read, though the upload-pack answer ends with a flush packet
+    after the pack". It replays `info-refs.bin` and `upload-pack.bin`
+    through `SmartHttpSource` and `Reader`, and checks that the request
+    sent is `request-v0.bin` byte for byte.
+13. "pack structure: one flush packet after the trailer is read only
+    where allowed; other trailing bytes, a short pack and a bad trailer
+    are refused by name"
+
+Controls, `node scripts/control.mjs packages/git/src/http-read.ts ...
+--expect 'own host, captured answers' -- packages/git
+test/own-host.test.ts` [run]:
+
+| Change | Result |
+|---|---|
+| The trailer read from the last 20 bytes of the input, as before | distinguishes: the read is refused `hash-mismatch: pack trailer`, the live failure |
+| `SmartHttpSource` without `flushAfter` | distinguishes: refused `unreadable: pack trailing data` |
+
+Runs [run]: the `git` project, 10 files, 26 tests, all passed. The site
+tests with the other users of the pack decoder (`site-route`,
+`site-conformance`, `github-founding`, `artifacts-host` in the `scope`
+project), 14 tests, all passed. Both packages typecheck.
+
+**Gate**, one run of `npm run gate` at `e380dcf5ce26` (tree
+`d9bdd59c9761`), same container [run]: whitespace exit 0; typecheck exit
+0, 11.4 s elapsed, 35.4 s CPU; test exit 1, 69.8 s elapsed, 111.6 s CPU.
+Vitest: 105 files, 104 passed and 1 failed; 781 tests, 780 passed and 1
+failed, T36 of `packages/checkers/test/runner.test.ts` as before. The run
+reported 2 uncaught `EPIPE` errors from the local Git server of
+`packages/git/test/support/host.ts`, while `http.test.ts` and
+`push.test.ts` ran; those tests passed. The same errors came in the first
+gate run of section 5, before this branch changed anything in `git`, and
+not in the run of section 8. So they are intermittent and come from that
+test server, not from this change [inferred]. `scripts/active-source.test.mjs`
+on its own: 6 passed, 0 failed. This note's commit changes only this note.
+
+**Expected after the redeploy** [inferred]: `/site/<directory>/HEAD/`
+answers 200 with the page of section 8 for an empty tree, "The repository
+has no files at this commit.", and `/README.md` answers 404 `not-found`,
+because the founding commit has no files.
