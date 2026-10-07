@@ -331,7 +331,7 @@ It installs only if `package-lock.json` changed since the last install,
 typechecks every workspace, and runs every test: one vitest process for
 the repository (`vitest.config.ts` at the root, one project for each of
 `bytes`, `derive`, `platform`, `git`, `checkers`, `replay`, `client`,
-`scope` and `lanes`), then one script (`scripts/active-source.test.mjs`). The script checks that no
+`scope`, `lanes` and `cli`), then one script (`scripts/active-source.test.mjs`). The script checks that no
 active file imports from `parked/` or names a removed format, and that no
 platform package depends on the lanes package or imports from it. It prints the head, the tree and
 each step's elapsed and CPU time. It also fails on a whitespace error in
@@ -344,6 +344,15 @@ vitest lets projects share a group only when their worker counts agree. The
 `git` project runs the real `git` program, as a client and as a server, on
 local repositories, and one file of the `checkers` project runs it for the
 runner's checkout. Nothing runs twice.
+
+The command line's story, `packages/cli/test/*.scope.test.ts`, runs from
+the root inside the `scope` project too, and has no Worker of its own. Its
+commands go over the Worker's HTTP routes for the namespace `PLATFORM`,
+called in the test's isolate; the Git host and the scheduler are labelled
+stand-ins in the file. The `cli` project is its Node test of the key files.
+`scripts/control.mjs` cannot select a root project, so a control of the
+story is run by hand: change the line, run
+`npx vitest run --project scope story`, restore the file.
 
 The lane scenarios, `packages/lanes/test/*.scope.test.ts`, run from
 the root inside the `scope` project: the same test Worker, loaded once.
