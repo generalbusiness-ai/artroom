@@ -5,3 +5,4 @@ export * from "./http.ts";
 export * from "./binding.ts";
 export * from "./prepare.ts";
 export * from "./session.ts";
+export * from "./signed-read.ts";
