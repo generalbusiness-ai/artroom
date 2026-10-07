@@ -16,6 +16,8 @@ import { timeMs } from "@generalbusiness/artroom-derive";
 export interface CredentialReply { id: string; ends: Timestamp }
 export interface CredentialPosition { mint: OperationId; attempt: number }
 export interface PendingCredentialReply extends CredentialReply, CredentialPosition {}
+export interface RevocationPosition { revoke: OperationId; attempt: number }
+export interface ExpectedRevocation extends RevocationPosition { mint: OperationId; mintAttempt: number; id: string }
 export interface MintedCredential extends CredentialReply { mint: OperationId; attempt: number; plaintext: string }
 export interface ScopePrivateCredential extends Omit<MintedCredential, "plaintext"> {
   plaintext: string | null;
@@ -31,6 +33,18 @@ CREATE TABLE IF NOT EXISTS private_credential (
   PRIMARY KEY (scope, id), UNIQUE (scope, mint, attempt)
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS private_credential_pending ON private_credential (scope, state, mint, attempt);
+CREATE TABLE IF NOT EXISTS private_credential_revocation (
+  scope TEXT NOT NULL, revoke TEXT NOT NULL, attempt INTEGER NOT NULL,
+  mint TEXT NOT NULL, mint_attempt INTEGER NOT NULL, id TEXT NOT NULL, done INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (scope, revoke, attempt)
+) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS private_credential_revocations ON private_credential_revocation (scope, done, revoke, attempt);
+CREATE TRIGGER IF NOT EXISTS private_credential_revoked AFTER UPDATE OF state ON private_credential
+WHEN NEW.state = 'revoked'
+BEGIN
+  UPDATE private_credential_revocation SET done = 1
+  WHERE scope = NEW.scope AND mint = NEW.mint AND mint_attempt = NEW.attempt;
+END;
 `;
 
 export class CredentialStore {
@@ -100,6 +114,35 @@ export class CredentialStore {
     };
   }
 
+  /**
+   * Before DELETE leaves, bind its attempt to an exact private mint and ID.
+   * A repeat is the same binding; a conflict changes nothing. This records
+   * an expectation, never a host answer or proof of revocation.
+   */
+  expectRevoke(expected: ExpectedRevocation): boolean {
+    const scope = this.#scope();
+    if (scope === null) return false;
+    const credential = this.#sql.exec("SELECT id FROM private_credential WHERE scope = ? AND mint = ? AND attempt = ?", scope, expected.mint, expected.mintAttempt).toArray()[0];
+    if (credential?.["id"] !== expected.id) return false;
+    const existing = this.#sql.exec("SELECT mint, mint_attempt, id FROM private_credential_revocation WHERE scope = ? AND revoke = ? AND attempt = ?", scope, expected.revoke, expected.attempt).toArray()[0];
+    if (existing) return existing["mint"] === expected.mint && existing["mint_attempt"] === expected.mintAttempt && existing["id"] === expected.id;
+    this.#sql.exec("INSERT INTO private_credential_revocation (scope, revoke, attempt, mint, mint_attempt, id) VALUES (?, ?, ?, ?, ?, ?)", scope, expected.revoke, expected.attempt, expected.mint, expected.mintAttempt, expected.id).toArray();
+    return true;
+  }
+
+  /** Bounded metadata of expected revocations still awaiting the caller's verified committed answer, never plaintext or an inferred answer. */
+  revocations(after: RevocationPosition | null, limit: number): { items: ExpectedRevocation[]; more: boolean } {
+    const scope = this.#scope();
+    if (scope === null || !Number.isSafeInteger(limit) || limit < 1 || !Number.isSafeInteger(limit + 1)) return { items: [], more: false };
+    const rows = after === null
+      ? this.#sql.exec("SELECT revoke, attempt, mint, mint_attempt, id FROM private_credential_revocation WHERE scope = ? AND done = 0 ORDER BY revoke, attempt LIMIT ?", scope, limit + 1).toArray()
+      : this.#sql.exec("SELECT revoke, attempt, mint, mint_attempt, id FROM private_credential_revocation WHERE scope = ? AND done = 0 AND (revoke, attempt) > (?, ?) ORDER BY revoke, attempt LIMIT ?", scope, after.revoke, after.attempt, limit + 1).toArray();
+    return {
+      items: rows.slice(0, limit).map((row) => ({ revoke: row["revoke"] as OperationId, attempt: row["attempt"] as number, mint: row["mint"] as OperationId, mintAttempt: row["mint_attempt"] as number, id: row["id"] as string })),
+      more: rows.length > limit,
+    };
+  }
+
   /** An explicit private read, including the plaintext, if custody still holds it. */
   read(mint: OperationId, attempt: number): ScopePrivateCredential | null {
     const scope = this.#scope();
@@ -135,7 +178,11 @@ export class CredentialStore {
     return credential.plaintext !== null && credential.plaintext !== "";
   }
 
-  /** The caller has an actual revocation answer. No expiry, rejection or dropped plaintext calls this automatically. */
+  /**
+   * The caller verified an actual committed revocation answer. The update
+   * and its trigger atomically drop plaintext and complete every matching
+   * expected binding. No expiry, rejection or dropped plaintext calls this.
+   */
   revoked(mint: OperationId, attempt: number): boolean {
     const scope = this.#scope();
     if (scope === null || !this.#read(scope, mint, attempt)) return false;
