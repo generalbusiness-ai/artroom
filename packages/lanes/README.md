@@ -43,7 +43,7 @@ contract package's types. Its tests and scripts also use `bytes`,
 | `scripts/pin.mjs` | Writes the four byte files and `src/digests.ts` from the values. |
 | `scripts/reference.mjs` | Writes `docs/lanes-reference.md` from the values. With `--check` it writes nothing and exits 1 when the file is stale. |
 | `test/definitions.test.ts` | Four plain tests: the pins, with the generated reference; the counts against the bounds; validation of both definitions whole; and the demo profile's pins, its strict subset of rows and its validation. |
-| `test/*.scope.test.ts` | Eleven scenarios on real scopes under the two pinned digests, T1 to T9 and T34, on the fixture `graph.ts`; four, W1 to W4 (`wiring.scope.test.ts`), and plan 019's story on the demo profile (`story.scope.test.ts`), on a room of real platform scopes (`room.ts`). In the workerd test pool. Each names the stand-ins it uses. |
+| `test/*.scope.test.ts` | Eleven scenarios on real scopes under the two pinned digests, T1 to T9 and T34, on the fixture `graph.ts`; five, W1 to W5 (`wiring.scope.test.ts`), and plan 019's story on the demo profile (`story.scope.test.ts`), on a room of real platform scopes (`room.ts`). In the workerd test pool. Each names the stand-ins it uses. |
 | `test/support/graph.ts`, `room.ts`, `worker.ts` | The fixture of the scenarios; a room founded on the real platform scopes in the namespace `PLATFORM`, whose real directory creates the lanes; and the test Worker, which is the scope package's `./testing/worker`. |
 | `vitest.scope.config.ts`, `wrangler.test.jsonc` | The configuration that runs the scenarios alone. From the root they run inside the `scope` project. Nothing is deployed from either file. |
 

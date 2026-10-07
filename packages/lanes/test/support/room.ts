@@ -20,7 +20,7 @@ import { runInDurableObject } from "cloudflare:test";
 import { expect } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { Answer, DeclaredDefinition, Entry, FactRef, Intent, MemberRef, OperationId, Seed } from "@generalbusiness/artroom-contract";
-import { canonicalize, factRefOf, intentDigest, scopeIdOf, seedDigest, signIntent, textDigest } from "@generalbusiness/artroom-bytes";
+import { canonicalize, factRefOf, intentDigest, keyIdOfSecret, scopeIdOf, seedDigest, signIntent, textDigest } from "@generalbusiness/artroom-bytes";
 import { ScopeHandle, declaredHandle } from "@generalbusiness/artroom-client";
 import { validateDefinition, valueDigest, type ValidDefinition } from "@generalbusiness/artroom-derive";
 import { keys, type Actor } from "@generalbusiness/artroom-derive/testing";
@@ -35,8 +35,11 @@ import type { Item } from "@generalbusiness/artroom-derive";
 import { DIGESTS, change, issue, type changeDemo } from "../../src/index.ts";
 import { Host, Node, net, reader, soon } from "./graph.ts";
 
-export { Platform, copied, rewritten, routed, settle };
+export { Platform, copied, rewritten, routed, settle, soon };
 export const { rita, una, vic, paul, sam } = keys;
+/** A sixth test key, for a checker member: sam's key is the room's recovery key, which membership enrols for no member. */
+const checkerSecret = new Uint8Array(32).fill(6);
+export const checkerKey: Signer = { secret: checkerSecret, key: keyIdOfSecret(checkerSecret), member: { ...paul.member, member: "@check" as MemberRef["member"] }, principal: null };
 
 /** A Git object ID. No repository exists here: the Git host is a stand-in. */
 export const oid = (c: string) => c.repeat(40);

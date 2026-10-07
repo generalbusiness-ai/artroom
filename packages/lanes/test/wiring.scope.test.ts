@@ -1,10 +1,12 @@
 import { expect, test } from "vitest";
-import { firstExtents, platform } from "@generalbusiness/artroom-platform";
+import { CONFIGURATION_DOMAIN, firstExtents, platform } from "@generalbusiness/artroom-platform";
+import { canonicalize, textDigest } from "@generalbusiness/artroom-bytes";
+import { valueDigest } from "@generalbusiness/artroom-derive";
 import { MemorySource, httpSource, verify, type HistorySource, type MemoryScope } from "@generalbusiness/artroom-replay";
 import { CAPABILITY_CODE } from "@generalbusiness/artroom-scope";
 import { DIGESTS, change, issue } from "../src/index.ts";
 import type { Node } from "./support/graph.ts";
-import { Platform, copied, merged, oid, paul, proposed, publicationOf, reported, rewritten, rita, room, routed, una, vic, type Room } from "./support/room.ts";
+import { Platform, copied, merged, oid, paul, proposed, publicationOf, reported, rewritten, rita, room, routed, checkerKey, soon, una, vic, type Room } from "./support/room.ts";
 
 // The lanes against the real rules scope and the real destination (plan 024, gate 2; request i5). Every platform scope is a Durable
 // Object of the namespace `PLATFORM` under the deployed class, the production authority and the platform package's own data and
@@ -138,3 +140,32 @@ test("W4, the single-controller exception: rita, the one holder of rules.publish
   const publication = await publicationOf(r, C, second.id);
   expect([second.state, publication?.state, String(publication?.values["reason"]).split(":").slice(0, 3)]).toEqual(["published", "published", ["single-controller", "rules", "@rita"]]);
 });
+
+test("W5, a required check: the rules require the check `unit`, run by a checker member of the real membership scope; the real lane opens the job and the checker's key decides it passed; the destination judges the merge with the retained job opening and decision and the checker key's current standing, and publishes; with the job only requested it refuses (STAND-IN: the Git host; SCRIPTED: the changed set; no runner: the checker's answer is signed by the test)", async () => {
+  const r = await room();
+  // A checker member, @check, with a key enrolled by an invitation of rita's; a configuration that the rules scope keeps.
+  const checker = await r.M.did(rita, "add-member", { fields: { handle: "@check", kind: "checker" } });
+  const secret = "the invitation of the required checker key";
+  const invitation = await r.M.did(rita, "invite-key", { fields: { member: checker, kind: "checker", inviteHash: textDigest(secret), inviteEnds: soon(3600) }, expected: await r.M.expected({ member: checker }) });
+  await r.M.did(checkerKey, "enrol", { on: 0, fields: { invitation, secret }, expected: await r.M.expected({ on: 0, member: checker }) });
+  const configuration = { name: "unit", image: `sha256:${"e".repeat(64)}`, environment: {}, steps: [["npm", "test"]], judged: { passed: { exit: 0, line: "ok" }, failed: { exit: 1, line: "not ok" } }, limits: { seconds: 600, bytes: 65536 } };
+  const digest = valueDigest(CONFIGURATION_DOMAIN, configuration);
+  expect(await r.rules.stub.submit(await r.rules.intent(rita, "keep-configuration", { fields: { digest, name: "unit" } }), [], { values: [canonicalize(configuration)] })).toMatchObject({ answer: "accepted" });
+  const checks = [{ name: "unit", configuration: digest, required: true, checker: await r.member("@check") }];
+  expect(await r.publishRules({ approvals: 1, ownerMayReview: false, checks, labels: [], extents: firstExtents({ approvals: 1, checks: [{ name: "unit", required: true }] }) })).toMatchObject({ answer: "accepted" });
+  await r.activate(issue, DIGESTS.issue);
+  await r.activate(change, DIGESTS.change);
+  const I = await r.lane(rita, "open-issue", issue, DIGESTS.issue, { title: "A bug", conditions: ["it works"] });
+  const { C, manifest } = await proposed(r, I, una, "@una", []);
+  await C.did(paul, "review-verdict", { fields: { manifest, verdict: "approve", extent: "source" } });
+  r.changes = { paths: ["src/a.ts"], links: [], unreadable: 0 };
+  const job = (await C.did(una, "request-check", { fields: { manifest, name: "unit", configuration: digest } })).fact.seq;
+  // The control: the lane refuses a merge while the job is only requested.
+  expect(await C.asks(rita, "merge", { fields: { manifest, reports: [] } })).toBe("guard-failed: required-check-not-passed");
+  // Only a key that holds `change.check` answers it: paul, a member, is refused by the real membership standing; the key of @check is admitted.
+  expect(await C.asks(paul, "check", { fields: { job, tree: oid("3"), configuration: digest, outcome: "passed" } })).toBe("unauthorized");
+  const decided = (await C.did(checkerKey, "check", { fields: { job, tree: oid("3"), configuration: digest, outcome: "passed" } })).fact.seq;
+  const done = await merged(r, C, manifest, []);
+  const publication = await publicationOf(r, C, done.id);
+  expect([done.state, publication?.state, (await C.item(job)).state, (await C.item(job)).refs["decidedBy"], (await I.item(0)).state]).toEqual(["published", "published", "passed", decided, "closed"]);
+}, 30_000);
