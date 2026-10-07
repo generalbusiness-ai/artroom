@@ -7,8 +7,10 @@ The combined source is locally gated and ready for exact review preparation.
 It contains the GitHub component, the hosting service adapter, causal reads,
 claim recovery and the upload-pack framing repair. It is not approved or
 landed. This exact combined source now has live founding, authenticated
-replay and Git clone evidence. A legitimate implementation/receipt binding
-remains owed. Full I3, native lane hold and
+replay and Git clone evidence. Planner decision `0478ff82` binds its new
+independent SOURCE review to existing Gate 1 request `225da894` and producer
+`f8a56f1c`; receipt eligibility remains conditional on approval, landing and
+the required landed-commit gate. Full I3, native lane hold and
 change publication, profiles, capacity and browser obligations stay open.
 
 ## Source and ownership
@@ -147,7 +149,11 @@ has not overwritten it with this narrower source. The cloned and rendered
 own-host paths need reconciliation with the new session and resource-hash
 protocol. The later cloud requests remain separate and ordered.
 
-Before a receipt or landing, the owner must choose a separate GitHub
-component milestone or bind an exact expanded successor that actually
-satisfies the intended Gate 1 scope. This note grants no approval, ignores
-no unreadable dependency, and closes no broader commission.
+Planner decision `0478ff82fe22979331146bfeabe3eb32861a0138` and report
+`c6b43291` choose the expanded successor under existing `225da894` /
+`f8a56f1c`, preserving the historical `74f5aee6` changes-requested review
+and all original/re-cut conditions. No GitHub-only partial receipt is made.
+Independent exact SOURCE approval, implementer landing and the required
+landed-commit gate are still needed. The decision closes no separately owned
+I3, Gate 2, live-operations, clone, site, browser, profile or manual work.
+This note grants no approval and ignores no unreadable dependency.

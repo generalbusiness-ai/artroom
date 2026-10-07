@@ -6,8 +6,9 @@ Branch: `request/i5-live-ops-intake`.
 
 This packet inventories the combined candidate for independent source review.
 It is no source approval, implementation acceptance, receipt or landing.
-The owner still needs a legitimate binding between the implementation and
-what its receipt would complete. Full I3, native lane hold and change
+Planner decision `0478ff82` binds the expanded successor to existing225/f8
+for independent review. Receipt eligibility remains conditional on exact
+approval, implementer landing and the required landed-commit gate. Full I3, native lane hold and change
 publication, profiles, capacity and browser obligations remain open.
 
 ## Exact comparison and gate correspondence
@@ -97,8 +98,9 @@ on the expanded branch: the stale `4ff0` lane pin is replaced by current
 and the historical real-run-owed paragraph is framed as historical evidence.
 The receipt-binding gap is recorded by detail
 `3bf72be30a1db15f993f6077f883d7d66e9b1122` and event
-`efb6db9950231d60dc9174287f3130c5a1cc7012`. No binding choice has been
-made. These finding repairs and recorded details grant no approval.
+`efb6db9950231d60dc9174287f3130c5a1cc7012`. Planner decision `0478ff82` now chooses the expanded successor under225/f8,
+not a GitHub-only partial receipt. These finding repairs and the binding
+decision grant no source approval.
 
 The later combined delta requires independent review. None of the old
 review's read credit applies to these **49 changed paths** from
@@ -283,7 +285,8 @@ The committed live witness gives raw safe evidence paths and SHA-256 values;
 builder read all six reports and the deploy/configuration/install/claim logs
 in full. Durable result `76b016bcf9ac18b542f9f45814cc495b9fa0fb55` and binding
 request `48ea69f70c696ac0d5ccd47ba7952d42633086fa` remain producer statements,
-not source approval. Planner promised the binding decision at `fbec8162`.
+not source approval. Planner promised the binding decision at `fbec8162` and delivered it as
+`0478ff82fe22979331146bfeabe3eb32861a0138` / report `c6b43291`.
 
 ## Complete native path inventory
 
