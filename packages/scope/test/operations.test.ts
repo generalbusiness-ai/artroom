@@ -5,10 +5,10 @@ import type { OperationId, Read } from "@generalbusiness/artroom-contract";
 import { canonicalize } from "@generalbusiness/artroom-bytes";
 import { checkpointOf, operationId, operationOpening, snapshotInput, snapshotRead, stagedRefName, timeMs, type Opening } from "@generalbusiness/artroom-derive";
 import { isAnswer } from "../src/operations.ts";
-import { ScopeObject, SqliteStore, Turns, Wakes, production, type EffectAnswer, type EffectRequest, type OperationStatus, type OutcomeRecorded, type Wiring } from "../src/index.ts";
+import { ScopeObject, SqliteStore, Turns, Wakes, production, type EffectAnswer, type EffectRequest, type OperationStatus, type OutcomeRecorded, type Outside, type Wiring } from "../src/index.ts";
 import { variant } from "@generalbusiness/artroom-derive/testing";
 import { controls, testPorts } from "../src/testing.ts";
-import { FENCE, MINT, mint, outsideOf, owners, pushOf, type OutsideDouble } from "./outside.ts";
+import { FENCE, MINT, mint, outsideOf, owners, pushOf, wired, type OutsideDouble } from "./outside.ts";
 import { HOLD, Lane, START, at, definition, found, founding, reader, rita, stubOf } from "./support.ts";
 
 /** The delay before the second attempt of an operation. */
@@ -182,6 +182,51 @@ describe("outside operations at a real scope (scope contract, section 4.3; autho
     expect([derived, (await seen(s, fresh)).state, out.sent.length]).toEqual([
       { scope: s.at, operation: fresh, attempt: 1, owner: "platform:destination@1", kind: "push", origin: (await s.sealed(next))[0] }, "settled", 3,
     ]);
+
+    // Recovery is a trusted port boundary, not another send. This made-up
+    // read owner rejects unknown outcomes, as the destination's real read
+    // owner does. Its host and rules are stand-ins; the operation rows,
+    // send mark, alarm clock and restart below are real SQLite/runtime.
+    const recovering = await found({ deliveryBatch: 1 });
+    const originals: EffectRequest[] = [];
+    const reads: EffectRequest[] = [];
+    let recovered: EffectAnswer | null = null;
+    const recoveryOwners: typeof owners = {
+      rules: (owner, kind) => kind === "read" ? { selects: false, read: true, retries: () => false, wellFormed: (result) => result === "confirmed" } : owners.rules(owner, kind),
+    };
+    const recoveryPort: Outside = {
+      accepts: () => true,
+      send: async (request) => { originals.push(request); return null; },
+      recovery: {
+        accepts: (owner, kind) => owner === "platform:destination@1" && kind === "read",
+        read: async (request) => { reads.push(request); return recovered; },
+      },
+    };
+    wired.set(recovering.name, () => ({ outside: recoveryPort, owners: recoveryOwners }));
+    await recovering.restart();
+    const [safe, mutation] = await open(recovering, { owner: "platform:destination@1", kind: "read", attempts: 1 }, pushOf(1)) as [OperationId, OperationId];
+    expect([await surface(recovering).effect(), await surface(recovering).effect(), originals.map((r) => r.kind), reads]).toEqual([1, 1, ["read", "push"], []]);
+    const delay = recovering.c.bounds.drainRetrySeconds;
+    expect([await seen(recovering, safe), outcomes(await seen(recovering, mutation)), await recovering.alarmAt()]).toMatchObject([
+      { state: "pending", sends: [{ attempt: 1, sent: START, next: timeMs(at(delay)) }] }, [["unknown at 2"]], timeMs(at(delay)),
+    ]);
+    // No immediate polling, even when another caller asks for a pass.
+    expect([await surface(recovering).effect(), reads.length, originals.length]).toEqual([0, 0, 2]);
+    recovering.c.clock.now = at(delay);
+    expect(await recovering.alarm()).toBe(true);
+    expect([reads, originals.length, await recovering.alarmAt(), outcomes(await seen(recovering, safe))])
+      .toEqual([[originals[0]], 2, timeMs(at(2 * delay)), [[]]]);
+    // The unresolved safe read's delayed row survives a restart. A failed
+    // recovery writes no outcome and never rewrites the original sent mark.
+    await recovering.restart();
+    expect([await surface(recovering).effect(), reads.length, await recovering.alarmAt()]).toEqual([0, 1, timeMs(at(2 * delay))]);
+    recovered = { result: "confirmed", evidence: { basis: "read", body: { commit: "read-later" } } };
+    recovering.c.clock.now = at(2 * delay);
+    expect(await recovering.alarm()).toBe(true);
+    expect([reads, originals.length, await seen(recovering, safe), outcomes(await seen(recovering, mutation)), await recovering.alarmAt()]).toMatchObject([
+      [originals[0], originals[0]], 2, { state: "settled", sends: [{ attempt: 1, sent: START }], operation: { attempts: [{ attempt: 1, outcomes: [{ result: "confirmed", seq: 3 }] }] } }, [["unknown at 2"]], null,
+    ]);
+    expect([await surface(recovering).effect(), originals.filter((r) => r.kind === "read").length, originals.filter((r) => r.kind === "push").length, reads.every((r) => r.operation === safe && r.kind === "read")]).toEqual([0, 1, 1, true]);
   });
 
   test("a late answer that arrives while the scope's turn is unavailable is kept in hand, and the driver writes it at the next wake-up, after the attempt's row is closed; the request is not sent again", async () => {

@@ -27,7 +27,9 @@
  * idempotent and is sent again until it is acknowledged. An outside effect
  * is not, so nothing of the dispatcher's retry rule is here. A further try
  * is another attempt, which an entry opens (section 4.3, item 2), or another
- * operation.
+ * operation. A trusted recovery port may repeat a safe read or retrieve
+ * this attempt's retained reply while no outcome can be written; it never
+ * repeats the outside mutation or clears its durable send mark.
  *
  * Nothing here runs inside a storage transaction. A pass runs after a
  * commit and from the object's alarm.
@@ -112,6 +114,19 @@ export interface Outside {
   send(request: EffectRequest): Promise<EffectAnswer | null>;
   late?(deliver: LateAnswers): void;
   judged?(at: { scope: ScopeRef; operation: OperationId; attempt: number }, sealed: Sealed | null): void;
+  /**
+   * Trusted recovery for an already marked attempt with no recorded outcome.
+   * `read` may repeat only a safe host read or retrieve that same attempt's
+   * retained own reply. It must never send or repeat a mutation. `accepts`
+   * declares the owner/kind for which this guarantee holds; the driver cannot
+   * prove it. An unsuccessful read gets the existing drain retry delay only
+   * while the owner's rules refuse its unknown outcome. Held answers take
+   * precedence, and a written unknown mutation remains unchanged.
+   */
+  recovery?: {
+    accepts(owner: CapabilityName | PlatformDefinition, kind: string): boolean;
+    read(request: EffectRequest): Promise<EffectAnswer | null>;
+  };
 }
 
 /**
@@ -268,11 +283,12 @@ export class Operations {
         continue;
       }
       if (row.sent !== null) {
-        // The request may have left: the mark was written and no outcome followed. The answer in hand is offered if there is one.
-        // Otherwise the process stopped between the send and the outcome, and the outcome is `unknown`. It is never sent again.
-        const input = this.#held.get(keyOf(id, attempt)) ?? this.#unknown(id, attempt);
+        // The request may have left: its durable mark has no outcome. An answer in hand wins; otherwise only an accepted safe
+        // recovery read may obtain one. With neither, unknown is offered. The original mutation is never sent again.
+        const input = this.#held.get(keyOf(id, attempt));
+        const recovery = input ? null : this.#recovery(row);
         offered.add(keyOf(id, attempt));
-        work.push(() => this.#offer(row, input, now));
+        work.push(() => recovery ? this.#answer(row, recovery.request, now, recovery.read) : this.#offer(row, input ?? this.#unknown(id, attempt), now));
         continue;
       }
       const operation = store.operation(id);
@@ -353,12 +369,33 @@ export class Operations {
     return this.#wakes.set();
   }
 
-  /** The one request of one attempt, and the outcome that its answer gives. */
-  async #send(row: Sending, request: EffectRequest, now: number): Promise<void> {
+  /** A bound recovery read, only for a runnable owner; never marks or sends. */
+  #recovery(row: Sending): { request: EffectRequest; read: () => Promise<EffectAnswer | null> } | null {
+    const operation = this.#store.operation(row.operation);
+    try {
+      const recovery = this.#outside.recovery;
+      const scope = this.#store.scope();
+      const origin = this.#store.stored(Number(row.operation.split(":")[0]));
+      if (!operation || !scope || !origin || !this.#scope.pinned()?.definition || !this.#scope.owners()?.rules(operation.owner, operation.kind) || !recovery?.accepts(operation.owner, operation.kind)) return null;
+      const request: EffectRequest = { scope: scope.at, operation: row.operation, attempt: row.attempt, owner: operation.owner, kind: operation.kind, origin: { entry: JSON.parse(origin.bytes) as Entry, hash: origin.hash } };
+      return { request, read: () => recovery.read(request) };
+    } catch (failure) {
+      report(this.#diagnoses, "outside-recovery-failed", operation ? `${operation.owner}:${operation.kind}` : "owner", failure);
+      return null;
+    }
+  }
+
+  /** The one original request of one attempt. Recovery never calls this. */
+  #send(row: Sending, request: EffectRequest, now: number): Promise<void> {
+    return this.#answer(row, request, now, () => this.#outside.send(request));
+  }
+
+  /** One original answer or a trusted recovery read, offered identically. */
+  async #answer(row: Sending, request: EffectRequest, now: number, ask: () => Promise<EffectAnswer | null>): Promise<void> {
     const { operation, attempt } = row;
     // A port that fails gave no answer. What it threw is diagnosed by its name alone, and is passed on to nobody: its text may
     // hold a credential (`diag.ts`).
-    const sent = (async () => this.#outside.send(request))().catch((failure: unknown) => { report(this.#diagnoses, "outside-call-failed", `${request.owner}:${request.kind}`, failure); return null; });
+    const sent = (async () => ask())().catch((failure: unknown) => { report(this.#diagnoses, "outside-call-failed", `${request.owner}:${request.kind}`, failure); return null; });
     const answer = await within(() => sent, this.#bounds.dispatchSeconds);
     if (isAnswer(answer)) return this.#offer(row, { type: "outcome", operation, attempt, result: answer.result, evidence: answer.evidence, retain: answer.retain }, now);
     // No answer in time, none at all, or one that is no answer: the outcome is `unknown`. If the request's own answer still
@@ -402,7 +439,7 @@ export class Operations {
     }
     this.#held.delete(key);
     // Written, or already written, the row is closed by the entry. An outcome that the scope can never write leaves the attempt as it is, and visible.
-    if (recorded.recorded === "refused") this.#store.postpone(operation, attempt, null);
+    if (recorded.recorded === "refused") this.#store.postpone(operation, attempt, this.#recovery(row) ? now + this.#bounds.drainRetrySeconds * 1000 : null);
   }
 
   /**
