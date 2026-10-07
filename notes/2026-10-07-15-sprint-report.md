@@ -45,7 +45,10 @@ over, on both Git hosts.
   session at 13:30; with it deployed, a fresh room was founded at 14:19,
   `artroom clone` took a read token from the room and cloned the
   repository at 14:22, and `artroom verify` reported all six scopes of the
-  room consistent, the first complete live verification.
+  room consistent. Builder's own gate 1 witness had already verified six
+  scopes consistent on its review Worker at about 12:20, with a clone by an
+  operator-issued token; the 14:22 run is the first on the demo deployment
+  with a token the room issued.
 - **Gate 1 is filed.** Builder's expanded candidate `7f467c21` under
   `225da894` folds the cloud deliveries; checker's source verdict at 13:07
   is changes requested with two findings, named below. Filed, not landed.
@@ -134,6 +137,7 @@ Cloned into <dir>.          e1a3edc 2026-10-07 18:21:48 +0000 artroom Found this
 # 14:22:38
 $ artroom verify register | directory | membership | rules | destination | inbox
 Result: consistent, for the mode, target, coverage and trusts stated below.   (each of the six)
+# builder's gate 1 witness recorded the same six consistent at about 12:20 on its review Worker, with an operator-issued token
 ```
 
 Stand-ins and limits: on the 09:56 room the clone's read token was issued
@@ -172,7 +176,7 @@ flowchart LR
 | Live-operations fixes | `claude/i5-live-ops-delivery-ttb16z` `31cd3557` | A driver pass on the first turn after a restart; entries read by the cause chain and a register read by a membership session; `claim` resume with `--again`; `verify` by signed reads; `docs/deploy.md` | Run at 09:23 on GitHub: install, settings and claim back to back; four scopes consistent | `4d8d543f`; inside the gate 1 candidate |
 | The room's own host (gate 1b) | `claude/artifacts-host-adapter-pxbx8y` `c7955c39` | The provider over the binding, its wiring under one setting pinned to a register, routing by the register's recorded host, shared host checks, `docs/hosts.md` | 09:55, above | inside the gate 1 candidate |
 | Read tokens and clone | `claude/read-token-credential-flow-6vlu8d` `2cba4677` | The destination's `read-token` act and `mint-read` operation on each host, one-time custody, the credential route, `artroom clone` and `artroom remote` | 14:22, above | `48407a70` |
-| Site renderer (plan 025, section 6) | `claude/i5-site-renderer-39k7iz` `e380dcf5` | A GitHub Flavored Markdown converter with no dependency, conformance stated at 672 of 672 specification examples, the `/site` route with index, links, images, refusals by name, ETag by commit; the pack read repaired by the host's real bytes | 11:39, above | `a2317893` |
+| Site renderer (plan 025, section 6) | `claude/i5-site-renderer-39k7iz` `e380dcf5` | A GitHub Flavored Markdown converter with no dependency, conformance stated by its own test at 672 of 672 specification examples in the specification's mode (the served route's parity is not yet shown), the `/site` route with index, links, images, refusals by name, ETag by commit; the pack read repaired by the host's real bytes | 11:39, above | `a2317893` |
 | Destination session read | `claude/destination-read-authorization-zu9wlt` `87ba6fab` | A register whole to its signing keys and sessions; a room's scopes whole to its membership's session; the story reads the destination; the note is not pushed | 14:22, above: clone by the room's token; six scopes consistent | with `48407a70` |
 | Jam: rockstar lead and the mood phrase | jam repository `claude/lead-rockstar-attitude-awtqym` `5f0c458` | The lead's brief and player, glides and vibrato in the renderer, mood entries read through a lexicon into style, two reference moods, two clips | Clips rendered: `j2b-clip.wav`, `j2-mood-clip.wav` | none; recorded `8e9df12b`, `7cfb3052` |
 
