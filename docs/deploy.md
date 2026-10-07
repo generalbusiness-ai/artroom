@@ -6,6 +6,10 @@ Nothing in this repository deploys the Worker. The Worker's code is
 `packages/scope/src/worker.ts`; its configuration is
 `packages/scope/wrangler.jsonc`.
 
+A deployment serves rooms of every definition version that its platform
+package has shipped, each by the version that its genesis pinned
+([scopes.md](scopes.md), "Definition versions").
+
 ## Settings and secrets
 
 A setting is a plain value. A secret is stored by the host and is never

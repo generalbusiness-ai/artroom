@@ -48,7 +48,7 @@ share no storage and no transaction.
 A scope has a **kind**, which is one of `register`, `directory`, `membership`,
 `rules`, `destination`, `inbox`, `task` and `lane`. The substrate treats every
 kind alike. A person founds a scope with no creator in one of two ways. Under
-`platform:register@1`, an `install` intent founds a register, of the kind
+a version of `platform:register`, an `install` intent founds a register, of the kind
 `register`. Under any other definition, a `found` intent founds a directory
 with no creator, a path that stays until a repository's founding by its
 register is whole. Every other scope is created by another scope: a
@@ -60,6 +60,34 @@ carries every rule needed to answer its creation; a missing rule is still
 refused for the whole pinned
 version. A configured GitHub adapter is authored; its deployed validation
 and the remaining I3 work are not delivered.
+
+## Definition versions
+
+A platform definition is named with its version, such as
+`platform:destination@2`. A change to a definition's data or to its rules
+makes a new version, and a version that has shipped does not change. A
+scope pins its version in the seed of its genesis, and it is judged and
+replayed by that version for as long as it exists. The platform package
+serves every version that it has shipped (`VERSIONS`, in
+`packages/platform/src/index.ts`), and `platform(name)` resolves any of
+them. A rule that must state its own version, such as the owner of an
+operation that it opens or the definition of a scope that it creates,
+reads it from the scope's genesis. So a room's versions follow from its
+register: version 1 of the register creates version 1 of the directory,
+which creates membership, the rules scope and the destination at version
+1, and version 2 does the same at version 2. `artroom install` founds a
+register at the newest version, and `artroom claim` founds the room at the
+version that the register creates; both print the versions. A register
+founded before version 2 keeps creating rooms at version 1.
+
+| Definition | Version 1 | Version 2 |
+|---|---|---|
+| `platform:register` | As first shipped. | The same data and rules; it creates the directory at version 2. |
+| `platform:directory` | As first shipped. | Creates its three scopes at version 2. The field `definition` of `open-issue` and `open-pr` states the place of the definition's bytes, so an act without them is refused `bad-field`. |
+| `platform:membership` | As first shipped. | The same data. Each role's first list ends with `destination.read-token`. |
+| `platform:rules` | As first shipped. | The field `digest` of `activate` states the place of the definition's bytes. |
+| `platform:destination` | As first shipped: no `read-token`, and a founding commit with the empty tree. | The act `read-token` and its operation `mint-read`. The genesis keeps the founder's handle, and the founding commit holds one file, `README.md`: the repository's name as a heading and the sentence "Founded by <handle> through the room <directory id>." |
+| `platform:inbox` | As first shipped. | None. |
 
 ## Identity and incarnation
 
@@ -756,7 +784,7 @@ if (answer.answer === "accepted") await scope.followReceipt(answer.receipt);
   a key ID and signatures, never a private key. The value returned is the
   value signed: keep it, and retry with it.
 - `ScopeHandle` has `submit`, `settle`, the reads, `definition`, `text`,
-  `followReceipt` and `followDuty`. `found` founds a directory, or, under `platform:register@1`, a register by an `install`. `submit`
+  `followReceipt` and `followDuty`. `found` founds a directory, or, under a version of `platform:register`, a register by an `install`. `submit`
   and `found` take, as one more argument, what travels beside the intent:
   the detached texts, the declared named values and, for an act, the
   presented facts.
