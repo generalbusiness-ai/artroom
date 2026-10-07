@@ -1,9 +1,9 @@
 import { expect, test } from "vitest";
-import { PROPOSED_BOUNDS, type ScopeId, type Seed } from "@generalbusiness/artroom-contract";
-import { canonicalize, intentDigest, newIncarnation, scopeIdOf, signIntent } from "@generalbusiness/artroom-bytes";
-import { clockOf, judgeGenesis, judgeOutcome } from "@generalbusiness/artroom-derive";
-import { Ledger, T0 } from "@generalbusiness/artroom-derive/testing";
-import { REGISTER, repositoryName } from "@generalbusiness/artroom-platform";
+import { PROPOSED_BOUNDS, type Entry, type FieldValue, type ScopeId, type ScopeRef, type Seed } from "@generalbusiness/artroom-contract";
+import { canonicalize, digestBytes, entryHash, intentDigest, newIncarnation, scopeIdOf, signIntent, utf8 } from "@generalbusiness/artroom-bytes";
+import { MemoryState, clockOf, judgeGenesis, judgeOutcome } from "@generalbusiness/artroom-derive";
+import { Ledger, T0, d } from "@generalbusiness/artroom-derive/testing";
+import { DESTINATION, DIRECTORY, REGISTER, directoryIdOf, repositoryName } from "@generalbusiness/artroom-platform";
 import { installing, paul, registerDefinition, registerPlatform, rita, sam } from "../../platform/test/support-founding.ts";
 import { gitHubOutside, type GitHubBindings } from "../src/github-wiring.ts";
 import type { OutsideGiven } from "../src/object.ts";
@@ -45,6 +45,33 @@ function registerFixture(installKey = "install") {
 }
 const json = (body: unknown, status = 201) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 
+/** SCRIPTED destination birth and state: no destination judge or mint runs.
+ * Its retained register claim is the real judgment above. This fixture proves
+ * the factory's authority gate only, not a complete directory creation. */
+function destinationGiven(register: Ledger, creator: ScopeRef): OutsideGiven {
+  const claim = register.fact(1);
+  const copy = register.own(1)!.entry;
+  const bytes = canonicalize(copy);
+  const content = digestBytes(utf8(bytes));
+  const seed: Seed = { v: 1, kind: "destination", definition: DESTINATION, creator, cause: d("e"), ordinal: 3 };
+  const at: ScopeRef = { scope: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(3)), kind: "destination" };
+  const entry: Entry = {
+    ...register.own(0)!.entry, at,
+    input: { type: "genesis", seed, inc: at.inc, kind: "establish", founding: null, source: null, n: null, message: null, decision: "applied" },
+    uses: [{ fact: claim, content }], effects: [], sends: [],
+  };
+  const hash = entryHash(entry);
+  const state = new MemoryState();
+  state.setScope({ ...register.state.scope()!, at, creator, head: { seq: 0, hash }, genesis: { hash, source: null, n: null } });
+  state.putItem({ id: 0, type: "branch", state: "empty", revision: 0, opened: hash, parties: {}, attributed: [], refs: { directory: creator as unknown as FieldValue, claim: claim as unknown as FieldValue }, values: { repository: register.item(1).values["repository"]!, name: "main" } });
+  return {
+    state, own: (seq) => seq === 0 ? { entry, hash } : null,
+    retained: (kind, digest) => kind === "entry" && digest === content ? { kind, digest, bytes, under: "platform:register" } : null,
+    scope: () => state.scope(), genesis: () => entry.input.type === "genesis" ? entry.input : null,
+    clock: { read: () => register.now }, random: { bytes: (length) => new Uint8Array(length) },
+  };
+}
+
 // Invariant: production configuration routes a real bound register request to
 // exactly one explicitly authorized provider creation and records only metadata.
 test("explicit factory configuration creates the claim's exact name through scripted HTTP and retains no secret in the judged entry", async () => {
@@ -85,6 +112,19 @@ test("explicit factory configuration creates the claim's exact name through scri
     expect(denied.accepts(REGISTER, "create-repository")).toBe(false);
     expect(await denied.send(otherRequest)).toBeNull();
     expect(other.register.head.seq).toBe(1);
+    expect(requests).toHaveLength(1);
+    // A creator-null directory could cite this authentic claim but supply
+    // another repository. Its child's factory cannot acquire App authority.
+    const expected: ScopeRef = { scope: directoryIdOf(f.register.item(1).values["seed"] as never), inc: newIncarnation(new Uint8Array(16).fill(1)), kind: "directory" };
+    const transport = async (request: Request) => { requests.push(request); return json({}); };
+    const unrelated: ScopeRef = { ...expected, scope: scopeIdOf({ v: 1, kind: "directory", definition: DIRECTORY, creator: null, cause: d("8"), ordinal: 0 }) };
+    const forged = gitHubOutside(destinationGiven(f.register, unrelated), state.storage.sql, env, transport);
+    expect(forged.accepts(DESTINATION, "mint")).toBe(false);
+    const birth = destinationGiven(f.register, expected);
+    const legitimate = gitHubOutside(birth, state.storage.sql, env, transport);
+    expect(legitimate.accepts(DESTINATION, "mint")).toBe(true);
+    const missingClaim = gitHubOutside({ ...birth, retained: () => null }, state.storage.sql, env, transport);
+    expect(missingClaim.accepts(DESTINATION, "mint")).toBe(false);
     expect(requests).toHaveLength(1);
   });
 });

@@ -4,10 +4,10 @@
  * Missing or invalid configuration leaves every outside effect unsent.
  * No configuration, key, token or plaintext belongs in a scope's history.
  */
-import type { FieldValue, ScopeId } from "@generalbusiness/artroom-contract";
-import { canonicalize, entryHash, isFactRef, isOperationId, isScopeId, parseStrict, timeMs } from "@generalbusiness/artroom-bytes";
-import { valueDigest } from "@generalbusiness/artroom-derive";
-import { DESTINATION, DESTINATION_KINDS, REGISTER, destinationBranch, destinationWrite } from "@generalbusiness/artroom-platform";
+import type { Entry, FieldValue, ScopeId } from "@generalbusiness/artroom-contract";
+import { canonicalize, entryHash, isDigest, isFactRef, isOperationId, isScopeId, parseStrict, timeMs } from "@generalbusiness/artroom-bytes";
+import { isEntryOf, valueDigest } from "@generalbusiness/artroom-derive";
+import { DESTINATION, DESTINATION_KINDS, REGISTER, destinationBranch, destinationWrite, directoryIdOf } from "@generalbusiness/artroom-platform";
 import type { GitHubAccount, GitHubInstallationToken } from "@generalbusiness/artroom-git/github";
 import { CredentialStore } from "./credential-store.ts";
 import { DestinationHost, type DestinationBinding, type DestinationRepository } from "./destination-host.ts";
@@ -61,6 +61,25 @@ function cleanupTokens(raw: string | undefined): ReadonlyMap<string, Cleanup> | 
   return cleanup;
 }
 
+/** The creator is the actual directory derived by this verified register claim,
+ * not an independently founded directory that merely cites the same claim. */
+function destinationBirth(given: OutsideGiven, registerScope: ScopeId): boolean {
+  try {
+    const genesis = given.own(0)?.entry;
+    const branch = destinationBranch(given.state);
+    const claim = branch?.refs["claim"];
+    if (genesis?.input.type !== "genesis" || genesis.input.seed.creator?.kind !== "directory" || !same(branch?.refs["directory"], genesis.input.seed.creator) || !isFactRef(claim) || claim.at.kind !== "register" || claim.at.scope !== registerScope) return false;
+    const use = genesis.uses.find((use) => same(use.fact, claim));
+    const retained = use ? given.retained("entry", use.content) : null;
+    if (!retained) return false;
+    const opening = parseStrict(retained.bytes) as unknown as Entry;
+    if (!isEntryOf(opening, claim) || opening.input.type !== "act" || opening.input.signed.intent.kind !== "found") return false;
+    const seeds = opening.effects.filter((effect) => effect.effect === "value" && effect.item === claim.seq && effect.slot === "seed");
+    const seed = seeds.length === 1 && seeds[0]?.effect === "value" ? seeds[0].value : null;
+    return isDigest(seed) && directoryIdOf(seed) === genesis.input.seed.creator.scope;
+  } catch { return false; }
+}
+
 /**
  * A deterministic local handle backed by the scope's already sealed mint.
  * The explicit adapter-attempt choice does NOT identify a GitHub-issued token
@@ -110,13 +129,8 @@ export function gitHubOutside(given: OutsideGiven, sql: Pick<SqlStorage, "exec">
         return item?.values["host"] === host && item.values["namespace"] === namespace;
       }
       if (owner === DESTINATION && scope?.at.kind === "destination" && genesis?.seed.definition === DESTINATION) {
-        const branch = destinationBranch(given.state);
-        const repository = branch?.values["repository"] as Record<string, unknown> | undefined;
-        // The destination retains the original register claim, inherited in
-        // its directory's creation. Check that local fixed reference without
-        // scanning history or discovering another scope over the network.
-        const claim = branch?.refs["claim"];
-        return isFactRef(claim) && claim.at.kind === "register" && claim.at.scope === config.registerScope && repository?.["host"] === host && repository["namespace"] === namespace;
+        const repository = destinationBranch(given.state)?.values["repository"] as Record<string, unknown> | undefined;
+        return destinationBirth(given, config.registerScope) && repository?.["host"] === host && repository["namespace"] === namespace;
       }
       return false;
     };
