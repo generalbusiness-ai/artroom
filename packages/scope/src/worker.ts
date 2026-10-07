@@ -45,8 +45,11 @@
  * | `GET /v1/scopes/:scope/waiting/:list?cursor=` | One page of the list `diagnosed` or `unanswered` of the requests that wait, for the session of an admin. |
  *
  * A reader presents a read session in the `Authorization` header, as
- * `Session <token>`, set from memory. A reader that presents none is
- * answered `forbidden`. A request whose URL holds a credential, in its path
+ * `Session <token>`, set from memory. A reader with no session may present
+ * a signed read there instead, as `Signed <signed read>` (`signed-reads.ts`):
+ * the summary, the genesis and its own entries, of a scope where its key
+ * signed an entry within the authority window of an intent. A reader that
+ * presents neither is answered `forbidden`. A request whose URL holds a credential, in its path
  * or its query, is refused `credential-in-url` before anything else, and
  * the credential is not used (authority note, section 5.3).
  *

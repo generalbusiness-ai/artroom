@@ -158,7 +158,8 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
     this.#name = isScopeId(name) ? name : null;
     this.#store = store;
     this.#scope = new Scope(this.#name, store, ports, bounds);
-    this.#reads = new Reads(store, () => this.#scope.pinned(), ports.readers, wiring.reads ?? READ_BOUNDS, record);
+    // A signed read is judged on this scope's clock, within the authority window of an intent (`signed-reads.ts`).
+    this.#reads = new Reads(store, () => this.#scope.pinned(), ports.readers, wiring.reads ?? READ_BOUNDS, record, { clock: ports.clock, window: bounds.intentLifetimeSeconds });
     this.#deliveries = new Deliveries(this.#name, this.#scope, store, ports, bounds);
     this.#dispatcher = given.transport ? new Dispatcher(this.#scope, store, { transport: given.transport, clock: ports.clock, capabilities: ports.capabilities }, wakes, bounds) : null;
     this.#operations = new Operations(this.#scope, store, ports, wakes, bounds, (operation, attempt, seq) => { record.found("outcome-conflict", [{ operation, attempt }, { entry: seq }]); });

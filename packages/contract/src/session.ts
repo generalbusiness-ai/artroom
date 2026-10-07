@@ -9,10 +9,14 @@
  * them.
  */
 
-import type { Base64Url, KeyId, MemberId, ScopeRef, Timestamp } from "./scope.ts";
+import type { Base64Url, KeyId, MemberId, ScopeId, ScopeRef, Timestamp } from "./scope.ts";
 
-/** The tags of the bytes that a session's MAC and a session request's signature are over. Neither is a tag of `DOMAINS`, so neither is ever the bytes of an intent. */
-export const SESSION_DOMAINS = { token: "artroom-session-1", request: "artroom-session-request-1" } as const;
+/**
+ * The tags of the bytes that a session's MAC, a session request's signature
+ * and a signed read's signature are over. None is a tag of `DOMAINS`, so
+ * none is ever the bytes of an intent.
+ */
+export const SESSION_DOMAINS = { token: "artroom-session-1", request: "artroom-session-request-1", read: "artroom-read-1" } as const;
 
 /**
  * A device's request for a read session. It follows the one form of a
@@ -53,3 +57,29 @@ export type SessionRefusal = "sessions-unavailable" | "bad-request" | "not-found
 
 /** Membership's answer to a session request. It is an answer and no entry. `token` is the credential: it is kept in memory and presented in a header. */
 export type SessionAnswer = { ok: true; token: string; session: SessionClaims } | { ok: false; reason: SessionRefusal };
+
+/**
+ * A signed read: one read of one scope, signed by a device key, with no
+ * session (the planner's decisions 61cc5e50 and c6499e91). A scope answers
+ * it only to a key that signed an entry of that scope within the authority
+ * window of an intent, and only for the scope's summary, its genesis and
+ * the entries that key signed.
+ *
+ * - `to`: the scope ID of the scope that is read.
+ * - `actor`: the key that signs.
+ * - `read`: the read's name. `arg`: its argument: `"summary"` for the
+ *   summary; the cursor of `history` and `log`, `"0"` for the first page;
+ *   the position of an `entry`, in decimal.
+ * - `notAfter`: after the scope's clock reading, and at most the lifetime
+ *   of an intent ahead of it, as for an intent.
+ *
+ * Exactly these members. The signature is by `actor`, with the signing of
+ * an intent (Ed25519), over the tag `artroom-read-1`, one newline byte and
+ * the canonical JSON of the request. A reader presents it in the
+ * `Authorization` header as `Signed ` and the unpadded base64url of the
+ * canonical JSON of the signed read.
+ */
+export interface ReadRequest { v: 1; to: ScopeId; actor: KeyId; read: SignedReadName; arg: string; notAfter: Timestamp }
+export interface SignedRead { request: ReadRequest; sig: Base64Url }
+/** The reads that a signed read may name. */
+export type SignedReadName = "summary" | "history" | "entry" | "log";

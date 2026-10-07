@@ -5,10 +5,12 @@
  * request, as every signature's bytes are built (`domains.ts`). The tag is
  * no tag of an intent, so a signed session request is never a signed
  * intent, and a signed intent is never a session request.
+ *
+ * A signed read is built the same way under its own tag, `artroom-read-1`.
  */
 
 import { SESSION_DOMAINS } from "@generalbusiness/artroom-contract";
-import type { SessionRequest, SignedSessionRequest } from "@generalbusiness/artroom-contract";
+import type { ReadRequest, SessionRequest, SignedRead, SignedSessionRequest } from "@generalbusiness/artroom-contract";
 import { canonicalBytes, utf8 } from "./canonical.ts";
 import { sign, verify } from "./sign.ts";
 
@@ -32,6 +34,22 @@ export function signSessionRequest(request: SessionRequest, secret: Uint8Array):
 export function verifySessionRequest(signed: SignedSessionRequest): boolean {
   try {
     return verify(signed.request.actor, signed.sig, requestBytes(signed.request));
+  } catch {
+    return false;
+  }
+}
+
+const readBytes = (request: ReadRequest): Uint8Array => taggedBytes(SESSION_DOMAINS.read, canonicalBytes(request));
+
+/** Sign a read request with the device's own key. */
+export function signRead(request: ReadRequest, secret: Uint8Array): SignedRead {
+  return { request, sig: sign(secret, readBytes(request)) };
+}
+
+/** True when the signature is by the request's `actor` over the request's bytes. Malformed input is false. Never throws. */
+export function verifySignedRead(signed: SignedRead): boolean {
+  try {
+    return verify(signed.request.actor, signed.sig, readBytes(signed.request));
   } catch {
     return false;
   }

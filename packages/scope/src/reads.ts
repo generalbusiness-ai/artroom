@@ -8,8 +8,11 @@
  * A read is one synchronous pass over storage, so it sees one head.
  *
  * Who may read is the readers port's to say, and in production that is a
- * read session (authority note, section 3.9; `sessions.ts`). A reader that
- * presents no session is answered `forbidden` by every read here.
+ * read session (authority note, section 3.9; `sessions.ts`). Beside it, a
+ * reader may present a signed read (`signed-reads.ts`): the summary, the
+ * genesis and the entries of a key that signed an entry of this scope
+ * within the authority window of an intent. A reader that presents
+ * neither is answered `forbidden` by every read here.
  *
  * Three reads are of what is no history (authority note, section 12, G13
  * and G17): `incidents`, a page of the operator's record of this scope; and
@@ -21,12 +24,13 @@
  */
 
 import { ENTRY_READ_BYTES, HISTORY_PAGE_BYTES, HISTORY_PAGE_ENTRIES, OUTBOX_PAGE_DUTIES, RETAINED_INPUT_BYTES, RETAINED_ITEMS_PAGE } from "@generalbusiness/artroom-contract";
-import type { Cursor, Digest, DutyId, Entry, LogPage, OperationId, Read, ReadRefusal, RetainedInput, Summary } from "@generalbusiness/artroom-contract";
+import type { Cursor, Digest, DutyId, Entry, KeyId, LogPage, OperationId, Read, ReadRefusal, RetainedInput, SignedReadName, Summary } from "@generalbusiness/artroom-contract";
 import { isDutyId, isOperationId, positionOf } from "@generalbusiness/artroom-bytes";
 import { byteOrder, own, type Item, type ScopeState, type ValidDefinition } from "@generalbusiness/artroom-derive";
 import type { Pinned } from "./core.ts";
 import { waitingIn, type Incident, type OperatorRecord } from "./operator.ts";
 import type { ReadName, Readers } from "./ports.ts";
+import { checkSignedRead, presentsSignedRead, signerOf, type SignedReading } from "./signed-reads.ts";
 import type { Duty, OperationStatus, Sealed, Store, Stored } from "./store.ts";
 
 /** The kinds of retained input that the read route serves by digest. `value` is read by domain as well. */
@@ -58,14 +62,19 @@ export class Reads {
   readonly #readers: Readers;
   readonly #bounds: ReadBounds;
   readonly #record: OperatorRecord | null;
+  readonly #signed: SignedReading | null;
 
-  /** `record`: the operator's record of this scope. Null: it keeps none, and the read of it finds nothing. */
-  constructor(store: Store, pinned: () => Pinned | null, readers: Readers, bounds: ReadBounds = READ_BOUNDS, record: OperatorRecord | null = null) {
+  /**
+   * `record`: the operator's record of this scope. Null: it keeps none, and the read of it finds nothing.
+   * `signed`: the clock and the window that a signed read is judged by. Null: this scope answers no signed read.
+   */
+  constructor(store: Store, pinned: () => Pinned | null, readers: Readers, bounds: ReadBounds = READ_BOUNDS, record: OperatorRecord | null = null, signed: SignedReading | null = null) {
     this.#store = store;
     this.#pinned = pinned;
     this.#readers = readers;
     this.#bounds = bounds;
     this.#record = record;
+    this.#signed = signed;
   }
 
   /**
@@ -74,23 +83,42 @@ export class Reads {
    * that could not be judged is answered with the port's own name for that:
    * `sessions-unavailable` or `clock-behind`. Nothing is read in any case.
    */
-  #open(reader: unknown, read: ReadName): { scope: ScopeState; pinned: Pinned } | { ok: false; reason: ReadRefusal } {
-    const allowed = this.#readers.allows(reader, read);
-    if (allowed !== true) return no(allowed === false ? "forbidden" : allowed);
+  /**
+   * A reader that presents a signed read is judged by that alone, and never
+   * by the readers port: only the reads of `SIGNED_READS`, with `arg` as
+   * the argument that the request must name. `signer`: the key of a signed
+   * read, whose reads of entries are limited to the genesis and its own.
+   * Null: a session or the readers port allowed the read whole.
+   */
+  #open(reader: unknown, read: ReadName, arg?: string): { scope: ScopeState; pinned: Pinned; signer: KeyId | null } | { ok: false; reason: ReadRefusal } {
+    let signer: KeyId | null = null;
+    if (presentsSignedRead(reader)) {
+      if (!this.#signed || arg === undefined) return no("forbidden");
+      const checked = checkSignedRead(this.#signed, this.#store, reader as string, read as SignedReadName, arg);
+      if (!("key" in checked)) return no(checked.refused === false ? "forbidden" : checked.refused);
+      signer = checked.key;
+    } else {
+      const allowed = this.#readers.allows(reader, read);
+      if (allowed !== true) return no(allowed === false ? "forbidden" : allowed);
+    }
     const scope = this.#store.scope();
     const pinned = this.#pinned();
-    return scope && pinned ? { scope, pinned } : no("not-found");
+    return scope && pinned ? { scope, pinned, signer } : no("not-found");
+  }
+  /** Whether the reader that `signer` names may have this stored entry: every reader but a signed one; a signed one, the genesis and its own. */
+  #mine(signer: KeyId | null, row: Stored): boolean {
+    return signer === null || row.seq === 0 || signerOf(JSON.parse(row.bytes) as Entry, this.#store) === signer;
   }
   /** For a read that needs the definition: its item types and their states. */
-  #defined(reader: unknown, read: ReadName): { scope: ScopeState; pinned: Pinned; definition: ValidDefinition } | { ok: false; reason: ReadRefusal } {
-    const open = this.#open(reader, read);
+  #defined(reader: unknown, read: ReadName, arg?: string): { scope: ScopeState; pinned: Pinned; definition: ValidDefinition } | { ok: false; reason: ReadRefusal } {
+    const open = this.#open(reader, read, arg);
     if (!("scope" in open)) return open;
     return open.pinned.definition ? { ...open, definition: open.pinned.definition } : no("unsupported-definition");
   }
 
   /** One response. Each type's `max` bounds its live items, and the definition bounds the counts. */
   summary(reader: unknown): Read<Summary> {
-    const open = this.#defined(reader, "summary");
+    const open = this.#defined(reader, "summary", "summary");
     if (!("scope" in open)) return open;
     const { scope, pinned, definition } = open;
     const items: Item[] = [];
@@ -134,12 +162,12 @@ export class Reads {
 
   /** A page of the history from the entry the cursor names, or from the genesis: at most the bound's entries and bytes, and at least one entry. */
   history(reader: unknown, cursor?: Cursor): Read<readonly Sealed[]> {
-    const open = this.#open(reader, "history");
+    const open = this.#open(reader, "history", cursor ?? "0");
     if (!("scope" in open)) return open;
     const from = position(cursor, 0);
     if (from === undefined || from === null) return no("not-found");
     const { rows, more } = this.#page(from);
-    return { ok: true, at: open.scope.head, value: rows.map((row) => ({ entry: JSON.parse(row.bytes) as Entry, hash: row.hash })), complete: !more, ...(more ? { next: String(from + rows.length) } : {}) };
+    return { ok: true, at: open.scope.head, value: rows.filter((row) => this.#mine(open.signer, row)).map((row) => ({ entry: JSON.parse(row.bytes) as Entry, hash: row.hash })), complete: !more, ...(more ? { next: String(from + rows.length) } : {}) };
   }
 
   /**
@@ -149,12 +177,12 @@ export class Reads {
    * history page.
    */
   log(reader: unknown, cursor?: Cursor): Read<LogPage> {
-    const open = this.#open(reader, "log");
+    const open = this.#open(reader, "log", cursor ?? "0");
     if (!("scope" in open)) return open;
     const from = position(cursor, 0);
     if (from === undefined || from === null) return no("not-found");
     const { rows, more } = this.#page(from);
-    const value: LogPage = { scope: open.scope.at, definition: open.pinned.named, entries: rows.map((row) => ({ seq: row.seq, hash: row.hash, bytes: row.bytes })) };
+    const value: LogPage = { scope: open.scope.at, definition: open.pinned.named, entries: rows.filter((row) => this.#mine(open.signer, row)).map((row) => ({ seq: row.seq, hash: row.hash, bytes: row.bytes })) };
     return { ok: true, at: open.scope.head, value, complete: !more, ...(more ? { next: String(from + rows.length) } : {}) };
   }
 
@@ -178,10 +206,11 @@ export class Reads {
 
   /** One entry by `seq`. */
   entry(reader: unknown, seq: number): Read<Sealed> {
-    const open = this.#open(reader, "entry");
+    const open = this.#open(reader, "entry", String(seq));
     if (!("scope" in open)) return open;
     const row = Number.isSafeInteger(seq) ? this.#store.stored(seq) : null;
     if (!row) return no("not-found");
+    if (!this.#mine(open.signer, row)) return no("forbidden");
     if (row.size > this.#bounds.entryBytes) return no("too-large");
     return { ok: true, at: open.scope.head, value: { entry: JSON.parse(row.bytes) as Entry, hash: row.hash }, complete: true };
   }

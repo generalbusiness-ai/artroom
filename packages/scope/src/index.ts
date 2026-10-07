@@ -13,5 +13,6 @@ export * from "./authority.ts";
 export * from "./definitions.ts";
 export * from "./diag.ts";
 export * from "./sessions.ts";
+export * from "./signed-reads.ts";
 export * from "./limits.ts";
 export * from "./operator.ts";
