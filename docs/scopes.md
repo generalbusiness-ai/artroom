@@ -60,10 +60,12 @@ the founding witness is a stand-in. A scope Worker is deployed at
 and its root URL returns 404. The destination now
 carries every rule needed to answer its creation; a missing rule is still
 refused for the whole pinned
-version. A configured GitHub adapter is authored; the live repository
-founding, publication, clone and authenticated replay still require
-evidence. The deployed URL alone does not close that work or the remaining
-I3 work.
+version. The initial GitHub adapter checkpoint owed a live run; later
+component records observe real founding publications and clones on GitHub
+and the hosting service. Those observations are bound to their recorded
+source versions. Complete authenticated replay and the combined source's
+live verification remain owed. A responding URL alone closes neither that
+work nor the remaining I3 work.
 
 ## Identity and incarnation
 

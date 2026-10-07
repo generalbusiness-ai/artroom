@@ -238,7 +238,7 @@ The digests at this head:
 | Definition | Digest |
 |---|---|
 | `issue` | `sha256:325cb4f33da9deb1a31d85ba0f1456068d4d9d08009978b779aed70cb08e00ad` |
-| `change` | `sha256:4ff0c7f681c664a3c2dae22bd0df4a9a1bb239e19bc185db41f7f140d4dfca45` |
+| `change` | `sha256:e182f6fb8ebc0525214e6fd9139c6c5e405d9bab2885d7202cd66602f8155a07` |
 
 A digest is `definitionDigest` of the bytes package: SHA-256 over the tag
 `artroom-definition-1`, a newline and the canonical JSON of the whole

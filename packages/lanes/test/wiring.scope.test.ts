@@ -18,7 +18,7 @@ import { Platform, copied, merged, oid, paul, proposed, publicationOf, reported,
 // | The Git host | A STAND-IN. The destination's: `OutsideDouble`, answering each recorded attempt from the actual SQLite records (`Room.drive`). A lane's: `Host` of `graph.ts`, answering the attempts that the code of `hold@1` opens. No repository exists. |
 // | The changed set of a publication | SCRIPTED: `Room.changes`, the paths that the host's judge read answers with. The destination classifies them against the extents that it observes in the real rules scope. |
 // | The commits | Named by the test. The judge read answers with the manifest's own tree and base, and with each selected report's commit as an ancestor. |
-// | Runner | None. The rules here require no check. |
+// | Runner | None. W5 requires a check with a test-signed answer; the other scenarios require no check. No command or image runs. |
 
 type Issue = Node<typeof issue>;
 
