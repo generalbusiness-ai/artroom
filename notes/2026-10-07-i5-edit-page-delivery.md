@@ -137,7 +137,39 @@ platform data of the destination changed (section 5) **[inferred]**.
 
 ## 4. Gate
 
-See the end of this note, written after the run.
+The command, at the root, with a clean checkout: `npm run gate`. Machine: a
+cloud container with 4 CPUs; load average 0.49 before and 1.38 after;
+installation skipped against the unchanged lockfile; earlier focused runs
+had warmed the caches **[run]**.
+
+The final run, at head `1920e052c3ea66589b571ed2b986a222bf2b7c35`, tree
+`4f5f6c0a03ac5ea75443e60edef90a1d37945f85`, **failed on one test that this
+branch does not touch**, T36 of `packages/checkers/test/runner.test.ts`, as
+the brief foresaw for this container's Git **[run]**:
+
+| Step | Exit | Elapsed seconds | CPU seconds |
+|---|---|---:|---:|
+| Install | skipped | | |
+| Whitespace | 0 | 0.0 | 0.0 |
+| Typecheck | 0 | 10.9 | 34.8 |
+| Tests (test runner) | 1 | 105.2 | 144.5 |
+
+The test runner: 112 files, 799 tests, 798 passed, 1 failed (T36); its own
+duration 102.77 seconds; the step's 126.03 user and 18.46 system CPU
+seconds **[run]**. Because the test runner failed, the gate did not run its
+last script; run alone, `node --test scripts/active-source.test.mjs` gives
+6 tests, 6 passed **[run]**.
+
+Two earlier runs failed on this branch, and are why the last commits
+exist: at `fa4aa0f`, the same T36 and, run alone, the layering script
+(2 of 6 failed: a command-line test named the lanes package, and named the
+git package); at `7974d8f`, the whitespace step (a blank line at the end
+of `packages/scope/test/hosts.ts`) **[run]**.
+
+This section was written after the final run and changes only this note:
+the gated tree is `4f5f6c0a03ac5ea75443e60edef90a1d37945f85`, and the tree
+with the note's figures is named in the summary of the commit that adds
+them.
 
 ## 5. What is owed
 
