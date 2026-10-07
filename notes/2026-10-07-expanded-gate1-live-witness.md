@@ -88,6 +88,51 @@ is empty. No content-change or native lane publication is claimed.
 This operator token is a labelled stand-in for the separately commissioned
 room read-token/CLI clone flow; no fresh-person signoff is claimed.
 
+## Direct publication, cleanup and deployed-settings evidence
+
+The deployment listing records initial source upload `a9419198` at
+16:18:10.914 UTC, session-secret successor
+`ae1710fa-c9e6-4f58-a1e1-888699c19461` at 16:18:58.323, and hosting-config
+successor `8694dade-1530-4d49-a80a-bfab114b3e08` at 16:20:10.440.
+The final configured version served the claim and subsequent authenticated
+reads. These settings successors preserve the uploaded executable source;
+no assertion that the initial upload UUID remained the active version is made.
+
+Builder read authenticated register and destination history at 16:38:08.171
+UTC and retained their sealed entries, without credential plaintext.
+Register entry 2 at 16:20:57.353 confirms creation of the exact repository
+name above on attempt 1; entry 3 confirms the directory result and active
+claim. Register entry 2 contains no creation-token handle and no separate
+cleanup outcome. The adapter's own create method revokes its short-lived
+creation token before returning confirmation; that cleanup is a source and
+own-answer boundary, not an independently queried provider revocation log.
+
+Destination operations are all attempt 1:
+
+| Entry | Recorded time (UTC) | Result |
+| --- | --- | --- |
+| 2 | 16:21:00.685 | Mint confirmed, reported expiry 16:36:00.780; only adapter handle recorded |
+| 3 | 16:21:01.989 | First-head confirmed, seen `deb39648e7622493c5e7b80d0213cd443531cdd4`; branch ready, receipt owed |
+| 4 | 16:21:02.120 | First-head token revoke confirmed |
+| 5 | 16:21:02.127 | Receipt token mint confirmed, reported expiry 16:36:02.306 |
+| 6 | 16:21:03.028 | Receipt confirmed, seen `1d152241020c73adc3fbd8b6166674ff0a76001f`; receipt written |
+| 7 | 16:21:03.174 | Receipt token revoke confirmed |
+
+These entries are accepted outside-system answers recorded by the service;
+replay does not separately verify the provider's revocation side effect.
+Their hashes match the stated replay coverage, including destination entry 7
+`sha256:9a7ce831befbc5d482edf62bccee8fffef9cd7e3bcdfbfcb2fa0e592453e0deb`.
+
+A second operator-token clone retained actual Git stdout/stderr, followed by
+`git ls-remote` on the same authenticated remote. Both exited 0. Issuance and
+clone took 2.459 seconds; the new reported read-token expiry was
+16:40:35.713 UTC, again requested TTL 120 seconds. Git advertised the exact
+founding head plus receipt commit `1d152241020c73adc3fbd8b6166674ff0a76001f`
+at `refs/artroom/receipts/1115b8fa894fc51c75edadc137d687be0e2f213d5f8f9ef004c14b526c74ac56`.
+The first clone's metadata is preserved above; this second observation adds
+raw command output and receipt-ref corroboration. Neither clone is the
+later room-issued CLI credential flow.
+
 ## Evidence index
 
 These logs contain command outcomes and replay reports. They exclude token
@@ -107,6 +152,10 @@ values and private key material. Clone JSON contains safe result metadata only.
 | `/tmp/artroom-expanded-review-verify-destination.log` | 2612 | `be32cd3056944166be8f89e78830252dcf790447a4669edca1b4cf8decf296b3` |
 | `/tmp/artroom-expanded-review-verify-inbox.log` | 2358 | `2ca725ed6fc2e59c527a49010566e5285625f8e6c5b209cb363ab62219458ecc` |
 | `/tmp/artroom-expanded-review-clone.json` | 902 | `aba73fd6f6ab034174fdbef11e826b07782972159028c2eaf24505c074c9f4b0` |
+
+| `/tmp/artroom-expanded-review-deployments.log` | 1057 | `3699c0a6bc48472de7409ddf2a282470a88cc352ee09ed4a4856d93712fa6c90` |
+| `/tmp/artroom-expanded-review-live-entries.json` | 37666 | `354c98f6552407a33cb6f25993739ea6ae451808aaed3e467f6a9b1f2af2a16b` |
+| `/tmp/artroom-expanded-review-clone-raw.json` | 1363 | `4a0381944adaa84af3c8de1c14eaac5d7da8b4fa912451db7cf602134d28a188` |
 
 This witness is producer evidence for exact independent source/evidence review.
 It grants no source approval, request closure, receipt or main landing.

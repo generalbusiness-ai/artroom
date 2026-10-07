@@ -259,6 +259,17 @@ name the exact implementation request, receipt consequences, final head and
 source trees, and cover the full later delta above. This packet closes no
 commission and grants no approval.
 
+## Exact live evidence supplement
+
+The final live witness now retains sealed R/G histories, actual first-head
+and receipt outcomes, both destination token revocations, the hosting
+settings successor version, and raw operator-clone/ls-remote output showing
+the receipt ref. Creation-token cleanup remains a source/own-answer boundary
+without a separate register cleanup entry or provider revocation log. No
+credential plaintext is included. These notes-only additions preserve the
+gated packages and scripts trees; prior live observations retain their
+source and trust qualifications.
+
 ## Final documentation reconciliation
 
 Builder corrected current `docs/cli.md` claim guidance to match the gated
