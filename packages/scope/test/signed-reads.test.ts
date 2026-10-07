@@ -1,25 +1,54 @@
 import { describe, expect, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { Intent, ReadRequest, ScopeId, Sealed, SignedReadName } from "@generalbusiness/artroom-contract";
-import { b64url, canonicalBytes, intentDigest, scopeIdOf, signIntent, signRead } from "@generalbusiness/artroom-bytes";
+import type { Entry, FactRef, Intent, OperationId, ReadRequest, ScopeId, ScopeRef, Sealed, Seed, SignedReadName } from "@generalbusiness/artroom-contract";
+import { b64url, canonicalBytes, entryHash, intentDigest, scopeIdOf, seedDigest, signIntent, signRead } from "@generalbusiness/artroom-bytes";
 import { secretSigner, signedLogReader, signedReader } from "@generalbusiness/artroom-client";
-import { keys, type Actor } from "@generalbusiness/artroom-derive/testing";
-import { REGISTER, platform } from "@generalbusiness/artroom-platform";
+import { timeMs, timeOf, useOf } from "@generalbusiness/artroom-derive";
+import { d, keys, otherLane, t, type Actor } from "@generalbusiness/artroom-derive/testing";
+import { DIRECTORY, REGISTER, platform, repositoryName } from "@generalbusiness/artroom-platform";
 import { httpSource, verify } from "@generalbusiness/artroom-replay";
+import { CHAIN_STEPS, rootOf } from "../src/signed-reads.ts";
 import { net } from "../src/testing.ts";
 import { soon } from "./net.ts";
-import { Platform, rita, routed } from "./repository.ts";
+import { outsideOf, wired } from "./outside.ts";
+import { Platform, rita, routed, settle } from "./repository.ts";
 import { platformNet } from "./worker.ts";
 
 const { paul, vic } = keys;
 const SERVICE = "https://scopes.test";
 
 /** A register that `who` founds by an `install` that names rita a founder, as an operator's key would. */
-async function installed(who: Actor): Promise<Platform> {
+async function installed(who: Actor, before?: (name: ScopeId) => void): Promise<Platform> {
   const install: Intent = { v: 1, to: null, actor: who.key, kind: "install", on: null, expected: {}, fields: { host: "git.example", namespace: "artroom", policy: "keys", founders: [rita.key] }, idempotencyKey: crypto.randomUUID(), notAfter: soon(60) };
   const R = new Platform(scopeIdOf({ v: 1, kind: "register", definition: REGISTER, creator: null, cause: intentDigest(install), ordinal: 0 }));
+  before?.(R.name);
   expect(await R.stub.found(signIntent(install, who.secret), REGISTER)).toMatchObject({ answer: "accepted" });
   return R;
+}
+
+/**
+ * A register that paul installs, naming rita a founder, and rita's claim, with the repository creation answered by a STAND-IN Git
+ * host (`outside.ts`): the reply to attempt 1 is lost, and attempt 2, made `delay` seconds after the claim, is confirmed. The
+ * directory is created then, and its genesis creates membership, the rules scope and the destination, which are confirmed.
+ */
+async function founded(delay: number): Promise<{ R: Platform; D: Platform; children: Platform[] }> {
+  const R = await installed(paul, (name) => wired.set(name, () => ({ outside: outsideOf(name) })));
+  const found = await R.intent(rita, "found", { expected: await R.expected({ register: 0 }), fields: { branch: "main", founderHandle: "@rita", recoveryKey: keys.sam.key } });
+  const seed: Seed = { v: 1, kind: "directory", definition: DIRECTORY, creator: await R.at(), cause: intentDigest(found.intent), ordinal: 0 };
+  const D = new Platform(scopeIdOf(seed));
+  const host = outsideOf(R.name);
+  host.answer("1:0" as OperationId, 1, null);
+  host.answer("1:0" as OperationId, 2, { result: "confirmed", evidence: { basis: "own-answer", body: { name: repositoryName(seedDigest(seed), 2), id: "repo-1" } } });
+  expect(await R.stub.submit(found, [])).toMatchObject({ answer: "accepted" });
+  const driven = async () => { while ((await (R.stub as unknown as { effect(): Promise<number> }).effect()) > 0) { /* each pass may make the next one due */ } };
+  await driven();
+  net.clock.now = soon(delay);
+  await driven();
+  await settle(R, D);
+  const sends = (await D.entries())[0]!.sends;
+  const children = [1, 2, 3].map((n) => new Platform(scopeIdOf(sends.find((send) => send.n === n)!.to as Seed)));
+  await settle(R, D, ...children);
+  return { R, D, children };
 }
 
 /** One read over the Worker's routes, with the real read sessions as deployed under a TEST SECRET: a reader with no session and no signed read reads nothing. */
@@ -43,7 +72,7 @@ const seqs = (body: { value?: unknown }) => (body.value as readonly Sealed[]).ma
 // and only its summary, its genesis and that key's own entries. Every other read, scope, key and time is `forbidden`.
 // Each scope here is a real register in the namespace `PLATFORM`, under the deployed class's readers: the real read sessions,
 // under a TEST SECRET. No Git host is wired: the claim's creation is recorded and nothing is sent.
-describe("signed reads on real registers (the planner's decisions 61cc5e50 and c6499e91)", () => {
+describe("signed reads on real registers (the planner's decisions 61cc5e50, c6499e91 and 70a0680e)", () => {
   test("the install's key reads the register's summary, genesis and own entries with no session; a founder's claim key reads its own; every other read, another scope and a key that signed nothing are forbidden", async () => {
     net.hold = net.deaf = null;
     const R = await installed(paul);
@@ -110,5 +139,63 @@ describe("signed reads on real registers (the planner's decisions 61cc5e50 and c
     // Six minutes later the install is older than the window, and the claim is not: paul is refused, and rita reads.
     net.clock.now = soon(360);
     expect([(await get(R.name, await signed(paul, R.name, "summary", "summary"))).status, (await get(R.name, await signed(rita, R.name, "summary", "summary"))).status]).toEqual([403, 200]);
+  });
+
+  test("the claim's key reads the summary and genesis of the directory the claim caused, and of membership, the rules scope and the destination that the directory caused, with no session; the install's key, which signed no claim, reads none of them", async () => {
+    net.hold = net.deaf = null;
+    const { D, children } = await founded(PROPOSED_BOUNDS.dispatchRetrySeconds);
+    const [M, Ru, G] = children as [Platform, Platform, Platform];
+    expect(await Promise.all(children.map(async (node) => (await node.summary()).value.scope.kind))).toEqual(["membership", "rules", "destination"]);
+    // For each of the four scopes: the summary, the genesis, and a history that holds the genesis only.
+    const reads = async (who: Actor, node: Platform) => {
+      const history = await get(`${node.name}/history`, await signed(who, node.name, "history", "0"));
+      return [(await get(node.name, await signed(who, node.name, "summary", "summary"))).status, (await get(`${node.name}/entries/0`, await signed(who, node.name, "entry", "0"))).status, history.status, history.status === 200 ? seqs(history.body) : null];
+    };
+    expect(await Promise.all([D, M, Ru, G].map((node) => reads(rita, node)))).toEqual([D, M, Ru, G].map(() => [200, 200, 200, [0]]));
+    // Control: the same reads with no header, and by the install's key, are forbidden.
+    expect(await Promise.all([D, M, Ru, G].map(async (node) => [(await get(node.name)).status, ...(await reads(paul, node))]))).toEqual([D, M, Ru, G].map(() => [403, 403, 403, 403, null]));
+    // The root's key reads the summary and the genesis only: an entry after the genesis, which it did not sign, is forbidden.
+    expect([(await get(`${D.name}/entries/1`, await signed(rita, D.name, "entry", "1"))).status, (await get(`${M.name}/entries/1`, await signed(rita, M.name, "entry", "1"))).status]).toEqual([403, 403]);
+  });
+
+  test("the window of a read by the cause chain is measured at the root entry: the claim, not the genesis that the claim caused", async () => {
+    net.hold = net.deaf = null;
+    const claimed = net.clock.now;
+    // The directory and its children are created ten minutes after the claim.
+    const { D, children } = await founded(600);
+    const M = children[0]!;
+    const at = (seconds: number) => { net.clock.now = timeOf(timeMs(claimed)! + seconds * 1000); };
+    const both = async () => [(await get(D.name, await signed(rita, D.name, "summary", "summary"))).status, (await get(M.name, await signed(rita, M.name, "summary", "summary"))).status];
+    // Fourteen minutes after the claim, it is within the window: rita reads both.
+    at(840);
+    expect(await both()).toEqual([200, 200]);
+    // Sixteen minutes after the claim, it is older than the window, and the geneses are six minutes old: both are forbidden.
+    at(960);
+    expect(await both()).toEqual([403, 403]);
+  });
+
+  // Made by hand: a chain of geneses, each the creation of the one before, from rita's act. No scope judged them. It shows the bound of
+  // `rootOf`, which no real chain reaches: the longest of the platform's is two causes, from membership to the claim.
+  test("a cause chain is followed through at most four causes: a genesis four creations from the signed act has its root, one five creations away has none, an entry that cannot be read is unavailable, and a cause that names no source has no root", async () => {
+    const act: Entry = { v: 1, at: otherLane, seq: 1, prev: d("0"), time: t(0), clamped: false, epoch: 0, input: { type: "act", signed: signIntent({ v: 1, to: otherLane.scope, actor: rita.key, kind: "split", on: null, expected: {}, fields: {}, idempotencyKey: "split", notAfter: t(60) }, rita.secret), authority: [], presented: {} }, uses: [], prepared: [], effects: [], sends: [] };
+    const fact = (entry: Entry): FactRef => ({ at: entry.at, seq: entry.seq, hash: entryHash(entry) });
+    const kept = new Map<string, Entry>([[useOf(fact(act), act).content, act]]);
+    const chain: Entry[] = [];
+    let source = act;
+    for (let n = 1; n <= CHAIN_STEPS + 1; n++) {
+      const seed: Seed = { v: 1, kind: "lane", definition: d("e"), creator: source.at, cause: source.input.type === "genesis" ? seedDigest(source.input.seed) : intentDigest((source.input as { signed: { intent: Intent } }).signed.intent), ordinal: 0 };
+      const at: ScopeRef = { ...otherLane, scope: scopeIdOf(seed) };
+      const genesis: Entry = { v: 1, at, seq: 0, prev: null, time: t(n), clamped: false, epoch: 0, input: { type: "genesis", seed, inc: otherLane.inc, kind: "open", founding: null, source: fact(source), n: 0, message: { class: "request", type: "create", body: {} }, decision: "applied" }, uses: [useOf(fact(source), source)], prepared: [], effects: [], sends: [] };
+      kept.set(useOf(fact(genesis), genesis).content, genesis);
+      chain.push(genesis);
+      source = genesis;
+    }
+    const read = async (use: { content: string }) => kept.get(use.content) ?? null;
+    const root = { actor: rita.key, time: t(0) };
+    expect([await rootOf(chain[0]!, read), await rootOf(chain[CHAIN_STEPS - 1]!, read), await rootOf(chain[CHAIN_STEPS]!, read)]).toEqual([root, root, null]);
+    // Control: the same chain under a bound one longer has its root. An entry of the chain that cannot be read now; and a genesis whose
+    // source is a genesis that its seed's cause does not name.
+    const stray: Entry = { ...chain[1]!, input: { ...(chain[1]!.input as Extract<Entry["input"], { type: "genesis" }>), seed: { ...(chain[1]!.input as Extract<Entry["input"], { type: "genesis" }>).seed, cause: d("c") } } };
+    expect([await rootOf(chain[CHAIN_STEPS]!, read, CHAIN_STEPS + 1), await rootOf(chain[1]!, async (use) => (use.content === useOf(fact(act), act).content ? null : read(use))), await rootOf(stray, read)]).toEqual([root, "unavailable", null]);
   });
 });

@@ -10,9 +10,10 @@
  * Who may read is the readers port's to say, and in production that is a
  * read session (authority note, section 3.9; `sessions.ts`). Beside it, a
  * reader may present a signed read (`signed-reads.ts`): the summary, the
- * genesis and the entries of a key that signed an entry of this scope
- * within the authority window of an intent. A reader that presents
- * neither is answered `forbidden` by every read here.
+ * genesis and the entries of a key that signed an entry of this scope, or
+ * the root of its genesis's cause chain, within the authority window of an
+ * intent. A reader that presents neither is answered `forbidden` by every
+ * read here.
  *
  * Three reads are of what is no history (authority note, section 12, G13
  * and G17): `incidents`, a page of the operator's record of this scope; and
@@ -108,7 +109,7 @@ export class Reads {
   }
   /** Whether the reader that `signer` names may have this stored entry: every reader but a signed one; a signed one, the genesis and its own. */
   #mine(signer: KeyId | null, row: Stored): boolean {
-    return signer === null || row.seq === 0 || signerOf(JSON.parse(row.bytes) as Entry, this.#store) === signer;
+    return signer === null || row.seq === 0 || signerOf(JSON.parse(row.bytes) as Entry) === signer;
   }
   /** For a read that needs the definition: its item types and their states. */
   #defined(reader: unknown, read: ReadName, arg?: string): { scope: ScopeState; pinned: Pinned; definition: ValidDefinition } | { ok: false; reason: ReadRefusal } {

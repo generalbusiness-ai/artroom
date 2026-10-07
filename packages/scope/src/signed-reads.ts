@@ -1,11 +1,12 @@
 /**
  * Signed reads: the second way a reader may read a scope, beside a read
- * session (the planner's decisions 61cc5e50 and c6499e91). It is for a key
- * that has no session yet: the operator key that signed `install` reads
- * the register, and the key that signed a claim's `found` reads the
- * register's summary and, once the directory exists, the directory's
- * genesis and summary, from which it learns membership's ID and asks there
- * for a session.
+ * session (the planner's decisions 61cc5e50, c6499e91 and 70a0680e). It is
+ * for a key that has no session yet: the operator key that signed
+ * `install` reads the register, and the key that signed a claim's `found`
+ * reads the register's summary, then the directory that the claim caused
+ * and the membership, rules scope and destination that the directory's
+ * genesis caused, from which it learns membership's ID and asks there for
+ * a session.
  *
  * **The request.** The forms are the contract package's `session.ts`:
  * `ReadRequest` and `SignedRead`. A reader presents one in the
@@ -27,14 +28,38 @@
  *    than an intent may live (`intentLifetimeSeconds`): the authority
  *    window of an intent.
  * 6. The key signed no entry of this scope whose time is within that
- *    window of the reading.
+ *    window of the reading, and it did not sign the root of this scope's
+ *    cause chain within that window of the reading.
  *
  * **Who signed an entry.** The actor of the signed intent of an `act` or
- * a `preparation`. For a genesis that took effect: the actor of the
- * founding intent it holds, as a register's does; or, for a child, the
- * actor of the intent whose digest is the seed's cause, in an entry that
- * the genesis retains, as a directory's genesis retains the claim's entry.
- * No other entry has a signer.
+ * a `preparation`, and, for a genesis that took effect with a founding
+ * intent, as a register's does, the actor of that intent. No other entry
+ * has a signer.
+ *
+ * **The cause chain** (decision 70a0680e), in `rootOf`. A child's genesis
+ * names its creator's entry as its source and retains it, and its seed's
+ * cause names what asked for it (scope contract, section 7.2). The chain
+ * is followed from the genesis of the scope that is read, one cause at a
+ * time:
+ *
+ * - the cause is an act's intent: the source entry, or, when the source is
+ *   an outcome, the act that opened its operation, which the genesis
+ *   retains (a directory's genesis retains the claim's entry). That act is
+ *   the root, and its actor and time are the root's;
+ * - the cause is the source's own seed: the source is its creator's
+ *   genesis, and the chain goes on from there (membership, the rules scope
+ *   and the destination are caused by the directory's genesis);
+ * - a genesis with a founding intent is a root, with its actor;
+ * - any other cause, as a delivery's, ends the chain with no root.
+ *
+ * Each cause followed is one step, and at most `CHAIN_STEPS` are followed:
+ * a chain that needs more has no root. Each entry of the chain is read
+ * from this scope's retained entries, or else from its own scope through
+ * the resolver port, and is the entry that the fact names, by its hash.
+ * The root is fixed by the history, so a scope finds it once, before a
+ * signed read, and keeps it. The window is measured at the root entry's
+ * time: the key reads the chain's scopes only while its own entry there
+ * is within the window of the reading.
  *
  * **What it reads.** The summary; the genesis; and the entries that the
  * key signed: `entry` for one of them, and `history` and `log` pages that
@@ -48,9 +73,9 @@
  * else. It travels in a header, never in a URL.
  */
 
-import type { Entry, KeyId, SignedRead, SignedReadName } from "@generalbusiness/artroom-contract";
-import { canonicalize, intentDigest, isKeyId, isScopeId, isSignature, parseStrict, unb64url, verifySignedRead } from "@generalbusiness/artroom-bytes";
-import { isObject, timeMs, type ScopeState } from "@generalbusiness/artroom-derive";
+import type { Entry, FactUse, KeyId, SignedRead, SignedReadName, Timestamp } from "@generalbusiness/artroom-contract";
+import { canonicalize, intentDigest, isKeyId, isScopeId, isSignature, parseStrict, seedDigest, unb64url, verifySignedRead } from "@generalbusiness/artroom-bytes";
+import { isObject, same, timeMs, type ScopeState } from "@generalbusiness/artroom-derive";
 import type { Clock, ReadName } from "./ports.ts";
 import type { Store } from "./store.ts";
 
@@ -89,27 +114,60 @@ function openSignedRead(reader: string): SignedRead | null {
   }
 }
 
+/** The signed entry at the root of a genesis's cause chain: its signer and its time. */
+export interface Root { actor: KeyId; time: Timestamp }
+
 /** What a scope's check of a signed read is given. Each is read at every check. */
 export interface SignedReading {
   /** The scope's own clock. */
   clock: Clock;
   /** The authority window of an intent, in seconds: the scope's `intentLifetimeSeconds`. */
   window: number;
+  /** The root of this scope's cause chain, as the scope found it before the read. Absent or null: none is known. */
+  root?: () => Root | null;
 }
 
-/** The key that signed an entry, or null: it has no signer (see the head of this file). `store` gives the entries a genesis retains. */
-export function signerOf(entry: Entry, store: Pick<Store, "retained">): KeyId | null {
+/** The most causes that a cause chain is followed through (decision 70a0680e). */
+export const CHAIN_STEPS = 4;
+
+/** The key that signed an entry, or null: it has no signer (see the head of this file). */
+export function signerOf(entry: Entry): KeyId | null {
   const input = entry.input;
   if (input.type === "act" || input.type === "preparation") return input.signed.intent.actor;
-  if (input.type !== "genesis" || input.decision !== "applied") return null;
-  if (input.founding) return input.founding.intent.actor;
-  for (const use of entry.uses) {
-    const kept = store.retained("entry", use.content);
-    if (!kept) continue;
-    const used = JSON.parse(kept.bytes) as Entry;
-    if (used.input.type === "act" && intentDigest(used.input.signed.intent) === input.seed.cause) return used.input.signed.intent.actor;
+  return input.type === "genesis" && input.decision === "applied" && input.founding ? input.founding.intent.actor : null;
+}
+
+/**
+ * The root of a genesis's cause chain (see the head of this file), or null:
+ * it has none within `steps` causes. `read` gives an entry that a genesis
+ * names by a fact, or null when it cannot be read now; then the answer is
+ * `unavailable`, and may be another later. Each `read` is of an entry that
+ * a genesis of the chain retains.
+ */
+export async function rootOf(genesis: Entry, read: (use: FactUse) => Promise<Entry | null>, steps = CHAIN_STEPS): Promise<Root | null | "unavailable"> {
+  let entry = genesis;
+  for (let step = 0; ; step++) {
+    const input = entry.input;
+    if (input.type !== "genesis" || input.decision !== "applied") return null;
+    if (input.founding) return { actor: input.founding.intent.actor, time: entry.time };
+    if (step === steps) return null;
+    const use = input.source ? entry.uses.find((u) => same(u.fact, input.source)) : undefined;
+    if (!use) return null;
+    const source = await read(use);
+    if (!source) return "unavailable";
+    if (source.input.type === "genesis") {
+      if (seedDigest(source.input.seed) !== input.seed.cause) return null;
+      entry = source;
+      continue;
+    }
+    // The cause is an act's intent: the source itself, or the act that opened the source outcome's operation, which the genesis retains.
+    for (const u of entry.uses) {
+      const used = u === use ? source : await read(u);
+      if (!used) return "unavailable";
+      if (used.input.type === "act" && intentDigest(used.input.signed.intent) === input.seed.cause) return { actor: used.input.signed.intent.actor, time: used.time };
+    }
+    return null;
   }
-  return null;
 }
 
 /**
@@ -117,7 +175,7 @@ export function signerOf(entry: Entry, store: Pick<Store, "retained">): KeyId | 
  * `key`: the read may be made, by that key. `read` and `arg` are the read
  * that is asked and its argument, as the request must name them.
  */
-export function checkSignedRead(config: SignedReading, store: Pick<Store, "scope" | "stored" | "retained">, reader: string, read: ReadName, arg: string): { key: KeyId } | { refused: false | "clock-behind" } {
+export function checkSignedRead(config: SignedReading, store: Pick<Store, "scope" | "stored">, reader: string, read: ReadName, arg: string): { key: KeyId } | { refused: false | "clock-behind" } {
   const signed = openSignedRead(reader);
   if (!signed || !verifySignedRead(signed)) return { refused: false };
   const scope: ScopeState | null = store.scope();
@@ -134,7 +192,9 @@ export function checkSignedRead(config: SignedReading, store: Pick<Store, "scope
     if (!row) break;
     const entry = JSON.parse(row.bytes) as Entry;
     if ((timeMs(entry.time) ?? -Infinity) < reading - window) break;
-    if (signerOf(entry, store) === actor) return { key: actor };
+    if (signerOf(entry) === actor) return { key: actor };
   }
-  return { refused: false };
+  // The root of the cause chain, measured at its own time.
+  const root = config.root?.() ?? null;
+  return root && root.actor === actor && (timeMs(root.time) ?? -Infinity) >= reading - window ? { key: actor } : { refused: false };
 }
