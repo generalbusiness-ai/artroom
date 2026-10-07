@@ -546,7 +546,7 @@ test("read-token takes hours from 1 to 24 and opens one mint-read; its confirmed
   // A body with any other member, or a secret beside the handle, does not follow.
   expect(said(r.answered(mintRead, 1, "confirmed", { token: "read:1", ends: t(3600), plaintext: "secret" }))).toEqual(BAD_INPUT);
   expect(said(r.answered(mintRead, 1, "confirmed", { token: "", ends: t(3600) }))).toEqual(BAD_INPUT);
-  expect([said(r.answered(mintRead, 1, "confirmed", { token: "read:1", ends: t(3600) })), r.last.effects.filter((effect) => effect.effect !== "outcome" && effect.effect !== "attempt"), outcomesOf(r, mintRead)]).toEqual([WRITTEN, [], [["confirmed"]]]);
+  expect([said(r.answered(mintRead, 1, "confirmed", { token: "read:1", ends: t(3600) })), r.last.effects.map((effect) => effect.effect), outcomesOf(r, mintRead)]).toEqual([WRITTEN, ["attempt"], [["confirmed"]]]);
   // The branch is as it was, but for the act's revision: no slot holds a read credential.
   expect({ ...JSON.parse(branch), revision: r.branch.revision }).toEqual(r.branch);
   // A refused mint is an empty record.
