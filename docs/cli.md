@@ -8,7 +8,10 @@ and the command prints the scope's answer. A refusal writes nothing, and
 the command exits 1 with the refusal's reason.
 
 The source is `packages/cli`. In this repository it runs as
-`packages/cli/bin/artroom.js` under Node 22 or later. Nothing is
+`packages/cli/bin/artroom.js` under Node 22.0.0 or later, using the CLI's
+installed `tsx` 4.21.0 dependency. The launcher resolves that loader beside
+the package, so it works from another directory and fetches no tool when
+it runs. The launcher is checked on Node 22.0.0 and 26.10.0. Nothing is
 published to a registry. A scope Worker is deployed at
 <https://artroom-scope.inguz.workers.dev>; its routes start at `/v1/scopes`.
 The root URL returns 404 because it has no application page. This endpoint

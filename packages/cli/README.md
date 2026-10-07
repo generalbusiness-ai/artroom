@@ -4,6 +4,10 @@ The `artroom` command for the new model: thin functions over a scope
 service's HTTP routes and a signing key. [docs/cli.md](../../docs/cli.md)
 says what each command does, what it prints and what it does not do yet.
 
+The JavaScript launcher uses the package's pinned `tsx` 4.21.0 runtime
+under Node 22.0.0 or later. It resolves the installed loader from the CLI,
+not the current directory, and installs or downloads nothing at launch.
+
 | Module | Holds |
 |---|---|
 | `commands` | One function for each command, over a `Context`: a store, and optionally a `fetch`, a clock and a pause for waiting. Each returns an exit code and its lines. |

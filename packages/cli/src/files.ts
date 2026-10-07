@@ -7,7 +7,8 @@
  * nothing else.
  */
 
-import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+import { chmodSync, existsSync, linkSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { b64url, unb64url } from "@generalbusiness/artroom-bytes";
@@ -30,11 +31,22 @@ export function fileStore(dir: string): Store {
   /** Write a whole file owner-only, through a temporary name, so a reader never sees half of it. */
   const write = (path: string, text: string, exclusive: boolean) => {
     ensure();
-    if (exclusive && existsSync(path)) throw new Error(`${path} exists already; it is not replaced`);
-    const temporary = `${path}.${process.pid}.tmp`;
-    writeFileSync(temporary, text, { mode: 0o600, flag: "wx" });
-    chmodSync(temporary, 0o600);
-    renameSync(temporary, path);
+    const temporary = `${path}.${process.pid}.${randomUUID()}.tmp`;
+    let created = false;
+    try {
+      writeFileSync(temporary, text, { mode: 0o600, flag: "wx" });
+      created = true;
+      chmodSync(temporary, 0o600);
+      // A hard link publishes complete owner-only bytes atomically and refuses
+      // an existing name. A check before rename cannot enforce exclusivity.
+      if (exclusive) linkSync(temporary, path);
+      else renameSync(temporary, path);
+    } catch (failure) {
+      if (exclusive && (failure as NodeJS.ErrnoException).code === "EEXIST") throw new Error(`${path} exists already; it is not replaced`);
+      throw failure;
+    } finally {
+      if (created && existsSync(temporary)) unlinkSync(temporary);
+    }
   };
   const keyPath = (name: string) => {
     if (!NAME.test(name)) throw new Error(`${JSON.stringify(name)} is not a key name`);
