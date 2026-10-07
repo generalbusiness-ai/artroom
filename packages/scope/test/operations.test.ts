@@ -190,6 +190,7 @@ describe("outside operations at a real scope (scope contract, section 4.3; autho
     const recovering = await found({ deliveryBatch: 1 });
     const originals: EffectRequest[] = [];
     const reads: EffectRequest[] = [];
+    const diagnoses: string[] = [];
     let recovered: EffectAnswer | null = null;
     const recoveryOwners: typeof owners = {
       rules: (owner, kind) => kind === "read" ? { selects: false, read: true, retries: () => false, wellFormed: (result) => result === "confirmed" } : owners.rules(owner, kind),
@@ -202,7 +203,7 @@ describe("outside operations at a real scope (scope contract, section 4.3; autho
         read: async (request) => { reads.push(request); return recovered; },
       },
     };
-    wired.set(recovering.name, () => ({ outside: recoveryPort, owners: recoveryOwners }));
+    wired.set(recovering.name, () => ({ outside: recoveryPort, owners: recoveryOwners, diagnoses: (d) => { diagnoses.push(JSON.stringify(d)); } }));
     await recovering.restart();
     const [safe, mutation] = await open(recovering, { owner: "platform:destination@1", kind: "read", attempts: 1 }, pushOf(1)) as [OperationId, OperationId];
     expect([await surface(recovering).effect(), await surface(recovering).effect(), originals.map((r) => r.kind), reads]).toEqual([1, 1, ["read", "push"], []]);
@@ -227,6 +228,45 @@ describe("outside operations at a real scope (scope contract, section 4.3; autho
       [originals[0], originals[0]], 2, { state: "settled", sends: [{ attempt: 1, sent: START }], operation: { attempts: [{ attempt: 1, outcomes: [{ result: "confirmed", seq: 3 }] }] } }, [["unknown at 2"]], null,
     ]);
     expect([await surface(recovering).effect(), originals.filter((r) => r.kind === "read").length, originals.filter((r) => r.kind === "push").length, reads.every((r) => r.operation === safe && r.kind === "read")]).toEqual([0, 1, 1, true]);
+
+    // Two original mutations now lose their replies and record unknown.
+    // The trusted custody reader below scripts durably retained public
+    // reply metadata only; it proves the driver's boundary, not custody or
+    // a provider. Scope eviction loses the driver, not this outside script.
+    const [lateFirst, lateSecond] = await open(recovering, pushOf(1), pushOf(1)) as [OperationId, OperationId];
+    expect([await surface(recovering).effect(), await surface(recovering).effect(), originals.length]).toEqual([1, 1, 4]);
+    const unknowns = (await recovering.sealed(5)).slice(0, 2);
+    expect([outcomes(await seen(recovering, lateFirst)), outcomes(await seen(recovering, lateSecond)), await recovering.alarmAt()]).toEqual([[["unknown at 5"]], [["unknown at 6"]], null]);
+    const pending = [
+      { operation: lateFirst, attempt: 1, answer: own("reply-first") },
+      { operation: lateSecond, attempt: 1, answer: own("reply-second") },
+    ];
+    const pages: number[] = [];
+    let cursor = 0;
+    recoveryPort.replies = (limit) => {
+      pages.push(limit);
+      const answers = pending.slice(cursor, cursor + limit);
+      cursor += answers.length;
+      return { answers, more: cursor < pending.length };
+    };
+    await recovering.restart();
+    expect([await surface(recovering).effect(), pages, originals.length, outcomes(await seen(recovering, lateFirst)), outcomes(await seen(recovering, lateSecond)), await recovering.alarmAt()]).toEqual([
+      1, [1], 4, [["unknown at 5", "confirmed at 7"]], [["unknown at 6"]], timeMs(at(2 * delay)),
+    ]);
+    // `more` wakes the next bounded page immediately. Only the already
+    // received own replies follow unknown; no mutation is sent or marked
+    // again, and both unknown entries keep their exact original bytes.
+    expect(await recovering.alarm()).toBe(true);
+    expect([pages, originals.length, outcomes(await seen(recovering, lateSecond)), (await recovering.sealed(5)).slice(0, 2), await recovering.alarmAt()]).toEqual([
+      [1, 1], 4, [["unknown at 6", "confirmed at 8"]], unknowns, null,
+    ]);
+    expect([await seen(recovering, lateFirst), await seen(recovering, lateSecond), outcomes(await seen(recovering, mutation))]).toMatchObject([
+      { state: "settled", sends: [{ attempt: 1, sent: at(2 * delay) }] }, { state: "settled", sends: [{ attempt: 1, sent: at(2 * delay) }] }, [["unknown at 2"]],
+    ]);
+    recoveryPort.replies = () => { throw new Error("private-retained-reply-secret"); };
+    expect([await surface(recovering).effect(), originals.length, (await recovering.head()).seq, await recovering.alarmAt()]).toEqual([0, 4, 8, null]);
+    expect(diagnoses.some((d) => d.includes("outside-replies-failed"))).toBe(true);
+    expect(diagnoses.join("").includes("private-retained-reply-secret")).toBe(false);
   });
 
   test("a late answer that arrives while the scope's turn is unavailable is kept in hand, and the driver writes it at the next wake-up, after the attempt's row is closed; the request is not sent again", async () => {

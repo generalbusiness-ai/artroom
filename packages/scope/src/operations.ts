@@ -127,6 +127,18 @@ export interface Outside {
     accepts(owner: CapabilityName | PlatformDefinition, kind: string): boolean;
     read(request: EffectRequest): Promise<EffectAnswer | null>;
   };
+  /**
+   * Trusted, pure retrieval of already received own replies, retained
+   * durably by this port. One bounded page of public answer metadata only:
+   * no plaintext credential, outside call or repeated mutation. `more`
+   * means another bounded page remains. The driver cannot prove the port's
+   * custody or provenance; it still checks the sent mark and submits each
+   * reply through normal late-answer judgment. An answer in hand wins.
+   */
+  replies?(limit: number): {
+    answers: Array<{ operation: OperationId; attempt: number; answer: EffectAnswer }>;
+    more: boolean;
+  };
 }
 
 /**
@@ -210,6 +222,8 @@ export class Operations {
   #walk: { after: Sending | null } | null = { after: null };
   #running: Promise<number> | null = null;
   #again = false;
+  /** A trusted retained-reply page has a successor; memory only, reset on restart. */
+  #replyMore = false;
 
   /** Told of an answer that contradicts the outcome that entry `seq` records. It is the operator's record, which no judgment reads. */
   readonly #conflict: ((operation: OperationId, attempt: number, seq: number) => void) | undefined;
@@ -252,7 +266,7 @@ export class Operations {
   /**
    * One pass over the attempts that have no outcome and are due, and over
    * one page of the walk. Rule 7: a pass is bounded, by two batches of rows
-   * and one of answers in hand; with nothing due it writes nothing and asks
+   * and one each of answers in hand and retained replies; with nothing due it writes nothing and asks
    * for no wake-up; and it opens no attempt, which only an entry does.
    */
   async #pass(): Promise<number> {
@@ -263,6 +277,8 @@ export class Operations {
     // is sent and nothing is offered. Each attempt stays as it is recorded, with no wake-up, until a runtime that can run the
     // definition restarts the object. The walk ends at once: it could do nothing for any row.
     const runs = Boolean(this.#scope.pinned()?.definition);
+    const replyMore = this.#replyMore;
+    if (!runs) this.#replyMore = false;
     const walked = this.#walk;
     // The page has its own batch, so what is due never uses it up. A page that is not full is the last. The walk goes on by the
     // row it reached, so a row that stays as it is recorded is passed, and holds back no row after it.
@@ -270,8 +286,9 @@ export class Operations {
     this.#walk = page.length < batch ? null : { after: page.at(-1)! };
     const due = [...store.unsent(now, batch), ...page];
     if (due.length === 0 && (this.#held.size === 0 || !runs)) {
-      if (walked) await this.#wake(now);
-      return 0;
+      const resumed = runs ? await this.#resume(batch) : 0;
+      if (walked || resumed > 0 || replyMore || this.#replyMore) await this.#wake(now);
+      return resumed;
     }
     const scope = store.scope()!;
     const work: (() => Promise<void>)[] = [];
@@ -317,8 +334,36 @@ export class Operations {
     // Rule 6: each attempt is sent and answered by itself. One that waits for its answer delays no other, and its answer changes no other.
     await Promise.all(work.map((start) => start()));
     const replies = runs ? await this.#replies(offered, batch) : 0;
+    const resumed = runs ? await this.#resume(batch) : 0;
     await this.#wake(now);
-    return work.length + replies;
+    return work.length + replies + resumed;
+  }
+
+  /** One retained page after work/held answers; no network, mark or send. */
+  async #resume(batch: number): Promise<number> {
+    this.#replyMore = false;
+    let answers: Array<{ operation: OperationId; attempt: number; answer: EffectAnswer }>;
+    try {
+      if (!this.#outside.replies) return 0;
+      const page = this.#outside.replies(batch);
+      if (typeof page !== "object" || page === null || !Array.isArray(page.answers) || page.answers.length > batch || typeof page.more !== "boolean") throw new Error("invalid retained reply page");
+      // Validate and snapshot the entire page before any answer is offered.
+      answers = page.answers.map((reply) => {
+        if (!reply || !isOperationId(reply.operation) || !Number.isSafeInteger(reply.attempt) || reply.attempt < 1 || !isAnswer(reply.answer)) throw new Error("invalid retained reply metadata");
+        return { operation: reply.operation, attempt: reply.attempt, answer: reply.answer };
+      });
+      this.#replyMore = page.more;
+    } catch (failure) {
+      report(this.#diagnoses, "outside-replies-failed", "retained-replies", failure);
+      return 0;
+    }
+    let offered = 0;
+    for (const reply of answers) {
+      if (this.#held.has(keyOf(reply.operation, reply.attempt))) continue;
+      await this.answered(reply.operation, reply.attempt, reply.answer);
+      offered++;
+    }
+    return offered;
   }
 
   /**
@@ -359,13 +404,13 @@ export class Operations {
   /**
    * The driver's wake for what it holds in memory only, and the alarm at the
    * earliest of all wakes. While pages of the walk remain, the driver asks to
-   * be woken at once. While an answer is in hand, it asks to be woken after
+   * be woken at once, as when a retained-reply page has a successor. While an answer is in hand, it asks to be woken after
    * the delay of a turn that left work due. A scope whose definition cannot
    * be run can write nothing, and asks for neither.
    */
   #wake(now: number): void | Promise<void> {
     const runs = Boolean(this.#scope.pinned()?.definition);
-    this.#wakes.driver(this.#walk && runs ? now : this.#held.size > 0 && runs ? now + this.#bounds.drainRetrySeconds * 1000 : null);
+    this.#wakes.driver((this.#walk || this.#replyMore) && runs ? now : this.#held.size > 0 && runs ? now + this.#bounds.drainRetrySeconds * 1000 : null);
     return this.#wakes.set();
   }
 
