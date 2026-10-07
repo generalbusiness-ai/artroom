@@ -128,6 +128,9 @@ test("the page's data functions on the demo story: the issue, the change, the ac
   // The rules of the room, read from the rules scope; rita is the one member whose role holds `rules.publish`.
   const rules = await loadRules(forPaul);
   expect(rules).toMatchObject({ approvals: 1, ownerMayReview: false, singleControllerException: false, controllers: ["@rita"] });
+  // The revision is the position of the last publish, as the rules scope's own item records it.
+  expect(rules.revision).toBe((await r.rules.item(0)).refs["published"]);
+  expect(typeof rules.revision).toBe("number");
   expect(rules.extents?.map((e) => [e.name, e.approvals, e.approver, e.class])).toEqual([["rules", 1, "rules.publish", "authority"], ["infrastructure", 1, "change.merge", "deployment"], ["source", 1, "change.review", "content"]]);
   expect(rules.definitions.map((d) => [d.name, d.digest, d.state])).toEqual([["issue", DEMO_DIGESTS.issue, "active"], ["change", DEMO_DIGESTS.change, "active"]]);
   // The rules scope's acts: rita may publish the rules; paul may not.

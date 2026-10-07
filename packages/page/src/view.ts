@@ -99,7 +99,7 @@ export function changeScreen(room: Room, change: ChangeView, last: Answer | null
       field("Base", h("code", {}, short(current.base))), field("Integration commit", h("code", {}, short(current.integration))), field("Tree", h("code", {}, short(current.tree))),
     ) : h("p", { class: "muted" }, "No version is proposed yet."), change.manifests.length > 1 ? h("p", { class: "muted" }, `${change.manifests.length - 1} earlier version(s).`) : null),
     section("Reviews by extent",
-      change.rules ? h("p", { class: "muted" }, `The rules this lane holds, revision ${or(change.rules.revision)}: ${or(change.rules.approvals)} approval(s) in the lane's count.`) : h("p", { class: "muted" }, "This lane holds no rules yet: it has not asked the rules scope."),
+      change.rules ? h("p", { class: "muted" }, `The rules this lane holds, from update ${or(change.rules.revision)} of the rules scope: ${or(change.rules.approvals)} approval(s) in the lane's own count. The destination judges each merge on the rules it observes then.`) : h("p", { class: "muted" }, "This lane holds no rules yet: it has not asked the rules scope."),
       table(["Extent", "Approvals of this version", "Counts from a member holding", "By"], byExtent),
       table(["Review", "Reviewer", "Verdict", "Extent", "Version", "State"], change.reviews.map((r) => [String(r.id), or(r.reviewer), or(r.verdict), or(r.extent), or(r.manifest), state(r.state)]))),
     section("Review requests", table(["Request", "Asked of", "Asked by", "State"], change.requests.map((r) => [String(r.id), or(r.requested), or(r.requester), state(r.state)]))),
@@ -124,7 +124,7 @@ export function rulesScreen(room: Room, rules: RulesView): HTMLElement {
     h("h1", {}, "The rules of this room"), whoLine(room),
     h("p", {}, `A controller may change them: a member whose role holds rules.publish. In this room: ${list(rules.controllers, "nobody")}. A change of the rules is the act publish on the rules scope; the destination judges each merge on the rules it observes then.`),
     h("dl", {},
-      field("Revision", rules.revision === null ? "none published yet" : `entry ${rules.revision} of the rules scope`),
+      field("Revision", rules.revision === null ? "none published yet" : `${rules.revision}, the position of the last publish in the rules scope`),
       field("Approvals the lanes count", or(rules.approvals)),
       field("An author's agent controller may review", rules.ownerMayReview === null ? "not stated" : rules.ownerMayReview ? "yes" : "no"),
       field("Single-controller exception", rules.singleControllerException ? "declared: the one controller may land a rules change that they author" : "not declared"),
@@ -132,7 +132,7 @@ export function rulesScreen(room: Room, rules: RulesView): HTMLElement {
       field("Labels", list(rules.labels)),
     ),
     section("Extents", rules.extents === null ? h("p", { class: "muted" }, "No extents are published yet.") :
-      table(["Extent", "Class", "Approvals", "Counts from a member holding", "Required checks", "Paths"], rules.extents.map((e) => [e.name, e.class, String(e.approvals), e.approver, list(e.checks), list(e.patterns ?? [], "every path no other extent names")]))),
+      table(["Extent", "Class", "Approvals", "Counts from a member holding", "Required checks", "Paths"], rules.extents.map((e) => [e.name, e.class, String(e.approvals), e.approver, list(e.checks), list(e.patterns ?? [], "every path that no pattern of the rules matches")]))),
     section("Active definitions", table(["Name", "Digest", "State"], rules.definitions.map((d) => [d.name, h("code", {}, short(d.digest)), state(d.state)]))),
     h("p", { class: "muted" }, `Rules scope ${rules.scope}, read at entry ${rules.head.seq}.`),
   );

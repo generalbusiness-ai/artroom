@@ -193,6 +193,7 @@ export interface ReviewRequest { id: number; state: string; requested: string | 
 export interface Job { id: number; state: string; name: string | null; manifest: number | null }
 export interface Link { id: number; state: string; issue: ScopeId | null; how: string | null }
 export interface Extent { name: string; approvals: number; approver: string; checks: string[]; class: string; patterns?: string[] }
+/** The rules a change lane holds, as the rules scope last sent them. `revision`: the update's revision, which the relation counts. */
 export interface LaneRules { approvals: number | null; revision: number | null; ownerMayReview: boolean | null; extents: Extent[]; checks: { name: string; required: boolean }[] }
 /** One outside operation of the destination, for one publication: its kind, and the result of each of its attempts in order. */
 export interface Operation { id: string; kind: string; attempts: ("opened" | "confirmed" | "refused" | "unknown")[] }
@@ -317,9 +318,10 @@ export async function loadRules(room: Room): Promise<RulesView> {
   const { summary, at } = await summaryOf(handle);
   const rules = summary.items.find((item) => item.type === "rules");
   if (!rules) throw new Unreadable(`${room.rules} holds no rules.`);
-  const published = rules.refs["published"] as FactRef | null | undefined;
+  // The slot holds the position of the last `publish` in this scope's history: the revision of the rules (`revisionOf`).
+  const published = rules.refs["published"];
   return {
-    scope: room.rules, head: at, revision: published ? published.seq : null,
+    scope: room.rules, head: at, revision: typeof published === "number" ? published : null,
     approvals: localId(rules.values["approvals"]), ownerMayReview: typeof rules.values["ownerMayReview"] === "boolean" ? rules.values["ownerMayReview"] : null,
     singleControllerException: typeof rules.values["singleControllerException"] === "boolean" ? rules.values["singleControllerException"] : null,
     checks: Array.isArray(rules.values["checks"]) ? (rules.values["checks"] as unknown as RulesView["checks"]) : [],
