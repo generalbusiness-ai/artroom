@@ -112,6 +112,26 @@ Pinned Wrangler 4.147.0, run from `/tmp`, built a dry-run Worker bundle at
 `/tmp/artroom-demo-worker-dry-run.log`. That build precedes later repairs
 and is not a deployment or a current-head gate.
 
+The coupled `github-founding.test.ts` now uses the actual configured factory
+on five real scope objects. It confirms their births, exact first-head and
+receipt packs, both scoped token cleanups, private binding completion and
+public histories without plaintext. Actual destination eviction/restart
+preserves history and private rows and makes no extra provider call. REST
+and Git upstream responses, clock and readers remain scripted. It produces
+no source lane or source publication.
+
+That witness exposed transport deadline timers retaining object activity.
+The first optional eviction timed out; explicitly clearing each HTTP
+controller's timer in `finally` allowed the same actual restart to pass.
+The final coupled witness took 185 ms; Git/scope typechecks and four focused
+HTTP tests also passed. Raw evidence, exact source hashes, the earlier
+one-pass cleanup failure and eviction timeout are preserved in
+`/tmp/artroom-github-founding-225.log`. This is producer lifecycle evidence,
+not a timeout-based distinguishing control or a deployed run.
+
+The latest published sprint report at `54cc1bd23` is preserved by the
+branch's merge `4b12597c`; it changes no source or test body.
+
 Hugh selected `generalbusiness-ai`, organization ID `285042784`, and says
 the App is not yet created. The exact setup requirements were sent to the
 planner and saved in workroom evidence `827d4c7c`; the register authority
