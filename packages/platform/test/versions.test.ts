@@ -49,7 +49,7 @@ test("a rule reads its own version from the scope's genesis: the register of eac
   expect((["platform:register@1", "platform:register@2"] as const).map((named) => directorySeed(found(named)).definition)).toEqual(["platform:directory@1", "platform:directory@2"]);
 
   const roleTable = (platform("platform:membership@1")!.rules["role-table"] as Extract<PlatformRule, { place: "effect" }>);
-  const lists = (named: PlatformDefinition) => Object.fromEntries((roleTable.run(inGenesis(named)) as { slot: string; value: string[] }[]).map((effect) => [effect.slot, effect.value]));
+  const lists = (named: PlatformDefinition) => Object.fromEntries((roleTable.run(inGenesis(named)) as unknown as readonly { slot: string; value: string[] }[]).map((effect) => [effect.slot, effect.value]));
   const [one, two] = [lists("platform:membership@1"), lists("platform:membership@2")];
   expect(Object.values(one).some((list) => list.includes("destination.read-token"))).toBe(false);
   expect(Object.values(two).every((list) => list.at(-1) === "destination.read-token")).toBe(true);
