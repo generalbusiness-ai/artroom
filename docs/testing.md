@@ -336,7 +336,10 @@ The command line's story, `packages/cli/test/*.scope.test.ts`, runs from
 the root inside the `scope` project too, and has no Worker of its own. Its
 commands go over the Worker's HTTP routes for the namespace `PLATFORM`,
 called in the test's isolate; the Git host and the scheduler are labelled
-stand-ins in the file. The `cli` project is its Node test of the key files.
+stand-ins in the file. Its readers are the real read sessions and signed
+reads, under a session secret that the test generates; the test's own reads
+of what a scope holds go past them by `platformNet.inspector`, a reader that
+the command never presents. The `cli` project is its Node test of the key files.
 `scripts/control.mjs` cannot select a root project, so a control of the
 story is run by hand: change the line, run
 `npx vitest run --project scope story`, restore the file.

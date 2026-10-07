@@ -1,12 +1,14 @@
 /**
- * Signed reads, as a device makes them (the planner's decisions 61cc5e50
- * and c6499e91; the scope package's `signed-reads.ts`). A device with no
- * read session yet reads a scope where its key signed an entry within the
- * authority window of an intent: the scope's summary, its genesis and the
- * entries that key signed. So the operator key that signed `install`
- * reads the register, and a founder's key that signed `found` reads the
- * register's summary and the new directory's genesis and summary, from
- * which it learns membership's ID and asks there for a session.
+ * Signed reads, as a device makes them (the planner's decisions 61cc5e50,
+ * c6499e91 and 70a0680e; the scope package's `signed-reads.ts`). A device
+ * with no read session yet reads a scope where its key signed an entry, or
+ * the root of the scope's cause chain, within the authority window of an
+ * intent: the scope's summary, its genesis and the entries that key
+ * signed. So the operator key that signed `install` reads the register,
+ * and a founder's key that signed `found` reads the register's summary,
+ * the directory that the claim caused, and membership, the rules scope and
+ * the destination, which the directory caused; it learns membership's ID
+ * from the directory, and asks there for a session once it holds a seat.
  *
  * - `signedReader` signs one read: the scope, the read's name, its
  *   argument and a `notAfter`, with the device's key, as an intent is
