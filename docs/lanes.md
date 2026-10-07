@@ -238,7 +238,15 @@ The digests at this head:
 | Definition | Digest |
 |---|---|
 | `issue` | `sha256:325cb4f33da9deb1a31d85ba0f1456068d4d9d08009978b779aed70cb08e00ad` |
-| `change` | `sha256:4ff0c7f681c664a3c2dae22bd0df4a9a1bb239e19bc185db41f7f140d4dfca45` |
+| `change` | `sha256:3f0389ba644e6d58e96a352debcc77d01661ffcf349c6db53d0645c2513eae70` |
+| `issue-demo` | `sha256:82a938c8f54ddcac7974ca688ebea7d51c35d2aa70f4e3729965e9f915bc464e` |
+| `change-demo` | `sha256:d86c64ae0a570165660a6eb4d75153b8c2f59c9cdaec2ecc789e2c38524a17a2` |
+
+The `change` rows marked "i5 edit" in `change.ts` add the act
+`propose-file`, a one-file version of a change, and the manifest's slots
+`path`, `digest` and `size`; a manifest's integration commit and tree are
+optional. They are no rows of an adopted lane forms revision.
+`notes/2026-10-07-i5-edit-page-delivery.md` lists them.
 
 A digest is `definitionDigest` of the bytes package: SHA-256 over the tag
 `artroom-definition-1`, a newline and the canonical JSON of the whole

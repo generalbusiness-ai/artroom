@@ -116,6 +116,15 @@ Took effect: entry sc_p6xp2lmd...:8, hash sha256:2cd70f9ada97.
 Refused: guard-failed (not-activated), judged at entry sc_hs5f27fz...:4. Nothing was written.
 ```
 
+`--value <file>`, given once or more, sends each file's text beside the
+intent as a value. The scope reads a value only at a place that its
+definition states, by its digest: the bytes of a definition for the rules
+scope's `activate` and the directory's `open-issue` and `open-pr`. For
+example, an admin activates the demo profile's change definition with
+`artroom act activate --on rules --set digest=<digest> --set name=change
+--value packages/lanes/definitions/change-demo.json`, whose digest is in
+`packages/lanes/src/digests.ts`.
+
 **`artroom log <scope> [--limit n]`** and **`artroom show <entry>`**
 read the history and one entry over the read routes.
 
@@ -197,6 +206,57 @@ The token is for the clone. A later `git fetch` in the clone needs a new
 token; run `artroom clone` again for one. A token that is never read ends
 at its end.
 
+**`artroom edit <path> --file <local file> [--title <text>]`** writes one
+file of the repository through the room. The person never writes the
+repository: the room judges the change and its destination writes it. The
+examples have the form that `packages/cli/test/edit.scope.test.ts`
+asserts, with IDs cut short; the numbers in them are illustrative.
+
+1. It reads the local file. A file that is no UTF-8 text, or that has more
+   than 65,536 bytes, is not carried: nothing is signed, and it exits 2.
+2. It reads the change definition that the rules scope holds active, and
+   its bytes. With none active it signs nothing.
+3. It signs the directory's `open-pr` under that definition, with its bytes
+   beside the act, and waits for the new change lane. The title is
+   `--title`, or `Edit <path>`.
+4. It signs the lane's `ask-rules`, and waits for the rules scope's answer.
+5. It signs `propose-file` on the destination's head: the path, the digest
+   and size of the bytes, and the bytes. This is the change's only version.
+6. It merges the change as `artroom merge` does.
+
+```
+Proposed README.md (37 bytes) as change sc_q3xk...., version 6.
+Published: commit 5d0c1e6b..., by the merge sc_q3xk...:7.
+Page: https://scopes.test/site/sc_hs5f27fz.../HEAD/README.md
+```
+
+The rules decide who must approve. A change in an extent that asks no
+approval is published on the merger's own act; a change in the rules
+extent, such as `AGENTS.md`, waits for the rules scope's controller:
+
+```
+Proposed AGENTS.md (31 bytes) as change sc_ab12..., version 6.
+Not published: the merge sc_ab12...:7 is refused, rules-not-met:rules. The change sc_ab12... stays open at version 6. When it may be merged, run: artroom merge sc_ab12...
+```
+
+The controller approves it for that extent with `artroom act review-verdict
+--on <change> --set manifest=<version> --set verdict=approve --set
+extent=rules`, and a member who holds `change.merge` runs `artroom merge`.
+A second `edit` of the same path replaces the file. A path that no
+published tree may hold (an empty, `.`, `..` or `.git` segment, a control
+character, more than 1,024 bytes) is refused by the destination as
+`path-invalid`, and nothing is pushed. A path where the published tree has
+a folder, a symbolic link or a submodule, or a file on the way, is refused
+as `integration-invalid`.
+
+**`artroom merge <change>`** signs `merge` of the change's current version,
+naming the reports it selects, and waits until the merge is published,
+refused or aborted. It needs `change.merge`, which admins and maintainers
+hold. Published: it prints the commit, and for a one-file version the
+page's address. Refused by the lane, it prints the refusal; refused by the
+destination, the reason. Either way the change stays open, and `artroom
+merge` may be run again.
+
 Exit codes: 0 done; 1 refused, unavailable, not found or not consistent;
 2 a command line this cannot run.
 
@@ -218,9 +278,11 @@ it (the intent window), and the retained inputs those entries name.
 - Nothing is deployed, so the command has run only against the test
   Worker. Its tests use a stand-in for the Git host and drive the
   scopes' dispatchers in place of a deployment's alarms.
-- The lanes' acts arrive with the lane wiring branch. Until then the
-  directory refuses `open-issue` and `open-pr`, because the rules scope
-  has activated no lane definition.
+- `edit` carries a file as UTF-8 text of at most 65,536 bytes: no image
+  or other binary file. See `notes/2026-10-07-i5-edit-page-delivery.md`,
+  section 3.
+- `verify` carries no code of the lane capabilities, so it cannot replay a
+  change lane, nor a destination whose history names one.
 - `invite --acts` is refused: membership's `invite-member` has no list of
   acts for one member.
 - The founder must reach the seat within 15 minutes of the claim: until

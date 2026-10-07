@@ -352,7 +352,11 @@ called in the test's isolate; the Git host and the scheduler are labelled
 stand-ins in the file. Its readers are the real read sessions and signed
 reads, under a session secret that the test generates; the test's own reads
 of what a scope holds go past them by `platformNet.inspector`, a reader that
-the command never presents. The `cli` project is its Node test of the key files.
+the command never presents. `edit.scope.test.ts` runs `artroom edit` the same way, on each host through
+the production wiring of its ports (`artifacts-wiring.ts`,
+`github-wiring.ts`) over a labelled stand-in that keeps refs and objects in
+maps and decodes each pushed pack; the site route reads the published file
+back over the same stand-in. The `cli` project is its Node test of the key files.
 `scripts/control.mjs` cannot select a root project, so a control of the
 story is run by hand: change the line, run
 `npx vitest run --project scope story`, restore the file.

@@ -126,6 +126,20 @@ authorization value and URL query replaced by `[redacted]`.
 | `host-not-configured` | 503 | This deployment does not read that room's Git host, or the room was not created by the register that the host's setting names. |
 | `unreadable` | 502 | The room or the repository could not be read. |
 
+## Editing a page
+
+`artroom edit <path> --file <local file>` changes one page (docs/cli.md).
+The command opens a change on the room's change lane with a one-file
+version: the path, the digest and size of the bytes, and the bytes. The
+room judges it by its rules, as any change: a page in an extent that asks
+no approval is published on the merger's own act, and one in the rules
+extent waits for the rules scope's controller. On merge the destination
+writes the published tree with that one file and pushes the new commit,
+on the hosting's own Git service and on GitHub the same way. The command
+prints the commit and the page's address, `<base-url>/site/<directory>/HEAD/<path>`,
+which then serves the file. A page is text: a file of more than 65,536
+bytes, or one that is not UTF-8, cannot be edited this way.
+
 ## Who can read a site
 
 **Every site is public for now.** Anyone who has the room's directory
