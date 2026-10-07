@@ -12,7 +12,7 @@ import type { EffectAnswer, EffectRequest, Outside } from "./operations.ts";
 /** Each method sends once. Missing, lost or malformed replies are no answer. */
 export interface RegisterProvider {
   createRepository(name: string): Promise<unknown>;
-  deleteRepository(id: string): Promise<unknown>;
+  deleteRepository(id: string, name: string): Promise<unknown>;
   revokeCredential(id: string): Promise<unknown>;
 }
 export type RepositoryCreation =
@@ -67,7 +67,7 @@ export class RegisterHost implements Outside {
       if (!body || !text(body["name"]) || !text(body["id"]) || (body["credential"] !== undefined && !text(body["credential"]))) return null;
       if (request.kind === "delete-repository") {
         const id = body["id"];
-        const reply = members(await this.#provider.deleteRepository(id), ["deleted", "id"]);
+        const reply = members(await this.#provider.deleteRepository(id, body["name"]), ["deleted", "id"]);
         return reply?.["id"] === id && typeof reply["deleted"] === "boolean" ? answer(reply["deleted"] ? "confirmed" : "refused", { id }) : null;
       }
       const credential = body["credential"];

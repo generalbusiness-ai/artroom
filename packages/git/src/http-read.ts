@@ -353,7 +353,8 @@ export class SmartHttpSource implements GitSource {
       const headers = new Headers({ accept: media, "cache-control": "no-cache" });
       if (this.#authorization !== undefined) headers.set("authorization", this.#authorization);
       if (body !== undefined) headers.set("content-type", "application/x-git-upload-pack-request");
-      const response = await this.#fetch(new Request(url, { method: body === undefined ? "GET" : "POST", headers, redirect: "error", credentials: "omit", signal: AbortSignal.timeout(this.#timeoutMs), ...(body === undefined ? {} : { body }) }));
+      const init: RequestInit & { credentials: "omit" } = { method: body === undefined ? "GET" : "POST", headers, redirect: "manual", credentials: "omit", signal: AbortSignal.timeout(this.#timeoutMs), ...(body === undefined ? {} : { body }) };
+      const response = await this.#fetch(new Request(url, init));
       if (response.status !== 200 || response.redirected || (response.url !== "" && response.url !== url) || response.headers.get("content-type")?.split(";", 1)[0]?.trim() !== media) {
         await response.body?.cancel().catch(() => undefined);
         throw fail("HTTP read response");

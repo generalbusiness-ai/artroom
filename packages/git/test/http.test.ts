@@ -118,7 +118,7 @@ test("Web smart HTTP initializes and deletes exact refs on local Git; a racing C
   const absent = await client.readRef(REF);
   expect([deleted.reported, posts, host.updates, absent.value]).toEqual(["deleted", 4, 4, null]);
   expect(attemptOutcome(deletion, classifySend(deleted, one), absent).result).toBe("confirmed");
-  expect(requests.every((r) => r.redirect === "error" && r.credentials === "omit" && !r.url.includes(TOKEN))).toBe(true);
+  expect(requests.every((r) => r.redirect === "manual" && r.credentials === "omit" && !r.url.includes(TOKEN))).toBe(true);
   expect(new Set(host.credentials)).toEqual(new Set([`Bearer ${TOKEN}`]));
   expect(JSON.stringify([client, requests, applied, raced, lost]).includes(TOKEN)).toBe(false);
 

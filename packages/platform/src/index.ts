@@ -29,6 +29,7 @@ export { foundingObjects, receiptObjects, receiptRef, importRef, type Destinatio
 export type { LaneRead } from "./destination.ts";
 // The host port reads the same recorded operation context as the rules.
 export { branchOf as destinationBranch, mintOf as destinationMint, servedBy as destinationWrite, statementOf as destinationStatement, targetOf as destinationTarget, writeSends as destinationSends, readFor as destinationRead } from "./destination.ts";
+export { mintRevoked as destinationRevokedMint } from "./destination.ts";
 export { DESTINATION_CHANGED_SET, NOT_RESERVED, isJudgeChanges, isJudgeEvidence, isRecordedJudgeEvidence, judgeReservation } from "./reservation.ts";
 export type { JudgeChanges, JudgeEvidence, RecordedJudgeEvidence, Reservation, ReservationAsked, ReservationRead, Statement } from "./reservation.ts";
 export { RULES };

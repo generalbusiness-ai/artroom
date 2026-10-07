@@ -24,7 +24,7 @@ export interface SmartHttpOptions {
   maxBytes: number;
   /** An HTTP Authorization value. Kept privately, never in a URL or answer. */
   authorization?: string;
-  /** A trusted fetch implementation that honors redirect:error and the signal. */
+  /** A trusted fetch implementation that honors manual redirects and the signal. */
   fetch?: (request: Request) => Promise<Response>;
   transport?: Transport;
   bounds?: ReadBounds;
@@ -171,7 +171,8 @@ export class SmartHttpGit {
       const headers = new Headers({ accept: media, "cache-control": "no-cache" });
       if (this.#authorization !== undefined) headers.set("authorization", this.#authorization);
       if (body !== undefined) headers.set("content-type", "application/x-git-receive-pack-request");
-      const request = new Request(url, { method: body === undefined ? "GET" : "POST", headers, redirect: "error", credentials: "omit", signal, ...(body === undefined ? {} : { body }) });
+      const init: RequestInit & { credentials: "omit" } = { method: body === undefined ? "GET" : "POST", headers, redirect: "manual", credentials: "omit", signal, ...(body === undefined ? {} : { body }) };
+      const request = new Request(url, init);
       const response = await this.#fetch(request);
       if (response.status !== 200 || response.redirected || (response.url !== "" && response.url !== url) || response.headers.get("content-type")?.split(";", 1)[0]?.trim() !== media) {
         await response.body?.cancel().catch(() => undefined);

@@ -2,11 +2,11 @@
  * @generalbusiness/artroom-git
  *
  * Everything of Artroom that touches a Git repository or a Git host (I3
- * plan, section 3.1). It runs in Node and in a container, never in a scope's
- * commit. The review that each retained part passed is
+ * plan, section 3.1). It runs outside a scope's commit. The review that each retained part passed is
  * `notes/2026-10-05-i3-git-review.md`.
  *
  * `./node` has the one module that needs Node: `nodeExec`.
+ * `./http`, `./http-read` and `./github` use Web APIs and also run in Workers.
  */
 
 export { GitRefusal, MAX_REF_NAME, ZERO_ID, branchRef, isObjectId, objectId, refName, remoteUrl } from "./names.ts";

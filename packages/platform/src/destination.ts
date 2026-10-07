@@ -743,7 +743,7 @@ export function writeSends(state: Pick<StateView, "operation" | "item" | "page">
  *   wrote into the publication's slot `token`. The search reads this
  *   scope's own entries back to `reservedAt` (I3 deltas, entry FA5).
  */
-function mintRevoked(state: Pick<StateView, "operation" | "item">, own: Own, revoke: Operation): Operation | null {
+export function mintRevoked(state: Pick<StateView, "operation" | "item">, own: Own, revoke: Operation): Operation | null {
   const seq = seqOf(revoke.id);
   const { input, effects } = ownEntry(own, seq);
   if (input.type === "outcome") {

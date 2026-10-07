@@ -84,7 +84,7 @@ test("Web upload-pack reads exact local Git closure and empty refs, and decodes 
   expect(await reader.blob(blob2)).toEqual(expected.get(blob2)!.data);
   expect(await source.object(blob2, 0)).toEqual({ type: "blob", size: expected.get(blob2)!.data.length, data: null });
   expect(requests.filter((r) => r.method === "POST").map((r) => r.body)).toEqual([`003cwant ${head} ofs-delta\n00000009done\n`]);
-  expect(requests.every((r) => r.redirect === "error" && r.credentials === "omit" && !r.url.includes(TOKEN) && !r.body.includes(TOKEN))).toBe(true);
+  expect(requests.every((r) => r.redirect === "manual" && r.credentials === "omit" && !r.url.includes(TOKEN) && !r.body.includes(TOKEN))).toBe(true);
   expect(JSON.stringify(source).includes(TOKEN)).toBe(false);
 
   // A fresh reader wants a nonadvertised exact tree/blob only when real Git

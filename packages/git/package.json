@@ -1,7 +1,7 @@
 {
   "name": "@generalbusiness/artroom-git",
   "version": "0.1.0-dev.1",
-  "description": "Artroom's one place that touches a Git repository or a Git host: the object reader, the commands, the evidence of a push, and the gateway that holds a token. It runs in Node and in a container, never in a scope's commit.",
+  "description": "Artroom's Git object reader, commands, push evidence, token gateway and Web HTTP provider primitives. It runs in Node, containers and Workers, outside a scope's commit.",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
