@@ -29,8 +29,8 @@ test("a signed read is the scope, the read, its argument and a notAfter, signed 
   await expect(signedReader(signer, scope, "summary", "summary", { now, lifetimeSeconds: PROPOSED_BOUNDS.intentLifetimeSeconds + 1 })).rejects.toThrow(RangeError);
 });
 
-// Invariant: with no reader, the four reads go out signed, each naming its own read and argument; a session's reader goes out as it is.
-test("a transport with signed reads signs summary, history, entry and log with their arguments when no reader is presented, and sends a presented session unchanged", async () => {
+// Invariant: with no reader, the five reads go out signed, each naming its own read and argument; a session's reader goes out as it is.
+test("a transport with signed reads signs summary, history, entry, log and retained with their arguments when no reader is presented, and sends a presented session unchanged", async () => {
   const sent: { path: string; authorization: string | undefined }[] = [];
   const fetch: Fetch = (url, init) => {
     sent.push({ path: url.replace(`https://scopes.test/v1/scopes/${scope}`, ""), authorization: init?.headers?.["authorization"] });
@@ -42,12 +42,15 @@ test("a transport with signed reads signs summary, history, entry and log with t
   await reads.history(scope, null, "200");
   await reads.entry(scope, null, 0);
   await reads.log(scope, null, "5");
+  await reads.retained(scope, null, "entry", `sha256:${"c".repeat(64)}`);
   await reads.summary(scope, "Session ars1.x.y");
   const named = sent.map(({ path, authorization }) => [path, authorization?.startsWith("Signed ") ? [opened(authorization).request.read, opened(authorization).request.arg] : authorization]);
   expect(named).toEqual([
-    ["", ["summary", "summary"]], ["/history", ["history", "0"]], ["/history?cursor=200", ["history", "200"]], ["/entries/0", ["entry", "0"]], ["/log?cursor=5", ["log", "5"]], ["", "Session ars1.x.y"],
+    ["", ["summary", "summary"]], ["/history", ["history", "0"]], ["/history?cursor=200", ["history", "200"]], ["/entries/0", ["entry", "0"]], ["/log?cursor=5", ["log", "5"]],
+    [`/retained/entry/sha256%3A${"c".repeat(64)}`, ["retained", `sha256:${"c".repeat(64)}`]], ["", "Session ars1.x.y"],
   ]);
-  // The replay source's reader: a signed read for a page of the log, and no header for a retained input.
+  // The replay source's reader: a signed read for a page of the log, and for a retained input by its digest.
   const log = signedLogReader(secretSigner(secret), { now });
-  expect([opened((await log(scope, "log", "0"))!).request.read, await log(scope, "retained", `sha256:${"b".repeat(64)}`)]).toEqual(["log", undefined]);
+  const kept = opened((await log(scope, "retained", `sha256:${"b".repeat(64)}`))!).request;
+  expect([opened((await log(scope, "log", "0"))!).request.read, [kept.read, kept.arg]]).toEqual(["log", ["retained", `sha256:${"b".repeat(64)}`]]);
 });

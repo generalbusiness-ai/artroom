@@ -642,12 +642,18 @@ of an active member, for the scopes of that one repository, for at most
 ten minutes. A scope checks it under the deployment's session secret, with
 no call to membership. A deployment with no secret bound issues and
 accepts no session. A reader with no session may present a signed read: a
-read of one scope signed by a key that signed an entry of that scope
-within the authority window of an intent. It reads the summary, the
-genesis and that key's own entries, and nothing else. So the operator key
-that signed `install` reads the register, and a founder's key reads the
-directory, where membership's reference is, before it holds a session. A
-reader with neither reads nothing. The scope package's guide says what a
+read of one scope signed by a key that signed an entry of that scope, or
+the entry at the root of its genesis's cause chain, within the authority
+window of an intent. It reads the summary, the genesis, that key's own
+entries, the entries whose cause chain leads within four causes to one of
+those (an outcome to the act that opened its operation, a delivery to
+the entry that sent it, a child's genesis to what created it), and the
+retained inputs that those entries name. So the operator key that signed
+`install` reads the register, and a founder's key reads the register's
+record of its claim, the directory and its three children, before it
+holds a session. A session of a membership scope reads the register in
+the same way, by the claim that caused its directory. A reader with
+neither reads nothing. The scope package's guide says what a
 session binds, how it ends, and the form of a signed read.
 
 ## Replay, and what a report means

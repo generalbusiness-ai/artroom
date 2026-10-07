@@ -103,7 +103,7 @@ export class PlatformScope extends DeployedScope<PlatformEnv> {
       sessions: session.sessions,
       readers: (given) => {
         const real = session.readers(given);
-        return { allows: (reader, read) => (!platformNet.sessions || (platformNet.inspector !== null && reader === platformNet.inspector) ? true : real.allows(reader, read)) };
+        return { allows: (reader, read) => (!platformNet.sessions || (platformNet.inspector !== null && reader === platformNet.inspector) ? true : real.allows(reader, read)), chained: real.chained! };
       },
       ...(platformNet.limits ? { limits: platformNet.limits } : {}),
       ports: {

@@ -9,7 +9,7 @@
  * the user. `memoryStore` keeps them in memory, for a test.
  */
 
-import type { ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
+import type { Digest, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
 
 /** The scopes of one repository, as `claim` or `join` learned them. */
 export interface Repository {
@@ -21,6 +21,12 @@ export interface Repository {
   inbox?: ScopeId;
 }
 
+/**
+ * A claim whose `found` was submitted and whose repository is not known yet: the register it went to, the digest of its signed
+ * intent, from which the directory's seed is computed, and the handle it names. No part of it is a secret.
+ */
+export interface PendingClaim { register: ScopeId; intent: Digest; handle: string }
+
 export interface Config {
   v: 1;
   /** The scope service's base URL. */
@@ -30,6 +36,8 @@ export interface Config {
   /** The register this command founded, as its receipt names it. */
   register?: ScopeRef;
   repository?: Repository;
+  /** A claim that `claim` submitted and has not seen through yet. A later `claim` goes on from it. */
+  claim?: PendingClaim;
   /** The caller's handle in membership, once it has one. */
   handle?: string;
 }

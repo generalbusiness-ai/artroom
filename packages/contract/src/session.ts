@@ -60,16 +60,19 @@ export type SessionAnswer = { ok: true; token: string; session: SessionClaims } 
 
 /**
  * A signed read: one read of one scope, signed by a device key, with no
- * session (the planner's decisions 61cc5e50 and c6499e91). A scope answers
- * it only to a key that signed an entry of that scope within the authority
- * window of an intent, and only for the scope's summary, its genesis and
- * the entries that key signed.
+ * session (the planner's decisions 61cc5e50 and c6499e91, and reads by the
+ * cause chain). A scope answers it only to a key that signed an entry of
+ * that scope, or the root of its genesis's cause chain, within the
+ * authority window of an intent, and only for the scope's summary, its
+ * genesis, the entries that key signed, the entries whose cause chain leads
+ * to one of those, and the retained inputs that those entries name.
  *
  * - `to`: the scope ID of the scope that is read.
  * - `actor`: the key that signs.
  * - `read`: the read's name. `arg`: its argument: `"summary"` for the
  *   summary; the cursor of `history` and `log`, `"0"` for the first page;
- *   the position of an `entry`, in decimal.
+ *   the position of an `entry`, in decimal; the digest of a `retained`
+ *   input. At most 128 characters.
  * - `notAfter`: after the scope's clock reading, and at most the lifetime
  *   of an intent ahead of it, as for an intent.
  *
@@ -82,4 +85,4 @@ export type SessionAnswer = { ok: true; token: string; session: SessionClaims } 
 export interface ReadRequest { v: 1; to: ScopeId; actor: KeyId; read: SignedReadName; arg: string; notAfter: Timestamp }
 export interface SignedRead { request: ReadRequest; sig: Base64Url }
 /** The reads that a signed read may name. */
-export type SignedReadName = "summary" | "history" | "entry" | "log";
+export type SignedReadName = "summary" | "history" | "entry" | "log" | "retained";

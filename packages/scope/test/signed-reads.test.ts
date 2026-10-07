@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { Entry, FactRef, Intent, OperationId, ReadRequest, ScopeId, ScopeRef, Sealed, Seed, SignedReadName } from "@generalbusiness/artroom-contract";
 import { b64url, canonicalBytes, entryHash, intentDigest, scopeIdOf, seedDigest, signIntent, signRead } from "@generalbusiness/artroom-bytes";
-import { secretSigner, signedLogReader, signedReader } from "@generalbusiness/artroom-client";
+import { requestSession, secretSigner, sessionRequest, signedLogReader, signedReader, type Fetch } from "@generalbusiness/artroom-client";
 import { timeMs, timeOf, useOf } from "@generalbusiness/artroom-derive";
 import { d, keys, otherLane, t, type Actor } from "@generalbusiness/artroom-derive/testing";
 import { DIRECTORY, REGISTER, platform, repositoryName } from "@generalbusiness/artroom-platform";
@@ -18,8 +18,8 @@ const { paul, vic } = keys;
 const SERVICE = "https://scopes.test";
 
 /** A register that `who` founds by an `install` that names rita a founder, as an operator's key would. */
-async function installed(who: Actor, before?: (name: ScopeId) => void): Promise<Platform> {
-  const install: Intent = { v: 1, to: null, actor: who.key, kind: "install", on: null, expected: {}, fields: { host: "git.example", namespace: "artroom", policy: "keys", founders: [rita.key] }, idempotencyKey: crypto.randomUUID(), notAfter: soon(60) };
+async function installed(who: Actor, before?: (name: ScopeId) => void, founders: readonly Actor[] = [rita]): Promise<Platform> {
+  const install: Intent = { v: 1, to: null, actor: who.key, kind: "install", on: null, expected: {}, fields: { host: "git.example", namespace: "artroom", policy: "keys", founders: founders.map((f) => f.key) }, idempotencyKey: crypto.randomUUID(), notAfter: soon(60) };
   const R = new Platform(scopeIdOf({ v: 1, kind: "register", definition: REGISTER, creator: null, cause: intentDigest(install), ordinal: 0 }));
   before?.(R.name);
   expect(await R.stub.found(signIntent(install, who.secret), REGISTER)).toMatchObject({ answer: "accepted" });
@@ -49,6 +49,25 @@ async function founded(delay: number): Promise<{ R: Platform; D: Platform; child
   const children = [1, 2, 3].map((n) => new Platform(scopeIdOf(sends.find((send) => send.n === n)!.to as Seed)));
   await settle(R, D, ...children);
   return { R, D, children };
+}
+
+/**
+ * `who`'s claim at a register whose outside port is the STAND-IN Git host (`outside.ts`), which confirms the one attempt of its
+ * creation. The directory is created, and its genesis creates membership, the rules scope and the destination, which are confirmed.
+ */
+async function claimedBy(R: Platform, who: Actor, handle: string): Promise<{ D: Platform; children: Platform[] }> {
+  const found = await R.intent(who, "found", { expected: await R.expected({ register: 0 }), fields: { branch: "main", founderHandle: handle, recoveryKey: keys.sam.key } });
+  const seed: Seed = { v: 1, kind: "directory", definition: DIRECTORY, creator: await R.at(), cause: intentDigest(found.intent), ordinal: 0 };
+  const D = new Platform(scopeIdOf(seed));
+  const answer = await R.stub.submit(found, []);
+  if (answer.answer !== "accepted") throw new Error(`the claim was not accepted: ${JSON.stringify(answer)}`);
+  outsideOf(R.name).answer(`${answer.receipt.fact.seq}:0` as OperationId, 1, { result: "confirmed", evidence: { basis: "own-answer", body: { name: repositoryName(seedDigest(seed), 1), id: `repo-${answer.receipt.fact.seq}` } } });
+  while ((await (R.stub as unknown as { effect(): Promise<number> }).effect()) > 0) { /* each pass may make the next one due */ }
+  await settle(R, D);
+  const sends = (await D.entries())[0]!.sends;
+  const children = [1, 2, 3].map((n) => new Platform(scopeIdOf(sends.find((send) => send.n === n)!.to as Seed)));
+  await settle(R, D, ...children);
+  return { D, children };
 }
 
 /** One read over the Worker's routes, with the real read sessions as deployed under a TEST SECRET: a reader with no session and no signed read reads nothing. */
@@ -141,21 +160,21 @@ describe("signed reads on real registers (the planner's decisions 61cc5e50, c649
     expect([(await get(R.name, await signed(paul, R.name, "summary", "summary"))).status, (await get(R.name, await signed(rita, R.name, "summary", "summary"))).status]).toEqual([403, 200]);
   });
 
-  test("the claim's key reads the summary and genesis of the directory the claim caused, and of membership, the rules scope and the destination that the directory caused, with no session; the install's key, which signed no claim, reads none of them", async () => {
+  test("the claim's key reads the summary, the genesis and every entry of the directory the claim caused, and of membership, the rules scope and the destination that the directory caused, with no session; the install's key, which signed no claim, reads none of them", async () => {
     net.hold = net.deaf = null;
     const { D, children } = await founded(PROPOSED_BOUNDS.dispatchRetrySeconds);
     const [M, Ru, G] = children as [Platform, Platform, Platform];
     expect(await Promise.all(children.map(async (node) => (await node.summary()).value.scope.kind))).toEqual(["membership", "rules", "destination"]);
-    // For each of the four scopes: the summary, the genesis, and a history that holds the genesis only.
+    // For each of the four scopes: the summary, the genesis, and a history that holds every entry, each of whose chains leads to the claim.
     const reads = async (who: Actor, node: Platform) => {
       const history = await get(`${node.name}/history`, await signed(who, node.name, "history", "0"));
       return [(await get(node.name, await signed(who, node.name, "summary", "summary"))).status, (await get(`${node.name}/entries/0`, await signed(who, node.name, "entry", "0"))).status, history.status, history.status === 200 ? seqs(history.body) : null];
     };
-    expect(await Promise.all([D, M, Ru, G].map((node) => reads(rita, node)))).toEqual([D, M, Ru, G].map(() => [200, 200, 200, [0]]));
+    const all = await Promise.all([D, M, Ru, G].map(async (node) => (await node.entries()).map((entry) => entry.seq)));
+    expect(await Promise.all([D, M, Ru, G].map((node) => reads(rita, node)))).toEqual(all.map((seqs) => [200, 200, 200, seqs]));
+    expect(all.every((seqs) => seqs.length > 1)).toBe(true);
     // Control: the same reads with no header, and by the install's key, are forbidden.
     expect(await Promise.all([D, M, Ru, G].map(async (node) => [(await get(node.name)).status, ...(await reads(paul, node))]))).toEqual([D, M, Ru, G].map(() => [403, 403, 403, 403, null]));
-    // The root's key reads the summary and the genesis only: an entry after the genesis, which it did not sign, is forbidden.
-    expect([(await get(`${D.name}/entries/1`, await signed(rita, D.name, "entry", "1"))).status, (await get(`${M.name}/entries/1`, await signed(rita, M.name, "entry", "1"))).status]).toEqual([403, 403]);
   });
 
   test("the window of a read by the cause chain is measured at the root entry: the claim, not the genesis that the claim caused", async () => {
@@ -174,9 +193,83 @@ describe("signed reads on real registers (the planner's decisions 61cc5e50, c649
     expect(await both()).toEqual([403, 403]);
   });
 
-  // Made by hand: a chain of geneses, each the creation of the one before, from rita's act. No scope judged them. It shows the bound of
-  // `rootOf`, which no real chain reaches: the longest of the platform's is two causes, from membership to the claim.
-  test("a cause chain is followed through at most four causes: a genesis four creations from the signed act has its root, one five creations away has none, an entry that cannot be read is unavailable, and a cause that names no source has no root", async () => {
+  // Invariant: a key reads, by signed read, an entry whose cause chain leads within four causes to an entry it signed, within the window
+  // at that entry, and the retained inputs that such an entry names; every other entry and input is forbidden. On real scopes: a
+  // register with two founders, rita and vic, each of whom claims; the STAND-IN Git host confirms each creation.
+  test("after the claim, the claim's key reads the register's outcome entry, its record of the directory and the retained inputs they name, and the retained inputs of the directory's genesis; the install's key and a key that signed only another claim are refused them; the replay of the directory over these reads is consistent", async () => {
+    net.hold = net.deaf = null;
+    const R = await installed(paul, (name) => wired.set(name, () => ({ outside: outsideOf(name) })), [rita, vic]);
+    const { D } = await claimedBy(R, rita, "@rita");
+    const { D: V } = await claimedBy(R, vic, "@vic");
+    const entries = await R.entries();
+    // The register's history: the install, rita's claim, its outcome and the record of her directory; then the same three of vic's.
+    expect(entries.map((entry) => entry.input.type)).toEqual(["genesis", "act", "outcome", "delivery", "act", "outcome", "delivery"]);
+    const history = async (who: Actor, node: Platform) => seqs((await get(`${node.name}/history`, await signed(who, node.name, "history", "0"))).body);
+    expect([await history(rita, R), await history(vic, R), await history(paul, R)]).toEqual([[0, 1, 2, 3], [0, 4, 5, 6], [0]]);
+    const entry = async (who: Actor, seq: number) => (await get(`${R.name}/entries/${seq}`, await signed(who, R.name, "entry", String(seq)))).status;
+    expect([await entry(rita, 2), await entry(vic, 2), await entry(paul, 2), await entry(vic, 5), await entry(rita, 5)]).toEqual([200, 403, 403, 200, 403]);
+
+    // Retained inputs: the register's record of each directory retains that directory's genesis, and rita's directory's genesis
+    // retains her claim and its outcome. Each is read by the key whose chain the entry that names it leads to.
+    const retained = async (who: Actor, node: Platform, digest: string) => (await get(`${node.name}/retained/entry/${encodeURIComponent(digest)}`, await signed(who, node.name, "retained", digest))).status;
+    const [ritas, vics] = [entries[3]!.uses[0]!.content, entries[6]!.uses[0]!.content];
+    expect([await retained(rita, R, ritas), await retained(vic, R, ritas), await retained(paul, R, ritas), await retained(vic, R, vics)]).toEqual([200, 403, 403, 200]);
+    const genesis = (await D.entries())[0]!;
+    expect(genesis.uses.map((use) => use.fact.seq).sort()).toEqual([1, 2]);
+    expect(await Promise.all(genesis.uses.map((use) => retained(rita, D, use.content)))).toEqual([200, 200]);
+    expect(await Promise.all(genesis.uses.map((use) => retained(vic, D, use.content)))).toEqual([403, 403]);
+    // Vic's own directory retains his claim, not rita's.
+    expect(await retained(vic, V, genesis.uses[0]!.content)).toBe(403);
+
+    // The replay of rita's directory by her signed reads of the log and of its retained inputs: every entry, every input.
+    platformNet.sessions = true;
+    platformNet.secret = b64url(new Uint8Array(32).fill(9));
+    try {
+      const { report, why } = await verify(httpSource(SERVICE, { fetch: routed, reader: signedLogReader(secretSigner(rita.secret), { now: () => Date.parse(net.clock.now) }) }), { mode: "replay", scope: D.name, platform, grants: "proven" });
+      expect([report.result, why]).toEqual(["consistent", null]);
+    } finally {
+      platformNet.sessions = false;
+      platformNet.secret = null;
+    }
+  });
+
+  // Invariant: a session of a membership scope reads, at the register, the genesis and the entries whose cause chain leads to the
+  // claim that caused that membership's directory, and the inputs they name; nothing else of the register.
+  test("a session of the founded membership reads the register's genesis, the claim, its outcome and its record of the directory, and the retained inputs they name; not another founder's entries, not the register's summary or items, and with no session nothing", async () => {
+    net.hold = net.deaf = null;
+    const R = await installed(paul, (name) => wired.set(name, () => ({ outside: outsideOf(name) })), [rita, vic]);
+    const { children } = await claimedBy(R, rita, "@rita");
+    await claimedBy(R, vic, "@vic");
+    const M = children[0]!;
+    // Rita takes her seat and her first key, and asks membership for a session, under a TEST SECRET.
+    const seat = await M.did(rita, "seat", { expected: await M.expected({ roster: 0 }) });
+    await M.did(rita, "first-key", { fields: { member: seat }, expected: await M.expected({ roster: 0, member: seat }) });
+    const [at, entries] = [await M.at(), await R.entries()];
+    platformNet.sessions = true;
+    platformNet.secret = b64url(new Uint8Array(32).fill(9));
+    try {
+      const issued = await requestSession(SERVICE, M.name, sessionRequest(at, rita.secret, soon(60), "chained"), { fetch: routed as unknown as Fetch });
+      if (!issued.ok) throw new Error(`no session: ${issued.reason}`);
+      const session = issued.session.reader();
+      const read = async (path: string, as: string | null = session) => {
+        const response = await routed(`${SERVICE}/v1/scopes/${R.name}${path}`, as === null ? {} : { headers: { authorization: as } });
+        return { status: response.status, body: await response.json() as { value?: unknown } };
+      };
+      const history = await read("/history");
+      expect([history.status, seqs(history.body)]).toEqual([200, [0, 1, 2, 3]]);
+      expect([(await read("/entries/2")).status, (await read("/entries/5")).status, (await read(`/retained/entry/${encodeURIComponent(entries[3]!.uses[0]!.content)}`)).status, (await read(`/retained/entry/${encodeURIComponent(entries[6]!.uses[0]!.content)}`)).status]).toEqual([200, 403, 200, 403]);
+      // The register's summary and its items are no entries: forbidden. With no session, the history is forbidden too.
+      expect([(await read("")).status, (await read("/items/claim")).status, (await read("/history", null)).status]).toEqual([403, 403, 403]);
+    } finally {
+      platformNet.sessions = false;
+      platformNet.secret = null;
+    }
+  });
+
+  // Made by hand: a chain of geneses, each the creation of the one before, from rita's act, an outcome of that act's operation, and
+  // deliveries from the geneses. No scope judged them. It shows the bound of `rootOf`, which no real chain passes: the longest of the
+  // platform's founding is four causes, from an entry of membership that the directory's confirmation wrote to the claim.
+  test("a cause chain is followed through at most four causes: a genesis four creations from the signed act has its root, one five creations away has none; an outcome leads to the act that opened its operation, in its own scope only; a delivery leads to the entry that sent it, within the same bound; an entry that cannot be read is unavailable, and a cause that names no source has no root", async () => {
     const act: Entry = { v: 1, at: otherLane, seq: 1, prev: d("0"), time: t(0), clamped: false, epoch: 0, input: { type: "act", signed: signIntent({ v: 1, to: otherLane, actor: rita.key, kind: "split", on: null, expected: {}, fields: {}, idempotencyKey: "split", notAfter: t(60) }, rita.secret), authority: [], presented: {} }, uses: [], prepared: [], effects: [], sends: [] };
     const fact = (entry: Entry): FactRef => ({ at: entry.at, seq: entry.seq, hash: entryHash(entry) });
     const kept = new Map<string, Entry>([[useOf(fact(act), act).content, act]]);
@@ -191,11 +284,20 @@ describe("signed reads on real registers (the planner's decisions 61cc5e50, c649
       source = genesis;
     }
     const read = async (use: { content: string }) => kept.get(use.content) ?? null;
-    const root = { actor: rita.key, time: t(0) };
+    const root = { actor: rita.key, time: t(0), scope: act.at.scope, seq: act.seq };
     expect([await rootOf(chain[0]!, read), await rootOf(chain[CHAIN_STEPS - 1]!, read), await rootOf(chain[CHAIN_STEPS]!, read)]).toEqual([root, root, null]);
     // Control: the same chain under a bound one longer has its root. An entry of the chain that cannot be read now; and a genesis whose
     // source is a genesis that its seed's cause does not name.
     const stray: Entry = { ...chain[1]!, input: { ...(chain[1]!.input as Extract<Entry["input"], { type: "genesis" }>), seed: { ...(chain[1]!.input as Extract<Entry["input"], { type: "genesis" }>).seed, cause: d("c") } } };
     expect([await rootOf(chain[CHAIN_STEPS]!, read, CHAIN_STEPS + 1), await rootOf(chain[1]!, async (use) => (use.content === useOf(fact(act), act).content ? null : read(use))), await rootOf(stray, read)]).toEqual([root, "unavailable", null]);
+
+    // An outcome of the operation that the act opened, in the act's scope: one cause, read from that scope's own entries. The same
+    // outcome read as another scope's entry ends the chain.
+    const outcome: Entry = { ...act, seq: 2, prev: d("1"), input: { type: "outcome", operation: "1:0" as OperationId, attempt: 1, owner: REGISTER, kind: "create-repository", result: "confirmed", evidence: { basis: "own-answer", body: {} } } };
+    const own = { scope: otherLane.scope, entry: (seq: number) => (seq === 1 ? act : null) };
+    expect([await rootOf(outcome, read, CHAIN_STEPS, own), await rootOf(outcome, read, CHAIN_STEPS, { ...own, scope: chain[0]!.at.scope }), await rootOf(outcome, read)]).toEqual([root, null, null]);
+    // A delivery from a genesis three creations away is four causes from the act; one from a genesis four creations away is five.
+    const delivery = (from: Entry): Entry => ({ ...act, seq: 3, prev: d("2"), input: { type: "delivery", from: fact(from), n: 0, message: { class: "control", type: "confirm", genesis: fact(from) } }, uses: [useOf(fact(from), from)] });
+    expect([await rootOf(delivery(chain[CHAIN_STEPS - 2]!), read), await rootOf(delivery(chain[CHAIN_STEPS - 1]!), read)]).toEqual([root, null]);
   });
 });

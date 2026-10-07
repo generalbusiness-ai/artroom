@@ -14,12 +14,12 @@
  * | Command | What it does |
  * |---|---|
  * | `install` | Founds the register by an `install` intent, signed by a new operator key that is also the one founder key. |
- * | `claim` | Signs the register's `found` act, then waits until the directory, membership, rules scope and destination are created and confirmed. Then it takes the founder's seat and first key in membership. |
+ * | `claim` | Signs the register's `found` act, then waits until the directory, membership, rules scope and destination are created and confirmed. Then it takes the founder's seat and first key in membership. A claim it gave up waiting on is kept as pending, and the next `claim` goes on from it; `--again` signs a new one. |
  * | `invite`, `join` | Membership's `invite-member` and `join`. The link carries the invitation's number and secret; the joining key is made and kept locally. |
  * | `acts` | The acts of a scope's definition, with the ones the caller's role holds. |
  * | `act` | One act of any kind, through the client's declared handle for a declared definition, or as a signed intent for a platform one. |
  * | `log`, `show` | The scope's history, and one entry, over the read routes. |
- * | `verify` | The replay verifier over the read routes. |
+ * | `verify` | The replay verifier over the read routes: with the caller's session, and by signed reads where the session is refused. |
  */
 
 import type { Answer, DeclaredDefinition, Digest, Entry, FieldValue, Founded, Item, KeyId, PlatformDefinition, ScopeId, Seed, Summary } from "@generalbusiness/artroom-contract";
@@ -29,7 +29,7 @@ import {
   type Fetch, type ReadSigning, type Signing, type Transport,
 } from "@generalbusiness/artroom-client";
 import { DIRECTORY, MEMBERSHIP, REGISTER, ROLE_LISTS, platform, type Role } from "@generalbusiness/artroom-platform";
-import { SourceError, httpSource, render, verify as replay } from "@generalbusiness/artroom-replay";
+import { SourceError, httpSource, render, verify as replay, type HistorySource } from "@generalbusiness/artroom-replay";
 import type { Config, Repository, Store } from "./store.ts";
 
 export interface Context {
@@ -241,15 +241,15 @@ const accepted = (answer: Answer | Founded, scope: ScopeId | null, took: string)
 
 // ---------------------------------------------------------------- waiting for scopes
 
-/** Reads until `ready` holds, pausing between reads. */
-async function waitFor<T>(ctx: Context, waiting: () => readonly ScopeId[], read: () => Promise<T | null>, what: string): Promise<T> {
+/** Reads until `ready` holds, pausing between reads. `then`: what the person may do after the command gives up. */
+async function waitFor<T>(ctx: Context, waiting: () => readonly ScopeId[], read: () => Promise<T | null>, what: string, then = "run the command's reads again later."): Promise<T> {
   const tries = ctx.tries ?? 120;
   for (let n = 0; n < tries; n++) {
     const got = await read();
     if (got !== null) return got;
     await (ctx.pause ?? (() => new Promise<void>((resolve) => { setTimeout(resolve, 1000); })))(waiting());
   }
-  return stop(failed(`Gave up waiting for ${what} after ${tries} reads. What was asked may still take effect; run the command's reads again later.`));
+  return stop(failed(`Gave up waiting for ${what} after ${tries} reads. What was asked may still take effect; ${then}`));
 }
 
 /** The scope's summary once it is `active`: created and confirmed. */
@@ -294,27 +294,56 @@ export function install(ctx: Context, service: string, options: { host?: string;
  * operator key: the register's summary, where that key signed `install`;
  * then the directory that the claim caused, and the scopes that the
  * directory caused; then membership, where the key has signed `seat`.
+ *
+ * **Resume.** Before it submits the `found`, the command saves the signed
+ * intent's digest, the register and the handle in the config as a pending
+ * claim. A refusal or an unavailable answer wrote nothing, and removes it.
+ * If the command gives up waiting, the claim stays pending, and the next
+ * `claim` submits nothing: it reads the register once, which is the first
+ * call that a register restarted since the claim gets, and goes on waiting
+ * for the directory whose seed that digest gives. Only `--again` signs a
+ * second `found`, which creates a second repository. The config holds no
+ * secret.
  */
-export function claim(ctx: Context, name: string, options: { handle?: string; branch?: string } = {}): Promise<Outcome> {
+export function claim(ctx: Context, name: string, options: { handle?: string; branch?: string; again?: boolean } = {}): Promise<Outcome> {
   return run(async () => {
     const config = await configOf(ctx);
     const register = config.register ?? stop(usage("No register is known here. Run: artroom install <base-url>."));
     if (config.repository) return usage(`A repository is claimed here already: directory ${config.repository.directory.scope}.`);
     const secret = await signerOf(ctx, config);
     const signer = secretSigner(secret);
-    const recovery = keyIdOfSecret(await keyOf(ctx, "recovery"));
-    const handle = options.handle ?? "@founder";
     const R = await handleOf(ctx, config, register.scope, null);
-    const shape = platform(REGISTER)!.data as unknown as DefinitionShape;
-    const fields = { branch: options.branch ?? "main", founderHandle: handle, recoveryKey: recovery };
-    const signed = await signedIntent(signer, { to: register, kind: "found", fields, expected: expectedOf(shape.acts["found"]!, (await summaryOf(R)).items, null, fields) }, signing(ctx));
-    accepted(await R.submit(signed), register.scope, "Claimed");
+    const pending = config.claim?.register === register.scope && !options.again ? config.claim : null;
+    let cause: Digest;
+    let handle: string;
+    if (pending) {
+      // Nothing is signed. The read's answer does not matter: a register that restarted sends what it recorded at its first call.
+      await R.summary();
+      [cause, handle] = [pending.intent, pending.handle];
+    } else {
+      const recovery = keyIdOfSecret(await keyOf(ctx, "recovery"));
+      handle = options.handle ?? "@founder";
+      const shape = platform(REGISTER)!.data as unknown as DefinitionShape;
+      const fields = { branch: options.branch ?? "main", founderHandle: handle, recoveryKey: recovery };
+      const signed = await signedIntent(signer, { to: register, kind: "found", fields, expected: expectedOf(shape.acts["found"]!, (await summaryOf(R)).items, null, fields) }, signing(ctx));
+      cause = intentDigest(signed.intent);
+      const { claim: _, ...without } = config;
+      await ctx.store.save({ ...without, claim: { register: register.scope, intent: cause, handle } });
+      try {
+        accepted(await R.submit(signed), register.scope, "Claimed");
+      } catch (error) {
+        // A refusal or an unavailable answer wrote nothing: no claim is pending. A lost reply may have been recorded, and stays pending.
+        if (error instanceof Stop) await ctx.store.save(without);
+        throw error;
+      }
+    }
+    const resume = `run artroom claim ${name} again to go on waiting for this claim, or with --again to sign a new one, which creates a second repository.`;
 
     // The register's rule fixes the directory's seed from the claim's own intent (`directorySeed`).
-    const seed: Seed = { v: 1, kind: "directory", definition: DIRECTORY, creator: register, cause: intentDigest(signed.intent), ordinal: 0 };
+    const seed: Seed = { v: 1, kind: "directory", definition: DIRECTORY, creator: register, cause, ordinal: 0 };
     const D = await handleOf(ctx, config, scopeIdOf(seed), null);
     const children: ScopeId[] = [];
-    const directory = await waitFor(ctx, () => [register.scope, D.scope, ...children], () => active(D), "the directory");
+    const directory = await waitFor(ctx, () => [register.scope, D.scope, ...children], () => active(D), "the directory", resume);
     const made = await createdBy(D, 0);
     const kind = (k: string) => made.find((m) => m.seed.kind === k)?.scope ?? stop(failed(`The directory's genesis creates no ${k}.`));
     children.push(kind("membership"), kind("rules"), kind("destination"));
@@ -322,7 +351,7 @@ export function claim(ctx: Context, name: string, options: { handle?: string; br
     const summaries = await waitFor(ctx, () => [register.scope, D.scope, ...children], async () => {
       const all = await Promise.all([membership!, rules!, destination!].map(active));
       return all.every((s) => s !== null) ? (all as Summary[]) : null;
-    }, "membership, the rules scope and the destination");
+    }, "membership, the rules scope and the destination", resume);
     const repository: Repository = { directory: directory.scope, membership: summaries[0]!.scope, rules: rules!.scope, destination: destination!.scope };
 
     // The founder's seat and first key (`founding-key`): the first admin of the repository.
@@ -337,7 +366,8 @@ export function claim(ctx: Context, name: string, options: { handle?: string; br
       await waitFor(ctx, () => [M.scope, inbox], () => active(I), "the founder's inbox");
       repository.inbox = inbox;
     }
-    await ctx.store.save({ ...config, repository, handle });
+    const { claim: _, ...rest } = config;
+    await ctx.store.save({ ...rest, repository, handle });
     return done(
       `Claimed ${name}: directory ${repository.directory.scope}, membership ${repository.membership.scope}, rules ${repository.rules}, destination ${repository.destination}; each created and confirmed.`,
       `You are ${handle}, an admin, on key ${signer.key}${inbox ? `; your inbox is ${inbox}` : ""}.`,
@@ -539,12 +569,26 @@ export function show(ctx: Context, named: string): Promise<Outcome> {
  * the platform package's data and rules for a platform definition. It
  * prints the report: what it checked, and what it took on trust.
  */
+/**
+ * A source whose reads go with the caller's session, and a read that the session is refused (`forbidden`) goes again as a signed
+ * read by the caller's key. So a scope that accepts no session of this repository yet, as a rules scope that records membership's
+ * ID with no incarnation before its first act, is read by the key's cause chain while that holds.
+ */
+function sessionFirst(session: HistorySource, signed: HistorySource): HistorySource {
+  return {
+    page: async (scope, from, allow) => { const got = await session.page(scope, from, allow); return !got.ok && got.reason === "forbidden" ? signed.page(scope, from, allow) : got; },
+    retained: async (scope, kind, digest, allow, domain) => { const got = await session.retained(scope, kind, digest, allow, domain); return !got.ok && got.reason === "forbidden" ? signed.retained(scope, kind, digest, allow, domain) : got; },
+  };
+}
+
 export function verify(ctx: Context, named: string | undefined): Promise<Outcome> {
   return run(async () => {
     const config = await configOf(ctx);
     const scope = scopeNamed(config, named);
     const reader = await readerOf(ctx, config);
-    const source = httpSource(config.service, { ...(ctx.fetch ? { fetch: ctx.fetch } : {}), reader: reader ?? signedLogReader(secretSigner(await signerOf(ctx, config)), readSigning(ctx)) });
+    const options = ctx.fetch ? { fetch: ctx.fetch } : {};
+    const signed = httpSource(config.service, { ...options, reader: signedLogReader(secretSigner(await signerOf(ctx, config)), readSigning(ctx)) });
+    const source = reader === null ? signed : sessionFirst(httpSource(config.service, { ...options, reader }), signed);
     const { report, why } = await replay(source, { mode: "replay", scope, platform, grants: "proven" });
     const lines = render(report, why).split("\n").filter((line) => line.length > 0);
     return report.result === "consistent" ? done(...lines) : failed(...lines);

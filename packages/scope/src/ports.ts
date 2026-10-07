@@ -223,7 +223,15 @@ export type ReadName = "summary" | "items" | "history" | "entry" | "outbox" | "o
  * scope's clock reads earlier than its previous entry's time (section 3.12,
  * W6). Nothing is read in any of the three cases.
  */
-export interface Readers { allows(reader: unknown, read: ReadName): boolean | "sessions-unavailable" | "clock-behind" }
+export interface Readers {
+  allows(reader: unknown, read: ReadName): boolean | "sessions-unavailable" | "clock-behind";
+  /**
+   * For a reader that `allows` refused: a session of a membership scope at a scope that reads by the cause chain, the register
+   * (`sessions.ts`, `chainedSession`). The membership scope: the reader reads the entries that the chain gives it. False, or a
+   * name, as for `allows`. Absent: no reader reads by the chain.
+   */
+  chained?(reader: unknown, read: ReadName): { membership: ScopeRef } | false | "sessions-unavailable" | "clock-behind";
+}
 
 export interface Ports {
   clock: Clock; random: Random; authority: Authority; resolver: Resolver; rules: Rules; alarm: Alarm; definitions: Definitions; texts: SentTexts; readers: Readers;
