@@ -55,11 +55,15 @@ register is whole. Every other scope is created by another scope: a
 register's founding of a repository creates its directory, and the directory
 creates membership, the rules scope and the destination. Three limits stand.
 Nothing yet checks the installation's authority to install. The Git host in
-the witness is a stand-in. Nothing is deployed. The destination now
+the founding witness is a stand-in. A scope Worker is deployed at
+<https://artroom-scope.inguz.workers.dev>; its API starts at `/v1/scopes`,
+and its root URL returns 404. The destination now
 carries every rule needed to answer its creation; a missing rule is still
 refused for the whole pinned
-version. A configured GitHub adapter is authored; its deployed validation
-and the remaining I3 work are not delivered.
+version. A configured GitHub adapter is authored; the live repository
+founding, publication, clone and authenticated replay still require
+evidence. The deployed URL alone does not close that work or the remaining
+I3 work.
 
 ## Identity and incarnation
 
@@ -641,14 +645,19 @@ is a read session: a token that a membership scope issues to a device key
 of an active member, for the scopes of that one repository, for at most
 ten minutes. A scope checks it under the deployment's session secret, with
 no call to membership. A deployment with no secret bound issues and
-accepts no session. A reader with no session may present a signed read: a
-read of one scope signed by a key that signed an entry of that scope
-within the authority window of an intent. It reads the summary, the
-genesis and that key's own entries, and nothing else. So the operator key
-that signed `install` reads the register, and a founder's key reads the
-directory, where membership's reference is, before it holds a session. A
-reader with neither reads nothing. The scope package's guide says what a
-session binds, how it ends, and the form of a signed read.
+accepts no session. A reader with no session may present a signed read:
+the key must have a signed local entry, or a signed root of the scope's
+cause chain, within the intent authority window, 900 seconds by default.
+The chain follows at most four causes through verified source entries.
+The claim's `found` entry is the root for its directory and the
+membership, rules and destination scopes that the directory creates; the
+window is measured at that claim's time, not at each child's genesis.
+The read serves the summary, genesis and the key's own signed entries.
+History and log pages are filtered, and retained inputs and streams are
+unavailable through this route. The CLI can therefore bootstrap `claim`
+before membership issues a session, while replay through signed reads
+remains partial. A reader with neither reads nothing. The scope package's
+guide says what a session binds, how it ends, and the form of a signed read.
 
 ## Replay, and what a report means
 
@@ -753,15 +762,15 @@ and nothing here guesses at it.
 
 | Not delivered | Owner | What the substrate has in its place |
 |---|---|---|
-| Grants and membership: who may act, how a grant is shown to be current, revocation | The authority design, then the authority and publication delivery | The `Grant` shape and the check that a grant names the action, the key and the scope. Membership is runnable under its eleven rules. Whether a grant is current is asked of a port, `Authority`, in two phases: a read before the turn, and a decision in the commit on what was read. The production default reads no grant, so none is current. The deployed class, `DeployedScope`, has a real authority (`repositoryAuthority`, in `packages/scope/src/authority.ts`): a membership scope judges its own acts on its own head, and every other scope reads the membership scope that it records. A scope that records none reads nothing, and an act that needs a grant is answered `authority-unavailable`. `packages/scope/test/membership.test.ts` shows it on real scopes, for membership and an inbox. Most other tests use a test authority that is named as one. Nothing is deployed. |
+| Grants and membership: who may act, how a grant is shown to be current, revocation | The authority design, then the authority and publication delivery | The `Grant` shape and the check that a grant names the action, the key and the scope. Membership is runnable under its eleven rules. Whether a grant is current is asked of a port, `Authority`, in two phases: a read before the turn, and a decision in the commit on what was read. The production default reads no grant, so none is current. The deployed class, `DeployedScope`, has a real authority (`repositoryAuthority`, in `packages/scope/src/authority.ts`): a membership scope judges its own acts on its own head, and every other scope reads the membership scope that it records. A scope that records none reads nothing, and an act that needs a grant is answered `authority-unavailable`. `packages/scope/test/membership.test.ts` shows it on real scopes, for membership and an inbox. Most other tests use a test authority that is named as one. A live authority journey still requires its own evidence. |
 | Who may read, and sessions | The same | Read sessions bound to one repository, in `packages/scope/src/sessions.ts`, with the client's side in `packages/client/src/session.ts`. The form of a token and of a session request are source choices (I3 deltas, entries ES1 to ES9). |
 | Platform definitions: register, directory, membership, rules, destination, inbox, task | The same | `packages/platform` supplies six runnable definitions: register, directory, membership, rules, destination and inbox. Each carries every rule of its marks. `platform:task@1` is not supplied, and a runtime or replay that lacks any rule of a pinned version answers `unsupported-definition` for the whole scope. The rules scope answers observations with its revision, the digest of its extents, and the separately retained canonical value. Platform data now states the subjects that acts, outcomes and result clauses observe; the runtime reads them before the turn and retains what the declared rows require. It also reads named values in declared byte domains. The destination reads its reservation evidence from the retained lane entries, observes membership and the rules, judges the touched extents, and counts its work under the branch and publication holders. Its first-head, receipt and deciding-read rules are tested with the real judges in memory (`packages/platform/test/destination-creates.test.ts`); its computed objects and public ref names are checked with real local Git in both object formats (`destination-objects.test.ts`). These witnesses use a made-up bureau or host answers where labelled. The configured GitHub adapter is source, with local focused witnesses; its deployed run and the rest of I3 remain outstanding. |
 | Hold tokens, workspaces and their export | The same | The hold item, its epoch and its timed end. `workspaceEffects` in `packages/derive` derives its workspace records when the judge has the code of `hold@1`; the production ports supply that code. The production authority reads the membership scope that a lane records. The directory now declares observations of active definitions for `open-issue` and `open-pr`, and of the worker for `open-task`; the runtime can read those subjects before a turn. Token minting and revocation have a driver, but no adapter reaches a real Git host. |
 | The rules of the `hold@1` and `git-read@1` capabilities in a running scope: their records, guards, effects and steps | The same | The rules are pure functions in `packages/derive` (`src/capability/`, `src/prepare.ts`), with tests on made-up definitions, and the Git reader is `packages/git`. The production ports hold them (`CAPABILITY_CODE`, in `packages/scope/src/ports.ts`). With only the production defaults no grant is read and nothing is sent outside, so every act and step is refused `unauthorized` and no attempt is sent. A verifier runs them when its caller gives them (`Options.capabilities` and `Options.owners`, in `packages/replay`). The replay command gives none, and answers `unsupported-definition` for a history that needs them. The tests of a scope have a scripted stand-in, which is named as one, and the lane scenarios T3, T4 and T5b run on the code itself with a stand-in for the Git host. |
 | Publication to a destination, and the evidence of an outside write | The same | The destination has all its outcome rules, a reader of retained change-lane entries, the five reservation observation rows, and held counts for operations, requests, items and a bound withdrawal decision. A publication keeps its receipt and cleanup duties after it becomes final, and releases the remaining reservation when those duties settle. The operations driver reads declared subjects and records the evidence values beside their outcomes, under the pinned owner's byte domains. The founding and receipt object builders take the repository's object format explicitly. The production default outside port sends nothing. Explicit GitHub configuration enables register and destination adapters, private credential custody, safe read recovery and retrieval of retained mint replies. Host authority is pinned to one register and its destinations. Focused witnesses use scripted provider replies and real local Git or SQLite where stated; a deployed publication remains unverified. Native lane hold and Git-read operations still have no production host adapter. |
 | Running the two lane definitions, `issue` and `change` | The authority and publication delivery, for the capability rules and the platform scopes that the rows read | The two definitions as data, in `packages/lanes`, validated whole and pinned by digest. Both use capability forms, whose code the production ports hold, so a scope can be founded or created under either. With only the production defaults it admits no act and no step, because no grant is read. Eleven test scenarios run them on real scopes with stand-ins that each test names. [lanes.md](lanes.md) says which rows wait and on whom. The fixtures' lane and ticket are made up for tests. |
-| The application: browser pages, the command line, tools for agents | The application delivery | The client handle. |
-| A deployment | Demo gate 1, request `225da894` | `packages/scope/wrangler.jsonc` supplies the Worker configuration. The real deployed founding, publication, person clone and authenticated verifier run remain outstanding. |
+| The application: browser pages, the command line, tools for agents | The application delivery | The client handle and the command in `packages/cli`, described in [cli.md](cli.md). Its story fixture uses real authority, signed reads and sessions, a stand-in Git host and test-driven dispatchers. It establishes no complete deployed journey. |
+| A deployment | Demo gate 1, request `225da894` | `packages/scope/wrangler.jsonc` supplies the Worker configuration, and the scope Worker is deployed at <https://artroom-scope.inguz.workers.dev>. The real deployed founding, publication, person clone and authenticated verifier run remain outstanding. |
 | Budgets in bytes, items, records and pending requests; the numbers of every bound | The proof plan | Admission and replay check the budget of entries, including the reservations of holders, observations, evidence values and bound decisions. The holder amounts are computed in all five dimensions, but admission against the other four budgets is still outstanding. The numbers remain temporary examples; the capacity proof is not complete. |
 
 The earlier model's source that a later delivery still replaces is in

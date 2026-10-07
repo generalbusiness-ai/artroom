@@ -9,7 +9,11 @@ the command exits 1 with the refusal's reason.
 
 The source is `packages/cli`. In this repository it runs as
 `packages/cli/bin/artroom.js` under Node 22 or later. Nothing is
-published to a registry, and no service is deployed.
+published to a registry. A scope Worker is deployed at
+<https://artroom-scope.inguz.workers.dev>; its routes start at `/v1/scopes`.
+The root URL returns 404 because it has no application page. This endpoint
+does not establish a completed live founding, publication, clone or
+authenticated replay.
 
 ## What it needs
 
@@ -24,6 +28,11 @@ published to a registry, and no service is deployed.
 A scope is named by its ID (`sc_...`) or by one of the names `claim` or
 `join` learned: `register`, `directory`, `membership`, `rules`,
 `destination`, `inbox`. An entry is named `<scope>:<seq>`.
+
+An install receipt does not enable GitHub effects by itself. The deployment
+must configure its GitHub authority and pin the chosen register's scope ID
+beforehand; other registers do not receive that host authority. Full
+authorization to install a register remains unimplemented.
 
 ## The commands
 
@@ -118,28 +127,44 @@ Exit codes: 0 done; 1 refused, unavailable, not found or not consistent;
 
 ## Reads and sessions
 
-Before it reads, the command asks the repository's membership scope for a
-read session, signed by its key. If membership gives none (a service with
-no session secret, or a key that is no active member's), the command
-reads without one, and the scope decides. Under a real session a member
-can read the scopes that record their membership. No session covers the
-register.
+Once it knows membership, the command asks that scope for a read session,
+signed by its key. A member's session covers scopes that record that
+membership; it does not cover the register.
+
+Before membership is known, or when no session is issued, `summary`,
+`history`, `entry` and `log` use signed reads by the caller's key. The
+scope permits these while a local entry signed by that key, or the root
+entry of its cause chain signed by that key, is within the intent
+authority window: 900 seconds by default. The claim's `found` entry is
+the root for its directory and the membership, rules and destination
+scopes that the directory creates. This lets `claim` learn their
+references, wait for confirmation and take the founder's seat before it
+has a session. The window starts at the claim entry's time, not at each
+child's genesis.
+
+A signed read serves the summary, the genesis and the key's own signed
+entries. History and log pages are filtered; they keep the original
+page's cursor and completion flag. It grants no retained-input read or
+stream. Replay through signed reads can therefore be incomplete or miss a
+dependency. In the CLI fixture, the register's sole genesis replays
+`consistent` before a claim; that result does not cover a later history
+or the child scopes' retained inputs.
 
 ## What it does not do yet
 
 - There is no page. This is the command line only.
-- Nothing is deployed, so the command has run only against the test
-  Worker. Its tests use a stand-in for the Git host and drive the
-  scopes' dispatchers in place of a deployment's alarms.
-- The lanes' acts arrive with the lane wiring branch. Until then the
-  directory refuses `open-issue` and `open-pr`, because the rules scope
-  has activated no lane definition.
+- The documented CLI story is a workerd fixture with real scope rules,
+  authority, signed reads and sessions. Its Git host is a stand-in, and
+  it drives dispatchers in place of deployment alarms. The deployed
+  repository journey still needs its own evidence.
+- The command does not activate lane definitions. The directory refuses
+  `open-issue` and `open-pr` until the rules scope has activated the
+  supplied definition.
 - `invite --acts` is refused: membership's `invite-member` has no list of
   acts for one member.
-- On a deployment with read sessions, `claim` cannot read the register or
-  the new directory, because no session covers them yet. The verifier
-  cannot read the register either, so `verify` of a scope whose creation
-  chain starts there reports a missing dependency. The delivery note,
-  section 5, has the details.
+- A membership session cannot read the register. `verify` uses the
+  session when one is available, and can report a missing dependency when
+  the creation chain reaches a register that the session cannot read.
+  Signed-read replay has the separate coverage limits described above.
 - An act definition has no description text. The line `acts` prints is
   made from the act's step, item and grant.
