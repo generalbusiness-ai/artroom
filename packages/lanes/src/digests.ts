@@ -14,5 +14,5 @@ export const LANE_FORMS = { revision: 14, commit: "4b3bf5da" } as const;
 /** The definition digest of each lane definition: SHA-256 over the tag `artroom-definition-1`, a newline and its canonical JSON. */
 export const DIGESTS = {
   issue: "sha256:325cb4f33da9deb1a31d85ba0f1456068d4d9d08009978b779aed70cb08e00ad",
-  change: "sha256:abbc0d785f95ffd558377282311d1523dd8b0d22b683eb04ff923f302a543d05",
+  change: "sha256:e182f6fb8ebc0525214e6fd9139c6c5e405d9bab2885d7202cd66602f8155a07",
 } as const satisfies Record<string, Digest>;

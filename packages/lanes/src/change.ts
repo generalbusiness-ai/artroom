@@ -189,7 +189,8 @@ export const change = {
       many: false, max: 1, initial: "current",
       states: { current: { final: false } },
       parties: {},
-      refs: { source: { fixed: false, required: false, to: { type: "fact", kind: ["publish"], under: "platform:rules" } } },
+      // i5 wiring: the real rules scope sends its update from the entry that records a lane's `rules-wanted`, of that kind.
+      refs: { source: { fixed: false, required: false, to: { type: "fact", kind: ["publish", "rules-wanted"], under: "platform:rules" } } },
       values: {
         approvals: { fixed: false, required: true, of: { type: "int", min: 0, max: 64 } },
         checks: {
@@ -1573,6 +1574,9 @@ export const change = {
         outcome: { type: "enum", of: ["committed", "unknown", "published", "refused", "aborted"], required: true },
         commit: { type: "commit", required: false },
         reason: { type: "text", max: 1024, required: false },
+        // i5 wiring: the revision of the rules that the destination judged the reservation under, which its update states. A lane
+        // that declared no such field refused the real update, `bad-field`.
+        rules: { type: "int", min: 0, max: 1000000000, required: false },
       },
       guards: [
         { equals: { a: { sender: true }, b: { slot: "destination", of: "also.proposal" } }, reason: "not-the-destination" },
