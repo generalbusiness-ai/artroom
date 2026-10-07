@@ -268,7 +268,8 @@ test("a lane is created only under a digest that the retained observation of the
     // Revision 25, EP15: a digest that is `active`, whose bytes hash to it and do not validate, is refused under its own code.
     said(d.act(rita, "open-issue", opening(d, {}, BROKEN.digest), { observed: [rulesObserved(rules, [BROKEN.digest])], values: [BROKEN.bytes] })),
     d.head.seq, d.item(0).values["lastNumber"],
-  ]).toEqual([["refused", "guard-failed", "not-activated"], ["unavailable", "authority-unavailable", null], ["unavailable", "dependency-unavailable", null], ["refused", "unsupported-definition", "unsupported-definition"], head, 0]);
+    // Without the bytes at the place that `definition` states, the act is refused `bad-field` (the contract's section 6.2, revision 19).
+  ]).toEqual([["refused", "guard-failed", "not-activated"], ["unavailable", "authority-unavailable", null], ["refused", "bad-field", null], ["refused", "unsupported-definition", "unsupported-definition"], head, 0]);
 
   // One entry: the row, with the next number, and the one `create` of a lane under that digest, at ordinal 0. Its cause is the
   // act's intent. The entry retains the observation of the rules that its guard read.

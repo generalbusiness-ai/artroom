@@ -5,7 +5,7 @@ import type { Bounds, DeclaredDefinition } from "@generalbusiness/artroom-contra
 import { canonicalize, definitionDigest, parseStrict } from "@generalbusiness/artroom-bytes";
 import { capabilitiesOf, counted, derivable, gitRead, holdCapability, validateDefinition, type ValidDefinition } from "@generalbusiness/artroom-derive";
 import { reference } from "../scripts/reference.mjs";
-import { DIGESTS, LANE_FORMS, change, definitions, issue } from "../src/index.ts";
+import { DEMO_DIGESTS, DIGESTS, LANE_FORMS, change, changeDemo, definitions, issue, issueDemo } from "../src/index.ts";
 
 const lanes = { issue, change } as const;
 const names = ["issue", "change"] as const;
@@ -35,13 +35,14 @@ describe("the two lane definitions, as data (lane forms, revision 14)", () => {
 
   test("the counts: the item types, acts, timed rules and handlers that the lane forms state, each within its adopted bound, and each bound a row meets is met exactly", () => {
     const counted = (d: DeclaredDefinition) => [d.items, d.acts, d.timed, d.receives].map((part) => Object.keys(part).length);
-    expect([counted(issue), counted(change)]).toEqual([[12, 50, 1, 7], [14, 52, 2, 4]]);
+    // `change` has one act that is no row of the lane forms' revision 14: `ask-rules` (request i5; `src/change.ts` marks it).
+    expect([counted(issue), counted(change)]).toEqual([[12, 50, 1, 7], [14, 53, 2, 4]]);
     // The validator is the counter. A definition passes with a bound at the number below, and is refused with one less.
     // `propose-manifest` has 24 guards as written and 16 effects, which are the adopted bounds, and its guards are nested 8 deep, which
     // is the bound too. Counting those nested it has 73 guards. Four acts name 4 other items. `intent` has 10 values.
     const meets: Record<(typeof names)[number], Partial<Bounds>> = {
       issue: { items: 12, acts: 50, timedRules: 1, receives: 7, values: 10, also: 4 },
-      change: { items: 14, acts: 52, timedRules: 2, receives: 4, also: 4, presents: 1, guards: 24, nestedGuards: 73, guardDepth: 8, effects: 16 },
+      change: { items: 14, acts: 53, timedRules: 2, receives: 4, also: 4, presents: 1, guards: 24, nestedGuards: 73, guardDepth: 8, effects: 16 },
     };
     const found = names.flatMap((name) => (Object.entries(meets[name]) as [keyof Bounds, number][]).map(([bound, n]) => {
       const less = validated(lanes[name], { [bound]: n - 1 });
@@ -95,5 +96,20 @@ describe("the two lane definitions, as data (lane forms, revision 14)", () => {
     // The control: the same definition with the act that opens a hold as its genesis is refused, by that rule.
     const timed = validated({ ...issue, genesis: "take-hold" });
     expect(timed.ok ? null : timed.problems.map((p) => p.code)).toEqual(["genesis-timed"]);
+  });
+
+  test("the demo profile: each definition is exactly its pinned bytes and digest, keeps its full definition's name, holds a strict subset of its acts and handlers, each the full definition's row unchanged, with every item type and timed rule, and passes the validator whole", () => {
+    const profile = { issue: [issueDemo, issue, "issue-demo"], change: [changeDemo, change, "change-demo"] } as const;
+    for (const [name, [demo, full, pinned]] of Object.entries(profile)) {
+      expect(file(pinned) === canonicalize(demo), `${pinned}: the byte file is not the canonical bytes of the value; run scripts/pin.mjs`).toBe(true);
+      expect([definitionDigest(demo), definitionDigest(parseStrict(file(pinned)) as DeclaredDefinition)], name).toEqual([DEMO_DIGESTS[name as "issue"], DEMO_DIGESTS[name as "issue"]]);
+      const checked = validated(demo);
+      expect([checked.ok && checked.definition.digest, demo.name], name).toEqual([DEMO_DIGESTS[name as "issue"], full.name]);
+      // A strict subset of the rows: every kept act and handler is the full definition's own row; nothing else differs.
+      const kept = (part: "acts" | "receives") => Object.entries(demo[part]).every(([row, value]) => canonicalize(value) === canonicalize((full[part] as Record<string, unknown>)[row]));
+      expect([kept("acts"), kept("receives"), canonicalize({ ...demo, acts: {}, receives: {} }) === canonicalize({ ...full, acts: {}, receives: {} })], name).toEqual([true, true, true]);
+    }
+    expect(([[issueDemo, issue], [changeDemo, change]] as const).map(([demo, full]) => [Object.keys(demo.acts).length, Object.keys(full.acts).length, Object.keys(demo.receives).length, Object.keys(full.receives).length])).toEqual([[12, 50, 5, 7], [18, 53, 2, 4]]);
+    expect(new Set([...Object.values(DIGESTS), ...Object.values(DEMO_DIGESTS)]).size).toBe(4);
   });
 });

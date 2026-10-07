@@ -36,7 +36,7 @@ The counts, as `packages/lanes/test/definitions.test.ts` asserts them:
 | Definition | Item types | Acts | Timed rules | Handlers | Canonical bytes |
 |---|---|---|---|---|---|
 | `issue` | 12 | 50 | 1 | 7 | 46,160 |
-| `change` | 14 | 52 | 2 | 4 | 56,293 |
+| `change` | 14 | 53 | 2 | 4 | 58,349 |
 
 Neither definition declares a rule expression. Both list two capabilities,
 `hold@1` and `git-read@1`.
@@ -258,9 +258,11 @@ node packages/lanes/scripts/reference.mjs   # docs/lanes-reference.md
 `packages/lanes/test/definitions.test.ts` fails while the byte files or
 the digests are not the ones that `pin.mjs` writes, and while
 `docs/lanes-reference.md` is not the file that `reference.mjs` writes. Its
-three tests show that each definition is exactly its pinned bytes and
-digest, that the counts are the ones above, and that both definitions pass
-`validateDefinition` whole at the bounds of `PROPOSED_BOUNDS`.
+four tests show that each definition is exactly its pinned bytes and
+digest, that the counts are the ones above, that both definitions pass
+`validateDefinition` whole at the bounds of `PROPOSED_BOUNDS`, and the same
+of the demo profile, `issue-demo` and `change-demo`, with each a strict
+subset of its full definition's rows.
 
 `node packages/lanes/scripts/reference.mjs --check` makes the same
 comparison outside a test run, and exits 1 when the file is stale.
@@ -348,6 +350,7 @@ type:
 | The production wiring founds a scope under a definition that needs a capability record, and that scope admits no act and no step and sends nothing; a runtime that lacks the code founds none | `packages/scope/test/founding.test.ts` | Real: the object as deployed |
 | What a definition does once a capability has answered | The same test, with `scriptedCapability` of `@generalbusiness/artroom-scope/testing` | A stand-in |
 | What the two pinned definitions do on real scopes: eleven scenarios, T1 to T9 and T34 | `packages/lanes/test/*.scope.test.ts`, on the one fixture `test/support/graph.ts` | Real scopes, storage, turn and dispatchers, founded and created by the two pinned digests. T3, T4 and T5b run on the capability's code, as the production ports hold it. Stand-ins, each named in the test: the test authority, a Git host (`Host`), the scripted capability where a scenario still uses it, scripted peers for the rules scope and the destination, and a made-up directory |
+| What a change lane does with the real rules scope and the real destination: W1 to W5, and plan 019's story on the demo profile | `packages/lanes/test/wiring.scope.test.ts` and `story.scope.test.ts`, on `test/support/room.ts` | Real platform scopes under the deployed class and the production authority; lanes created by the real directory under activated digests, on the capability's code; grants read from the real membership scope. Stand-ins: a Git host for the destination and for each lane; the changed set of a publication is scripted |
 
 The eleven scenarios found and create scopes under both definitions. A
 scenario chooses the capability code of its namespace. `onCode`, of the
@@ -372,7 +375,7 @@ entries, and `net.sized` gives one lane a small budget of entries for the
 two capacity scenarios.
 
 One run of the ten scenarios T1 to T9 writes 21 of the 50 act kinds of `issue` and
-12 of the 52 of `change`, and runs 2 of 7 and 2 of 4 handlers (counted by
+12 of the 52 of `change` as they then were, and runs 2 of 7 and 2 of 4 handlers (counted by
 a script over one run; `notes/2026-10-05-i2-contract-deltas.md`, section
 20, lists them). The counts are the same after I3 step 16. Of those rows,
 these now run on the capability's code: `report` of `issue`, and
