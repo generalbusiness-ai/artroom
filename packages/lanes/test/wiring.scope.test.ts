@@ -1,13 +1,10 @@
 import { expect, test } from "vitest";
-import type { FactRef } from "@generalbusiness/artroom-contract";
-import type { Item } from "@generalbusiness/artroom-derive";
-import type { Actor } from "@generalbusiness/artroom-derive/testing";
 import { firstExtents, platform } from "@generalbusiness/artroom-platform";
 import { MemorySource, httpSource, verify, type HistorySource, type MemoryScope } from "@generalbusiness/artroom-replay";
 import { CAPABILITY_CODE } from "@generalbusiness/artroom-scope";
 import { DIGESTS, change, issue } from "../src/index.ts";
-import { reader, type Node } from "./support/graph.ts";
-import { Platform, copied, oid, paul, rewritten, rita, room, routed, una, vic, type Room } from "./support/room.ts";
+import type { Node } from "./support/graph.ts";
+import { Platform, copied, merged, oid, paul, proposed, publicationOf, reported, rewritten, rita, room, routed, una, vic, type Room } from "./support/room.ts";
 
 // The lanes against the real rules scope and the real destination (plan 024, gate 2; request i5). Every platform scope is a Durable
 // Object of the namespace `PLATFORM` under the deployed class, the production authority and the platform package's own data and
@@ -21,9 +18,7 @@ import { Platform, copied, oid, paul, rewritten, rita, room, routed, una, vic, t
 // | The commits | Named by the test. The judge read answers with the manifest's own tree and base, and with each selected report's commit as an ancestor. |
 // | Runner | None. The rules here require no check. |
 
-type Change = Node<typeof change>;
 type Issue = Node<typeof issue>;
-type Selection = { accepted: FactRef; report: FactRef };
 
 /** The extents of the first definition, with 1 approval for `source` and `infrastructure`, no check, and the declaration of the exception. */
 const rulesWith = (singleControllerException = false) => ({ approvals: 1, ownerMayReview: false, checks: [], labels: [], extents: firstExtents({ approvals: 1, checks: [] }), singleControllerException });
@@ -34,49 +29,6 @@ async function opened(r: Room): Promise<Issue> {
   await r.activate(issue, DIGESTS.issue);
   await r.activate(change, DIGESTS.change);
   return r.lane(rita, "open-issue", issue, DIGESTS.issue, { title: "A bug", conditions: ["it works"] });
-}
-
-/** vic's report on the issue, staged from vic's own hold under rita's offer, and rita's acceptance of it: what a manifest selects. */
-async function reported(r: Room, I: Issue): Promise<Selection> {
-  const filed = await I.fact(0);
-  const offer = (await I.did(rita, "offer", { fields: { offeree: await r.member("@vic") } })).fact;
-  await I.did(vic, "accept", { on: offer.seq, fields: { terms: filed } });
-  await I.instance(vic, (await I.did(vic, "take-hold", { fields: { commitment: offer.seq } })).fact.seq);
-  const report = (await I.stagedDid(vic, "report", { fields: { commitment: offer.seq, terms: filed, commit: oid("a"), tree: oid("1"), claims: ["it works"] } })).fact;
-  const accepted = (await I.did(rita, "accept-report", { on: report.seq, fields: { commitment: offer.seq, terms: filed } })).fact;
-  return { accepted, report };
-}
-
-/**
- * A pull request that `who` opens through the directory and integrates on the room's head: the lane asks the rules scope for its
- * rules, `who` takes a hold under a commitment to themself, proposes one version that selects `selected`, and links the issue.
- */
-async function proposed(r: Room, I: Issue, who: Actor, handle: string, selected: Selection[]): Promise<{ C: Change; manifest: number }> {
-  const C = await r.lane(who, "open-pr", change, DIGESTS.change, { title: "A fix", draft: false });
-  await C.did(who, "ask-rules", { on: 0 });
-  await r.settle();
-  const offer = (await C.did(who, "offer", { fields: { offeree: await r.member(handle), terms: "Fix it." } })).fact;
-  await C.did(who, "accept", { on: offer.seq, fields: { terms: offer } });
-  const hold = (await C.did(who, "take-hold", { fields: { commitment: offer.seq } })).fact.seq;
-  await C.instance(who, hold, "i-1");
-  const manifest = (await C.stagedDid(who, "propose-manifest", { fields: { hold, instance: "i-1", base: r.firstHead, integration: oid("c"), tree: oid("3"), complete: true, selected, decisions: [] } })).fact.seq;
-  await C.did(who, "link-own", { fields: { issue: I.at, how: "keyword" } });
-  return { C, manifest };
-}
-
-/** rita merges, and the destination judges the reservation and publishes what it reserves. Returns the merge item as the lane then holds it. */
-async function merged(r: Room, C: Change, manifest: number, reports: FactRef[]) {
-  const merge = (await C.did(rita, "merge", { fields: { manifest, reports } })).fact.seq;
-  await r.publish();
-  return C.item(merge);
-}
-
-/** The destination's publication for one merge entry of a lane, found by its operation. */
-async function publicationOf(r: Room, C: Change, merge: number) {
-  // Final items too: a published or not-reserved publication is final, and the summary lists live items only.
-  const read = await (r.G.stub as unknown as { items(reader: unknown, type: string): Promise<{ ok: boolean; value: Item[] }> }).items(reader, "publication");
-  const items = read.ok ? read.value : [];
-  return items.find((item) => { const operation = item.refs["operation"] as FactRef | undefined; return operation?.seq === merge && operation.at.scope === C.name; }) ?? null;
 }
 
 test("W1, a source-only change with one approving reviewer for the source extent: the real destination reserves and publishes the real lane's merge, whose reserve names the selected report; the lane records it, and the linked issue closes once (STAND-IN: the Git host; SCRIPTED: the changed set)", async () => {

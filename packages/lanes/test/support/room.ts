@@ -19,7 +19,7 @@ import { env } from "cloudflare:workers";
 import { runInDurableObject } from "cloudflare:test";
 import { expect } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { Answer, DeclaredDefinition, Entry, Intent, MemberRef, OperationId, Seed } from "@generalbusiness/artroom-contract";
+import type { Answer, DeclaredDefinition, Entry, FactRef, Intent, MemberRef, OperationId, Seed } from "@generalbusiness/artroom-contract";
 import { canonicalize, factRefOf, intentDigest, scopeIdOf, seedDigest, signIntent, textDigest } from "@generalbusiness/artroom-bytes";
 import { ScopeHandle, declaredHandle } from "@generalbusiness/artroom-client";
 import { validateDefinition, valueDigest, type ValidDefinition } from "@generalbusiness/artroom-derive";
@@ -30,6 +30,9 @@ import { SqliteStore } from "../../../scope/src/index.ts";
 import { api } from "@generalbusiness/artroom-scope/worker";
 import { outsideOf, wired } from "../../../scope/test/outside.ts";
 import { Platform, copied, rewritten, routed, settle } from "../../../scope/test/repository.ts";
+import type { Actor as Signer } from "@generalbusiness/artroom-derive/testing";
+import type { Item } from "@generalbusiness/artroom-derive";
+import { DIGESTS, change, issue, type changeDemo } from "../../src/index.ts";
 import { Host, Node, net, reader, soon } from "./graph.ts";
 
 export { Platform, copied, rewritten, routed, settle };
@@ -173,6 +176,57 @@ export class Room {
     this.#lanes.set(name, node as never);
     return node;
   }
+}
+
+/** A report that a manifest selects, with its acceptance. */
+export type Selection = { accepted: FactRef; report: FactRef };
+type Lane<D extends DeclaredDefinition> = Node<D>;
+
+/** vic's report on the issue, staged from vic's own hold under rita's offer, and rita's acceptance of it: what a manifest selects. */
+export async function reported(r: Room, I: Lane<typeof issue>): Promise<Selection> {
+  const filed = await I.fact(0);
+  const offer = (await I.did(rita, "offer", { fields: { offeree: await r.member("@vic") } })).fact;
+  await I.did(vic, "accept", { on: offer.seq, fields: { terms: filed } });
+  await I.instance(vic, (await I.did(vic, "take-hold", { fields: { commitment: offer.seq } })).fact.seq);
+  const report = (await I.stagedDid(vic, "report", { fields: { commitment: offer.seq, terms: filed, commit: oid("a"), tree: oid("1"), claims: ["it works"] } })).fact;
+  const accepted = (await I.did(rita, "accept-report", { on: report.seq, fields: { commitment: offer.seq, terms: filed } })).fact;
+  return { accepted, report };
+}
+
+/**
+ * A pull request that `who` opens through the directory and integrates on the room's head: the lane asks the rules scope for
+ * its rules, `who` takes a hold under a commitment to themself, proposes one version that selects `selected`, and links the
+ * issue `I` to close. `definition` and `digest`: the full `change` by default, or the demo profile's. `commits`: the version's
+ * base, the room's first head by default, and its integration commit.
+ */
+export async function proposed(
+  r: Room, I: { at: Node<DeclaredDefinition>["at"] }, who: Signer, handle: string, selected: Selection[],
+  definition: typeof change | typeof changeDemo = change, digest: string = DIGESTS.change, commits: { base?: string; integration?: string } = {},
+): Promise<{ C: Lane<typeof change>; manifest: number }> {
+  // Typed as the full definition: every act used here is a row of the profile too.
+  const C = await r.lane(who, "open-pr", definition, digest, { title: "A fix", draft: false }) as unknown as Lane<typeof change>;
+  await C.did(who, "ask-rules", { on: 0 });
+  await r.settle();
+  const offer = (await C.did(who, "offer", { fields: { offeree: await r.member(handle), terms: "Fix it." } })).fact;
+  await C.did(who, "accept", { on: offer.seq, fields: { terms: offer } });
+  const hold = (await C.did(who, "take-hold", { fields: { commitment: offer.seq } })).fact.seq;
+  await C.instance(who, hold, "i-1");
+  const manifest = (await C.stagedDid(who, "propose-manifest", { fields: { hold, instance: "i-1", base: commits.base ?? r.firstHead, integration: commits.integration ?? oid("c"), tree: oid("3"), complete: true, selected, decisions: [] } })).fact.seq;
+  await C.did(who, "link-own", { fields: { issue: I.at, how: "keyword" } });
+  return { C, manifest };
+}
+
+/** rita merges, and the destination judges the reservation and publishes what it reserves. Returns the merge item as the lane then holds it. */
+export async function merged(r: Room, C: Lane<typeof change>, manifest: number, reports: FactRef[]): Promise<Item> {
+  const merge = (await C.did(rita, "merge", { fields: { manifest, reports } })).fact.seq;
+  await r.publish();
+  return C.item(merge);
+}
+
+/** The destination's publication for one merge entry of a lane, found by its operation. Final items too: the summary lists live items only. */
+export async function publicationOf(r: Room, C: { name: string }, merge: number): Promise<Item | null> {
+  const read = await (r.G.stub as unknown as { items(reader: unknown, type: string): Promise<{ ok: boolean; value: Item[] }> }).items(reader, "publication");
+  return (read.ok ? read.value : []).find((item) => { const operation = item.refs["operation"] as FactRef | undefined; return operation?.seq === merge && operation.at.scope === C.name; }) ?? null;
 }
 
 /**
