@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { expect, test } from "vitest";
+import { sha1 } from "@generalbusiness/artroom-bytes";
 import { decodePack, SmartHttpSource } from "../src/http-read.ts";
 import { GitRefusal } from "../src/names.ts";
 import { Reader } from "../src/reader.ts";
@@ -53,7 +54,14 @@ test("pack structure: one flush packet after the trailer is read only where allo
   expect(ascii(withFlush.subarray(withFlush.length - 4))).toBe("0000");
   expect((await decodePack(pack, { maxBytes })).map((o) => o.id).sort()).toEqual([EMPTY_TREE, HEAD].sort());
   expect((await decodePack(withFlush, { maxBytes, flushAfter: true })).length).toBe(2);
+  // A valid checksum over the bytes does not authorize an uncounted object:
+  // declare one object while preserving both compressed entries and re-seal
+  // the actual final trailer. The counted boundary must still reject it.
+  const uncounted = new Uint8Array(pack);
+  new DataView(uncounted.buffer).setUint32(8, 1);
+  uncounted.set(sha1(uncounted.subarray(0, uncounted.length - 20)), uncounted.length - 20);
   const cases: [Uint8Array, boolean, { reason: string; what: string }][] = [
+    [uncounted, true, { reason: "hash-mismatch", what: "pack trailer" }],
     [withFlush, false, { reason: "unreadable", what: "pack trailing data" }],
     [Uint8Array.from([...pack, 0x30, 0x30, 0x30, 0x31]), true, { reason: "unreadable", what: "pack trailing data" }],
     [Uint8Array.from([...withFlush, 0x30, 0x30, 0x30, 0x30]), true, { reason: "unreadable", what: "pack trailing data" }],
