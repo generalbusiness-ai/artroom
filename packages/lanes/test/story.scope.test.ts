@@ -41,7 +41,7 @@ test("the story on the demo profile: an issue is filed, commented on and assigne
   expect([landed.state, (await publicationOf(r, C, landed.id))?.state, (await r.G.item(0)).values["head"]]).toEqual(["published", "published", oid("c")]);
   // The merge closed the issue, with the link recorded as a fact of the change lane; the assignment stays as it was.
   const goal = await I.item(0);
-  expect([goal.state, goal.values["closeReason"], (goal.parties["assignees"] as { member: string }[]).map((m) => m.member), (await C.item(0)).state]).toEqual(["closed", "completed", ["@vic"], "merged"]);
+  expect([goal.state, goal.values["closeReason"], (goal.parties["assignees"] as unknown as readonly { member: string }[]).map((m) => m.member), (await C.item(0)).state]).toEqual(["closed", "completed", ["@vic"], "merged"]);
 
   // The rules are the room's own. rita raises the source extent and the lane's count to two approvals; a second change on a new
   // issue asks the rules scope again and, with one approval, is refused by the lane.
