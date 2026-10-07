@@ -200,13 +200,28 @@ describe("a founding on real scopes under the deployed class (authority note, se
     // A read session of rita's, issued by membership under a TEST SECRET that this test generates. A scope accepts a session only
     // when it names the membership reference that the scope itself records, with its incarnation. So what a reader with it is
     // answered at the rules scope shows what that scope records, as its own store holds it.
+    // Age every founding history past the 900-second signed bootstrap window.
+    net.clock.now = soon(901);
     platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32)));
     const real = async <T>(run: () => Promise<T>): Promise<T> => { platformNet.sessions = true; try { return await run(); } finally { platformNet.sessions = false; } };
     const issued = await real(async () => requestSession(SERVICE, membershipScope!.name, sessionRequest(learned!, rita.secret, soon(60), "founding-real"), { fetch: routed as unknown as Fetch }));
     if (!issued.ok) throw new Error(`no session: ${issued.reason}`);
     const reads = async (node: Platform) => (await real(() => routed(`${SERVICE}/v1/scopes/${node.name}`, { headers: { authorization: issued.session.reader() } }))).status;
-    // The directory records the reference with its incarnation, and the rules scope records the ID alone: no session is accepted there yet.
-    expect([await reads(D), await reads(rulesScope!)]).toEqual([200, 403]);
+    // Birth-session preparation permits the first read without retaining a
+    // membership observation or changing grant authority. The rules scope
+    // has had no act; its aged founding can be replayed without anchors.
+    const beforeReads = await rulesScope!.entries();
+    expect([await reads(D), await reads(rulesScope!), await reads(G)]).toEqual([200, 200, 200]);
+    await rulesScope!.restart();
+    expect(await reads(rulesScope!)).toBe(200);
+    expect(await rulesScope!.entries()).toEqual(beforeReads);
+    const invalidReader = issued.session.reader().slice(0, -1) + "!";
+    expect((await real(() => routed(`${SERVICE}/v1/scopes/${rulesScope!.name}`, { headers: { authorization: invalidReader } }))).status).toBe(403);
+    for (const node of [rulesScope!, D, G]) {
+      const head = (await node.summary()).at;
+      const { report, why } = await real(() => verify(httpSource(SERVICE, { fetch: routed, reader: issued.session.reader() }), { mode: "replay", platform, grants: "proven", scope: node.name, head }));
+      expect([report.result, why]).toEqual(["consistent", null]);
+    }
     const publish = async (approvals: number) => rulesScope!.act(rita, "publish", { on: 0, expected: await rulesScope!.expected({ on: 0 }), fields: { approvals, ownerMayReview: false, checks: [], labels: [], extents: firstExtents({ approvals, checks: [] }) as never } });
     // The rules scope's first act that needs a grant. It holds membership's scope ID and no incarnation, so its first read asks by the
     // ID alone. The answer's `of` holds the incarnation of the scope that answered, guard 1 takes it, and the entry that retains

@@ -178,12 +178,13 @@ alone. Guard 1 takes an answer of that ID and of the kind `membership`,
 and the entry that retains it fixes the incarnation. From then on the
 read states the incarnation, and the recorded reference is checked again
 inside the commit (I3 deltas, section 26, entries EM21 and EY7 to EY9).
-A rules scope accepts no read session before an entry of it retains an
-observation of membership (entry EY12). A destination may instead resolve
-its session reference from the confirmed membership reference in its
-recorded birth directory, after local token, clock and read checks
-(`destinationSessionMembership`, in `authority.ts`). This writes no entry
-and does not fix its grant authority. A scope whose entries retain more than one
+Before a retained membership observation, a rules scope or destination may
+resolve its session reference from the confirmed full membership reference
+in its recorded birth directory, after local token, clock and read checks
+(`repositorySessionMembership`, in `authority.ts`). Rules additionally checks
+that the directory confirms its exact rules reference. This writes no entry
+and does not fix grant authority; token or directory incarnation mismatches
+remain forbidden. A scope whose entries retain more than one
 incarnation of that ID records no reference, and an act there that needs a
 grant is answered
 `authority-unavailable` (entry EY9).

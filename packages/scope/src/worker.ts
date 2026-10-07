@@ -71,7 +71,7 @@ import type { Answer, Beside, Cursor, DeclaredDefinition, Digest, DutyId, Grant,
 import { definitionDigest, intentDigest, isScopeId, positionOf, scopeIdOf } from "@generalbusiness/artroom-bytes";
 import { isObject, type Item } from "@generalbusiness/artroom-derive";
 import { foundedKind, type Founded } from "./core.ts";
-import { destinationSessionMembership, fixedMembership, repositoryAuthority } from "./authority.ts";
+import { repositorySessionMembership, fixedMembership, repositoryAuthority } from "./authority.ts";
 import { membershipIn, namespace, type Binding } from "./namespace.ts";
 import { ScopeObject, type OutsideGiven, type Wiring } from "./object.ts";
 import type { Incident } from "./operator.ts";
@@ -320,7 +320,7 @@ export function sessionWiring(sessions: () => Sessions | null, binding?: Binding
   return {
     readers: (given) => sessionReaders({
       sessions, clock: given.clock, scope: given.scope, membership: (scope) => fixedMembership(given, scope),
-      ...(binding ? { membershipPreparation: destinationSessionMembership(given, (directory, reader) => within(() => (binding.get(binding.idFromName(directory.scope)) as Remote).summary(reader), fetchSeconds)) } : {}),
+      ...(binding ? { membershipPreparation: repositorySessionMembership(given, (directory, reader) => within(() => (binding.get(binding.idFromName(directory.scope)) as Remote).summary(reader), fetchSeconds)) } : {}),
     }), sessions,
   };
 }

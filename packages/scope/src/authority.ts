@@ -36,7 +36,7 @@ import type { Digest, Entry, Input, KeyId, Observation, ObservationRequest, Obse
 import { canonicalize, hex, isObservationUse, isRecord, parseStrict } from "@generalbusiness/artroom-bytes";
 import { WINDOWS, contentChecked, contentStates, fixedBy, highestHead, isScopeRef, judgeGrant, membershipOf, namedBy, observationOf, observedName, observedOf, prefer, revoked, same, subjectName, valueDigest, type Clock as Reading, type ContentStates, type GrantJudgment, type Needed, type RecordedRef, type Retains, type StateView, type ValueRead } from "@generalbusiness/artroom-derive";
 import { isPlatformDefinition } from "@generalbusiness/artroom-bytes";
-import { DESTINATION, DIRECTORY, destinationBranch, platform, standingOf } from "@generalbusiness/artroom-platform";
+import { DESTINATION, DIRECTORY, RULES_SCOPE, destinationBranch, platform, standingOf } from "@generalbusiness/artroom-platform";
 import type { Asked, Authority, Clock, Further, Random, Standing } from "./ports.ts";
 import type { SessionReading } from "./sessions.ts";
 
@@ -388,32 +388,32 @@ const NOTHING_READ: Further = { read: () => Promise.resolve(), observed: () => [
  * (section 3.9; `sessions.ts`). Null also for a rules scope or a
  * destination that records no incarnation yet: no session is accepted
  * there from this local reference before its first retained observation.
- * A destination's session reader may resolve its directory's confirmed birth
+ * A rules scope's or destination's session reader may resolve its directory's confirmed birth
  * reference separately; that does not alter this authority reference.
  */
 export const fixedMembership = (config: Pick<Repository, "genesis" | "state">, scope: ScopeRef): ScopeRef | null => fixedBy(recordedMembership(config, scope), null);
 
-/** The destination's actual directory, recorded by its judged creation. A
+/** The actual directory of a rules scope or destination, recorded by its judged creation. A
  * session's claims cannot select this target or substitute its incarnation. */
-function destinationSessionBirth(config: Pick<Repository, "genesis" | "state">, scope: ScopeRef): { directory: ScopeRef; membership: RecordedRef } | null {
+function repositorySessionBirth(config: Pick<Repository, "genesis" | "state">, scope: ScopeRef): { directory: ScopeRef; membership: RecordedRef } | null {
   const genesis = config.genesis();
   const state = config.state;
-  if (!state || scope.kind !== "destination" || !same(state.scope()?.at, scope) || genesis?.decision !== "applied" || genesis.seed.kind !== "destination" || genesis.seed.definition !== DESTINATION) return null;
+  if (!state || !same(state.scope()?.at, scope) || genesis?.decision !== "applied" || genesis.seed.kind !== scope.kind || !((scope.kind === "destination" && genesis.seed.definition === DESTINATION) || (scope.kind === "rules" && genesis.seed.definition === RULES_SCOPE))) return null;
   const directory = genesis.seed.creator;
-  const held = destinationBranch(state)?.refs["directory"];
+  const held = (scope.kind === "destination" ? destinationBranch(state) : state.page("rules", ["current"], null, 1).items[0])?.refs["directory"];
   const membership = recordedMembership(config, scope);
   return directory?.kind === "directory" && isScopeRef(held) && same(held, directory) && genesis.source?.seq === 0 && same(genesis.source.at, directory) && genesis.message?.class === "request" && genesis.message.type === "create" && membership?.kind === "membership" ? { directory, membership } : null;
 }
 
-/** Resolve only the session reference of a destination that has not retained
+/** Resolve only the session reference of a rules scope or destination that has not retained
  * a membership observation yet. This does not fix grant authority, retain an
  * observation, or write history. The caller checks MAC, clock and read first. */
-export function destinationSessionMembership(config: Pick<Repository, "genesis" | "state">, read: (directory: ScopeRef, reader: string) => Promise<unknown>): NonNullable<SessionReading["membershipPreparation"]> {
+export function repositorySessionMembership(config: Pick<Repository, "genesis" | "state">, read: (directory: ScopeRef, reader: string) => Promise<unknown>): NonNullable<SessionReading["membershipPreparation"]> {
   return {
-    recorded: (scope) => destinationSessionBirth(config, scope)?.membership ?? null,
+    recorded: (scope) => repositorySessionBirth(config, scope)?.membership ?? null,
     async resolve(scope, reader) {
       try {
-        const birth = destinationSessionBirth(config, scope);
+        const birth = repositorySessionBirth(config, scope);
         if (!birth) return null;
         const reply = await read(birth.directory, reader);
         const value = isRecord(reply) && reply["ok"] === true && isRecord(reply["value"]) ? reply["value"] : null;
@@ -422,7 +422,9 @@ export function destinationSessionMembership(config: Pick<Repository, "genesis" 
         if (repositories.length !== 1) return null;
         const refs = repositories[0]["refs"];
         const reference: unknown = isRecord(refs) ? refs["membership"] : null;
-        const after = destinationSessionBirth(config, scope);
+        const target: unknown = isRecord(refs) ? refs[scope.kind] : null;
+        if (scope.kind === "rules" && (!isScopeRef(target) || !same(target, scope))) return null;
+        const after = repositorySessionBirth(config, scope);
         return isScopeRef(reference) && reference.kind === "membership" && after && same(after.directory, birth.directory) && reference.scope === after.membership.scope && (after.membership.inc === null || after.membership.inc === reference.inc) ? reference : null;
       } catch { return null; }
     },
