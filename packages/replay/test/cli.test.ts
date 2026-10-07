@@ -121,9 +121,9 @@ test("a history the service refuses to read is a read error that names the servi
     return Promise.resolve({ status: 403, body: new Response(JSON.stringify({ ok: false, reason: "forbidden" })).body });
   };
   const reader = (scope: ScopeId, read: "log" | "retained", arg: string) => `Signed ${scope}:${read}:${arg}`;
-  const refused = verify(httpSource("https://scopes.test", { fetch: forbidding, reader }), { mode: "integrity", scope: id });
-  await expect(refused).rejects.toThrow(SourceError);
-  await expect(refused).rejects.toMatchObject({ reason: "forbidden", message: `the history of ${id} cannot be read: forbidden` });
+  const refused: unknown = await verify(httpSource("https://scopes.test", { fetch: forbidding, reader }), { mode: "integrity", scope: id }).catch((error: unknown) => error);
+  expect(refused).toBeInstanceOf(SourceError);
+  expect([(refused as SourceError).reason, (refused as SourceError).message]).toEqual(["forbidden", `the history of ${id} cannot be read: forbidden`]);
   expect(asked).toEqual([`/v1/scopes/${id}/log?cursor=0 Signed ${id}:log:0`]);
   const err: string[] = [];
   const code = await main(["https://scopes.test", id], { out: () => undefined, err: (text) => err.push(text), fetch: forbidding });
