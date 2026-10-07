@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Artroom page</title>
+<style>
+  :root { --bg: #f7f7f5; --surface: #fff; --text: #1b1b19; --muted: #55534e; --border: #e3e2de; --accent: #3451c6; --ok: #24753a; --ok-soft: #e9f5ec; --bad: #b42323; --bad-soft: #fcecec; color-scheme: light; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #111112; --surface: #18181a; --text: #ececee; --muted: #b0b0b8; --border: #2c2c30; --accent: #93a6ff; --ok: #6fcf8a; --ok-soft: #142a1b; --bad: #ff8a8a; --bad-soft: #301616; color-scheme: dark; }
+  }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 ui-sans-serif, system-ui, sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 16px 16px 8px; }
+  #page > section { max-width: 860px; margin: 0 auto 24px; padding: 0 16px; box-sizing: border-box; }
+  h1 { font-size: 22px; margin: 8px 0; } h2 { font-size: 16px; margin: 20px 0 8px; }
+  a { color: var(--accent); }
+  .muted, .meta { color: var(--muted); font-size: 13px; }
+  dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 8px 0; } dt { color: var(--muted); } dd { margin: 0; }
+  table { border-collapse: collapse; width: 100%; background: var(--surface); } th, td { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--border); font-size: 14px; vertical-align: top; }
+  code { font: 13px ui-monospace, monospace; }
+  .comment, .merge { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 4px 12px; margin: 8px 0; }
+  .state { display: inline-block; padding: 0 6px; border: 1px solid var(--border); border-radius: 4px; font-size: 13px; }
+  .state-published, .state-merged, .state-met, .state-passed, .state-closed { color: var(--ok); }
+  .state-refused, .state-failed, .state-not-reserved { color: var(--bad); }
+  .states li { margin: 4px 0; }
+  .answer { padding: 6px 10px; border-radius: 6px; } .ok { background: var(--ok-soft); color: var(--ok); } .bad { background: var(--bad-soft); color: var(--bad); }
+  details { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 4px 12px; margin: 6px 0; } summary { cursor: pointer; font-size: 14px; }
+  form label { display: block; margin: 6px 0; font-size: 14px; } input { font: inherit; width: 100%; max-width: 520px; box-sizing: border-box; padding: 4px 6px; }
+  button { font: inherit; margin: 6px 8px 6px 0; padding: 4px 12px; }
+</style>
+</head>
+<body>
+<div id="page"><main><p>Loading.</p></main></div>
+<script type="module" src="page.js"></script>
+</body>
+</html>
