@@ -19,7 +19,8 @@
  * STAND-IN host of `outside.ts`, as the outside port of a register. The
  * four: the shared scripted clock, and transport that
  * a test can hold; the test readers,
- * a stand-in for read sessions, until a test sets `platformNet.sessions`, and from then the real read sessions; and the scripted peers,
+ * a stand-in for read sessions, until a test sets `platformNet.sessions`, and from then the real read sessions, but for the one reader
+ * that a test names in `platformNet.inspector` for its own reads; and the scripted peers,
  * a stand-in for a lane that sends a notice. The platform definitions are
  * the platform package's, with every rule of membership, as deployed. A
  * test may take one rule of membership away, `platformNet.without`, as a
@@ -74,7 +75,12 @@ export class NetScope extends DeployedScope<NetEnv> {
  * Both are read at each use. `limits`: the serving limits of a join, read
  * when a scope's object starts. Null: the proposed ones.
  */
-export const platformNet: { without: string | null; sessions: boolean; secret: string | null; limits: LimitConfig | null } = { without: null, sessions: false, secret: null, limits: null };
+/**
+ * `inspector`: while `sessions` is set, a reader that is exactly this text is let read, as the test readers let every reader. It is
+ * for a test's own reads of what a scope holds, by a reader that no client presents. Every other reader is judged by the real read
+ * sessions.
+ */
+export const platformNet: { without: string | null; sessions: boolean; secret: string | null; limits: LimitConfig | null; inspector: string | null } = { without: null, sessions: false, secret: null, limits: null, inspector: null };
 /** Test-only, name-bound outside factories. ScopeObject supplies its live
  * readonly store facade after storage exists; no default port is changed. */
 export const platformOutside = new Map<string, (given: OutsideGiven, sql: Pick<SqlStorage, "exec">) => Outside>();
@@ -97,7 +103,7 @@ export class PlatformScope extends DeployedScope<PlatformEnv> {
       sessions: session.sessions,
       readers: (given) => {
         const real = session.readers(given);
-        return { allows: (reader, read) => (platformNet.sessions ? real.allows(reader, read) : true) };
+        return { allows: (reader, read) => (!platformNet.sessions || (platformNet.inspector !== null && reader === platformNet.inspector) ? true : real.allows(reader, read)) };
       },
       ...(platformNet.limits ? { limits: platformNet.limits } : {}),
       ports: {

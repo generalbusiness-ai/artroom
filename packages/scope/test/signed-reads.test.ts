@@ -177,7 +177,7 @@ describe("signed reads on real registers (the planner's decisions 61cc5e50, c649
   // Made by hand: a chain of geneses, each the creation of the one before, from rita's act. No scope judged them. It shows the bound of
   // `rootOf`, which no real chain reaches: the longest of the platform's is two causes, from membership to the claim.
   test("a cause chain is followed through at most four causes: a genesis four creations from the signed act has its root, one five creations away has none, an entry that cannot be read is unavailable, and a cause that names no source has no root", async () => {
-    const act: Entry = { v: 1, at: otherLane, seq: 1, prev: d("0"), time: t(0), clamped: false, epoch: 0, input: { type: "act", signed: signIntent({ v: 1, to: otherLane.scope, actor: rita.key, kind: "split", on: null, expected: {}, fields: {}, idempotencyKey: "split", notAfter: t(60) }, rita.secret), authority: [], presented: {} }, uses: [], prepared: [], effects: [], sends: [] };
+    const act: Entry = { v: 1, at: otherLane, seq: 1, prev: d("0"), time: t(0), clamped: false, epoch: 0, input: { type: "act", signed: signIntent({ v: 1, to: otherLane, actor: rita.key, kind: "split", on: null, expected: {}, fields: {}, idempotencyKey: "split", notAfter: t(60) }, rita.secret), authority: [], presented: {} }, uses: [], prepared: [], effects: [], sends: [] };
     const fact = (entry: Entry): FactRef => ({ at: entry.at, seq: entry.seq, hash: entryHash(entry) });
     const kept = new Map<string, Entry>([[useOf(fact(act), act).content, act]]);
     const chain: Entry[] = [];
