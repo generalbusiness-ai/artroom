@@ -19,7 +19,7 @@
  * | `acts` | The acts of a scope's definition, with the ones the caller's role holds. |
  * | `act` | One act of any kind, through the client's declared handle for a declared definition, or as a signed intent for a platform one. |
  * | `log`, `show` | The scope's history, and one entry, over the read routes. |
- * | `verify` | The replay verifier over the read routes. |
+ * | `verify` | The replay verifier over the read routes: with the caller's session, and by signed reads where the session is refused. |
  */
 
 import type { Answer, DeclaredDefinition, Digest, Entry, FieldValue, Founded, Item, KeyId, PlatformDefinition, ScopeId, Seed, Summary } from "@generalbusiness/artroom-contract";
@@ -29,7 +29,7 @@ import {
   type Fetch, type ReadSigning, type Signing, type Transport,
 } from "@generalbusiness/artroom-client";
 import { DIRECTORY, MEMBERSHIP, REGISTER, ROLE_LISTS, platform, type Role } from "@generalbusiness/artroom-platform";
-import { SourceError, httpSource, render, verify as replay } from "@generalbusiness/artroom-replay";
+import { SourceError, httpSource, render, verify as replay, type HistorySource } from "@generalbusiness/artroom-replay";
 import type { Config, Repository, Store } from "./store.ts";
 
 export interface Context {
@@ -569,12 +569,26 @@ export function show(ctx: Context, named: string): Promise<Outcome> {
  * the platform package's data and rules for a platform definition. It
  * prints the report: what it checked, and what it took on trust.
  */
+/**
+ * A source whose reads go with the caller's session, and a read that the session is refused (`forbidden`) goes again as a signed
+ * read by the caller's key. So a scope that accepts no session of this repository yet, as a rules scope that records membership's
+ * ID with no incarnation before its first act, is read by the key's cause chain while that holds.
+ */
+function sessionFirst(session: HistorySource, signed: HistorySource): HistorySource {
+  return {
+    page: async (scope, from, allow) => { const got = await session.page(scope, from, allow); return !got.ok && got.reason === "forbidden" ? signed.page(scope, from, allow) : got; },
+    retained: async (scope, kind, digest, allow, domain) => { const got = await session.retained(scope, kind, digest, allow, domain); return !got.ok && got.reason === "forbidden" ? signed.retained(scope, kind, digest, allow, domain) : got; },
+  };
+}
+
 export function verify(ctx: Context, named: string | undefined): Promise<Outcome> {
   return run(async () => {
     const config = await configOf(ctx);
     const scope = scopeNamed(config, named);
     const reader = await readerOf(ctx, config);
-    const source = httpSource(config.service, { ...(ctx.fetch ? { fetch: ctx.fetch } : {}), reader: reader ?? signedLogReader(secretSigner(await signerOf(ctx, config)), readSigning(ctx)) });
+    const options = ctx.fetch ? { fetch: ctx.fetch } : {};
+    const signed = httpSource(config.service, { ...options, reader: signedLogReader(secretSigner(await signerOf(ctx, config)), readSigning(ctx)) });
+    const source = reader === null ? signed : sessionFirst(httpSource(config.service, { ...options, reader }), signed);
     const { report, why } = await replay(source, { mode: "replay", scope, platform, grants: "proven" });
     const lines = render(report, why).split("\n").filter((line) => line.length > 0);
     return report.result === "consistent" ? done(...lines) : failed(...lines);

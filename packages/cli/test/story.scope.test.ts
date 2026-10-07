@@ -31,7 +31,7 @@ const reader = "a test reader";
 // | The test's own reads | The test, and the scheduler stand-in, read what each scope holds with a reader that the command never presents (`platformNet.inspector`), past the read sessions. |
 // | Who may install | Nothing checks it: that is the installation design's. |
 describe("the artroom command on real scopes with the real read sessions. The Git host and the scheduler are STAND-INs", () => {
-  test("install, claim by signed reads, seat and session, invite and join over the Worker's routes; acts lists what the role holds; one act takes effect and one is refused by name with nothing written; log, show and verify read the histories back", async () => {
+  test("install, claim by signed reads, seat and session, invite and join over the Worker's routes; acts lists what the role holds; one act takes effect and one is refused by name with nothing written; log and show read the histories back, and verify reports each of the six consistent over the live read surface; a key of another register reads none of it", async () => {
     net.hold = net.deaf = null;
     platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32)));
     platformNet.sessions = true;
@@ -154,21 +154,25 @@ async function story(): Promise<void> {
   expect([logged.lines.length, logged.lines.some((line) => addedLine.test(line)), logged.lines.at(-1)]).toEqual([3, true, `${head + 1} entries in all.`]);
   const shown = await run(una, "show", `membership:${seq}`);
   expect(shown).toEqual({ code: 0, lines: [`${logged.lines.find((line) => addedLine.test(line))}; hash ${sealed.hash}.`, 'Fields: {"handle":"@check","kind":"checker"}. Grants recorded: 1.'] });
-  // With her session the verifier reads membership's history, and not the register's, which records no membership: no session
-  // covers it. So the replay cannot show the register's entry that the chain of creations rests on, and says so.
+  // With her session the verifier reads membership's history, and the register's genesis and the entries whose cause chain leads to
+  // the claim that caused membership's directory, on which the chain of creations rests: the replay is consistent.
+  const consistent = "Result: consistent, for the mode, target, coverage and trusts stated below.";
   const verified = await run(una, "verify", "membership");
-  expect([verified.code, verified.lines[0], verified.lines.find((line) => line.startsWith("Finding:"))], verified.lines.join("\n")).toEqual([1, "Result: missing dependency: a source history could not be read.", expect.stringContaining(`the history of the source scope ${R.name} cannot be read`)]);
-  // A read that the session does not cover is refused by the scope, and the command says so: the register records no membership.
-  expect(await run(una, "log", R.name)).toEqual({ code: 1, lines: [`Cannot read the history of ${R.name}: forbidden.`] });
-  // A history whose first page cannot be read has no report: the command prints why, and exits non-zero.
-  const unread = await run(una, "verify", R.name);
-  expect([unread.code, unread.lines]).toEqual([1, [expect.stringMatching(/cannot be read: forbidden$/)]]);
+  expect([verified.code, verified.lines[0]], verified.lines.join("\n")).toEqual([0, consistent]);
+  expect((await run(una, "log", R.name)).code).toBe(0);
 
-  // After the story, and outside it: with the test readers, a STAND-IN that lets every reader read, every history can be read,
-  // and each of the six replays consistent.
-  platformNet.sessions = false;
+  // Over the live read surface, with rita's session, each of the six histories replays consistent: the register's entries by the
+  // chain of her claim, and every other scope by the membership reference it records.
   for (const scope of ["register", "directory", "membership", "rules", "destination", "inbox"]) {
-    const verified = await run(rita, "verify", scope);
-    expect([scope, verified.code, verified.lines[0]], verified.lines.join("\n")).toEqual([scope, 0, "Result: consistent, for the mode, target, coverage and trusts stated below."]);
+    const live = await run(rita, "verify", scope);
+    expect([scope, live.code, live.lines[0]], live.lines.join("\n")).toEqual([scope, 0, consistent]);
   }
+
+  // What stays forbidden: a key of another register, which signed nothing in this one and holds no session of this repository.
+  const vic: Context = { store: memoryStore(), fetch, now, pause };
+  expect((await run(vic, "install", SERVICE, "--host", "git.example", "--namespace", "elsewhere")).code).toBe(0);
+  expect(await run(vic, "log", R.name)).toEqual({ code: 1, lines: [`Cannot read the history of ${R.name}: forbidden.`] });
+  // A history whose first page cannot be read has no report: the command prints why, and exits non-zero.
+  const unread = await run(vic, "verify", R.name);
+  expect([unread.code, unread.lines]).toEqual([1, [expect.stringMatching(/cannot be read: forbidden$/)]]);
 }
