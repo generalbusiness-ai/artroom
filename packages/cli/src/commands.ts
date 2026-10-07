@@ -22,10 +22,12 @@
  * | `verify` | The replay verifier over the read routes: with the caller's session, and by signed reads where the session is refused. |
  * | `remote` | The repository's host, namespace, name and remote URL, from the destination's branch item. |
  * | `clone` | Signs the destination's `read-token`, waits for its outcome, reads the read token once, and runs `git clone` with it in an `Authorization` header that git reads from its environment. The token is never an argument and never printed. |
+ * | `edit` | Opens a change through the directory under the change definition that the rules scope holds active, proposes one file as its only version (`propose-file`), and merges it as `merge` does. The room, not the person, writes the repository. |
+ * | `merge` | Signs `merge` of a change's current version, and waits until the room has published it or refused it. |
  */
 
 import type { Answer, DeclaredDefinition, Digest, Entry, FieldValue, Founded, Item, KeyId, OperationId, PlatformDefinition, ScopeId, Seed, Summary } from "@generalbusiness/artroom-contract";
-import { b64url, intentDigest, keyIdOfSecret, scopeIdOf, textDigest, timeOf, unb64url, utf8 } from "@generalbusiness/artroom-bytes";
+import { b64url, definitionDigest, digestBytes, intentDigest, keyIdOfSecret, parseStrict, scopeIdOf, textDigest, timeOf, unb64url, utf8 } from "@generalbusiness/artroom-bytes";
 import {
   ScopeHandle, TransportError, declaredHandle, found, httpTransport, requestSession, secretSigner, sessionRequest, signedIntent, signedLogReader, signedReads,
   type Fetch, type ReadSigning, type Signing, type Transport,
@@ -51,6 +53,8 @@ export interface Context {
   tries?: number;
   /** The `git` program, for `clone`. `main.ts` gives Node's (`git.ts`); a test gives a stand-in. Absent: there is none. */
   git?: Git;
+  /** A local file's bytes, for `edit --file` and `act --value`, or null when it cannot be read. `main.ts` gives Node's; a test gives its own. */
+  read?: (path: string) => Promise<Uint8Array | null>;
 }
 
 /**
@@ -498,9 +502,13 @@ export function acts(ctx: Context, named?: string): Promise<Outcome> {
  * handle, which checks each field's shape before it signs; a platform
  * definition's is signed as given. The scope judges both.
  */
-export function act(ctx: Context, kind: string, options: { on?: string; target?: number; set?: readonly string[] } = {}): Promise<Outcome> {
+export function act(ctx: Context, kind: string, options: { on?: string; target?: number; set?: readonly string[]; value?: readonly string[] } = {}): Promise<Outcome> {
   return run(async () => {
     const config = await configOf(ctx);
+    // A value beside the intent, for a field that names one by its digest, such as the bytes of a definition that `activate` or
+    // `open-issue` names: each file's text, as it is. The scope reads it only at a place that its definition states.
+    const values: string[] = [];
+    for (const path of options.value ?? []) values.push(textOf(await fileOf(ctx, path), path));
     const scope = scopeNamed(config, options.on);
     const secret = await signerOf(ctx, config);
     const signer = secretSigner(secret);
@@ -522,10 +530,10 @@ export function act(ctx: Context, kind: string, options: { on?: string; target?:
       const typed = await declaredHandle(handle, declared);
       if (!typed.ok) return failed(`Cannot act on ${scope}: ${typed.reason}.`);
       const { signed, beside } = await typed.handle.intent(signer, kind as never, { on: target, fields, expected } as never, signing(ctx));
-      return answered(scope, await typed.handle.submit(signed, [], beside), "Took effect");
+      return answered(scope, await typed.handle.submit(signed, [], { ...beside, ...(values.length > 0 ? { values } : {}) }), "Took effect");
     }
     const signed = await signedIntent(signer, { to: summary.scope, kind, on: target, fields, expected }, signing(ctx));
-    return answered(scope, await handle.submit(signed), "Took effect");
+    return answered(scope, await handle.submit(signed, [], values.length > 0 ? { values } : {}), "Took effect");
   });
 }
 
@@ -734,4 +742,157 @@ export function clone(ctx: Context, directory: string | undefined, options: { ho
     if (code === 0) return done(...lines, `Cloned into ${directory ?? value.remote.replace(/\.git$/, "").split("/").at(-1)}.`);
     return failed(...lines, code === null ? "git could not be run; the token was read and is not kept." : `git clone exited with ${code}; the token was read and is not kept.`);
   });
+}
+
+// ---------------------------------------------------------------- a one-file change: edit, and merge
+
+/** The most bytes of a file that `edit` proposes: the bound of the field `content` of the change lane's `propose-file`, a text. */
+export const EDIT_BYTES = 65536;
+
+/** A local file's bytes, or a stop: the command cannot run without them. */
+async function fileOf(ctx: Context, path: string): Promise<Uint8Array> {
+  const bytes = ctx.read ? await ctx.read(path) : null;
+  return bytes ?? stop(usage(`Cannot read the file ${path}.`));
+}
+
+/** The text that is exactly these bytes, as UTF-8 with any byte order mark kept, or a stop: a change carries a file as a text. */
+function textOf(bytes: Uint8Array, path: string): string {
+  let text: string | null = null;
+  try { text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes); } catch { /* not UTF-8 */ }
+  if (text === null || utf8(text).length !== bytes.length) return stop(usage(`${path} is not UTF-8 text: a change carries a file as a text.`));
+  return text;
+}
+
+/** One entry's effect on one item, of one kind, from a sealed entry. */
+type Effects = Entry["effects"];
+const stateOf = (effects: Effects, item: number): string | null => { const found = effects.find((e) => e.effect === "state" && e.item === item); return found?.effect === "state" ? found.state : null; };
+const valueOf_ = (effects: Effects, item: number, slot: string): unknown => { const found = effects.find((e) => e.effect === "value" && e.item === item && e.slot === slot); return found?.effect === "value" ? found.value : undefined; };
+
+/** The change definition that the rules scope holds active, and its canonical bytes, which the rules scope retains. The latest activation wins. */
+async function changeDefinition(ctx: Context, config: Config, reader: string | null): Promise<{ digest: Digest; bytes: string; declared: DeclaredDefinition }> {
+  const repository = config.repository!;
+  const R = await handleOf(ctx, config, repository.rules, reader);
+  const active = (await summaryOf(R)).items.filter((item) => item.type === "definition" && item.state === "active" && item.values["name"] === "change").sort((a, b) => b.id - a.id)[0];
+  const digest = active?.values["digest"] as Digest | undefined;
+  if (!digest) return stop(failed(`The rules scope ${repository.rules} holds no change definition active. An admin activates one: artroom act activate --on rules --set digest=<digest> --set name=change --value <definition file>.`));
+  const transport = signedReads(transportOf(ctx, config.service), secretSigner(await signerOf(ctx, config)), readSigning(ctx));
+  // A value in the domain of a definition is kept as a definition (`core.ts`), and read by that kind.
+  const kept = await transport.retained(repository.rules, reader, "definition", digest);
+  if (!kept.ok) return stop(failed(`Cannot read the change definition ${digest} from the rules scope: ${kept.reason}.`));
+  try {
+    const declared = parseStrict(kept.value.bytes) as DeclaredDefinition;
+    if (definitionDigest(declared) === digest) return { digest, bytes: kept.value.bytes, declared };
+  } catch { /* not a definition */ }
+  return stop(failed(`The rules scope's bytes for ${digest} are not that definition.`));
+}
+
+/** A declared handle on a lane: the lane must run exactly the definition given. */
+async function laneOf(ctx: Context, config: Config, lane: ScopeId, reader: string | null, declared: DeclaredDefinition) {
+  const typed = await declaredHandle(await handleOf(ctx, config, lane, reader), declared);
+  return typed.ok ? typed.handle : stop(failed(`Cannot act on ${lane}: ${typed.reason}.`));
+}
+
+/**
+ * `artroom edit <path> --file <local file> [--title <text>]`: one file, proposed as a change and published by the room.
+ *
+ * 1. The file is read here, as UTF-8 text of at most 65,536 bytes; nothing is signed for a file that cannot be carried.
+ * 2. The directory's `open-pr` opens a change lane under the change definition that the rules scope holds active, whose bytes go
+ *    beside the act. The command waits for the lane.
+ * 3. The lane's `ask-rules`, and the wait for the rules scope's answer: a merge is judged on the lane's copy of the rules.
+ * 4. `propose-file`, on the destination's head: the path, the digest and size of the bytes, and the bytes.
+ * 5. `merge`, and the wait for the room's answer, as `artroom merge` does.
+ *
+ * The command judges nothing: the lane, the rules and the destination do. A refusal is printed as it came, with what was written
+ * before it, so that the change can be merged later.
+ */
+export function edit(ctx: Context, path: string, options: { file?: string; title?: string } = {}): Promise<Outcome> {
+  return run(async () => {
+    if (options.file === undefined) return usage("edit needs --file <local file>: the bytes to write at the path.");
+    const bytes = await fileOf(ctx, options.file);
+    if (bytes.length > EDIT_BYTES) return usage(`${options.file} has ${bytes.length} bytes; a change carries at most ${EDIT_BYTES}.`);
+    const content = textOf(bytes, options.file);
+    const config = await configOf(ctx);
+    const repository = config.repository ?? stop(usage("No repository is known here. Run: artroom claim <name>, or artroom join <link>."));
+    const signer = secretSigner(await signerOf(ctx, config));
+    const reader = await readerOf(ctx, config);
+    const change = await changeDefinition(ctx, config, reader);
+
+    // The change lane, opened by the directory.
+    const D = await handleOf(ctx, config, repository.directory.scope, reader);
+    const shape = platform(DIRECTORY)!.data as unknown as DefinitionShape;
+    const fields = { definition: change.digest, title: options.title ?? `Edit ${path}`, draft: false };
+    const signed = await signedIntent(signer, { to: repository.directory, kind: "open-pr", fields, expected: expectedOf(shape.acts["open-pr"]!, (await summaryOf(D)).items, null, fields) }, signing(ctx));
+    const opened = accepted(await D.submit(signed, [], { values: [change.bytes] }), D.scope, "Opened").receipt.fact.seq;
+    const lane = (await createdBy(D, opened)).find((made) => made.seed.kind === "lane")?.scope ?? stop(failed(`Entry ${D.scope}:${opened} opens no lane.`));
+    const L = await handleOf(ctx, config, lane, reader);
+    await waitFor(ctx, () => [D.scope, lane], () => active(L), `the change ${lane}`);
+    const C = await laneOf(ctx, config, lane, reader, change.declared);
+
+    // The lane's copy of the rules.
+    const asked = await C.intent(signer, "ask-rules" as never, { on: 0, fields: {}, expected: expectedOf(change.declared.acts["ask-rules"] as unknown as ActShape, (await summaryOf(L)).items, 0, {}) } as never, signing(ctx));
+    accepted(await C.submit(asked.signed, [], asked.beside), lane, "Asked");
+    await waitFor(ctx, () => [lane, repository.rules], async () => ((await summaryOf(L)).items.some((item) => item.type === "rules" && typeof item.values["revision"] === "number") ? true : null), `the rules of ${lane}`);
+
+    // The one version: the file on the published head.
+    const head = (await destinationOf(ctx, config)).summary.items.find((item) => item.type === "branch")?.values["head"];
+    if (typeof head !== "string") return failed(`The destination ${repository.destination} has no published head yet.`);
+    const file = { base: head, path, digest: digestBytes(bytes), size: bytes.length, content };
+    const proposed = await C.intent(signer, "propose-file" as never, { on: null, fields: file, expected: expectedOf(change.declared.acts["propose-file"] as unknown as ActShape, (await summaryOf(L)).items, null, file) } as never, signing(ctx));
+    const version = (await C.submit(proposed.signed, [], proposed.beside));
+    if (version.answer !== "accepted") return answered(lane, version, "Proposed");
+    const lines = [`Proposed ${path} (${bytes.length} bytes) as change ${lane}, version ${version.receipt.fact.seq}.`];
+    const outcome = await merging(ctx, config, lane, reader, change.declared);
+    return { ...outcome, lines: [...lines, ...outcome.lines] };
+  });
+}
+
+/** `artroom merge <change>`: `merge` of the change's current version, and the wait for the room's answer. */
+export function merge(ctx: Context, named: string): Promise<Outcome> {
+  return run(async () => {
+    const config = await configOf(ctx);
+    const lane = scopeNamed(config, named);
+    const reader = await readerOf(ctx, config);
+    const read = await (await handleOf(ctx, config, lane, reader)).definition();
+    if (!read.ok) return failed(`Cannot read the definition of ${lane}: ${read.reason}.`);
+    if (read.value.name !== "change") return usage(`${lane} is no change: its definition is ${read.value.name}.`);
+    return merging(ctx, config, lane, reader, read.value);
+  });
+}
+
+/**
+ * Sign `merge` of the change's current version, naming the reports it selects, and wait until the merge is final. Published: the
+ * commit, and the page's address for a one-file version. Refused, by the lane or by the destination: the reason, and how to go on.
+ */
+async function merging(ctx: Context, config: Config, lane: ScopeId, reader: string | null, declared: DeclaredDefinition): Promise<Outcome> {
+  const repository = config.repository ?? stop(usage("No repository is known here. Run: artroom claim <name>, or artroom join <link>."));
+  const signer = secretSigner(await signerOf(ctx, config));
+  const L = await handleOf(ctx, config, lane, reader);
+  const items = (await summaryOf(L)).items;
+  const version = items.find((item) => item.type === "manifest" && item.state === "current") ?? stop(failed(`The change ${lane} has no current version.`));
+  const selected = (version.values["selected"] ?? []) as { report: unknown }[];
+  const fields = { manifest: version.id, reports: selected.map((s) => s.report) } as Record<string, FieldValue>;
+  const C = await laneOf(ctx, config, lane, reader, declared);
+  const { signed, beside } = await C.intent(signer, "merge" as never, { on: null, fields, expected: expectedOf(declared.acts["merge"] as unknown as ActShape, items, null, fields) } as never, signing(ctx));
+  const answer = await C.submit(signed, [], beside);
+  const again = `When it may be merged, run: artroom merge ${lane}`;
+  if (answer.answer !== "accepted") return { ...answered(lane, answer, "Merged"), lines: [...answered(lane, answer, "Merged").lines, `The change ${lane} waits, at version ${version.id}. ${again}`] };
+  const seq = answer.receipt.fact.seq;
+  let next = seq + 1;
+  const ended = await waitFor(ctx, () => [lane, repository.destination], async () => {
+    for (;;) {
+      const read = await L.entry(next);
+      if (!read.ok) return read.reason === "not-found" ? null : stop(failed(`Cannot read entry ${lane}:${next}: ${read.reason}.`));
+      next++;
+      const state = stateOf(read.value.entry.effects, seq);
+      if (state === "published" || state === "refused" || state === "aborted") return { state, effects: read.value.entry.effects };
+    }
+  }, `the room's answer to merge ${lane}:${seq}`, `run artroom merge ${lane} again only after artroom log ${lane} shows the merge ${seq} ended.`);
+  const reason = valueOf_(ended.effects, seq, "reason");
+  if (ended.state !== "published") return failed(`Not published: the merge ${lane}:${seq} is ${ended.state}${typeof reason === "string" ? `, ${reason}` : ""}. The change ${lane} stays open at version ${version.id}. ${again}`);
+  const commit = valueOf_(ended.effects, seq, "commit");
+  const path = version.values["path"];
+  return done(
+    `Published: commit ${String(commit)}, by the merge ${lane}:${seq}.`,
+    ...(typeof path === "string" ? [`Page: ${config.service.replace(/\/+$/, "")}/site/${repository.directory.scope}/HEAD/${path.split("/").map(encodeURIComponent).join("/")}`] : []),
+  );
 }
