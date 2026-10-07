@@ -6,8 +6,9 @@ Requests: `225da894` (whole Gate 1, producer `f8a56f1c`) and `4d8d543f`
 The combined source is locally gated and ready for exact review preparation.
 It contains the GitHub component, the hosting service adapter, causal reads,
 claim recovery and the upload-pack framing repair. It is not approved or
-landed. Exact live evidence for this combined source and a legitimate
-implementation/receipt binding remain owed. Full I3, native lane hold and
+landed. This exact combined source now has live founding, authenticated
+replay and Git clone evidence. A legitimate implementation/receipt binding
+remains owed. Full I3, native lane hold and
 change publication, profiles, capacity and browser obligations stay open.
 
 ## Source and ownership
@@ -112,6 +113,20 @@ malformed-tail control are `/tmp/artroom-expanded-framing-focused.log` and
 the gate; no sweep was run.
 
 ## Live evidence and remaining limits
+
+The isolated Worker `artroom-scope-review-g1.inguz.workers.dev` runs the
+gated packages/scripts trees above, deployed from notes-only head
+`3c5b117918206f20047111916399a58b6894101c`. Source deployment version
+`a9419198-1212-45dc-9ae9-f2d2b92047be`; session and hosting configuration
+were applied afterward. Install took 1.307 seconds and claim 8.880 seconds.
+All six authenticated replay commands exited 0 and reported consistent,
+without anchors or missing foreign facts. The real operator-token clone
+exited 0: founding commit `deb39648e7622493c5e7b80d0213cd443531cdd4`,
+empty tree `4b825dc642cb6eb9a060e54bf8d69288fbee4904`, subject
+“Found this repository.” on `main`. See the companion live witness for
+exact identities, coverage, logs and trust limits. Builder used an operator
+read-token stand-in; this does not demonstrate the later room-issued clone
+credential flow or a fresh-person walkthrough.
 
 Earlier observed runs are attributed to their exact source versions:
 builder's public GitHub founding/credential-free clone from `dfaa5395`
