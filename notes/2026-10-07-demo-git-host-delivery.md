@@ -136,11 +136,11 @@ not a timeout-based distinguishing control or a deployed run.
 The latest published sprint report at `54cc1bd23` is preserved by the
 branch's merge `4b12597c`; it changes no source or test body.
 
-Hugh selected `generalbusiness-ai`, organization ID `285042784`, and says
-the App is not yet created. The exact setup requirements were sent to the
+Hugh selected `generalbusiness-ai`, organization ID `285042784`. At the
+earlier checkpoint the App had not been created. Setup requirements went to the
 planner and saved in workroom evidence `827d4c7c`; the register authority
-pin was added in `06c2723d`. No App, repository or deployment has been
-created by this delivery.
+pin was added in `06c2723d`. The subsequent App handoff and live run are
+recorded below.
 
 ## Remaining run dependencies
 
@@ -150,17 +150,16 @@ the delivered Gate2 lane wiring into this branch for a native first
 publication. That merge is now `c248ea071`; its only conflict was the testing
 guide, resolved by preserving both descriptions. It supplies definition
 value places, the merge's selected reports and the rules/extent wiring.
-The remaining production hold/staging dependency is under investigation;
-the native fixtures still supply a scripted lane host. Builder has asked
-whether the decision's labelled source-entry stand-in covers this runtime
-dependency. No such deployed fallback has run.
+The native fixtures still supply a scripted lane host. Planner `72ccc867`
+resolved the dependency: founding publication satisfies this GitHub gate;
+native hold/staging and a real change-lane publication follow in Gate 2.
 
 Planner decisions `c6499e91` and `70a0680e` made the bootstrap policy precise.
 The cloud delivery `09c390c9b84f1f5340925c9a783a22e094bac7a2` is integrated:
 signed reads, a cause chain of at most four causes whose window starts at
 the signed root entry, and the command line's bootstrap reads. Local review
 found validation-before-cause-read and class transport forwarding defects;
-repairs are in progress. Recent signed reads give only the summary, genesis
+the integrated repairs are described below. Recent signed reads give only the summary, genesis
 and signer's entries; authenticated full replay remains owed.
 Gate2 request `14db4e69` and Gate3 request `490fc42c` stay open and preserve
 their required filing and landing order after Gate1. Their cloud test
