@@ -141,16 +141,23 @@ created by this delivery.
 ## Remaining run dependencies
 
 The native lane hold and Git-read operations are not supplied by this
-register/destination adapter. The cloud Gate2 delivery also fixes the
-definition value places needed by activation and lane creation, and the
-lane's missing `reports` field. Builder has asked the planner which exact
-prerequisites or independent source scenario should produce Gate1's first
-publication before Gate2 lands. No scripted lane history substitutes for
-that decision or for the required deployed run.
+register/destination adapter. Planner decision `c6499e91` authorized merging
+the delivered Gate2 lane wiring into this branch for a native first
+publication. That merge is now `c248ea071`; its only conflict was the testing
+guide, resolved by preserving both descriptions. It supplies definition
+value places, the merge's selected reports and the rules/extent wiring.
+The remaining production hold/staging dependency is under investigation;
+the native fixtures still supply a scripted lane host. Builder has asked
+whether the decision's labelled source-entry stand-in covers this runtime
+dependency. No such deployed fallback has run.
 
-Planner decision `61cc5e50` permits a signed pre-session read for bootstrap.
-The directory's cross-scope authorization, its window anchor and the
-meaning of own entries still need precision. The handler is not yet built.
+Planner decisions `c6499e91` and `70a0680e` made the bootstrap policy precise.
+The cloud delivery `09c390c9b84f1f5340925c9a783a22e094bac7a2` is integrated:
+signed reads, a cause chain of at most four causes whose window starts at
+the signed root entry, and the command line's bootstrap reads. Local review
+found validation-before-cause-read and class transport forwarding defects;
+repairs are in progress. Recent signed reads give only the summary, genesis
+and signer's entries; authenticated full replay remains owed.
 Gate2 request `14db4e69` and Gate3 request `490fc42c` stay open and preserve
 their required filing and landing order after Gate1. Their cloud test
 figures are not local builder verification.
@@ -195,3 +202,49 @@ the shared Mac, Node 26.10.0 and Git 2.54.0. Focused runs warmed caches;
 load was not sampled. A note-only successor preserves the gated source
 and tests. This gate verifies the local checkpoint; it closes no deployed
 journey, final review or landing requirement.
+
+## Resumed intake and deployment handoff
+
+The planner deployed the original `9c0f5890` source as `artroom-scope`, URL
+`https://artroom-scope.inguz.workers.dev`, version
+`dfe6bd8f-9a69-412a-b46d-f917511e89fd`. Its observed install succeeded;
+subsequent bootstrap reads were forbidden on that earlier source. The
+register is now outside its bootstrap window. This is the planner's
+attributed evidence (`65a64e03`, `4bc51bde`), not a builder live founding.
+Builder's current root GET returned 404 with `not-found`; the planner's
+earlier root 500 was not reproduced.
+
+The App handoff is present in the established owner-only local secret
+directory. Read-only validation with the actual GitHub helper passed:
+App `5223496`, installation `168852986`, account `generalbusiness-ai`
+(`285042784`, Organization), active, all repositories, Contents and
+Administration write. Exactly two installation GETs were made, with no
+token mint or resource mutation. Evidence:
+`/tmp/artroom-github-installation-readonly-result.json`. Hugh chose public
+demo repositories. A separate configured creation credential remains
+missing; its local path has been requested without asking for its value.
+The planner's session-secret file was preserved owner-only in the local
+handoff directory; its original remains intact. No secret value appears
+here or in the logs.
+
+Focused intake results, before the pending runtime/read-boundary repairs:
+
+- Seven scope tests passed for signed reads, founding and the CLI story on
+  `09c390c9`: `/tmp/artroom-gate1-09c-focused-scope.log`.
+- Two client signed-read tests and eight replay/CLI Node tests passed:
+  `/tmp/artroom-gate1-09c-client-read.log` and
+  `/tmp/artroom-gate1-09c-focused-node.log`.
+- Four canonical lane/profile tests passed after the merge:
+  `/tmp/artroom-gate1-merged-definitions.log`.
+- The merged scope story/wiring run passed eight tests and failed the CLI
+  refusal input, which lacked the newly required definition bytes. The
+  repaired CLI witness uses a complete duplicate-member act, asserts its
+  named `handle-in-use` refusal and unchanged head after earlier inbox work
+  settles. That story passed: `/tmp/artroom-gate1-merged-cli-refusal.log`.
+  The original integration failure remains in
+  `/tmp/artroom-gate1-merged-story-wiring.log`.
+
+The earlier 747-test gate does not verify these integrated source changes.
+A new complete gate is owed when repairs settle, before exact-head review.
+No real-host claim/publication, clone, authenticated complete verifier run,
+filing or landing is claimed by this checkpoint.
