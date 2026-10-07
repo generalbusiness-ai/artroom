@@ -250,6 +250,13 @@ Design note for review under request `a2cbd459`, following assert `4e4134b4` as 
 The [current task map dated 2026-10-06](023-2026-10-06-connected-story-current-tasks.md)
 names the adopted scope-model basis, live implementation owners and
 requester amendments, remaining decisions and real acceptance still owed.
+
+The [full manual planning inventory](025-2026-10-06-current-manual-inventory.md)
+retains all 67 approved page outcomes and their current dependencies. Read it
+with the [operative acceptance criteria](026-2026-10-06-manual-inventory-review-binding.md):
+passing results and permission boundaries are required. This reviewed planning
+handoff delivers no manual page, tested release, cold run or source capability.
+
 The commissioning record below is dated 2026-10-03; its original IDs and
 reviewed design remain historical evidence.
 
