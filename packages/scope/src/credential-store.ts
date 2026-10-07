@@ -14,9 +14,12 @@ import { canonicalize } from "@generalbusiness/artroom-bytes";
 import { timeMs } from "@generalbusiness/artroom-derive";
 
 export interface CredentialReply { id: string; ends: Timestamp }
+export interface CredentialPosition { mint: OperationId; attempt: number }
+export interface PendingCredentialReply extends CredentialReply, CredentialPosition {}
 export interface MintedCredential extends CredentialReply { mint: OperationId; attempt: number; plaintext: string }
 export interface ScopePrivateCredential extends Omit<MintedCredential, "plaintext"> {
   plaintext: string | null;
+  /** Custody and the mint's judgment, not proof that a provider token is still usable or that expiry revoked it. */
   state: "held" | "live" | "revoked";
 }
 export type CredentialPut = "stored" | "repeat" | "conflict" | "no-scope";
@@ -27,6 +30,7 @@ CREATE TABLE IF NOT EXISTS private_credential (
   ends TEXT NOT NULL, plaintext TEXT, state TEXT NOT NULL CHECK (state IN ('held', 'live', 'revoked')),
   PRIMARY KEY (scope, id), UNIQUE (scope, mint, attempt)
 ) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS private_credential_pending ON private_credential (scope, state, mint, attempt);
 `;
 
 export class CredentialStore {
@@ -78,6 +82,24 @@ export class CredentialStore {
     return row ? { id: row["id"] as string, ends: row["ends"] as Timestamp } : null;
   }
 
+  /**
+   * At most the caller's limit of held own replies after that mint attempt,
+   * in mint and attempt order. The index starts at the cursor; no secret is
+   * selected. Expired or dropped plaintext leaves the historical reply
+   * valid. This read never offers that reply or claims a revocation.
+   */
+  pending(after: CredentialPosition | null, limit: number): { items: PendingCredentialReply[]; more: boolean } {
+    const scope = this.#scope();
+    if (scope === null || !Number.isSafeInteger(limit) || limit < 1 || !Number.isSafeInteger(limit + 1)) return { items: [], more: false };
+    const rows = after === null
+      ? this.#sql.exec("SELECT mint, attempt, id, ends FROM private_credential WHERE scope = ? AND state = 'held' ORDER BY mint, attempt LIMIT ?", scope, limit + 1).toArray()
+      : this.#sql.exec("SELECT mint, attempt, id, ends FROM private_credential WHERE scope = ? AND state = 'held' AND (mint, attempt) > (?, ?) ORDER BY mint, attempt LIMIT ?", scope, after.mint, after.attempt, limit + 1).toArray();
+    return {
+      items: rows.slice(0, limit).map((row) => ({ mint: row["mint"] as OperationId, attempt: row["attempt"] as number, id: row["id"] as string, ends: row["ends"] as Timestamp })),
+      more: rows.length > limit,
+    };
+  }
+
   /** An explicit private read, including the plaintext, if custody still holds it. */
   read(mint: OperationId, attempt: number): ScopePrivateCredential | null {
     const scope = this.#scope();
@@ -95,7 +117,9 @@ export class CredentialStore {
   /**
    * The caller has checked a mint's judgment. Only its exact confirmed live
    * metadata makes custody live. A rejected or mismatched judgment drops
-   * plaintext without claiming the provider revoked anything.
+   * plaintext without claiming the provider revoked anything. Confirmed
+   * metadata records `live` even if custody lost the secret; the returned
+   * boolean says whether custody still has usable plaintext.
    */
   judged(mint: OperationId, attempt: number, confirmed: CredentialReply | null): boolean {
     const scope = this.#scope();
@@ -106,9 +130,9 @@ export class CredentialStore {
       this.#sql.exec("UPDATE private_credential SET plaintext = NULL WHERE scope = ? AND mint = ? AND attempt = ?", scope, mint, attempt).toArray();
       return false;
     }
-    if (credential.state === "revoked" || credential.plaintext === null || credential.plaintext === "") return false;
+    if (credential.state === "revoked") return false;
     this.#sql.exec("UPDATE private_credential SET state = 'live' WHERE scope = ? AND mint = ? AND attempt = ?", scope, mint, attempt).toArray();
-    return true;
+    return credential.plaintext !== null && credential.plaintext !== "";
   }
 
   /** The caller has an actual revocation answer. No expiry, rejection or dropped plaintext calls this automatically. */

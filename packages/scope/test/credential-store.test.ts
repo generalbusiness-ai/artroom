@@ -11,25 +11,34 @@ const minted = (mint: string, plaintext = "private-provider-credential"): Minted
 test("private custody retains one mint's own reply and secret across a real object restart, uses only its judged live credential, and writes nothing into public state, history or log", async () => {
   const scope = await found();
   const credential = minted("1:0");
+  const second = { ...minted("2:0", "private-provider-second"), id: "provider-token-2", ends: START };
+  const metadata = ({ mint, attempt, id, ends }: MintedCredential) => ({ mint, attempt, id, ends });
   const before = { head: await scope.head(), summary: await scope.summary(), history: await scope.sealed() };
   expect(await scope.inside((state) => {
     const store = new CredentialStore(state.storage.sql, () => scope.at);
-    return [store.put(credential), store.live(credential.mint, 1, START), store.reply(credential.mint, 1)];
-  })).toEqual(["stored", null, { id: credential.id, ends: credential.ends }]);
+    return [store.put(credential), store.put(second), store.judged(second.mint, 1, null), store.live(credential.mint, 1, START), store.reply(credential.mint, 1)];
+  })).toEqual(["stored", "stored", false, null, { id: credential.id, ends: credential.ends }]);
 
   await scope.restart();
   expect(await scope.inside((state) => {
     const store = new CredentialStore(state.storage.sql, () => scope.at);
     const retained = store.read(credential.mint, 1);
     const reply = store.reply(credential.mint, 1)!;
+    const firstPage = store.pending(null, 1);
+    const nextPage = store.pending(firstPage.items[0]!, 1);
+    const invalidLimit = store.pending(null, -2);
     const judged = store.judged(credential.mint, 1, reply);
     const live = store.live(credential.mint, 1, START);
     const otherAttempt = store.live(credential.mint, 2, START);
-    const otherIncarnation = new CredentialStore(state.storage.sql, () => ({ ...scope.at, inc: "in_aaaaaaaaaaaaaaaaaaaaaaaaaa" as never })).read(credential.mint, 1);
-    return { retained, reply, judged, live, otherAttempt, otherIncarnation };
+    const isolated = new CredentialStore(state.storage.sql, () => ({ ...scope.at, inc: "in_aaaaaaaaaaaaaaaaaaaaaaaaaa" as never }));
+    const otherIncarnation = [isolated.read(credential.mint, 1), isolated.pending(null, 1)];
+    const revoked = store.revoked(second.mint, 1);
+    return { retained, reply, firstPage, nextPage, judged, live, otherAttempt, otherIncarnation, revoked, remaining: store.pending(null, 1), invalidLimit };
   })).toEqual({
     retained: { ...credential, state: "held" }, reply: { id: credential.id, ends: credential.ends }, judged: true,
-    live: { ...credential, state: "live" }, otherAttempt: null, otherIncarnation: null,
+    firstPage: { items: [metadata(credential)], more: true }, nextPage: { items: [metadata(second)], more: false },
+    live: { ...credential, state: "live" }, otherAttempt: null, otherIncarnation: [null, { items: [], more: false }],
+    revoked: true, remaining: { items: [], more: false }, invalidLimit: { items: [], more: false },
   });
 
   const after = { head: await scope.head(), summary: await scope.summary(), history: await scope.sealed() };
