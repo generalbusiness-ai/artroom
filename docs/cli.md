@@ -40,12 +40,31 @@ Installed: register sc_hinqqbm4....
 The operator key key_baqzbaDy... is kept in the config directory, readable only by you. It is the one founder key.
 ```
 
-**`artroom claim <name> [--handle @you] [--branch main]`** signs the
-register's `found` act. It then waits until the directory, membership,
-the rules scope and the destination are created and confirmed. Then it
-takes the founder's seat and first key in membership, which makes the
-founder the first admin. `<name>` is a label for this output only: the
-register's `found` act has no name field (see "What it does not do yet").
+**`artroom claim <name> [--handle @you] [--branch main] [--again]`**
+signs the register's `found` act. It then waits until the directory,
+membership, the rules scope and the destination are created and
+confirmed. Then it takes the founder's seat and first key in membership,
+which makes the founder the first admin. `<name>` is a label for this
+output only: the register's `found` act has no name field (see "What it
+does not do yet").
+
+Before it sends the `found`, the command saves a pending claim in the
+config: the register, the digest of the signed intent and the handle.
+None of these is a secret. If the register refuses the claim, or answers
+that it is unavailable, nothing was written and the pending claim is
+removed. If the command gives up waiting, the claim stays pending:
+
+```
+Gave up waiting for the directory after 120 reads. What was asked may still take effect; run artroom claim demo again to go on waiting for this claim, or with --again to sign a new one, which creates a second repository.
+```
+
+Run `artroom claim <name>` again to go on. It signs nothing: it reads
+the register once, which starts a register that was restarted since the
+claim, and waits for the directory that the pending claim's digest names.
+`--handle` is then ignored: the handle is the one the claim signed.
+`--again` signs a new `found`. Each `found` that takes effect creates a
+repository, so use it only when the first claim was refused or will never
+take effect.
 
 ```
 Claimed demo: directory sc_hs5f27fz..., membership sc_p6xp2lmd..., rules sc_sfbjwioy..., destination sc_e5xgdizd...; each created and confirmed.
@@ -105,8 +124,12 @@ sc_p6xp2lmd...:9  2099-01-01T00:00:00Z  delivery result from inbox:0; 0 effects,
 ```
 
 **`artroom verify <scope>`** runs the replay verifier over the read
-routes, with the platform package's rules. It prints the verifier's
-report: the result, what it covered, and what it takes on trust.
+routes, with the platform package's rules. It reads with the caller's
+session, and a read that the session is refused goes again as a signed
+read by the caller's key. It prints the verifier's report: the result,
+what it covered, and what it takes on trust. A history whose first page
+cannot be read has no report; the command prints
+`... cannot be read: <reason>` and exits 1.
 
 ```
 Result: consistent, for the mode, target, coverage and trusts stated below.
@@ -121,9 +144,12 @@ Exit codes: 0 done; 1 refused, unavailable, not found or not consistent;
 Before it reads, the command asks the repository's membership scope for a
 read session, signed by its key. If membership gives none (a service with
 no session secret, or a key that is no active member's), the command
-reads without one, and the scope decides. Under a real session a member
-can read the scopes that record their membership. No session covers the
-register.
+reads by signed reads of its key, and the scope decides. Under a real
+session a member can read the scopes that record their membership, and,
+at the register, its genesis and the entries that come from the claim
+that founded the repository. A signed read reads the entries that the
+key signed, the entries that come from one of those within 15 minutes of
+it (the intent window), and the retained inputs those entries name.
 
 ## What it does not do yet
 
@@ -136,10 +162,11 @@ register.
   has activated no lane definition.
 - `invite --acts` is refused: membership's `invite-member` has no list of
   acts for one member.
-- On a deployment with read sessions, `claim` cannot read the register or
-  the new directory, because no session covers them yet. The verifier
-  cannot read the register either, so `verify` of a scope whose creation
-  chain starts there reports a missing dependency. The delivery note,
-  section 5, has the details.
+- The founder must reach the seat within 15 minutes of the claim: until
+  the seat, the founder reads the new scopes by signed reads only, and
+  those last for the intent window after the claim. A claim whose
+  creation takes longer gives up, and a resumed claim cannot read the
+  directory either. See `notes/2026-10-07-i5-live-ops-delivery.md`,
+  section 4.
 - An act definition has no description text. The line `acts` prints is
   made from the act's step, item and grant.
