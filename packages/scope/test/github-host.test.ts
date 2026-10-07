@@ -82,7 +82,7 @@ test("scripted object store inspection counts a changed non-UTF8 path", async ()
 // Invariant: a lost creation answer stays unknown and cleanup cannot use broad
 // or wrong-repository authority. A real Worker RSA key signs a restricted mint.
 // HTTP, custody mapping and the binding's operation/scope are stand-ins.
-test("scripted GitHub provider creation loss and mismatched cleanup stay pending without a second mutation; Worker RSA signs a restricted mint", async () => {
+test("scripted GitHub provider creation loss and mismatched cleanup stay pending without a second mutation; Worker RSA signs a restricted mint; a member's read token is restricted to the repository with contents read", async () => {
   const keys = await crypto.subtle.generateKey({ name: "RSASSA-PKCS1-v1_5", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" }, true, ["sign", "verify"]) as CryptoKeyPair;
   const privateBytes = new Uint8Array(await crypto.subtle.exportKey("pkcs8", keys.privateKey) as ArrayBuffer);
   const privateKey = `-----BEGIN PRIVATE KEY-----\n${btoa(Array.from(privateBytes, (byte) => String.fromCharCode(byte)).join(""))}\n-----END PRIVATE KEY-----\n`;
@@ -104,7 +104,9 @@ test("scripted GitHub provider creation loss and mismatched cleanup stay pending
       if (lost) throw new Error(token);
       if (request.url.endsWith("/app/installations/99/access_tokens")) {
         mintRequest = request;
-        return new Response(JSON.stringify({ token, expires_at: "2026-10-06T13:00:00Z", repository_selection: "selected", permissions: { contents: "write", metadata: "read" }, repositories: [scriptedRepository()] }), { status: 201, headers: { "content-type": "application/json" } });
+        // The scripted host grants the permissions asked, as GitHub does for an installation that holds them.
+        const asked = await request.clone().json() as { permissions: Record<string, string> };
+        return new Response(JSON.stringify({ token, expires_at: "2026-10-06T13:00:00Z", repository_selection: "selected", permissions: { ...asked.permissions, metadata: "read" }, repositories: [scriptedRepository()] }), { status: 201, headers: { "content-type": "application/json" } });
       }
       if (new URL(request.url).hostname === "api.github.com") return new Response(JSON.stringify(scriptedRepository()), { headers: { "content-type": "application/json" } });
       return new Response(`${pkt("# service=git-upload-pack\n")}0000${pkt(`${"1".repeat(40)} refs/heads/main\0ofs-delta\n`)}0000`, { headers: { "content-type": "application/x-git-upload-pack-advertisement" } });
@@ -150,5 +152,12 @@ test("scripted GitHub provider creation loss and mismatched cleanup stay pending
   const now = Date.parse("2026-10-06T12:00:00Z") / 1000;
   expect(JSON.parse(decode(jwt[1]!))).toEqual({ iat: now - 60, exp: now + 540, iss: "fixture" });
   expect(await crypto.subtle.verify("RSASSA-PKCS1-v1_5", keys.publicKey, Uint8Array.from(decode(jwt[2]!), (byte) => byte.charCodeAt(0)), utf8(`${jwt[0]}.${jwt[1]}`))).toBe(true);
+  // A member's read token (I5): one POST, restricted to the repository's ID with contents read; GitHub states its end. The
+  // handle is the caller's; the remote is GitHub's form.
+  const beforeRead = calls;
+  expect(await provider.mintRead(repository, { handle: "read:caller-handle", seconds: 7200 })).toEqual({ id: "read:caller-handle", ends: "2026-10-06T13:00:00Z", plaintext: token });
+  expect(calls).toBe(beforeRead + 1);
+  expect(await mintRequest!.json()).toEqual({ repository_ids: [71], permissions: { contents: "read" } });
+  expect(provider.remote(repository)).toBe("https://github.com/demo/repo.git");
   expect(JSON.stringify(provider)).not.toContain(token);
 });
