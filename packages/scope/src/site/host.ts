@@ -41,6 +41,39 @@ export interface Room {
 export interface Opened {
   source: GitSource;
   close(): Promise<void>;
+  /** The last request the source sent and what came back, query left out, for a log line. Empty before the first. */
+  last(): string;
+  /** The secrets this read holds, which a log line must not show. */
+  secrets: readonly string[];
+}
+
+/** The steps of a read, as a refusal's `x-site-step` header and the log name them. */
+export type SiteStep = "room" | "open" | "info" | "token" | "refs" | "objects" | "render";
+
+/** An error of one step of opening a repository. */
+export class StepError extends Error {
+  readonly step: SiteStep;
+  constructor(step: SiteStep, message: string, options?: { cause?: unknown }) {
+    super(message, options);
+    this.name = "StepError";
+    this.step = step;
+  }
+}
+
+/** A remote URL as compared with the service's report: no trailing `/`, and no `.git` at the end. */
+export const sameRemote = (reported: unknown, expected: string): boolean => {
+  const bare = (url: string) => url.replace(/\/+$/, "").replace(/\.git$/, "");
+  return typeof reported === "string" && bare(reported) === bare(expected);
+};
+
+/** Run one step: an error of it is a `StepError` of that step, its class and message kept. */
+async function step<T>(name: SiteStep, run: () => Promise<T>): Promise<T> {
+  try {
+    return await run();
+  } catch (e) {
+    if (e instanceof StepError) throw e;
+    throw new StepError(name, e instanceof Error ? `${e.name}: ${e.message}` : String(e), { cause: e });
+  }
 }
 
 /** The bindings the site reads: the scope namespace and the two hosts' settings. */
@@ -94,8 +127,24 @@ function setting(raw: string | undefined): (Setting & Record<string, unknown>) |
  */
 export function readerOf(env: SiteEnv, room: Room, fetch?: (request: Request) => Promise<Response>): (() => Promise<Opened>) | null {
   const { repository } = room;
-  const transport = (remote: string, maxBytes: number, authorization?: string) =>
-    new SmartHttpSource({ remote, maxBytes, ...(authorization === undefined ? {} : { authorization }), ...(fetch === undefined ? {} : { fetch }) });
+  const send = fetch ?? ((request: Request) => globalThis.fetch(request));
+  // Each source records its last request and answer, for the log line of a failed read. No header and no query is kept.
+  const transport = (remote: string, maxBytes: number, authorization?: string) => {
+    let last = "";
+    const traced = async (request: Request): Promise<Response> => {
+      const url = new URL(request.url);
+      const asked = `${request.method} ${url.origin}${url.pathname}`;
+      try {
+        const response = await send(request);
+        last = `${asked} -> ${response.status} ${response.headers.get("content-type") ?? "no content-type"}`;
+        return response;
+      } catch (e) {
+        last = `${asked} -> ${e instanceof Error ? e.name : "error"}`;
+        throw e;
+      }
+    };
+    return { source: new SmartHttpSource({ remote, maxBytes, ...(authorization === undefined ? {} : { authorization }), fetch: traced }), last: () => last };
+  };
   if (repository.host === ARTIFACTS_HOST) {
     const config = setting(env.ARTIFACTS_CONFIG);
     const binding = env.ARTIFACTS as ArtifactsNamespace | undefined;
@@ -104,13 +153,18 @@ export function readerOf(env: SiteEnv, room: Room, fetch?: (request: Request) =>
     if (!REPOSITORY_NAME.test(repository.name) || repository.name.toLowerCase().endsWith(".git") || repository.id !== repository.name) return null;
     const remote = `https://${service}/git/${repository.namespace}/${repository.name}.git`;
     return async () => {
-      const handle = await binding.get(repository.name);
-      // The service's own report of the remote must be the expected one before a token is minted.
-      if (record(await handle.info())?.["remote"] !== remote) throw new Error("the service reports another remote");
-      const plaintext = record(await handle.createToken("read", READ_TTL))?.["plaintext"];
-      if (typeof plaintext !== "string" || !/^[!-~]{1,4096}$/.test(plaintext)) throw new Error("no read token");
+      const handle = await step("open", () => binding.get(repository.name));
+      // The service's own report of the remote must be the expected one before a token is minted. A trailing `/` and a
+      // final `.git` are not compared: either form names the same repository.
+      const info = await step("info", () => handle.info());
+      if (!sameRemote(record(info)?.["remote"], remote)) throw new StepError("info", `the service reports another remote, ${typeof record(info)?.["remote"]}`);
+      // The minted token's plaintext is `plaintext`, or `token` where the service names it so.
+      const minted = record(await step("token", () => handle.createToken("read", READ_TTL)));
+      const plaintext = typeof minted?.["plaintext"] === "string" ? minted["plaintext"] : minted?.["token"];
+      if (typeof plaintext !== "string" || !/^[!-~]{1,4096}$/.test(plaintext)) throw new StepError("token", `no read token in the answer; its fields: ${minted ? Object.keys(minted).sort().join(", ") : "none"}`);
+      const { source, last } = transport(remote, config.maxBytes, `Bearer ${plaintext}`);
       return {
-        source: transport(remote, config.maxBytes, `Bearer ${plaintext}`),
+        source, last, secrets: [plaintext],
         close: async () => {
           try { await handle.revokeToken(plaintext); } catch { /* it ends at its expiry */ }
         },
@@ -127,7 +181,7 @@ export function readerOf(env: SiteEnv, room: Room, fetch?: (request: Request) =>
     if (!publicReads && (typeof token !== "string" || !/^[A-Za-z0-9_.-]{1,4096}$/.test(token))) return null;
     const remote = `https://github.com/${repository.namespace}/${repository.name}.git`;
     const authorization = publicReads ? undefined : `Basic ${btoa(`x-access-token:${token!}`)}`;
-    return async () => ({ source: transport(remote, config.maxBytes, authorization), close: async () => {} });
+    return async () => ({ ...transport(remote, config.maxBytes, authorization), secrets: publicReads ? [] : [token!], close: async () => {} });
   }
   return null;
 }

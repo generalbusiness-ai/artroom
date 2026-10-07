@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers";
-import { afterAll, beforeAll, expect, test } from "vitest";
+import { afterAll, beforeAll, expect, test, vi } from "vitest";
 import type { Intent, Seed } from "@generalbusiness/artroom-contract";
 import { canonicalize, intentDigest, scopeIdOf, signIntent, utf8 } from "@generalbusiness/artroom-bytes";
 import { keys } from "@generalbusiness/artroom-derive/testing";
@@ -9,7 +9,7 @@ import { buildPack, type RawGitObject } from "@generalbusiness/artroom-git/http"
 import type { ArtifactsNamespace } from "../src/artifacts-host.ts";
 import { artifactsOutside } from "../src/artifacts-wiring.ts";
 import type { SiteEnv } from "../src/site/host.ts";
-import { FILE_BYTES, site } from "../src/site/route.ts";
+import { FILE_BYTES, redacted, site } from "../src/site/route.ts";
 import { net } from "../src/testing.ts";
 import { soon } from "./net.ts";
 import { Platform, rita, sam, settle } from "./repository.ts";
@@ -49,18 +49,29 @@ class Scripted {
   readonly minted: string[] = [];
   readonly revoked = new Set<string>();
   packs = 0;
+  /** What the service is scripted to answer: the field that holds a minted token, the remote that `info` reports, and a failure. */
+  tokenField: "plaintext" | "token" = "plaintext";
+  reported: ((name: string) => string) | null = null;
+  failing: "get" | "info" | "token" | "refs" | "pack" | null = null;
   readonly remote = (name: string) => `https://${SERVICE}/git/${NAMESPACE}/${name}.git`;
   readonly ns: ArtifactsNamespace = {
-    get: async (name) => ({
-      createToken: async (scope, ttl) => {
-        expect([scope, ttl]).toEqual(["read", 120]);
-        const plaintext = `read-plaintext-${this.minted.length + 1}`;
-        this.minted.push(plaintext);
-        return { id: `tok-${this.minted.length}`, plaintext, scope, expiresAt: "2026-10-07T13:15:00Z" };
-      },
-      revokeToken: async (token) => { this.revoked.add(token); return true; },
-      info: async () => ({ name, remote: this.remote(name) }),
-    }),
+    get: async (name) => {
+      if (this.failing === "get") throw new TypeError("scripted: no such binding method");
+      return {
+        createToken: async (scope, ttl) => {
+          expect([scope, ttl]).toEqual(["read", 120]);
+          if (this.failing === "token") throw new Error("scripted: createToken refused");
+          const plaintext = `read-plaintext-${this.minted.length + 1}`;
+          this.minted.push(plaintext);
+          return { id: `tok-${this.minted.length}`, [this.tokenField]: plaintext, scope, expiresAt: "2026-10-07T13:15:00Z" };
+        },
+        revokeToken: async (token) => { this.revoked.add(token); return true; },
+        info: async () => {
+          if (this.failing === "info") throw new Error("scripted: info failed");
+          return { name, remote: (this.reported ?? this.remote)(name) };
+        },
+      };
+    },
     create: async (name) => {
       expect(this.name).toBeNull();
       this.name = name;
@@ -88,6 +99,8 @@ class Scripted {
     expect(url.origin + url.pathname.replace(/\/(info\/refs|git-upload-pack)$/, "")).toBe(this.remote(this.name!));
     const token = request.headers.get("authorization")?.replace(/^Bearer /, "") ?? "";
     if (!this.minted.includes(token) || this.revoked.has(token)) return new Response("no", { status: 401 });
+    if (this.failing === "refs" && url.pathname.endsWith("/info/refs")) return new Response("scripted", { status: 500 });
+    if (this.failing === "pack" && url.pathname.endsWith("/git-upload-pack")) return new Response("scripted", { status: 403, headers: { "content-type": "text/plain" } });
     if (request.method === "GET" && url.pathname.endsWith("/info/refs") && url.searchParams.get("service") === "git-upload-pack") {
       const lines = [...this.refs].map(([ref, id], i) => pkt(`${id} ${ref}${i === 0 ? "\0ofs-delta allow-reachable-sha1-in-want\n" : "\n"}`));
       return new Response(`${pkt("# service=git-upload-pack\n")}0000${lines.join("")}0000`, { headers: { "content-type": "application/x-git-upload-pack-advertisement" } });
@@ -136,6 +149,7 @@ beforeAll(async () => {
   host.refs.set("refs/heads/main", first);
   host.refs.set("refs/heads/moving", first);
   host.refs.set("refs/tags/v1", first);
+  host.refs.set("refs/tags/empty", host.commit({}, "empty\n"));
 });
 
 afterAll(() => {
@@ -262,4 +276,59 @@ test("cache: same commit, same ETag, and If-None-Match answers 304 without readi
   expect(moved.status).toBe(200);
   expect(moved.headers.get("etag")).not.toBe(etag);
   expect(await moved.text()).toContain('<h1 id="guide-again">Guide, again</h1>');
+});
+
+// Invariant: the minted token is read from `plaintext` or from `token`, and the service's reported remote is compared with no
+// trailing `/` and no final `.git`; any other remote is refused before a token is minted.
+test("binding answers: a token named token, and a remote reported with or without .git and a trailing slash, each read the page; another remote is refused at the step info (STAND-IN host)", async () => {
+  const at = `/site/${D.name}/HEAD/README.md`;
+  try {
+    host.tokenField = "token";
+    expect((await get(at)).status).toBe(200);
+    host.tokenField = "plaintext";
+    for (const form of [(n: string) => `https://${SERVICE}/git/${NAMESPACE}/${n}`, (n: string) => `https://${SERVICE}/git/${NAMESPACE}/${n}/`, (n: string) => `https://${SERVICE}/git/${NAMESPACE}/${n}.git/`]) {
+      host.reported = form;
+      expect((await get(at)).status).toBe(200);
+    }
+    host.reported = (n) => `https://elsewhere.invalid/git/${NAMESPACE}/${n}.git`;
+    const minted = host.minted.length;
+    const other = await get(at);
+    expect([other.status, other.headers.get("x-site-step")]).toEqual([502, "info"]);
+    expect(host.minted.length).toBe(minted);
+  } finally {
+    host.tokenField = "plaintext";
+    host.reported = null;
+  }
+});
+
+// Invariant: a failed read names its step in the header x-site-step and in one log line with the error's class and message,
+// and neither the body nor the line holds a token or a query.
+test("a failure at each step answers the same refusal with x-site-step and logs one redacted line naming the step (STAND-IN host)", async () => {
+  const at = `/site/${D.name}/HEAD/README.md`;
+  const lines: string[] = [];
+  const spy = vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => { lines.push(args.map(String).join(" ")); });
+  try {
+    for (const [failing, step] of [["get", "open"], ["info", "info"], ["token", "token"], ["refs", "refs"], ["pack", "objects"]] as const) {
+      host.failing = failing;
+      lines.length = 0;
+      const response = await get(at);
+      expect([failing, response.status, response.headers.get("x-site-step"), await response.text()]).toEqual([failing, 502, step, "unreadable: the repository could not be read\n"]);
+      expect(lines).toHaveLength(1);
+      expect(lines[0]!.startsWith(`site ${step}: `)).toBe(true);
+      expect(lines[0]).not.toMatch(/read-plaintext|\?service=/);
+    }
+    // The read's own steps give the last request and its answer, the query left out.
+    expect(lines[0]).toMatch(/^site objects: GitRefusal: unreadable: HTTP read response; last request: POST https:\/\/service\.invalid\/git\/.*\/git-upload-pack -> 403 text\/plain$/);
+  } finally {
+    host.failing = null;
+    spy.mockRestore();
+  }
+  expect(redacted("GET https://u:p@h.invalid/x?token=abc Bearer abc.def secret-1", ["secret-1"])).toBe("GET https://[redacted]@h.invalid/x?[redacted] Bearer [redacted] [redacted]");
+});
+
+// Invariant: an empty repository's root answers a plain page that says it has no files, not a refusal.
+test("an empty tree: the root of a commit with no files answers a page that says so (STAND-IN host)", async () => {
+  const empty = await get(`/site/${D.name}/empty/`);
+  expect([empty.status, empty.headers.get("content-type")]).toEqual([200, "text/html; charset=utf-8"]);
+  expect(await empty.text()).toContain("<h1>empty</h1>\n<p>The repository has no files at this commit.</p>");
 });

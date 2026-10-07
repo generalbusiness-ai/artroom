@@ -35,7 +35,7 @@ one page at the tag `v1.0`.
 | The path names | The answer |
 |---|---|
 | A markdown file (`.md` or `.markdown`) | The page, rendered as HTML. |
-| A folder, or nothing (the repository's root) | The folder's `index.md`, else its `README.md` (either name in any letter case, or ending in `.markdown`), rendered. A folder with neither answers a list of its files and folders. |
+| A folder, or nothing (the repository's root) | The folder's `index.md`, else its `README.md` (either name in any letter case, or ending in `.markdown`), rendered. A folder with neither answers a list of its files and folders. A folder with no files, or a repository with no files at its root, answers a page that says so. |
 | An image (`.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.avif`, `.svg`, `.ico`, `.bmp`) | The image's bytes, with its type. |
 | Any other file | The file's bytes, as a download. |
 | A symbolic link or a submodule | A refusal (`not-found`). |
@@ -110,7 +110,11 @@ as the specification's runner sets it.
 ## Refusals
 
 A refusal is plain text: a reason, a colon, and a sentence. It shows
-nothing of the repository.
+nothing of the repository. A refusal from a failed read also has the
+header `x-site-step`, which names the step that failed: `room`, `open`,
+`info`, `token`, `refs`, `objects` or `render`. The Worker's log has one
+line for it, `site <step>: <error class>: <message>`, with any token,
+authorization value and URL query replaced by `[redacted]`.
 
 | Reason | Status | When |
 |---|---|---|

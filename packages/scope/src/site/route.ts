@@ -30,7 +30,7 @@
  */
 import { GitRefusal, READ_BOUNDS, Reader, refName, type ObjectId, type TreeEntry } from "@generalbusiness/artroom-git";
 import { credentialInUrl } from "../sessions.ts";
-import { readerOf, roomOf, type Opened, type SiteEnv } from "./host.ts";
+import { StepError, readerOf, roomOf, type Opened, type SiteEnv, type SiteStep } from "./host.ts";
 import { renderMarkdown } from "./markdown.ts";
 import { escapeHtml } from "./node.ts";
 
@@ -46,8 +46,31 @@ const TAG_DEPTH = 4;
 export type SiteRefusal = "bad-request" | "method-not-allowed" | "not-found" | "ref-not-found" | "too-large" | "host-not-configured" | "unreadable";
 const STATUS: Record<SiteRefusal, number> = { "bad-request": 400, "method-not-allowed": 405, "not-found": 404, "ref-not-found": 404, "too-large": 413, "host-not-configured": 503, unreadable: 502 };
 
-export function refused(reason: SiteRefusal, sentence: string): Response {
-  return new Response(`${reason}: ${sentence}\n`, { status: STATUS[reason], headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff" } });
+/** A refusal. `step`: the step of the read that failed, as the header `x-site-step`; the body does not say it. */
+export function refused(reason: SiteRefusal, sentence: string, step?: SiteStep): Response {
+  return new Response(`${reason}: ${sentence}\n`, { status: STATUS[reason], headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff", ...(step ? { "x-site-step": step } : {}) } });
+}
+
+/** A text with every secret it may hold taken out: the given secrets, an authorization's value, a URL's user and query. */
+export function redacted(text: string, secrets: readonly string[] = []): string {
+  let out = text;
+  for (const secret of secrets) if (secret.length > 0) out = out.split(secret).join("[redacted]");
+  return out
+    .replace(/\b(Bearer|Basic|token|authorization)(\s*[:=]?\s+)[^\s,;"']+/gi, "$1$2[redacted]")
+    .replace(/(\b[a-z][a-z0-9+.-]*:\/\/)[^\s/@]*@/gi, "$1[redacted]@")
+    .replace(/(\b[a-z][a-z0-9+.-]*:\/\/[^\s?#]*)\?[^\s#]*/gi, "$1?[redacted]");
+}
+
+/**
+ * The one log line of a failed read: the step, the error's class and message, and the last request the Git source sent with
+ * what came back. Every secret is redacted.
+ */
+function logged(step: SiteStep, e: unknown, opened?: Opened): void {
+  const cause = e instanceof StepError && e.cause instanceof Error ? e.cause : e;
+  const name = cause instanceof Error ? cause.name : typeof cause;
+  const message = e instanceof StepError ? e.message : cause instanceof Error ? cause.message : String(cause);
+  const last = opened?.last() ?? "";
+  console.error(redacted(`site ${step}: ${name}: ${message}${last ? `; last request: ${last}` : ""}`, opened?.secrets ?? []));
 }
 
 /** True when the request is for the site route. */
@@ -116,7 +139,7 @@ function parse(url: URL): { directory: string; ref: string; path: string[]; trai
 }
 
 /** The commit that a branch or tag names now, an annotated tag followed. Null when the repository has neither of that name. */
-async function commitOf(reader: Reader, ref: string, branch: string): Promise<ObjectId | null> {
+async function commitOf(reader: Reader, ref: string, branch: string, at: (step: SiteStep) => void): Promise<ObjectId | null> {
   const names = ref === "HEAD" ? [`refs/heads/${branch}`] : [`refs/heads/${ref}`, `refs/tags/${ref}`];
   for (const name of names) {
     refName(name, "site ref");
@@ -124,6 +147,7 @@ async function commitOf(reader: Reader, ref: string, branch: string): Promise<Ob
     if (id === null) continue;
     // A branch names a commit, and the commit's own read checks it, after the cheap answer of a cached page. A tag may name a tag.
     if (name.startsWith("refs/heads/")) return id;
+    at("objects");
     for (let depth = 0; ; depth++) {
       try {
         await reader.commit(id);
@@ -179,16 +203,18 @@ export async function site(request: Request, env: SiteEnv, fetch?: (request: Req
   if (ref !== "HEAD") {
     try {
       refName(`refs/heads/${ref}`, "site ref");
-    } catch {
-      return refused("ref-not-found", "no branch or tag has that name");
+    } catch (e) {
+      logged("refs", e);
+      return refused("ref-not-found", "no branch or tag has that name", "refs");
     }
   }
 
   let room;
   try {
     room = await roomOf(env.SCOPES, directory);
-  } catch {
-    return refused("unreadable", "the room could not be read");
+  } catch (e) {
+    logged("room", e);
+    return refused("unreadable", "the room could not be read", "room");
   }
   if (!room) return refused("not-found", "no room has that directory");
   const open = readerOf(env, room, fetch);
@@ -197,18 +223,24 @@ export async function site(request: Request, env: SiteEnv, fetch?: (request: Req
   let opened: Opened;
   try {
     opened = await open();
-  } catch {
-    return refused("unreadable", "the repository could not be read");
+  } catch (e) {
+    const failed = e instanceof StepError ? e.step : "open";
+    logged(failed, e);
+    return refused("unreadable", "the repository could not be read", failed);
   }
+  // The step of the read in progress, which a failure names.
+  let step: SiteStep = "refs";
+  const at = (next: SiteStep) => { step = next; };
   try {
     const reader = new Reader(opened.source, { ...READ_BOUNDS, blobBytes: FILE_BYTES });
-    const commit = await commitOf(reader, ref, room.branch);
+    const commit = await commitOf(reader, ref, room.branch, at);
     if (commit === null) return refused("ref-not-found", "no branch or tag has that name");
     const etag = await etagOf(commit, path.join("/") + (trailing ? "/" : ""));
     const cached = { etag, "cache-control": `public, max-age=${MAX_AGE}` };
     if (matches(request.headers.get("if-none-match"), etag)) return new Response(null, { status: 304, headers: cached });
 
     // The path, segment by segment, from the commit's tree.
+    at("objects");
     let tree = await reader.tree((await reader.commit(commit)).tree);
     let entry: TreeEntry | null = null;
     for (let i = 0; i < path.length; i++) {
@@ -224,9 +256,11 @@ export async function site(request: Request, env: SiteEnv, fetch?: (request: Req
     const href = (parts: readonly string[], dir: boolean) => prefix + parts.map(segment).join("/") + (dir && parts.length > 0 ? "/" : "");
     const crumbs = [`<a href="${escapeHtml(prefix)}">${escapeHtml(ref)}</a>`, ...path.map((part, i) => `<a href="${escapeHtml(href(path.slice(0, i + 1), i < path.length - 1 || entry === null || entry.kind === "tree"))}">${escapeHtml(part)}</a>`)].join(" / ");
     const html = (title: string, body: string) => new Response(page(title, crumbs, body, commit), { status: 200, headers: { ...cached, "content-type": "text/html; charset=utf-8", "content-security-policy": PAGE_POLICY, "x-content-type-options": "nosniff", "referrer-policy": "no-referrer" } });
-    const rendered = async (file: TreeEntry, at: string[]) => {
-      const { html: body, title } = renderMarkdown(text.decode(await reader.blob(file.id, "page")), { resolve: (destination) => resolveAddress(prefix, at.join("/"), destination) });
-      return html(title ?? at.join("/"), body);
+    const rendered = async (file: TreeEntry, where: string[]) => {
+      const source = text.decode(await reader.blob(file.id, "page"));
+      at("render");
+      const { html: body, title } = renderMarkdown(source, { resolve: (destination) => resolveAddress(prefix, where.join("/"), destination) });
+      return html(title ?? where.join("/"), body);
     };
 
     // A directory: its index page, else a listing.
@@ -240,6 +274,8 @@ export async function site(request: Request, env: SiteEnv, fetch?: (request: Req
         return `<li>${linked ? `<a href="${escapeHtml(href([...path, name], e.kind === "tree"))}">${shown}</a>` : shown}</li>`;
       });
       const title = path.length === 0 ? ref : path.join("/");
+      // An empty folder, or an empty repository at its root, is a page that says so.
+      if (items.length === 0) return html(title, `<h1>${escapeHtml(title)}</h1>\n<p>${path.length === 0 ? "The repository has no files at this commit." : "This folder has no files at this commit."}</p>\n`);
       return html(title, `<h1>${escapeHtml(title)}</h1>\n<ul>\n${items.join("\n")}\n</ul>\n`);
     }
 
@@ -253,9 +289,10 @@ export async function site(request: Request, env: SiteEnv, fetch?: (request: Req
       headers: { ...cached, "content-type": type ?? "application/octet-stream", ...(type ? {} : { "content-disposition": "attachment" }), "content-security-policy": FILE_POLICY, "x-content-type-options": "nosniff" },
     });
   } catch (e) {
-    if (e instanceof GitRefusal && e.reason === "too-large" && e.what === "page") return refused("too-large", `a file of more than ${FILE_BYTES} bytes is not served`);
-    if (e instanceof GitRefusal && e.reason === "bad-ref-name") return refused("ref-not-found", "no branch or tag has that name");
-    return refused("unreadable", "the repository could not be read");
+    logged(step, e, opened);
+    if (e instanceof GitRefusal && e.reason === "too-large" && e.what === "page") return refused("too-large", `a file of more than ${FILE_BYTES} bytes is not served`, step);
+    if (e instanceof GitRefusal && e.reason === "bad-ref-name") return refused("ref-not-found", "no branch or tag has that name", step);
+    return refused("unreadable", "the repository could not be read", step);
   } finally {
     await opened.close();
   }
