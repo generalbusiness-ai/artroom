@@ -232,21 +232,24 @@ async function resolveLink(reader: Reader, path: string, files: Map<string, Flat
   if (firstBytes.length > SNAPSHOT_BOUNDS.pathBytes) return bad();
   if (target === "" || target.startsWith("/") || target.includes("\0")) return null;
   const reached: string[] = [];
-  const visited = new Set([path]);
+  // The links whose expansion is still under way, each with how many components follow its target. A link that is reached again
+  // while it is on this stack is a cycle; one reached again after its target was consumed (as in `alias/../alias/x`) is not.
+  const expanding: { link: string; after: number }[] = [{ link: path, after: 0 }];
   const at = path.split("/").slice(0, -1);
   let remaining = target.split("/");
   let next = 0;
   for (let steps = 0; next < remaining.length; steps++) {
     // A work bound is uncertainty, never proof that a resolvable link is broken.
     if (steps > SNAPSHOT_BOUNDS.pathBytes * (DESTINATION_CHANGED_SET.links + 1)) return bad();
+    while (expanding.length > 0 && remaining.length - next <= expanding[expanding.length - 1]!.after) expanding.pop();
     const component = remaining[next++]!;
     if (component === "" || component === ".") continue;
     if (component === "..") { if (at.length === 0) return null; at.pop(); continue; }
     const candidate = [...at, component].join("/");
     const file = files.get(candidate);
     if (file?.mode === "120000") {
-      if (visited.has(candidate)) return null;
-      visited.add(candidate);
+      if (expanding.some((open) => open.link === candidate)) return null;
+      expanding.push({ link: candidate, after: remaining.length - next });
       reached.push(candidate);
       const bytes = await reader.blob(file.id);
       try { target = strict.decode(bytes); } catch { return null; }

@@ -152,3 +152,29 @@ test("scripted GitHub provider creation loss and mismatched cleanup stay pending
   expect(await crypto.subtle.verify("RSASSA-PKCS1-v1_5", keys.publicKey, Uint8Array.from(decode(jwt[2]!), (byte) => byte.charCodeAt(0)), utf8(`${jwt[0]}.${jwt[1]}`))).toBe(true);
   expect(JSON.stringify(provider)).not.toContain(token);
 });
+
+// Invariant: a symbolic link is a cycle only when it is reached again while its own expansion is under way. Reaching a link a
+// second time after its target was consumed, as `..` allows, resolves; the global count of visited names was wrong for that.
+test("symbolic-link resolution: a link reached again after its expansion completed resolves; a link inside its own expansion is a cycle", async () => {
+  const f = fixture();
+  const links: SnapshotFile[] = [
+    { path: "alias", mode: "120000", id: f.blob("dir") },
+    { path: "again", mode: "120000", id: f.blob("alias/../alias/file.txt") },
+    { path: "thrice", mode: "120000", id: f.blob("alias/../alias/../alias/file.txt") },
+    { path: "a", mode: "120000", id: f.blob("b") },
+    { path: "b", mode: "120000", id: f.blob("a") },
+    { path: "self", mode: "120000", id: f.blob("self") },
+  ];
+  const base = f.commit(f.tree([...links, { path: "dir/file.txt", mode: "100644", id: f.blob("before\n") }]), []);
+  const integration = f.commit(f.tree([...links, { path: "dir/file.txt", mode: "100644", id: f.blob("after\n") }]), [base]);
+  const tree = (await new Reader(f.source(base)).commit(integration)).tree;
+  const context: DestinationInspection = { repository, ref: "refs/heads/main", recorded: base, base, integration, tree, reports: [base, integration] };
+  const result = await inspectGit(new Reader(f.source(base)), context);
+  const resolves = Object.fromEntries((JSON.parse(result.retain![0]!.bytes) as { links: { path: string; resolves: string[] | null }[] }).links.map((link) => [link.path, link.resolves]));
+  expect(resolves["again"]).toEqual(["alias", "alias", "dir/file.txt"]);
+  expect(resolves["thrice"]).toEqual(["alias", "alias", "alias", "dir/file.txt"]);
+  expect(resolves["a"]).toBeNull();
+  expect(resolves["b"]).toBeNull();
+  expect(resolves["self"]).toBeNull();
+  expect(resolves["alias"]).toEqual(["dir"]);
+});
