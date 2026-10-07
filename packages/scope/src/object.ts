@@ -31,7 +31,7 @@
 import { DurableObject } from "cloudflare:workers";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { SessionAnswer } from "@generalbusiness/artroom-contract";
-import type { Answer, Beside, Bounds, Cursor, DeclaredDefinition, Digest, DutyId, Entry, FactUse, Grant, Input, LogPage, OperationId, PlatformDefinition, Read, RetainedInput, ScopeId, Settlement, SignedIntent } from "@generalbusiness/artroom-contract";
+import type { Answer, Beside, Bounds, Cursor, DeclaredDefinition, Digest, DutyId, Entry, Grant, Input, LogPage, OperationId, PlatformDefinition, Read, RetainedInput, ScopeId, Settlement, SignedIntent } from "@generalbusiness/artroom-contract";
 import { isScopeId } from "@generalbusiness/artroom-bytes";
 import { isEntryOf, timeMs, type Item } from "@generalbusiness/artroom-derive";
 import type { ScopeState } from "@generalbusiness/artroom-derive";
@@ -46,7 +46,7 @@ import { Dispatcher, Wakes } from "./outbox.ts";
 import { production, type Alarm, type Authority, type Clock, type Delivery, type Ports, type Readers, type Transport } from "./ports.ts";
 import { SessionRequests, Streams, issueSession, type Opened, type Sessions, type StreamRefusal } from "./sessions.ts";
 import { READ_BOUNDS, Reads, type ReadBounds, type Summary } from "./reads.ts";
-import { presentsSignedRead, rootOf, type Root } from "./signed-reads.ts";
+import { Chains, presentsSignedRead } from "./signed-reads.ts";
 import { LATE, within } from "./turn.ts";
 import { SqliteStore } from "./sqlite.ts";
 import type { Duty, OperationStatus, Sealed, Store } from "./store.ts";
@@ -107,10 +107,8 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
   readonly #limits: JoinLimits;
   readonly #sessions: () => Sessions | null;
   readonly #requests: SessionRequests;
-  /** An entry that a genesis of this scope's cause chain names, from this scope's retained entries or from its own scope. */
-  readonly #chained: (use: FactUse) => Promise<Entry | null>;
-  /** The root of this scope's cause chain, once it is found: the history fixes it. Undefined: not found yet. */
-  #root: Root | null | undefined = undefined;
+  /** The roots of this scope's cause chains, each found once (`signed-reads.ts`). */
+  readonly #chains: Chains;
   /** True until this object's first turn: its first call or its alarm (`#first`). In memory, so a restart sets it again. */
   #fresh = true;
 
@@ -168,14 +166,16 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
     this.#store = store;
     this.#scope = new Scope(this.#name, store, ports, bounds);
     // A signed read is judged on this scope's clock, within the authority window of an intent (`signed-reads.ts`).
-    this.#reads = new Reads(store, () => this.#scope.pinned(), ports.readers, wiring.reads ?? READ_BOUNDS, record, { clock: ports.clock, window: bounds.intentLifetimeSeconds, root: () => this.#root ?? null });
-    this.#chained = async (use) => {
-      const kept = store.retained("entry", use.content);
+    // An entry that an entry of a cause chain names: one of this scope's own, one it retains, or one read from its own scope.
+    this.#chains = new Chains(store, async (use) => {
+      const own = use.fact.at.scope === this.#name ? store.stored(use.fact.seq) : null;
+      const kept = own ?? store.retained("entry", use.content);
       const local = kept ? (JSON.parse(kept.bytes) as Entry) : null;
       if (local && isEntryOf(local, use.fact)) return local;
       const read = await within(() => ports.resolver.read(use.fact, bounds.fetchSeconds), bounds.fetchSeconds);
       return read !== LATE && read !== null && "entry" in read && isEntryOf(read.entry, use.fact) ? read.entry : null;
-    };
+    });
+    this.#reads = new Reads(store, () => this.#scope.pinned(), ports.readers, wiring.reads ?? READ_BOUNDS, record, { clock: ports.clock, window: bounds.intentLifetimeSeconds, chains: this.#chains });
     this.#deliveries = new Deliveries(this.#name, this.#scope, store, ports, bounds);
     this.#dispatcher = given.transport ? new Dispatcher(this.#scope, store, { transport: given.transport, clock: ports.clock, capabilities: ports.capabilities }, wakes, bounds) : null;
     this.#operations = new Operations(this.#scope, store, ports, wakes, bounds, (operation, attempt, seq) => { record.found("outcome-conflict", [{ operation, attempt }, { entry: seq }]); });
@@ -315,15 +315,12 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
   }
 
   /**
-   * Before a signed read: the root of this scope's cause chain (`signed-reads.ts`), found once and kept. A chain that cannot be read
-   * now is looked for again at the next signed read, and this one is judged with no root.
+   * Before a read that may be limited by the cause chain: a signed read, or a session at a register (`signed-reads.ts`, `Chains`).
+   * The roots of the entries that are new are found and kept. A chain that cannot be read now is looked for again at the next such
+   * read, and this one is judged without the roots from there on.
    */
   async #rooted(reader: unknown): Promise<void> {
-    if (this.#root !== undefined || !presentsSignedRead(reader)) return;
-    const genesis = this.#store.stored(0);
-    if (!genesis) return;
-    const root = await rootOf(JSON.parse(genesis.bytes) as Entry, this.#chained);
-    if (root !== "unavailable") this.#root = root;
+    if (presentsSignedRead(reader) || (typeof reader === "string" && this.#store.scope()?.at.kind === "register")) await this.#chains.update();
   }
 
   async summary(reader: unknown): Promise<Read<Summary>> { this.#first(); await this.#rooted(reader); return this.#reads.summary(reader); }
@@ -335,7 +332,7 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
   operations(reader: unknown, cursor?: Cursor, open = false): Read<readonly OperationStatus[]> { this.#first(); return this.#reads.operations(reader, cursor, open); }
   operation(reader: unknown, operation: OperationId): Read<OperationStatus> { this.#first(); return this.#reads.operation(reader, operation); }
   async log(reader: unknown, cursor?: Cursor): Promise<Read<LogPage>> { this.#first(); await this.#rooted(reader); return this.#reads.log(reader, cursor); }
-  retained(reader: unknown, kind: RetainedInput["kind"], digest: Digest, domain?: string): Read<RetainedInput> { this.#first(); return this.#reads.retained(reader, kind, digest, domain); }
+  async retained(reader: unknown, kind: RetainedInput["kind"], digest: Digest, domain?: string): Promise<Read<RetainedInput>> { this.#first(); await this.#rooted(reader); return this.#reads.retained(reader, kind, digest, domain); }
   incidents(reader: unknown, cursor?: Cursor): Read<readonly Incident[]> { this.#first(); return this.#reads.incidents(reader, cursor); }
   waiting(reader: unknown, list: "diagnosed" | "unanswered", cursor?: Cursor): Read<readonly Duty[]> { this.#first(); return this.#reads.waiting(reader, list, cursor); }
 }

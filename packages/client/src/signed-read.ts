@@ -3,8 +3,9 @@
  * c6499e91 and 70a0680e; the scope package's `signed-reads.ts`). A device
  * with no read session yet reads a scope where its key signed an entry, or
  * the root of the scope's cause chain, within the authority window of an
- * intent: the scope's summary, its genesis and the entries that key
- * signed. So the operator key that signed `install` reads the register,
+ * intent: the scope's summary, its genesis, the entries that key signed,
+ * the entries whose cause chain leads to one of those, and the retained
+ * inputs that those entries name. So the operator key that signed `install` reads the register,
  * and a founder's key that signed `found` reads the register's summary,
  * the directory that the claim caused, and membership, the rules scope and
  * the destination, which the directory caused; it learns membership's ID
@@ -13,11 +14,11 @@
  * - `signedReader` signs one read: the scope, the read's name, its
  *   argument and a `notAfter`, with the device's key, as an intent is
  *   signed. Its value is the `Authorization` header of that one read.
- * - `signedReads` is a transport that signs each of the four reads that a
+ * - `signedReads` is a transport that signs each of the five reads that a
  *   signed read may name, when the caller presents no reader. A caller
  *   that presents one, such as a session, is sent as before.
  * - `signedLogReader` gives the replay package's `httpSource` the header
- *   of each `log` read.
+ *   of each `log` and `retained` read.
  *
  * A signed read is no session: each one is good for its one read, with
  * its one argument, until its `notAfter`.
@@ -44,7 +45,7 @@ export interface ReadSigning {
   maxLifetimeSeconds?: number;
 }
 
-/** The argument that a signed read names: `"summary"` for the summary; a page's cursor, `"0"` for the first; an entry's position. */
+/** The argument that a signed read names: `"summary"` for the summary; a page's cursor, `"0"` for the first; an entry's position; a retained input's digest. */
 export function readArgument(read: SignedReadName, at?: string | number): string {
   if (read === "summary") return "summary";
   return at === undefined ? "0" : String(at);
@@ -66,8 +67,8 @@ export async function signedReader(signer: Signer, to: ScopeId, read: SignedRead
 }
 
 /**
- * A transport whose `summary`, `history`, `entry` and `log` are signed
- * reads by `signer` when the caller presents no reader. A reader that is a
+ * A transport whose `summary`, `history`, `entry`, `log` and `retained` are
+ * signed reads by `signer` when the caller presents no reader. A reader that is a
  * text, such as a session's, is sent as it is. Every other operation is
  * the transport's own.
  */
@@ -80,10 +81,11 @@ export function signedReads(transport: Transport, signer: Signer, signing: ReadS
     history: async (scope, reader, cursor) => transport.history(scope, await as(reader, scope, "history", cursor), cursor),
     entry: async (scope, reader, seq) => transport.entry(scope, await as(reader, scope, "entry", seq), seq),
     log: async (scope, reader, cursor) => transport.log(scope, await as(reader, scope, "log", cursor), cursor),
+    retained: async (scope, reader, kind, digest, domain) => transport.retained(scope, await as(reader, scope, "retained", digest), kind, digest, domain),
   };
 }
 
-/** The reader of the replay package's `httpSource`: a signed read for each `log` page, and no header for a retained input, which a signed read does not reach. */
+/** The reader of the replay package's `httpSource`: a signed read for each `log` page and each retained input, by its digest. */
 export function signedLogReader(signer: Signer, signing: ReadSigning = {}): (scope: ScopeId, read: "log" | "retained", arg: string) => Promise<string | undefined> {
-  return async (scope, read, arg) => (read === "log" ? signedReader(signer, scope, "log", arg, signing) : undefined);
+  return async (scope, read, arg) => signedReader(signer, scope, read, arg, signing);
 }
