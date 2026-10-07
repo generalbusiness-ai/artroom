@@ -331,7 +331,7 @@ It installs only if `package-lock.json` changed since the last install,
 typechecks every workspace, and runs every test: one vitest process for
 the repository (`vitest.config.ts` at the root, one project for each of
 `bytes`, `derive`, `platform`, `git`, `checkers`, `replay`, `client`,
-`scope`, `lanes` and `cli`), then one script (`scripts/active-source.test.mjs`). The script checks that no
+`scope`, `lanes`, `cli` and `page`), then one script (`scripts/active-source.test.mjs`). The script checks that no
 active file imports from `parked/` or names a removed format, and that no
 platform package depends on the lanes package or imports from it. It prints the head, the tree and
 each step's elapsed and CPU time. It also fails on a whitespace error in
@@ -353,6 +353,17 @@ stand-ins in the file. The `cli` project is its Node test of the key files.
 `scripts/control.mjs` cannot select a root project, so a control of the
 story is run by hand: change the line, run
 `npx vitest run --project scope story`, restore the file.
+
+The page's story, `packages/page/test/story.scope.test.ts`, runs from the
+root inside the `scope` project too, on the lanes' room fixture. Its reads
+and acts are the page's own data functions over the Worker's HTTP routes;
+the Git host and the changed set are labelled stand-ins in the file. The
+`page` project is its Node test of the states of a change.
+`record.scope.test.ts` is no test of a property: it runs only with
+`PAGE_RECORD=1`, and `packages/page/test/screens.mjs` uses what it prints
+to take the page's screenshots in Chromium. That script needs
+`playwright-core` installed outside the checkout; it is not part of the
+gate.
 
 The lane scenarios, `packages/lanes/test/*.scope.test.ts`, run from
 the root inside the `scope` project: the same test Worker, loaded once.
