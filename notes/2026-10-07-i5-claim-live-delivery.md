@@ -161,8 +161,9 @@ every test passed. A run of the whole `scope` project (38 files, 116
 tests) printed none and exited 0. [run] Its source is not found
 [inferred: the previous branch's note saw it before this change].
 
-This note is the only commit after the gate run, and changes documents
-only. Source and tests are unchanged from tree `6c8d255a`.
+The commits after the gate run add this note and remove the empty marker
+`notes/.keep-i5-claim-live`, and change documents only. Source and tests
+are unchanged from tree `6c8d255a`.
 
 ## 5. What is owed
 
