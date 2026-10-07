@@ -8,7 +8,7 @@ import { act, acts, claim, install, invite, join, log, show, verify, type Contex
 export const USAGE = [
   "Usage:",
   "  artroom install <base-url> [--host <git-host>] [--namespace <name>]",
-  "  artroom claim <name> [--handle @you] [--branch main]",
+  "  artroom claim <name> [--handle @you] [--branch main] [--again]",
   "  artroom invite <@member> --role <role> [--hours 24]",
   "  artroom join <link>",
   "  artroom acts [<scope>]",
@@ -19,7 +19,10 @@ export const USAGE = [
   "A scope is a scope ID, or one of: register, directory, membership, rules, destination, inbox.",
 ].join("\n");
 
-/** The words of a command line: the positional ones, and each `--name value`; `--set` may be given more than once. */
+/** The flags that take no value. */
+const SWITCHES: ReadonlySet<string> = new Set(["again"]);
+
+/** The words of a command line: the positional ones, each `--name value`, and each switch; `--set` may be given more than once. */
 export function parse(argv: readonly string[]): { words: string[]; flags: Map<string, string[]> } | null {
   const words: string[] = [];
   const flags = new Map<string, string[]>();
@@ -27,6 +30,10 @@ export function parse(argv: readonly string[]): { words: string[]; flags: Map<st
     const arg = argv[i]!;
     if (!arg.startsWith("--")) {
       words.push(arg);
+      continue;
+    }
+    if (SWITCHES.has(arg.slice(2))) {
+      flags.set(arg.slice(2), ["true"]);
       continue;
     }
     const value = argv[++i];
@@ -37,7 +44,7 @@ export function parse(argv: readonly string[]): { words: string[]; flags: Map<st
 }
 
 const KNOWN: Record<string, readonly string[]> = {
-  install: ["host", "namespace"], claim: ["handle", "branch"], invite: ["role", "acts", "hours"], join: [], acts: [], act: ["on", "target", "set"], log: ["limit"], show: [], verify: [],
+  install: ["host", "namespace"], claim: ["handle", "branch", "again"], invite: ["role", "acts", "hours"], join: [], acts: [], act: ["on", "target", "set"], log: ["limit"], show: [], verify: [],
 };
 
 /** Runs one command line with the given context. */
@@ -52,7 +59,7 @@ export async function command(ctx: Context, argv: readonly string[]): Promise<Ou
   const needs = (what: string): Outcome => ({ code: 2, lines: [`${name} needs ${what}.`, USAGE] });
   switch (name) {
     case "install": return first === undefined ? needs("a base URL") : install(ctx, first, { ...(flag("host") ? { host: flag("host")! } : {}), ...(flag("namespace") ? { namespace: flag("namespace")! } : {}) });
-    case "claim": return first === undefined ? needs("a name") : claim(ctx, first, { ...(flag("handle") ? { handle: flag("handle")! } : {}), ...(flag("branch") ? { branch: flag("branch")! } : {}) });
+    case "claim": return first === undefined ? needs("a name") : claim(ctx, first, { ...(flag("handle") ? { handle: flag("handle")! } : {}), ...(flag("branch") ? { branch: flag("branch")! } : {}), ...(flag("again") ? { again: true } : {}) });
     case "invite": return first === undefined ? needs("a member's handle") : invite(ctx, first, { ...(flag("role") ? { role: flag("role")! } : {}), ...(flag("acts") !== undefined ? { acts: flag("acts")! } : {}), ...(flag("hours") ? { hours: number("hours")! } : {}) });
     case "join": return first === undefined ? needs("a link") : join(ctx, first);
     case "acts": return acts(ctx, first);
