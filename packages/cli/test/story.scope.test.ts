@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
-import type { Digest, Item, OperationId, Read } from "@generalbusiness/artroom-contract";
-import { b64url, textDigest, timeMs } from "@generalbusiness/artroom-bytes";
+import type { Digest, Item, OperationId, Read, Seed } from "@generalbusiness/artroom-contract";
+import { b64url, scopeIdOf, timeMs } from "@generalbusiness/artroom-bytes";
 import type { Fetch } from "@generalbusiness/artroom-client";
 import { repositoryName } from "@generalbusiness/artroom-platform";
 import { net } from "@generalbusiness/artroom-scope/testing";
@@ -138,13 +138,15 @@ async function story(): Promise<void> {
   const sealed = (await M.sealed())[seq]!;
   expect(added.lines).toEqual([`Took effect: entry ${M.name}:${seq}, hash ${sealed.hash.slice(0, 19)}.`]);
   expect((await M.item(seq)).values).toMatchObject({ handle: "@check", kind: "checker" });
+  // Let this accepted act's inbox creation settle before comparing the head around the next, refused act.
+  await settle(M, ...sealed.sends.flatMap((send) => ("creator" in send.to ? [new Platform(scopeIdOf(send.to as Seed))] : [])));
 
-  // act, refused: una opens an issue under a definition that the real rules scope has never activated. The scope refuses it by
-  // the guard's name, and writes nothing.
-  const before = (await D.summary()).at;
-  const refused = await run(una, "act", "open-issue", "--on", "directory", "--set", `definition=${textDigest("a definition no rules scope activated")}`, "--set", "title=An inactive definition", "--set", "conditions=[]");
-  expect(refused).toEqual({ code: 1, lines: [`Refused: guard-failed (not-activated), judged at entry ${D.name}:${before.seq}. Nothing was written.`] });
-  expect((await D.summary()).at).toEqual(before);
+  // act, refused: the admin tries to add the checker handle already held by the member above. Membership refuses it by the
+  // guard's name, and writes nothing. This complete act tests a named judgment rather than missing definition bytes.
+  const before = (await M.summary()).at;
+  const refused = await run(rita, "act", "add-member", "--on", "membership", "--set", "handle=@check", "--set", "kind=checker");
+  expect(refused).toEqual({ code: 1, lines: [`Refused: guard-failed (handle-in-use), judged at entry ${M.name}:${before.seq}. Nothing was written.`] });
+  expect((await M.summary()).at).toEqual(before);
 
   // log, show and verify with una's session: the command asks membership for one with her key.
   const head = (await M.summary()).at.seq;
