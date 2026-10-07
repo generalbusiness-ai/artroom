@@ -138,6 +138,65 @@ Result: consistent, for the mode, target, coverage and trusts stated below.
 Mode: replay. Within the coverage stated below, the history was folded from its genesis, ...
 ```
 
+**`artroom remote`** prints the repository's host, namespace, name and
+remote URL, from the destination's branch item. On GitHub the URL is
+`https://github.com/<namespace>/<name>.git`. On the hosting's own Git
+service it is `https://<host>/git/<namespace>/<name>.git`, where `<host>`
+is the deployment's setting, which no scope records: until a clone has
+learned it, the command marks that part. The examples are from
+`packages/cli/test/clone.scope.test.ts`.
+
+```
+Host: artifacts
+Namespace: artroom-demo
+Name: 5kywbv2y...-1
+Remote URL: https://<service host>/git/artroom-demo/5kywbv2y...-1.git (the service host is the deployment's setting; artroom clone prints it whole)
+```
+
+**`artroom clone [<directory>] [--hours 1]`** clones the repository with
+a read token of the caller's own:
+
+1. If there is no `git` program, it signs nothing and prints the clone
+   command with the token's place marked.
+2. It signs the destination's `read-token` act with `hours` (1 to 24;
+   the default is 1). Every role holds its grant, so any active member
+   may sign it. The destination opens a `mint-read` operation, and the
+   host mints a read token for that lifetime. On GitHub the lifetime is
+   GitHub's own, one hour.
+3. It waits for the outcome, which names the token by a nonsecret handle
+   and its end. Then it reads the token once, with the caller's read
+   session, from the destination's credential route. No other session can
+   read it, and it cannot be read twice.
+4. It runs `git clone -- <remote> [<directory>]`. The token goes to git
+   as an `Authorization` header, in the configuration `http.extraHeader`,
+   which the command sets in git's environment (`GIT_CONFIG_COUNT`,
+   `GIT_CONFIG_KEY_0`, `GIT_CONFIG_VALUE_0`). That is the same setting as
+   `git -c http.extraHeader=...`, but it is in no argument, so no process
+   list shows it. The token is in no printed line and in no file the
+   command writes, and git does not keep it in the clone's config. The
+   header is `Bearer <token>` on the hosting's own Git service, and
+   GitHub's form for an installation token, `Basic` with the user
+   `x-access-token`, on GitHub.
+
+It prints the remote URL, and keeps it in the config for `remote`.
+
+```
+Read token: sc_rh5ctnhi...:2, until 2099-01-01T02:00:00Z.
+Remote URL: https://service.invalid/git/artroom-demo/5kywbv2y...-1.git
+Cloned into here.
+```
+
+Without git:
+
+```
+git is not installed here, so nothing was signed. With git installed, run artroom clone again; it runs:
+git -c http.extraHeader="Authorization: Bearer <read token>" clone -- https://<service host>/git/artroom-demo/5kywbv2y...-1.git here
+```
+
+The token is for the clone. A later `git fetch` in the clone needs a new
+token; run `artroom clone` again for one. A token that is never read ends
+at its end.
+
 Exit codes: 0 done; 1 refused, unavailable, not found or not consistent;
 2 a command line this cannot run.
 
@@ -172,3 +231,12 @@ it (the intent window), and the retained inputs those entries name.
   section 4.
 - An act definition has no description text. The line `acts` prints is
   made from the act's step, item and grant.
+- A destination where no act has been signed yet cannot be read by
+  anyone once the founder's intent window after the claim has passed:
+  it accepts no read session until its first act records membership's
+  incarnation, and the founder's signed read lasts 15 minutes after the
+  claim. `remote` and `clone` then stop with `Cannot read <destination>:
+  forbidden.` Run the first `clone` within 15 minutes of the claim. See
+  `notes/2026-10-07-i5-clone-delivery.md`, section 5.
+- `git fetch` and `git pull` in a clone have no command that gives them a
+  token.

@@ -656,6 +656,14 @@ the same way, by the claim that caused its directory. A reader with
 neither reads nothing. The scope package's guide says what a
 session binds, how it ends, and the form of a signed read.
 
+One read answers a credential. A member's `read-token` act at the
+destination opens a `mint-read` host operation, whose outcome records the
+read token by a nonsecret handle and its end; the token itself goes to the
+destination's private custody. The credential route answers it once, to
+the session of the key that signed the act, before its end, and then
+drops it. Every other read of it is `forbidden`. The act and its outcome
+are ordinary entries, and a replay folds them.
+
 ## Replay, and what a report means
 
 `@generalbusiness/artroom-replay` checks a history without running the
