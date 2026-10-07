@@ -209,7 +209,7 @@ at its end.
 **`artroom edit <path> --file <local file> [--title <text>]`** writes one
 file of the repository through the room. The person never writes the
 repository: the room judges the change and its destination writes it. The
-examples have the form that `packages/cli/test/edit.scope.test.ts`
+examples have the form that `packages/lanes/test/edit.scope.test.ts`
 asserts, with IDs cut short; the numbers in them are illustrative.
 
 1. It reads the local file. A file that is no UTF-8 text, or that has more

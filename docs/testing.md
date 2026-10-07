@@ -268,6 +268,16 @@ host. What a real change lane does with the service's signed results is
 one scenario of the lanes, `packages/lanes/test/checks.scope.test.ts`,
 which calls the service's origin read and its signer as functions.
 
+`packages/lanes/test/edit.scope.test.ts` runs `artroom edit` as the
+command-line story runs its commands, on each host through the production
+wiring of its ports (`artifacts-wiring.ts`, `github-wiring.ts`) over a
+labelled stand-in of `packages/scope/test/hosts.ts`, which keeps refs and
+objects in maps and decodes each pushed pack; the site route reads the
+published file back over the same stand-in. It lives with the lanes,
+because it needs a lane definition and no other package may name the
+lanes package; the stand-ins live in the scope package, which may name the
+git package.
+
 `packages/lanes/test/support/room.ts` founds a repository on the real
 platform scopes, in the namespace `PLATFORM`, as `founding-real` does, and
 its real directory creates lanes under the digests that its real rules
@@ -352,11 +362,7 @@ called in the test's isolate; the Git host and the scheduler are labelled
 stand-ins in the file. Its readers are the real read sessions and signed
 reads, under a session secret that the test generates; the test's own reads
 of what a scope holds go past them by `platformNet.inspector`, a reader that
-the command never presents. `edit.scope.test.ts` runs `artroom edit` the same way, on each host through
-the production wiring of its ports (`artifacts-wiring.ts`,
-`github-wiring.ts`) over a labelled stand-in that keeps refs and objects in
-maps and decodes each pushed pack; the site route reads the published file
-back over the same stand-in. The `cli` project is its Node test of the key files.
+the command never presents. The `cli` project is its Node test of the key files.
 `scripts/control.mjs` cannot select a root project, so a control of the
 story is run by hand: change the line, run
 `npx vitest run --project scope story`, restore the file.

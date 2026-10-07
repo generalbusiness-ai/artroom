@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import type { Digest, Item, OperationId, Read } from "@generalbusiness/artroom-contract";
-import { b64url, canonicalize, factRefOf, textDigest, timeMs, timeOf, utf8 } from "@generalbusiness/artroom-bytes";
+import { b64url, canonicalize, definitionDigest, factRefOf, textDigest, timeMs, timeOf, utf8 } from "@generalbusiness/artroom-bytes";
 import type { Fetch } from "@generalbusiness/artroom-client";
 import { repositoryName } from "@generalbusiness/artroom-platform";
 import { net } from "@generalbusiness/artroom-scope/testing";
@@ -8,7 +8,6 @@ import { platformNet } from "@generalbusiness/artroom-scope/testing/worker";
 import { Platform, routed, settle } from "../../scope/test/repository.ts";
 import { outsideOf, wired } from "../../scope/test/outside.ts";
 import { foundingPublication } from "../../scope/test/publication.ts";
-import { DEMO_DIGESTS, issueDemo } from "../../lanes/src/index.ts";
 import { command, memoryStore, type Context, type Outcome } from "../src/index.ts";
 
 const SERVICE = "https://scopes.test";
@@ -66,7 +65,9 @@ async function story(): Promise<void> {
     await settle(...[...(register ? [register] : []), ...waiting.filter((scope) => scope !== register?.name).map((scope) => new Platform(scope as never))]);
   };
   const rita: Context = { store: memoryStore(), fetch, now, pause };
-  const una: Context = { store: memoryStore(), fetch, now, pause, read: async (path) => (path === "issue-demo.json" ? utf8(canonicalize(issueDemo)) : null) };
+  // A made-up value in the domain of a definition, whose bytes are at hand beside an act: no rules scope activated it.
+  const inactive = { name: "a definition that no rules scope activated" };
+  const una: Context = { store: memoryStore(), fetch, now, pause, read: async (path) => (path === "inactive.json" ? utf8(canonicalize(inactive)) : null) };
   const run = async (who: Context, ...argv: string[]): Promise<Outcome> => command(who, argv);
 
   // install: the register, by an `install` intent of a new operator key, which is the one founder key.
@@ -147,10 +148,10 @@ async function story(): Promise<void> {
   expect(added.lines).toEqual([`Took effect: entry ${M.name}:${seq}, hash ${sealed.hash.slice(0, 19)}.`]);
   expect((await M.item(seq)).values).toMatchObject({ handle: "@check", kind: "checker" });
 
-  // act, refused: una opens an issue under a definition that the real rules scope has never activated, with the definition's bytes
-  // beside the act (`--value`). The scope refuses it by the guard's name, and writes nothing.
+  // act, refused: una opens an issue under a definition that the real rules scope has never activated, with its bytes beside the
+  // act (`--value`). The scope refuses it by the guard's name, and writes nothing.
   const before = (await D.summary()).at;
-  const refused = await run(una, "act", "open-issue", "--on", "directory", "--set", `definition=${DEMO_DIGESTS.issue}`, "--set", "title=An inactive definition", "--set", "conditions=[]", "--value", "issue-demo.json");
+  const refused = await run(una, "act", "open-issue", "--on", "directory", "--set", `definition=${definitionDigest(inactive as never)}`, "--set", "title=An inactive definition", "--set", "conditions=[]", "--value", "inactive.json");
   expect(refused).toEqual({ code: 1, lines: [`Refused: guard-failed (not-activated), judged at entry ${D.name}:${before.seq}. Nothing was written.`] });
   // With no bytes beside it, the digest names a value place that holds nothing: the field is refused before any guard is judged
   // (the lane wiring's value place; its note, section 6, gap 3).
