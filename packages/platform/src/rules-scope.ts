@@ -53,6 +53,7 @@
  */
 
 import type { DeclaredDefinition, Digest, MemberId, MemberObservation, ObservationRequest, PlatformData, PlatformDefinition, RulesObservation, ScopeId } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import { canonicalize, isDigest, isMemberRef, utf8 } from "@generalbusiness/artroom-bytes";
 import { byteOrder, validateDefinition, valueDigest } from "@generalbusiness/artroom-derive";
 import type { Item, RecordedRef, Rules, StateView } from "@generalbusiness/artroom-derive";
@@ -253,7 +254,11 @@ export const rulesScope: PlatformData = {
     activate: {
       step: "open", on: "definition", grant: "rules.activate",
       also: {},
-      fields: { digest: { ...DIGEST, required: true }, name: { type: "text", max: 64, required: true } },
+      // The definition's bytes come beside the intent at a stated place, in the domain of a definition: a value beside an intent is
+      // read only for a place that the pinned data states (the contract's section 6.2, revision 19). Without the place the runtime
+      // reads none, and the guard below can only answer `dependency-unavailable`. One place: the closure of a lane definition that
+      // creates only lanes of `self` is the definition alone.
+      fields: { digest: { ...DIGEST, required: true, value: { domain: DEFINITION_DOMAIN, max: PROPOSED_BOUNDS.definitionBytes } }, name: { type: "text", max: 64, required: true } },
       guards: [
         { code: "definition-bytes", row: "P21" },
         { none: { type: "definition", states: ["active"], where: [{ equals: { a: { slot: "digest" }, b: { field: "digest" } } }] } },
