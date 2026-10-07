@@ -83,6 +83,7 @@ import { gitHubOutside, type GitHubBindings } from "./github-wiring.ts";
 import { ARTIFACTS_HOST, artifactsOutside, type ArtifactsBindings } from "./artifacts-wiring.ts";
 import { recordedHost } from "./host-wiring.ts";
 import { NO_OUTSIDE, type Outside } from "./operations.ts";
+import { isSite, site } from "./site/route.ts";
 
 /**
  * The bindings of the deployed Worker (`wrangler.jsonc`): the one scope
@@ -384,4 +385,5 @@ export class ScopeService<E extends Env = Env> extends WorkerEntrypoint<E> imple
   retained(scope: string, reader: unknown, kind: RetainedInput["kind"], digest: Digest, domain?: string): Promise<Read<RetainedInput>> { return api(this.scopes()).retained(scope, reader, kind, digest, domain); }
 }
 
-export default { fetch: (request: Request, env: Env): Promise<Response> => route(request, env.SCOPES) };
+/** `GET /site/...` is a room's published pages (`site/route.ts`); every other path is a route of the table above. */
+export default { fetch: (request: Request, env: Env): Promise<Response> => (isSite(request) ? site(request, env) : route(request, env.SCOPES)) };
