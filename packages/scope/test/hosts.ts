@@ -215,4 +215,3 @@ export async function gitHub(): Promise<Stand> {
     secrets: () => [CREATION, privateKey, ...stand.minted],
   };
 }
-
