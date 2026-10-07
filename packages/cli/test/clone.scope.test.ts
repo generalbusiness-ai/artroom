@@ -52,7 +52,7 @@ function recordingGit(): Git & { runs: { args: readonly string[]; env: Readonly<
 // | git | A STAND-IN: a function that records its arguments and environment. Node's runner over a stand-in `git` script on the PATH is `git.test.ts`. |
 // | The scheduler | A STAND-IN: while a command waits, its `pause` runs the operations driver and the dispatchers, as a deployment's alarms would. |
 describe("artroom clone and artroom remote on real scopes. The Git hosts, git and the scheduler are STAND-INs", () => {
-  test("remote prints the host's form; clone without git signs nothing; clone signs read-token, reads the token once and gives it to git only in its environment's header configuration; a member clones once the destination has an act; GitHub's remote is whole", async () => {
+  test("remote prints the host's form; a member reads the destination with her session before any act there; clone without git signs nothing; clone signs read-token, reads the token once and gives it to git only in its environment's header configuration; a member clones with her own token; GitHub's remote is whole, and is read with the founder's session after the signed-read window", async () => {
     net.hold = net.deaf = null;
     platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32)));
     platformNet.sessions = true;
@@ -111,12 +111,12 @@ async function story(): Promise<void> {
     // remote: the branch item's record. The service's hostname is the deployment's setting, which no scope records: it is marked.
     expect(await run(rita, "remote")).toEqual({ code: 0, lines: ["Host: artifacts", `Namespace: ${NAMESPACE}`, `Name: ${name.name}`, `Remote URL: https://<service host>/git/${NAMESPACE}/${name.name}.git (the service host is the deployment's setting; artroom clone prints it whole)`] });
 
-    // A member who joined before any act at the destination cannot read it yet: the destination records membership's incarnation
-    // from its first act's observation, and until then accepts no session, and her key signed nothing there (the delivery note's
-    // section 5).
+    // A member who joined before any act at the destination reads it with her session: the destination knows membership's scope ID
+    // from its genesis, though no entry of it retains an observation yet (the planner's decision ca8ad1cf). Her key signed nothing
+    // there.
     const link = ok(await run(rita, "invite", "@una", "--role", "member")).lines[1]!.split(": ")[1]!;
     ok(await run(una, "join", link));
-    expect(await run(una, "clone")).toEqual({ code: 1, lines: [`Cannot read ${G.name}: forbidden.`] });
+    expect((await run(una, "remote")).lines).toEqual(["Host: artifacts", `Namespace: ${NAMESPACE}`, `Name: ${name.name}`, expect.stringMatching(/^Remote URL: https:\/\/<service host>\//)]);
 
     // Without git nothing is signed: the command prints the clone command with the token's place marked, and the destination's
     // head does not move.
@@ -138,7 +138,7 @@ async function story(): Promise<void> {
     // remote now prints the URL whole: the clone's credential answer named it, and the config keeps it.
     expect((await run(rita, "remote")).lines.at(-1)).toBe(`Remote URL: ${remoteUrl}`);
 
-    // Once the destination has an act, the member clones with a token of her own, read with her own session.
+    // The member clones with a token of her own, read with her own session.
     git.runs.length = 0;
     const hers = ok(await run(una, "clone"));
     expect([service.minted, git.runs.at(-1)]).toEqual([["read-plaintext-1", "read-plaintext-2"], { args: ["clone", "--", remoteUrl], env: { GIT_CONFIG_COUNT: "1", GIT_CONFIG_KEY_0: "http.extraHeader", GIT_CONFIG_VALUE_0: "Authorization: Bearer read-plaintext-2" } }]);
@@ -165,11 +165,12 @@ async function story(): Promise<void> {
     ok(await run(vic, "claim", "hub", "--handle", "@vic"));
     const hub = ((await new Platform((await vic.store.config())!.repository!.destination).item(0)).values["repository"]) as { name: string };
     expect(await run(vic, "remote")).toEqual({ code: 0, lines: ["Host: github.com", "Namespace: generalbusiness-ai", `Name: ${hub.name}`, `Remote URL: https://github.com/generalbusiness-ai/${hub.name}.git`] });
-    // The gap of the delivery note's section 5: a destination with no act yet accepts no session, and the founder's signed read
-    // lasts the intent window after the claim. Past it, nobody reads the destination, and neither command can go on.
+    // Past the intent window of the claim, the founder's key's signed read is refused, and the destination, which has no act yet, is
+    // read with the founder's session: remote and clone go on (the planner's decision ca8ad1cf; the gap the live-ops note's section 4,
+    // items 1 and 2, recorded).
     net.clock.now = timeOf(timeMs(net.clock.now)! + 16 * 60_000);
-    const destination = (await vic.store.config())!.repository!.destination;
-    expect([await run(vic, "remote"), await run({ ...vic, git: recordingGit() }, "clone")]).toEqual([{ code: 1, lines: [`Cannot read ${destination}: forbidden.`] }, { code: 1, lines: [`Cannot read ${destination}: forbidden.`] }]);
+    expect(await run(vic, "remote")).toEqual({ code: 0, lines: ["Host: github.com", "Namespace: generalbusiness-ai", `Name: ${hub.name}`, `Remote URL: https://github.com/generalbusiness-ai/${hub.name}.git`] });
+    expect(await run({ ...vic, git: { run: async () => null } }, "clone")).toEqual({ code: 1, lines: ["git is not installed here, so nothing was signed. With git installed, run artroom clone again; it runs:", `git -c http.extraHeader="Authorization: Basic <x-access-token:read token, base64>" clone -- https://github.com/generalbusiness-ai/${hub.name}.git`] });
   } finally {
     wired.delete(H.name);
   }

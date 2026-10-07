@@ -581,8 +581,8 @@ export function show(ctx: Context, named: string): Promise<Outcome> {
  */
 /**
  * A source whose reads go with the caller's session, and a read that the session is refused (`forbidden`) goes again as a signed
- * read by the caller's key. So a scope that accepts no session of this repository yet, as a rules scope that records membership's
- * ID with no incarnation before its first act, is read by the key's cause chain while that holds.
+ * read by the caller's key. Every scope of the room and the register accept a session of the room's membership (the planner's
+ * decision ca8ad1cf), so the fallback serves a scope of another room or register that the caller's key signed an entry of.
  */
 function sessionFirst(session: HistorySource, signed: HistorySource): HistorySource {
   return {
@@ -628,9 +628,9 @@ const remoteLine = (config: Config, repository: Recorded): string =>
   remoteOf(config, repository) ?? (repository.host === OWN_HOST ? `https://<service host>/git/${repository.namespace}/${repository.name}.git (the service host is the deployment's setting; artroom clone prints it whole)` : `not known for the host ${repository.host}`);
 
 /**
- * The destination's summary. The caller's session is presented first. A destination accepts no session before its first act
- * retains an observation of membership, so a session that is refused there reads again as a signed read by the caller's key,
- * which the destination answers where the key's claim caused it.
+ * The destination's summary. The caller's session is presented first; the destination accepts a session of the membership its
+ * genesis names. A caller with no session, or one that is refused, reads again by a signed read of the caller's key, which the
+ * destination answers where the key's claim caused it, within the intent window.
  */
 async function destinationOf(ctx: Context, config: Config): Promise<{ summary: Summary; reader: string | null; repository: Recorded }> {
   const scope = config.repository?.destination ?? stop(usage("No repository is known here. Run: artroom claim <name>, or artroom join <link>."));
