@@ -13,7 +13,11 @@ import { COMMAND_MS } from "./program.ts";
 
 export interface RawGitObject { id: ObjectId; type: "commit" | "tree" | "blob"; data: Uint8Array }
 export interface ReceiveAdvertisement { refs: RefTarget[]; capabilities: string[] }
-export interface HttpUpdate { ref: string; old: ObjectId | null; new: ObjectId | null; objects?: readonly RawGitObject[] }
+export interface HttpUpdate {
+  ref: string; old: ObjectId | null; new: ObjectId | null; objects?: readonly RawGitObject[];
+  /** Trusted caller's live authorization check, immediately before the POST. */
+  beforeSend?: () => boolean;
+}
 export interface SmartHttpOptions {
   remote: string;
   /** Caller-chosen buffer allowance for this transport, not a platform quota. */
@@ -236,6 +240,10 @@ export class SmartHttpGit {
     if (!advertised.capabilities.includes("report-status") || (update.new === null && !advertised.capabilities.includes("delete-refs"))) return NOT_RUN("unreadable");
     const body = join([packet(`${update.old ?? ZERO_ID} ${update.new ?? ZERO_ID} ${update.ref}\0report-status\n`), FLUSH, pack]);
     if (body.length > this.#maxBytes) return NOT_RUN("too-large");
+    // Compression and discovery awaited. A caller's live token or target may
+    // have changed while they ran; do not turn an earlier check into a send.
+    try { if (update.beforeSend && !update.beforeSend()) return NOT_RUN("unreadable"); }
+    catch { return NOT_RUN("unreadable"); }
     const signal = AbortSignal.timeout(this.#timeoutMs);
     const unknown: PushAnswer = { ran: true, refusal: null, exit: null, timedOut: false, reported: null, others: false, code: null };
     try {

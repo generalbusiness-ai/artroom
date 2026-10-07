@@ -121,6 +121,18 @@ test("Web smart HTTP initializes and deletes exact refs on local Git; a racing C
   expect(requests.every((r) => r.redirect === "error" && r.credentials === "omit" && !r.url.includes(TOKEN))).toBe(true);
   expect(new Set(host.credentials)).toEqual(new Set([`Bearer ${TOKEN}`]));
   expect(JSON.stringify([client, requests, applied, raced, lost]).includes(TOKEN)).toBe(false);
+
+  // Authorization may change while discovery awaits. The final synchronous
+  // caller check must prevent the POST even though its old ref still matches.
+  let permitted = true;
+  const guarded = new SmartHttpGit({ remote: "http://127.0.0.1/repo.git", transport: "local", maxBytes: 100_000, authorization: `Bearer ${TOKEN}`, fetch: async (request) => {
+    const response = await host.upstream(request);
+    permitted = false;
+    return response;
+  } });
+  const updates = host.updates;
+  const cancelled = await guarded.send({ ref: REF, old: null, new: target, objects, beforeSend: () => permitted });
+  expect([cancelled.ran, host.updates, refAt(remote, REF)]).toEqual([false, updates, null]);
 });
 
 // Invariant: unverified/over-bound bytes and a redirect send no update;
