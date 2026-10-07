@@ -83,7 +83,7 @@ async function resumed(): Promise<void> {
   const resumedClaim = await run("claim", "demo");
   expect(resumedClaim.code, resumedClaim.lines.join("\n")).toBe(0);
   const config = (await rita.store.config())!;
-  expect([config.claim, config.handle, resumedClaim.lines[1]]).toEqual([undefined, "@rita", expect.stringMatching(/^You are @rita, an admin, on key key_\S+; your inbox is sc_\S+\.$/)]);
+  expect([config.claim, config.handle, resumedClaim.lines[1], resumedClaim.lines[2]]).toEqual([undefined, "@rita", "Definitions: platform:directory@2, platform:membership@2, platform:rules@2, platform:destination@2.", expect.stringMatching(/^You are @rita, an admin, on key key_\S+; your inbox is sc_\S+\.$/)]);
   const D = new Platform(config.repository!.directory.scope);
   expect((await D.entries())[0]!.uses.map((use) => use.fact.seq)).toContain((await founds())[1]!.seq);
   // No third found; each creation attempt was sent once, by the pass that the register's first call after its restart started.

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import type { Digest, Item, OperationId, Read } from "@generalbusiness/artroom-contract";
-import { b64url, factRefOf, textDigest, timeMs, timeOf } from "@generalbusiness/artroom-bytes";
+import { b64url, textDigest, timeMs, timeOf } from "@generalbusiness/artroom-bytes";
 import type { Fetch } from "@generalbusiness/artroom-client";
 import { repositoryName } from "@generalbusiness/artroom-platform";
 import { net } from "@generalbusiness/artroom-scope/testing";
@@ -72,8 +72,9 @@ async function story(): Promise<void> {
   const installed = await run(rita, "install", SERVICE, "--host", "git.example", "--namespace", "artroom");
   expect(installed.code, installed.lines.join("\n")).toBe(0);
   const R = new Platform((await rita.store.config())!.register!.scope);
-  expect(installed.lines).toEqual([`Installed: register ${R.name}.`, expect.stringMatching(/^The operator key key_\S+ is kept in the config directory, readable only by you\. It is the one founder key\.$/)]);
-  expect((await R.summary()).value).toMatchObject({ status: "active", definition: "platform:register@1" });
+  expect(installed.lines).toEqual([`Installed: register ${R.name}, under platform:register@2.`, expect.stringMatching(/^The operator key key_\S+ is kept in the config directory, readable only by you\. It is the one founder key\.$/)]);
+  // A new register is founded on the newest version, and the room that it creates on the newest version of each definition.
+  expect((await R.summary()).value).toMatchObject({ status: "active", definition: "platform:register@2" });
   // Before the claim the operator key holds no session, and reads the register by signed reads of the log: its genesis is all there
   // is, and it replays.
   const early = await run(rita, "verify", "register");
@@ -98,6 +99,7 @@ async function story(): Promise<void> {
   for (const scope of [D, M, new Platform(repository.rules), new Platform(repository.destination), new Platform(repository.inbox!)]) expect((await scope.summary()).value.status).toBe("active");
   expect(claimed.lines).toEqual([
     `Claimed demo: directory ${D.name}, membership ${M.name}, rules ${repository.rules}, destination ${repository.destination}; each created and confirmed.`,
+    "Definitions: platform:directory@2, platform:membership@2, platform:rules@2, platform:destination@2.",
     expect.stringMatching(new RegExp(`^You are @rita, an admin, on key key_\\S+; your inbox is ${repository.inbox}\\.$`)),
   ]);
   expect(outsideOf(R.name).attempts).toEqual(["1:0#1"]);
@@ -105,7 +107,7 @@ async function story(): Promise<void> {
   // The destination's founding publication: the first head and its receipt, answered by the STAND-IN host. The destination then
   // holds entries that no member signed: the host's outcomes, the receipt's among them.
   const G = new Platform(repository.destination);
-  await foundingPublication(G, factRefOf((await R.entries())[1]!));
+  await foundingPublication(G);
   const recorded = (await G.item(0)) as { state: string; values: { repository?: { name: string } } };
   expect(recorded.state).toBe("ready");
 
@@ -129,7 +131,7 @@ async function story(): Promise<void> {
   // acts: what una's role holds on the directory, read with her session from the definition and from her standing in membership.
   const unasActs = await run(una, "acts", "directory");
   expect(unasActs).toEqual({ code: 0, lines: [
-    `Acts on ${D.name} (platform:directory@1) for @una (member):`,
+    `Acts on ${D.name} (platform:directory@2) for @una (member):`,
     "  open-issue: opens a lane; needs issue.open. Fields: definition:digest title:text body?:text conditions:list.",
     "  open-pr: opens a lane; needs change.open. Fields: definition:digest title:text body?:text draft:bool.",
     "  open-task: opens a task; needs task.control. Fields: worker:member controller:member lane:scope.",
@@ -146,12 +148,19 @@ async function story(): Promise<void> {
   expect(added.lines).toEqual([`Took effect: entry ${M.name}:${seq}, hash ${sealed.hash.slice(0, 19)}.`]);
   expect((await M.item(seq)).values).toMatchObject({ handle: "@check", kind: "checker" });
 
-  // act, refused: una opens an issue under a definition that the real rules scope has never activated. The scope refuses it by
-  // the guard's name, and writes nothing.
+  // act, refused: una opens an issue under a definition that the real rules scope has never activated. Under
+  // `platform:directory@2` the field `definition` states the place of the definition's bytes, and this command carries no value
+  // beside an intent, so the scope refuses the act `bad-field` before any guard (the contract's section 6.2, revision 19), and
+  // writes nothing. Under `platform:directory@1`, which states no place, the same act reaches the guard `definition-active`.
   const before = (await D.summary()).at;
   const refused = await run(una, "act", "open-issue", "--on", "directory", "--set", `definition=${textDigest("a definition no rules scope activated")}`, "--set", "title=An inactive definition", "--set", "conditions=[]");
-  expect(refused).toEqual({ code: 1, lines: [`Refused: guard-failed (not-activated), judged at entry ${D.name}:${before.seq}. Nothing was written.`] });
+  expect(refused).toEqual({ code: 1, lines: [`Refused: bad-field, judged at entry ${D.name}:${before.seq}. Nothing was written.`] });
   expect((await D.summary()).at).toEqual(before);
+  // A refusal by name: rita adds a member whose handle is no handle. The guard `handle-form` refuses it `bad-handle`; nothing is written.
+  const atMembership = (await M.summary()).at;
+  const named = await run(rita, "act", "add-member", "--on", "membership", "--set", "handle=no handle", "--set", "kind=checker");
+  expect(named).toEqual({ code: 1, lines: [`Refused: bad-field (bad-handle), judged at entry ${M.name}:${atMembership.seq}. Nothing was written.`] });
+  expect((await M.summary()).at).toEqual(atMembership);
 
   // log, show and verify with una's session: the command asks membership for one with her key.
   const head = (await M.summary()).at.seq;

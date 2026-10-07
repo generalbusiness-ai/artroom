@@ -472,7 +472,7 @@ describe("the value of an observation is derived once from the history of its so
     const H = m.head.seq;
     const r = new Rulebook(true, m.at.scope);
     /** STAND-IN for a read: what M answers for that key from its state at that head, as an observation that began at `at`. */
-    const seen = (who: Actor, head: number, at: string) => observationOf(standingOf(m.replay(head + 1), { of: m.at, key: who.key }), at as never)!;
+    const seen = (who: Actor, head: number, at: string) => observationOf(standingOf(m.replay(head + 1), { of: m.at, key: who.key }, MEMBERSHIP), at as never)!;
     const priors = new Map<number, ObservationUse["prior"]>();
     for (let i = 0; i < rounds; i++) {
       r.now = t(i + 1);
