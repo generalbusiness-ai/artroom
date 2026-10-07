@@ -11,6 +11,39 @@ for independent review. Receipt eligibility remains conditional on exact
 approval, implementer landing and the required landed-commit gate. Full I3, native lane hold and change
 publication, profiles, capacity and browser obligations remain open.
 
+## Repaired successor
+
+Source `8ec0d8d73` repairs review `6a649a90`; expanded delivery states exact
+changes and the successful 784+6 gate. Packages are
+`e2a7ccc9f3fd56f2ae2be14a82645d42298c8aa0`; scripts remain
+`c7ffb21b9435e2a7985a2bd0492c72dce1047787`. Historical inventories below
+retain their stated snapshots. Main documents are preserved through
+`6426b66c`; filing names the final notes-only head. Complete source delta
+from reviewed `7f467c219`:
+
+```text
+M	docs/cli.md
+M	docs/deploy.md
+M	docs/lanes.md
+M	docs/scopes.md
+A	notes/2026-10-07-15-sprint-report.md
+M	notes/2026-10-07-expanded-gate1-source-packet.md
+M	packages/cli/src/commands.ts
+M	packages/cli/src/files.ts
+M	packages/cli/src/store.ts
+M	packages/cli/test/files.test.ts
+A	packages/cli/test/join.scope.test.ts
+M	packages/lanes/README.md
+M	packages/lanes/test/support/graph.ts
+M	packages/scope/README.md
+M	packages/scope/src/github-host.ts
+M	packages/scope/test/github-host.test.ts
+```
+
+This is a full-source successor under225/f8 and renewedbb43508a. No prior-head
+body credit, partial receipt or broader closure. Existing live evidence is
+historical; new deployed replay, if run, is separately recorded.
+
 ## Exact comparison and gate correspondence
 
 | Boundary | Commit or tree |

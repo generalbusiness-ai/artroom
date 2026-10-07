@@ -13,6 +13,63 @@ independent SOURCE review to existing Gate 1 request `225da894` and producer
 the required landed-commit gate. Full I3, native lane hold and
 change publication, profiles, capacity and browser obligations stay open.
 
+## Repaired source after review 6a649a90
+
+Builder accepted the two P2s and guide P3s at `2fc33f9b` and repaired them
+in `8ec0d8d73f77fdccba68be0f8973d5cac9d3127b`, tree
+`68831eaf27cbd0d800d19fc00525e09046732c1d`.
+
+Join saves its exact signed envelope before sending in immutable owner-only
+private storage, because it contains the invitation secret. Public config
+holds a pointer/digests/references and accepted progress. Resume preserves
+key, signature and deadline; checks the original link and full references;
+settles accepted facts and checks the actual admitted entry; and saves inbox
+progress before waiting. The private record remains after success, owner-only.
+The actual Worker witness covers lost accepted answers, inbox waiting and
+restart, wrong receipts/settlement/markers/links/envelopes, and settlement
+after expiry. A deliberate fresh-sign retry control failed with the real
+key-in-use refusal; source was restored. File tests cover permissions and
+nonreplacement. The office, sibling IDs, memory store, transport faults and
+scheduler are labelled stand-ins.
+
+The GitHub walker tracks unfinished link expansions: finite repeated aliases
+resolve, real cycles return null, and the original work bound remains pending.
+Four focused host tests passed, including repeated traversal and exhaustion.
+The object store is scripted; no production content change was published.
+
+Planner's parallel `198a873d` repair (two commits, six paths) was read in full
+and remains preserved on its branch. This successor keeps stronger private
+join custody and exact receipt/entry checks; that version stored the invitation
+secret-bearing envelope in public config. Both walkers use active expansion
+rather than every visited name. No blind merge or duplicate commission.
+
+Guides now state typed retained inputs, causal entry/delivery eligibility,
+whole register history, destination birth-session preparation, real directory
+and authority fixtures, and W5's test-signed answer with no runner. Historical
+run debts and partial-milestone alternatives are qualified. Native hold,
+content-change, browser, fresh-person and full I3 limits remain open. The
+settings guide records the observed two-minute restart delay without promising
+that bound or refreshing a pending deadline.
+
+Successful gate at `8ec0d8d73`: **784 tests and six source checks**, all
+typechecks passed, clean checkout. Packages tree
+`e2a7ccc9f3fd56f2ae2be14a82645d42298c8aa0`; scripts tree
+`c7ffb21b9435e2a7985a2bd0492c72dce1047787`.
+Log `/tmp/artroom-gate1-review-repairs-gate-unrestricted.log`; raw logs
+`/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.eroCvQIiLC`.
+Install skipped matching lock; typecheck 4.3 elapsed/12.4 CPU seconds;
+tests 30.0 elapsed/55.6 CPU seconds. These are phase figures, not whole-command
+time. Shared Mac, Node 26.10.0, warm focused caches; concurrent load not sampled.
+The earlier gate failed sandbox EPERM on a local listener and Wrangler log
+(`/tmp/artroom-gate1-review-repairs-gate.log`); its approval retry was interrupted
+before execution. The unrestricted run passed; no mutation sweep was run.
+
+Main documents are preserved through corrected sprint report `d158cbfe` and
+demo script `6426b66c`, merged note-only at `c219ad7ca`. Packages/scripts
+remain exactly gated. Earlier live evidence stays bound to its actual older
+source; no transferred execution or old-head review credit is claimed.
+Approval, landing and the required landed-commit gate remain owed.
+
 ## Source and ownership
 
 This branch preserves the frozen GitHub component `a4e3dbd19`, integrates
