@@ -40,6 +40,8 @@ export interface Config {
   claim?: PendingClaim;
   /** The caller's handle in membership, once it has one. */
   handle?: string;
+  /** The repository's remote URL as a clone's credential answer gave it. It is no secret. */
+  remote?: string;
 }
 
 export interface Store {
