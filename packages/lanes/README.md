@@ -25,6 +25,7 @@ contract package's types. Its tests and scripts also use `bytes`,
 |---|---|
 | `issue`, `change` | The two definitions. Each is a value of the contract's `DeclaredDefinition`, written `as const`, so a client's declared handle is typed from its rows. |
 | `DIGESTS` | The pinned definition digest of each. |
+| `issueDemo`, `changeDemo`, `DEMO_DIGESTS` | The demo profile and its pinned digests. |
 | `LANE_FORMS` | The revision and the commit of the lane forms that the rows were written from. |
 | `definitions` | Both declarations as a list. A founder supplies it as the `definitions` of a founding, so that a directory which names the two digests in `create` sends retains their bytes for its children. |
 | `LaneDefinition` | The type each value is checked against. |
@@ -36,13 +37,14 @@ contract package's types. Its tests and scripts also use `bytes`,
 |---|---|
 | `src/issue.ts`, `src/change.ts` | The two values. One member is one row. A comment names the section of the lane forms that a group of rows comes from. |
 | `src/shared.ts` | The rows that the lane forms state once for both definitions, and that differ only by a grant's prefix or by the definition's name: the `hold` and `export` item types, six discussion acts, three acts on a hold or an export, the timed rule `hold-end`, and the two export handlers. |
-| `src/digests.ts` | `DIGESTS` and `LANE_FORMS`. `scripts/pin.mjs` writes it. |
-| `definitions/*.json` | The canonical bytes. `scripts/pin.mjs` writes them. |
-| `scripts/pin.mjs` | Writes the two byte files and `src/digests.ts` from the values. |
+| `src/demo.ts` | The demo profile: `issueDemo` and `changeDemo`, each its full definition with a subset of its acts and handlers, under the same name. |
+| `src/digests.ts` | `DIGESTS`, `DEMO_DIGESTS` and `LANE_FORMS`. `scripts/pin.mjs` writes it. |
+| `definitions/*.json` | The canonical bytes, of the two definitions and of the two of the demo profile. `scripts/pin.mjs` writes them. |
+| `scripts/pin.mjs` | Writes the four byte files and `src/digests.ts` from the values. |
 | `scripts/reference.mjs` | Writes `docs/lanes-reference.md` from the values. With `--check` it writes nothing and exits 1 when the file is stale. |
-| `test/definitions.test.ts` | Three plain tests: the pins, with the generated reference; the counts against the bounds; and validation of both definitions whole. |
-| `test/*.scope.test.ts` | Eleven scenarios on real scopes under the two pinned digests, T1 to T9 and T34, in the workerd test pool. Each names the stand-ins it uses. |
-| `test/support/graph.ts`, `worker.ts` | The one fixture of the scenarios, and the test Worker, which is the scope package's `./testing/worker`. |
+| `test/definitions.test.ts` | Four plain tests: the pins, with the generated reference; the counts against the bounds; validation of both definitions whole; and the demo profile's pins, its strict subset of rows and its validation. |
+| `test/*.scope.test.ts` | Eleven scenarios on real scopes under the two pinned digests, T1 to T9 and T34, on the fixture `graph.ts`; four, W1 to W4 (`wiring.scope.test.ts`), and plan 019's story on the demo profile (`story.scope.test.ts`), on a room of real platform scopes (`room.ts`). In the workerd test pool. Each names the stand-ins it uses. |
+| `test/support/graph.ts`, `room.ts`, `worker.ts` | The fixture of the scenarios; a room founded on the real platform scopes in the namespace `PLATFORM`, whose real directory creates the lanes; and the test Worker, which is the scope package's `./testing/worker`. |
 | `vitest.scope.config.ts`, `wrangler.test.jsonc` | The configuration that runs the scenarios alone. From the root they run inside the `scope` project. Nothing is deployed from either file. |
 
 ## Changing a row
@@ -50,7 +52,11 @@ contract package's types. Its tests and scripts also use `bytes`,
 A changed row is a new definition with a new digest. A scope that pinned
 the earlier digest keeps it. The rows follow the lane forms: change a row
 only when an adopted revision of that note changes it, and then set
-`LANE_FORMS` in `src/digests.ts` to the new revision and commit.
+`LANE_FORMS` in `src/digests.ts` to the new revision and commit. The rows
+that `src/change.ts` marks "i5 wiring" are the exception: they are what the
+lane needs to run against the real rules scope and destination, and no
+adopted revision states them yet
+(`notes/2026-10-07-i5-lane-wiring-delivery.md`).
 
 ```
 node packages/lanes/scripts/pin.mjs

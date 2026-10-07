@@ -268,6 +268,19 @@ host. What a real change lane does with the service's signed results is
 one scenario of the lanes, `packages/lanes/test/checks.scope.test.ts`,
 which calls the service's origin read and its signer as functions.
 
+`packages/lanes/test/support/room.ts` founds a repository on the real
+platform scopes, in the namespace `PLATFORM`, as `founding-real` does, and
+its real directory creates lanes under the digests that its real rules
+scope activated. The lane scenarios on it, `wiring.scope.test.ts` and
+`story.scope.test.ts`, use no test authority, no scripted peer and no
+scripted capability: a lane's grants are read from the real membership
+scope, and a merge is judged and published by the real destination. Two
+things are stand-ins, and the fixture labels each: the Git host, which is
+`OutsideDouble` for the destination and `Host` for each lane; and the
+changed set that the host's judge read answers with, which the test states.
+Such a test shows what the lanes and the platform scopes decide from those
+answers, and nothing about a real host, a real tree or a runner.
+
 ## Time, size and setup
 
 - No test waits on the wall clock. Use the test clock, a gate, or an
@@ -332,7 +345,7 @@ vitest lets projects share a group only when their worker counts agree. The
 local repositories, and one file of the `checkers` project runs it for the
 runner's checkout. Nothing runs twice.
 
-The eleven lane scenarios, `packages/lanes/test/*.scope.test.ts`, run from
+The lane scenarios, `packages/lanes/test/*.scope.test.ts`, run from
 the root inside the `scope` project: the same test Worker, loaded once.
 The root `vitest.config.ts` adds them, and no file of the scope package
 names the lanes package. The lanes package keeps
@@ -346,8 +359,8 @@ scenario is about a route. The reason is cost: in the workerd pool a call
 through the Worker's entrypoint takes longer the more of them one run has
 made (observed; `notes/2026-10-05-i2-contract-deltas.md`, entry DK11).
 
-The `lanes` project is the three tests of
-`packages/lanes/test/definitions.test.ts`. They read the two byte files
+The `lanes` project is the four tests of
+`packages/lanes/test/definitions.test.ts`. They read the four byte files
 under `packages/lanes/definitions`, and `docs/lanes-reference.md`,
 without importing them. So, by the rule above, a change to one of those
 files alone is not selected by `npm run test:changed`; the gate runs it.
