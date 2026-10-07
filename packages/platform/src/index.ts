@@ -26,11 +26,13 @@ export { CREATION_ATTEMPTS, REGISTER, REPOSITORY, directoryIdOf, directorySeed, 
 export { DEFINITION_DOMAIN, DIRECTORY, IMPORT_ATTEMPTS, SEEN, directoryMembership, directoryRules, directoryRulesScope } from "./directory.ts";
 export { COLLECT_MOST, DESTINATION, DESTINATION_ATTEMPTS, DESTINATION_KINDS, READ_TOKEN_HOURS, destinationMembership, destinationRulesScope, destinationReceipt, firstHeadCommit, revokedToken } from "./destination.ts";
 export { foundingObjects, receiptObjects, receiptRef, importRef, type DestinationObject, type DestinationCommit, type ObjectFormat } from "./destination-objects.ts";
+export { EDIT_PATH_BYTES, editCommit, editObjects, editPath } from "./destination-objects.ts";
+export { PROPOSE_FILE, fileOf } from "./destination-reading.ts";
 export type { LaneRead } from "./destination.ts";
 // The host port reads the same recorded operation context as the rules.
 export { branchOf as destinationBranch, mintOf as destinationMint, servedBy as destinationWrite, statementOf as destinationStatement, targetOf as destinationTarget, writeSends as destinationSends, readFor as destinationRead } from "./destination.ts";
 export { mintRevoked as destinationRevokedMint } from "./destination.ts";
-export { DESTINATION_CHANGED_SET, NOT_RESERVED, isJudgeChanges, isJudgeEvidence, isRecordedJudgeEvidence, judgeReservation } from "./reservation.ts";
+export { DESTINATION_CHANGED_SET, NOT_RESERVED, fileSound, isJudgeChanges, isJudgeEvidence, isRecordedJudgeEvidence, judgeReservation, type EditFile } from "./reservation.ts";
 export type { JudgeChanges, JudgeEvidence, RecordedJudgeEvidence, Reservation, ReservationAsked, ReservationRead, Statement } from "./reservation.ts";
 export { RULES };
 export { rulesScope };

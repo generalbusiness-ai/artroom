@@ -29,8 +29,8 @@ import type { Item, Opening, Operation, Own, PlatformRule, RecordedRef, RuleEffe
 import { DESTINATION_CHANGED_SET, isJudgeChanges, isRecordedJudgeEvidence, isObjectId, judgeReservation, type ReservationRead, type Statement } from "./reservation.ts";
 import { referenceOf } from "./rules-scope.ts";
 import { isExtents } from "./extents.ts";
-import { decidingKeys, manifestAuthors, readLane } from "./destination-reading.ts";
-import { foundingObjects, receiptObjects, receiptRef, type DestinationCommit, type ObjectFormat } from "./destination-objects.ts";
+import { PROPOSE_FILE, decidingKeys, fileOf, manifestAuthors, readLane } from "./destination-reading.ts";
+import { editCommit, foundingObjects, receiptObjects, receiptRef, type DestinationCommit, type ObjectFormat } from "./destination-objects.ts";
 
 /** The name and version that this data and these rules are. An operation that the destination opens states it as its owner (the contract's section 4.3). */
 export const DESTINATION = "platform:destination@1" satisfies PlatformDefinition;
@@ -110,7 +110,8 @@ const TOKEN = { type: "text", max: 32 } as const;
 /** The record of section 12.1.1, the value `repository` of a claim. */
 const REPOSITORY = { type: "record", of: { host: { ...NAME, required: true }, namespace: { ...NAME, required: true }, name: { ...NAME, required: true }, id: { ...NAME, required: true } } } as const;
 const OPERATION = { type: "fact", kind: ["merge"], under: "change" } as const;
-const MANIFEST = { type: "fact", kind: ["propose-manifest"], under: "change" } as const;
+// i5 edit: a one-file manifest is opened by `propose-file`.
+const MANIFEST = { type: "fact", kind: ["propose-manifest", "propose-file"], under: "change" } as const;
 const CLAIM = { type: "fact", kind: ["found"], under: "platform:register" } as const;
 const BRANCH = { branch: { item: "branch", one: true } } as const;
 const FROM_LANE = { kind: "lane", under: "change" } as const;
@@ -1250,7 +1251,8 @@ function reportsBound(given: Pick<RuleGiven, "uses">, statement: Statement): rea
   const manifest = given.uses.find((used) => used.fact.hash === statement.manifest.hash)?.entry;
   const commits = reportCommits(given, statement);
   if (!manifest || commits === undefined) return undefined;
-  const selected = manifest.input.type === "act" ? manifest.input.signed.intent.fields["selected"] : null;
+  // i5 edit: a one-file manifest selects no report.
+  const selected = manifest.input.type !== "act" ? null : manifest.input.signed.intent.kind === PROPOSE_FILE ? [] : manifest.input.signed.intent.fields["selected"];
   if (!Array.isArray(selected) || selected.length !== statement.reports.length) return null;
   const same = selected.every((record, place) => isObject(record) && isFactRef(record["report"]) && canonicalize(record["report"]) === canonicalize(statement.reports[place]!));
   return same && commits.every((commit): commit is string => commit !== null) ? commits : null;
@@ -1286,11 +1288,21 @@ const judgeDecides = (reads: Reads): Decides => (given) => {
   if (isDigest(recorded.changes) && !isJudgeChanges(changes)) throw new Error("the changed set is not at hand in its declared domain");
   const evidence = { ...recorded, changes } as import("./reservation.ts").JudgeEvidence;
   const head = branch.values["head"];
-  const asked = { recorded: typeof head === "string" ? head : null, evidence, statement: statementOf(own, publication), time };
+  const statement = statementOf(own, publication);
+  // i5 edit: a one-file manifest, read from its entry in `uses`. Its path is judged before what the evidence lacks.
+  const file = fileOf(given.uses.find((used) => used.fact.hash === statement.manifest.hash)?.entry);
+  const asked = { recorded: typeof head === "string" ? head : null, evidence, statement, time, file };
   // First from the evidence and this scope's own records. Only where that does not decide are `observed` and `uses` read.
   let [read, judged] = [null as ReservationRead | null, judgeReservation({ ...asked, read: null })];
   if (judged.reserved === null) {
     read = reservationRead(given, publication, asked.statement, reads(given, publication, asked.statement));
+    // i5 edit: the tree of a one-file manifest is the host's evidence, the published tree with the file written; its commit is
+    // the one this scope writes, with the time of this entry, which `reservedAt` names.
+    const format = formatOf(evidence.tree);
+    if (read !== null && read.manifest.file && format !== null && read.manifest.integration === null) {
+      const commit = editCommit(format, resolved.at.scope, time, evidence.tree!, read.manifest.base, read.manifest.file.path, statement.operation);
+      read = { ...read, manifest: { ...read.manifest, tree: evidence.tree, integration: commit.id } };
+    }
     judged = judgeReservation({ ...asked, read });
   }
   if (judged.reserved === null) throw new Error("what observed and uses say of this reservation is not at hand");

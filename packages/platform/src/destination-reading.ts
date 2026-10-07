@@ -3,7 +3,7 @@ import type { Entry, FactRef, KeyId, MemberId, RulesObservation } from "@general
 import { canonicalize, isMemberRef } from "@generalbusiness/artroom-bytes";
 import type { RuleGiven } from "@generalbusiness/artroom-derive";
 import type { LaneRead } from "./destination.ts";
-import type { Statement } from "./reservation.ts";
+import type { EditFile, Statement } from "./reservation.ts";
 
 const same = (a: unknown, b: unknown): boolean => canonicalize(a) === canonicalize(b);
 const of = (given: Pick<RuleGiven, "uses">, fact: FactRef): Entry | null => given.uses.find((copy) => same(copy.fact, fact))?.entry ?? null;
@@ -21,17 +21,32 @@ export function manifestAuthors(entry: Entry): MemberId[] {
   return [...new Set(authors)];
 }
 
+/** The act of the pinned `change` lane that opens a one-file manifest (i5 edit). */
+export const PROPOSE_FILE = "propose-file";
+
+/** The one-file manifest that an entry of the change lane opens, as its signed intent holds it, or null when it is no `propose-file` entry or its fields are out of form. */
+export function fileOf(entry: Entry | null | undefined): EditFile | null {
+  const proposed = fields(entry ?? null, PROPOSE_FILE);
+  if (!proposed) return null;
+  const { path, digest, size, content } = proposed;
+  return typeof path === "string" && typeof digest === "string" && typeof size === "number" && typeof content === "string" ? { path, digest, size, content } : null;
+}
+
 /** Read the statement from its retained entries, and compare each listed check against the currently observed rules. Nothing is fetched here. */
 export function readLane(given: Pick<RuleGiven, "uses" | "observed">, statement: Statement, rules: RulesObservation | null): LaneRead | null {
   const [merge, manifest] = [of(given, statement.operation), of(given, statement.manifest)];
-  const [merged, proposed] = [fields(merge, "merge"), fields(manifest, "propose-manifest")];
+  const merged = fields(merge, "merge");
+  const file = fileOf(manifest);
+  const proposed = file ? fields(manifest, PROPOSE_FILE) : fields(manifest, "propose-manifest");
   if (!manifest || !merged || !proposed) return null;
-  const { base, integration, tree, complete } = proposed;
-  if (typeof base !== "string" || typeof integration !== "string" || typeof tree !== "string" || typeof complete !== "boolean") return null;
+  // A one-file manifest names no integration commit and no tree: the rule `judge` derives both from the host's evidence.
+  const { base, integration = null, tree = null } = proposed;
+  const complete = file ? true : proposed["complete"];
+  if (typeof base !== "string" || (file === null && (typeof integration !== "string" || typeof tree !== "string")) || typeof complete !== "boolean") return null;
   const checks = rules?.content.asked === "rules" ? rules.content.checks : [];
   return {
     sound: merged["manifest"] === statement.manifest.seq,
-    manifest: { base, integration, tree, complete, authors: manifestAuthors(manifest) },
+    manifest: { base, integration: integration as string | null, tree: tree as string | null, file, complete, authors: manifestAuthors(manifest) },
     verdicts: statement.verdicts.map((verdict) => {
       const review = of(given, verdict.review);
       const reviewed = fields(review, "review-verdict");
