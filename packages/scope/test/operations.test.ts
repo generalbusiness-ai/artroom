@@ -407,7 +407,7 @@ describe("outside operations at a real scope (scope contract, section 4.3; autho
     const text = new TextDecoder();
     const line = (read: ReadableStreamReadResult<Uint8Array> | null) => (read === null ? "nothing was sent" : read.done ? "the stream ended" : JSON.parse(text.decode(read.value)) as unknown);
     const stream = await s.inside(async (_state, instance) => {
-      const opened = (instance as { stream(reader: unknown): { id: string; body: ReadableStream<Uint8Array> } }).stream(reader);
+      const opened = await (instance as { stream(reader: unknown): Promise<{ id: string; body: ReadableStream<Uint8Array> }> }).stream(reader);
       const from = opened.body.getReader();
       // The stream begins with the head, entry 2. The next read waits: the reader has been sent that head, and there is no other.
       const first = line(await from.read());
