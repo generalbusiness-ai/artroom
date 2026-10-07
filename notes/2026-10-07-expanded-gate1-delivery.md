@@ -68,7 +68,13 @@ Main documents are preserved through corrected sprint report `d158cbfe` and
 demo script `6426b66c`, merged note-only at `c219ad7ca`. Packages/scripts
 remain exactly gated. Earlier live evidence stays bound to its actual older
 source; no transferred execution or old-head review credit is claimed.
-Approval, landing and the required landed-commit gate remain owed.
+The repaired Worker recheck of the existing aged room passed register,
+membership and inbox; rules history was forbidden, making directory and
+destination replay incomplete. The live witness preserves all failures and
+coverage; no fresh room or anchors were substituted. Earlier all-six results
+remain the historical fresh-founding run. The existing ordered read/clone
+follow-up owns this age-dependent read gap. Approval, landing and the required
+landed-commit gate remain owed.
 
 ## Source and ownership
 

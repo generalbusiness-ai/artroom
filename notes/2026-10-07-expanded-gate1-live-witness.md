@@ -133,6 +133,48 @@ The first clone's metadata is preserved above; this second observation adds
 raw command output and receipt-ref corroboration. Neither clone is the
 later room-issued CLI credential flow.
 
+## Repaired source: aged-room replay recheck
+
+The successful repaired gate is `8ec0d8d73` (784+6); packages
+`e2a7ccc9f3fd56f2ae2be14a82645d42298c8aa0`. The isolated Worker was
+redeployed from source-identical notes successor `c219ad7ca` as
+`0c87eda7-6c63-4311-9a67-4a990ea24f9f`. Session/hosting bindings stayed
+configured. The same existing room was checked with the current repaired
+CLI, without a new founding, history mutation or anchors.
+
+| Scope | Exit | Actual result |
+| --- | ---: | --- |
+| Register | 0 | Consistent, entries 0–3 |
+| Membership | 0 | Consistent, entries 0–4 |
+| Inbox | 0 | Consistent, entries 0–1 |
+| Rules | 1 | History forbidden |
+| Directory | 1 | Missing dependency: rules genesis; directory coverage 0–2, aiming through 4 |
+| Destination | 1 | Missing dependency: rules genesis; destination coverage 0, aiming through 7 |
+
+All six reports were read in full. No anchor was supplied. Directory and
+destination each report one missing foreign fact: rules entry 0,
+`sha256:5d692496f2e0bd99789cbf52ea1596df3c71854b4cc20b455bf0b38ed6c525d5`.
+This room is well past its bootstrap signed-root window. The rules scope
+has no retained membership observation, the documented pre-session limit;
+the repair changes join recovery and GitHub link inspection, not that read
+protocol. These results do not establish complete aged-room verification.
+They remain visible for the existing destination-read/clone follow-up;
+a fresh room or explicit anchors are not substituted for this failed recheck.
+The earlier six consistent reports above remain the original exact-source
+fresh-founding results, not reproduced by this current recheck. Recorded
+service/platform/outside-answer trusts and all stand-in limits still apply.
+
+| Safe retained evidence | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `/tmp/artroom-gate1-repair-deploy.log` | 669 | `57fcaae8753f3b3d9e04484b765aeb2e14caa5956b1e72986ecdc324b32437c8` |
+| `/tmp/artroom-gate1-repair-verifies.json` | 756 | `bc5a828f2a51b03e18e6f39fba3d98127fd72535f4f85f3333c509af5016582f` |
+| `/tmp/artroom-gate1-repair-verify-register.log` | 1879 | `83889186eaad501298db41f99182fd5cbbc89ee61d1e527f932d76fb7c6724d8` |
+| `/tmp/artroom-gate1-repair-verify-directory.log` | 2563 | `4818ce76ec3971d9b5b7b812ce4ab3008c8d49f254e6359922c344b17b26c141` |
+| `/tmp/artroom-gate1-repair-verify-membership.log` | 2363 | `0088c57fbfc8675e2ba6dffacb33e3362902ef29a4833274547e24efded5dddc` |
+| `/tmp/artroom-gate1-repair-verify-rules.log` | 97 | `7f8b7c5faaf4b73d0fed119cc85a9258d36df83833198ec25d1da06be609cd4e` |
+| `/tmp/artroom-gate1-repair-verify-destination.log` | 2813 | `ff071617852b428df539655adaed7e6ac646d48a2f7cc21797377426e6a3ba2d` |
+| `/tmp/artroom-gate1-repair-verify-inbox.log` | 2358 | `2ca725ed6fc2e59c527a49010566e5285625f8e6c5b209cb363ab62219458ecc` |
+
 ## Evidence index
 
 These logs contain command outcomes and replay reports. They exclude token
