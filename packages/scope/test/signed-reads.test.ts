@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { Entry, FactRef, Intent, OperationId, ReadRequest, ScopeId, ScopeRef, Sealed, Seed, SignedReadName } from "@generalbusiness/artroom-contract";
-import { b64url, canonicalBytes, entryHash, factRefOf, intentDigest, scopeIdOf, seedDigest, signIntent, signRead } from "@generalbusiness/artroom-bytes";
+import { b64url, canonicalBytes, entryHash, intentDigest, scopeIdOf, seedDigest, signIntent, signRead } from "@generalbusiness/artroom-bytes";
 import { requestSession, secretSigner, sessionRequest, signedLogReader, signedReader, type Fetch } from "@generalbusiness/artroom-client";
 import { timeMs, timeOf, useOf } from "@generalbusiness/artroom-derive";
 import { d, keys, otherLane, t, type Actor } from "@generalbusiness/artroom-derive/testing";
@@ -310,7 +310,7 @@ describe("signed reads on real registers (the planner's decisions 61cc5e50, c649
     const { D, children } = await claimedBy(R, rita, "@rita");
     const { children: vics } = await claimedBy(R, vic, "@vic");
     const [M, Ru, G] = children as [Platform, Platform, Platform];
-    await foundingPublication(G, factRefOf((await R.entries())[1]!));
+    await foundingPublication(G);
     const entries = await G.entries();
     // The publication wrote the host's outcomes, the receipt's among them: entries that no member signed. The branch is ready.
     expect((await G.item(0)).state).toBe("ready");

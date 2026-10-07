@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import type { Digest, OperationId, RetainedInput } from "@generalbusiness/artroom-contract";
+import type { Digest, OperationId, RetainedInput, ScopeId } from "@generalbusiness/artroom-contract";
 import { canonicalize, entryHash, factRefOf, newIncarnation } from "@generalbusiness/artroom-bytes";
 import { t } from "@generalbusiness/artroom-derive/testing";
 import { destinationReceipt, foundingObjects, type DestinationObject, type RecordedJudgeEvidence } from "@generalbusiness/artroom-platform";
@@ -98,7 +98,9 @@ describe("destination outside adapter; scripted host, platform judgments in memo
       expect(written).toMatchObject({ result: "confirmed", evidence: { body: { send: "accepted" } } });
       const sent = f.provider.calls.find((call) => call.kind === "send")!.body as Parameters<DestinationProvider["send"]>[0];
       const genesis = f.branch.own(0)!.entry;
-      const expected = foundingObjects("sha1", genesis.at.scope, genesis.time, f.branch.branch.refs["claim"] as never);
+      // The founding commit of `platform:destination@2`: one README that names the repository, the founder's handle and the directory.
+      const readme = { name: (f.branch.branch.values["repository"] as { name: string }).name, handle: "@rita", directory: (f.branch.branch.refs["directory"] as { scope: ScopeId }).scope };
+      const expected = foundingObjects("sha1", genesis.at.scope, genesis.time, f.branch.branch.refs["claim"] as never, readme);
       expect({ commit: sent.commit, objects: sent.objects }).toEqual(expected);
       expect(sent).toMatchObject({ old: null, ref: "refs/heads/main", token: "private-token-1", binding: { mint, write, writeAttempt: 1 } });
       f.record(write, written!);

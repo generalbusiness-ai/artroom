@@ -17,7 +17,7 @@
  */
 import type { Entry, ScopeId } from "@generalbusiness/artroom-contract";
 import { isScopeId, parseStrict } from "@generalbusiness/artroom-bytes";
-import { DIRECTORY } from "@generalbusiness/artroom-platform";
+import { isOf } from "@generalbusiness/artroom-platform";
 import type { GitSource } from "@generalbusiness/artroom-git";
 import { SmartHttpSource } from "@generalbusiness/artroom-git/http-read";
 import { READ_TTL, type ArtifactsNamespace } from "../artifacts-host.ts";
@@ -96,7 +96,7 @@ export async function roomOf(scopes: Binding, directory: string): Promise<Room |
   if (!sourced || sourced.at.kind !== "directory" || sourced.at.scope !== directory || sourced.bytes === null) return null;
   const entry = parseStrict(sourced.bytes) as unknown as Entry;
   const input = entry.input;
-  if (input.type !== "genesis" || input.decision !== "applied" || input.seed.definition !== DIRECTORY || input.seed.creator?.kind !== "register") return null;
+  if (input.type !== "genesis" || input.decision !== "applied" || !isOf(input.seed.definition, "platform:directory") || input.seed.creator?.kind !== "register") return null;
   const fields = record(record(input.message?.body)?.["fields"]);
   const repository = record(fields?.["repository"]);
   const branch = fields?.["branch"];

@@ -5,7 +5,7 @@
  */
 import type { FieldValue, ScopeRef } from "@generalbusiness/artroom-contract";
 import { canonicalize, entryHash, intentDigest, isDigest, isOperationId, seedDigest, utf8 } from "@generalbusiness/artroom-bytes";
-import { DIRECTORY, REGISTER, repositoryName } from "@generalbusiness/artroom-platform";
+import { DIRECTORY_OF, isOf, repositoryName } from "@generalbusiness/artroom-platform";
 import type { OutsideGiven } from "./object.ts";
 import type { EffectAnswer, EffectRequest, Outside } from "./operations.ts";
 
@@ -50,7 +50,7 @@ export class RegisterHost implements Outside {
   }
 
   accepts(owner: string, kind: string): boolean {
-    return owner === REGISTER && ["create-repository", "delete-repository", "revoke-credential"].includes(kind);
+    return isOf(owner, "platform:register") && ["create-repository", "delete-repository", "revoke-credential"].includes(kind);
   }
 
   async send(request: EffectRequest): Promise<EffectAnswer | null> {
@@ -62,7 +62,7 @@ export class RegisterHost implements Outside {
         return this.#created(name, await this.#provider.createRepository(name));
       }
       const opening = request.origin.entry.input;
-      if (opening.type !== "outcome" || opening.owner !== REGISTER || opening.kind !== "create-repository" || opening.result !== "confirmed" || opening.evidence.basis !== "own-answer") return null;
+      if (opening.type !== "outcome" || !isOf(opening.owner, "platform:register") || opening.kind !== "create-repository" || opening.result !== "confirmed" || opening.evidence.basis !== "own-answer") return null;
       const body = members(opening.evidence.body, ["name", "id"], ["credential"]);
       if (!body || !text(body["name"]) || !text(body["id"]) || (body["credential"] !== undefined && !text(body["credential"]))) return null;
       if (request.kind === "delete-repository") {
@@ -85,7 +85,7 @@ export class RegisterHost implements Outside {
     const given = this.#given;
     const scope = given.scope();
     const genesis = given.genesis();
-    if (!scope || !sameScope(scope.at, request.scope) || scope.at.kind !== "register" || genesis?.seed.definition !== REGISTER || !this.accepts(request.owner, request.kind) || !isOperationId(request.operation) || !Number.isSafeInteger(request.attempt) || request.attempt < 1) return false;
+    if (!scope || !sameScope(scope.at, request.scope) || scope.at.kind !== "register" || genesis?.seed.definition !== request.owner || !this.accepts(request.owner, request.kind) || !isOperationId(request.operation) || !Number.isSafeInteger(request.attempt) || request.attempt < 1) return false;
     const operation = given.state.operation(request.operation);
     if (!operation || operation.owner !== request.owner || operation.kind !== request.kind || !operation.attempts.some((attempt) => attempt.attempt === request.attempt)) return false;
     const [seq, k] = request.operation.split(":").map(Number);
@@ -105,7 +105,10 @@ export class RegisterHost implements Outside {
     const seeds = entry.effects.filter((effect) => effect.effect === "value" && effect.item === entry.seq && effect.slot === "seed");
     const seed = claim?.values["seed"];
     if (claim?.type !== "claim" || !isDigest(seed) || seeds.length !== 1 || seeds[0]!.effect !== "value" || seeds[0]!.value !== seed) return null;
-    const derived = seedDigest({ v: 1, kind: "directory", definition: DIRECTORY, creator: request.scope, cause: intentDigest(entry.input.signed.intent), ordinal: 0 });
+    // The directory's version is the one that the register's own version creates.
+    const definition = DIRECTORY_OF[this.#given.genesis()?.seed.definition ?? ""];
+    if (!definition) return null;
+    const derived = seedDigest({ v: 1, kind: "directory", definition, creator: request.scope, cause: intentDigest(entry.input.signed.intent), ordinal: 0 });
     return seed === derived ? repositoryName(seed, request.attempt) : null;
   }
 
