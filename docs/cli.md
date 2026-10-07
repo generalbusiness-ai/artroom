@@ -33,7 +33,9 @@ The examples are from one run of the test in
 **`artroom install <base-url> [--host <git-host>] [--namespace <name>]`**
 founds the register with an `install` intent, signed by a new operator
 key, which is also the one founder key. The host defaults to `github.com`
-and the namespace to `artroom`.
+and the namespace to `artroom`. For the demo's host, the hosting's own Git
+service, use `--host artifacts --namespace artroom-demo`;
+[hosts.md](hosts.md) says what each host needs.
 
 ```
 Installed: register sc_hinqqbm4....
