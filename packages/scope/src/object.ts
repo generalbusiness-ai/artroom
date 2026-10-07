@@ -39,7 +39,7 @@ import { Scope, type Checkpointed, type Founded } from "./core.ts";
 import { Deliveries } from "./delivery.ts";
 import { declaredBy, observedAt, routed, sentText, sourced, type Sourced } from "./namespace.ts";
 import { JoinLimits, isJoin, type LimitConfig } from "./limits.ts";
-import { Operations } from "./operations.ts";
+import { Operations, type Outside } from "./operations.ts";
 import { OperatorRecord, sendAgain, type Incident, type Resent } from "./operator.ts";
 import { Dispatcher, Wakes } from "./outbox.ts";
 import { production, type Alarm, type Authority, type Clock, type Delivery, type Ports, type Readers, type Transport } from "./ports.ts";
@@ -62,6 +62,9 @@ import type { Duty, OperationStatus, Sealed } from "./store.ts";
  * entry (authority note, section 3.9). With it, `ports.readers` is not
  * used. `sessions`: the deployment's session configuration, asked at each
  * request for a session. Absent, or null: this object issues none.
+ * `outside`: the outside port, made after the store, with live reads of
+ * this scope's state, genesis and sealed entries. It is given no storage
+ * writes or public RPC methods. With it, `ports.outside` is not used.
  * `limits`: the serving limits of a join, in place of the proposed ones.
  */
 export interface Given extends Pick<Ports, "clock" | "random"> {
@@ -70,10 +73,15 @@ export interface Given extends Pick<Ports, "clock" | "random"> {
   /** The scope's record: its reference, its head and the time of its previous entry. */
   scope(): ScopeState | null;
 }
+export interface OutsideGiven extends Given {
+  /** One sealed entry of this scope, or null. No other scope is read. */
+  own(seq: number): Sealed | null;
+}
 export interface Wiring {
   ports?: Partial<Ports>; bounds?: Bounds; reads?: ReadBounds;
   authority?: (given: Given) => Authority;
   readers?: (given: Given) => Readers;
+  outside?: (given: OutsideGiven) => Outside;
   sessions?: () => Sessions | null;
   limits?: LimitConfig;
 }
@@ -122,7 +130,26 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
     const made: Given = { clock: given.clock, random: given.random, genesis, state: store, scope: () => store.scope() };
     const authority = wiring.authority?.(made);
     const readers = wiring.readers?.(made);
-    const ports: Ports = { ...given, alarm: wakes.deadline, ...(authority ? { authority } : {}), ...(readers ? { readers } : {}) };
+    // The outside port reads the current record when it sends, outside any commit. A facade gives it only state reads, not the store.
+    const outsideState: StateView = {
+      scope: () => store.scope(), item: (...args) => store.item(...args), count: (...args) => store.count(...args), page: (...args) => store.page(...args),
+      relation: (...args) => store.relation(...args), copies: (...args) => store.copies(...args), accepted: (...args) => store.accepted(...args),
+      request: (...args) => store.request(...args), decided: (...args) => store.decided(...args), creation: (...args) => store.creation(...args),
+      operation: (...args) => store.operation(...args), texts: (...args) => store.texts(...args), prepared: (...args) => store.prepared(...args),
+      preparations: (...args) => store.preparations(...args), record: (...args) => store.record(...args), records: (...args) => store.records(...args),
+      recordCount: (...args) => store.recordCount(...args), observed: (...args) => store.observed(...args), incarnations: (...args) => store.incarnations(...args),
+      outstanding: () => store.outstanding(), holder: (...args) => store.holder(...args), holders: () => store.holders(),
+      operationsFor: (...args) => store.operationsFor(...args), account: (...args) => store.account(...args), accountsOf: (...args) => store.accountsOf(...args),
+      lookup: (...args) => store.lookup(...args), all: () => store.all(),
+    };
+    const outside = wiring.outside?.({
+      ...made, state: outsideState,
+      own: (seq) => {
+        const kept = Number.isSafeInteger(seq) && seq >= 0 ? store.stored(seq) : null;
+        return kept ? { entry: JSON.parse(kept.bytes) as Entry, hash: kept.hash } : null;
+      },
+    });
+    const ports: Ports = { ...given, alarm: wakes.deadline, ...(authority ? { authority } : {}), ...(readers ? { readers } : {}), ...(outside ? { outside } : {}) };
     // The operator's record: two tables of this object's storage that are no part of the store, and that no judgment is given.
     const record = new OperatorRecord({ exec: (query, ...bindings) => ctx.storage.sql.exec(query, ...bindings) }, ports.clock, () => store.scope()?.at ?? null);
     this.#name = isScopeId(name) ? name : null;

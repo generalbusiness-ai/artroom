@@ -5,9 +5,9 @@ import type { OperationId, Read } from "@generalbusiness/artroom-contract";
 import { canonicalize } from "@generalbusiness/artroom-bytes";
 import { checkpointOf, operationId, operationOpening, snapshotInput, snapshotRead, stagedRefName, timeMs, type Opening } from "@generalbusiness/artroom-derive";
 import { isAnswer } from "../src/operations.ts";
-import { SqliteStore, Turns, Wakes, production, type EffectAnswer, type OperationStatus, type OutcomeRecorded } from "../src/index.ts";
+import { ScopeObject, SqliteStore, Turns, Wakes, production, type EffectAnswer, type EffectRequest, type OperationStatus, type OutcomeRecorded, type Wiring } from "../src/index.ts";
 import { variant } from "@generalbusiness/artroom-derive/testing";
-import { controls } from "../src/testing.ts";
+import { controls, testPorts } from "../src/testing.ts";
 import { FENCE, MINT, mint, outsideOf, owners, pushOf, type OutsideDouble } from "./outside.ts";
 import { HOLD, Lane, START, at, definition, found, founding, reader, rita, stubOf } from "./support.ts";
 
@@ -109,7 +109,7 @@ describe("outside operations at a real scope (scope contract, section 4.3; autho
     expect(incidents.ok && incidents.value.map(({ kind, scope, refs }) => ({ kind, scope, refs }))).toEqual([{ kind: "outcome-conflict", scope: s.at, refs: [{ operation: op, attempt: 1 }, { entry: 4 }] }]);
   });
 
-  test("T20: an idle ledger writes nothing; a port that sends nothing leaves the attempt recorded and visible; an outcome is written at a scope with no free room; an operation opens at most its stated attempts and then none by itself; a retry is a new operation", async () => {
+  test("T20: an idle ledger writes nothing; a port that sends nothing leaves the attempt recorded and visible; an outcome is written at a scope with no free room; an operation opens at most its stated attempts and then none by itself; a retry is a new operation; an outside factory reads the committed opening from the current record", async () => {
     // A budget in which the entry that opens two attempts, and what it reserves, exactly fit: 2 entries written, 4 for the attempts and 1 for the closing checkpoint.
     const s = await found({ scopeEntries: 7 });
     const out = outsideOf(s.name);
@@ -145,6 +145,43 @@ describe("outside operations at a real scope (scope contract, section 4.3; autho
     out.answer(retry, 1, { result: "confirmed", evidence: { basis: "read", body: { commit: "c1" } } });
     expect(await s.alarm()).toBe(true);
     expect([retry, out.attempts.at(-1), (await seen(s, retry)).state, (await seen(s, op)).state, outcomes(await seen(s, op))]).toEqual(["4:0", "4:0#1", "settled", "unknown", [["refused at 2"], ["unknown at 3"]]]);
+
+    // The factory is made before the next opening. Its reads must stay live, and its port replaces the wired port that now refuses.
+    // The local object uses the same real SQLite storage; the opening and the owner and host rules remain the stand-ins above.
+    out.accepting = false;
+    const next = (await s.head()).seq + 1;
+    let derived: EffectRequest | null = null;
+    let factory: ScopeObject;
+    class FactoryScope extends ScopeObject {
+      protected override wiring(): Wiring {
+        return {
+          ports: { ...testPorts(s.c), outside: out, owners }, bounds: s.c.bounds,
+          outside: (given) => {
+            expect([given.scope()?.head.seq, given.state.operation(operationId(next, 0)), given.own(next)]).toEqual([next - 1, null, null]);
+            // A StateView type over a raw SqliteStore would still expose these storage writes at runtime.
+            expect("putOperation" in given.state || "append" in given.state || "retain" in given.state).toBe(false);
+            return {
+              accepts: () => true,
+              send: async (request) => {
+                const scope = given.scope()!;
+                const operation = given.state.operation(request.operation)!;
+                const origin = given.own(operation.attempts[0]!.opened)!;
+                expect([given.state.scope(), scope.head, given.genesis()]).toEqual([scope, { seq: next, hash: origin.hash }, given.own(0)!.entry.input]);
+                derived = { scope: scope.at, operation: operation.id, attempt: operation.attempts[0]!.attempt, owner: operation.owner, kind: operation.kind, origin };
+                expect(derived).toEqual(request);
+                return own(origin.hash);
+              },
+            };
+          },
+        };
+      }
+    }
+    await s.inside((state) => { factory = new FactoryScope(state, {}); });
+    const [fresh] = await open(s, pushOf(1)) as [OperationId];
+    expect(await s.inside(() => factory.effect())).toBe(1);
+    expect([derived, (await seen(s, fresh)).state, out.sent.length]).toEqual([
+      { scope: s.at, operation: fresh, attempt: 1, owner: "platform:destination@1", kind: "push", origin: (await s.sealed(next))[0] }, "settled", 3,
+    ]);
   });
 
   test("a late answer that arrives while the scope's turn is unavailable is kept in hand, and the driver writes it at the next wake-up, after the attempt's row is closed; the request is not sent again", async () => {
