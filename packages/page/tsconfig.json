@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "../..",
+    // The page runs in a browser; its data functions run in any runtime with fetch and WebCrypto.
+    "lib": ["ES2022", "ESNext.Disposable", "DOM"],
+    "skipLibCheck": true
+  },
+  "include": ["src"]
+}

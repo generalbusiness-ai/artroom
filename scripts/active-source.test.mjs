@@ -37,22 +37,28 @@ test("no active source or configuration file reaches into parked/, and parked/ i
 
 // A lane is a definition, and the platform holds no lane (I2 plan, section 4.1). The lanes
 // package may depend on any platform package. No platform package names it or reaches into it.
+// The page is a client, not a platform package: its story test runs on the lanes' room fixture
+// and demo definitions, so its tests and its development dependency may name the lanes package,
+// and its source may not.
 test("no platform package depends on the lanes package or imports from it", () => {
   assert.ok(files.includes("packages/lanes/package.json"), "the lanes package was listed");
-  const platform = files.filter((f) => f.startsWith("packages/") && !f.startsWith("packages/lanes/") && !f.endsWith(".md"));
+  const pageTests = (f) => f.startsWith("packages/page/test/") || f === "packages/page/package.json";
+  const platform = files.filter((f) => f.startsWith("packages/") && !f.startsWith("packages/lanes/") && !pageTests(f) && !f.endsWith(".md"));
   assert.deepEqual(platform.filter((f) => /artroom-lanes|[.\/]\/lanes\//.test(text(f))), []);
+  const page = JSON.parse(text("packages/page/package.json") || "{}");
+  assert.equal(page.dependencies?.["@generalbusiness/artroom-lanes"], undefined, "the page depends on the lanes package for its tests only");
 });
 
 // The platform package is pure data and rules over the contract, the bytes and the derivation (I3 plan, section 3.1). It names no
 // package above them, and only the packages that run or check its definitions name it: the runtime, the verifier, the lanes' tests,
 // and the command line, which reads a platform definition's acts (no scope retains a platform definition's declaration to read) and
-// runs the verifier with the platform's rules.
-test("the platform package depends only on contract, bytes and derive, and only scope, replay, lanes and cli name it", () => {
+// runs the verifier with the platform's rules; and the page, which reads a platform definition's acts as the command line does.
+test("the platform package depends only on contract, bytes and derive, and only scope, replay, lanes, cli and page name it", () => {
   assert.ok(files.includes("packages/platform/package.json"), "the platform package was listed");
   const source = (f) => f.startsWith("packages/") && !f.endsWith(".md");
   const inside = files.filter((f) => source(f) && f.startsWith("packages/platform/"));
   assert.deepEqual(inside.filter((f) => /artroom-(scope|replay|client|lanes)/.test(text(f))), []);
-  const named = files.filter((f) => source(f) && !/^packages\/(platform|scope|replay|lanes|cli)\//.test(f));
+  const named = files.filter((f) => source(f) && !/^packages\/(platform|scope|replay|lanes|cli|page)\//.test(f));
   assert.deepEqual(named.filter((f) => /artroom-platform/.test(text(f))), []);
 });
 

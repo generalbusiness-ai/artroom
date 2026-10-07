@@ -1,0 +1,12 @@
+{
+  // The story on real scopes runs in the Workers runtime, as the scope package's tests do. It reaches the data functions only
+  // (`src/index.ts`), not the view.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "../..",
+    "lib": ["ES2022", "ESNext.Disposable"],
+    "types": ["@cloudflare/workers-types", "@cloudflare/vitest-pool-workers/types"],
+    "skipLibCheck": true
+  },
+  "include": ["test/**/*.scope.test.ts", "../scope/test/env.d.ts"]
+}
