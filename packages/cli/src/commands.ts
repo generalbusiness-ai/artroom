@@ -25,10 +25,11 @@
 import type { Answer, DeclaredDefinition, Digest, Entry, FieldValue, Founded, Item, KeyId, PlatformDefinition, ScopeId, Seed, Summary } from "@generalbusiness/artroom-contract";
 import { b64url, intentDigest, keyIdOfSecret, scopeIdOf, textDigest, timeOf, unb64url, utf8 } from "@generalbusiness/artroom-bytes";
 import {
-  ScopeHandle, TransportError, declaredHandle, found, httpTransport, requestSession, secretSigner, sessionRequest, signedIntent, type Fetch, type Signing, type Transport,
+  ScopeHandle, TransportError, declaredHandle, found, httpTransport, requestSession, secretSigner, sessionRequest, signedIntent, signedLogReader, signedReads,
+  type Fetch, type ReadSigning, type Signing, type Transport,
 } from "@generalbusiness/artroom-client";
-import { DIRECTORY, REGISTER, ROLE_LISTS, platform, type Role } from "@generalbusiness/artroom-platform";
-import { httpSource, render, verify as replay } from "@generalbusiness/artroom-replay";
+import { DIRECTORY, MEMBERSHIP, REGISTER, ROLE_LISTS, platform, type Role } from "@generalbusiness/artroom-platform";
+import { SourceError, httpSource, render, verify as replay } from "@generalbusiness/artroom-replay";
 import type { Config, Repository, Store } from "./store.ts";
 
 export interface Context {
@@ -61,13 +62,17 @@ class Stop extends Error {
 }
 const stop = (outcome: Outcome): never => { throw new Stop(outcome); };
 
-/** Runs a command, and turns a stop and a lost reply into its outcome. A lost reply says what the transport says: whether anything may have been recorded. */
+/**
+ * Runs a command, and turns a stop, a lost reply and a history that cannot be read into its outcome. A lost reply says what the
+ * transport says: whether anything may have been recorded. A history that cannot be read says why: "... cannot be read: <reason>".
+ */
 async function run(command: () => Promise<Outcome>): Promise<Outcome> {
   try {
     return await command();
   } catch (error) {
     if (error instanceof Stop) return error.outcome;
     if (error instanceof TransportError) return failed(`No answer: ${error.message}`);
+    if (error instanceof SourceError) return failed(error.message);
     throw error;
   }
 }
@@ -96,6 +101,7 @@ async function signerOf(ctx: Context, config: Config): Promise<Uint8Array> {
 }
 
 const signing = (ctx: Context): Signing => (ctx.now ? { now: ctx.now() } : {});
+const readSigning = (ctx: Context): ReadSigning => (ctx.now ? { now: ctx.now } : {});
 const transportOf = (ctx: Context, service: string): Transport => httpTransport(service, ctx.fetch ? { fetch: ctx.fetch } : {});
 
 /**
@@ -103,7 +109,8 @@ const transportOf = (ctx: Context, service: string): Transport => httpTransport(
  * repository's membership scope, signed for by the caller's key, or none.
  * A deployment with no session secret answers `sessions-unavailable`, and a
  * key that is not an active member's is refused one: the reads then go
- * without one, and the scope decides whether they may read.
+ * without one, as signed reads by the caller's key (`handleOf`), and the
+ * scope decides whether they may read.
  */
 async function readerOf(ctx: Context, config: Config): Promise<string | null> {
   const membership = config.repository?.membership;
@@ -115,8 +122,14 @@ async function readerOf(ctx: Context, config: Config): Promise<string | null> {
   return answer.ok ? answer.session.reader() : null;
 }
 
+/**
+ * A handle on one scope. A read with no session is a signed read by the
+ * caller's key: the scope answers it where that key signed an entry, or the
+ * root of the scope's cause chain, within the window of an intent.
+ */
 async function handleOf(ctx: Context, config: Config, scope: ScopeId, reader?: string | null): Promise<ScopeHandle> {
-  return new ScopeHandle(transportOf(ctx, config.service), scope, reader === undefined ? await readerOf(ctx, config) : reader);
+  const transport = signedReads(transportOf(ctx, config.service), secretSigner(await signerOf(ctx, config)), readSigning(ctx));
+  return new ScopeHandle(transport, scope, reader === undefined ? await readerOf(ctx, config) : reader);
 }
 
 async function summaryOf(handle: ScopeHandle): Promise<Summary> {
@@ -276,6 +289,11 @@ export function install(ctx: Context, service: string, options: { host?: string;
  * signed intent; the directory, once it exists, creates membership, the
  * rules scope and the destination. Then the founder takes the seat and the
  * first key in membership, and so becomes its first admin.
+ *
+ * Every read here is a signed read by the founder key, which is the
+ * operator key: the register's summary, where that key signed `install`;
+ * then the directory that the claim caused, and the scopes that the
+ * directory caused; then membership, where the key has signed `seat`.
  */
 export function claim(ctx: Context, name: string, options: { handle?: string; branch?: string } = {}): Promise<Outcome> {
   return run(async () => {
@@ -383,9 +401,11 @@ export function join(ctx: Context, text: string): Promise<Outcome> {
     const signer = secretSigner(secret);
     const config: Config = { v: 1, service: link.service, key: "device", repository: link.repository };
     const M = await handleOf(ctx, config, link.repository.membership.scope, null);
-    const shape = platform((await summaryOf(M)).definition)!.data as unknown as DefinitionShape;
+    // The new key has signed nothing yet, so it reads nothing in membership before the join. Membership is the directory's
+    // `platform:membership@1`, whose `join` names its member by a mark, which has no key in `expected`: no revision is read.
+    const shape = platform(MEMBERSHIP)!.data as unknown as DefinitionShape;
     const fields = { invitation: link.invitation, secret: link.secret };
-    const signed = await signedIntent(signer, { to: link.repository.membership, kind: "join", fields, expected: expectedOf(shape.acts["join"]!, (await summaryOf(M)).items, null, fields) }, signing(ctx));
+    const signed = await signedIntent(signer, { to: link.repository.membership, kind: "join", fields, expected: expectedOf(shape.acts["join"]!, [], null, fields) }, signing(ctx));
     const seq = accepted(await M.submit(signed), M.scope, "Joined").receipt.fact.seq;
     const inbox = (await createdBy(M, seq)).find((m) => m.seed.kind === "inbox")?.scope ?? stop(failed(`Joined, but entry ${M.scope}:${seq} creates no inbox.`));
     const I = await handleOf(ctx, config, inbox, null);
@@ -524,7 +544,7 @@ export function verify(ctx: Context, named: string | undefined): Promise<Outcome
     const config = await configOf(ctx);
     const scope = scopeNamed(config, named);
     const reader = await readerOf(ctx, config);
-    const source = httpSource(config.service, { ...(ctx.fetch ? { fetch: ctx.fetch } : {}), ...(reader ? { reader } : {}) });
+    const source = httpSource(config.service, { ...(ctx.fetch ? { fetch: ctx.fetch } : {}), reader: reader ?? signedLogReader(secretSigner(await signerOf(ctx, config)), readSigning(ctx)) });
     const { report, why } = await replay(source, { mode: "replay", scope, platform, grants: "proven" });
     const lines = render(report, why).split("\n").filter((line) => line.length > 0);
     return report.result === "consistent" ? done(...lines) : failed(...lines);
