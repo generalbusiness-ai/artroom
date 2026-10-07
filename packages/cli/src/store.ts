@@ -9,7 +9,7 @@
  * the user. `memoryStore` keeps them in memory, for a test.
  */
 
-import type { ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
+import type { Digest, FactRef, ScopeId, ScopeRef, SignedIntent } from "@generalbusiness/artroom-contract";
 
 /** The scopes of one repository, as `claim` or `join` learned them. */
 export interface Repository {
@@ -21,6 +21,24 @@ export interface Repository {
   inbox?: ScopeId;
 }
 
+/**
+ * One exact mutation envelope, kept before it leaves. A missing accepted fact
+ * means delivery is uncertain: retry these bytes, never a fresh signature.
+ */
+export interface ClaimStep { signed: SignedIntent; accepted?: FactRef }
+/**
+ * Public authorization data, not signing keys. `found` is optional only to
+ * recognize older digest-only records: they cannot reconstruct their signature.
+ * Learned repository references and enrollment steps survive interrupted runs.
+ */
+export interface PendingClaim {
+  register: ScopeId; intent: Digest; handle: string;
+  found?: ClaimStep;
+  repository?: Repository;
+  seat?: ClaimStep;
+  firstKey?: ClaimStep;
+}
+
 export interface Config {
   v: 1;
   /** The scope service's base URL. */
@@ -30,6 +48,8 @@ export interface Config {
   /** The register this command founded, as its receipt names it. */
   register?: ScopeRef;
   repository?: Repository;
+  /** A claim that `claim` submitted and has not seen through yet. A later `claim` goes on from it. */
+  claim?: PendingClaim;
   /** The caller's handle in membership, once it has one. */
   handle?: string;
 }

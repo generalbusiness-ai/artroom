@@ -2,6 +2,7 @@ import { expect, test, vi } from "vitest";
 import type { Digest, Entry, ScopeId } from "@generalbusiness/artroom-contract";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { retainedReadArgument } from "@generalbusiness/artroom-bytes";
 import { SourceError, httpSource, main, verify, type Fetch, type MemoryScope, type MemorySource } from "../src/index.ts";
 import { rewrite, sourceOf, world } from "./world.ts";
 
@@ -125,6 +126,9 @@ test("a history the service refuses to read is a read error that names the servi
   expect(refused).toBeInstanceOf(SourceError);
   expect([(refused as SourceError).reason, (refused as SourceError).message]).toEqual(["forbidden", `the history of ${id} cannot be read: forbidden`]);
   expect(asked).toEqual([`/v1/scopes/${id}/log?cursor=0 Signed ${id}:log:0`]);
+  const digest = `sha256:${"b".repeat(64)}` as const;
+  await httpSource("https://scopes.test", { fetch: forbidding, reader }).retained(id, "value", digest, { bytes: 1000 }, "long-domain".repeat(30));
+  expect(asked.at(-1)).toBe(`/v1/scopes/${id}/retained/value/${encodeURIComponent(digest)}?domain=${"long-domain".repeat(30)} Signed ${id}:retained:${retainedReadArgument("value", digest, "long-domain".repeat(30))}`);
   const err: string[] = [];
   const code = await main(["https://scopes.test", id], { out: () => undefined, err: (text) => err.push(text), fetch: forbidding });
   expect([code, err]).toEqual([2, [`read error: the history of ${id} cannot be read: forbidden`]]);

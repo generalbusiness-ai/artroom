@@ -345,6 +345,33 @@ describe("outside operations at a real scope (scope contract, section 4.3; autho
     ]);
   });
 
+  // Invariant: after a restart, the object's first call sends an attempt that was recorded and not sent, with no further commit
+  // and no alarm, and the sent mark keeps it from being sent again. This is the register whose create-repository attempt was
+  // recorded before the Git host's settings existed: the settings are added and the Worker restarted.
+  test("an attempt recorded while the outside port refused is sent after a restart with a port that accepts, at the first call, which is a read: no commit and no alarm come before it, and it is sent exactly once", async () => {
+    const s = await found();
+    const out = outsideOf(s.name);
+    out.accepting = false;
+    const [op] = await open(s, pushOf(1)) as [OperationId];
+    // The port refuses: the attempt stays recorded and not sent, and asks for no wake-up.
+    expect([await surface(s).effect(), out.sent.length, await s.alarmAt()]).toEqual([0, 0, null]);
+    const head = await s.head();
+
+    // The settings change, and the object restarts. Its first call is a read of the operation.
+    out.accepting = true;
+    await s.restart();
+    expect((await seen(s, op)).state).toBe("pending");
+    // The pass runs after the read's answer, which does not wait for it. A bounded number of turns of the event loop, and no time.
+    for (let turn = 0; turn < 200 && out.sent.length === 0; turn++) await tick();
+    expect([out.attempts, await s.head()]).toEqual([[`${op}#1`], head]);
+    out.answer(op, 1, own("c1"));
+    while ((await seen(s, op)).state !== "settled") await tick();
+
+    // Another restart and every way a pass starts: nothing is sent again.
+    await s.restart();
+    expect([(await seen(s, op)).state, await surface(s).effect(), await s.alarm(), out.attempts]).toEqual(["settled", 0, false, [`${op}#1`]]);
+  });
+
   test("a scope whose pinned definition the runtime cannot run sends nothing outside the service: the attempt stays recorded, with no wake-up, and is sent once the runtime can run the definition. The capability is the scripted stand-in", async () => {
     // The lane of the other tests, with one capability guard. The scripted test capability, a stand-in, is the code for it.
     const staged = variant(definition.declared, (def) => { def.acts.report.guards.push({ capability: { name: "hold", guard: "staged", with: { commit: { field: "commit" }, under: { item: "also.commitment" } } } }); def.acts.report.fields.commit = { type: "commit", required: true }; });

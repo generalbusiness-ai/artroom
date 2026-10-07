@@ -34,10 +34,11 @@
 
 import type { Digest, Entry, Input, KeyId, Observation, ObservationRequest, ObservationUse, ObservedScope, PlatformDefinition, RunId, ScopeRef } from "@generalbusiness/artroom-contract";
 import { canonicalize, hex, isObservationUse, isRecord, parseStrict } from "@generalbusiness/artroom-bytes";
-import { WINDOWS, contentChecked, contentStates, fixedBy, highestHead, judgeGrant, membershipOf, namedBy, observationOf, observedName, observedOf, prefer, revoked, same, subjectName, valueDigest, type Clock as Reading, type ContentStates, type GrantJudgment, type Needed, type RecordedRef, type Retains, type StateView, type ValueRead } from "@generalbusiness/artroom-derive";
+import { WINDOWS, contentChecked, contentStates, fixedBy, highestHead, isScopeRef, judgeGrant, membershipOf, namedBy, observationOf, observedName, observedOf, prefer, revoked, same, subjectName, valueDigest, type Clock as Reading, type ContentStates, type GrantJudgment, type Needed, type RecordedRef, type Retains, type StateView, type ValueRead } from "@generalbusiness/artroom-derive";
 import { isPlatformDefinition } from "@generalbusiness/artroom-bytes";
-import { platform, standingOf } from "@generalbusiness/artroom-platform";
+import { DESTINATION, DIRECTORY, destinationBranch, platform, standingOf } from "@generalbusiness/artroom-platform";
 import type { Asked, Authority, Clock, Further, Random, Standing } from "./ports.ts";
+import type { SessionReading } from "./sessions.ts";
 
 /**
  * One read of a membership scope: the standing of one key, answered from
@@ -386,9 +387,47 @@ const NOTHING_READ: Further = { read: () => Promise.resolve(), observed: () => [
  * read session is accepted only when it names that scope and incarnation
  * (section 3.9; `sessions.ts`). Null also for a rules scope or a
  * destination that records no incarnation yet: no session is accepted
- * there before its first retained observation.
+ * there from this local reference before its first retained observation.
+ * A destination's session reader may resolve its directory's confirmed birth
+ * reference separately; that does not alter this authority reference.
  */
 export const fixedMembership = (config: Pick<Repository, "genesis" | "state">, scope: ScopeRef): ScopeRef | null => fixedBy(recordedMembership(config, scope), null);
+
+/** The destination's actual directory, recorded by its judged creation. A
+ * session's claims cannot select this target or substitute its incarnation. */
+function destinationSessionBirth(config: Pick<Repository, "genesis" | "state">, scope: ScopeRef): { directory: ScopeRef; membership: RecordedRef } | null {
+  const genesis = config.genesis();
+  const state = config.state;
+  if (!state || scope.kind !== "destination" || !same(state.scope()?.at, scope) || genesis?.decision !== "applied" || genesis.seed.kind !== "destination" || genesis.seed.definition !== DESTINATION) return null;
+  const directory = genesis.seed.creator;
+  const held = destinationBranch(state)?.refs["directory"];
+  const membership = recordedMembership(config, scope);
+  return directory?.kind === "directory" && isScopeRef(held) && same(held, directory) && genesis.source?.seq === 0 && same(genesis.source.at, directory) && genesis.message?.class === "request" && genesis.message.type === "create" && membership?.kind === "membership" ? { directory, membership } : null;
+}
+
+/** Resolve only the session reference of a destination that has not retained
+ * a membership observation yet. This does not fix grant authority, retain an
+ * observation, or write history. The caller checks MAC, clock and read first. */
+export function destinationSessionMembership(config: Pick<Repository, "genesis" | "state">, read: (directory: ScopeRef, reader: string) => Promise<unknown>): NonNullable<SessionReading["membershipPreparation"]> {
+  return {
+    recorded: (scope) => destinationSessionBirth(config, scope)?.membership ?? null,
+    async resolve(scope, reader) {
+      try {
+        const birth = destinationSessionBirth(config, scope);
+        if (!birth) return null;
+        const reply = await read(birth.directory, reader);
+        const value = isRecord(reply) && reply["ok"] === true && isRecord(reply["value"]) ? reply["value"] : null;
+        if (!value || !isScopeRef(value["scope"]) || !same(value["scope"], birth.directory) || value["definition"] !== DIRECTORY || value["status"] !== "active" || !Array.isArray(value["items"])) return null;
+        const repositories = value["items"].filter((item: unknown) => isRecord(item) && item["type"] === "repository" && item["state"] === "open");
+        if (repositories.length !== 1) return null;
+        const refs = repositories[0]["refs"];
+        const reference: unknown = isRecord(refs) ? refs["membership"] : null;
+        const after = destinationSessionBirth(config, scope);
+        return isScopeRef(reference) && reference.kind === "membership" && after && same(after.directory, birth.directory) && reference.scope === after.membership.scope && (after.membership.inc === null || after.membership.inc === reference.inc) ? reference : null;
+      } catch { return null; }
+    },
+  };
+}
 
 /**
  * The production authority of one scope of a repository (authority note,

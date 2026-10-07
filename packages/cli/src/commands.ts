@@ -14,23 +14,23 @@
  * | Command | What it does |
  * |---|---|
  * | `install` | Founds the register by an `install` intent, signed by a new operator key that is also the one founder key. |
- * | `claim` | Signs the register's `found` act, then waits until the directory, membership, rules scope and destination are created and confirmed. Then it takes the founder's seat and first key in membership. |
+ * | `claim` | Signs the register's `found` act, then waits until the directory, membership, rules scope and destination are created and confirmed. Then it takes the founder's seat and first key in membership. A claim it gave up waiting on is kept as pending, and the next `claim` goes on from it; `--again` signs a new one. |
  * | `invite`, `join` | Membership's `invite-member` and `join`. The link carries the invitation's number and secret; the joining key is made and kept locally. |
  * | `acts` | The acts of a scope's definition, with the ones the caller's role holds. |
  * | `act` | One act of any kind, through the client's declared handle for a declared definition, or as a signed intent for a platform one. |
  * | `log`, `show` | The scope's history, and one entry, over the read routes. |
- * | `verify` | The replay verifier over the read routes. |
+ * | `verify` | The replay verifier over the read routes: with the caller's session, and by signed reads where the session is refused. |
  */
 
-import type { Answer, DeclaredDefinition, Digest, Entry, FieldValue, Founded, Item, KeyId, PlatformDefinition, ScopeId, Seed, Summary } from "@generalbusiness/artroom-contract";
-import { b64url, intentDigest, keyIdOfSecret, scopeIdOf, textDigest, timeOf, unb64url, utf8 } from "@generalbusiness/artroom-bytes";
+import type { Answer, DeclaredDefinition, Digest, Entry, FactRef, FieldValue, Founded, Item, KeyId, PlatformDefinition, ScopeId, ScopeRef, Seed, Summary } from "@generalbusiness/artroom-contract";
+import { b64url, canonicalize, factRefOf, intentDigest, isDigest, isFactRef, isIncarnation, isScopeId, keyIdOfSecret, parseStrict, scopeIdOf, seedDigest, textDigest, timeOf, unb64url, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import {
   ScopeHandle, TransportError, declaredHandle, found, httpTransport, requestSession, secretSigner, sessionRequest, signedIntent, signedLogReader, signedReads,
   type Fetch, type ReadSigning, type Signing, type Transport,
 } from "@generalbusiness/artroom-client";
 import { DIRECTORY, MEMBERSHIP, REGISTER, ROLE_LISTS, platform, type Role } from "@generalbusiness/artroom-platform";
-import { SourceError, httpSource, render, verify as replay } from "@generalbusiness/artroom-replay";
-import type { Config, Repository, Store } from "./store.ts";
+import { SourceError, httpSource, render, verify as replay, type HistorySource } from "@generalbusiness/artroom-replay";
+import type { ClaimStep, Config, PendingClaim, Repository, Store } from "./store.ts";
 
 export interface Context {
   store: Store;
@@ -241,15 +241,15 @@ const accepted = (answer: Answer | Founded, scope: ScopeId | null, took: string)
 
 // ---------------------------------------------------------------- waiting for scopes
 
-/** Reads until `ready` holds, pausing between reads. */
-async function waitFor<T>(ctx: Context, waiting: () => readonly ScopeId[], read: () => Promise<T | null>, what: string): Promise<T> {
+/** Reads until `ready` holds, pausing between reads. `then`: what the person may do after the command gives up. */
+async function waitFor<T>(ctx: Context, waiting: () => readonly ScopeId[], read: () => Promise<T | null>, what: string, then = "run the command's reads again later."): Promise<T> {
   const tries = ctx.tries ?? 120;
   for (let n = 0; n < tries; n++) {
     const got = await read();
     if (got !== null) return got;
     await (ctx.pause ?? (() => new Promise<void>((resolve) => { setTimeout(resolve, 1000); })))(waiting());
   }
-  return stop(failed(`Gave up waiting for ${what} after ${tries} reads. What was asked may still take effect; run the command's reads again later.`));
+  return stop(failed(`Gave up waiting for ${what} after ${tries} reads. What was asked may still take effect; ${then}`));
 }
 
 /** The scope's summary once it is `active`: created and confirmed. */
@@ -283,6 +283,40 @@ export function install(ctx: Context, service: string, options: { host?: string;
   });
 }
 
+/** Saved envelopes are checked against their actual caller and destination,
+ * never re-signed from metadata. An accepted marker belongs to that scope. */
+function validStep(step: ClaimStep, to: ScopeRef, key: KeyId, kind: string): boolean {
+  try {
+    return verifySignedIntent(step?.signed) && step.signed.intent.actor === key && step.signed.intent.kind === kind && canonicalize(step.signed.intent.to) === canonicalize(to)
+      && (step.accepted === undefined || (isFactRef(step.accepted) && step.accepted.seq > 0 && canonicalize(step.accepted.at) === canonicalize(to)));
+  } catch { return false; }
+}
+function validRepository(repository: Repository, directory: Seed): boolean {
+  try {
+    const sibling = (kind: "membership" | "rules" | "destination", ordinal: number) => scopeIdOf({ v: 1, kind, definition: `platform:${kind}@1`, creator: repository.directory, cause: seedDigest(directory), ordinal });
+    // Directory@1 creates these three fixed siblings in order. Both its exact
+    // seed and full confirmed reference determine their IDs; the same founder
+    // key/handle in another room cannot authorize a substituted cache.
+    return repository.directory.scope === scopeIdOf(directory) && repository.directory.kind === "directory" && isIncarnation(repository.directory.inc)
+      && isScopeId(repository.membership.scope) && repository.membership.kind === "membership" && isIncarnation(repository.membership.inc)
+      && repository.membership.scope === sibling("membership", 0) && repository.rules === sibling("rules", 1) && repository.destination === sibling("destination", 2)
+      && (repository.inbox === undefined || isScopeId(repository.inbox));
+  } catch { return false; }
+}
+function foundingMembership(summary: Summary, at: ScopeRef, key: KeyId, handle: string): boolean {
+  const roster = summary.items.find((item) => item.type === "roster");
+  return canonicalize(summary.scope) === canonicalize(at) && summary.definition === MEMBERSHIP
+    && roster?.values["foundingKey"] === key && roster.values["foundingHandle"] === handle;
+}
+async function recordedStep(handle: ScopeHandle, seq: number, at: ScopeRef, key: KeyId, kind: string): Promise<ClaimStep> {
+  const got = await handle.entry(seq);
+  if (!got.ok || got.value.entry.input.type !== "act") return stop(failed(`Cannot recover the admitted ${kind} entry; the claim remains pending.`));
+  const entry = got.value.entry;
+  const step: ClaimStep = { signed: entry.input.type === "act" ? entry.input.signed : stop(failed("The enrollment entry is not an act.")), accepted: factRefOf(entry) };
+  if (!validStep(step, at, key, kind) || step.accepted!.seq !== seq || step.accepted!.hash !== got.value.hash) return stop(failed(`The admitted ${kind} entry does not match this membership and signing key; nothing was submitted.`));
+  return step;
+}
+
 /**
  * `artroom claim <name>`: the register's `found` act, signed by the founder
  * key. The register fixes the directory's seed, so its ID is known from the
@@ -294,50 +328,155 @@ export function install(ctx: Context, service: string, options: { host?: string;
  * operator key: the register's summary, where that key signed `install`;
  * then the directory that the claim caused, and the scopes that the
  * directory caused; then membership, where the key has signed `seat`.
+ *
+ * **Resume.** Keep each exact signed found, seat and first-key before sending
+ * it, then keep its accepted fact. An uncertain delivery retries that same
+ * envelope; an accepted step is skipped. Never refresh a saved deadline.
+ * Learned child references are kept before enrollment. Only `--again` opens
+ * another found. An older digest-only record can continue from its actual
+ * admitted directory and checked retained claim; absence or ambiguity never
+ * invents its missing signature. No signing key is in config.
  */
-export function claim(ctx: Context, name: string, options: { handle?: string; branch?: string } = {}): Promise<Outcome> {
+export function claim(ctx: Context, name: string, options: { handle?: string; branch?: string; again?: boolean } = {}): Promise<Outcome> {
   return run(async () => {
     const config = await configOf(ctx);
     const register = config.register ?? stop(usage("No register is known here. Run: artroom install <base-url>."));
     if (config.repository) return usage(`A repository is claimed here already: directory ${config.repository.directory.scope}.`);
     const secret = await signerOf(ctx, config);
     const signer = secretSigner(secret);
-    const recovery = keyIdOfSecret(await keyOf(ctx, "recovery"));
-    const handle = options.handle ?? "@founder";
     const R = await handleOf(ctx, config, register.scope, null);
-    const shape = platform(REGISTER)!.data as unknown as DefinitionShape;
-    const fields = { branch: options.branch ?? "main", founderHandle: handle, recoveryKey: recovery };
-    const signed = await signedIntent(signer, { to: register, kind: "found", fields, expected: expectedOf(shape.acts["found"]!, (await summaryOf(R)).items, null, fields) }, signing(ctx));
-    accepted(await R.submit(signed), register.scope, "Claimed");
+    const { claim: _, ...base } = config;
+    let pending: PendingClaim;
+    if (config.claim && !options.again) {
+      pending = config.claim;
+      if (pending.register !== register.scope || !isDigest(pending.intent) || typeof pending.handle !== "string") return failed("The pending claim does not identify this register and a valid recorded intent; nothing was submitted.");
+      if (pending.found && (!validStep(pending.found, register, signer.key, "found") || intentDigest(pending.found.signed.intent) !== pending.intent || pending.found.signed.intent.fields["founderHandle"] !== pending.handle)) return failed("The pending claim does not match this register, signing key and recorded intent; nothing was submitted.");
+    } else {
+      const recovery = keyIdOfSecret(await keyOf(ctx, "recovery"));
+      const handle = options.handle ?? "@founder";
+      const shape = platform(REGISTER)!.data as unknown as DefinitionShape;
+      const fields = { branch: options.branch ?? "main", founderHandle: handle, recoveryKey: recovery };
+      const signed = await signedIntent(signer, { to: register, kind: "found", fields, expected: expectedOf(shape.acts["found"]!, (await summaryOf(R)).items, null, fields) }, signing(ctx));
+      pending = { register: register.scope, intent: intentDigest(signed.intent), handle, found: { signed } };
+      await ctx.store.save({ ...base, claim: pending });
+    }
+    const keep = async (next: PendingClaim) => { await ctx.store.save({ ...base, claim: next }); pending = next; };
+    if (!pending.found) {
+      // Legacy records did not preserve the envelope. A real admitted
+      // directory retains the original claim, so recover that exact signature
+      // as already accepted. Never submit a reconstructed or fresh found.
+      await R.summary();
+      const legacySeed: Seed = { v: 1, kind: "directory", definition: DIRECTORY, creator: register, cause: pending.intent, ordinal: 0 };
+      const D = await handleOf(ctx, config, scopeIdOf(legacySeed), null);
+      const genesis = await D.entry(0);
+      let found: ClaimStep | null = null;
+      let unread = genesis.ok ? "no matching retained claim" : `directory genesis read: ${genesis.reason}`;
+      if (genesis.ok && genesis.value.entry.input.type === "genesis" && canonicalize(genesis.value.entry.input.seed) === canonicalize(legacySeed)) {
+        for (const use of genesis.value.entry.uses) {
+          if (canonicalize(use.fact.at) !== canonicalize(register)) continue;
+          const kept = await signedReads(transportOf(ctx, config.service), signer, readSigning(ctx)).retained(D.scope, null, "entry", use.content);
+          if (!kept.ok) { unread = `retained claim read: ${kept.reason}`; continue; }
+          try {
+            const entry = parseStrict(kept.value.bytes) as unknown as Entry;
+            if (entry.input.type !== "act" || canonicalize(factRefOf(entry)) !== canonicalize(use.fact)) continue;
+            const candidate: ClaimStep = { signed: entry.input.signed, accepted: use.fact };
+            if (validStep(candidate, register, signer.key, "found") && intentDigest(candidate.signed.intent) === pending.intent && candidate.signed.intent.fields["founderHandle"] === pending.handle) { found = candidate; break; }
+          } catch { /* Not a checked copy of this legacy claim. */ }
+        }
+      }
+      if (!found) return failed(`This pending claim has only a digest and no readable admitted directory with its exact found signature (${unread}). Nothing was submitted. Retry the reads later, recover it manually, or use --again to sign a new claim, which may create another repository.`);
+      await keep({ ...pending, found });
+    }
+    const submitted = async (step: ClaimStep, at: ScopeRef, handle: ScopeHandle, took: string): Promise<FactRef> => {
+      const digest = intentDigest(step.signed.intent);
+      if (step.accepted) {
+        // Settlement admits nothing and is bound to the exact envelope. A
+        // saved marker alone cannot stand for some other accepted request.
+        const settled = await handle.settle(step.signed);
+        if (!settled.ok) return stop(failed(`Cannot confirm the saved ${step.signed.intent.kind} step: ${settled.reason}. The exact request remains pending; nothing was submitted.`));
+        if (settled.value.intent !== digest || canonicalize(settled.value.fact) !== canonicalize(step.accepted)) return stop(failed("The saved accepted fact does not match this exact claim step; nothing was submitted."));
+        return step.accepted;
+      }
+      const receipt = accepted(await handle.submit(step.signed), at.scope, took).receipt;
+      if (!isFactRef(receipt.fact) || canonicalize(receipt.fact.at) !== canonicalize(at) || receipt.intent !== digest) throw new TransportError("The accepted reply does not match this exact claim step; its saved request remains pending.");
+      return receipt.fact;
+    };
+    const foundFact = await submitted(pending.found!, register, R, "Claimed");
+    if (!pending.found!.accepted) {
+      // An unavailable answer also requires the same request on retry. Even
+      // an expired/refused envelope remains saved: only --again replaces it.
+      await keep({ ...pending, found: { signed: pending.found!.signed, accepted: foundFact } });
+    } else if (!pending.repository) {
+      // Wake recorded creation after a settings restart. This read does not
+      // settle the found or change its already accepted request bytes.
+      await R.summary();
+    }
+    const resume = `run artroom claim ${name} again to go on waiting for this claim, or with --again to sign a new one, which creates a second repository.`;
 
     // The register's rule fixes the directory's seed from the claim's own intent (`directorySeed`).
-    const seed: Seed = { v: 1, kind: "directory", definition: DIRECTORY, creator: register, cause: intentDigest(signed.intent), ordinal: 0 };
-    const D = await handleOf(ctx, config, scopeIdOf(seed), null);
-    const children: ScopeId[] = [];
-    const directory = await waitFor(ctx, () => [register.scope, D.scope, ...children], () => active(D), "the directory");
-    const made = await createdBy(D, 0);
-    const kind = (k: string) => made.find((m) => m.seed.kind === k)?.scope ?? stop(failed(`The directory's genesis creates no ${k}.`));
-    children.push(kind("membership"), kind("rules"), kind("destination"));
-    const [membership, rules, destination] = await Promise.all(children.map((scope) => handleOf(ctx, config, scope, null)));
-    const summaries = await waitFor(ctx, () => [register.scope, D.scope, ...children], async () => {
-      const all = await Promise.all([membership!, rules!, destination!].map(active));
-      return all.every((s) => s !== null) ? (all as Summary[]) : null;
-    }, "membership, the rules scope and the destination");
-    const repository: Repository = { directory: directory.scope, membership: summaries[0]!.scope, rules: rules!.scope, destination: destination!.scope };
+    const seed: Seed = { v: 1, kind: "directory", definition: DIRECTORY, creator: register, cause: pending.intent, ordinal: 0 };
+    let repository = pending.repository;
+    if (!repository) {
+      const D = await handleOf(ctx, config, scopeIdOf(seed), null);
+      const children: ScopeId[] = [];
+      const directory = await waitFor(ctx, () => [register.scope, D.scope, ...children], () => active(D), "the directory", resume);
+      const made = await createdBy(D, 0);
+      const kind = (k: string) => made.find((m) => m.seed.kind === k)?.scope ?? stop(failed(`The directory's genesis creates no ${k}.`));
+      children.push(kind("membership"), kind("rules"), kind("destination"));
+      const handles = await Promise.all(children.map((scope) => handleOf(ctx, config, scope, null)));
+      const summaries = await waitFor(ctx, () => [register.scope, D.scope, ...children], async () => {
+        const all = await Promise.all(handles.map(active));
+        return all.every((s) => s !== null) ? (all as Summary[]) : null;
+      }, "membership, the rules scope and the destination", resume);
+      if (directory.scope.scope !== D.scope || directory.scope.kind !== "directory" || summaries.some((summary, n) => summary.scope.scope !== children[n] || summary.scope.kind !== ["membership", "rules", "destination"][n])) return failed("A creation read names another scope; the claim remains pending.");
+      repository = { directory: directory.scope, membership: summaries[0]!.scope, rules: children[1]!, destination: children[2]! };
+      await keep({ ...pending, repository });
+    }
+    if (!validRepository(repository, seed)) return failed("The saved repository references do not match this claim; nothing was submitted.");
+    const handle = pending.handle;
 
     // The founder's seat and first key (`founding-key`): the first admin of the repository.
-    const M = membership!;
-    const mShape = platform(summaries[0]!.definition)!.data as unknown as DefinitionShape;
-    const seat = accepted(await M.submit(await signedIntent(signer, { to: repository.membership, kind: "seat", expected: expectedOf(mShape.acts["seat"]!, (await summaryOf(M)).items, null, {}) }, signing(ctx))), M.scope, "Seated").receipt.fact.seq;
-    const keyFields = { member: seat };
-    accepted(await M.submit(await signedIntent(signer, { to: repository.membership, kind: "first-key", fields: keyFields, expected: expectedOf(mShape.acts["first-key"]!, (await summaryOf(M)).items, null, keyFields) }, signing(ctx))), M.scope, "First key");
-    const inbox = (await createdBy(M, seat)).find((m) => m.seed.kind === "inbox")?.scope;
+    const enrollment = { ...base, repository };
+    const M = await handleOf(ctx, enrollment, repository.membership.scope);
+    const mShape = platform(MEMBERSHIP)!.data as unknown as DefinitionShape;
+    if (!pending.seat) {
+      const summary = await summaryOf(M);
+      if (!foundingMembership(summary, repository.membership, signer.key, pending.handle)) return failed("Membership does not record this claim's founding key and handle; nothing was submitted.");
+      const members = summary.items.filter((item) => item.type === "member");
+      const own = members.filter((item) => item.values["handle"] === pending.handle);
+      if (own.length === 1 && own[0]!.state === "active") await keep({ ...pending, seat: await recordedStep(M, own[0]!.id, repository.membership, signer.key, "seat") });
+      else if (members.length !== 0) return failed("Existing membership makes the missing seat stage ambiguous; nothing was submitted.");
+      else {
+        const signed = await signedIntent(signer, { to: repository.membership, kind: "seat", expected: expectedOf(mShape.acts["seat"]!, summary.items, null, {}) }, signing(ctx));
+        await keep({ ...pending, seat: { signed } });
+      }
+    }
+    if (!validStep(pending.seat!, repository.membership, signer.key, "seat")) return failed("The saved seat does not match this membership and signing key; nothing was submitted.");
+    const seat = await submitted(pending.seat!, repository.membership, M, "Seated");
+    if (!pending.seat!.accepted) await keep({ ...pending, seat: { signed: pending.seat!.signed, accepted: seat } });
+    const keyFields = { member: seat.seq };
+    if (!pending.firstKey) {
+      const summary = await summaryOf(M);
+      if (!foundingMembership(summary, repository.membership, signer.key, pending.handle)) return failed("Membership does not record this claim's founding key and handle; nothing was submitted.");
+      const keys = summary.items.filter((item) => item.type === "key");
+      const own = keys.filter((item) => item.values["id"] === signer.key && item.refs["member"] === seat.seq);
+      if (own.length === 1 && own[0]!.state === "active") await keep({ ...pending, firstKey: await recordedStep(M, own[0]!.id, repository.membership, signer.key, "first-key") });
+      else if (keys.length !== 0) return failed("Existing membership makes the missing first-key stage ambiguous; nothing was submitted.");
+      else {
+        const signed = await signedIntent(signer, { to: repository.membership, kind: "first-key", fields: keyFields, expected: expectedOf(mShape.acts["first-key"]!, summary.items, null, keyFields) }, signing(ctx));
+        await keep({ ...pending, firstKey: { signed } });
+      }
+    }
+    if (!validStep(pending.firstKey!, repository.membership, signer.key, "first-key") || pending.firstKey!.signed.intent.fields["member"] !== seat.seq) return failed("The saved first key does not match this seat and signing key; nothing was submitted.");
+    const firstKey = await submitted(pending.firstKey!, repository.membership, M, "First key");
+    if (!pending.firstKey!.accepted) await keep({ ...pending, firstKey: { signed: pending.firstKey!.signed, accepted: firstKey } });
+    const inbox = (await createdBy(M, seat.seq)).find((m) => m.seed.kind === "inbox")?.scope;
     if (inbox) {
-      const I = await handleOf(ctx, config, inbox, null);
+      const I = await handleOf(ctx, enrollment, inbox);
       await waitFor(ctx, () => [M.scope, inbox], () => active(I), "the founder's inbox");
       repository.inbox = inbox;
     }
-    await ctx.store.save({ ...config, repository, handle });
+    await ctx.store.save({ ...base, repository, handle });
     return done(
       `Claimed ${name}: directory ${repository.directory.scope}, membership ${repository.membership.scope}, rules ${repository.rules}, destination ${repository.destination}; each created and confirmed.`,
       `You are ${handle}, an admin, on key ${signer.key}${inbox ? `; your inbox is ${inbox}` : ""}.`,
@@ -539,12 +678,26 @@ export function show(ctx: Context, named: string): Promise<Outcome> {
  * the platform package's data and rules for a platform definition. It
  * prints the report: what it checked, and what it took on trust.
  */
+/**
+ * A source whose reads go with the caller's session, and a read that the session is refused (`forbidden`) goes again as a signed
+ * read by the caller's key. So a scope that accepts no session of this repository yet, as a rules scope that records membership's
+ * ID with no incarnation before its first act, is read by the key's cause chain while that holds.
+ */
+function sessionFirst(session: HistorySource, signed: HistorySource): HistorySource {
+  return {
+    page: async (scope, from, allow) => { const got = await session.page(scope, from, allow); return !got.ok && got.reason === "forbidden" ? signed.page(scope, from, allow) : got; },
+    retained: async (scope, kind, digest, allow, domain) => { const got = await session.retained(scope, kind, digest, allow, domain); return !got.ok && got.reason === "forbidden" ? signed.retained(scope, kind, digest, allow, domain) : got; },
+  };
+}
+
 export function verify(ctx: Context, named: string | undefined): Promise<Outcome> {
   return run(async () => {
     const config = await configOf(ctx);
     const scope = scopeNamed(config, named);
     const reader = await readerOf(ctx, config);
-    const source = httpSource(config.service, { ...(ctx.fetch ? { fetch: ctx.fetch } : {}), reader: reader ?? signedLogReader(secretSigner(await signerOf(ctx, config)), readSigning(ctx)) });
+    const options = ctx.fetch ? { fetch: ctx.fetch } : {};
+    const signed = httpSource(config.service, { ...options, reader: signedLogReader(secretSigner(await signerOf(ctx, config)), readSigning(ctx)) });
+    const source = reader === null ? signed : sessionFirst(httpSource(config.service, { ...options, reader }), signed);
     const { report, why } = await replay(source, { mode: "replay", scope, platform, grants: "proven" });
     const lines = render(report, why).split("\n").filter((line) => line.length > 0);
     return report.result === "consistent" ? done(...lines) : failed(...lines);

@@ -66,11 +66,12 @@
  */
 
 import { WorkerEntrypoint } from "cloudflare:workers";
+import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { Answer, Beside, Cursor, DeclaredDefinition, Digest, DutyId, Grant, LogPage, PlatformDefinition, Read, ReadRefusal, RetainedInput, ScopeApi, ScopeId, Seed, SessionAnswer, SessionRefusal, Settlement, SignedIntent } from "@generalbusiness/artroom-contract";
 import { definitionDigest, intentDigest, isScopeId, positionOf, scopeIdOf } from "@generalbusiness/artroom-bytes";
 import { isObject, type Item } from "@generalbusiness/artroom-derive";
 import { foundedKind, type Founded } from "./core.ts";
-import { fixedMembership, repositoryAuthority } from "./authority.ts";
+import { destinationSessionMembership, fixedMembership, repositoryAuthority } from "./authority.ts";
 import { membershipIn, namespace, type Binding } from "./namespace.ts";
 import { ScopeObject, type OutsideGiven, type Wiring } from "./object.ts";
 import type { Incident } from "./operator.ts";
@@ -78,6 +79,7 @@ import type { Summary } from "./reads.ts";
 import { credentialInUrl, relay, sessionReaders, sessionsOf, type Opened, type Sessions, type StreamRefusal } from "./sessions.ts";
 import type { Duty, Sealed } from "./store.ts";
 import { gitHubOutside, type GitHubBindings } from "./github-wiring.ts";
+import { within } from "./turn.ts";
 
 /**
  * The bindings of the deployed Worker (`wrangler.jsonc`): the one scope
@@ -286,8 +288,13 @@ export async function route(request: Request, binding: Binding): Promise<Respons
  * accepts a session only for the membership scope that the scope itself
  * records: the reference that its authority reads, with its incarnation (`fixedMembership`).
  */
-export function sessionWiring(sessions: () => Sessions | null): Required<Pick<Wiring, "readers" | "sessions">> {
-  return { readers: (given) => sessionReaders({ sessions, clock: given.clock, scope: given.scope, membership: (scope) => fixedMembership(given, scope) }), sessions };
+export function sessionWiring(sessions: () => Sessions | null, binding?: Binding, fetchSeconds = PROPOSED_BOUNDS.fetchSeconds): Required<Pick<Wiring, "readers" | "sessions">> {
+  return {
+    readers: (given) => sessionReaders({
+      sessions, clock: given.clock, scope: given.scope, membership: (scope) => fixedMembership(given, scope),
+      ...(binding ? { membershipPreparation: destinationSessionMembership(given, (directory, reader) => within(() => (binding.get(binding.idFromName(directory.scope)) as Remote).summary(reader), fetchSeconds)) } : {}),
+    }), sessions,
+  };
 }
 
 /**
@@ -314,7 +321,7 @@ export class DeployedScope<E extends Env = Env> extends ScopeObject<E> {
       ports: namespace(this.scopes()),
       authority: (given) => repositoryAuthority({ ...given, reader: membershipIn(this.scopes()) }),
       ...(this.env.GITHUB_APP_CONFIG ? { outside: (given: OutsideGiven) => gitHubOutside(given, this.ctx.storage.sql, this.env) } : {}),
-      ...sessionWiring(() => sessionsOf(this.env.SESSION_SECRET, this.env.DEPLOYMENT)),
+      ...sessionWiring(() => sessionsOf(this.env.SESSION_SECRET, this.env.DEPLOYMENT), this.scopes()),
     };
   }
 }

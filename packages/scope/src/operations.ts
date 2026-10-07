@@ -311,7 +311,8 @@ export class Operations {
       const operation = store.operation(id);
       const origin = store.stored(Number(id.split(":")[0]));
       // Nothing is sent that this runtime cannot send, or whose outcome it could not judge. The attempt stays recorded and not sent,
-      // and no wake-up is asked for it (rule 7). The walk after a restart looks at it once more.
+      // and no wake-up is asked for it (rule 7). The walk after a restart looks at it once more: the object's first call starts it
+      // (`object.ts`, `#first`).
       const rules = operation ? this.#scope.owners()?.rules(operation.owner, operation.kind) : null;
       if (!operation || !origin || !this.#outside.accepts(operation.owner, operation.kind) || !rules) {
         if (row.next !== null) store.postpone(id, attempt, null);

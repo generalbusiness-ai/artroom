@@ -13,7 +13,7 @@
 
 import { DOMAINS, HISTORY_PAGE_BYTES, HISTORY_PAGE_ENTRIES, RETAINED_INPUT_BYTES } from "@generalbusiness/artroom-contract";
 import type { Digest, Head, RetainedInput, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
-import { LATE, digestOfHash, positionOf, sha256, takeBytes, utf8, within, type ByteStream, type Expiry } from "@generalbusiness/artroom-bytes";
+import { LATE, digestOfHash, positionOf, retainedReadArgument, sha256, takeBytes, utf8, within, type ByteStream, type Expiry } from "@generalbusiness/artroom-bytes";
 import { isLocalId, isObject, isScopeRef } from "@generalbusiness/artroom-derive";
 
 /** One entry as stored: its canonical JSON text, and the hash the source gives for it. */
@@ -80,8 +80,8 @@ const isHead = (v: unknown): v is Head => isObject(v) && isLocalId(v["seq"]) && 
  * /v1/scopes/:scope/retained/:kind/:digest`. `reader` is sent as the
  * `Authorization` header: a text, such as a read session, for every read;
  * or a function that gives the header for each read, by the scope, the
- * read's name and its argument (the cursor of `log`, or the digest of
- * `retained`), such as a client's signed read. A function that gives
+ * read's name and its argument (the cursor of `log`, or the fixed-width
+ * kind/digest/domain hash of `retained`), such as a client's signed read. A function that gives
  * undefined sends no header for that read.
  *
  * A reply is read as raw bytes, chunk by chunk, by the bytes package's
@@ -140,7 +140,7 @@ export function httpSource(service: string, options: { fetch?: Fetch; reader?: s
     },
     async retained(scope, kind, digest, allow, domain) {
       if (kind === "value" && (typeof domain !== "string" || domain.length === 0)) return unread("not-found");
-      const got = await get(`/v1/scopes/${scope}/retained/${kind}/${encodeURIComponent(digest)}${domain === undefined ? "" : `?domain=${encodeURIComponent(domain)}`}`, Math.min(allow.bytes, RETAINED_REPLY_BYTES), [scope, "retained", digest]);
+      const got = await get(`/v1/scopes/${scope}/retained/${kind}/${encodeURIComponent(digest)}${domain === undefined ? "" : `?domain=${encodeURIComponent(domain)}`}`, Math.min(allow.bytes, RETAINED_REPLY_BYTES), [scope, "retained", retainedReadArgument(kind, digest, domain)]);
       if (!("body" in got)) return got;
       const value = got.body["value"];
       if (!isObject(value) || (kind === "value" && value["domain"] !== domain) || typeof value["bytes"] !== "string" || (value["under"] !== undefined && typeof value["under"] !== "string")) return unread("unavailable");

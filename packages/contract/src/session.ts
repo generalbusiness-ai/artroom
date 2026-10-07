@@ -16,7 +16,7 @@ import type { Base64Url, KeyId, MemberId, ScopeId, ScopeRef, Timestamp } from ".
  * and a signed read's signature are over. None is a tag of `DOMAINS`, so
  * none is ever the bytes of an intent.
  */
-export const SESSION_DOMAINS = { token: "artroom-session-1", request: "artroom-session-request-1", read: "artroom-read-1" } as const;
+export const SESSION_DOMAINS = { token: "artroom-session-1", request: "artroom-session-request-1", read: "artroom-read-1", readResource: "artroom-read-resource-1" } as const;
 
 /**
  * A device's request for a read session. It follows the one form of a
@@ -60,16 +60,21 @@ export type SessionAnswer = { ok: true; token: string; session: SessionClaims } 
 
 /**
  * A signed read: one read of one scope, signed by a device key, with no
- * session (the planner's decisions 61cc5e50 and c6499e91). A scope answers
- * it only to a key that signed an entry of that scope within the authority
- * window of an intent, and only for the scope's summary, its genesis and
- * the entries that key signed.
+ * session (the planner's decisions 61cc5e50 and c6499e91, and reads by the
+ * cause chain). A scope answers it only to a key that signed an entry of
+ * that scope, or the root of its genesis's cause chain, within the
+ * authority window of an intent, and only for the scope's summary, its
+ * genesis, the entries that key signed, the entries whose cause chain leads
+ * to one of those, and the retained inputs that those entries name.
  *
  * - `to`: the scope ID of the scope that is read.
  * - `actor`: the key that signs.
  * - `read`: the read's name. `arg`: its argument: `"summary"` for the
  *   summary; the cursor of `history` and `log`, `"0"` for the first page;
- *   the position of an `entry`, in decimal.
+ *   the position of an `entry`, in decimal; for `retained`, the SHA-256
+ *   digest of `artroom-read-resource-1`, one newline, and canonical JSON
+ *   `[kind, digest, domain ?? null]`. The complete resource is bound even
+ *   when a domain is long. At most 128 characters; the request's v stays 1.
  * - `notAfter`: after the scope's clock reading, and at most the lifetime
  *   of an intent ahead of it, as for an intent.
  *
@@ -82,4 +87,4 @@ export type SessionAnswer = { ok: true; token: string; session: SessionClaims } 
 export interface ReadRequest { v: 1; to: ScopeId; actor: KeyId; read: SignedReadName; arg: string; notAfter: Timestamp }
 export interface SignedRead { request: ReadRequest; sig: Base64Url }
 /** The reads that a signed read may name. */
-export type SignedReadName = "summary" | "history" | "entry" | "log";
+export type SignedReadName = "summary" | "history" | "entry" | "log" | "retained";
