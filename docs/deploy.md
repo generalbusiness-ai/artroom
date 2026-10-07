@@ -52,10 +52,18 @@ or in the command line's config.
 4. **Restart** the Worker, by deploying it again. A scope object reads its
    settings when it starts. After a restart, a register with a recorded
    creation that was not sent sends it at the first request it gets.
+   Redeploying does not promise that every already-running scope object
+   immediately reloads its settings. In the planner's 7 October own-host
+   run, a register installed just before its host setting changed kept
+   the previous setting until it restarted, about two minutes later.
 5. **Claim.** Run `artroom claim <name> --handle @you`. If it gives up
    waiting, run the same command again: it goes on from the pending claim
-   and signs nothing new. `--again` signs a second claim, which creates a
-   second repository.
+   without replacing its saved signed requests or deadlines. In the
+   settings-change run, the first claim reached its 120-read limit; the
+   same command resumed after the register restarted, with no second
+   `found`. This delay is an observed run, not a guaranteed restart bound.
+   `--again` deliberately signs a second claim, which may create a second
+   repository while an earlier unknown claim can still take effect.
 
 Finish the initial bootstrap while the operator's install is within its
 900-second read window. Before enrollment, the claim's causal read window

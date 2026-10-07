@@ -33,7 +33,7 @@ what a judge drafts, in one storage transaction for each entry.
 | `turn` | `Turns.run(waiting, founding?)`: section 5.2, steps 3 to 7, and section 5.3. `isSigned` and `fetchFacts`: step 1. `Waiting`, `Verdict`, `End`. |
 | `core` | `Scope`: `found`, `submit`, `settle`, `alarm`, `checkpoint`, `pinned`. `receiptOf`. The answers `Founded` and `Checkpointed`. |
 | `sessions` | Read sessions: `sessionsOf`, `mintSession`, `openSession`, `sessionReaders` (the production readers port), `issueSession` (membership's answer to a signed request), `credentialInUrl`, and `Streams` with `relay`, the streams of a scope's head. |
-| `signed-reads` | `checkSignedRead`: a read signed by a key with a recent local signed entry or a recent signed root of this scope's cause chain. `rootOf` follows at most four causes through verified source entries. The read covers summary, genesis and that key's own signed entries; it grants no retained-input read or stream. |
+| `signed-reads` | `checkSignedRead`: a read signed by a key with a recent local signed entry or a recent signed root of this scope's cause chain. `rootOf` follows at most four causes through verified source entries. The read covers summary, genesis, that key's signed and causally rooted entries, and their typed retained inputs. At a register, a recent local signer reads the whole history. It grants no stream. |
 | `limits` | `JoinLimits`: the serving limits of a join at the front of a membership scope. `addressKey`, `isJoin`, `PROPOSED_LIMITS`. |
 | `operator` | `OperatorRecord`: the operator's record of a scope, outside its history. `incidentsOf`, `waitingIn`, and `sendAgain`, the instruction to dispatch a waiting request once more. |
 | `reads` | `Reads`: `summary`, `items`, `history`, `entry`, `outbox`, and `duty`, one send's row; `operations` and `operation`, the outside operations with their attempts and outcomes; `incidents`, a page of the operator's record, and `waiting`, the two lists of requests that wait. For a verifier: `log`, a history page as stored bytes, and `retained`, one retained input by kind and digest, with a domain for `value`. `ReadBounds` and `READ_BOUNDS`. |
@@ -178,9 +178,12 @@ alone. Guard 1 takes an answer of that ID and of the kind `membership`,
 and the entry that retains it fixes the incarnation. From then on the
 read states the incarnation, and the recorded reference is checked again
 inside the commit (I3 deltas, section 26, entries EM21 and EY7 to EY9).
-Two limits on the recorded membership reference remain. Such a scope
-accepts no read session before an entry of it retains an observation of
-membership (entry EY12). A scope whose entries retain more than one
+A rules scope accepts no read session before an entry of it retains an
+observation of membership (entry EY12). A destination may instead resolve
+its session reference from the confirmed membership reference in its
+recorded birth directory, after local token, clock and read checks
+(`destinationSessionMembership`, in `authority.ts`). This writes no entry
+and does not fix its grant authority. A scope whose entries retain more than one
 incarnation of that ID records no reference, and an act there that needs a
 grant is answered
 `authority-unavailable` (entry EY9).
@@ -455,8 +458,8 @@ section 3.9).
 ## Signed reads
 
 A reader with no session may present a signed read instead
-(`signed-reads.ts`; the planner's decisions 61cc5e50, c6499e91 and
-70a0680e). It is how a key learns enough to ask for a session: the operator
+(`signed-reads.ts`; the planner's decisions 61cc5e50, c6499e91,
+70a0680e and ca8ad1cf). It is how a key learns enough to ask for a session: the operator
 key that signed `install` reads the register, and the key that signed a claim's `found`
 reads the register's summary and the genesis and summary of its directory
 and the membership, rules and destination scopes that directory creates.
@@ -464,25 +467,28 @@ It learns membership's reference before it holds a session.
 
 | Question | Answer |
 |---|---|
-| The request | `Authorization: Signed <base64url>`: the unpadded base64url of the canonical JSON of `{ request, sig }`. `request` is `{ v: 1, to, actor, read, arg, notAfter }`: the scope ID, the key, the read (`summary`, `history`, `entry` or `log`), its argument (`"summary"`; a page's cursor, `"0"` for the first; an entry's position) and a time. |
+| The request | `Authorization: Signed <base64url>`: the unpadded base64url of the canonical JSON of `{ request, sig }`. `request` is `{ v: 1, to, actor, read, arg, notAfter }`: the scope ID, the key, the read (`summary`, `history`, `entry`, `log` or `retained`), its argument (`"summary"`; a page's cursor, `"0"` for the first; an entry's position; `retainedReadArgument(kind, digest, domain)`, the resource hash over the exact kind, digest and domain) and a time. |
 | The signature | Ed25519 by `actor`, as an intent is signed, over the tag `artroom-read-1`, a newline and the canonical JSON of `request`. |
 | The window | The scope's `intentLifetimeSeconds`, 900 by default, on the scope's own clock: the reading is before `notAfter`, and `notAfter` is at most that far ahead. |
-| Who may read | A key with a local signed entry within that window, or a signed root of this scope's cause chain within that window. Local signers are the actors of acts, preparations and applied founding intents. A child genesis has no signer of its own. |
-| The cause chain | Starting at the scope's genesis, follow at most four causes through entries verified against their fact references. An act whose intent caused the birth is the root; when the cause is the creator's seed, continue through that creator's genesis. The directory's claim is the root for its membership, rules and destination children. The window is measured at the root entry's time, not the child's genesis time. A delivery's cause supplies no root. |
-| What it reads | The summary, the genesis, and the key's own entries: `entry` for one of them, and `history` and `log` pages that hold only those and the genesis, with the `next` and `complete` of the unfiltered page. |
-| Every other case | `forbidden`, and nothing is written: another read, another argument, another scope, a key with neither a recent local signed entry nor a recent signed root, a signature that is not the key's, a time outside the window. A clock behind the previous entry's time: `clock-behind`. No stream. |
+| Who may read | Summary needs a recent local signer or recent genesis-root signer. An entry may instead qualify by its own causal root; history and log require at least one eligible root before revealing the head. Local signers are the actors of acts, preparations and applied founding intents. A child genesis has no signer of its own. |
+| The cause chain | Starting at each entry, follow at most four causes through entries verified against their fact references. A child genesis follows its creation cause; an outcome follows the local entry that opened its operation; a diagnosis follows the local entry that made its send; a delivery follows its retained source entry. An outcome or diagnosis of another scope ends the chain. The directory's claim is the root for its membership, rules and destination children. The window is measured at the signed root entry's time. |
+| What it reads | The summary, genesis, the key's own entries and entries whose causal root the key signed within the window; `retained` serves the actual typed inputs carried by eligible entries, never a digest merely quoted in text. History and log pages keep the `next` and `complete` of the unfiltered page. At a register, a recent local signer reads every history entry and its typed retained inputs. |
+| Every other case | `forbidden`, and nothing is written: another read, another argument, another scope, a key with no eligible local or causal signed root, a signature that is not the key's, a time outside the window. A clock behind the previous entry's time: `clock-behind`. No stream. |
 
-The object finds the cause-chain root before a signed read and keeps it in
-memory; a restart finds it again. An unavailable source can be read again
-on a later request. The root does not extend the window or turn the other
+The object finds the roots of eligible entries before a signed read and
+keeps them in memory; a restart finds them again. An unavailable source
+can be read again on a later request. The root does not extend the window or turn the other
 entries in the chain into the key's own signed entries.
 
-Replay through signed reads remains partial: log pages are filtered and
-`retained` is not a signed read. A register containing only its genesis can
-replay `consistent`, as the CLI fixture shows before its claim. A child's
-retained inputs or an unreadable source history can instead make replay
-incomplete or report a missing dependency. That fixture result does not
-establish a deployed repository journey.
+A session issued by membership created under a register claim may read
+that register's whole history and its typed retained inputs, without the
+signed-entry window (ca8ad1cf). This grants no register summary or items
+permission. Other signed histories remain filtered; their coverage alone
+does not establish complete replay of omitted entries. Missing retained
+inputs or an unreadable source history can make replay incomplete or report
+a missing dependency. Whole register history does not grant access to
+another directory's private history, and a fixture replay establishes no
+deployed repository journey.
 
 A join at a membership scope is served through `limits.ts`: serving
 limits by the caller's address, held in memory, which no guard reads and

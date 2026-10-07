@@ -33,6 +33,10 @@ test("scripted object store inspection derives verified ancestry and complete ol
   const unchanged: SnapshotFile[] = [
     { path: "alias", mode: "120000", id: f.blob("dir") },
     { path: "chain", mode: "120000", id: f.blob("alias/file.txt") },
+    { path: "repeat", mode: "120000", id: f.blob("alias/../alias/file.txt") },
+    { path: "self", mode: "120000", id: f.blob("self/file.txt") },
+    { path: "root", mode: "120000", id: f.blob("dir/..") },
+    { path: "absolute", mode: "120000", id: f.blob("/dir/file.txt") },
     { path: "cycle-a", mode: "120000", id: f.blob("cycle-b") },
     { path: "cycle-b", mode: "120000", id: f.blob("cycle-a") },
   ];
@@ -50,11 +54,15 @@ test("scripted object store inspection derives verified ancestry and complete ol
   const changes = JSON.parse(retained!.bytes);
   expect(isJudgeChanges(changes)).toBe(true);
   expect(changes).toEqual({ paths: ["dir/file.txt", "outside"], unreadable: 0, links: [
+    { path: "absolute", tree: "both", resolves: null },
     { path: "alias", tree: "both", resolves: ["dir"] },
     { path: "chain", tree: "both", resolves: ["alias", "dir/file.txt"] },
     { path: "cycle-a", tree: "both", resolves: null },
     { path: "cycle-b", tree: "both", resolves: null },
     { path: "outside", tree: "old", resolves: null },
+    { path: "repeat", tree: "both", resolves: ["alias", "alias", "dir/file.txt"] },
+    { path: "root", tree: "both", resolves: [""] },
+    { path: "self", tree: "both", resolves: null },
   ] });
   expect(retained!.bytes).toBe(canonicalize(changes));
   expect(result.evidence.changes).toBe(valueDigest(DESTINATION_CHANGED_SET.domain, changes));
@@ -62,6 +70,23 @@ test("scripted object store inspection derives verified ancestry and complete ol
   const incomplete = await inspectGit(new Reader(f.source(base)), context).then(() => "answered", () => "pending");
   expect(incomplete).toBe("pending"); // Never count a named but missing blob as a complete present closure.
 });
+
+// Invariant: a finite expansion beyond the work bound supplies no broken-link
+// fact or retained changed-set value. The object store is scripted, as above.
+test("scripted object store inspection leaves finite symbolic-link work exhaustion pending", async () => {
+  const f = fixture();
+  const base = f.commit(f.tree([]), []);
+  const tree = f.tree([
+    { path: "a0", mode: "120000", id: f.blob("dir") },
+    { path: "a1", mode: "120000", id: f.blob("a0/../".repeat(600) + "a0") },
+    { path: "a2", mode: "120000", id: f.blob("a1/../".repeat(600) + "a1") },
+    { path: "dir/file.txt", mode: "100644", id: f.blob("present\n") },
+  ]);
+  const integration = f.commit(tree, [base]);
+  const result = await inspectGit(new Reader(f.source(base)), { repository, ref: "refs/heads/main", recorded: base, base, integration, tree, reports: [] })
+    .then((result) => ({ state: "answered", result }), () => ({ state: "pending" }));
+  expect(result).toEqual({ state: "pending" });
+}, 30_000);
 
 // Invariant: changed raw paths that are not text are counted, not discarded.
 test("scripted object store inspection counts a changed non-UTF8 path", async () => {

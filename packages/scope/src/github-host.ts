@@ -232,34 +232,41 @@ async function resolveLink(reader: Reader, path: string, files: Map<string, Flat
   if (firstBytes.length > SNAPSHOT_BOUNDS.pathBytes) return bad();
   if (target === "" || target.startsWith("/") || target.includes("\0")) return null;
   const reached: string[] = [];
-  const visited = new Set([path]);
+  // A link can occur again after its target has finished expanding. Only
+  // re-entering an unfinished expansion proves a cycle.
+  const active = new Set([path]);
   const at = path.split("/").slice(0, -1);
-  let remaining = target.split("/");
-  let next = 0;
-  for (let steps = 0; next < remaining.length; steps++) {
-    // A work bound is uncertainty, never proof that a resolvable link is broken.
-    if (steps > SNAPSHOT_BOUNDS.pathBytes * (DESTINATION_CHANGED_SET.links + 1)) return bad();
-    const component = remaining[next++]!;
-    if (component === "" || component === ".") continue;
-    if (component === "..") { if (at.length === 0) return null; at.pop(); continue; }
-    const candidate = [...at, component].join("/");
-    const file = files.get(candidate);
-    if (file?.mode === "120000") {
-      if (visited.has(candidate)) return null;
-      visited.add(candidate);
-      reached.push(candidate);
-      const bytes = await reader.blob(file.id);
-      try { target = strict.decode(bytes); } catch { return null; }
-      if (bytes.length > SNAPSHOT_BOUNDS.pathBytes) return bad();
-      if (target === "" || target.startsWith("/") || target.includes("\0")) return null;
-      remaining = [...target.split("/"), ...remaining.slice(next)];
-      next = 0;
-    } else {
-      if (!directories.has(candidate) && !file) return null;
-      if (next < remaining.length && !directories.has(candidate)) return null;
-      at.push(component);
+  let steps = 0;
+  const walk = async (components: readonly string[], suffix: boolean): Promise<boolean> => {
+    for (let next = 0; next < components.length; next++) {
+      // A work bound is uncertainty, never proof that a resolvable link is broken.
+      if (steps++ > SNAPSHOT_BOUNDS.pathBytes * (DESTINATION_CHANGED_SET.links + 1)) return bad();
+      const component = components[next]!;
+      if (component === "" || component === ".") continue;
+      if (component === "..") { if (at.length === 0) return false; at.pop(); continue; }
+      const candidate = [...at, component].join("/");
+      const file = files.get(candidate);
+      const more = suffix || next + 1 < components.length;
+      if (file?.mode === "120000") {
+        if (active.has(candidate)) return false;
+        active.add(candidate);
+        reached.push(candidate);
+        const bytes = await reader.blob(file.id);
+        let target: string;
+        try { target = strict.decode(bytes); } catch { return false; }
+        if (bytes.length > SNAPSHOT_BOUNDS.pathBytes) return bad();
+        if (target === "" || target.startsWith("/") || target.includes("\0")) return false;
+        if (!(await walk(target.split("/"), more))) return false;
+        active.delete(candidate);
+      } else {
+        if (!directories.has(candidate) && !file) return false;
+        if (more && !directories.has(candidate)) return false;
+        at.push(component);
+      }
     }
-  }
+    return true;
+  };
+  if (!(await walk(target.split("/"), false))) return null;
   reached.push(at.join("/"));
   return reached;
 }

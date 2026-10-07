@@ -251,10 +251,13 @@ explicit service limits. Tests use the labelled stand-ins stated by their
 notes and docs/testing.md; a passing local gate proves no deployment,
 provider execution, real runner or complete I3 journey.
 
-Before approval, receipt preparation or landing, bind an exact expanded
-successor that satisfies the intended scope, or adopt a separately scoped
-GitHub component milestone. Reusing the older component receipt without
-that binding does not resolve review `74f5aee6`. The independent review must
+At this inventory checkpoint, review `74f5aee6` required an exact
+expanded-successor binding or a separately scoped GitHub component
+milestone. That alternative is historical: planner decisions `0478ff82`
+and `bb43508a` bind the current whole Gate 1 successor to `225da894` and
+producer `f8a56f1c`. The older component receipt alone does not resolve
+that review; the whole request's source, live evidence and receipt
+conditions still apply. The independent review must
 name the exact implementation request, receipt consequences, final head and
 source trees, and cover the full later delta above. This packet closes no
 commission and grants no approval.

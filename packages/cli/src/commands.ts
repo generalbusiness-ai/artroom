@@ -22,15 +22,15 @@
  * | `verify` | The replay verifier over the read routes: with the caller's session, and by signed reads where the session is refused. |
  */
 
-import type { Answer, DeclaredDefinition, Digest, Entry, FactRef, FieldValue, Founded, Item, KeyId, PlatformDefinition, ScopeId, ScopeRef, Seed, Summary } from "@generalbusiness/artroom-contract";
-import { b64url, canonicalize, factRefOf, intentDigest, isDigest, isFactRef, isIncarnation, isScopeId, keyIdOfSecret, parseStrict, scopeIdOf, seedDigest, textDigest, timeOf, unb64url, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
+import type { Answer, DeclaredDefinition, Digest, Entry, FactRef, FieldValue, Founded, Item, KeyId, PlatformDefinition, ScopeId, ScopeRef, Seed, SignedIntent, Summary } from "@generalbusiness/artroom-contract";
+import { b64url, canonicalize, factRefOf, intentDigest, isDigest, isFactRef, isIncarnation, isScopeId, isScopeRef, keyIdOfSecret, parseStrict, scopeIdOf, seedDigest, textDigest, timeOf, unb64url, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import {
   ScopeHandle, TransportError, declaredHandle, found, httpTransport, requestSession, secretSigner, sessionRequest, signedIntent, signedLogReader, signedReads,
   type Fetch, type ReadSigning, type Signing, type Transport,
 } from "@generalbusiness/artroom-client";
 import { DIRECTORY, MEMBERSHIP, REGISTER, ROLE_LISTS, platform, type Role } from "@generalbusiness/artroom-platform";
 import { SourceError, httpSource, render, verify as replay, type HistorySource } from "@generalbusiness/artroom-replay";
-import type { ClaimStep, Config, PendingClaim, Repository, Store } from "./store.ts";
+import type { ClaimStep, Config, PendingClaim, PendingJoin, Repository, Store } from "./store.ts";
 
 export interface Context {
   store: Store;
@@ -530,25 +530,70 @@ function linkOf(text: string): Link | null {
   }
 }
 
-/** `artroom join <link>`: membership's `join`, signed by a new key kept here. Prints the inbox that membership creates for the member. */
+/** `artroom join <link>` resumes the exact enrollment kept before delivery. */
 export function join(ctx: Context, text: string): Promise<Outcome> {
   return run(async () => {
     const link = linkOf(text) ?? stop(usage("That is not an invitation link from artroom invite."));
+    if (typeof link.service !== "string" || typeof link.handle !== "string" || link.invitation < 1
+      || !isScopeRef(link.repository?.directory) || link.repository.directory.kind !== "directory"
+      || !isScopeRef(link.repository?.membership) || link.repository.membership.kind !== "membership"
+      || !isScopeId(link.repository?.rules) || !isScopeId(link.repository?.destination)) return usage("That invitation link has invalid repository references.");
     const before = await ctx.store.config();
     if (before?.repository) return usage(`This config directory has a repository already: directory ${before.repository.directory.scope}.`);
-    const secret = await keyOf(ctx, "device");
-    const signer = secretSigner(secret);
-    const config: Config = { v: 1, service: link.service, key: "device", repository: link.repository };
-    const M = await handleOf(ctx, config, link.repository.membership.scope, null);
-    // The new key has signed nothing yet, so it reads nothing in membership before the join. Membership is the directory's
-    // `platform:membership@1`, whose `join` names its member by a mark, which has no key in `expected`: no revision is read.
-    const shape = platform(MEMBERSHIP)!.data as unknown as DefinitionShape;
-    const fields = { invitation: link.invitation, secret: link.secret };
-    const signed = await signedIntent(signer, { to: link.repository.membership, kind: "join", fields, expected: expectedOf(shape.acts["join"]!, [], null, fields) }, signing(ctx));
-    const seq = accepted(await M.submit(signed), M.scope, "Joined").receipt.fact.seq;
-    const inbox = (await createdBy(M, seq)).find((m) => m.seed.kind === "inbox")?.scope ?? stop(failed(`Joined, but entry ${M.scope}:${seq} creates no inbox.`));
+    if (before && !before.join) return usage("This config directory is set up already; use another config directory to join.");
+    const linkDigest = textDigest(canonicalize(link));
+    let pending: PendingJoin | undefined = before?.join;
+    const shared = pending && (({ inbox: _inbox, ...repository }) => repository)(pending.repository);
+    if (pending && (pending.link !== linkDigest || before!.service !== link.service || canonicalize(shared) !== canonicalize(link.repository) || pending.handle !== link.handle)) return failed("The invitation link does not match the pending join; nothing was submitted. Retry the original invitation link.");
+    const base: Config = before ? { v: 1, service: before.service, key: before.key } : { v: 1, service: link.service, key: "device" };
+    const signer = secretSigner(pending ? await signerOf(ctx, base) : await keyOf(ctx, base.key));
+    let signed: SignedIntent;
+    const keep = async (next: PendingJoin) => { await ctx.store.save({ ...base, join: next }); pending = next; };
+    if (!pending) {
+      // No pre-join membership reads are authorized. Its pinned definition
+      // names the invitation by a mark, with no revision in expected.
+      const shape = platform(MEMBERSHIP)!.data as unknown as DefinitionShape;
+      const fields = { invitation: link.invitation, secret: link.secret };
+      signed = await signedIntent(signer, { to: link.repository.membership, kind: "join", fields, expected: expectedOf(shape.acts["join"]!, [], null, fields) }, signing(ctx));
+      const request = `join-${b64url(fresh(12)).toLowerCase().replace(/_/g, "a")}`;
+      // The envelope includes the invitation secret. Publish it privately,
+      // then its public pointer, before any mutation can leave this process.
+      await ctx.store.keepPrivate(request, utf8(JSON.stringify(signed)));
+      await keep({ request, intent: intentDigest(signed.intent), link: linkDigest, repository: link.repository, handle: link.handle });
+    } else {
+      const bytes = await ctx.store.private(pending.request);
+      if (!bytes) return failed("The exact private join request is missing; nothing was submitted. Restore its private record before retrying.");
+      try { signed = JSON.parse(new TextDecoder().decode(bytes)) as SignedIntent; }
+      catch { return failed("The private join request cannot be read; nothing was submitted."); }
+    }
+    const at = link.repository.membership;
+    if (!validStep({ signed, ...(pending!.accepted ? { accepted: pending!.accepted } : {}) }, at, signer.key, "join")
+      || intentDigest(signed.intent) !== pending!.intent || signed.intent.fields["invitation"] !== link.invitation || signed.intent.fields["secret"] !== link.secret) return failed("The saved join does not match this invitation, membership and signing key; nothing was submitted.");
+    const config: Config = { ...base, repository: link.repository };
+    const M = await handleOf(ctx, config, at.scope, null);
+    const digest = intentDigest(signed.intent);
+    let fact: FactRef;
+    if (pending!.accepted) {
+      const settled = await M.settle(signed);
+      if (!settled.ok) return failed(`Cannot confirm the saved join: ${settled.reason}. The exact request remains pending; nothing was submitted.`);
+      if (settled.value.intent !== digest || canonicalize(settled.value.fact) !== canonicalize(pending!.accepted)) return failed("The saved accepted fact does not match this exact join; nothing was submitted.");
+      fact = pending!.accepted;
+    } else {
+      const receipt = accepted(await M.submit(signed), M.scope, "Joined").receipt;
+      if (!isFactRef(receipt.fact) || canonicalize(receipt.fact.at) !== canonicalize(at) || receipt.intent !== digest) throw new TransportError("The accepted reply does not match this exact join; its saved request remains pending.");
+      fact = receipt.fact;
+      await keep({ ...pending!, accepted: fact });
+    }
+    const entry = await M.entry(fact.seq);
+    if (!entry.ok) return failed(`Cannot read entry ${M.scope}:${fact.seq}: ${entry.reason}. The join remains pending; retry the original invitation link.`);
+    if (canonicalize(factRefOf(entry.value.entry)) !== canonicalize(fact) || entry.value.hash !== fact.hash
+      || entry.value.entry.input.type !== "act" || canonicalize(entry.value.entry.input.signed) !== canonicalize(signed)) return failed("The admitted entry does not match this exact join; nothing was submitted.");
+    const inbox = entry.value.entry.sends.flatMap((send) => "creator" in send.to && send.to.kind === "inbox" ? [scopeIdOf(send.to as Seed)] : [])[0]
+      ?? stop(failed(`Joined, but entry ${M.scope}:${fact.seq} creates no inbox. The join remains pending.`));
+    if (pending!.repository.inbox && pending!.repository.inbox !== inbox) return failed("The saved inbox does not match this join; nothing was submitted.");
+    await keep({ ...pending!, repository: { ...link.repository, inbox } });
     const I = await handleOf(ctx, config, inbox, null);
-    await waitFor(ctx, () => [M.scope, inbox], () => active(I), "your inbox");
+    await waitFor(ctx, () => [M.scope, inbox], () => active(I), "your inbox", "retry the original artroom join invitation link to continue this enrollment.");
     await ctx.store.save({ ...config, repository: { ...link.repository, inbox }, handle: link.handle });
     return done(`Joined as ${link.handle} on key ${signer.key}.`, `Your inbox: ${inbox}.`);
   });

@@ -304,8 +304,8 @@ children.
 
 ## What runs today, and what does not
 
-**Under the production wiring, a lane can be founded, and it then does
-little.** Both definitions list `git-read@1`, and both use forms that need
+**The production defaults and the deployed class have different ports.**
+Both definitions list `git-read@1`, and both use forms that need
 the code of `hold@1` or `git-read@1`. The derive package holds that code as
 pure functions, and from I3 step 16 the production ports hold it. The
 validator reads those forms, checks them against the tables in the
@@ -323,13 +323,16 @@ read. A delivery from another scope is judged by its handler.
 
 The deployed class, `DeployedScope`, has a real authority: a lane reads
 the membership scope that its genesis records. A lane records one only
-when its creator does. The directory that will create lanes with that
-reference can be created, by a register's founding. Its guard
-`definition-active` reads an observation of the rules scope, which no
-runtime reads before a turn yet, so it creates no lane, and no
-test runs a lane under that authority. A lane that records none reads
-nothing, and an act that needs a grant is answered
-`authority-unavailable`. Nothing is deployed.
+when its creator does. The real directory declares the rules
+observations for `open-issue` and `open-pr`, and the runtime reads them
+before the turn. Once the real rules scope activates a digest, that
+directory creates lanes under it with the membership reference. W1 to W5
+and the demo story run those lanes with real membership authority on
+`room.ts`. A lane that records none reads nothing, and an act that needs a
+grant is answered `authority-unavailable`. The fixtures use stand-in Git
+hosts and a scripted changed set; they establish no deployed lane journey
+or native host hold. W5 signs a required checker answer in the test; no
+runner, command or image runs.
 
 The rule of the contract's section 6.1 is of the whole scope, and not only
 of the rows that use a
@@ -350,7 +353,7 @@ type:
 | The production wiring founds a scope under a definition that needs a capability record, and that scope admits no act and no step and sends nothing; a runtime that lacks the code founds none | `packages/scope/test/founding.test.ts` | Real: the object as deployed |
 | What a definition does once a capability has answered | The same test, with `scriptedCapability` of `@generalbusiness/artroom-scope/testing` | A stand-in |
 | What the two pinned definitions do on real scopes: eleven scenarios, T1 to T9 and T34 | `packages/lanes/test/*.scope.test.ts`, on the one fixture `test/support/graph.ts` | Real scopes, storage, turn and dispatchers, founded and created by the two pinned digests. T3, T4 and T5b run on the capability's code, as the production ports hold it. Stand-ins, each named in the test: the test authority, a Git host (`Host`), the scripted capability where a scenario still uses it, scripted peers for the rules scope and the destination, and a made-up directory |
-| What a change lane does with the real rules scope and the real destination: W1 to W5, and plan 019's story on the demo profile | `packages/lanes/test/wiring.scope.test.ts` and `story.scope.test.ts`, on `test/support/room.ts` | Real platform scopes under the deployed class and the production authority; lanes created by the real directory under activated digests, on the capability's code; grants read from the real membership scope. Stand-ins: a Git host for the destination and for each lane; the changed set of a publication is scripted |
+| What a change lane does with the real rules scope and the real destination: W1 to W5, and plan 019's story on the demo profile | `packages/lanes/test/wiring.scope.test.ts` and `story.scope.test.ts`, on `test/support/room.ts` | Real platform scopes under the deployed class and the production authority; lanes created by the real directory under activated digests, on the capability's code; grants read from the real membership scope. Stand-ins: a Git host for the destination and for each lane; the changed set of a publication is scripted. W5 signs the checker's answer in the test; no runner runs. These fixtures show no real host, tree or deployment |
 
 The eleven scenarios found and create scopes under both definitions. A
 scenario chooses the capability code of its namespace. `onCode`, of the
@@ -419,13 +422,13 @@ Worker entry do not import it.
 
 | Waits | On |
 |---|---|
-| The capability rows above: the records, guards and effects of `hold@1`, and `git-read@1` | The authority and publication delivery |
-| The handlers `rules` and `publication` of `change`: their senders are a rules scope and a destination, under the names `platform:rules` and `platform:destination`, which the lane forms assume | The authority design, for the platform definitions, then the same delivery |
+| Native host execution of the capability rows above | The authority and publication delivery. The production code runs in the labelled fixtures; no production adapter reaches a real host for lane hold or Git-read operations. |
+| Deployed lane rules and publication journeys | The authority and publication delivery. W1 to W5 already run the real rules scope, destination and lane handlers under real membership authority, with the host and changed set limits stated above. |
 | The export handlers: their sender is a task scope, under the assumed name `platform:task` | The authority design and the hosted agents delivery |
-| An index row that reaches a directory, and a notice that reaches an inbox | The authority and publication delivery |
-| Grants: who may act under `issue.promise`, `change.merge` and the other actions | The same |
+| Deployed lane indexing and notices | The authority and publication delivery. The room fixture already runs lane index sends to the real directory; it establishes no live journey. |
+| Live evidence of lane grants under `issue.promise`, `change.merge` and the other actions | The same. The room fixture already reads these grants from real membership. |
 | Capacity in items, records, bytes and pending requests | The proof plan and a later delivery. Today the count is of entries only. |
-| Browser pages, the command line and tools for agents | The application delivery |
+| Browser pages and tools for agents; a complete application journey | The application delivery. The command line is source in `packages/cli`; its fixture boundaries are in [cli.md](cli.md). |
 
 No row was changed to make it pass. A row that an owner still has to
 decide is in the data as the lane forms state it.

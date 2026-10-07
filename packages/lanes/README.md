@@ -77,8 +77,11 @@ asserts the list, and that the code has each form. So a scope can be
 founded or created under either digest. With only the production defaults
 it admits no act and no step, because that authority reads no grant. The
 deployed class reads a lane's grants from the membership scope that the
-lane records, and no test runs a lane there yet
-([docs/lanes.md](../../docs/lanes.md)). A runtime
+lane records. W1 to W5 and the demo story run lanes created by the real
+directory under that authority, on `room.ts`
+([docs/lanes.md](../../docs/lanes.md)). Their Git host and changed set are
+stand-ins; W5 signs the checker's answer in the test and runs no runner.
+These fixtures establish no deployed journey or native host hold. A runtime
 that lacks the code answers `unsupported-definition`. The scenarios T3, T4
 and T5b run on the code itself, with a stand-in for the Git host. The
 others use a scripted capability, which is a stand-in.

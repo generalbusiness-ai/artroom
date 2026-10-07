@@ -101,3 +101,22 @@ test("install keeps its operator key owner-only under the config directory, refu
   expect([launched.status, launched.stdout, launched.stderr]).toEqual([2, "", expect.stringMatching(/^Usage:\n  artroom install /)]);
   expect(launched.stdout + launched.stderr).not.toContain(b64url(secret));
 });
+
+// Invariant: pending secret-bearing request bytes survive a new fileStore,
+// owner-only and immutable, without relaxing the signing key format.
+test("private pending envelopes persist owner-only separately from public config and signing keys", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "artroom-private-"));
+  try {
+    const store = fileStore(dir);
+    const bytes = new TextEncoder().encode(JSON.stringify({ secret: "an invitation secret", signed: "complete envelope" }));
+    await store.keepPrivate("join-pending", bytes);
+    await store.save({ v: 1, service: "https://service.test", key: "device" });
+    const reopened = fileStore(dir);
+    expect(await reopened.private("join-pending")).toEqual(bytes);
+    expect([statSync(join(dir, "private")).mode & 0o777, statSync(join(dir, "private", "join-pending.data")).mode & 0o777]).toEqual([0o700, 0o600]);
+    expect(readFileSync(join(dir, "config.json"), "utf8")).not.toContain("invitation secret");
+    expect(await reopened.secret("join-pending")).toBeNull();
+    await expect(reopened.keepPrivate("join-pending", new Uint8Array([1]))).rejects.toThrow(/exists already; it is not replaced/);
+    expect(await reopened.private("join-pending")).toEqual(bytes);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});

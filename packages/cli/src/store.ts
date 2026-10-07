@@ -39,6 +39,16 @@ export interface PendingClaim {
   firstKey?: ClaimStep;
 }
 
+/** A join keeps its secret-bearing envelope in private storage, never config. */
+export interface PendingJoin {
+  request: string;
+  intent: Digest;
+  link: Digest;
+  repository: Repository;
+  handle: string;
+  accepted?: FactRef;
+}
+
 export interface Config {
   v: 1;
   /** The scope service's base URL. */
@@ -52,6 +62,8 @@ export interface Config {
   claim?: PendingClaim;
   /** The caller's handle in membership, once it has one. */
   handle?: string;
+  /** Exact pending enrollment; retry the same invitation link to continue. */
+  join?: PendingJoin;
 }
 
 export interface Store {
@@ -61,13 +73,23 @@ export interface Store {
   secret(name: string): Promise<Uint8Array | null>;
   /** Keep a new secret under the name. A name that holds one already is refused: a key is never replaced. */
   keep(name: string, secret: Uint8Array): Promise<void>;
+  /** Owner-only opaque bytes, distinct from signing keys and public config. */
+  private(name: string): Promise<Uint8Array | null>;
+  /** Publish complete private bytes without replacing an existing record. */
+  keepPrivate(name: string, bytes: Uint8Array): Promise<void>;
 }
 
 /** A store in memory, for a test: each instance is one person's config directory. */
 export function memoryStore(): Store {
   let config: Config | null = null;
   const secrets = new Map<string, Uint8Array>();
+  const privateBytes = new Map<string, Uint8Array>();
   return {
+    private: async (name) => privateBytes.get(name)?.slice() ?? null,
+    keepPrivate: async (name, bytes) => {
+      if (privateBytes.has(name)) throw new Error(`a private record named ${name} exists already; it is not replaced`);
+      privateBytes.set(name, bytes.slice());
+    },
     config: async () => (config === null ? null : structuredClone(config)),
     save: async (next) => { config = structuredClone(next); },
     secret: async (name) => secrets.get(name) ?? null,

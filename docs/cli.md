@@ -104,7 +104,14 @@ Link for @una only (it holds the invitation's secret): artroom-invite:eyJ2Ijox..
 ```
 
 **`artroom join <link>`** is membership's `join`, signed by a new key
-that the command makes and keeps. It waits for the member's inbox.
+that the command makes and keeps. Before sending, it saves the exact signed
+request in an owner-only `private/<name>.data` file; the invitation secret
+is absent from public config. It saves the accepted fact and inbox progress
+before waiting for the member's inbox. After a lost reply or an interrupted
+wait, run `artroom join` with the original link again. This reuses the same
+key, request and deadline. An accepted request is confirmed by a read-only
+settlement, even after its deadline. A missing private request or a different
+link stops the retry; it never signs a replacement automatically.
 
 ```
 Joined as @una on key key_H1bY2Hml....
