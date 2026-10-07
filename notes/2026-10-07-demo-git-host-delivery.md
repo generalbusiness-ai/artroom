@@ -154,3 +154,44 @@ meaning of own entries still need precision. The handler is not yet built.
 Gate2 request `14db4e69` and Gate3 request `490fc42c` stay open and preserve
 their required filing and landing order after Gate1. Their cloud test
 figures are not local builder verification.
+
+## Local preparation and checkpoint gate
+
+`scripts/demo-git-host.mjs` supplies local `prepare` and `plan` phases.
+Run it with Node 26 and pinned `tsx@4.21.0` from `/tmp`; no tool package is
+installed in this checkout. It creates three signing keys in an exclusive
+owner-only directory and file, and prints public signed install data and
+the exact register seed. The explicit deadline must fit the server's
+existing 900-second intent lifetime. Changing it changes the register pin;
+the helper overwrites no key or plan and extends no deadline automatically.
+Its CLI performs no network request. Bootstrap, directory, source
+publication and deployed verification are not supplied by those phases.
+
+Two direct Node tests passed through that pinned runtime, independently
+checking the Ed25519 signature and actual filesystem permissions, exclusive
+creation, public output and immutable plan. Permission and deadline controls
+distinguish their faults. Evidence:
+`/tmp/artroom-demo-git-host-prepare-225.log`, including the initial native
+Node TypeScript import failure and the successful scratch runtime. These
+two tests are separate from the Vitest gate. No actual user key directory
+or live network phase has been created or run.
+
+The complete checkpoint gate passed once at clean head
+`a69c90c98d52efe6a9a4b6611bb1ff84547f1dc2`, tree
+`5c531a12fd88709b9980b0c33f08a01687f77d04`: all workspace typechecks,
+747 tests and 6 active-source checks. Log:
+`/tmp/artroom-demo-git-host-gate-a69c90c98.log`; raw phase logs:
+`/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.Z6SuAvqXvg`.
+
+| Phase | Elapsed seconds | CPU seconds |
+|---|---:|---:|
+| Install | 1.9 | 2.2 |
+| Whitespace | 0.0 | 0.0 |
+| Typecheck | 3.5 | 9.6 |
+| Tests | 12.3 | 34.4 |
+
+These are printed phase figures, not a whole-command timing. Machine:
+the shared Mac, Node 26.10.0 and Git 2.54.0. Focused runs warmed caches;
+load was not sampled. A note-only successor preserves the gated source
+and tests. This gate verifies the local checkpoint; it closes no deployed
+journey, final review or landing requirement.
