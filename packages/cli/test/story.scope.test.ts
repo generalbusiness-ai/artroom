@@ -111,7 +111,7 @@ describe("the artroom command on real scopes. The Git host and the scheduler are
     // membership records after it.
     const seq = Number(/:(\d+),/.exec(added.lines[0]!)![1]);
     const sealed = (await M.sealed())[seq]!;
-    expect(added.lines).toEqual([`Took effect: entry ${M.name}:${seq}, hash ${sealed.hash.slice(0, 12)}....`]);
+    expect(added.lines).toEqual([`Took effect: entry ${M.name}:${seq}, hash ${sealed.hash.slice(0, 19)}.`]);
     expect((await M.item(seq)).values).toMatchObject({ handle: "@check", kind: "checker" });
 
     // act, refused: una opens an issue under a definition that the real rules scope has never activated. The scope refuses it by

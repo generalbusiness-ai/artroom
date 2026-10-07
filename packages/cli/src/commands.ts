@@ -216,7 +216,7 @@ function valueOf(config: Config, field: { type?: string } | undefined, text: str
 /** The answer to an act, in one or two lines. A refusal names its reason and, when the failed guard has one, its name. */
 function answered(scope: ScopeId, answer: Answer, took: string): Outcome {
   switch (answer.answer) {
-    case "accepted": return done(`${took}: entry ${scope}:${answer.receipt.fact.seq}, hash ${short(answer.receipt.fact.hash)}.`);
+    case "accepted": return done(`${took}: entry ${scope}:${answer.receipt.fact.seq}, hash ${answer.receipt.fact.hash.slice(0, 19)}.`);
     case "refused": return failed(`Refused: ${answer.reason}${"name" in answer && answer.name ? ` (${answer.name})` : ""}, judged at entry ${scope}:${answer.judgedAt.seq}. Nothing was written.`);
     case "unavailable": return failed(`Unavailable: ${answer.reason}. Send the same command again later.`);
     case "mismatch": return failed(`Mismatch: ${answer.reason}.`);
