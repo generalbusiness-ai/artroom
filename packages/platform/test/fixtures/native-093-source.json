@@ -1,0 +1,17 @@
+{
+  "source": "0938010b54e27d436ea1feb92dce6e843ac7bf54",
+  "catalogBefore": "b5ec1b6620c76c55e5ebb44a06139f81f6c15cd9abf46605383b68bc4085aab4",
+  "modules": {
+    "destination-objects.ts": "00e0de1d0f7c57120e8952b11ac4e345ef40c2a95a27fe2c4ceae645c6bee561",
+    "destination-reading.ts": "64c58c427e89c7eacc8f6bb5bfc036836d8a9e98ddaacf0c04d6dc7644f80c31",
+    "destination.ts": "e5b184d17c18542951ac120e9d816548eebfb4c498eefae3a88e72fc62bb72e7",
+    "directory.ts": "49882b278ce9276c544fa02fdd700f945a8ce49a402b4cfdfc2986f109bb3545",
+    "extents.ts": "0c212a4b785ef2608ef07b25cc4c28cea17ac571addbafa9f1e02da638923561",
+    "inbox.ts": "0a10a6dff57ead87465a828b86bbe65aba97d0ada7bb0c83b39814e0ec78da94",
+    "membership.ts": "5a3881adef3668d0a4f1d75d7d07ff016b9197e1d47607bea4f3a904261acb88",
+    "register.ts": "c8582035483d8085e7748df538d7099909c47678c339904738ef7ecfa73dc457",
+    "reservation.ts": "1a7da7a82ff6719dfff5444e9d2d899176d21d8076e80482fe05fe0514d2b0cb",
+    "rules-scope.ts": "f66d867e24c38eedad69a7d3e56d0943cb92207c0f58e96f0a0d4a4c3e781ada",
+    "rules.ts": "8719764a6e634aaeb95d6feb51291caf0f6da2f4ebb54fb03130230923d4350d"
+  }
+}
