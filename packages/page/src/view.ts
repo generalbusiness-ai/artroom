@@ -152,17 +152,25 @@ export function rulesScreen(room: Room, rules: RulesView): HTMLElement {
 
 // ---------------------------------------------------------------- acts
 
+/** Actual nonaccepted category; no claim that a timed drain wrote nothing. */
+export function nonacceptedAnswerText(answer: Exclude<Answer, { answer: "accepted" }>): string {
+  switch (answer.answer) {
+    case "refused": return `Refused: ${answer.reason}${"name" in answer && answer.name ? ` (${answer.name})` : ""}. The request was refused.`;
+    case "unavailable": return `Unavailable: ${answer.reason}. Outcome unknown; no acceptance is confirmed.`;
+    case "mismatch": return `Mismatch: ${answer.reason}. The idempotency key names another recorded intent.`;
+  }
+}
+
 /** Known submit result and separate observation phase. No head is invented. */
 export function answerText(acted: Acted): string[] {
   const a = acted.answer;
   let known: string;
   switch (a.answer) {
     case "accepted": known = `Accepted ${acted.kind}: ${a.receipt.fact.at.scope}:${a.receipt.fact.seq}, hash ${a.receipt.fact.hash}, incarnation ${a.receipt.fact.at.inc}.`; break;
-    case "refused": known = `Refused: ${a.reason}${"name" in a && a.name ? ` (${a.name})` : ""}. Nothing was written by this request.`; break;
-    case "unavailable": known = `Unavailable: ${a.reason}.`; break;
-    case "mismatch": known = `Mismatch: ${a.reason}.`; break;
+    case "refused": case "unavailable": case "mismatch": known = nonacceptedAnswerText(a); break;
   }
-  return [known, ...(acted.observation === null ? [] : [`Observation unknown: ${acted.observation} Inspect artroom log ${acted.scope}${a.answer === "accepted" ? ` and artroom show ${a.receipt.fact.at.scope}:${a.receipt.fact.seq}` : ""} before submitting another act; do not resubmit to recover observation.`])];
+  const recovery = a.answer === "unavailable" || a.answer === "mismatch" ? [`Inspect artroom log ${acted.scope} and the original request before another act. Recovery requires the same signed envelope; this page does not retain it.`] : [];
+  return [known, ...recovery, ...(acted.observation === null ? [] : [`Observation unknown: ${acted.observation} Inspect artroom log ${acted.scope}${a.answer === "accepted" ? ` and artroom show ${a.receipt.fact.at.scope}:${a.receipt.fact.seq}` : ""} before submitting another act; do not resubmit to recover observation.`])];
 }
 export function answerLine(acted: Acted): HTMLElement {
   return h("div", { class: "answer", role: "status" }, h("p", {}, `Known answer for ${acted.kind} on ${acted.scope}${acted.on === null ? "" : `, item ${acted.on}`}.`), answerText(acted).map((line) => h("p", {}, line)));

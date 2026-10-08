@@ -106,7 +106,7 @@ async function resumed(): Promise<void> {
   expect([(await founds()).length, sent["found"]!.length]).toEqual([0, 1]);
   await rita.store.save(beforeLegacy);
   unavailableFound = true;
-  expect(await run("claim", "demo")).toEqual({ code: 1, lines: ["Unavailable: unavailable. Nothing was written."] });
+  expect(await run("claim", "demo")).toEqual({ code: 1, lines: [`Unavailable: unavailable. Outcome unknown; no acceptance is confirmed. Inspect artroom log ${R.name} before another mutation. Recovery requires the same original signed envelope; repeating a generic command signs a new request.`] });
   expect((await rita.store.config())!.claim!.found!.signed).toEqual(savedFound);
   expect((await founds()).length).toBe(0);
   net.clock.now = timeOf(timeMs(net.clock.now)! + 30_000);

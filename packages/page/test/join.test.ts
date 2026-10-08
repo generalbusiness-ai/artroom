@@ -1,6 +1,7 @@
+import { answerText, nonacceptedAnswerText } from "../src/view.ts";
 import { expect, test } from "vitest";
 import type { SignedIntent } from "@generalbusiness/artroom-contract";
-import { b64url, intentDigest, newIncarnation, textDigest, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
+import { b64url, intentDigest, keyIdOfSecret, newIncarnation, textDigest, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import type { Fetch } from "@generalbusiness/artroom-client";
 import { joinRoom, placeOf, type Session } from "../src/index.ts";
 
@@ -52,6 +53,16 @@ test("page join refuses mismatched encoding before submission and accepts script
     expect([joined.answer.answer, joined.place]).toEqual(["accepted", { directory: repository.directory.scope, membership: repository.membership }]);
   }
   expect(submissions).toHaveLength(2);
+  for (const answer of [{ answer: "unavailable", reason: "busy" }, { answer: "mismatch", reason: "idempotency-mismatch" }, { answer: "refused", reason: "unauthorized", judgedAt: { seq: 0, hash: textDigest("scripted refused head") } }] as const) {
+    expect(nonacceptedAnswerText(answer)).toMatch(new RegExp(`^${answer.answer === "unavailable" ? "Unavailable" : answer.answer === "mismatch" ? "Mismatch" : "Refused"}:`));
+    expect(nonacceptedAnswerText(answer)).not.toContain("Nothing was written");
+    const result = answerText({ service: session.service, directory: repository.directory.scope, membership: repository.membership, key: keyIdOfSecret(session.secret), answer, scope: repository.membership.scope, kind: "join", on: null, before: { seq: 0, hash: textDigest("scripted before head") }, after: null, observation: null });
+    if (answer.answer !== "refused") {
+      expect(result.join(" ")).toContain("before another act");
+      expect(result.join(" ")).toContain("same signed envelope; this page does not retain it");
+    }
+  }
+
 });
 
 // SCRIPTED read/submit replies and a minimal DOM stand-in at the actual failure

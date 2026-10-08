@@ -254,3 +254,50 @@ This note was written after the gate run; it changes no source or test.
 - Plain English, no em-dashes, no product names but GitHub in the
   documents; "takes effect". [code]
 - Commits are small and each was pushed.
+
+
+## F3: actual answer categories and exact-envelope recovery guidance
+
+This correction continues expanded request
+`86206b5595fa55a7d84821a74e200aabc0fa837e` from
+`68be1ffeb3d64094232ec7f8e4373629f8527c07`. Complete reviewer
+`376aa53064b8adae9b330d5d655f5fb019b6b168` and planner decision
+`158be2c4800db1753af32e60674591ff17464cde` were read as builder.
+
+CLI generic answers and its accepted-only helper now keep refused, unavailable
+and mismatch distinct, including founding replies without judgedAt. Unavailable
+means the outcome is unknown and this reply confirms no acceptance. It directs
+inspection before another mutation and recovery only with the original signed
+envelope; repeating a generic command creates another request. Refused text
+reports refusal, rather than promising the turn wrote no entries. Native timed
+drain can write entries before an unavailable reply, and replay can stop before
+returning a previously accepted receipt. No new-act-applied-then-unavailable
+or duplicate-mutation trace is claimed by these client tests.
+
+Page join uses the same actual nonaccepted-category formatter as its act view.
+Unknown/retry state guidance and docs/page.md's introduction no longer promise
+nothing was written or recommend sending a newly signed Page act. Generic Page
+submission retains no original signed envelope; the text says so. The known
+accepted receipt/result and answerLine's status role remain unchanged. The
+Acted comment distinguishes before/after observations from category alone.
+Saved install/claim/private-join recovery and the accepted edit/linking result
+boundary remain unchanged; no generic persistence or retry machinery is added.
+F5 owns service-setting regions; these changes touch only main's view import
+and join answer block, docs' introduction and data's Acted comment. Root owns
+one combined Page asset rebuild after source composition.
+
+Focused Node category/state/join checks pass. The altered real-scope claim,
+story and issue display expectations also pass with their receipt and no-head-
+movement assertions intact: the affected five-file run passed nine tests in
+5.18 seconds. CLI and Page source/Node/scope-test types pass. Logs are in
+`/tmp/artroom-answer-guidance-evidence/`: `focused.log` retains the initial
+Page duplicate-import failure (the other three files passed); `join-final.log`
+and `join-typed-final.log` retain two-test passes, `affected-final.log` records
+the five-file pass, `cli-types.log` and `page-types-pass.log` record successful
+types. Initial Page digest/Acted fixture typing diagnostics remain separately;
+they were corrected without product policy changes. These tests use scripted
+answer metadata where labelled; they do not establish timed-turn, provider,
+browser or historical admission proof. Exact hashes and preservation metadata
+are retained in the evidence directory. No gate, broad suite, cloud, new task
+or promise, asset regeneration or root-candidate edit occurred. Root owns the
+final integrated gate and review.

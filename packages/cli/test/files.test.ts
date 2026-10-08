@@ -17,7 +17,7 @@ test("install keeps its operator key owner-only under the config directory, refu
   // A service that refuses every founding: what it answers is not the point here, only what the command keeps and prints.
   const fetch: Fetch = async () => new Response(JSON.stringify({ answer: "refused", reason: "unauthorized" }), { status: 403 }) as never;
   const outcome = await command({ store, fetch }, ["install", "https://service.test"]);
-  expect(outcome).toEqual({ code: 1, lines: ["Refused: unauthorized. Nothing was written."] });
+  expect(outcome).toEqual({ code: 1, lines: ["Refused: unauthorized. The request was refused."] });
 
   const path = join(dir, "keys", "operator.key");
   expect([statSync(dir).mode & 0o777, statSync(join(dir, "keys")).mode & 0o777, statSync(path).mode & 0o777]).toEqual([0o700, 0o700, 0o600]);
