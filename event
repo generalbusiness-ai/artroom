@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:3469aebabced0cbe328b995a076c1671d7918da4","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-08-expanded-i5-evidence.json."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:3709035dea7eda825f1175ef229cbf1cc34fc970","text":"Merge retired a covered predecessor; the successor is at packages/lanes/test/definitions.test.ts."}
