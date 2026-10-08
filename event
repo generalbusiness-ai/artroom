@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:dfc8827c5c5eed05651ef2ff9ae4418deb69f138","text":"Merge retired a covered predecessor; the successor is at packages/lanes/definitions/change.json."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:e2b281e17809ce1cd9e337d95f789a2de2b81389","text":"Merge retired a covered predecessor; the successor is at packages/scope/package.json."}
