@@ -371,3 +371,47 @@ recorded bodies remain local. This verifies the recording boundary, not a
 new Chromium invocation, live deployment or immutable version preview.
 The exact current view/status/link bodies were inspected for the selector
 correction. No browser or provider rehearsal occurred.
+
+The other five corrections are now composed. F1 restores actual main1eed's
+definition-byte places on directory opening and rules activation. Its six
+canonical @1 declarations match that baseline; five @2 declarations are
+unchanged. The existing native witness shows missing bytes refused, the same
+activation accepted with bytes, and exact retention. Its 41 focused tests
+and affected types pass; removing the place distinguishes the failure.
+This establishes current supported behavior, not historical admission.
+
+F2 shares bounded GitHub REST/account decoding and the exact numeric-ID
+validator between provider and Site acquisition. Missing, replacement or
+unavailable identity fails before exposing a source, with existing public
+and private read credentials. Its focused 24 tests, final adapter witness
+and affected types pass; an ID-bypass control exposes the replacement.
+No atomic post-lookup fence or live-provider proof is claimed.
+
+F3 keeps client categories distinct and replaces broad no-write/fresh-retry
+claims with known-result, inspection and original-envelope guidance. The
+accepted edit/linking boundary and saved recovery code remain unchanged.
+F4 validates Site existence, servability and size before 304; its 13 tests
+and types pass, and the old early return fails the missing-path assertion.
+F5 refuses unsupported service origins before persisting settings or I/O,
+including older saved settings; its handler witness and types pass, and
+the omitted-check control fails. The original cross-origin duty stays owed.
+Initial fixture/import/type errors and corrected outputs remain in each
+existing delivery note; branch counts overlap and are not summed as a gate.
+
+Composition needed one adjacent Page import conflict, resolved by retaining
+both the service guard and category formatter. The combined Settings/join/
+state checks pass: three files, seven tests. The Page bundle was rebuilt once
+after all six source corrections; its asset parity check passes. The CLI and
+scope guides also now match the current answer/replay and @1 contracts,
+including historical-source limits. No old PNG or browser evidence is added.
+
+Evidence remains in `/tmp/artroom-f1-evidence`,
+`/tmp/artroom-site-repository-identity-evidence.json`,
+`/tmp/artroom-answer-guidance-evidence`, the Site F4 and Page service-setting
+logs named by their delivery notes, and
+`/tmp/artroom-expanded-answer-settings-composed.log`,
+`/tmp/artroom-expanded-six-repairs-build.log` and
+`/tmp/artroom-expanded-six-repairs-assets.log`. The final ordinary gate at
+the composed source head and successor independent Source review are next.
+Earlier gate outcomes and unresolved native/timeout risks remain historical;
+none of these corrections claims their cause or closure of held duties.

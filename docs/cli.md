@@ -4,8 +4,11 @@
 thin function over two things: a scope service's base URL and a signing
 key. The command builds and signs intents and reads the service's routes.
 It judges nothing: whether an act takes effect is the scope's decision,
-and the command prints the scope's answer. A refusal writes nothing, and
-the command exits 1 with the refusal's reason.
+and the command prints the scope's actual answer category. A refusal exits
+1 with its reason. An unavailable answer confirms no acceptance; timed
+entries may already have been written. Inspect the history before another
+mutation. Recovery needs the original signed envelope; repeating a generic
+command signs a new request.
 
 The source is `packages/cli`. In this repository it runs as
 `packages/cli/bin/artroom.js` under Node 22.0.0 or later, using the CLI's
@@ -171,7 +174,7 @@ scope's summary; the scope checks it again.
 
 ```
 Took effect: entry sc_p6xp2lmd...:8, hash sha256:2cd70f9ada97.
-Refused: guard-failed (not-activated), judged at entry sc_hs5f27fz...:4. Nothing was written.
+Refused: guard-failed (not-activated), judged at entry sc_hs5f27fz...:4. The request was refused.
 ```
 
 `--value <file>`, given once or more, sends each file's text beside the
@@ -359,7 +362,7 @@ short; the numbers and hashes in them are illustrative.
 ```
 Proposed guide/start.md (53 bytes) as change sc_q3xk..., version 6.
 Linked: when it is published, the change sc_q3xk... closes issue #1 (sc_4bbo...).
-Refused: unauthorized, judged at entry sc_q3xk...:7. Nothing was written.
+Refused: unauthorized, judged at entry sc_q3xk...:7. The request was refused.
 The change sc_q3xk... waits, at version 6. When it may be merged, run: artroom merge sc_q3xk...
 ```
 
@@ -398,7 +401,7 @@ close an issue. A member who did not open it is refused:
 
 ```
 Commented: entry sc_4bbosp5k...:1, hash sha256:3b1f0c2d9e8a.
-Refused: unauthorized, judged at entry sc_yx6ty22i...:1. Nothing was written.
+Refused: unauthorized, judged at entry sc_yx6ty22i...:1. The request was refused.
 ```
 
 **`artroom issues`** lists every issue, oldest first: its number, its
