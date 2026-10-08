@@ -13,7 +13,7 @@
  *
  * | Command | What it does |
  * |---|---|
- * | `install` | Founds the register by an `install` intent, signed by a new operator key that is also the one founder key. |
+ * | `install` | Founds the register by an `install` intent, signed by a new operator key that is also the one founder key. With `--plan`, it signs the intent and prints the register ID it will found, and founds nothing; `--planned` founds that plan. |
  * | `claim` | Signs the register's `found` act, then waits until the directory, membership, rules scope and destination are created and confirmed. Then it takes the founder's seat and first key in membership. A claim it gave up waiting on is kept as pending, and the next `claim` goes on from it; `--again` signs a new one. |
  * | `invite`, `join` | Membership's `invite-member` and `join`. The link carries the invitation's number and secret; the joining key is made and kept locally. |
  * | `acts` | The acts of a scope's definition, with the ones the caller's role holds. |
@@ -26,7 +26,7 @@
  * | `merge` | Signs `merge` of a change's current version, and waits until the room has published it or refused it. |
  */
 
-import type { Answer, DeclaredDefinition, Digest, Entry, FieldValue, Founded, Item, KeyId, OperationId, PlatformDefinition, ScopeId, Seed, Summary } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS, type Answer, type DeclaredDefinition, type Digest, type Entry, type FieldValue, type Founded, type Item, type KeyId, type OperationId, type PlatformDefinition, type ScopeId, type Seed, type SignedIntent, type Summary } from "@generalbusiness/artroom-contract";
 import { b64url, definitionDigest, digestBytes, intentDigest, keyIdOfSecret, parseStrict, scopeIdOf, textDigest, timeOf, unb64url, utf8 } from "@generalbusiness/artroom-bytes";
 import {
   ScopeHandle, TransportError, declaredHandle, found, httpTransport, requestSession, secretSigner, sessionRequest, signedIntent, signedLogReader, signedReads,
@@ -289,14 +289,71 @@ export function install(ctx: Context, service: string, options: { host?: string;
   return run(async () => {
     const before = await ctx.store.config();
     if (before?.register) return usage(`This config directory has a register already: ${before.register.scope}.`);
-    const secret = await keyOf(ctx, "operator");
-    const signer = secretSigner(secret);
-    const fields = { host: options.host ?? "github.com", namespace: options.namespace ?? "artroom", policy: "keys", founders: [signer.key] };
-    const signed = await signedIntent(signer, { to: null, kind: "install", fields }, signing(ctx));
+    const { signed, key } = await installing(ctx, options, signing(ctx));
     const { answer } = await found(transportOf(ctx, service), signed, REGISTER);
     const receipt = accepted(answer, null, "Installed").receipt;
     await ctx.store.save({ v: 1, service, key: "operator", register: receipt.fact.at });
-    return done(`Installed: register ${receipt.fact.at.scope}, under ${REGISTER}.`, `The operator key ${signer.key} is kept in the config directory, readable only by you. It is the one founder key.`);
+    return done(`Installed: register ${receipt.fact.at.scope}, under ${REGISTER}.`, `The operator key ${key} is kept in the config directory, readable only by you. It is the one founder key.`);
+  });
+}
+
+/** The signed `install` intent, by the operator key, which is made and kept when it does not exist yet. */
+async function installing(ctx: Context, options: { host?: string; namespace?: string }, at: Signing): Promise<{ signed: SignedIntent; key: KeyId }> {
+  const signer = secretSigner(await keyOf(ctx, "operator"));
+  const fields = { host: options.host ?? "github.com", namespace: options.namespace ?? "artroom", policy: "keys", founders: [signer.key] };
+  return { signed: await signedIntent(signer, { to: null, kind: "install", fields }, at), key: signer.key };
+}
+
+/**
+ * The ID of the register that a founding by this intent, under this version, makes: a scope's ID is a function of its seed, and
+ * a register's seed of the founding intent and the version alone (the scope's `found`).
+ */
+const registerIdOf = (founding: SignedIntent, definition: PlatformDefinition): ScopeId =>
+  scopeIdOf({ v: 1, kind: "register", definition, creator: null, cause: intentDigest(founding.intent), ordinal: 0 });
+
+/**
+ * `artroom install --plan <base-url>`: sign the `install` intent and print the ID of the register that it will found, and found
+ * nothing. The intent lives as long as an intent may, so it can be founded until its `notAfter`, the time printed. The plan is
+ * kept in the config, so that the operator can pin that ID in the Worker's host setting before the register exists, and then
+ * run `install --planned`. A later plan replaces it.
+ */
+export function planInstall(ctx: Context, service: string, options: { host?: string; namespace?: string } = {}): Promise<Outcome> {
+  return run(async () => {
+    const before = await ctx.store.config();
+    if (before?.register) return usage(`This config directory has a register already: ${before.register.scope}.`);
+    const { signed } = await installing(ctx, options, { ...signing(ctx), lifetimeSeconds: PROPOSED_BOUNDS.intentLifetimeSeconds - 60 });
+    const register = registerIdOf(signed, REGISTER);
+    await ctx.store.save({ v: 1, service, key: "operator", plan: { service, definition: REGISTER, founding: signed, register } });
+    const { host, namespace } = signed.intent.fields as { host: string; namespace: string };
+    return done(
+      `Planned: register ${register}, under ${REGISTER}, on host ${host}, namespace ${namespace}. The seed's time is ${signed.intent.notAfter}.`,
+      `Set registerScope to ${register} in the Worker's host setting, then run artroom install --planned before ${signed.intent.notAfter}.`,
+    );
+  });
+}
+
+/**
+ * `artroom install --planned`: found the register that `install --plan` planned, with the intent it kept. Before anything is
+ * sent, the plan is checked: the register ID that its intent and version make must be the one it printed, and the version must be
+ * the one this command founds under. A plan that fails is refused, and nothing is sent or written. After the founding, the
+ * receipt's register must be the planned one.
+ */
+export function installPlanned(ctx: Context): Promise<Outcome> {
+  return run(async () => {
+    const before = await ctx.store.config();
+    if (before?.register) return usage(`This config directory has a register already: ${before.register.scope}.`);
+    const plan = before?.plan ?? stop(usage("No install is planned here. Run: artroom install --plan <base-url>."));
+    if (plan.definition !== REGISTER || registerIdOf(plan.founding, plan.definition) !== plan.register) {
+      return failed(`Refused: plan-mismatch. The planned register ${plan.register} is not the one that this command would found${plan.definition !== REGISTER ? `, under ${REGISTER} and not ${plan.definition}` : ""}. Nothing was sent. Plan again, and set the new register ID.`);
+    }
+    if ((ctx.now?.() ?? Date.now()) >= Date.parse(plan.founding.intent.notAfter)) {
+      return failed(`Refused: plan-expired. The planned install could be founded until ${plan.founding.intent.notAfter}. Nothing was sent. Plan again, and set the new register ID.`);
+    }
+    const { answer } = await found(transportOf(ctx, plan.service), plan.founding, plan.definition);
+    const receipt = accepted(answer, null, "Installed").receipt;
+    if (receipt.fact.at.scope !== plan.register) return failed(`The register founded is ${receipt.fact.at.scope}, not the planned ${plan.register}. The plan is kept; report this.`);
+    await ctx.store.save({ v: 1, service: plan.service, key: before!.key, register: receipt.fact.at });
+    return done(`Installed: register ${receipt.fact.at.scope}, under ${REGISTER}, as planned.`, `The operator key ${plan.founding.intent.actor} is kept in the config directory, readable only by you. It is the one founder key.`);
   });
 }
 
