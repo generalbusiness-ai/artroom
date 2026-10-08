@@ -1,0 +1,414 @@
+{
+  "status": "source-pair carry confirmation only; no new execution or admission proof",
+  "request": "91bd9bf008a8ab0b875cf62fd7c313510023e249",
+  "editRequest": "50b608c8ab49bc06f21045620226ad535db87fdf",
+  "pageCheckpoint": "2f52eb9b763db3db6091ec0a1df710b845cd3c95",
+  "exactPhaseSource": "6d29bae7f0f88c5f552197a19d1869c1a2d9c3bd",
+  "carriedCommit": "c7cb1f31e7181c5dae3e96e24a83ad53a1197177",
+  "carriedTree": "0ad056e27612440a28209c2a96df23811ad147b4",
+  "changedPaths": [
+    "notes/2026-10-08-i5-edit-phase-outcome-repair.md",
+    "packages/cli/src/commands.ts",
+    "packages/lanes/test/edit.scope.test.ts"
+  ],
+  "commandsPairs": {
+    "pageBefore": {
+      "head": "2f52eb9b763db3db6091ec0a1df710b845cd3c95",
+      "bytes": 94586,
+      "sha256": "2b0ea2721849e5747dbb3911a747db569d18bc82902c6cd007dd73e86d479447",
+      "gitBlob": "20a134dd628b33f8710ba2c9b203e29eb6e6bb89"
+    },
+    "editSource": {
+      "head": "6d29bae7f0f88c5f552197a19d1869c1a2d9c3bd",
+      "bytes": 94560,
+      "sha256": "ccb2f12f524c9a2b3b84491f025c25d4985f635df1925200979605c6576ee0d8",
+      "gitBlob": "d0b9d6b8f531a1bae0cba1940c9a7ac9fbe97701"
+    },
+    "composedAfter": {
+      "head": "c7cb1f31e7181c5dae3e96e24a83ad53a1197177",
+      "bytes": 95668,
+      "sha256": "0564bd566c80be78054e7bfa356ac14bf202f83688ada8ca8ce05d44187d4783",
+      "gitBlob": "24b02d1063394a1d23b48cd9c7eb0e6106273c04"
+    }
+  },
+  "pageExportsPreserved": {
+    "confirmation": "Removing only the same page export declarations, Standing type, Pick parameter type and heldActs addition reproduces the entire exact edit-source commands.ts byte-for-byte. No old CLI function body was substituted.",
+    "reconstructedSha256": "ccb2f12f524c9a2b3b84491f025c25d4985f635df1925200979605c6576ee0d8",
+    "matchesEditSource": true,
+    "unchangedCurrentCommandPrefix": {
+      "boundary": "ActShape through the point before edit, including all page exports/heldActs plus current install/claim/private join/clone bodies",
+      "bytes": 75936,
+      "sha256": "20ebb7acaa8ce157183d4cdb4e8b447be0ed66cf98113db1d6ab0b2324538acb",
+      "identicalToPageCheckpoint": true
+    }
+  },
+  "unchangedPageFiles": [
+    {
+      "path": "packages/page/package.json",
+      "record": {
+        "head": "2f52eb9b763db3db6091ec0a1df710b845cd3c95",
+        "bytes": 1282,
+        "sha256": "bb77544a45638b7e1274faa8834cf5978f8f9a3b9503562961468a50f97cd83c",
+        "gitBlob": "598c39eb85ab442e1bdf8c5bfdb4251a31d909e6"
+      },
+      "identicalAfterCarry": true
+    },
+    {
+      "path": "packages/page/scripts/assets.mjs",
+      "record": {
+        "head": "2f52eb9b763db3db6091ec0a1df710b845cd3c95",
+        "bytes": 2327,
+        "sha256": "19812bd2dddf18169acad942d0e7cfa28559fdcce44d8ba75f930e1b2db02944",
+        "gitBlob": "c87e6129461590f1579ff62d156d6faa1b2b6281"
+      },
+      "identicalAfterCarry": true
+    },
+    {
+      "path": "packages/page/src/data.ts",
+      "record": {
+        "head": "2f52eb9b763db3db6091ec0a1df710b845cd3c95",
+        "bytes": 38198,
+        "sha256": "a99610a6e7d067e702ce53921c0b0f9df18133e106ced6672cfcc6380f35d44c",
+        "gitBlob": "e65d2205f563f436cf8701922c96b6c0dc3e0f63"
+      },
+      "identicalAfterCarry": true
+    },
+    {
+      "path": "packages/page/src/index.html",
+      "record": {
+        "head": "2f52eb9b763db3db6091ec0a1df710b845cd3c95",
+        "bytes": 2682,
+        "sha256": "c309fef6f9005b6c208ded8f691ebf3a0872fa69e15abac28459bcf93458f254",
+        "gitBlob": "e7716f64e834290d55730456c5364fc8455f0204"
+      },
+      "identicalAfterCarry": true
+    },
+    {
+      "path": "packages/page/src/index.ts",
+      "record": {
+        "head": "2f52eb9b763db3db6091ec0a1df710b845cd3c95",
+        "bytes": 175,
+        "sha256": "52a584b7f0e90047e91dd8fb23f1ec7c1378050528ebe9ce222a4601efdd8e20",
+        "gitBlob": "be3a169965ef799aabcc9ec93b56e9c3a747d8d1"
+      },
+      "identicalAfterCarry": true
+    },
+    {
+      "path": "packages/page/src/main.ts",
+      "record": {
+        "head": "2f52eb9b763db3db6091ec0a1df710b845cd3c95",
+        "bytes": 9427,
+        "sha256": "e32e5ed9bf5097ec0de42984270b428632b5d5adb6751dfb689f34e7adc8617d",
+        "gitBlob": "5f113b7a728cdabdc469d7af3ce664f423cd1224"
+      },
+      "identicalAfterCarry": true
+    },
+    {
+      "path": "packages/page/src/states.ts",
+      "record": {
+        "head": "2f52eb9b763db3db6091ec0a1df710b845cd3c95",
+        "bytes": 5068,
+        "sha256": "c5473178bf7672462920e1d6f05d135d18cdf5b62196d38e2fe3e8d5f9a84236",
+        "gitBlob": "b5bbd6247a17c8a39343a1ffb487e9db29ca0be6"
+      },
+      "identicalAfterCarry": true
+    },
+    {
+      "path": "packages/page/src/view.ts",
+      "record": {
+        "head": "2f52eb9b763db3db6091ec0a1df710b845cd3c95",
+        "bytes": 15788,
+        "sha256": "a75fac2f9d3be525bcb309815ae5c455233c4437cadfa1a8e906e0b89d9293cb",
+        "gitBlob": "d038bff579ca981760d548bb09619c5738f8a6e9"
+      },
+      "identicalAfterCarry": true
+    },
+    {
+      "path": "packages/page/test/assets.test.ts",
+      "record": {
+        "head": "2f52eb9b763db3db6091ec0a1df710b845cd3c95",
+        "bytes": 779,
+        "sha256": "4951e6cf1807ccff03e9273c07affbf7d1a5efbfedcd80751b1287bc8114f271",
+        "gitBlob": "8e5f159c7ef1462686f472d44981c4644c91a8e5"
+      },
+      "identicalAfterCarry": true
+    },
+    {
+      "path": "packages/page/test/join.test.ts",
+      "record": {
+        "head": "2f52eb9b763db3db6091ec0a1df710b845cd3c95",
+        "bytes": 3799,
+        "sha256": "08e593a455d1e9d64e38f7837f7a81ad8dfd1586818dc8e118d035e2f3ae8189",
+        "gitBlob": "5f3c8f52e83f1f4ef06d7239dfa538b2ee886299"
+      },
+      "identicalAfterCarry": true
+    },
+    {
+      "path": "packages/page/test/record.scope.test.ts",
+      "record": {
+        "head": "2f52eb9b763db3db6091ec0a1df710b845cd3c95",
+        "bytes": 5993,
+        "sha256": "dc9ccb7e6c6519315c6e01cb220771df7ec077e34b883457b26c0047dd02bcac",
+        "gitBlob": "9bfcaafb11f1684ff5ae873cd0a2e207aa585060"
+      },
+      "identicalAfterCarry": true
+    },
+    {
+      "path": "packages/page/test/screens.mjs",
+      "record": {
+        "head": "2f52eb9b763db3db6091ec0a1df710b845cd3c95",
+        "bytes": 8100,
+        "sha256": "f826d61a857dcac6631e111906e3e4152d8ff076b537b1bf6a9c14a8017cccc5",
+        "gitBlob": "1807a7166ad313672024edd3e3e9763c2ce64b90"
+      },
+      "identicalAfterCarry": true
+    },
+    {
+      "path": "packages/page/test/screenshots/README.md",
+      "record": {
+        "head": "2f52eb9b763db3db6091ec0a1df710b845cd3c95",
+        "bytes": 1620,
+        "sha256": "8cb5ccbbea08c122b2303fa5aaee1b45f4971afc8d3d180a59d296aa4deee011",
+        "gitBlob": "cd12950e73b9edb5aeb42a26c052e4427858549b"
+      },
+      "identicalAfterCarry": true
+    },
+    {
+      "path": "packages/page/test/screenshots/change-published.png",
+      "record": {
+        "head": "2f52eb9b763db3db6091ec0a1df710b845cd3c95",
+        "bytes": 108420,
+        "sha256": "74fe51bc7c7e45f0fb823ff76e08aad460da5781271192a576a66f5e84034a42",
+        "gitBlob": "f177b60af9e50ad51d68e3ff22f4017c0ca29bd4"
+      },
+      "identicalAfterCarry": true
+    },
+    {
+      "path": "packages/page/test/screenshots/change-refused.png",
+      "record": {
+        "head": "2f52eb9b763db3db6091ec0a1df710b845cd3c95",
+        "bytes": 278956,
+        "sha256": "62a5acf8cc99e0b6998954082690bebd4a2ffab3d79307b624885533b759f053",
+        "gitBlob": "b0541c7298b1628d77e11bb95138ce26c8095660"
+      },
+      "identicalAfterCarry": true
+    },
+    {
+      "path": "packages/page/test/screenshots/issue.png",
+      "record": {
+        "head": "2f52eb9b763db3db6091ec0a1df710b845cd3c95",
+        "bytes": 108903,
+        "sha256": "4e918243618a5edb245e465c3850593483335bf48971636cf984ffdd84d98d03",
+        "gitBlob": "736c05a7db6ef56e9b235c04e156f784fbc64784"
+      },
+      "identicalAfterCarry": true
+    },
+    {
+      "path": "packages/page/test/screenshots/rules.png",
+      "record": {
+        "head": "2f52eb9b763db3db6091ec0a1df710b845cd3c95",
+        "bytes": 115513,
+        "sha256": "2093f1bf6d2df3a86aed89258345a1a55bf73f58995979786e76a0c1daef1603",
+        "gitBlob": "db69458db2513445529cdcd55f551de9123e4a48"
+      },
+      "identicalAfterCarry": true
+    },
+    {
+      "path": "packages/page/test/screenshots/site-readme.png",
+      "record": {
+        "head": "2f52eb9b763db3db6091ec0a1df710b845cd3c95",
+        "bytes": 18550,
+        "sha256": "e3e6176f40b2007e29a075690612f1111ff3fa224b5865158bf31e62807ce602",
+        "gitBlob": "2ebc7bfde020179f27edc6ac1fcf660c3d885d2d"
+      },
+      "identicalAfterCarry": true
+    },
+    {
+      "path": "packages/page/test/settings.mjs",
+      "record": {
+        "head": "2f52eb9b763db3db6091ec0a1df710b845cd3c95",
+        "bytes": 6393,
+        "sha256": "d1f391fb7e55d4c031403c66dedd33cd3b0c6c5b15e4b7adc29d776ec6c688f5",
+        "gitBlob": "f4b566489bf6e586ec4a4dc8755959f0a3de2d40"
+      },
+      "identicalAfterCarry": true
+    },
+    {
+      "path": "packages/page/test/states.test.ts",
+      "record": {
+        "head": "2f52eb9b763db3db6091ec0a1df710b845cd3c95",
+        "bytes": 4800,
+        "sha256": "346a6b31dac13bc044ec7bc736771b2903e19125e2b25df47cbdc005249fb2e1",
+        "gitBlob": "465339b998fe36a7297d761776448668af88cf26"
+      },
+      "identicalAfterCarry": true
+    },
+    {
+      "path": "packages/page/test/story.scope.test.ts",
+      "record": {
+        "head": "2f52eb9b763db3db6091ec0a1df710b845cd3c95",
+        "bytes": 12926,
+        "sha256": "7841eb21ac0074524e5bad4a78b1df3db0a4c680eea3327d8e183e21adad60ab",
+        "gitBlob": "986f69b6ec2a1c64ee1cf3682b72d5b3509bd454"
+      },
+      "identicalAfterCarry": true
+    },
+    {
+      "path": "packages/page/test/support/demo.ts",
+      "record": {
+        "head": "2f52eb9b763db3db6091ec0a1df710b845cd3c95",
+        "bytes": 7842,
+        "sha256": "4ee1816bb569151befb1ee986318fadb04ed05e5a6a53066d1261028f9f763bf",
+        "gitBlob": "e55696a16c6114715533de676efa49cef2f8c5d4"
+      },
+      "identicalAfterCarry": true
+    },
+    {
+      "path": "packages/page/test/version-view.mjs",
+      "record": {
+        "head": "2f52eb9b763db3db6091ec0a1df710b845cd3c95",
+        "bytes": 4697,
+        "sha256": "72ffde2eb49d33ee18a6bf961204426635cbf3bf3eab00f16f7db9d40036b95b",
+        "gitBlob": "d8aedf4b948f23af6ffeffdb7c2f56c66665464a"
+      },
+      "identicalAfterCarry": true
+    },
+    {
+      "path": "packages/page/tsconfig.json",
+      "record": {
+        "head": "2f52eb9b763db3db6091ec0a1df710b845cd3c95",
+        "bytes": 293,
+        "sha256": "225bfb1f9591ad947e41251a07d901c4a1802cf015e43664c9ce86bed43832c1",
+        "gitBlob": "f45a3af7366a3eb9761952f9bf2610a61daa2e49"
+      },
+      "identicalAfterCarry": true
+    },
+    {
+      "path": "packages/page/tsconfig.scope.json",
+      "record": {
+        "head": "2f52eb9b763db3db6091ec0a1df710b845cd3c95",
+        "bytes": 498,
+        "sha256": "a24d96696241a0ae8efc266ab767b0aa6ed5d45cb0b6ec3f5ac9ea80ebc046f9",
+        "gitBlob": "99151f968a113a5ffc643a509a42c3348811c7de"
+      },
+      "identicalAfterCarry": true
+    },
+    {
+      "path": "packages/page/tsconfig.test.json",
+      "record": {
+        "head": "2f52eb9b763db3db6091ec0a1df710b845cd3c95",
+        "bytes": 187,
+        "sha256": "25e7c8ebac89f553ab629214510d7b6c4f0ae80f971eb089217d3b5eea2ff4ba",
+        "gitBlob": "113768b64a3040d3eb76432dcdde8bcee572121f"
+      },
+      "identicalAfterCarry": true
+    },
+    {
+      "path": "packages/page/vitest.config.ts",
+      "record": {
+        "head": "2f52eb9b763db3db6091ec0a1df710b845cd3c95",
+        "bytes": 404,
+        "sha256": "adca97464c9336d532bed3a5d3bbc2c8d710fcd10f161b0f727fd7aabcbf63d5",
+        "gitBlob": "d151321ff39d7e13476623120af65ff793018534"
+      },
+      "identicalAfterCarry": true
+    },
+    {
+      "path": "docs/page.md",
+      "record": {
+        "head": "2f52eb9b763db3db6091ec0a1df710b845cd3c95",
+        "bytes": 11484,
+        "sha256": "922ca4418131a268babb050a47a3d894fa7baeee41e6670ff2c54f3bc41aa1e2",
+        "gitBlob": "7c952f25d16361c357d753216c5a87b696cbce97"
+      },
+      "identicalAfterCarry": true
+    },
+    {
+      "path": "packages/scope/src/page.ts",
+      "record": {
+        "head": "2f52eb9b763db3db6091ec0a1df710b845cd3c95",
+        "bytes": 2980,
+        "sha256": "144d0476f0b8aae92d43310fdc03b3cc807d324990f13087fdb882ed3d34c3eb",
+        "gitBlob": "0ce32645a547d3324177c426580c6615f3846422"
+      },
+      "identicalAfterCarry": true
+    },
+    {
+      "path": "packages/scope/src/page-assets.ts",
+      "record": {
+        "head": "2f52eb9b763db3db6091ec0a1df710b845cd3c95",
+        "bytes": 403960,
+        "sha256": "601883e9c694b795e82260f579fd1a024dc10a4d00453365d0bd9c2a5ed346a1",
+        "gitBlob": "65664415558a3e29d8828a40d9fbc41b1fac858f"
+      },
+      "identicalAfterCarry": true
+    },
+    {
+      "path": "packages/scope/src/worker.ts",
+      "record": {
+        "head": "2f52eb9b763db3db6091ec0a1df710b845cd3c95",
+        "bytes": 28356,
+        "sha256": "7dba2cc3fc38daa5d3742dd30ae60c89c883516fc1590ad91fd23f5ad26aa3d3",
+        "gitBlob": "81d296704927e358fff4ea9d7b175dc15938c9c1"
+      },
+      "identicalAfterCarry": true
+    },
+    {
+      "path": "packages/scope/test/page-route.test.ts",
+      "record": {
+        "head": "2f52eb9b763db3db6091ec0a1df710b845cd3c95",
+        "bytes": 2337,
+        "sha256": "94158b5facde416a35473d8d6be9ef1c1d79b2155831365006c82b4bb5492805",
+        "gitBlob": "cf39c23e4e4e959f6c8ca89997d1ac7911b98bb9"
+      },
+      "identicalAfterCarry": true
+    },
+    {
+      "path": "package-lock.json",
+      "record": {
+        "head": "2f52eb9b763db3db6091ec0a1df710b845cd3c95",
+        "bytes": 127437,
+        "sha256": "cd8420a6fb6836e8bd1c0a2a6397286ab8c7a1699b74250bde27d8fb562ba52b",
+        "gitBlob": "bcce10023c719885b929965532dc7527875afa5d"
+      },
+      "identicalAfterCarry": true
+    },
+    {
+      "path": "vitest.config.ts",
+      "record": {
+        "head": "2f52eb9b763db3db6091ec0a1df710b845cd3c95",
+        "bytes": 2485,
+        "sha256": "81984bb70569da834cb16ba0441b453a8543053a5ff3f3b9ffbb0c41ace80701",
+        "gitBlob": "ab4eb30eece673a0e270ae7c17953168c8613a38"
+      },
+      "identicalAfterCarry": true
+    },
+    {
+      "path": "notes/2026-10-08-i5-story-selective-assembly.md",
+      "record": {
+        "head": "2f52eb9b763db3db6091ec0a1df710b845cd3c95",
+        "bytes": 7743,
+        "sha256": "9da8ae3b0dd9488f146f48543f60a1a656d79dfb0160c4437966a979ea1bb9cc",
+        "gitBlob": "0558b927835675df57d12e61c428a59c066cfaad"
+      },
+      "identicalAfterCarry": true
+    },
+    {
+      "path": "notes/2026-10-08-i5-story-selective-assembly-ledger.json",
+      "record": {
+        "head": "2f52eb9b763db3db6091ec0a1df710b845cd3c95",
+        "bytes": 27287,
+        "sha256": "abb3b3d1a79bec70dddf2b5d38dbef9cb704ada6ea7136bcb8e9fa7401f94a89",
+        "gitBlob": "467cd336ff40ed2f1e4edd61cc11e1c5c6012121"
+      },
+      "identicalAfterCarry": true
+    }
+  ],
+  "evidenceLimits": [
+    "Original page note and ledger bytes/hashes are preserved, not rewritten as final-head execution evidence.",
+    "Guard, Place, main/view, assets, compact witness, full story/support/recorder, screenshots, runtime route, lock/config are byte-identical to page checkpoint.",
+    "No tests, build, asset regeneration, gate, browser, provider or deployment was run for this carry.",
+    "Edit phase tests/types/control are separately reported by the source worker note and its exact retained log paths; they were not executed here.",
+    "Full page story/scope-test types remain site-owner composition obligations; durable page enrollment, real preview/screenshots and final integrated source/build/gate/admission remain pending."
+  ]
+}
