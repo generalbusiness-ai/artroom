@@ -44,7 +44,7 @@ What it needs:
 
   | Field | Value |
   |---|---|
-  | `registerScope` | The register's scope ID, from `artroom install`. |
+  | `registerScope` | The register's scope ID, from `artroom install --plan` before the install (see [deploy.md](deploy.md)), or from `artroom install` after it. |
   | `namespace` | `artroom-demo`, the binding's namespace. |
   | `host` | The service's hostname, as it appears in its remote URLs. |
   | `maxBytes` | The most bytes one Git transfer may hold, at least 32. |

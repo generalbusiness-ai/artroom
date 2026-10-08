@@ -42,6 +42,35 @@ Installed: register sc_hinqqbm4....
 The operator key key_baqzbaDy... is kept in the config directory, readable only by you. It is the one founder key.
 ```
 
+**`artroom install --plan <base-url> [--host <git-host>] [--namespace <name>]`**
+signs the same `install` intent and founds nothing. A register's ID is a
+function of its seed, and the seed of the intent and the register's
+version alone, so the command prints the ID that the install will found,
+and the seed's time: the intent's `notAfter`, 14 minutes ahead, until
+which it can be founded. It keeps the signed intent, the version and the
+ID in the config. An intent and its signature are no secret; the
+register's genesis records both. A later plan replaces it.
+
+```
+Planned: register sc_4kq2v7..., under platform:register@2, on host artifacts, namespace artroom-demo. The seed's time is 2026-10-08T09:14:00Z.
+Set registerScope to sc_4kq2v7... in the Worker's host setting, then run artroom install --planned before 2026-10-08T09:14:00Z.
+```
+
+**`artroom install --planned`** founds the planned register, with the kept
+intent and no other argument. Before anything is sent it checks the plan:
+a plan whose ID is not the one its intent and version make, or whose
+version is not the one this command founds under, is refused as
+`plan-mismatch`; a plan whose time is over is refused as `plan-expired`.
+Either refusal sends nothing and writes nothing; plan again, and set the
+new ID. After the founding, the receipt's register must be the planned
+one.
+
+```
+Installed: register sc_4kq2v7..., under platform:register@2, as planned.
+```
+
+[deploy.md](deploy.md) says why and when to plan first.
+
 **`artroom claim <name> [--handle @you] [--branch main] [--again]`**
 signs the register's `found` act. It then waits until the directory,
 membership, the rules scope and the destination are created and

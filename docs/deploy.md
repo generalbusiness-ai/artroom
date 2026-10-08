@@ -41,22 +41,53 @@ or in the command line's config.
 
 ## The order
 
-1. **Deploy** the Worker with `DEPLOYMENT` and `SESSION_SECRET`, and with
-   no `GITHUB_APP_CONFIG`.
-2. **Install.** Run `artroom install <base-url> --host github.com
+The host setting pins the register's scope ID, so the setting must name
+the register before its first claim. A register's ID is a function of its
+install's signed intent, so the command line computes it before the
+register exists. Plan first, then set the setting, then install:
+
+1. **Deploy** the Worker with `DEPLOYMENT` and `SESSION_SECRET`.
+2. **Plan.** Run `artroom install --plan <base-url> --host github.com
    --namespace <login>`, where `<login>` is the account's `login`. It
-   prints `Installed: register sc_...`. A register whose host or
-   namespace differs from the configuration sends nothing.
+   founds nothing. It prints `Planned: register sc_...` and the seed's
+   time, and keeps the plan in the config. The plan can be founded until
+   that time, 14 minutes after the plan.
 3. **Set `GITHUB_APP_CONFIG`**, with `registerScope` set to that register
-   ID, and the GitHub secrets. `registerScope` can only be known after
-   the install, and it must be set before the claim.
-4. **Restart** the Worker, by deploying it again. A scope object reads its
-   settings when it starts. After a restart, a register with a recorded
-   creation that was not sent sends it at the first request it gets.
-5. **Claim.** Run `artroom claim <name> --handle @you`. If it gives up
-   waiting, run the same command again: it goes on from the pending claim
-   and signs nothing new. `--again` signs a second claim, which creates a
-   second repository.
+   ID, and the GitHub secrets. A register whose host or namespace differs
+   from the setting sends nothing.
+4. **Install.** Run `artroom install --planned`. It checks that the plan
+   still makes that ID, founds the register, and prints
+   `Installed: register sc_..., ..., as planned.` A plan whose time is
+   over is refused as `plan-expired`, and nothing is sent: plan again and
+   set the new ID.
+5. **Claim.** Run `artroom claim <name> --handle @you`. The register
+   sends its creation at once. If the claim still gives up waiting, run
+   the same command again: it goes on from the pending claim and signs
+   nothing new. `--again` signs a second claim, which creates a second
+   repository.
+
+The same order holds for the hosting's own Git service, with `--host
+artifacts`, `--namespace artroom-demo` and `ARTIFACTS_CONFIG`
+([hosts.md](hosts.md)).
+
+### The earlier order, and its wait
+
+`artroom install <base-url> --host ... --namespace ...` with no plan
+still works: it founds at once and prints the register ID, and the
+setting is set after it. Then the register's object may have started
+before the setting took effect. A claim's creation is then recorded and
+not sent until the object sees the setting. Observed on 2026-10-07, that
+took about two minutes each time, so the claim gave up waiting and had to
+be run again.
+
+Two things now shorten that wait. The Worker reads its host settings at
+each call of its outside port, not once per object. And at each request,
+an object that holds an attempt it could not send because its port
+refused that kind sends it as soon as the port accepts it, once, with no
+restart. A Worker whose setting changed is still a new version, and an
+object running the earlier version may keep the earlier setting until it
+restarts; a request that reaches it after the restart sends what it
+recorded. Planning first avoids the wait.
 
 ## The creation credential
 
