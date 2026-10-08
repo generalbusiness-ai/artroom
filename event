@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:a53736bc3747ce440bc4709e7b083cac66a05519","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-07-i5-clone-delivery.md."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:a7c17d3f8a05a026e1eef5fb5344c0b2600e9c28","text":"Merge retired a covered predecessor; the successor is at packages/platform/src/destination-objects.ts."}
