@@ -1236,13 +1236,14 @@ async function merging(ctx: Context, config: Config, lane: ScopeId, reader: stri
   const seq = answer.receipt.fact.seq;
   let next = seq + 1;
   const ended = await waitFor(ctx, () => [lane, repository.destination], async () => {
-    for (;;) {
-      const read = await L.entry(next);
-      if (!read.ok) return read.reason === "not-found" ? null : stop(failed(`Cannot read entry ${lane}:${next}: ${read.reason}.`));
-      next++;
-      const state = stateOf(read.value.entry.effects, seq);
-      if (state === "published" || state === "refused" || state === "aborted") return { state, effects: read.value.entry.effects };
-    }
+    const read = await L.entry(next);
+    if (!read.ok) return read.reason === "not-found" ? null : stop(failed(`Cannot read entry ${lane}:${next}: ${read.reason}.`));
+    next++;
+    const state = stateOf(read.value.entry.effects, seq);
+    if (state === "published" || state === "refused" || state === "aborted") return { state, effects: read.value.entry.effects };
+    // An unrelated entry still consumes this pass. Retain next and yield to
+    // the existing tries/pause policy instead of scanning without a bound.
+    return null;
   }, `the room's answer to merge ${lane}:${seq}`, `run artroom merge ${lane} again only after artroom log ${lane} shows the merge ${seq} ended.`);
   const reason = valueOf_(ended.effects, seq, "reason");
   if (ended.state !== "published") return failed(`Not published: the merge ${lane}:${seq} is ${ended.state}${typeof reason === "string" ? `, ${reason}` : ""}. The change ${lane} stays open at version ${version.id}. ${again}`);

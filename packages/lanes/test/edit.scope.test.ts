@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
 import { describe, expect, test } from "vitest";
 import type { DeclaredDefinition, Item, Read, ScopeId } from "@generalbusiness/artroom-contract";
-import { b64url, canonicalize, definitionDigest, scopeIdOf, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
+import { b64url, canonicalize, definitionDigest, entryHash, scopeIdOf, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
 import type { Fetch } from "@generalbusiness/artroom-client";
 import { firstExtents, platform } from "@generalbusiness/artroom-platform";
 import { foundingObjects } from "../../platform/src/future-2/destination-objects.ts";
@@ -228,4 +228,48 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
   expect(host.pushes.filter((p) => p.ref === "refs/heads/main").map((p) => p.commit)).toEqual([first, head1, head2, head3]);
   const items = await (G.stub as unknown as { items(reader: unknown, type: string): Promise<Read<readonly Item[]>> }).items(reader, "publication");
   expect(items.ok && items.value.map((item) => [item.state, item.values["reason"] ?? null])).toEqual([["published", null], ["published", null], ["not-reserved", "rules-not-met:rules"], ["published", null], ["not-reserved", "path-invalid"]]);
+
+  if (at.host === "artifacts") {
+    // Scripted HTTP read boundary only: after one real accepted merge, three
+    // unrelated entries precede its terminal entry. That terminal is just
+    // beyond the configured existing tries budget; no infinite stream or
+    // timeout is needed to distinguish the former unbounded inner scan.
+    const badLane = /as change (sc_\S+),/.exec(outside.lines[0]!)![1]!;
+    const template = (await new Platform(badLane as ScopeId).entries()).find((entry) => entry.effects.length === 0)!;
+    expect(template).toBeDefined();
+    const tries = 3;
+    const reads: number[] = [];
+    let mergeSeq: number | null = null;
+    let submits = 0;
+    let pauses = 0;
+    const streamFetch = (async (url: string, init?: RequestInit) => {
+      const path = new URL(url).pathname;
+      const prefix = `/v1/scopes/${badLane}/entries/`;
+      if (mergeSeq !== null && path.startsWith(prefix)) {
+        const seq = Number(path.slice(prefix.length));
+        reads.push(seq);
+        const entry = { ...template, seq, effects: reads.length <= tries ? [] : [
+          { effect: "state" as const, item: mergeSeq, state: "published" },
+          { effect: "value" as const, item: mergeSeq, slot: "commit", value: head3 },
+        ] };
+        const hash = entryHash(entry);
+        return new Response(JSON.stringify({ ok: true, at: { seq, hash }, value: { entry, hash }, complete: true }), { headers: { "content-type": "application/json" } });
+      }
+      const response = await routed(url, init);
+      if (path === `/v1/scopes/${badLane}/acts` && init?.method === "POST") {
+        const asked = JSON.parse(String(init.body)) as { signed?: { intent?: { kind?: string } } };
+        if (asked.signed?.intent?.kind === "merge") {
+          submits++;
+          const answer = await response.clone().json() as { answer: string; receipt?: { fact: { seq: number } } };
+          if (answer.answer === "accepted") mergeSeq = answer.receipt!.fact.seq;
+        }
+      }
+      return response;
+    }) as unknown as Fetch;
+    const exhausted = await command({ ...rita, fetch: streamFetch, tries, pause: async (waiting) => { pauses++; await pause(waiting); } }, ["merge", badLane]);
+    expect([exhausted.code, exhausted.lines[0], reads, pauses, submits]).toEqual([
+      1, `Gave up waiting for the room's answer to merge ${badLane}:${mergeSeq} after ${tries} reads. What was asked may still take effect; run artroom merge ${badLane} again only after artroom log ${badLane} shows the merge ${mergeSeq} ended.`,
+      Array.from({ length: tries }, (_, n) => mergeSeq! + n + 1), tries, 1,
+    ]);
+  }
 }

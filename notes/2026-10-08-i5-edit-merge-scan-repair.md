@@ -1,0 +1,11 @@
+# Bounded merge observation repair
+
+Preparation successor to `d5a58b418bf12a381072187725e6d2ec2614ecc7`, under edit request `50b608c8ab49bc06f21045620226ad535db87fdf` and planner finding `1ca449b4473634e468a8ee9d71ff779ddf60428d` (read in full).
+
+The merge callback now reads one entry per existing waitFor pass. A nonterminal entry advances the retained next position, then yields to the existing pause/tries policy. A not-found entry leaves the position for a later pass. Terminal state still belongs to the original accepted merge item, and no polling pass submits another merge. Exhaustion retains the original merge/lane identity in the existing conservative guidance. No new default, quota, timeout or read engine was introduced.
+
+The existing own-host scenario now includes one finite scripted HTTP read boundary after one real accepted merge: three nonterminal entries, followed by that target merge's terminal entry just beyond a configured tries3 budget. The test expects exactly three reads/pauses, one merge submission and honest exhaustion guidance. Returned entry bodies are scripted from a real lane entry; this shows the client's read-budget behavior, not an authoritative publication/history or an infinite producer.
+
+Both unchanged full edit scenarios and the strengthened boundary pass in the same separately labelled diagnostic site composition: `/tmp/artroom-edit-merge-scan-tests.log` (2 passed). Scope/CLI dependency types pass in `/tmp/artroom-edit-merge-scan-types.log`. Restoring the exact predecessor's inner for(;;) makes the control read four entries, pause zero times and report synthetic publication instead of bounded exhaustion; the assertion fails and the submission count remains one. `/tmp/artroom-edit-merge-scan-control.log` records the single own-host control; corrected source is restored.
+
+The original site404 evidence, diagnostic-only exact directory@2 acceptance and site authority/birth-proof limits remain those of `2026-10-08-i5-edit-selective-assembly.md`. No site source entered this branch. Native/platform/proposed-row and current claim/join/clone/install source are unchanged from d5. Owner adoption, full source review, ordered integration and integrated gate remain owed. No live provider, browser, deployment, main landing, gate or request closure occurred.
