@@ -368,3 +368,10 @@ the failure, and sessions.ts was restored exactly. `preservation.json` records
 exact candidate comparisons and hashes. No package install, cloud, gate,
 deployment or main change occurred; the consolidated candidate's final review
 and gate remain Root's work.
+
+Combined candidate qualification: the main-preservation merge retains strict
+full-incarnation session matching. Before a local observation, rules and the
+destination resolve the confirmed full membership reference from their actual
+recorded birth directory after local authentication, clock and read checks.
+The preceding ID-only source/control description is evidence of donor315,
+not the merged authorization policy. The final integrated witness remains owed.

@@ -245,3 +245,72 @@ The two failures **[run]**:
 - A refusal writes nothing and is printed as the answer **[run]**.
 - Plain English; no product named in documents but GitHub and "the
   hosting's own Git service"; nothing deployed.
+
+## 7. T39 setup settlement carried into the315 candidate
+
+2026-10-08, T4 under planner decisions
+`45c611cca0e991e35b6cbe577f22927dc3ac7390` and
+`c878b983530dd68d5266589a6754b1fc4dae7a80`, both read in full. This isolated
+worktree starts at exact `3157859665e5531a3f94b124ccec00d2994c01ad`; it does
+not change the shared expanded landing. Earlier causal repair
+`332428fc937eb8c022f0704cf88e39e443b12d36` (retained in issues head3873f4)
+was read against315. The settlement call was missing here.
+
+T39's founder `seat` creates an inbox. Its applied creation result is a
+membership entry, even with no item effects. Taking the no-write baseline
+before that duty finishes permits an unrelated result to move the head when
+the route later drives dispatch. The minimal repair imports `settle` and calls
+`settle(scope, await scope.created(seat))` before the baseline and refused
+joins. Every original response, exact-head and invitation-state assertion is
+unchanged. No production limit, count allowance, timeout or sleep changed.
+
+The natural focused issues+limits run passed all three tests in two files
+(4.16 seconds Vitest duration). It did not reproduce an intermittent failure.
+One controlled run held only the real inbox creation transport during setup,
+released it and advanced the existing scripted clock by two seconds so the
+original unanswered attempt was due. The unchanged repaired baseline passed.
+Removing only its early setup settlement failed the original head assertion,
+entry4 to5; the forged joins still refused `bad-intent`, the next join was
+`rate-limited`, and the invitation remained `invited`. The helper reported
+DISTINGUISHES and restored the source. A temporary later dispatcher settlement
+made the owed delivery ordering deterministic. All holds, diagnostic clock
+changes, dispatch hooks and logging were removed from the committed test.
+
+The control captured actual extra entry5, time `2099-01-01T00:00:02Z`, hash
+`sha256:26bfcc04f4a7d3890812f25ed7ca580ad53e90e8bb3552a1560d44cdffca4e1a`.
+Its input was a delivery/result, outcome and clause `applied`, with zero item
+effects. Exact source: inbox
+`sc_i2jxdthak7kvku56he7kn5phtnyvc2efkt36jdvfwdubixu4c4ja`, incarnation
+`in_mj6w7aehnpbjdqeaswwxxyptzu`, entry0 hash
+`sha256:8cd384699e92d2f34077f563a43d636c40d4ee134d9c95e86059e2c076630630`.
+Membership duty2.0 recorded applied result at5, with `diagnosis:null`; its
+confirmation duty5.0 was acknowledged. These are fresh controlled fixture
+facts, not recovered cloud/full-gate failure records. They establish the
+causal fixture defect; they do not identify every pool abort/context problem
+or claim that a particular unrecorded intermittent failure had this source.
+
+Commands selected only the existing witnesses:
+
+```sh
+./node_modules/.bin/vitest run --project scope packages/lanes/test/issues.scope.test.ts packages/scope/test/limits.test.ts
+python3 /tmp/artroom-315-t39-evidence/run-control.py
+npm run typecheck --workspace @generalbusiness/artroom-scope
+```
+
+The control script retains its exact temporary preparation and helper argv;
+it restores the minimal test in a finally block. Scope source/test typechecks
+passed after restoration. Original redirected outputs:
+
+| Output | SHA-256 |
+|---|---|
+| `/tmp/artroom-315-t39-evidence/natural-pair.log` | `e9c24d8cbd93e861e82317d945c4fdf656d923430a11ef30bfe24682e88fe157` |
+| `/tmp/artroom-315-t39-evidence/control-delivery.log` | `c2cd7de3bd5d643c2bb9ad2c39adeab43d0ae0a43915550c64f705d7cb195473` |
+| `/tmp/artroom-315-t39-evidence/types.log` | `6d6fedb36dbee4bff38ae0d2fcbad3cce9af62a012c11f1517cbd8d6ce0d09a6` |
+| `/tmp/artroom-315-t39-evidence/run-control.py` | `5530b396ed8293dbf036c663894d2da2f46ee6f9134897b9f7e098a0ca1230fd` |
+
+Local Node v26.10.0 and existing installed dependencies were reused through
+isolated workspace links. Lock files differ because main has extra tooling;
+common installed test/compiler/library versions were compared, not represented
+as a fresh locked install. No dependency or lock edits/install, whole gate,
+provider/cloud operation or main landing occurred. T4 reports into the one
+expanded candidate; its integrated gate and independent review remain with T1.

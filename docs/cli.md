@@ -427,8 +427,7 @@ at the register, its genesis and the entries that come from the claim
 that founded the repository. A signed read reads the entries that the
 key signed, the entries that come from one of those within 15 minutes of
 it (the intent window), and the retained inputs those entries carry. History and log pages can
-be filtered; a sparse page is not complete replay evidence. The multiple-claim
-coverage and destination-session gaps remain explicit intake findings.
+be filtered; a sparse page is not complete replay evidence. Replay still states its actual coverage and foreign-history trust.
 
 ## What it does not do yet
 
@@ -455,8 +454,8 @@ coverage and destination-session gaps remain explicit intake findings.
   made from the act's step, item and grant.
 - An active member's session reads the destination before its first act,
   including after the founder's signed-read window. The destination checks
-  the membership ID and kind recorded by its genesis, and also the
-  incarnation once an observation records it. The first `remote` or `clone`
+  the full confirmed membership reference from its recorded birth directory
+  before accepting a session, even before its first retained observation. The first `remote` or `clone`
   need not occur within 15 minutes of the claim. Signed reads without a
   session retain their window. See the destination-read follow-up in
   `notes/2026-10-07-i5-clone-delivery.md`.

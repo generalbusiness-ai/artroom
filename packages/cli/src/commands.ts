@@ -34,7 +34,7 @@ import {
   type Fetch, type ReadSigning, type Signing, type Transport,
 } from "@generalbusiness/artroom-client";
 import { TOKENS_FLOOR, capabilitiesOf, gitRead, holdCapability } from "@generalbusiness/artroom-derive";
-import { DIRECTORY_OF, SIBLINGS_OF, MEMBERSHIP, READ_TOKEN_HOURS, REGISTER, ROLE_LISTS, isOf, platform, type Role } from "@generalbusiness/artroom-platform";
+import { DIRECTORY_OF, SIBLINGS_OF, READ_TOKEN_HOURS, REGISTER, ROLE_LISTS, isOf, platform, type Role } from "@generalbusiness/artroom-platform";
 import { SourceError, httpSource, render, verify as replay, type HistorySource } from "@generalbusiness/artroom-replay";
 import type { ClaimStep, Config, PendingClaim, PendingJoin, Repository, Store } from "./store.ts";
 
