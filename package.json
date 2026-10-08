@@ -10,7 +10,9 @@
     "typecheck": "npm run typecheck --workspaces --if-present && tsc -p scripts/tsconfig.json",
     "test": "vitest run && node --test scripts/active-source.test.mjs",
     "test:changed": "node scripts/test-changed.mjs",
-    "gate": "bash scripts/gate.sh"
+    "gate": "bash scripts/gate.sh",
+    "demo:run": "node --import tsx --no-warnings scripts/demo-run.ts",
+    "demo:captures": "node --import tsx --no-warnings scripts/demo-captures.ts"
   },
   "devDependencies": {
     "typescript": "7.0.2",

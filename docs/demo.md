@@ -34,17 +34,20 @@ a value that an earlier line printed, such as the change's scope ID. A
 later shot types those values, so the runner needs no help from the
 operator after the setting.
 
-The runner does not stop at a shot that does not match. It runs every
-shot it can, and marks a shot "not run" when an earlier shot did not print
-a value it needs.
+The runner continues after ordinary output mismatches while it can. If a
+newly captured scope identity is missing or disagrees with its saved
+configuration, it stops later commands and hooks. It also marks a shot
+"not run" when an earlier shot did not print a value it needs.
 
 ## How to rehearse a deployment
 
-The runner uses the same runtime as `packages/cli/bin/artroom.js`: `node`
-22 or later, with `--experimental-transform-types`. Nothing is installed.
-
+The runner uses Node 22 or later with the `tsx` loader already declared
+by the current CLI workspace. No package is installed by the runner.
+The older standalone runner delivery lacks that dependency declaration;
+it needs the current CLI dependency integration before these commands
+are usable from a fresh install.
 ```
-node --experimental-transform-types --no-warnings scripts/demo-run.ts \
+node --import tsx --no-warnings scripts/demo-run.ts \
   https://<service> --host artifacts --namespace artroom-demo \
   --scratch /tmp/rehearsal-1 --out /tmp/rehearsal-1/out
 ```
@@ -85,8 +88,16 @@ six pictures, each at most 300 kB: `room.png`, `issue.png`,
 (the `guide/start.md` change), `rules.png` and `site-page.png` (the page
 as the site renders it). It also writes `captures.md`, which lists them.
 
+The deployment form requires the owner-home `capture-observations.json`
+that a successful current runner writes. Before loading the key, captures
+bind the service and room hints to the configured full references and
+native returned creation facts. Old room files, a changed config/source,
+or a home without those observations fail closed. `room.json` alone does
+not establish this association. The pictures are screen observations;
+they do not replace the native receipts for publication or closure.
+
 ```
-PLAYWRIGHT_CORE=<scratch directory> node --experimental-transform-types --no-warnings \
+PLAYWRIGHT_CORE=<scratch directory> node --import tsx --no-warnings \
   scripts/demo-captures.ts https://<service> --home /tmp/rehearsal-1/founder \
   --room /tmp/rehearsal-1/out/room.json --out /tmp/rehearsal-1/out
 ```
@@ -113,8 +124,9 @@ answers the browser with the Worker's recorded answers, as
 3. Each take: fresh config directories (`ARTROOM_HOME`) on both screens,
    and a new room. The takes type the commands of the transcript in the
    same order; the runner's room is not used on camera.
-4. After the take: `artroom verify --all` on the take's room, and the
-   captures of that room for the cut-ins.
+4. After the take: `artroom verify --all` on the take's room. The current
+   deployment capture form supports homes with the runner's bound native
+   observations; a manually created take home without them is unsupported.
 
 ## In the tests
 

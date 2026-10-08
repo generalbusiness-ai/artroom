@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
 import { describe, expect, inject, test } from "vitest";
 import type { ScopeId } from "@generalbusiness/artroom-contract";
-import { b64url, scopeIdOf, timeMs } from "@generalbusiness/artroom-bytes";
+import { b64url, canonicalize, keyIdOfSecret, scopeIdOf, textDigest, timeMs } from "@generalbusiness/artroom-bytes";
 import type { Fetch } from "@generalbusiness/artroom-client";
 import { net } from "@generalbusiness/artroom-scope/testing";
 import { platformNet, platformOutside } from "@generalbusiness/artroom-scope/testing/worker";
@@ -12,6 +12,7 @@ import { Platform, routed, settle } from "../../scope/test/repository.ts";
 import { memoryStore, type Context, type Git, type Outcome } from "../../cli/src/index.ts";
 import { actsOn, listLanes, loadChange, loadIssue, loadRules, loadSite, openRoom, placeOf } from "../../page/src/index.ts";
 import { FILES, judged, rehearse, transcript, type Person, type Rehearsal, type Stage, type Taken } from "../../../scripts/demo/rehearse.ts";
+import { captureBinding, observeCaptures } from "../../../scripts/demo/capture-binding.ts";
 
 const SERVICE = "https://scopes.test";
 
@@ -204,6 +205,25 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
   // The room's ids are what the shots printed, for the captures.
   expect(Object.keys(rehearsal.room).sort()).toEqual(["controlled", "destination", "directory", "issue", "membership", "published", "refused", "register", "rules", "service"]);
 
+  // Real native genesis and actual creator send entries anchor the capture's
+  // lane hints to the full refs kept by claim/join, without a new grant.
+  const births = await observeCaptures(people.founder!, rehearsal.room);
+  const config = (await people.founder!.store.config())!;
+  const observed = { v: 1 as const, source: "test source", service: SERVICE, config: textDigest(canonicalize(config)), actor: keyIdOfSecret((await people.founder!.store.secret(config.key))!), births };
+  const bound = captureBinding(config, observed, SERVICE, { ...rehearsal.room, diagnostic: "not capture metadata" } as typeof rehearsal.room, "test source");
+  expect(bound.place).toEqual({ directory: config.repository!.directory.scope, membership: config.repository!.membership });
+  expect(bound.room).toEqual(rehearsal.room);
+  expect(() => captureBinding(config, observed, "https://other.test", rehearsal.room, "test source")).toThrow("Capture binding");
+  expect(() => captureBinding(config, observed, SERVICE, { ...rehearsal.room, published: rehearsal.room.controlled! }, "test source")).toThrow("Capture binding");
+  const detached = structuredClone(observed);
+  detached.births.published.creator = null;
+  expect(() => captureBinding(config, detached, SERVICE, rehearsal.room, "test source")).toThrow("Capture binding");
+  let loaded = 0;
+  const noKey: Context = { ...people.founder!, store: { ...people.founder!.store, secret: async () => { loaded++; throw new Error("unexpected key load"); } } };
+  await expect(observeCaptures(noKey, { ...rehearsal.room, service: "https://other.test" })).rejects.toThrow("Capture binding");
+  await expect(observeCaptures(noKey, { ...rehearsal.room, directory: rehearsal.room.issue! })).rejects.toThrow("Capture binding");
+  expect(loaded).toBe(0);
+
   // Each of the shots that the table lists as the script's outcomes is what the room holds: the issue is closed, the branch
   // holds the three commits after the founding one in order, and the refused change is not on it.
   const lines = (n: number) => rehearsal.shots[n - 1]!.lines;
@@ -233,5 +253,15 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
   const changed = { ...rehearsal, shots: rehearsal.shots.map((shot) => (shot.n === 19 ? { ...shot, match: false, why: "line 1 differs" } : shot)), ok: false };
   const told2 = transcript(changed, { service: SERVICE, host: at.host, namespace: at.namespace, started: "", how: "" });
   expect([told2.includes("Result: 1 of 26 shots did not print what the script expects: 19."), told2.split("\n").filter((line) => line.endsWith(" | no |")).length]).toEqual([true, 1]);
+  // A captured register whose saved plan disagrees must not reach the pin
+  // hook or any later command. The command still produces its normal lines;
+  // this control changes only the saved correspondence the runner must check.
+  let pins = 0;
+  let saves = 0;
+  const stopped = await rehearse({ ...stage, pin: async () => { pins++; return "unexpected pin"; }, person: async (who) => {
+    const ctx = await stage.person(who);
+    return { ...ctx, store: { ...ctx.store, save: async (saved) => { saves++; await ctx.store.save(saved.plan ? { ...saved, plan: { ...saved.plan, register: config.repository!.directory.scope } } : saved); } } };
+  } });
+  expect([pins, saves, stopped.ok, stopped.shots[0]!.why, stopped.shots.slice(1).every((shot) => shot.code === -1)]).toEqual([0, 1, false, "captured scope identity is missing or inconsistent", true]);
   await drained();
 }

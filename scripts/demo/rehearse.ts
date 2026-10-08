@@ -11,7 +11,7 @@
  * one, and nothing else that it prints holds a secret (a read token is never printed by `artroom clone`; a key is printed by its ID).
  */
 
-import { canonicalize, utf8 } from "@generalbusiness/artroom-bytes";
+import { canonicalize, isScopeId, utf8 } from "@generalbusiness/artroom-bytes";
 import { command, type Context, type Outcome } from "@generalbusiness/artroom-cli";
 import { DEMO_DIGESTS, changeDemo, issueDemo } from "@generalbusiness/artroom-lanes";
 import { firstExtents } from "@generalbusiness/artroom-platform";
@@ -347,12 +347,14 @@ export async function rehearse(stage: Stage): Promise<Rehearsal> {
   const v: Found = {};
   const taken: Taken[] = [];
   const list = shots(stage);
+  let identityStop: string | null = null;
   for (const [i, shot] of list.entries()) {
     const started = now();
     const expected = { code: shot.expect.code, lines: shot.expect.lines(v) };
     const base = { n: i + 1, title: shot.title, scene: shot.scene, who: `${shot.who} (${HANDLES[shot.who]})`, at: new Date(started).toISOString(), expected };
     let words: string[];
     try {
+      if (identityStop !== null) throw new Missing(identityStop);
       words = filled(shot.typed(v), v);
     } catch (error) {
       if (!(error instanceof Missing)) throw error;
@@ -366,8 +368,24 @@ export async function rehearse(stage: Stage): Promise<Rehearsal> {
     if (words[0] === "GET") outcome = seen(await stage.get(words[1]!), shows);
     else if (words[0] === "git") outcome = await stage.log(words[2]!);
     else outcome = await command(await personOf(shot.who), words.slice(1));
-    const why = judged(expected, outcome, v);
-    const note = shot.after ? await shot.after(v, stage) : null;
+    let why = judged(expected, outcome, v);
+    // Ordinary output mismatches remain diagnostic and may continue. A newly
+    // captured scope identity cannot drive another person's command or hook
+    // when the producer did not return the complete expected result.
+    const names = ["register", "directory", "membership", "rules", "destination", "issue", "published", "controlled", "refused"]
+      .filter((name) => expected.lines.some((line) => line.includes(`<${name}>`)));
+    if (names.length > 0) {
+      const config = await (await personOf(shot.who)).store.config();
+      const r = config?.repository;
+      const mismatch = names.some((name) => !isScopeId(v[name]))
+        || (names.includes("register") && v["register"] !== config?.plan?.register)
+        || (names.includes("directory") && (!r || v["directory"] !== r.directory.scope || v["membership"] !== r.membership.scope || v["rules"] !== r.rules || v["destination"] !== r.destination));
+      if (why !== null || mismatch) {
+        identityStop = "captured scope identity is missing or inconsistent";
+        why ??= identityStop;
+      }
+    }
+    const note = shot.after && why === null ? await shot.after(v, stage) : null;
     const done: Taken = {
       ...base, typed: withheld(words.map(quoted).join(" ")), code: outcome.code, lines: outcome.lines.map(withheld),
       seconds: Math.round((now() - started) / 100) / 10, match: why === null, why, note,
