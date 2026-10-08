@@ -292,3 +292,31 @@ from that gate. Their tree identity is checked before filing, with no rerun.
 The single full exact-head Source review remains required under request
 `86206b5595fa55a7d84821a74e200aabc0fa837e`; named deferrals and original held
 proof obligations remain open.
+
+## Accepted edit result recovery correction
+
+Planner finding `c6257b52bb58fc710123fab19af66a78b30d666e` identified
+one remaining supported failure: after a proposal was accepted, a thrown
+optional-linking failure escaped to the outer command and hid its known
+lane/version. Correction `231c46c101ac6cf90eaea1ff1bba3f78f54e05b8`
+converts supported failures within that phase and retains the proposal,
+failure outcome and inspection guidance before another mutation. Transport
+details use a fixed unavailable diagnostic. There is no automatic retry,
+rollback or safe-resubmit claim; unexpected errors still propagate.
+
+The existing issue workflow retains its successful `--closes` and replay
+assertions. A same-room tail admits one real proposal, then scripts loss of
+the linking summary read. It shows one proposal, no link/merge submission
+and the original lane/version in the result. Its final focused run passes;
+the former source fails by losing that line and exposing the scripted fault.
+CLI and Scope Worker/Node types pass. Raw logs and source comparisons are
+in `/tmp/artroom-edit-link-result-evidence`; the complete edit delivery note
+records the boundary and its existing host/scheduler stand-ins.
+
+This changes product source after the preceding gate. That gate is retained
+as historical evidence and does not verify this correction. A new ordinary
+gate at the composed source head is required before the single complete
+Source review. The previous uncaught timeout diagnostic has no identified
+test owner in the saved log or cache; it remains an unresolved cancellation
+risk, rather than clean-runtime credit. No timer, dependency or assertion
+changes, extra diagnostic suite or cloud/browser/provider run are made.
