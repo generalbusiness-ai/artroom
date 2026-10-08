@@ -5,7 +5,7 @@
 > **Current baseline:** Accepted I5 is `7bb3a6415892138a25f5a147f89ae8469b0a716d`; the publication base is `16d7ba440d148c8d6dc29307810ee3c0c103c624`. [BASELINE.md](../BASELINE.md) supersedes the old findings below. Implementation remains uncommissioned and undispatched.
 >
 > **Drift check after future dispatch:** `git diff --stat 7bb3a6415892138a25f5a147f89ae8469b0a716d..HEAD -- packages/cli/src packages/cli/test docs/cli.md docs/hosts.md`
-> Compare excerpts against live source. Accepted I5 retains main claim/join recovery and integrates repaired planned-install/clone/edit code. Compare later drift from accepted I5, including `store.ts`, `clone-proof.ts` and `clone-outcome.ts`; do not copy the historical315 implementation. STOP if integration changes retry meaning or source does not match.
+> Compare excerpts against live source. Accepted I5 retains main claim/join recovery and integrates repaired planned-install/clone/edit code. Compare later drift from accepted I5, including `store.ts`, `clone-proof.ts` and `clone-outcome.ts`; do not copy the historical `315785966` implementation. STOP if integration changes retry meaning or source does not match.
 
 ## Status
 
@@ -18,14 +18,7 @@
 
 ## Current I5 reconciliation
 
-| Earlier finding | Accepted I5 behavior | Work still proposed and owed |
-|---|---|---|
-| Failed/capped item or history reads and failed destination reads look empty | Page summary, definition and enumerations reject incomplete, failed and mixed-head results; budget exhaustion is unreadable. Publications use checked destination reads. | Partial rows with typed provenance/continuation; text absent/redacted versus unreadable; qualified advisory fallbacks; bounded room query and scoped publication reads. |
-| Returned action answer disappears after failed refresh | `act` exposes the real answer before awaited refresh; `main.ts` retains it by service/directory/membership/key/scope and the failure view displays it. | This map is memory-only. Durable draft, original signed envelope, lost-reply settlement and reload/outbox recovery remain with the shared owner. |
-| Unsafe service/identity or proposal links; HEAD presented as a selected version | Page rejects credential-bearing and unsupported cross-origin service settings before persistence/join/read; join validates supplied identity. Site validates URL and stable repository identity. Latest-site navigation is labelled separately; invalid proposal paths have no version link and immutable rendering is explicitly unavailable. | Fresh standing and contextual authority; authorized immutable artifact/preview routes, cross-origin isolation and selected-version viewing. `siteAddress` still constructs a HEAD address; the guarded view, not this helper alone, suppresses invalid proposal links. |
-| Clone and planned install use weaker recovery | Planned install retains an exact attempted marker and configured-service acknowledgement; clone checks the exact accepted request/opening/outcome before reading one credential, bounds observation and preserves unknown/refused recovery guidance. Existing claim/join saved-envelope recovery is retained. | Clone occupied/writable-target preflight, renewed fetch custody, local attachment/import, multi-room context and durable application/edit orchestration. Service acknowledgement is not independent founding-history proof; stand-in witnesses are not provider acceptance. |
-
-Future steps are proposed only. Reuse the already-landed invariants above rather than commission them twice. Remaining reload/outbox, standing, query, preview and external acceptance duties stay open.
+See the shared [accepted I5 baseline and evidence](../BASELINE.md). I5 retains exact claim/join recovery, planned-install attempted/service-acknowledged identity and clone request/opening/outcome checks with bounded observation. Proposed work adds local context/attachment, target preflight, durable application orchestration and separately adopted import/renewed-read custody. A service acknowledgement is not independent founding-history proof.
 
 ## Why this matters
 

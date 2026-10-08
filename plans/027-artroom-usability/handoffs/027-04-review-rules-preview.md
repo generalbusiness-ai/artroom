@@ -18,14 +18,7 @@
 
 ## Current I5 reconciliation
 
-| Earlier finding | Accepted I5 behavior | Work still proposed and owed |
-|---|---|---|
-| Failed/capped item or history reads and failed destination reads look empty | Page summary, definition and enumerations reject incomplete, failed and mixed-head results; budget exhaustion is unreadable. Publications use checked destination reads. | Partial rows with typed provenance/continuation; text absent/redacted versus unreadable; qualified advisory fallbacks; bounded room query and scoped publication reads. |
-| Returned action answer disappears after failed refresh | `act` exposes the real answer before awaited refresh; `main.ts` retains it by service/directory/membership/key/scope and the failure view displays it. | This map is memory-only. Durable draft, original signed envelope, lost-reply settlement and reload/outbox recovery remain with the shared owner. |
-| Unsafe service/identity or proposal links; HEAD presented as a selected version | Page rejects credential-bearing and unsupported cross-origin service settings before persistence/join/read; join validates supplied identity. Site validates URL and stable repository identity. Latest-site navigation is labelled separately; invalid proposal paths have no version link and immutable rendering is explicitly unavailable. | Fresh standing and contextual authority; authorized immutable artifact/preview routes, cross-origin isolation and selected-version viewing. `siteAddress` still constructs a HEAD address; the guarded view, not this helper alone, suppresses invalid proposal links. |
-| Clone and planned install use weaker recovery | Planned install retains an exact attempted marker and configured-service acknowledgement; clone checks the exact accepted request/opening/outcome before reading one credential, bounds observation and preserves unknown/refused recovery guidance. Existing claim/join saved-envelope recovery is retained. | Clone occupied/writable-target preflight, renewed fetch custody, local attachment/import, multi-room context and durable application/edit orchestration. Service acknowledgement is not independent founding-history proof; stand-in witnesses are not provider acceptance. |
-
-Future steps are proposed only. Reuse the already-landed invariants above rather than commission them twice. Remaining reload/outbox, standing, query, preview and external acceptance duties stay open.
+See the shared [accepted I5 baseline and evidence](../BASELINE.md). I5 already guards unsafe service/identity/URL boundaries and separates latest-site navigation from explicitly unavailable immutable rendering. Proposed work supplies outcome hierarchy, exact version/extent review, revision-safe rules editing and adopted immutable authorized preview. Current HEAD navigation is retained as latest navigation only.
 
 ## Why this matters
 
@@ -35,7 +28,7 @@ The refused change screen emphasizes confirmed internal effects before the refus
 
 Candidate `view.ts/changeScreen` chooses the current or latest manifest, calculates reviews for its extents, displays diagnostic states and metadata, then merge outcomes. `rulesScreen` renders protocol tables; `actsPanel` supplies generic publish fields. `data.ts/loadChange` exposes manifest metadata but no actual base/current diff content; `loadRules` reads structured extents/checks/definitions. `states.ts/changeStates` explains rules-not-met and authority-lost but lacks generic/path/out-of-date summary. `siteAddress` always selects HEAD.
 
-Historical315 excerpts; these are not current source:
+Historical `315785966` excerpts; these are not current source:
 
 ```ts
 // view.ts:83–88 — changeScreen

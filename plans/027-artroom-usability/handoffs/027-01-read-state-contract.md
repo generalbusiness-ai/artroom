@@ -18,14 +18,7 @@
 
 ## Current I5 reconciliation
 
-| Earlier finding | Accepted I5 behavior | Work still proposed and owed |
-|---|---|---|
-| Failed/capped item or history reads and failed destination reads look empty | Page summary, definition and enumerations reject incomplete, failed and mixed-head results; budget exhaustion is unreadable. Publications use checked destination reads. | Partial rows with typed provenance/continuation; text absent/redacted versus unreadable; qualified advisory fallbacks; bounded room query and scoped publication reads. |
-| Returned action answer disappears after failed refresh | `act` exposes the real answer before awaited refresh; `main.ts` retains it by service/directory/membership/key/scope and the failure view displays it. | This map is memory-only. Durable draft, original signed envelope, lost-reply settlement and reload/outbox recovery remain with the shared owner. |
-| Unsafe service/identity or proposal links; HEAD presented as a selected version | Page rejects credential-bearing and unsupported cross-origin service settings before persistence/join/read; join validates supplied identity. Site validates URL and stable repository identity. Latest-site navigation is labelled separately; invalid proposal paths have no version link and immutable rendering is explicitly unavailable. | Fresh standing and contextual authority; authorized immutable artifact/preview routes, cross-origin isolation and selected-version viewing. `siteAddress` still constructs a HEAD address; the guarded view, not this helper alone, suppresses invalid proposal links. |
-| Clone and planned install use weaker recovery | Planned install retains an exact attempted marker and configured-service acknowledgement; clone checks the exact accepted request/opening/outcome before reading one credential, bounds observation and preserves unknown/refused recovery guidance. Existing claim/join saved-envelope recovery is retained. | Clone occupied/writable-target preflight, renewed fetch custody, local attachment/import, multi-room context and durable application/edit orchestration. Service acknowledgement is not independent founding-history proof; stand-in witnesses are not provider acceptance. |
-
-Future steps are proposed only. Reuse the already-landed invariants above rather than commission them twice. Remaining reload/outbox, standing, query, preview and external acceptance duties stay open.
+See the shared [accepted I5 baseline and evidence](../BASELINE.md). I5 rejects failed/incomplete/mixed-head enumeration and keeps returned action answers across refresh failure in memory. Proposed work extends typed partial/provenance and text-read distinctions, durable reload/outbox settlement, fresh standing and independent status axes. Existing guards are reused, not commissioned again.
 
 ## Why this matters
 
@@ -35,7 +28,7 @@ I5 now refuses incomplete enumerations and preserves a returned answer across re
 
 Candidate `packages/page/src/data.ts` separates domain reads/signing from DOM. `itemsOf`, `textOf`, `listLanes`, `publicationsOf` and `historyOf` assemble projections; `fresh` renews sessions; `openRoom` reads membership standing once; `actsOn` uses `room.me`; `act` signs typed acts using expected revisions. Candidate `main.ts` caches opened rooms and stores last action answers in a transient map. `states.ts/changeStates` projects records without judging rules.
 
-Historical315 excerpts; these are not current source:
+Historical `315785966` excerpts; these are not current source:
 
 ```ts
 // data.ts:108–113 — itemsOf
