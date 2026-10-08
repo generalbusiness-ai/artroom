@@ -465,3 +465,34 @@ artifacts and the original implementation binding remain. One normal targeted
 Source re-review against reviewed 68be, explicit material-risk disposition,
 requester judgment and witnessed landing are still required under request862
 and planner158. No named deferral or original held duty closes from this run.
+
+## Bounded residues from successor review db2cf
+
+The complete successor verdict `db2cf178` supports the main six corrections
+but requests two bounded residues. Builder read and accepted that review as
+delivered, without implementation approval, and follows planner `a049e753`
+under the same request. Builder resumed at 14:17 Eastern; the 14:15 refile
+target was missed and no deadline or landing credit is claimed.
+
+Correction `69aa07a2c113c8d0363f2a395cf97556bcb84b74`, carried as
+`62bec463b`, keeps waiting/later-merge advice only after a factual refusal.
+Unavailable and mismatch retain category, inspection and original-request
+guidance without asserting a waiting state or suggesting a newly signed
+merge. Accepted receipt, bounded one-entry observation and known edit
+proposal code are byte-preserved outside that branch.
+
+The existing edit workflow keeps its original two host fixtures and all
+positive/refusal/head/receipt assertions. A compact tail scripts mismatch
+for merge and unavailable for edit, retaining the real proposal and one
+request per call. Both tests pass; CLI and Scope Worker/Node types pass.
+The initial malformed test regex and corrected final output are retained in
+`/tmp/artroom-merge-tail-guidance-evidence`. This is a client response-boundary
+witness, not native unknown/conflict or executed duplicate-mutation proof.
+
+The Page guide now distinguishes answer category from separate head
+observations, and latest-site navigation from unavailable immutable previews.
+The preview duty remains owed. The existing Page bundle still matches the
+combined source; parity passes without a rebuild, as recorded in
+`/tmp/artroom-expanded-merge-residue-assets.log`. A source-correct ordinary
+gate at the composed head and one targeted successor review against 05d6
+remain required. Earlier results and all original risks/duties stay retained.
