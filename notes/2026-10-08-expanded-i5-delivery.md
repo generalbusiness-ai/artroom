@@ -116,8 +116,27 @@ host/read/clock stand-ins and do not establish complete historical executable
 or admission correspondence. The existing versions note records the exact pins
 and focused logs.
 
-The final gate, combined filing and full exact-head independent Source
-review have not run. No new deployment, browser or provider rehearsal was
+## Final gate
+
+The one final gate ran at `e713875079ba40633f3fb5996cc92d24bd19caa6`,
+tree `5c5068b5b40b6581a3ce719f20049693240e21f8`, on local Node v26.10.0.
+It started clean, reused the declared lock's installed dependencies, and
+passed whitespace and all workspace types. Tests failed when native workerd
+aborted with `kj/async.c++:2194: Promise callback destroyed itself`.
+Vitest reported 77 files and 709 tests passed out of 78 files and 720 tests,
+one unhandled pool-worker exit, and a ten-second close timeout. The final
+active-source script was not reached. Whitespace took 0.0 seconds; types
+4.9 elapsed/15.3 CPU; tests 26.4 elapsed/45.2 CPU. This is a failed,
+incomplete gate, not an assertion that the remaining tests pass.
+
+Raw logs: `/tmp/artroom-expanded-final-gate.log` and
+`/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.nDbKCO2fKw/test.log`.
+The versions note was staged during the run; source and tests stayed unchanged.
+This document successor does not rerun the gate. Read-only crash localization
+is pending; no timeout, abort variant or test deletion is used to hide it.
+
+The combined filing and full exact-head independent Source review remain
+pending. No new deployment, browser or provider rehearsal was
 performed. Historical twenty-six-shot matches do not establish this head's
 full site, navigation, browser, workspace or device obligations. Original
 source/history/admission, current tuple, custody, actual sends and cleanup,
