@@ -564,7 +564,7 @@ export function fieldValue(room: Room, type: string, typed: string): FieldValue 
   return valueOf({ repository: { membership: room.membership } as never }, { type }, typed);
 }
 
-/** What an act came to: the scope's answer, and the scope's head before and after. A refusal leaves the head where it was. */
+/** The scope's answer and independent before/after observations. A category alone proves no absence of timed entries. */
 export interface Acted {
   service: string; directory: ScopeId; membership: ScopeRef; key: KeyId; scope: ScopeId; kind: string; on: number | null;
   answer: Answer; before: Head; after: Head | null; observation: string | null;

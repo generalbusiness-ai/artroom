@@ -252,17 +252,24 @@ export function valueOf(config: Pick<Config, "repository">, field: { type?: stri
 }
 
 /** The answer to an act, in one or two lines. A refusal names its reason and, when the failed guard has one, its name. */
+const inspectBeforeMutation = (scope: ScopeId | null): string => scope === null ? "the configured service's history" : `artroom log ${scope}`;
+const unavailableAnswer = (reason: string, scope: ScopeId | null): Outcome => failed(`Unavailable: ${reason}. Outcome unknown; no acceptance is confirmed. Inspect ${inspectBeforeMutation(scope)} before another mutation. Recovery requires the same original signed envelope; repeating a generic command signs a new request.`);
+const mismatchAnswer = (reason: string, scope: ScopeId | null): Outcome => failed(`Mismatch: ${reason}. The idempotency key names another recorded intent. Inspect ${inspectBeforeMutation(scope)} and the original request before another mutation.`);
 function answered(scope: ScopeId, answer: Answer, took: string): Outcome {
   switch (answer.answer) {
     case "accepted": return done(`${took}: entry ${scope}:${answer.receipt.fact.seq}, hash ${answer.receipt.fact.hash.slice(0, 19)}.`);
-    case "refused": return failed(`Refused: ${answer.reason}${"name" in answer && answer.name ? ` (${answer.name})` : ""}, judged at entry ${scope}:${answer.judgedAt.seq}. Nothing was written.`);
-    case "unavailable": return failed(`Unavailable: ${answer.reason}. Send the same command again later.`);
-    case "mismatch": return failed(`Mismatch: ${answer.reason}.`);
+    case "refused": return failed(`Refused: ${answer.reason}${"name" in answer && answer.name ? ` (${answer.name})` : ""}, judged at entry ${scope}:${answer.judgedAt.seq}. The request was refused.`);
+    case "unavailable": return unavailableAnswer(answer.reason, scope);
+    case "mismatch": return mismatchAnswer(answer.reason, scope);
   }
 }
 
-const accepted = (answer: Answer | Founded, scope: ScopeId | null, took: string): Extract<Answer, { answer: "accepted" }> =>
-  answer.answer === "accepted" ? answer : stop(answer.answer === "refused" && "judgedAt" in answer ? answered(scope!, answer, took) : failed(`${answer.answer === "refused" ? "Refused" : "Unavailable"}: ${answer.reason}. Nothing was written.`));
+function accepted(answer: Answer | Founded, scope: ScopeId | null, took: string): Extract<Answer, { answer: "accepted" }> {
+  if (answer.answer === "accepted") return answer;
+  if (answer.answer === "unavailable") return stop(unavailableAnswer(answer.reason, scope));
+  if (answer.answer === "mismatch") return stop(mismatchAnswer(answer.reason, scope));
+  return stop("judgedAt" in answer ? answered(scope!, answer, took) : failed(`Refused: ${answer.reason}. The request was refused.`));
+}
 
 // ---------------------------------------------------------------- waiting for scopes
 

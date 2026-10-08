@@ -32,6 +32,11 @@ test("unavailable authority is an answer of unavailable, a dependency that could
   expect(changeStates(none, refusedBy("dependency-unavailable")).map((s) => s.state)).toEqual(["unavailable authority"]);
   expect(changeStates({ requests: [], merges: [merge({ state: "refused", reason: "authority-lost" })] }).map((s) => s.state)).toEqual(["unavailable authority"]);
   expect(changeStates(none, refusedBy("unauthorized"))).toEqual([]);
+  const unknown = changeStates(none, { answer: "unavailable", reason: "busy" })[0]!.detail;
+  expect(unknown).toContain("Outcome unknown; no acceptance is confirmed");
+  expect(unknown).toContain("same signed envelope");
+  expect(unknown).toContain("this page does not retain it");
+  expect(unknown).not.toMatch(/Nothing was written|same act may be sent again/);
 });
 
 test("policy not met names each extent the destination names, a path in no extent, or the lane's own approvals-needed; another reason is no policy state", () => {

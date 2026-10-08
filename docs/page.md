@@ -4,7 +4,10 @@ The page is a small client for a room, for the demo story of plan 019. It
 runs in a browser. It reads a room over the scope service's HTTP routes,
 and it signs acts with a key that the browser keeps. It judges nothing:
 whether an act takes effect is the scope's decision, and the page shows the
-scope's answer. A refusal writes nothing, and the page shows its reason.
+scope's answer and refusal reason. An unavailable answer confirms no acceptance;
+timed entries may already have been written. Inspect the history before another
+act. Recovery requires the same original signed envelope, which generic Page
+submission does not retain.
 
 The source is `packages/page`. The scope Worker serves it at `/page/`, on
 the same origin as the routes it reads, so no second deployment and no

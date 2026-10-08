@@ -122,7 +122,7 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
 
   // Assignment needs issue.triage, which members do not hold: una's is refused by name, and nothing is written. rita assigns una.
   const atIssue = (await I.summary()).at;
-  expect(await run(una, "issue", "assign", "#1", "@una")).toEqual({ code: 1, lines: [`Refused: unauthorized, judged at entry ${I.name}:${atIssue.seq}. Nothing was written.`] });
+  expect(await run(una, "issue", "assign", "#1", "@una")).toEqual({ code: 1, lines: [`Refused: unauthorized, judged at entry ${I.name}:${atIssue.seq}. The request was refused.`] });
   expect((await I.summary()).at).toEqual(atIssue);
   ok(await run(rita, "issue", "assign", I.name, "@una"));
   expect((await I.item(0)).parties["assignees"]).toEqual([expect.objectContaining({ member: "@una" })]);
@@ -132,7 +132,7 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
   const second = /Its lane is (sc_\S+)\.$/.exec(ok(await run(una, "issue", "open", "--title", "A typo on the front page")).lines[0]!)!;
   const J = new Platform(second[1] as ScopeId);
   const atSecond = (await J.summary()).at;
-  expect(await run(paul, "issue", "close", "2")).toEqual({ code: 1, lines: [`Refused: unauthorized, judged at entry ${J.name}:${atSecond.seq}. Nothing was written.`] });
+  expect(await run(paul, "issue", "close", "2")).toEqual({ code: 1, lines: [`Refused: unauthorized, judged at entry ${J.name}:${atSecond.seq}. The request was refused.`] });
   expect([(await J.summary()).at, (await J.item(0)).state]).toEqual([atSecond, "open"]);
 
   // una's edit says it closes issue 1. The change lane links it; una is a member and holds no change.merge, so her merge is refused
@@ -146,7 +146,7 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
   expect(edited).toEqual({ code: 1, lines: [
     `Proposed guide/start.md (${files["start.md"]!.length} bytes) as change ${lane[1]}, version ${lane[2]}.`,
     `Linked: when it is published, the change ${lane[1]} closes issue #1 (${I.name}).`,
-    expect.stringMatching(new RegExp(`^Refused: unauthorized, judged at entry ${lane[1]}:\\d+\\. Nothing was written\\.$`)),
+    expect.stringMatching(new RegExp(`^Refused: unauthorized, judged at entry ${lane[1]}:\\d+\\. The request was refused\\.$`)),
     `The change ${lane[1]} waits, at version ${lane[2]}. When it may be merged, run: artroom merge ${lane[1]}`,
   ] });
   expect([host.refs.get("refs/heads/main"), (await I.item(0)).state]).toEqual([head0, "open"]);

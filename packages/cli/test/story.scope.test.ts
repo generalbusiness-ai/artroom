@@ -156,22 +156,22 @@ async function story(): Promise<void> {
   // act (`--value`). The scope refuses it by the guard's name, and writes nothing.
   const before = (await D.summary()).at;
   const refused = await run(una, "act", "open-issue", "--on", "directory", "--set", `definition=${definitionDigest(inactive as never)}`, "--set", "title=An inactive definition", "--set", "conditions=[]", "--value", "inactive.json");
-  expect(refused).toEqual({ code: 1, lines: [`Refused: guard-failed (not-activated), judged at entry ${D.name}:${before.seq}. Nothing was written.`] });
+  expect(refused).toEqual({ code: 1, lines: [`Refused: guard-failed (not-activated), judged at entry ${D.name}:${before.seq}. The request was refused.`] });
   // With no bytes beside it, the digest names a value place that holds nothing: the field is refused before any guard is judged
   // (the lane wiring's value place; its note, section 6, gap 3).
   const unnamed = await run(una, "act", "open-issue", "--on", "directory", "--set", `definition=${textDigest("a definition no rules scope activated")}`, "--set", "title=An inactive definition", "--set", "conditions=[]");
-  expect(unnamed).toEqual({ code: 1, lines: [`Refused: bad-field, judged at entry ${D.name}:${before.seq}. Nothing was written.`] });
+  expect(unnamed).toEqual({ code: 1, lines: [`Refused: bad-field, judged at entry ${D.name}:${before.seq}. The request was refused.`] });
   expect((await D.summary()).at).toEqual(before);
   // A refusal by name: rita adds a member whose handle is no handle. The guard `handle-form` refuses it `bad-handle`; nothing is written.
   const atMembership = (await M.summary()).at;
   const named = await run(rita, "act", "add-member", "--on", "membership", "--set", "handle=no handle", "--set", "kind=checker");
-  expect(named).toEqual({ code: 1, lines: [`Refused: bad-field (bad-handle), judged at entry ${M.name}:${atMembership.seq}. Nothing was written.`] });
+  expect(named).toEqual({ code: 1, lines: [`Refused: bad-field (bad-handle), judged at entry ${M.name}:${atMembership.seq}. The request was refused.`] });
   expect((await M.summary()).at).toEqual(atMembership);
   // act, refused: the admin tries to add the checker handle already held by the member above. Membership refuses it by the
   // guard's name, and writes nothing. This complete act tests a named judgment rather than missing definition bytes.
   const beforeDuplicate = (await M.summary()).at;
   const duplicate = await run(rita, "act", "add-member", "--on", "membership", "--set", "handle=@check", "--set", "kind=checker");
-  expect(duplicate).toEqual({ code: 1, lines: [`Refused: guard-failed (handle-in-use), judged at entry ${M.name}:${beforeDuplicate.seq}. Nothing was written.`] });
+  expect(duplicate).toEqual({ code: 1, lines: [`Refused: guard-failed (handle-in-use), judged at entry ${M.name}:${beforeDuplicate.seq}. The request was refused.`] });
   expect((await M.summary()).at).toEqual(beforeDuplicate);
 
   // log, show and verify with una's session: the command asks membership for one with her key.

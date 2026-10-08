@@ -22,7 +22,7 @@
 import type { Answer, FieldValue, ScopeId } from "@generalbusiness/artroom-contract";
 import { b64url, keyIdOfSecret, unb64url } from "@generalbusiness/artroom-bytes";
 import { act, actAssociation, actsOn, fieldValue, joinRoom, listLanes, loadChange, loadIssue, loadRules, openRoom, placeOf, type Acted, type Place, type Room, type Session } from "./data.ts";
-import { actsPanel, answerLine, changeScreen, failureScreen, h, issueScreen, roomScreen, rulesScreen } from "./view.ts";
+import { actsPanel, answerLine, nonacceptedAnswerText, changeScreen, failureScreen, h, issueScreen, roomScreen, rulesScreen } from "./view.ts";
 
 const KEPT = "artroom-page";
 /** The room text survives a key-generation redraw in memory only. It can hold an invitation secret. */
@@ -123,7 +123,7 @@ function settingsScreen(): HTMLElement {
       if (!next) return;
       try {
         const joined = await joinRoom(sessionOf(next), (room as HTMLTextAreaElement).value);
-        if (joined.answer.answer !== "accepted") return tell(false, `Membership refused the join: ${joined.answer.reason}${"name" in joined.answer && joined.answer.name ? ` (${joined.answer.name})` : ""}. Nothing was written.`);
+        if (joined.answer.answer !== "accepted") return tell(false, `${nonacceptedAnswerText(joined.answer)} Inspect membership ${joined.place.membership.scope} and the original request before another join. Recovery requires the same signed envelope; this page does not retain it.`);
         save({ ...next, place: joined.place });
       } catch (error) {
         tell(false, error instanceof Error ? error.message : String(error));

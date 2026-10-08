@@ -37,8 +37,8 @@ export function changeStates(view: Pick<ChangeView, "requests" | "merges">, last
     }
   }
 
-  if (last?.answer === "unavailable") states.push({ state: "unavailable authority", detail: `The scope could not judge the last act now: ${last.reason}. Nothing was written; the same act may be sent again.` });
-  if (last?.answer === "refused" && UNAVAILABLE.includes(last.reason)) states.push({ state: "unavailable authority", detail: `The last act was refused: ${last.reason}. Nothing was written.` });
+  if (last?.answer === "unavailable") states.push({ state: "unavailable authority", detail: `Last answer: unavailable (${last.reason}). Outcome unknown; no acceptance is confirmed. Inspect the history and original request before another act. Recovery requires the same signed envelope; this page does not retain it.` });
+  if (last?.answer === "refused" && UNAVAILABLE.includes(last.reason)) states.push({ state: "unavailable authority", detail: `The last act was refused: ${last.reason}.` });
   if (latest?.state === "refused" && latest.reason === "authority-lost") {
     states.push({ state: "unavailable authority", detail: `Merge ${latest.id} was not reserved: the destination did not observe the merger's authority within its window (authority-lost).` });
   }
@@ -51,7 +51,7 @@ export function changeStates(view: Pick<ChangeView, "requests" | "merges">, last
     });
   }
   if (last?.answer === "refused" && "name" in last && last.name === "approvals-needed") {
-    states.push({ state: "policy not met", detail: "The lane refused the merge: its copy of the rules needs more approvals of this version (approvals-needed). Nothing was written." });
+    states.push({ state: "policy not met", detail: "The lane refused the merge: its copy of the rules needs more approvals of this version (approvals-needed)." });
   }
 
   if (latest && (["intended", "committed", "unknown"].includes(latest.state) || (latest.publication && !["published", "aborted", "not-reserved"].includes(latest.publication.state)))) {
