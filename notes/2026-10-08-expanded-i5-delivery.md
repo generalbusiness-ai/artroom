@@ -135,6 +135,29 @@ The versions note was staged during the run; source and tests stayed unchanged.
 This document successor does not rerun the gate. Read-only crash localization
 is pending; no timeout, abort variant or test deletion is used to hide it.
 
+## Corrections after the failed gate
+
+Planner localization identified the operations file as reproducing the native
+crash alone. Commit comparison remains in progress; that identifies the file,
+not yet the callback lifetime that causes it.
+
+The page story's failing no-session phase expected full definition-item
+enumeration using limited signed reads. Those reads do not authorize items.
+The test now requires explicit unreadability and retains the real member
+session's complete rules view. Its whole story passes, and its control returning
+partial rows fails the rejection assertion. No authority is broadened.
+
+The composed CLI had omitted the completed planned-install recovery while the
+demo retained its corrected acknowledgement expectation. The reviewed recovery
+is restored: exact attempted marker before submission, retained original plan
+and complete configured-service acknowledgement, same-fact late recovery,
+unsent-expired refusal, and no silent replacement. Existing claim/join and
+other feature paths remain. The install witness passes two tests. The existing
+demo witness on the isolated `4c9 + 93c4` composition passes all twenty-six
+shots, one test with the recorder skipped. Logs and limits are in the related
+install/story notes and `/tmp/artroom-expanded-demo-contract-focused.log`.
+These are focused test outcomes, not a corrected passing gate.
+
 The combined filing and full exact-head independent Source review remain
 pending. No new deployment, browser or provider rehearsal was
 performed. Historical twenty-six-shot matches do not establish this head's
