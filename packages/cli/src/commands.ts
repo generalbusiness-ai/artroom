@@ -22,7 +22,7 @@
  * | `verify` | The replay verifier over the read routes: with the caller's session, and by signed reads where the session is refused. |
  */
 
-import type { Answer, DeclaredDefinition, Digest, Entry, FactRef, FieldValue, Founded, Item, KeyId, PlatformDefinition, ScopeId, ScopeRef, Seed, SignedIntent, Summary } from "@generalbusiness/artroom-contract";
+import type { Answer, DeclaredDefinition, Digest, Entry, FactRef, FieldValue, Founded, Item, KeyId, PlatformDefinition, Receipt, ScopeId, ScopeRef, Seed, SignedIntent, Summary } from "@generalbusiness/artroom-contract";
 import { b64url, canonicalize, factRefOf, intentDigest, isDigest, isFactRef, isIncarnation, isScopeId, isScopeRef, keyIdOfSecret, parseStrict, scopeIdOf, seedDigest, textDigest, timeOf, unb64url, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import {
   ScopeHandle, TransportError, readCredential, declaredHandle, found, httpTransport, requestSession, secretSigner, sessionRequest, signedIntent, signedLogReader, signedReads,
@@ -347,8 +347,9 @@ async function recordedStep(handle: ScopeHandle, seq: number, at: ScopeRef, key:
  * rules scope and the destination. Then the founder takes the seat and the
  * first key in membership, and so becomes its first admin.
  *
- * Every read here is a signed read by the founder key, which is the
- * operator key: the register's summary, where that key signed `install`;
+ * Discovery reads use the founder's signed reads: the register's summary,
+ * where that key signed `install`; accepted found recovery instead obtains
+ * the exact supported pin from its checked, read-only settlement receipt;
  * then the directory that the claim caused, and the scopes that the
  * directory caused; then membership, where the key has signed `seat`.
  *
@@ -369,22 +370,36 @@ export function claim(ctx: Context, name: string, options: { handle?: string; br
     const signer = secretSigner(secret);
     const R = await handleOf(ctx, config, register.scope, null);
     const { claim: _, ...base } = config;
-    const registered = await summaryOf(R);
-    const registerDefinition = knownPlatform(registered.definition, "platform:register");
-    const directoryDefinition = registerDefinition ? DIRECTORY_OF[registered.definition] : undefined;
-    const siblings = directoryDefinition ? siblingsOf(directoryDefinition) : null;
-    if (canonicalize(registered.scope) !== canonicalize(register) || registered.status !== "active" || !registerDefinition || !directoryDefinition || !siblings) return failed("The register's exact pinned definition or reference is not supported; nothing was submitted.");
-    let pending: PendingClaim;
+    let savedPending: PendingClaim | undefined;
     if (config.claim && !options.again) {
-      pending = config.claim;
-      if (pending.register !== register.scope || !isDigest(pending.intent) || typeof pending.handle !== "string") return failed("The pending claim does not identify this register and a valid recorded intent; nothing was submitted.");
-      if (pending.found && (!validStep(pending.found, register, signer.key, "found") || intentDigest(pending.found.signed.intent) !== pending.intent || pending.found.signed.intent.fields["founderHandle"] !== pending.handle)) return failed("The pending claim does not match this register, signing key and recorded intent; nothing was submitted.");
-    } else {
+      savedPending = config.claim;
+      if (savedPending.register !== register.scope || !isDigest(savedPending.intent) || typeof savedPending.handle !== "string") return failed("The pending claim does not identify this register and a valid recorded intent; nothing was submitted.");
+      if (savedPending.found && (!validStep(savedPending.found, register, signer.key, "found") || intentDigest(savedPending.found.signed.intent) !== savedPending.intent || savedPending.found.signed.intent.fields["founderHandle"] !== savedPending.handle)) return failed("The pending claim does not match this register, signing key and recorded intent; nothing was submitted.");
+    }
+    let settledFound: Receipt | null = null;
+    if (savedPending?.found?.accepted) {
+      // An accepted request settles from its exact signed envelope even after
+      // register summary read windows end. A cache cannot choose the pin:
+      // the receipt must match this full accepted fact and intent first.
+      const settled = await R.settle(savedPending.found.signed);
+      if (!settled.ok) return failed(`Cannot confirm the saved found step: ${settled.reason}. The exact request remains pending; nothing was submitted.`);
+      if (settled.value.intent !== savedPending.intent || canonicalize(settled.value.fact) !== canonicalize(savedPending.found.accepted) || canonicalize(settled.value.fact.at) !== canonicalize(register)) return failed("The saved accepted fact does not match this exact claim step; nothing was submitted.");
+      settledFound = settled.value;
+    }
+    const registered = settledFound ? null : await summaryOf(R);
+    const pinnedRegister = settledFound?.definition ?? registered!.definition;
+    const registerDefinition = knownPlatform(pinnedRegister, "platform:register");
+    const directoryDefinition = registerDefinition ? DIRECTORY_OF[pinnedRegister] : undefined;
+    const siblings = directoryDefinition ? siblingsOf(directoryDefinition) : null;
+    if ((registered && (canonicalize(registered.scope) !== canonicalize(register) || registered.status !== "active")) || !registerDefinition || !directoryDefinition || !siblings) return failed("The register's exact pinned definition or reference is not supported; nothing was submitted.");
+    let pending: PendingClaim;
+    if (savedPending) pending = savedPending;
+    else {
       const recovery = keyIdOfSecret(await keyOf(ctx, "recovery"));
       const handle = options.handle ?? "@founder";
       const shape = registerDefinition.data as unknown as DefinitionShape;
       const fields = { branch: options.branch ?? "main", founderHandle: handle, recoveryKey: recovery };
-      const signed = await signedIntent(signer, { to: register, kind: "found", fields, expected: expectedOf(shape.acts["found"]!, registered.items, null, fields) }, signing(ctx));
+      const signed = await signedIntent(signer, { to: register, kind: "found", fields, expected: expectedOf(shape.acts["found"]!, registered!.items, null, fields) }, signing(ctx));
       pending = { register: register.scope, intent: intentDigest(signed.intent), handle, found: { signed } };
       await ctx.store.save({ ...base, claim: pending });
     }
@@ -420,7 +435,7 @@ export function claim(ctx: Context, name: string, options: { handle?: string; br
       if (step.accepted) {
         // Settlement admits nothing and is bound to the exact envelope. A
         // saved marker alone cannot stand for some other accepted request.
-        const settled = await handle.settle(step.signed);
+        const settled = step === pending.found && settledFound ? { ok: true as const, value: settledFound } : await handle.settle(step.signed);
         if (!settled.ok) return stop(failed(`Cannot confirm the saved ${step.signed.intent.kind} step: ${settled.reason}. The exact request remains pending; nothing was submitted.`));
         if (settled.value.intent !== digest || canonicalize(settled.value.fact) !== canonicalize(step.accepted)) return stop(failed("The saved accepted fact does not match this exact claim step; nothing was submitted."));
         return step.accepted;
