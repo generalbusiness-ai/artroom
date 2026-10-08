@@ -6,11 +6,12 @@
  */
 
 import { configDir, fileStore } from "./files.ts";
+import { nodeGit } from "./git.ts";
 import { command } from "./line.ts";
 
 /** The command under Node. Returns the exit code. */
 export async function main(argv: readonly string[]): Promise<number> {
-  const outcome = await command({ store: fileStore(configDir()) }, argv);
+  const outcome = await command({ store: fileStore(configDir()), git: nodeGit() }, argv);
   (outcome.code === 0 ? process.stdout : process.stderr).write(`${outcome.lines.join("\n")}\n`);
   return outcome.code;
 }

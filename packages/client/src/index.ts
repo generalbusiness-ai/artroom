@@ -6,3 +6,4 @@ export * from "./binding.ts";
 export * from "./prepare.ts";
 export * from "./session.ts";
 export * from "./signed-read.ts";
+export * from "./credential.ts";

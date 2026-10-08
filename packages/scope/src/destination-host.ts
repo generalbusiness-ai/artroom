@@ -1,9 +1,9 @@
 /** Destination outside effects. Provider calls happen outside the scope's commit;
  * platform rules alone judge their evidence. Plaintexts stay in private custody. */
-import type { Entry, FactRef, FieldValue, OperationId, RetainedInput, ScopeRef } from "@generalbusiness/artroom-contract";
-import { canonicalize, entryHash, isFactRef, isOperationId, parseStrict, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
-import { isEntryOf, type Operation } from "@generalbusiness/artroom-derive";
-import { DESTINATION, DESTINATION_KINDS, destinationBranch, destinationMint, destinationRead, destinationReceipt, destinationRevokedMint, destinationSends, destinationStatement, destinationTarget, destinationWrite, firstHeadCommit, foundingObjects, isRecordedJudgeEvidence, revokedToken, type DestinationObject, type ObjectFormat, type RecordedJudgeEvidence } from "@generalbusiness/artroom-platform";
+import type { Entry, FactRef, FieldValue, KeyId, OperationId, PlatformDefinition, RetainedInput, ScopeRef } from "@generalbusiness/artroom-contract";
+import { canonicalize, entryHash, isFactRef, isKeyId, isOperationId, parseStrict, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
+import { isEntryOf, valueDigest, type Operation } from "@generalbusiness/artroom-derive";
+import { DESTINATION, DESTINATION_KINDS, destinationBranch, destinationMint, destinationRead, destinationReceipt, destinationRevokedMint, destinationSends, destinationStatement, destinationTarget, destinationWrite, firstHeadCommit, foundingObjects, isRecordedJudgeEvidence, revokedToken, platform, type DestinationObject, type ObjectFormat, type RecordedJudgeEvidence } from "@generalbusiness/artroom-platform";
 import type { CredentialPosition, CredentialStore, RevocationPosition } from "./credential-store.ts";
 import type { OutsideGiven } from "./object.ts";
 import type { EffectAnswer, EffectRequest, Outside } from "./operations.ts";
@@ -13,6 +13,9 @@ export interface DestinationRepository { host: string; namespace: string; name: 
 export interface DestinationBinding { scope: ScopeRef; mint: OperationId; attempt: number; write: OperationId; writeAttempt: number; ref: string }
 export interface DestinationInspection { repository: DestinationRepository; ref: string; recorded: string | null; base: string; integration: string; tree: string; reports: readonly string[] }
 export interface DestinationProvider {
+  /** Optional until an exact read-token definition is supplied. No automatic retry. */
+  mintRead?(repository: DestinationRepository, request: { handle: string; seconds: number }): Promise<unknown>;
+  remote?(repository: DestinationRepository): string;
   format(repository: DestinationRepository): Promise<ObjectFormat>;
   /** Own reply: {id, ends, plaintext}, or {minted:false}. No request is retried here. */
   mint(repository: DestinationRepository, binding: DestinationBinding): Promise<unknown>;
@@ -25,7 +28,7 @@ export interface DestinationProvider {
   send(request: { repository: DestinationRepository; ref: string; old: string | null; commit: string; objects: readonly DestinationObject[]; expectedTree?: string; requireParentless: boolean; token: string; binding: DestinationBinding; allowed(): boolean }): Promise<unknown>;
   inspect(context: DestinationInspection): Promise<{ evidence: RecordedJudgeEvidence; retain?: readonly RetainedInput[] }>;
 }
-export interface DestinationHostOptions { host: string; namespace: string; provider: DestinationProvider; custody: Pick<CredentialStore, "put" | "reply" | "live" | "read" | "judged" | "revoked" | "pending" | "expectRevoke" | "revocations"> }
+export interface DestinationHostOptions { host: string; namespace: string; provider: DestinationProvider; custody: Pick<CredentialStore, "put" | "reply" | "live" | "read" | "judged" | "revoked" | "pending" | "expectRevoke" | "revocations" | "held" | "take"> }
 
 const sameScope = (a: ScopeRef, b: ScopeRef) => canonicalize(a) === canonicalize(b);
 const objectId = (v: unknown): v is string => typeof v === "string" && /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(v);
@@ -47,7 +50,7 @@ export class DestinationHost implements Outside {
   #revokeCursor: RevocationPosition | null = null;
   constructor(given: OutsideGiven, options: DestinationHostOptions) { this.#given = given; this.#options = options; }
 
-  accepts(owner: string, kind: string): boolean { return owner === DESTINATION && (Object.values(DESTINATION_KINDS) as string[]).includes(kind); }
+  accepts(owner: string, kind: string): boolean { return this.#reads()?.accepts(owner, kind) === true || owner === DESTINATION && (Object.values(DESTINATION_KINDS) as string[]).includes(kind); }
   /** Repeating these reads never repeats a host mutation. The driver keeps the same attempt. */
   readonly recovery = {
     accepts: (owner: string, kind: string): boolean => owner === DESTINATION && [DESTINATION_KINDS.judge, DESTINATION_KINDS.read, DESTINATION_KINDS.adoptRead].includes(kind as "judge" | "read" | "adopt-read"),
@@ -89,6 +92,8 @@ export class DestinationHost implements Outside {
     // pass so a later mint whose text sorts earlier is still found.
     this.#replyCursor = page.more && last ? { mint: last.mint, attempt: last.attempt } : null;
     for (const held of page.items) {
+      const readAnswer = this.#reads()?.reply(held);
+      if (readAnswer) { answers.push({ operation: held.mint, attempt: held.attempt, answer: readAnswer }); continue; }
       const operation = this.#given.state.operation(held.mint);
       if (operation?.owner !== DESTINATION || operation.kind !== DESTINATION_KINDS.mint || !text(held.id) || timeMs(held.ends) === null) continue;
       const origin = this.#given.own(Number(held.mint.split(":")[0]));
@@ -100,6 +105,7 @@ export class DestinationHost implements Outside {
 
   async send(request: EffectRequest): Promise<EffectAnswer | null> {
     try {
+      if (this.#reads()?.accepts(request.owner, request.kind)) return await this.#reads()!.send(request);
       const context = this.#bound(request);
       if (!context) return null;
       const { operation, repository, ref } = context;
@@ -143,6 +149,8 @@ export class DestinationHost implements Outside {
 
   /** Only the actual committed outcome releases custody for use or drops a revoked secret. */
   judged(at: { scope: ScopeRef; operation: OperationId; attempt: number }, sealed: Sealed | null): void {
+    const read = this.#reads();
+    if (read?.accepts(this.#given.state.operation(at.operation)?.owner ?? "", this.#given.state.operation(at.operation)?.kind ?? "")) return read.judged(at, sealed);
     const scope = this.#given.scope();
     const operation = this.#given.state.operation(at.operation);
     if (!scope || !sameScope(scope.at, at.scope) || operation?.owner !== DESTINATION || (operation.kind !== DESTINATION_KINDS.mint && operation.kind !== DESTINATION_KINDS.revoke)) return;
@@ -160,6 +168,21 @@ export class DestinationHost implements Outside {
     }
     const body = valid && input.type === "outcome" ? members(input.evidence.body, ["token", "ends"]) : null;
     this.#options.custody.judged(at.operation, at.attempt, body && text(body["token"]) && typeof body["ends"] === "string" && timeMs(body["ends"]) !== null ? { id: body["token"], ends: body["ends"] } : null);
+  }
+
+  /** The selected catalog definition must advertise both read boundaries.
+   * Native @1 currently has neither. Its literal naming fence is preparation,
+   * not a policy for archived clone-era @1 bundles; historical source selection
+   * must reconcile those separately. This creates no catalog data. */
+  #reads(): DestinationReadTokens | null {
+    const named = this.#given.genesis()?.seed.definition;
+    if (typeof named !== "string" || named === "platform:destination@1" || !named.startsWith("platform:destination@")) return null;
+    const code = platform(named as PlatformDefinition);
+    return code?.data.acts["read-token"] && code.data.outcomes["mint-read"]
+      ? new DestinationReadTokens(this.#given, this.#options, named as PlatformDefinition) : null;
+  }
+  credential(handle: string, key: KeyId): { token: string; ends: string; remote: string } | null {
+    return this.#reads()?.credential(handle, key) ?? null;
   }
 
   #confirmation(operation: Operation, attempt: number): Sealed | null {
@@ -295,5 +318,94 @@ export class DestinationHost implements Outside {
     }
     const recorded = branch?.values["head"];
     return { repository, ref, recorded: objectId(recorded) ? recorded : null, base, integration, tree, reports };
+  }
+}
+
+/** The read-credential boundary, independent of a platform catalog. Production
+ * DestinationHost supplies it only for shipped data declaring read-token and
+ * mint-read. Tests may script recorded entries and must label that boundary. */
+export class DestinationReadTokens {
+  constructor(readonly given: OutsideGiven, readonly options: DestinationHostOptions, readonly owner: PlatformDefinition) {}
+  accepts(owner: string, kind: string): boolean { return owner === this.owner && kind === "mint-read"; }
+
+  #bound(request: EffectRequest): { operation: Operation; repository: DestinationRepository; hours: number } | null {
+    const scope = this.given.scope();
+    if (!scope || scope.at.kind !== "destination" || !sameScope(scope.at, request.scope) || this.given.genesis()?.seed.definition !== this.owner || !this.accepts(request.owner, request.kind) || !isOperationId(request.operation) || request.attempt !== 1) return null;
+    const operation = this.given.state.operation(request.operation);
+    if (!operation || operation.owner !== this.owner || operation.kind !== "mint-read" || !operation.attempts.some((attempt) => attempt.attempt === request.attempt)) return null;
+    const [seq, k] = request.operation.split(":").map(Number);
+    const origin = this.given.own(seq!);
+    if (!origin || !sameScope(origin.entry.at, scope.at) || origin.hash !== request.origin.hash || entryHash(request.origin.entry) !== origin.hash || canonicalize(origin.entry) !== canonicalize(request.origin.entry)) return null;
+    const opens = origin.entry.effects.filter((effect) => effect.effect === "operation" && effect.k === k);
+    if (opens.length !== 1 || opens[0]!.effect !== "operation" || opens[0]!.owner !== this.owner || opens[0]!.kind !== "mint-read") return null;
+    const input = origin.entry.input;
+    const branch = destinationBranch(this.given.state);
+    const hours = input.type === "act" ? input.signed.intent.fields["hours"] : null;
+    if (input.type !== "act" || input.signed.intent.kind !== "read-token" || !input.signed.intent.to || !sameScope(input.signed.intent.to, scope.at) || input.signed.intent.on !== branch?.id || !isKeyId(input.signed.intent.actor) || typeof hours !== "number" || !Number.isSafeInteger(hours) || hours < 1 || hours > 24) return null;
+    const repository = members(branch?.values["repository"], ["host", "namespace", "name", "id"]);
+    if (!repository || !Object.values(repository).every(text) || repository["host"] !== this.options.host || repository["namespace"] !== this.options.namespace) return null;
+    return { operation, repository: repository as unknown as DestinationRepository, hours };
+  }
+  #request(mint: OperationId, attempt: number): EffectRequest | null {
+    const scope = this.given.scope();
+    const origin = this.given.own(Number(mint.split(":")[0]));
+    return scope && origin ? { scope: scope.at, operation: mint, attempt, owner: this.owner, kind: "mint-read", origin } : null;
+  }
+  async send(request: EffectRequest): Promise<EffectAnswer | null> {
+    try {
+      const context = this.#bound(request);
+      if (!context || !this.options.provider.mintRead) return null;
+      const kept = this.options.custody.reply(request.operation, request.attempt);
+      if (kept) return answer("confirmed", { token: kept.id, ends: kept.ends });
+      const id = `read:${valueDigest("artroom.read-credential.v1", { scope: request.scope, operation: request.operation, attempt: request.attempt, origin: request.origin.hash } as unknown as FieldValue)}`;
+      const reply = await this.options.provider.mintRead(context.repository, { handle: id, seconds: context.hours * 3600 });
+      // A reply cannot be kept against a replaced scope or operation.
+      if (!this.#bound(request)) return null;
+      if (members(reply, ["minted"])?.["minted"] === false) return answer("refused", {});
+      const body = members(reply, ["id", "ends", "plaintext"]);
+      if (!body || body["id"] !== id || typeof body["ends"] !== "string" || timeMs(body["ends"]) === null || typeof body["plaintext"] !== "string" || !/^[!-~]{1,4096}$/.test(body["plaintext"])) return null;
+      const held = this.options.custody.put({ id, ends: body["ends"], plaintext: body["plaintext"], mint: request.operation, attempt: request.attempt });
+      return held === "stored" || held === "repeat" ? answer("confirmed", { token: id, ends: body["ends"] }) : null;
+    } catch { return null; }
+  }
+  reply(held: CredentialPosition & { id: string; ends: string }): EffectAnswer | null {
+    const request = this.#request(held.mint, held.attempt);
+    return request && this.#bound(request) && text(held.id) && timeMs(held.ends) !== null ? answer("confirmed", { token: held.id, ends: held.ends }) : null;
+  }
+  #confirmation(operation: Operation, attempt: number): Sealed | null {
+    const scope = this.given.scope();
+    const confirmed = operation.attempts.find((opened) => opened.attempt === attempt)?.outcomes.find((outcome) => outcome.result === "confirmed");
+    const sealed = confirmed ? this.given.own(confirmed.seq) : null;
+    const input = sealed?.entry.input;
+    return scope && sealed && sameScope(sealed.entry.at, scope.at) && entryHash(sealed.entry) === sealed.hash && input?.type === "outcome" && input.operation === operation.id && input.attempt === attempt && input.owner === this.owner && input.kind === "mint-read" && input.result === "confirmed" && input.evidence.basis === "own-answer" ? sealed : null;
+  }
+  judged(at: { scope: ScopeRef; operation: OperationId; attempt: number }, sealed: Sealed | null): void {
+    const request = this.#request(at.operation, at.attempt);
+    const context = request && sameScope(request.scope, at.scope) ? this.#bound(request) : null;
+    if (!context) return;
+    const recorded = this.#confirmation(context.operation, at.attempt);
+    if (sealed && (!recorded || recorded.hash !== sealed.hash || canonicalize(recorded.entry) !== canonicalize(sealed.entry))) return;
+    const input = recorded?.entry.input;
+    const body = input?.type === "outcome" ? members(input.evidence.body, ["token", "ends"]) : null;
+    this.options.custody.judged(at.operation, at.attempt, body && text(body["token"]) && typeof body["ends"] === "string" && timeMs(body["ends"]) !== null ? { id: body["token"], ends: body["ends"] } : null);
+  }
+  credential(handle: string, key: KeyId): { token: string; ends: string; remote: string } | null {
+    try {
+      if (!text(handle) || !isKeyId(key)) return null;
+      const held = this.options.custody.held(handle);
+      const request = held ? this.#request(held.mint, held.attempt) : null;
+      const context = request ? this.#bound(request) : null;
+      if (!held || held.state !== "live" || !context || !this.options.provider.remote) return null;
+      const input = this.#confirmation(context.operation, held.attempt)?.entry.input;
+      const body = input?.type === "outcome" ? members(input.evidence.body, ["token", "ends"]) : null;
+      const opening = request!.origin.entry.input;
+      if (body?.["token"] !== handle || body["ends"] !== held.ends || opening.type !== "act" || opening.signed.intent.actor !== key) return null;
+      const remote = this.options.provider.remote(context.repository);
+      if (typeof remote !== "string" || !/^https:\/\//i.test(remote) || /[\x00-\x20\x7f-\x9f]/.test(remote)) return null;
+      const url = new URL(remote);
+      if (url.protocol !== "https:" || url.username !== "" || url.password !== "") return null;
+      const taken = this.options.custody.take(handle, this.given.clock.read());
+      return taken ? { token: taken.plaintext, ends: taken.ends, remote } : null;
+    } catch { return null; }
   }
 }

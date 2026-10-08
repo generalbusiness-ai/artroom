@@ -102,6 +102,18 @@ export class GitHubProvider implements RegisterProvider, DestinationProvider {
     // Lost replies or failed custody remain pending; this port never remints.
     return { id, ends: token.expiresAt, plaintext: token.plaintext };
   }
+  /** One repository-restricted read installation token; GitHub fixes its expiry. */
+  async mintRead(repository: DestinationRepository, request: { handle: string; seconds: number }): Promise<unknown> {
+    repository = { ...repository };
+    this.#remote(repository);
+    const id = handle(request.handle);
+    if (!Number.isSafeInteger(request.seconds) || request.seconds < 3600 || request.seconds > 86400 || request.seconds % 3600 !== 0) return bad();
+    await this.#identity(repository, await this.#options.readCredential({ ...repository }));
+    const token = await this.#app.mintInstallationToken({ repositoryIds: [numericId(repository.id)], permissions: { contents: "read" } });
+    return { id, ends: token.expiresAt, plaintext: token.plaintext };
+  }
+  remote(repository: DestinationRepository): string { return this.#remote({ ...repository }); }
+
   async revoke(id: string, plaintext: string): Promise<unknown> {
     handle(id);
     await this.#app.revokeToken(plaintext);
@@ -149,14 +161,18 @@ export class GitHubProvider implements RegisterProvider, DestinationProvider {
   #transport(remote: string) {
     return { remote, maxBytes: this.#options.maxBytes, bounds: this.#bounds, ...(this.#options.app.fetch === undefined ? {} : { fetch: this.#options.app.fetch }), ...(this.#options.app.timeoutMs === undefined ? {} : { timeoutMs: this.#options.app.timeoutMs }) };
   }
-  async #source(repository: DestinationRepository): Promise<SmartHttpSource> {
-    repository = { ...repository };
-    const remote = this.#remote(repository);
-    const plaintext = await this.#options.readCredential({ ...repository });
+  /** The same stable-ID lookup protects reads and a read-token's named remote. */
+  async #identity(repository: DestinationRepository, plaintext: string | undefined): Promise<void> {
     // Lookup validates the configured account and the recorded stable ID.
     // A missing/unexposed lookup is uncertainty, never an absent Git object.
     const seen = await this.#app.repository(repository.name, plaintext);
     if (seen === null || seen.id !== numericId(repository.id)) return bad();
+  }
+  async #source(repository: DestinationRepository): Promise<SmartHttpSource> {
+    repository = { ...repository };
+    const remote = this.#remote(repository);
+    const plaintext = await this.#options.readCredential({ ...repository });
+    await this.#identity(repository, plaintext);
     return new SmartHttpSource({ ...this.#transport(remote), ...(plaintext === undefined ? {} : { authorization: gitAuthorization(plaintext) }) });
   }
 }

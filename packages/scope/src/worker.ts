@@ -94,6 +94,8 @@ import { NO_OUTSIDE, type Outside } from "./operations.ts";
 export interface Env extends GitHubBindings, ArtifactsBindings { SCOPES: DurableObjectNamespace; SESSION_SECRET?: string; DEPLOYMENT?: string }
 
 /** A scope's surface as a caller over RPC has it. */
+type ReadCredential = { token: string; ends: string; remote: string };
+
 interface Remote {
   found(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions?: readonly DeclaredDefinition[], beside?: Beside): Promise<Founded>;
   submit(signed: SignedIntent, grants: readonly Grant[], beside?: Beside, address?: string | null): Promise<Answer>;
@@ -110,6 +112,7 @@ interface Remote {
   session(asked: unknown): Promise<SessionAnswer>;
   stream(reader: unknown): Promise<Opened | StreamRefusal>;
   release(id: string): Promise<void>;
+  credential(reader: unknown, handle: string): Promise<Read<ReadCredential>>;
   incidents(reader: unknown, cursor?: Cursor): Promise<Read<readonly Incident[]>>;
   waiting(reader: unknown, list: "diagnosed" | "unanswered", cursor?: Cursor): Promise<Read<readonly Duty[]>>;
 }
@@ -118,6 +121,7 @@ const MISSING = { ok: false, reason: "not-found" } as const;
 
 /** The contract's operations, and the four that sessions and the operator's lists add. None of the four writes an entry. */
 export interface Api extends ScopeApi {
+  credential(scope: string, reader: unknown, handle: string): Promise<Read<ReadCredential>>;
   session(scope: string, asked: unknown): Promise<SessionAnswer>;
   /** The body is the reader's side of the stream (`relay`): cancelling it releases the scope's subscription at once. */
   stream(scope: string, reader: unknown): Promise<ReadableStream<Uint8Array> | StreamRefusal | typeof MISSING>;
@@ -172,6 +176,7 @@ export function api(binding: Binding, address: string | null = null): Api {
       if (!object || !opened) return MISSING;
       return "body" in opened ? relay(opened, () => object.release(opened.id)) : opened;
     },
+    async credential(scope: string, reader: unknown, handle: string): Promise<Read<ReadCredential>> { return (await at(scope)?.credential(reader, handle)) ?? MISSING; },
     async incidents(scope: string, reader: unknown, cursor?: Cursor): Promise<Read<readonly Incident[]>> { return (await at(scope)?.incidents(reader, cursor)) ?? MISSING; },
     async waiting(scope: string, reader: unknown, list: "diagnosed" | "unanswered", cursor?: Cursor): Promise<Read<readonly Duty[]>> { return (await at(scope)?.waiting(reader, list, cursor)) ?? MISSING; },
   };
@@ -275,6 +280,10 @@ export async function route(request: Request, binding: Binding): Promise<Respons
   if (what === "retained") return read(await scopes.retained(scope, reader, which as RetainedInput["kind"], last as Digest, url.searchParams.get("domain") ?? undefined));
   if (what === "incidents") return read(await scopes.incidents(scope, reader, cursor));
   if (what === "waiting" && (which === "diagnosed" || which === "unanswered")) return read(await scopes.waiting(scope, reader, which, cursor));
+  if (what === "credential" && which !== undefined && last === undefined) {
+    const answer = await scopes.credential(scope, reader, which);
+    return new Response(JSON.stringify(answer), { status: answer.ok ? 200 : READ_STATUS[answer.reason], headers: { "content-type": "application/json", "cache-control": "no-store" } });
+  }
   if (what === "stream") {
     const stream = await scopes.stream(scope, reader);
     // The body is the reader's side of the scope's stream. A reader that goes away cancels it, and the scope releases the subscription at once.
@@ -307,6 +316,7 @@ export function outsideOf(given: OutsideGiven, sql: Pick<SqlStorage, "exec">, en
       read: (request) => pick().recovery?.read(request) ?? Promise.resolve(null),
     },
     replies: (limit) => pick().replies?.(limit) ?? { answers: [], more: false },
+    credential: (handle, key) => pick().credential?.(handle, key) ?? null,
   };
 }
 

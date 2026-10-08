@@ -3,7 +3,7 @@
  * no state of a process, so a test runs the same lines as a person types.
  */
 
-import { act, acts, claim, install, invite, join, log, show, verify, type Context, type Outcome } from "./commands.ts";
+import { act, acts, claim, clone, install, invite, join, log, remote, show, verify, type Context, type Outcome } from "./commands.ts";
 
 export const USAGE = [
   "Usage:",
@@ -16,6 +16,8 @@ export const USAGE = [
   "  artroom log <scope> [--limit n]",
   "  artroom show <scope>:<seq>",
   "  artroom verify <scope>",
+  "  artroom remote",
+  "  artroom clone [<directory>] [--hours 1]",
   "A scope is a scope ID, or one of: register, directory, membership, rules, destination, inbox.",
 ].join("\n");
 
@@ -44,7 +46,7 @@ export function parse(argv: readonly string[]): { words: string[]; flags: Map<st
 }
 
 const KNOWN: Record<string, readonly string[]> = {
-  install: ["host", "namespace"], claim: ["handle", "branch", "again"], invite: ["role", "acts", "hours"], join: [], acts: [], act: ["on", "target", "set"], log: ["limit"], show: [], verify: [],
+  install: ["host", "namespace"], claim: ["handle", "branch", "again"], invite: ["role", "acts", "hours"], join: [], acts: [], act: ["on", "target", "set"], log: ["limit"], show: [], verify: [], remote: [], clone: ["hours"],
 };
 
 /** Runs one command line with the given context. */
@@ -66,6 +68,8 @@ export async function command(ctx: Context, argv: readonly string[]): Promise<Ou
     case "act": return first === undefined ? needs("an act kind") : act(ctx, first, { ...(flag("on") ? { on: flag("on")! } : {}), ...(flag("target") ? { target: number("target")! } : {}), set: parsed.flags.get("set") ?? [] });
     case "log": return log(ctx, first, { ...(flag("limit") ? { limit: number("limit")! } : {}) });
     case "show": return first === undefined ? needs("an entry") : show(ctx, first);
+    case "remote": return first === undefined ? remote(ctx) : { code: 2, lines: ["remote takes no argument.", USAGE] };
+    case "clone": return clone(ctx, first, { ...(flag("hours") ? { hours: number("hours")! } : {}) });
     default: return verify(ctx, first);
   }
 }
