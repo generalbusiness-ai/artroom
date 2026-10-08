@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import type { Entry, OperationId, Seed } from "@generalbusiness/artroom-contract";
+import type { Entry, OperationId, Receipt, Seed } from "@generalbusiness/artroom-contract";
 import { b64url, canonicalize, intentDigest, scopeIdOf, seedDigest, textDigest, timeMs, timeOf } from "@generalbusiness/artroom-bytes";
 import type { EffectRequest } from "../../scope/src/operations.ts";
 import type { Fetch } from "@generalbusiness/artroom-client";
@@ -61,7 +61,7 @@ async function recovering(): Promise<void> {
     const store = memoryStore();
     const submissions: string[] = [];
     let fault = true;
-    let badReceipt = false;
+    let badReceipt: "hash" | "definition" | "intent" | null = null;
     const ctx: Context = {
       now: () => timeMs(net.clock.now)!,
       store: { ...store, save: async (config) => {
@@ -78,14 +78,16 @@ async function recovering(): Promise<void> {
         const response = await routed(url, init);
         if (founding && mode === "reply" && fault) { fault = false; throw new Error("simulated accepted reply loss"); }
         if (founding && badReceipt) {
-          const answer = await response.json() as { receipt: { fact: { hash: string } } };
-          answer.receipt.fact.hash = textDigest("another entry");
+          const answer = await response.json() as { receipt: Receipt };
+          if (badReceipt === "hash") answer.receipt.fact.hash = textDigest("another entry");
+          if (badReceipt === "definition") answer.receipt.definition = answer.receipt.definition === "platform:register@1" ? "platform:register@2" : "platform:register@1";
+          if (badReceipt === "intent") answer.receipt.intent = textDigest("another intent");
           return new Response(JSON.stringify(answer), { headers: { "content-type": "application/json" } });
         }
         return response;
       }) as Fetch,
     };
-    return { ctx, store, submissions, receipt: (bad: boolean) => { badReceipt = bad; } };
+    return { ctx, store, submissions, receipt: (bad: typeof badReceipt) => { badReceipt = bad; } };
   };
   for (const mode of ["reply", "save"] as const) {
     const s = scenario(mode);
@@ -108,10 +110,14 @@ async function recovering(): Promise<void> {
     }
     net.clock.now = timeOf(Date.parse(original.founding.intent.notAfter) + 1000);
     if (mode === "reply") {
-      s.receipt(true);
-      expect((await command(s.ctx, ["install", "--planned"])).lines[0]).toMatch(/^The install receipt does not prove/);
-      expect(await s.store.config()).toEqual(pending);
-      s.receipt(false);
+      // Only the accepted receipt is changed. The real genesis read still
+      // proves the original entry, so it cannot detect wrong receipt metadata.
+      for (const field of ["hash", "definition", "intent"] as const) {
+        s.receipt(field);
+        expect((await command(s.ctx, ["install", "--planned"])).lines[0]).toMatch(/^The install receipt does not prove/);
+        expect(await s.store.config()).toEqual(pending);
+      }
+      s.receipt(null);
     }
     const recovered = await command(s.ctx, ["install", "--planned"]);
     expect([recovered.code, (await s.store.config())!.register?.scope, (await s.store.config())!.plan]).toEqual([0, original.register, undefined]);

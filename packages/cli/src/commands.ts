@@ -377,6 +377,9 @@ export function installPlanned(ctx: Context): Promise<Outcome> {
     const { answer } = await found(transportOf(ctx, plan.service), plan.founding, plan.definition);
     const receipt = accepted(answer, null, "Installed").receipt;
     if (receipt.fact.at.scope !== plan.register) return failed(`The register founded is ${receipt.fact.at.scope}, not the planned ${plan.register}. The plan is kept; report this.`);
+    if (receipt.definition !== plan.definition || receipt.intent !== intentDigest(plan.founding.intent)) {
+      return failed("The install receipt does not prove the planned register's exact founding. The plan is kept; report this.");
+    }
     const handle = new ScopeHandle(signedReads(transportOf(ctx, plan.service), secretSigner(operator!), readSigning(ctx)), plan.register, null);
     const followed = await handle.followReceipt(receipt);
     if (!followed.ok || followed.entry.seq !== 0 || followed.entry.at.kind !== "register" || followed.entry.input.type !== "genesis"

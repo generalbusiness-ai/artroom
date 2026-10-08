@@ -79,3 +79,26 @@ This remains predecessor source preparation. Main's Gate 1 repairs must
 be preserved during integration. The original request still owes the
 integrated gate, independent review, filing order and witnessed landing;
 this note closes none of them.
+
+## Receipt metadata correction
+
+Under the same `da1a` request and `79e1bac1` adoption, planned install now
+checks the receipt's definition against the exact planned pin and its
+intent digest against the original founding before following the receipt
+or saving installed configuration. A mismatch keeps the pending plan.
+The existing recovery witness changes each metadata member in a shape-valid
+accepted answer while leaving the actual genesis read unchanged. That read
+alone cannot detect incorrect receipt metadata.
+
+CLI source, Node-test and scope-test typechecks passed. The focused saved-plan
+and real-scope install witnesses passed: two files, three tests. A manual
+control removed this exact metadata guard; the recovery assertion then failed
+because an altered definition was reported installed. The source was restored.
+An earlier helper invocation selected Node's runner at the root and never
+started Vitest; an early-restoration attempt supplied no control evidence.
+Neither is counted as a successful control. No whole gate was run.
+
+The genesis proof read and its inherited bootstrap window remain unchanged
+pending the owner's disposition. This correction does not substitute a
+shape-valid response for independently checked genesis bytes, refresh an
+envelope, widen read authority or approve native acknowledgement as that proof.
