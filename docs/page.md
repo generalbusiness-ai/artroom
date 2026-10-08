@@ -46,9 +46,11 @@ origin can read. The site route's pages, on the same origin, run no script
 
 Open `<base URL>/page/` and go to Settings (`#/settings`). Give it:
 
-- **The base URL**, only if the routes are on another origin than the
-  page. Empty means the page's own origin, which is the case when the
-  scope Worker serves it.
+- **The base URL** of this page's own service. Empty means the page's
+  origin. Settings refuses another origin by name before keeping settings
+  or sending a request; previously saved cross-origin settings are refused
+  too. Open that service's `/page/` instead. The page's current policy and
+  routes do not support cross-origin service configuration.
 - **The room**: an invitation link from `artroom invite`, or the content of
   the command line's `config.json`. The page keeps only the room it names:
   the directory's scope ID, and membership's scope ID with its
@@ -143,8 +145,10 @@ that the room's records show, with the record it comes from:
   act. It does not follow the scopes' streams.
 - **Editing the rules** is the generic form of `publish`, with the
   extents as JSON. There is no rules editor.
-- **Another origin.** The routes set no cross-origin headers. A page
-  served elsewhere than the scope Worker cannot read them.
+- **Another origin.** The routes set no cross-origin headers and the page
+  allows connections only to its own origin. Settings rejects a different
+  service origin as unsupported. A reviewed cross-origin trust and route
+  boundary remains owed; this refusal does not implement or waive it.
 
 ## Tests
 

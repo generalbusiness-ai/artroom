@@ -21,7 +21,7 @@
 
 import type { Answer, FieldValue, ScopeId } from "@generalbusiness/artroom-contract";
 import { b64url, keyIdOfSecret, unb64url } from "@generalbusiness/artroom-bytes";
-import { act, actAssociation, actsOn, fieldValue, joinRoom, listLanes, loadChange, loadIssue, loadRules, openRoom, placeOf, type Acted, type Place, type Room, type Session } from "./data.ts";
+import { act, actAssociation, actsOn, fieldValue, joinRoom, listLanes, loadChange, loadIssue, loadRules, openRoom, placeOf, pageService, Unreadable, type Acted, type Place, type Room, type Session } from "./data.ts";
 import { actsPanel, answerLine, changeScreen, failureScreen, h, issueScreen, roomScreen, rulesScreen } from "./view.ts";
 
 const KEPT = "artroom-page";
@@ -48,9 +48,10 @@ function keep(kept: Settings): void {
 }
 
 const sessionOf = (kept: Settings): Session => {
+  const service = pageService(kept.service, location.origin);
   const secret = unb64url(kept.secret);
   if (!secret || secret.length !== 32) throw new Error("The key kept in this browser is not a 32-byte secret. Set a key in Settings.");
-  return { service: kept.service || location.origin, secret };
+  return { service, secret };
 };
 
 const root = (): HTMLElement => document.getElementById("page")!;
@@ -100,7 +101,7 @@ function settingsScreen(): HTMLElement {
   const said = h("p", { class: "answer", role: "status", hidden: "" });
   const tell = (good: boolean, text: string) => { said.textContent = text; said.className = `answer ${good ? "ok" : "bad"}`; said.removeAttribute("hidden"); };
   const form = h("form", {},
-    h("label", {}, "Base URL of the scope service ", service),
+    h("label", {}, "Base URL of this page's scope service ", service),
     h("label", {}, "Room ", room),
     h("label", {}, "Key ", secret),
     h("button", { type: "submit" }, "Keep in this browser"),
@@ -108,10 +109,13 @@ function settingsScreen(): HTMLElement {
     h("button", { type: "button", id: "join" }, "Join with the invitation link"),
   );
   const read = (newSecret: string | null): Settings | null => {
+    let base: string;
+    try { base = pageService((service as HTMLInputElement).value, location.origin); }
+    catch (error) { tell(false, error instanceof Unreadable ? error.message : "Invalid service URL."); return null; }
     const typed = (room as HTMLTextAreaElement).value.trim();
     const place = typed ? placeOf(typed) : kept?.place ?? null;
     if (typed && !place) { tell(false, "That is neither an invitation link nor a config file that names a repository."); return null; }
-    return { service: (service as HTMLInputElement).value.trim(), place, secret: newSecret ?? ((secret as HTMLInputElement).value.trim() || kept?.secret || "") };
+    return { service: base, place, secret: newSecret ?? ((secret as HTMLInputElement).value.trim() || kept?.secret || "") };
   };
   const save = (next: Settings) => { keep(next); roomDraft = ""; (room as HTMLTextAreaElement).value = ""; opened = null; location.hash = "#/"; };
   form.addEventListener("submit", (event) => { event.preventDefault(); const next = read(null); if (next) save(next); });
@@ -135,6 +139,7 @@ function settingsScreen(): HTMLElement {
     h("p", {}, key && key.length === 32 ? `This browser keeps key ${keyIdOfSecret(key)}.` : "This browser keeps no key yet."),
     h("p", {}, kept?.place ? `The room: directory ${kept.place.directory}, membership ${kept.place.membership.scope}.` : "No room is set yet."),
     h("p", { class: "muted" }, "A key is a member's once membership enrols it. With an invitation link from artroom invite, make a new key here and join with the link; or paste the key that the command line keeps in keys/device.key with its config.json. The page shows a key ID, never the key."),
+    h("p", { class: "muted" }, "This page uses its own service origin. Cross-origin service configuration is not supported."),
     said, form);
 }
 
