@@ -376,13 +376,13 @@ test("an empty tree: the root of a commit with no files answers a page that says
   expect(await empty.text()).toContain("<h1>empty</h1>\n<p>The repository has no files at this commit.</p>");
 });
 
-// Invariant: every page names the room and links to the root at the same ref, shows the branch or tag, links to the versions,
+// Invariant: every page labels the recorded repository and links to the root at the same ref, shows the branch or tag, links to the versions,
 // has a breadcrumb of its path, and a footer that names the commit it was rendered from and links to the room's page.
-test("navigation: the header names the room and the branch or tag, the breadcrumb links each folder of the path, and the footer names the commit and links to /page/ (STAND-IN host)", async () => {
+test("navigation: the header labels the repository and the branch or tag, the breadcrumb links each folder of the path, and the footer names the commit and links to /page/ (STAND-IN host)", async () => {
   const at = (ref: string) => `/site/${D.name}/${ref}/`;
   const start = await page(await get(`${at("nav")}guide/start.md`));
   expect(start.status).toBe(200);
-  expect(start.body).toContain(`<header><a class="room" href="${at("nav")}">${host.name}</a> <span class="version">tag nav</span> <a href="/site/${D.name}/versions/">versions</a></header>`);
+  expect(start.body).toContain(`<header><a class="room" href="${at("nav")}">Repository: ${host.name}</a> <span class="version">tag nav</span> <a href="/site/${D.name}/versions/">versions</a></header>`);
   expect(start.body).toContain(`<nav aria-label="Breadcrumb"><a href="${at("nav")}">nav</a> / <a href="${at("nav")}guide/">guide</a> / <a href="${at("nav")}guide/start.md">start.md</a></nav>`);
   expect(start.body).toContain(`<footer>Rendered from commit <code>${nav}</code>. <a href="/page/">The room's page</a>.</footer>`);
   // The published branch, by HEAD and by its name; the footer names the commit that the branch names.
@@ -440,7 +440,7 @@ test("versions: /site/<directory>/versions/ lists each branch and tag with its c
   // Branches first, then tags.
   expect(rows).toEqual([...expected.filter((r) => r[0] === "branch"), ...expected.filter((r) => r[0] === "tag")]);
   expect(rows.find((r) => r[2] === "release")![4]).not.toBe(host.refs.get("refs/tags/release"));
-  expect(versions.body).toContain(`<a class="room" href="/site/${D.name}/HEAD/">${host.name}</a>`);
+  expect(versions.body).toContain(`<a class="room" href="/site/${D.name}/HEAD/">Repository: ${host.name}</a>`);
   expect(versions.body).not.toContain("Rendered from commit");
 
   const etag = response.headers.get("etag")!;

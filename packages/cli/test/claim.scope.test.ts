@@ -47,9 +47,12 @@ async function resumed(): Promise<void> {
   let beforeFound = false;
   let unavailableFound = false;
   let unavailableSettlement = false;
+  let mismatchedDefinition = false;
+  const requestedPaths: string[] = [];
   let after: "seat" | "first-key" | null = null;
   const sent: Record<string, SignedIntent[]> = { found: [], seat: [], "first-key": [] };
   const fetch = (async (url: string, init?: RequestInit) => {
+    requestedPaths.push(new URL(url).pathname);
     const body = typeof init?.body === "string" ? JSON.parse(init.body) as { signed?: SignedIntent } : null;
     const settlement = new URL(url).pathname.endsWith("/settle");
     if (settlement && unavailableSettlement) { unavailableSettlement = false; return Response.json({ ok: false, reason: "unavailable" }); }
@@ -61,6 +64,14 @@ async function resumed(): Promise<void> {
     // STAND-IN for an unavailable reply, before delivery to the real Worker.
     if (kind === "found" && unavailableFound) { unavailableFound = false; return Response.json({ answer: "unavailable", reason: "unavailable" }); }
     const response = await routed(url, init);
+    if (kind === "found" && mismatchedDefinition) {
+      mismatchedDefinition = false;
+      // The Worker really admits the exact request under @2. Only this HTTP
+      // response metadata is scripted; the actual core's receipt is checked.
+      const actual = await response.json() as { answer: string; receipt: { definition: string } };
+      expect([actual.answer, actual.receipt.definition]).toEqual(["accepted", "platform:register@2"]);
+      return Response.json({ ...actual, receipt: { ...actual.receipt, definition: "platform:register@1" } });
+    }
     if (kind === after) { after = null; await response.body?.cancel(); throw new Error("scripted loss after accepted enrollment"); }
     return response;
   }) as unknown as Fetch;
@@ -110,11 +121,15 @@ async function resumed(): Promise<void> {
   await noSecret();
   expect([(await founds()).length, host.sent.length]).toEqual([1, 0]);
 
-  // --again signs a second found, which is now the pending one.
+  // --again signs a second found. A mismatched known definition in its
+  // accepted reply stops before directory routing, keeping the exact request.
+  mismatchedDefinition = true;
+  const beforeMismatch = requestedPaths.length;
   const again = await run("claim", "demo", "--handle", "@rita", "--again");
-  expect(again.code).toBe(1);
+  expect(again).toEqual({ code: 1, lines: ["No answer: The accepted reply names another register definition; its exact saved request remains pending."] });
+  expect(requestedPaths.slice(beforeMismatch).every((path) => path.startsWith(`/v1/scopes/${R.name}`))).toBe(true);
   const second = (await rita.store.config())!.claim!;
-  expect([(await founds()).length, second.intent === pending.claim!.intent, host.sent.length]).toEqual([2, false, 0]);
+  expect([(await founds()).length, second.intent === pending.claim!.intent, second.found!.accepted, host.sent.length]).toEqual([2, false, undefined, 0]);
   await noSecret();
 
   // The Git host's settings are set, and the register's object restarts. The host will create each repository.
@@ -182,7 +197,7 @@ async function resumed(): Promise<void> {
   expect([(await founds()).length, host.attempts.sort()]).toEqual([2, [`${(await founds())[0]!.seq}:0#1`, `${(await founds())[1]!.seq}:0#1`].sort()]);
   expect([(await enrollment("seat")).length, (await enrollment("first-key")).length]).toEqual([1, 1]);
   expect(sent["first-key"]).toEqual([keyedPending.firstKey!.signed, keyedPending.firstKey!.signed]);
-  expect(sent["found"]).toHaveLength(4); // three identical attempts + explicit --again.
+  expect(sent["found"]).toEqual([savedFound, savedFound, savedFound, second.found!.signed, second.found!.signed]); // The mismatched reply retries only its exact admitted envelope.
   await noSecret();
   // A legacy digest can recover its exact admitted found from the real
   // directory's retained claim, and its already admitted enrollment from

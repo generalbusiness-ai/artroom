@@ -16,7 +16,8 @@ A page's address is:
 
 - `<base-url>` is the scope Worker's address, the one given to
   `artroom install`.
-- `<directory>` is the room's directory scope ID (`sc_...`).
+- `<directory>` is the room's directory scope identifier (`sc_...`),
+  not a human name.
   `artroom claim` prints it ("Claimed demo: directory sc_..."), and the
   command line keeps it under the name `directory`.
 - `<ref>` is `HEAD`, a branch or a tag. `HEAD` is the room's published
@@ -44,13 +45,13 @@ Two more addresses:
 
 ## What every page shows
 
-- **A header.** The room's name, which links to the root of the same
-  branch or tag; the branch or tag shown, such as "branch main (HEAD)",
-  "branch draft" or "tag v1.0"; and a link to the versions page. The
-  room's name is the repository's name as the directory records it (the
-  name the register gave the repository at the Git host). The name given
-  to `artroom claim` is kept only by the command line, so the site cannot
-  show it.
+- **A header.** "Repository:" and the repository's name as the directory
+  records it, linking to the root of the same branch or tag; the branch
+  or tag shown, such as "branch main (HEAD)", "branch draft" or "tag v1.0";
+  and a link to the versions page. This is the name the register gave the
+  repository at the Git host. It is not a human claim name. Carrying a
+  signed claim display name into the directory and header remains a named
+  follow-up after the demo; the current signed fields do not contain it.
 - **A breadcrumb.** The ref, then each folder of the path, each a link,
   then the page itself.
 - **A footer.** "Rendered from commit" and the commit's ID, and a link to
@@ -131,8 +132,8 @@ as the specification's runner sets it.
   that cannot be read, and every page answers `unreadable`.
 - **Caching.** An answer may be kept for 60 seconds. Each answer has an
   `ETag` made from the commit, the path, and what the header shows: the
-  room's name, the ref as written in the address, and the branch or tag it
-  names. So the same file under `HEAD`, under the branch's name and under a
+  recorded repository name, the ref as written in the address, and the
+  branch or tag it names. So the same file under `HEAD`, under the branch's name and under a
   tag has three tags. A browser that asks again with that tag, while the
   ref still names the same commit, gets `304 Not Modified`, and the Worker
   reads no file. When the ref moves to a new commit, every page gets a new

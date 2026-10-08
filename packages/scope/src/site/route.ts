@@ -53,7 +53,7 @@ export const FILE_BYTES = 1024 * 1024;
 /** How long a cache may keep an answer before it asks again, in seconds. A branch can move, so this is short. */
 export const MAX_AGE = 60;
 /** Changes when the HTML of the same file at the same commit would change: it is part of every `ETag`. */
-const RENDERER = "site-2";
+const RENDERER = "site-3";
 /** How many annotated tags one ref may be followed through to its commit. */
 const TAG_DEPTH = 4;
 /** How many markdown files of one folder's listing are read for their titles. The rest are listed by name. */
@@ -213,7 +213,7 @@ async function peeled(reader: Reader, object: ObjectId): Promise<ObjectId> {
 
 /** What a page's header and footer show. */
 interface Frame {
-  /** The room's name, which links to `root`. */
+  /** The recorded repository name, which links to `root`; not a human claim name. */
   room: string;
   root: string;
   /** The branch or tag shown, as words. */
@@ -248,7 +248,7 @@ blockquote{margin-left:0;padding-left:1rem;border-left:.25rem solid #d1d9e0;colo
 </style>
 </head>
 <body>
-<header><a class="room" href="${escapeHtml(frame.root)}">${escapeHtml(frame.room)}</a> <span class="version">${escapeHtml(frame.version)}</span> <a href="${escapeHtml(frame.versions)}">versions</a></header>
+<header><a class="room" href="${escapeHtml(frame.root)}">Repository: ${escapeHtml(frame.room)}</a> <span class="version">${escapeHtml(frame.version)}</span> <a href="${escapeHtml(frame.versions)}">versions</a></header>
 <nav aria-label="Breadcrumb">${frame.crumbs}</nav>
 <main>
 ${body}</main>

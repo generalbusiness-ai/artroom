@@ -243,3 +243,31 @@ branch does not touch it.
 - The ETag covers the header's inputs: built and shown.
 - No wiki links, no search, no edit button: none built.
 - The converter untouched except where a title is read: `titleOf` only.
+
+
+## Combined sprint: honest repository label and named follow-up
+
+Owner decision `605bc3ba199d27944369bf3f4fbb5bf2b73fd6d1` selects the
+permitted named follow-up under request
+`530d18175f501c5587f570c3efe4bf61fe4bfa6d` and combined preparation
+`c878b983530dd68d5266589a6754b1fc4dae7a80`: **signed claim display name
+carried to directory and site header**, after demo submission. That
+obligation remains open. The earlier delivery and run records above are
+historical; they do not establish a human claim name in the current data.
+
+The current header now labels its actual `repository.name` value
+"Repository:". The directory scope ID in the site address is an
+identifier, not a human name. No signed field, founding schema, version
+cohort or old seed changes. The renderer cache tag advances from `site-2`
+to `site-3` so a cached header with the previous label does not answer 304
+for the changed rendered bytes. The existing navigation and versions
+assertions check the visible repository label; the other site assertions
+remain.
+
+Validation: `npm run test -w @generalbusiness/artroom-scope --
+test/site-route.test.ts` passed: 1 file, 13 tests, exit 0 (4.72 seconds),
+with the existing scripted Git host. Raw log:
+`/tmp/artroom-expanded-site-label.log`. Scope types had already passed
+before this wording-only change; no repeat typecheck was needed.
+No new gate, cloud, browser or provider proof. The full exact-head gate
+and Source review remain with the combined filing.

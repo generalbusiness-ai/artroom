@@ -450,7 +450,7 @@ export function claim(ctx: Context, name: string, options: { handle?: string; br
       registerDefinition = registered.definition;
       const shape = platform(registered.definition)!.data as unknown as DefinitionShape;
       const fields = { branch: options.branch ?? "main", founderHandle: handle, recoveryKey: recovery };
-      const signed = await signedIntent(signer, { to: register, kind: "found", fields, expected: expectedOf(shape.acts["found"]!, (await summaryOf(R)).items, null, fields) }, signing(ctx));
+      const signed = await signedIntent(signer, { to: register, kind: "found", fields, expected: expectedOf(shape.acts["found"]!, registered.items, null, fields) }, signing(ctx));
       pending = { register: register.scope, intent: intentDigest(signed.intent), handle, found: { signed } };
       await ctx.store.save({ ...base, claim: pending });
     }
@@ -500,7 +500,10 @@ export function claim(ctx: Context, name: string, options: { handle?: string; br
       }
       const receipt = accepted(await handle.submit(step.signed), at.scope, took).receipt;
       if (!isFactRef(receipt.fact) || canonicalize(receipt.fact.at) !== canonicalize(at) || receipt.intent !== digest) throw new TransportError("The accepted reply does not match this exact claim step; its saved request remains pending.");
-      if (step.signed.intent.kind === "found" && canonicalize(at) === canonicalize(register)) registerDefinition = receipt.definition;
+      if (step.signed.intent.kind === "found" && canonicalize(at) === canonicalize(register)) {
+        if (registerDefinition !== null && receipt.definition !== registerDefinition) throw new TransportError("The accepted reply names another register definition; its exact saved request remains pending.");
+        registerDefinition = receipt.definition;
+      }
       return receipt.fact;
     };
     const foundFact = await submitted(pending.found!, register, R, "Claimed");
