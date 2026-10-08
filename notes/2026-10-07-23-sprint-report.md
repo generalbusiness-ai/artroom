@@ -222,6 +222,32 @@ three-hour rule (`8025388b`); hugh's judgments on the three jam clips
 - The story page is served and tested on recorded answers; a live browser
   session against the deployment is the next check.
 
+## After this report was written (23:04 to 23:12)
+
+Two cloud sessions hugh allowed until midnight delivered after the
+report landed, and the planner ran both live:
+
+- **The site's navigation** (`claude/artroom-edit-page-site-navigation-vjqfjo`
+  `db7aaf3b`): a header with the room's name and the version, a
+  breadcrumb, folder listings by title, a footer naming the rendered
+  commit, a versions page of branches and tags, and the bare room address
+  redirecting to HEAD. Deployed as Worker version `39aee9b5`; live at
+  23:06 on the room of 21:14. Owed: the header names the repository, not
+  the claim.
+- **The demo runner** (`claude/edit-page-issue-commands-h08jb0`
+  `18c4ab42`): `scripts/demo-run.ts` performs every shot of the demo
+  script against a deployment and writes a transcript with a match table;
+  `scripts/demo-captures.ts` takes the page captures. First rehearsal,
+  23:07 to 23:09: the planned register printed and pinned, then all 26
+  shots as the script expects, `verify --all` consistent on 12 scopes, 89
+  seconds after the setting; the six captures taken from the live room.
+  The recording-day rehearsal is now one command (`docs/demo.md`).
+
+Both are merged on `planner/i5-demo-host` at `31578596` and filed to
+builder at the end of the queue. Sprint 11's planner commitment to drive
+the page live is met by the captures; the recording-day checklist run
+once is still owed.
+
 ## Sprint 11 commitments, 23:00 to 07:00 Eastern
 
 Recorded in the workroom under the cadence act `c514748f`, within plan 024.
