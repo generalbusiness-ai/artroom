@@ -104,7 +104,7 @@ export class PlatformScope extends DeployedScope<PlatformEnv> {
       readers: (given) => {
         const real = session.readers(given);
         return {
-          allows: (reader, read) => (!platformNet.sessions || (platformNet.inspector !== null && reader === platformNet.inspector) ? true : real.allows(reader, read)), chained: real.chained!,
+          allows: (reader, read) => (!platformNet.sessions || (platformNet.inspector !== null && reader === platformNet.inspector) ? true : real.allows(reader, read)), chained: real.chained!, holder: real.holder!,
           // The inspector is an explicit test bypass. It resolves no peer and
           // supplies no production session authority.
           prepare: (reader, read) => (!platformNet.sessions || (platformNet.inspector !== null && reader === platformNet.inspector) ? Promise.resolve() : real.prepare!(reader, read)),

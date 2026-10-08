@@ -111,6 +111,7 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
   readonly #chains: Chains;
   readonly #signed: SignedReading;
   readonly #readers: Readers;
+  readonly #outside: Outside;
   /** True until this object's first turn: its first call or its alarm (`#first`). In memory, so a restart sets it again. */
   #fresh = true;
 
@@ -179,6 +180,7 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
     });
     this.#signed = { clock: ports.clock, window: bounds.intentLifetimeSeconds, chains: this.#chains };
     this.#readers = ports.readers;
+    this.#outside = ports.outside;
     this.#reads = new Reads(store, () => this.#scope.pinned(), ports.readers, wiring.reads ?? READ_BOUNDS, record, this.#signed, () => this.#scope.owners());
     this.#deliveries = new Deliveries(this.#name, this.#scope, store, ports, bounds);
     this.#dispatcher = given.transport ? new Dispatcher(this.#scope, store, { transport: given.transport, clock: ports.clock, capabilities: ports.capabilities }, wakes, bounds) : null;
@@ -361,4 +363,15 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
   async retained(reader: unknown, kind: RetainedInput["kind"], digest: Digest, domain?: string): Promise<Read<RetainedInput>> { this.#first(); await this.#prepared(reader, "retained"); await this.#rooted(reader, "retained", retainedReadArgument(kind, digest, domain)); return this.#reads.retained(reader, kind, digest, domain); }
   async incidents(reader: unknown, cursor?: Cursor): Promise<Read<readonly Incident[]>> { this.#first(); await this.#prepared(reader, "incidents"); return this.#reads.incidents(reader, cursor); }
   async waiting(reader: unknown, list: "diagnosed" | "unanswered", cursor?: Cursor): Promise<Read<readonly Duty[]>> { this.#first(); await this.#prepared(reader, "waiting"); return this.#reads.waiting(reader, list, cursor); }
+
+  /** One-time credential handoff, after the same full-reference preparation as every session read. */
+  async credential(reader: unknown, handle: unknown): Promise<Read<{ token: string; ends: string; remote: string }>> {
+    this.#first();
+    await this.#prepared(reader, "credential");
+    const key = this.#readers.holder?.(reader, "credential") ?? false;
+    if (key === "sessions-unavailable" || key === "clock-behind") return { ok: false, reason: key };
+    const scope = this.#store.scope();
+    const answer = key !== false && typeof handle === "string" && scope?.at.kind === "destination" ? this.#outside.credential?.(handle, key) ?? null : null;
+    return answer && scope ? { ok: true, at: scope.head, value: answer, complete: true } : { ok: false, reason: "forbidden" };
+  }
 }

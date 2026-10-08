@@ -104,7 +104,7 @@ export function sessionsOf(secret: unknown, deployment: unknown): Sessions | nul
 // ---------------------------------------------------------------- the token
 
 /** The reads of the contract's section 9.1, which every session is given. */
-const MEMBER_READS: readonly ReadName[] = ["summary", "items", "history", "entry", "outbox", "operations", "log", "retained"];
+const MEMBER_READS: readonly ReadName[] = ["summary", "items", "history", "entry", "outbox", "operations", "log", "retained", "credential"];
 /** The reads of the repository's admin page (section 12, G13 and G17). */
 const ADMIN_READS: readonly ReadName[] = ["incidents", "waiting"];
 const READ_NAMES: ReadonlySet<string> = new Set<string>([...MEMBER_READS, ...ADMIN_READS]);
@@ -287,6 +287,10 @@ export function sessionReaders(config: SessionReading): Readers {
       return "claims" in checked ? checked.claims.reads.includes(read) : checked.refused;
     },
     chained: (reader, read) => chainedSession(checking, reader, read),
+    holder(reader, read) {
+      const checked = checkSession(checking, reader);
+      return "claims" in checked ? (checked.claims.reads.includes(read) ? checked.claims.key : false) : checked.refused;
+    },
   };
 }
 

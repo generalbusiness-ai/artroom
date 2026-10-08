@@ -64,6 +64,8 @@ export interface Config {
   handle?: string;
   /** Exact pending enrollment; retry the same invitation link to continue. */
   join?: PendingJoin;
+  /** Nonsecret repository URL learned from the credential answer. */
+  remote?: string;
 }
 
 export interface Store {

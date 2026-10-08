@@ -34,7 +34,7 @@ function fixture(kind: "destination" | "rules" = "destination") {
     sessions: () => sessions, clock: { read: () => now }, scope: () => context.state.scope(),
     membership: (scope) => fixedMembership(context, scope), membershipPreparation: preparation,
   });
-  const claims: SessionClaims = { v: 1, deployment: sessions.deployment, membership: MEMBERSHIP, member: rita.member.member, key: rita.key, reads: ["summary", "history", "retained"], ends: t(60) };
+  const claims: SessionClaims = { v: 1, deployment: sessions.deployment, membership: MEMBERSHIP, member: rita.member.member, key: rita.key, reads: ["summary", "history", "retained", "credential"], ends: t(60) };
   const token = (over: Partial<SessionClaims> = {}) => readerOf(mintSession(sessions, { ...claims, ...over }));
   return { at, branch, context, preparation, readers, claims, token, calls: () => calls, clock: (value: Timestamp) => { now = value; }, answer: (value: unknown) => { reply = value; } };
 }
@@ -119,5 +119,26 @@ test("rules session preparation requires its directory's exact confirmed rules a
   f.answer(value(f.branch.bureau.at, [repository(f.at)]));
   await f.readers.prepare!(valid, "history");
   expect(f.readers.allows(valid, "history")).toBe(true);
+  expect(fixedMembership(f.context, f.at)).toBeNull();
+});
+
+// Invariant: a credential holder uses the resolved exact membership reference,
+// and resolving it never bypasses the read permission or the expiry check.
+// The membership and directory answers remain the stand-ins documented above.
+test("credential holder is absent until exact session preparation, and rechecks read permission and expiry", async () => {
+  const f = fixture();
+  const reader = f.token();
+  expect(f.readers.holder!(reader, "credential")).toBe(false);
+  await f.readers.prepare!(f.token({ reads: ["summary"] }), "credential");
+  expect(f.calls()).toBe(0);
+  const wrong = f.token({ membership: { ...MEMBERSHIP, inc: newIncarnation(new Uint8Array(16).fill(9)) } });
+  await f.readers.prepare!(wrong, "credential");
+  expect(f.readers.holder!(wrong, "credential")).toBe(false);
+  await f.readers.prepare!(reader, "credential");
+  expect(f.readers.holder!(reader, "credential")).toBe(rita.key);
+  expect(f.readers.holder!(wrong, "credential")).toBe(false);
+  expect(f.readers.holder!(f.token({ reads: ["summary"] }), "credential")).toBe(false);
+  f.clock(f.claims.ends);
+  expect(f.readers.holder!(reader, "credential")).toBe(false);
   expect(fixedMembership(f.context, f.at)).toBeNull();
 });

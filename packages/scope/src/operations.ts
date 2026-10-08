@@ -35,7 +35,7 @@
  * commit and from the object's alarm.
  */
 
-import type { Bounds, CapabilityName, DecisiveEvidence, Entry, Evidence, FactRef, FactUse, OperationId, PlatformDefinition, RetainedInput, ScopeRef } from "@generalbusiness/artroom-contract";
+import type { Bounds, CapabilityName, DecisiveEvidence, Entry, Evidence, FactRef, FactUse, KeyId, OperationId, PlatformDefinition, RetainedInput, ScopeRef } from "@generalbusiness/artroom-contract";
 import { canonicalize, isEvidence, isOperationId, isRetainedInput, parseStrict, utf8 } from "@generalbusiness/artroom-bytes";
 import { clockOf, recordedOutcome, evidenceValues, valueDigest, settleOutcome, snapshotInput, snapshotRead, timeMs, timeOf, type Clock as Reading, type Fetched, type OutcomeOffered, type Owners } from "@generalbusiness/artroom-derive";
 import { ownOf, valuesOf, type Scope } from "./core.ts";
@@ -139,6 +139,12 @@ export interface Outside {
     answers: Array<{ operation: OperationId; attempt: number; answer: EffectAnswer }>;
     more: boolean;
   };
+  /**
+   * The one-time read of a member's read credential, by its nonsecret handle, for the key whose session asks (I5;
+   * `destination-host.ts`, `credential`). The plaintext leaves the port's custody as it is answered. Null: nothing is answered.
+   * Absent: this port holds no such credential.
+   */
+  credential?(handle: string, key: KeyId): { token: string; ends: string; remote: string } | null;
 }
 
 /**

@@ -22,10 +22,10 @@
  * | `verify` | The replay verifier over the read routes: with the caller's session, and by signed reads where the session is refused. |
  */
 
-import type { Answer, DeclaredDefinition, Digest, Entry, FactRef, FieldValue, Founded, Item, KeyId, PlatformDefinition, ScopeId, ScopeRef, Seed, SignedIntent, Summary } from "@generalbusiness/artroom-contract";
+import type { Answer, DeclaredDefinition, Digest, Entry, FactRef, FieldValue, Founded, Item, KeyId, OperationId, PlatformDefinition, ScopeId, ScopeRef, Seed, SignedIntent, Summary } from "@generalbusiness/artroom-contract";
 import { b64url, canonicalize, factRefOf, intentDigest, isDigest, isFactRef, isIncarnation, isScopeId, isScopeRef, keyIdOfSecret, parseStrict, scopeIdOf, seedDigest, textDigest, timeOf, unb64url, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import {
-  ScopeHandle, TransportError, declaredHandle, found, httpTransport, requestSession, secretSigner, sessionRequest, signedIntent, signedLogReader, signedReads,
+  ScopeHandle, TransportError, readCredential, declaredHandle, found, httpTransport, requestSession, secretSigner, sessionRequest, signedIntent, signedLogReader, signedReads,
   type Fetch, type ReadSigning, type Signing, type Transport,
 } from "@generalbusiness/artroom-client";
 import { DIRECTORY, MEMBERSHIP, REGISTER, ROLE_LISTS, platform, type Role } from "@generalbusiness/artroom-platform";
@@ -47,7 +47,12 @@ export interface Context {
   pause?: (waiting: readonly ScopeId[]) => Promise<void>;
   /** How many reads a wait makes before it gives up. The default is 120. */
   tries?: number;
+  /** Git runner; absent when this runtime cannot execute Git. */
+  git?: Git;
 }
+
+/** A Git process receives credential configuration through its environment. */
+export interface Git { run(args: readonly string[], env: Readonly<Record<string, string>>): Promise<number | null> }
 
 /** What a command ends with: its exit code, and the lines it prints. 0: done. 1: refused, unavailable or not found. 2: not a command this can run. */
 export interface Outcome { code: 0 | 1 | 2; lines: string[] }
@@ -746,5 +751,116 @@ export function verify(ctx: Context, named: string | undefined): Promise<Outcome
     const { report, why } = await replay(source, { mode: "replay", scope, platform, grants: "proven" });
     const lines = render(report, why).split("\n").filter((line) => line.length > 0);
     return report.result === "consistent" ? done(...lines) : failed(...lines);
+  });
+}
+
+// ---------------------------------------------------------------- the repository's remote, and a clone
+
+/** The repository record of the destination's branch item: `{ host, namespace, name, id }`. */
+interface Recorded { host: string; namespace: string; name: string; id: string }
+
+/** The host of the hosting's own Git service, as a register records it. */
+const OWN_HOST = "artifacts";
+
+/**
+ * The remote URL of a recorded repository, in its host's form, or null where the room's record does not give it. GitHub's is
+ * whole. The hosting's own Git service names its hostname in the Worker's setting, which no scope records: a clone learns it
+ * from the credential's answer, and the config keeps it.
+ */
+function remoteOf(config: Config, repository: Recorded): string | null {
+  if (repository.host === "github.com") return `https://github.com/${repository.namespace}/${repository.name}.git`;
+  const path = `/git/${repository.namespace}/${repository.name}.git`;
+  return repository.host === OWN_HOST && config.remote?.endsWith(path) ? config.remote : null;
+}
+/** The remote URL as the person is told it: whole, or in its host's form with the part the room does not record marked. */
+const remoteLine = (config: Config, repository: Recorded): string =>
+  remoteOf(config, repository) ?? (repository.host === OWN_HOST ? `https://<service host>/git/${repository.namespace}/${repository.name}.git (the service host is the deployment's setting; artroom clone prints it whole)` : `not known for the host ${repository.host}`);
+
+/**
+ * Read the destination with the caller's session, including its strict birth-reference preparation.
+ * A refused session falls back to the existing bounded signed-read cause chain.
+ */
+async function destinationOf(ctx: Context, config: Config): Promise<{ summary: Summary; reader: string | null; repository: Recorded }> {
+  const scope = config.repository?.destination ?? stop(usage("No repository is known here. Run: artroom claim <name>, or artroom join <link>."));
+  const reader = await readerOf(ctx, config);
+  let read = await (await handleOf(ctx, config, scope, reader)).summary();
+  if (!read.ok && read.reason === "forbidden" && reader !== null) read = await (await handleOf(ctx, config, scope, null)).summary();
+  if (!read.ok) return stop(failed(`Cannot read ${scope}: ${read.reason}.`));
+  if (read.value.scope.scope !== scope || read.value.scope.kind !== "destination") return stop(failed(`${scope} is no destination.`));
+  const branch = read.value.items.find((item) => item.type === "branch");
+  const repository = branch?.values["repository"] as Recorded | undefined;
+  if (!branch || !repository || typeof repository.host !== "string" || typeof repository.name !== "string" || typeof repository.namespace !== "string" || typeof repository.id !== "string") return stop(failed(`The destination ${scope} records no repository.`));
+  return { summary: read.value, reader, repository };
+}
+
+/** `artroom remote`: the repository's host, namespace, name and remote URL, as the destination's branch item records them. */
+export function remote(ctx: Context): Promise<Outcome> {
+  return run(async () => {
+    const config = await configOf(ctx);
+    const { repository } = await destinationOf(ctx, config);
+    return done(`Host: ${repository.host}`, `Namespace: ${repository.namespace}`, `Name: ${repository.name}`, `Remote URL: ${remoteLine(config, repository)}`);
+  });
+}
+
+/** The value of the `Authorization` header that git sends with a read token: a bearer token, and GitHub's documented form for an installation token. */
+const authorization = (repository: Recorded, token: string): string =>
+  repository.host === "github.com" ? `Basic ${b64(`x-access-token:${token}`)}` : `Bearer ${token}`;
+const b64 = (text: string): string => btoa(String.fromCharCode(...utf8(text)));
+/** The configuration that carries the header, as git reads it from its environment: the same as `-c http.extraHeader=...`, but in no argument. */
+const headerEnv = (value: string): Record<string, string> => ({ GIT_CONFIG_COUNT: "1", GIT_CONFIG_KEY_0: "http.extraHeader", GIT_CONFIG_VALUE_0: `Authorization: ${value}` });
+
+/**
+ * `artroom clone [directory] [--hours n]`: a clone of the room's repository, with a read token of its own.
+ *
+ * 1. Without `git` here, it signs nothing: it prints the clone command, with the token's place marked.
+ * 2. It signs the destination's `read-token` for `hours` (default 1, from 1 to 24), and waits for the outcome of its `mint-read`.
+ * 3. It reads the token once, with the caller's session, from the destination's credential route.
+ * 4. It runs `git clone -- <remote> [directory]`, with the header in git's environment configuration. The token is in no
+ *    argument, in no line this command prints, and in no file this command writes. The Git process controls its own output.
+ */
+export function clone(ctx: Context, directory: string | undefined, options: { hours?: number } = {}): Promise<Outcome> {
+  return run(async () => {
+    const hours = options.hours ?? 1;
+    if (!Number.isSafeInteger(hours) || hours < 1 || hours > 24) return usage("--hours is a whole number from 1 to 24.");
+    const config = await configOf(ctx);
+    const { summary, repository } = await destinationOf(ctx, config);
+    const args = (url: string) => ["clone", "--", url, ...(directory === undefined ? [] : [directory])];
+    if (!ctx.git || (await ctx.git.run(["--version"], {})) === null) {
+      const url = remoteOf(config, repository) ?? `https://<service host>/git/${repository.namespace}/${repository.name}.git`;
+      return failed("git is not installed here, so nothing was signed. With git installed, run artroom clone again; it runs:", `git -c http.extraHeader="Authorization: ${repository.host === "github.com" ? "Basic <x-access-token:read token, base64>" : "Bearer <read token>"}" ${args(url).join(" ")}`);
+    }
+    if (!platform(summary.definition as PlatformDefinition)?.data.acts["read-token"]) return failed(`The destination definition ${summary.definition} does not support read-token. An explicitly versioned destination and membership integration is required.`);
+    // The act: `read-token` on the branch, at the revision the summary has now. The scope judges the grant and the field.
+    const scope = summary.scope.scope;
+    const signer = secretSigner(await signerOf(ctx, config));
+    const branch = summary.items.find((item) => item.type === "branch")!;
+    const signed = await signedIntent(signer, { to: summary.scope, kind: "read-token", on: branch.id, fields: { hours }, expected: { on: branch.revision } }, signing(ctx));
+    const seq = accepted(await (await handleOf(ctx, config, scope, null)).submit(signed), scope, "Read token").receipt.fact.seq;
+    // The outcome of its `mint-read`, which the host's answer writes: read with the caller's session, which the destination now accepts.
+    const operation: OperationId = `${seq}:0`;
+    const reader = await readerOf(ctx, config) ?? stop(failed(`Signed read-token at ${scope}:${seq}, but no read session is given here, and only a session reads the token.`));
+    const D = await handleOf(ctx, config, scope, reader);
+    let next = seq + 1;
+    const outcome = await waitFor(ctx, () => [scope], async () => {
+      for (;;) {
+        const read = await D.entry(next);
+        if (!read.ok) return read.reason === "not-found" ? null : stop(failed(`Cannot read entry ${scope}:${next}: ${read.reason}.`));
+        next++;
+        const input = read.value.entry.input;
+        if (input.type === "outcome" && input.operation === operation) return input;
+      }
+    }, `the read token of ${scope}:${seq}`, "the token, if minted, ends at its end unread.");
+    if (outcome.result !== "confirmed") return failed(`The host did not mint a read token: the outcome at ${scope}:${next - 1} is ${outcome.result}. Nothing was cloned.`);
+    const handle = (outcome.evidence.body as { token?: unknown }).token;
+    if (typeof handle !== "string") return failed(`The outcome at ${scope}:${next - 1} names no token.`);
+    // The token, once. The route answers it to this session's key only, and then no more.
+    const answer = await readCredential(config.service, scope, reader, handle, ctx.fetch ? { fetch: ctx.fetch } : {});
+    if (!answer.ok) return failed(`Cannot read the read token ${handle}: ${answer.reason}.`);
+    const value = answer.value;
+    if (value.remote !== config.remote) await ctx.store.save({ ...config, remote: value.remote });
+    const code = await ctx.git.run(args(value.remote), headerEnv(authorization(repository, value.token)));
+    const lines = [`Read token: ${scope}:${seq}, until ${value.ends}.`, `Remote URL: ${value.remote}`];
+    if (code === 0) return done(...lines, `Cloned into ${directory ?? value.remote.replace(/\.git$/, "").split("/").at(-1)}.`);
+    return failed(...lines, code === null ? "git could not be run; the token was read and is not kept." : `git clone exited with ${code}; the token was read and is not kept.`);
   });
 }
