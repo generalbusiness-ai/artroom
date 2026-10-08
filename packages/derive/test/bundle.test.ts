@@ -60,6 +60,14 @@ test("canonical bytes/closed fields precede content claims; explicit preparse bo
   expect(parseBundleRecord("ArtifactRef", canonicalBytes(ref), { ...limits, bytes: 1 })).toMatchObject({ ok: false, reason: "limits" });
   expect(parseBundleRecord("ArtifactRef", canonicalBytes(ref), { ...limits, records: 0 })).toMatchObject({ ok: false, reason: "limits" });
   expect(parseBundleRecord("ArtifactRef", canonicalBytes(ref), { ...limits, tokens: 1 })).toMatchObject({ ok: false, reason: "limits" });
+  const emptyBytes = new Uint8Array();
+  const empty: BundleArtifact = { ref: { digest: digestBytes(emptyBytes), bytes: 0, encoding: "raw" }, bytes: emptyBytes, kind: null };
+  expect(verifyDeclaredBundleClosure(empty.ref.digest, [empty], { ...limits, bytes: 1 })).toMatchObject({ ok: false, reason: "limits", path: "artifacts[0].ref.metadata-bytes" });
+  const extra: Record<string, unknown> = {}; extra["self"] = extra; extra["surrogate"] = "\ud800";
+  const malformed = { ...empty, ref: { ...empty.ref, extra, absent: undefined } };
+  expect(verifyDeclaredBundleClosure(empty.ref.digest, [malformed], limits)).toMatchObject({ ok: false, reason: "schema" });
+  const accessor = { ...empty.ref }; Object.defineProperty(accessor, "digest", { enumerable: true, get: () => { throw new Error("metadata accessor must not run"); } });
+  expect(verifyDeclaredBundleClosure(empty.ref.digest, [{ ...empty, ref: accessor }], limits)).toMatchObject({ ok: false, reason: "schema" });
   const original = fixture().finish(); const first = original.artifacts[0]!;
   expect(verifyDeclaredBundleClosure(original.root, [...original.artifacts, { ...first, ref: { ...first.ref, encoding: "utf8" } }], limits)).toMatchObject({ ok: false, reason: "conflict" });
   const changed = original.artifacts.map((item, index) => index === 0 ? { ...item, bytes: utf8("[]") } : item);
@@ -78,6 +86,11 @@ test("canonical bytes/closed fields precede content claims; explicit preparse bo
   const anchorRef = add("TrustAnchor", anchor);
   expect(verifyDeclaredBundleClosure(semanticContentId("artroom-bundle-trust-anchor-1", anchor), original.artifacts, limits)).toMatchObject({ ok: true });
   expect(verifyDeclaredBundleClosure(anchorRef.digest, original.artifacts, limits)).toMatchObject({ ok: true });
+  const pin = { service: service.digest, subject: { kind: "founding", service: service.digest, seed: { v: 1, kind: "register", definition: "platform:register@1", creator: null, cause: d("a"), ordinal: 0 }, intent: d("b"), admission: first.ref.digest }, bundle: original.root, abi: original.artifacts.find((item) => item.kind === "ABIRecord")!.ref.digest, bindingSet: anchor.first.bindingSet, revision: 0, activationTuple: d("c"), runtimeRelease: first.ref.digest, compatibility: first.ref.digest };
+  const pinRef = add("SelectionPin", pin);
+  expect(verifyDeclaredBundleClosure(pinRef.digest, original.artifacts, limits)).toMatchObject({ ok: true });
+  const wrongRaw = add("SelectionPin", { ...pin, runtimeRelease: original.root });
+  expect(verifyDeclaredBundleClosure(wrongRaw.digest, original.artifacts, limits)).toMatchObject({ ok: false, reason: "unavailable", path: "artifact-reference" });
   const aliased = { ...anchor, first: { ...anchor.first, bindingSet: setRef.digest } };
   const aliasedRef = add("TrustAnchor", aliased);
   expect(verifyDeclaredBundleClosure(aliasedRef.digest, original.artifacts, limits)).toMatchObject({ ok: false, reason: "content", path: "reference.domain" });

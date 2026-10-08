@@ -1,6 +1,6 @@
 /** Bounded declared record/artifact closure. No acquisition, code loading, trust installation or selection. */
 import type { ArtifactId, ArtifactRef, BundleId, Digest, ExportRef, ModuleId, SemanticBundleManifest, ABIRecord, HistoricalSourceBinding, ScopeCoverage, AdmissionCorrespondence, BindingSetRevision, SignaturePayload, TrustAnchor, HistoryChunk, HistoricalContext } from "@generalbusiness/artroom-contract";
-import { canonicalize, digestBytes, semanticContentId, utf8, type SemanticContentDomain } from "@generalbusiness/artroom-bytes";
+import { canonicalize, digestBytes, isDigest, semanticContentId, utf8, type SemanticContentDomain } from "@generalbusiness/artroom-bytes";
 import { byteOrder } from "./values.ts";
 import { boundedCanonical, bundleAttempt, BundleError, checkBundleLimits, parsed, type BundleLimits, type BundleRecordKind, type BundleRecords, type BundleResult } from "./bundle-records.ts";
 
@@ -16,6 +16,37 @@ export interface DeclaredClosure {
 }
 function fail(reason: "limits" | "content" | "closure" | "conflict" | "unavailable", path: string): never { throw new BundleError(reason, path); }
 const same = (a: unknown, b: unknown): boolean => canonicalize(a) === canonicalize(b);
+/** Closed scalar metadata check before any canonical serialization/UTF-8 allocation.
+ * Reject accessors/extra fields without traversing their values; validated metadata needs no serialization. */
+function checkedArtifactRef(value: unknown, limits: BundleLimits, path: string): ArtifactRef {
+  if (limits.records < 1 || limits.tokens < 7 || limits.depth < 1) fail("limits", `${path}.metadata`);
+  try {
+    if (!value || typeof value !== "object" || Array.isArray(value)
+      || (Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null)) throw new BundleError("schema", path);
+    let count = 0;
+    for (const name in value) if (Object.hasOwn(value, name)) {
+      if (++count > 3 || (name !== "digest" && name !== "bytes" && name !== "encoding")) throw new BundleError("schema", path);
+    }
+    if (count !== 3 || Object.getOwnPropertySymbols(value).length !== 0) throw new BundleError("schema", path);
+    const own = (name: string) => {
+      const property = Object.getOwnPropertyDescriptor(value, name);
+      if (!property || !Object.hasOwn(property, "value")) throw new BundleError("schema", path);
+      return property.value as unknown;
+    };
+    const digest = own("digest"), bytes = own("bytes"), encoding = own("encoding");
+    if (typeof digest !== "string" || digest.length !== 71 || !isDigest(digest)
+      || typeof bytes !== "number" || !Number.isSafeInteger(bytes) || Object.is(bytes, -0) || bytes < 0
+      || (encoding !== "raw" && encoding !== "utf8" && encoding !== "canonical-json")) throw new BundleError("schema", path);
+    // All strings are now fixed ASCII forms and the integer has at most sixteen digits.
+    const metadataBytes = '{"bytes":,"digest":"","encoding":""}'.length + String(bytes).length + digest.length + encoding.length;
+    if (metadataBytes > limits.bytes) fail("limits", `${path}.metadata-bytes`);
+    return { digest, bytes, encoding };
+  } catch (error) {
+    if (error instanceof BundleError) throw error;
+    // Malformed host metadata cannot leak a CanonicalError/TypeError outside the typed data result.
+    throw new BundleError("schema", path);
+  }
+}
 const DOMAINS: Partial<Record<BundleRecordKind, SemanticContentDomain>> = {
   SemanticBundleManifest: "artroom-semantic-bundle-1", HistoricalSourceBinding: "artroom-source-binding-1",
   BindingSetRevision: "artroom-source-binding-set-1", TrustAnchor: "artroom-bundle-trust-anchor-1",
@@ -33,8 +64,7 @@ export function verifyDeclaredBundleClosure(root: Digest, artifacts: readonly Bu
     const logicalSources = new Map<string, HistoricalContext>();
     for (let i = 0; i < artifacts.length; i++) {
       const item = artifacts[i]!;
-      // Check the closed ArtifactRef through the same bounded parser before using its declared length.
-      const ref = parsed("ArtifactRef", utf8(canonicalize(item.ref)), limits);
+      const ref = checkedArtifactRef(item.ref, limits, `artifacts[${i}].ref`);
       bytes += item.bytes.length;
       if (!Number.isSafeInteger(bytes) || bytes > limits.bytes) fail("limits", "artifacts.bytes");
       if (ref.bytes !== item.bytes.length || ref.digest !== digestBytes(item.bytes)) fail("content", `artifacts[${i}]`);
@@ -126,6 +156,8 @@ export function verifyDeclaredBundleClosure(root: Digest, artifacts: readonly Bu
           const declared = new Map(m.definitions.filter((definition) => definition.kind === "declared").map((definition) => [definition.named, definition]));
           for (const definition of declared.values()) for (const digest of definition.creates) if (!declared.has(digest)) fail("closure", "definition.creates");
           if (m.definitions.length > 0) {
+            // Supported current definition-domain subset only. This does not
+            // interpret an arbitrary historical ABI/schema or claim its admission meaning.
             const domain = domains.records.find((row) => row.tag === "artroom-definition-1");
             if (!domain || domain.algorithm !== "sha256" || domain.framing !== "tag-newline-canonical") fail("unavailable", "definition.domain");
             for (const definition of m.definitions) {
