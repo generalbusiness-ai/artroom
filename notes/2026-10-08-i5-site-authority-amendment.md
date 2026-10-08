@@ -24,6 +24,19 @@ no automatic domain-number change is proposed, but the owner must decide
 their final identity/byte contract. Unused @3 and attachment allocations
 remain proposals pending verification and adoption.
 
+Pending-opt-in recovery follow-up within the same 31fa amendment owner:
+frozen review subject `4de373d6c439d5f4e4aa1381d2da653b1495ef9f` remains
+unchanged. The recovery interface addition below is a proposed repair for
+normal successor review after Root reading, not adoption,
+implementation or a duplicate task.
+
+This draft also answers both P2 findings in the full formal verdict
+`ad33b64583f6696ebe75895f13feea2c430e1e9d` and planner disposition
+`88cd7081bcec9ac54fca0670e4d7b46539825353`, both read in full. Their
+current-selection and known/ambiguous pending recovery boundaries are
+incorporated below; new factory/signature fields still require successor
+normal review before code. No frozen review subject is edited in Git.
+
 The planner has adopted the product direction: site visibility is distinct
 from repository visibility; explicit public or members policy, absent deny;
 durable Room authority controlled by `rules.publish`; a distinct renderer
@@ -218,6 +231,143 @@ an ambiguous answer. A competing request cannot replace that pending epoch.
 After creation the controller's authority is rechecked before selection;
 loss of authority leaves records retained and site unselected/denied.
 
+### Pending opt-in settlement and current-controller recovery
+
+Expiration or a controller/key/permission change does not erase an admitted
+opt-in, refresh its signature or authorize a new selection. It changes the
+pending record's actionable status. The factory keeps the exact original
+opt-in envelope/digest, recorded admission time and historical authority
+proof, immutable Room binding digest, candidate seed/definition and any
+verified A genesis. A pending identity also names stable service, complete D,
+binding epoch and pending revision digest, plus the creation executor's
+owner/nonce/release and its original resource/duty ledger reference. Recovery
+requests must bind **all** that identity; they cannot select an A merely by
+kind, repository name or a shortened ID.
+
+Proposed `settlePendingSiteOptIn(pendingIdentity)` is an authenticated,
+read-only historical settlement. It reads the factory's original admission
+and exact candidate, verifies signatures and permissions at their recorded
+admission time with the actual historical bundles, and checks the candidate
+seed/cause, applied genesis, full incarnation, binding and resource records.
+It does not reapply the old request's notAfter against today's clock as if
+it were a new mutation; nor may an expired request create or select anything
+through this read. A real previously admitted A remains a historical fact
+even if the original key has since expired, been revoked or lost rules.publish.
+An absence/read failure is not proof that creation never happened or cannot
+still happen.
+
+Settlement reports one of: verified admitted-unselected A; selected with its
+exact binding decision; held-unknown with exact missing evidence; or a proven
+terminal creation/refusal/abort with its closure evidence. Where the genesis
+is verified but current selection authority is missing, report
+held-current-authority, not an unexplained generic pending state. Retain a
+durable responsible recovery executor and the permitted next action:
+recover the original creation/fence evidence, or ask a current eligible Room
+controller for completion/handoff/abort. If the Room has no eligible current
+controller, use its existing membership/recovery procedure to restore one
+where that actual historical protocol supports it. If it cannot, report
+the missing recovery authority as an owner obligation rather than assuming
+restoration; the site factory gets no operator override. Only authorized controllers and
+factory recovery may inspect these detailed records; a viewer-facing refusal
+does not disclose private candidate/resource metadata.
+
+`completeSiteOptIn(pendingIdentity, candidateGenesis, signedCompletion)` is
+a **new current-controller** authorization to finish that original candidate,
+not a refreshed opt-in or a replacement A. It requires fresh actual R/M
+rules.publish authority, current expiry/signature/revocation checks and CAS
+of the exact pending epoch/revision. It selects only the historically settled
+original A with its same seed, full genesis fact and immutable Room binding.
+The selection decision retains both the original opt-in/genesis cause and
+the new factory completion decision/receipt and current controller proof;
+it does not invent an old R completion FactRef. It does not rewrite A's genesis
+or treat the completing key as its original signer. It enables no renderer
+grant by itself: A still requires current configuration/delegation separately.
+If creation remains unknown, completion refuses and the original stays held;
+it must not issue a fresh creation under a new signature to fill the gap.
+
+For a definitively applied A, the current controller may instead use proposed
+`retireSiteSelection(pendingIdentity, candidateGenesis, signedRetirement,
+selectionClosureProof)`. It historically settles that exact applied genesis
+and its original opt-in/binding, then requires fresh R/M rules.publish
+authority and CAS of the same pending predecessor/epoch. The slot records
+retiring-selection and blocks new selection work. An authenticated terminal
+retire/refuse-selection decision requires all old selection continuations
+fenced for the original owner/nonce/release and epoch. It retains A, its
+origin/genesis/evidence, custody and all duties, and records terminal epoch
+and revision before any next-epoch opt-in may proceed. Known durable creation
+is not treated as ambiguous simply because its original issuer is gone:
+its immutable genesis and proved original creation/idempotence rules settle
+that creation. Neither the new controller nor a late original continuation
+may overwrite it or create a different candidate. If that correspondence or
+selection fence is unproved, retirement remains held with its named owner
+and proof action. No old-issuer signature is required for this new decision.
+
+For genuinely ambiguous creation, proposed
+`reconcileSiteOptIn(pendingIdentity, signedReconciliation)` lets a current
+eligible controller authorize authenticated original-candidate/evidence
+recovery and record progress without the old issuer returning. It binds the
+same original request/seed/epoch/resource ledger and changes neither the
+creation cause nor the candidate. It cannot manufacture absence, refresh
+creation authority or reset the slot. Actual evidence may resolve it to
+known-applied (then complete or retire-selection), or establish original
+creation/selection closure for the abort path below. Otherwise held-unknown
+continues with a responsible owner and precise next recovery action.
+
+`handoffSiteOptIn(pendingIdentity, targetController, signedHandoff)` transfers
+the named recovery responsibility only after current R/M controller
+authorization and the target's verified current controller identity and
+acceptance, all bound to the same epoch/candidate/resources. It records the
+handoff and recipient, not a new opt-in or a change to D/M/R/G/repository.
+It transfers no human key, provider plaintext, renderer grant or old Room
+duty. Administrative handoff does not fence an original execution owner or
+authorize another creation. A mutating executor handoff needs actual
+authenticated closure/fencing of the original owner/nonce/release; without
+that proof the recipient may inspect/recover, not replay the original
+creation or race its original selection continuation.
+
+`abortSiteOptIn(pendingIdentity, signedAbort, closureProof)` requires a fresh
+current controller and exact pending CAS. The slot first records an abort
+request which blocks new selection work; that request alone is not terminal.
+For ambiguous/not-yet-settled creation, termination requires authenticated
+durable proof that no original creation
+or selection continuation can still run for that owner/nonce/release and
+epoch, including already queued/in-flight work. Every late continuation
+must be unable to reopen the tombstone or select/create through it. A lease,
+timeout, expired key/deadline, missing response or current read of no genesis
+is not such a fence. If that proof is unavailable, record held-abort-requested
+with its owner and recovery action; preserve the candidate and duties.
+
+For an already admitted A, use the known-applied retire-selection path above,
+which retains its exact genesis/history and quarantines it as unselected;
+it neither deletes A nor fabricates that it was never created. A's current
+binding/act gates must preclude future selection
+or new renderer use for the aborted epoch. Once original creation/selection
+closure is proven, the slot records an immutable terminal decision/tombstone
+and may admit a separately authorized opt-in at a **new** epoch. A competing
+request cannot silently reset the old pending slot, reuse its epoch or
+substitute its candidate. If the underlying factory/executor cannot prove
+this exclusion, the epoch stays held with the explicit responsible owner;
+the unsupported fence is a proof obligation, not inferred completion.
+
+Each path retains the original candidate's resource ledger and exact
+mint/attempt/custody/cleanup ownership, even after the binding epoch can
+terminate. Pending/unselected A grants no renderer use; resources, if already
+recorded during preparation, remain attributed to that A and original
+operation. Unknown creation or mint, late reply and failed revoke survive;
+only actual judged settlement/cleanup evidence changes their state. Remote
+cleanup may remain owed after local creation/selection closure is proven,
+but a new epoch cannot take its secrets or drop those duties. Existing
+D/M/R/G functionality and obligations remain untouched.
+
+These named read/completion/retire-selection/reconciliation/handoff/abort
+and status/resource/fence records
+are proposed site-factory schemas, not existing built-in acts. Their exact
+historical evaluator, current-controller guard, causal receipt, CAS and
+executor closure correspondence require the same owner review before code.
+They use the existing attachment owner and recovery machinery; no generic
+registry, new effect engine, administrative authority bypass or instant
+revocation promise is introduced.
+
 `readSiteBinding(service,D)` is the sole typed discovery boundary. It returns
 the current authenticated binding decision and exact authority genesis, or
 absent/pending/refused. The site verifies its service/D, epoch freshness,
@@ -249,6 +399,69 @@ FactRefs form the configuration causal chain; old R.published and old
 publication rules are untouched. The selected binding never changes merely
 because configuration changes. A replacement authority/definition requires
 a fresh controller opt-in, binding CAS and continuity of old A duties.
+
+### Current selection is a final-use boundary for both paths
+
+Every site read carries this proposed nonsecret `SiteUseContext` through
+proof preparation, renderer mint, private borrowing, actual host use and
+cache/response handling:
+
+```
+{ service:ServiceId, directory:D, bindingEpoch:number,
+  bindingRevision:Digest, authority:ScopeRef, authorityDefinition:PlatformDefinition,
+  configuration?:FactRef, delegation?:FactRef,
+  repository:{host,namespace,name,id}, publishedCommit?:ObjectId }
+```
+
+The full selected authority is R@3 on the native path or A on the attachment
+path, as the one authoritative slot actually selects. From its first binding
+read, the context carries that authenticated selection. Configuration,
+delegation and commit fields are filled only as their proofs resolve;
+mint/borrow/host use or content/cache/304 release requires the complete
+verified context and refuses missing fields. The context is bound
+to the request and relevant mint/borrow identity; it is not supplied by an
+untrusted browser as authority. Cache identities also include service,
+complete D, binding epoch/revision and full selected authority, in addition
+to their existing configuration/commit/path/profile/viewer partition.
+
+`currentSiteSelection(context)` authenticates a fresh current read from
+that exact service/full-D slot through its adopted typed publisher/trust
+boundary. It requires equal epoch, revision and full selected authority
+(including incarnation/definition), not merely a monotonic floor or a cached
+old A observation. Missing/pending/disabled/unknown selection, unavailable
+authentication, changed epoch/revision/authority or a binding mismatch
+refuses new use. A1's own pointer, valid delegation, issuer standing and
+published commit can remain unchanged after the slot selects A2; none can
+override this current-slot refusal.
+
+Run this gate after every awaited preparation and immediately before mint,
+private credential borrowing, actual host use and every answer, including
+internal cache hits and 304. Run the viewer/configuration/expiry/custody
+checks alongside it, not instead of it. Authenticated slot reads and final
+use/release checks must be coupled at the actual operation boundary under
+the reviewed current-use protocol; a stale cached object cannot treat an
+earlier discovery result as permission for a later call. The owner must
+specify and prove that precise freshness/final-call correspondence before
+enablement. This is not a claim of an atomic provider RPC or instantaneous
+recall of already delivered bytes. A denied/unavailable gate may return only
+the bounded non-disclosing refusal, never cached content or an old-policy 304.
+
+On selection change, cancel/deny new uses of the old context. A continuation
+must not reuse its old credential/configuration as the newly selected
+authority; a new request must independently establish the new context and
+viewer eligibility. Do not release buffered private bytes after an awaited
+host read merely because the original A still calls them public. Internal
+cache invalidation/partitioning is helpful but cannot replace this gate.
+
+Original already-started attempts, their immutable provider/credential
+bindings, unknown/late replies, reconciliation and cleanup remain on the
+original owner after replacement. A late known mint reply is retained and
+cleaned up under that mint/attempt; it cannot become permission for a new
+old-authority borrow/read. Current selection refusal must not discard its
+secret/duty, fabricate revocation, remint or reassign the original attempt.
+Only authenticated internal paths proving an actual original recorded duty
+may perform that reconciliation/cleanup without new-use authorization;
+a caller's `cleanup` hint cannot turn a new host read into such a duty.
 
 The delegate issuer and configuring controller need current verified
 rules.publish authority; plain viewers do not. Ordinary active member/key
@@ -319,7 +532,8 @@ expiry and request identity. The platform's new `site-delegation` grant mark
 has no ordinary action fallback: an admin's ordinary grant, a copied viewer
 session, or a human key cannot substitute for the service proof.
 
-The native mark verifies signature, current R@3 rules site pointer, exact configuration
+The native mark verifies signature, authenticated current SiteUseContext
+selection, current R@3 rules site pointer, exact configuration
 and delegation bytes/facts, renderer installation/key, absence of that key
 from human membership, exact destination/repository and expiry. It may pass
 with no MemberRef under the existing custom-mark mechanism, but its service
@@ -341,7 +555,8 @@ capability merely by returning bytes.
 
 Native G@3 destination `site-read` opens a bounded `site-read` holder and one
 `mint-site-read` operation under its own new pinned owner. Before minting,
-the provider port checks all current proof/expiry/custody conditions and
+the provider port authenticates current binding epoch/revision/full authority
+and checks all current proof/expiry/custody conditions and
 the exact stable repository. Mint read-only rights for that repository
 alone, with absolute expiry bounded by the request, delegation and configured
 maximum; reject broader rights, another ID/namespace, missing/invalid expiry
@@ -356,7 +571,8 @@ The renderer borrows it through an authenticated internal port with a
 bounded per-read custody handle; no viewer, ordinary credential endpoint,
 history, URL or log receives the plaintext. Dedicated renderer signing-key
 custody remains separate from human/operator keys and provider tokens.
-After any await, recheck configuration/delegation, publication eligibility,
+After any await, recheck current service/full-D slot epoch/revision/full
+selected authority, configuration/delegation, publication eligibility,
 expiry, exact borrowing owner and custody before the actual host read and
 before answering. Do not remint/reassign an ambiguous original attempt.
 
@@ -384,7 +600,8 @@ fact/digest and the authoritative binding revision. It is not an old R rules
 observation or an extension of old RulesContent. Its typed read/retention and
 replay representation need the attachment owner's schema amendment before
 code; existing observation unions are not assumed to accept it. A's
-service grant mark reads/retains that exact current A answer and resolves
+service grant mark rechecks the authoritative current slot as well as
+reading/retaining that exact A answer, and resolves
 controller/issuer authority through the actual historical R/M bundles.
 Renderer `site-read`, holders, mint-site-read/revoke operations, private
 custody, authenticated borrowing, late replies and cleanup all belong to A
@@ -438,13 +655,16 @@ Request order is explicit:
    eligibility. A valid old session alone is insufficient for this site gate.
    The current-main `43d` exact birth/typed resource guards remain in force.
 3. Only after viewer eligibility, resolve the authorized published version,
-   select a cache entry or reach the host. Recheck viewer/configuration
-   eligibility after awaits and immediately before an answer, including 304.
+   select a cache entry or reach the host. Carry SiteUseContext and recheck
+   its authenticated current service/full-D binding epoch/revision/full
+   selected authority and viewer/configuration eligibility after awaits and
+   immediately before all mint/borrow/host use and every answer/cache hit/304.
    Validate path existence/type before 304; a guessed ETag cannot authorize a
    nonexistent path. No failure discloses private titles/listings/commit IDs.
 
 Members responses use private cache isolation and no shared public response
-cache. A cache key alone is not authorization. Keys bind exact room,
+cache. A cache key alone is not authorization. Keys bind stable service,
+complete directory, binding epoch/revision/full selected authority, exact room,
 configuration revision, immutable published commit, normalized path, renderer
 profile and the relevant viewer eligibility partition; all cached bytes/304
 still pass the current gate. Public cache use also revalidates current Room
@@ -513,8 +733,8 @@ That pending site state is not claimed complete old-room site support.
 | Rules/platform owner | Adopt site-only acts/items/pointer, canonical schemas/domains, previous/expected revision handling, publication guards and current site observation. Preserve ordinary publish/check configurations and old pins. |
 | Contract/authority/security owner | Adopt separate renderer ServicePrincipal/SiteDelegation semantics, custom mark with no ordinary grant fallback, dedicated-key registration/custody/disjoint membership proof, exact current-use and replay attribution, and typed internal configuration read. Ordinary Grant does not already provide this. |
 | Destination/host/custody owner | Adopt exact published/receipt proof, new scoped operations/holders, actual returned read rights/expiry, authenticated private renderer borrowing, original-attempt identity and durable cleanup through all failure/restart/late-answer cases. |
-| Session/site owner | Adopt site-authority@1 and separate siteViewerEligibility over existing authenticated membership-summary eligibility plus current standing, before all caches/304/ref/host access; do not add site permission to old SessionClaims. Adopt private internal partitioning/invalidation, external no-store and controlled-cache bypass, final post-await checks and same-commit link resolution. Any alternative external cache policy needs separate adoption. Name actual recall/expiry limits; already delivered bytes cannot be recalled. |
-| Version/Room/attachment owner | Allocate unused native and independent site-authority identities; adopt exact site-only factory/genesis, full Room/bundle binding, one authenticated discovery slot and pending/CAS/revision/settlement schemas. Prove controller authority using actual historical implementations and unchanged old Room functionality/duties; no fake old acts, repin, automatic migration or replacement Room. |
+| Session/site owner | Adopt site-authority@1 and separate siteViewerEligibility over existing authenticated membership-summary eligibility plus current standing, before all caches/304/ref/host access; do not add site permission to old SessionClaims. Adopt SiteUseContext with authenticated current service/full-D binding epoch/revision/full selected authority after awaits and at every mint/borrow/host/answer boundary, private internal partitioning/invalidation, external no-store and controlled-cache bypass, and same-commit link resolution. Preserve original late/unknown/cleanup duties separately from new-use gating. Any alternative external cache policy needs separate adoption. Name actual recall/expiry limits; already delivered bytes cannot be recalled. |
+| Version/Room/attachment owner | Allocate unused native and independent site-authority identities; adopt exact site-only factory/genesis, full Room/bundle binding, one authenticated discovery slot and pending/CAS/revision/settlement/completion/retire-selection/reconciliation/handoff/abort/status/resource schemas. Prove historical original-candidate settlement separately from current controller permission: known-applied completion/selection retirement retains A and fences old selection, ambiguous creation requires its actual closure proof and never resets. Prove owner fencing before mutating handoff. Unknown records remain held with a responsible owner/action. Preserve old Room functionality/duties; no fake old acts, repin, automatic migration or replacement Room. |
 | Navigation/publication owner | Complete safe published branch/tag and human-label mappings from plan025 under the exact receipt/publication proof. HEAD/proved-commit staging does not close these obligations. |
 | Existing capacity owner | Bound configuration/delegation bytes and retained versions, holder/operation reservations, reads/proof closure, outstanding credentials, cleanup backlog and private cache work using existing capacity evidence. No new numbers or matrix. |
 
@@ -524,6 +744,10 @@ Strengthen existing rules, destination, session, custody and site witnesses:
 the real existing D/M/R/G can opt in without any old-scope act/history change;
 concurrent or uncertain opt-ins cannot select two authorities for one binding
 epoch, and exact retry/discovery recovers the same causal A genesis; stale or
+expired/revoked original opt-in settlement retains that actual genesis and
+requires a fresh current controller to complete the same candidate; handoff
+and abort cannot reset an unknown epoch or outrun an original continuation,
+and terminal closure retains resources/cleanup;
 unauthenticated binding hints deny; a plain member without rules.publish can
 view after current eligibility while configuration still needs controller
 authority;
@@ -531,7 +755,11 @@ unauthorized configure changes nothing; exact controller configuration and
 delegation facts replay; absent/unknown/disabled policy denies; another
 room/incarnation, human key or expired/broader renderer grant cannot mint or
 borrow; current member/key changes refuse site bytes and 304; cache hits
-cannot bypass that gate; path-before304 remains; unpublished operator/tag/
+cannot bypass that gate; swap the authoritative slot from A1/public to
+A2/members or unconfigured while a read is suspended, leaving A1's own
+pointer/delegation/publication valid, and show new old-context mint/borrow/
+host use or content/cache/304 release is refused while original duties remain;
+path-before304 remains; unpublished operator/tag/
 proposal commits are refused despite valid host objects; a real judged
 first-head/publication plus written receipt selects exactly its commit;
 restart/lost/late mint and failed cleanup retain their original duties.
