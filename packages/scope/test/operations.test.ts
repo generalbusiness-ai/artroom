@@ -449,34 +449,60 @@ describe("outside operations at a real scope (scope contract, section 4.3; autho
     expect([(await seen(s, op)).state, await surface(s).effect(), await s.alarm(), out.attempts]).toEqual(["settled", 0, false, [`${op}#1`]]);
   });
 
-  // Invariant: in one life of the object, an attempt that a pass left unsent because the port refused its kind is sent at the
-  // next call after the port accepts it, a read with no commit and no alarm before it, and exactly once. This is the register
-  // whose create-repository attempt was recorded before the Git host's setting was read, with no restart after it.
-  test("an attempt recorded while the outside port refused is sent, with no restart, at the next call after the port accepts its kind, which is a read; it is sent exactly once; while the port still refuses, reads send nothing", async () => {
-    const s = await found();
+  // Invariant: bounded same-life acceptance detection advances past an
+  // unsupported prefix; only the later enabled attempt leaves, once.
+  // Generic owner/kind acceptance is scripted, not a native host policy.
+  test("an attempt recorded while the outside port refused is sent, with no restart, after bounded reads find its later accepted kind beyond an unsupported prefix; it is sent exactly once", async () => {
+    const s = await found({ deliveryBatch: 1 });
     const out = outsideOf(s.name);
-    out.accepting = false;
-    const [op] = await open(s, pushOf(1)) as [OperationId];
-    expect([await surface(s).effect(), out.sent.length, await s.alarmAt()]).toEqual([0, 0, null]);
-    const head = await s.head();
+    let enabled = false;
+    let asked = 0;
+    wired.set(s.name, () => ({ outside: {
+      accepts: (_owner, kind) => { asked++; return enabled && kind === "push"; },
+      send: (request) => out.send(request),
+      late: (answer) => out.late(answer),
+    } }));
+    try {
+      await s.restart(); // Construct the scripted generic port before opening.
+      const [first, second, op] = await open(s, MINT, MINT, pushOf(1)) as [OperationId, OperationId, OperationId];
+      for (let pass = 0; pass < 4; pass++) expect(await surface(s).effect()).toBe(0);
+      expect([out.sent.length, await s.alarmAt()]).toEqual([0, null]);
+      const head = await s.head();
 
-    // Control: while the port refuses, reads and turns of the event loop send nothing.
-    for (let read = 0; read < 3; read++) expect((await seen(s, op)).state).toBe("pending");
-    for (let turn = 0; turn < 50; turn++) await tick();
-    expect(out.sent.length).toBe(0);
+      // While no kind is accepted, ordinary reads inspect at most one batch
+      // without another pass, request, entry or alarm.
+      for (let read = 0; read < 3; read++) {
+        const before = asked;
+        expect((await seen(s, op)).state).toBe("pending");
+        expect(asked - before).toBeLessThanOrEqual(1);
+      }
+      expect([out.sent.length, await s.alarmAt()]).toEqual([0, null]);
 
-    // The setting appears in the same life. The next call is a read of the operation; its pass runs after the answer.
-    out.accepting = true;
-    expect((await seen(s, op)).state).toBe("pending");
-    for (let turn = 0; turn < 200 && out.sent.length === 0; turn++) await tick();
-    expect([out.attempts, await s.head()]).toEqual([[`${op}#1`], head]);
-    out.answer(op, 1, own("c1"));
-    while ((await seen(s, op)).state !== "settled") await tick();
+      // Only the later kind becomes accepted. The two prefix rows stay
+      // unsupported; repeated reads must reach the later row in this life.
+      out.answer(op, 1, own("c1"));
+      enabled = true;
+      let detected = false;
+      for (let read = 0; read < 3 && !detected; read++) {
+        await seen(s, op);
+        detected = out.sent.length > 0 || await s.alarmAt() !== null;
+      }
+      expect(detected).toBe(true);
+      // Detection restarts the original bounded parked walk. Its immediate
+      // alarms, not event-loop ticks, advance past the two unsupported rows.
+      for (let pass = 0; pass < 3 && out.sent.length === 0; pass++) {
+        expect(await s.alarmAt()).toBe(timeMs(START));
+        expect(await s.alarm()).toBe(true);
+      }
+      expect([out.attempts, out.sent[0]?.origin.hash, out.sent[0]?.origin.entry.seq]).toEqual([[`${op}#1`], head.hash, head.seq]);
+      expect((await seen(s, op)).state).toBe("settled");
 
-    // Further reads, a pass and the alarm send nothing again.
-    for (let read = 0; read < 3; read++) await seen(s, op);
-    for (let turn = 0; turn < 50; turn++) await tick();
-    expect([await surface(s).effect(), await s.alarm(), out.attempts]).toEqual([0, false, [`${op}#1`]]);
+      // Unsupported prefix rows remain durable, unsent and pending. Further
+      // reads/passes/alarms cannot resend the accepted attempt's original.
+      for (const id of [first, second]) expect(await seen(s, id)).toMatchObject({ state: "pending", sends: [{ attempt: 1, next: null, sent: null }] });
+      for (let read = 0; read < 3; read++) await seen(s, op);
+      expect([await surface(s).effect(), await s.alarm(), out.attempts, await s.alarmAt()]).toEqual([0, false, [`${op}#1`], null]);
+    } finally { wired.delete(s.name); }
   });
 
   test("a scope whose pinned definition the runtime cannot run sends nothing outside the service: the attempt stays recorded, with no wake-up, and is sent once the runtime can run the definition. The capability is the scripted stand-in", async () => {
