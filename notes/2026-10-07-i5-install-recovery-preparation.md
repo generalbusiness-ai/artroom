@@ -6,6 +6,11 @@ recovery boundary in event `79e1bac158353009b9d93558115a623bcfae4138`.
 Builder read that complete event with the explicit repository and actor.
 This implements that disposition; it adopts no additional policy.
 
+The current successor implements the further explicit acknowledgement
+disposition `aa575e06e92fe04019ec70df53437d51a2f56ca3`, read in full. The
+predecessor proof-read behavior and its limits below remain historical;
+the final section records the current path, evidence and trust basis.
+
 ## Result
 
 Before the first possible founding submission, the command durably saves
@@ -132,3 +137,71 @@ invalid control attempts above supply no successful-control evidence.
 This annotation changes only the note. Source, tests, dependencies and the
 packages/scripts trees remain unchanged. The integrated gate and original
 review/filing/landing order remain owed; no document-only rerun is performed.
+
+## Native acknowledgement successor under aa575
+
+The configured service's native accepted identical founding may now finalize
+planned identity recovery after the full signed-read bootstrap window, without
+GET entry zero. The local checks retain the exact signed envelope, operator,
+service, pinned version and derived scope ID; receipt definition/intent digest,
+register kind/scope/sequence zero and structurally valid complete incarnation/
+hash must match. Any previously retained accepted fact must remain identical.
+Mismatch, conflict, unavailable acknowledgement or unsupported provenance keeps
+the original plan held. Never-attempted expiry and native refusal of an expired
+unaccepted founding remain unchanged.
+
+Acceptance evidence is saved before the final installed config. Both that
+intermediate state and installed config retain the original plan, complete
+accepted receipt and explicit `service-acknowledged` status. They remain for
+later verification/reconciliation. The command reports that trust basis and
+claims no independently computed genesis hash or fresh mutation rights.
+
+An injected Context.fetch needs an internal declaration bound to the exact
+callback identity and configured service. Ordinary native fetch uses the
+configured-service contract. The declaration prevents accidental treatment of
+an arbitrary callback as that service, but authenticates no remote history.
+It changes no ordinary client transport or read authority and introduces no
+product permission flow. The real routed scope witness explicitly declares
+its service transport; synthetic altered replies are refusal/conflict controls,
+not independent history proof.
+
+The same compact witness retries 901 seconds after the original plan deadline,
+past the full 15-minute genesis window. It asserts zero recovery entry reads,
+retained envelope/receipt/status after success and final-config-save loss,
+malformed identity and metadata refusal, undeclared callback hold, and conflicts
+in hash/incarnation against the prior durable accepted fact. It still shows
+one genesis and byte-identical submissions; the inspector's later entry read
+is test-only and is not the command's authority or proof.
+
+Exact commands, run from `/tmp/artroom-install-plan-prep`, with output redirected
+before execution:
+
+```text
+npm run typecheck --workspace @generalbusiness/artroom-cli
+npx vitest run --project scope install.scope --project cli install.test
+npx vitest run --project scope install.scope -t 'the attempted marker precedes submission'
+```
+
+The first completed with exit 0 for all three CLI configurations. The second
+completed with exit 0: two files, three tests. For the third, only the retained
+accepted-fact conflict predicate was replaced with false. The unchanged witness
+failed by assertion: a conflicting hash was reported installed instead of held.
+It exited 1, with one failure and one skip. Source was restored after completion;
+commands.ts SHA-256 before and after restoration was
+`37396a657469c279c61a9741644156a0a3c408579cfef7cf8b2b92e8b80a8c15`.
+
+| Original captured output file | SHA-256 |
+|---|---|
+| `/tmp/artroom-install-ack-typecheck.log` | `b071fdcd2a1b9f41028faa45b00336ae371e0f884cc193f14edfaf8c03d0b11f` |
+| `/tmp/artroom-install-ack-focused.log` | `5b45e47c2d03ac333959e009da3134572033a48061faeb92ae7429200dcdff11` |
+| `/tmp/artroom-install-ack-control.log` | `1c7fe58f9f8e048f2cf6a1bb17a7537727a77702fbc32cb7a87d7c4c3a91f537` |
+
+Final commands.ts and install.scope.test.ts have the checked bytes; the latter's
+SHA-256 is `6bfac2cc2c36526fc212e0d2a800f2ff460bfb24392bf28b5fc2ecce076bf873`.
+Store declarations were checked; only their documentation was clarified after
+validation. Final store.ts SHA-256 is
+`933fbc8caf7075a8fcd93251bcdc68b19672713fa4f0be9a585140243452cf2e`.
+An initial fixture typecheck rejected an explicitly undefined optional trust
+property; the fixture now deletes it, and the final typecheck above passed.
+No package installation, provider operation, sleep or whole gate was run. The
+integrated gate and original normal review/filing/landing order remain owed.

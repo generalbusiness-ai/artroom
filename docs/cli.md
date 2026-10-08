@@ -71,9 +71,15 @@ attempted marker bound to the exact plan. If delivery or the final config
 save is uncertain, retry `install --planned`. An attempted plan may send
 only its original envelope after expiry; the server returns an already
 accepted identical founding, or refuses an expired unaccepted one. The
-marker proves no acceptance and extends no deadline. The command follows
-the full receipt and checks the exact applied genesis before saving the
-installed config; a mismatch leaves the recovery plan intact.
+marker proves no acceptance and extends no deadline. The native configured-service
+acknowledgement is checked against the exact planned definition, intent digest
+and complete register fact. It must match any retained accepted fact. Recovery
+does not require an aged bootstrap read. The command saves the original plan
+and receipt before the installed config and retains them afterwards, labelled
+`service-acknowledged` for later history verification. This acknowledges the
+service's installed identity; it does not independently verify genesis bytes
+or grant new authority. A mismatch or unavailable acknowledgement leaves the
+recovery plan intact.
 
 ```
 Installed: register sc_4kq2v7..., under platform:register@2, as planned.

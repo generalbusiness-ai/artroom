@@ -27,7 +27,7 @@
  */
 
 import { PROPOSED_BOUNDS, type Answer, type DeclaredDefinition, type Digest, type Entry, type FieldValue, type Founded, type Item, type KeyId, type OperationId, type PlatformDefinition, type ScopeId, type Seed, type SignedIntent, type Summary } from "@generalbusiness/artroom-contract";
-import { b64url, canonicalize, definitionDigest, digestBytes, intentDigest, isScopeId, isSignedIntentShape, keyIdOfSecret, parseStrict, scopeIdOf, textDigest, timeMs, timeOf, unb64url, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
+import { b64url, canonicalize, definitionDigest, digestBytes, intentDigest, isReceipt, isScopeId, isSignedIntentShape, keyIdOfSecret, parseStrict, scopeIdOf, textDigest, timeMs, timeOf, unb64url, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import {
   ScopeHandle, TransportError, declaredHandle, found, httpTransport, requestSession, secretSigner, sessionRequest, signedIntent, signedLogReader, signedReads,
   type Fetch, type ReadSigning, type Signing, type Transport,
@@ -40,6 +40,10 @@ export interface Context {
   store: Store;
   /** Replaces the runtime's `fetch`: a test passes the Worker's routes. */
   fetch?: Fetch;
+  /** Internal trust input for an injected founding transport, bound to the
+   * exact configured service and fetch. This declaration authenticates no
+   * remote history; ordinary native fetch uses the configured service contract. */
+  trustedFoundingService?: { service: string; fetch: Fetch };
   /** The clock that intents are signed by, in milliseconds. The default is the runtime's. */
   now?: () => number;
   /**
@@ -344,8 +348,9 @@ export function planInstall(ctx: Context, service: string, options: { host?: str
  * sent, the plan is checked: the register ID that its intent and version make must be the one it printed, and the version must be
  * a supported pinned version. A marker is saved before possible submission.
  * A never-attempted expired plan sends nothing; an attempted exact replay
- * leaves expiry and identity to the server. The full receipt/genesis is
- * checked before the plan is replaced by installed configuration.
+ * leaves expiry and identity to the server. The configured service's native
+ * acknowledgement is checked against every derivable identity, retained with
+ * the original plan, and labelled separately from verified genesis bytes.
  */
 export function installPlanned(ctx: Context): Promise<Outcome> {
   return run(async () => {
@@ -370,25 +375,34 @@ export function installPlanned(ctx: Context): Promise<Outcome> {
     if (plan.attempted === undefined && now >= timeMs(plan.founding.intent.notAfter)!) {
       return failed(`Refused: plan-expired. The planned install could be founded until ${plan.founding.intent.notAfter}. Nothing was sent. Plan again, and set the new register ID.`);
     }
+    const matches = (receipt: unknown): receipt is NonNullable<PlannedInstall["acknowledged"]>["receipt"] => isReceipt(receipt)
+      && receipt.definition === plan.definition && receipt.intent === intentDigest(plan.founding.intent)
+      && receipt.fact.at.scope === plan.register && receipt.fact.at.kind === "register" && receipt.fact.seq === 0;
+    const prior = plan.acknowledged;
+    if (prior !== undefined && (!prior || prior.status !== "service-acknowledged" || prior.service !== plan.service || !matches(prior.receipt))) {
+      return failed("Held: the retained install acknowledgement does not match the original plan. The plan is kept.");
+    }
+    if (ctx.fetch !== undefined && (ctx.trustedFoundingService?.service !== plan.service || ctx.trustedFoundingService.fetch !== ctx.fetch)) {
+      return failed("Held: this injected transport has no configured-service acknowledgement trust. The plan is kept; no request was sent.");
+    }
     // The durable marker must precede the first possible request. An exact
     // attempted replay may recover an accepted genesis after expiry; the
     // server still refuses an expired founding that was never accepted.
     if (plan.attempted === undefined) await ctx.store.save({ ...before!, plan: { ...plan, attempted: attempt } });
     const { answer } = await found(transportOf(ctx, plan.service), plan.founding, plan.definition);
     const receipt = accepted(answer, null, "Installed").receipt;
-    if (receipt.fact.at.scope !== plan.register) return failed(`The register founded is ${receipt.fact.at.scope}, not the planned ${plan.register}. The plan is kept; report this.`);
-    if (receipt.definition !== plan.definition || receipt.intent !== intentDigest(plan.founding.intent)) {
-      return failed("The install receipt does not prove the planned register's exact founding. The plan is kept; report this.");
+    if (!matches(receipt)) {
+      return failed("Held: the install acknowledgement does not match the planned register's exact identity. The plan is kept.");
     }
-    const handle = new ScopeHandle(signedReads(transportOf(ctx, plan.service), secretSigner(operator!), readSigning(ctx)), plan.register, null);
-    const followed = await handle.followReceipt(receipt);
-    if (!followed.ok || followed.entry.seq !== 0 || followed.entry.at.kind !== "register" || followed.entry.input.type !== "genesis"
-      || followed.entry.input.seed.definition !== plan.definition || followed.entry.input.decision !== "applied"
-      || canonicalize(followed.entry.input.founding) !== canonicalize(plan.founding)) {
-      return failed("The install receipt does not prove the planned register's exact founding. The plan is kept; report this.");
+    if (prior !== undefined && canonicalize(prior.receipt.fact) !== canonicalize(receipt.fact)) {
+      return failed("Held: the install acknowledgement conflicts with the retained accepted fact. The plan is kept.");
     }
-    await ctx.store.save({ v: 1, service: plan.service, key: before!.key, register: receipt.fact.at });
-    return done(`Installed: register ${receipt.fact.at.scope}, under ${plan.definition}, as planned.`, `The operator key ${plan.founding.intent.actor} is kept in the config directory, readable only by you. It is the one founder key.`);
+    // Save acceptance evidence before the final installed config. A lost final
+    // save can recover only the same fact; neither save erases the envelope.
+    const acknowledged: PlannedInstall = { ...plan, attempted: attempt, acknowledged: { status: "service-acknowledged", service: plan.service, receipt } };
+    await ctx.store.save({ ...before!, plan: acknowledged });
+    await ctx.store.save({ ...before!, plan: acknowledged, register: receipt.fact.at });
+    return done(`Installed: register ${receipt.fact.at.scope}, under ${plan.definition}, as planned.`, "Service-acknowledged identity recovery. The original plan and receipt are retained for later history verification.");
   });
 }
 
