@@ -338,9 +338,9 @@
       },
       {
         "path": "packages/derive/src/bundle-closure.ts",
-        "gitBlob": "e3e7731b70830c29225d057f5a05d9acd224e0d4",
-        "bytes": 24854,
-        "sha256": "bbfe6ccefb51dd3f31d396ec6df6c4cc28eeb3813f405fc29d06ef10f41afe31"
+        "gitBlob": "7aed2bfe489e5212262c2c6fba0e9d518571c120",
+        "bytes": 24593,
+        "sha256": "da9c2d0675f23223190d7a2b5fdbaf52c3591cc381b818aa6a4cbf3bf8272b23"
       },
       {
         "path": "packages/derive/src/bundle-records.ts",
@@ -356,9 +356,9 @@
       },
       {
         "path": "packages/derive/test/bundle.test.ts",
-        "gitBlob": "b5cc71030f5450d9412365c8a5343dc56746de1f",
-        "bytes": 16362,
-        "sha256": "212fcbd387f4dc0e5bf8b0ce4cdd9a012960d0307cae20879b7c3bbfc3371f98"
+        "gitBlob": "24d0b11c1fc699c3fd3bdf30abc9b337404c64f8",
+        "bytes": 15465,
+        "sha256": "33ec4b9237c8bf2c9f742508343c397921ba0f42f6d1a5739df329a1faa88a5d"
       }
     ]
   },
