@@ -244,3 +244,44 @@ This note was written after the gate run and changes no source or test.
 - Plain English, no em-dashes; no product named but GitHub; "takes
   effect" [code].
 - Small commits, each pushed [run].
+
+## 7 Candidate preservation repairs, 2026-10-08
+
+On candidate `3157859665e5531a3f94b124ccec00d2994c01ad`, carry the
+already reviewed page source from
+`e7901bae257b6cd4366a893ec1b9b6920dd6c2de`: exact `src/data.ts`,
+`src/main.ts`, `src/view.ts` and `test/join.test.ts` under `packages/page`.
+No older Worker, platform, CLI or site source is transplanted.
+
+The page refuses incomplete summaries, refused/truncated/budget-exhausted
+item/history projections and mixed heads rather than displaying empty results.
+An actual returned submit answer is saved in memory before awaited refresh,
+bound to service/directory/membership/key/scope; failed refresh and view redraw
+keep the known answer and separate unknown observation with inspect-before-new-act
+guidance. This is memory-only and supplies no missing reply or durable recovery.
+The version view rejects invalid edit paths and does not offer a HEAD link as
+an immutable proposed/published version preview. Latest-site navigation remains
+explicit; exact eligible version rendering is still owed to the site owner.
+Invitation encodings must match configured service, full native references and
+an explicit supported membership hint before signing; this is no provenance
+proof and does not implement pre-enrollment discovery or saved join recovery.
+The settings room text survives key-generation redraw in memory and is cleared
+on save; it is not persisted as an invitation secret.
+
+The existing locked tooling, borrowed with local workspace links and no package
+installation, built `packages/scope/src/page-assets.ts` from this composition.
+One focused page batch passed seven tests in three files; all page source, Node
+test and scope-test TypeScript configurations passed. Raw local logs:
+`/tmp/artroom-candidate-page-build.log`,
+`/tmp/artroom-candidate-page-focused.log`,
+`/tmp/artroom-candidate-page-types.log`. The new join/read/answer witness uses
+scripted HTTP and a minimal DOM stand-in; it proves no browser/provider or
+real enrollment/publication. No whole gate, provider, browser or cloud ran.
+
+The five-line page-route query witness is carried with the separately owned
+Worker ingress repair. This branch does not change `worker.ts`, and that
+witness has not been run against the unguarded candidate here. The combined
+Worker must reject credential-bearing URLs before dispatching to site/page,
+while preserving the candidate's site and scope routes. Final composed route
+verification and the candidate's one gate/review remain owed. The claim name
+header is held pending its owner-selected signed founding schema.
