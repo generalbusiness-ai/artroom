@@ -239,3 +239,20 @@ The original setup is also retained at
 `e56b38a5ddec2000874e4214ece5ba6f518f16c93acc2176f1c62bbba989983b`.
 No dependency, new witness matrix, gate, provider, activation or main change
 was made. All original component limits above remain.
+
+## Fixture-owned cleanup
+
+Builder's follow-up to the planner's scratch-ownership requirement replaces
+the shared repository helper's global cleanup with one fixture-owned
+temporary root, allocated only by authenticated configure. The bare repository
+and clone destination live under that root. Teardown removes only that root;
+an unused fixture removes no directory and cannot clear another test's scratch
+registry. The existing real Git helper supplies the same controlled Git
+environment. Authentication, output checks and all clone assertions are unchanged.
+
+The existing focused runtime-versions file passed once after this source change;
+scope source, Worker and Node helper typechecks also exited zero. Builder
+observed those command exits directly. Original output is retained at
+`/tmp/artroom-clone-real-git-owned-cleanup-focused.log` and
+`/tmp/artroom-clone-real-git-owned-cleanup-types.log`. No extra witness, whole
+gate, provider or main change was made.

@@ -5,15 +5,16 @@
  * redirect safety evidence. Tokens exist only in memory/requests/process env. */
 import { spawn } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { createServer, type IncomingMessage } from "node:http";
 import type { AddressInfo } from "node:net";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import type { TestProject } from "vitest/node";
 import { Host } from "../../../git/test/support/host.ts";
-import { bare, cleanup, git, scratch } from "../../../git/test/support/repo.ts";
+import { git } from "../../../git/test/support/repo.ts";
 import type { LocalCloneAddress } from "./local-clone.ts";
 
 const MAX = 1024 * 1024; // fixture-only buffer bound, not a product quota
@@ -30,6 +31,7 @@ export default async function setup(project: TestProject) {
   // Only the nonce-protected fixed configure request allocates these paths.
   let repo: string | null = null;
   let directory: string | null = null;
+  let fixtureRoot: string | null = null;
   const nonce = randomBytes(32).toString("hex");
   const tokens = new Map<string, { id: string; scope: "read" | "write"; seconds: number; live: boolean }>();
   let name: string | null = null; let remote = ""; let readRequests = 0; let tokenInOutput = false;
@@ -95,9 +97,11 @@ export default async function setup(project: TestProject) {
       const value = raw.length ? JSON.parse(raw.toString("utf8")) as Record<string, unknown> : {};
       if (path === "/configure" && request.method === "POST" && typeof value["name"] === "string" && /^[A-Za-z0-9_.-]+$/.test(value["name"]) && (name === null || name === value["name"])) {
         if (name === null) {
-          repo = bare();
+          fixtureRoot = mkdtempSync(join(tmpdir(), "artroom-local-clone-"));
+          repo = join(fixtureRoot, "repo.git");
+          git(fixtureRoot, ["init", "-q", "--bare", repo]);
           git(repo, ["symbolic-ref", "HEAD", "refs/heads/main"]);
-          directory = join(scratch(), "clone");
+          directory = join(fixtureRoot, "clone");
         }
         name = value["name"]; remote = `https://service.invalid/git/artroom-demo/${name}.git`; send({ remote, directory });
       } else if (path === "/mint" && request.method === "POST" && name !== null && value["name"] === name && (value["scope"] === "read" || value["scope"] === "write") && typeof value["seconds"] === "number" && Number.isSafeInteger(value["seconds"]) && value["seconds"] > 0) {
@@ -124,5 +128,8 @@ export default async function setup(project: TestProject) {
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   project.provide("localClone", { url, nonce } satisfies LocalCloneAddress);
-  return async () => { await new Promise<void>((resolve) => server.close(() => resolve())); cleanup(); };
+  return async () => {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    if (fixtureRoot !== null) rmSync(fixtureRoot, { recursive: true, force: true });
+  };
 }
