@@ -64,6 +64,23 @@ test("canonical bytes/closed fields precede content claims; explicit preparse bo
   expect(verifyDeclaredBundleClosure(original.root, [...original.artifacts, { ...first, ref: { ...first.ref, encoding: "utf8" } }], limits)).toMatchObject({ ok: false, reason: "conflict" });
   const changed = original.artifacts.map((item, index) => index === 0 ? { ...item, bytes: utf8("[]") } : item);
   expect(verifyDeclaredBundleClosure(original.root, changed, limits)).toMatchObject({ ok: false, reason: "content" });
+  // Representative typed-edge witness: TrustAnchor.first requires the framed
+  // BindingSetId, although the same record's raw ArtifactId is a valid inspection root.
+  const add = (kind: Exclude<BundleArtifact["kind"], null>, value: unknown) => {
+    const bytes = canonicalBytes(value); const ref = { digest: digestBytes(bytes), bytes: bytes.length, encoding: "canonical-json" as const };
+    original.artifacts.push({ ref, bytes, kind }); return ref;
+  };
+  const evidence = { artifact: first.ref, kind: "operator-statement" as const };
+  const service = add("ServiceIdentity", { format: "artroom-logical-service-1", name: "fixture", provenance: evidence });
+  const set = { format: "artroom-source-binding-set-1", service: service.digest, revision: 0, parent: null, bindings: [], decision: evidence };
+  const setRef = add("BindingSetRevision", set);
+  const anchor = { format: "artroom-bundle-trust-anchor-1", service: service.digest, publisher: keyIdOfSecret(new Uint8Array(32).fill(1)), first: { revision: 0, bindingSet: semanticContentId("artroom-source-binding-set-1", set) }, authority: evidence, custody: evidence };
+  const anchorRef = add("TrustAnchor", anchor);
+  expect(verifyDeclaredBundleClosure(semanticContentId("artroom-bundle-trust-anchor-1", anchor), original.artifacts, limits)).toMatchObject({ ok: true });
+  expect(verifyDeclaredBundleClosure(anchorRef.digest, original.artifacts, limits)).toMatchObject({ ok: true });
+  const aliased = { ...anchor, first: { ...anchor.first, bindingSet: setRef.digest } };
+  const aliasedRef = add("TrustAnchor", aliased);
+  expect(verifyDeclaredBundleClosure(aliasedRef.digest, original.artifacts, limits)).toMatchObject({ ok: false, reason: "content", path: "reference.domain" });
 });
 
 test("founding failures retain exact intended target; recorded refusal remains an existing full reference and cannot become applied/unborn by shape", () => {

@@ -64,10 +64,19 @@ export function verifyDeclaredBundleClosure(root: Digest, artifacts: readonly Bu
       const artifact = ids.get(id);
       if (!artifact) fail("unavailable", "reference");
       if (kind && artifact.kind !== kind) fail("closure", kind);
+      // Kind alone cannot substitute a raw record hash for its adopted typed ContentId.
+      const domain = kind === undefined ? undefined : DOMAINS[kind];
+      if (kind && id !== (domain ? semanticContentId(domain, artifact.value) : artifact.ref.digest)) fail("content", "reference.domain");
+      return artifact;
+    };
+    const rawFound = (id: ArtifactId, kind?: BundleRecordKind): CheckedArtifact => {
+      const artifact = raw.get(id);
+      if (!artifact) fail("unavailable", "artifact-reference");
+      if (kind && artifact.kind !== kind) fail("closure", kind);
       return artifact;
     };
     const referenced = (ref: ArtifactRef, kind?: BundleRecordKind): CheckedArtifact => {
-      const artifact = found(ref.digest, kind);
+      const artifact = rawFound(ref.digest, kind);
       if (!same(ref, artifact.ref)) fail("conflict", "artifact-reference");
       return artifact;
     };
@@ -96,14 +105,14 @@ export function verifyDeclaredBundleClosure(root: Digest, artifacts: readonly Bu
         const manifest = found(pin.bundle, "SemanticBundleManifest").value as SemanticBundleManifest;
         if (manifest.abi.digest !== pin.abi) fail("conflict", "selection.abi");
         // Runtime/compatibility/admission fields are raw ArtifactIds in this contract. Their owner meanings remain opaque here.
-        for (const id of [pin.runtimeRelease, pin.compatibility]) { if (++edgeCount > limits.edges) fail("limits", "edges"); out.push(found(id)); }
+        for (const id of [pin.runtimeRelease, pin.compatibility]) { if (++edgeCount > limits.edges) fail("limits", "edges"); out.push(rawFound(id)); }
         if (pin.subject.kind === "born") {
           typed(pin.subject.binding, "HistoricalSourceBinding");
           const binding = found(pin.subject.binding, "HistoricalSourceBinding").value as HistoricalSourceBinding;
           if (!same(pin.subject.context, binding.context) || binding.bundle !== pin.bundle) fail("conflict", "selection.binding");
           const chosen = pin.subject.binding;
           if (!set.bindings.some((entry) => entry.binding === chosen && same(entry.context, pin.subject.kind === "born" ? pin.subject.context : null))) fail("conflict", "selection.binding-set");
-        } else { if (++edgeCount > limits.edges) fail("limits", "edges"); out.push(found(pin.subject.admission)); }
+        } else { if (++edgeCount > limits.edges) fail("limits", "edges"); out.push(rawFound(pin.subject.admission)); }
       };
       switch (artifact.kind) {
         case "SemanticBundleManifest": {
@@ -189,7 +198,7 @@ export function verifyDeclaredBundleClosure(root: Digest, artifacts: readonly Bu
         case "SelectionSubject": {
           const subject = artifact.value as BundleRecords["SelectionSubject"];
           if (subject.kind === "born") { service(subject.context.service); typed(subject.binding, "HistoricalSourceBinding"); }
-          else { service(subject.service); if (++edgeCount > limits.edges) fail("limits", "edges"); out.push(found(subject.admission)); }
+          else { service(subject.service); if (++edgeCount > limits.edges) fail("limits", "edges"); out.push(rawFound(subject.admission)); }
           break;
         }
         case "SelectionResult": {
@@ -251,6 +260,8 @@ export function verifyDeclaredBundleClosure(root: Digest, artifacts: readonly Bu
       for (const child of edges(artifact)) visit(child, depth + 1);
       visiting.delete(artifact.ref.digest); visited.add(artifact.ref.digest);
     };
+    // Inspection roots intentionally accept a raw artifact ID or a typed ContentId.
+    // All semantic fields above use kind-specific framing; ArtifactRefs/raw IDs use rawFound.
     const first = found(root);
     visit(first, 0);
     const cyclic = new Set<ModuleId>();
