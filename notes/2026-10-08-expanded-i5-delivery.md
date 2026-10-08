@@ -222,3 +222,12 @@ its log remains diagnostic, not a source-failure claim. Exact commands,
 source bounds, raw logs and control bytes are retained in
 `/tmp/artroom-expanded-reacceptance-evidence.json`. No full-file rerun,
 gate, provider/cloud run, crash/restart substitution or activation.
+
+The separate T20 factory witness now derives `sentAt` from the actual SQLite
+attempt record and still compares the complete request and selected scripted
+clock. Its prior expectation omitted this added bookkeeping. The final
+focused T20 check passes one test; Worker-test types pass. Logs:
+`/tmp/artroom-expanded-operations-t20-final.log` and
+`/tmp/artroom-expanded-operations-t20-types-final.log`. The initial optional
+field type error and intermediate checks are retained. No production logic,
+T2/T19 assertion or timeout changes; this does not resolve the native crash.

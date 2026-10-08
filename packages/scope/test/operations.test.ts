@@ -229,6 +229,7 @@ describe("outside operations at a real scope (scope contract, section 4.3; autho
     const next = (await s.head()).seq + 1;
     let derived: EffectRequest | null = null;
     let factory: ScopeObject;
+    let factoryStore: SqliteStore;
     class FactoryScope extends ScopeObject {
       protected override wiring(): Wiring {
         return {
@@ -244,7 +245,9 @@ describe("outside operations at a real scope (scope contract, section 4.3; autho
                 const operation = given.state.operation(request.operation)!;
                 const origin = given.own(operation.attempts[0]!.opened)!;
                 expect([given.state.scope(), scope.head, given.genesis()]).toEqual([scope, { seq: next, hash: origin.hash }, given.own(0)!.entry.input]);
-                derived = { scope: scope.at, operation: operation.id, attempt: operation.attempts[0]!.attempt, owner: operation.owner, kind: operation.kind, origin };
+                const sentAt = factoryStore.sending(request.operation, request.attempt)?.sent;
+                if (sentAt === undefined || sentAt === null) return expect.fail("the factory must receive an actually marked request");
+                derived = { scope: scope.at, operation: operation.id, attempt: operation.attempts[0]!.attempt, owner: operation.owner, kind: operation.kind, origin, sentAt };
                 expect(derived).toEqual(request);
                 return own(origin.hash);
               },
@@ -253,11 +256,14 @@ describe("outside operations at a real scope (scope contract, section 4.3; autho
         };
       }
     }
-    await s.inside((state) => { factory = new FactoryScope(state, {}); });
+    await s.inside((state) => {
+      factoryStore = new SqliteStore({ exec: (query, ...bindings) => state.storage.sql.exec(query, ...bindings), transaction: (closure) => state.storage.transactionSync(closure) });
+      factory = new FactoryScope(state, {});
+    });
     const [fresh] = await open(s, pushOf(1)) as [OperationId];
     expect(await s.inside(() => factory.effect())).toBe(1);
     expect([derived, (await seen(s, fresh)).state, out.sent.length]).toEqual([
-      { scope: s.at, operation: fresh, attempt: 1, owner: "platform:destination@1", kind: "push", origin: (await s.sealed(next))[0] }, "settled", 3,
+      { scope: s.at, operation: fresh, attempt: 1, owner: "platform:destination@1", kind: "push", origin: (await s.sealed(next))[0], sentAt: s.c.clock.now }, "settled", 3,
     ]);
 
     // Recovery is a trusted port boundary, not another send. This made-up
