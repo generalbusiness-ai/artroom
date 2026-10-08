@@ -1,7 +1,7 @@
 import { expect, test, vi } from "vitest";
 import type { Entry, Input, OperationId, Read } from "@generalbusiness/artroom-contract";
-import { httpTransport, type Fetch } from "@generalbusiness/artroom-client";
-import { CLONE_ENTRIES_PER_POLL, outcomeFetch, pauseOutcome, waitOutcome } from "../src/clone-outcome.ts";
+import { httpTransport, TransportError, type Fetch } from "@generalbusiness/artroom-client";
+import { CLONE_ENTRIES_PER_POLL, outcomeFetch, outcomeWaitLines, pauseOutcome, waitOutcome } from "../src/clone-outcome.ts";
 
 const operation: OperationId = "1:0";
 const outcome = (id: OperationId = operation): Input => ({ type: "outcome", owner: "platform:destination@99", kind: "mint-read", operation: id, attempt: 1, result: "confirmed", evidence: { basis: "own-answer", body: { token: "nonsecret-handle", ends: "2026-10-08T12:00:00Z" } } });
@@ -76,4 +76,39 @@ test("outcome deadline aborts the active read and caller cancellation releases t
     request.abort();
     expect(combined?.aborted).toBe(true); // Per-request deadlines remain effective too.
   } finally { vi.useRealTimers(); }
+});
+
+// Invariant: read and pause exceptions retain the accepted operation/cursor
+// guidance, omit raw secrets, stop further reads, and still preserve deliberate
+// local proof refusals. All readers/pauses here are stand-ins.
+test("exceptional outcome stops retain actionable progress without exposing transport text or replacing a local proof refusal", async () => {
+  const scope = `sc_${"a".repeat(52)}` as const;
+  const secret = "private-provider-token-sentinel";
+  let reads = 0;
+  let pauses = 0;
+  const readFailure = await waitOutcome(operation, 2, async () => {
+    reads++;
+    if (reads === 2) throw new TransportError(secret);
+    return scripted(outcome("9:0"));
+  }, async () => { pauses++; }, 2).then((value) => value, (error: Error) => ({ escaped: error.message }));
+  expect(readFailure).toEqual({ ok: false, reason: "read-failed", next: 3, scanned: 1, polls: 1 });
+  expect([reads, pauses]).toEqual([2, 0]);
+  if (!("ok" in readFailure) || readFailure.ok) return expect.fail("read failure must be a contextual stop");
+  const readLines = outcomeWaitLines(scope, 1, operation, readFailure);
+  expect(readLines[0]).toContain(`${scope}:1 (${operation}): read-failed; 1 entries in 1 polls, next entry ${scope}:3`);
+  expect(readLines[1]).toContain(`artroom show ${scope}:1 and artroom log destination`);
+  expect(readLines.join(" ")).not.toContain(secret);
+
+  reads = pauses = 0;
+  const pauseFailure = await waitOutcome(operation, 2, async () => { reads++; return scripted(outcome("9:0")); }, async () => { pauses++; throw new Error(secret); }, 2, { entriesPerPoll: 1 }).then((value) => value, (error: Error) => ({ escaped: error.message }));
+  expect(pauseFailure).toEqual({ ok: false, reason: "pause-failed", next: 3, scanned: 1, polls: 1 });
+  expect([reads, pauses]).toEqual([1, 1]);
+  if (!("ok" in pauseFailure) || pauseFailure.ok) return expect.fail("pause failure must be a contextual stop");
+  const pauseLines = outcomeWaitLines(scope, 1, operation, pauseFailure);
+  expect(pauseLines[0]).toContain(`${scope}:1 (${operation}): pause-failed; 1 entries in 1 polls, next entry ${scope}:3`);
+  expect(pauseLines[1]).toContain("no credential was retrieved and nothing was cloned");
+  expect(pauseLines.join(" ")).not.toContain(secret);
+
+  const refusal = new Error("intentional local exact-proof refusal");
+  await expect(waitOutcome(operation, 2, async () => { throw refusal; }, async () => {}, 2, {}, (error) => error === refusal)).rejects.toBe(refusal);
 });

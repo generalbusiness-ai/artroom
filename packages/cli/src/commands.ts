@@ -31,7 +31,7 @@ import {
 import { DIRECTORY, MEMBERSHIP, REGISTER, ROLE_LISTS, platform, type Role } from "@generalbusiness/artroom-platform";
 import { SourceError, httpSource, render, verify as replay, type HistorySource } from "@generalbusiness/artroom-replay";
 import type { ClaimStep, Config, PendingClaim, PendingJoin, Repository, Store } from "./store.ts";
-import { outcomeFetch, pauseOutcome, waitOutcome, type CloneWait } from "./clone-outcome.ts";
+import { outcomeFetch, outcomeWaitLines, pauseOutcome, waitOutcome, type CloneWait } from "./clone-outcome.ts";
 import { readTokenEntry, readTokenOpening, readTokenOutcome, readTokenReceipt } from "./clone-proof.ts";
 
 export interface Context {
@@ -859,11 +859,8 @@ export function clone(ctx: Context, directory: string | undefined, options: { ho
       const got = await D.entry(next);
       if (got.ok && (!readTokenEntry(got.value, proof.to, next) || (got.value.entry.input.type === "outcome" && got.value.entry.input.operation === operation && !readTokenOutcome(got.value, next, proof)))) return stop(failed(`The entry at ${scope}:${next} does not match this destination's recorded mint-read (${operation}); inspect artroom log destination. No credential was retrieved and nothing was cloned.`));
       return got;
-    }, (signal) => ctx.pause ? ctx.pause([scope]) : pauseOutcome(signal), ctx.tries ?? 120, ctx.cloneWait);
-    if (!waited.ok) {
-      const reason = waited.reason === "read-refused" ? `entry read refused: ${waited.refusal}` : waited.reason;
-      return failed(`Stopped waiting for read token at ${scope}:${seq} (${operation}): ${reason}; ${waited.scanned} entries in ${waited.polls} polls, next entry ${scope}:${waited.next}.`, `The accepted mint may still finish. Inspect artroom show ${scope}:${seq} and artroom log destination; no credential was retrieved and nothing was cloned. An unread token remains subject to its reported expiry.`);
-    }
+    }, (signal) => ctx.pause ? ctx.pause([scope]) : pauseOutcome(signal), ctx.tries ?? 120, ctx.cloneWait, (error) => error instanceof Stop);
+    if (!waited.ok) return failed(...outcomeWaitLines(scope, seq, operation, waited));
     const outcome = waited.outcome;
     const next = waited.next;
     if (outcome.result === "unknown") return failed(`The read-token mint at ${scope}:${seq} is unknown (outcome ${scope}:${next - 1}). The host may have minted a token; no automatic mint retry was made. Inspect artroom show ${scope}:${seq} and artroom log destination. No credential was retrieved and nothing was cloned.`);

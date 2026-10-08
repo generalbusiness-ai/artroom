@@ -170,11 +170,13 @@ export class DestinationHost implements Outside {
     this.#options.custody.judged(at.operation, at.attempt, body && text(body["token"]) && typeof body["ends"] === "string" && timeMs(body["ends"]) !== null ? { id: body["token"], ends: body["ends"] } : null);
   }
 
-  /** The exact shipped definition must advertise both boundaries before any
-   * read-token dispatch. Current @1 does not; this creates no catalog data. */
+  /** The selected catalog definition must advertise both read boundaries.
+   * Native @1 currently has neither. Its literal naming fence is preparation,
+   * not a policy for archived clone-era @1 bundles; historical source selection
+   * must reconcile those separately. This creates no catalog data. */
   #reads(): DestinationReadTokens | null {
     const named = this.#given.genesis()?.seed.definition;
-    if (typeof named !== "string" || named === DESTINATION || !named.startsWith("platform:destination@")) return null;
+    if (typeof named !== "string" || named === "platform:destination@1" || !named.startsWith("platform:destination@")) return null;
     const code = platform(named as PlatformDefinition);
     return code?.data.acts["read-token"] && code.data.outcomes["mint-read"]
       ? new DestinationReadTokens(this.#given, this.#options, named as PlatformDefinition) : null;
