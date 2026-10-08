@@ -41,11 +41,14 @@ const join = (...parts: Uint8Array[]): Uint8Array => {
 };
 const PNG = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4]);
 
+/** An annotated tag object, which the stand-in host holds beside the objects a push sends. */
+interface TagObject { id: string; type: "tag"; data: Uint8Array }
+
 /**
  * A pack with these tag objects added after its own: `buildPack` writes commits, trees and blobs only, which is all a push
  * sends. Each tag is an undeltified entry of type 4, its data deflated; the count and the trailer are written again.
  */
-async function withTags(pack: Uint8Array, tags: readonly RawGitObject[]): Promise<Uint8Array> {
+async function withTags(pack: Uint8Array, tags: readonly TagObject[]): Promise<Uint8Array> {
   if (tags.length === 0) return pack;
   const entries: Uint8Array[] = [];
   for (const tag of tags) {
@@ -66,7 +69,7 @@ async function withTags(pack: Uint8Array, tags: readonly RawGitObject[]): Promis
 class Scripted {
   name: string | null = null;
   readonly refs = new Map<string, string>();
-  readonly objects = new Map<string, RawGitObject>();
+  readonly objects = new Map<string, RawGitObject | TagObject>();
   readonly minted: string[] = [];
   readonly revoked = new Set<string>();
   packs = 0;
@@ -130,7 +133,7 @@ class Scripted {
       this.packs++;
       // Every object, whatever is wanted: the source keeps what it was sent and checks each object it reads.
       const all = [...this.objects.values()];
-      const pack = await withTags(await buildPack(all.filter((o) => o.type !== "tag"), { maxBytes: MAX_BYTES }), all.filter((o) => o.type === "tag"));
+      const pack = await withTags(await buildPack(all.filter((o): o is RawGitObject => o.type !== "tag"), { maxBytes: MAX_BYTES }), all.filter((o): o is TagObject => o.type === "tag"));
       return new Response(join(utf8(pkt("NAK\n")), pack), { headers: { "content-type": "application/x-git-upload-pack-result" } });
     }
     return new Response("unscripted", { status: 404 });
