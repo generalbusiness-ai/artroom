@@ -6,6 +6,19 @@ Draft for review under existing `48407a70` and `9be26ef7`, governed by
 manifest and contextual interface around the existing evaluator. It is no
 implementation, binding publication, bootstrap grant or activation.
 
+This is the prepared proposed successor, following Root review of the complete
+changes-requested verdict `28966df36e361fe4ab19efbb0bb8e177422aaa88` and
+planner disposition `bb63707edec5a7129ce4cad39d7dbfdc71d4d4ec`, both read in
+full through builder in the explicit repository workroom. The frozen review
+subject remains `4823ec753940b935d25876a46e67c2e79e2a5f73`; its unchanged
+711-line predecessor is retained at `/tmp/artroom-bundle-482-predecessor.md`,
+SHA-256
+`a745d8abb45475a88c3fd39f70b7cef03cf6892ecfaee1bc0e58b92e0ac349cc`.
+The previously reviewed founding-held scratch
+proposal is applied below. The recorded-refusal target/result is an additional
+proposed owner amendment, requiring complete normal successor DESIGN review
+before adoption; neither failure variant creates runnable history or access.
+
 ## Evidence inspected and its limits
 
 Read-only inspection used the packet's schema and bounded metadata
@@ -597,11 +610,140 @@ interface PreparedSelection {
                     domain: string | null; artifact: ArtifactRef }[];
   prepared: Prepared[];
 }
+interface FoundingTarget {
+  service: ServiceId;
+  seed: Seed;
+  intent: Digest;
+}
+type FoundingAdmissionInput = "admission" | "binding-set" | "activation-tuple"
+  | "bundle" | "abi" | "runtime-release" | "compatibility";
+type FoundingHold =
+  | { reason: "unavailable"; inputs: FoundingAdmissionInput[] }
+  | { reason: "conflict";
+      inputs: { input: FoundingAdmissionInput; candidates: Digest[] }[] };
+interface RecordedRefusalTarget {
+  service: ServiceId; scope: ScopeRef;
+  genesis: FactRef; named: Digest | PlatformDefinition; targetHead: Head;
+  genesisBytes: ArtifactRef;
+  history: { first: number; last: number; entries: ArtifactRef }[];
+  retained: { kind: RetainedInput["kind"]; digest: Digest;
+              domain: string | null; artifact: ArtifactRef }[];
+  refusalSchema: ArtifactRef;
+}
+type RefusalCorrespondenceInput = "historical-admission" | "source-binding"
+  | "bundle" | "abi" | "local-adapter" | "runtime-compatibility";
+type RefusalHold =
+  | { reason: "unavailable"; inputs: RefusalCorrespondenceInput[] }
+  | { reason: "conflict";
+      inputs: { input: RefusalCorrespondenceInput; candidates: Digest[] }[] };
 type SelectionResult =
   | { result: "selected"; pin: SelectionPin }
   | { result: "unresolved"; context: HistoricalContext; missing: MissingEvidence[] }
-  | { result: "conflict"; context: HistoricalContext; candidates: BindingId[] };
+  | { result: "conflict"; context: HistoricalContext; candidates: BindingId[] }
+  | { result: "founding-held"; target: FoundingTarget; hold: FoundingHold }
+  | { result: "existing-refused-held"; target: RecordedRefusalTarget;
+      hold: RefusalHold };
 ```
+
+founding-held identifies the exact requested logical service, complete
+intended Seed and intent digest without asserting an applied genesis,
+incarnation or target head. It is a typed internal stop, never a pin or
+authority grant. The target repeats the exact selection request; a valid
+shape alone does not prove the intent or founding authority. unavailable
+lists only the absent required inputs. conflict lists the exact input and
+actual competing nonsecret content IDs observed, without fabricating an
+accepted SelectionPin. Input lists are sorted and unique; conflict groups
+are sorted by input and their candidate IDs are sorted unique, with at
+least two competing IDs in each group. Neither list is empty. These are
+semantic cardinalities, not new acquisition quotas or numeric defaults.
+IDs retain their input-specific identity meanings; a digest match across
+differently typed inputs never makes them interchangeable.
+
+No founding entry, admission-attribution write, preparation or outside
+work is started from founding-held. Missing current admission inputs are
+not historical MissingEvidence and do not trigger 71b or a new acquisition
+route. Retry may reconsider the same target only through the existing
+authorized selection boundary, with new full current checks. It cannot
+synthesize HistoricalContext, infer a genesis hash/head, select a conflicting
+candidate by newest/time, or treat an already-born scope as founding.
+
+existing-refused-held identifies an actual recorded scope whose sealed
+genesis refused. It is not the founding-held target and is never passed as
+an applied HistoricalContext, born SelectionSubject or selected pin. service
+is the configured logical service; scope is the actual full kind/ScopeId/
+incarnation, not a guessed reference from an intended Seed. genesis has seq
+zero and exactly that scope. Its hash is verified over the original sealed
+genesis bytes using the retained entry-domain/schema, not a reserialization.
+named is the exact declared pin in those bytes, including its full digest or
+platform name, never a current catalog interpretation of a colliding name.
+The original input/Seed and refused result must be present in genesisBytes;
+refusalSchema retains the exact entry/result schema used to recognize that
+recorded disposition. This structural schema must itself be authenticated
+under the configured accepted trust/evidence boundary; a caller-chosen schema
+cannot reclassify a sealed record. The full reference and retained Seed must
+agree under that schema, without asserting an applied birth. That recognition
+is structural evidence, not proof of
+the judgment's semantic correctness or permission to execute its bundle.
+
+history uses the same closed HistoryChunk schema above, but its original
+genesis bytes are refused, not applied. Ranges are sorted, adjacent and
+gap-free from zero through the actual witnessed targetHead; the final hash,
+all prev links, full references and original-byte artifacts are verified.
+No future/applied endpoint is invented. retained has the same sorted exact
+kind/domain/digest/framing rules as ScopeCoverage, with domain nonnull exactly
+for values; it preserves the authorized original proof inputs needed for
+inspection, not missing-zero replacements. Artifact encoding, length and
+hash checks remain exact. Protected entries/values stay under existing
+protected retention/access, including any credential-bearing founding input.
+An unavailable original artifact cannot be replaced by its hash or unsafe
+export; no new byte acquisition or public metadata route follows.
+
+The refused target and its fields are not accepted as caller authority.
+They must be authenticated against the actual sealed record, its witnessed
+endpoint and already-authorized original-byte evidence. If those facts or
+the structural refusal schema cannot be established, classification itself
+stays held at the existing evidence/access boundary: do not label unknown
+history refused, applied or unborn. This result represents the subsequent
+semantic/execution correspondence stop once that exact refused history is
+established. It does not assert original admission release, HistoricalSourceBinding
+or an available executable adapter. RefusalHold lists only actual unavailable
+or competing correspondence inputs, with the same closed nonempty sorted
+unique input/candidate validation as FoundingHold. Candidate IDs have their
+input-specific identity (original admission artifact, source BindingId,
+BundleId, ABI artifact, reviewed local-adapter artifact or compatibility
+artifact); a competing BindingId does not imply accepted applied coverage.
+Missing historical originals continue to use their exact MissingEvidence and
+existing 71b handoff; RefusalHold records the selection stop, not a replacement
+for that evidence record or a new acquisition request.
+
+Existing authorized sealed refusal inspection remains supported: verify the
+original bytes/reference/hash chain and show their recorded refused result
+under their exact retained schema without claiming replay correctness.
+Already-authorized reconciliation of that original request, resources and
+cleanup retains the full original scope/operation/attempt/provider/custody
+identity and existing current checks. Reconciliation requiring unavailable
+historical semantics, runnable compatibility or executor proof remains held;
+it cannot run today's code to explain or settle the old refusal. No new read,
+act, retry or cleanup privilege is granted. Do not erase a refusal, its
+history, resource ownership, late/unknown answers or cleanup duty; do not
+retry its creation as an unborn/fresh founding. These duties survive every
+selection stop. Full refused-genesis semantic/legacy execution coverage remains
+owed under existing 484/9be; applied-only staging and truthful raw inspection
+do not close it. The missing exact owner correspondence must be supplied or
+disposed of through the existing reviewed owner/evidence boundary before
+runnable coverage can be extended; this successor adds no new binding kind
+or fallback execution path.
+
+Every added record and nested variant follows the exact own-field, canonical
+byte and closed-union rules above. Unknown reason/input/result tags, extra or
+missing fields, invalid references or mismatched original bytes are validation
+failures, not unavailable-input holds. Access denial remains the current
+access refusal; it is not historical missing evidence or an acquisition grant.
+A resolved semantic refusal keeps its selected contract's recorded/refused
+behavior; an evaluator/profile fault retains its exact ABI fault/halting
+classification, never a manufactured founding-held or successful inspection.
+No protected candidate identity or input is exposed beyond existing authorized
+metadata access. These distinctions add no executable API.
 
 These are proposed selection records, not trusted wire flags. selected is an
 internal result produced only by the local verifier and configured acceptance
@@ -707,5 +849,5 @@ Required concrete inputs and decisions before executable integration:
 All these remain acceptance prerequisites; no missing term counts as zero.
 No source implementation, project import/evaluation, build, test, gate,
 provider/account/credential access, new history acquisition, binding publication
-or activation was performed for this draft. Only this proposal and its scratch
-copy changed.
+or activation was performed for this draft. Only this proposal and its
+predecessor scratch copy changed.
