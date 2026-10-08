@@ -10,11 +10,18 @@ tests, configuration or history. It approves no deployment or provider
 operation. New historical-resolution and routing choices below need normal
 design review and adoption before implementation.
 
+Revision for findings `2720f4eb70e4ec7b729a1ffdc3a10a1e3a7f8139` and
+boundary clarification `a347c1e6d4ac22ff1a8fc683805f16bb46ada220`, both
+read in full. Committed predecessor
+`5fa375edd27ebae89b0706adbce4cd7e0a260cab` remains immutable. Root read this revision in full; procedural artifact binding belongs to
+the planner. Gate1 has separately passed its gate, been approved and landed;
+this design changes none of that reviewed source.
+
 Explicit versions for future semantic changes are already adopted. This
 proposal supplies the missing choices for histories which already use one
 legacy name for different implementations, and for continuing host writes
 through both old and new registers. Filing order remains Gate1/1b, live
-reads, clone, site, then edit/version combined. Frozen Gate1 is unchanged.
+reads, clone, site, then edit/version combined. Reviewed Gate1 is unchanged.
 
 ## Evidence and the problem
 
@@ -51,62 +58,142 @@ implementation a content-addressed bundle manifest containing canonical
 data bytes and digests, executable source/build digests, build recipe and
 dependency/toolchain identities, the evaluator ABI, rules and mark table,
 observation/observed-value derivation, membership/rules-reference derivation,
-authority and session semantics, and capability versions/code. Include
+historical grant/authority derivation, and capability versions/code. Include
 outside-adapter evidence interpretation and credential-handle derivation
 where they affect those histories. Provider secrets are never part of it.
 Keep the actual bytes and build inputs, not just Git hashes or mutable
 package exports. A bundle absent or incomplete locally cannot be run.
 
-Historical evaluation uses those archived implementations. New host
-transport plumbing may surround them only where its correspondence is
-explicitly reviewed; it cannot substitute new judges or authority rules.
-Do not import an archived Worker wholesale into a replay and activate its
-bindings: historical evaluation is pure and sends no provider requests.
-Safe runtime execution must separately retain the bundle's authority and
-capability meaning through the deployed ports.
+The archive is a narrow immutable binding manifest and the bytes needed by
+the existing pure evaluator through explicit ports, not a new engine or an
+archived Worker with active bindings. Historical evaluation reconstructs
+sealed judgments, observations, grants and capability effects from recorded
+facts and time. It sends no provider requests and issues no present sessions.
+Current transport and admission guards remain outside that evaluator.
+
+### Operation boundary and precedence (proposed V1a)
+
+| Operation | Historical bundle governs | Current service boundary governs | Unresolved provenance |
+|---|---|---|---|
+| Pure historical verification | Sealed act judgment, recorded-time grant derivation, observations at their recorded heads, capability effects and interpretation of recorded outside answers | Authentication only when acquiring remote bytes; registry publisher trust and coverage validation | Incomplete, with exact missing/conflicting binding; no historical grants promoted to present authority |
+| Authenticated genesis/raw acquisition | Nothing: acquisition does not judge the scope or grant authority from its history | Current signature/MAC, deployment, clock/expiry, full ScopeRef, named read, typed retained-resource eligibility and strict `43d` birth checks; cheap format/address checks before RPC and final post-await checks | Only the separately adopted bootstrap access below remains available; ordinary unresolved semantic authority confers no access |
+| Current live mutation and provider dispatch | The scope's resolved bundle determines its admitted act/rule/capability meaning; a resolved membership bundle interprets current membership standing at its current head | Current admission, freshness, revocation, standing eligibility and transport checks plus `43d` full-reference preparation and final post-await checks; exact activation and original attempt/provider binding | No grant preparation, sealing or dispatch; records, pending attempts and custody retained |
+
+Precedence is conjunctive, not a fallback: current transport checks pass
+first, then proven bundle resolution, then the bundle's semantic judgment
+under current admission/freshness checks. Access, provenance and activation
+preflight refusals seal no scope entry and send no provider request. After
+those preflights resolve, a semantic refusal keeps the actual contract's
+recorded/refused behavior; this design does not replace it with a universal
+no-write rule. Historical evaluation uses historical facts only;
+current helpers must not reinterpret a sealed old act or manufacture its
+past grant. Archived reader/session code must never replace current strict
+guards. Current standing is a fresh reading, not an archived observation.
+
+**Bootstrap proposal.** Publish nonsecret signed registry manifests outside
+scope-semantic access. Provide a narrowly named raw genesis/history
+acquisition path to an operator identity pinned in the service trust
+configuration, with an explicit complete-ScopeRef allowlist and purpose.
+It checks current signatures, replay/expiry limits, service/deployment
+address and typed bytes/hash linkage without deriving membership from the
+unresolved history. It is read-only and never returns private custody or
+provider tokens. Membership readers use the ordinary current `43d` path
+only after their required bundle is resolved. An unknown bundle cannot
+bootstrap its own authority. An explicitly local retained export is another
+input, labelled with its operator/source trust. This operator bootstrap
+access and its bounds require contract/security-owner adoption; it is not
+asserted to exist in current code. Without adopted authenticated acquisition
+or a supplied trusted export, resolution stops incomplete.
+
+Session and token promises remain those of the actual present issuance and
+serving code: current session MAC/deployment/expiry, existing standing checks
+where that operation performs them, and credential one-time take/expiry and
+recorded revocation duties. Key removal does not imply instantaneous
+invalidation of every issued read session or external bearer token. Any
+stronger revocation promise needs its own explicit owner amendment; `43d`
+shows strict aged birth reads, not that broader promise.
 
 **V2. Bind legacy scopes to bundles with operator evidence.** Proposed
-nonsecret `HistoricalSourceBinding` contains deployment identity, complete
+nonsecret `HistoricalSourceBinding` contains stable service identity, complete
 `ScopeRef` (kind/scope/incarnation), exact applied genesis entry hash,
 legacy definition name, bundle ID, an exact witnessed head, and the
-deployment/build receipt and adopted decision which attest the source used.
+immutable admission release/build receipt and adopted decision which attest
+the source used. Stable service identity names the continuing logical
+service; it is not the current Worker release or current session deployment
+label. Admission release identifies the binary/configuration which actually
+admitted the witnessed history. Current release identifies the runtime now
+executing requests. Rollout changes the last, never the first two. Session
+deployment addressing continues to use its adopted current rules.
 The host operator supplies the evidence; the definition owner attests the
 semantic bundle; normal independent review checks correspondence. A
 timestamp, room nickname, history shape, inferred feature presence or
 successful replay under one candidate is not sufficient provenance.
 
 Bindings live in a durable operator registry separate from scope histories,
-keyed by deployment, complete ScopeRef and genesis hash. Entries are
-append-only decisions with a revision and their evidence references. A
-deployment loads one explicit registry revision and checks its digest;
+keyed by stable service identity, complete ScopeRef and genesis hash. Entries
+are append-only decisions with a revision and their evidence references. A
+runtime loads one explicit registry revision and checks its digest;
 duplicate/conflicting bindings fail closed. Registry changes are operator
 actions reviewed under these existing requests, not membership actions or
 automatic discoveries. The replay client receives the same nonsecret
 manifest and decision evidence through an authenticated operator publication
 or an explicitly supplied local manifest; it reports this trust basis.
-Scope membership itself cannot choose its code.
+Scope membership itself cannot choose its code. A current release must
+explicitly declare compatible execution of each resolved bundle; its own
+release identity does not select historical semantics.
+
+**Canonical registry trust proposal.** Use the repository's canonical byte
+form and a domain-separated content digest for the manifest, with signatures
+over stable service ID, monotonic revision, parent digest, manifest digest
+and publisher key ID. A nonsecret operator trust anchor is pinned through
+reviewed service configuration; remote connection identity alone does not
+authorize a registry publisher. Signer authorization and key succession are
+operator decisions. Rotation is signed by the prior authorized key and
+adopted under the trust anchor; lost/compromised-key recovery needs a separate
+explicit operator trust reset. A scope cannot supply an alternative anchor.
+
+Online runtimes pin the active registry digest/revision in the activation
+tuple below and retain a monotonic accepted floor; a valid old signature
+cannot roll that floor back. Replay at an explicitly pinned historic revision
+reports that revision, operator trust and covered heads, with no claim of
+current freshness. An online client requires the operator-authenticated
+active revision and fails unavailable/conflicting publication rather than
+using a cached older revision silently. A local manifest requires explicit
+acceptance of the same configured operator anchor or a visibly supplied
+operator-trust override; it is never trusted because a scope returned it.
+Signature/hash validity proves publication identity, not actual executable
+correspondence; admission build/source evidence is still mandatory.
 
 **V3. Resolve by provenance, never by a legacy name alone.** Proposed
-`resolveHistorical({deployment, scope, genesis, named, targetHead}, registry)`
+`resolveHistorical({service, scope, genesis, named, targetHead}, registry)`
 returns a complete bundle plus evidence, or a typed unresolved/conflict
-result. A historical verifier first reads the authenticated genesis and
-target chain, then resolves every referenced scope similarly. Existing
-future unambiguous versions continue through the adopted version catalog.
+result. A historical verifier acquires genesis and the target chain through
+the semantic-independent authenticated boundary above, then resolves every
+referenced scope similarly. Existing future unambiguous versions continue
+through the adopted version catalog.
 Legacy `@1` scopes require an explicit binding; absence does not default to
 original main, clone-era code, or newest `@2`. Read access still obeys all
 existing guards. An authorized raw history read can remain available when
 semantic verification cannot proceed.
 
 **V4. A single bundle requires whole-history correspondence.** The supplied
-head proves the binding's observed coverage, not permission to guess later
-entries' source. Operator evidence must also establish which implementation
-continues to execute that scope. If one retained scope was actually admitted
+head must equal or descend from the binding's genesis on the verified chain;
+coverage is only the exact witnessed head and its verified ancestors.
+Extending coverage requires a signed registry amendment naming the new exact
+head, unchanged prefix, continued bundle, and actual admission release/build
+evidence for that extension. A wall-clock range, latest deployment, or
+successful replay cannot extend coverage. Live continued execution requires
+the active runtime's reviewed compatibility declaration for this bundle and
+activation tuple; the operator's initial witnessed head alone does not grant
+permission for later writes. If one retained scope was actually admitted
 by different semantics, do not silently pick a bundle which reproduces only
 its genesis. Mark it unresolved and retain the records. Exact code intervals
 bound to entry hashes and admission receipts would need a further explicit
 owner decision; this proposal does not authorize such a mechanism or claim
 that it is sufficient. Historical evaluation must never accept a semantic
-switch merely because it produces consistent output.
+switch merely because it produces consistent output. Mixed-history refusal
+preserves records with paused semantics; it does not prove that every legacy
+room remains operational.
 
 **V5. Unknown provenance permits no semantic mutation or outside action.**
 Runtime preparation fails before grants, sealing or dispatch; pending
@@ -159,17 +246,101 @@ remain held under their original attempts. Recovery, retained replies,
 credential retrieval and cleanup must use the same selected binding as
 dispatch; they must not fall through to another root.
 
-**H4. Publish and load a complete routing revision.** Proposed config schema
+**Immutable attempt binding.** Proposed nonsecret `AttemptBinding` is keyed
+by exact scope/incarnation, origin entry hash, operation and attempt. Before
+the first outside send, persist its semantic bundle, RegisterBinding content
+ID, exact provider/account/installation/namespace/repository identity and
+capability/ref/lifetime limits with the attempt's existing durable ownership.
+Dispatch, recovery, retained replies, credential retrieval and cleanup after
+restart look up that original binding. They do not choose a new binding from
+the current root list. Custody retains the original handle and scope keys.
+Amendments may extend provenance coverage or add compatible runtime releases;
+they cannot alter an admitted attempt's provider identity or capabilities.
+Secret rotation may supply new secret material only for the same adopted
+provider identity and rights; it never expands the attempt's authority.
+
+An existing attempt without this side record needs exact retained facts and
+operator evidence to bind it once, with an explicit reviewed decision. Do
+not infer the binding from current settings or rewrite its history. Unknown
+or conflicting attribution pauses its outside work and preserves its
+custody/duties. Runtime code may rotate only through reviewed compatible
+implementations of its bundle and capability semantics. This is an explicit
+port/attempt contract, not a second outside-effect engine.
+
+**H4. Activate one compatible revision set.** Proposed config schema
 version 2 replaces `registerScope` with `registers`; the parser retains exact
 field checks and rejects duplicate/conflicting identities and invalid whole
-configurations. A candidate limit is 16 roots per existing provider binding, not adopted or
-measured. The owner must choose the root and manifest-size bounds from the
-capacity evidence; this design asserts no numerical readiness. The operator publishes the
-complete list atomically and redeploys/restarts using the existing procedure;
-already-running objects may hold old settings, so claiming a new root waits
-until the active revision is witnessed. A single old config can remain
+configurations. A candidate limit is 16 roots per existing provider binding,
+not adopted or measured. The owner must choose the root and manifest-size bounds from the
+capacity evidence; this design asserts no numerical readiness. The operator
+publishes a signed activation manifest containing one coherent tuple:
+stable service ID, activation generation, current runtime release/build,
+registry revision/digest, routing revision/digest, bundle-set digest and
+reviewed runtime/port compatibility declaration. A trusted durable active
+pointer selects that tuple atomically; publishing artifacts or observing a
+new Worker version alone does not activate it. Every referenced artifact
+must already be retained and validated. A single old config can remain
 supported as one root only after its full identity/provenance is resolved;
 an ID alone must not be promoted into authority.
+
+Each scope object identifies its loaded tuple and verifies that its runtime
+supports it. Before semantic preparation/sealing or a provider send, it
+must obtain a generation ticket from the durable coordinator, including
+current final checks after awaited preparation. A stale cached object reloads
+compatible manifests through explicit current ports or refuses affected
+work. All live code runs current guards; no archived Worker receives bindings.
+
+**Proposed outstanding-ticket barrier.** The coordinator serializes ticket
+issuance and transition to draining in its durable transaction. A ticket
+binds generation/tuple, exact scope/incarnation/head, operation/attempt and
+purpose (scope admission or outside send-start). Once draining begins, no
+new ticket for the old generation is issued. Issued tickets remain durable
+and outstanding until authenticated finalization; timeout, an expired lease
+or a missing object response never retires a ticket.
+
+The scope persists the ticket and its finalization in its existing
+transaction: either the exact committed entry or logical send-start mark,
+or an atomic abort record which precludes that ticket from committing later.
+Duplicate processing reads this durable state and cannot reopen an aborted
+ticket. Recovery presents the exact finalization to the coordinator over an
+authenticated service boundary. The coordinator validates ticket identity,
+scope/incarnation, tuple and committed hash/mark or abort record, then
+retires that ticket in its own transaction. It switches the active pointer
+only when every issued old-generation ticket has authenticated finalization
+and the candidate tuple serves all resulting entries and attempt duties.
+Unknown or crashed work blocks the switch until recovery proves commit or
+abort. These transactions and the ticket barrier, not a cross-object read,
+provide the proposed exclusion. The contract/transaction owner must adopt
+and prove this mechanism before implementation.
+
+A logical send-start/sent mark is not evidence that the physical provider
+call happened or completed. It reserves the exact original attempt and
+provider/capability binding; physical dispatch still performs the current
+final-send checks through explicit ports. If dispatch has not started when
+the active generation changes, it acquires a compatible new-generation
+send-start ticket before calling the provider. Once the physical call may
+have started, no activation or abort invents an unsent outcome: the original
+attempt and any ambiguity remain duties served by the compatible tuple.
+Retries/recovery keep their existing original-attempt rules; the barrier
+does not become a second effect engine. This design needs proof at both
+the durable send mark and physical-call boundary, not an assumption that
+one atomic transaction encloses a provider RPC.
+
+Old releases without this barrier cannot participate in activation. The
+operator must first verify their replacement/drain, including outstanding
+calls and durable attempt/custody state; a new Worker label or presumed
+global restart is insufficient. Failure to prove replacement/drain blocks
+activation. Objects prove convergence per relevant operation. This proposal
+promises no instant session or external-token recall.
+
+New claims/roots stay disabled until the tuple validates all existing roots,
+bundles and pending attempt bindings, the operator explicitly admits the new
+root, and that register's object presents the same active generation at its
+claim boundary. Precomputed exact install/genesis pins may support preparing
+the binding; they do not grant host authority before activation. On a mixed
+tuple or unavailable coordinator, no affected sealing/send/new claim occurs.
+Approved old duties run only through a complete compatible tuple and their
+original bindings; they are never served through a partial revision mix.
 
 Old-root removal needs a separate operator decommission decision after
 pending writes, custody and cleanup duties are accounted for. It is not
@@ -192,16 +363,20 @@ this task. A separate general provider registry is unnecessary here.
    Do not mechanically merge the ID-only `87ba6fab` preparation.
 3. Validate retained old histories and exact old-root routing before enabling
    new-room claims. Deploy additive configuration containing both roots;
-   witness its active revision, then separately install/bind new roots under
-   the adopted future-version policy. This ordering is subject to the exact
+   witness its coherent activation tuple and per-operation convergence, then
+   separately install/bind new roots under the adopted future-version policy.
+   This ordering is subject to the exact
    precomputed-install pin procedure and owner approval of live actions.
 4. If correspondence, registry or route selection fails, expose a bounded
    diagnostic and pause affected mutations. Preserve raw records, pending
    operations and custody. No fallback to a default version or root.
-5. Roll back to the previous known complete registry/routing revision only
-   if it still serves every admitted root and semantic bundle. After a new
-   root has duties, removing it is not a safe rollback. Keep the compatible
-   runtime and disable new claims while repairing; an older binary lacking
+5. Roll back by a new monotonic activation generation referencing a complete
+   compatible runtime/registry/routing/bundle tuple, never by lowering the
+   trusted registry floor. It must preserve every admitted root, bundle,
+   immutable attempt/provider/capability binding and custody/cleanup duty.
+   Review and drain admission tickets exactly as for forward activation.
+   After a new root has duties, removing it is not a safe rollback. Keep the
+   compatible runtime and disable new claims while repairing; an older binary lacking
    admitted bundles cannot be used to resume those scopes. Never restore old
    configuration by dropping custody or outstanding cleanup.
 
@@ -209,18 +384,18 @@ this task. A separate general provider registry is unnecessary here.
 
 | Owner | Exact proposed amendment or input |
 |---|---|
-| Scope contract owner | At section 6.1, define complete semantic identity and the explicit legacy binding trust boundary; at replay/observations section 16.1, require provenance for every historical subject and report its coverage/trust. Adopt or reject the typed unresolved reason and V4 mixed-history refusal. No change to seed/history bytes. |
-| Platform/authority owner | Amend definition-version and platform mark/authority rules to preserve archived executable, observation and authority semantics; approve the original-main and clone-era bundles and their complete correspondence. Shared source helpers alone are not an archive. |
-| Deployment/host operator and planner | Supply 14:19 and 17:35 exact Worker/build-to-source receipts, full scope/incarnation/genesis/head bindings, retained histories and reference closure. Confirm whether any scope used multiple implementations. Adopt registry revision/storage/trust rules and both register roots; provide the exact existing provider capability scope without secrets. |
-| Host adapter owner | Adopt `RegisterBinding`, exact single-match selection, 16-root/size bounds, additive config transition and decommission/rollback duties. Amend `docs/deploy.md` and `docs/hosts.md` from one register to explicitly adopted roots. |
-| Replay/client owner | Add contextual bundle resolution and explicit trust/coverage reporting; preserve existing read authorization. CLI must not silently resolve missing legacy provenance or advertise old-room verification as fresh-room success. |
+| Scope contract/security/transaction owner | At section 6.1, define complete semantic identity and legacy binding trust; at section 16.1, require provenance for each historical subject and report coverage/trust. Adopt V1a operation precedence, exact bootstrap read eligibility, typed unresolved reason and V4 mixed-history refusal. Adopt and prove the durable outstanding-ticket barrier, scope transaction finalization, abort exclusion and logical-send/physical-call boundary; coordinator reads and timeouts are not finalization. Choose bounded registry/root/reference-closure work from capacity evidence. No change to seed/history bytes. |
+| Platform/authority owner | Preserve historical executable/observation/grant derivation while current strict `43d` transport/admission guards retain precedence; attest original-main and clone-era bundle correspondence and compatible current ports. Name actual session/token serving and revocation behavior; no inferred instant invalidation. Shared helpers alone are not an archive. |
+| Deployment/host operator and planner | Supply 14:19/17:35 and 19:47-19:51 exact Worker/build-to-source receipts, full scope/incarnation/genesis/head bindings, histories and reference closure; establish any mixed implementation. Adopt stable service identity, canonical signatures/trust anchor, publisher authorization, freshness floors, key rotation/reset, and coherent activation tuples. Supply both exact register roots and existing capability scope without secrets. Procedural review artifact binding remains the planner's work. |
+| Host adapter owner | Adopt `RegisterBinding` and immutable `AttemptBinding`, exact single-match selection, bounded additive config, original-provider recovery/read/cleanup, cached-object convergence and decommission/rollback duties. Numeric bounds remain unadopted and unmeasured. Amend `docs/deploy.md` and `docs/hosts.md` from one register to explicitly adopted roots. |
+| Replay/client owner | Add narrow contextual bundle/pure-evaluator interfaces and explicit operator trust, pinned revision and exact head coverage reporting; preserve current access checks. Local manifests require explicit operator trust. CLI must not silently resolve missing legacy provenance or advertise fresh-room success as old-room support. |
 
 The 14:19 and 17:35 attestations identify the same room and source; they
 still omit exact genesis/head hashes and full child/incarnation IDs. The
 19:47-19:51 evidence identifies the new directory and source but likewise
 does not supply a complete retained-history binding. These are evidence
-owed, not inferred identities. The permanent source archive and authenticated registry cannot
-be approved on those omissions. Future-version adoption alone does not
+owed, not inferred identities. The permanent source archive and authenticated
+registry cannot be approved on those omissions. Future-version adoption alone does not
 adopt any of these historical or routing choices.
 
 ## Compact validation plan after adoption
@@ -229,12 +404,20 @@ Follow [docs/testing.md](../docs/testing.md). Strengthen existing witnesses,
 not a new version/provider matrix: platform `versions.test.ts` keeps data
 pins and the equal-membership-digest/executable distinction; scope
 `versions.test.ts` adds replay of authentic retained original and clone-era
-histories selected by exact provenance, plus unresolved/conflicting refusal.
+histories selected by exact provenance, plus unresolved/conflicting refusal
+and a target beyond its attested coverage.
 Use the existing production host-wiring/founding boundary to show both roots
 retain exact writes, a foreign root is refused, and unknown provenance sends
 nothing. Existing signed-read/session, read-token/custody, host reply and
 cleanup witnesses must still distinguish their guards across restart and
-config changes. Preserve existing rules-birth witnesses during reconciliation.
+config changes. At the existing real read/session boundary distinguish wrong
+incarnation, stale/expired access and changed current standing according to
+each operation's actual serving rules; historical consistency alone is no
+access evidence. Existing host/attempt witnesses cover cached revision
+mismatch and retention of the original provider binding through restart and
+rollback. Strengthen those boundaries after owner adoption, not a separate
+activation test matrix. Preserve existing rules-birth witnesses during
+reconciliation.
 Only the producer performs relevant focused checks and one gate at the
 review head. A later authorized live witness must read the actual 14:19 and
 17:35 histories and their pending/custody states; do not replace either with
