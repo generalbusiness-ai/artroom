@@ -806,6 +806,7 @@ tag, newline and canonical payload, with no self-digest: the retained
 `artroom-site-delegation-1`, `artroom-site-configuration-1` and
 `artroom-site-binding-1`; additional `artroom-site-room-binding-1`,
 `artroom-site-factory-read-1`, `artroom-site-factory-receipt-1`,
+`artroom-site-locator-lookup-1`, `artroom-site-locator-answer-1`,
 `artroom-site-selection-read-1`, `artroom-site-current-use-1` and
 `artroom-site-borrow-1`, `artroom-site-handoff-offer-1`,
 `artroom-site-handoff-acceptance-1`,
@@ -1017,8 +1018,8 @@ actual controller/evidence correspondence remains held, never a verified
 boolean. Native reconcile/retire/handoff/abort map to their corresponding closed
 evidence shape with the original native identity and actual authority, never
 an attachment genesis; attachment actions carry their pending A. Eight mutation
-kinds, five native actions, path-tagged transitions, five authenticated read
-purposes and six result variants are checked together. Each path/action's
+kinds, five native actions, path-tagged transitions, four slot-bound authenticated read
+purposes plus one pre-slot locator lookup, and six mutation receipt variants are checked together. Each path/action's
 payload/mutation/result links must agree. No unrelated
 action or mutable state artifact substitutes for required original evidence.
 
@@ -1211,10 +1212,12 @@ Authorization is exactly {role:"renderer",registration:EvidenceRef} or
 {role:"recovery",registration:EvidenceRef,executor:SiteOwner} or
 {role:"controller",controllerProof:EvidenceRef}. Controller authorization is
 actual fresh R/M rules.publish, not service registration or old issuer status.
-Purpose is exactly {kind:"binding"} or {kind:"locator",locator:ScopeId} or
+Purpose is exactly {kind:"binding"} or
 {kind:"pending",pending:SitePendingIdentity} or
 {kind:"native-selection",selection:SiteNativeSelectionIdentity} or
-{kind:"original-request",request:Digest}. Renderer is allowed binding/locator discovery only.
+{kind:"original-request",request:Digest}. Renderer is allowed slot-bound binding reads and the separate pre-slot locator
+lookup below only. The four slot-bound purposes require the already
+authenticated complete SiteSlot; locator discovery never uses this request.
 All detailed purposes require current controller/exact original recovery
 authorization and the same full service/factory/D slot.
 
@@ -1252,21 +1255,87 @@ registry. Closed locator bytes are exactly
  locator:ScopeId,directory:ScopeRef,genesis:FactRef,roomBinding:Digest,
  position:SitePosition,record:FactoryRecordRef,tuple:Digest}.
 The actual factory publisher signs this canonical artifact under proposed
-artroom-site-locator-1 domain. Signed locator read binds actual configured
-factory/service, requested locator, nonce/notAfter and active tuple in the
-same factory-read contract, with purpose:{kind:"locator",locator:ScopeId};
-renderer authorization is discovery-only, never detailed pending/resources.
-Answer binds request digest, current factory record/position, locator artifact
-and publisher signature; absent/conflict is nondisclosing denial.
+artroom-site-locator-1 domain. It is a SiteLocatorRecord; its canonical artifact
+reference retains these exact bytes and signature correspondence. It does not
+supply the independently configured factory/service or renderer authorization.
 
-Locator equals directory.scope and genesis is exact applied directory birth;
-service/factory/room-binding/current position cross-match the current slot.
-Lookup must yield one exact currently selected full D. Missing/conflicting
-incarnations deny; no newest-incarnation fallback. Mapping changes need explicit
-publisher-authenticated adjudication plus current slot cross-check and retain
-old evidence. A URL/path/hostname/Room JSON supplies no such authority. These
-new exact locator signature/read/index forms require owner allocation and
-source support; declaration parsing is not implementation.
+A bare directory URL supplies only locator:ScopeId. Before any SiteSlot exists,
+the registered renderer forms a separate SignedSiteLocatorLookup {payload,sig}.
+Its closed payload is exactly:
+
+```
+{v:1,factory:Digest,service:ServiceId,actor:KeyId,
+ authorization:{role:"renderer",registration:EvidenceRef},
+ tuple:Digest,locator:ScopeId,nonce:Digest,notAfter:Timestamp}
+```
+
+The factory and full service identity are independently configured; the actual
+renderer registration/read authorization and active tuple are independently
+established, not supplied as authority by the URL or response. The request
+contains no directory incarnation, SiteSlot, guessed Room binding, or pending
+identity. Its request Digest is digestBytes of literal
+artroom-site-locator-lookup-1, newline and canonical unsigned payload; the
+registered renderer signs those same framed bytes using the existing signature
+primitive. Retain the exact signed envelope separately; neither envelope hash
+nor signature substitutes for that unsigned request identity. Registration,
+nonce/replay, lifetime and body bounds still require their actual owner evidence.
+
+A SignedSiteLocatorAnswer {payload,sig} has closed payload exactly:
+
+```
+{v:1,factory:Digest,service:ServiceId,locator:ScopeId,
+ request:Digest,tuple:Digest,result:
+   {state:"located",directory:ScopeRef,genesis:FactRef,roomBinding:Digest,
+    record:FactoryRecordRef,position:SitePosition,
+    locator:CanonicalArtifactRef<SiteLocatorRecord>,publisherFloor:EvidenceRef}
+   | {state:"denied"}}
+```
+
+The configured factory publisher signs literal artroom-site-locator-answer-1,
+newline and canonical unsigned answer payload. Its digest uses those same
+framed unsigned bytes and is distinct from request, raw locator artifact,
+record and state revision identities. No answer digest occurs inside itself.
+The outer locator is the requested bare ScopeId; the inner locator is the typed
+retained locator artifact. The six mutation receipt variants and four
+slot-selection answer variants above remain unchanged; this separate pre-slot
+lookup adds exactly two locator-answer variants. There are five authenticated
+read operations overall: four slot-bound purposes and one pre-slot lookup.
+
+The current authoritative site-slot publisher authenticates renderer/read
+registration, full configured factory/service, active tuple, nonce and deadline
+before consulting its site-only index. A located answer requires one unique
+eligible full D under that locator, verified applied directory genesis and Room
+binding, and the actual current record/position plus independently authenticated
+monotonic publisher-floor evidence. Directory kind is exact directory, locator
+equals directory.scope, genesis is its exact seq0 applied birth, and the
+record.slot equals {service,directory}. Every factory/service/tuple, full D,
+genesis, Room binding, position and record field must equal the retained signed
+locator record and current authoritative slot/index association. The floor
+EvidenceRef uses b74's typed artifact/kind contract; its actual owner-defined
+body, ordering and trusted current-floor acquisition are prerequisites, not a
+new guessed floor schema or permission from a supplied artifact.
+
+The renderer authenticates the configured publisher signature, exact original
+request digest and all cross-bindings, active tuple, original nonce/deadline
+association and actual current publisher floor before constructing SiteSlot
+from the answer's full D. An answer from an old floor/signature or replica is
+not current discovery authority. Unsupported/missing freshness correspondence
+denies. Only then may it issue a binding read or prepare current-use for that
+exact slot. Discovery authorizes neither detailed pending/resources nor content
+release; after every await the actual current slot-owner checks and terminal
+native consume/release boundary remain mandatory. A located answer is never a
+reusable current-use permission, even within its request lifetime.
+
+Absent, conflicting or ineligible incarnations return the same bounded denied
+variant without private metadata; no absent/history/candidate enumeration.
+Mapping changes require explicit publisher-authenticated adjudication, current
+slot cross-check and retained old evidence. No newest-incarnation choice,
+browser hint, URL/path/hostname authority, public JSON/history, old Room pin,
+public/member bypass or generic registry is added. These new exact pre-slot
+request/answer/index forms require owner allocation, current publisher/read
+registration, freshness correspondence and source support; declaration parsing
+is not implementation. Old-room preservation, recovery of exact saved requests,
+navigation eligibility and combined one-file/current-use obligations remain.
 
 ### Exact factory ledger, use and closure contracts
 
@@ -1575,6 +1644,8 @@ state/use/custody association/closure-signature/terminal exclusion schemas and
 execution proof;
 actual handoff domain/nonce/lifetime allocation and target-controller proof evidence; complete executor/use/resource/
 custody references and terminal consume coupling; actual initialized slot/locator publisher/index/adjudication source and signature/key correspondence;
+pre-slot lookup/answer domain allocation, actual renderer read registration and
+independently authenticated monotonic publisher-floor body/ordering/acquisition;
 actual operator/factory/renderer/recovery keys, roles, service addresses and
 custody/rotation/publication evidence; actual whole historical bundles/builds/
 admissions/cohort; actual immutable image/ABI/adapter/code correspondence;
