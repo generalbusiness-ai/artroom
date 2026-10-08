@@ -97,7 +97,9 @@ export default async function setup(project: TestProject) {
       const value = raw.length ? JSON.parse(raw.toString("utf8")) as Record<string, unknown> : {};
       if (path === "/configure" && request.method === "POST" && typeof value["name"] === "string" && /^[A-Za-z0-9_.-]+$/.test(value["name"]) && (name === null || name === value["name"])) {
         if (name === null) {
-          fixtureRoot = mkdtempSync(join(tmpdir(), "artroom-local-clone-"));
+          // A failed initialization retains this allocation for the next
+          // configure and for teardown; no retry loses its ownership.
+          if (fixtureRoot === null) fixtureRoot = mkdtempSync(join(tmpdir(), "artroom-local-clone-"));
           repo = join(fixtureRoot, "repo.git");
           git(fixtureRoot, ["init", "-q", "--bare", repo]);
           git(repo, ["symbolic-ref", "HEAD", "refs/heads/main"]);

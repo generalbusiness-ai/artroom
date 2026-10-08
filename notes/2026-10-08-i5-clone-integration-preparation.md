@@ -151,3 +151,19 @@ source/bundle, physical-send executor fence/closure, capacity, actual provider
 and compatible activation obligations remain owed. Final gate, ordinary source
 review and ordered clone filing/landing remain owed. No main, live provider,
 site policy, page/edit/install adoption or whole-request closure occurred.
+
+## Partial initialization retains cleanup ownership
+
+Checker finding `9c0a47f33ff12616e75a339b04e7304b98617af9` identified a
+failure-then-retry path that replaced the only temporary-root handle before
+configuration completed. The fixture now allocates only when its owned root
+is null. A failed initialization retains the same root for a later configure
+and teardown; no retry drops that ownership. Lazy setup, fixed authenticated
+target and unrelated scratch protection remain unchanged.
+
+Builder observed the existing focused clone witness and scope source/Worker/
+Node-helper typecheck command exits zero after the change. Raw logs are
+`/tmp/artroom-clone-ordered-init-retry-focused.log` and
+`/tmp/artroom-clone-ordered-init-retry-types.log`. Those checks do not claim an
+executed Git-initialization failure trace; ownership retention follows from
+the guarded allocation. No extra test matrix, gate, provider or main change.
