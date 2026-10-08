@@ -166,23 +166,48 @@ or platform data changed; only the command line did **[code]**.
 
 ## 4. Gate
 
-The first gate run, at `2440fe0`, tree `07889b9b`, failed on two tests:
-T36 of `packages/checkers/test/runner.test.ts`, which the brief foresaw
-for this container's Git, and T39 of `packages/scope/test/limits.test.ts`
-("junk-signed joins ... the invitation was never counted"): its
-membership's head was entry 5 where it read entry 4 **[run]**. T39 passed
-alone three times, and failed in one of two runs after the new scenario
-in the same worker; after the edit scenario it passed three of three
-**[run]**. A submit starts a dispatch pass in the background
-(`packages/scope/src/object.ts`, `ctx.waitUntil(this.#dispatcher.run())`),
-so T39's read of its head races its own inbox's delivery, and load left
-by an earlier test can decide the race **[inferred]**. The scenario now
-settles every scope of its room before it ends; after that the pair passed
-four of four **[run]**. The cause in T39 itself is not fixed (section 5).
-The same run printed two uncaught `EPIPE` errors from
-`packages/git/test/http.test.ts`; that file's tests passed **[run]**.
+The command, at the root, with a clean checkout: `npm run gate`. Machine: a
+cloud container with 4 CPUs; load average 0.39 before the final run and
+1.08 after **[run]**.
 
-Figures of the final run: see the summary of the commit that adds them.
+The final run, at head `7e6e104e44cded8edea0f2515a0d6e1c0e8cdd13`, tree
+`22e9dc07997d3a934129adcff59558659d7e691d`, **failed on two tests that this
+branch does not change** **[run]**:
+
+| Step | Exit | Elapsed seconds | CPU seconds |
+|---|---|---:|---:|
+| Install | skipped (the lock file was installed) | | |
+| Whitespace | 0 | 0.0 | 0.0 |
+| Typecheck | 0 | 10.6 | 34.0 |
+| Tests (test runner) | 1 | 128.7 | 169.0 |
+
+The test runner: 115 files, 804 tests, 802 passed, 2 failed; its own
+duration 126.21 seconds; 147.58 user and 21.46 system CPU seconds. It also
+printed two uncaught `EPIPE` errors from `packages/git/test/http.test.ts`,
+whose tests passed. Because the test runner failed, the gate did not run
+its last script; run alone, `node --test scripts/active-source.test.mjs`
+gives 6 tests, 6 passed **[run]**.
+
+The two failures **[run]**:
+
+- **T36** of `packages/checkers/test/runner.test.ts`, which the brief
+  foresaw for this container's Git.
+- **T39** of `packages/scope/test/limits.test.ts` ("junk-signed joins ...
+  and an admin's act from the limited address is admitted"): the head of
+  its membership scope was entry 5 where the test had read entry 4 before
+  its refused posts, so something was recorded in between. It failed in
+  both gate runs on this branch (the first at `2440fe0`). It passed in
+  every other run I made: alone three times; the `scope` project alone
+  once at the base `13ae305` and once at `7e6e104`; after the issues
+  scenario in one worker, three of four; and the whole root test run once
+  more at `7e6e104` with a print added to T39 to name the entry, where it
+  did not move. I have not found what writes entry 5, nor whether this
+  branch makes it more likely: the edit-page note reports T39 passing in
+  its gate at `1920e05`, and I made no gate run at the base. A guess I
+  tested and that did not hold: a background dispatch started by T39's
+  own posts (a delay of 300 ms before its second read did not make it
+  fail, three of three). The issues scenario now settles every scope of
+  its room before it ends; that did not stop the second gate failure.
 
 ## 5. What is owed
 
@@ -199,8 +224,10 @@ Figures of the final run: see the summary of the commit that adds them.
 3. **Members and `change.merge`** (section 3), against shot 8 of the demo
    script. The planner decides whether the demo's editor is a maintainer,
    or the room's rules give members `change.merge`.
-4. **T39** races a background dispatch (section 4). Its owner should wait
-   for the inbox's delivery, or read the head after it.
+4. **T39** fails in the full test run, not alone (section 4). Whoever
+   gates this branch locally should run the gate; if T39 fails there too,
+   it needs its cause found before landing, since it passed in the
+   edit-page gate before this branch.
 5. **T36** fails in this container's Git, untouched.
 
 ## 6. Decisions followed
