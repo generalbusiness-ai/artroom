@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers";
-import { describe, expect, test } from "vitest";
+import { describe, expect, inject, test } from "vitest";
 import type { ScopeId } from "@generalbusiness/artroom-contract";
 import { b64url, scopeIdOf, timeMs } from "@generalbusiness/artroom-bytes";
 import type { Fetch } from "@generalbusiness/artroom-client";
@@ -10,9 +10,14 @@ import { site } from "../../scope/src/site/route.ts";
 import { ownHost, type Stand } from "../../scope/test/hosts.ts";
 import { Platform, routed, settle } from "../../scope/test/repository.ts";
 import { memoryStore, type Context, type Git, type Outcome } from "../../cli/src/index.ts";
+import { actsOn, listLanes, loadChange, loadIssue, loadRules, loadSite, openRoom, placeOf } from "../../page/src/index.ts";
 import { FILES, judged, rehearse, transcript, type Person, type Rehearsal, type Stage, type Taken } from "../../../scripts/demo/rehearse.ts";
 
 const SERVICE = "https://scopes.test";
+
+declare module "vitest" {
+  interface ProvidedContext { demoRecord: boolean }
+}
 
 // Invariant: the demo runner's rehearsal, run on a room, prints for every shot of the demo script's middle the exit code and the
 // lines the script expects, in order, and its transcript's table says so shot by shot; a shot whose outcome differs is a row that
@@ -42,10 +47,81 @@ describe("the demo runner's rehearsal on real scopes. The Git host, git and the 
       for (const name of wired) platformOutside.delete(name);
     }
   }, 240_000);
+
+  // Not a test of a property: the recorder for `scripts/demo-captures.ts --recorded`. It runs only when the root config provides
+  // `demoRecord`, which `DEMO_RECORD=1` sets. It rehearses on a fresh room, as the test above does, then reads each screen of the
+  // captures as the browser will, through the page's data functions, signed in as the founder, and asks the Worker's entry for the
+  // page's two files. Each request and its answer is printed, in lines that begin `DEMO-RECORD `, for the script to give the browser
+  // in place of a service, as `packages/page/test/screens.mjs` does with its own recorder.
+  test.skipIf(!inject("demoRecord"))("record the Worker's answers to the page's reads on the rehearsal's room, for demo-captures (runs only with DEMO_RECORD=1)", async () => {
+    net.hold = net.deaf = null;
+    platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32)));
+    platformNet.sessions = true;
+    const wired = new Set<ScopeId>();
+    try {
+      await record(ownHost(), wired);
+    } finally {
+      platformNet.secret = null;
+      platformNet.sessions = false;
+      net.hold = null;
+      for (const name of wired) platformOutside.delete(name);
+    }
+  }, 240_000);
 });
 
+/** One recorded answer: its status, the headers the browser needs, and its body. */
+interface Recorded { status: number; headers: Record<string, string>; body: string }
+const KEPT_HEADERS = ["content-type", "content-security-policy", "location", "x-content-type-options"];
+
+async function record(at: Stand, wired: Set<ScopeId>): Promise<void> {
+  const { stage, people, pages, drained } = testStage(at, wired);
+  const rehearsal = await rehearse(stage);
+  expect(rehearsal.ok).toBe(true);
+  await drained();
+  const recording = new Map<string, Recorded>();
+  const keep = async (key: string, answer: Response): Promise<Response> => {
+    const body = await answer.text();
+    const headers = Object.fromEntries(KEPT_HEADERS.flatMap((name) => (answer.headers.get(name) ? [[name, answer.headers.get(name)!]] : [])));
+    recording.set(key, { status: answer.status, headers, body });
+    return new Response(body, { status: answer.status, headers: answer.headers });
+  };
+  // An act's body differs each time it is signed, so it is answered by its path alone. A session is answered by its path and the
+  // key that asked, which the browser's own request names.
+  const recorded = (async (url: string, init?: RequestInit) => {
+    const answer = await (pages as unknown as (url: string, init?: RequestInit) => Promise<Response>)(url, init);
+    const path = url.slice(SERVICE.length);
+    const actor = path.endsWith("/sessions") ? ` ${(JSON.parse(String(init?.body)) as { request: { actor: string } }).request.actor}` : "";
+    return keep(`${init?.method === "POST" ? "POST" : "GET"} ${path}${actor}`, answer);
+  }) as unknown as Fetch;
+  const founder = people.founder!;
+  const config = (await founder.store.config())!;
+  const secret = (await founder.store.secret(config.key))!;
+  const place = placeOf(JSON.stringify(config))!;
+  const { issue, published, refused } = rehearsal.room as Required<typeof rehearsal.room>;
+  // The screens, each as `main.ts` draws it: the room, the issue, the refused change, the published change and the rules; then
+  // the rendered page, which the browser opens by its address.
+  const room = await openRoom({ service: SERVICE, secret, fetch: recorded, now: () => timeMs(net.clock.now)! }, place);
+  await listLanes(room);
+  await actsOn(room, room.directory);
+  await loadIssue(room, issue as ScopeId);
+  await actsOn(room, issue as ScopeId);
+  for (const change of [refused, published] as ScopeId[]) {
+    await loadChange(room, change);
+    await actsOn(room, change);
+  }
+  await loadRules(room);
+  await actsOn(room, room.rules);
+  expect((await loadSite(room, "guide/start.md")).status).toBe(200);
+  for (const path of ["/page/", "/page/page.js"]) await keep(`GET ${path}`, await worker.fetch(new Request(`${SERVICE}${path}`), {} as Env));
+  const kept = { service: SERVICE, place, room: rehearsal.room, secret: b64url(secret), answers: Object.fromEntries(recording) };
+  // In lines of at most 64 KiB, which the test runner prints whole.
+  const text = b64url(new TextEncoder().encode(JSON.stringify(kept)));
+  for (let i = 0, n = 0; i < text.length; i += 65536, n++) console.log(`DEMO-RECORD ${n} ${text.slice(i, i + 65536)}`);
+  console.log("DEMO-RECORD end");
+}
+
 /** The stage of the rehearsal on the test Worker, and what the test reads of it: the people's contexts and the stand-in host. */
-function testStage(at: Stand, wired: Set<ScopeId>): { stage: Stage; people: Partial<Record<Person, Context>>; drained(): Promise<void> } {
+function testStage(at: Stand, wired: Set<ScopeId>): { stage: Stage; people: Partial<Record<Person, Context>>; pages: Fetch; drained(): Promise<void> } {
   const fetch = ((url: string, init?: RequestInit) => routed(url, init)) as unknown as Fetch;
   const now = () => timeMs(net.clock.now)!;
   let register: ScopeId | null = null;
@@ -78,6 +154,12 @@ function testStage(at: Stand, wired: Set<ScopeId>): { stage: Stage; people: Part
       return 0;
     },
   };
+  // The paths as the deployed Worker answers them: the site route over the stand-in host, the page, and the scope routes.
+  const deployed = async (url: string, init?: RequestInit): Promise<Response> => {
+    const path = new URL(url).pathname;
+    return path.startsWith("/site/") ? site(new Request(url, init), { SCOPES: env.PLATFORM, ...at.bindings(register!) }, at.stand.fetch)
+      : path.startsWith("/page/") ? worker.fetch(new Request(url, init), {} as Env) : routed(url, init);
+  };
   const people: Partial<Record<Person, Context>> = {};
   const stage: Stage = {
     service: SERVICE, host: at.host, namespace: at.namespace, name: "demo",
@@ -89,9 +171,7 @@ function testStage(at: Stand, wired: Set<ScopeId>): { stage: Stage; people: Part
       return `STAND-IN for the operator's setting: the test wires the stand-in host to ${planned} before the planned install.`;
     },
     get: async (url) => {
-      const path = new URL(url).pathname;
-      const answer = path.startsWith("/site/") ? await site(new Request(url), { SCOPES: env.PLATFORM, ...at.bindings(register!) }, at.stand.fetch)
-        : path.startsWith("/page/") ? await worker.fetch(new Request(url), {} as Env) : await routed(url);
+      const answer = await deployed(url);
       return { status: answer.status, type: answer.headers.get("content-type") ?? "", body: await answer.text() };
     },
     log: async (directory): Promise<Outcome> => {
@@ -106,7 +186,7 @@ function testStage(at: Stand, wired: Set<ScopeId>): { stage: Stage; people: Part
       return { code: 0, lines };
     },
   };
-  return { stage, people, drained: () => pause([]) };
+  return { stage, people, pages: deployed as unknown as Fetch, drained: () => pause([]) };
 }
 
 async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {

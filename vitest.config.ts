@@ -35,8 +35,9 @@ export default defineConfig({
       project("replay", "replay", "vitest.config.ts", 0),
       project("client", "client", "vitest.config.ts", 0),
       project("scope", "scope", "vitest.config.ts", 1, ["../lanes/test/**/*.scope.test.ts", "../cli/test/**/*.scope.test.ts", "../page/test/**/*.scope.test.ts"], {
-        // The page's recorder for its screenshots runs only when asked: `PAGE_RECORD=1` (packages/page/test/screens.mjs).
-        provide: { pageRecord: process.env["PAGE_RECORD"] === "1" },
+        // The page's recorder for its screenshots runs only when asked: `PAGE_RECORD=1` (packages/page/test/screens.mjs). So does
+        // the demo runner's recorder for its captures: `DEMO_RECORD=1` (scripts/demo-captures.ts --recorded).
+        provide: { pageRecord: process.env["PAGE_RECORD"] === "1", demoRecord: process.env["DEMO_RECORD"] === "1" },
       }),
       project("lanes", "lanes", "vitest.config.ts", 0),
       project("cli", "cli", "vitest.config.ts", 0),
