@@ -1,0 +1,147 @@
+{
+  "status": "proposal-only; no verified context produced",
+  "baseHead": "1d311bf900ff3989d857579fa979a59015cfe660",
+  "request": "da1 / 484",
+  "planner": "e5973cf17ca0113d8731264059ce0ae5b17415ff",
+  "scope": "Named local source anchors, not a closed executable manifest or historical admission receipt. Imported transitive closure, ABI and actual runtime bounds remain to be reviewed and bound.",
+  "files": [
+    {
+      "path": "packages/platform/src/register.ts",
+      "bytes": 27078,
+      "sha256": "c8582035483d8085e7748df538d7099909c47678c339904738ef7ecfa73dc457",
+      "gitBlob": "00db8250f2eaa029d580c733f11cdd18a18dca78"
+    },
+    {
+      "path": "packages/platform/src/future-2/register.ts",
+      "bytes": 27695,
+      "sha256": "5fdc74b40af95a0e0ef06552b8d39eaf48795aeb53a05af2a5f672feeb372e14",
+      "gitBlob": "e76d1534c1707b7cb2b7b829750962e71e2aca28"
+    },
+    {
+      "path": "packages/platform/src/index.ts",
+      "bytes": 11158,
+      "sha256": "35e46c07a7eac7487ca83a0920c98d07d0aa2a0c772aac52d266bfa00fce1d6c",
+      "gitBlob": "6d13686f4bb249fba5dfcd45e3c4883e4f5fe4ec"
+    },
+    {
+      "path": "packages/platform/src/versions.ts",
+      "bytes": 2237,
+      "sha256": "48bd87fb01f11f0ad71fcefc486dd10e2b1f56e8bbb335665efce91232f03a02",
+      "gitBlob": "ba2a421f649f407c5419b03c5119836f54bd594c"
+    },
+    {
+      "path": "packages/platform/src/membership.ts",
+      "bytes": 46886,
+      "sha256": "5a3881adef3668d0a4f1d75d7d07ff016b9197e1d47607bea4f3a904261acb88",
+      "gitBlob": "13253b2b1737ee428b337246a17fe3a36dcfa494"
+    },
+    {
+      "path": "packages/derive/src/genesis.ts",
+      "bytes": 14842,
+      "sha256": "f465995efa6a6c1ee46129df44bcb52f48bf17878e46d1331fa5712dc9cfe0fe",
+      "gitBlob": "5f2eb8cf5962b7ff4217bf8323b5ee4206d2d0df"
+    },
+    {
+      "path": "packages/derive/src/effects.ts",
+      "bytes": 37409,
+      "sha256": "d4b3cf6a15e5c19f0846f1c13bbf6649b95a3382c9bd82befffaf7ffdae32cde",
+      "gitBlob": "119867549adc097f2383223e679948c08d612c3b"
+    },
+    {
+      "path": "packages/derive/src/judge.ts",
+      "bytes": 30741,
+      "sha256": "e86e7c795d25089db03ae9ea6201b3b5596c470428814879713ef11d6cf2092c",
+      "gitBlob": "7de0a7473461e54d5032acc3a21270592a430849"
+    },
+    {
+      "path": "packages/derive/src/fold.ts",
+      "bytes": 19581,
+      "sha256": "18c1d18e8afeb8f6049f62a4c87d9e8b410d01c83187cfa7a092def784434fc6",
+      "gitBlob": "d030780e1ff3abd8496b31138fd21f54fa449c4a"
+    },
+    {
+      "path": "packages/derive/src/state.ts",
+      "bytes": 32297,
+      "sha256": "79282f3b400d5b71acbcc0e03a4ee8e865b896a9c0a50e5e218388a1b9119ae2",
+      "gitBlob": "f162a5655095541fb219e8f6a1f482ac36990a7f"
+    },
+    {
+      "path": "packages/derive/src/values.ts",
+      "bytes": 5038,
+      "sha256": "253e43878044fa8207a0c8154e32b97526e046fb60b5ab9c2d0f121721496b65",
+      "gitBlob": "af42bb60d0f82598257d503b0162024448471347"
+    },
+    {
+      "path": "packages/derive/src/rules.ts",
+      "bytes": 1941,
+      "sha256": "8395e3bdacd5dba3266637a412076c69e101c3a06f0eb86c0811d42aef97f221",
+      "gitBlob": "8eb06450b0c2a2d161d0a2fe59fc554158fa409f"
+    },
+    {
+      "path": "packages/contract/src/intent.ts",
+      "bytes": 2079,
+      "sha256": "a0c59756d9c6859b0b015d620ee1a60ebaeaf041472ab44da1e14335b907aa4b",
+      "gitBlob": "f75de33847667fb13b22cd23f7b8e37759aea906"
+    },
+    {
+      "path": "packages/contract/src/entry.ts",
+      "bytes": 9945,
+      "sha256": "b7df370a8c7981c2e0853d9d7c84b0983ce3c09c9c8a3641879e86e6ff0a85c2",
+      "gitBlob": "75309ae7acc560a16ec6943be50220c2e9b0360d"
+    },
+    {
+      "path": "packages/contract/src/definition.ts",
+      "bytes": 13902,
+      "sha256": "669cae9eac79ae7fa9d390ec27142669f0d21a31431b0efd133f1128f66cbed2",
+      "gitBlob": "497d37aaab24e949050f368787feac3348fdb15f"
+    },
+    {
+      "path": "packages/contract/src/platform.ts",
+      "bytes": 10940,
+      "sha256": "e6be0299701d332a7117f8f517ba04dd0f823103127c8bfb94bd2a29bfa239d9",
+      "gitBlob": "8264b308a6e0dea98834212ed19c5b4fcbdb61b0"
+    },
+    {
+      "path": "packages/contract/src/result.ts",
+      "bytes": 4985,
+      "sha256": "ea62c78defea760dd278c5a2326d62200eac5bff62c610da098103f30923b13d",
+      "gitBlob": "efe90789595ba908a62bdff6b1d7b28432426000"
+    },
+    {
+      "path": "packages/contract/src/bounds.ts",
+      "bytes": 6124,
+      "sha256": "3754ca8335cbb70e137dd09de7764c63123d35c633ac1f5a5f74e8cc557990af",
+      "gitBlob": "958fd7ae86d12c674410102d02eb453cbc19e364"
+    },
+    {
+      "path": "packages/scope/src/core.ts",
+      "bytes": 47227,
+      "sha256": "56d0730ceacf9b4c532976d05cd5694a48878c916c3938bac4d26e5740f2fc84",
+      "gitBlob": "48715befd3ae74c52a40fe791effc38122578584"
+    },
+    {
+      "path": "packages/cli/src/commands.ts",
+      "bytes": 66497,
+      "sha256": "36fb3c2d5ffaf003c96955fca1d720bc69bfba88b25ec98376cab804ebe41477",
+      "gitBlob": "a83b1057fb446c76d638661c778dadefa2ab6367"
+    },
+    {
+      "path": "packages/cli/src/store.ts",
+      "bytes": 4049,
+      "sha256": "99d6b1f03292df38b2d1dc30b041e86c481e68f06663929fd71aa78c63cb402f",
+      "gitBlob": "dda8c7ce1ac86dbfd80ffe8db7bb1f4696395646"
+    },
+    {
+      "path": "package.json",
+      "bytes": 491,
+      "sha256": "1eb4496340ebb8d32e799f0f428b8786772499d6115cd75687246e84813830b7",
+      "gitBlob": "f4853ffb1f10860e630b6182fca78099928a46c5"
+    },
+    {
+      "path": "package-lock.json",
+      "bytes": 126500,
+      "sha256": "bd4d9ed101dff266d71008f8a9ac42257093065ab5079cd399e004e40ae3162d",
+      "gitBlob": "7e6e3a01844fe2d01718f26d17701619056b97e1"
+    }
+  ]
+}
