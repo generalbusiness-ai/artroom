@@ -74,8 +74,9 @@ import type { Head, ScopeRef, SessionAnswer, SessionClaims, SessionRefusal, Sign
 import { hex } from "@generalbusiness/artroom-bytes";
 import { b64url, canonicalBytes, canonicalize, hmacSha256, isKeyId, isMemberId, isSignature, parseStrict, taggedBytes, unb64url, utf8, verifySessionRequest } from "@generalbusiness/artroom-bytes";
 import { isObject, isScopeRef, same, timeMs, timeOf, type RecordedRef, type ScopeState, type StateView } from "@generalbusiness/artroom-derive";
-import { MEMBERSHIP, standingOf } from "@generalbusiness/artroom-platform";
+import { membershipStanding } from "@generalbusiness/artroom-platform";
 import type { Clock, ReadName, Readers } from "./ports.ts";
+import { knownPlatform } from "./platform-version.ts";
 
 // ---------------------------------------------------------------- the secret
 
@@ -360,13 +361,13 @@ export function issueSession(
   const { to, actor, notAfter } = asked.request;
   const scope = state.scope();
   // A provisional membership answers no session (section 12.1.3).
-  if (!scope || scope.status !== "active" || scope.at.kind !== "membership" || pinned?.named !== MEMBERSHIP) return no("not-found");
+  if (!scope || scope.status !== "active" || scope.at.kind !== "membership" || !knownPlatform(pinned?.named, "platform:membership")) return no("not-found");
   if (to.scope !== scope.at.scope || to.inc !== scope.at.inc || to.kind !== scope.at.kind) return no("misaddressed");
   const [reading, previous, ends] = [timeMs(config.clock.read()), timeMs(scope.time), timeMs(notAfter)!];
   if (reading === null || previous === null || reading < previous) return no("clock-behind");
   if (reading >= ends) return no("expired");
   if (ends - reading > REQUEST_SECONDS * 1000) return no("bad-request");
-  const standing = standingOf(state, { of: scope.at, key: actor });
+  const standing = membershipStanding(pinned!.named as string, state, { of: scope.at, key: actor });
   // A revoked key, a key that membership does not hold, a removed member, and an agent whose controller is not active: none is issued a session.
   if (!standing || !("key" in standing) || standing.keyState !== "active" || standing.memberState !== "active" || standing.controllerActive === false) return no("unauthorized");
   // The last check, and the one write: this key has not been given a session for this operation identity.

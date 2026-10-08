@@ -3,11 +3,12 @@
 import type { Entry, FactRef, FieldValue, KeyId, OperationId, PlatformDefinition, RetainedInput, ScopeRef } from "@generalbusiness/artroom-contract";
 import { canonicalize, entryHash, isFactRef, isKeyId, isOperationId, parseStrict, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
 import { isEntryOf, valueDigest, type Operation } from "@generalbusiness/artroom-derive";
-import { DESTINATION, DESTINATION_KINDS, destinationBranch, destinationMint, destinationRead, destinationReceipt, destinationRevokedMint, destinationSends, destinationStatement, destinationTarget, destinationWrite, firstHeadCommit, foundingObjects, isRecordedJudgeEvidence, revokedToken, platform, type DestinationObject, type ObjectFormat, type RecordedJudgeEvidence } from "@generalbusiness/artroom-platform";
+import { DESTINATION_KINDS, destinationBranch, destinationMint, destinationRead, destinationReceipt, destinationRevokedMint, destinationSends, destinationStatement, destinationTarget, destinationWrite, firstHeadCommit, foundingObjects, isRecordedJudgeEvidence, revokedToken, platform, destination2Helpers, type DestinationObject, type ObjectFormat, type RecordedJudgeEvidence } from "@generalbusiness/artroom-platform";
 import type { CredentialPosition, CredentialStore, RevocationPosition } from "./credential-store.ts";
 import type { OutsideGiven } from "./object.ts";
 import type { EffectAnswer, EffectRequest, Outside } from "./operations.ts";
 import type { Sealed } from "./store.ts";
+import { knownPlatform } from "./platform-version.ts";
 
 export interface DestinationRepository { host: string; namespace: string; name: string; id: string }
 export interface DestinationBinding { scope: ScopeRef; mint: OperationId; attempt: number; write: OperationId; writeAttempt: number; ref: string }
@@ -50,10 +51,22 @@ export class DestinationHost implements Outside {
   #revokeCursor: RevocationPosition | null = null;
   constructor(given: OutsideGiven, options: DestinationHostOptions) { this.#given = given; this.#options = options; }
 
-  accepts(owner: string, kind: string): boolean { return this.#reads()?.accepts(owner, kind) === true || owner === DESTINATION && (Object.values(DESTINATION_KINDS) as string[]).includes(kind); }
+  #owner(): string | null {
+    const named = this.#given.genesis()?.seed.definition;
+    return knownPlatform(named, "platform:destination") ? named! : null;
+  }
+  #helpers() {
+    const named = this.#owner();
+    if (named === "platform:destination@2") return destination2Helpers;
+    if (named !== "platform:destination@1") throw new Error("unsupported destination helpers");
+    return { branchOf: destinationBranch, mintOf: destinationMint, servedBy: destinationWrite, readFor: destinationRead, destinationReceipt, mintRevoked: destinationRevokedMint, writeSends: destinationSends, statementOf: destinationStatement, targetOf: destinationTarget, firstHeadCommit, revokedToken };
+  }
+  accepts(owner: string, kind: string): boolean {
+    return owner === this.#owner() && Object.hasOwn(platform(owner)?.data.outcomes ?? {}, kind);
+  }
   /** Repeating these reads never repeats a host mutation. The driver keeps the same attempt. */
   readonly recovery = {
-    accepts: (owner: string, kind: string): boolean => owner === DESTINATION && [DESTINATION_KINDS.judge, DESTINATION_KINDS.read, DESTINATION_KINDS.adoptRead].includes(kind as "judge" | "read" | "adopt-read"),
+    accepts: (owner: string, kind: string): boolean => owner === this.#owner() && [DESTINATION_KINDS.judge, DESTINATION_KINDS.read, DESTINATION_KINDS.adoptRead].includes(kind as "judge" | "read" | "adopt-read"),
     read: (request: EffectRequest): Promise<EffectAnswer | null> => this.recovery.accepts(request.owner, request.kind) ? this.send(request) : Promise.resolve(null),
   };
 
@@ -69,11 +82,11 @@ export class DestinationHost implements Outside {
     this.#revokeCursor = revocations.more && lastRevoke ? { revoke: lastRevoke.revoke, attempt: lastRevoke.attempt } : null;
     for (const expected of revocations.items) {
       const operation = this.#given.state.operation(expected.revoke);
-      if (operation?.owner !== DESTINATION || operation.kind !== DESTINATION_KINDS.revoke) continue;
+      if (operation?.owner !== this.#owner() || operation.kind !== DESTINATION_KINDS.revoke) continue;
       const origin = this.#given.own(Number(expected.revoke.split(":")[0]));
       if (!origin || !this.#bound({ scope: scope.at, operation: expected.revoke, attempt: expected.attempt, owner: operation.owner, kind: operation.kind, origin })) continue;
-      const mint = destinationRevokedMint(this.#given.state, this.#given.own, operation);
-      if (mint?.id !== expected.mint || expected.mintAttempt !== 1 || revokedToken(this.#given.state, this.#given.own, operation) !== expected.id) continue;
+      const mint = this.#helpers().mintRevoked(this.#given.state, this.#given.own, operation);
+      if (mint?.id !== expected.mint || expected.mintAttempt !== 1 || this.#helpers().revokedToken(this.#given.state, this.#given.own, operation) !== expected.id) continue;
       const confirmed = this.#confirmation(operation, expected.attempt)?.entry.input;
       const body = confirmed?.type === "outcome" ? members(confirmed.evidence.body, ["token"]) : null;
       if (body?.["token"] !== expected.id) continue;
@@ -95,7 +108,7 @@ export class DestinationHost implements Outside {
       const readAnswer = this.#reads()?.reply(held);
       if (readAnswer) { answers.push({ operation: held.mint, attempt: held.attempt, answer: readAnswer }); continue; }
       const operation = this.#given.state.operation(held.mint);
-      if (operation?.owner !== DESTINATION || operation.kind !== DESTINATION_KINDS.mint || !text(held.id) || timeMs(held.ends) === null) continue;
+      if (operation?.owner !== this.#owner() || operation.kind !== DESTINATION_KINDS.mint || !text(held.id) || timeMs(held.ends) === null) continue;
       const origin = this.#given.own(Number(held.mint.split(":")[0]));
       if (!origin || !this.#bound({ scope: scope.at, operation: held.mint, attempt: held.attempt, owner: operation.owner, kind: operation.kind, origin })) continue;
       answers.push({ operation: held.mint, attempt: held.attempt, answer: answer("confirmed", { token: held.id, ends: held.ends }) });
@@ -110,7 +123,7 @@ export class DestinationHost implements Outside {
       if (!context) return null;
       const { operation, repository, ref } = context;
       if (operation.kind === DESTINATION_KINDS.mint) {
-        const served = destinationWrite(this.#given.state, this.#given.own, operation);
+        const served = this.#helpers().servedBy(this.#given.state, this.#given.own, operation);
         if (!served) return null;
         const binding = this.#binding(request, served.write, served.attempt, ref);
         const reply = await this.#options.provider.mint(repository, binding);
@@ -121,8 +134,8 @@ export class DestinationHost implements Outside {
         return held === "stored" || held === "repeat" ? answer("confirmed", { token: body["id"], ends: body["ends"] }) : null;
       }
       if (operation.kind === DESTINATION_KINDS.revoke) {
-        const mint = destinationRevokedMint(this.#given.state, this.#given.own, operation);
-        const token = revokedToken(this.#given.state, this.#given.own, operation);
+        const mint = this.#helpers().mintRevoked(this.#given.state, this.#given.own, operation);
+        const token = this.#helpers().revokedToken(this.#given.state, this.#given.own, operation);
         const held = mint ? this.#options.custody.read(mint.id, 1) : null;
         if (!token || held?.id !== token || !held.plaintext) return null;
         if (!this.#options.custody.expectRevoke({ revoke: operation.id, attempt: request.attempt, mint: mint!.id, mintAttempt: 1, id: token })) return null;
@@ -153,17 +166,17 @@ export class DestinationHost implements Outside {
     if (read?.accepts(this.#given.state.operation(at.operation)?.owner ?? "", this.#given.state.operation(at.operation)?.kind ?? "")) return read.judged(at, sealed);
     const scope = this.#given.scope();
     const operation = this.#given.state.operation(at.operation);
-    if (!scope || !sameScope(scope.at, at.scope) || operation?.owner !== DESTINATION || (operation.kind !== DESTINATION_KINDS.mint && operation.kind !== DESTINATION_KINDS.revoke)) return;
+    if (!scope || !sameScope(scope.at, at.scope) || operation?.owner !== this.#owner() || (operation.kind !== DESTINATION_KINDS.mint && operation.kind !== DESTINATION_KINDS.revoke)) return;
     // A repeat/conflict notification carries no new entry. Keep custody backed
     // by the exact confirmed outcome this scope previously committed.
     const outcome = sealed ?? this.#confirmation(operation, at.attempt);
     const recorded = outcome ? this.#given.own(outcome.entry.seq) : null;
     const input = recorded?.entry.input;
-    const valid = outcome && recorded?.hash === outcome.hash && canonicalize(recorded.entry) === canonicalize(outcome.entry) && sameScope(recorded.entry.at, at.scope) && input?.type === "outcome" && input.operation === at.operation && input.attempt === at.attempt && input.owner === DESTINATION && input.kind === operation.kind && input.result === "confirmed" && input.evidence.basis === "own-answer";
+    const valid = outcome && recorded?.hash === outcome.hash && canonicalize(recorded.entry) === canonicalize(outcome.entry) && sameScope(recorded.entry.at, at.scope) && input?.type === "outcome" && input.operation === at.operation && input.attempt === at.attempt && input.owner === operation.owner && input.kind === operation.kind && input.result === "confirmed" && input.evidence.basis === "own-answer";
     if (operation.kind === DESTINATION_KINDS.revoke) {
       const body = valid && input.type === "outcome" ? members(input.evidence.body, ["token"]) : null;
-      const mint = body ? destinationRevokedMint(this.#given.state, this.#given.own, operation) : null;
-      if (mint && body?.["token"] === revokedToken(this.#given.state, this.#given.own, operation)) this.#options.custody.revoked(mint.id, 1);
+      const mint = body ? this.#helpers().mintRevoked(this.#given.state, this.#given.own, operation) : null;
+      if (mint && body?.["token"] === this.#helpers().revokedToken(this.#given.state, this.#given.own, operation)) this.#options.custody.revoked(mint.id, 1);
       return;
     }
     const body = valid && input.type === "outcome" ? members(input.evidence.body, ["token", "ends"]) : null;
@@ -190,12 +203,12 @@ export class DestinationHost implements Outside {
     const confirmed = operation.attempts.find((opened) => opened.attempt === attempt)?.outcomes.find((outcome) => outcome.result === "confirmed");
     const sealed = confirmed ? this.#given.own(confirmed.seq) : null;
     const input = sealed?.entry.input;
-    return scope && sealed && sameScope(sealed.entry.at, scope.at) && entryHash(sealed.entry) === sealed.hash && input?.type === "outcome" && input.operation === operation.id && input.attempt === attempt && input.owner === DESTINATION && input.kind === operation.kind && input.result === "confirmed" && input.evidence.basis === "own-answer" ? sealed : null;
+    return scope && sealed && sameScope(sealed.entry.at, scope.at) && entryHash(sealed.entry) === sealed.hash && input?.type === "outcome" && input.operation === operation.id && input.attempt === attempt && input.owner === operation.owner && input.kind === operation.kind && input.result === "confirmed" && input.evidence.basis === "own-answer" ? sealed : null;
   }
 
   #bound(request: EffectRequest): { operation: Operation; repository: DestinationRepository; ref: string } | null {
     const scope = this.#given.scope();
-    if (!scope || scope.at.kind !== "destination" || !sameScope(scope.at, request.scope) || this.#given.genesis()?.seed.definition !== DESTINATION || !this.accepts(request.owner, request.kind) || !isOperationId(request.operation) || !Number.isSafeInteger(request.attempt) || request.attempt < 1) return null;
+    if (!scope || scope.at.kind !== "destination" || !sameScope(scope.at, request.scope) || this.#given.genesis()?.seed.definition !== request.owner || !this.accepts(request.owner, request.kind) || !isOperationId(request.operation) || !Number.isSafeInteger(request.attempt) || request.attempt < 1) return null;
     const operation = this.#given.state.operation(request.operation);
     if (!operation || operation.owner !== request.owner || operation.kind !== request.kind || !operation.attempts.some((attempt) => attempt.attempt === request.attempt)) return null;
     const [seq, k] = request.operation.split(":").map(Number);
@@ -211,15 +224,15 @@ export class DestinationHost implements Outside {
   }
 
   #binding(request: EffectRequest, write: Operation, attempt: number, ref: string): DestinationBinding {
-    const mint = destinationMint(this.#given.state, write, attempt);
+    const mint = this.#helpers().mintOf(this.#given.state, write, attempt);
     if (!mint) throw new Error("missing mint");
     return { scope: request.scope, mint: mint.id, attempt: 1, write: write.id, writeAttempt: attempt, ref: write.kind === DESTINATION_KINDS.receipt ? this.#receipt(write).ref : ref };
   }
   #receipt(write: Operation) {
-    const target = destinationTarget(this.#given.state, this.#given.own, write);
+    const target = this.#helpers().targetOf(this.#given.state, this.#given.own, write);
     if (target?.type !== "receipt") throw new Error("missing receipt");
     // Refs depend on recorded facts, not object format.
-    return destinationReceipt(this.#given.state, this.#given.own, target, "sha1");
+    return this.#helpers().destinationReceipt(this.#given.state, this.#given.own, target, "sha1");
   }
   async #seen(repository: DestinationRepository, ref: string): Promise<string> {
     try { const seen = await this.#options.provider.ref(repository, ref); return seen === null ? "absent" : objectId(seen) ? seen : "failed"; } catch { return "failed"; }
@@ -228,10 +241,10 @@ export class DestinationHost implements Outside {
     const state = this.#given.state;
     const own = this.#given.own;
     const binding = this.#binding(request, write, request.attempt, branchRef);
-    const target = destinationTarget(state, own, write);
-    const mint = destinationMint(state, write, request.attempt);
+    const target = this.#helpers().targetOf(state, own, write);
+    const mint = this.#helpers().mintOf(state, write, request.attempt);
     const credential = mint ? this.#options.custody.live(mint.id, 1, this.#given.clock.read()) : null;
-    if (!destinationSends(state, own, write, request.attempt) || !credential) return answer("refused", { send: "not-sent", seen: await this.#seen(repository, binding.ref) });
+    if (!this.#helpers().writeSends(state, own, write, request.attempt) || !credential) return answer("refused", { send: "not-sent", seen: await this.#seen(repository, binding.ref) });
     const format = await this.#options.provider.format(repository);
     if (format !== "sha1" && format !== "sha256") return null;
     let commit: string;
@@ -241,18 +254,18 @@ export class DestinationHost implements Outside {
     let requireParentless = false;
     if (write.kind === DESTINATION_KINDS.receipt) {
       if (!target) return null;
-      const receipt = destinationReceipt(state, own, target, format);
+      const receipt = this.#helpers().destinationReceipt(state, own, target, format);
       ({ commit, objects } = receipt);
       expectedTree = objects.find((object) => object.kind === "tree")!.id;
       requireParentless = true;
     } else if (write.kind === DESTINATION_KINDS.firstHead) {
-      commit = firstHeadCommit(state, own, write, format);
+      commit = this.#helpers().firstHeadCommit(state, own, write, format);
       const claim = destinationBranch(state)?.refs["claim"];
       const genesis = own(0)?.entry;
       if (!genesis || !isFactRef(claim)) return null;
-      const founding = foundingObjects(format, genesis.at.scope, genesis.time, claim);
+      const founding = this.#owner() === "platform:destination@2" ? destination2Helpers.foundingOf(state, own, format) : foundingObjects(format, genesis.at.scope, genesis.time, claim);
       objects = commit === founding.commit ? founding.objects : await this.#options.provider.objects(repository, commit);
-      if (commit === founding.commit) { expectedTree = founding.objects[0]!.id; requireParentless = true; }
+      if (commit === founding.commit) { expectedTree = founding.objects.find((object) => object.kind === "tree")!.id; requireParentless = true; }
     } else {
       const head = destinationBranch(state)?.values["head"];
       const integration = target?.values["integration"];
@@ -262,7 +275,7 @@ export class DestinationHost implements Outside {
       // The confirmed reservation compared this tree with its retained manifest.
       const reservedAt = target?.values["reservedAt"];
       const reserved = typeof reservedAt === "number" ? own(reservedAt)?.entry.input : null;
-      const evidence = reserved?.type === "outcome" && reserved.owner === DESTINATION && reserved.kind === DESTINATION_KINDS.judge && reserved.result === "confirmed" && isRecordedJudgeEvidence(reserved.evidence.body) ? reserved.evidence.body : null;
+      const evidence = reserved?.type === "outcome" && reserved.owner === this.#owner() && reserved.kind === DESTINATION_KINDS.judge && reserved.result === "confirmed" && isRecordedJudgeEvidence(reserved.evidence.body) ? reserved.evidence.body : null;
       const tree = evidence?.tree;
       if (!objectId(tree)) return null;
       expectedTree = tree;
@@ -270,10 +283,10 @@ export class DestinationHost implements Outside {
     }
     // Async preparation may have let a read or compromise close the target.
     const live = this.#options.custody.live(binding.mint, 1, this.#given.clock.read());
-    if (!destinationSends(state, own, write, request.attempt) || live?.id !== credential.id || live?.plaintext !== credential.plaintext) return answer("refused", { send: "not-sent", seen: await this.#seen(repository, binding.ref) });
+    if (!this.#helpers().writeSends(state, own, write, request.attempt) || live?.id !== credential.id || live?.plaintext !== credential.plaintext) return answer("refused", { send: "not-sent", seen: await this.#seen(repository, binding.ref) });
     const allowed = () => {
       const held = this.#options.custody.live(binding.mint, 1, this.#given.clock.read());
-      return destinationSends(state, own, write, request.attempt) && held?.id === credential.id && held?.plaintext === credential.plaintext;
+      return this.#helpers().writeSends(state, own, write, request.attempt) && held?.id === credential.id && held?.plaintext === credential.plaintext;
     };
     const reply = members(await this.#options.provider.send({ repository, ref: binding.ref, old, commit, objects, ...(expectedTree === undefined ? {} : { expectedTree }), requireParentless, token: live.plaintext!, binding, allowed }), ["send"]);
     const sent = reply?.["send"];
@@ -283,7 +296,7 @@ export class DestinationHost implements Outside {
 
   #readRef(read: Operation, branchRef: string): string | null {
     if (read.kind === DESTINATION_KINDS.adoptRead) return branchRef;
-    const of = destinationRead(this.#given.state, this.#given.own, read);
+    const of = this.#helpers().readFor(this.#given.state, this.#given.own, read);
     if (!of) return null;
     if (of !== "receipt") return branchRef;
     const input = this.#given.own(Number(read.id.split(":")[0]))?.entry.input;
@@ -302,7 +315,7 @@ export class DestinationHost implements Outside {
     const id = branch?.refs["judging"];
     const publication = typeof id === "number" ? this.#given.state.item(id) : null;
     if (!publication) return null;
-    const statement = destinationStatement(this.#given.own, publication);
+    const statement = this.#helpers().statementOf(this.#given.own, publication);
     const reserve = this.#given.own(publication.id)?.entry;
     if (!reserve) return null;
     const manifest = this.#fact(reserve, statement.manifest);

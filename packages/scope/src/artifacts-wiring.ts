@@ -9,11 +9,12 @@
  */
 import type { ScopeId } from "@generalbusiness/artroom-contract";
 import { canonicalize, isScopeId, parseStrict } from "@generalbusiness/artroom-bytes";
-import { DESTINATION, REGISTER, destinationBranch } from "@generalbusiness/artroom-platform";
+import { destinationBranch } from "@generalbusiness/artroom-platform";
 import { ArtifactsProvider, type ArtifactsNamespace, type CreationCustody } from "./artifacts-host.ts";
 import { CredentialStore } from "./credential-store.ts";
 import { DestinationHost, type DestinationRepository } from "./destination-host.ts";
 import { credentialHandle, exact, hostBound } from "./host-wiring.ts";
+import { knownPlatform } from "./platform-version.ts";
 import type { OutsideGiven } from "./object.ts";
 import { NO_OUTSIDE, type EffectRequest, type Outside } from "./operations.ts";
 import { RegisterHost } from "./register-host.ts";
@@ -92,15 +93,15 @@ export function artifactsOutside(given: OutsideGiven, sql: Pick<SqlStorage, "exe
     const custody = new CredentialStore(sql, () => given.scope()?.at ?? null);
     const destination = new DestinationHost(given, { host, namespace, provider, custody });
     const bound = hostBound(given, config.registerScope, host, namespace);
-    const accepts = (owner: string, kind: string): boolean => bound(owner) && (owner === REGISTER ? register.accepts(owner, kind) : destination.accepts(owner, kind));
-    const send = (request: EffectRequest) => !accepts(request.owner, request.kind) ? Promise.resolve(null) : request.owner === REGISTER ? register.send(request) : destination.send(request);
+    const accepts = (owner: string, kind: string): boolean => bound(owner) && (knownPlatform(owner, "platform:register") ? register.accepts(owner, kind) : destination.accepts(owner, kind));
+    const send = (request: EffectRequest) => !accepts(request.owner, request.kind) ? Promise.resolve(null) : knownPlatform(request.owner, "platform:register") ? register.send(request) : destination.send(request);
     // No `recovery`: each read of this service mints a read token, so a
     // repeated read is not free of mutation.
     return {
       accepts, send,
       judged: (at, sealed) => destination.judged(at, sealed),
-      replies: (limit) => bound(DESTINATION) ? destination.replies(limit) : { answers: [], more: false },
-      credential: (handle, key) => bound(DESTINATION) ? destination.credential(handle, key) : null,
+      replies: (limit) => bound(given.genesis()?.seed.definition ?? "") ? destination.replies(limit) : { answers: [], more: false },
+      credential: (handle, key) => bound(given.genesis()?.seed.definition ?? "") ? destination.credential(handle, key) : null,
     };
   } catch { return NO_OUTSIDE; }
 }

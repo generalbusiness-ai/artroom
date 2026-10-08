@@ -27,6 +27,8 @@ import { rulesScope2, rulesScopeRules as rulesScopeRules2, rulesAnswer as rulesA
 
 export { inbox, membership, register, directory, destination };
 export { destination2, directory2, membership2, register2, rulesScope2 };
+/** Explicit future helper module; native helper exports keep their identity. */
+export * as destination2Helpers from "./future-2/destination.ts";
 export { isOf, pinnedBy, pinnedOf, versionOf } from "./versions.ts";
 export { DIRECTORY_OF } from "./future-2/register.ts";
 export { SIBLINGS_OF } from "./future-2/directory.ts";
@@ -105,6 +107,14 @@ export interface Platform {
    * where a scope under this version records one.
    */
   readonly rulesScope?: (state: StateView) => RecordedRef | null;
+}
+
+/** Current session/authority code can request the exact key-standing
+ * implementation without widening its state facade or selecting NEWEST. */
+export function membershipStanding(named: string, state: Parameters<typeof standingOf>[0], asked: ObservationRequest): ReturnType<typeof standingOf> {
+  if (named === "platform:membership@1") return standingOf(state, asked);
+  if (named === "platform:membership@2") return standingOf2(state, asked, "platform:membership@2");
+  return null;
 }
 
 /** Explicit future install selection. Legacy public constants and name-only

@@ -36,8 +36,9 @@ import type { Digest, Entry, Input, KeyId, Observation, ObservationRequest, Obse
 import { canonicalize, hex, isObservationUse, isRecord, parseStrict } from "@generalbusiness/artroom-bytes";
 import { WINDOWS, contentChecked, contentStates, fixedBy, highestHead, isScopeRef, judgeGrant, membershipOf, namedBy, observationOf, observedName, observedOf, prefer, revoked, same, subjectName, valueDigest, type Clock as Reading, type ContentStates, type GrantJudgment, type Needed, type RecordedRef, type Retains, type StateView, type ValueRead } from "@generalbusiness/artroom-derive";
 import { isPlatformDefinition } from "@generalbusiness/artroom-bytes";
-import { DESTINATION, DIRECTORY, RULES_SCOPE, destinationBranch, platform, standingOf } from "@generalbusiness/artroom-platform";
+import { SIBLINGS_OF, destinationBranch, platform, membershipStanding } from "@generalbusiness/artroom-platform";
 import type { Asked, Authority, Clock, Further, Random, Standing } from "./ports.ts";
+import { knownPlatform } from "./platform-version.ts";
 import type { SessionReading } from "./sessions.ts";
 
 /**
@@ -316,7 +317,7 @@ export function observing(config: Observing): Authority {
  * entries hold one read as `fresh`. An act whose row names no action is
  * judged on no grant, and nothing is built for it.
  */
-export function ownStanding(random: Random): Authority {
+export function ownStanding(random: Random, genesis: Repository["genesis"]): Authority {
   const run: RunId = hex(random.bytes(16));
   let count = 0;
   return {
@@ -328,7 +329,9 @@ export function ownStanding(random: Random): Authority {
       return Promise.resolve({
         membership: scope,
         held(view, clock) {
-          const observation = observationOf(standingOf(view, { of: scope, key }), clock.reading);
+          const named = genesis()?.seed.definition;
+          const answer = knownPlatform(named, "platform:membership") ? membershipStanding(named, view, { of: scope, key }) : null;
+          const observation = observationOf(answer, clock.reading);
           // No answer: the scope is not an active membership scope at this head, so no grant rests on it (section 12.1.3, case e).
           if (!observation) return null;
           const use: ObservationUse = { observation, read: { run, n }, use: "fresh", prior: null };
@@ -398,7 +401,7 @@ export const fixedMembership = (config: Pick<Repository, "genesis" | "state">, s
 function repositorySessionBirth(config: Pick<Repository, "genesis" | "state">, scope: ScopeRef): { directory: ScopeRef; membership: RecordedRef } | null {
   const genesis = config.genesis();
   const state = config.state;
-  if (!state || !same(state.scope()?.at, scope) || genesis?.decision !== "applied" || genesis.seed.kind !== scope.kind || !((scope.kind === "destination" && genesis.seed.definition === DESTINATION) || (scope.kind === "rules" && genesis.seed.definition === RULES_SCOPE))) return null;
+  if (!state || !same(state.scope()?.at, scope) || genesis?.decision !== "applied" || genesis.seed.kind !== scope.kind || !((scope.kind === "destination" && knownPlatform(genesis.seed.definition, "platform:destination")) || (scope.kind === "rules" && knownPlatform(genesis.seed.definition, "platform:rules")))) return null;
   const directory = genesis.seed.creator;
   const held = (scope.kind === "destination" ? destinationBranch(state) : state.page("rules", ["current"], null, 1).items[0])?.refs["directory"];
   const membership = recordedMembership(config, scope);
@@ -417,7 +420,7 @@ export function repositorySessionMembership(config: Pick<Repository, "genesis" |
         if (!birth) return null;
         const reply = await read(birth.directory, reader);
         const value = isRecord(reply) && reply["ok"] === true && isRecord(reply["value"]) ? reply["value"] : null;
-        if (!value || !isScopeRef(value["scope"]) || !same(value["scope"], birth.directory) || value["definition"] !== DIRECTORY || value["status"] !== "active" || !Array.isArray(value["items"])) return null;
+        if (!value || !isScopeRef(value["scope"]) || !same(value["scope"], birth.directory) || !knownPlatform(value["definition"], "platform:directory") || SIBLINGS_OF[value["definition"] as string]?.[scope.kind as "destination" | "rules"] !== config.genesis()?.seed.definition || value["status"] !== "active" || !Array.isArray(value["items"])) return null;
         const repositories = value["items"].filter((item: unknown) => isRecord(item) && item["type"] === "repository" && item["state"] === "open");
         if (repositories.length !== 1) return null;
         const refs = repositories[0]["refs"];
@@ -465,7 +468,7 @@ export function repositorySessionMembership(config: Pick<Repository, "genesis" |
  * the membership scope answers, and nothing a caller brings.
  */
 export function repositoryAuthority(config: Repository): Authority {
-  const own = ownStanding(config.random);
+  const own = ownStanding(config.random, config.genesis);
   const observed = observing({
     clock: config.clock, random: config.random, reader: config.reader, membership: (scope) => recordedMembership(config, scope),
     // Where a version's scopes record their rules reference is code of the version, as for the membership reference. The read goes

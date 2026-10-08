@@ -21,11 +21,12 @@
 import type { Digest, Entry, ObservationRequest, ObservedScope, RoutingRefusal, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
 import { canonicalize, isDigest, isKeyId, isMemberId, isPlatformDefinition, isScopeId, parseStrict, platformName, scopeIdOf } from "@generalbusiness/artroom-bytes";
 import { isObject, isScopeRef, type Delivered, type ScopeState } from "@generalbusiness/artroom-derive";
-import { MEMBERSHIP, RULES_SCOPE, platform } from "@generalbusiness/artroom-platform";
+import { platform } from "@generalbusiness/artroom-platform";
 import type { Membership } from "./authority.ts";
 import type { Pinned } from "./core.ts";
 import type { Definitions, Delivery, Resolver, SentTexts, Transport } from "./ports.ts";
 import type { Store } from "./store.ts";
+import { knownPlatform } from "./platform-version.ts";
 
 /** What the object at a name answers to a read of one of its entries. `bytes` null: it has no entry at that sequence number. */
 export interface Sourced { at: ScopeRef; under: string; bytes: string | null }
@@ -146,7 +147,7 @@ export function sentText(store: Store, seq: number, digest: Digest): string | nu
  * asker, and the answer is the same for every scope that asks.
  */
 export function observedAt(store: Store, pinned: Pinned | null, asked: unknown): unknown {
-  const kind = pinned?.named === MEMBERSHIP ? "membership" : pinned?.named === RULES_SCOPE ? "rules" : null;
+  const kind = knownPlatform(pinned?.named, "platform:membership") ? "membership" : knownPlatform(pinned?.named, "platform:rules") ? "rules" : null;
   const supplied = pinned?.definition ? platform(pinned.named) : null;
   const answers = supplied?.observed;
   if (kind === null || !answers) return null;
