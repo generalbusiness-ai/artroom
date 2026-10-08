@@ -188,3 +188,54 @@ component; it does not prove live provider rights/expiry, original historical
 admission/archives, executor closure, capacity or compatible activation. The
 complete request still owes those actual integrated proofs, final gate,
 ordinary independent source review and source filing/landing in order.
+
+## Lazy local Git fixture setup
+
+This small successor preserves `4372387c5cbe20d59cc6d81415441e6ad25cc619`
+under the same 484/3501 component owner. The previous global setup created a
+bare repository, ran symbolic-ref and created the clone scratch directory for
+every scope-project invocation. Those operations now run only inside the
+existing nonce-authenticated, fixed `/configure` request for the one accepted
+repository name. Repeating that same configuration keeps the same owned paths;
+another name is still refused. Global setup still starts its loopback fixture
+server, but unrelated tests cause no Git initialization or temp repository
+allocation. This is a source-boundary observation, not a timed unrelated-suite
+comparison.
+
+The provided address now contains only URL/nonce. `/configure` returns the
+fixture-owned directory alongside the same remote; the existing witness uses
+that directory for its unchanged exact clone argv and result assertions.
+No caller can provide a directory or arbitrary command. `/run` before
+configuration refuses, and backend/inspection require their allocated state.
+The nonce, fixed child, controlled environment, exact remote/target/credential
+checks, all-token raw-output scan and buffer-bound success check are unchanged.
+The literal README, judged HEAD, independently hashed tree, current session,
+one mint/take, clean remote and second-take refusal assertions remain.
+Production source, the actual-header control and all runtime policy are unchanged.
+
+Only the existing focused witness and scope typecheck ran, once each, in
+parallel using existing installed dependencies. Commands were:
+
+```sh
+/usr/bin/time -p ./node_modules/.bin/vitest run --project scope packages/scope/test/runtime-versions.test.ts > /tmp/artroom-clone-real-git-lazy-evidence/focused.log 2>&1
+/usr/bin/time -p npm run typecheck --workspace @generalbusiness/artroom-scope > /tmp/artroom-clone-real-git-lazy-evidence/typecheck.log 2>&1
+```
+
+The focused run passed its one test: 1.85 seconds Vitest duration, 2.50 seconds
+command elapsed, 2.44 user/0.48 system CPU seconds. Typechecks passed: 0.85
+seconds elapsed, 2.41 user/0.33 system CPU seconds. These are separate command
+measurements during concurrent work, not a gate or before/after speedup.
+Machine was local macOS arm64, Node v26.10.0, Apple Git 2.54.0. Dependency/tool
+caches were reused; machine load and cache warmth were not controlled.
+Original raw logs contain no private token values:
+
+| Output | Bytes | SHA-256 |
+|---|---:|---|
+| `/tmp/artroom-clone-real-git-lazy-evidence/focused.log` | 249 | `9bc8ca208ebaf470f3f1c59eee8c27fdacb2dd9527b1a67025e3c9814a9084af` |
+| `/tmp/artroom-clone-real-git-lazy-evidence/typecheck.log` | 180 | `7c464be94224d3ced3960c7432fed55998ca32c03097243734b1e89959188700` |
+
+The original setup is also retained at
+`/tmp/artroom-local-clone-setup-437-predecessor.ts`, SHA-256
+`e56b38a5ddec2000874e4214ece5ba6f518f16c93acc2176f1c62bbba989983b`.
+No dependency, new witness matrix, gate, provider, activation or main change
+was made. All original component limits above remain.

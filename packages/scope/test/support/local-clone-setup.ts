@@ -26,9 +26,10 @@ async function body(request: IncomingMessage): Promise<Buffer> {
 }
 
 export default async function setup(project: TestProject) {
-  const repo = bare();
-  git(repo, ["symbolic-ref", "HEAD", "refs/heads/main"]);
-  const directory = join(scratch(), "clone");
+  // Unrelated scope files need no Git process or temporary repository.
+  // Only the nonce-protected fixed configure request allocates these paths.
+  let repo: string | null = null;
+  let directory: string | null = null;
   const nonce = randomBytes(32).toString("hex");
   const tokens = new Map<string, { id: string; scope: "read" | "write"; seconds: number; live: boolean }>();
   let name: string | null = null; let remote = ""; let readRequests = 0; let tokenInOutput = false;
@@ -36,10 +37,12 @@ export default async function setup(project: TestProject) {
   const requests: { path: string; method: string; bytes: number; status: number }[] = [];
   let failure: string | null = null;
   const run = async (args: string[], env: Record<string, string>) => {
+    if (directory === null) return { code: 1, outputClean: true };
+    const targetDirectory = directory;
     const version = same(args, ["--version"]) && same(env, {});
     const token = env["GIT_CONFIG_VALUE_0"]?.replace(/^Authorization: Bearer /, "");
     const held = token ? tokens.get(token) : undefined;
-    const clone = same(args, ["clone", "--", remote, directory]) && Object.keys(env).sort().join() === "GIT_CONFIG_COUNT,GIT_CONFIG_KEY_0,GIT_CONFIG_VALUE_0"
+    const clone = same(args, ["clone", "--", remote, targetDirectory]) && Object.keys(env).sort().join() === "GIT_CONFIG_COUNT,GIT_CONFIG_KEY_0,GIT_CONFIG_VALUE_0"
       && env["GIT_CONFIG_COUNT"] === "1" && env["GIT_CONFIG_KEY_0"] === "http.extraHeader"
       && env["GIT_CONFIG_VALUE_0"] === `Authorization: Bearer ${token}` && held?.scope === "read" && held.seconds === 3600 && held.live;
     if (!version && !clone) return { code: 1, outputClean: true };
@@ -47,7 +50,7 @@ export default async function setup(project: TestProject) {
     // this trusted process environment maps its transport to the local host.
     const added = clone ? { ...env, GIT_CONFIG_COUNT: "2", GIT_CONFIG_KEY_1: `url.${url}/repo.git.insteadOf`, GIT_CONFIG_VALUE_1: remote } : env;
     return new Promise<{ code: number | null; outputClean: boolean }>((resolve) => {
-      const child = spawn(process.execPath, ["--import", createRequire(import.meta.url).resolve("tsx"), fileURLToPath(new URL("./local-clone-child.ts", import.meta.url))], { cwd: dirname(directory), env: controlled, stdio: ["pipe", "pipe", "pipe", "ipc"] });
+      const child = spawn(process.execPath, ["--import", createRequire(import.meta.url).resolve("tsx"), fileURLToPath(new URL("./local-clone-child.ts", import.meta.url))], { cwd: dirname(targetDirectory), env: controlled, stdio: ["pipe", "pipe", "pipe", "ipc"] });
       const chunks: Buffer[] = []; let bytes = 0; let code: number | null = 1;
       const capture = (chunk: Buffer) => { bytes += chunk.length; if (bytes > MAX) child.kill(); else chunks.push(Buffer.from(chunk)); };
       child.stdout!.on("data", capture); child.stderr!.on("data", capture);
@@ -75,7 +78,7 @@ export default async function setup(project: TestProject) {
         for (const [key, value] of Object.entries(request.headers)) if (typeof value === "string") headers.set(key, value);
         if (path === "/backend" && headers.get("x-clone-fixture") !== nonce) { response.writeHead(403); response.end(); return; }
         const target = path === "/backend" ? headers.get("x-clone-remote") ?? "" : `${remote}${(request.url ?? "").slice("/repo.git".length)}`;
-        if (!name || !target.startsWith(`${remote}/`)) { response.writeHead(404); response.end(); return; }
+        if (!name || repo === null || !target.startsWith(`${remote}/`)) { response.writeHead(404); response.end(); return; }
         const tail = target.slice(remote.length);
         const upload = tail === "/info/refs?service=git-upload-pack" || tail === "/git-upload-pack";
         const receive = tail === "/info/refs?service=git-receive-pack" || tail === "/git-receive-pack";
@@ -91,7 +94,12 @@ export default async function setup(project: TestProject) {
       if (request.headers["x-clone-fixture"] !== nonce) { response.writeHead(403); response.end(); return; }
       const value = raw.length ? JSON.parse(raw.toString("utf8")) as Record<string, unknown> : {};
       if (path === "/configure" && request.method === "POST" && typeof value["name"] === "string" && /^[A-Za-z0-9_.-]+$/.test(value["name"]) && (name === null || name === value["name"])) {
-        name = value["name"]; remote = `https://service.invalid/git/artroom-demo/${name}.git`; send({ remote });
+        if (name === null) {
+          repo = bare();
+          git(repo, ["symbolic-ref", "HEAD", "refs/heads/main"]);
+          directory = join(scratch(), "clone");
+        }
+        name = value["name"]; remote = `https://service.invalid/git/artroom-demo/${name}.git`; send({ remote, directory });
       } else if (path === "/mint" && request.method === "POST" && name !== null && value["name"] === name && (value["scope"] === "read" || value["scope"] === "write") && typeof value["seconds"] === "number" && Number.isSafeInteger(value["seconds"]) && value["seconds"] > 0) {
         const plaintext = `local-test-${randomBytes(24).toString("hex")}`;
         const token = { id: `local-test-${tokens.size + 1}`, scope: value["scope"] as "read" | "write", seconds: value["seconds"], live: true };
@@ -102,7 +110,7 @@ export default async function setup(project: TestProject) {
         send(await run(value["args"] as string[], value["env"] as Record<string, string>));
       } else if (path === "/status" && request.method === "GET") {
         send({ requests, failure });
-      } else if (path === "/inspect" && request.method === "GET" && existsSync(join(directory, ".git"))) {
+      } else if (path === "/inspect" && request.method === "GET" && directory !== null && existsSync(join(directory, ".git"))) {
         const config = readFileSync(join(directory, ".git", "config"), "utf8");
         const readme = readFileSync(join(directory, "README.md"));
         // Independent Node hashes of the literal README bytes and standard
@@ -115,6 +123,6 @@ export default async function setup(project: TestProject) {
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-  project.provide("localClone", { url, nonce, directory } satisfies LocalCloneAddress);
+  project.provide("localClone", { url, nonce } satisfies LocalCloneAddress);
   return async () => { await new Promise<void>((resolve) => server.close(() => resolve())); cleanup(); };
 }

@@ -54,7 +54,7 @@ test("runtime exact @2 membership observations and aged destination/rules reads 
     const repository = repositoryName(seedDigest(seed), 1);
     const address = inject("localClone");
     const bridge = localClone(address);
-    const { remote } = await bridge.configure(repository);
+    const { remote, directory } = await bridge.configure(repository);
     let readMints = 0;
     let callerToken = "";
     const binding: ArtifactsNamespace = {
@@ -106,7 +106,7 @@ test("runtime exact @2 membership observations and aged destination/rules reads 
         gitCalls++;
         if (args[0] === "--version") { expect(canonicalize(args) === canonicalize(["--version"]) && canonicalize(env) === "{}").toBe(true); }
         else {
-          expect(canonicalize(args) === canonicalize(["clone", "--", remote, address.directory])).toBe(true);
+          expect(canonicalize(args) === canonicalize(["clone", "--", remote, directory])).toBe(true);
           expect(args.join(" ").includes(callerToken)).toBe(false);
           // Boolean assertion avoids printing the private test token on failure.
           expect(callerToken.length > 0 && canonicalize(env) === canonicalize({ GIT_CONFIG_COUNT: "1", GIT_CONFIG_KEY_0: "http.extraHeader", GIT_CONFIG_VALUE_0: `Authorization: Bearer ${callerToken}` })).toBe(true);
@@ -116,12 +116,12 @@ test("runtime exact @2 membership observations and aged destination/rules reads 
         return ran.code;
       } },
     };
-    const cloned = await command(context, ["clone", address.directory]);
+    const cloned = await command(context, ["clone", directory]);
     expect(cloned.code, cloned.lines.join("\n")).toBe(0);
     expect(gitCalls).toBe(2);
     expect(readMints).toBe(1);
     expect(cloned.lines).toContain(`Remote URL: ${remote}`);
-    expect(cloned.lines).toContain(`Cloned into ${address.directory}.`);
+    expect(cloned.lines).toContain(`Cloned into ${directory}.`);
     expect(cloned.lines.join(" ").includes(callerToken)).toBe(false);
     expect(await store.config()).toHaveProperty("remote", remote);
     expect(JSON.stringify(await store.config()).includes(callerToken)).toBe(false);

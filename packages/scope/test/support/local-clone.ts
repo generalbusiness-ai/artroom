@@ -1,6 +1,6 @@
 /** Test-only bridge to Node's real Git. Host identity/mint rights are stand-ins. */
 import type {} from "vitest";
-export interface LocalCloneAddress { url: string; nonce: string; directory: string }
+export interface LocalCloneAddress { url: string; nonce: string }
 export interface LocalCloneInspection {
   head: string; tree: string; expectedTree: string; paths: string; readme: string; origin: string;
   tokenInConfig: boolean; tokenInOutput: boolean; readRequests: number;
@@ -15,7 +15,7 @@ export function localClone(at: LocalCloneAddress) {
     return response.json() as Promise<T>;
   };
   return {
-    configure: (name: string) => json<{ remote: string }>("/configure", { name }),
+    configure: (name: string) => json<{ remote: string; directory: string }>("/configure", { name }),
     mint: (name: string, scope: "read" | "write", seconds: number) => json<{ id: string; scope: "read" | "write"; plaintext: string }>("/mint", { name, scope, seconds }),
     revoke: (name: string, plaintext: string) => json<boolean>("/revoke", { name, plaintext }),
     run: (args: readonly string[], env: Readonly<Record<string, string>>) => json<{ code: number | null; outputClean: boolean }>("/run", { args, env }),
