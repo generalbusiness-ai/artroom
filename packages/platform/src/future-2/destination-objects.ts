@@ -125,20 +125,15 @@ function rowOrder(a: TreeRow, b: TreeRow): number {
 const sameBytes = (a: Uint8Array, b: Uint8Array): boolean => a.length === b.length && a.every((byte, i) => byte === b[i]);
 
 /**
- * The objects of a one-file edit of the published commit `base`: a blob of
- * the bytes, each tree from the root down to the file's folder written
- * again, and the commit. `read` gives an object of the base's closure, which
- * the caller read from the Git host. An existing regular file at the path
- * keeps its mode, and any other path gets 100644. Null: the published tree
- * does not let the file be written there, because a folder, a symbolic link
- * or a submodule is at the path, or a file, a link or a submodule is at a
- * folder on the way; or the path is not one that `editPath` gives. The
- * commit is `editCommit`'s.
+ * Only the blob/trees of a one-file edit of `base`, with no commit, operation
+ * or time. Caller supplies the verified base commit and required tree closure;
+ * this callback is not proof of their hashes, completeness or authorization.
+ * Existing regular files retain their mode; a new file has mode 100644.
+ * Null has the existing path/tree refusal meaning of `editObjects`.
  */
-export function editObjects(
+export function editTree(
   format: ObjectFormat, read: (id: string) => DestinationObject | null, base: string, path: string, bytes: Uint8Array,
-  commit: { scope: ScopeId; time: Timestamp; operation: FactRef },
-): (DestinationCommit & { tree: string }) | null {
+): { tree: string; objects: readonly DestinationObject[] } | null {
   const segments = editPath(path);
   const parent = read(base);
   const rootLine = parent?.kind === "commit" ? /^tree ([0-9a-f]{40}|[0-9a-f]{64})\n/.exec(ascii.decode(parent.body.subarray(0, 80))) : null;
@@ -169,8 +164,24 @@ export function editObjects(
   };
   const tree = write(rootLine[1]!, segments);
   if (tree === null) return null;
+  return { tree, objects: made };
+}
+
+/**
+ * The same one-file objects and actual operation/time-bound commit as before.
+ * `read` supplies the caller's verified base closure. A folder, symbolic link
+ * or submodule at the path, a non-folder on the way, or an invalid path gives
+ * null. Tree construction is independent; only this wrapper calls editCommit.
+ */
+export function editObjects(
+  format: ObjectFormat, read: (id: string) => DestinationObject | null, base: string, path: string, bytes: Uint8Array,
+  commit: { scope: ScopeId; time: Timestamp; operation: FactRef },
+): (DestinationCommit & { tree: string }) | null {
+  const made = editTree(format, read, base, path, bytes);
+  if (made === null) return null;
+  const { tree, objects } = made;
   const top = editCommit(format, commit.scope, commit.time, tree, base, path, commit.operation);
-  return { commit: top.id, tree, objects: [...made, top] };
+  return { commit: top.id, tree, objects: [...objects, top] };
 }
 
 /** The two public ref names: the fact's entry hash, with no additional domain. */

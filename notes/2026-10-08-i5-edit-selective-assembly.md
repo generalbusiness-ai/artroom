@@ -39,3 +39,51 @@ Control: removing only edit's first destination@2 check makes the own-host witne
 Root and the assigned preservation reader own the full changed-body/source review. This assembly read exact owned request and testing guidance, current/client and feature helper bodies, targeted future/host source pairs and definition structural deltas; supplemental unchanged large bodies were selected reads, not freshly complete files. All final changed hashes are retained in the ledger for review against the committed checkpoint.
 
 Dependencies are borrowed from the existing installation with workspace links into this worktree. No tooling install, package or lock change occurred. No site module, site authority policy, Root/profiles/default catalog, provider deployment, live browser, main landing, whole gate, source approval or request closure is included. The edit filing's direct full scenario/type load still requires the queued site source; its separate composition is precisely labelled evidence, not a complete integrated head. Integrated gate, independent ordinary source review, owner adoption and original filing order remain owed.
+
+## Pure editTree extraction preparation
+
+This slice follows adopted owner DESIGN `721c2f816cd034e762fa8278de02d4d4354dcc88`,
+adoption `7349458bc1f40004535434363111e0341b7f97c5` and planner extraction
+direction `70cc2b2b6c07ed12a9ec0e717ba0df030e8180fb`, within the same 50b/9be.
+The actual edit helper lineage is base `6d29bae7f0f88c5f552197a19d1869c1a2d9c3bd`
+on isolated `request/i5-edit-tree-extraction`. The earlier main checkpoint 1eed scratch
+remains clean and unused as a source; main has no future-2 edit helper.
+
+`future-2/destination-objects.ts` extracts the exact existing tree algorithm
+into editTree, with only format/read/base/path/bytes inputs and blob/tree
+outputs. editObjects wraps it and appends the unchanged editCommit. The tree
+algorithm, editPath and editCommit compare byte-for-byte with the base. Native
+common helpers, platform data/rules, catalog/index and version helpers remain
+unchanged. The actual future-2 helper body changed by extraction; this is an
+output-preservation claim, not a claim that its whole source blob is unchanged.
+
+The raw read callback still requires the caller's verified base commit and
+required closure. It does not newly authenticate object hashes, completeness,
+source, authorization, digest/size or work budgets. The separately bounded
+verified-input/digest/size/changed-set adapter remains owed. No fake operation,
+time, commit, permission, new parser or Git dependency was added.
+
+The existing edit.test.ts retains all four tests and original assertions. Its
+existing SHA-1/SHA-256 local Git loop now also compares pure blob/tree outputs
+with the wrapper, verifies that changed operation/time changes only the commit,
+and independently checks retained executable mode `100755` with Git's own index.
+New/replaced/nested files, untouched entries/link, null path conflicts, exact
+commit identity/message, fsck and pure reservation assertions remain. One
+focused file passed 4/4; platform source/test typechecks passed. No extra control
+was needed for this algorithm-preserving extraction. Raw original outputs:
+
+| Output | SHA-256 |
+|---|---|
+| `/tmp/artroom-edit-tree-evidence/focused.log` | `f848e4b45c34abd19eefc93ca18181dc22ebd4741d5de5d31f72993bcfc26a74` |
+| `/tmp/artroom-edit-tree-evidence/typecheck.log` | `7164e781f55f730d5b11f99c10513168239de3ff338d0315651cb93b32fe3130` |
+| `/tmp/artroom-edit-tree-evidence/preservation.log` | `54882229c1f172efeded696b33f91d851bb07e85593344957b6f62d345a7d4df` |
+
+Commands: `npm exec -- vitest run --project platform edit` and
+`npm run typecheck --workspace @generalbusiness/artroom-platform`. Existing
+dependencies were reused with isolated workspace links and unchanged lockfile;
+no package/tool install or metadata change. Preservation is raw source comparison,
+not whole source reading or historical admission proof. No catalog/identity/wire
+registration, provider, Room setup, whole gate, main landing or activation ran.
+Authorized acquisition, actual checker ABI/image, reservation/publication,
+combined-c4 allocations/tuple, custody/executor/capacity/historical proofs and
+full functional/source review remain owed.
