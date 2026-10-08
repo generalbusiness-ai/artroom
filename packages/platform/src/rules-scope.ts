@@ -62,9 +62,9 @@ import type { Extent } from "./extents.ts";
 
 /**
  * The versions of the rules scope that this package serves. Version 2
- * differs in one thing: the field `digest` of `activate` states the place
- * of the definition's bytes (`rulesScope2`). An answer states the version
- * of the scope that gives it.
+ * keeps the newer room cohort and observation identity. Both preserve
+ * actual main1eed's definition-byte place on `activate`; an answer states
+ * the version of the scope that gives it.
  */
 export const RULES_SCOPE_1 = "platform:rules@1" satisfies PlatformDefinition;
 /** The newest version of the rules scope: the one that a directory of the newest version creates. */
@@ -261,7 +261,8 @@ export const rulesScope: PlatformData = {
     activate: {
       step: "open", on: "definition", grant: "rules.activate",
       also: {},
-      fields: { digest: { ...DIGEST, required: true }, name: { type: "text", max: 64, required: true } },
+      // Actual main1eed shipped this input/retention place under platform:rules@1.
+      fields: { digest: { ...DIGEST, required: true, value: { domain: DEFINITION_DOMAIN, max: PROPOSED_BOUNDS.definitionBytes } }, name: { type: "text", max: 64, required: true } },
       guards: [
         { code: "definition-bytes", row: "P21" },
         { none: { type: "definition", states: ["active"], where: [{ equals: { a: { slot: "digest" }, b: { field: "digest" } } }] } },
@@ -312,23 +313,9 @@ export const rulesScope: PlatformData = {
   outcomes: {},
 };
 
-/**
- * `platform:rules@2`: version 1, with the place of the definition's bytes
- * on the field `digest` of `activate`. A value beside an intent is read
- * only for a place that the pinned data states (the contract's section
- * 6.2, revision 19). Without the place, under version 1, the runtime reads
- * none, and the guard `definition-bytes` can only answer
- * `dependency-unavailable`. One place: the closure of a lane definition
- * that creates only lanes of `self` is the definition alone.
- */
-const activate1 = rulesScope.acts["activate"]!;
-export const rulesScope2: PlatformData = {
-  ...rulesScope,
-  acts: {
-    ...rulesScope.acts,
-    activate: { ...activate1, fields: { ...activate1.fields, digest: { ...DIGEST, required: true, value: { domain: DEFINITION_DOMAIN, max: PROPOSED_BOUNDS.definitionBytes } } } },
-  },
-};
+/** Version 2 has the same declaration bytes as actual main's supported @1.
+ * Its cohort and version-named observation remain distinct executable meaning. */
+export const rulesScope2: PlatformData = rulesScope;
 
 // ---------------------------------------------------------------- reading the rules scope's state
 
