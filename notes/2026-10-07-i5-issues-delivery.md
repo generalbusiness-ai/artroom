@@ -199,7 +199,8 @@ The two failures **[run]**:
   both gate runs on this branch (the first at `2440fe0`). It passed in
   every other run I made: alone three times; the `scope` project alone
   once at the base `13ae305` and once at `7e6e104`; after the issues
-  scenario in one worker, three of four; and the whole root test run once
+  scenario in one worker, five of six (one of two before the scenario
+  settled its scopes at its end, four of four after); and the whole root test run once
   more at `7e6e104` with a print added to T39 to name the entry, where it
   did not move. I have not found what writes entry 5, nor whether this
   branch makes it more likely: the edit-page note reports T39 passing in
