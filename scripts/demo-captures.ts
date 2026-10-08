@@ -184,7 +184,7 @@ async function main(argv: readonly string[]): Promise<number> {
   writeFileSync(join(resolve(out), "captures.md"), [
     "# Page captures",
     "",
-    `Written by scripts/demo-captures.ts ${recorded ? "--recorded: the page answered with the test Worker's recorded answers on the rehearsal's room" : `against ${sitting.service}, on the room bound to the selected owner home`}, in Chromium. These are screen observations; the rehearsal's native receipts establish its outcomes.`,
+    `Written by scripts/demo-captures.ts ${recorded ? "--recorded: the page answered with the test Worker's recorded answers on the rehearsal's room" : `against ${sitting.service}, on the room bound to the selected owner home`}, in Chromium. These are screen observations. Authoritative outcome and publication proof must be established separately from retained native histories and receipts; this capture does not establish it.`,
     "",
     ...(sitting.observation ? [`Capture association: source ${sitting.observation.source}; config ${sitting.observation.config}; actor ${sitting.observation.actor}; directory ${sitting.place.directory}; membership ${JSON.stringify(sitting.place.membership)}; lane IDs ${JSON.stringify(sitting.room)}.`, ""] : []),
     "| File | Shows | Bytes |",
