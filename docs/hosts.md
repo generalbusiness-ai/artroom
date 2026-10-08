@@ -131,8 +131,11 @@ platform versions, membership actions and observation code, and host
 routing that preserves old rooms. The current destination `@1` and unknown
 catalog versions refuse `read-token` and `mint-read`. Component tests with
 scripted histories do not prove a room-issued token or a successful clone.
-Full receipt/fact validation and successful orchestration witnesses remain
-part of the later integration review.
+The client checks exact receipt/envelope metadata, the accepted act's full
+fact and operation effects, and each scanned entry's full fact before it
+can retrieve a credential. These checks are not historical replay.
+Successful room-issued orchestration witnesses and trusted historical
+version integration remain part of the later review.
 
 In the prepared flow, the member signs the destination's `read-token` act,
 with requested hours from 1 to 24. That signed act authorizes one
@@ -151,7 +154,8 @@ do not set GitHub's installation-token lifetime. Neither provider retries
 a lost mint automatically.
 
 The outcome wait lasts at most 120 seconds, with at most 120 polls of
-64 entries, keeping its next-entry cursor between polls. It reports the accepted act,
+64 outcome-history entries, keeping its next-entry cursor between polls.
+One accepted-act proof read also shares that deadline. It reports the accepted act,
 operation, scanned entries and next entry if it stops. The accepted mint
 may still finish; inspect `artroom show <scope>:<act sequence>` and
 `artroom log destination`. Stopping the wait does not revoke a token or

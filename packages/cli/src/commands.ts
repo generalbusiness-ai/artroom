@@ -22,7 +22,7 @@
  * | `verify` | The replay verifier over the read routes: with the caller's session, and by signed reads where the session is refused. |
  */
 
-import type { Answer, DeclaredDefinition, Digest, Entry, FactRef, FieldValue, Founded, Item, KeyId, OperationId, PlatformDefinition, ScopeId, ScopeRef, Seed, SignedIntent, Summary } from "@generalbusiness/artroom-contract";
+import type { Answer, DeclaredDefinition, Digest, Entry, FactRef, FieldValue, Founded, Item, KeyId, PlatformDefinition, ScopeId, ScopeRef, Seed, SignedIntent, Summary } from "@generalbusiness/artroom-contract";
 import { b64url, canonicalize, factRefOf, intentDigest, isDigest, isFactRef, isIncarnation, isScopeId, isScopeRef, keyIdOfSecret, parseStrict, scopeIdOf, seedDigest, textDigest, timeOf, unb64url, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import {
   ScopeHandle, TransportError, readCredential, declaredHandle, found, httpTransport, requestSession, secretSigner, sessionRequest, signedIntent, signedLogReader, signedReads,
@@ -32,6 +32,7 @@ import { DIRECTORY, MEMBERSHIP, REGISTER, ROLE_LISTS, platform, type Role } from
 import { SourceError, httpSource, render, verify as replay, type HistorySource } from "@generalbusiness/artroom-replay";
 import type { ClaimStep, Config, PendingClaim, PendingJoin, Repository, Store } from "./store.ts";
 import { outcomeFetch, pauseOutcome, waitOutcome, type CloneWait } from "./clone-outcome.ts";
+import { readTokenEntry, readTokenOpening, readTokenOutcome, readTokenReceipt } from "./clone-proof.ts";
 
 export interface Context {
   store: Store;
@@ -838,15 +839,26 @@ export function clone(ctx: Context, directory: string | undefined, options: { ho
     const signer = secretSigner(await signerOf(ctx, config));
     const branch = summary.items.find((item) => item.type === "branch")!;
     const signed = await signedIntent(signer, { to: summary.scope, kind: "read-token", on: branch.id, fields: { hours }, expected: { on: branch.revision } }, signing(ctx));
-    const seq = accepted(await (await handleOf(ctx, config, scope, null)).submit(signed), scope, "Read token").receipt.fact.seq;
+    const receipt = accepted(await (await handleOf(ctx, config, scope, null)).submit(signed), scope, "Read token").receipt;
+    const proof = readTokenReceipt(receipt, summary, signed);
+    if (!proof) return failed(`The accepted reply does not match this destination, definition and exact read-token request. It may still have been recorded at ${scope}; inspect artroom log destination. No credential was retrieved and nothing was cloned.`);
+    const seq = proof.receipt.fact.seq;
     // The outcome of its `mint-read`, which the host's answer writes: read with the caller's session, which the destination now accepts.
-    const operation: OperationId = `${seq}:0`;
+    const operation = proof.operation;
     const reader = await readerOf(ctx, config) ?? stop(failed(`Signed read-token at ${scope}:${seq}, but no read session is given here, and only a session reads the token.`));
     const send = ctx.fetch ?? (globalThis as { fetch?: Fetch }).fetch!;
     let D: ScopeHandle | null = null;
+    let openingChecked = false;
     const waited = await waitOutcome(operation, seq + 1, async (next, signal) => {
       D ??= await handleOf({ ...ctx, fetch: outcomeFetch(send, signal) }, config, scope, reader);
-      return D.entry(next);
+      if (!openingChecked) {
+        const opening = await D.entry(seq);
+        if (!opening.ok || !readTokenOpening(opening.value, proof)) return stop(failed(`Cannot confirm the exact accepted read-token act and its mint-read opening at ${scope}:${seq}; inspect artroom show ${scope}:${seq} and artroom log destination. No credential was retrieved and nothing was cloned.`));
+        openingChecked = true;
+      }
+      const got = await D.entry(next);
+      if (got.ok && (!readTokenEntry(got.value, proof.to, next) || (got.value.entry.input.type === "outcome" && got.value.entry.input.operation === operation && !readTokenOutcome(got.value, next, proof)))) return stop(failed(`The entry at ${scope}:${next} does not match this destination's recorded mint-read (${operation}); inspect artroom log destination. No credential was retrieved and nothing was cloned.`));
+      return got;
     }, (signal) => ctx.pause ? ctx.pause([scope]) : pauseOutcome(signal), ctx.tries ?? 120, ctx.cloneWait);
     if (!waited.ok) {
       const reason = waited.reason === "read-refused" ? `entry read refused: ${waited.refusal}` : waited.reason;
@@ -854,7 +866,8 @@ export function clone(ctx: Context, directory: string | undefined, options: { ho
     }
     const outcome = waited.outcome;
     const next = waited.next;
-    if (outcome.result !== "confirmed") return failed(`The host did not mint a read token: the outcome at ${scope}:${next - 1} is ${outcome.result}. Nothing was cloned.`);
+    if (outcome.result === "unknown") return failed(`The read-token mint at ${scope}:${seq} is unknown (outcome ${scope}:${next - 1}). The host may have minted a token; no automatic mint retry was made. Inspect artroom show ${scope}:${seq} and artroom log destination. No credential was retrieved and nothing was cloned.`);
+    if (outcome.result === "refused") return failed(`The host refused the read-token mint at ${scope}:${seq} (outcome ${scope}:${next - 1}). No credential was retrieved and nothing was cloned.`);
     const handle = (outcome.evidence.body as { token?: unknown }).token;
     if (typeof handle !== "string") return failed(`The outcome at ${scope}:${next - 1} names no token.`);
     // The token, once. The route answers it to this session's key only, and then no more.
