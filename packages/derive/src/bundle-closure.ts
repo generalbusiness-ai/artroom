@@ -37,7 +37,7 @@ export function verifyDeclaredBundleClosure(root: Digest, artifacts: readonly Bu
   return bundleAttempt(() => {
     checkBundleLimits(limits);
     if (artifacts.length > limits.artifacts) fail("limits", "artifacts");
-    const raw = new Map<ArtifactId, CheckedArtifact>(), ids = new Map<Digest, CheckedArtifact>();
+    const raw = new Map<ArtifactId, CheckedArtifact>(), typedIds = new Map<Digest, CheckedArtifact>();
     let bytes = 0, edgeCount = 0;
     const logicalSources = new Map<string, HistoricalContext>();
     for (let i = 0; i < artifacts.length; i++) {
@@ -59,22 +59,25 @@ export function verifyDeclaredBundleClosure(root: Digest, artifacts: readonly Bu
         catch { fail("content", `artifacts[${i}].encoding`); }
       }
       const checked = { ref, kind: item.kind, value, bytes: item.bytes };
-      raw.set(ref.digest, checked); ids.set(ref.digest, checked);
+      raw.set(ref.digest, checked);
       const domain = item.kind === null ? undefined : DOMAINS[item.kind];
       if (domain) {
         const id = semanticContentId(domain, value);
-        const prior = ids.get(id);
+        const prior = typedIds.get(id);
         if (prior && prior.ref.digest !== ref.digest) fail("conflict", `artifacts[${i}].id`);
-        ids.set(id, checked);
+        typedIds.set(id, checked);
       }
     }
-    const found = (id: Digest, kind?: BundleRecordKind): CheckedArtifact => {
-      const artifact = ids.get(id);
-      if (!artifact) fail("unavailable", "reference");
-      if (kind && artifact.kind !== kind) fail("closure", kind);
-      // Kind alone cannot substitute a raw record hash for its adopted typed ContentId.
-      const domain = kind === undefined ? undefined : DOMAINS[kind];
-      if (kind && id !== (domain ? semanticContentId(domain, artifact.value) : artifact.ref.digest)) fail("content", "reference.domain");
+    const found = (id: Digest, kind: BundleRecordKind): CheckedArtifact => {
+      const domain = DOMAINS[kind];
+      const artifact = (domain ? typedIds : raw).get(id);
+      if (!artifact) {
+        if (domain && raw.has(id)) fail("content", "reference.domain");
+        fail("unavailable", "reference");
+      }
+      if (artifact.kind !== kind) fail("closure", kind);
+      // Namespaces stay separate even when retained raw framing material shares a typed ID.
+      if (id !== (domain ? semanticContentId(domain, artifact.value) : artifact.ref.digest)) fail("content", "reference.domain");
       return artifact;
     };
     const rawFound = (id: ArtifactId, kind?: BundleRecordKind): CheckedArtifact => {
@@ -270,9 +273,12 @@ export function verifyDeclaredBundleClosure(root: Digest, artifacts: readonly Bu
       for (const child of edges(artifact)) visit(child, depth + 1);
       visiting.delete(artifact.ref.digest); visited.add(artifact.ref.digest);
     };
-    // Inspection roots intentionally accept a raw artifact ID or a typed ContentId.
-    // All semantic fields above use kind-specific framing; ArtifactRefs/raw IDs use rawFound.
-    const first = found(root);
+    // The unqualified inspection root accepts either namespace only when unambiguous.
+    // Distinct raw framing bytes may legitimately share a semantic record's typed ID.
+    const rawRoot = raw.get(root), typedRoot = typedIds.get(root);
+    if (rawRoot && typedRoot && rawRoot !== typedRoot) fail("conflict", "root.identity");
+    const first = typedRoot ?? rawRoot;
+    if (!first) fail("unavailable", "reference");
     visit(first, 0);
     const cyclic = new Set<ModuleId>();
     for (const id of visited) {

@@ -27,7 +27,7 @@ function fixture() {
     { id: "a.ts", source, imports: [{ specifier: "./b", target: { kind: "module", module: "b.ts" } }], exports: [{ name: "read", signature: "bytes" }] },
     { id: "b.ts", source, imports: [], exports: [] },
   ], components: [{ role: "bytes", root: { module: "a.ts", name: "read", signature: "bytes" }, closure: ["a.ts", "b.ts"] }], definitions: [], capabilities: [], profiles: [], bounds: { format: "artroom-semantic-bounds-1", schema: opaque, values: opaque, applies: "historical-admission" }, domains, build, executable, buildEvidence: { class: "missing", missing: { reason: "not-produced", subject: "original fixture", handoff: "71b6dde2dc9059659f8fb1b606f85f13162232ce" } } };
-  const finish = () => { record("SemanticBundleManifest", manifest); return { root: semanticContentId("artroom-semantic-bundle-1", manifest), artifacts, opaque, abi }; };
+  const finish = () => { record("SemanticBundleManifest", manifest); return { root: semanticContentId("artroom-semantic-bundle-1", manifest), artifacts, opaque, abi, manifest }; };
   return { artifacts, manifest, finish };
 }
 
@@ -95,6 +95,16 @@ test("canonical bytes/closed fields precede content claims; explicit preparse bo
   const aliased = { ...anchor, first: { ...anchor.first, bindingSet: setRef.digest } };
   const aliasedRef = add("TrustAnchor", aliased);
   expect(verifyDeclaredBundleClosure(aliasedRef.digest, original.artifacts, limits)).toMatchObject({ ok: false, reason: "content", path: "reference.domain" });
+  // No hash collision is needed: exact framing bytes have a raw digest equal
+  // to the manifest's typed ID. Retention and typed edges remain valid, while
+  // the unqualified ambiguous root refuses in either insertion order.
+  const framing = semanticContentBytes("artroom-semantic-bundle-1", original.manifest);
+  expect(digestBytes(framing)).toBe(original.root);
+  const framedRaw: BundleArtifact = { ref: canonicalBytes({ digest: digestBytes(framing), bytes: framing.length, encoding: "raw" }), bytes: framing, kind: null };
+  for (const artifacts of [[...original.artifacts, framedRaw], [framedRaw, ...original.artifacts]]) {
+    expect(verifyDeclaredBundleClosure(pinRef.digest, artifacts, limits)).toMatchObject({ ok: true });
+    expect(verifyDeclaredBundleClosure(original.root, artifacts, limits)).toMatchObject({ ok: false, reason: "conflict", path: "root.identity" });
+  }
 });
 
 test("founding failures retain exact intended target; recorded refusal remains an existing full reference and cannot become applied/unborn by shape", () => {
