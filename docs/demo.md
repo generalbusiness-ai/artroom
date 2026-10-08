@@ -2,7 +2,8 @@
 
 The demo runner plays the middle of the demo script
 (`notes/2026-10-07-demo-script-draft.md`) against a deployment, as three
-people on three devices, and writes down what each command printed. The
+people with three fresh config contexts on one system, and writes down
+what each command printed. It does not verify hardware identity. The
 captures script then takes pictures of the room's page. Run both the
 evening before a recording, and again on the morning of it.
 

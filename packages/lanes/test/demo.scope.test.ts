@@ -146,6 +146,10 @@ function testStage(at: Stand, wired: Set<ScopeId>): { stage: Stage; people: Part
   const clones = new Map<string, string>();
   const git: Git = {
     run: async (args, given) => {
+      if (args.length === 1 && args[0] === "--version") {
+        expect(given).toEqual({});
+        return 0;
+      }
       if (args[0] !== "clone") return 1;
       const [remote, directory] = args.slice(-2) as [string, string];
       const header = (given["GIT_CONFIG_VALUE_0"] ?? "").replace(/^Authorization: /, "");
@@ -164,7 +168,12 @@ function testStage(at: Stand, wired: Set<ScopeId>): { stage: Stage; people: Part
   const people: Partial<Record<Person, Context>> = {};
   const stage: Stage = {
     service: SERVICE, host: at.host, namespace: at.namespace, name: "demo",
-    person: (who) => (people[who] = { store: memoryStore(), fetch, now, pause, git, read: async (path) => FILES[path] ?? null }),
+    person: (who) => {
+      // The injected transport is this real test Worker at SERVICE, not an
+      // arbitrary callback asserted to prove a service's historical source.
+      const context = { store: memoryStore(), fetch, trustedFoundingService: { service: SERVICE, fetch }, now, pause, git, read: async (path: string) => FILES[path] ?? null };
+      return (people[who] = context);
+    },
     pin: async (planned) => {
       register = planned as ScopeId;
       wire(register);
@@ -262,6 +271,6 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
     const ctx = await stage.person(who);
     return { ...ctx, store: { ...ctx.store, save: async (saved) => { saves++; await ctx.store.save(saved.plan ? { ...saved, plan: { ...saved.plan, register: config.repository!.directory.scope } } : saved); } } };
   } });
-  expect([pins, saves, stopped.ok, stopped.shots[0]!.why, stopped.shots.slice(1).every((shot) => shot.code === -1)]).toEqual([0, 1, false, "captured scope identity is missing or inconsistent", true]);
+  expect([pins, saves, stopped.ok, stopped.shots[0]!.why, stopped.shots.slice(1).every((shot) => shot.code === -1)]).toEqual([0, 1, false, "planned install identity is missing or inconsistent", true]);
   await drained();
 }

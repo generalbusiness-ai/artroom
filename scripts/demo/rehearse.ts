@@ -11,12 +11,12 @@
  * one, and nothing else that it prints holds a secret (a read token is never printed by `artroom clone`; a key is printed by its ID).
  */
 
-import { canonicalize, isScopeId, utf8 } from "@generalbusiness/artroom-bytes";
+import { canonicalize, intentDigest, isPlatformDefinition, isReceipt, isScopeId, isScopeRef, isSignedIntentShape, keyIdOfSecret, platformName, scopeIdOf, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import { command, type Context, type Outcome } from "@generalbusiness/artroom-cli";
 import { DEMO_DIGESTS, changeDemo, issueDemo } from "@generalbusiness/artroom-lanes";
-import { firstExtents } from "@generalbusiness/artroom-platform";
+import { firstExtents, platform } from "@generalbusiness/artroom-platform";
 
-/** The three people of the script, each on a device of their own: a fresh config directory. */
+/** The three people of the script, each with a fresh config directory. Hardware identity is not verified. */
 export type Person = "founder" | "member" | "maintainer";
 export const HANDLES: Readonly<Record<Person, string>> = { founder: "@hugh", member: "@una", maintainer: "@paul" };
 
@@ -111,6 +111,7 @@ interface Shot {
 
 const slash = (service: string) => service.replace(/\/+$/, "");
 const bytes = (name: string) => FILES[name]!.length;
+export const INSTALL_ACKNOWLEDGEMENT = "Service-acknowledged identity recovery. The original plan and receipt are retained for later history verification.";
 
 /**
  * The shots. An expected line is a template: `<name>` stands for any text without a space and keeps it under that name,
@@ -134,7 +135,7 @@ function shots(stage: Stage): Shot[] {
     {
       title: "Install as planned", scene: "3", who: "founder",
       typed: () => ["artroom", "install", "--planned"],
-      expect: { code: 0, lines: () => ["Installed: register {register}, under {registerDefinition}, as planned.", "The operator key <operatorKey> is kept in the config directory, readable only by you. It is the one founder key."] },
+      expect: { code: 0, lines: () => ["Installed: register {register}, under {registerDefinition}, as planned.", INSTALL_ACKNOWLEDGEMENT] },
     },
     {
       title: "Claim the room", scene: "3", who: "founder",
@@ -339,6 +340,36 @@ function seen(page: Fetched, shows: string | null): Outcome {
   };
 }
 
+/** Local correspondence to the plan produced by the reviewed command. A
+ * retained acknowledgement is configured-service evidence, not independent
+ * genesis proof or permission for later operations. */
+export async function plannedOperator(ctx: Context, stage: Pick<Stage, "service" | "host" | "namespace">, register: string, definition: string, installed: boolean): Promise<string | null> {
+  const config = await ctx.store.config();
+  const raw = config?.plan as unknown;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const plan = raw as Record<string, unknown>;
+  const founding = plan["founding"];
+  if (!config || config.key !== "operator" || config.service !== stage.service || plan["service"] !== stage.service
+    || plan["register"] !== register || !isScopeId(register) || plan["definition"] !== definition
+    || !isPlatformDefinition(definition) || platformName(definition) !== "platform:register" || platform(definition) === null
+    || !isSignedIntentShape(founding) || !verifySignedIntent(founding) || founding.intent.kind !== "install" || founding.intent.to !== null
+    || founding.intent.on !== null || Object.keys(founding.intent.expected).length !== 0
+    || founding.intent.fields["host"] !== stage.host || founding.intent.fields["namespace"] !== stage.namespace
+    || scopeIdOf({ v: 1, kind: "register", definition, creator: null, cause: intentDigest(founding.intent), ordinal: 0 }) !== register) return null;
+  const secret = await ctx.store.secret(config.key);
+  if (!(secret instanceof Uint8Array) || secret.length !== 32 || keyIdOfSecret(secret) !== founding.intent.actor) return null;
+  if (installed) {
+    const rawAcknowledgement = plan["acknowledged"];
+    if (!rawAcknowledgement || typeof rawAcknowledgement !== "object" || Array.isArray(rawAcknowledgement)) return null;
+    const acknowledgement = rawAcknowledgement as Record<string, unknown>;
+    const receipt = acknowledgement["receipt"];
+    if (acknowledgement["status"] !== "service-acknowledged" || acknowledgement["service"] !== stage.service || !isReceipt(receipt)
+      || receipt.definition !== definition || receipt.intent !== intentDigest(founding.intent) || receipt.fact.at.scope !== register
+      || receipt.fact.at.kind !== "register" || receipt.fact.seq !== 0 || !isScopeRef(config.register) || canonicalize(config.register) !== canonicalize(receipt.fact.at)) return null;
+  }
+  return founding.intent.actor;
+}
+
 /** Runs every shot in order, each as the person it names, and keeps going after a shot that does not match while it can. */
 export async function rehearse(stage: Stage): Promise<Rehearsal> {
   const now = () => (stage.now ? stage.now() : Date.now());
@@ -369,6 +400,13 @@ export async function rehearse(stage: Stage): Promise<Rehearsal> {
     else if (words[0] === "git") outcome = await stage.log(words[2]!);
     else outcome = await command(await personOf(shot.who), words.slice(1));
     let why = judged(expected, outcome, v);
+    if (i === 0 || i === 1) {
+      const key = why === null ? await plannedOperator(await personOf(shot.who), stage, v["register"]!, v["registerDefinition"]!, i === 1) : null;
+      if (key === null || (v["operatorKey"] !== undefined && v["operatorKey"] !== key)) {
+        identityStop = "planned install identity is missing or inconsistent";
+        why ??= identityStop;
+      } else v["operatorKey"] = key;
+    }
     // Ordinary output mismatches remain diagnostic and may continue. A newly
     // captured scope identity cannot drive another person's command or hook
     // when the producer did not return the complete expected result.
