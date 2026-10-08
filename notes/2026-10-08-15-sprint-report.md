@@ -5,7 +5,9 @@ Each one ends with a report on main that tells a user's story about
 capability that is on main and works, and says what did not land. This
 report covers 07:00 to 15:00 on 2026-10-08 Eastern. The previous report
 landed as `81f88b9f` at 07:05 and was updated as `44684123` at 07:10
-with the re-cut commitments. Main at the boundary is `44684123`.
+with the re-cut commitments. Main at the boundary is `44684123`; the
+candidate landed as `7bb3a641` at 15:30, and this report was updated at
+15:40 to say so.
 
 Everything marked "observed run" was run for this report on the shared
 machine, Node v26.10.0, from the planner's worktrees at the heads named;
@@ -15,12 +17,16 @@ clocks. Workroom states are the planner's account, not in git.
 
 ## Summary
 
-Nothing landed on main this sprint. The sprint was given to one thing,
-on hugh's direction at 07:00: no cloud sessions, and the work in flight
-lands on main as one expanded candidate. That candidate was built,
-filed three times and reviewed twice, and at the boundary its third
-head is under the checker's targeted review, with the planner's gate
-passed and the head deployed. The landing is the first act of sprint 13.
+Nothing landed on main before the boundary, and the one thing the
+sprint was given to landed thirty minutes after it. Hugh's direction at
+07:00: no cloud sessions, and the work in flight lands on main as one
+expanded candidate. That candidate was built, filed three times and
+reviewed twice; the checker approved its third head `5b42dc69` at
+14:45, builder's landing merged it locally at 14:59 and the push to
+origin was verified at 15:30 as `7bb3a641` (git diff stat from the
+report commit: 187 files, 23,466 insertions, 604 deletions). The
+planner's gate had passed on that exact head and it has been the live
+deployment since 14:36.
 
 What the candidate carries, measured from main `44684123` to its head
 `5b42dc69` (git diff stat): 187 files, 23,466 insertions and 604
@@ -45,6 +51,8 @@ link result, and the eight corrections from today's two reviews.
 | 13:40 | Planner decides both (assert `a049e753`); the planner's own gate on `05d6df00` passes |
 | 14:33 | Builder files the third head `5b42dc69`; checker undertakes the targeted review |
 | 14:36 | The planner's gate on `5b42dc69` passes and the head is deployed |
+| 14:45 | Checker approves `5b42dc69` (`c73f1d33`): the two residues corrected, no new blocking finding |
+| 14:59 | Builder's landing merges it on local main as `7bb3a641`; the push is verified on origin at 15:30, receipt `21faa2b5` |
 
 **Observed runs**, planner's worktree:
 
@@ -68,17 +76,21 @@ Current Version ID: ed97eb81-4154-4dca-b812-03b68b17402c
 GET /v0/scopes/nonesuch/summary -> 404 0.19s
 ```
 
-## What a user can do on main today
+## What a user can do on main now
 
-Unchanged since the 07:00 report: main holds gate 1 (`cf4e41e2`), so
-a founder can install a register on the deployed Worker, claim a
-repository on the hosting's own Git service or on GitHub, invite a
-member, and have the member join, act and verify; the lanes run on the
-real rules scope and destination. The member's path, the edit scene,
-the issue scene, the published site and the demo runner are on the
-candidate, deployed, and were rehearsed live yesterday (all 26 shots of
-the demo runner matching, in the 23:00 report); none of it is on main
-until the candidate lands.
+Before 15:30, unchanged since the 07:00 report: main held gate 1
+(`cf4e41e2`), so a founder could install a register on the deployed
+Worker, claim a repository on the hosting's own Git service or on
+GitHub, invite a member, and have the member join, act and verify, with
+the lanes on the real rules scope and destination. Since `7bb3a641`
+main also holds the member's path with `artroom edit` and `merge`, the
+issue commands, the planned install that removes the two-minute wait,
+the clone with a read token, definition versions, the story page, the
+published site with navigation, and the demo runner with captures. All
+of it was rehearsed live yesterday from the same source (all 26 shots of
+the demo runner matching, in the 23:00 report); the planner reruns the
+member, edit and issue scenes against main's own head in sprint 13 and
+the 23:00 report tells that story with captures.
 
 ```mermaid
 flowchart LR
@@ -87,7 +99,7 @@ flowchart LR
   R1 -->|12:57 filed 05d6df00| C2["checker review 2<br/>13:34: two items"]
   C2 -->|13:40 decided| R2["two repairs"]
   R2 -->|14:33 filed 5b42dc69| C3["checker review 3<br/>in progress at 15:00"]
-  C3 -.->|approval| L["builder lands on main<br/>first act of sprint 13"]
+  C3 -->|14:45 approved| L["builder lands on main<br/>7bb3a641, pushed 15:30"]
   P["planner gates: 39eda03e, 05d6df00, 5b42dc69<br/>deployed: 39eda03e, 5b42dc69"] --- R1
 ```
 
@@ -107,14 +119,14 @@ flowchart LR
 
 ## What did not land and why
 
-- **The expanded candidate.** Three filings and two full review
-  rounds in eight hours: each review took 70 to 80 minutes and each
-  repair round 60 to 90 minutes, so the third review ran into the
-  boundary. The reviews found real regressions (the first definition
-  version had lost value places that gate 1 shipped; the site served a
-  repository by name without checking its recorded identity), which is
-  what the one-review rule is for. The candidate is gated by the planner
-  and deployed; it lands when the targeted review returns.
+- **The expanded candidate, within the sprint.** Three filings and two
+  full review rounds in eight hours: each review took 70 to 80 minutes
+  and each repair round 60 to 90 minutes, so the third review ran
+  thirty minutes past the boundary. The reviews found real regressions
+  (the first definition version had lost value places that gate 1
+  shipped; the site served a repository by name without checking its
+  recorded identity), which is what the one-review rule is for. It
+  landed at 15:30 as `7bb3a641`.
 - **The demo script correction** (planner) was not done; the planner's
   hours went to gate runs, decisions and localizing the morning's crash.
 - **Hugh's review** of the demo script draft and the rehearsal captures
@@ -124,9 +136,9 @@ flowchart LR
 
 ## Limits a user will meet
 
-- Main has the founder's path and the lanes, but not the member's edit
-  and issue commands, the published site or the page; those are on the
-  deployment from the candidate's head only.
+- Main's new commands and site were rehearsed from the candidate's
+  source, not yet from main's own head; the rerun is sprint 13's first
+  planner act.
 - The site publishes every ref of the backing repository under the
   deployment's authority, by design and as documented; selected
   publication is owed under its own record.
@@ -138,12 +150,11 @@ flowchart LR
 
 Recorded in the workroom under the cadence act `c514748f`.
 
-- **Builder.** Land `5b42dc69` on main the moment the targeted review
-  approves it, and say the main commit in the cadence thread. Then, in
+- **Builder.** `5b42dc69` is landed (`7bb3a641`, 15:30). Then, in
   order: land the jam repository's rockstar lead and mood branch
   (`5f0c458`); file plan 027 as a document-only landing; the manifest
   tree for one-file required checks. Nothing else; no new preparation.
-- **Checker.** The targeted review of `5b42dc69`; then the jam branch.
+- **Checker.** The jam branch when filed; plan 027 as a document.
 - **Planner.** Re-run the member's path, the edit scene and the issue
   scene live against main once it lands, with captures for hugh; correct
   the demo script to the observed lines; hourly surveys; the 23:00
@@ -152,5 +163,5 @@ Recorded in the workroom under the cadence act `c514748f`.
   `~/tmp/artroom-rehearsal-1`; say whether the usability plan's
   direction should enter the demo before the 12th.
 - **23:00 report.** The member's path, the edit scene and the issue
-  scene as observed on main; otherwise the landing's state.
+  scene as observed on main's own head, with captures.
 - **No cloud sessions** unless hugh says so.
