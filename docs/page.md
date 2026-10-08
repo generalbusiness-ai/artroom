@@ -94,7 +94,7 @@ membership.
 Every screen shows who the page acts as: the member's handle and role, or
 that the key is no active member's.
 
-**What you may do here.** Under each issue, change and the rules, the page
+**What you may do here.** Under the room, each issue, each change and the rules, the page
 lists the acts of that scope's definition that the signed-in member may
 sign now: each act whose grant action the member's role holds, and each act
 that a rule decides. It computes this the way `artroom acts` does, with the

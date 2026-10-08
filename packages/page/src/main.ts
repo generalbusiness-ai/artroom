@@ -4,7 +4,7 @@
  *
  * | Address | Screen |
  * |---|---|
- * | `#/` | The room's issues and changes. |
+ * | `#/` | The room's issues and changes, and the acts the caller may sign on the directory (opening an issue or a change). |
  * | `#/issue/<scope>` | One issue, and the acts the caller may sign on it. |
  * | `#/change/<scope>` | One change, with its states, and the acts the caller may sign on it. |
  * | `#/rules` | The rules of this room, and the acts the caller may sign on the rules scope. |
@@ -147,7 +147,7 @@ async function draw(): Promise<void> {
     if (kind === "issue" && scope) return show(issueScreen(room, await loadIssue(room, scope as ScopeId)), await panelFor(room, scope as ScopeId));
     if (kind === "change" && scope) return show(changeScreen(room, await loadChange(room, scope as ScopeId), last(scope)), await panelFor(room, scope as ScopeId));
     if (kind === "rules") return show(rulesScreen(room, await loadRules(room)), await panelFor(room, room.rules));
-    return show(roomScreen(room, await listLanes(room)));
+    return show(roomScreen(room, await listLanes(room)), await panelFor(room, room.directory));
   } catch (error) {
     show(failure(error));
   }
