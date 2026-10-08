@@ -1,0 +1,72 @@
+{
+  "purpose": "Delivery metadata, not authority, readiness or independent Source approval",
+  "gate": {
+    "head": "39eda03ec4e8d55d901526d809b8bcf3e9d58122",
+    "tree": "4a450bfe0d3fe31f30694dc8579d8ce35b82bb54",
+    "reported_exit": 0,
+    "vitest_passed": 842,
+    "opt_in_recorders_skipped": 2,
+    "active_source_passed": 6,
+    "runtime_diagnostic": "Uncaught cross-Durable-Object RefcountedCanceler exception in Vitest timeout cancellation; no affected task identified; assessment required before landing"
+  },
+  "evidence_head_before_this_note": "5e89ecf6f1eff174e75d84ee0091510f9cafe27b",
+  "package_tree": "700a60b7106ea70b15842e07ffff0bc31c824ed7",
+  "gated_package_tree": "700a60b7106ea70b15842e07ffff0bc31c824ed7",
+  "changes_since_gate_before_this_note": [
+    "notes/2026-10-08-expanded-i5-delivery.md"
+  ],
+  "records": [
+    {
+      "path": "/tmp/artroom-expanded-corrected-gate.log",
+      "bytes": 503,
+      "sha256": "6cf6aa626a251528b275632605858ec7d01efe2d9d53190997651a84ae5a1a9a"
+    },
+    {
+      "path": "/tmp/artroom-expanded-final-gate.log",
+      "bytes": 2855,
+      "sha256": "d0619857419be5ff028ee7b905081f5ac59e63108dfb1094de7732c6b44571f0"
+    },
+    {
+      "path": "/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.xVtOoQ6ngJ/whitespace.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.xVtOoQ6ngJ/typecheck.log",
+      "bytes": 1510,
+      "sha256": "b05ed3728460487c42438640e0ac5e1f38c1944c2c38137be5294ffcecabf447"
+    },
+    {
+      "path": "/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.xVtOoQ6ngJ/test.log",
+      "bytes": 2071,
+      "sha256": "c8a62477987177728eab2c02b8c227f06090c550f2629b705888ae723de44d18"
+    },
+    {
+      "path": "/tmp/artroom-operations-runtime-isolation-evidence.json",
+      "bytes": 15339,
+      "sha256": "3ebc28466c34de0932e16a5211d03e61c3bcf7633f487b51e8968341168103b7"
+    },
+    {
+      "path": "/tmp/artroom-native-stack-capture/evidence.json",
+      "bytes": 6470,
+      "sha256": "d321421e686362fe6339a35b05932fa43129fd77be910f31ae836b0dc4d54b7f"
+    },
+    {
+      "path": "/tmp/artroom-expanded-reacceptance-evidence.json",
+      "bytes": 3214,
+      "sha256": "38add56bb09c96e1be2d42dab19aadf098895df22d60f3d35159979268586d94"
+    },
+    {
+      "path": "/tmp/artroom-expanded-demo-contract-evidence.json",
+      "bytes": 3717,
+      "sha256": "a2a67f80ae0c7b68590aea11aac17f3e63f18fbdfa04698ae98412edd11a8ffe"
+    }
+  ],
+  "limits": [
+    "Original failed gate retained",
+    "Native unsafe-abort interaction isolated, not fixed or mixed-cohort/physical-drain proof",
+    "Default test timeouts and all invariant assertions retained",
+    "No provider/browser/cloud run or historical admission/source proof",
+    "Normal complete exact-head Source review and requester judgment still required"
+  ]
+}
