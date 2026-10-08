@@ -324,3 +324,48 @@ changed no package or lock file. The gate and independent review of the
 reconciled delivery remain owed, in the existing filing order after the
 story page. If a later authorized gate still fails T39, capture its actual
 extra input/source and outbox before attributing that failure to this cause.
+
+## 8. Complete discovery before verify --all
+
+2026-10-08, same request and preparation branch, after T39 repair
+`332428fc937eb8c022f0704cf88e39e443b12d36`. Read-only intake found that
+`roomScopes` stopped after 1,000 history pages even if its last reply named
+another cursor. It returned the scopes found so far to `verifyAll`, which
+could report `All consistent` without discovering later creations. The
+runtime allows 100,000 entries and pages are bounded by bytes as well as
+entry count, so 1,000 pages is not proof of complete history coverage.
+
+The command now exits 1 with an explicit `Incomplete` discovery finding,
+the exact scope and final next cursor. It never starts whole-room replay
+from that partial discovery. No resume feature is claimed. The default
+bound remains 1,000 pages per scope; `Context.historyPages` allows a caller
+or test to choose a positive integer bound. Existing typed, signed reads,
+scope identity handling and child discovery remain unchanged. No provider
+or runtime policy changed. `docs/cli.md` now names this refusal.
+
+Invariant: when room creation discovery reaches its page bound with a cursor
+left, `verify --all` cannot report a whole-room result. The cheap witness is
+`packages/cli/test/verify.test.ts`: the real command and typed signed-read
+HTTP transport receive a stand-in service's summary and hand-made history
+entries. No scope judged those entries. With small bounds of one and two
+pages, it checks the exact refusal and final cursor, including following
+the first cursor before reaching the second. This proves discovery coverage,
+not scope admission, read authorization or history consistency.
+
+One focused control replaced only `if (pages + 1 === pageLimit)` with
+`if (false)`. The unchanged witness failed by its outcome assertion: the
+command wrongly proceeded to replay the partial discovered set instead of
+refusing discovery and retaining its final cursor. `scripts/control.mjs`
+reported **DISTINGUISHES** and restored the source. The stand-in deliberately
+offers no replay endpoint; this control demonstrates the wrong boundary
+crossing, not a claim that this particular scripted history replays
+consistent. There was no sweep or whole-suite repetition.
+
+Validation: the new Node witness passed. CLI typecheck first found an
+index-signature property access in the new test, corrected to bracket
+access; the CLI source, Node-test and scope-test typechecks then passed.
+After that correction one focused run of the Node witness and the existing
+real issues journey passed both tests (4.13 s). That existing journey still
+reports all twelve discovered room scopes consistent at the unchanged
+default bound. No gate, provider operation, deployment or landing ran;
+the reconciled delivery still owes its gate and independent review.

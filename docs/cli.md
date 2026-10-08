@@ -177,6 +177,11 @@ inbox sc_3a6xxtoj..., entry 1: consistent.
 All consistent: 12 scopes.
 ```
 
+Discovery reads at most 1,000 history pages per scope. If another page is
+still named at that bound, the command exits 1 with `Incomplete`, the
+scope and its next history cursor. It does not verify a shortened list or
+print `All consistent` for the whole room.
+
 **`artroom remote`** prints the repository's host, namespace, name and
 remote URL, from the destination's branch item. On GitHub the URL is
 `https://github.com/<namespace>/<name>.git`. On the hosting's own Git

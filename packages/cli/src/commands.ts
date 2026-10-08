@@ -53,6 +53,8 @@ export interface Context {
   pause?: (waiting: readonly ScopeId[]) => Promise<void>;
   /** How many reads a wait makes before it gives up. The default is 120. */
   tries?: number;
+  /** History pages per scope while discovering the room for `verify --all`. The default is 1,000. */
+  historyPages?: number;
   /** The `git` program, for `clone`. `main.ts` gives Node's (`git.ts`); a test gives a stand-in. Absent: there is none. */
   git?: Git;
   /** A local file's bytes, for `edit --file` and `act --value`, or null when it cannot be read. `main.ts` gives Node's; a test gives its own. */
@@ -647,6 +649,8 @@ export function verify(ctx: Context, named: string | undefined, options: { all?:
  * are other rooms', and are not followed.
  */
 async function roomScopes(ctx: Context, config: Config, reader: string | null): Promise<{ kind: string; scope: ScopeId }[]> {
+  const pageLimit = ctx.historyPages ?? 1000;
+  if (!Number.isSafeInteger(pageLimit) || pageLimit < 1) return stop(usage("The room history page limit must be a positive integer."));
   const directory = config.repository!.directory.scope;
   const D = await handleOf(ctx, config, directory, reader);
   const register = ((await summaryOf(D)).items.find((item) => item.type === "repository")?.refs["register"] as ScopeRef | undefined)?.scope;
@@ -654,7 +658,7 @@ async function roomScopes(ctx: Context, config: Config, reader: string | null): 
   // From the directory on: each scope found is read in turn, and what its history creates is added at the end.
   for (let i = found.length - 1; i < found.length; i++) {
     const handle = await handleOf(ctx, config, found[i]!.scope, reader);
-    for (let cursor: string | undefined, pages = 0; pages < 1000; pages++) {
+    for (let cursor: string | undefined, pages = 0; pages < pageLimit; pages++) {
       const page = await handle.history(cursor);
       if (!page.ok) return stop(failed(`Cannot read the history of ${handle.scope}: ${page.reason}.`));
       for (const { entry } of page.value) {
@@ -666,6 +670,7 @@ async function roomScopes(ctx: Context, config: Config, reader: string | null): 
         }
       }
       if (page.next === undefined) break;
+      if (pages + 1 === pageLimit) return stop(failed(`Incomplete: room discovery for ${handle.scope} reached ${pageLimit} history pages; next cursor ${JSON.stringify(page.next)}. The whole room was not verified.`));
       cursor = page.next;
     }
   }
