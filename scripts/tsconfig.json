@@ -1,0 +1,11 @@
+{
+  // The demo runner and its captures run under Node; the captures' page functions run in the browser that Playwright drives.
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "..",
+    "lib": ["ES2022", "ESNext.Disposable", "DOM"],
+    "types": ["node"],
+    "skipLibCheck": true
+  },
+  "include": ["demo-run.ts", "demo-captures.ts", "demo"]
+}
