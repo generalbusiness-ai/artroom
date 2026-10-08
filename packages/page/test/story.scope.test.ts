@@ -1,139 +1,137 @@
 import { expect, test } from "vitest";
-import type { MemberRef } from "@generalbusiness/artroom-contract";
-import { timeMs } from "@generalbusiness/artroom-bytes";
-import type { Fetch } from "@generalbusiness/artroom-client";
-import { firstExtents } from "@generalbusiness/artroom-platform";
+import { timeMs, timeOf } from "@generalbusiness/artroom-bytes";
 import { net } from "@generalbusiness/artroom-scope/testing";
-import { DEMO_DIGESTS, changeDemo, issueDemo } from "@generalbusiness/artroom-lanes";
-import { paul, proposed, rita, room, routed, una } from "../../lanes/test/support/room.ts";
-import { act, actsOn, changeStates, listLanes, loadChange, loadIssue, loadRules, openRoom, type Session } from "../src/index.ts";
+import { platformNet } from "@generalbusiness/artroom-scope/testing/worker";
+import { DEMO_DIGESTS } from "@generalbusiness/artroom-lanes";
+import { act, actsOn, changeStates, joinRoom, listLanes, loadChange, loadIssue, loadRules, loadSite, openRoom, placeOf, siteAddress, Unreadable } from "../src/index.ts";
+import { SERVICE, demo } from "./support/demo.ts";
 
-const SERVICE = "https://scopes.test";
-
-// Invariant: the page's own data functions, over the Worker's HTTP routes and a member's key, show plan 019's story as the room
-// records it: the issue with its comment, assignment and state; the change with its reviews by extent, its merges and the
-// destination's publication; the acts each member may sign now, from the definition and their role; an act that takes effect,
-// and a refusal shown by its reason with the head unmoved; and plan 016's states of the change as the story reaches them.
+// Invariant: the page's own data functions, over the deployed Worker's routes and a member's key, open a room with a read session
+// from membership (or signed reads where membership gives none), and show what the room records: the issue it opened with a
+// definition's bytes beside the act; a one-file change that `artroom edit` proposed, with its path, digest and size, merged and
+// published, and the published file read back through the site route; a controlled-extent change that waits, with the
+// destination's refusal by name and plan 016's state; an act refused by its guard's name with the head unmoved; the acts each
+// member may sign now; and the rules. A key that is no member's reads nothing.
 //
-// The room is the lanes package's `room()` on the demo profile, as in `packages/lanes/test/story.scope.test.ts`: real platform
-// scopes under the deployed class and the production authority, lanes created by the real directory, grants read from the real
-// membership scope. Every read and act of the page goes through `routed`, the Worker's HTTP routes, called in the test's isolate.
-//
-// | Part | Is |
-// |---|---|
-// | The page's reads and acts | Real: `src/data.ts`, over the client's HTTP transport. No DOM. |
-// | The setup the page cannot do | The fixture: the founding, the rules, the two activations, filing the issue and opening the change with its version (a hold under the stand-in host). The directory refuses `open-issue` from a client that sends no definition bytes. |
-// | The Git host | A STAND-IN: `OutsideDouble` for the destination, `Host` for each lane. No repository exists. |
-// | The changed set of a publication | SCRIPTED: `Room.changes`. |
-// | The scheduler | The fixture's `publish`, which drives the destination's dispatchers and answers each host request. |
-// | The readers | The test readers, which let every reader read: membership gives no read session here, and the page reads without one. |
-test("the page's data functions on the demo story: the issue, the change, the acts each member may sign, an act that takes effect, a refusal by its reason with nothing written, and the states of the change from waiting for a reviewer to publication confirmed (STAND-IN: the Git host; SCRIPTED: the changed set)", async () => {
-  const r = await room();
-  expect(await r.publishRules({ approvals: 1, ownerMayReview: false, checks: [], labels: [], extents: firstExtents({ approvals: 1, checks: [] }) })).toMatchObject({ answer: "accepted" });
-  await r.activate(issueDemo, DEMO_DIGESTS.issue);
-  await r.activate(changeDemo, DEMO_DIGESTS.change);
-  const I = await r.lane(rita, "open-issue", issueDemo, DEMO_DIGESTS.issue, { title: "The parser drops comments", conditions: ["comments survive a round trip"] });
+// The room is `support/demo.ts`: founded by the command line on real scopes, real read sessions under a TEST SECRET, the site
+// route, and a STAND-IN Git host (`OwnGit`, under the production wiring of the hosting own Git service). The scheduler is a
+// STAND-IN that the test drives (`pause`). No DOM.
+test("the page's data functions against the Worker's routes as deployed: join with a link and a session from membership; signed reads where no session is given; open an issue with the definition's bytes; an edited README merged, published and read back from the site; AGENTS.md waiting for the controller, refused by name, then published; a refusal by guard name with nothing written; the acts by role; the rules (STAND-IN: the Git host and the scheduler)", async () => {
+  const d = await demo();
+  try {
+    const [ritas, pauls] = [await d.secretOf(d.rita), await d.secretOf(d.paul)];
+    const place = placeOf(JSON.stringify(d.config))!;
+    expect(place).toEqual({ directory: d.D.name, membership: d.config.repository!.membership });
+    expect(placeOf(d.link)).toEqual(place);
+    expect(placeOf("not a room")).toBeNull();
 
-  const fetch = ((url: string, init?: RequestInit) => routed(url, init)) as unknown as Fetch;
-  const as = (who: { secret: Uint8Array }): Session => ({ service: SERVICE, secret: who.secret, fetch, now: () => timeMs(net.clock.now)! });
-  const member = async (handle: string): Promise<MemberRef> => r.member(handle);
+    // A key that is no member's: membership refuses it a session, its signed read of the directory is refused, and nothing is read.
+    const stranger = crypto.getRandomValues(new Uint8Array(32));
+    await expect(openRoom(d.as(stranger), place)).rejects.toThrow(new Unreadable(`Cannot read ${d.D.name}: forbidden.`));
 
-  // Opening the room: the directory names membership, the rules scope and the destination; the caller's standing is read.
-  const forPaul = await openRoom(as(paul), r.D.name);
-  expect([forPaul.membership.scope, forPaul.rules, forPaul.destination, forPaul.me?.handle, forPaul.me?.role]).toEqual([r.M.name, r.rules.name, r.G.name, "@paul", "member"]);
-  const forRita = await openRoom(as(rita), r.D.name);
-  const forUna = await openRoom(as(una), r.D.name);
-  expect(forRita.me?.role).toBe("admin");
+    // una signs in on the page: a new key, enrolled by membership's `join` with the invitation link; then a session from membership.
+    const unas = crypto.getRandomValues(new Uint8Array(32));
+    const joined = await joinRoom(d.as(unas), d.link);
+    expect([joined.answer.answer, joined.place]).toEqual(["accepted", place]);
+    const forUna = await openRoom(d.as(unas), place);
+    expect([forUna.me?.handle, forUna.me?.role, forUna.reader !== null, forUna.rules, forUna.destination]).toEqual(["@una", "member", true, d.rules.name, d.G.name]);
+    // A second join with the same link is refused by membership, by name, and writes nothing.
+    const again = await joinRoom(d.as(crypto.getRandomValues(new Uint8Array(32))), d.link);
+    expect(again.answer.answer).toBe("refused");
 
-  // The room's issues: the directory's index row, with the lane's own state.
-  expect((await listLanes(forPaul)).issues).toEqual([{ scope: I.name, number: 1, kind: "issue", title: "The parser drops comments", state: "open", draft: null }]);
+    // With no session secret, membership gives no session, and the page reads by signed reads: rita's key signed acts of the rules
+    // scope and her claim caused the directory, within the window, so she reads; una's key signed none of the directory, so her read
+    // of it is refused.
+    const secret = platformNet.secret;
+    platformNet.secret = null;
+    try {
+      const signed = await openRoom(d.as(ritas), place);
+      expect([signed.reader, signed.unsessioned, signed.me?.handle]).toEqual([null, "sessions-unavailable", "@rita"]);
+      expect((await loadRules(signed)).definitions.map((x) => x.name)).toEqual(["issue", "change"]);
+      await expect(openRoom(d.as(unas), place)).rejects.toThrow(new Unreadable(`Cannot read ${d.D.name}: forbidden.`));
+    } finally {
+      platformNet.secret = secret;
+    }
 
-  // The acts on the issue come from its definition and the caller's role: a member may comment and may not assign.
-  const paulsOnIssue = (await actsOn(forPaul, I.name)).acts.map((a) => a.kind);
-  expect(paulsOnIssue).toContain("comment");
-  expect(paulsOnIssue).not.toContain("assign");
-  expect((await actsOn(forRita, I.name)).acts.map((a) => a.kind)).toContain("assign");
-  // Only the profile's acts are offered: `label` is a row of the full definition, not of `issue-demo`.
-  expect((await actsOn(forRita, I.name)).acts.map((a) => a.kind)).not.toContain("label");
+    const forRita = await openRoom(d.as(ritas), place);
+    const forPaul = await openRoom(d.as(pauls), place);
+    expect([forRita.me?.role, forPaul.me?.handle, forPaul.me?.role]).toEqual(["admin", "@paul", "maintainer"]);
 
-  // Two acts take effect through the page: paul comments, and rita assigns vic.
-  const commented = await act(forPaul, I.name, "comment", { fields: { body: "I see it too, on every file with a trailing comment." } });
-  expect(commented.answer.answer).toBe("accepted");
-  expect(commented.after.seq).toBeGreaterThan(commented.before.seq);
-  expect((await act(forRita, I.name, "assign", { on: 0, fields: { assignees: [await member("@vic")] as never } })).answer.answer).toBe("accepted");
-  expect(await loadIssue(forPaul, I.name)).toMatchObject({
-    number: 1, title: "The parser drops comments", state: "open", requester: "@rita", assignees: ["@vic"], conditions: ["comments survive a round trip"],
-    comments: [{ author: "@paul", state: "visible", body: "I see it too, on every file with a trailing comment." }],
-  });
+    // una opens an issue through the page. The directory's `open-issue` takes the definition's bytes at a stated place: the page
+    // offers the definitions the rules scope holds active, and sends the bytes it reads from the rules scope beside the act.
+    const opening = (await actsOn(forUna, d.D.name)).acts.find((a) => a.kind === "open-issue")!;
+    expect(opening.fields.find((f) => f.name === "definition")?.choices?.map((c) => c.value)).toEqual([DEMO_DIGESTS.change, DEMO_DIGESTS.issue]);
+    const filed = await act(forUna, d.D.name, "open-issue", { fields: { definition: DEMO_DIGESTS.issue, title: "The handbook is empty", conditions: ["README.md says what the room is for"] } });
+    expect(filed.answer.answer, JSON.stringify(filed.answer)).toBe("accepted");
+    await d.pause([d.D.name]);
+    const [issue] = (await listLanes(forUna)).issues;
+    expect(issue).toMatchObject({ number: 1, kind: "issue", title: "The handbook is empty", state: "open" });
 
-  // A pull request that closes the issue, opened with its version by the fixture. una asks paul to review it, through the page.
-  const { C, manifest } = await proposed(r, I, una, "@una", [], changeDemo, DEMO_DIGESTS.change);
-  expect((await act(forUna, C.name, "request-review-own", { fields: { requested: await member("@paul") } })).answer.answer).toBe("accepted");
-  let change = await loadChange(forUna, C.name);
-  expect(changeStates(change)).toEqual([{ state: "waiting for a reviewer", detail: expect.stringMatching(/^@paul is asked to review, by @una/) }]);
-  expect((await listLanes(forUna)).changes.map((row) => [row.scope, row.kind, row.state])).toEqual([[C.name, "pr", "open"]]);
+    // paul comments on it; the acts offered follow the role: paul may comment and may not assign; rita may assign.
+    expect((await actsOn(forPaul, issue!.scope)).acts.map((a) => a.kind)).toContain("comment");
+    expect((await actsOn(forUna, issue!.scope)).acts.map((a) => a.kind)).not.toContain("assign");
+    expect((await actsOn(forRita, issue!.scope)).acts.map((a) => a.kind)).toContain("assign");
+    expect((await act(forPaul, issue!.scope, "comment", { fields: { body: "I will write it with artroom edit." } })).answer.answer).toBe("accepted");
+    expect(await loadIssue(forUna, issue!.scope)).toMatchObject({ number: 1, state: "open", requester: "@una", conditions: ["README.md says what the room is for"], comments: [{ author: "@paul", body: "I will write it with artroom edit." }] });
 
-  // A refusal: una's role holds `change.review`, so the page offers her `review-verdict`; the lane refuses it by its guard, because
-  // she is an author of the version. The answer is the reason, and the lane's head does not move.
-  expect((await actsOn(forUna, C.name)).acts.map((a) => a.kind)).toContain("review-verdict");
-  const refused = await act(forUna, C.name, "review-verdict", { fields: { manifest, verdict: "approve", extent: "source" } });
-  expect(refused.answer).toMatchObject({ answer: "refused", reason: "guard-failed", name: "author-cannot-review" });
-  expect(refused.after).toEqual(refused.before);
+    // rita's `artroom edit README.md`: a source-only change, merged on her own act and published by the room.
+    const edited = await d.run(d.rita, "edit", "README.md", "--file", "readme.md", "--title", "Write the handbook");
+    expect(edited.code, edited.lines.join("\n")).toBe(0);
+    const head1 = d.at.stand.refs.get("refs/heads/main")!;
+    const readme = (await listLanes(forUna)).changes.find((row) => row.title === "Write the handbook")!;
+    expect(readme).toMatchObject({ kind: "pr", state: "merged" });
+    let change = await loadChange(forUna, readme.scope);
+    expect(change.manifests.map((m) => m.file)).toEqual([{ path: "README.md", digest: expect.stringMatching(/^sha256:/), size: 37, page: `${SERVICE}/site/${d.D.name}/HEAD/README.md` }]);
+    expect([change.merges.map((m) => [m.state, m.commit, m.publication?.state])]).toEqual([[["published", head1, "published"]]]);
+    expect(changeStates(change).map((s) => s.state)).toEqual(["publication confirmed", ...change.merges[0]!.publication!.operations.map(() => "effect confirmed")]);
+    // The published file, read back through the site route at the address the page links to.
+    const shown = await loadSite(forUna, "README.md");
+    expect([shown.address, shown.status, shown.text]).toEqual([siteAddress(forUna, "README.md"), 200, expect.stringContaining('<h1 id="the-handbook">The handbook</h1>\n<p>Written by the room.</p>')]);
 
-  // paul approves for the source extent, answering the request, which the lane then records as met. Merging is offered to rita, an
-  // admin, and not to paul, a member.
-  const request = change.requests[0]!.id;
-  expect((await act(forPaul, C.name, "review-verdict", { fields: { manifest, request, verdict: "approve", extent: "source" } })).answer.answer).toBe("accepted");
-  expect((await loadChange(forPaul, C.name)).requests.map((rq) => [rq.requested, rq.state])).toEqual([["@paul", "met"]]);
-  expect((await actsOn(forPaul, C.name)).acts.map((a) => a.kind)).not.toContain("merge");
-  expect((await actsOn(forRita, C.name)).acts.map((a) => a.kind)).toContain("merge");
+    // paul's `artroom edit AGENTS.md`: the rules extent asks the controller's approval, so the destination refuses the merge by name
+    // and nothing is pushed. The page shows the version's file, the refusal and the state "policy not met"; the site has no such page.
+    const waiting = await d.run(d.paul, "edit", "AGENTS.md", "--file", "agents.md", "--title", "Rules for agents");
+    expect(waiting.code, waiting.lines.join("\n")).toBe(1);
+    const agents = (await listLanes(forPaul)).changes.find((row) => row.title === "Rules for agents")!;
+    change = await loadChange(forPaul, agents.scope);
+    const manifest = change.manifests[0]!.id;
+    expect([change.state, change.manifests[0]!.file?.path, change.merges.map((m) => [m.state, m.reason, m.publication?.state])]).toEqual(["open", "AGENTS.md", [["refused", "rules-not-met:rules", "not-reserved"]]]);
+    expect(changeStates(change)[0]).toEqual({ state: "policy not met", detail: expect.stringMatching(/^Merge \d+ was not reserved: the rules are not met for the extent rules\.$/) });
+    expect([d.at.stand.refs.get("refs/heads/main"), (await loadSite(forPaul, "AGENTS.md")).status]).toEqual([head1, 404]);
 
-  // The change touches an instruction file for agents and a source file. rita's merge takes effect in the lane; the destination
-  // does not reserve it, and the page names the rules extent that is not met. Before the stand-in host answers, the destination's
-  // first operation for the publication, its judge read, is queued.
-  r.changes = { paths: ["AGENTS.md", "src/parser.ts"], links: [], unreadable: 0 };
-  expect((await act(forRita, C.name, "merge", { fields: { manifest, reports: [] } })).answer.answer).toBe("accepted");
-  await r.settle();
-  change = await loadChange(forRita, C.name);
-  expect(changeStates(change)).toEqual([
-    { state: "publication in progress", detail: expect.stringMatching(/^Merge \d+ is intended; the destination's publication \d+ is queued\.$/) },
-    { state: "effect queued", detail: expect.stringMatching(/^judge, operation \d+:0, attempt 1: opened\.$/) },
-  ]);
-  await r.publish();
-  change = await loadChange(forRita, C.name);
-  expect(change.merges.map((m) => [m.state, m.reason, m.publication?.state])).toEqual([["refused", "rules-not-met:rules", "not-reserved"]]);
-  expect(change.reviews.map((rv) => [rv.reviewer, rv.verdict, rv.extent])).toEqual([["@paul", "approve", "source"]]);
-  expect(change.rules?.extents.map((e) => e.name)).toEqual(["rules", "infrastructure", "source"]);
-  // The destination's judge read was confirmed by the stand-in host; what it read did not meet the rules.
-  expect(changeStates(change)).toEqual([
-    { state: "policy not met", detail: expect.stringMatching(/^Merge \d+ was not reserved: the rules are not met for the extent rules\.$/) },
-    { state: "effect confirmed", detail: expect.stringMatching(/^judge, operation \d+:0, attempt 1: confirmed\.$/) },
-  ]);
-  expect((await loadIssue(forRita, I.name)).state).toBe("open");
+    // A refusal by the guard's name: paul's role holds `change.review`, so the page offers him `review-verdict`; the lane refuses it,
+    // because he is the version's author. The answer is the reason; the lane's head does not move.
+    expect((await actsOn(forPaul, agents.scope)).acts.map((a) => a.kind)).toContain("review-verdict");
+    const refused = await act(forPaul, agents.scope, "review-verdict", { fields: { manifest, verdict: "approve", extent: "rules" } });
+    expect(refused.answer).toMatchObject({ answer: "refused", reason: "guard-failed", name: "author-cannot-review" });
+    expect(refused.after).toEqual(refused.before);
 
-  // rita, the rules scope's controller, approves for the rules extent and merges again. The destination publishes; each of its
-  // outside operations for the publication is confirmed by the stand-in host; the merge closes the issue.
-  expect((await act(forRita, C.name, "review-verdict", { fields: { manifest, verdict: "approve", extent: "rules" } })).answer.answer).toBe("accepted");
-  expect((await act(forRita, C.name, "merge", { fields: { manifest, reports: [] } })).answer.answer).toBe("accepted");
-  await r.publish();
-  change = await loadChange(forPaul, C.name);
-  expect([change.state, change.merges.map((m) => m.state)]).toEqual(["merged", ["refused", "published"]]);
-  const landed = change.merges[1]!;
-  expect(landed.publication?.state).toBe("published");
-  const operations = landed.publication?.operations ?? [];
-  expect(new Set(operations.map((o) => o.kind))).toEqual(new Set(["judge", "mint", "push", "receipt", "revoke"]));
-  expect(changeStates(change).map((s) => s.state)).toEqual(["publication confirmed", ...operations.map(() => "effect confirmed")]);
-  expect(await loadIssue(forPaul, I.name)).toMatchObject({ state: "closed", closeReason: "completed", assignees: ["@vic"] });
+    // rita, the rules scope's controller, approves it for the rules extent through the page; paul merges it through the page, and
+    // the room publishes it. The site then serves AGENTS.md.
+    expect((await act(forRita, agents.scope, "review-verdict", { fields: { manifest, verdict: "approve", extent: "rules" } })).answer.answer).toBe("accepted");
+    expect((await act(forPaul, agents.scope, "merge", { fields: { manifest, reports: [] } })).answer.answer).toBe("accepted");
+    await d.pause([agents.scope, d.G.name]);
+    change = await loadChange(forPaul, agents.scope);
+    const head2 = d.at.stand.refs.get("refs/heads/main")!;
+    expect([change.state, change.merges.map((m) => [m.state, m.reason])]).toEqual(["merged", [["refused", "rules-not-met:rules"], ["published", null]]]);
+    expect([change.merges[1]!.commit, head2 !== head1]).toEqual([head2, true]);
+    expect(changeStates(change)[0]?.state).toBe("publication confirmed");
+    expect((await loadSite(forPaul, "AGENTS.md")).text).toContain("Ask before you push.");
 
-  // The rules of the room, read from the rules scope; rita is the one member whose role holds `rules.publish`.
-  const rules = await loadRules(forPaul);
-  expect(rules).toMatchObject({ approvals: 1, ownerMayReview: false, singleControllerException: false, controllers: ["@rita"] });
-  // The revision is the position of the last publish, as the rules scope's own item records it.
-  expect(rules.revision).toBe((await r.rules.item(0)).refs["published"]);
-  expect(typeof rules.revision).toBe("number");
-  expect(rules.extents?.map((e) => [e.name, e.approvals, e.approver, e.class])).toEqual([["rules", 1, "rules.publish", "authority"], ["infrastructure", 1, "change.merge", "deployment"], ["source", 1, "change.review", "content"]]);
-  expect(rules.definitions.map((d) => [d.name, d.digest, d.state])).toEqual([["issue", DEMO_DIGESTS.issue, "active"], ["change", DEMO_DIGESTS.change, "active"]]);
-  // The rules scope's acts: rita may publish the rules; paul may not.
-  expect((await actsOn(forRita, r.rules.name)).acts.map((a) => a.kind)).toContain("publish");
-  expect((await actsOn(forPaul, r.rules.name)).acts.map((a) => a.kind)).not.toContain("publish");
-}, 120_000);
+    // The rules of the room: rita is the one member whose role holds `rules.publish`; she is offered `publish`, paul is not.
+    const rules = await loadRules(forPaul);
+    expect(rules).toMatchObject({ approvals: 0, ownerMayReview: false, controllers: ["@rita"] });
+    expect(rules.extents?.map((e) => [e.name, e.approvals, e.approver])).toEqual([["rules", 1, "rules.publish"], ["infrastructure", 0, "change.merge"], ["source", 0, "change.review"]]);
+    expect(rules.definitions.map((x) => [x.name, x.digest, x.state])).toEqual([["issue", DEMO_DIGESTS.issue, "active"], ["change", DEMO_DIGESTS.change, "active"]]);
+    expect((await actsOn(forRita, d.rules.name)).acts.map((a) => a.kind)).toContain("publish");
+    expect((await actsOn(forPaul, d.rules.name)).acts.map((a) => a.kind)).not.toContain("publish");
+
+    // A session ends 600 seconds after membership issued it; the page asks for a new one before its next read.
+    const first = forUna.reader!;
+    net.clock.now = timeOf(timeMs(net.clock.now)! + 601_000);
+    await expect(loadIssue(forUna, issue!.scope)).resolves.toMatchObject({ state: "open" });
+    expect([forUna.reader !== null, forUna.reader !== first]).toEqual([true, true]);
+  } finally {
+    d.done();
+  }
+}, 180_000);

@@ -219,9 +219,12 @@ export async function listLanes(room: Room): Promise<{ issues: LaneRow[]; change
   for (const item of summary.items.filter((i) => i.type === "lane")) {
     const scope = scopeOf(item.refs["scope"]);
     if (!scope) continue;
-    // The lane's own state, read from it; the index row is the lane's advisory copy.
-    const lane = await handleOf(room, scope).summary();
-    const main = lane.ok ? lane.value.items.find((i) => i.type === "intent" || i.type === "proposal") : undefined;
+    // The lane's own state, read from it; the index row is the lane's advisory copy. A final main item (a merged change, say)
+    // is no longer in the summary: it is read from the scope's retained final items.
+    const handle = handleOf(room, scope);
+    const lane = await handle.summary();
+    const type = item.values["kind"] === "issue" ? "intent" : "proposal";
+    const main = lane.ok ? lane.value.items.find((i) => i.type === type) ?? (await itemsOf(handle, lane.value, type))[0] : undefined;
     rows.push({
       scope, number: typeof item.values["number"] === "number" ? item.values["number"] : null, kind: (text(item.values["kind"]) as LaneRow["kind"]) ?? null,
       title: text(main?.values["title"]) ?? text(item.values["title"]), state: main?.state ?? text(item.values["state"]), draft: typeof item.values["draft"] === "boolean" ? item.values["draft"] : null,
