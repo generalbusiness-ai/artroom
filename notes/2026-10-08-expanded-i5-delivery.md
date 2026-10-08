@@ -265,3 +265,30 @@ IncomingRequest task cancellation through `abortAllDurableObjects`, but
 do not identify the actor or context. Mixed-cohort/physical-drain proof,
 the final combined gate, exact-head Source review and actual acceptance
 remain owed. No passing whole-gate, provider or new deployment claim.
+
+## Corrected gate outcome
+
+The required gate ran once after the isolation correction at
+`39eda03ec4e8d55d901526d809b8bcf3e9d58122`, tree
+`4a450bfe0d3fe31f30694dc8579d8ce35b82bb54`, on local Node v26.10.0,
+with the declared installed lock and a clean source checkout. Its command
+and every phase returned zero: whitespace 0.0 seconds; typecheck 4.7 elapsed
+and 15.5 CPU seconds; tests 62.8 elapsed and 93.0 CPU seconds. Vitest reports
+131 files passed, one recorder file skipped; 842 tests passed and the two
+opt-in recorders skipped. The final active-source script passed all six.
+
+Raw gate log: `/tmp/artroom-expanded-corrected-gate.log`. Complete phase
+outputs: `/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.xVtOoQ6ngJ`.
+The raw test output also emits an uncaught cross-object I/O exception from
+Vitest's `abortContextSignal`/`abortIfTimeout`/`rejectTimeoutError`, naming
+`RefcountedCanceler`. It reports no failed test or unhandled-error count.
+This diagnostic is retained explicitly: command exit zero is not a claim
+of clean runtime acceptance. Its meaning and material risk must be assessed
+in the independent review and requester judgment before landing. No timeout
+is widened or error relabelled as success. The original failed gate remains.
+
+This note-only successor changes no source, tests, configuration or dependency
+from that gate. Their tree identity is checked before filing, with no rerun.
+The single full exact-head Source review remains required under request
+`86206b5595fa55a7d84821a74e200aabc0fa837e`; named deferrals and original held
+proof obligations remain open.
