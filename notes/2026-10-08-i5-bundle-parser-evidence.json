@@ -13,12 +13,15 @@
     "adoption": "0bc05e07e67049b8d76c8f3dfb6b1d7e64109423"
   },
   "base": "1eed91aacac56649ac0b75c0652215b0418eeff8",
-  "sourceHead": "25a6736ceba38f633c85be605f4b97538fd01f74",
-  "sourceTree": "2222e160a300c8b908489df09c634b0945957a43",
+  "sourceHead": "56df3fb3a3e3fd0b52a58cb8d6ce6903e0b4fe50",
+  "sourceTree": "f44a28ffbd7a68c6e33be22fd9a324f95fd323a0",
   "predecessors": [
     "3771ddbb8938b6c7fd65d033869ccd9d13989955",
     "3c9b0e3fe5de7109fbc709534267f7968606c3e0",
-    "522167cd7709f65728a42d549414cc491daff3ba"
+    "522167cd7709f65728a42d549414cc491daff3ba",
+    "25a6736ceba38f633c85be605f4b97538fd01f74",
+    "801b60c82a8cea5e1bfd34843e958cae8a25cb9f",
+    "d444f79a144fdfb7f7a82aba379af68281f38f4a"
   ],
   "sources": [
     {
@@ -47,9 +50,9 @@
     },
     {
       "path": "packages/derive/src/bundle-closure.ts",
-      "gitBlob": "7aed2bfe489e5212262c2c6fba0e9d518571c120",
-      "bytes": 24593,
-      "sha256": "da9c2d0675f23223190d7a2b5fdbaf52c3591cc381b818aa6a4cbf3bf8272b23"
+      "gitBlob": "e3e7731b70830c29225d057f5a05d9acd224e0d4",
+      "bytes": 24854,
+      "sha256": "bbfe6ccefb51dd3f31d396ec6df6c4cc28eeb3813f405fc29d06ef10f41afe31"
     },
     {
       "path": "packages/derive/src/bundle-records.ts",
@@ -65,9 +68,9 @@
     },
     {
       "path": "packages/derive/test/bundle.test.ts",
-      "gitBlob": "24d0b11c1fc699c3fd3bdf30abc9b337404c64f8",
-      "bytes": 15465,
-      "sha256": "33ec4b9237c8bf2c9f742508343c397921ba0f42f6d1a5739df329a1faa88a5d"
+      "gitBlob": "b5cc71030f5450d9412365c8a5343dc56746de1f",
+      "bytes": 16362,
+      "sha256": "212fcbd387f4dc0e5bf8b0ce4cdd9a012960d0307cae20879b7c3bbfc3371f98"
     }
   ],
   "evidence": [
@@ -264,6 +267,37 @@
       "command": "npm run typecheck --workspace @generalbusiness/artroom-contract --workspace @generalbusiness/artroom-bytes --workspace @generalbusiness/artroom-derive",
       "result": "contract, bytes and derive workspace typechecks passed",
       "capture": "original redirected command output, not reconstructed transcript"
+    },
+    {
+      "path": "/tmp/artroom-bundle-index-repair-evidence/control-root-ambiguity.log",
+      "bytes": 2632,
+      "sha256": "83f11f6c798c2b22e8b1a18263c1b9aecae2217aec67573cd16426cd1db90b47",
+      "sourceAttribution": "finished separate-index repair working tree, unchanged through source commit",
+      "preparedFor": "56df3fb3a3e3fd0b52a58cb8d6ce6903e0b4fe50",
+      "capture": "original redirected command output, not reconstructed transcript",
+      "argv": [
+        "node",
+        "scripts/control.mjs",
+        "packages/derive/src/bundle-closure.ts",
+        "if (rawRoot && typedRoot && rawRoot !== typedRoot) fail(\"conflict\", \"root.identity\");",
+        "void rawRoot;",
+        "--expect",
+        "canonical bytes/closed fields",
+        "--",
+        "packages/derive",
+        "bundle.test.ts"
+      ],
+      "result": "unchanged baseline: four tests passed; one assertion failed with only root ambiguity guard removed; DISTINGUISHES; helper restored source"
+    },
+    {
+      "path": "/tmp/artroom-bundle-index-repair-evidence/types.log",
+      "bytes": 302,
+      "sha256": "e91e4eb7853b95c405400a3821d2a82ce6a15ccdfe4e921a02249e5af81907a3",
+      "sourceAttribution": "finished separate-index repair working tree, unchanged through source commit",
+      "preparedFor": "56df3fb3a3e3fd0b52a58cb8d6ce6903e0b4fe50",
+      "capture": "original redirected command output, not reconstructed transcript",
+      "command": "npm run typecheck --workspace @generalbusiness/artroom-contract --workspace @generalbusiness/artroom-bytes --workspace @generalbusiness/artroom-derive",
+      "result": "contract, bytes and derive workspace typechecks passed"
     }
   ],
   "limits": [
@@ -273,5 +307,65 @@
     "canonical reference bytes are validated; original host fields serialized away are not asserted validated",
     "no runtime/replay selection, production loader, network/dynamic imports, acquisition, gate, provider, activation or main change"
   ],
-  "documentationSuccessor": "note and manifest only; no source/test changes or reruns"
+  "documentationSuccessor": "note and manifest only; no source/test changes or reruns",
+  "previousSource": {
+    "head": "25a6736ceba38f633c85be605f4b97538fd01f74",
+    "tree": "2222e160a300c8b908489df09c634b0945957a43",
+    "sourceHashesAtThatCheckpoint": [
+      {
+        "path": "packages/bytes/src/index.ts",
+        "gitBlob": "3102d5f8bece6408932f62e7c5d3aae801079115",
+        "bytes": 328,
+        "sha256": "af48a5772acbc7ef4840f5e8c3645819c9c5d9d63bbb6d800de541bad5fa281f"
+      },
+      {
+        "path": "packages/bytes/src/semantic-content.ts",
+        "gitBlob": "f5afedfa5bbc6fb667d310463a287ecb27ca55e7",
+        "bytes": 1134,
+        "sha256": "ab6dc119df1593bcb2fc063c33e450997b2389661d52f90eb9daf89546635c61"
+      },
+      {
+        "path": "packages/contract/src/index.ts",
+        "gitBlob": "e12e3e324ddc2f86f63861869d07fc8a73bf695e",
+        "bytes": 1456,
+        "sha256": "6768bb6811ab2e9f99facac5cfc212fccf2738ef3aeae8aad7fa2f0f44709686"
+      },
+      {
+        "path": "packages/contract/src/semantic-bundle.ts",
+        "gitBlob": "e6529b30a660f84c142454dfddc477d016e2909c",
+        "bytes": 11672,
+        "sha256": "c87bc3434fa98bda877accdcb4ce05f04cf868acb8cb99b26be2f4cab4e7919f"
+      },
+      {
+        "path": "packages/derive/src/bundle-closure.ts",
+        "gitBlob": "e3e7731b70830c29225d057f5a05d9acd224e0d4",
+        "bytes": 24854,
+        "sha256": "bbfe6ccefb51dd3f31d396ec6df6c4cc28eeb3813f405fc29d06ef10f41afe31"
+      },
+      {
+        "path": "packages/derive/src/bundle-records.ts",
+        "gitBlob": "c9f6f647b972ee1c71f88a4ada83362f3c3fc8e3",
+        "bytes": 26854,
+        "sha256": "85730ad527003a37343d0ff83a23addca83c2cfc74217c39eac58d4eeb86969b"
+      },
+      {
+        "path": "packages/derive/src/index.ts",
+        "gitBlob": "f846c21a7d7453142bfcc86ef9a4329e4f60d353",
+        "bytes": 1214,
+        "sha256": "1f6491f66c88797fd1cf68b4c5856742a3fbcc135b259d9657e1aa2da55ef918"
+      },
+      {
+        "path": "packages/derive/test/bundle.test.ts",
+        "gitBlob": "b5cc71030f5450d9412365c8a5343dc56746de1f",
+        "bytes": 16362,
+        "sha256": "212fcbd387f4dc0e5bf8b0ce4cdd9a012960d0307cae20879b7c3bbfc3371f98"
+      }
+    ]
+  },
+  "repair": {
+    "finding": "2036b29f05c228f10860b05cc78da386f0515a14",
+    "frozenPredecessor": "d444f79a144fdfb7f7a82aba379af68281f38f4a",
+    "scope": "separate raw/typed indexes; kind-specific edges retain exact framing; unqualified root refuses distinct-object ambiguity in either insertion order; legitimate raw framing remains retainable",
+    "sourceHead": "56df3fb3a3e3fd0b52a58cb8d6ce6903e0b4fe50"
+  }
 }
