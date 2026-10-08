@@ -335,3 +335,36 @@ commands without `remote` and `clone`. [code]
 - `show` and `acts` are unchanged. [code]
 - The connectivity file `notes/.keep-i5-clone` is kept, as the brief
   asked for it.
+
+
+## Destination-read follow-up on the consolidated candidate
+
+Steering `45c611cca0e991e35b6cbe577f22927dc3ac7390` selects candidate
+`3157859665e5531a3f94b124ccec00d2994c01ad`. The original section 5.1 gap
+is already closed in that source by `6d00499aa` and the selected decision
+`ca8ad1cf0fc94a017c5f696b0319d11467a36507`. A membership session reads
+its destination before any destination act: the genesis-recorded membership
+ID and kind must match, and the incarnation must also match once recorded.
+Signed reads without a session retain their original window. No production
+source change or broader design is needed for this gap.
+
+The existing CLI clone witness now advances its clock by 16 minutes before
+the first artifacts destination read and first read-token act, after checking
+that the destination has no act. The original founder/member clone, one-time
+private credential and token-only-in-Git-environment assertions remain. Real
+scopes, HTTP routes and session reads run; the Git host, Git runner and
+scheduler remain explicitly labelled stand-ins. This is no live provider or
+real Git execution claim. The stale first-clone deadline in docs/cli.md is
+corrected; the pre-seat claim window is separate and unchanged.
+
+Focused command: `./node_modules/.bin/vitest run --project scope
+packages/cli/test/clone.scope.test.ts` (one test passed). CLI source and scope
+source/test typechecks passed with their existing tsconfig files. Raw logs
+are `/tmp/artroom-destination-read-evidence/focused.log`, `cli-types.log`
+and `scope-types.log`. One narrow control restored the old mandatory
+incarnation comparison in checkSession: the first remote after the window
+failed by assertion with forbidden instead of success. `control.log` retains
+the failure, and sessions.ts was restored exactly. `preservation.json` records
+exact candidate comparisons and hashes. No package install, cloud, gate,
+deployment or main change occurred; the consolidated candidate's final review
+and gate remain Root's work.

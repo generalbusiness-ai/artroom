@@ -423,12 +423,12 @@ it (the intent window), and the retained inputs those entries name.
   section 4.
 - An act definition has no description text. The line `acts` prints is
   made from the act's step, item and grant.
-- A destination where no act has been signed yet cannot be read by
-  anyone once the founder's intent window after the claim has passed:
-  it accepts no read session until its first act records membership's
-  incarnation, and the founder's signed read lasts 15 minutes after the
-  claim. `remote` and `clone` then stop with `Cannot read <destination>:
-  forbidden.` Run the first `clone` within 15 minutes of the claim. See
-  `notes/2026-10-07-i5-clone-delivery.md`, section 5.
+- An active member's session reads the destination before its first act,
+  including after the founder's signed-read window. The destination checks
+  the membership ID and kind recorded by its genesis, and also the
+  incarnation once an observation records it. The first `remote` or `clone`
+  need not occur within 15 minutes of the claim. Signed reads without a
+  session retain their window. See the destination-read follow-up in
+  `notes/2026-10-07-i5-clone-delivery.md`.
 - `git fetch` and `git pull` in a clone have no command that gives them a
   token.
