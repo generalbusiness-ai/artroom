@@ -1,0 +1,15 @@
+# Accepted merge observation outcomes
+
+Held successor to `bf784b0b73ba1c83fd0d84109a4cb0fd6f03cbb2`, under existing edit request `50b608c8ab49bc06f21045620226ad535db87fdf`. Checker `4a8a6e19beabbf79116bb52f285486efb5809c0a` and planner `c3c570b9f4626eaca4ce405a4f52440a1e810363` were read in full.
+
+Once a real merge receipt is accepted, read refusal, transport/source failure, unexpected observation failure and bounded exhaustion return an unknown-observation result containing its complete known fact, lane/sequence and current version. Read codes and error kinds are bounded; arbitrary exception messages are not echoed. Guidance names that accepted merge and asks for show/log inspection before any new merge, without resubmitting to recover observation. Terminal published/refused/aborted results remain separate and unchanged. The one-entry wait budget and existing defaults remain.
+
+Edit now uses the existing supported-stop wrapper around merge preparation, so its already admitted Proposed lane/version line survives supported helper stops as well. No accepted fact is invented when no reply was received, and no persistence/resubmission engine is added. Pre-admission and actual refused requests retain their existing status.
+
+The existing own-host witness keeps its finite budget case and adds compact read-refusal/direct-merge and transport-loss/edit boundaries after real native accepted receipts. Every command submits one merge; the edit retains its proposal and suppresses the scripted private error detail. Before deliberately starting another test command, the test inspector checks the prior real merge's terminal entry. Read responses/faults are labelled HTTP stand-ins, not authoritative publication or deployed source evidence.
+
+Both full scenarios pass in the existing diagnostic-only site composition: `/tmp/artroom-edit-phase-outcomes-tests-final.log` (2 passed); types pass in `/tmp/artroom-edit-phase-outcomes-types.log`. An initial witness attempt used the live-item summary to inspect an already final item and threw before the added boundary; `/tmp/artroom-edit-phase-outcomes-tests.log` preserves that setup failure. The witness now checks the actual final history effect instead.
+
+Control: allowing the post-acceptance TransportError to escape to the generic handler drops the accepted merge identity/guidance and prints the scripted error message; the one-submit assertion remains one. `/tmp/artroom-edit-phase-outcomes-control.log` records this assertion failure. The phase handler was restored. Original scan/preflight controls and original site404 logs remain retained; no broad suite or matrix was repeated.
+
+Native/platform, current claim/private join/clone/install and site source are unchanged from bf. Site evidence remains the labelled historical-route diagnostic composition, with full c4/birth/permission integration owed. All existing row/check/version/source adoption, integrated gate and filing obligations remain held. No live provider, browser, deployment, gate, main landing, source approval or request closure occurred.
