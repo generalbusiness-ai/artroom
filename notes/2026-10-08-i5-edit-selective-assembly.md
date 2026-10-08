@@ -141,3 +141,26 @@ No new wire, factory caller, mint, catalog allocation, activation, provider,
 Room setup, whole gate or main landing ran. Physical peak/capacity, authorized
 acquisition, historical admission, actual checker image/ABI, combined-c4 tuple,
 reservation/publication and current custody/executor proofs remain owed.
+
+## Reader-boundary work classification correction
+
+Planner P2 `7923df6672cb2e145b5b5aa82b95015c661bcec2` identified that the
+Reader's source-error sanitizer converted the adapter's Allowance exception
+into unreadable during a source read. Work exhaustion now throws the existing
+GitRefusal too-large, which Reader preserves. Other raw errors remain sanitized
+and missing/corrupt basis remains unknown. No Reader or comparison code changed.
+The existing witness sets work to exactly file bytes plus supplied object body
+lengths and one per object: snapshotting consumes it, so the first source-read
+spend must produce refused/too-large. This reaches the previously missed branch.
+One affected witness and scope source/test typechecks passed; original raw logs:
+
+| Output | SHA-256 |
+|---|---|
+| `/tmp/artroom-edit-candidate-evidence/p2-focused.log` | `b4910df9391a427a0e475800c9bc43917498f0dfdc8df79b8a868e339c17e723` |
+| `/tmp/artroom-edit-candidate-evidence/p2-types.log` | `6d6fedb36dbee4bff38ae0d2fcbad3cce9af62a012c11f1517cbd8d6ce0d09a6` |
+
+Predecessor 6adfa83bc5fca554d0c2f3bca2a5c0498e4b4539 and all prior logs remain
+unchanged. Later composition must apply the compareTrees delta to the selected
+executor source and preserve the executor 340 fence/send-classification path;
+replacing the whole GitHubHost file with this older donor would lose that work.
+No extra control, suite, gate, Room, provider, wiring or activation ran.

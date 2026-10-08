@@ -34,7 +34,9 @@ export async function editCandidate(input: CandidateInput, limits: CandidateAllo
   if (!(file.bytes instanceof Uint8Array) || !Number.isSafeInteger(file.size) || file.size < 0 || file.bytes.length !== file.size) return no("refused", "wrong-size");
   if (file.bytes.length > limits.inputBytes || suppliedObjects.length > limits.inputObjects) return no("refused", "too-large");
   let work = 0; let entries = 0;
-  const spend = (n: number) => { if (!Number.isSafeInteger(n) || n < 0 || n > limits.work - work) throw new Allowance(); work += n; };
+  // Reader preserves GitRefusal across its source boundary; an arbitrary
+  // allowance exception there would become unreadable and lose its meaning.
+  const spend = (n: number) => { if (!Number.isSafeInteger(n) || n < 0 || n > limits.work - work) throw new GitRefusal("too-large", "candidate work"); work += n; };
   const count = (n: number) => { if (n > limits.treeEntries - entries) throw new Allowance(); entries += n; spend(n); };
   try {
     spend(file.bytes.length);

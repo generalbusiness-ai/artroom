@@ -41,6 +41,8 @@ test("candidate needs exact snapshotted base/tree closure and file bytes; preser
   expect(await editCandidate(good, { ...limits, generatedBytes: 1 })).toEqual({ result: "refused", reason: "too-large" });
   expect(await editCandidate(good, { ...limits, treeEntries: 1 })).toEqual({ result: "refused", reason: "too-large" });
   expect(await editCandidate(good, { ...limits, work: 1 })).toEqual({ result: "refused", reason: "too-large" });
+  const snapshotWork = good.file.bytes.length + good.objects.reduce((n, object) => n + object.body.length + 1, 0);
+  expect(await editCandidate(good, { ...limits, work: snapshotWork })).toEqual({ result: "refused", reason: "too-large" });
   expect(await editCandidate({ ...good, objects: [...good.objects, { kind: "blob", id: "x".repeat(1600), body: new Uint8Array() }] }, limits)).toEqual({ result: "unknown", reason: "bad-object-id" });
   expect(await editCandidate({ ...good, file: { ...good.file, path: "éé" } }, { ...limits, comparison: { ...limits.comparison, pathBytes: 2 } })).toEqual({ result: "refused", reason: "bad-path" });
   expect(await editCandidate(good, { ...limits, read: { ...limits.read, closureObjects: 0 } })).toEqual({ result: "refused", reason: "too-large" });
