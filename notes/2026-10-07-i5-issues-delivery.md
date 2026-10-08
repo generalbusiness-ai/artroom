@@ -245,3 +245,82 @@ The two failures **[run]**:
 - A refusal writes nothing and is printed as the answer **[run]**.
 - Plain English; no product named in documents but GitHub and "the
   hosting's own Git service"; nothing deployed.
+
+## 7. Local T39 fixture diagnosis and repair
+
+2026-10-08. Builder preparation under gitseq request
+`0716158cb871b5380755b6d718f9084c82c11eaa`, incoming
+`2c702757e414643ee29721e93bee39f2a74a819c`, own base
+`13ae305505d910b23d44e524860dc788cbcc5a8f`. No runtime source changed in
+that delivery. This follow-up changes only T39's fixture preparation and
+this note. No gate, provider operation, deployment or landing was run.
+
+**The reproduced fixture defect.** T39 seats the founder, which sends the
+request creating the founder's inbox. It then admits `first-key` and an
+invitation and takes its no-write baseline without settling that inbox and
+membership. The inbox's real creation result is itself a membership entry,
+even though it has no item effects. It can arrive after that baseline.
+`ScopeObject.submit` schedules its dispatcher through `#sent` even when
+JoinLimits refuses a request before semantic submission. The invariant
+being measured therefore included an unrelated unfinished setup duty.
+
+The first natural pair run, issues followed by limits in the same scope
+project, passed all three tests. It did **not** reproduce the cloud failure.
+To distinguish the fixture premise, temporary diagnostic preparation held
+only the real inbox creation transport, took the original head at entry 4,
+released transport and let the authoritative dispatchers settle the actual
+request. The first release-only probe still passed because that unanswered
+attempt's one-second retry was not due under the frozen scripted clock.
+The completed control advanced that clock by two seconds, without a wall
+sleep. T39 then failed its original exact head assertion, 4 to 5, while the
+two forged joins still answered `bad-intent`, the next join was
+`rate-limited`, and the invitation remained `invited`.
+
+The control's extra entry was:
+
+| Field | Captured value |
+|---|---|
+| Membership | `sc_khu2ak6ul6wmqpwoaxg737t2qeqroyhubl4a53236yylqjbvcrhq`, incarnation `in_hejvuwz6bhmkqt7rbk3xvvjfbm` |
+| Entry | 5, hash `sha256:2692dad9f99ab029e528575a0db705bd482fd2b4c9b8deacdf3fde39bdfd3c52` |
+| Time | `2099-01-01T00:00:02Z` |
+| Input | `delivery`, message class `result`, outcome `applied`; answers membership seat entry 2, send 0 |
+| Exact source | Inbox `sc_7oabkqtvenw3bwgooxy3ia5sksglgp4drc6ppbrqdrmgzxnzbwra`, incarnation `in_2m33sr6kzfcdxhx225pb2lwka4`, entry 0, hash `sha256:27b0074744bcd09e6636423391040b3400cf98033160a28e38ac09254671726f` |
+| Effects/sends | No item effects; one inbox confirmation control |
+| Outbox | Duty `2.0` acknowledged; result `{ clause: "applied", seq: 5 }`; `diagnosis: null`. Confirmation duty `5.0` also acknowledged |
+
+These are a controlled run's IDs and bytes, not recovered cloud-failure
+records. They prove that the existing fixture permits the reported extra
+entry and that the limits refuse correctly in this ordering. They do not
+prove which entry the cloud failure actually recorded or that every possible
+full-pool interaction is settled. A cross-object RPC exception alone is no
+diagnosis: namespace transport catches it and returns an unanswered attempt;
+dispatcher diagnosis needs actual routing refusals. Pool abort/context
+diagnostics must be distinguished from this sealed delivery result.
+
+**Repair.** Before taking the baseline or posting the forged joins, call
+`settle(scope, await scope.created(seat))`: membership and its exact founder
+inbox finish their owed creation/result/confirmation through the existing
+real delivery boundary. No count is allowed to drift, no runtime write is
+suppressed, and all original refusal, invitation-state and exact-head
+assertions remain unchanged. The same controlled ordering passed once the
+baseline was taken after this settlement. The hold, clock advancement and
+diagnostic logging were then removed.
+
+Focused runs on the local macOS checkout with the locked dependencies:
+
+| Run | Result | Vitest duration |
+|---|---|---|
+| Natural issues + limits, diagnostic logging only on unexpected movement | 3 passed, 2 files | 4.78 s |
+| Held inbox, release with retry not yet due | 1 passed, 1 skipped | 1.07 s |
+| Held inbox, retry due after scripted clock +2 s, original baseline | Exact-head assertion failed, 1 skipped | 1.03 s |
+| Same controlled delivery, settlement before baseline | 1 passed, 1 skipped | 1.13 s |
+| Final minimal repair, natural issues + limits, no temporary diagnostics | 3 passed, 2 files | 3.96 s |
+
+The commands were the root Vitest scope project with only
+`../lanes/test/issues.scope.test.ts test/limits.test.ts`, or only
+`test/limits.test.ts -t "at a real membership"`. No whole suite was
+repeated and no mutation sweep was run. Locked `npm ci --ignore-scripts`
+changed no package or lock file. The gate and independent review of the
+reconciled delivery remain owed, in the existing filing order after the
+story page. If a later authorized gate still fails T39, capture its actual
+extra input/source and outbox before attributing that failure to this cause.
