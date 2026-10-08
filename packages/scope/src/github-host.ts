@@ -226,28 +226,53 @@ export function gitOriginalRequest(path: string, request: Pick<Parameters<Destin
   return { method: "POST", path, publicBody: digestBytes(canonicalBytes(receiveArguments({ ref: request.ref, old: request.old, new: request.commit, objects: request.objects.map(({ id, kind, body }) => ({ id, type: kind, data: body })) }))), custodyFromSite: null };
 }
 
+/** Explicit comparison limits; inspectGit retains its established defaults. */
+export interface TreeComparisonLimits {
+  trees: number; files: number; pathBytes: number; depth: number;
+  changedPaths: number; links: number; changedBytes: number;
+  /** Maximum component iterations in each whole-link resolution. */
+  linkSteps: number;
+  visit?: (kind: "tree" | "entry" | "bytes" | "link-step", amount: number) => void;
+  onLimit?: () => never;
+  beforeSerialize?: (changes: JudgeChanges) => void;
+}
+const INSPECTION_LIMITS: TreeComparisonLimits = {
+  trees: SNAPSHOT_BOUNDS.trees, files: SNAPSHOT_BOUNDS.files,
+  pathBytes: SNAPSHOT_BOUNDS.pathBytes, depth: SNAPSHOT_BOUNDS.depth,
+  changedPaths: DESTINATION_CHANGED_SET.paths, links: DESTINATION_CHANGED_SET.links,
+  changedBytes: DESTINATION_CHANGED_SET.max,
+  // Preserve legacy `steps++ > N`: it allowed N + 1 component iterations.
+  linkSteps: SNAPSHOT_BOUNDS.pathBytes * (DESTINATION_CHANGED_SET.links + 1) + 1,
+};
+const comparisonLimit = (limits: TreeComparisonLimits): never => limits.onLimit ? limits.onLimit() : bad();
+
 interface FlatFile { id: string; mode: string; path: string | null }
 interface FlatTree { files: Map<string, FlatFile>; directories: Set<string> }
 const strict = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
-async function flatTree(reader: Reader, tree: string): Promise<FlatTree> {
+async function flatTree(reader: Reader, tree: string, limits: TreeComparisonLimits): Promise<FlatTree> {
   const files = new Map<string, FlatFile>();
   const directories = new Set([""]);
   let trees = 0;
   const walk = async (id: string, prefix: Uint8Array, depth: number): Promise<void> => {
-    if (++trees > SNAPSHOT_BOUNDS.trees || depth >= SNAPSHOT_BOUNDS.depth) return bad();
+    limits.visit?.("tree", 1);
+    if (++trees > limits.trees || depth >= limits.depth) return comparisonLimit(limits);
     for (const entry of await reader.tree(id)) {
-      const path = new Uint8Array(prefix.length + (prefix.length > 0 ? 1 : 0) + entry.name.length);
+      limits.visit?.("entry", 1);
+      const length = prefix.length + (prefix.length > 0 ? 1 : 0) + entry.name.length;
+      if (length > limits.pathBytes) return comparisonLimit(limits);
+      if (entry.kind === "gitlink") return bad();
+      limits.visit?.("bytes", length);
+      const path = new Uint8Array(length);
       path.set(prefix);
       if (prefix.length > 0) path[prefix.length] = 47;
       path.set(entry.name, prefix.length + (prefix.length > 0 ? 1 : 0));
-      if (path.length > SNAPSHOT_BOUNDS.pathBytes || entry.kind === "gitlink") return bad();
       let text: string | null = null;
       try { text = strict.decode(path); } catch { /* Raw path remains identified and counted. */ }
       if (entry.kind === "tree") {
         if (text !== null) directories.add(text);
         await walk(entry.id, path, depth + 1);
       } else {
-        if (files.size >= SNAPSHOT_BOUNDS.files) return bad();
+        if (files.size >= limits.files) return comparisonLimit(limits);
         files.set(hex(path), { id: entry.id, mode: entry.mode, path: text });
       }
     }
@@ -257,13 +282,13 @@ async function flatTree(reader: Reader, tree: string): Promise<FlatTree> {
 }
 
 /** Whole-tree symbolic-link resolution, including directory links and cycles. */
-async function resolveLink(reader: Reader, path: string, files: Map<string, FlatFile>, directories: Set<string>): Promise<readonly string[] | null> {
+async function resolveLink(reader: Reader, path: string, files: Map<string, FlatFile>, directories: Set<string>, limits: TreeComparisonLimits): Promise<readonly string[] | null> {
   const first = files.get(path);
   if (!first) return null;
   let target: string;
   const firstBytes = await reader.blob(first.id);
   try { target = strict.decode(firstBytes); } catch { return null; }
-  if (firstBytes.length > SNAPSHOT_BOUNDS.pathBytes) return bad();
+  if (firstBytes.length > limits.pathBytes) return comparisonLimit(limits);
   if (target === "" || target.startsWith("/") || target.includes("\0")) return null;
   const reached: string[] = [];
   // A link can occur again after its target has finished expanding. Only
@@ -274,10 +299,12 @@ async function resolveLink(reader: Reader, path: string, files: Map<string, Flat
   const walk = async (components: readonly string[], suffix: boolean): Promise<boolean> => {
     for (let next = 0; next < components.length; next++) {
       // A work bound is uncertainty, never proof that a resolvable link is broken.
-      if (steps++ > SNAPSHOT_BOUNDS.pathBytes * (DESTINATION_CHANGED_SET.links + 1)) return bad();
+      limits.visit?.("link-step", 1);
+      if (steps++ >= limits.linkSteps) return comparisonLimit(limits);
       const component = components[next]!;
       if (component === "" || component === ".") continue;
       if (component === "..") { if (at.length === 0) return false; at.pop(); continue; }
+      limits.visit?.("bytes", at.reduce((n, part) => n + part.length + 1, component.length));
       const candidate = [...at, component].join("/");
       const file = files.get(candidate);
       const more = suffix || next + 1 < components.length;
@@ -288,7 +315,7 @@ async function resolveLink(reader: Reader, path: string, files: Map<string, Flat
         const bytes = await reader.blob(file.id);
         let target: string;
         try { target = strict.decode(bytes); } catch { return false; }
-        if (bytes.length > SNAPSHOT_BOUNDS.pathBytes) return bad();
+        if (bytes.length > limits.pathBytes) return comparisonLimit(limits);
         if (target === "" || target.startsWith("/") || target.includes("\0")) return false;
         if (!(await walk(target.split("/"), more))) return false;
         active.delete(candidate);
@@ -322,7 +349,17 @@ export async function inspectGit(reader: Reader, context: DestinationInspection,
     todo.push(...(await reader.commit(id)).parents);
   }
   const evidence: RecordedJudgeEvidence = { head, present: true, tree: integration.tree, firstParent: integration.parents[0] ?? null, ancestors: [...new Set(context.reports.filter((id) => seen.has(objectId(id, "report"))))], changes: null };
-  const [old, next] = await Promise.all([flatTree(reader, base.tree), flatTree(reader, integration.tree)]);
+  const changes = await compareTrees(reader, base.tree, integration.tree, INSPECTION_LIMITS);
+  if ("over" in changes) return { evidence: { ...evidence, changes } };
+  const bytes = canonicalize(changes);
+  const digest = valueDigest(DESTINATION_CHANGED_SET.domain, changes);
+  return { evidence: { ...evidence, changes: digest }, retain: [{ kind: "value", domain: DESTINATION_CHANGED_SET.domain, digest, bytes }] };
+}
+
+/** Compare verified trees without inventing a commit or publication fact.
+ * Missing reads/work exhaustion remain uncertainty, never a broken-link fact. */
+export async function compareTrees(reader: Reader, oldTree: string, newTree: string, limits: TreeComparisonLimits): Promise<JudgeChanges | { over: "paths" | "links" | "bytes" }> {
+  const [old, next] = await Promise.all([flatTree(reader, oldTree, limits), flatTree(reader, newTree, limits)]);
   const paths: string[] = [];
   let unreadable = 0;
   let changed = 0;
@@ -330,33 +367,36 @@ export async function inspectGit(reader: Reader, context: DestinationInspection,
     const before = old.files.get(key);
     const after = next.files.get(key);
     if (before?.id === after?.id && before?.mode === after?.mode) continue;
-    if (++changed > DESTINATION_CHANGED_SET.paths) return { evidence: { ...evidence, changes: { over: "paths" } } };
+    if (++changed > limits.changedPaths) return { over: "paths" };
     const path = after?.path ?? before?.path ?? null;
     if (path === null) unreadable++;
     else paths.push(path);
   }
+  limits.visit?.("bytes", paths.length * paths.length * paths.reduce((max, path) => Math.max(max, utf8(path).length), 0));
   paths.sort(byteOrder);
   const textual = (tree: FlatTree): Map<string, FlatFile> => new Map([...tree.files.values()].flatMap((file) => file.path === null ? [] : [[file.path, file] as const]));
   const oldFiles = textual(old);
   const newFiles = textual(next);
-  const linkNames = [...new Set([...oldFiles, ...newFiles].flatMap(([path, file]) => file.mode === "120000" ? [path] : []))].sort(byteOrder);
-  if (linkNames.length > DESTINATION_CHANGED_SET.links) return { evidence: { ...evidence, changes: { over: "links" } } };
+  const linkNames = [...new Set([...oldFiles, ...newFiles].flatMap(([path, file]) => file.mode === "120000" ? [path] : []))];
+  limits.visit?.("bytes", linkNames.length * linkNames.length * linkNames.reduce((max, path) => Math.max(max, utf8(path).length), 0));
+  linkNames.sort(byteOrder);
+  if (linkNames.length > limits.links) return { over: "links" };
   const links: TreeLink[] = [];
   for (const path of linkNames) {
     const before = oldFiles.get(path);
     const after = newFiles.get(path);
-    const left = before?.mode === "120000" ? await resolveLink(reader, path, oldFiles, old.directories) : undefined;
-    const right = after?.mode === "120000" ? await resolveLink(reader, path, newFiles, next.directories) : undefined;
+    const left = before?.mode === "120000" ? await resolveLink(reader, path, oldFiles, old.directories, limits) : undefined;
+    const right = after?.mode === "120000" ? await resolveLink(reader, path, newFiles, next.directories, limits) : undefined;
     if (left !== undefined && right !== undefined && before?.id === after?.id && canonicalize(left) === canonicalize(right)) links.push({ path, tree: "both", resolves: left });
     else {
       if (left !== undefined) links.push({ path, tree: "old", resolves: left });
       if (right !== undefined) links.push({ path, tree: "new", resolves: right });
     }
-    if (links.length > DESTINATION_CHANGED_SET.links) return { evidence: { ...evidence, changes: { over: "links" } } };
+    if (links.length > limits.links) return { over: "links" };
   }
   const changes: JudgeChanges = { paths, links, unreadable };
+  limits.beforeSerialize?.(changes);
   const bytes = canonicalize(changes);
-  if (utf8(bytes).length > DESTINATION_CHANGED_SET.max) return { evidence: { ...evidence, changes: { over: "bytes" } } };
-  const digest = valueDigest(DESTINATION_CHANGED_SET.domain, changes);
-  return { evidence: { ...evidence, changes: digest }, retain: [{ kind: "value", domain: DESTINATION_CHANGED_SET.domain, digest, bytes }] };
+  if (utf8(bytes).length > limits.changedBytes) return { over: "bytes" };
+  return changes;
 }

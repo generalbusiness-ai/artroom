@@ -6,7 +6,7 @@ import { expect, test } from "vitest";
 import type { FactRef, ScopeId, Timestamp } from "@generalbusiness/artroom-contract";
 import { canonicalize, digestBytes, utf8 } from "@generalbusiness/artroom-bytes";
 import { d, otherLane } from "@generalbusiness/artroom-derive/testing";
-import { editCommit, editObjects, editPath, type DestinationObject } from "../src/future-2/destination-objects.ts";
+import { editCommit, editObjects, editPath, editTree, type DestinationObject } from "../src/future-2/destination-objects.ts";
 import { judgeReservation, type EditFile, type ReservationRead, type Statement } from "../src/future-2/reservation.ts";
 import { FOUND, HEAD, TREE, reading as nativeReading } from "./support-destination.ts";
 
@@ -34,6 +34,7 @@ for (const format of ["sha1", "sha256"] as const) test(`Git ${format} reads an e
     writeFileSync(join(directory, "z", "keep.txt"), "keep\n");
     spawnSync("ln", ["-s", "docs", join(directory, "link")]);
     git(["add", "-A"]);
+    git(["update-index", "--chmod=+x", "docs/guide.md"]);
     git(["commit", "-q", "-m", "base"]);
     const base = git(["rev-parse", "HEAD"]);
     // `read`: an object of the base's closure, as the host would give it.
@@ -43,13 +44,18 @@ for (const format of ["sha1", "sha256"] as const) test(`Git ${format} reads an e
       return { kind, id, body: new Uint8Array(body) };
     };
     const edit = (path: string, text: string) => editObjects(format, read, base, path, utf8(text), { scope, time, operation });
-    const written = (path: string, text: string) => {
+    const written = (path: string, text: string, mode = "100644") => {
       const made = edit(path, text)!;
+      const tree = editTree(format, read, base, path, utf8(text));
+      expect(tree).toEqual({ tree: made.tree, objects: made.objects.filter((object) => object.kind !== "commit") });
+      const another = editObjects(format, read, base, path, utf8(text), { scope, time: "2026-10-07T12:00:01Z", operation: { ...operation, seq: 10 } })!;
+      expect({ tree: another.tree, objects: another.objects.filter((object) => object.kind !== "commit") }).toEqual(tree);
+      expect(another.commit).not.toBe(made.commit);
       for (const object of made.objects) expect(git(["hash-object", "-w", "--stdin", "-t", object.kind], object.body)).toBe(object.id);
       git(["fsck", "--strict", "--no-dangling", made.commit]);
       // Git's own tree for the same change: the base's index, with the one file added.
       git(["read-tree", base]);
-      git(["update-index", "--add", "--cacheinfo", `100644,${git(["hash-object", "-w", "--stdin"], text)},${path}`]);
+      git(["update-index", "--add", "--cacheinfo", `${mode},${git(["hash-object", "-w", "--stdin"], text)},${path}`]);
       expect([made.tree, git(["rev-parse", `${made.commit}^{tree}`]), git(["rev-parse", `${made.commit}^`])]).toEqual([git(["write-tree"]), made.tree, base]);
       expect(git(["show", `${made.commit}:${path}`])).toBe(text.trimEnd());
       expect(git(["diff", "--name-only", base, made.commit])).toBe(path);
@@ -58,11 +64,13 @@ for (const format of ["sha1", "sha256"] as const) test(`Git ${format} reads an e
     const replaced = written("README.md", "# New\n\nWritten by the room.\n");
     written("NEW.md", "new\n");
     written("docs/deep/page.md", "deep\n");
+    written("docs/guide.md", "# Executable guide\n", "100755");
     // The commit is `editCommit`'s, of that tree on the base.
     expect(replaced.commit).toBe(editCommit(format, scope, time, replaced.tree, base, "README.md", operation).id);
     expect(git(["log", "-1", "--format=%an <%ae>%n%B", replaced.commit])).toBe(`artroom <${scope}@artroom.invalid>\nWrite README.md.\n\noperation ${canonicalize(operation)}`);
     // The published tree does not let these be written: a folder at the path, a link at the path or on the way, a file on the way.
     expect([edit("docs", "x"), edit("link", "x"), edit("link/guide.md", "x"), edit("README.md/x", "x"), edit("../x", "x")]).toEqual([null, null, null, null, null]);
+    expect(["docs", "link", "link/guide.md", "README.md/x", "../x"].map((path) => editTree(format, read, base, path, utf8("x")))).toEqual([null, null, null, null, null]);
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });
 

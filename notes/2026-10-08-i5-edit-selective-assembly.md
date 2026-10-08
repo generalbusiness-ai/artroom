@@ -39,3 +39,149 @@ Control: removing only edit's first destination@2 check makes the own-host witne
 Root and the assigned preservation reader own the full changed-body/source review. This assembly read exact owned request and testing guidance, current/client and feature helper bodies, targeted future/host source pairs and definition structural deltas; supplemental unchanged large bodies were selected reads, not freshly complete files. All final changed hashes are retained in the ledger for review against the committed checkpoint.
 
 Dependencies are borrowed from the existing installation with workspace links into this worktree. No tooling install, package or lock change occurred. No site module, site authority policy, Root/profiles/default catalog, provider deployment, live browser, main landing, whole gate, source approval or request closure is included. The edit filing's direct full scenario/type load still requires the queued site source; its separate composition is precisely labelled evidence, not a complete integrated head. Integrated gate, independent ordinary source review, owner adoption and original filing order remain owed.
+
+## Pure editTree extraction preparation
+
+This slice follows adopted owner DESIGN `721c2f816cd034e762fa8278de02d4d4354dcc88`,
+adoption `7349458bc1f40004535434363111e0341b7f97c5` and planner extraction
+direction `70cc2b2b6c07ed12a9ec0e717ba0df030e8180fb`, within the same 50b/9be.
+The actual edit helper lineage is base `6d29bae7f0f88c5f552197a19d1869c1a2d9c3bd`
+on isolated `request/i5-edit-tree-extraction`. The earlier main checkpoint 1eed scratch
+remains clean and unused as a source; main has no future-2 edit helper.
+
+`future-2/destination-objects.ts` extracts the exact existing tree algorithm
+into editTree, with only format/read/base/path/bytes inputs and blob/tree
+outputs. editObjects wraps it and appends the unchanged editCommit. The tree
+algorithm, editPath and editCommit compare byte-for-byte with the base. Native
+common helpers, platform data/rules, catalog/index and version helpers remain
+unchanged. The actual future-2 helper body changed by extraction; this is an
+output-preservation claim, not a claim that its whole source blob is unchanged.
+
+The raw read callback still requires the caller's verified base commit and
+required closure. It does not newly authenticate object hashes, completeness,
+source, authorization, digest/size or work budgets. The separately bounded
+verified-input/digest/size/changed-set adapter remains owed. No fake operation,
+time, commit, permission, new parser or Git dependency was added.
+
+The existing edit.test.ts retains all four tests and original assertions. Its
+existing SHA-1/SHA-256 local Git loop now also compares pure blob/tree outputs
+with the wrapper, verifies that changed operation/time changes only the commit,
+and independently checks retained executable mode `100755` with Git's own index.
+New/replaced/nested files, untouched entries/link, null path conflicts, exact
+commit identity/message, fsck and pure reservation assertions remain. One
+focused file passed 4/4; platform source/test typechecks passed. No extra control
+was needed for this algorithm-preserving extraction. Raw original outputs:
+
+| Output | SHA-256 |
+|---|---|
+| `/tmp/artroom-edit-tree-evidence/focused.log` | `f848e4b45c34abd19eefc93ca18181dc22ebd4741d5de5d31f72993bcfc26a74` |
+| `/tmp/artroom-edit-tree-evidence/typecheck.log` | `7164e781f55f730d5b11f99c10513168239de3ff338d0315651cb93b32fe3130` |
+| `/tmp/artroom-edit-tree-evidence/preservation.log` | `54882229c1f172efeded696b33f91d851bb07e85593344957b6f62d345a7d4df` |
+
+Commands: `npm exec -- vitest run --project platform edit` and
+`npm run typecheck --workspace @generalbusiness/artroom-platform`. Existing
+dependencies were reused with isolated workspace links and unchanged lockfile;
+no package/tool install or metadata change. Preservation is raw source comparison,
+not whole source reading or historical admission proof. No catalog/identity/wire
+registration, provider, Room setup, whole gate, main landing or activation ran.
+Authorized acquisition, actual checker ABI/image, reservation/publication,
+combined-c4 allocations/tuple, custody/executor/capacity/historical proofs and
+full functional/source review remain owed.
+
+## Bounded candidate byte adapter preparation
+
+Isolated request/i5-edit-candidate-prep starts from extraction
+81948340d49262f93a05fd6cb85a413afff9deff under the same 50b/9be owner.
+The new unwired scope/edit-candidate adapter uses existing Git Reader checks
+and the exported pure editTree. Scope already has Git/platform dependencies;
+no dependency or lock change is needed. It snapshots supplied file/object
+bytes and metadata before awaits, validates every supplied SHA-1 ID, checks
+exact file path/digest/size, and verifies the actual base commit plus required
+tree/blob closure. Parent IDs are parsed but ancestry is not traversed or
+claimed. SHA-256 remains explicitly unsupported by this reader adapter.
+
+All caller input/read/object/tree-entry/depth/work/generated/comparison
+allowances are mandatory and detached. Input bytes count supplied file/object
+payloads; identifiers have fixed validated forms and path has its explicit
+UTF-8 byte cap. Work charges reads/hash bytes, occurrence expansion, parsing,
+sorting and link steps. Conservative output/work preflight occurs before raw
+editTree construction; generated candidates are read-verified again. Missing,
+malformed or corrupt basis yields unknown, not empty-tree evidence. Proven
+file/path/format/allowance failure yields a fixed refusal. No raw error text
+escapes. This is byte correspondence, not authenticated source or permission.
+
+The shared compareTrees seam extracts the existing GitHub inspection's raw
+path, mode, changed-set and complete symbolic-link resolution logic. It keeps
+old inspectGit defaults, over-path/link/byte classes and uncertainty versus
+broken links; head/integration/closure/ancestry checks remain byte-identical.
+The new adapter supplies explicit limits and work hooks. A link with unchanged
+bytes may now resolve differently because the candidate adds its target; the
+compact witness checks both old and new results rather than assuming no links.
+
+Final focused checks passed four tests: the new pure candidate witness plus
+three existing scripted object-store inspection cases (provider case skipped).
+Scope/platform source and test typechecks passed. One control omitted required
+blob verification and wrongly accepted a missing unchanged README; the witness
+failed by assertion (DISTINGUISHES), and source was restored. Later link-sort
+work accounting is covered by the final focused run. Original raw outputs:
+
+| Output | SHA-256 |
+|---|---|
+| `/tmp/artroom-edit-candidate-evidence/focused-final.log` | `fced124f6167f6401aed74b1f670f66a5575b5b306392f538328d0008856c771` |
+| `/tmp/artroom-edit-candidate-evidence/types-final.log` | `ece107d2d6c6313853003179434f47991bfc1f7a5707a5f837be502ea89f6b86` |
+| `/tmp/artroom-edit-candidate-evidence/control-closure.log` | `fafdf9a7dc0dc3c229770fe93c148b992abc9630c81625894af63f6c712b5d78` |
+| `/tmp/artroom-edit-candidate-evidence/preservation.log` | `a9857a6ac8c3a77da53e07754b464f1c2904274a85beb4d2365e1dea8849a949` |
+
+The witness includes snapshot mutation, mode/tree/link preservation, missing/
+corrupt basis, file digest/size/path, unused invalid ID, UTF-8 path allowance,
+base closure zero/read-size limits, work/entry/generated and exact changed-set
+byte boundaries. It runs no Room or provider. Earlier original failed type
+log is types-01.log; passing intermediate logs remain separately retained.
+No new wire, factory caller, mint, catalog allocation, activation, provider,
+Room setup, whole gate or main landing ran. Physical peak/capacity, authorized
+acquisition, historical admission, actual checker image/ABI, combined-c4 tuple,
+reservation/publication and current custody/executor proofs remain owed.
+
+## Reader-boundary work classification correction
+
+Planner P2 `7923df6672cb2e145b5b5aa82b95015c661bcec2` identified that the
+Reader's source-error sanitizer converted the adapter's Allowance exception
+into unreadable during a source read. Work exhaustion now throws the existing
+GitRefusal too-large, which Reader preserves. Other raw errors remain sanitized
+and missing/corrupt basis remains unknown. No Reader or comparison code changed.
+The existing witness sets work to exactly file bytes plus supplied object body
+lengths and one per object: snapshotting consumes it, so the first source-read
+spend must produce refused/too-large. This reaches the previously missed branch.
+One affected witness and scope source/test typechecks passed; original raw logs:
+
+| Output | SHA-256 |
+|---|---|
+| `/tmp/artroom-edit-candidate-evidence/p2-focused.log` | `b4910df9391a427a0e475800c9bc43917498f0dfdc8df79b8a868e339c17e723` |
+| `/tmp/artroom-edit-candidate-evidence/p2-types.log` | `6d6fedb36dbee4bff38ae0d2fcbad3cce9af62a012c11f1517cbd8d6ce0d09a6` |
+
+Predecessor 6adfa83bc5fca554d0c2f3bca2a5c0498e4b4539 and all prior logs remain
+unchanged. Later composition must apply the compareTrees delta to the selected
+executor source and preserve the executor 340 fence/send-classification path;
+replacing the whole GitHubHost file with this older donor would lose that work.
+No extra control, suite, gate, Room, provider, wiring or activation ran.
+
+## Exact link-step count correction
+
+Planner P2 `96f9ca582a521c2c2d0d877eab54800aa630e164` identified that the
+comparison's old greater-than check admitted a component with linkSteps zero.
+Explicit caller linkSteps now means maximum component count per whole-link
+resolution. The greater-than-or-equal guard refuses zero; the existing fixture
+confirms exact one-step success with unchanged old/new link results. Work still
+bounds aggregate resolution. InspectGit retains its historical N + 1 behavior
+by adding one only to its legacy default count. No broken-link fact is inferred
+from exhaustion. The Reader-boundary correction at 44f8e1f5601d06a0de1eb8128b6175bebc423415
+remains unchanged. Final focused adapter and three affected inspection tests
+passed (provider case skipped); scope source/test typechecks passed. Raw logs:
+
+| Output | SHA-256 |
+|---|---|
+| `/tmp/artroom-edit-candidate-evidence/link-count-focused.log` | `2fe9fdd7f7c0801854b8b06f562a202d16df56be43fbd965b3c18fd44918822f` |
+| `/tmp/artroom-edit-candidate-evidence/link-count-types.log` | `6d6fedb36dbee4bff38ae0d2fcbad3cce9af62a012c11f1517cbd8d6ce0d09a6` |
+
+Earlier heads/logs and the executor 340 composition requirement remain intact.
+No new control, matrix, whole suite, gate, provider or activation was run.
