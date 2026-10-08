@@ -8,3 +8,4 @@ export * from "./records.ts";
 export * from "./facttext.ts";
 export * from "./take.ts";
 export * from "./session.ts";
+export * from "./semantic-content.ts";
