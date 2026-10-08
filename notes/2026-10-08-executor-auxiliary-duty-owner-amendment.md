@@ -1,5 +1,11 @@
 # Proposed executor and auxiliary-duty owner amendment
 
+Proposed normal whole-amendment DESIGN successor to frozen
+`7ff8668b5617d708a6f7cf4c708c4e66765a5b7f`, whose reviewed note SHA-256 is
+`607e60e40f32f12ae119a129d1c49606883254a48ee58d7946cbb74af478b1cc`.
+This repairs ordinary review `630deaa2` under the existing `03ae` evidence-only
+promise; no prior-head approval or implementation credit transfers.
+
 Draft for review, 2026-10-08. Existing requests `48407a70` and `9be26ef7`;
 governing design `c8318a8a06bf88e7ee1422c4ce99c34f602a439f`, adopted by
 `a515f21b5e1f3f3e1fa75c222722a825255fd8fa`. This is a source correspondence
@@ -38,6 +44,12 @@ The pre-role-equality 908-line draft is retained at
 The frozen 943-line predecessor is retained at
 `/tmp/artroom-executor-correspondence-pre-creation-token-943.md`, SHA-256
 `a596053ee26f6f3dc5cda850213f2c9ee446f0df81575ca1b3b8fb04ad29ec1d`.
+The ordinary-reviewed 968-line predecessor is retained at
+`/tmp/artroom-executor-correspondence-pre-target-selector-968.md`, SHA-256
+`607e60e40f32f12ae119a129d1c49606883254a48ee58d7946cbb74af478b1cc`.
+The creation-target selector correction follows full readings of ordinary
+changes-requested report `630deaa2` and planner direction `6d9872f8`; it requires
+a normal whole-amendment successor review and is not yet adopted authority.
 
 ## Existing seams and the missing proof
 
@@ -416,6 +428,7 @@ interface PermitPayload {
   callPlan: Digest;
   purpose: "original-dispatch" | "auxiliary-read" | "owned-cleanup";
   duty: Digest | null;
+  targetResolution: Digest | null;
 }
 interface ClosurePayload {
   format: "artroom-owner-closure-1";
@@ -454,6 +467,7 @@ interface AuxiliaryReceiptJudgment {
   result: "usable" | "cleanup-only" | "unavailable";
   reason: null | "wrong-repository" | "wrong-rights" | "invalid-expiry"
                | "expired" | "malformed-reply" | "missing-handle";
+  targetResolution: Digest | null;
 }
 interface CleanupAuthority {
   format: "artroom-owned-cleanup-1";
@@ -465,6 +479,7 @@ interface CleanupAuthority {
   /** Nonsecret provider ID only; required bearer bytes remain private. */
   target: { repository: string; providerCredential: string | null };
   admittedBy: Digest;
+  targetResolution: Digest | null;
 }
 interface LocalClosureRecord {
   format: "artroom-dispatch-exclusion-1";
@@ -501,6 +516,7 @@ interface AuxiliaryDutyState {
                    | "custody-failed" | "revoke-refused" | "revoke-unanswered";
   revision: number;
   predecessor: Digest | null;
+  targetResolution: Digest | null;
 }
 interface OwnerClosedState {
   format: "artroom-owner-state-1";
@@ -524,6 +540,49 @@ interface ProviderTarget {
   provider: Digest;               // exact retained immutable provider identity
   repository: { host: string; namespace: string; name: string; id: string | null };
 }
+interface CreationReplySelector {
+  format: "artroom-creation-reply-selector-1";
+  attempt: AttemptKey;
+  creationSiteOrdinal: number;
+  originalInvocation: InvocationKey;
+  originalDispatcher: OwnerKey;
+  provider: Digest;
+  expectedRepository: { host: string; namespace: string; name: string };
+  adapterCorrespondence: Digest;
+}
+type PlannedTarget =
+  | { mode: "fixed"; value: ProviderTarget }
+  | { mode: "creation-reply"; selector: CreationReplySelector };
+interface CreationReplyAssociation {
+  format: "artroom-creation-reply-association-1";
+  attempt: AttemptKey;
+  originalPlan: Digest;
+  creationSiteOrdinal: number;
+  originalInvocation: Digest;
+  originalOwner: OwnerKey;
+  replyCustody: Digest;            // private record reference, not raw response hash
+  cleanupHandle: Digest | null;
+  publicReplyMetadata: Digest | null;
+}
+interface LinkedTargetResolution {
+  format: "artroom-creation-target-resolution-1";
+  selector: Digest;
+  attempt: AttemptKey;
+  originalPlan: Digest;
+  creationSiteOrdinal: number;
+  originalInvocation: Digest;
+  originalDispatcher: OwnerKey;
+  validatedBy: OwnerKey;
+  association: Digest;
+  replyCustody: Digest;
+  cleanupHandle: Digest;
+  target: ProviderTarget;          // validated nonnull stable repository ID
+  adapterCorrespondence: Digest;
+}
+type TargetResolutionReadback =
+  | { ok: true; attestation: SignedOwnerRecord<LinkedTargetResolution>;
+      association: CreationReplyAssociation }
+  | { ok: false; reason: "not-found" | "conflict" | "unavailable" };
 interface Rights {
   operation: "create" | "delete" | "read" | "write" | "revoke";
   permissions: readonly { name: string; level: "read" | "write" }[];
@@ -546,7 +605,7 @@ interface CallSitePlan {
   ordinal: number;
   site: MutationSite;
   role: CallRole;
-  target: ProviderTarget;
+  target: PlannedTarget;
   ref: string | null;
   rights: Rights;
   absoluteLifetime: AbsoluteLifetime | null;
@@ -583,6 +642,7 @@ interface CallEntry {
   request: RequestIdentity;
   cleanupHandle: Digest | null;    // reference to private custody, never bearer
   mayStartAt: Timestamp;
+  targetResolution: Digest | null;
 }
 interface CleanupHandoff {
   format: "artroom-cleanup-handoff-1";
@@ -603,6 +663,7 @@ interface CleanupHandoff {
   compatibleTuple: Digest;
   coordinator: { namespace: string; object: string; key: KeyId };
   remainingAuthority: Digest;
+  targetResolution: Digest | null;
 }
 ```
 
@@ -666,6 +727,8 @@ Proposed domain tags are exact strings:
 `artroom-auxiliary-receipt-1`, `artroom-owned-cleanup-1`,
 `artroom-auxiliary-duty-state-1`, `artroom-owner-state-1`,
 `artroom-dispatch-call-entry-1`, `artroom-cleanup-handoff-1`,
+`artroom-creation-reply-selector-1`, `artroom-creation-reply-association-1`,
+`artroom-creation-target-resolution-1`,
 `artroom-dispatch-exclusion-1` and `artroom-owner-finalization-1`.
 IDs are SHA-256 over tag, newline and canonical payload bytes, as the existing
 tagged-byte/digest implementation does. IDs are external to the payload they
@@ -684,10 +747,12 @@ For each concrete invocation, the producer selects the exact finite permitted
 sequence from the existing method's reviewed code. An unchecked optional site
 or implicit provider retry cannot expand it.
 
-Target/provider and repository fields must equal the immutable AttemptBinding;
-an unknown repository ID is permitted only for creation that cannot know it
-before the call. A usable token and ordinary repository write require the
-nonnull stable ID. ref is nonnull only for the exact Git write target. Rights
+For mode fixed, target.value provider/repository fields must equal the immutable
+AttemptBinding; an unknown ID is permitted only for the original create. A
+derivative cleanup site with that necessarily unknown pre-create ID must instead
+use the narrowly pre-admitted creation-reply selector below, not a fixed null ID.
+A usable token and ordinary repository write require a validated nonnull stable
+ID. ref is nonnull only for the exact Git write target. Rights
 must equal that site's constrained rights in the original adopted binding; they
 are not widened by a family label or a new cleanup owner. PublicBody identifies
 the retained nonsecret arguments (for a Git write, the exact ref/old/new/object
@@ -714,6 +779,112 @@ admission/reservation -> plan -> physical invocation -> immutable duty origin
 -> duty-bound permit -> consumed CallEntry -> changing duty state/closure.
 For cleanup of an already admitted duty, sourceDuty refers to that existing
 origin; no new mint duty is created or rewritten by cleanup.
+
+### Pre-admitted creation target selector and immutable resolution
+
+A creation-reply selector is allowed only for exact derivative cleanup of its
+original repository.create. Its attempt/provider/expected host/namespace/name
+must equal the original pre-create binding; creationSiteOrdinal names that
+plan's earlier original repository.create site, originalInvocation has ordinal
+zero/site repository.create and the same AttemptKey, and originalDispatcher
+equals its admitted owner. The selected create's fixed value has id null;
+the derivative cleanup selector never means a generic nullable-ID target.
+The selector contains no plan/duty/permit/entry/resolution ID, preserving the
+acyclic plan identity. Its external digest uses the selector domain.
+
+Before allowing that original create, whole-plan admission must verify that
+the actual reviewed provider adapter supports the selector's exact stable-ID
+correspondence and cleanup route under the active compatible tuple. Its retained
+adapterCorrespondence identifies the reviewed implementation/procedure, which
+must validate a returned stable ID against the original provider and expected
+host/namespace/name, the exact original invocation and quarantined own reply/
+cleanup handle. It must also construct/check the exact cleanup endpoint and
+arguments from those constraints. This is advance support for that validation,
+not a prediction of a future reply or guarantee that validation will succeed.
+A caller flag, generic ID validator or unreviewed adapter label is insufficient.
+If the adapter cannot support this exact correspondence, creation is unsupported
+before markSent or any call; do not create first and discover an unrepresentable
+cleanup route afterwards.
+
+After a reply, retain its bounded private material and the immutable
+CreationReplyAssociation before validation/exposure. association.originalInvocation
+names the actual original PhysicalInvocation ID; the association carries no
+resolution or changing duty-state ID. publicReplyMetadata refers only to
+nonsecret fields; replyCustody is a private capture reference, never a public
+hash of token/bearer bytes. An unavailable reply/handle still records the owned
+creation uncertainty and no successful target resolution.
+
+Apply only that selector's reviewed procedure to this associated original own
+reply. A successful LinkedTargetResolution binds its external selector ID,
+unchanged original plan/attempt/create site/invocation/dispatcher, exact provider,
+expected host/namespace/name, private association/capture/cleanup handle and
+validated nonnull returned stable repository ID. The ID cannot be taken from
+another reply, directory listing or caller-selected target. Retain the whole
+resolution immutably; its external digest uses the resolution domain. One
+selector/original invocation may have only one accepted target resolution.
+Identical repetition is idempotent; conflicting resolution never replaces it.
+Missing, malformed, conflicting or unprovable correspondence keeps the owned
+duty and quarantined material held, with no derivative cleanup dispatch.
+
+The resolution attestation is signed under the resolution domain by the
+compatible tuple's authorized executor/namespace key, scoped to validatedBy's
+actual object/ScopeRef/release/build. validatedBy may be a compatible later
+validator; it never replaces originalDispatcher or reopens its nonce. Before
+issuing a derivative cleanup permit, the coordinator authenticates the signed
+payload and reads it plus its association through that tuple-pinned actual
+namespace/object boundary. Hash the payload to the proposed resolution ID and
+the association to payload.association; match original invocation, plan, scope,
+reply custody and cleanup handle. Open/conflicting/missing data cannot authorize
+cleanup. The terminal port authenticates the same permit-bound resolution and
+performs the exact private custody lookup; a digest string alone is insufficient.
+This readback adds no proof that an unreviewed adapter implements the validation.
+
+Install the resolution reference in AuxiliaryDutyState by predecessor CAS.
+Neither AttemptBinding, CallPlan, DutyIdentity, the original permit nor original
+consumed CallEntry is rewritten. Its original duty/sourceDuty remain null and
+targetResolution remains null. Later cleanup uses the same original plan's
+selector and a new positive invocation, with the validated resolution separately
+bound into its signed permit, consumed entry and any handoff. This is a linked
+target refinement for admitted cleanup, not new create/mint/write authority.
+
+The terminal check for a creation-derived cleanup must establish all of these
+equalities in addition to the existing role/owner/ordinal/custody checks:
+
+- Resolution.selector equals the digest of the selected site's exact selector;
+  resolution.originalPlan equals permit.callPlan, entry.plan, handoff.originalPlan
+  when present, and the unchanged original plan ID. AttemptKey and binding match
+  selector, resolution, duty origin, permit, physical invocation and consumed entry.
+- Resolution creationSiteOrdinal/originalDispatcher match the selector's
+  selected create and original owner. Resolution.originalInvocation equals the
+  external digest of the actual original PhysicalInvocation whose attempt,
+  auxiliaryOrdinal zero, selected repository.create site and originalOwner
+  equal selector.originalInvocation/originalDispatcher. Association
+  attempt/plan/create-site/invocation/owner match those same original records;
+  it cannot refer to the current cleanup executor as the original owner.
+- Resolution.adapterCorrespondence equals the pre-admitted selector's exact
+  reviewed adapter correspondence and is supported by the compatible live port.
+  Its target.provider and repository host/namespace/name equal the immutable
+  expected binding; its stable ID is exactly the validated ID in that associated
+  quarantined own reply, never a guessed pre-create ID.
+- Permit, CallEntry, CleanupAuthority, current duty state and any CleanupHandoff
+  targetResolution all equal the immutable resolution ID. Private custody lookup
+  must yield the same association/replyCustody/cleanupHandle/invocation/provider/
+  validated stable target. Actual terminal target, endpoint, rights/ref and
+  arguments must match the selected cleanup constraints and this resolution.
+- A usable AuxiliaryReceiptJudgment for a creation-derived target must carry
+  that same targetResolution and compare its nonnull repository ID against the
+  validated resolution, with the same invocation/custody/rights/expiry checks.
+  A fixed-target judgment keeps targetResolution null and compares its exact
+  pre-admitted fixed target. Neither branch treats null as a wildcard.
+
+Creation-specific endpoint/argument construction belongs to the reviewed exact
+adapter correspondence. The terminal entry retains the original RequestIdentity
+constraints and validated resolution separately; it cannot replace them with an
+arbitrary response-chosen URI/body. A provider needing an unrepresentable
+projection remains pre-dispatch unsupported until that exact correspondence is
+specified and reviewed. No namespace search, second create/mint, original resend,
+generic target resolver or effect engine is added. Existing Artifacts name-as-ID
+and GitHub's no-creation-token path are not alleged broken by this schema repair.
 
 PhysicalInvocation has no self-ID, permit, changing state or own newly created
 duty ID. Its external digest is computed before dispatch. DutyIdentity carries
@@ -789,7 +960,8 @@ the handoff using the same predecessor CAS, changes current owner/permit through
 the new issued cleanup permit, and retains the handoff as the transition evidence.
 newPermit must equal that signed permit's content ID, and its owner/tuple/duty/
 attempt/callPlan must equal the handoff's newOwner/compatibleTuple/duty/origin/
-originalPlan. The permit does not contain a handoff ID; the handoff is issued
+originalPlan, including the exact linked targetResolution where required by
+the selector. The permit does not contain a handoff ID; the handoff is issued
 after the permit and carries it without an ID cycle. The scope must not permit
 new-owner cleanup entry until the authenticated handoff CAS commits.
 The new tuple must explicitly support the same bundle, original provider binding,
@@ -877,7 +1049,8 @@ Its exact schema/validation and provider trust correspondence belong to normal
 host/contract review; the proposed exact record above supplies that review
 subject. Invalid reply never becomes usable custody. A `usable` judgment
 requires a nonnull cleanup handle and nonnull stable repository ID matching
-the original binding, reportedEnds strictly after checkedAt, no reason,
+the fixed admitted target or the selector's validated linked target resolution,
+reportedEnds strictly after checkedAt, no reason,
 and matching invocation/owner/binding/repository/rights. All other judgments
 authorize no token use. The repository-evidence field discloses whether the
 existing trusted bound handle or an exact own reply supplies that identity;
