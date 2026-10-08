@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import type { Entry, OperationId, Seed, SignedIntent } from "@generalbusiness/artroom-contract";
 import { b64url, intentDigest, scopeIdOf, seedDigest, timeMs, timeOf } from "@generalbusiness/artroom-bytes";
 import type { Fetch } from "@generalbusiness/artroom-client";
-import { DIRECTORY, repositoryName } from "@generalbusiness/artroom-platform";
+import { repositoryName } from "@generalbusiness/artroom-platform";
 import { net } from "@generalbusiness/artroom-scope/testing";
 import { platformNet } from "@generalbusiness/artroom-scope/testing/worker";
 import { Platform, routed, settle } from "../../scope/test/repository.ts";
@@ -121,7 +121,7 @@ async function resumed(): Promise<void> {
   host.accepting = true;
   await R.restart();
   for (const claim of await founds()) {
-    const seed: Seed = { v: 1, kind: "directory", definition: DIRECTORY, creator: await R.at(), cause: intentDigest(claim.input.signed.intent), ordinal: 0 };
+    const seed: Seed = { v: 1, kind: "directory", definition: "platform:directory@2", creator: await R.at(), cause: intentDigest(claim.input.signed.intent), ordinal: 0 };
     host.answer(`${claim.seq}:0` as OperationId, 1, { result: "confirmed", evidence: { basis: "own-answer", body: { name: repositoryName(seedDigest(seed), 1), id: `repo-${claim.seq}` } } });
   }
 
@@ -150,7 +150,7 @@ async function resumed(): Promise<void> {
   expect(await run("claim", "demo")).toEqual({ code: 1, lines: ["The saved accepted fact does not match this exact claim step; nothing was submitted."] });
   expect([sent["found"]!.length, sent["seat"]!.length, sent["first-key"]!.length]).toEqual(beforeMarker);
   await rita.store.save(originalSeated);
-  const firstSeed: Seed = { v: 1, kind: "directory", definition: DIRECTORY, creator: await R.at(), cause: pending.claim!.intent, ordinal: 0 };
+  const firstSeed: Seed = { v: 1, kind: "directory", definition: "platform:directory@2", creator: await R.at(), cause: pending.claim!.intent, ordinal: 0 };
   const firstDirectory = new Platform(scopeIdOf(firstSeed));
   const firstBirths = (await firstDirectory.entries())[0]!.sends;
   const firstMembership = new Platform(scopeIdOf(firstBirths.find((send) => "creator" in send.to && send.to.kind === "membership")!.to as Seed));
@@ -175,7 +175,7 @@ async function resumed(): Promise<void> {
   const resumedClaim = await run("claim", "demo");
   expect(resumedClaim.code, resumedClaim.lines.join("\n")).toBe(0);
   const config = (await rita.store.config())!;
-  expect([config.claim, config.handle, resumedClaim.lines[1]]).toEqual([undefined, "@rita", expect.stringMatching(/^You are @rita, an admin, on key key_\S+; your inbox is sc_\S+\.$/)]);
+  expect([config.claim, config.handle, resumedClaim.lines[1], resumedClaim.lines[2]]).toEqual([undefined, "@rita", "Definitions: platform:directory@2, platform:membership@2, platform:rules@2, platform:destination@2.", expect.stringMatching(/^You are @rita, an admin, on key key_\S+; your inbox is sc_\S+\.$/)]);
   const D = new Platform(config.repository!.directory.scope);
   expect((await D.entries())[0]!.uses.map((use) => use.fact.seq)).toContain((await founds())[1]!.seq);
   // No third found; each creation attempt was sent once, by the pass that the register's first call after its restart started.

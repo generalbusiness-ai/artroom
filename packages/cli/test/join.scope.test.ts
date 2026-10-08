@@ -26,7 +26,7 @@ test("join retries its exact private envelope after accepted reply loss and inbo
     await settle(O, M, await M.created(seat));
     const invitationSecret = "the private invitation secret of at least 32 bytes";
     const invitation = await M.did(rita, "invite-member", { fields: { handle: "@joiner", role: "member", inviteHash: textDigest(invitationSecret), inviteEnds: timeOf(timeMs(net.clock.now)! + 3600_000) } });
-    const linkData = { v: 1, service: "https://scopes.test", repository: { directory: await O.at(), membership: await M.at(), rules: O.name, destination: O.name }, invitation, secret: invitationSecret, handle: "@joiner" };
+    const linkData = { v: 1, service: "https://scopes.test", repository: { directory: await O.at(), membership: await M.at(), rules: O.name, destination: O.name }, invitation, secret: invitationSecret, handle: "@joiner", definition: "platform:membership@1" };
     const link = `artroom-invite:${b64url(utf8(JSON.stringify(linkData)))}`;
     let lose = true;
     let hideInbox = true;

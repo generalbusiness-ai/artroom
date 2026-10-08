@@ -28,7 +28,7 @@ import {
   ScopeHandle, TransportError, readCredential, declaredHandle, found, httpTransport, requestSession, secretSigner, sessionRequest, signedIntent, signedLogReader, signedReads,
   type Fetch, type ReadSigning, type Signing, type Transport,
 } from "@generalbusiness/artroom-client";
-import { DIRECTORY, MEMBERSHIP, REGISTER, ROLE_LISTS, platform, type Role } from "@generalbusiness/artroom-platform";
+import { DIRECTORY_OF, NEWEST, ROLE_LISTS, SIBLINGS_OF, platform, type Platform as SuppliedPlatform, type Role } from "@generalbusiness/artroom-platform";
 import { SourceError, httpSource, render, verify as replay, type HistorySource } from "@generalbusiness/artroom-replay";
 import type { ClaimStep, Config, PendingClaim, PendingJoin, Repository, Store } from "./store.ts";
 import { outcomeFetch, outcomeWaitLines, pauseOutcome, waitOutcome, type CloneWait } from "./clone-outcome.ts";
@@ -285,10 +285,12 @@ export function install(ctx: Context, service: string, options: { host?: string;
     const signer = secretSigner(secret);
     const fields = { host: options.host ?? "github.com", namespace: options.namespace ?? "artroom", policy: "keys", founders: [signer.key] };
     const signed = await signedIntent(signer, { to: null, kind: "install", fields }, signing(ctx));
-    const { answer } = await found(transportOf(ctx, service), signed, REGISTER);
+    const definition = NEWEST["platform:register"];
+    if (!definition || !knownPlatform(definition, "platform:register")) return failed("This command has no supported register version to install; nothing was submitted.");
+    const { answer } = await found(transportOf(ctx, service), signed, definition);
     const receipt = accepted(answer, null, "Installed").receipt;
     await ctx.store.save({ v: 1, service, key: "operator", register: receipt.fact.at });
-    return done(`Installed: register ${receipt.fact.at.scope}.`, `The operator key ${signer.key} is kept in the config directory, readable only by you. It is the one founder key.`);
+    return done(`Installed: register ${receipt.fact.at.scope}, under ${definition}.`, `The operator key ${signer.key} is kept in the config directory, readable only by you. It is the one founder key.`);
   });
 }
 
@@ -300,10 +302,22 @@ function validStep(step: ClaimStep, to: ScopeRef, key: KeyId, kind: string): boo
       && (step.accepted === undefined || (isFactRef(step.accepted) && step.accepted.seq > 0 && canonicalize(step.accepted.at) === canonicalize(to)));
   } catch { return false; }
 }
+/** Exact catalog selection, never name-only classification or a newest fallback. */
+function knownPlatform(named: unknown, name: string): SuppliedPlatform | null {
+  const supplied = typeof named === "string" ? platform(named) : null;
+  return supplied?.data.name === name ? supplied : null;
+}
+function siblingsOf(named: string): (typeof SIBLINGS_OF)[string] | null {
+  if (!knownPlatform(named, "platform:directory")) return null;
+  const siblings = SIBLINGS_OF[named];
+  return siblings && knownPlatform(siblings.membership, "platform:membership") && knownPlatform(siblings.rules, "platform:rules") && knownPlatform(siblings.destination, "platform:destination") ? siblings : null;
+}
 function validRepository(repository: Repository, directory: Seed): boolean {
   try {
-    const sibling = (kind: "membership" | "rules" | "destination", ordinal: number) => scopeIdOf({ v: 1, kind, definition: `platform:${kind}@1`, creator: repository.directory, cause: seedDigest(directory), ordinal });
-    // Directory@1 creates these three fixed siblings in order. Both its exact
+    const siblings = siblingsOf(directory.definition);
+    if (!siblings) return false;
+    const sibling = (kind: "membership" | "rules" | "destination", ordinal: number) => scopeIdOf({ v: 1, kind, definition: siblings[kind], creator: repository.directory, cause: seedDigest(directory), ordinal });
+    // The pinned directory creates these three fixed siblings in order. Both its exact
     // seed and full confirmed reference determine their IDs; the same founder
     // key/handle in another room cannot authorize a substituted cache.
     return repository.directory.scope === scopeIdOf(directory) && repository.directory.kind === "directory" && isIncarnation(repository.directory.inc)
@@ -312,9 +326,9 @@ function validRepository(repository: Repository, directory: Seed): boolean {
       && (repository.inbox === undefined || isScopeId(repository.inbox));
   } catch { return false; }
 }
-function foundingMembership(summary: Summary, at: ScopeRef, key: KeyId, handle: string): boolean {
+function foundingMembership(summary: Summary, at: ScopeRef, key: KeyId, handle: string, named: PlatformDefinition): boolean {
   const roster = summary.items.find((item) => item.type === "roster");
-  return canonicalize(summary.scope) === canonicalize(at) && summary.definition === MEMBERSHIP
+  return canonicalize(summary.scope) === canonicalize(at) && summary.status === "active" && summary.definition === named && knownPlatform(named, "platform:membership") !== null
     && roster?.values["foundingKey"] === key && roster.values["foundingHandle"] === handle;
 }
 async function recordedStep(handle: ScopeHandle, seq: number, at: ScopeRef, key: KeyId, kind: string): Promise<ClaimStep> {
@@ -355,6 +369,11 @@ export function claim(ctx: Context, name: string, options: { handle?: string; br
     const signer = secretSigner(secret);
     const R = await handleOf(ctx, config, register.scope, null);
     const { claim: _, ...base } = config;
+    const registered = await summaryOf(R);
+    const registerDefinition = knownPlatform(registered.definition, "platform:register");
+    const directoryDefinition = registerDefinition ? DIRECTORY_OF[registered.definition] : undefined;
+    const siblings = directoryDefinition ? siblingsOf(directoryDefinition) : null;
+    if (canonicalize(registered.scope) !== canonicalize(register) || registered.status !== "active" || !registerDefinition || !directoryDefinition || !siblings) return failed("The register's exact pinned definition or reference is not supported; nothing was submitted.");
     let pending: PendingClaim;
     if (config.claim && !options.again) {
       pending = config.claim;
@@ -363,9 +382,9 @@ export function claim(ctx: Context, name: string, options: { handle?: string; br
     } else {
       const recovery = keyIdOfSecret(await keyOf(ctx, "recovery"));
       const handle = options.handle ?? "@founder";
-      const shape = platform(REGISTER)!.data as unknown as DefinitionShape;
+      const shape = registerDefinition.data as unknown as DefinitionShape;
       const fields = { branch: options.branch ?? "main", founderHandle: handle, recoveryKey: recovery };
-      const signed = await signedIntent(signer, { to: register, kind: "found", fields, expected: expectedOf(shape.acts["found"]!, (await summaryOf(R)).items, null, fields) }, signing(ctx));
+      const signed = await signedIntent(signer, { to: register, kind: "found", fields, expected: expectedOf(shape.acts["found"]!, registered.items, null, fields) }, signing(ctx));
       pending = { register: register.scope, intent: intentDigest(signed.intent), handle, found: { signed } };
       await ctx.store.save({ ...base, claim: pending });
     }
@@ -375,7 +394,7 @@ export function claim(ctx: Context, name: string, options: { handle?: string; br
       // directory retains the original claim, so recover that exact signature
       // as already accepted. Never submit a reconstructed or fresh found.
       await R.summary();
-      const legacySeed: Seed = { v: 1, kind: "directory", definition: DIRECTORY, creator: register, cause: pending.intent, ordinal: 0 };
+      const legacySeed: Seed = { v: 1, kind: "directory", definition: directoryDefinition, creator: register, cause: pending.intent, ordinal: 0 };
       const D = await handleOf(ctx, config, scopeIdOf(legacySeed), null);
       const genesis = await D.entry(0);
       let found: ClaimStep | null = null;
@@ -423,7 +442,7 @@ export function claim(ctx: Context, name: string, options: { handle?: string; br
     const resume = `run artroom claim ${name} again to go on waiting for this claim, or with --again to sign a new one, which creates a second repository.`;
 
     // The register's rule fixes the directory's seed from the claim's own intent (`directorySeed`).
-    const seed: Seed = { v: 1, kind: "directory", definition: DIRECTORY, creator: register, cause: pending.intent, ordinal: 0 };
+    const seed: Seed = { v: 1, kind: "directory", definition: directoryDefinition, creator: register, cause: pending.intent, ordinal: 0 };
     let repository = pending.repository;
     if (!repository) {
       const D = await handleOf(ctx, config, scopeIdOf(seed), null);
@@ -437,7 +456,7 @@ export function claim(ctx: Context, name: string, options: { handle?: string; br
         const all = await Promise.all(handles.map(active));
         return all.every((s) => s !== null) ? (all as Summary[]) : null;
       }, "membership, the rules scope and the destination", resume);
-      if (directory.scope.scope !== D.scope || directory.scope.kind !== "directory" || summaries.some((summary, n) => summary.scope.scope !== children[n] || summary.scope.kind !== ["membership", "rules", "destination"][n])) return failed("A creation read names another scope; the claim remains pending.");
+      if (directory.scope.scope !== D.scope || directory.scope.kind !== "directory" || directory.definition !== directoryDefinition || summaries.some((summary, n) => summary.scope.scope !== children[n] || summary.scope.kind !== ["membership", "rules", "destination"][n] || summary.definition !== [siblings.membership, siblings.rules, siblings.destination][n])) return failed("A creation read names another scope or pinned definition; the claim remains pending.");
       repository = { directory: directory.scope, membership: summaries[0]!.scope, rules: children[1]!, destination: children[2]! };
       await keep({ ...pending, repository });
     }
@@ -447,10 +466,10 @@ export function claim(ctx: Context, name: string, options: { handle?: string; br
     // The founder's seat and first key (`founding-key`): the first admin of the repository.
     const enrollment = { ...base, repository };
     const M = await handleOf(ctx, enrollment, repository.membership.scope);
-    const mShape = platform(MEMBERSHIP)!.data as unknown as DefinitionShape;
+    const mShape = knownPlatform(siblings.membership, "platform:membership")!.data as unknown as DefinitionShape;
     if (!pending.seat) {
       const summary = await summaryOf(M);
-      if (!foundingMembership(summary, repository.membership, signer.key, pending.handle)) return failed("Membership does not record this claim's founding key and handle; nothing was submitted.");
+      if (!foundingMembership(summary, repository.membership, signer.key, pending.handle, siblings.membership)) return failed("Membership does not record this claim's exact definition, founding key and handle; nothing was submitted.");
       const members = summary.items.filter((item) => item.type === "member");
       const own = members.filter((item) => item.values["handle"] === pending.handle);
       if (own.length === 1 && own[0]!.state === "active") await keep({ ...pending, seat: await recordedStep(M, own[0]!.id, repository.membership, signer.key, "seat") });
@@ -466,7 +485,7 @@ export function claim(ctx: Context, name: string, options: { handle?: string; br
     const keyFields = { member: seat.seq };
     if (!pending.firstKey) {
       const summary = await summaryOf(M);
-      if (!foundingMembership(summary, repository.membership, signer.key, pending.handle)) return failed("Membership does not record this claim's founding key and handle; nothing was submitted.");
+      if (!foundingMembership(summary, repository.membership, signer.key, pending.handle, siblings.membership)) return failed("Membership does not record this claim's exact definition, founding key and handle; nothing was submitted.");
       const keys = summary.items.filter((item) => item.type === "key");
       const own = keys.filter((item) => item.values["id"] === signer.key && item.refs["member"] === seat.seq);
       if (own.length === 1 && own[0]!.state === "active") await keep({ ...pending, firstKey: await recordedStep(M, own[0]!.id, repository.membership, signer.key, "first-key") });
@@ -488,13 +507,14 @@ export function claim(ctx: Context, name: string, options: { handle?: string; br
     await ctx.store.save({ ...base, repository, handle });
     return done(
       `Claimed ${name}: directory ${repository.directory.scope}, membership ${repository.membership.scope}, rules ${repository.rules}, destination ${repository.destination}; each created and confirmed.`,
+      `Definitions: ${directoryDefinition}, ${siblings.membership}, ${siblings.rules}, ${siblings.destination}.`,
       `You are ${handle}, an admin, on key ${signer.key}${inbox ? `; your inbox is ${inbox}` : ""}.`,
     );
   });
 }
 
 /** What an invitation link carries. Its secret is the invitation's, which `join` presents once; it is no signing key. */
-interface Link { v: 1; service: string; repository: Omit<Repository, "inbox">; invitation: number; secret: string; handle: string }
+interface Link { v: 1; service: string; repository: Omit<Repository, "inbox">; invitation: number; secret: string; handle: string; definition?: string }
 const LINK = "artroom-invite:";
 
 /**
@@ -513,6 +533,7 @@ export function invite(ctx: Context, member: string, options: { role?: string; a
     const signer = secretSigner(await signerOf(ctx, config));
     const M = await handleOf(ctx, config, repository.membership.scope);
     const summary = await summaryOf(M);
+    if (canonicalize(summary.scope) !== canonicalize(repository.membership) || !knownPlatform(summary.definition, "platform:membership")) return failed("The membership's exact pinned definition or reference is not supported; nothing was submitted.");
     const shape = (await definitionOf(M, summary)).shape;
     const secret = b64url(fresh(32));
     const now = ctx.now?.() ?? Date.now();
@@ -520,7 +541,7 @@ export function invite(ctx: Context, member: string, options: { role?: string; a
     const signed = await signedIntent(signer, { to: repository.membership, kind: "invite-member", fields, expected: expectedOf(shape.acts["invite-member"]!, summary.items, null, fields) }, signing(ctx));
     const invitation = accepted(await M.submit(signed), M.scope, "Invited").receipt.fact.seq;
     const { inbox: _inbox, ...shared } = repository;
-    const link: Link = { v: 1, service: config.service, repository: shared, invitation, secret, handle: member };
+    const link: Link = { v: 1, service: config.service, repository: shared, invitation, secret, handle: member, definition: summary.definition };
     return done(
       `Invited ${member} as ${options.role}: invitation ${repository.membership.scope}:${invitation}, until ${fields.inviteEnds}.`,
       `Link for ${member} only (it holds the invitation's secret): ${LINK}${b64url(utf8(JSON.stringify(link)))}`,
@@ -554,6 +575,9 @@ export function join(ctx: Context, text: string): Promise<Outcome> {
     let pending: PendingJoin | undefined = before?.join;
     const shared = pending && (({ inbox: _inbox, ...repository }) => repository)(pending.repository);
     if (pending && (pending.link !== linkDigest || before!.service !== link.service || canonicalize(shared) !== canonicalize(link.repository) || pending.handle !== link.handle)) return failed("The invitation link does not match the pending join; nothing was submitted. Retry the original invitation link.");
+    if (link.definition === undefined) return failed("This invitation names no exact membership version. Enrollment is held until its version provenance is resolved; nothing was submitted.");
+    const membership = knownPlatform(link.definition, "platform:membership");
+    if (!membership) return failed("The invitation's exact membership version is not supported; nothing was submitted.");
     const base: Config = before ? { v: 1, service: before.service, key: before.key } : { v: 1, service: link.service, key: "device" };
     const signer = secretSigner(pending ? await signerOf(ctx, base) : await keyOf(ctx, base.key));
     let signed: SignedIntent;
@@ -561,7 +585,7 @@ export function join(ctx: Context, text: string): Promise<Outcome> {
     if (!pending) {
       // No pre-join membership reads are authorized. Its pinned definition
       // names the invitation by a mark, with no revision in expected.
-      const shape = platform(MEMBERSHIP)!.data as unknown as DefinitionShape;
+      const shape = membership.data as unknown as DefinitionShape;
       const fields = { invitation: link.invitation, secret: link.secret };
       signed = await signedIntent(signer, { to: link.repository.membership, kind: "join", fields, expected: expectedOf(shape.acts["join"]!, [], null, fields) }, signing(ctx));
       const request = `join-${b64url(fresh(12)).toLowerCase().replace(/_/g, "a")}`;
@@ -790,7 +814,7 @@ async function destinationOf(ctx: Context, config: Config): Promise<{ summary: S
   let read = await (await handleOf(ctx, config, scope, reader)).summary();
   if (!read.ok && read.reason === "forbidden" && reader !== null) read = await (await handleOf(ctx, config, scope, null)).summary();
   if (!read.ok) return stop(failed(`Cannot read ${scope}: ${read.reason}.`));
-  if (read.value.scope.scope !== scope || read.value.scope.kind !== "destination") return stop(failed(`${scope} is no destination.`));
+  if (read.value.scope.scope !== scope || read.value.scope.kind !== "destination" || !knownPlatform(read.value.definition, "platform:destination")) return stop(failed(`${scope} is no supported destination.`));
   const branch = read.value.items.find((item) => item.type === "branch");
   const repository = branch?.values["repository"] as Recorded | undefined;
   if (!branch || !repository || typeof repository.host !== "string" || typeof repository.name !== "string" || typeof repository.namespace !== "string" || typeof repository.id !== "string") return stop(failed(`The destination ${scope} records no repository.`));
