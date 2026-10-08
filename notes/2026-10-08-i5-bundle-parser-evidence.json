@@ -1,0 +1,277 @@
+{
+  "purpose": "repository preparation evidence only; not an adopted runtime record, trust installation, admission receipt or executable proof",
+  "repo": "/Users/hughpyle/play/artroom",
+  "worktree": "/tmp/artroom-bundle-prep",
+  "branch": "request/i5-bundle-prep",
+  "requests": [
+    "48407a70e3083e8ef396db347e064b2cd6e9879f",
+    "9be26ef7e1a4aac138bc0637d7ed121e26fcd105"
+  ],
+  "design": {
+    "head": "b74cb9c1ed8dab2f04d8282e20f025e85c32d05b",
+    "review": "b8416d7d474a92de72e506c9d9c983ae8d02ad7a",
+    "adoption": "0bc05e07e67049b8d76c8f3dfb6b1d7e64109423"
+  },
+  "base": "1eed91aacac56649ac0b75c0652215b0418eeff8",
+  "sourceHead": "25a6736ceba38f633c85be605f4b97538fd01f74",
+  "sourceTree": "2222e160a300c8b908489df09c634b0945957a43",
+  "predecessors": [
+    "3771ddbb8938b6c7fd65d033869ccd9d13989955",
+    "3c9b0e3fe5de7109fbc709534267f7968606c3e0",
+    "522167cd7709f65728a42d549414cc491daff3ba"
+  ],
+  "sources": [
+    {
+      "path": "packages/bytes/src/index.ts",
+      "gitBlob": "3102d5f8bece6408932f62e7c5d3aae801079115",
+      "bytes": 328,
+      "sha256": "af48a5772acbc7ef4840f5e8c3645819c9c5d9d63bbb6d800de541bad5fa281f"
+    },
+    {
+      "path": "packages/bytes/src/semantic-content.ts",
+      "gitBlob": "f5afedfa5bbc6fb667d310463a287ecb27ca55e7",
+      "bytes": 1134,
+      "sha256": "ab6dc119df1593bcb2fc063c33e450997b2389661d52f90eb9daf89546635c61"
+    },
+    {
+      "path": "packages/contract/src/index.ts",
+      "gitBlob": "e12e3e324ddc2f86f63861869d07fc8a73bf695e",
+      "bytes": 1456,
+      "sha256": "6768bb6811ab2e9f99facac5cfc212fccf2738ef3aeae8aad7fa2f0f44709686"
+    },
+    {
+      "path": "packages/contract/src/semantic-bundle.ts",
+      "gitBlob": "e6529b30a660f84c142454dfddc477d016e2909c",
+      "bytes": 11672,
+      "sha256": "c87bc3434fa98bda877accdcb4ce05f04cf868acb8cb99b26be2f4cab4e7919f"
+    },
+    {
+      "path": "packages/derive/src/bundle-closure.ts",
+      "gitBlob": "7aed2bfe489e5212262c2c6fba0e9d518571c120",
+      "bytes": 24593,
+      "sha256": "da9c2d0675f23223190d7a2b5fdbaf52c3591cc381b818aa6a4cbf3bf8272b23"
+    },
+    {
+      "path": "packages/derive/src/bundle-records.ts",
+      "gitBlob": "c9f6f647b972ee1c71f88a4ada83362f3c3fc8e3",
+      "bytes": 26854,
+      "sha256": "85730ad527003a37343d0ff83a23addca83c2cfc74217c39eac58d4eeb86969b"
+    },
+    {
+      "path": "packages/derive/src/index.ts",
+      "gitBlob": "f846c21a7d7453142bfcc86ef9a4329e4f60d353",
+      "bytes": 1214,
+      "sha256": "1f6491f66c88797fd1cf68b4c5856742a3fbcc135b259d9657e1aa2da55ef918"
+    },
+    {
+      "path": "packages/derive/test/bundle.test.ts",
+      "gitBlob": "24d0b11c1fc699c3fd3bdf30abc9b337404c64f8",
+      "bytes": 15465,
+      "sha256": "33ec4b9237c8bf2c9f742508343c397921ba0f42f6d1a5739df329a1faa88a5d"
+    }
+  ],
+  "evidence": [
+    {
+      "path": "/tmp/artroom-bundle-prep-evidence/control-closure.log",
+      "bytes": 2742,
+      "sha256": "dd9a9824154412711c8a9dd6ff0bdd23d14421c875a1e5b41f27528ca5ddc06d",
+      "sourceAttribution": "uncommitted initial preparation; exact intermediate source snapshots were not saved",
+      "preparedFor": null,
+      "argv": [
+        "node",
+        "scripts/control.mjs",
+        "packages/derive/src/bundle-closure.ts",
+        "if (!same([...reachable].sort(byteOrder), component.closure)) fail(\"closure\", \"component.closure\");",
+        "void reachable;",
+        "--expect",
+        "declared component closure",
+        "--",
+        "packages/derive",
+        "bundle.test.ts"
+      ],
+      "result": "unchanged baseline: four tests passed; one assertion failed with only named guard removed; DISTINGUISHES; helper restored source",
+      "capture": "original redirected command output, not reconstructed transcript"
+    },
+    {
+      "path": "/tmp/artroom-bundle-prep-evidence/focused-cross-record.log",
+      "bytes": 214,
+      "sha256": "a461a611850ff465a2b2f20b3d6fcba9c974d0e82efa4505d813109d8a21620c",
+      "sourceAttribution": "uncommitted initial preparation; exact intermediate source snapshots were not saved",
+      "preparedFor": null,
+      "command": "./node_modules/.bin/vitest run --project derive packages/derive/test/bundle.test.ts",
+      "result": "one Node file, four tests passed",
+      "capture": "original redirected command output, not reconstructed transcript"
+    },
+    {
+      "path": "/tmp/artroom-bundle-prep-evidence/focused-final.log",
+      "bytes": 214,
+      "sha256": "0778aa811e1f5e87d27a2e70c077dc1b2afe5c82ca683e3f0051b8df25455920",
+      "sourceAttribution": "uncommitted initial preparation; exact intermediate source snapshots were not saved",
+      "preparedFor": null,
+      "command": "./node_modules/.bin/vitest run --project derive packages/derive/test/bundle.test.ts",
+      "result": "one Node file, four tests passed",
+      "capture": "original redirected command output, not reconstructed transcript"
+    },
+    {
+      "path": "/tmp/artroom-bundle-prep-evidence/focused.log",
+      "bytes": 214,
+      "sha256": "2fb5db0e030c577bf0c7b32357292439bb57691a53a62e62c95f58416ac88b92",
+      "sourceAttribution": "uncommitted initial preparation; exact intermediate source snapshots were not saved",
+      "preparedFor": null,
+      "command": "./node_modules/.bin/vitest run --project derive packages/derive/test/bundle.test.ts",
+      "result": "one Node file, four tests passed",
+      "capture": "original redirected command output, not reconstructed transcript"
+    },
+    {
+      "path": "/tmp/artroom-bundle-prep-evidence/types-checkpoint.log",
+      "bytes": 302,
+      "sha256": "e91e4eb7853b95c405400a3821d2a82ce6a15ccdfe4e921a02249e5af81907a3",
+      "sourceAttribution": "uncommitted initial preparation; exact intermediate source snapshots were not saved",
+      "preparedFor": null,
+      "command": "npm run typecheck --workspace @generalbusiness/artroom-contract --workspace @generalbusiness/artroom-bytes --workspace @generalbusiness/artroom-derive",
+      "result": "contract, bytes and derive workspace typechecks passed",
+      "capture": "original redirected command output, not reconstructed transcript"
+    },
+    {
+      "path": "/tmp/artroom-bundle-prep-evidence/types-cross-record.log",
+      "bytes": 302,
+      "sha256": "e91e4eb7853b95c405400a3821d2a82ce6a15ccdfe4e921a02249e5af81907a3",
+      "sourceAttribution": "uncommitted initial preparation; exact intermediate source snapshots were not saved",
+      "preparedFor": null,
+      "command": "npm run typecheck --workspace @generalbusiness/artroom-contract --workspace @generalbusiness/artroom-bytes --workspace @generalbusiness/artroom-derive",
+      "result": "contract, bytes and derive workspace typechecks passed",
+      "capture": "original redirected command output, not reconstructed transcript"
+    },
+    {
+      "path": "/tmp/artroom-bundle-prep-evidence/types-final.log",
+      "bytes": 302,
+      "sha256": "e91e4eb7853b95c405400a3821d2a82ce6a15ccdfe4e921a02249e5af81907a3",
+      "sourceAttribution": "uncommitted initial preparation; exact intermediate source snapshots were not saved",
+      "preparedFor": null,
+      "command": "npm run typecheck --workspace @generalbusiness/artroom-contract --workspace @generalbusiness/artroom-bytes --workspace @generalbusiness/artroom-derive",
+      "result": "contract, bytes and derive workspace typechecks passed",
+      "capture": "original redirected command output, not reconstructed transcript"
+    },
+    {
+      "path": "/tmp/artroom-bundle-prep-evidence/types-repaired.log",
+      "bytes": 302,
+      "sha256": "e91e4eb7853b95c405400a3821d2a82ce6a15ccdfe4e921a02249e5af81907a3",
+      "sourceAttribution": "uncommitted initial preparation; exact intermediate source snapshots were not saved",
+      "preparedFor": null,
+      "command": "npm run typecheck --workspace @generalbusiness/artroom-contract --workspace @generalbusiness/artroom-bytes --workspace @generalbusiness/artroom-derive",
+      "result": "contract, bytes and derive workspace typechecks passed",
+      "capture": "original redirected command output, not reconstructed transcript"
+    },
+    {
+      "path": "/tmp/artroom-bundle-prep-evidence/types.log",
+      "bytes": 2654,
+      "sha256": "76f278903f6d41d85d35eacdd4a8e9e807a4e9da8f2ccd885a1d25bb5ab12acd",
+      "sourceAttribution": "uncommitted initial preparation; exact intermediate source snapshots were not saved",
+      "preparedFor": null,
+      "command": "npm run typecheck --workspace @generalbusiness/artroom-contract --workspace @generalbusiness/artroom-bytes --workspace @generalbusiness/artroom-derive",
+      "result": "initial failure: CapabilityRecord export collision and TypeScript narrowing/unused errors",
+      "capture": "original redirected command output, not reconstructed transcript"
+    },
+    {
+      "path": "/tmp/artroom-bundle-domain-repair-evidence/control-domain.log",
+      "bytes": 2614,
+      "sha256": "f230867a9d656835a34b163345a096c39d3c5d1ebe751748021d0b7b05f85498",
+      "sourceAttribution": "working tree committed as domain repair",
+      "preparedFor": "3c9b0e3fe5de7109fbc709534267f7968606c3e0",
+      "argv": [
+        "node",
+        "scripts/control.mjs",
+        "packages/derive/src/bundle-closure.ts",
+        "if (kind && id !== (domain ? semanticContentId(domain, artifact.value) : artifact.ref.digest)) fail(\"content\", \"reference.domain\");",
+        "void domain;",
+        "--expect",
+        "canonical bytes/closed fields",
+        "--",
+        "packages/derive",
+        "bundle.test.ts"
+      ],
+      "result": "unchanged baseline: four tests passed; one assertion failed with only named guard removed; DISTINGUISHES; helper restored source",
+      "capture": "original redirected command output, not reconstructed transcript"
+    },
+    {
+      "path": "/tmp/artroom-bundle-domain-repair-evidence/types.log",
+      "bytes": 302,
+      "sha256": "e91e4eb7853b95c405400a3821d2a82ce6a15ccdfe4e921a02249e5af81907a3",
+      "sourceAttribution": "working tree committed as domain repair",
+      "preparedFor": "3c9b0e3fe5de7109fbc709534267f7968606c3e0",
+      "command": "npm run typecheck --workspace @generalbusiness/artroom-contract --workspace @generalbusiness/artroom-bytes --workspace @generalbusiness/artroom-derive",
+      "result": "contract, bytes and derive workspace typechecks passed",
+      "capture": "original redirected command output, not reconstructed transcript"
+    },
+    {
+      "path": "/tmp/artroom-bundle-metadata-repair-evidence/control-metadata.log",
+      "bytes": 2763,
+      "sha256": "a4ff105233cab13e7fb3985803f3b38380ee284ef7847d07b26f27f318a5e375",
+      "sourceAttribution": "working tree committed as first metadata repair; superseded by canonical-byte API",
+      "preparedFor": "522167cd7709f65728a42d549414cc491daff3ba",
+      "argv": [
+        "node",
+        "scripts/control.mjs",
+        "packages/derive/src/bundle-closure.ts",
+        "if (metadataBytes > limits.bytes) fail(\"limits\", `${path}.metadata-bytes`);",
+        "void metadataBytes;",
+        "--expect",
+        "canonical bytes/closed fields",
+        "--",
+        "packages/derive",
+        "bundle.test.ts"
+      ],
+      "result": "unchanged baseline: four tests passed; one assertion failed with only named guard removed; DISTINGUISHES; helper restored source",
+      "capture": "original redirected command output, not reconstructed transcript"
+    },
+    {
+      "path": "/tmp/artroom-bundle-metadata-repair-evidence/types.log",
+      "bytes": 302,
+      "sha256": "e91e4eb7853b95c405400a3821d2a82ce6a15ccdfe4e921a02249e5af81907a3",
+      "sourceAttribution": "working tree committed as first metadata repair; superseded by canonical-byte API",
+      "preparedFor": "522167cd7709f65728a42d549414cc491daff3ba",
+      "command": "npm run typecheck --workspace @generalbusiness/artroom-contract --workspace @generalbusiness/artroom-bytes --workspace @generalbusiness/artroom-derive",
+      "result": "contract, bytes and derive workspace typechecks passed",
+      "capture": "original redirected command output, not reconstructed transcript"
+    },
+    {
+      "path": "/tmp/artroom-bundle-reference-bytes-evidence/control-metadata-bound.log",
+      "bytes": 2771,
+      "sha256": "586705a012f975e094c377f9266ceed7b10f80198ec0dcf9ac637b8985e91ed2",
+      "sourceAttribution": "final canonical-reference-byte repair working tree, unchanged through source commit",
+      "preparedFor": "25a6736ceba38f633c85be605f4b97538fd01f74",
+      "argv": [
+        "node",
+        "scripts/control.mjs",
+        "packages/derive/src/bundle-records.ts",
+        "if (bytes.length > limits.bytes) fail(\"limits\", \"bytes\");",
+        "void bytes.length;",
+        "--expect",
+        "canonical bytes/closed fields",
+        "--",
+        "packages/derive",
+        "bundle.test.ts"
+      ],
+      "result": "unchanged baseline: four tests passed; one assertion failed with only named guard removed; DISTINGUISHES; helper restored source",
+      "capture": "original redirected command output, not reconstructed transcript"
+    },
+    {
+      "path": "/tmp/artroom-bundle-reference-bytes-evidence/types.log",
+      "bytes": 302,
+      "sha256": "e91e4eb7853b95c405400a3821d2a82ce6a15ccdfe4e921a02249e5af81907a3",
+      "sourceAttribution": "final canonical-reference-byte repair working tree, unchanged through source commit",
+      "preparedFor": "25a6736ceba38f633c85be605f4b97538fd01f74",
+      "command": "npm run typecheck --workspace @generalbusiness/artroom-contract --workspace @generalbusiness/artroom-bytes --workspace @generalbusiness/artroom-derive",
+      "result": "contract, bytes and derive workspace typechecks passed",
+      "capture": "original redirected command output, not reconstructed transcript"
+    }
+  ],
+  "limits": [
+    "all evidence uses made-up Node data; no historical schema/executable/admission/trust correspondence proved",
+    "graph success is declared content correspondence; signatures have separate cryptographic checks",
+    "current artroom-definition-1 digest subset only; generic historical ABI/domain interpretation remains held",
+    "canonical reference bytes are validated; original host fields serialized away are not asserted validated",
+    "no runtime/replay selection, production loader, network/dynamic imports, acquisition, gate, provider, activation or main change"
+  ],
+  "documentationSuccessor": "note and manifest only; no source/test changes or reruns"
+}
