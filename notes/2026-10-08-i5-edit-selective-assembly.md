@@ -209,10 +209,68 @@ was patched, stubbed, imported or relabelled as complete. All original tests
 and failed restart evidence remain.
 
 Exact source/parent/body and raw log hashes are retained in
-/tmp/artroom-source-composition-preservation.json, SHA256 11a124aa31c52a990bfbc979b756a1de0cac7749bb2de0c590c2755d35202110.
+/tmp/artroom-source-composition-preservation.json, SHA256 5060e4540f982debe2eed64ab2582de99158289e681455740ca0b2de16a91fd1.
 Raw focused output: /tmp/artroom-source-composition-focused.log; affected type
 outputs: /tmp/artroom-source-composition-{scope,platform,checkers,cli,lanes}-types.log.
 No story/site/c4 wire, provider/browser, matrix, broader suite, control, gate,
 main or activation was added. Actual ABI/image/supplier/trust/current-context/
 auxiliary/custody/drain/capacity, full functionality, normal complete Source
 review, final integrated gate and ordered filing/landing remain owed.
+
+
+## Pure sealed checker intake preparation
+
+This isolated preparation continues requests `50b608c8ab49bc06f21045620226ad535db87fdf`
+and `9be26ef7e1a4aac138bc0637d7ed121e26fcd105`, under adopted design
+`721c2f816cd034e762fa8278de02d4d4354dcc88` and adoption `7349458bc1f40004535434363111e0341b7f97c5`.
+Base is composition `1129e9cf8f9be2a3864908f6e31087df704e6d2d`.
+
+The separate `packages/checkers/src/one-file-intake.ts` reads only supplied
+sealed evidence. It checks the full configured lane and rules references,
+job and manifest hashes, signed act address and opening kind, unique opening
+and immutable slots, signed field/effect correspondence, job manifest/tree,
+explicit target and complete configuration selector. The file content must
+match its UTF-8 size and digest. Deadline follows the exact loaded row's time
+source. No notice name/tree or missing integration selects a mode or domain.
+
+The caller must supply an externally reviewed loaded lane contract and the
+actual retained definition bytes. Both canonical records must match exactly,
+with the pinned and configured activation digest. Only the current declared
+`artroom-definition-1` digest domain and supported opening grammar are read;
+this is neither a historical ABI interpreter nor full definition validation.
+Manifest tree slots may retain their declared optional requirement: the
+supported opening itself must always write the mandatory signed tree. The
+one-file ABI is an explicit loaded-contract binding, not a new invented lane
+field. Absent or unsupported context remains unavailable.
+
+Configured rules reads and compatibility are typed input contracts only.
+Intake success means local evidence consistency, not authority or permission
+to run. In particular an integration target with a domain-2 selector is still
+reported as evidence for a later incompatibility decision. No service, runner,
+signer, durable store, mint, acquisition, catalog, export subpath or dependency
+is enabled or changed. Actual successor row allocation, protected original
+admission history, whole-definition/source/executable correspondence, retained
+ABI artifact closure, immutable image/adapter binding, configured authorized
+reads, custody, capacity and executor proofs remain prerequisites.
+
+Two compact Node witnesses use explicitly hand-sealed signed entries and a
+made-up locally loaded definition. No scope admitted them and no actual ABI
+or image artifact is claimed. File and integration evidence derive; substituted
+signed/effect path, absent target, invalid signature, substituted retained
+bytes, wrong rules incarnation, missing ABI/context and digest-only old job
+remain unavailable. Legacy intake and its behavior remain separate.
+
+Commands were `./node_modules/.bin/vitest run --project checkers
+packages/checkers/test/one-file-intake.test.ts` (2 passed), the corresponding
+`one-file-contract.test.ts` run (2 passed), and
+`./node_modules/.bin/tsc -p packages/checkers/tsconfig.test.json` (passed).
+Raw logs are `/tmp/artroom-check-target-intake-evidence/focused.log`,
+`f6-preservation.log` and `types-final.log`; the initial type narrowing errors
+remain in `types.log`. `control.log` records the one guard-removal control:
+dropping signed/effect correspondence wrongly derives the substituted path
+fixture, failing the target-unavailable assertion. The source was restored.
+`preservation.json` records exact unchanged legacy intake/service/runner/signing/
+store/configuration/outcome/index, package/lock and composed GitHub host bytes
+against base. Dependencies were borrowed with local workspace links; no
+package installation occurred. No gate, provider, deployment, wire adoption,
+activation, actual checker composition or request closure is claimed.

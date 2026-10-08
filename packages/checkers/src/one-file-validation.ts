@@ -56,6 +56,8 @@ function checkout(v: unknown): asserts v is OneFileCheckout {
   else demand(r["confirmed"] === true && exactly(v, ["confirmed", "head", "indexTree", "worktreeTree"]) && isObjectId(r["head"]) && isObjectId(r["indexTree"]) && isObjectId(r["worktreeTree"]));
 }
 export const readSelector = (bytes: unknown, limits: CheckReadLimits): CheckValidation<ConfigurationSelector> => parse(bytes, limits, selector);
+/** Bounded canonical data only; callers must apply their own exact grammar and trust binding. */
+export const readCanonicalCheckValue = (bytes: unknown, limits: CheckReadLimits): CheckValidation<unknown> => parse(bytes, limits, () => {});
 export function readCheckTarget(bytes: unknown, limits: CheckReadLimits): CheckValidation<CheckTarget> {
   return parse(bytes, limits, (v) => {
     if (exactly(v, ["kind", "manifest", "base", "commit", "tree"]) && v["kind"] === "integration") { demand(isFactRef(v["manifest"]) && isObjectId(v["base"]) && isObjectId(v["commit"]) && isObjectId(v["tree"])); return; }
