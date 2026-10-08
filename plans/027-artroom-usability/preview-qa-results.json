@@ -1,0 +1,400 @@
+{
+  "browser": "Existing cached Playwright 1.63.0, bundled Chromium",
+  "errors": [],
+  "results": [
+    {
+      "screen": "issues",
+      "device": "desktop",
+      "sample": "populated",
+      "theme": "light",
+      "width": 992,
+      "scrollWidth": 990,
+      "duplicates": [],
+      "clipped": []
+    },
+    {
+      "screen": "changes",
+      "device": "desktop",
+      "sample": "populated",
+      "theme": "light",
+      "width": 992,
+      "scrollWidth": 990,
+      "duplicates": [],
+      "clipped": []
+    },
+    {
+      "screen": "create",
+      "device": "desktop",
+      "sample": "populated",
+      "theme": "light",
+      "width": 992,
+      "scrollWidth": 990,
+      "duplicates": [],
+      "clipped": []
+    },
+    {
+      "screen": "rules",
+      "device": "desktop",
+      "sample": "populated",
+      "theme": "light",
+      "width": 992,
+      "scrollWidth": 990,
+      "duplicates": [],
+      "clipped": []
+    },
+    {
+      "screen": "issues",
+      "device": "390",
+      "sample": "populated",
+      "theme": "light",
+      "width": 390,
+      "scrollWidth": 388,
+      "duplicates": [],
+      "clipped": []
+    },
+    {
+      "screen": "changes",
+      "device": "390",
+      "sample": "populated",
+      "theme": "light",
+      "width": 390,
+      "scrollWidth": 388,
+      "duplicates": [],
+      "clipped": []
+    },
+    {
+      "screen": "create",
+      "device": "390",
+      "sample": "populated",
+      "theme": "light",
+      "width": 390,
+      "scrollWidth": 388,
+      "duplicates": [],
+      "clipped": []
+    },
+    {
+      "screen": "rules",
+      "device": "390",
+      "sample": "populated",
+      "theme": "light",
+      "width": 390,
+      "scrollWidth": 388,
+      "duplicates": [],
+      "clipped": []
+    },
+    {
+      "screen": "issues",
+      "device": "320",
+      "sample": "populated",
+      "theme": "light",
+      "width": 320,
+      "scrollWidth": 318,
+      "duplicates": [],
+      "clipped": []
+    },
+    {
+      "screen": "changes",
+      "device": "320",
+      "sample": "populated",
+      "theme": "light",
+      "width": 320,
+      "scrollWidth": 318,
+      "duplicates": [],
+      "clipped": []
+    },
+    {
+      "screen": "create",
+      "device": "320",
+      "sample": "populated",
+      "theme": "light",
+      "width": 320,
+      "scrollWidth": 318,
+      "duplicates": [],
+      "clipped": []
+    },
+    {
+      "screen": "rules",
+      "device": "320",
+      "sample": "populated",
+      "theme": "light",
+      "width": 320,
+      "scrollWidth": 318,
+      "duplicates": [],
+      "clipped": []
+    },
+    {
+      "screen": "detail",
+      "device": "desktop",
+      "sample": "review",
+      "theme": "light",
+      "width": 992,
+      "scrollWidth": 990,
+      "duplicates": [],
+      "clipped": []
+    },
+    {
+      "screen": "detail",
+      "device": "desktop",
+      "sample": "path",
+      "theme": "light",
+      "width": 992,
+      "scrollWidth": 990,
+      "duplicates": [],
+      "clipped": []
+    },
+    {
+      "screen": "detail",
+      "device": "desktop",
+      "sample": "pending",
+      "theme": "light",
+      "width": 992,
+      "scrollWidth": 990,
+      "duplicates": [],
+      "clipped": []
+    },
+    {
+      "screen": "detail",
+      "device": "desktop",
+      "sample": "published",
+      "theme": "light",
+      "width": 992,
+      "scrollWidth": 990,
+      "duplicates": [],
+      "clipped": []
+    },
+    {
+      "screen": "issues",
+      "device": "desktop",
+      "sample": "empty",
+      "theme": "light",
+      "width": 992,
+      "scrollWidth": 990,
+      "duplicates": [],
+      "clipped": []
+    },
+    {
+      "screen": "detail",
+      "device": "390",
+      "sample": "review",
+      "theme": "light",
+      "width": 390,
+      "scrollWidth": 388,
+      "duplicates": [],
+      "clipped": []
+    },
+    {
+      "screen": "detail",
+      "device": "390",
+      "sample": "path",
+      "theme": "light",
+      "width": 390,
+      "scrollWidth": 388,
+      "duplicates": [],
+      "clipped": []
+    },
+    {
+      "screen": "detail",
+      "device": "390",
+      "sample": "pending",
+      "theme": "light",
+      "width": 390,
+      "scrollWidth": 388,
+      "duplicates": [],
+      "clipped": []
+    },
+    {
+      "screen": "detail",
+      "device": "390",
+      "sample": "published",
+      "theme": "light",
+      "width": 390,
+      "scrollWidth": 388,
+      "duplicates": [],
+      "clipped": []
+    },
+    {
+      "screen": "issues",
+      "device": "390",
+      "sample": "empty",
+      "theme": "light",
+      "width": 390,
+      "scrollWidth": 388,
+      "duplicates": [],
+      "clipped": []
+    },
+    {
+      "screen": "detail",
+      "device": "320",
+      "sample": "review",
+      "theme": "light",
+      "width": 320,
+      "scrollWidth": 318,
+      "duplicates": [],
+      "clipped": []
+    },
+    {
+      "screen": "detail",
+      "device": "320",
+      "sample": "path",
+      "theme": "light",
+      "width": 320,
+      "scrollWidth": 318,
+      "duplicates": [],
+      "clipped": []
+    },
+    {
+      "screen": "detail",
+      "device": "320",
+      "sample": "pending",
+      "theme": "light",
+      "width": 320,
+      "scrollWidth": 318,
+      "duplicates": [],
+      "clipped": []
+    },
+    {
+      "screen": "detail",
+      "device": "320",
+      "sample": "published",
+      "theme": "light",
+      "width": 320,
+      "scrollWidth": 318,
+      "duplicates": [],
+      "clipped": []
+    },
+    {
+      "screen": "issues",
+      "device": "320",
+      "sample": "empty",
+      "theme": "light",
+      "width": 320,
+      "scrollWidth": 318,
+      "duplicates": [],
+      "clipped": []
+    },
+    {
+      "screen": "issues",
+      "device": "desktop",
+      "sample": "populated",
+      "theme": "light",
+      "width": 992,
+      "scrollWidth": 990,
+      "duplicates": [],
+      "clipped": []
+    },
+    {
+      "screen": "issues",
+      "device": "320",
+      "sample": "empty",
+      "theme": "light",
+      "width": 320,
+      "scrollWidth": 318,
+      "duplicates": [],
+      "clipped": []
+    },
+    {
+      "screen": "create",
+      "device": "320",
+      "sample": "populated",
+      "theme": "light",
+      "width": 320,
+      "scrollWidth": 318,
+      "duplicates": [],
+      "clipped": []
+    },
+    {
+      "screen": "detail",
+      "device": "desktop",
+      "sample": "review",
+      "theme": "light",
+      "width": 992,
+      "scrollWidth": 990,
+      "duplicates": [],
+      "clipped": []
+    },
+    {
+      "screen": "detail",
+      "device": "320",
+      "sample": "review",
+      "theme": "light",
+      "width": 320,
+      "scrollWidth": 318,
+      "duplicates": [],
+      "clipped": []
+    },
+    {
+      "screen": "detail",
+      "device": "320",
+      "sample": "path",
+      "theme": "light",
+      "width": 320,
+      "scrollWidth": 318,
+      "duplicates": [],
+      "clipped": []
+    },
+    {
+      "screen": "rules",
+      "device": "320",
+      "sample": "populated",
+      "theme": "light",
+      "width": 320,
+      "scrollWidth": 318,
+      "duplicates": [],
+      "clipped": []
+    },
+    {
+      "screen": "issues",
+      "device": "desktop",
+      "sample": "populated",
+      "theme": "light",
+      "width": 992,
+      "scrollWidth": 990,
+      "duplicates": [],
+      "clipped": []
+    },
+    {
+      "screen": "detail",
+      "device": "320",
+      "sample": "path",
+      "theme": "light",
+      "width": 320,
+      "scrollWidth": 318,
+      "duplicates": [],
+      "clipped": []
+    },
+    {
+      "screen": "issues",
+      "device": "390",
+      "sample": "populated",
+      "theme": "dark",
+      "width": 390,
+      "scrollWidth": 388,
+      "duplicates": [],
+      "clipped": []
+    },
+    {
+      "screen": "issues",
+      "device": "desktop",
+      "sample": "populated",
+      "theme": "light",
+      "width": 288,
+      "scrollWidth": 286,
+      "duplicates": [],
+      "clipped": []
+    }
+  ],
+  "interactions": [
+    "search",
+    "clear filters",
+    "create issue",
+    "room name/address",
+    "create room",
+    "files",
+    "proposal preview",
+    "approve version",
+    "publish sample",
+    "fix path",
+    "review/apply rules",
+    "sidebar navigation"
+  ]
+}
