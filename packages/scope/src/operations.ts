@@ -262,21 +262,26 @@ export class Operations {
    * Whether the outside port now accepts the kind of an attempt that a pass of this life left unsent because it did not. Bounded:
    * it asks about at most one batch of them, and writes nothing. A pass that finds one starts the walk again (`#pass`).
    */
-  reaccepted(): boolean {
-    let asked = 0;
-    for (const { owner, kind } of this.#refused.values()) {
-      if (asked++ >= this.#bounds.deliveryBatch) return false;
-      if (this.#outside.accepts(owner, kind)) return true;
-    }
-    return false;
-  }
-  /** As `reaccepted`, and each attempt found accepted is let go: the walk looks at it once, and a pass that still cannot send it records it again. */
-  #accepted(): boolean {
+  reaccepted(): boolean { return this.#accepted(false); }
+
+  /** Bounded rotating inspection of the in-memory refused queue. A read
+   * leaves an accepted entry first, so its following pass sees that same
+   * entry; a pass removes accepted entries and restarts the durable walk. */
+  #accepted(remove = true): boolean {
     let found = false;
-    let asked = 0;
-    for (const [key, { owner, kind }] of [...this.#refused]) {
-      if (asked++ >= this.#bounds.deliveryBatch) break;
-      if (this.#outside.accepts(owner, kind)) { this.#refused.delete(key); found = true; }
+    const limit = Math.min(this.#bounds.deliveryBatch, this.#refused.size);
+    for (let n = 0; n < limit; n++) {
+      const first = this.#refused.entries().next().value;
+      if (!first) break;
+      const [key, refused] = first;
+      if (this.#outside.accepts(refused.owner, refused.kind)) {
+        if (!remove) return true;
+        this.#refused.delete(key);
+        found = true;
+      } else {
+        this.#refused.delete(key);
+        this.#refused.set(key, refused);
+      }
     }
     return found;
   }

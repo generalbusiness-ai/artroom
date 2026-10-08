@@ -165,3 +165,38 @@ full site, navigation, browser, workspace or device obligations. Original
 source/history/admission, current tuple, custody, actual sends and cleanup,
 required checks, retention and capacity proofs remain explicit. Parked
 designs are preserved on their own branches and supply no activation.
+
+
+## Bounded same-life acceptance detection
+
+Finding `d6d547efb406b17be2070370f6e8039339ea98ea` identifies a
+conditional generic Outside gap: an unsupported insertion prefix could
+hide a later accepted attempt forever while the parked walk had ended.
+The consuming scan also copied the whole in-memory refused map before
+its bounded predicate checks. No native provider selective reacceptance
+or measured capacity failure is inferred from that finding.
+
+From `17a568f86e381c080d1c1e0ee16a2308f77388d9`, one shared scan
+rotates still-unsupported entries after at most `deliveryBatch` checks,
+without copying the map. Detection leaves an accepted entry first for the
+following pass, which removes it and restarts the existing durable walk.
+Only the scan region changes. The original durable rows, marks and exact
+requests, marked-attempt no-resend branch, recovery/null handling and
+alarm policy remain byte-equal. Memory order is not authority or a new
+persistence engine; existing actual capacity obligations remain.
+
+The existing same-life reacceptance witness now puts two unsupported
+attempts before a later enabled kind with a one-row batch. It checks the
+cheap read-side predicate bound, detection within three reads, completion
+through the existing immediate walk alarms, intact unsent pending prefix,
+exact opening origin, and one original send with no resend. The generic
+Outside/owner/opening are scripted; the scope and storage are real.
+
+One final focused witness passes (1 test, 10 filtered), and Scope source
+and test typechecks pass. Restoring the old prefix scan fails the explicit
+`detected` assertion, with source restored in `finally`. The first failed
+witness used event-loop ticks rather than driving the existing alarms;
+its log remains diagnostic, not a source-failure claim. Exact commands,
+source bounds, raw logs and control bytes are retained in
+`/tmp/artroom-expanded-reacceptance-evidence.json`. No full-file rerun,
+gate, provider/cloud run, crash/restart substitution or activation.
