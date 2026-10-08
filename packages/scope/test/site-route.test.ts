@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
 import { afterAll, beforeAll, expect, test, vi } from "vitest";
 import type { Intent, Seed } from "@generalbusiness/artroom-contract";
-import { canonicalize, intentDigest, scopeIdOf, signIntent, utf8 } from "@generalbusiness/artroom-bytes";
+import { canonicalize, intentDigest, scopeIdOf, signIntent, timeMs, timeOf, utf8 } from "@generalbusiness/artroom-bytes";
 import { keys } from "@generalbusiness/artroom-derive/testing";
 import { DIRECTORY, REGISTER } from "@generalbusiness/artroom-platform";
 import { idOf, snapshotCommit, type SnapshotFile } from "@generalbusiness/artroom-git";
@@ -9,7 +9,7 @@ import { buildPack, type RawGitObject } from "@generalbusiness/artroom-git/http"
 import type { ArtifactsNamespace } from "../src/artifacts-host.ts";
 import { artifactsOutside } from "../src/artifacts-wiring.ts";
 import type { SiteEnv } from "../src/site/host.ts";
-import { FILE_BYTES, redacted, site } from "../src/site/route.ts";
+import { FILE_BYTES, etagOf, redacted, site } from "../src/site/route.ts";
 import { net } from "../src/testing.ts";
 import { soon } from "./net.ts";
 import { Platform, rita, sam, settle } from "./repository.ts";
@@ -52,6 +52,8 @@ class Scripted {
   /** What the service is scripted to answer: the field that holds a minted token, the remote that `info` reports, and a failure. */
   tokenField: "plaintext" | "token" = "plaintext";
   reported: ((name: string) => string) | null = null;
+  tokenReply: ((plaintext: string) => unknown) | null = null;
+  cleanup: (() => unknown) | null = null;
   failing: "get" | "info" | "token" | "refs" | "pack" | null = null;
   readonly remote = (name: string) => `https://${SERVICE}/git/${NAMESPACE}/${name}.git`;
   readonly ns: ArtifactsNamespace = {
@@ -63,9 +65,14 @@ class Scripted {
           if (this.failing === "token") throw new Error("scripted: createToken refused");
           const plaintext = `read-plaintext-${this.minted.length + 1}`;
           this.minted.push(plaintext);
-          return { id: `tok-${this.minted.length}`, [this.tokenField]: plaintext, scope, expiresAt: "2026-10-07T13:15:00Z" };
+          if (this.tokenReply) return this.tokenReply(plaintext);
+          return { id: `tok-${this.minted.length}`, [this.tokenField]: plaintext, scope, expiresAt: timeOf(timeMs(net.clock.now)! + 600_000) };
         },
-        revokeToken: async (token) => { this.revoked.add(token); return true; },
+        revokeToken: async (token) => {
+          const answer = this.cleanup ? this.cleanup() : true;
+          if (answer === true) this.revoked.add(token);
+          return answer;
+        },
         info: async () => {
           if (this.failing === "info") throw new Error("scripted: info failed");
           return { name, remote: (this.reported ?? this.remote)(name) };
@@ -119,7 +126,7 @@ const host = new Scripted();
 let D: Platform;
 let R: Platform;
 let siteEnv: SiteEnv;
-const get = (path: string, init?: RequestInit, environment: SiteEnv = siteEnv) => site(new Request(`https://scopes.test${path}`, init), environment, host.fetch);
+const get = (path: string, init?: RequestInit, environment: SiteEnv = siteEnv) => site(new Request(`https://scopes.test${path}`, init), environment, host.fetch, () => timeMs(net.clock.now)!);
 const prior = { hold: net.hold, deaf: net.deaf };
 
 beforeAll(async () => {
@@ -257,8 +264,8 @@ test("refusals: a missing page, a bad ref, a file over the size bound at the rea
 });
 
 // Invariant: the ETag is the commit and the path: the same for the same commit and path, new for a new commit or another path,
-// and a request that names it is answered 304 before any object is read.
-test("cache: same commit, same ETag, and If-None-Match answers 304 without reading the pack; a new commit, a new ETag (STAND-IN host)", async () => {
+// and a request that names it is answered 304 only after its path is checked.
+test("cache: same commit, same ETag, and If-None-Match answers 304 after validating the path; a new commit, a new ETag (STAND-IN host)", async () => {
   const at = `/site/${D.name}/moving/docs/guide.md`;
   const first = await get(at);
   const etag = first.headers.get("etag")!;
@@ -269,8 +276,17 @@ test("cache: same commit, same ETag, and If-None-Match answers 304 without readi
   const packs = host.packs;
   const unchanged = await get(at, { headers: { "if-none-match": etag } });
   expect([unchanged.status, await unchanged.text(), unchanged.headers.get("etag")]).toEqual([304, "", etag]);
-  expect(host.packs).toBe(packs);
+  // A guessed validator or wildcard cannot make a missing path, a file
+  // addressed as a directory into a successful cache hit.
+  for (const path of ["docs/missing.md", "docs/guide.md/", "docs/guide.md/child"]) {
+    const guessed = await etagOf(host.refs.get("refs/heads/moving")!, path);
+    for (const validator of [guessed, "*"]) {
+      const absent = await get(`/site/${D.name}/moving/${path}`, { headers: { "if-none-match": validator } });
+      expect([absent.status, (await absent.text()).startsWith("not-found:")]).toEqual([404, true]);
+    }
+  }
 
+  expect(host.packs).toBeGreaterThan(packs);
   host.refs.set("refs/heads/moving", host.commit({ "docs/guide.md": "# Guide, again\n" }, "second\n"));
   const moved = await get(at, { headers: { "if-none-match": etag } });
   expect(moved.status).toBe(200);
@@ -331,4 +347,39 @@ test("an empty tree: the root of a commit with no files answers a page that says
   const empty = await get(`/site/${D.name}/empty/`);
   expect([empty.status, empty.headers.get("content-type")]).toEqual([200, "text/html; charset=utf-8"]);
   expect(await empty.text()).toContain("<h1>empty</h1>\n<p>The repository has no files at this commit.</p>");
+});
+
+// Invariant: unacceptable returned token scope/expiry stops HTTP and cleans
+// usable plaintext; cleanup false or loss gives a refusal, never success.
+test("site token replies require read scope and reported ISO expiry; unconfirmed cleanup withholds the page without claiming a retained duty (STAND-IN host)", async () => {
+  const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+  const at = `/site/${D.name}/HEAD/README.md`;
+  try {
+    for (const reply of [
+      { scope: "write", expiresAt: timeOf(timeMs(net.clock.now)! + 600_000) },
+      { expiresAt: timeOf(timeMs(net.clock.now)! + 600_000) },
+      { scope: "read" },
+      { scope: "read", expiresAt: "2026-02-30T13:15:00Z" },
+      { scope: "read", expiresAt: 1791378900000 },
+      { scope: "read", expiresAt: net.clock.now },
+    ]) {
+      host.tokenReply = (plaintext) => ({ plaintext, ...reply });
+      const packs = host.packs;
+      const answer = await get(at);
+      expect([answer.status, answer.headers.get("x-site-step")]).toEqual([502, "token"]);
+      expect(host.revoked.has(host.minted.at(-1)!)).toBe(true);
+      expect(host.packs).toBe(packs);
+    }
+    host.tokenReply = (plaintext) => ({ plaintext, scope: "read", expiresAt: timeOf(timeMs(net.clock.now)! + 600_000).replace(/Z$/, ".000Z") });
+    expect((await get(at)).status).toBe(200);
+    for (const cleanup of [() => false, () => { throw new Error("read-plaintext-sensitive"); }]) {
+      host.cleanup = cleanup;
+      const answer = await get(at);
+      expect([answer.status, answer.headers.get("x-site-step"), answer.headers.get("cache-control"), await answer.text()]).toEqual([502, "cleanup", "no-store", "unreadable: read token revocation was not confirmed\n"]);
+      expect(host.revoked.has(host.minted.at(-1)!)).toBe(false);
+      expect(spy.mock.calls.flat().join(" ")).not.toContain("read-plaintext");
+    }
+  } finally {
+    host.tokenReply = null; host.cleanup = null; spy.mockRestore();
+  }
 });

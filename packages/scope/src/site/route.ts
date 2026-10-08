@@ -21,7 +21,7 @@
  *
  * Every answer of a file carries an `ETag` of the commit and the path, and
  * `Cache-Control`. A request whose `If-None-Match` names that tag is
- * answered 304 once the ref is read, and nothing more is read.
+ * answered 304 after the commit and path have been checked; its blob is not rendered.
  *
  * A refusal is plain text: the reason, a colon and a sentence, with the
  * status that says the same, and `Cache-Control: no-store`. Its body holds
@@ -145,7 +145,7 @@ async function commitOf(reader: Reader, ref: string, branch: string, at: (step: 
     refName(name, "site ref");
     let id = await reader.ref(name);
     if (id === null) continue;
-    // A branch names a commit, and the commit's own read checks it, after the cheap answer of a cached page. A tag may name a tag.
+    // A branch names a commit; its own read checks it before any cached answer. A tag may name a tag.
     if (name.startsWith("refs/heads/")) return id;
     at("objects");
     for (let depth = 0; ; depth++) {
@@ -193,7 +193,7 @@ ${body}</main>
 }
 
 /** One request to the site route. `fetch`: the transport to the Git host, for a test's scripted host. */
-export async function site(request: Request, env: SiteEnv, fetch?: (request: Request) => Promise<Response>): Promise<Response> {
+export async function site(request: Request, env: SiteEnv, fetch?: (request: Request) => Promise<Response>, now: () => number = Date.now): Promise<Response> {
   const url = new URL(request.url);
   if (credentialInUrl(url)) return refused("bad-request", "a credential in an address is not used");
   if (request.method !== "GET") return refused("method-not-allowed", "the site answers GET only");
@@ -217,7 +217,7 @@ export async function site(request: Request, env: SiteEnv, fetch?: (request: Req
     return refused("unreadable", "the room could not be read", "room");
   }
   if (!room) return refused("not-found", "no room has that directory");
-  const open = readerOf(env, room, fetch);
+  const open = readerOf(env, room, fetch, now);
   if (!open) return refused("host-not-configured", "this deployment does not read that room's repository");
 
   let opened: Opened;
@@ -237,7 +237,6 @@ export async function site(request: Request, env: SiteEnv, fetch?: (request: Req
     if (commit === null) return refused("ref-not-found", "no branch or tag has that name");
     const etag = await etagOf(commit, path.join("/") + (trailing ? "/" : ""));
     const cached = { etag, "cache-control": `public, max-age=${MAX_AGE}` };
-    if (matches(request.headers.get("if-none-match"), etag)) return new Response(null, { status: 304, headers: cached });
 
     // The path, segment by segment, from the commit's tree.
     at("objects");
@@ -251,6 +250,8 @@ export async function site(request: Request, env: SiteEnv, fetch?: (request: Req
     }
     if (entry !== null && entry.kind !== "tree" && trailing && path.length > 0) return refused("not-found", "no directory is at that path");
     if (entry !== null && (entry.kind === "gitlink" || entry.mode === "120000")) return refused("not-found", "a submodule or a symbolic link is not served");
+
+    if (matches(request.headers.get("if-none-match"), etag)) return new Response(null, { status: 304, headers: cached });
 
     const prefix = `/site/${segment(directory)}/${segment(ref)}/`;
     const href = (parts: readonly string[], dir: boolean) => prefix + parts.map(segment).join("/") + (dir && parts.length > 0 ? "/" : "");
@@ -294,6 +295,13 @@ export async function site(request: Request, env: SiteEnv, fetch?: (request: Req
     if (e instanceof GitRefusal && e.reason === "bad-ref-name") return refused("ref-not-found", "no branch or tag has that name", step);
     return refused("unreadable", "the repository could not be read", step);
   } finally {
-    await opened.close();
+    // This stateless reader cannot retain a cleanup duty. Withholding the
+    // response reports uncertainty; it is no proof the token was revoked.
+    let revoked = false;
+    try { revoked = await opened.close(); } catch { /* no confirmed cleanup */ }
+    if (!revoked) {
+      logged("cleanup", new StepError("cleanup", "read token revocation was not confirmed"), opened);
+      return refused("unreadable", "read token revocation was not confirmed", "cleanup");
+    }
   }
 }
