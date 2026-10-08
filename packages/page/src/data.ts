@@ -33,7 +33,7 @@
  * is shown as its reason.
  */
 
-import type { Answer, DeclaredDefinition, Digest, Entry, FactRef, FieldValue, Head, Item, KeyId, MemberRef, ScopeId, ScopeRef, Summary } from "@generalbusiness/artroom-contract";
+import type { Answer, DeclaredDefinition, Digest, Entry, FactRef, FieldValue, Head, Item, KeyId, MemberRef, ScopeId, ScopeRef, Summary, Read } from "@generalbusiness/artroom-contract";
 import { LATE, b64url, isScopeId, isScopeRef as fullScopeRef, keyIdOfSecret, takeBytes, timeOf } from "@generalbusiness/artroom-bytes";
 import {
   ScopeHandle, declaredHandle, httpTransport, requestSession, secretSigner, sessionRequest, signedIntent, signedReads, type Fetch, type Session as ReadSession, type Signing, type Transport,
@@ -99,19 +99,32 @@ async function fresh(room: Room): Promise<void> {
 async function summaryOf(handle: ScopeHandle): Promise<{ summary: Summary; at: Head }> {
   const read = await handle.summary();
   if (!read.ok) throw new Unreadable(`Cannot read ${handle.scope}: ${read.reason}.`);
+  if (!read.complete || read.next !== undefined) throw new Unreadable(`Cannot read ${handle.scope}: incomplete summary.`);
   return { summary: read.value, at: read.at };
 }
 
-/** Every item of one type: the live ones from the summary, and the final ones the scope retains, page by page. */
-async function itemsOf(handle: ScopeHandle, summary: Summary, type: string): Promise<Item[]> {
-  const items = new Map<number, Item>(summary.items.filter((item) => item.type === type).map((item) => [item.id, item]));
-  for (let cursor: string | undefined, pages = 0; pages < 100; pages++) {
-    const page = await handle.items(type, cursor);
-    if (!page.ok) break;
-    for (const item of page.value) if (!items.has(item.id)) items.set(item.id, item);
-    if (page.next === undefined) break;
+/** Collect only a complete enumeration. Existing caller budgets stay unchanged. */
+async function pagesOf<T>(request: (cursor?: string) => Promise<Read<readonly T[]>>, what: string, budget: number, at: Head): Promise<T[]> {
+  const rows: T[] = [];
+  let cursor: string | undefined;
+  for (let pages = 0; pages < budget; pages++) {
+    const page = await request(cursor);
+    if (!page.ok) throw new Unreadable(`${what}: ${page.reason}.`);
+    if (page.at.seq !== at.seq || page.at.hash !== at.hash) throw new Unreadable(`${what}: head changed; enumeration incomplete.`);
+    rows.push(...page.value);
+    if (page.next === undefined) {
+      if (!page.complete) throw new Unreadable(`${what}: incomplete enumeration.`);
+      return rows;
+    }
     cursor = page.next;
   }
+  throw new Unreadable(`${what}: page budget exhausted; enumeration incomplete.`);
+}
+
+/** Every item of one type, only when retained-item enumeration completes. */
+async function itemsOf(handle: ScopeHandle, summary: Summary, type: string, at: Head): Promise<Item[]> {
+  const items = new Map<number, Item>(summary.items.filter((item) => item.type === type).map((item) => [item.id, item]));
+  for (const item of await pagesOf((cursor) => handle.items(type, cursor), `Cannot read ${type} items of ${handle.scope}`, 100, at)) if (!items.has(item.id)) items.set(item.id, item);
   return [...items.values()].sort((a, b) => a.id - b.id);
 }
 
@@ -236,9 +249,9 @@ export async function listLanes(room: Room): Promise<{ issues: LaneRow[]; change
     // The lane's own state, read from it; the index row is the lane's advisory copy. A final main item (a merged change, say)
     // is no longer in the summary: it is read from the scope's retained final items.
     const handle = handleOf(room, scope);
-    const lane = await handle.summary();
+    const { summary: lane, at } = await summaryOf(handle);
     const type = item.values["kind"] === "issue" ? "intent" : "proposal";
-    const main = lane.ok ? lane.value.items.find((i) => i.type === type) ?? (await itemsOf(handle, lane.value, type))[0] : undefined;
+    const main = lane.items.find((i) => i.type === type) ?? (await itemsOf(handle, lane, type, at))[0];
     rows.push({
       scope, number: typeof item.values["number"] === "number" ? item.values["number"] : null, kind: (text(item.values["kind"]) as LaneRow["kind"]) ?? null,
       title: text(main?.values["title"]) ?? text(item.values["title"]), state: main?.state ?? text(item.values["state"]), draft: typeof item.values["draft"] === "boolean" ? item.values["draft"] : null,
@@ -256,14 +269,15 @@ async function laneDefinition(room: Room, handle: ScopeHandle, summary: Summary)
   if (kept) return kept;
   const read = await handle.definition();
   if (!read.ok) throw new Unreadable(`Cannot read the definition of ${handle.scope}: ${read.reason}.`);
+  if (!read.complete || read.next !== undefined) throw new Unreadable(`Cannot read the definition of ${handle.scope}: incomplete.`);
   room.definitions.set(summary.definition, read.value);
   return read.value;
 }
 
 export interface Comment { id: number; author: string | null; state: string; body: string | null }
 
-const commentsOf = async (handle: ScopeHandle, summary: Summary): Promise<Comment[]> =>
-  Promise.all((await itemsOf(handle, summary, "comment")).map(async (c) => ({ id: c.id, author: memberOf(c.parties["author"]), state: c.state, body: await textOf(handle, c.values["body"]) })));
+const commentsOf = async (handle: ScopeHandle, summary: Summary, at: Head): Promise<Comment[]> =>
+  Promise.all((await itemsOf(handle, summary, "comment", at)).map(async (c) => ({ id: c.id, author: memberOf(c.parties["author"]), state: c.state, body: await textOf(handle, c.values["body"]) })));
 
 export interface IssueView {
   scope: ScopeId; definition: string; head: Head;
@@ -278,13 +292,13 @@ export async function loadIssue(room: Room, scope: ScopeId): Promise<IssueView> 
   const { summary, at } = await summaryOf(handle);
   const definition = await laneDefinition(room, handle, summary);
   if (definition.name !== "issue") throw new Unreadable(`${scope} is a lane under ${definition.name}, not an issue.`);
-  const intent = summary.items.find((item) => item.type === "intent") ?? (await itemsOf(handle, summary, "intent"))[0];
+  const intent = summary.items.find((item) => item.type === "intent") ?? (await itemsOf(handle, summary, "intent", at))[0];
   if (!intent) throw new Unreadable(`${scope} holds no issue.`);
   return {
     scope, definition: summary.definition, head: at,
     number: typeof intent.values["number"] === "number" ? intent.values["number"] : null, title: text(intent.values["title"]), body: await textOf(handle, intent.values["body"]),
     state: intent.state, closeReason: text(intent.values["closeReason"]), requester: memberOf(intent.parties["requester"]), assignees: membersOf(intent.parties["assignees"]),
-    conditions: Array.isArray(intent.values["conditions"]) ? (intent.values["conditions"] as string[]) : [], comments: await commentsOf(handle, summary),
+    conditions: Array.isArray(intent.values["conditions"]) ? (intent.values["conditions"] as string[]) : [], comments: await commentsOf(handle, summary, at),
   };
 }
 
@@ -330,7 +344,7 @@ export async function loadChange(room: Room, scope: ScopeId): Promise<ChangeView
   const { summary, at } = await summaryOf(handle);
   const definition = await laneDefinition(room, handle, summary);
   if (definition.name !== "change") throw new Unreadable(`${scope} is a lane under ${definition.name}, not a change.`);
-  const all = (type: string) => itemsOf(handle, summary, type);
+  const all = (type: string) => itemsOf(handle, summary, type, at);
   const proposal = summary.items.find((item) => item.type === "proposal") ?? (await all("proposal"))[0];
   if (!proposal) throw new Unreadable(`${scope} holds no proposal.`);
   const rulesItem = summary.items.find((item) => item.type === "rules");
@@ -357,34 +371,25 @@ export async function loadChange(room: Room, scope: ScopeId): Promise<ChangeView
       extents: Array.isArray(rulesItem.values["extents"]) ? (rulesItem.values["extents"] as unknown as Extent[]) : [],
       checks: Array.isArray(rulesItem.values["checks"]) ? (rulesItem.values["checks"] as unknown as { name: string; required: boolean }[]) : [],
     } : null,
-    comments: await commentsOf(handle, summary),
+    comments: await commentsOf(handle, summary, at),
   };
 }
 
 /** The destination's publications for one lane, by the lane's merge entry, each with the operations opened for it. */
 async function publicationsOf(room: Room, lane: ScopeId): Promise<Map<number, Publication>> {
   const G = handleOf(room, room.destination);
-  const read = await G.summary();
-  if (!read.ok) return new Map();
-  const items = (await itemsOf(G, read.value, "publication")).filter((item) => (item.refs["operation"] as FactRef | undefined)?.at.scope === lane);
+  const { summary, at } = await summaryOf(G);
+  const items = (await itemsOf(G, summary, "publication", at)).filter((item) => (item.refs["operation"] as FactRef | undefined)?.at.scope === lane);
   if (items.length === 0) return new Map();
-  const operations = operationsOf(await historyOf(G));
+  const operations = operationsOf(await historyOf(G, at));
   return new Map(items.map((item) => [
     (item.refs["operation"] as FactRef).seq,
     { id: item.id, state: item.state, reason: text(item.values["reason"]), operations: operations.filter((o) => o.for === item.id).map(({ for: _for, ...o }) => o) },
   ]));
 }
 
-async function historyOf(handle: ScopeHandle): Promise<Entry[]> {
-  const entries: Entry[] = [];
-  for (let cursor: string | undefined, pages = 0; pages < 1000; pages++) {
-    const page = await handle.history(cursor);
-    if (!page.ok) throw new Unreadable(`Cannot read the history of ${handle.scope}: ${page.reason}.`);
-    entries.push(...page.value.map((sealed) => sealed.entry));
-    if (page.next === undefined) break;
-    cursor = page.next;
-  }
-  return entries;
+async function historyOf(handle: ScopeHandle, at: Head): Promise<Entry[]> {
+  return (await pagesOf((cursor) => handle.history(cursor), `Cannot read the history of ${handle.scope}`, 1000, at)).map((sealed) => sealed.entry);
 }
 
 /**
@@ -466,7 +471,7 @@ export async function loadRules(room: Room): Promise<RulesView> {
     checks: Array.isArray(rules.values["checks"]) ? (rules.values["checks"] as unknown as RulesView["checks"]) : [],
     labels: Array.isArray(rules.values["labels"]) ? (rules.values["labels"] as string[]) : [],
     extents: Array.isArray(rules.values["extents"]) ? (rules.values["extents"] as unknown as Extent[]) : null,
-    definitions: (await itemsOf(handle, summary, "definition")).map((d) => ({ name: String(d.values["name"]), digest: String(d.values["digest"]), state: d.state })),
+    definitions: (await itemsOf(handle, summary, "definition", at)).map((d) => ({ name: String(d.values["name"]), digest: String(d.values["digest"]), state: d.state })),
     controllers: holdersOf((await summaryOf(handleOf(room, room.membership.scope))).summary.items, "rules.publish"),
   };
 }
@@ -560,7 +565,14 @@ export function fieldValue(room: Room, type: string, typed: string): FieldValue 
 }
 
 /** What an act came to: the scope's answer, and the scope's head before and after. A refusal leaves the head where it was. */
-export interface Acted { answer: Answer; before: Head; after: Head }
+export interface Acted {
+  service: string; directory: ScopeId; membership: ScopeRef; key: KeyId; scope: ScopeId; kind: string; on: number | null;
+  answer: Answer; before: Head; after: Head | null; observation: string | null;
+}
+/** Memory-only association; contains no signing key or current permission. */
+export function actAssociation(room: Pick<Room, "session" | "directory" | "membership">, scope: ScopeId): string {
+  return JSON.stringify([room.session.service.replace(/\/+$/, ""), room.directory, room.membership, keyIdOfSecret(room.session.secret), scope]);
+}
 
 /**
  * Signs and sends one act. The expected revision of each item the act
@@ -568,7 +580,7 @@ export interface Acted { answer: Answer; before: Head; after: Head }
  * act goes through the client's declared handle, which checks each field's
  * shape before it signs and carries detached texts beside the intent.
  */
-export async function act(room: Room, scope: ScopeId, kind: string, asked: { on?: number | null; fields?: Record<string, FieldValue> } = {}): Promise<Acted> {
+export async function act(room: Room, scope: ScopeId, kind: string, asked: { on?: number | null; fields?: Record<string, FieldValue> } = {}, received?: (result: Acted) => void): Promise<Acted> {
   await fresh(room);
   const handle = handleOf(room, scope);
   const { summary, at: before } = await summaryOf(handle);
@@ -590,5 +602,9 @@ export async function act(room: Room, scope: ScopeId, kind: string, asked: { on?
   } else {
     answer = await handle.submit(await signedIntent(signer, { to: summary.scope, kind, on, fields, expected }, signing), [], values.length > 0 ? { values } : {});
   }
-  return { answer, before, after: (await summaryOf(handle)).at };
+  const result: Acted = { service: room.session.service, directory: room.directory, membership: { ...room.membership }, key: signer.key, scope, kind, on, answer, before, after: null, observation: "Observation refresh pending." };
+  received?.(result); // Preserve the real answer before any awaited refresh.
+  try { result.after = (await summaryOf(handle)).at; result.observation = null; }
+  catch (error) { result.observation = error instanceof Unreadable ? error.message : "The observation refresh failed."; }
+  return result;
 }

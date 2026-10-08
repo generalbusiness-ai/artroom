@@ -14,7 +14,7 @@
 
 import { editPath } from "@generalbusiness/artroom-platform";
 import type { Answer } from "@generalbusiness/artroom-contract";
-import { siteAddress, type Acted, type ChangeView, type IssueView, type LaneRow, type Offered, type Room, type RulesView } from "./data.ts";
+import { siteAddress, Unreadable, type Acted, type ChangeView, type IssueView, type LaneRow, type Offered, type Room, type RulesView } from "./data.ts";
 import { changeStates } from "./states.ts";
 
 type Child = Node | string | null | undefined | false;
@@ -152,15 +152,26 @@ export function rulesScreen(room: Room, rules: RulesView): HTMLElement {
 
 // ---------------------------------------------------------------- acts
 
-/** The scope's answer to the act just sent, in one line. A refusal says what was refused and that nothing was written. */
-export function answerLine(acted: Acted): HTMLElement {
+/** Known submit result and separate observation phase. No head is invented. */
+export function answerText(acted: Acted): string[] {
   const a = acted.answer;
+  let known: string;
   switch (a.answer) {
-    case "accepted": return h("p", { class: "answer ok", role: "status" }, `Took effect: entry ${a.receipt.fact.seq}.`);
-    case "refused": return h("p", { class: "answer bad", role: "status" }, `Refused: ${a.reason}${"name" in a && a.name ? ` (${a.name})` : ""}. Nothing was written: the scope's head is still entry ${acted.after.seq}.`);
-    case "unavailable": return h("p", { class: "answer bad", role: "status" }, `Unavailable: ${a.reason}. Nothing was written; the same act may be sent again.`);
-    case "mismatch": return h("p", { class: "answer bad", role: "status" }, `Mismatch: ${a.reason}.`);
+    case "accepted": known = `Accepted ${acted.kind}: ${a.receipt.fact.at.scope}:${a.receipt.fact.seq}, hash ${a.receipt.fact.hash}, incarnation ${a.receipt.fact.at.inc}.`; break;
+    case "refused": known = `Refused: ${a.reason}${"name" in a && a.name ? ` (${a.name})` : ""}. Nothing was written by this request.`; break;
+    case "unavailable": known = `Unavailable: ${a.reason}.`; break;
+    case "mismatch": known = `Mismatch: ${a.reason}.`; break;
   }
+  return [known, ...(acted.observation === null ? [] : [`Observation unknown: ${acted.observation} Inspect artroom log ${acted.scope}${a.answer === "accepted" ? ` and artroom show ${a.receipt.fact.at.scope}:${a.receipt.fact.seq}` : ""} before submitting another act; do not resubmit to recover observation.`])];
+}
+export function answerLine(acted: Acted): HTMLElement {
+  return h("div", { class: "answer", role: "status" }, h("p", {}, `Known answer for ${acted.kind} on ${acted.scope}${acted.on === null ? "" : `, item ${acted.on}`}.`), answerText(acted).map((line) => h("p", {}, line)));
+}
+/** The actual failure screen keeps known results visible when a view reload fails. */
+export function failureScreen(error: unknown, known: readonly Acted[] = []): HTMLElement {
+  return h("main", {}, h("h1", {}, "Observation unknown"), h("p", { class: "answer bad" }, error instanceof Unreadable ? error.message : "The view could not be read."),
+    known.map((result) => answerLine({ ...result, observation: result.observation ?? "The subsequent view could not be read." })),
+    h("p", {}, h("a", { href: "#/settings" }, "Settings")));
 }
 
 /**

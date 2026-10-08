@@ -390,4 +390,7 @@ export class ScopeService<E extends Env = Env> extends WorkerEntrypoint<E> imple
   retained(scope: string, reader: unknown, kind: RetainedInput["kind"], digest: Digest, domain?: string): Promise<Read<RetainedInput>> { return api(this.scopes()).retained(scope, reader, kind, digest, domain); }
 }
 
-export default { fetch: async (request: Request, env: Env): Promise<Response> => isPage(request) ? page(request) : route(request, env.SCOPES) };
+export default { fetch: async (request: Request, env: Env): Promise<Response> => {
+  if (credentialInUrl(new URL(request.url))) return json(400, { error: "credential-in-url" });
+  return isPage(request) ? page(request) : route(request, env.SCOPES);
+} };

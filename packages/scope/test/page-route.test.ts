@@ -19,6 +19,11 @@ test("the Worker serves the page at /page/: its HTML and script under a same-ori
   const js = await get("/page/page.js");
   expect([js.status, js.headers.get("content-type"), js.headers.get("x-content-type-options"), (await js.text()).length]).toEqual([200, "text/javascript; charset=utf-8", "nosniff", PAGE_JS.length]);
 
+  for (const path of ["/page/?token=value", "/page/page.js?secret=value"]) {
+    const refused = await get(path);
+    expect(refused.status).toBe(400);
+    expect(await refused.json()).toEqual({ error: "credential-in-url" });
+  }
   const bare = await get("/page");
   expect([bare.status, bare.headers.get("location")]).toEqual([301, "/page/"]);
   expect((await get("/page/keys.json")).status).toBe(404);

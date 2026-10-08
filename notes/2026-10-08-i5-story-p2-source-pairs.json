@@ -1,0 +1,191 @@
+{
+  "request": "91bd9bf008a8ab0b875cf62fd7c313510023e249",
+  "finding": "308238561b4694cc4f3a03e8bc6ae127477c27a7",
+  "disposition": "3307da7c75d8dfd360e1020e76ec1ce4a09cfaa5",
+  "base": "571845dd393933510387e6fc34662ee7f23e0ac2",
+  "status": "isolated three-P2 source repair; no full-source approval or activation",
+  "sourcePairs": [
+    {
+      "path": "packages/scope/src/worker.ts",
+      "before": {
+        "head": "571845dd393933510387e6fc34662ee7f23e0ac2",
+        "bytes": 28356,
+        "sha256": "7dba2cc3fc38daa5d3742dd30ae60c89c883516fc1590ad91fd23f5ad26aa3d3",
+        "gitBlob": "81d296704927e358fff4ea9d7b175dc15938c9c1"
+      },
+      "after": {
+        "bytes": 28465,
+        "sha256": "a2711215e7eafb0951a3c49fb8a45dd8dc7038c884a993e2944d762607416311"
+      }
+    },
+    {
+      "path": "packages/scope/test/page-route.test.ts",
+      "before": {
+        "head": "571845dd393933510387e6fc34662ee7f23e0ac2",
+        "bytes": 2337,
+        "sha256": "94158b5facde416a35473d8d6be9ef1c1d79b2155831365006c82b4bb5492805",
+        "gitBlob": "cf39c23e4e4e959f6c8ca89997d1ac7911b98bb9"
+      },
+      "after": {
+        "bytes": 2567,
+        "sha256": "d8fd4dccfbe25753e946087db28958e2914f837ac638df87ec2d6f9648a3a9e6"
+      }
+    },
+    {
+      "path": "packages/page/src/data.ts",
+      "before": {
+        "head": "571845dd393933510387e6fc34662ee7f23e0ac2",
+        "bytes": 38198,
+        "sha256": "a99610a6e7d067e702ce53921c0b0f9df18133e106ced6672cfcc6380f35d44c",
+        "gitBlob": "e65d2205f563f436cf8701922c96b6c0dc3e0f63"
+      },
+      "after": {
+        "bytes": 39931,
+        "sha256": "ba7a5135a98ac2e0c491e988943af75980b63b9e40d7dc78705c25fbce01f6ab"
+      }
+    },
+    {
+      "path": "packages/page/src/main.ts",
+      "before": {
+        "head": "571845dd393933510387e6fc34662ee7f23e0ac2",
+        "bytes": 9427,
+        "sha256": "e32e5ed9bf5097ec0de42984270b428632b5d5adb6751dfb689f34e7adc8617d",
+        "gitBlob": "5f113b7a728cdabdc469d7af3ce664f423cd1224"
+      },
+      "after": {
+        "bytes": 9905,
+        "sha256": "d982b19b3c7ba2b4515fac366f1d9273967a04d2ef662616d4f70cfac21d0692"
+      }
+    },
+    {
+      "path": "packages/page/src/view.ts",
+      "before": {
+        "head": "571845dd393933510387e6fc34662ee7f23e0ac2",
+        "bytes": 15788,
+        "sha256": "a75fac2f9d3be525bcb309815ae5c455233c4437cadfa1a8e906e0b89d9293cb",
+        "gitBlob": "d038bff579ca981760d548bb09619c5738f8a6e9"
+      },
+      "after": {
+        "bytes": 16753,
+        "sha256": "dd9fe1c478c9f7a5633e327eab564a357fb9b80dd35bb9be823c7f874994fb76"
+      }
+    },
+    {
+      "path": "packages/page/test/join.test.ts",
+      "before": {
+        "head": "571845dd393933510387e6fc34662ee7f23e0ac2",
+        "bytes": 3799,
+        "sha256": "08e593a455d1e9d64e38f7837f7a81ad8dfd1586818dc8e118d035e2f3ae8189",
+        "gitBlob": "5f3c8f52e83f1f4ef06d7239dfa538b2ee886299"
+      },
+      "after": {
+        "bytes": 9670,
+        "sha256": "79c831e3e0b415bfa51c7a0d83c34bbdcdf5d44ca0a36e362bdaa995bf0f2612"
+      }
+    },
+    {
+      "path": "packages/scope/src/page-assets.ts",
+      "before": {
+        "head": "571845dd393933510387e6fc34662ee7f23e0ac2",
+        "bytes": 403960,
+        "sha256": "601883e9c694b795e82260f579fd1a024dc10a4d00453365d0bd9c2a5ed346a1",
+        "gitBlob": "65664415558a3e29d8828a40d9fbc41b1fac858f"
+      },
+      "after": {
+        "bytes": 405450,
+        "sha256": "2bc96f7218ded56decbe155a8ac80f4ac46eb884058defa6eaa6ab80747867fc"
+      }
+    }
+  ],
+  "logs": [
+    {
+      "path": "/tmp/artroom-story-p2-assets-final.log",
+      "bytes": 219,
+      "sha256": "f341e5cd7be67210e53cd73071b5cb377c742410747ae00750a2250898321b96"
+    },
+    {
+      "path": "/tmp/artroom-story-p2-build-final.log",
+      "bytes": 188,
+      "sha256": "d3b109c7555dc3d9ecbb53dde3fc36a524aaa7cf92810b11dda7540bbd4a44ed"
+    },
+    {
+      "path": "/tmp/artroom-story-p2-build.log",
+      "bytes": 188,
+      "sha256": "a3116ca731379579e711cae255d5d965d5cafb813f70e1c47f4b5529690d8012"
+    },
+    {
+      "path": "/tmp/artroom-story-p2-focused.log",
+      "bytes": 221,
+      "sha256": "bb58cc086b79555b38e0b1df5c01540c4516ea9918bac3e3773cb975bca7a605"
+    },
+    {
+      "path": "/tmp/artroom-story-p2-node-types-final.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/artroom-story-p2-page-types.log",
+      "bytes": 815,
+      "sha256": "42a233d5dc44cc17025bde1411e03f239b21e3961765e776ef303639fb4b5689"
+    },
+    {
+      "path": "/tmp/artroom-story-p2-read-control.log",
+      "bytes": 1681,
+      "sha256": "795d61f7f7766116c9e2dd7d1168686b0daf4c012b10aa2ea4df397dfd59d13c"
+    },
+    {
+      "path": "/tmp/artroom-story-p2-result-control.log",
+      "bytes": 1361,
+      "sha256": "48354156ad6824c1332393e022d006346496c38a1a835f0e73aeb23392412fbc"
+    },
+    {
+      "path": "/tmp/artroom-story-p2-route-final.log",
+      "bytes": 220,
+      "sha256": "52a35a57f092942050b12eb7a79dee85084a43b73a09c27787a9b7ef23404227"
+    },
+    {
+      "path": "/tmp/artroom-story-p2-scope-types.log",
+      "bytes": 109,
+      "sha256": "6d6fedb36dbee4bff38ae0d2fcbad3cce9af62a012c11f1517cbd8d6ce0d09a6"
+    },
+    {
+      "path": "/tmp/artroom-story-p2-source-types-final.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/artroom-story-p2-url-control-final.log",
+      "bytes": 1275,
+      "sha256": "9027b3f70da8d7229cfc6aecbf697d4bef58a18bcef9010f0823a8dee34e0394"
+    },
+    {
+      "path": "/tmp/artroom-story-p2-url-control.log",
+      "bytes": 1244,
+      "sha256": "9422980599e84e1638a7a1c47b11cea7c5b4929359f8c9c2d5a9c842b93fa230"
+    },
+    {
+      "path": "/tmp/artroom-story-p2-controls.json",
+      "bytes": 1810,
+      "sha256": "eee55dc9a36203aea34c66ee732eef9af5516c510719984618bc9033da2aa8d0"
+    },
+    {
+      "path": "/tmp/artroom-story-p2-url-control-final.json",
+      "bytes": 310,
+      "sha256": "9a8be5284f950fcb3f405a105714ccb00fac5db4b4baa795d291de9a08d39655"
+    }
+  ],
+  "checks": {
+    "focused": "3 files / 4 tests passed in2.40s; scripted join/read/submit and minimal DOM failure renderer, actual local Worker page route, generated parity",
+    "correctedRoute": "1file/1test passed after status-before-JSON witness correction",
+    "controls": "Read and failure-renderer controls fail by assertion; corrected URL control fails by expected400/received200. Original URL SyntaxError control diagnostic only. All sources restored.",
+    "types": "Scope types passed. Page source/Node types passed, including final separate compiles. Page scope-test config blocked solely on absent site/route.ts and site/host.ts.",
+    "assets": "Rebuilt after real source changes; final generated parity1test passed after full membership association addition."
+  },
+  "limits": [
+    "Unreadable/refused/incomplete/budget-exhausted/mixed-head enumeration is a failure, not established absence; only complete relevant enumeration supports empty projections.",
+    "Known submit answer/full real receipt retained before refresh; after null is unknown observation, never a fabricated head.",
+    "Actual renderer exercised with minimal DOM stand-in; main callback/map/context wiring reviewed statically, not browser execution.",
+    "Full story/support/recorder/settings/version witnesses and CLI/store unchanged; full site/story/browser/durable enrollment/integrated gate obligations remain.",
+    "No browser, provider, matrix, gate, deployment, main mutation or new persistence engine."
+  ]
+}

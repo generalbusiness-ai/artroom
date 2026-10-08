@@ -132,3 +132,29 @@ screenshots remain pending. Old images retain historical captions and bytes.
 Settings/version browser scripts were not rerun on this composed source.
 No broader bundle correspondence, evaluator/admission or founding authority
 proof is supplied by these source hashes or generated build bytes.
+
+## Three P2 repairs after checkpoint 571845dd
+
+Finding 30823856 and planner3307da7c were read in full. The Worker now applies
+the existing URL-credential refusal before page dispatch, retaining route's
+guard. Refused/incomplete/exhausted or mixed-head item/history/publication
+reads fail honestly; they never establish empty/None. Existing100/1000 page
+budgets stay unchanged. Real submit answers/full receipts are recorded before
+refresh, associated with service/directory/full membership/key/scope, and
+remain visible in the failure renderer with unknown-observation and
+inspect-before-resubmit guidance. No current head, permission or receipt is
+invented and no durable storage or resubmission engine was added.
+
+Focused baseline:3files/4tests passed; Scope types and Page source/Node types
+passed. Page scope-test types remain blocked only by the same missing site
+modules; full story/support/recorder are unchanged. Three narrow controls
+distinguish by assertion and restore source. The original URL-control
+SyntaxError is diagnostic only; the corrected status-first witness/control
+shows expected400/received200. Assets were regenerated, with final parity
+passing. No browser/provider/gate or full-story run was made. Exact source
+pairs and raw log paths/hashes are in 2026-10-08-i5-story-p2-source-pairs.json.
+
+This append preserves the prior note prefix, SHA256
+9da8ae3b0dd9488f146f48543f60a1a656d79dfb0160c4437966a979ea1bb9cc,
+and leaves the original assembly ledger unchanged. No earlier evidence is
+relabeled as execution of this successor. Full obligations remain owed.
