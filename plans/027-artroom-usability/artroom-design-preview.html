@@ -1,0 +1,209 @@
+<div id="artroom-design-preview">
+  <div class="viz-row" style="justify-content:space-between;padding:8px 0 14px">
+    <span class="text-small">Design preview · sample data</span>
+    <span class="text-small">Proposed experience</span>
+  </div>
+  <div class="viz-controls">
+    <label class="form-label">Screen
+      <select class="form-select" id="ar-screen">
+        <option value="issues">Issues</option><option value="changes">Changes</option><option value="detail">Change detail</option><option value="create">Create room</option><option value="rules">Configure rules</option>
+      </select>
+    </label>
+    <label class="form-label">Device
+      <select class="form-select" id="ar-device"><option value="desktop">Desktop</option><option value="390">Mobile · 390 px</option><option value="320">Mobile · 320 px</option></select>
+    </label>
+    <label class="form-label">Sample state
+      <select class="form-select" id="ar-state"><option value="populated">Populated</option><option value="empty">New room · empty</option><option value="review">Needs review</option><option value="path">Publication refused · invalid path</option><option value="pending">Publication pending</option><option value="published">Publication confirmed</option></select>
+    </label>
+  </div>
+  <div class="viz-carousel" aria-label="Artroom navigation designs">
+    <section data-variant="Room tabs" aria-label="Room tabs design"><div class="ar-stage"><div class="ar-app" data-layout="tabs" aria-label="Artroom room tabs"></div></div></section>
+    <section data-variant="Workspace sidebar" aria-label="Workspace sidebar design" hidden><div class="ar-stage"><div class="ar-app" data-layout="sidebar" aria-label="Artroom workspace sidebar"></div></div></section>
+  </div>
+  <span class="sr-only" id="ar-live" aria-live="polite"></span>
+</div>
+<style>
+#artroom-design-preview .ar-stage{container-type:inline-size;max-width:100%;margin:18px auto 0;min-height:760px}
+#artroom-design-preview .ar-stage[data-device="390"]{max-width:390px}
+#artroom-design-preview .ar-stage[data-device="320"]{max-width:320px}
+#artroom-design-preview .ar-app{--ar-bg:light-dark(#ffffff,#17191d);--ar-ink:light-dark(#20232b,#edf0f4);--ar-secondary:light-dark(#565d6b,#afb7c4);--ar-surface:light-dark(#f6f7f9,#22252b);--ar-line:light-dark(#e3e6ec,#373c46);--ar-input-line:light-dark(#6b7785,#8994a3);--ar-brand:light-dark(#4651bb,#b8bffe);--ar-on-brand:light-dark(#ffffff,#161e55);--ar-soft:light-dark(#eff0fd,#2b3050);--ar-green:light-dark(#25683c,#94d7a8);--ar-green-bg:light-dark(#edf7ef,#22382a);--ar-amber:light-dark(#79500b,#e6bd71);--ar-amber-bg:light-dark(#fff5df,#3c321e);--ar-red:light-dark(#a22e31,#f4afb0);--ar-red-bg:light-dark(#fff0ef,#41282a);color-scheme:light dark;color:var(--ar-ink);background:var(--ar-bg);font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:16px;line-height:1.5;border:1px solid var(--ar-line);border-radius:14px;overflow:clip;min-height:690px;box-shadow:0 10px 35px light-dark(#1b23400b,#00000024)}
+#artroom-design-preview .ar-app *{box-sizing:border-box}
+#artroom-design-preview .ar-app button,#artroom-design-preview .ar-app input,#artroom-design-preview .ar-app select,#artroom-design-preview .ar-app textarea{font:inherit;color:inherit}
+#artroom-design-preview .ar-app button{cursor:var(--cursor-interaction,pointer)}
+#artroom-design-preview .ar-app button:disabled{cursor:not-allowed;opacity:.55}
+#artroom-design-preview .ar-app button:focus-visible,#artroom-design-preview .ar-app input:focus-visible,#artroom-design-preview .ar-app select:focus-visible,#artroom-design-preview .ar-app textarea:focus-visible,#artroom-design-preview .ar-app summary:focus-visible{outline:3px solid var(--ar-brand);outline-offset:3px}
+#artroom-design-preview .ar-top{padding:16px 24px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--ar-line);min-height:64px;flex-wrap:wrap}
+#artroom-design-preview .ar-brand{font-weight:650;letter-spacing:-.4px;display:flex;gap:9px;align-items:center}
+#artroom-design-preview .ar-mark{background:var(--ar-brand);color:var(--ar-on-brand);width:28px;height:28px;border-radius:8px;display:grid;place-items:center;font-weight:650}
+#artroom-design-preview .ar-crumb{color:var(--ar-secondary);min-width:0;overflow-wrap:anywhere}
+#artroom-design-preview .ar-account{margin-left:auto;min-width:36px;min-height:36px;border-radius:50%;border:1px solid var(--ar-line);background:var(--ar-surface);font-weight:600}
+#artroom-design-preview .ar-roomhead{padding:24px 28px 0;display:flex;gap:16px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
+#artroom-design-preview .ar-roomhead h1{font-size:22px;line-height:1.25;letter-spacing:-.5px;margin:0 0 6px;font-weight:650}
+#artroom-design-preview .ar-app p{margin:0 0 14px}
+#artroom-design-preview .ar-muted{color:var(--ar-secondary)}
+#artroom-design-preview .ar-small{font-size:14px}
+#artroom-design-preview .ar-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+#artroom-design-preview .ar-btn{min-height:36px;padding:7px 12px;border:1px solid var(--ar-line);border-radius:7px;background:var(--ar-bg);font-weight:550;display:inline-flex;align-items:center;justify-content:center;gap:6px;text-decoration:none}
+#artroom-design-preview .ar-btn:hover{background:var(--ar-surface)}
+#artroom-design-preview .ar-btn.ar-primary{background:var(--ar-brand);border-color:var(--ar-brand);color:var(--ar-on-brand)}
+#artroom-design-preview .ar-link{border:0;background:transparent;color:var(--ar-brand);padding:6px 0;text-align:left;text-decoration:none;min-height:36px}
+#artroom-design-preview .ar-nav{display:flex;gap:20px;padding:0 28px;margin-top:18px;border-bottom:1px solid var(--ar-line)}
+#artroom-design-preview .ar-nav button{background:transparent;border:0;border-bottom:2px solid transparent;min-height:46px;padding:10px 0;color:var(--ar-secondary);font-weight:550}
+#artroom-design-preview .ar-nav button[aria-current="page"]{border-bottom-color:var(--ar-brand);color:var(--ar-ink)}
+#artroom-design-preview .ar-body{padding:24px 28px 36px;min-width:0}
+#artroom-design-preview .ar-body h2{font-size:20px;line-height:1.3;letter-spacing:-.3px;font-weight:650;margin:0 0 6px}
+#artroom-design-preview .ar-body h3{font-size:15px;margin:0 0 8px;font-weight:600}
+#artroom-design-preview .ar-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+#artroom-design-preview .ar-input{background:var(--ar-bg);border:1px solid var(--ar-input-line);border-radius:7px;min-height:40px;padding:9px 11px;width:100%;min-width:0}
+#artroom-design-preview .ar-search{flex:1;max-width:420px;min-width:190px}
+#artroom-design-preview .ar-filters{display:flex;gap:3px;flex-wrap:wrap}
+#artroom-design-preview .ar-filter{border:0;background:transparent;min-height:38px;border-radius:6px;padding:8px 11px;color:var(--ar-secondary)}
+#artroom-design-preview .ar-filter[aria-pressed="true"]{background:var(--ar-soft);color:var(--ar-brand);font-weight:600}
+#artroom-design-preview .ar-count{color:var(--ar-secondary);font-size:14px;margin-left:4px;font-variant-numeric:tabular-nums}
+#artroom-design-preview .ar-list{border:1px solid var(--ar-line);border-radius:9px;overflow:clip}
+#artroom-design-preview .ar-listhead{background:var(--ar-surface);padding:10px 16px;color:var(--ar-secondary);font-size:14px}
+#artroom-design-preview .ar-item{display:flex;gap:12px;align-items:flex-start;padding:16px;border-top:1px solid var(--ar-line)}
+#artroom-design-preview .ar-item:first-child{border-top:0}
+#artroom-design-preview .ar-dot{flex:none;width:18px;height:18px;border:2px solid var(--ar-green);border-radius:50%;margin-top:5px;display:grid;place-items:center;color:var(--ar-green);font-size:11px}
+#artroom-design-preview .ar-dot.closed{background:var(--ar-surface);border-color:var(--ar-secondary);color:var(--ar-secondary)}
+#artroom-design-preview .ar-item-main{flex:1;min-width:0}
+#artroom-design-preview .ar-item-title{border:0;background:transparent;text-align:left;padding:0;min-height:28px;font-weight:600;overflow-wrap:anywhere}
+#artroom-design-preview .ar-item-title:hover{color:var(--ar-brand)}
+#artroom-design-preview .ar-item-meta{display:flex;gap:8px;flex-wrap:wrap;color:var(--ar-secondary);font-size:14px;margin-top:3px}
+#artroom-design-preview .ar-tag{padding:2px 7px;background:var(--ar-surface);border-radius:5px;font-size:14px;white-space:nowrap;align-self:center}
+#artroom-design-preview .ar-tag.good{background:var(--ar-green-bg);color:var(--ar-green)}
+#artroom-design-preview .ar-tag.warn{background:var(--ar-amber-bg);color:var(--ar-amber)}
+#artroom-design-preview .ar-tag.bad{background:var(--ar-red-bg);color:var(--ar-red)}
+#artroom-design-preview .ar-empty{padding:52px 24px;max-width:440px;margin:auto;text-align:center}
+#artroom-design-preview .ar-empty h3{font-size:18px;margin-bottom:8px}
+#artroom-design-preview .ar-empty p{color:var(--ar-secondary)}
+#artroom-design-preview .ar-detailhead{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:12px 0 20px}
+#artroom-design-preview .ar-detailnav{display:flex;gap:6px;flex-wrap:wrap;margin:18px 0;border-bottom:1px solid var(--ar-line);padding-bottom:10px}
+#artroom-design-preview .ar-panel{border:1px solid var(--ar-line);border-radius:9px;padding:18px;margin:18px 0;background:var(--ar-bg)}
+#artroom-design-preview .ar-status{border:1px solid var(--ar-line);border-left:3px solid var(--ar-amber);border-radius:9px;padding:18px;margin:18px 0;background:var(--ar-amber-bg)}
+#artroom-design-preview .ar-status.good{border-left-color:var(--ar-green);background:var(--ar-green-bg)}
+#artroom-design-preview .ar-status.bad{border-left-color:var(--ar-red);background:var(--ar-red-bg)}
+#artroom-design-preview .ar-status p{margin:5px 0 14px}
+#artroom-design-preview .ar-event{padding:14px 0;border-bottom:1px solid var(--ar-line);display:flex;gap:12px}
+#artroom-design-preview .ar-avatar{width:30px;height:30px;flex:none;border-radius:50%;background:var(--ar-surface);display:grid;place-items:center;color:var(--ar-secondary);font-size:14px}
+#artroom-design-preview .ar-event-main{min-width:0}
+#artroom-design-preview .ar-form{max-width:520px;margin:12px auto}
+#artroom-design-preview .ar-form label{display:block;font-weight:550;margin:20px 0 7px}
+#artroom-design-preview .ar-form textarea{min-height:110px;resize:vertical}
+#artroom-design-preview .ar-form .ar-help{font-size:14px;color:var(--ar-secondary);margin:7px 0 0}
+#artroom-design-preview .ar-form .ar-actions{margin-top:24px}
+#artroom-design-preview .ar-app details{margin:20px 0;border-top:1px solid var(--ar-line);padding-top:16px}
+#artroom-design-preview .ar-app summary{cursor:var(--cursor-interaction,pointer);min-height:38px;display:list-item;font-weight:550}
+#artroom-design-preview .ar-rule{padding:20px 0;border-bottom:1px solid var(--ar-line);display:flex;gap:18px;justify-content:space-between;align-items:flex-start;flex-wrap:wrap}
+#artroom-design-preview .ar-rule-main{flex:1;min-width:160px;max-width:500px}
+#artroom-design-preview .ar-rule label{font-weight:600;display:block;margin-bottom:4px}
+#artroom-design-preview .ar-rule p{font-size:14px;color:var(--ar-secondary);margin:0}
+#artroom-design-preview .ar-rule select{width:auto;max-width:100%;min-width:145px}
+#artroom-design-preview .ar-check{display:flex;gap:12px;padding:12px 0;align-items:flex-start}
+#artroom-design-preview .ar-check input{width:18px;height:18px;flex:none;accent-color:var(--ar-brand)}
+#artroom-design-preview .ar-check label{margin:0;font-weight:500}
+#artroom-design-preview .ar-code{font-family:ui-monospace,SFMono-Regular,monospace;font-size:14px;overflow-wrap:anywhere;white-space:pre-wrap;margin:12px 0}
+#artroom-design-preview .ar-diff-add{background:var(--ar-green-bg);color:var(--ar-green);padding:10px;display:block;white-space:pre-wrap;overflow-wrap:anywhere}
+#artroom-design-preview .ar-alert{background:var(--ar-soft);padding:12px 16px;margin:0 0 18px;border-radius:7px;color:var(--ar-ink);overflow-wrap:anywhere}
+#artroom-design-preview .ar-error{color:var(--ar-red);margin-top:8px}
+#artroom-design-preview .ar-grid{display:grid;grid-template-columns:minmax(0,1fr) 220px;gap:24px}
+#artroom-design-preview .ar-sideinfo{padding-top:18px}
+#artroom-design-preview .ar-sideinfo p{font-size:14px}
+#artroom-design-preview .ar-site{padding:30px 0;max-width:540px;margin:auto}
+#artroom-design-preview .ar-shell{display:block}
+#artroom-design-preview .ar-app[data-layout="sidebar"] .ar-shell{display:grid;grid-template-columns:176px minmax(0,1fr)}
+#artroom-design-preview .ar-app[data-layout="sidebar"] .ar-nav{margin:0;display:flex;flex-direction:column;gap:4px;padding:22px 14px;border-bottom:0;border-right:1px solid var(--ar-line);background:var(--ar-surface)}
+#artroom-design-preview .ar-app[data-layout="sidebar"] .ar-nav button{padding:8px 12px;text-align:left;border:0;border-radius:6px;min-height:40px}
+#artroom-design-preview .ar-app[data-layout="sidebar"] .ar-nav button[aria-current="page"]{background:var(--ar-bg);color:var(--ar-brand)}
+#artroom-design-preview .ar-app[data-density="compact"] .ar-item{padding-top:10px;padding-bottom:10px}
+@container (max-width:640px){
+  #artroom-design-preview .ar-top{padding:12px 16px;gap:8px}
+  #artroom-design-preview .ar-crumb{font-size:14px}
+  #artroom-design-preview .ar-roomhead{padding:22px 16px 0;gap:12px}
+  #artroom-design-preview .ar-roomhead h1{font-size:21px}
+  #artroom-design-preview .ar-roomhead>.ar-actions{width:100%}
+  #artroom-design-preview .ar-roomhead>.ar-actions .ar-btn{flex:1}
+  #artroom-design-preview .ar-body{padding:20px 16px 28px}
+  #artroom-design-preview .ar-nav{padding:0 16px;gap:8px;flex-wrap:wrap}
+  #artroom-design-preview .ar-nav button{font-size:14px}
+  #artroom-design-preview .ar-btn,#artroom-design-preview .ar-link,#artroom-design-preview .ar-filter,#artroom-design-preview .ar-account{min-height:44px}
+  #artroom-design-preview .ar-input{font-size:16px;min-height:44px}
+  #artroom-design-preview .ar-toolbar{align-items:stretch}
+  #artroom-design-preview .ar-search{max-width:none;min-width:0;flex-basis:100%}
+  #artroom-design-preview .ar-item{padding:14px 12px;gap:10px;flex-wrap:wrap}
+  #artroom-design-preview .ar-item-main{flex-basis:calc(100% - 28px)}
+  #artroom-design-preview .ar-item-title{min-height:36px;overflow-wrap:break-word;word-break:normal}
+  #artroom-design-preview .ar-item>.ar-tag{margin-left:28px}
+  #artroom-design-preview .ar-grid{display:block}
+  #artroom-design-preview .ar-sideinfo{border-top:1px solid var(--ar-line);margin-top:24px}
+  #artroom-design-preview .ar-panel,#artroom-design-preview .ar-status{padding:14px}
+  #artroom-design-preview .ar-form{margin:0}
+  #artroom-design-preview .ar-form .ar-actions .ar-btn{flex:1}
+  #artroom-design-preview .ar-rule{gap:12px}
+  #artroom-design-preview .ar-rule select{width:100%}
+  #artroom-design-preview .ar-app[data-layout="sidebar"] .ar-shell{display:block}
+  #artroom-design-preview .ar-app[data-layout="sidebar"] .ar-nav{flex-direction:row;background:var(--ar-bg);border-right:0;border-bottom:1px solid var(--ar-line);padding:8px 16px;gap:8px;flex-wrap:wrap}
+  #artroom-design-preview .ar-app[data-layout="sidebar"] .ar-nav button{min-height:44px;padding:8px}
+}
+@media (prefers-reduced-motion:reduce){#artroom-design-preview *{scroll-behavior:auto}}
+</style>
+<script>
+(() => {
+  const root=document.getElementById('artroom-design-preview');
+  const apps=[...root.querySelectorAll('.ar-app')];
+  const controls={screen:root.querySelector('#ar-screen'),device:root.querySelector('#ar-device'),state:root.querySelector('#ar-state')};
+  const saved=window.openai?.widgetState?.privateContent;
+  let state={screen:'issues',device:'desktop',sample:'populated',filter:'open',query:'',tab:'discussion',notice:'',approved:false,roomName:'Field notes',localEmpty:false};
+  if(saved&&typeof saved==='object') for(const key of ['screen','device','sample']) if(typeof saved[key]==='string')state[key]=saved[key];
+  const issues=[{n:5,title:'Make the first edit easier to find',status:'open',author:'@una',assignee:'@paul',label:'Usability'},{n:6,title:'Explain who can approve protected files',status:'open',author:'@paul',assignee:'Unassigned',label:'Documentation'},{n:1,title:'Add a getting-started page',status:'closed',author:'@una',assignee:'@paul',label:'Documentation'}];
+  const changes=[{n:3,title:'Clarify the agent instructions',status:'open',author:'@paul',file:'AGENTS.md',readiness:'Needs review',kind:'warn'},{n:4,title:'Add an introductory page',status:'open',author:'@paul',file:'../outside.md',readiness:'Publication refused',kind:'bad'},{n:2,title:'Add the getting-started guide',status:'merged',author:'@paul',file:'guide/start.md',readiness:'Published',kind:'good'}];
+  const escape=x=>String(x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const btn=(label,action,primary=false,extra='')=>`<button type="button" class="ar-btn${primary?' ar-primary':''}" data-action="${action}" ${extra}>${label}</button>`;
+  const tag=(label,kind='')=>`<span class="ar-tag ${kind}">${label}</span>`;
+  function remember(){if(window.openai?.setWidgetState)window.openai.setWidgetState({modelContent:{screen:state.screen,device:state.device,sample:state.sample},privateContent:{screen:state.screen,device:state.device,sample:state.sample}}).catch(()=>{});}
+  function announce(text){root.querySelector('#ar-live').textContent=text;}
+  function setScreen(screen){state.screen=screen;state.query='';state.filter='open';state.notice='';state.tab='discussion';render();remember();}
+  function shell(app,content){
+    const current=state.screen==='detail'?'changes':(['issue-detail','new-issue'].includes(state.screen)?'issues':state.screen);
+    const nav=`<nav class="ar-nav" aria-label="Room"><button type="button" data-action="issues" ${current==='issues'?'aria-current="page"':''}>Issues</button><button type="button" data-action="changes" ${current==='changes'?'aria-current="page"':''}>Changes</button><button type="button" data-action="pages" ${current==='pages'?'aria-current="page"':''}>Pages</button><button type="button" data-action="rules" ${current==='rules'?'aria-current="page"':''}>Settings</button></nav>`;
+    return `<header class="ar-top"><div class="ar-brand"><span class="ar-mark" aria-hidden="true">a</span> Artroom</div><span class="ar-crumb">/ ${escape(state.roomName)}</span><button class="ar-account" type="button" data-action="account" aria-label="View your account">H</button></header>${!['issues','changes','pages'].includes(state.screen)?'':`<div class="ar-roomhead"><div><h1>${escape(state.roomName)}</h1></div><div class="ar-actions">${btn('Edit page','edit')}${btn('Open site','site')}</div></div>`}<div class="ar-shell">${state.screen==='create'?'':nav}<main class="ar-body">${state.notice?`<div class="ar-alert" role="status">${escape(state.notice)}</div>`:''}${content}</main></div>`;
+  }
+  function listScreen(type){
+    const isIssue=type==='issues',all=isIssue?issues:changes,empty=state.sample==='empty'||state.localEmpty;
+    const closed=isIssue?'closed':'merged',selected=state.filter==='open'?'open':closed;
+    const matches=empty?[]:all.filter(x=>(state.filter==='all'||x.status===selected)&&(`${x.title} ${x.n} ${x.author} ${x.file||''}`).toLowerCase().includes(state.query.toLowerCase()));
+    const openCount=empty?0:all.filter(x=>x.status==='open').length,closedCount=empty?0:all.length-openCount;
+    const items=matches.map(x=>`<article class="ar-item"><span class="ar-dot ${x.status!=='open'?'closed':''}" aria-label="${x.status}">${x.status!=='open'?'✓':''}</span><div class="ar-item-main"><button class="ar-item-title" data-action="${isIssue?'issue-detail':'detail'}" data-number="${x.n}" type="button">${escape(x.title)}</button><div class="ar-item-meta"><span>#${x.n} · ${x.status==='merged'?'merged':'opened'} by ${x.author}</span><span>${isIssue?escape(x.assignee):escape(x.file)}</span></div></div>${tag(isIssue?x.label:x.readiness,isIssue?'':x.kind)}</article>`).join('');
+    const emptyContent=empty?`<div class="ar-empty"><h3>${isIssue?'Start with one thing to do':'Your first change starts with an edit'}</h3><p>${isIssue?'Capture a question, a problem, or an idea. You can add the details as the work takes shape.':'Edit a page to propose a change. Reviews and publication stay connected to the work.'}</p>${btn(isIssue?'Create issue':'Edit page',isIssue?'new-issue':'edit',true)}</div>`:`<div class="ar-empty"><h3>No ${type} match</h3><p>Try a different status or search.</p>${btn('Clear filters','clear')}</div>`;
+    return `<div class="ar-toolbar"><div><h2>${isIssue?'Issues':'Changes'}</h2><span class="ar-muted ar-small">${isIssue?'Plan and track the work.':'Review proposed work and follow publication.'}</span></div>${btn(isIssue?'Create issue':'Edit page',isIssue?'new-issue':'edit',true)}</div><div class="ar-toolbar"><input type="search" class="ar-input ar-search" data-search aria-label="Search ${type}" placeholder="Search ${type}…" value="${escape(state.query)}"><div class="ar-filters" aria-label="Filter ${type} by status">${['open',closed,'all'].map((f,i)=>`<button class="ar-filter" type="button" data-filter="${f}" aria-pressed="${state.filter===f}">${f[0].toUpperCase()+f.slice(1)}<span class="ar-count">${i===0?openCount:i===1?closedCount:openCount+closedCount}</span></button>`).join('')}</div></div><div class="ar-list"><div class="ar-listhead" data-results>${matches.length} ${matches.length===1?'result':'results'}${!isIssue?' · Proposal status and publication are shown separately':''}</div><div data-rows>${items||emptyContent}</div></div>`;
+  }
+  function detail(){
+    const mode=['path','pending','published'].includes(state.sample)?state.sample:'review';
+    const path=mode==='path',published=mode==='published',pending=mode==='pending';
+    const title=path?'Add an introductory page':published?'Add the getting-started guide':'Clarify the agent instructions';
+    let status=path?`<div class="ar-status bad"><h3>Publication refused · invalid file path</h3><p><code>../outside.md</code> is outside the room. The change is still open. Change the path before trying again.</p>${btn('Fix path','fix-path',true)}</div>`:published?`<div class="ar-status good"><h3>Published</h3><p>This version was published successfully. Issue #1 was closed by this publication.</p><div class="ar-actions">${btn('View this published version','published-version',true)}${btn('View latest site','site')}</div></div>`:pending?`<div class="ar-status"><h3>Publication pending</h3><p>The request is recorded. The destination has not confirmed publication yet. The change remains open.</p>${btn('Check publication','check-publication')}</div>`:state.approved?`<div class="ar-status"><h3>Review recorded for this version</h3><p>Current room rules will be checked when you publish. An approval alone does not confirm publication.</p>${btn('Publish change','publish',true)}</div>`:`<div class="ar-status"><h3>Needs approval for protected files</h3><p>AGENTS.md needs one approval from a rules controller. The last publication attempt was refused. The change is still open.</p><div class="ar-actions">${btn('Review change','review',true)}${btn('Request review','request-review')}</div></div>`;
+    const discussion=`<div class="ar-panel"><h3>@paul proposed this change</h3><p>${published?'Add a short guide for the first clone and edit.':path?'Add an introductory page for new members.':'Make the instructions clear about when a review is needed.'}</p>${published?'<p class="ar-muted ar-small">Closes issue #1 · Add a getting-started page</p>':''}</div><div class="ar-event"><span class="ar-avatar" aria-hidden="true">P</span><div class="ar-event-main"><strong>@paul</strong><p>Please check the wording before this is published.</p></div></div><form data-form="comment"><label class="ar-small" for="${this.prefix}-comment">Add a comment</label><textarea class="ar-input" id="${this.prefix}-comment" name="comment" rows="3" placeholder="Share a question or feedback…" required></textarea><div class="ar-actions" style="margin-top:10px">${btn('Comment','submit-comment')}</div></form>`;
+    const file=path?'../outside.md':published?'guide/start.md':'AGENTS.md';
+    const files=`<div class="ar-panel"><h3>${escape(file)}</h3><p class="ar-muted ar-small">Proposed version · one file</p><code class="ar-diff-add">+ ${published?'# Getting started\n+ Clone the room, then edit a page.':'# Agent instructions\n+ Ask for review before publishing protected files.'}</code><div class="ar-actions" style="margin-top:16px">${btn('Preview this version','preview')}</div></div>`;
+    const checks=`<div class="ar-panel"><h3>Publication requirements</h3><p>${path?'File path validation failed.':published?'The destination confirmed publication for this version.':pending?'Waiting for the destination to confirm the result.':'Protected-file review: '+(state.approved?'one approval recorded.':'one rules controller approval needed.')}</p><p class="ar-muted">No automated checks are required in this sample room.</p><p class="ar-muted ar-small">The destination evaluates the current room rules at publication. Reviews apply to a specific proposal version.</p>${btn('Configure rules','rules')}</div>`;
+    return `<button class="ar-link" data-action="changes" type="button">← Back to changes</button><h2>${title} <span class="ar-muted">#${path?4:published?2:3}</span></h2><div class="ar-detailhead">${tag(published?'Merged':'Open',published?'good':'')}<span class="ar-muted ar-small">@paul proposed one file · Version 5</span></div><div class="ar-grid"><div>${status}<nav class="ar-detailnav" aria-label="Change detail">${['discussion','files','checks'].map(x=>`<button class="ar-filter" type="button" data-tab="${x}" aria-pressed="${state.tab===x}">${x[0].toUpperCase()+x.slice(1)}${x==='files'?' · 1':''}</button>`).join('')}</nav>${state.tab==='files'?files:state.tab==='checks'?checks:discussion}</div><aside class="ar-sideinfo"><h3>Reviewers</h3><p>@hugh <span class="ar-muted">· Rules controller</span></p><h3>Changed file</h3><p>${escape(file)}</p><h3>Related work</h3><p>${published?'Issue #1 · Completed':'No linked issue'}</p><button class="ar-link" data-action="preview" type="button">Preview this version</button><details><summary>Technical details</summary><p class="ar-muted ar-small">Full version evidence, rule revisions, and publication receipts belong here. They are omitted from this design sample.</p></details></aside></div>`;
+  }
+  function create(){return `<div class="ar-form"><button class="ar-link" data-action="issues" type="button">← Back to rooms</button><h2>Create a room</h2><p class="ar-muted">Give the work a home. You can invite people and adjust the rules later.</p><form data-form="create"><label for="${this.prefix}-name">Room name</label><input class="ar-input" id="${this.prefix}-name" name="name" placeholder="Field notes" required maxlength="80"><label for="${this.prefix}-path">Room address</label><input class="ar-input" id="${this.prefix}-path" name="path" placeholder="field-notes" pattern="[a-z0-9]+(-[a-z0-9]+)*" required><p class="ar-help">Your workspace / <span data-slug>field-notes</span></p><div class="ar-panel"><h3>Ready for the first edit</h3><p class="ar-muted ar-small">Issues and changes are enabled. Protected files require a rules controller review. Publication happens only when you choose Publish.</p></div><details><summary>Advanced setup</summary><label for="${this.prefix}-remote">Import an existing repository</label><input class="ar-input" id="${this.prefix}-remote" name="remote" placeholder="Repository URL (optional)"><p class="ar-help">Leave this empty to start a new room. Hosting and rule details can be configured later.</p></details><div class="ar-actions"><button type="button" data-submit class="ar-btn ar-primary">Create room</button>${btn('Cancel','issues')}</div></form></div>`;}
+  function rules(){return `<div class="ar-toolbar"><div><h2>Configure rules</h2><p class="ar-muted">Choose how work is reviewed before publication.</p></div></div><form data-form="rules"><div class="ar-rule"><div class="ar-rule-main"><label for="${this.prefix}-ordinary">Ordinary files</label><p>Pages, documentation, and other files outside protected groups.</p></div><select class="ar-input" id="${this.prefix}-ordinary" name="ordinary"><option>No approval required</option><option>One reviewer required</option><option>Two reviewers required</option></select></div><div class="ar-rule"><div class="ar-rule-main"><label for="${this.prefix}-protected">Protected instructions and workflows</label><p>AGENTS.md, CLAUDE.md, and automation workflows. Approval must come from a rules controller.</p></div><select class="ar-input" id="${this.prefix}-protected" name="protected"><option>One controller required</option><option>Two controllers required</option></select></div><div class="ar-rule"><div class="ar-rule-main"><label for="${this.prefix}-infra">Infrastructure files</label><p>Git configuration and deployment settings outside the protected group. Approval comes from a maintainer.</p></div><select class="ar-input" id="${this.prefix}-infra" name="infra"><option>No approval required</option><option>One maintainer required</option></select></div><div class="ar-check"><input type="checkbox" id="${this.prefix}-own" name="own"><label for="${this.prefix}-own">Allow an author's controller to approve their own work<br><span class="ar-muted ar-small">Off by default. A controller review is separate from authorship.</span></label></div><details><summary>Advanced rules</summary><label for="${this.prefix}-patterns">Protected file patterns</label><textarea class="ar-input ar-code" id="${this.prefix}-patterns" name="patterns" rows="4">**/AGENTS.md\n**/CLAUDE.md\n.github/workflows/**\n.github/actions/**</textarea><p class="ar-muted ar-small">Rules changes require permission to publish room rules. Pattern validation and conflict detection are required before applying them.</p></details><div class="ar-panel"><h3>Before you apply</h3><p class="ar-muted">New rules are evaluated when a change is published. Existing proposals may need new approvals.</p><p class="ar-muted ar-small">Signed in as @hugh · Rules controller</p></div><div class="ar-actions"><button class="ar-btn ar-primary" type="button" data-submit>Review rule changes</button>${btn('Cancel','issues')}</div></form>`;}
+  function formScreen(kind){const isIssue=kind==='new-issue';return `<div class="ar-form"><button class="ar-link" data-action="${isIssue?'issues':'changes'}" type="button">← Back to ${isIssue?'issues':'changes'}</button><h2>${isIssue?'Create issue':'Edit a page'}</h2><form data-form="${isIssue?'issue':'edit'}"><label for="${this.prefix}-title">${isIssue?'Title':'File path'}</label><input class="ar-input" id="${this.prefix}-title" name="title" value="${kind==='fix-path'?'guide/intro.md':''}" placeholder="${isIssue?'What needs to happen?':'guide/intro.md'}" required><label for="${this.prefix}-body">${isIssue?'Description (optional)':'Page content'}</label><textarea class="ar-input" id="${this.prefix}-body" name="body" rows="6" placeholder="${isIssue?'Add a little context…':'Write your page…'}" ${isIssue?'':'required'}>${kind==='fix-path'?'# Introduction\nWelcome to the room.':''}</textarea><p class="ar-help">${isIssue?'Assignment and labels can be added later.':'Your edit creates a proposal. It will not publish without a separate Publish action.'}</p><div class="ar-actions"><button type="button" data-submit class="ar-btn ar-primary">${isIssue?'Create issue':'Propose change'}</button>${btn('Cancel',isIssue?'issues':'changes')}</div></form></div>`;}
+  function review(){return `<div class="ar-form"><button class="ar-link" data-action="detail" type="button">← Back to change</button><h2>Review this version</h2><p class="ar-muted">Clarify the agent instructions · Version 5</p><form data-form="review"><label for="${this.prefix}-verdict">Decision</label><select class="ar-input" id="${this.prefix}-verdict" name="verdict"><option value="approve">Approve version</option><option value="changes">Request changes</option><option value="comment">Comment only</option></select><label for="${this.prefix}-feedback">Feedback (optional)</label><textarea class="ar-input" id="${this.prefix}-feedback" name="feedback" rows="4"></textarea><p class="ar-help">Signed in as @hugh · Rules controller. Approval is tied to this version and protected file group.</p><div class="ar-actions"><button class="ar-btn ar-primary" type="button" data-submit>Submit review</button>${btn('Cancel','detail')}</div></form></div>`;}
+  function extra(){if(state.screen==='issue-detail'){const issue=issues.find(x=>x.n===state.selectedIssue)||issues[0];return `<button class="ar-link" data-action="issues" type="button">← Back to issues</button><h2>${escape(issue.title)} <span class="ar-muted">#${issue.n}</span></h2><div class="ar-detailhead">${tag(issue.status==='open'?'Open':'Closed')}<span class="ar-muted ar-small">Opened by ${issue.author} · ${escape(issue.assignee)}</span></div><div class="ar-panel"><p>A new member should see where to make their first edit without reading setup instructions.</p></div><div class="ar-actions">${btn('Edit page','edit',true)}${issue.status==='open'?btn('Close issue','close-issue'):''}</div>`;}if(state.screen==='rule-review')return `<h2>Review rule changes</h2><div class="ar-panel"><h3>Publication policy</h3><p>${escape(state.ruleSummary||'Review requirements updated.')}</p><p class="ar-muted">These changes will apply at publication, including to open proposals.</p></div><div class="ar-actions">${btn('Apply rules','apply-rules',true)}${btn('Keep editing','rules')}</div>`;if(['preview','site','published-version','pages'].includes(state.screen)){const proposal=state.screen==='preview';return `<button class="ar-link" data-action="${proposal?'detail':'issues'}" type="button">← Back to ${proposal?'change':'room'}</button><div class="ar-alert">${proposal?'Proposed version 5 · Unpublished · Isolated preview':state.screen==='published-version'?'Published version of change #2 · Pinned to its publication':'Latest published site · Sample content'}</div><article class="ar-site"><h2>${proposal?'Agent instructions':'Getting started'}</h2><p>${proposal?'Ask for review before publishing protected files.':'Clone the room, then edit a page.'}</p><p class="ar-muted">This sample shows how preview and published content stay distinct.</p></article>`;}return '';}
+  function render(){controls.screen.value=['issues','changes','detail','create','rules'].includes(state.screen)?state.screen:controls.screen.value;controls.device.value=state.device;controls.state.value=state.sample;apps.forEach((app,index)=>{app.parentElement.dataset.device=state.device;const scope={prefix:`ar-${index}`};let content=state.screen==='issues'||state.screen==='changes'?listScreen(state.screen):state.screen==='detail'?detail.call(scope):state.screen==='create'?create.call(scope):state.screen==='rules'?rules.call(scope):['new-issue','edit','fix-path'].includes(state.screen)?formScreen.call(scope,state.screen):state.screen==='review-form'?review.call(scope):extra();app.innerHTML=shell(app,content);});}
+  controls.screen.addEventListener('change',()=>setScreen(controls.screen.value));
+  controls.device.addEventListener('change',()=>{state.device=controls.device.value;render();remember();});
+  controls.state.addEventListener('change',()=>{state.sample=controls.state.value;state.approved=false;state.localEmpty=false;state.notice='';if(['review','path','pending','published'].includes(state.sample))state.screen='detail';else if(!['issues','changes','create','rules'].includes(state.screen))state.screen='issues';render();remember();});
+  root.addEventListener('input',event=>{const el=event.target;if(el.matches('[data-search]')){state.query=el.value;const app=el.closest('.ar-app'),html=listScreen(state.screen),holder=document.createElement('div');holder.innerHTML=html;app.querySelector('[data-rows]').innerHTML=holder.querySelector('[data-rows]').innerHTML;app.querySelector('[data-results]').textContent=holder.querySelector('[data-results]').textContent;announce(app.querySelector('[data-results]').textContent);}if(el.name==='name'){const form=el.closest('form'),slug=el.value.toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');form.elements.path.value=slug;form.querySelector('[data-slug]').textContent=slug||'room-address';}if(el.name==='path'){el.closest('form').querySelector('[data-slug]').textContent=el.value;}});
+  root.addEventListener('click',event=>{const el=event.target.closest('button');if(!el||!root.contains(el))return;if(el.hasAttribute('data-submit')){submitLocal(el.closest('form'));return;}if(el.dataset.filter){const appIndex=apps.indexOf(el.closest('.ar-app'));state.filter=el.dataset.filter;render();apps[appIndex].querySelector(`[data-filter="${state.filter}"]`).focus();remember();return;}if(el.dataset.tab){const appIndex=apps.indexOf(el.closest('.ar-app'));state.tab=el.dataset.tab;render();apps[appIndex].querySelector(`[data-tab="${state.tab}"]`).focus();return;}const action=el.dataset.action;if(!action)return;if(['issues','changes','rules','create','new-issue','edit','fix-path','preview','site','published-version','pages','issue-detail'].includes(action)){if(action==='issue-detail')state.selectedIssue=Number(el.dataset.number)||5;setScreen(action);return;}if(action==='detail'){state.sample=el.dataset.number==='4'?'path':el.dataset.number==='2'?'published':'review';setScreen('detail');return;}if(action==='clear'){state.query='';state.filter='all';render();return;}if(action==='review'){setScreen('review-form');return;}if(action==='request-review'){state.notice='Design sample: a review request was added for @hugh. No notification was sent.';render();return;}if(action==='publish'){state.sample='published';state.notice='Design sample: the destination confirmed publication. No real content was published.';render();announce('Sample publication confirmed.');return;}if(action==='check-publication'){state.notice='Design sample: publication is still pending. No confirmation is available; do not submit a duplicate request.';render();return;}if(action==='account'){state.notice='Design sample: signed in as @hugh, an admin and rules controller. Account settings would open here.';render();return;}if(action==='submit-comment'){submitLocal(el.closest('form'));return;}if(action==='apply-rules'){state.notice='Design sample: rules were applied. No real room settings changed.';state.screen='rules';render();return;}if(action==='close-issue'){const issue=issues.find(x=>x.n===state.selectedIssue);if(issue)issue.status='closed';state.notice='Design sample: the issue was closed locally. No real issue changed.';state.screen='issues';state.filter='closed';render();return;}});
+  function submitLocal(form){if(!form?.dataset.form||!form.reportValidity())return;const values=new FormData(form),kind=form.dataset.form;if(kind==='create'){state.roomName=String(values.get('name'));state.localEmpty=true;state.sample='empty';state.screen='issues';state.notice='Design sample: room created with the standard setup. No real room was created.';}if(kind==='issue'){issues.unshift({n:7,title:String(values.get('title')),status:'open',author:'@hugh',assignee:'Unassigned',label:'New'});state.localEmpty=false;state.sample='populated';state.screen='issues';state.filter='open';state.notice='Design sample: issue added locally.';}if(kind==='edit'){const path=String(values.get('title'));if(path.startsWith('/')||path.split('/').includes('..')){state.notice='Use a file path inside the room, such as guide/intro.md.';render();return;}state.screen='detail';state.sample='review';state.notice='Design sample: a new proposal was saved locally. It has not been published.';}if(kind==='review'){state.approved=values.get('verdict')==='approve';state.screen='detail';state.sample='review';state.notice=state.approved?'Design sample: approval recorded for version 5. Publication is a separate action.':'Design sample: review feedback recorded. No real review was submitted.';}if(kind==='comment'){state.notice='Design sample: comment added locally. No real message was sent.';}if(kind==='rules'){state.ruleSummary=`Ordinary files: ${values.get('ordinary')}. Protected files: ${values.get('protected')}. Infrastructure: ${values.get('infra')}. Own-controller review: ${values.get('own')?'allowed':'not allowed'}.`;state.screen='rule-review';}render();remember();announce(state.notice||'Preview updated.');}
+  root.addEventListener('submit',event=>{if(event.target.dataset.form){event.preventDefault();submitLocal(event.target);}});
+  root.addEventListener('keydown',event=>{if(event.key==='Enter'&&event.target.matches('input')&&event.target.closest('form')){event.preventDefault();submitLocal(event.target.closest('form'));}});
+  window.addEventListener('openai:set_globals',event=>{const next=event.detail?.globals?.widgetState?.privateContent;if(next&&typeof next==='object'){for(const key of ['screen','device','sample'])if(typeof next[key]==='string')state[key]=next[key];render();}});
+  render();
+  if(globalThis.Tweak){const design={density:'comfortable'};const tweak=new Tweak({container:root,onChange:()=>apps.forEach(app=>app.dataset.density=design.density)});tweak.addSelect(design,'density',{label:'List density',options:['comfortable','compact']});}
+})();
+</script>
