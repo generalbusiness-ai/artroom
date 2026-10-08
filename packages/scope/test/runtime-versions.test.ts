@@ -4,6 +4,8 @@ import type { Intent, Seed } from "@generalbusiness/artroom-contract";
 import { keys } from "@generalbusiness/artroom-derive/testing";
 import { readCredential, requestSession, sessionRequest, type Fetch } from "@generalbusiness/artroom-client";
 import { repositoryName } from "@generalbusiness/artroom-platform";
+// Test-only orchestration import; the scope production package has no CLI dependency.
+import { command, memoryStore, type Context } from "../../cli/src/index.ts";
 import { net } from "../src/testing.ts";
 import { artifactsOutside } from "../src/artifacts-wiring.ts";
 import type { ArtifactsNamespace } from "../src/artifacts-host.ts";
@@ -16,7 +18,8 @@ import { platformNet, platformOutside } from "./worker.ts";
 // Invariant: known @2 observations and strict aged birth-session preparation
 // use the exact supplied implementation, without broad unknown-family lookup.
 // These are real PLATFORM scopes/rules/current sessions. The register's Git
-// host and clock are STAND-INS. This is not activation/provenance or a clone.
+// host, binding, Git runner and clock are STAND-INS. This proves local CLI
+// orchestration, not activation/provenance, a real Git clone or provider.
 test("runtime exact @2 membership observations and aged destination/rules reads retain full birth references; unknown code is unavailable", async () => {
   expect([knownPlatform("platform:membership@1", "platform:membership"), knownPlatform("platform:membership@2", "platform:membership"), knownPlatform("platform:membership@99", "platform:membership"), knownPlatform("platform:directory@2", "platform:membership")]).toEqual([true, true, false, false]);
   net.hold = net.deaf = null;
@@ -39,6 +42,8 @@ test("runtime exact @2 membership observations and aged destination/rules reads 
   await settle(R, D, M, rules, G);
   const seat = await M.did(rita, "seat", { expected: await M.expected({ roster: 0 }) });
   await M.did(rita, "first-key", { fields: { member: seat }, expected: await M.expected({ roster: 0, member: seat }) });
+  const directoryAt = await D.at();
+  const membershipAt = await M.at();
   const standing = await M.stub.observe({ of: await M.at(), key: rita.key });
   expect(standing).toMatchObject({ definition: "platform:membership@2", key: rita.key, actions: expect.arrayContaining(["destination.read-token"]) });
   net.clock.now = soon(901);
@@ -70,20 +75,44 @@ test("runtime exact @2 membership observations and aged destination/rules reads 
       return { ...outside, accepts: (owner, kind) => kind === "mint-read" && outside.accepts(owner, kind) };
     });
     await G.restart();
+    const remote = `https://service.invalid/git/artroom-demo/${repository}.git`;
+    const store = memoryStore();
+    await store.keep("device", rita.secret);
+    await store.save({ v: 1, service: "https://scopes.test", key: "device", register: await R.at(), repository: { directory: directoryAt, membership: membershipAt, rules: rules.name, destination: G.name }, handle: "@rita" });
+    let gitCalls = 0;
+    const context: Context = {
+      store, fetch: routed as unknown as Fetch, now: () => timeMs(net.clock.now)!,
+      pause: async () => { await (G.stub as unknown as { effect(): Promise<number> }).effect(); },
+      // SCRIPTED runner: validates the caller's complete handoff, executes no
+      // Git program and writes no filesystem/config or terminal output.
+      git: { run: async (args, env) => {
+        gitCalls++;
+        if (args[0] === "--version") { expect(args).toEqual(["--version"]); expect(env).toEqual({}); return 0; }
+        expect(args).toEqual(["clone", "--", remote, "scripted-clone"]);
+        expect(args.join(" ")).not.toContain("scripted-private-read");
+        expect(env).toEqual({ GIT_CONFIG_COUNT: "1", GIT_CONFIG_KEY_0: "http.extraHeader", GIT_CONFIG_VALUE_0: "Authorization: Bearer scripted-private-read" });
+        return 0;
+      } },
+    };
+    const cloned = await command(context, ["clone", "scripted-clone"]);
+    expect(cloned.code, cloned.lines.join("\n")).toBe(0);
+    expect(gitCalls).toBe(2);
+    expect(readMints).toBe(1);
+    expect(cloned.lines).toContain(`Remote URL: ${remote}`);
+    expect(cloned.lines).toContain("Cloned into scripted-clone.");
+    expect(cloned.lines.join(" ")).not.toContain("scripted-private-read");
+    expect(await store.config()).toHaveProperty("remote", remote);
+    expect(JSON.stringify(await store.config())).not.toContain("scripted-private-read");
+    // Inspector-only history read; the CLI above presented actual sessions and
+    // used real HTTP admission, bounded outcome/receipt proof and private take.
     platformNet.sessions = false;
-    const token = await G.act(rita, "read-token", { on: 0, fields: { hours: 1 }, expected: await G.expected({ on: 0 }) });
-    expect(token.answer, JSON.stringify(token)).toBe("accepted");
-    if (token.answer !== "accepted") return expect.fail("read-token must be admitted by real @2 rules");
-    await (G.stub as unknown as { effect(): Promise<number> }).effect();
-    const minted = (await G.entries()).find((entry) => entry.input.type === "outcome" && entry.input.operation === `${token.receipt.fact.seq}:0`);
+    const entries = await G.entries();
+    const minted = entries.find((entry) => entry.input.type === "outcome" && entry.input.kind === "mint-read");
     expect(minted?.input).toMatchObject({ type: "outcome", owner: "platform:destination@2", kind: "mint-read", result: "confirmed" });
     if (minted?.input.type !== "outcome") return expect.fail("confirmed outcome is required");
     const handle = (minted.input.evidence.body as { token: string }).token;
-    expect(readMints).toBe(1);
-    expect(JSON.stringify(await G.entries())).not.toContain("scripted-private-read");
+    expect(JSON.stringify(entries)).not.toContain("scripted-private-read");
     platformNet.sessions = true;
-    const credential = await readCredential("https://scopes.test", G.name, session.session.reader(), handle, { fetch: routed as unknown as Fetch });
-    expect(credential).toMatchObject({ ok: true, value: { token: "scripted-private-read", remote: `https://service.invalid/git/artroom-demo/${repository}.git` } });
     expect(await readCredential("https://scopes.test", G.name, session.session.reader(), handle, { fetch: routed as unknown as Fetch })).toEqual({ ok: false, reason: "forbidden" });
   } finally { platformNet.sessions = false; platformNet.secret = null; wired.delete(R.name); platformOutside.delete(G.name); }
 });
