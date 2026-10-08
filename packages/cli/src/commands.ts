@@ -24,7 +24,7 @@
 
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { Answer, DeclaredDefinition, Digest, EffectForm, Entry, FactRef, FieldValue, Founded, Item, KeyId, PlatformDefinition, Receipt, ScopeId, ScopeRef, Seed, SignedIntent, Summary } from "@generalbusiness/artroom-contract";
-import { b64url, canonicalize, definitionDigest, digestBytes, factRefOf, intentDigest, isDigest, isReceipt, isSignedIntentShape, isFactRef, isIncarnation, isScopeId, isScopeRef, keyIdOfSecret, parseStrict, scopeIdOf, seedDigest, textDigest, timeMs, timeOf, unb64url, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
+import { READ_REFUSALS, b64url, canonicalize, definitionDigest, digestBytes, factRefOf, intentDigest, isDigest, isReceipt, isSignedIntentShape, isFactRef, isIncarnation, isScopeId, isScopeRef, keyIdOfSecret, parseStrict, scopeIdOf, seedDigest, textDigest, timeMs, timeOf, unb64url, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import {
   ScopeHandle, TransportError, readCredential, declaredHandle, found, httpTransport, requestSession, secretSigner, sessionRequest, shapeDeclaredAct, signedIntent, signedLogReader, signedReads,
   type Fetch, type ReadSigning, type Signing, type Transport,
@@ -1198,7 +1198,9 @@ export function edit(ctx: Context, path: string, options: { file?: string; title
     const version = (await C.submit(proposed.signed, [], proposed.beside));
     if (version.answer !== "accepted") return answered(lane, version, "Proposed");
     const lines = [`Proposed ${path} (${bytes.length} bytes) as change ${lane}, version ${version.receipt.fact.seq}.`];
-    const outcome = await merging(ctx, config, lane, reader, change.declared);
+    // Preserve the admitted proposal even if merge preparation has a
+    // supported read/transport stop before receiving its own receipt.
+    const outcome = await run(() => merging(ctx, config, lane, reader, change.declared));
     return { ...outcome, lines: [...lines, ...outcome.lines] };
   });
 }
@@ -1235,16 +1237,32 @@ async function merging(ctx: Context, config: Config, lane: ScopeId, reader: stri
   if (answer.answer !== "accepted") return { ...answered(lane, answer, "Merged"), lines: [...answered(lane, answer, "Merged").lines, `The change ${lane} waits, at version ${version.id}. ${again}`] };
   const seq = answer.receipt.fact.seq;
   let next = seq + 1;
-  const ended = await waitFor(ctx, () => [lane, repository.destination], async () => {
-    const read = await L.entry(next);
-    if (!read.ok) return read.reason === "not-found" ? null : stop(failed(`Cannot read entry ${lane}:${next}: ${read.reason}.`));
-    next++;
-    const state = stateOf(read.value.entry.effects, seq);
-    if (state === "published" || state === "refused" || state === "aborted") return { state, effects: read.value.entry.effects };
-    // An unrelated entry still consumes this pass. Retain next and yield to
-    // the existing tries/pause policy instead of scanning without a bound.
-    return null;
-  }, `the room's answer to merge ${lane}:${seq}`, `run artroom merge ${lane} again only after artroom log ${lane} shows the merge ${seq} ended.`);
+  const unknown = (reason: string): Outcome => failed(
+    `Accepted merge: ${lane}:${seq}, version ${version.id}, fact ${canonicalize(answer.receipt.fact)}.`,
+    `Observation unknown: ${reason}. Inspect artroom show ${lane}:${seq} and artroom log ${lane} before requesting another merge; do not resubmit this merge to recover observation.`,
+  );
+  let ended: { state: string; effects: Effects };
+  try {
+    const observed = await waitFor(ctx, () => [lane, repository.destination], async () => {
+      const read = await L.entry(next);
+      if (!read.ok) return read.reason === "not-found" ? null : { unknown: read.reason };
+      next++;
+      const state = stateOf(read.value.entry.effects, seq);
+      if (state === "published" || state === "refused" || state === "aborted") return { state, effects: read.value.entry.effects };
+      // An unrelated entry still consumes this pass. Retain next and yield
+      // to the existing tries/pause policy instead of an unbounded scan.
+      return null;
+    }, `the room's answer to merge ${lane}:${seq}`);
+    if ("unknown" in observed) return unknown(observed.unknown);
+    ended = observed;
+  } catch (error) {
+    // Never print arbitrary exception messages: transports/sources may carry
+    // private data. Only known read codes and phase/error kinds are shown.
+    if (error instanceof Stop) return unknown("wait-exhausted");
+    if (error instanceof TransportError) return unknown("transport-error");
+    if (error instanceof SourceError) return unknown(typeof error.reason === "string" && Object.hasOwn(READ_REFUSALS, error.reason) ? `source-error:${error.reason}` : "source-error");
+    return unknown("observation-error");
+  }
   const reason = valueOf_(ended.effects, seq, "reason");
   if (ended.state !== "published") return failed(`Not published: the merge ${lane}:${seq} is ${ended.state}${typeof reason === "string" ? `, ${reason}` : ""}. The change ${lane} stays open at version ${version.id}. ${again}`);
   const commit = valueOf_(ended.effects, seq, "commit");

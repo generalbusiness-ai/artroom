@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 import { describe, expect, test } from "vitest";
-import type { DeclaredDefinition, Item, Read, ScopeId } from "@generalbusiness/artroom-contract";
+import type { DeclaredDefinition, FactRef, Item, Read, ScopeId } from "@generalbusiness/artroom-contract";
 import { b64url, canonicalize, definitionDigest, entryHash, scopeIdOf, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
 import type { Fetch } from "@generalbusiness/artroom-client";
 import { firstExtents, platform } from "@generalbusiness/artroom-platform";
@@ -240,6 +240,7 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
     const tries = 3;
     const reads: number[] = [];
     let mergeSeq: number | null = null;
+    let mergeFact: FactRef | null = null;
     let submits = 0;
     let pauses = 0;
     const streamFetch = (async (url: string, init?: RequestInit) => {
@@ -260,16 +261,62 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
         const asked = JSON.parse(String(init.body)) as { signed?: { intent?: { kind?: string } } };
         if (asked.signed?.intent?.kind === "merge") {
           submits++;
-          const answer = await response.clone().json() as { answer: string; receipt?: { fact: { seq: number } } };
-          if (answer.answer === "accepted") mergeSeq = answer.receipt!.fact.seq;
+          const answer = await response.clone().json() as { answer: string; receipt?: { fact: FactRef } };
+          if (answer.answer === "accepted") { mergeFact = answer.receipt!.fact; mergeSeq = mergeFact.seq; }
         }
       }
       return response;
     }) as unknown as Fetch;
     const exhausted = await command({ ...rita, fetch: streamFetch, tries, pause: async (waiting) => { pauses++; await pause(waiting); } }, ["merge", badLane]);
-    expect([exhausted.code, exhausted.lines[0], reads, pauses, submits]).toEqual([
-      1, `Gave up waiting for the room's answer to merge ${badLane}:${mergeSeq} after ${tries} reads. What was asked may still take effect; run artroom merge ${badLane} again only after artroom log ${badLane} shows the merge ${mergeSeq} ended.`,
+    const version = /version (\d+)\./.exec(outside.lines[0]!)![1]!;
+    expect([exhausted.code, exhausted.lines, reads, pauses, submits]).toEqual([
+      1, [
+        `Accepted merge: ${badLane}:${mergeSeq}, version ${version}, fact ${canonicalize(mergeFact)}.`,
+        `Observation unknown: wait-exhausted. Inspect artroom show ${badLane}:${mergeSeq} and artroom log ${badLane} before requesting another merge; do not resubmit this merge to recover observation.`,
+      ],
       Array.from({ length: tries }, (_, n) => mergeSeq! + n + 1), tries, 1,
     ]);
+
+    // A read refusal and a transport loss follow real accepted receipts.
+    // Read responses/faults are scripted; mutations still use routed. Each
+    // command submits once. The edit case must keep its admitted proposal.
+    for (const fault of ["refusal", "transport"] as const) {
+      // Before deliberately starting another test command, the test inspector
+      // confirms the previous real merge ended; no unknown-observation retry.
+      await pause([badLane, G.name]);
+      expect((await new Platform(badLane as ScopeId).entries()).some((entry) => entry.effects.some((effect) => effect.effect === "state" && effect.item === mergeSeq && effect.state === "refused"))).toBe(true);
+      let fact: FactRef | null = null;
+      let acceptedVersion: number | null = null;
+      let submitted = 0;
+      const broken = (async (url: string, init?: RequestInit) => {
+        const path = new URL(url).pathname;
+        if (fact && path.startsWith(`/v1/scopes/${fact.at.scope}/entries/`)) {
+          if (fault === "transport") throw new Error("TEST private transport detail");
+          return new Response(JSON.stringify({ ok: false, reason: "forbidden" }), { status: 403, headers: { "content-type": "application/json" } });
+        }
+        const response = await routed(url, init);
+        if (init?.method === "POST" && path.endsWith("/acts")) {
+          const asked = JSON.parse(String(init.body)) as { signed?: { intent?: { kind?: string; fields?: { manifest?: number } } } };
+          if (asked.signed?.intent?.kind === "merge") {
+            submitted++;
+            const answer = await response.clone().json() as { answer: string; receipt?: { fact: FactRef } };
+            if (answer.answer === "accepted") { fact = answer.receipt!.fact; acceptedVersion = asked.signed.intent.fields!.manifest!; }
+          }
+        }
+        return response;
+      }) as unknown as Fetch;
+      const outcome = await command({ ...rita, fetch: broken }, fault === "refusal" ? ["merge", badLane] : ["edit", "../outside.md", "--file", "readme.md"]);
+      expect(fact).not.toBeNull();
+      const accepted = fact as unknown as FactRef;
+      expect([outcome.code, outcome.lines.slice(fault === "transport" ? 1 : 0), submitted]).toEqual([
+        1, [
+          `Accepted merge: ${accepted.at.scope}:${accepted.seq}, version ${acceptedVersion}, fact ${canonicalize(accepted)}.`,
+          `Observation unknown: ${fault === "refusal" ? "forbidden" : "transport-error"}. Inspect artroom show ${accepted.at.scope}:${accepted.seq} and artroom log ${accepted.at.scope} before requesting another merge; do not resubmit this merge to recover observation.`,
+        ], 1,
+      ]);
+      if (fault === "transport") expect(outcome.lines[0]).toMatch(new RegExp(`^Proposed \\.\\./outside\\.md \\(\\d+ bytes\\) as change ${accepted.at.scope}, version ${acceptedVersion}\\.$`));
+      expect(outcome.lines.join("\n")).not.toMatch(/No answer|Nothing was written|TEST private transport detail/);
+      mergeSeq = accepted.seq;
+    }
   }
 }
