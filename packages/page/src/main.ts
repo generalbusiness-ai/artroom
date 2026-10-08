@@ -21,10 +21,12 @@
 
 import type { Answer, FieldValue, ScopeId } from "@generalbusiness/artroom-contract";
 import { b64url, keyIdOfSecret, unb64url } from "@generalbusiness/artroom-bytes";
-import { act, actsOn, fieldValue, joinRoom, listLanes, loadChange, loadIssue, loadRules, openRoom, placeOf, type Acted, type Place, type Room, type Session } from "./data.ts";
-import { actsPanel, answerLine, changeScreen, h, issueScreen, roomScreen, rulesScreen } from "./view.ts";
+import { act, actAssociation, actsOn, fieldValue, joinRoom, listLanes, loadChange, loadIssue, loadRules, openRoom, placeOf, type Acted, type Place, type Room, type Session } from "./data.ts";
+import { actsPanel, answerLine, changeScreen, failureScreen, h, issueScreen, roomScreen, rulesScreen } from "./view.ts";
 
 const KEPT = "artroom-page";
+/** The room text survives a key-generation redraw in memory only. It can hold an invitation secret. */
+let roomDraft = "";
 /** What this browser keeps: the base URL, the room (no secret of it) and the key. */
 interface Settings { service: string; place: Place | null; secret: string }
 
@@ -55,10 +57,10 @@ const root = (): HTMLElement => document.getElementById("page")!;
 /** The number of the latest draw: a slower, earlier draw that ends after a later one shows nothing. */
 let drawing = 0;
 const showFor = (n: number) => (...children: HTMLElement[]) => { if (n === drawing) root().replaceChildren(...children); };
-const failure = (error: unknown) => h("main", {}, h("h1", {}, "Not read"), h("p", { class: "answer bad" }, error instanceof Error ? error.message : String(error)), h("p", {}, h("a", { href: "#/settings" }, "Settings")));
+
 
 let opened: { key: string; room: Room } | null = null;
-/** The scope's answer to the last act sent from this page, by scope, for the states and the answer line. */
+/** The scope's answer to the last act sent from this page, by service/room/member/scope, for the states and the answer line. */
 const lastActs = new Map<string, Acted>();
 
 async function roomOf(kept: Settings, place: Place): Promise<Room> {
@@ -77,22 +79,23 @@ async function panelFor(room: Room, scope: ScopeId): Promise<HTMLElement> {
         const fields: Record<string, FieldValue> = {};
         for (const [name, text] of Object.entries(typed)) fields[name] = fieldValue(room, offered?.fields.find((f) => f.name === name)?.type ?? "text", text);
         const target = /^\d+$/.test(on) ? Number(on) : null;
-        lastActs.set(scope, await act(room, scope, kind, { on: target, fields }));
+        const association = actAssociation(room, scope);
+        const result = await act(room, scope, kind, { on: target, fields }, (known) => lastActs.set(association, known));
+        lastActs.set(association, result);
       } catch (error) {
-        lastActs.delete(scope);
         alert(error instanceof Error ? error.message : String(error));
       }
       await draw();
     })();
   };
-  const last = lastActs.get(scope);
+  const last = lastActs.get(actAssociation(room, scope));
   return actsPanel(await actsOn(room, scope), send, last ? answerLine(last) : null);
 }
 
 function settingsScreen(): HTMLElement {
   const kept = settings();
   const service = h("input", { name: "service", value: kept?.service ?? "", placeholder: `${location.origin} (this page's own)` });
-  const room = h("textarea", { name: "room", rows: "3", placeholder: "an invitation link (artroom-invite:...), or the content of the command line's config.json" });
+  const room = h("textarea", { name: "room", rows: "3", placeholder: "an invitation link (artroom-invite:...), or the content of the command line's config.json" }, roomDraft);
   const secret = h("input", { name: "secret", type: "password", autocomplete: "off", placeholder: kept ? "kept; paste another to replace it" : "32-byte secret, base64url" });
   const said = h("p", { class: "answer", role: "status", hidden: "" });
   const tell = (good: boolean, text: string) => { said.textContent = text; said.className = `answer ${good ? "ok" : "bad"}`; said.removeAttribute("hidden"); };
@@ -110,9 +113,9 @@ function settingsScreen(): HTMLElement {
     if (typed && !place) { tell(false, "That is neither an invitation link nor a config file that names a repository."); return null; }
     return { service: (service as HTMLInputElement).value.trim(), place, secret: newSecret ?? ((secret as HTMLInputElement).value.trim() || kept?.secret || "") };
   };
-  const save = (next: Settings) => { keep(next); opened = null; location.hash = "#/"; };
+  const save = (next: Settings) => { keep(next); roomDraft = ""; (room as HTMLTextAreaElement).value = ""; opened = null; location.hash = "#/"; };
   form.addEventListener("submit", (event) => { event.preventDefault(); const next = read(null); if (next) save(next); });
-  form.querySelector("#new-key")!.addEventListener("click", () => { const next = read(b64url(crypto.getRandomValues(new Uint8Array(32)))); if (next) { keep(next); opened = null; void draw(); } });
+  form.querySelector("#new-key")!.addEventListener("click", () => { const next = read(b64url(crypto.getRandomValues(new Uint8Array(32)))); if (next) { roomDraft = (room as HTMLTextAreaElement).value; keep(next); opened = null; void draw(); } });
   // Joining signs membership's `join` with the kept key and the link's secret. The link is not kept: only the room it names.
   form.querySelector("#join")!.addEventListener("click", () => {
     void (async () => {
@@ -143,13 +146,19 @@ async function draw(): Promise<void> {
   try {
     const room = await roomOf(kept, kept.place);
     const [, kind, scope] = path.split("/") as [string, string?, string?];
-    const last = (s: string): Answer | null => lastActs.get(s)?.answer ?? null;
+    const last = (s: string): Answer | null => lastActs.get(actAssociation(room, s as ScopeId))?.answer ?? null;
     if (kind === "issue" && scope) return show(issueScreen(room, await loadIssue(room, scope as ScopeId)), await panelFor(room, scope as ScopeId));
     if (kind === "change" && scope) return show(changeScreen(room, await loadChange(room, scope as ScopeId), last(scope)), await panelFor(room, scope as ScopeId));
     if (kind === "rules") return show(rulesScreen(room, await loadRules(room)), await panelFor(room, room.rules));
     return show(roomScreen(room, await listLanes(room)), await panelFor(room, room.directory));
   } catch (error) {
-    show(failure(error));
+    // Match the original service/room/member, even if opening this view failed.
+    let known: Acted[] = [];
+    try {
+      const context = { session: sessionOf(kept), directory: kept.place.directory, membership: kept.place.membership };
+      known = [...lastActs.entries()].filter(([association, result]) => association === actAssociation(context, result.scope)).map(([, result]) => result);
+    } catch { /* Invalid current settings cannot match a known result. */ }
+    show(failureScreen(error, known));
   }
 }
 

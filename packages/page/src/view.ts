@@ -12,8 +12,9 @@
  * | `actsPanel` | The acts the caller may sign now on the scope shown, each a form whose button signs and sends it, and the scope's answer. |
  */
 
+import { editPath } from "@generalbusiness/artroom-platform";
 import type { Answer } from "@generalbusiness/artroom-contract";
-import { siteAddress, type Acted, type ChangeView, type IssueView, type LaneRow, type Offered, type Room, type RulesView } from "./data.ts";
+import { siteAddress, Unreadable, type Acted, type ChangeView, type IssueView, type LaneRow, type Offered, type Room, type RulesView } from "./data.ts";
 import { changeStates } from "./states.ts";
 
 type Child = Node | string | null | undefined | false;
@@ -49,7 +50,7 @@ export function roomScreen(room: Room, lanes: { issues: LaneRow[]; changes: Lane
   ]);
   return h("main", {},
     h("h1", {}, "Room"), whoLine(room),
-    h("p", {}, h("a", { href: "#/rules" }, "The rules of this room"), " · ", h("a", { href: siteAddress(room, "") }, "The published site")),
+    h("p", {}, h("a", { href: "#/rules" }, "The rules of this room"), " · ", h("a", { href: siteAddress(room, "") }, "Latest published site")),
     section("Issues", table(["Number", "Title", "State", ""], rows("issue", lanes.issues))),
     section("Changes", table(["Number", "Title", "State", ""], rows("change", lanes.changes))),
     h("p", { class: "muted" }, `Directory ${room.directory}.`),
@@ -82,6 +83,7 @@ export function changeScreen(room: Room, change: ChangeView, last: Answer | null
   // The version that is current, or after a merge the latest one.
   const current = change.manifests.find((m) => m.state === "current") ?? change.manifests.at(-1) ?? null;
   const states = changeStates(change, last);
+  const published = change.merges.find((merge) => merge.state === "published" && merge.manifest === current?.id);
   const extents = change.rules?.extents ?? [];
   // Reviews by extent: the approvals of the current version that state each extent of the rules the lane holds.
   const byExtent = extents.map((extent) => {
@@ -92,6 +94,7 @@ export function changeScreen(room: Room, change: ChangeView, last: Answer | null
     h("p", {}, h("a", { href: "#/" }, "Room")),
     h("h1", {}, `${or(change.title, "(no title)")} `, h("span", { class: "muted" }, `#${or(change.number, "?")}`)),
     whoLine(room),
+    h("p", {}, h("a", { href: siteAddress(room, "") }, "Latest published site")),
     h("dl", {}, field("State", state(change.state)), field("Opened by", or(change.author))),
     change.body ? h("p", { class: "body" }, change.body) : null,
     section("Where it stands", states.length === 0 ? h("p", { class: "muted" }, "No review is asked for, no merge is in progress and none has been refused.") :
@@ -101,7 +104,10 @@ export function changeScreen(room: Room, change: ChangeView, last: Answer | null
       field("Base", h("code", {}, short(current.base))),
       current.file ? [
         field("File", h("code", {}, current.file.path)), field("Bytes", or(current.file.size)), field("Digest", h("code", {}, short(current.file.digest))),
-        field("Rendered page", h("span", {}, h("a", { href: current.file.page }, current.file.page), change.merges.some((m) => m.state === "published" && m.manifest === current.id) ? "" : h("span", { class: "muted" }, " (shows the published branch: this version once it is published)"))),
+        // HEAD is latest navigation, never an immutable version preview.
+        // This branch has no receipt-eligible immutable site selector.
+        field("Rendered page", editPath(current.file.path) === null ? "Not available for an invalid path." : published ? "Rendering this published version is not available yet." : "Not published."),
+        published?.commit ? field("Recorded publication commit", h("code", {}, published.commit)) : null,
       ] : [field("Integration commit", h("code", {}, short(current.integration))), field("Tree", h("code", {}, short(current.tree)))],
     ) : h("p", { class: "muted" }, "No version is proposed yet."), change.manifests.length > 1 ? h("p", { class: "muted" }, `${change.manifests.length - 1} earlier version(s).`) : null),
     section("Reviews by extent",
@@ -146,15 +152,26 @@ export function rulesScreen(room: Room, rules: RulesView): HTMLElement {
 
 // ---------------------------------------------------------------- acts
 
-/** The scope's answer to the act just sent, in one line. A refusal says what was refused and that nothing was written. */
-export function answerLine(acted: Acted): HTMLElement {
+/** Known submit result and separate observation phase. No head is invented. */
+export function answerText(acted: Acted): string[] {
   const a = acted.answer;
+  let known: string;
   switch (a.answer) {
-    case "accepted": return h("p", { class: "answer ok", role: "status" }, `Took effect: entry ${a.receipt.fact.seq}.`);
-    case "refused": return h("p", { class: "answer bad", role: "status" }, `Refused: ${a.reason}${"name" in a && a.name ? ` (${a.name})` : ""}. Nothing was written: the scope's head is still entry ${acted.after.seq}.`);
-    case "unavailable": return h("p", { class: "answer bad", role: "status" }, `Unavailable: ${a.reason}. Nothing was written; the same act may be sent again.`);
-    case "mismatch": return h("p", { class: "answer bad", role: "status" }, `Mismatch: ${a.reason}.`);
+    case "accepted": known = `Accepted ${acted.kind}: ${a.receipt.fact.at.scope}:${a.receipt.fact.seq}, hash ${a.receipt.fact.hash}, incarnation ${a.receipt.fact.at.inc}.`; break;
+    case "refused": known = `Refused: ${a.reason}${"name" in a && a.name ? ` (${a.name})` : ""}. Nothing was written by this request.`; break;
+    case "unavailable": known = `Unavailable: ${a.reason}.`; break;
+    case "mismatch": known = `Mismatch: ${a.reason}.`; break;
   }
+  return [known, ...(acted.observation === null ? [] : [`Observation unknown: ${acted.observation} Inspect artroom log ${acted.scope}${a.answer === "accepted" ? ` and artroom show ${a.receipt.fact.at.scope}:${a.receipt.fact.seq}` : ""} before submitting another act; do not resubmit to recover observation.`])];
+}
+export function answerLine(acted: Acted): HTMLElement {
+  return h("div", { class: "answer", role: "status" }, h("p", {}, `Known answer for ${acted.kind} on ${acted.scope}${acted.on === null ? "" : `, item ${acted.on}`}.`), answerText(acted).map((line) => h("p", {}, line)));
+}
+/** The actual failure screen keeps known results visible when a view reload fails. */
+export function failureScreen(error: unknown, known: readonly Acted[] = []): HTMLElement {
+  return h("main", {}, h("h1", {}, "Observation unknown"), h("p", { class: "answer bad" }, error instanceof Unreadable ? error.message : "The view could not be read."),
+    known.map((result) => answerLine({ ...result, observation: result.observation ?? "The subsequent view could not be read." })),
+    h("p", {}, h("a", { href: "#/settings" }, "Settings")));
 }
 
 /**
