@@ -3,7 +3,7 @@
  * no state of a process, so a test runs the same lines as a person types.
  */
 
-import { act, acts, claim, clone, install, installPlanned, invite, join, log, planInstall, remote, show, verify, type Context, type Outcome } from "./commands.ts";
+import { act, acts, claim, clone, edit, merge, install, installPlanned, invite, join, log, planInstall, remote, show, verify, type Context, type Outcome } from "./commands.ts";
 
 export const USAGE = [
   "Usage:",
@@ -14,12 +14,14 @@ export const USAGE = [
   "  artroom invite <@member> --role <role> [--hours 24]",
   "  artroom join <link>",
   "  artroom acts [<scope>]",
-  "  artroom act <kind> --on <scope> [--target <item>] [--set name=value ...]",
+  "  artroom act <kind> --on <scope> [--target <item>] [--set name=value ...] [--value <file> ...]",
   "  artroom log <scope> [--limit n]",
   "  artroom show <scope>:<seq>",
   "  artroom verify <scope>",
   "  artroom remote",
   "  artroom clone [<directory>] [--hours 1]",
+  "  artroom edit <path> --file <local file> [--title <text>]",
+  "  artroom merge <change>",
   "A scope is a scope ID, or one of: register, directory, membership, rules, destination, inbox.",
 ].join("\n");
 
@@ -48,7 +50,7 @@ export function parse(argv: readonly string[]): { words: string[]; flags: Map<st
 }
 
 const KNOWN: Record<string, readonly string[]> = {
-  install: ["host", "namespace", "plan", "planned"], claim: ["handle", "branch", "again"], invite: ["role", "acts", "hours"], join: [], acts: [], act: ["on", "target", "set"], log: ["limit"], show: [], verify: [], remote: [], clone: ["hours"],
+  install: ["host", "namespace", "plan", "planned"], claim: ["handle", "branch", "again"], invite: ["role", "acts", "hours"], join: [], acts: [], act: ["on", "target", "set", "value"], log: ["limit"], show: [], verify: [], remote: [], clone: ["hours"], edit: ["file", "title"], merge: [],
 };
 
 /** Runs one command line with the given context. */
@@ -72,11 +74,13 @@ export async function command(ctx: Context, argv: readonly string[]): Promise<Ou
     case "invite": return first === undefined ? needs("a member's handle") : invite(ctx, first, { ...(flag("role") ? { role: flag("role")! } : {}), ...(flag("acts") !== undefined ? { acts: flag("acts")! } : {}), ...(flag("hours") ? { hours: number("hours")! } : {}) });
     case "join": return first === undefined ? needs("a link") : join(ctx, first);
     case "acts": return acts(ctx, first);
-    case "act": return first === undefined ? needs("an act kind") : act(ctx, first, { ...(flag("on") ? { on: flag("on")! } : {}), ...(flag("target") ? { target: number("target")! } : {}), set: parsed.flags.get("set") ?? [] });
+    case "act": return first === undefined ? needs("an act kind") : act(ctx, first, { ...(flag("on") ? { on: flag("on")! } : {}), ...(flag("target") ? { target: number("target")! } : {}), set: parsed.flags.get("set") ?? [], value: parsed.flags.get("value") ?? [] });
     case "log": return log(ctx, first, { ...(flag("limit") ? { limit: number("limit")! } : {}) });
     case "show": return first === undefined ? needs("an entry") : show(ctx, first);
     case "remote": return first === undefined ? remote(ctx) : { code: 2, lines: ["remote takes no argument.", USAGE] };
     case "clone": return clone(ctx, first, { ...(flag("hours") ? { hours: number("hours")! } : {}) });
+    case "edit": return first === undefined ? needs("a path in the repository") : edit(ctx, first, { ...(flag("file") !== undefined ? { file: flag("file")! } : {}), ...(flag("title") !== undefined ? { title: flag("title")! } : {}) });
+    case "merge": return first === undefined ? needs("a change") : merge(ctx, first);
     default: return verify(ctx, first);
   }
 }

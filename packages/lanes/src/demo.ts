@@ -49,7 +49,7 @@ export const issueDemo = {
   },
 } as const satisfies LaneDefinition;
 
-/** `change`, with 18 of its 53 acts: open, edit, ready and close, ask the rules, propose a version, request and give a review, request and answer a check, comment, link to close, merge and cancel it, and the commitment and hold acts that a version needs. */
+/** `change`, with 19 of its 54 acts: open, edit, ready and close, ask the rules, propose a version or a one-file version, request and give a review, request and answer a check, comment, link to close, merge and cancel it, and the commitment and hold acts that a version needs. */
 export const changeDemo = {
   ...change,
   receives: changeReceives,
@@ -60,6 +60,7 @@ export const changeDemo = {
     "close-own": ca["close-own"],
     "ask-rules": ca["ask-rules"],
     "propose-manifest": ca["propose-manifest"],
+    "propose-file": ca["propose-file"],
     "request-review-own": ca["request-review-own"],
     "review-verdict": ca["review-verdict"],
     "request-check": ca["request-check"],

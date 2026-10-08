@@ -35,14 +35,14 @@ describe("the two lane definitions, as data (lane forms, revision 14)", () => {
 
   test("the counts: the item types, acts, timed rules and handlers that the lane forms state, each within its adopted bound, and each bound a row meets is met exactly", () => {
     const counted = (d: DeclaredDefinition) => [d.items, d.acts, d.timed, d.receives].map((part) => Object.keys(part).length);
-    // `change` has one act that is no row of the lane forms' revision 14: `ask-rules` (request i5; `src/change.ts` marks it).
-    expect([counted(issue), counted(change)]).toEqual([[12, 50, 1, 7], [14, 53, 2, 4]]);
+    // `change` also carries proposed i5 acts outside lane forms revision 14: `ask-rules` and `propose-file` (request i5; `src/change.ts` marks it).
+    expect([counted(issue), counted(change)]).toEqual([[12, 50, 1, 7], [14, 54, 2, 4]]);
     // The validator is the counter. A definition passes with a bound at the number below, and is refused with one less.
     // `propose-manifest` has 24 guards as written and 16 effects, which are the adopted bounds, and its guards are nested 8 deep, which
     // is the bound too. Counting those nested it has 73 guards. Four acts name 4 other items. `intent` has 10 values.
     const meets: Record<(typeof names)[number], Partial<Bounds>> = {
       issue: { items: 12, acts: 50, timedRules: 1, receives: 7, values: 10, also: 4 },
-      change: { items: 14, acts: 53, timedRules: 2, receives: 4, also: 4, presents: 1, guards: 24, nestedGuards: 73, guardDepth: 8, effects: 16 },
+      change: { items: 14, acts: 54, timedRules: 2, receives: 4, also: 4, presents: 1, guards: 24, nestedGuards: 73, guardDepth: 8, effects: 16 },
     };
     const found = names.flatMap((name) => (Object.entries(meets[name]) as [keyof Bounds, number][]).map(([bound, n]) => {
       const less = validated(lanes[name], { [bound]: n - 1 });
@@ -109,7 +109,7 @@ describe("the two lane definitions, as data (lane forms, revision 14)", () => {
       const kept = (part: "acts" | "receives") => Object.entries(demo[part]).every(([row, value]) => canonicalize(value) === canonicalize((full[part] as Record<string, unknown>)[row]));
       expect([kept("acts"), kept("receives"), canonicalize({ ...demo, acts: {}, receives: {} }) === canonicalize({ ...full, acts: {}, receives: {} })], name).toEqual([true, true, true]);
     }
-    expect(([[issueDemo, issue], [changeDemo, change]] as const).map(([demo, full]) => [Object.keys(demo.acts).length, Object.keys(full.acts).length, Object.keys(demo.receives).length, Object.keys(full.receives).length])).toEqual([[12, 50, 5, 7], [18, 53, 2, 4]]);
+    expect(([[issueDemo, issue], [changeDemo, change]] as const).map(([demo, full]) => [Object.keys(demo.acts).length, Object.keys(full.acts).length, Object.keys(demo.receives).length, Object.keys(full.receives).length])).toEqual([[12, 50, 5, 7], [19, 54, 2, 4]]);
     expect(new Set([...Object.values(DIGESTS), ...Object.values(DEMO_DIGESTS)]).size).toBe(4);
   });
 });

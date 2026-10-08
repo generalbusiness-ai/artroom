@@ -2,8 +2,10 @@
  * platform rules alone judge their evidence. Plaintexts stay in private custody. */
 import type { Entry, FactRef, FieldValue, KeyId, OperationId, PlatformDefinition, RetainedInput, ScopeRef } from "@generalbusiness/artroom-contract";
 import { canonicalize, entryHash, isFactRef, isKeyId, isOperationId, parseStrict, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
-import { isEntryOf, valueDigest, type Operation } from "@generalbusiness/artroom-derive";
-import { DESTINATION_KINDS, destinationBranch, destinationMint, destinationRead, destinationReceipt, destinationRevokedMint, destinationSends, destinationStatement, destinationTarget, destinationWrite, firstHeadCommit, foundingObjects, isRecordedJudgeEvidence, revokedToken, platform, destination2Helpers, type DestinationObject, type ObjectFormat, type RecordedJudgeEvidence } from "@generalbusiness/artroom-platform";
+import { isEntryOf, valueDigest, type Item, type Operation } from "@generalbusiness/artroom-derive";
+import { DESTINATION_KINDS, destinationBranch, destinationMint, destinationRead, destinationReceipt, destinationRevokedMint, destinationSends, destinationStatement, destinationTarget, destinationWrite, editObjects, editPath, fileOf, fileSound, firstHeadCommit, foundingObjects, isRecordedJudgeEvidence, revokedToken, platform, destination2Helpers, type DestinationObject, type EditFile, type ObjectFormat, type RecordedJudgeEvidence } from "@generalbusiness/artroom-platform";
+import { GitRefusal, READ_BOUNDS, Reader, type GitSource } from "@generalbusiness/artroom-git";
+import { inspectGit } from "./github-host.ts";
 import type { CredentialPosition, CredentialStore, RevocationPosition } from "./credential-store.ts";
 import type { OutsideGiven } from "./object.ts";
 import type { EffectAnswer, EffectRequest, Outside } from "./operations.ts";
@@ -144,6 +146,8 @@ export class DestinationHost implements Outside {
         return answer(reply["revoked"] ? "confirmed" : "refused", { token });
       }
       if (operation.kind === DESTINATION_KINDS.judge) {
+        const edit = this.#owner() === "platform:destination@2" ? this.#edit(this.#judging()) : null;
+        if (edit) return await this.#inspectEdit(repository, ref, edit);
         const inspection = this.#inspection(repository, ref);
         if (!inspection) return null;
         const reply = await this.#options.provider.inspect(inspection);
@@ -279,7 +283,16 @@ export class DestinationHost implements Outside {
       const tree = evidence?.tree;
       if (!objectId(tree)) return null;
       expectedTree = tree;
-      objects = await this.#options.provider.objects(repository, commit);
+      const edit = this.#owner() === "platform:destination@2" && target ? this.#edit(target) : null;
+      if (edit) {
+        // A one-file manifest: the objects that the reservation's tree and commit name, built again on the base's closure.
+        const time = typeof reservedAt === "number" ? own(reservedAt)?.entry.time : undefined;
+        if (time === undefined || edit.base !== head) return null;
+        const base = await this.#options.provider.objects(repository, edit.base);
+        const built = this.#build(format, base, edit, time);
+        if (!built || built.commit !== commit || built.tree !== tree) return null;
+        objects = [...new Map([...base, ...built.objects].map((object) => [object.id, object])).values()];
+      } else objects = await this.#options.provider.objects(repository, commit);
     }
     // Async preparation may have let a read or compromise close the target.
     const live = this.#options.custody.live(binding.mint, 1, this.#given.clock.read());
@@ -309,6 +322,54 @@ export class DestinationHost implements Outside {
     if (!kept) return null;
     const copy = parseStrict(kept.bytes) as unknown as Entry;
     return isEntryOf(copy, fact) ? copy : null;
+  }
+  /** The publication whose `judge` is open. */
+  #judging(): Item | null {
+    const id = destinationBranch(this.#given.state)?.refs["judging"];
+    return typeof id === "number" ? this.#given.state.item(id) : null;
+  }
+  /** The one-file manifest of a publication, from the manifest's entry that its `reserve` retained, with its base and operation; null for any other manifest. */
+  #edit(publication: Item | null): { file: EditFile; base: string; operation: FactRef } | null {
+    const reserve = publication ? this.#given.own(publication.id)?.entry : null;
+    if (!publication || !reserve) return null;
+    const statement = this.#helpers().statementOf(this.#given.own, publication);
+    const manifest = this.#fact(reserve, statement.manifest);
+    const file = fileOf(manifest);
+    const base = manifest?.input.type === "act" ? manifest.input.signed.intent.fields["base"] : null;
+    return file && objectId(base) ? { file, base, operation: statement.operation } : null;
+  }
+  /** The objects of a one-file edit on the base's closure, or null when the published tree does not let the file be written. */
+  #build(format: ObjectFormat, base: readonly DestinationObject[], edit: { file: EditFile; base: string; operation: FactRef }, time: Entry["time"]) {
+    const scope = this.#given.scope();
+    if (!scope) return null;
+    const read = new Map(base.map((object) => [object.id, object]));
+    return editObjects(format, (id) => read.get(id) ?? null, edit.base, edit.file.path, utf8(edit.file.content), { scope: scope.at.scope, time, operation: edit.operation });
+  }
+  /**
+   * The evidence of `judge` for a one-file manifest. The branch's head, as the host shows it. A path that no tree may hold, bytes
+   * that are not the ones the manifest states, and a published tree that does not let the file be written there give evidence that
+   * the integration is not present. Otherwise the base's closure with the file written is inspected as any integration is, by
+   * `inspectGit`: its tree, its first parent and its changed set.
+   */
+  async #inspectEdit(repository: DestinationRepository, ref: string, edit: { file: EditFile; base: string; operation: FactRef }): Promise<EffectAnswer | null> {
+    const seen = await this.#options.provider.ref(repository, ref);
+    const head = objectId(seen) ? seen : null;
+    const absent: RecordedJudgeEvidence = { head, present: false, tree: null, firstParent: null, ancestors: [], changes: null };
+    if (editPath(edit.file.path) === null || !fileSound(edit.file)) return answer("confirmed", absent);
+    const format = await this.#options.provider.format(repository);
+    const base = await this.#options.provider.objects(repository, edit.base);
+    // The commit's time is not judged here: the tree, the parent and the changed set do not depend on it.
+    const built = this.#build(format, base, edit, this.#given.clock.read());
+    if (!built) return answer("confirmed", absent);
+    const objects = new Map([...base, ...built.objects].map((object) => [object.id, object]));
+    const source: GitSource = {
+      object: async (id) => { const object = objects.get(id); return object ? { type: object.kind, size: object.body.length, data: new Uint8Array(object.body) } : null; },
+      ref: async (name) => (name === ref ? head : null),
+      refs: async () => { throw new GitRefusal("unreadable", "an edit's inspection lists no refs"); },
+    };
+    const branch = destinationBranch(this.#given.state)?.values["head"];
+    const reply = await inspectGit(new Reader(source, READ_BOUNDS), { repository, ref, recorded: objectId(branch) ? branch : null, base: edit.base, integration: built.commit, tree: built.tree, reports: [] });
+    return isRecordedJudgeEvidence(reply.evidence) ? { ...answer("confirmed", reply.evidence), ...(reply.retain === undefined ? {} : { retain: reply.retain }) } : null;
   }
   #inspection(repository: DestinationRepository, ref: string): DestinationInspection | null {
     const branch = destinationBranch(this.#given.state);
