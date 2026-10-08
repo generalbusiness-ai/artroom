@@ -158,6 +158,18 @@ shots, one test with the recorder skipped. Logs and limits are in the related
 install/story notes and `/tmp/artroom-expanded-demo-contract-focused.log`.
 These are focused test outcomes, not a corrected passing gate.
 
+The completed clone receipt/opening/full-fact and outcome identity checks,
+bounded cancellable waiter and typed one-time credential parser are restored
+around the current CLI features. The actual local Git witness and its owned
+lazy fixture are also carried. On exact isolated composition
+`e2893ada8be2a954ad7c2b1cf1cf42b017a516e5`, one focused batch passes eleven
+tests across six files, including the real Git clone. CLI and Scope Worker/
+Node-helper types pass. Log:
+`/tmp/artroom-expanded-clone-current-evidence/focused.log`.
+The host identity, mint rights, scripted clock and trusted URL rewrite remain
+stand-ins; no live provider, TLS, original historical or admission proof is
+inferred. Current source incorporates these exact component changes.
+
 The combined filing and full exact-head independent Source review remain
 pending. No new deployment, browser or provider rehearsal was
 performed. Historical twenty-six-shot matches do not establish this head's
