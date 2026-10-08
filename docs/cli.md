@@ -23,7 +23,9 @@ published to a registry, and no service is deployed.
 
 A scope is named by its ID (`sc_...`) or by one of the names `claim` or
 `join` learned: `register`, `directory`, `membership`, `rules`,
-`destination`, `inbox`. An entry is named `<scope>:<seq>`.
+`destination`, `inbox`. An entry is named `<scope>:<seq>`. An issue is
+named by its number, `3` or `#3`, as `artroom issues` lists it, or by its
+lane's scope ID.
 
 ## The commands
 
@@ -164,7 +166,8 @@ sc_p6xp2lmd...:9  2099-01-01T00:00:00Z  delivery result from inbox:0; 0 effects,
 ```
 
 **`artroom verify <scope>`** runs the replay verifier over the read
-routes, with the platform package's rules. It reads with the caller's
+routes, with the platform package's rules and the code of the two lane
+capabilities, `hold@1` and `git-read@1`, so it replays a lane too. It reads with the caller's
 session, and a read that the session is refused goes again as a signed
 read by the caller's key. It prints the verifier's report: the result,
 what it covered, and what it takes on trust. A history whose first page
@@ -174,6 +177,33 @@ cannot be read has no report; the command prints
 ```
 Result: consistent, for the mode, target, coverage and trusts stated below.
 Mode: replay. Within the coverage stated below, the history was folded from its genesis, ...
+```
+
+**`artroom verify --all`** runs the same replay for every scope of the
+room: the register, the directory, and every scope that the directory
+created and each of those created (membership, the rules scope, the
+destination, each lane, each inbox), found by the creations in their
+histories. It prints one line for each scope: its kind, its ID, the entry
+the replay reached and the result. The last line is `All consistent: <n>
+scopes.`, or the first finding, and then the command exits 1. A history
+that cannot be read is a finding. The example is from
+`packages/lanes/test/issues.scope.test.ts`, after two issues were closed by
+two published changes:
+
+```
+register sc_3kisrweg..., entry 3: consistent.
+directory sc_6frfaa2y..., entry 21: consistent.
+membership sc_kc5qv4qq..., entry 10: consistent.
+rules sc_qmnrfkiu..., entry 8: consistent.
+destination sc_6bqqdirs..., entry 27: consistent.
+lane sc_4bbosp5k..., entry 5: consistent.
+lane sc_yx6ty22i..., entry 3: consistent.
+lane sc_7hogxnge..., entry 12: consistent.
+lane sc_zdmnlqyr..., entry 12: consistent.
+inbox sc_vyo43gf3..., entry 1: consistent.
+inbox sc_obxlkkam..., entry 1: consistent.
+inbox sc_3a6xxtoj..., entry 1: consistent.
+All consistent: 12 scopes.
 ```
 
 **`artroom remote`** prints the repository's host, namespace, name and
@@ -251,7 +281,9 @@ asserts, with IDs cut short; the numbers in them are illustrative.
 4. It signs the lane's `ask-rules`, and waits for the rules scope's answer.
 5. It signs `propose-file` on the destination's head: the path, the digest
    and size of the bytes, and the bytes. This is the change's only version.
-6. It merges the change as `artroom merge` does.
+6. With `--closes <issue>`, it signs the lane's `link-own` to that issue,
+   as `artroom merge --closes` does.
+7. It merges the change as `artroom merge` does.
 
 ```
 Proposed README.md (37 bytes) as change sc_q3xk...., version 6.
@@ -286,6 +318,74 @@ page's address. Refused by the lane, it prints the refusal; refused by the
 destination, the reason. Either way the change stays open, and `artroom
 merge` may be run again.
 
+With **`--closes <issue>`**, `merge` first signs the change lane's
+`link-own` to the issue (`how` is `keyword`). The link is a fact of the
+change lane. When the merge is published, the lane tells the issue, and
+the issue closes with the reason `completed`, by its own entry. Only the
+change's author may sign `link-own`; the demo profile has no `link-any`.
+So a member who opens a change can link it, but cannot merge it: members
+do not hold `change.merge`. The member's change waits, linked, and an
+admin or a maintainer merges it. The examples from here on have the form
+that `packages/lanes/test/issues.scope.test.ts` asserts, with IDs cut
+short; the numbers and hashes in them are illustrative.
+
+```
+Proposed guide/start.md (53 bytes) as change sc_q3xk..., version 6.
+Linked: when it is published, the change sc_q3xk... closes issue #1 (sc_4bbo...).
+Refused: unauthorized, judged at entry sc_q3xk...:7. Nothing was written.
+The change sc_q3xk... waits, at version 6. When it may be merged, run: artroom merge sc_q3xk...
+```
+
+Then, as the admin, `artroom merge sc_q3xk...`:
+
+```
+Published: commit 5d0c1e6b..., by the merge sc_q3xk...:8.
+Page: https://scopes.test/site/sc_hs5f27fz.../HEAD/guide/start.md
+```
+
+**`artroom issue open --title <text> [--body <text>]`** signs the
+directory's `open-issue` under the issue definition that the rules scope
+holds active, with its bytes beside the act, and waits for the issue's
+lane. The body is a detached text: the act holds its digest. The issue's
+one condition is its title, because the lane refuses an issue with no
+condition. The directory numbers issues and changes in one sequence. An
+admin activates the demo profile's issue definition as for the change
+definition: `--set name=issue --value
+packages/lanes/definitions/issue-demo.json`.
+
+```
+Opened issue #1: The handbook has no start page. Its lane is sc_4bbosp5k....
+```
+
+**`artroom issue comment <issue> <text>`** is the issue lane's `comment`.
+Any member may comment.
+
+**`artroom issue assign <issue> <@member>`** is the lane's `assign`. It
+sets the assignee, and needs `issue.triage`, which admins and maintainers
+hold. Assignment is optional; no rule of the demo profile needs it.
+
+**`artroom issue close <issue>`** signs `close-own` when the caller opened
+the issue, and `close-any` otherwise, which needs `issue.triage`. The
+reason is `completed`. The demo profile has no rule that lets an assignee
+close an issue. A member who did not open it is refused:
+
+```
+Commented: entry sc_4bbosp5k...:1, hash sha256:3b1f0c2d9e8a.
+Refused: unauthorized, judged at entry sc_yx6ty22i...:1. Nothing was written.
+```
+
+**`artroom issues`** lists every issue, oldest first: its number, its
+state and close reason, its title, its assignees and its lane. Each issue
+is read in its own lane. The directory's row for an issue is an index that
+the lane's own acts update, and a merge that closes the issue does not
+update it, so the row can still say `open`.
+
+```
+#1  closed (completed)  The handbook has no start page; assigned to @una; lane sc_4bbosp5k...
+#2  closed (completed)  A typo on the front page; lane sc_yx6ty22i...
+2 issues, 0 open.
+```
+
 Exit codes: 0 done; 1 refused, unavailable, not found or not consistent;
 2 a command line this cannot run.
 
@@ -310,8 +410,9 @@ it (the intent window), and the retained inputs those entries name.
 - `edit` carries a file as UTF-8 text of at most 65,536 bytes: no image
   or other binary file. See `notes/2026-10-07-i5-edit-page-delivery.md`,
   section 3.
-- `verify` carries no code of the lane capabilities, so it cannot replay a
-  change lane, nor a destination whose history names one.
+- `issue open` has no flag for an issue's conditions: the title is its one
+  condition. See `notes/2026-10-07-i5-issues-delivery.md`, section 5.
+- A member cannot merge their own change: `merge` needs `change.merge`.
 - `invite --acts` is refused: membership's `invite-member` has no list of
   acts for one member.
 - The founder must reach the seat within 15 minutes of the claim: until

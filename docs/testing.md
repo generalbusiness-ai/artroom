@@ -276,7 +276,9 @@ objects in maps and decodes each pushed pack; the site route reads the
 published file back over the same stand-in. It lives with the lanes,
 because it needs a lane definition and no other package may name the
 lanes package; the stand-ins live in the scope package, which may name the
-git package.
+git package. `packages/lanes/test/issues.scope.test.ts` runs `artroom issue`,
+`issues`, `edit --closes`, `merge --closes` and `verify --all` the same way,
+on the hosting's own Git service only, for the same reason.
 
 `packages/lanes/test/support/room.ts` founds a repository on the real
 platform scopes, in the namespace `PLATFORM`, as `founding-real` does, and
