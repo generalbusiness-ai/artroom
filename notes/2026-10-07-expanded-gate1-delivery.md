@@ -115,8 +115,10 @@ The repaired Worker recheck of the existing aged room passed register,
 membership and inbox; rules history was forbidden, making directory and
 destination replay incomplete. The live witness preserves all failures and
 coverage; no fresh room or anchors were substituted. Earlier all-six results
-remain the historical fresh-founding run. The existing ordered read/clone
-follow-up owns this age-dependent read gap. Approval, landing and the required
+remain the historical fresh-founding run. At that historical checkpoint this age-dependent gap was named for the
+ordered read/clone follow-up. Decision `43d2443f` subsequently required its
+strict repair inside225, recorded in the current successor above. Approval,
+landing and the required
 landed-commit gate remain owed.
 
 ## Source and ownership
