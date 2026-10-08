@@ -167,3 +167,11 @@ Node-helper typecheck command exits zero after the change. Raw logs are
 `/tmp/artroom-clone-ordered-init-retry-types.log`. Those checks do not claim an
 executed Git-initialization failure trace; ownership retention follows from
 the guarded allocation. No extra test matrix, gate, provider or main change.
+
+## Publication continuity
+
+This documentation successor restores the ordered clone preparation pointer
+after unrelated bundle-parser evidence was mistakenly published on its promise.
+All source and witness bytes remain exactly those of `a77cc128449bb238f7776e899a7254c09935ba10`.
+No checks were rerun, and no new Source approval or execution proof is claimed.
+Bundle evidence has a separate publication step; the full clone request remains open.
