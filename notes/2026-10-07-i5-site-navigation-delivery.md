@@ -327,3 +327,46 @@ for this preparation. The combined filing owns the exact-head gate and
 full Source review. The host acquisition/identity repair is a separate
 source change; this preparation does not establish its provider identity
 proof or widen the site's publication policy.
+
+### Residual F4 correction: versions rows also precede 304
+
+Checker `e7c50bce265a3d5d3300e292011c9ec77ab8e210` and planner
+`5dc4091f98db86fe272ec2167599d533d3c8b731` identified the remaining
+versions-page early return under the same request and finding. This
+preparation starts at combined head
+`64aa6ccafcb740b5cdcb05a0c65b4caafbee14ea`. It supersedes the prior
+statement that versions conditional handling stays unchanged: versions
+now constructs and validates every ordinary row, including annotated-tag
+peeling, before the shared HTML response applies the conditional matcher.
+Its ETag and cache headers remain unchanged. Both source comments that
+still described a 304 before object reads are corrected.
+
+The existing versions witness retains its rows, valid annotated-tag,
+matching-ETag and changed-ref assertions. It adds a valid wildcard 304
+and one supported annotated tag whose target is a blob rather than a
+commit: ordinary and wildcard requests both return 502, `no-store`, with
+the failed step `objects`. The existing scripted Git host supplies the
+pack; the tag/blob reads and refusal are the actual Git reader and route.
+This is no provider proof or broader publication-policy change.
+
+Validation:
+
+- `npm run test -w @generalbusiness/artroom-scope -- test/site-route.test.ts`:
+  exit 0, all 13 tests pass, 6.34 seconds.
+- `npm run typecheck -w @generalbusiness/artroom-scope`: exit 0.
+- One control restores only the early versions return and its request
+  argument, then runs
+  `npm run test -w @generalbusiness/artroom-scope -- test/site-route.test.ts -t 'versions:'`.
+  Exit 1: the unchanged witness receives 304 with public caching instead
+  of the required ordinary 502/no-store/objects result. The verified
+  repaired source is restored byte for byte afterwards.
+
+| Raw output | SHA-256 |
+|---|---|
+| `/tmp/artroom-site-versions-f4-focused.log` | `335b7b732551c9fba74860cbd53a31d227a011e22831898d4344e5c4d62ddab7` |
+| `/tmp/artroom-site-versions-f4-types.log` | `4df6218037a0d03e53f31b1b9e167db9e850ff75810f379cc9c2e0e16ae594e1` |
+| `/tmp/artroom-site-versions-f4-control.log` | `0e12342f97f90c2a76a7b189d95d74c024f79e7a14f1ff41c651c78fba0fc21d` |
+
+No gate, provider, browser or installation run. The stopped combined gate
+at the preceding head earns no corrected-head pass credit. The combined
+filing still owes the final exact-head gate and normal Source review.

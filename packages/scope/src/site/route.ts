@@ -34,8 +34,9 @@
  *
  * Every answer of a file carries an `ETag` of the commit, the path and what
  * the header shows, and `Cache-Control`. A request whose `If-None-Match`
- * names that tag is answered 304 once the ref is read, and nothing more is
- * read. The versions page's tag is of every ref it lists.
+ * names that tag is answered 304 only after the requested representation
+ * has passed its ordinary read and servability checks. The versions page's
+ * tag is of every ref it lists; its rows are validated before 304 as well.
  *
  * A refusal is plain text: the reason, a colon and a sentence, with the
  * status that says the same, and `Cache-Control: no-store`. Its body holds
@@ -186,7 +187,7 @@ async function commitOf(reader: Reader, ref: string, branch: string, at: (step: 
     refName(name, "site ref");
     const id = await reader.ref(name);
     if (id === null) continue;
-    // A branch names a commit, and the commit's own read checks it, after the cheap answer of a cached page. A tag may name a tag.
+    // A branch names a commit, which the page reads and checks before a conditional response. A tag may name a tag.
     if (name.startsWith("refs/heads/")) return { commit: id, name };
     at("objects");
     return { commit: await peeled(reader, id), name };
@@ -307,7 +308,7 @@ export async function site(request: Request, env: SiteEnv, fetch?: (request: Req
   const html = (title: string, frame: Frame, body: string, cached: Record<string, string>) => notModified(cached) ?? new Response(page(title, frame, body), { status: 200, headers: { ...cached, "content-type": "text/html; charset=utf-8", "content-security-policy": PAGE_POLICY, "x-content-type-options": "nosniff", "referrer-policy": "no-referrer" } });
   try {
     const reader = new Reader(opened.source, { ...READ_BOUNDS, blobBytes: FILE_BYTES });
-    if (versions) return await versionsPage(reader, room.repository.name, room.branch, base, request, at, html);
+    if (versions) return await versionsPage(reader, room.repository.name, room.branch, base, at, html);
     const named = await commitOf(reader, ref, room.branch, at);
     if (named === null) return refused("ref-not-found", "no branch or tag has that name");
     const { commit } = named;
@@ -404,13 +405,12 @@ async function listing(reader: Reader, entries: readonly TreeEntry[], href: (nam
  * or a new tag gives a new one.
  */
 async function versionsPage(
-  reader: Reader, room: string, branch: string, base: string, request: Request, at: (step: SiteStep) => void,
+  reader: Reader, room: string, branch: string, base: string, at: (step: SiteStep) => void,
   html: (title: string, frame: Frame, body: string, cached: Record<string, string>) => Response,
 ): Promise<Response> {
   const refs = [...(await reader.snapshot("refs/heads/", "site refs")), ...(await reader.snapshot("refs/tags/", "site refs"))];
   const etag = `"versions.${await digestOf([RENDERER, room, branch, ...refs.flatMap((r) => [r.ref, r.target])])}"`;
   const cached = { etag, "cache-control": `public, max-age=${MAX_AGE}` };
-  if (matches(request.headers.get("if-none-match"), etag)) return new Response(null, { status: 304, headers: cached });
   at("objects");
   const row = async (r: { ref: string; target: ObjectId }) => {
     const tag = r.ref.startsWith("refs/tags/");

@@ -440,7 +440,7 @@ test("a folder: its listing gives sub-folders, markdown files by their first hea
 });
 
 // Invariant: the versions page lists every branch and tag of the repository with the commit it names, an annotated tag
-// followed, and marks the published branch; its ETag changes when a ref changes.
+// followed, and marks the published branch; its ETag changes when a ref changes, and invalid rows fail before 304.
 test("versions: /site/<directory>/versions/ lists each branch and tag with its commit, an annotated tag followed, the published branch marked; a new tag gives a new ETag (STAND-IN host)", async () => {
   const at = `/site/${D.name}/versions/`;
   const response = await get(at);
@@ -460,6 +460,26 @@ test("versions: /site/<directory>/versions/ lists each branch and tag with its c
 
   const etag = response.headers.get("etag")!;
   expect((await get(at, { headers: { "if-none-match": etag } })).status).toBe(304);
+  expect((await get(at, { headers: { "if-none-match": "*" } })).status).toBe(304);
+  // A supported annotated-tag pack entry whose target is a blob, not a commit.
+  const wrong = utf8("not a commit\n");
+  const wrongId = idOf("blob", wrong);
+  host.objects.set(wrongId, { id: wrongId, type: "blob", data: wrong });
+  const tag = utf8(`object ${wrongId}\ntype blob\ntag wrong-target\ntagger Rita <rita@example.invalid> 0 +0000\n\nwrong target\n`);
+  const tagId = idOf("tag", tag);
+  host.objects.set(tagId, { id: tagId, type: "tag", data: tag });
+  host.refs.set("refs/tags/wrong-target", tagId);
+  try {
+    const ordinary = await get(at);
+    const conditional = await get(at, { headers: { "if-none-match": "*" } });
+    for (const answer of [ordinary, conditional]) {
+      expect([answer.status, answer.headers.get("cache-control"), answer.headers.get("x-site-step")]).toEqual([502, "no-store", "objects"]);
+    }
+  } finally {
+    host.refs.delete("refs/tags/wrong-target");
+    host.objects.delete(tagId);
+    host.objects.delete(wrongId);
+  }
   host.refs.set("refs/tags/later", nav);
   try {
     const later = await get(at, { headers: { "if-none-match": etag } });
