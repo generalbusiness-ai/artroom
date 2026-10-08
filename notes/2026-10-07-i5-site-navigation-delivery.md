@@ -271,3 +271,59 @@ with the existing scripted Git host. Raw log:
 before this wording-only change; no repeat typecheck was needed.
 No new gate, cloud, browser or provider proof. The full exact-head gate
 and Source review remain with the combined filing.
+
+## Combined Source correction: validate the representation before 304
+
+Under existing request `86206`, Source review
+`376aa53064b8adae9b330d5d655f5fb019b6b168` finding F4 and planner decision
+`158be2c4800db1753af32e60674591ff17464cde`, this isolated preparation starts
+at `68be1ffeb3d64094232ec7f8e4373629f8527c07`. It moves the page/file
+conditional response to the successful response boundary. The commit,
+tree, requested path and servability checks run first; blob reads still
+enforce the file size bound. A missing path or symbolic link remains 404
+with `If-None-Match: *`, and an oversized file remains 413. Valid pages,
+images, directory indexes and listings still answer 304. ETag bytes and
+cache headers are unchanged. Conditional page reads now fetch and validate
+the objects and prepare the representation; the former claim that they
+read no pack no longer describes this code. The versions page's existing
+ref-list conditional handling is unchanged.
+
+The existing cache witness is strengthened rather than duplicated. Its
+register and directory are real scopes; its Git transport and objects are
+the existing labelled stand-in. The symlink has real snapshot/tree bytes
+and runs through the actual Git reader and route. It does not prove a
+provider or browser. An initial attempt to include a gitlink was rejected
+by the stand-in's production pack writer before the route could inspect
+it. That failed fixture run is retained, and the final witness uses a
+supported symlink snapshot. The existing route guard still refuses both
+symbolic links and gitlinks; this focused witness does not separately
+prove the gitlink branch.
+
+Validation on the restored final source:
+
+- `npm run test -w @generalbusiness/artroom-scope -- test/site-route.test.ts`:
+  exit 0, 13 tests pass, 5.52 seconds.
+- `npm run typecheck -w @generalbusiness/artroom-scope`: exit 0, source,
+  test and Node-support typechecks.
+- One old-branch control inserts the original early conditional return
+  before the path traversal and runs
+  `npm run test -w @generalbusiness/artroom-scope -- test/site-route.test.ts -t 'cache: same commit'`.
+  Exit 1: the unchanged witness fails by assertion, receiving 304 instead
+  of 404 for the missing path. The repaired source is restored byte for
+  byte after the control.
+
+Raw outputs and SHA-256 hashes (retained outside the checkout):
+
+| Output | Path | SHA-256 |
+|---|---|---|
+| Passing Site file | `/tmp/artroom-site-route-f4-focused-corrected.log` | `42807691beb55baad9c851b0d744edac6b34ba161db102f8fef77c5561f0110f` |
+| Passing types | `/tmp/artroom-site-route-f4-types-corrected.log` | `4df6218037a0d03e53f31b1b9e167db9e850ff75810f379cc9c2e0e16ae594e1` |
+| Distinguishing control | `/tmp/artroom-site-route-f4-control.log` | `3cfa20cada91ad249ed3c611f9d9b7e7a415f6483e93f18665bdfc9057ff5a9a` |
+| Initial unsupported gitlink fixture failure | `/tmp/artroom-site-route-f4-focused.log` | `1724c935c018fa73882839c96260abeec12a379bf57e27b9529c71f7176c4e73` |
+| Initial index-signature type error, corrected | `/tmp/artroom-site-route-f4-types.log` | `49d7b45a87bc5dfdfd1a197f7b11a597dfabd702297877093785467ff81a9800` |
+
+No package installation, provider call, browser run or gate was performed
+for this preparation. The combined filing owns the exact-head gate and
+full Source review. The host acquisition/identity repair is a separate
+source change; this preparation does not establish its provider identity
+proof or widen the site's publication policy.

@@ -300,8 +300,8 @@ test("refusals: a missing page, a bad ref, a file over the size bound at the rea
 });
 
 // Invariant: the ETag is the commit and the path: the same for the same commit and path, new for a new commit or another path,
-// and a request that names it is answered 304 before any object is read.
-test("cache: same commit, same ETag, and If-None-Match answers 304 without reading the pack; a new commit, a new ETag (STAND-IN host)", async () => {
+// and a conditional request answers 304 only after the requested representation is validated as servable.
+test("cache: same commit, same ETag, and If-None-Match answers 304 only for a servable path; a new commit, a new ETag (STAND-IN host)", async () => {
   const at = `/site/${D.name}/moving/docs/guide.md`;
   const first = await get(at);
   const etag = first.headers.get("etag")!;
@@ -309,10 +309,25 @@ test("cache: same commit, same ETag, and If-None-Match answers 304 without readi
   expect(etag).toMatch(new RegExp(`^"${host.refs.get("refs/heads/moving")}\\.[0-9a-f]{24}"$`));
   expect((await get(at)).headers.get("etag")).toBe(etag);
   expect((await get(`/site/${D.name}/moving/docs/index.md`)).headers.get("etag")).not.toBe(etag);
-  const packs = host.packs;
   const unchanged = await get(at, { headers: { "if-none-match": etag } });
   expect([unchanged.status, await unchanged.text(), unchanged.headers.get("etag")]).toEqual([304, "", etag]);
-  expect(host.packs).toBe(packs);
+  const conditional = { headers: { "if-none-match": "*" } };
+  for (const path of ["docs/guide.md", "docs/diagram.png", "docs/", "notes/"]) {
+    expect((await get(`/site/${D.name}/moving/${path}`, conditional)).status).toBe(304);
+  }
+  expect((await get(`/site/${D.name}/moving/missing.md`, conditional)).status).toBe(404);
+  expect((await get(`/site/${D.name}/moving/big.md`, conditional)).status).toBe(413);
+
+  // Real Git object parsing and symlink refusal, with bytes supplied by the same stand-in host.
+  const target = utf8("README.md");
+  const blob = idOf("blob", target);
+  host.objects.set(blob, { id: blob, type: "blob", data: target });
+  const unserved = snapshotCommit([{ path: "link", mode: "120000", id: blob }], "unserved\n");
+  for (const object of unserved.objects) host.objects.set(object.id, object);
+  host.refs.set("refs/heads/unserved", unserved.commit);
+  const address = `/site/${D.name}/unserved/link`;
+  expect((await get(address)).status).toBe(404);
+  expect((await get(address, conditional)).status).toBe(404);
 
   host.refs.set("refs/heads/moving", host.commit({ "docs/guide.md": "# Guide, again\n" }, "second\n"));
   const moved = await get(at, { headers: { "if-none-match": etag } });

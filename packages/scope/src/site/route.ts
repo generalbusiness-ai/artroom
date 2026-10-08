@@ -301,7 +301,10 @@ export async function site(request: Request, env: SiteEnv, fetch?: (request: Req
   let step: SiteStep = "refs";
   const at = (next: SiteStep) => { step = next; };
   const base = `/site/${segment(directory)}/`;
-  const html = (title: string, frame: Frame, body: string, cached: Record<string, string>) => new Response(page(title, frame, body), { status: 200, headers: { ...cached, "content-type": "text/html; charset=utf-8", "content-security-policy": PAGE_POLICY, "x-content-type-options": "nosniff", "referrer-policy": "no-referrer" } });
+  // Conditional caching applies only after the representation has passed its ordinary read and servability checks.
+  const notModified = (cached: Record<string, string>) => matches(request.headers.get("if-none-match"), cached["etag"]!)
+    ? new Response(null, { status: 304, headers: cached }) : null;
+  const html = (title: string, frame: Frame, body: string, cached: Record<string, string>) => notModified(cached) ?? new Response(page(title, frame, body), { status: 200, headers: { ...cached, "content-type": "text/html; charset=utf-8", "content-security-policy": PAGE_POLICY, "x-content-type-options": "nosniff", "referrer-policy": "no-referrer" } });
   try {
     const reader = new Reader(opened.source, { ...READ_BOUNDS, blobBytes: FILE_BYTES });
     if (versions) return await versionsPage(reader, room.repository.name, room.branch, base, request, at, html);
@@ -310,8 +313,6 @@ export async function site(request: Request, env: SiteEnv, fetch?: (request: Req
     const { commit } = named;
     const etag = await etagOf(commit, path.join("/") + (trailing ? "/" : ""), [room.repository.name, ref, named.name]);
     const cached = { etag, "cache-control": `public, max-age=${MAX_AGE}` };
-    if (matches(request.headers.get("if-none-match"), etag)) return new Response(null, { status: 304, headers: cached });
-
     // The path, segment by segment, from the commit's tree.
     at("objects");
     let tree = await reader.tree((await reader.commit(commit)).tree);
@@ -352,7 +353,7 @@ export async function site(request: Request, env: SiteEnv, fetch?: (request: Req
     if (isMarkdown(name)) return await rendered(entry, path);
     const bytes = await reader.blob(entry.id, "page");
     const type = IMAGES[extension(name)];
-    return new Response(bytes, {
+    return notModified(cached) ?? new Response(bytes, {
       status: 200,
       headers: { ...cached, "content-type": type ?? "application/octet-stream", ...(type ? {} : { "content-disposition": "attachment" }), "content-security-policy": FILE_POLICY, "x-content-type-options": "nosniff" },
     });
