@@ -58,8 +58,13 @@ register exists. Plan first, then set the setting, then install:
 4. **Install.** Run `artroom install --planned`. It checks that the plan
    still makes that ID, founds the register, and prints
    `Installed: register sc_..., ..., as planned.` A plan whose time is
-   over is refused as `plan-expired`, and nothing is sent: plan again and
-   set the new ID.
+   over and was never attempted is refused as `plan-expired`, and nothing
+   is sent: plan again and set the new ID. If submission or the config save
+   was uncertain, keep the original plan and run `install --planned`
+   again. It may recover the same accepted founding after expiry; it does
+   not refresh the intent or permit an expired first founding. An
+   unresolved attempted plan cannot be replaced by a new plan or plain
+   install.
 5. **Claim.** Run `artroom claim <name> --handle @you`. The register
    sends its creation at once. If the claim still gives up waiting, run
    the same command again: it goes on from the pending claim and signs

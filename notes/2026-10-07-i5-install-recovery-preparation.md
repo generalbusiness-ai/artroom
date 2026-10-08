@@ -1,0 +1,81 @@
+# Planned install recovery: adopted boundary, isolated source preparation
+
+This follows preparation `80f7d056802914f224d79fe607172530c34663dc` under
+request `da1a2f020c30efb19e860782f91ccf2c64b51f52`. The planner adopted the
+recovery boundary in event `79e1bac158353009b9d93558115a623bcfae4138`.
+Builder read that complete event with the explicit repository and actor.
+This implements that disposition; it adopts no additional policy.
+
+## Result
+
+Before the first possible founding submission, the command durably saves
+an attempted marker. Its digest binds the exact service, operator key,
+signed envelope (including signature and deadline), supported pinned
+definition and derived register ID. A marker that no longer matches is
+refused before network. An unsupported exact pin retains the pending plan
+and reports unsupported provenance; no newest-version substitution occurs.
+
+A never-attempted expired plan still sends nothing. An attempted plan may
+send only the identical original founding after expiry. The server's
+unchanged identity and expiry checks decide whether it recovers an existing
+accepted genesis or refuses an expired founding that was never accepted.
+The marker proves no acceptance and grants no new effect or time allowance.
+
+The saved marker/envelope survive transport uncertainty and an atomic
+config-save failure. Full receipt fact/hash, exact founding and applied
+genesis checks still precede saving installed configuration. A mismatch
+preserves pending recovery state. Both a new `install --plan` and plain
+`install` refuse to silently replace an attempted pending plan. No key,
+signature, deadline, version or register ID is refreshed during recovery.
+
+An attempted marker is also retained after a server refusal. This change
+adds no automatic discard/reset policy. Previous claim/private-join code,
+operations reconsideration and final-send/custody guards are untouched.
+
+## Evidence and limits
+
+One compact real-scope witness covers accepted reply loss and config-save
+loss, the never-attempted expiry boundary, and an attempted request that
+never reached the server. It checks the marker at the actual HTTP send,
+rejects substitution of a supported version and its recomputed ID, and
+rejects a returned wrong full-fact hash while preserving the plan. Accepted
+recovery retains one genesis and one identical submission payload/ID.
+The server refuses the attempted-but-unaccepted expired replay. Existing
+malformed/envelope/operator/service mismatch witnesses remain in place.
+Faults are injected around the real HTTP founding and receipt routes; no
+Git host or external provider runs.
+
+The successful recovery is tested one second after the original 14-minute
+deadline, inside the inherited 15-minute signed-read authority window.
+A much later exact replay may obtain native acceptance while its genesis
+read is forbidden; the command then retains the plan rather than trusting
+an unverified receipt. This does not widen read authority or claim indefinite
+receipt-read access. That remaining read/provenance boundary is visible to
+the owner and integration review.
+
+Focused validation after the final source changes:
+
+- Two files, three tests passed: CLI saved-plan witness and both planned
+  install scope witnesses. Runner duration 1.56 seconds; no whole gate or
+  performance comparison. Output: `/tmp/artroom-install-recovery-tests.log`.
+- CLI source, Node-test and scope-test typechecks each exited 0.
+- A one-test control restores the older unconditional local expiry check.
+  Baseline: one passed. Mutant: one assertion failed, returning
+  `plan-expired` where exact attempted recovery/receipt verification is
+  expected. **Distinguishes**; the source is restored.
+  `/tmp/artroom-install-recovery-before.log` and `-after.log` retain output;
+  the corresponding `.json` files retain assertions;
+  `/tmp/artroom-install-recovery-control-summary.json` records the result.
+- Two earlier helper invocations were inconclusive before mutation: a
+  relative configuration path resolved outside the checkout; an absolute
+  configuration invoked from package cwd discovered no matching test.
+  The successful control runs directly from the root cwd, preserving the
+  same baseline/mutant/restoration protocol. Neither inconclusive run is
+  evidence, and no source was changed by them.
+- `git diff --check` passed. No package or tooling installation, manifest
+  change, provider call, deployment or whole gate was performed.
+
+This remains predecessor source preparation. Main's Gate 1 repairs must
+be preserved during integration. The original request still owes the
+integrated gate, independent review, filing order and witnessed landing;
+this note closes none of them.

@@ -33,7 +33,11 @@ export interface PendingClaim { register: ScopeId; intent: Digest; handle: strin
  * ID is known before the register exists, and the Worker's host setting can pin it first. An intent and its signature are no
  * secret: the register's genesis records both.
  */
-export interface PlannedInstall { service: string; definition: PlatformDefinition; founding: SignedIntent; register: ScopeId }
+export interface PlannedInstall {
+  service: string; definition: PlatformDefinition; founding: SignedIntent; register: ScopeId;
+  /** Saved before possible submission; binds the exact plan, not proof of acceptance. */
+  attempted?: Digest;
+}
 
 export interface Config {
   v: 1;

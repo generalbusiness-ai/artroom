@@ -49,7 +49,9 @@ version alone, so the command prints the ID that the install will found,
 and the seed's time: the intent's `notAfter`, 14 minutes ahead, until
 which it can be founded. It keeps the signed intent, the version and the
 ID in the config. An intent and its signature are no secret; the
-register's genesis records both. A later plan replaces it.
+register's genesis records both. A later plan replaces a never-attempted
+plan. Once submission was attempted, both a new plan and plain install
+refuse `install-pending`: recover with the original `install --planned`.
 
 ```
 Planned: register sc_4kq2v7..., under platform:register@2, on host artifacts, namespace artroom-demo. The seed's time is 2026-10-08T09:14:00Z.
@@ -59,11 +61,19 @@ Set registerScope to sc_4kq2v7... in the Worker's host setting, then run artroom
 **`artroom install --planned`** founds the planned register, with the kept
 intent and no other argument. Before anything is sent it checks the plan:
 a plan whose ID is not the one its intent and version make, or whose
-version is not the one this command founds under, is refused as
-`plan-mismatch`; a plan whose time is over is refused as `plan-expired`.
-Either refusal sends nothing and writes nothing; plan again, and set the
-new ID. After the founding, the receipt's register must be the planned
-one.
+operator/service binding is wrong, is refused as `plan-mismatch`. An
+unsupported pinned version keeps the pending plan and reports unsupported
+provenance. A never-attempted plan whose time is over is refused as
+`plan-expired`, without network: plan again and set the new ID.
+
+Before the first possible founding submission, the command saves an
+attempted marker bound to the exact plan. If delivery or the final config
+save is uncertain, retry `install --planned`. An attempted plan may send
+only its original envelope after expiry; the server returns an already
+accepted identical founding, or refuses an expired unaccepted one. The
+marker proves no acceptance and extends no deadline. The command follows
+the full receipt and checks the exact applied genesis before saving the
+installed config; a mismatch leaves the recovery plan intact.
 
 ```
 Installed: register sc_4kq2v7..., under platform:register@2, as planned.

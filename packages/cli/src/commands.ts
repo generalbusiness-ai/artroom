@@ -34,7 +34,7 @@ import {
 } from "@generalbusiness/artroom-client";
 import { DIRECTORY_OF, MEMBERSHIP, READ_TOKEN_HOURS, REGISTER, ROLE_LISTS, isOf, platform, type Role } from "@generalbusiness/artroom-platform";
 import { SourceError, httpSource, render, verify as replay, type HistorySource } from "@generalbusiness/artroom-replay";
-import type { Config, Repository, Store } from "./store.ts";
+import type { Config, PlannedInstall, Repository, Store } from "./store.ts";
 
 export interface Context {
   store: Store;
@@ -289,6 +289,7 @@ export function install(ctx: Context, service: string, options: { host?: string;
   return run(async () => {
     const before = await ctx.store.config();
     if (before?.register) return usage(`This config directory has a register already: ${before.register.scope}.`);
+    if (before?.plan?.attempted !== undefined) return failed("Refused: install-pending. Retry artroom install --planned with the original plan; an attempted install cannot be replaced silently.");
     const { signed, key } = await installing(ctx, options, signing(ctx));
     const { answer } = await found(transportOf(ctx, service), signed, REGISTER);
     const receipt = accepted(answer, null, "Installed").receipt;
@@ -311,16 +312,22 @@ async function installing(ctx: Context, options: { host?: string; namespace?: st
 const registerIdOf = (founding: SignedIntent, definition: PlatformDefinition): ScopeId =>
   scopeIdOf({ v: 1, kind: "register", definition, creator: null, cause: intentDigest(founding.intent), ordinal: 0 });
 
+/** Local recovery identity only. The signature and server decide authority. */
+const installAttemptOf = (plan: PlannedInstall): Digest => textDigest(canonicalize({
+  service: plan.service, operator: plan.founding.intent.actor, founding: plan.founding, definition: plan.definition, register: plan.register,
+}));
+
 /**
  * `artroom install --plan <base-url>`: sign the `install` intent and print the ID of the register that it will found, and found
  * nothing. The intent lives as long as an intent may, so it can be founded until its `notAfter`, the time printed. The plan is
  * kept in the config, so that the operator can pin that ID in the Worker's host setting before the register exists, and then
- * run `install --planned`. A later plan replaces it.
+ * run `install --planned`. A later plan replaces only a never-attempted plan.
  */
 export function planInstall(ctx: Context, service: string, options: { host?: string; namespace?: string } = {}): Promise<Outcome> {
   return run(async () => {
     const before = await ctx.store.config();
     if (before?.register) return usage(`This config directory has a register already: ${before.register.scope}.`);
+    if (before?.plan?.attempted !== undefined) return failed("Refused: install-pending. Retry artroom install --planned with the original plan; an attempted install cannot be replaced silently.");
     const { signed } = await installing(ctx, options, { ...signing(ctx), lifetimeSeconds: PROPOSED_BOUNDS.intentLifetimeSeconds - 60 });
     const register = registerIdOf(signed, REGISTER);
     await ctx.store.save({ v: 1, service, key: "operator", plan: { service, definition: REGISTER, founding: signed, register } });
@@ -335,8 +342,10 @@ export function planInstall(ctx: Context, service: string, options: { host?: str
 /**
  * `artroom install --planned`: found the register that `install --plan` planned, with the intent it kept. Before anything is
  * sent, the plan is checked: the register ID that its intent and version make must be the one it printed, and the version must be
- * the one this command founds under. A plan that fails is refused, and nothing is sent or written. After the founding, the
- * receipt's register must be the planned one.
+ * a supported pinned version. A marker is saved before possible submission.
+ * A never-attempted expired plan sends nothing; an attempted exact replay
+ * leaves expiry and identity to the server. The full receipt/genesis is
+ * checked before the plan is replaced by installed configuration.
  */
 export function installPlanned(ctx: Context): Promise<Outcome> {
   return run(async () => {
@@ -345,8 +354,8 @@ export function installPlanned(ctx: Context): Promise<Outcome> {
     const plan = before?.plan ?? stop(usage("No install is planned here. Run: artroom install --plan <base-url>."));
     const operator = await ctx.store.secret("operator");
     const now = ctx.now?.() ?? Date.now();
-    const valid = isOf(plan.definition, "platform:register") && platform(plan.definition) !== null
-      && isSignedIntentShape(plan.founding) && verifySignedIntent(plan.founding)
+    if (!isOf(plan.definition, "platform:register") || platform(plan.definition) === null) return failed("Unsupported install provenance: this command cannot serve the plan's exact pinned register version. The pending plan is kept; nothing was sent.");
+    const valid = isSignedIntentShape(plan.founding) && verifySignedIntent(plan.founding)
       && plan.founding.intent.kind === "install" && plan.founding.intent.to === null && plan.founding.intent.on === null
       && Object.keys(plan.founding.intent.expected).length === 0
       && before!.key === "operator" && operator instanceof Uint8Array && operator.length === 32 && plan.founding.intent.actor === keyIdOfSecret(operator)
@@ -356,9 +365,15 @@ export function installPlanned(ctx: Context): Promise<Outcome> {
     if (!valid) {
       return failed("Refused: plan-mismatch. The saved plan does not match this service, operator key and supported register version. Nothing was sent. Keep the original plan for recovery; do not silently replace it.");
     }
-    if (now >= timeMs(plan.founding.intent.notAfter)!) {
+    const attempt = installAttemptOf(plan);
+    if (plan.attempted !== undefined && plan.attempted !== attempt) return failed("Refused: plan-mismatch. The attempted marker belongs to another service, operator, envelope, version or register. The pending plan is kept; nothing was sent.");
+    if (plan.attempted === undefined && now >= timeMs(plan.founding.intent.notAfter)!) {
       return failed(`Refused: plan-expired. The planned install could be founded until ${plan.founding.intent.notAfter}. Nothing was sent. Plan again, and set the new register ID.`);
     }
+    // The durable marker must precede the first possible request. An exact
+    // attempted replay may recover an accepted genesis after expiry; the
+    // server still refuses an expired founding that was never accepted.
+    if (plan.attempted === undefined) await ctx.store.save({ ...before!, plan: { ...plan, attempted: attempt } });
     const { answer } = await found(transportOf(ctx, plan.service), plan.founding, plan.definition);
     const receipt = accepted(answer, null, "Installed").receipt;
     if (receipt.fact.at.scope !== plan.register) return failed(`The register founded is ${receipt.fact.at.scope}, not the planned ${plan.register}. The plan is kept; report this.`);

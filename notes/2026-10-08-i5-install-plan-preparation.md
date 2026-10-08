@@ -67,6 +67,11 @@ the required gate and independent review remain owed.
 
 ## Outstanding decisions and integration
 
+The expiry paragraphs below record the `80f7d0568` checkpoint. The planner
+subsequently answered that question in `79e1bac1`; the source follow-through
+and its remaining read limit are recorded in
+[the recovery preparation](2026-10-07-i5-install-recovery-preparation.md).
+
 An accepted install whose reply or config save was lost can be recovered
 by the native exact founding repeat even after its deadline: genesis
 checks a verified identical existing founding before checking expiry.

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import type { Entry, OperationId, Seed } from "@generalbusiness/artroom-contract";
-import { b64url, intentDigest, seedDigest, timeMs } from "@generalbusiness/artroom-bytes";
+import { b64url, canonicalize, intentDigest, scopeIdOf, seedDigest, textDigest, timeMs, timeOf } from "@generalbusiness/artroom-bytes";
 import type { EffectRequest } from "../../scope/src/operations.ts";
 import type { Fetch } from "@generalbusiness/artroom-client";
 import { DIRECTORY, repositoryName } from "@generalbusiness/artroom-platform";
@@ -38,7 +38,102 @@ describe("install --plan and --planned. The Git host and the scheduler are STAND
       platformNet.inspector = null;
     }
   });
+
+  test("the attempted marker precedes submission; accepted reply or config-save loss recovers the same founding after expiry, while an unsent expired plan sends nothing and an attempted unaccepted expired founding is refused", async () => {
+    const clock = net.clock.now;
+    platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32)));
+    platformNet.sessions = true;
+    platformNet.inspector = reader;
+    try { await recovering(); }
+    finally {
+      net.clock.now = clock;
+      platformNet.secret = null;
+      platformNet.sessions = false;
+      platformNet.inspector = null;
+    }
+  });
 });
+
+async function recovering(): Promise<void> {
+  // Each fault is bookkeeping around the real HTTP founding and receipt
+  // read. No Git host runs. A marker is checked at the actual send boundary.
+  const scenario = (mode: "reply" | "save" | "unaccepted" | "unsent") => {
+    const store = memoryStore();
+    const submissions: string[] = [];
+    let fault = true;
+    let badReceipt = false;
+    const ctx: Context = {
+      now: () => timeMs(net.clock.now)!,
+      store: { ...store, save: async (config) => {
+        if (mode === "save" && fault && config.register) { fault = false; throw new Error("simulated config-save loss"); }
+        await store.save(config);
+      } },
+      fetch: (async (url: string, init?: RequestInit) => {
+        const founding = url.endsWith("/v1/scopes") && init?.method === "POST";
+        if (founding) {
+          expect((await store.config())!.plan!.attempted).toMatch(/^sha256:/);
+          submissions.push(String(init!.body));
+          if (mode === "unaccepted" && fault) { fault = false; throw new Error("simulated request loss before delivery"); }
+        }
+        const response = await routed(url, init);
+        if (founding && mode === "reply" && fault) { fault = false; throw new Error("simulated accepted reply loss"); }
+        if (founding && badReceipt) {
+          const answer = await response.json() as { receipt: { fact: { hash: string } } };
+          answer.receipt.fact.hash = textDigest("another entry");
+          return new Response(JSON.stringify(answer), { headers: { "content-type": "application/json" } });
+        }
+        return response;
+      }) as Fetch,
+    };
+    return { ctx, store, submissions, receipt: (bad: boolean) => { badReceipt = bad; } };
+  };
+  for (const mode of ["reply", "save"] as const) {
+    const s = scenario(mode);
+    expect((await command(s.ctx, ["install", "--plan", SERVICE])).code).toBe(0);
+    const original = (await s.store.config())!.plan!;
+    // Capture the deliberately injected save failure only for this witness.
+    const lost = await command(s.ctx, ["install", "--planned"]).catch(() => ({ code: 1 }));
+    const pending = (await s.store.config())!;
+    expect([lost.code, pending.register, pending.plan?.founding]).toEqual([1, undefined, original.founding]);
+    expect(pending.plan?.attempted).toMatch(/^sha256:/);
+    // A supported version and its recomputed ID still cannot replace the
+    // exact version/ID bound by a prior attempt's marker.
+    const changed = { ...pending.plan!, definition: "platform:register@1" as const, register: scopeIdOf({ v: 1, kind: "register", definition: "platform:register@1", creator: null, cause: intentDigest(original.founding.intent), ordinal: 0 }) };
+    await s.store.save({ ...pending, plan: changed });
+    expect([(await command(s.ctx, ["install", "--planned"])).lines[0]?.split(".")[0], s.submissions.length]).toEqual(["Refused: plan-mismatch", 1]);
+    await s.store.save(pending);
+    for (const replacement of [["install", "--plan", SERVICE], ["install", SERVICE]]) {
+      expect((await command(s.ctx, replacement)).lines[0]).toMatch(/^Refused: install-pending\./);
+      expect(await s.store.config()).toEqual(pending);
+    }
+    net.clock.now = timeOf(Date.parse(original.founding.intent.notAfter) + 1000);
+    if (mode === "reply") {
+      s.receipt(true);
+      expect((await command(s.ctx, ["install", "--planned"])).lines[0]).toMatch(/^The install receipt does not prove/);
+      expect(await s.store.config()).toEqual(pending);
+      s.receipt(false);
+    }
+    const recovered = await command(s.ctx, ["install", "--planned"]);
+    expect([recovered.code, (await s.store.config())!.register?.scope, (await s.store.config())!.plan]).toEqual([0, original.register, undefined]);
+    expect(new Set(s.submissions).size).toBe(1);
+    const entries = await new Platform(original.register).entries();
+    const genesis = entries[0]!;
+    expect([entries.length, genesis.input.type === "genesis" && canonicalize(genesis.input.founding)]).toEqual([1, canonicalize(original.founding)]);
+  }
+  const unsent = scenario("unsent");
+  expect((await command(unsent.ctx, ["install", "--plan", SERVICE])).code).toBe(0);
+  const unsentPlan = (await unsent.store.config())!.plan!;
+  net.clock.now = timeOf(Date.parse(unsentPlan.founding.intent.notAfter) + 1000);
+  expect([(await command(unsent.ctx, ["install", "--planned"])).lines[0]?.split(".")[0], unsent.submissions]).toEqual(["Refused: plan-expired", []]);
+
+  const unaccepted = scenario("unaccepted");
+  expect((await command(unaccepted.ctx, ["install", "--plan", SERVICE])).code).toBe(0);
+  expect((await command(unaccepted.ctx, ["install", "--planned"])).code).toBe(1);
+  const unacceptedPlan = (await unaccepted.store.config())!.plan!;
+  net.clock.now = timeOf(Date.parse(unacceptedPlan.founding.intent.notAfter) + 1000);
+  expect((await command(unaccepted.ctx, ["install", "--planned"])).lines[0]).toMatch(/^Refused: expired/);
+  expect([(await unaccepted.store.config())!.register, new Set(unaccepted.submissions).size, unaccepted.submissions.length]).toEqual([undefined, 1, 2]);
+}
 
 async function planned(): Promise<void> {
   const fetch = ((url: string, init?: RequestInit) => routed(url, init)) as unknown as Fetch;
