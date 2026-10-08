@@ -1,4 +1,4 @@
-import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
@@ -27,5 +27,5 @@ test("the Node runner passes the header only through git's environment configura
     process.env["PATH"] = path;
   }
   // No git: the program is not found, and the answer is null. Control: the same runner over the stand-in answers 0, above.
-  expect(await nodeGit(join(bin, "no-such-git")).run(["--version"], {})).toBeNull();
+  try { expect(await nodeGit(join(bin, "no-such-git")).run(["--version"], {})).toBeNull(); } finally { rmSync(bin, { recursive: true, force: true }); }
 });
