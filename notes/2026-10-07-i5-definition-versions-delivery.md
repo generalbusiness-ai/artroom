@@ -170,3 +170,57 @@ are those of tree `d7d1ad2e`.
   answer; the command adds no check of its own [run].
 - The register got a version 2 although its data did not change, because
   the version of the directory it creates is part of its meaning [code].
+
+## 7. Combined candidate: membership pin check
+
+2026-10-08, T3 of the one expanded candidate under45/c878. Planner owner
+`605bc3ba199d27944369bf3f4fbb5bf2b73fd6d1`, read in full, confirms this was
+a CHECK, not a requirement for unequal data hashes. Both membership@1 and@2
+retain the exact declaration digest
+`sha256:78b3f59009f78030f88d3444187c0c7deb40c296b7f07b18d5e86a161222f831`.
+No pin, version or source rule was changed to make them differ.
+
+The catalog supplies the same declaration data with separate version-named
+standing wrappers. Membership's role-table rule selects FIRST_ACTIONS_OF from
+its actual genesis pin; @2 adds destination.read-token to every first role
+list, while @1 does not. Namespace observation and session issuance select
+standing using the actual pinned name. Equal data digests do not establish
+identical executable meaning or historical admission correspondence.
+
+One focused batch ran on source
+`06467a1ead72c63518a05aa18a32967d7d922ba3`, tree
+`9da1fa8eab09f082a19253d26e7ee63c7ec126d4`: three files, four tests passed
+(2.07 seconds). The platform versions file checks both exact equal pins and
+version-selected first lists as plain functions. The scope versions file
+checks a real freshly founded@1 room, its@1 standing retained by a dependent
+rules act and consistent replay; deliberately substituting@2 code gives a
+mismatch. The existing read-token file supplies the real freshly founded@2
+membership/session/destination-standing path and replay, with explicitly
+scripted Git hosts. These are distinct proofs; the declaration test alone
+is not an actual@2 standing witness.
+
+Full-reference boundaries were read in the current source. Session issuance
+checks the actual scope/kind/incarnation; final preparation compares the
+resolved reference with the complete authenticated claims and checkSession
+checks the complete reference. Initial recorded-incarnation lookup may be
+nullable and directory resolution trusts the configured directory summary.
+Root confirmed this exact landed-main boundary was preserved. This check does
+not claim complete historical directory-birth, original bundle/admission or
+mixed-era legacy compatibility proof. Those broader obligations remain.
+
+Commands, run once without a gate:
+
+```sh
+./node_modules/.bin/vitest run --project platform --project scope packages/platform/test/versions.test.ts packages/scope/test/versions.test.ts packages/scope/test/read-token.test.ts
+npm run typecheck --workspace @generalbusiness/artroom-platform
+```
+
+Platform source/test typechecks passed. Source was clean at batch start; only
+Root's expanded-delivery note was untracked. The recorded relevant source and
+witness hashes stayed unchanged through the run; before/after records and
+original outputs are in `/tmp/artroom-expanded-membership-pin-evidence`.
+No source/witness edit, extra suite, new matrix, cloud call or historical
+complete-proof claim was made. The one final integrated gate belongs to Root.
+
+Original focused output SHA-256: a30cd7d2a6a075a80c00f223d5d4ac21f8f034c7719a9ddc862ac0700edce02a.
+Original type output SHA-256: 7164e781f55f730d5b11f99c10513168239de3ff338d0315651cb93b32fe3130.
