@@ -30,12 +30,40 @@ For example, `<base-url>/site/sc_hs5f27fz.../HEAD/` opens the room's
 front page, and `<base-url>/site/sc_hs5f27fz.../v1.0/docs/setup.md` opens
 one page at the tag `v1.0`.
 
+Two more addresses:
+
+- `<base-url>/site/<directory>/`, with no ref, redirects (status 302) to
+  `<base-url>/site/<directory>/HEAD/`.
+- `<base-url>/site/<directory>/versions/` is the versions page: every
+  branch and tag of the room's repository, each with the commit it names
+  and a link to its root. An annotated tag shows the commit it names, not
+  the tag object. The published branch is marked "HEAD, the published
+  branch". The list is read from the Git host, as the host advertises it.
+  Because of this address, the root of a branch or tag named `versions`
+  cannot be opened; its other paths can.
+
+## What every page shows
+
+- **A header.** The room's name, which links to the root of the same
+  branch or tag; the branch or tag shown, such as "branch main (HEAD)",
+  "branch draft" or "tag v1.0"; and a link to the versions page. The
+  room's name is the repository's name as the directory records it (the
+  name the register gave the repository at the Git host). The name given
+  to `artroom claim` is kept only by the command line, so the site cannot
+  show it.
+- **A breadcrumb.** The ref, then each folder of the path, each a link,
+  then the page itself.
+- **A footer.** "Rendered from commit" and the commit's ID, and a link to
+  the room's page at `<base-url>/page/`. The footer would also link to a
+  verifier's result for the commit, but the Worker keeps no such result,
+  so no page has that link.
+
 ## What a path answers
 
 | The path names | The answer |
 |---|---|
 | A markdown file (`.md` or `.markdown`) | The page, rendered as HTML. |
-| A folder, or nothing (the repository's root) | The folder's `index.md`, else its `README.md` (either name in any letter case, or ending in `.markdown`), rendered. A folder with neither answers a list of its files and folders. A folder with no files, or a repository with no files at its root, answers a page that says so. |
+| A folder, or nothing (the repository's root) | The folder's `index.md`, else its `README.md` (either name in any letter case, or ending in `.markdown`), rendered. A folder with neither answers a list: its sub-folders, then its markdown files by title, then its other files. A markdown file's title is its first heading of the highest level, else its file name; only the first 100 markdown files of a folder are read for a title, and a file of more than 1 MiB keeps its name. A name that starts with `.` is not listed, but the file is still served at its own address. A folder with no files, or a repository with no files at its root, answers a page that says so. |
 | An image (`.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.avif`, `.svg`, `.ico`, `.bmp`) | The image's bytes, with its type. |
 | Any other file | The file's bytes, as a download. |
 | A symbolic link or a submodule | A refusal (`not-found`). |
@@ -69,6 +97,8 @@ Links and images:
 - An address that starts with `/` is taken from the repository's root.
 - An address with a scheme (`https:`, `mailto:` and so on), and a link to
   a place in the same page (`#setup`), is left as written.
+- A link to a folder, such as `guide`, `guide/`, `./` or `../`, answers
+  that folder's index page or list, with or without a final `/`.
 
 The converter's test runs every example of the specification: all 672
 render as the specification states, with each example's own extension on
@@ -100,10 +130,14 @@ as the specification's runner sets it.
   `maxBytes` (docs/hosts.md). A repository whose history is larger than
   that cannot be read, and every page answers `unreadable`.
 - **Caching.** An answer may be kept for 60 seconds. Each answer has an
-  `ETag` made from the commit and the path. A browser that asks again
-  with that tag, while the ref still names the same commit, gets `304 Not
-  Modified`, and the Worker reads no file. When the ref moves to a new
-  commit, every page gets a new tag.
+  `ETag` made from the commit, the path, and what the header shows: the
+  room's name, the ref as written in the address, and the branch or tag it
+  names. So the same file under `HEAD`, under the branch's name and under a
+  tag has three tags. A browser that asks again with that tag, while the
+  ref still names the same commit, gets `304 Not Modified`, and the Worker
+  reads no file. When the ref moves to a new commit, every page gets a new
+  tag. The versions page's tag is made from every branch and tag and the
+  object each names, so it changes when any of them moves or is added.
 - Each page read on the hosting's own Git service mints a read token for
   two minutes and revokes it after the read.
 
