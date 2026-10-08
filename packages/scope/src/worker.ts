@@ -65,6 +65,7 @@
  * observation read of a membership scope. It has no route here.
  */
 
+import { isPage, page } from "./page.ts";
 import { WorkerEntrypoint } from "cloudflare:workers";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { Answer, Beside, Cursor, DeclaredDefinition, Digest, DutyId, Grant, LogPage, PlatformDefinition, Read, ReadRefusal, RetainedInput, ScopeApi, ScopeId, Seed, SessionAnswer, SessionRefusal, Settlement, SignedIntent } from "@generalbusiness/artroom-contract";
@@ -389,4 +390,4 @@ export class ScopeService<E extends Env = Env> extends WorkerEntrypoint<E> imple
   retained(scope: string, reader: unknown, kind: RetainedInput["kind"], digest: Digest, domain?: string): Promise<Read<RetainedInput>> { return api(this.scopes()).retained(scope, reader, kind, digest, domain); }
 }
 
-export default { fetch: (request: Request, env: Env): Promise<Response> => route(request, env.SCOPES) };
+export default { fetch: async (request: Request, env: Env): Promise<Response> => isPage(request) ? page(request) : route(request, env.SCOPES) };

@@ -1,0 +1,35 @@
+{
+  "name": "@generalbusiness/artroom-page",
+  "version": "0.1.0-dev.1",
+  "description": "The minimal page for the demo story: a room's issues and changes, one issue, one change with its states, the rules, and the acts the signed-in member may do now, over a scope service's HTTP routes and a key kept in the browser.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "private": true,
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "node scripts/assets.mjs",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json && tsc -p tsconfig.scope.json",
+    "test": "vitest run --config vitest.config.ts"
+  },
+  "dependencies": {
+    "@generalbusiness/artroom-bytes": "0.1.0-dev.1",
+    "@generalbusiness/artroom-cli": "0.1.0-dev.1",
+    "@generalbusiness/artroom-client": "0.1.0-dev.1",
+    "@generalbusiness/artroom-contract": "0.1.0-dev.1",
+    "@generalbusiness/artroom-platform": "0.1.0-dev.1"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "0.22.0",
+    "@cloudflare/workers-types": "5.20260815.1",
+    "@generalbusiness/artroom-lanes": "0.1.0-dev.1",
+    "@generalbusiness/artroom-scope": "0.1.0-dev.1",
+    "esbuild": "0.28.1",
+    "vitest": "4.1.11"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
