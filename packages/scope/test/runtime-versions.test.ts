@@ -1,4 +1,4 @@
-import { expect, test } from "vitest";
+import { expect, inject, test } from "vitest";
 import { b64url, canonicalize, intentDigest, scopeIdOf, seedDigest, signIntent, timeMs, timeOf } from "@generalbusiness/artroom-bytes";
 import type { Intent, Seed } from "@generalbusiness/artroom-contract";
 import { keys } from "@generalbusiness/artroom-derive/testing";
@@ -14,12 +14,14 @@ import { soon } from "./net.ts";
 import { outsideOf, wired } from "./outside.ts";
 import { Platform, rita, routed, sam, settle } from "./repository.ts";
 import { platformNet, platformOutside } from "./worker.ts";
+import { localClone } from "./support/local-clone.ts";
 
 // Invariant: known @2 observations and strict aged birth-session preparation
 // use the exact supplied implementation, without broad unknown-family lookup.
 // These are real PLATFORM scopes/rules/current sessions. The register's Git
-// host, binding, Git runner and clock are STAND-INS. This proves local CLI
-// orchestration, not activation/provenance, a real Git clone or provider.
+// host identity/mint binding and clock are STAND-INS. A fixed Node bridge
+// runs production nodeGit and real git http-backend over a local repository.
+// This proves local clone composition, not a live provider or provenance.
 test("runtime exact @2 membership observations and aged destination/rules reads retain full birth references; unknown code is unavailable", async () => {
   expect([knownPlatform("platform:membership@1", "platform:membership"), knownPlatform("platform:membership@2", "platform:membership"), knownPlatform("platform:membership@99", "platform:membership"), knownPlatform("platform:directory@2", "platform:membership")]).toEqual([true, true, false, false]);
   net.hold = net.deaf = null;
@@ -46,10 +48,44 @@ test("runtime exact @2 membership observations and aged destination/rules reads 
   const membershipAt = await M.at();
   const standing = await M.stub.observe({ of: await M.at(), key: rita.key });
   expect(standing).toMatchObject({ definition: "platform:membership@2", key: rita.key, actions: expect.arrayContaining(["destination.read-token"]) });
-  net.clock.now = soon(901);
-  platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32)));
-  platformNet.sessions = true;
   try {
+    // Real host wiring/private SQLite and real Git objects/HTTP transfer;
+    // Artifacts identity/mint/revoke answers are an explicit local STAND-IN.
+    const repository = repositoryName(seedDigest(seed), 1);
+    const address = inject("localClone");
+    const bridge = localClone(address);
+    const { remote, directory } = await bridge.configure(repository);
+    let readMints = 0;
+    let callerToken = "";
+    const binding: ArtifactsNamespace = {
+      get: async (name) => {
+        if (name !== repository) throw new Error("local repository mismatch");
+        return {
+          info: async () => ({ name: repository, remote }),
+          createToken: async (scope, ttl) => {
+            const token = await bridge.mint(repository, scope, ttl);
+            if (scope === "read" && ttl === 3600) { readMints++; callerToken = token.plaintext; }
+            return { ...token, expiresAt: timeOf(timeMs(net.clock.now)! + ttl * 1000) };
+          },
+          revokeToken: async (plaintext) => bridge.revoke(repository, plaintext),
+        };
+      }, create: async () => { throw new Error("not used"); }, delete: async () => true,
+    };
+    platformOutside.set(G.name, (given, sql) => {
+      return artifactsOutside(given, sql, { ARTIFACTS: binding, ARTIFACTS_CONFIG: canonicalize({ registerScope: R.name, namespace: "artroom-demo", host: "service.invalid", maxBytes: 1024 * 1024, credentialIdentity: "adapter-attempt" }) }, bridge.forward);
+    });
+    await G.restart();
+    // Actual production first-head and receipt writes reach git http-backend.
+    // The scheduler remains a stand-in; no founding outcome is scripted here.
+    for (let pass = 0; pass < 32; pass++) if (await (G.stub as unknown as { effect(): Promise<number> }).effect() === 0) break;
+    const published = (await G.summary()).value.items.find((item) => item.type === "branch")!;
+    const foundingEvidence = (await G.entries()).filter((entry) => entry.input.type === "outcome").map((entry) => ({ seq: entry.seq, input: entry.input, effects: entry.effects }));
+    expect(published.state, canonicalize({ foundingEvidence, local: await bridge.status() })).toBe("ready");
+    const firstHead = published.values["head"];
+    expect((await G.entries()).some((entry) => entry.input.type === "outcome" && entry.input.kind === "receipt" && entry.input.result === "confirmed" && entry.effects.some((effect) => effect.effect === "state" && effect.state === "written"))).toBe(true);
+    net.clock.now = soon(901);
+    platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32)));
+    platformNet.sessions = true;
     const session = await requestSession("https://scopes.test", M.name, sessionRequest(await M.at(), rita.secret, soon(60), "runtime-known-v2"), { fetch: routed as unknown as Fetch });
     expect(session.ok).toBe(true);
     if (!session.ok) return expect.fail(session.reason);
@@ -57,25 +93,6 @@ test("runtime exact @2 membership observations and aged destination/rules reads 
       const response = await routed(`https://scopes.test/v1/scopes/${node.name}`, { headers: { authorization: session.session.reader() } });
       expect([response.status, await response.json()]).toMatchObject([200, { ok: true, value: { definition: `platform:${node === G ? "destination" : "rules"}@2` } }]);
     }
-    // Concrete provider boundary through real host wiring and private SQLite.
-    // ARTIFACTS is a SCRIPTED binding: no live repository/token/Git transfer.
-    const repository = repositoryName(seedDigest(seed), 1);
-    let readMints = 0;
-    const binding: ArtifactsNamespace = {
-      get: async () => ({
-        info: async () => ({ name: repository, remote: `https://service.invalid/git/artroom-demo/${repository}.git` }),
-        createToken: async (scope, ttl) => { if (scope === "read" && ttl === 3600) readMints++; return { id: "scripted-provider-id", scope, plaintext: "scripted-private-read", expiresAt: timeOf(timeMs(net.clock.now)! + ttl * 1000) }; },
-        revokeToken: async () => true,
-      }), create: async () => { throw new Error("not used"); }, delete: async () => true,
-    };
-    platformOutside.set(G.name, (given, sql) => {
-      const outside = artifactsOutside(given, sql, { ARTIFACTS: binding, ARTIFACTS_CONFIG: canonicalize({ registerScope: R.name, namespace: "artroom-demo", host: "service.invalid", maxBytes: 1024 * 1024, credentialIdentity: "adapter-attempt" }) }, async () => new Response("scripted unavailable Git", { status: 503 }));
-      // Fixture control: keep unrelated founding writes held while observing
-      // the read-mint boundary, so no scripted write can race its revision.
-      return { ...outside, accepts: (owner, kind) => kind === "mint-read" && outside.accepts(owner, kind) };
-    });
-    await G.restart();
-    const remote = `https://service.invalid/git/artroom-demo/${repository}.git`;
     const store = memoryStore();
     await store.keep("device", rita.secret);
     await store.save({ v: 1, service: "https://scopes.test", key: "device", register: await R.at(), repository: { directory: directoryAt, membership: membershipAt, rules: rules.name, destination: G.name }, handle: "@rita" });
@@ -83,26 +100,35 @@ test("runtime exact @2 membership observations and aged destination/rules reads 
     const context: Context = {
       store, fetch: routed as unknown as Fetch, now: () => timeMs(net.clock.now)!,
       pause: async () => { await (G.stub as unknown as { effect(): Promise<number> }).effect(); },
-      // SCRIPTED runner: validates the caller's complete handoff, executes no
-      // Git program and writes no filesystem/config or terminal output.
+      // The fixed bridge validates the exact argv/environment, then its Node
+      // child runs actual nodeGit. Captured output never returns raw text.
       git: { run: async (args, env) => {
         gitCalls++;
-        if (args[0] === "--version") { expect(args).toEqual(["--version"]); expect(env).toEqual({}); return 0; }
-        expect(args).toEqual(["clone", "--", remote, "scripted-clone"]);
-        expect(args.join(" ")).not.toContain("scripted-private-read");
-        expect(env).toEqual({ GIT_CONFIG_COUNT: "1", GIT_CONFIG_KEY_0: "http.extraHeader", GIT_CONFIG_VALUE_0: "Authorization: Bearer scripted-private-read" });
-        return 0;
+        if (args[0] === "--version") { expect(canonicalize(args) === canonicalize(["--version"]) && canonicalize(env) === "{}").toBe(true); }
+        else {
+          expect(canonicalize(args) === canonicalize(["clone", "--", remote, directory])).toBe(true);
+          expect(args.join(" ").includes(callerToken)).toBe(false);
+          // Boolean assertion avoids printing the private test token on failure.
+          expect(callerToken.length > 0 && canonicalize(env) === canonicalize({ GIT_CONFIG_COUNT: "1", GIT_CONFIG_KEY_0: "http.extraHeader", GIT_CONFIG_VALUE_0: `Authorization: Bearer ${callerToken}` })).toBe(true);
+        }
+        const ran = await bridge.run(args, env);
+        expect(ran.outputClean).toBe(true);
+        return ran.code;
       } },
     };
-    const cloned = await command(context, ["clone", "scripted-clone"]);
+    const cloned = await command(context, ["clone", directory]);
     expect(cloned.code, cloned.lines.join("\n")).toBe(0);
     expect(gitCalls).toBe(2);
     expect(readMints).toBe(1);
     expect(cloned.lines).toContain(`Remote URL: ${remote}`);
-    expect(cloned.lines).toContain("Cloned into scripted-clone.");
-    expect(cloned.lines.join(" ")).not.toContain("scripted-private-read");
+    expect(cloned.lines).toContain(`Cloned into ${directory}.`);
+    expect(cloned.lines.join(" ").includes(callerToken)).toBe(false);
     expect(await store.config()).toHaveProperty("remote", remote);
-    expect(JSON.stringify(await store.config())).not.toContain("scripted-private-read");
+    expect(JSON.stringify(await store.config()).includes(callerToken)).toBe(false);
+    const actual = await bridge.inspect();
+    expect(actual).toMatchObject({ head: firstHead, paths: "README.md", readme: `# ${repository}\n\nFounded by @rita through the room ${D.name}.\n`, origin: remote, tokenInConfig: false, tokenInOutput: false });
+    expect(actual.tree).toBe(actual.expectedTree);
+    expect(actual.readRequests).toBeGreaterThan(0);
     // Inspector-only history read; the CLI above presented actual sessions and
     // used real HTTP admission, bounded outcome/receipt proof and private take.
     platformNet.sessions = false;
@@ -111,7 +137,7 @@ test("runtime exact @2 membership observations and aged destination/rules reads 
     expect(minted?.input).toMatchObject({ type: "outcome", owner: "platform:destination@2", kind: "mint-read", result: "confirmed" });
     if (minted?.input.type !== "outcome") return expect.fail("confirmed outcome is required");
     const handle = (minted.input.evidence.body as { token: string }).token;
-    expect(JSON.stringify(entries)).not.toContain("scripted-private-read");
+    expect(JSON.stringify(entries).includes(callerToken)).toBe(false);
     platformNet.sessions = true;
     expect(await readCredential("https://scopes.test", G.name, session.session.reader(), handle, { fetch: routed as unknown as Fetch })).toEqual({ ok: false, reason: "forbidden" });
   } finally { platformNet.sessions = false; platformNet.secret = null; wired.delete(R.name); platformOutside.delete(G.name); }

@@ -111,3 +111,43 @@ and README/tree/remote evidence, old-history proof, final gate, ordinary
 independent source review and witnessed main landing in planner's order.
 No deployment, provider action, source approval or whole-request receipt
 was performed by this preparation.
+
+## Ordered real-Git component assembly
+
+This slice starts from clean `1d311bf900ff3989d857579fa979a59015cfe660` on
+`request/i5-clone-ordered-prep`, within the same484/3501 owner. It selects
+only the eight reviewed test/helper/config bodies from the nine-path component
+delta `d5a58b418bf12a381072187725e6d2ec2614ecc7` to
+`771d51d5a04b17b15ac1f4d31211c88c6bae3450`; this existing note is the ninth path.
+No branch ancestry or later install/edit/site/page source is imported.
+
+The original witness and existing scope configurations match the component's
+original d5 source exactly. All eight selected bodies match exact771. Current
+1d caller primitives, whole CLI commands/private claim/join/store, nodeGit,
+destination host and all native/runtime/platform bodies remain unchanged.
+The clone/remote section and nodeGit also match the component donor. These
+are source-pair preservation checks, not fresh full-file reading credit.
+
+The existing real-Git witness passed once (one test), with production nodeGit,
+actual local git http-backend/checkout, judged founding/receipt writes, literal
+README/head/independently hashed tree/clean remote, one read mint/private take
+and second-take refusal. Scope source/Worker/Node-helper typechecks passed once.
+The explicit fixture mint/rights/host identity, clock/scheduler, controlled
+environment and trusted loopback/proxy rewrite remain stand-ins; this is not
+TLS/redirect/ambient Git safety or live provider/historical source evidence.
+Fixture cleanup removes only its own lazily allocated root. Existing locked
+dependencies were borrowed with workspace links into this checkout; no install
+or dependency/lock change occurred. Exact checks and original raw outputs:
+
+| Output | SHA-256 |
+|---|---|
+| `/tmp/artroom-clone-ordered-source-pair.log` | `868fed68792369dfd54603eaf19c105c5d6627fef350927c5559f533c460d7c4` |
+| `/tmp/artroom-clone-ordered-focused.log` | `5898fb6a2f1656d0adf0b0415cb6eb64915fa35eef4f37eef8795aa5cd27384b` |
+| `/tmp/artroom-clone-ordered-types.log` | `4df6218037a0d03e53f31b1b9e167db9e850ff75810f379cc9c2e0e16ae594e1` |
+
+The original component's reviewed authorization-header control remains retained;
+no unchanged control, suite or gate was repeated here. All original historical
+source/bundle, physical-send executor fence/closure, capacity, actual provider
+and compatible activation obligations remain owed. Final gate, ordinary source
+review and ordered clone filing/landing remain owed. No main, live provider,
+site policy, page/edit/install adoption or whole-request closure occurred.
