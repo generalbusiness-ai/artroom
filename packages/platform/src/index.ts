@@ -35,6 +35,8 @@ export { SIBLINGS_OF } from "./future-2/directory.ts";
 export { FIRST_ACTIONS_OF, ROLE_TABLE_OF } from "./future-2/membership.ts";
 export { READ_TOKEN_HOURS, foundingOf } from "./future-2/destination.ts";
 export { readmeText, type Readme } from "./future-2/destination-objects.ts";
+export { SITE_CONFIGURATION_DOMAIN, SITE_DELEGATION_DOMAIN, parseSiteConfiguration, parseSiteDelegation } from "./site-declarations.ts";
+export type { SiteConfiguration, SiteDeclarationContext, SiteDelegation } from "./site-declarations.ts";
 
 export { ACTIONS_MOST, FIRST_ACTIONS, MEMBERSHIP, NO_MEMBER, ROLE_LISTS, ROLE_TABLE, actionsIn, isActions, isHandle, standingOf, type Role } from "./membership.ts";
 export { CREATION_ATTEMPTS, REGISTER, REPOSITORY, directoryIdOf, directorySeed, registerRules, repositoryName } from "./register.ts";
