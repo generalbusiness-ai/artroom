@@ -440,3 +440,28 @@ delta, focused/types/control logs and limitations are recorded in the
 existing navigation note. The backend-only correction preserves the rebuilt
 Page source/bundle. One subsequent ordinary gate at the corrected composed
 head is required; it follows this source change, not a blind retry.
+
+### Final gate for the review-corrected source
+
+The ordinary gate ran at clean
+`97184fa975e8782abb1d0263eae31b8f461accea`, tree
+`df1b4a5c08b4d8d17a60779cdf6213c9417acdb4`. Command and phases returned
+zero: whitespace 0.0 seconds; types 4.8 elapsed/15.5 CPU seconds; tests
+60.9 elapsed/90.9 CPU seconds. Vitest reports 133 files passed, one recorder
+file skipped, 844 tests passed and two opt-in recorders skipped. All six
+active-source checks pass. Root read complete phase outputs through EOF;
+this invocation emits no uncaught exception or unhandled error.
+
+Raw output: `/tmp/artroom-expanded-six-repairs-final-gate.log`. Phase logs:
+`/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.kshoakKxWj`.
+The previous interrupted 64aa run, failed e713 run and diagnostic-bearing
+39eda run remain retained at their exact heads. This pass does not establish
+their cause or fix, physical drain, provider truth or historical admission.
+
+The filing successor updates only the primary note and evidence JSON after
+this gate; product, tests, configuration and generated assets are unchanged.
+Their package tree identity is recorded before filing. All twelve delivery
+artifacts and the original implementation binding remain. One normal targeted
+Source re-review against reviewed 68be, explicit material-risk disposition,
+requester judgment and witnessed landing are still required under request862
+and planner158. No named deferral or original held duty closes from this run.
