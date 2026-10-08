@@ -4,8 +4,12 @@
  * this process with the configuration that the command adds. A secret goes
  * only in that added environment, which git reads as configuration
  * (`GIT_CONFIG_COUNT`, `GIT_CONFIG_KEY_n`, `GIT_CONFIG_VALUE_n`): it is in no
- * argument, so no process list shows it, and git writes none of it to the
- * clone's own config. No git on the `PATH`: the answer is null.
+ * argument or a config file written by this runner. The child program
+ * controls its own output; it inherits the terminal streams. The installed
+ * program, ambient environment and Git configuration are trusted, including
+ * URL rewrites, proxies, redirects and helpers. This is not a sandbox for
+ * the global http.extraHeader supplied by clone. No git on the
+ * `PATH`: the answer is null.
  */
 
 import { spawn } from "node:child_process";
