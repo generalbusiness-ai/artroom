@@ -25,6 +25,8 @@ import { act, actsOn, fieldValue, joinRoom, listLanes, loadChange, loadIssue, lo
 import { actsPanel, answerLine, changeScreen, h, issueScreen, roomScreen, rulesScreen } from "./view.ts";
 
 const KEPT = "artroom-page";
+/** The room text survives a key-generation redraw in memory only. It can hold an invitation secret. */
+let roomDraft = "";
 /** What this browser keeps: the base URL, the room (no secret of it) and the key. */
 interface Settings { service: string; place: Place | null; secret: string }
 
@@ -92,7 +94,7 @@ async function panelFor(room: Room, scope: ScopeId): Promise<HTMLElement> {
 function settingsScreen(): HTMLElement {
   const kept = settings();
   const service = h("input", { name: "service", value: kept?.service ?? "", placeholder: `${location.origin} (this page's own)` });
-  const room = h("textarea", { name: "room", rows: "3", placeholder: "an invitation link (artroom-invite:...), or the content of the command line's config.json" });
+  const room = h("textarea", { name: "room", rows: "3", placeholder: "an invitation link (artroom-invite:...), or the content of the command line's config.json" }, roomDraft);
   const secret = h("input", { name: "secret", type: "password", autocomplete: "off", placeholder: kept ? "kept; paste another to replace it" : "32-byte secret, base64url" });
   const said = h("p", { class: "answer", role: "status", hidden: "" });
   const tell = (good: boolean, text: string) => { said.textContent = text; said.className = `answer ${good ? "ok" : "bad"}`; said.removeAttribute("hidden"); };
@@ -110,9 +112,9 @@ function settingsScreen(): HTMLElement {
     if (typed && !place) { tell(false, "That is neither an invitation link nor a config file that names a repository."); return null; }
     return { service: (service as HTMLInputElement).value.trim(), place, secret: newSecret ?? ((secret as HTMLInputElement).value.trim() || kept?.secret || "") };
   };
-  const save = (next: Settings) => { keep(next); opened = null; location.hash = "#/"; };
+  const save = (next: Settings) => { keep(next); roomDraft = ""; (room as HTMLTextAreaElement).value = ""; opened = null; location.hash = "#/"; };
   form.addEventListener("submit", (event) => { event.preventDefault(); const next = read(null); if (next) save(next); });
-  form.querySelector("#new-key")!.addEventListener("click", () => { const next = read(b64url(crypto.getRandomValues(new Uint8Array(32)))); if (next) { keep(next); opened = null; void draw(); } });
+  form.querySelector("#new-key")!.addEventListener("click", () => { const next = read(b64url(crypto.getRandomValues(new Uint8Array(32)))); if (next) { roomDraft = (room as HTMLTextAreaElement).value; keep(next); opened = null; void draw(); } });
   // Joining signs membership's `join` with the kept key and the link's secret. The link is not kept: only the room it names.
   form.querySelector("#join")!.addEventListener("click", () => {
     void (async () => {
