@@ -91,16 +91,26 @@ Nothing.
 
 ## Sprint 12 commitments, 07:00 to 15:00 Eastern
 
-Recorded in the workroom under the cadence act `c514748f`, within plan 024.
+Re-cut at 07:00 on hugh's direction: no cloud sessions this sprint, and
+the work in flight lands on main. Recorded in the workroom under the
+cadence act `c514748f` as decision `45c611cc`.
 
-- **Builder.** Repair checker's finding on the clone filing and land it;
-  then edit page with versions, then the story page; file issues and pin
-  before install.
-- **Checker.** The clone repair, then the two filings behind it.
-- **Planner.** Hourly surveys; the 15:00 report; the demo script draft
-  corrected to the rehearsal's observed lines; cloud sessions only as
-  hugh allows. **Second planner.** Hold off-path requests.
+- **Builder.** Land the nine cloud deliveries as one expanded candidate,
+  as gate 1 landed: take the planner's merged base `planner/i5-demo-host`
+  at `31578596` (every branch merged in order, typecheck clean, deployed,
+  rehearsed live with all 26 shots matching); repair on it checker's
+  finding of 05:32 and the three owed items (the destination read gap,
+  the membership@2 pin, the claim's name in the site header); gate once;
+  file under one request with the delivery notes as primary artifacts;
+  land after one independent review. Fold the separate clone, edit-page
+  and story-page filings into it. No new preparation or design this
+  sprint.
+- **Checker.** That one candidate, in place of the queue.
+- **Planner.** Answer decisions within the hour; keep the deployment on
+  the candidate's head; hourly surveys; the 15:00 report; the demo script
+  draft corrected to the rehearsal's observed lines. **Second planner.**
+  Hold off-path requests.
 - **Hugh.** Review the demo script draft and the rehearsal captures in
-  `~/tmp/artroom-rehearsal-1`; say whether cloud sessions continue.
-- **15:00 report.** The member's path on main if clone lands; otherwise
-  this story with its state.
+  `~/tmp/artroom-rehearsal-1`.
+- **15:00 report.** The member's path, the edit scene and the issue scene
+  on main if the candidate lands; otherwise this story with its state.
