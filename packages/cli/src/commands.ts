@@ -27,10 +27,10 @@
  * | `issue`, `issues` | `open` is the directory's `open-issue`; `comment`, `assign` and `close` are the issue lane's own acts. `issues` lists each issue as its lane has it. |
  */
 
-import { PROPOSED_BOUNDS, type Answer, type DeclaredDefinition, type Digest, type Entry, type FactRef, type FieldValue, type Founded, type Item, type KeyId, type PlatformDefinition, type ScopeId, type ScopeRef, type Seed, type SignedIntent, type Summary } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS, type Answer, type DeclaredDefinition, type Digest, type EffectForm, type Entry, type FactRef, type FieldValue, type Founded, type Item, type KeyId, type PlatformDefinition, type ScopeId, type ScopeRef, type Seed, type SignedIntent, type Summary } from "@generalbusiness/artroom-contract";
 import { READ_REFUSALS, b64url, canonicalize, definitionDigest, digestBytes, factRefOf, intentDigest, isReceipt, isSignedIntentShape, isDigest, isFactRef, isIncarnation, isScopeId, isScopeRef, keyIdOfSecret, parseStrict, scopeIdOf, seedDigest, textDigest, timeMs, timeOf, unb64url, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import {
-  ScopeHandle, TransportError, readCredential, declaredHandle, found, httpTransport, requestSession, secretSigner, sessionRequest, signedIntent, signedLogReader, signedReads,
+  ScopeHandle, TransportError, readCredential, declaredHandle, found, httpTransport, requestSession, secretSigner, sessionRequest, shapeDeclaredAct, signedIntent, signedLogReader, signedReads,
   type Fetch, type ReadSigning, type Signing, type Transport,
 } from "@generalbusiness/artroom-client";
 import { TOKENS_FLOOR, capabilitiesOf, gitRead, holdCapability } from "@generalbusiness/artroom-derive";
@@ -1188,6 +1188,67 @@ async function laneOf(ctx: Context, config: Config, lane: ScopeId, reader: strin
   return typed.ok ? typed.handle : stop(failed(`Cannot act on ${lane}: ${typed.reason}.`));
 }
 
+/** The fixed edit workflow needs these declared inputs and effects. Guards
+ * remain the room's policy. No digest or profile name decides support. */
+function supportsEdit(declared: DeclaredDefinition, path: string, content: string, bytes: Uint8Array): boolean {
+  try {
+    const ask = declared.acts["ask-rules"];
+    const propose = declared.acts["propose-file"];
+    const merge = declared.acts["merge"];
+    if (declared.name !== "change" || !ask || !propose || !merge
+      || ask.step !== "transition" || ask.on !== "proposal"
+      || propose.step !== "open" || propose.on !== "manifest"
+      || merge.step !== "open" || merge.on !== "merge") return false;
+    const fields = propose.fields;
+    if (fields["base"]?.type !== "commit" || fields["digest"]?.type !== "digest" || fields["size"]?.type !== "int"
+      || fields["path"]?.type !== "text" || fields["path"].detached
+      || fields["content"]?.type !== "text" || fields["content"].detached
+      || merge.fields["manifest"]?.type !== "item" || merge.fields["manifest"].of !== "manifest"
+      || merge.fields["reports"]?.type !== "list" || merge.fields["reports"].of.type !== "fact") return false;
+    // The shared client validator rejects extra required fields/presentations
+    // and narrower input bounds before any lane is opened or intent signed.
+    shapeDeclaredAct(declared, "ask-rules", { on: 0, fields: {} });
+    shapeDeclaredAct(declared, "propose-file", { on: null, fields: { base: "0".repeat(40), path, digest: digestBytes(bytes), size: bytes.length, content } });
+    shapeDeclaredAct(declared, "merge", { on: null, fields: { manifest: 0, reports: [] } });
+    const same = (a: unknown, b: unknown) => canonicalize(a) === canonicalize(b);
+    const writtenSlot = (effect: EffectForm) => "party" in effect ? effect.party.slot : "ref" in effect ? effect.ref.slot
+      : "value" in effect ? effect.value.slot : "attribute" in effect ? effect.attribute.slot : "redact" in effect ? effect.redact.slot : null;
+    // Require one unconditional write from the needed source, without a
+    // conflicting write to that slot. Unrelated metadata effects may remain.
+    const requiredEffects = (actual: readonly EffectForm[], expected: readonly unknown[]) => expected.every((wanted) => {
+      const slot = writtenSlot(wanted as EffectForm);
+      const writers = actual.filter((effect) => (effect.of === undefined || effect.of === "on") && writtenSlot(effect) === slot);
+      if (writers.length !== 1) return false;
+      const { of: _primary, ...write } = writers[0]!;
+      return same(write, wanted);
+    });
+    const fileEffects = [
+      { party: { slot: "integrator", from: { signer: true } } },
+      { party: { slot: "authors", from: [{ signer: true }] } },
+      ...["base", "path", "digest", "size"].map((slot) => ({ value: { slot, from: { field: slot } } })),
+      { value: { slot: "complete", from: { const: true } } },
+    ];
+    // The command reads these exact slots afterwards. Conditional effects or
+    // another source for them do not establish its one-file manifest.
+    if (!requiredEffects(propose.effects, fileEffects) || !requiredEffects(merge.effects, [
+      { party: { slot: "merger", from: { signer: true } } },
+      { ref: { slot: "manifest", from: { item: "also.manifest" } } },
+    ])) return false;
+    const rules = ask.sends.filter((send) => "tell" in send && send.tell.message === "rules-wanted");
+    if (rules.length !== 1 || !("tell" in rules[0]!) || "if" in rules[0]!.tell
+      || !same(rules[0]!.tell.to, { slot: "rulesScope", of: "on" })) return false;
+    const reserves = merge.sends.filter((send) => "tell" in send && send.tell.message === "reserve");
+    const sending = reserves[0];
+    if (reserves.length !== 1 || !sending || !("tell" in sending) || "if" in sending.tell
+      || !same(sending.tell.to, { slot: "destination", of: "also.proposal" })
+      || !same(sending.tell.fields["operation"], "self") || !same(sending.tell.fields["manifest"], { item: "also.manifest" })
+      || !same(sending.tell.fields["reports"], { field: "reports" })
+      || !["jobs", "links", "verdicts"].every((field) => Object.hasOwn(sending.tell.fields, field))) return false;
+    return true;
+  } catch { return false; }
+}
+
+
 /**
  * `artroom edit <path> --file <local file> [--title <text>]`: one file, proposed as a change and published by the room.
  *
@@ -1215,6 +1276,9 @@ export function edit(ctx: Context, path: string, options: { file?: string; title
     // The issue that the change closes is found before anything is signed.
     const closes = options.closes === undefined ? null : await issueNamed(ctx, config, reader, options.closes);
     const change = await activeDefinition(ctx, config, reader, "change");
+    if (!supportsEdit(change.declared, path, content, bytes)) return failed(`Unsupported edit: the active change definition ${change.digest} does not support this command's ask-rules, one-file manifest and merge inputs and effects. No change was opened.`);
+    const destination = await destinationOf(ctx, config);
+    if (destination.summary.definition !== "platform:destination@2") return failed(`Unsupported edit: destination ${repository.destination} runs ${destination.summary.definition}; this command requires platform:destination@2 for a one-file manifest. No change was opened.`);
 
     // The change lane, opened by the directory.
     const D = await handleOf(ctx, config, repository.directory.scope, reader);
@@ -1232,8 +1296,11 @@ export function edit(ctx: Context, path: string, options: { file?: string; title
     accepted(await C.submit(asked.signed, [], asked.beside), lane, "Asked");
     await waitFor(ctx, () => [lane, repository.rules], async () => ((await summaryOf(L)).items.some((item) => item.type === "rules" && typeof item.values["revision"] === "number") ? true : null), `the rules of ${lane}`);
 
-    // The one version: the file on the published head.
-    const head = (await destinationOf(ctx, config)).summary.items.find((item) => item.type === "branch")?.values["head"];
+    // The one version: the file on the published head. Lane/rules awaits
+    // may advance it; the earlier protocol check is not a frozen head.
+    const currentDestination = await destinationOf(ctx, config);
+    if (currentDestination.summary.definition !== "platform:destination@2") return failed(`The destination ${repository.destination} no longer serves the supported one-file protocol. The change ${lane} stays open; no file was proposed.`);
+    const head = currentDestination.summary.items.find((item) => item.type === "branch")?.values["head"];
     if (typeof head !== "string") return failed(`The destination ${repository.destination} has no published head yet.`);
     const file = { base: head, path, digest: digestBytes(bytes), size: bytes.length, content };
     const proposed = await C.intent(signer, "propose-file" as never, { on: null, fields: file, expected: expectedOf(change.declared.acts["propose-file"] as unknown as ActShape, (await summaryOf(L)).items, null, file) } as never, signing(ctx));
