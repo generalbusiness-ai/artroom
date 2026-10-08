@@ -35,6 +35,9 @@ schemas, not executable permission or proof of the missing terminal fence.
 The pre-role-equality 908-line draft is retained at
 `/tmp/artroom-executor-correspondence-pre-role-equality-908.md`, SHA-256
 `bf4cebd3bd4c0409b2657cc6d87b6af599c94b177ead1eb58bdd8d96bbfe3af6`.
+The frozen 943-line predecessor is retained at
+`/tmp/artroom-executor-correspondence-pre-creation-token-943.md`, SHA-256
+`a596053ee26f6f3dc5cda850213f2c9ee446f0df81575ca1b3b8fb04ad29ec1d`.
 
 ## Existing seams and the missing proof
 
@@ -612,6 +615,27 @@ and permissible cleanup predecessor. It is content-addressed, not mutable
 caller text. Each cleanup dispatch records a separate ordinal and its source
 duty; new work cannot reuse an old invocation ID to remint or hide uncertainty.
 
+A creation-token-cleanup duty may originate from the original repository.create
+invocation at ordinal zero. That one provider create returns the creation token;
+there is no second local mint or additional original invocation. Its DutyIdentity
+invocation and originalMintInvocation both name that actual ordinal-zero create,
+with purpose creation-token-cleanup and the original dispatcher/mint owner.
+Purpose distinguishes this stable duty identity from a temporary-read-token duty.
+Token-only auxiliary mints retain positive ordinals and one-shot consumption.
+
+Before the original create may start, reserve and persist this duty origin,
+quarantine/reply custody and finalization/cleanup/uncertainty headroom. Its later
+state binds the original permit and exact returned reply/private cleanup handle
+to that same original invocation, without changing the immutable origin. Unknown
+create or missing/malformed token material remains an owned creation uncertainty;
+no token handle or second create/mint is inferred. The original permit and
+CallEntry remain original-dispatch with duty/sourceDuty null. Association lives
+in the separate duty state and receipt/custody records, not a rewritten consumed
+entry or a plan/entry hash back-reference. Closure carries this duty ID in
+carriedDuties until its exact cleanup/uncertainty is settled or handed off.
+Cleanup itself uses a new positive invocation ordinal and a duty-bound
+owned-cleanup permit, with the unchanged original create/provider binding.
+
 The stable duty ID is external: hash the immutable DutyIdentity only. Its
 binding must equal invocation.attempt.binding and its admission/plan must
 match the authenticated reservation. Store that identity once. Phase changes,
@@ -729,7 +753,8 @@ shape or labels:
   A cleanup entry's sourceDuty, entry.duty, permit.duty and CleanupAuthority.duty all equal the
   same existing admitted duty; its origin/binding/rights remain unchanged.
 - For the original mutation, auxiliaryOrdinal is zero and duty/sourceDuty are
-  null. Its may-start slot is unique across every permit/owner/release for the
+  null, including repository.create that separately originates a reserved
+  creation-token-cleanup duty. Its may-start slot is unique across every permit/owner/release for the
   original AttemptKey. Auxiliary mint is one-shot per positive allocated
   ordinal; cleanup/reconciliation gets a distinct reserved invocation under
   the reviewed existing duty policy, never a replay of a consumed call entry.
