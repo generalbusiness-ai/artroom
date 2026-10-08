@@ -1,4 +1,5 @@
-/** Adopted f60 declarations only. Parsing establishes neither authority nor
+/** Adopted c4 native declarations only. Unsupported attachment kinds stay
+ * outside this parser. Parsing establishes neither authority nor
  * registration, key custody, current policy, expiry or publication proof. */
 import type { Digest, FactRef, KeyId, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
 import { CanonicalError, canonicalBytes, canonicalize, isDigest, isFactRef, isKeyId, isRecord, isScopeRef, parseStrictBytes, timeMs, wellFormed } from "@generalbusiness/artroom-bytes";
@@ -18,12 +19,14 @@ export interface SiteDeclarationContext {
 }
 export interface SiteDelegation extends SiteDeclarationContext {
   v: 1;
+  authority: SiteDeclarationContext["rules"];
   renderer: { installation: Digest; key: KeyId };
   actions: ["repository.read"];
   notAfter: Timestamp;
 }
 export interface SiteConfiguration extends SiteDeclarationContext {
   v: 1;
+  authority: SiteDeclarationContext["rules"];
   audience: "public" | "members";
   versions: { mode: "latest-published"; ref: "HEAD" }
     | { mode: "pinned-published"; commit: string; publication: FactRef; receipt: FactRef };
@@ -51,15 +54,20 @@ function bound(value: unknown, expected: SiteDeclarationContext): value is SiteD
 function factAt(value: unknown, at: ScopeRef): value is FactRef {
   return isFactRef(value) && same(value.at, at);
 }
+/** Native declarations select their exact expected rules authority. This
+ * is not a legacy-attachment parser or proof of current slot selection. */
+function nativeAuthority(value: unknown, expected: SiteDeclarationContext): boolean {
+  return isRecord(value) && isScopeRef(value["authority"]) && value["authority"].kind === "rules" && same(value["authority"], expected.rules);
+}
 
 function delegation(value: unknown, expected: SiteDeclarationContext): value is SiteDelegation {
-  return exact(value, ["v", ...CONTEXT, "renderer", "actions", "notAfter"]) && bound(value, expected) && value["v"] === 1
+  return exact(value, ["v", "authority", ...CONTEXT, "renderer", "actions", "notAfter"]) && bound(value, expected) && nativeAuthority(value, expected) && value["v"] === 1
     && exact(value["renderer"], ["installation", "key"]) && isDigest(value["renderer"]["installation"]) && isKeyId(value["renderer"]["key"])
     && Array.isArray(value["actions"]) && value["actions"].length === 1 && value["actions"][0] === "repository.read"
     && timeMs(value["notAfter"]) !== null;
 }
 function configuration(value: unknown, expected: SiteDeclarationContext): value is SiteConfiguration {
-  if (!exact(value, ["v", ...CONTEXT, "audience", "versions", "rendering", "delegation"]) || !bound(value, expected) || value["v"] !== 1
+  if (!exact(value, ["v", "authority", ...CONTEXT, "audience", "versions", "rendering", "delegation"]) || !bound(value, expected) || !nativeAuthority(value, expected) || value["v"] !== 1
     || (value["audience"] !== "public" && value["audience"] !== "members") || value["rendering"] !== "site-safe@1"
     || !factAt(value["delegation"], expected.rules)) return false;
   const versions = value["versions"];

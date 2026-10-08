@@ -12,8 +12,8 @@ test("site declarations require exact realm/provider, closed policy and canonica
     repository: { host: "artifacts", namespace: "test", name: "room", id: "stable-test-id" },
   };
   const fact = (at: ScopeRef, seq: number): FactRef => ({ at, seq, hash: textDigest(`TEST fact ${seq}`) });
-  const delegated: SiteDelegation = { v: 1, ...expected, renderer: { installation: textDigest("TEST installation"), key: keyIdOfSecret(new Uint8Array(32).fill(1)) }, actions: ["repository.read"], notAfter: "2026-10-08T12:00:00Z" };
-  const configured: SiteConfiguration = { v: 1, ...expected, audience: "members", versions: { mode: "latest-published", ref: "HEAD" }, rendering: "site-safe@1", delegation: fact(expected.rules, 7) };
+  const delegated: SiteDelegation = { v: 1, ...expected, authority: expected.rules, renderer: { installation: textDigest("TEST installation"), key: keyIdOfSecret(new Uint8Array(32).fill(1)) }, actions: ["repository.read"], notAfter: "2026-10-08T12:00:00Z" };
+  const configured: SiteConfiguration = { v: 1, ...expected, authority: expected.rules, audience: "members", versions: { mode: "latest-published", ref: "HEAD" }, rendering: "site-safe@1", delegation: fact(expected.rules, 7) };
   const pinned: SiteConfiguration = { ...configured, audience: "public", versions: { mode: "pinned-published", commit: "b".repeat(40), publication: fact(expected.destination, 8), receipt: fact(expected.destination, 9) } };
   const readConfiguration = (value: unknown) => {
     const bytes = canonicalBytes(value);
@@ -22,6 +22,21 @@ test("site declarations require exact realm/provider, closed policy and canonica
   const bytes = canonicalBytes(delegated);
   expect(parseSiteDelegation(SITE_DELEGATION_DOMAIN, bytes, expected, bytes.length)).toEqual(delegated);
   expect([readConfiguration(configured), readConfiguration(pinned)]).toEqual([configured, pinned]);
+  // Native authority is required, complete and equal to the expected rules
+  // reference; old bytes or a substituted authority never infer that field.
+  const { authority: _authority, ...missingAuthority } = configured;
+  expect(readConfiguration(missingAuthority)).toBeNull();
+  const { authority: _delegatedAuthority, ...missingDelegatedAuthority } = delegated;
+  const missing = canonicalBytes(missingDelegatedAuthority);
+  expect(parseSiteDelegation(SITE_DELEGATION_DOMAIN, missing, expected, missing.length)).toBeNull();
+  const otherAuthority = { ...expected.rules, inc: newIncarnation(new Uint8Array(16).fill(2)) };
+  expect(readConfiguration({ ...configured, authority: otherAuthority })).toBeNull();
+  const substituted = canonicalBytes({ ...delegated, authority: otherAuthority });
+  expect(parseSiteDelegation(SITE_DELEGATION_DOMAIN, substituted, expected, substituted.length)).toBeNull();
+  expect(readConfiguration({ ...configured, authority: expected.destination })).toBeNull();
+  expect(readConfiguration({ ...configured, authority: { ...expected.rules, kind: "site" } })).toBeNull();
+  const unsupportedAttachment = canonicalBytes({ ...delegated, authority: { ...expected.rules, kind: "site" } });
+  expect(parseSiteDelegation(SITE_DELEGATION_DOMAIN, unsupportedAttachment, expected, unsupportedAttachment.length)).toBeNull();
   // Same IDs with another incarnation, or a substituted stable provider ID,
   // cannot be accepted merely because their shapes and byte forms are valid.
   const otherRealm = { ...expected, membership: { ...expected.membership, inc: newIncarnation(new Uint8Array(16).fill(1)) } };

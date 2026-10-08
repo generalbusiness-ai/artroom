@@ -61,3 +61,80 @@ retention/operations, transition/concurrency, current-use authority,
 provider credential correspondence, publication verification, legacy
 transition, integrated gate/review and activation remain owed. No whole
 gate, provider, deployment or main landing ran for this isolated component.
+
+## c4 native authority-field follow-up
+
+2026-10-08, same site owner and preparation branch, from exact parser head
+`e8a9422d99f3a7e0792441f3ede0f82262548a8b`. Complete successor DESIGN
+`c4a17ee0d62529a8d8ba574ef6e8a6242effb737` was independently approved in
+`5222bc6f42a33c0ed5134d86b3c8e3c659fa99f3` and adopted by
+`e5437627fd3dd8ccf38d797fc3c917d397d30ada`; both records were read in full.
+That successor now governs this parser's native canonical payloads. The
+earlier f60 preparation and checks above remain historical evidence.
+
+Both payloads now require explicit `authority`, a complete rules ScopeRef
+equal to the caller's expected `context.rules`. Missing authority is not
+inferred from another field or accepted as old payload bytes. A substituted
+incarnation, another owner kind or unsupported legacy `site` authority is
+refused. Declaration domains stay unchanged: these schemas were never
+shipped, and no domain/identity allocation is silently added. The native
+parser does not accept, fabricate or reinterpret unsupported attachment
+kinds. Native modules, catalog entries and @3 allocations are untouched.
+
+The existing one compact Node witness now includes required/substituted
+authority in both delegation and configuration, and unsupported attachment
+authority alongside its earlier exact realm/provider and canonical-byte
+cases. These remain made-up declarations/facts, not an actual current
+binding, grant, factory birth or renderer credential proof. The returned
+data does not establish that a rules authority was legitimately selected;
+the caller's real context, authenticated current slot and use gates remain
+separate required implementation work. No route or registration calls it.
+
+### Viewer/controller clarification
+
+For a members-only site, a plain viewer needs current active member/key
+eligibility and the exact-room session/birth/current-selection checks, not
+`rules.publish` or a controller role. Controller/issuer permission governs
+configuration, delegation and recovery/disable separately. For a native
+agent identity, existing controller-liveness eligibility applies only where
+the actual interpreted membership model already requires it; it is not a
+new publisher permission for ordinary viewers. No v1 session shape,
+issuance, serving or recall semantics change in this data-only component.
+Final factory/service signed wire, registration/borrowing and executor
+interfaces remain named owner inputs before their implementation/enablement.
+
+### Focused checks and original raw logs
+
+Commands, run in `/tmp/artroom-site-schema-prep`:
+
+```
+./node_modules/.bin/vitest run --project platform test/site-declarations.test.ts --reporter verbose > /tmp/artroom-site-schema-authority-evidence/focused.log 2>&1
+npm run typecheck --workspace @generalbusiness/artroom-platform > /tmp/artroom-site-schema-authority-evidence/typecheck.log 2>&1
+node scripts/control.mjs packages/platform/src/site-declarations.ts ' && same(value["authority"], expected.rules)' '' --expect 'site declarations require exact realm/provider' -- packages/platform test/site-declarations.test.ts > /tmp/artroom-site-schema-authority-evidence/control.log 2>&1
+```
+
+The focused witness passed (one test, Vitest duration 0.250 s). Platform
+source/test typechecks passed. Removing only authority-to-context equality
+made the same witness's substituted rules-incarnation assertion fail; the
+control reported **DISTINGUISHES** and restored the source. No other guard
+was removed and no test expectation changed for the control.
+
+These are original combined stdout/stderr files saved during the commands,
+not reconstructed transcript excerpts. The helper's temporary Vitest JSON
+was removed on exit as usual; its raw printed assertion/result remains in
+control.log. The logs contain only made-up nonsecret declaration identities,
+not private keys, invitations, provider plaintexts or live repository data.
+
+| Raw log | Bytes | SHA-256 |
+|---|---:|---|
+| `/tmp/artroom-site-schema-authority-evidence/focused.log` | 365 | `738806009926f2f6c866be60fe8da43a1b7b3e0ca0f6f241a67519c80df5c2fb` |
+| `/tmp/artroom-site-schema-authority-evidence/typecheck.log` | 112 | `7164e781f55f730d5b11f99c10513168239de3ff338d0315651cb93b32fe3130` |
+| `/tmp/artroom-site-schema-authority-evidence/control.log` | 3299 | `e10efd55fae47129de00cc3f44132c76f9362b718c241ae5b4f36bd378a21eb4` |
+
+Node was v26.10.0. Existing main dependencies were reused through a temporary
+node_modules link; both lockfiles again had SHA-256
+`bd4d9ed101dff266d71008f8a9ac42257093065ab5079cd399e004e40ae3162d`.
+Main reference measured `1eed91aacac56649ac0b75c0652215b0418eeff8`; no main
+file or installed package was changed. The temporary link was removed after
+the checks. No whole suite/gate, provider, route, activation or allocation
+ran. Complete source integration/review and full-site obligations remain open.
