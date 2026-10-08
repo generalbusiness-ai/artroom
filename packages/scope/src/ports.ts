@@ -225,13 +225,17 @@ export type ReadName = "summary" | "items" | "history" | "entry" | "outbox" | "o
  * W6). Nothing is read in any of the three cases.
  */
 export interface Readers {
+  /** Await before authorization when a reader needs an exact reference from
+   * a verified peer. The port validates the presented credential, clock and
+   * requested read before any RPC; `allows` checks them again afterwards. */
+  prepare?(reader: unknown, read: ReadName): Promise<void>;
   allows(reader: unknown, read: ReadName): boolean | "sessions-unavailable" | "clock-behind";
   /**
-   * For a reader that `allows` refused: a session of a membership scope at a register, which records no membership
-   * (`sessions.ts`, `registerSession`). The membership scope: the reader reads the register whole if one of its claims created
-   * that membership. False, or a name, as for `allows`. Absent: no session reads a register.
+   * For a reader that `allows` refused: a session of a membership scope at a scope that reads by the cause chain, the register
+   * (`sessions.ts`, `chainedSession`). The membership scope: the reader reads the entries that the chain gives it. False, or a
+   * name, as for `allows`. Absent: no reader reads by the chain.
    */
-  register?(reader: unknown, read: ReadName): { membership: ScopeRef } | false | "sessions-unavailable" | "clock-behind";
+  chained?(reader: unknown, read: ReadName): { membership: ScopeRef } | false | "sessions-unavailable" | "clock-behind";
   /**
    * The key whose session this reader presents, where `allows` lets it make that read. False, or a name, as for `allows`.
    * Absent: no reader is known by its key, and a read that needs one is `forbidden`.

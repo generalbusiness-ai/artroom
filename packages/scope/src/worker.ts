@@ -67,11 +67,12 @@
  */
 
 import { WorkerEntrypoint } from "cloudflare:workers";
+import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { Answer, Beside, Cursor, DeclaredDefinition, Digest, DutyId, Grant, LogPage, PlatformDefinition, Read, ReadRefusal, RetainedInput, ScopeApi, ScopeId, Seed, SessionAnswer, SessionRefusal, Settlement, SignedIntent } from "@generalbusiness/artroom-contract";
 import { definitionDigest, intentDigest, isScopeId, positionOf, scopeIdOf } from "@generalbusiness/artroom-bytes";
 import { isObject, type Item } from "@generalbusiness/artroom-derive";
 import { foundedKind, type Founded } from "./core.ts";
-import { recordedMembership, repositoryAuthority } from "./authority.ts";
+import { repositorySessionMembership, fixedMembership, repositoryAuthority } from "./authority.ts";
 import { membershipIn, namespace, type Binding } from "./namespace.ts";
 import { ScopeObject, type OutsideGiven, type Wiring } from "./object.ts";
 import type { Incident } from "./operator.ts";
@@ -80,6 +81,7 @@ import { credentialInUrl, relay, sessionReaders, sessionsOf, type Opened, type S
 import type { Duty, Sealed } from "./store.ts";
 import type { ReadCredential } from "./destination-host.ts";
 import { gitHubOutside, type GitHubBindings } from "./github-wiring.ts";
+import { within } from "./turn.ts";
 import { ARTIFACTS_HOST, artifactsOutside, type ArtifactsBindings } from "./artifacts-wiring.ts";
 import { recordedHost } from "./host-wiring.ts";
 import { NO_OUTSIDE, type Outside } from "./operations.ts";
@@ -338,14 +340,15 @@ export function outsideOf(given: OutsideGiven, sql: Pick<SqlStorage, "exec">, en
  * The two parts of a wiring that read sessions need, over one source of the
  * session configuration, which is asked at every use. The readers port
  * accepts a session only for the membership scope that the scope itself
- * records: the reference that its authority reads (`recordedMembership`),
- * with its incarnation where the scope records one. A rules scope and a
- * destination record membership's scope ID from their genesis, so they
- * accept its sessions from their first entry (the planner's decision
- * ca8ad1cf).
+ * records: the reference that its authority reads, with its incarnation (`fixedMembership`).
  */
-export function sessionWiring(sessions: () => Sessions | null): Required<Pick<Wiring, "readers" | "sessions">> {
-  return { readers: (given) => sessionReaders({ sessions, clock: given.clock, scope: given.scope, membership: (scope) => recordedMembership(given, scope) }), sessions };
+export function sessionWiring(sessions: () => Sessions | null, binding?: Binding, fetchSeconds = PROPOSED_BOUNDS.fetchSeconds): Required<Pick<Wiring, "readers" | "sessions">> {
+  return {
+    readers: (given) => sessionReaders({
+      sessions, clock: given.clock, scope: given.scope, membership: (scope) => fixedMembership(given, scope),
+      ...(binding ? { membershipPreparation: repositorySessionMembership(given, (directory, reader) => within(() => (binding.get(binding.idFromName(directory.scope)) as Remote).summary(reader), fetchSeconds)) } : {}),
+    }), sessions,
+  };
 }
 
 /**
@@ -375,7 +378,7 @@ export class DeployedScope<E extends Env = Env> extends ScopeObject<E> {
       authority: (given) => repositoryAuthority({ ...given, reader: membershipIn(this.scopes()) }),
       // Wired whether or not a host is configured now: `outsideOf` reads the settings at each call, and with neither it sends nothing.
       outside: (given: OutsideGiven) => outsideOf(given, this.ctx.storage.sql, this.env),
-      ...sessionWiring(() => sessionsOf(this.env.SESSION_SECRET, this.env.DEPLOYMENT)),
+      ...sessionWiring(() => sessionsOf(this.env.SESSION_SECRET, this.env.DEPLOYMENT), this.scopes()),
     };
   }
 }
@@ -409,5 +412,8 @@ export class ScopeService<E extends Env = Env> extends WorkerEntrypoint<E> imple
  * this Worker (`page.ts`); every other path is a route of the table above.
  */
 export default {
-  fetch: async (request: Request, env: Env): Promise<Response> => (isSite(request) ? site(request, env) : isPage(request) ? page(request) : route(request, env.SCOPES)),
+  fetch: async (request: Request, env: Env): Promise<Response> => {
+    if (credentialInUrl(new URL(request.url))) return json(400, { error: "credential-in-url" });
+    return isSite(request) ? site(request, env) : isPage(request) ? page(request) : route(request, env.SCOPES);
+  },
 };

@@ -57,7 +57,7 @@ export interface ArtifactsProviderOptions {
   timeoutMs?: number;
   /** Caller's nonsecret, durable credential mapping, allocated BEFORE mint. Not the service's token ID. */
   credentialHandle(repository: DestinationRepository, binding: DestinationBinding): Promise<string>;
-  /** Where a creation token is held when its revocation is not confirmed. Without it such a token is still reported, and stays owed. */
+  /** Where a creation token is durably held. Without custody, an unconfirmed immediate revocation leaves creation unknown. */
   creation?: CreationCustody;
   /** The repository this object records, for a revocation, which names only the token. */
   repositoryOf?(): DestinationRepository | null;
@@ -80,10 +80,11 @@ const codeOf = (e: unknown): string | null => {
 const repositoryName = (name: unknown): name is string => typeof name === "string" && /^[A-Za-z0-9][A-Za-z0-9_.-]{0,99}$/.test(name) && !name.toLowerCase().endsWith(".git");
 const plaintextOf = (value: unknown): string => typeof value === "string" && /^[!-~]{1,4096}$/.test(value) ? value : bad();
 const handle = (value: string): string => typeof value === "string" && value.length > 0 && value.length <= 256 && !/[\u0000-\u001f\u007f]/.test(value) ? value : bad();
-/** The service's expiry as one instant's text. A number is milliseconds; a string must name one instant. */
+/** The binding's reported ISO expiry, normalized to the contract's one
+ * instant text. No expiry is inferred from the requested TTL. */
 const endsOf = (value: unknown): string => {
-  const ms = typeof value === "number" ? value : typeof value === "string" ? (timeMs(value) ?? Date.parse(value)) : NaN;
-  return Number.isSafeInteger(ms) && ms > 0 ? timeOf(ms) : bad();
+  const ms = typeof value === "string" ? timeMs(value.replace(/\.000Z$/, "Z")) : null;
+  return ms !== null && ms > 0 ? timeOf(ms) : bad();
 };
 function own(reply: unknown, key: string): unknown {
   if (typeof reply !== "object" || reply === null) return undefined;
@@ -112,14 +113,22 @@ export class ArtifactsProvider implements RegisterProvider, DestinationProvider 
     let plaintext: string;
     try { plaintext = plaintextOf(own(created, "token")); } catch { return null; }
     const credential = `creation:${name}`;
-    try { this.#options.creation?.hold(credential, name, plaintext); } catch { /* still reported below, and owed */ }
+    let held = false;
+    try {
+      this.#options.creation?.hold(credential, name, plaintext);
+      const stored = this.#options.creation?.take(credential);
+      held = stored?.name === name && stored.plaintext === plaintext;
+    } catch { /* Immediate revocation can still confirm; otherwise no answer. */ }
     let revoked = false;
     try { revoked = await (await this.#options.binding.get(name)).revokeToken(plaintext) === true; } catch { revoked = false; }
     if (revoked) {
       try { this.#options.creation?.revoked(credential); } catch { /* the plaintext is revoked; a held copy is no authority */ }
-      return { created: true, name, id: name };
     }
-    return { created: true, name, id: name, credential };
+    if (own(created, "remote") !== this.#remote({ host: this.#options.host, namespace: this.#options.namespace, name, id: name })) return null;
+    if (revoked) return { created: true, name, id: name };
+    // A local cleanup handle is an answer only while its exact plaintext is
+    // durably held. Failed custody and failed revocation remain unknown.
+    return held ? { created: true, name, id: name, credential } : null;
   }
   async deleteRepository(id: string, name: string): Promise<unknown> {
     if (id !== name || !repositoryName(name)) return null;
@@ -147,7 +156,7 @@ export class ArtifactsProvider implements RegisterProvider, DestinationProvider 
     let token: unknown;
     try { token = await handleOf.createToken("write", WRITE_TTL); }
     catch (e) { if (codeOf(e) !== null) return { minted: false }; throw e; }
-    if (own(token, "scope") !== undefined && own(token, "scope") !== "write") return bad();
+    if (own(token, "scope") !== "write") return bad();
     // DestinationHost puts the plaintext in private custody before answering.
     // Lost replies or failed custody remain pending; this port never remints.
     return { id, ends: endsOf(own(token, "expiresAt")), plaintext: plaintextOf(own(token, "plaintext")) };
@@ -225,7 +234,8 @@ export class ArtifactsProvider implements RegisterProvider, DestinationProvider 
   /**
    * One read over smart HTTP, with a read token minted for it and revoked
    * after. The service's own report of the remote must be the expected one.
-   * A token whose revocation fails ends at its short expiry.
+   * The reply must state read scope and an actual expiry. A failed
+   * revocation is not proof that the requested TTL was honored.
    */
   async #read<T>(repository: DestinationRepository, read: (source: SmartHttpSource) => Promise<T>): Promise<T> {
     repository = { ...repository };
@@ -235,9 +245,11 @@ export class ArtifactsProvider implements RegisterProvider, DestinationProvider 
     const token = await handleOf.createToken("read", READ_TTL);
     const plaintext = plaintextOf(own(token, "plaintext"));
     try {
+      if (own(token, "scope") !== "read") return bad();
+      endsOf(own(token, "expiresAt"));
       return await read(new SmartHttpSource({ ...this.#transport(remote), authorization: `Bearer ${plaintext}` }));
     } finally {
-      try { await handleOf.revokeToken(plaintext); } catch { /* it ends at its expiry */ }
+      try { await handleOf.revokeToken(plaintext); } catch { /* no confirmed revocation; the reported expiry remains the service's assertion */ }
     }
   }
 }

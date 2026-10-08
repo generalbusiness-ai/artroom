@@ -225,7 +225,16 @@ test("absent or malformed configuration, or a missing binding, gives NO_OUTSIDE 
     }
     // Control: the complete setting with the binding takes effect.
     expect(artifactsOutside(f.given, state.storage.sql, artifactsEnv(scope, s.ns))).not.toBe(NO_OUTSIDE);
+    // A register installed for another namespace must not mutate the fixed
+    // artroom-demo binding, even when the explicit setting matches it.
+    const other = registerFixture("artifacts", "other", "other-namespace");
+    const wrongNamespace = artifactsOutside(other.given, state.storage.sql, {
+      ARTIFACTS: s.ns,
+      ARTIFACTS_CONFIG: canonicalize({ ...CONFIG, registerScope: other.register.at.scope, namespace: "other" }),
+    });
+    expect(await wrongNamespace.send(other.claim())).toBeNull();
     expect(s.calls).toEqual([]);
+    expect(wrongNamespace).toBe(NO_OUTSIDE);
   });
 });
 

@@ -1,18 +1,19 @@
 import { runInDurableObject } from "cloudflare:test";
 import { expect, test } from "vitest";
 import type { Entry, Intent, ScopeId, Seed } from "@generalbusiness/artroom-contract";
-import { canonicalize, factRefOf, intentDigest, scopeIdOf, signIntent, utf8 } from "@generalbusiness/artroom-bytes";
+import { b64url, canonicalize, factRefOf, intentDigest, newIncarnation, scopeIdOf, signIntent, utf8 } from "@generalbusiness/artroom-bytes";
+import { requestSession, sessionRequest, type Fetch } from "@generalbusiness/artroom-client";
 import { keys } from "@generalbusiness/artroom-derive/testing";
-import { DIRECTORY, REGISTER, destinationReceipt, destinationTarget, foundingObjects } from "@generalbusiness/artroom-platform";
+import { DIRECTORY, REGISTER, destinationMembership, destinationReceipt, destinationTarget, foundingObjects } from "@generalbusiness/artroom-platform";
 import { ZERO_ID } from "@generalbusiness/artroom-git";
 import { decodePack, type DecodedObject } from "@generalbusiness/artroom-git/http-read";
-import { SqliteStore } from "../src/index.ts";
+import { SqliteStore, mintSession, readerOf, sessionsOf } from "../src/index.ts";
 import { gitHubOutside, type GitHubBindings } from "../src/github-wiring.ts";
 import { net } from "../src/testing.ts";
 import { soon } from "./net.ts";
-import { Platform, rita, sam, settle } from "./repository.ts";
+import { Platform, rita, routed, sam, settle } from "./repository.ts";
 import { reader } from "./support.ts";
-import { platformOutside } from "./worker.ts";
+import { TEST_DEPLOYMENT, platformNet, platformOutside } from "./worker.ts";
 
 const ACCOUNT = { id: 285042784, login: "generalbusiness-ai", type: "Organization" } as const;
 const CREATION = "operator_creation_fixture_secret";
@@ -129,8 +130,10 @@ class ScriptedGitHub {
 // GitHub factory and destination adapters, retains its scoped credentials in
 // private SQLite, and writes only the exact founding head and own receipt.
 // All five objects, platform rules, membership authority, turn/dispatch and
-// Operations are real. HTTP/Git upstream, clock and read-session reader are
-// labelled stand-ins. No lane, source publication or actual GitHub runs.
+// Operations are real. HTTP/Git upstream and clock are labelled stand-ins;
+// fixture inspection uses an explicit reader bypass, while destination reads
+// below use actual membership-issued sessions. No lane, source publication or
+// actual GitHub runs.
 test("real PLATFORM founding through production GitHub factory writes exact first head and receipt with private revoked custody; upstream is scripted", async () => {
   const { paul } = keys;
   const keypair = await crypto.subtle.generateKey({ name: "RSASSA-PKCS1-v1_5", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" }, true, ["sign", "verify"]) as CryptoKeyPair;
@@ -151,7 +154,10 @@ test("real PLATFORM founding through production GitHub factory writes exact firs
   };
   const priorHold = net.hold;
   const priorDeaf = net.deaf;
+  const priorSessions = { sessions: platformNet.sessions, secret: platformNet.secret, inspector: platformNet.inspector };
   try {
+    platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32)));
+    platformNet.inspector = reader; // Labelled fixture inspector, never native session authority.
     net.deaf = null;
     net.hold = (envelope) => {
       // Install a name-bound test factory before real namespace delivery
@@ -229,9 +235,41 @@ test("real PLATFORM founding through production GitHub factory writes exact firs
     const publicHistory = canonicalize(histories);
     for (const secret of [CREATION, privateKey, ...host.minted]) expect(publicHistory).not.toContain(secret);
     const beforeRestart = { head: (await G.summary()).at, entries: histories[4], creates: host.creates, mints: host.minted.length, revokes: host.revoked.size, sends: host.sent.length };
+    // The first head, its receipt and both cleanups did not retain membership
+    // observations. A real session must still read all these later outcomes,
+    // rather than depending on the four-cause limit of a signed read.
+    const recordedMembership = () => runInDurableObject(G.object, (_instance, state) => {
+      const store = new SqliteStore({ exec: (query, ...bindings) => state.storage.sql.exec(query, ...bindings), transaction: (closure) => state.storage.transactionSync(closure) });
+      return destinationMembership(store);
+    });
+    expect(await recordedMembership()).toEqual({ scope: (await membership.at()).scope, inc: null, kind: "membership" });
+    const seat = await membership.did(rita, "seat", { expected: await membership.expected({ roster: 0 }) });
+    await membership.did(rita, "first-key", { fields: { member: seat }, expected: await membership.expected({ roster: 0, member: seat }) });
+    platformNet.sessions = true;
+    const issued = await requestSession("https://scopes.test", membership.name, sessionRequest(await membership.at(), rita.secret, soon(60), "github-founding-session"), { fetch: routed as unknown as Fetch });
+    expect(issued.ok).toBe(true);
+    if (!issued.ok) expect.fail(`no native session: ${issued.reason}`);
+    const native = issued.session.reader();
+    const retainedUse = genesis.uses[0]!;
+    const nativeReads = async () => {
+      const history = await G.stub.history(native);
+      expect(history.ok && history.value.map(({ entry }) => entry)).toEqual(beforeRestart.entries);
+      const retained = await G.stub.retained(native, "entry", retainedUse.content);
+      expect(retained.ok && JSON.parse(retained.value.bytes)).toEqual((await D.entries())[0]);
+      expect(await recordedMembership()).toEqual({ scope: issued.session.claims.membership.scope, inc: null, kind: "membership" });
+    };
+    await nativeReads();
+    // MAC-authentic controls under the TEST SECRET, not membership-issued
+    // tokens: neither another membership ID nor another incarnation reads.
+    const configured = sessionsOf(platformNet.secret, TEST_DEPLOYMENT)!;
+    for (const membershipRef of [{ ...issued.session.claims.membership, scope: R.name }, { ...issued.session.claims.membership, inc: newIncarnation(new Uint8Array(16).fill(9)) }]) {
+      const wrong = readerOf(mintSession(configured, { ...issued.session.claims, membership: membershipRef }));
+      expect(await G.stub.history(wrong)).toMatchObject({ ok: false, reason: "forbidden" });
+    }
     // Outside the runInDurableObject callback: evict the actual object life,
     // then read the same history and private SQL through its replacement.
     await G.restart();
+    await nativeReads();
     expect((await G.summary()).at).toEqual(beforeRestart.head);
     expect(await G.entries()).toEqual(beforeRestart.entries);
     expect(await privateState()).toEqual(custody);
@@ -239,6 +277,7 @@ test("real PLATFORM founding through production GitHub factory writes exact firs
   } finally {
     net.hold = priorHold;
     net.deaf = priorDeaf;
+    Object.assign(platformNet, priorSessions);
     for (const name of wired) platformOutside.delete(name);
   }
 });

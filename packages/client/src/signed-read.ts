@@ -1,11 +1,12 @@
 /**
  * Signed reads, as a device makes them (the planner's decisions 61cc5e50,
- * c6499e91 and 70a0680e; the scope package's `signed-reads.ts`). A device
+ * c6499e91, 70a0680e and ca8ad1cf; the scope package's `signed-reads.ts`). A device
  * with no read session yet reads a scope where its key signed an entry, or
  * the root of the scope's cause chain, within the authority window of an
  * intent: the scope's summary, its genesis, the entries that key signed,
  * the entries whose cause chain leads to one of those, and the retained
- * inputs that those entries name. So the operator key that signed `install` reads the register,
+ * inputs that those entries name. At a register, a recent local signer
+ * reads every entry and its carried inputs. So the operator key that signed `install` reads the register,
  * and a founder's key that signed `found` reads the register's summary,
  * the directory that the claim caused, and membership, the rules scope and
  * the destination, which the directory caused; it learns membership's ID
@@ -26,7 +27,7 @@
 
 import { PROPOSED_BOUNDS, SESSION_DOMAINS } from "@generalbusiness/artroom-contract";
 import type { ReadRequest, ScopeId, SignedRead, SignedReadName, Timestamp } from "@generalbusiness/artroom-contract";
-import { b64url, canonicalBytes, parseStrictBytes, taggedBytes } from "@generalbusiness/artroom-bytes";
+import { b64url, canonicalBytes, parseStrictBytes, retainedReadArgument, taggedBytes } from "@generalbusiness/artroom-bytes";
 import type { Transport } from "./handle.ts";
 import type { Signer } from "./intent.ts";
 
@@ -45,7 +46,7 @@ export interface ReadSigning {
   maxLifetimeSeconds?: number;
 }
 
-/** The argument that a signed read names: `"summary"` for the summary; a page's cursor, `"0"` for the first; an entry's position; a retained input's digest. */
+/** The argument of a signed read: summary, cursor, entry position or the already bound retained resource hash. */
 export function readArgument(read: SignedReadName, at?: string | number): string {
   if (read === "summary") return "summary";
   return at === undefined ? "0" : String(at);
@@ -76,16 +77,24 @@ export function signedReads(transport: Transport, signer: Signer, signing: ReadS
   const as = async (reader: unknown, scope: string, read: SignedReadName, at?: string | number): Promise<unknown> =>
     (typeof reader === "string" ? reader : signedReader(signer, scope as ScopeId, read, readArgument(read, at), signing));
   return {
-    ...transport,
+    // Delegate with the original receiver, including prototype methods and
+    // methods that read class-private fields; object spread loses those.
+    found: (...args) => transport.found(...args),
+    submit: (...args) => transport.submit(...args),
+    prepare: (...args) => transport.prepare(...args),
+    settle: (...args) => transport.settle(...args),
+    items: (...args) => transport.items(...args),
+    outbox: (...args) => transport.outbox(...args),
+    duty: (...args) => transport.duty(...args),
     summary: async (scope, reader) => transport.summary(scope, await as(reader, scope, "summary")),
     history: async (scope, reader, cursor) => transport.history(scope, await as(reader, scope, "history", cursor), cursor),
     entry: async (scope, reader, seq) => transport.entry(scope, await as(reader, scope, "entry", seq), seq),
     log: async (scope, reader, cursor) => transport.log(scope, await as(reader, scope, "log", cursor), cursor),
-    retained: async (scope, reader, kind, digest, domain) => transport.retained(scope, await as(reader, scope, "retained", digest), kind, digest, domain),
+    retained: async (scope, reader, kind, digest, domain) => transport.retained(scope, await as(reader, scope, "retained", retainedReadArgument(kind, digest, domain)), kind, digest, domain),
   };
 }
 
-/** The reader of the replay package's `httpSource`: a signed read for each `log` page and each retained input, by its digest. */
+/** The replay reader signs each log cursor and each complete retained resource argument supplied by httpSource. */
 export function signedLogReader(signer: Signer, signing: ReadSigning = {}): (scope: ScopeId, read: "log" | "retained", arg: string) => Promise<string | undefined> {
   return async (scope, read, arg) => signedReader(signer, scope, read, arg, signing);
 }

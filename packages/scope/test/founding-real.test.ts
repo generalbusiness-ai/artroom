@@ -6,7 +6,7 @@ import { b64url, canonicalize, entryHash, factRefOf, intentDigest, scopeIdOf, se
 import { requestSession, secretSigner, sessionRequest, signedReader, type Fetch } from "@generalbusiness/artroom-client";
 import { PROFILES, grantFrom, ruleAt, validateDefinition, valueDigest, type Item } from "@generalbusiness/artroom-derive";
 import { d, keys, otherLane, ticket, ticketDefinition } from "@generalbusiness/artroom-derive/testing";
-import { CONFIGURATION_DOMAIN, DESTINATION, DESTINATION_CHANGED_SET, DIRECTORY, MEMBERSHIP, REGISTER, RULES_SCOPE, destinationReceipt, firstExtents, foundingObjects, platform, repositoryName, revokedToken, RULES_EXTENTS_VALUE } from "@generalbusiness/artroom-platform";
+import { CONFIGURATION_DOMAIN, DESTINATION, DESTINATION_CHANGED_SET, DIRECTORY, REGISTER, destinationReceipt, firstExtents, foundingObjects, platform, repositoryName, revokedToken, RULES_EXTENTS_VALUE } from "@generalbusiness/artroom-platform";
 import { httpSource, verify } from "@generalbusiness/artroom-replay";
 import { targetOf } from "../../platform/src/destination.ts";
 import { SqliteStore, type Sealed, type Summary } from "../src/index.ts";
@@ -158,11 +158,10 @@ describe("a founding on real scopes under the deployed class (authority note, se
     expect(learned).toEqual(membership);
 
     // Every declared mark has its production rule, so the third child is created and confirmed too. No duty is held or waiting.
-    expect([lacking(REGISTER), lacking(DIRECTORY), lacking(MEMBERSHIP), lacking(RULES_SCOPE), lacking(DESTINATION)]).toEqual([[], [], [], [], []]);
+    expect([lacking(REGISTER), lacking(DIRECTORY), lacking("platform:membership@2"), lacking("platform:rules@2"), lacking(DESTINATION)]).toEqual([[], [], [], [], []]);
     expect(((await D.stub.outbox(reader)) as { value: readonly { acknowledged: unknown }[] }).value.every((duty) => duty.acknowledged !== null)).toBe(true);
     // STAND-IN: the destination's Git host. It answers with the exact ID that the package computes for the founding commit.
     const destinationHost = outsideOf(G.name);
-    // The founding commit of `platform:destination@2`: one README that names the repository, the founder's handle and the directory.
     const firstHead = foundingObjects("sha1", G.name, (await G.entries())[0]!.time, factRefOf(r[1]!), { name, handle: "@rita", directory: D.name }).commit;
     destinationHost.answer("0:0" as OperationId, 1, { result: "confirmed", evidence: { basis: "own-answer", body: { send: "accepted", seen: firstHead } } });
     let driving = "mint";
@@ -201,14 +200,28 @@ describe("a founding on real scopes under the deployed class (authority note, se
     // A read session of rita's, issued by membership under a TEST SECRET that this test generates. A scope accepts a session only
     // when it names the membership reference that the scope itself records, with its incarnation. So what a reader with it is
     // answered at the rules scope shows what that scope records, as its own store holds it.
+    // Age every founding history past the 900-second signed bootstrap window.
+    net.clock.now = soon(901);
     platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32)));
     const real = async <T>(run: () => Promise<T>): Promise<T> => { platformNet.sessions = true; try { return await run(); } finally { platformNet.sessions = false; } };
     const issued = await real(async () => requestSession(SERVICE, membershipScope!.name, sessionRequest(learned!, rita.secret, soon(60), "founding-real"), { fetch: routed as unknown as Fetch }));
     if (!issued.ok) throw new Error(`no session: ${issued.reason}`);
     const reads = async (node: Platform) => (await real(() => routed(`${SERVICE}/v1/scopes/${node.name}`, { headers: { authorization: issued.session.reader() } }))).status;
-    // The directory records the reference with its incarnation, and the rules scope records the ID alone. A session of that ID is
-    // accepted at both (the planner's decision ca8ad1cf).
-    expect([await reads(D), await reads(rulesScope!)]).toEqual([200, 200]);
+    // Birth-session preparation permits the first read without retaining a
+    // membership observation or changing grant authority. The rules scope
+    // has had no act; its aged founding can be replayed without anchors.
+    const beforeReads = await rulesScope!.entries();
+    expect([await reads(D), await reads(rulesScope!), await reads(G)]).toEqual([200, 200, 200]);
+    await rulesScope!.restart();
+    expect(await reads(rulesScope!)).toBe(200);
+    expect(await rulesScope!.entries()).toEqual(beforeReads);
+    const invalidReader = issued.session.reader().slice(0, -1) + "!";
+    expect((await real(() => routed(`${SERVICE}/v1/scopes/${rulesScope!.name}`, { headers: { authorization: invalidReader } }))).status).toBe(403);
+    for (const node of [rulesScope!, D, G]) {
+      const head = (await node.summary()).at;
+      const { report, why } = await real(() => verify(httpSource(SERVICE, { fetch: routed, reader: issued.session.reader() }), { mode: "replay", platform, grants: "proven", scope: node.name, head }));
+      expect([report.result, why]).toEqual(["consistent", null]);
+    }
     const publish = async (approvals: number) => rulesScope!.act(rita, "publish", { on: 0, expected: await rulesScope!.expected({ on: 0 }), fields: { approvals, ownerMayReview: false, checks: [], labels: [], extents: firstExtents({ approvals, checks: [] }) as never } });
     // The rules scope's first act that needs a grant. It holds membership's scope ID and no incarnation, so its first read asks by the
     // ID alone. The answer's `of` holds the incarnation of the scope that answered, guard 1 takes it, and the entry that retains
@@ -226,7 +239,7 @@ describe("a founding on real scopes under the deployed class (authority note, se
     const first = proof(await rulesScope!.last());
     expect(first).toMatchObject({ observation: { of: membership, key: rita.key, keyState: "active", role: "admin", within: { membership } }, use: "fresh", prior: null });
     // From then on the incarnation is a function of the folded state: the rules scope records the reference with it, and accepts the
-    // session of that incarnation. A later read states it: after a restart the object holds no observation in memory, records the same reference from
+    // session. A later read states it: after a restart the object holds no observation in memory, records the same reference from
     // its store, reads again, and is answered by the same incarnation.
     expect(await reads(rulesScope!)).toBe(200);
     await rulesScope!.restart();

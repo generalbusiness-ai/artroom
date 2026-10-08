@@ -13,15 +13,11 @@
  * genesis, the entries of a key that signed an entry of this scope, or the
  * root of its genesis's cause chain, within the authority window of an
  * intent, the entries whose cause chain leads to an entry that key signed,
- * and the retained inputs that those entries name.
- *
- * A register holds no secret, and a verifier folds it from its genesis, so
- * it is read whole (the planner's decision ca8ad1cf): its summary, every
- * entry and its retained inputs, by a signed read of a key that signed an
- * entry of it within the window, and by a session of a membership scope
- * that one of its claims created, with no window but the session's end
- * (`registerSession`). A reader that presents neither is answered
- * `forbidden` by every read here.
+ * and the retained inputs that those entries name. A session of a
+ * membership scope created by a register claim reads that register's whole
+ * history without the signed-entry window. A recent local register signer
+ * likewise reads its whole history and the inputs it carries. A reader that presents neither is
+ * answered `forbidden` by every read here.
  *
  * Three reads are of what is no history (authority note, section 12, G13
  * and G17): `incidents`, a page of the operator's record of this scope; and
@@ -32,10 +28,10 @@
  * nothing here changes because a request is old.
  */
 
-import { ENTRY_READ_BYTES, HISTORY_PAGE_BYTES, HISTORY_PAGE_ENTRIES, OUTBOX_PAGE_DUTIES, RETAINED_INPUT_BYTES, RETAINED_ITEMS_PAGE } from "@generalbusiness/artroom-contract";
-import type { Cursor, Digest, DutyId, Entry, KeyId, LogPage, OperationId, Read, ReadRefusal, RetainedInput, Summary } from "@generalbusiness/artroom-contract";
-import { isDutyId, isOperationId, positionOf } from "@generalbusiness/artroom-bytes";
-import { byteOrder, own, type Item, type ScopeState, type ValidDefinition } from "@generalbusiness/artroom-derive";
+import { DOMAINS, ENTRY_READ_BYTES, HISTORY_PAGE_BYTES, HISTORY_PAGE_ENTRIES, OUTBOX_PAGE_DUTIES, RETAINED_INPUT_BYTES, RETAINED_ITEMS_PAGE } from "@generalbusiness/artroom-contract";
+import type { Cursor, Digest, DutyId, Entry, FieldValue, KeyId, LogPage, OperationId, Read, ReadRefusal, RetainedInput, Summary } from "@generalbusiness/artroom-contract";
+import { isDigest, isDutyId, isOperationId, isSeed, positionOf, retainedReadArgument } from "@generalbusiness/artroom-bytes";
+import { bound, byteOrder, creationFields, evidenceValues, inputTexts, namedBy, own, placesOf, retainsOf, same, type Item, type Owners, type ScopeState, type ValidDefinition } from "@generalbusiness/artroom-derive";
 import type { Pinned } from "./core.ts";
 import { waitingIn, type Incident, type OperatorRecord } from "./operator.ts";
 import type { ReadName, Readers } from "./ports.ts";
@@ -66,10 +62,10 @@ const dutyOf = (duty: unknown): [seq: number, n: number] | null => (isDutyId(dut
 const operationOf = (id: unknown): [seq: number, k: number] | null => (isOperationId(id) ? (id.split(":").map(Number) as [number, number]) : null);
 
 /**
- * A reader that reads part of the scope: a signed read's key, with the earliest time of a root that leads it to an entry. A signed
- * read at a register, and a session, read the scope whole.
+ * A reader that reads part of the scope: a signed read's key, with the earliest time of a root that leads it to an entry; or a
+ * whole-history authority at a register, from a recent local signer or a created membership's session.
  */
-type Limit = { key: KeyId; since: number };
+type Limit = { key: KeyId; since: number; scoped: boolean; whole: boolean } | { whole: true };
 
 export class Reads {
   readonly #store: Store;
@@ -78,18 +74,20 @@ export class Reads {
   readonly #bounds: ReadBounds;
   readonly #record: OperatorRecord | null;
   readonly #signed: SignedReading | null;
+  readonly #owners: (() => Owners | undefined) | undefined;
 
   /**
    * `record`: the operator's record of this scope. Null: it keeps none, and the read of it finds nothing.
    * `signed`: the clock and the window that a signed read is judged by. Null: this scope answers no signed read.
    */
-  constructor(store: Store, pinned: () => Pinned | null, readers: Readers, bounds: ReadBounds = READ_BOUNDS, record: OperatorRecord | null = null, signed: SignedReading | null = null) {
+  constructor(store: Store, pinned: () => Pinned | null, readers: Readers, bounds: ReadBounds = READ_BOUNDS, record: OperatorRecord | null = null, signed: SignedReading | null = null, owners?: () => Owners | undefined) {
     this.#store = store;
     this.#pinned = pinned;
     this.#readers = readers;
     this.#bounds = bounds;
     this.#record = record;
     this.#signed = signed;
+    this.#owners = owners;
   }
 
   /**
@@ -101,11 +99,10 @@ export class Reads {
   /**
    * A reader that presents a signed read is judged by that alone, and never
    * by the readers port: only the reads of `SIGNED_READS`, with `arg` as
-   * the argument that the request must name. At a register it reads the
-   * whole scope. A session that the port refuses is asked of its
-   * `register` check: at a register, it reads the whole scope if one of the
-   * register's claims created its membership. `limit`: what a signed read
-   * reads of the entries elsewhere (`#mine`). Null: the read is whole.
+   * the argument that the request must name. A session that the port
+   * refuses is asked of its `chained` check. `limit`: what such a reader
+   * reads of the entries (`#mine`). Null: a session or the readers port
+   * allowed the read whole.
    */
   #open(reader: unknown, read: ReadName, arg?: string): { scope: ScopeState; pinned: Pinned; limit: Limit | null } | { ok: false; reason: ReadRefusal } {
     let limit: Limit | null = null;
@@ -114,15 +111,17 @@ export class Reads {
       // A read that a signed read cannot name has no argument here, and no request names it: it is refused by the check.
       const checked = checkSignedRead(this.#signed, this.#store, reader as string, read, arg ?? "");
       if (!("key" in checked)) return no(checked.refused === false ? "forbidden" : checked.refused);
-      // A register holds no secret: a key it admits reads it whole (decision ca8ad1cf).
-      limit = this.#store.scope()?.at.kind === "register" ? null : checked;
+      limit = checked;
     } else {
       const allowed = this.#readers.allows(reader, read);
       if (allowed !== true) {
-        const session = allowed === false ? (this.#readers.register?.(reader, read) ?? false) : allowed;
-        if (typeof session !== "object") return no(session === false ? "forbidden" : session);
-        // A session of a membership that none of this register's claims created reads nothing here.
-        if ((this.#signed?.chains?.claimOf(session.membership.scope) ?? null) === null) return no("forbidden");
+        const chained = allowed === false ? (this.#readers.chained?.(reader, read) ?? false) : allowed;
+        if (typeof chained !== "object") return no(chained === false ? "forbidden" : chained);
+        const claim = this.#signed?.chains?.claimOf(chained.membership.scope) ?? null;
+        if (claim === null) return no("forbidden");
+        // Lead ca8ad1cf: a created membership's authenticated session reads
+        // the whole register history, without the signed-entry window.
+        limit = { whole: true };
       }
     }
     const scope = this.#store.scope();
@@ -130,20 +129,61 @@ export class Reads {
     return scope && pinned ? { scope, pinned, limit } : no("not-found");
   }
   /**
-   * Whether a reader with that limit may have this stored entry: every reader but a limited one; a limited one, the genesis, its
-   * key's own entries and those whose chain leads to one of them at `since` or later. An entry whose root is not found yet is no
-   * limited reader's.
+   * Whether a reader with that limit may have this stored entry: every reader but a limited one; a limited one, the genesis, and a
+   * signed read's key its own entries and those whose chain leads to one of them at `since` or later; a session at a register, the
+   * whole history. An entry whose root is not found yet is no causally limited reader's.
    */
   #mine(limit: Limit | null, row: Stored): boolean {
-    if (limit === null || row.seq === 0) return true;
+    if (limit === null || limit.whole) return true;
     const entry = JSON.parse(row.bytes) as Entry;
-    return signerOf(entry) === limit.key || leads(this.#signed?.chains?.at(row.seq), limit.key, limit.since);
+    const root = this.#signed?.chains?.at(row.seq);
+    if ("key" in limit) return (limit.scoped && (row.seq === 0 || signerOf(entry) === limit.key)) || leads(root, limit.key, limit.since);
+    return false;
   }
-  /** Whether an entry that a reader with that limit may have names this digest: a retained input that it carries. */
-  #carried(limit: Limit, head: number, digest: Digest): boolean {
+  /** Exact retained names from typed fields and recorded provenance, never arbitrary text. */
+  #names(entry: Entry, kind: RetainedInput["kind"], digest: Digest, domain?: string): boolean {
+    const matches = (namedKind: RetainedInput["kind"], namedDigest: Digest, namedDomain?: string) => kind === namedKind && digest === namedDigest && domain === namedDomain;
+    const value = (namedDigest: Digest, namedDomain: string) => namedDomain === DOMAINS.definition ? matches("definition", namedDigest) : matches("value", namedDigest, namedDomain);
+    if (entry.uses.some((use) => matches("entry", use.content)) || entry.prepared.some((prepared) => matches("rule", prepared.input))) return true;
+    const input = entry.input;
+    if (input.type === "genesis" && isDigest(input.seed.definition) && matches("definition", input.seed.definition)) return true;
+    if (entry.sends.some((send) => isSeed(send.to) && isDigest(send.to.definition) && matches("definition", send.to.definition))) return true;
+    try {
+      if (input.type === "outcome") {
+        const rules = this.#owners?.()?.rules(input.owner, input.kind);
+        if ((rules?.retains?.(input.evidence) ?? []).some((named) => matches("snapshot", named))) return true;
+        if (evidenceValues(rules, input.evidence)?.some((named) => value(named.digest, named.domain))) return true;
+      }
+      const definition = this.#pinned()?.definition;
+      if (!definition) return false;
+      const source = input.type === "delivery" ? entry.uses.find((use) => same(use.fact, input.from)) : undefined;
+      const under = source ? this.#store.retained("entry", source.content)?.under : undefined;
+      if (inputTexts(definition, input, under).some((named) => matches("text", named))) return true;
+      let types: Readonly<Record<string, unknown>> | undefined;
+      let fields: Readonly<Record<string, FieldValue>> = {};
+      if (input.type === "act") { types = own(definition.declared.acts, input.signed.intent.kind)?.fields; fields = input.signed.intent.fields; }
+      else if (input.type === "genesis") {
+        const act = own(definition.declared.acts, definition.declared.genesis);
+        types = act?.fields;
+        fields = input.founding?.intent.fields ?? (input.source && act ? creationFields(input.message, input.source, act.fields) : null) ?? {};
+      } else if (input.type === "delivery" && (input.message.class === "request" || input.message.class === "advisory")) {
+        const received = bound(definition, input.message, input.from, under);
+        types = received?.handler?.fields;
+        fields = received?.fields ?? {};
+      }
+      if (placesOf(types, fields).some((named) => value(named.digest, named.domain))) return true;
+      if ((input.type === "act" || input.type === "outcome" || (input.type === "delivery" && "clause" in input)) && input.observed) {
+        const domains = retainsOf(definition);
+        if (input.observed.some((observation) => namedBy(observation.observation).some((named) => domains.some((declared) => value(named, declared))))) return true;
+      }
+    } catch { return false; }
+    return false;
+  }
+  /** Whether an authorized entry names this exact retained input. */
+  #carried(limit: Limit, head: number, kind: RetainedInput["kind"], digest: Digest, domain?: string): boolean {
     for (let seq = 0; seq <= head; seq++) {
       const row = this.#store.stored(seq);
-      if (row && row.bytes.includes(`"${digest}"`) && this.#mine(limit, row)) return true;
+      if (row && this.#mine(limit, row) && this.#names(JSON.parse(row.bytes) as Entry, kind, digest, domain)) return true;
     }
     return false;
   }
@@ -202,6 +242,7 @@ export class Reads {
   history(reader: unknown, cursor?: Cursor): Read<readonly Sealed[]> {
     const open = this.#open(reader, "history", cursor ?? "0");
     if (!("scope" in open)) return open;
+    if (open.limit && "key" in open.limit && !open.limit.scoped && !this.#signed?.chains?.has(open.limit.key, open.limit.since)) return no("forbidden");
     const from = position(cursor, 0);
     if (from === undefined || from === null) return no("not-found");
     const { rows, more } = this.#page(from);
@@ -217,6 +258,7 @@ export class Reads {
   log(reader: unknown, cursor?: Cursor): Read<LogPage> {
     const open = this.#open(reader, "log", cursor ?? "0");
     if (!("scope" in open)) return open;
+    if (open.limit && "key" in open.limit && !open.limit.scoped && !this.#signed?.chains?.has(open.limit.key, open.limit.since)) return no("forbidden");
     const from = position(cursor, 0);
     if (from === undefined || from === null) return no("not-found");
     const { rows, more } = this.#page(from);
@@ -230,10 +272,10 @@ export class Reads {
    * Values are read by domain and digest, with the same authority and byte bound as every other retained input.
    */
   retained(reader: unknown, kind: RetainedInput["kind"], digest: Digest, domain?: string): Read<RetainedInput> {
-    const open = this.#open(reader, "retained", typeof digest === "string" ? digest : "");
+    const open = this.#open(reader, "retained", retainedReadArgument(kind, digest, domain));
     if (!("scope" in open)) return open;
     // A limited reader reads an input that an entry it may have names, and is told nothing of any other.
-    if (open.limit && (typeof digest !== "string" || !this.#carried(open.limit, open.scope.head.seq, digest))) return no("forbidden");
+    if (open.limit && (typeof digest !== "string" || !this.#carried(open.limit, open.scope.head.seq, kind, digest, domain))) return no("forbidden");
     if (!READABLE.includes(kind) || typeof digest !== "string" || (kind === "value" && (typeof domain !== "string" || domain.length === 0))) return no("not-found");
     // The size is asked of storage first, so an input over the bound is refused before any of it is read into memory.
     const size = this.#store.retainedSize(kind, digest, domain);
@@ -249,7 +291,7 @@ export class Reads {
     const open = this.#open(reader, "entry", String(seq));
     if (!("scope" in open)) return open;
     const row = Number.isSafeInteger(seq) ? this.#store.stored(seq) : null;
-    if (!row) return no("not-found");
+    if (!row) return no(open.limit && "key" in open.limit && !open.limit.scoped ? "forbidden" : "not-found");
     if (!this.#mine(open.limit, row)) return no("forbidden");
     if (row.size > this.#bounds.entryBytes) return no("too-large");
     return { ok: true, at: open.scope.head, value: { entry: JSON.parse(row.bytes) as Entry, hash: row.hash }, complete: true };

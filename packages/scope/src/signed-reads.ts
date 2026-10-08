@@ -1,6 +1,6 @@
 /**
  * Signed reads: the second way a reader may read a scope, beside a read
- * session (the planner's decisions 61cc5e50, c6499e91 and 70a0680e). It is
+ * session (the planner's decisions 61cc5e50, c6499e91, 70a0680e and ca8ad1cf). It is
  * for a key that has no session yet: the operator key that signed
  * `install` reads the register, and the key that signed a claim's `found`
  * reads the register's summary, then the directory that the claim caused
@@ -27,9 +27,9 @@
  * 5. The reading is at or past `notAfter`, or `notAfter` is further ahead
  *    than an intent may live (`intentLifetimeSeconds`): the authority
  *    window of an intent.
- * 6. The key signed no entry of this scope whose time is within that
- *    window of the reading, and it did not sign the root of this scope's
- *    cause chain within that window of the reading.
+ * 6. Summary needs a recent local signer or recent genesis-root signer.
+ *    An entry may instead qualify by its own causal root. History/log
+ *    require at least one eligible root before revealing the scope head.
  *
  * **Who signed an entry.** The actor of the signed intent of an `act` or
  * a `preparation`, and, for a genesis that took effect with a founding
@@ -59,8 +59,9 @@
  * from this scope's own entries or its retained entries, or else from its
  * own scope through the resolver port, and is the entry that the fact
  * names, by its hash. The roots are fixed by the history, so a scope finds
- * each once (`Chains`), before a signed read, and keeps it. The window is
- * measured at the root entry's time.
+ * each once (`Chains`) when a valid limited read needs it. Request checks
+ * precede resolver work, and a local signer needs none for its summary or
+ * own entry. The window is measured at the original root entry's time.
  *
  * **What it reads.** The summary; the genesis; the entries that the key
  * signed; the entries whose chain leads to an entry that the key signed,
@@ -72,17 +73,11 @@
  * meets each entry once. Every other read is `forbidden`, and so is a
  * stream: a stream is opened by a session only.
  *
- * **At a register** (the planner's decision ca8ad1cf) the admitted key
- * reads the whole scope: its summary, every entry and every retained input.
- * A register holds no secret, and a verifier folds a history from its
- * genesis, with no hole. A session of a membership scope that one of the
- * register's claims created reads it whole too (`sessions.ts`,
- * `registerSession`), with no window. So co-founders on one register read
- * each other's claims.
- *
- * A session of a scope's own membership reads the destination, the rules
- * scope and the directory whole, as it reads membership, including the
- * entries that no member signed (`sessions.ts`, `checkSession`).
+ * At a register, a recent local signer reads every history entry. An
+ * authenticated session of membership created by one of its claims also
+ * reads every entry, without a signed-entry window. Both may read the
+ * actual typed inputs carried by that history. Register sessions gain
+ * neither summary nor items permission from this rule (ca8ad1cf).
  *
  * A signed read is no credential beyond itself: whoever holds one can make
  * that one read, with that argument, until its `notAfter`, and nothing
@@ -142,7 +137,7 @@ export interface SignedReading {
   /** The authority window of an intent, in seconds: the scope's `intentLifetimeSeconds`. */
   window: number;
   /** The roots of this scope's cause chains, as the scope found them before the read. Absent: none is known. */
-  chains?: Pick<Chains, "at" | "claimOf">;
+  chains?: Pick<Chains, "at" | "claimOf" | "has">;
 }
 
 /** The most causes that a cause chain is followed through (decision 70a0680e). */
@@ -222,8 +217,10 @@ export async function rootOf(start: Entry, read: (use: FactUse) => Promise<Entry
 export class Chains {
   readonly #store: Pick<Store, "scope" | "stored">;
   readonly #read: (use: FactUse) => Promise<Entry | null>;
-  readonly #roots: (Root | null)[] = [];
+  readonly #roots: (Root | null | undefined)[] = [];
   readonly #claims = new Map<ScopeId, number>();
+  readonly #retry = new Set<number>();
+  #next = 0;
 
   constructor(store: Pick<Store, "scope" | "stored">, read: (use: FactUse) => Promise<Entry | null>) {
     this.#store = store;
@@ -234,21 +231,26 @@ export class Chains {
   at(seq: number): Root | null | undefined { return this.#roots[seq]; }
   /** The position of the register's claim that caused the directory which created that membership scope, or null. */
   claimOf(membership: ScopeId): number | null { return this.#claims.get(membership) ?? null; }
+  /** Whether any resolved entry gives this key a causal read at this time. */
+  has(key: KeyId, since: number): boolean { return this.#roots.some((root) => leads(root, key, since)); }
 
-  /** Find the roots of the entries up to the head. An entry whose chain cannot be read now stops it; the next call goes on from there. */
+  /** Find new roots and retry unavailable ones independently; no resolved root is fetched again. */
   async update(): Promise<void> {
     const scope = this.#store.scope();
     if (!scope) return;
     const entryAt = (seq: number): Entry | null => { const row = this.#store.stored(seq); return row ? (JSON.parse(row.bytes) as Entry) : null; };
     const own = { scope: scope.at.scope, entry: entryAt };
-    for (let seq = this.#roots.length; seq <= scope.head.seq; seq++) {
+    const find = async (seq: number): Promise<void> => {
       const entry = entryAt(seq);
-      if (!entry) return;
+      if (!entry) { this.#retry.add(seq); return; }
       const root = await rootOf(entry, this.#read, CHAIN_STEPS, own);
-      if (root === "unavailable") return;
+      if (root === "unavailable") { this.#retry.add(seq); return; }
       if (scope.at.kind === "register" && root && root.scope === scope.at.scope) for (const membership of await this.#memberships(entry)) this.#claims.set(membership, root.seq);
       this.#roots[seq] = root;
-    }
+      this.#retry.delete(seq);
+    };
+    for (const seq of [...this.#retry]) await find(seq);
+    while (this.#next <= scope.head.seq) await find(this.#next++);
   }
 
   /** The membership scopes whose seeds the directory's genesis that a delivery came from names, or none. */
@@ -269,7 +271,7 @@ export class Chains {
  * `read` and `arg` are the read that is asked and its argument, as the
  * request must name them.
  */
-export function checkSignedRead(config: SignedReading, store: Pick<Store, "scope" | "stored">, reader: string, read: ReadName, arg: string): { key: KeyId; since: number } | { refused: false | "clock-behind" } {
+export function checkSignedReadRequest(config: SignedReading, store: Pick<Store, "scope">, reader: string, read: ReadName, arg: string): { key: KeyId; since: number } | { refused: false | "clock-behind" } {
   const signed = openSignedRead(reader);
   if (!signed || !verifySignedRead(signed)) return { refused: false };
   const scope: ScopeState | null = store.scope();
@@ -280,7 +282,15 @@ export function checkSignedRead(config: SignedReading, store: Pick<Store, "scope
   if (reading === null || previous === null || reading < previous) return { refused: "clock-behind" };
   const window = config.window * 1000;
   if (reading >= ends || ends - reading > window) return { refused: false };
-  const since = reading - window;
+  return { key: actor, since: reading - window };
+}
+
+/** Request validation and local signer eligibility, with no cause reads. */
+export function checkLocalSignedRead(config: SignedReading, store: Pick<Store, "scope" | "stored">, reader: string, read: ReadName, arg: string): { key: KeyId; since: number } | { refused: false | "clock-behind" } | { root: { actor: KeyId; since: number } } {
+  const checked = checkSignedReadRequest(config, store, reader, read, arg);
+  if (!("key" in checked)) return checked;
+  const { key: actor, since } = checked;
+  const scope = store.scope()!;
   // The entries within the window of the reading, from the head back. A key that signed one of them may read.
   for (let seq = scope.head.seq; seq >= 0; seq--) {
     const row = store.stored(seq);
@@ -289,9 +299,20 @@ export function checkSignedRead(config: SignedReading, store: Pick<Store, "scope
     if ((timeMs(entry.time) ?? -Infinity) < since) break;
     if (signerOf(entry) === actor) return { key: actor, since };
   }
-  // The root of the genesis's cause chain, measured at its own time.
+  return { root: { actor, since } };
+}
+
+/** The full check, using a resolved root only when local eligibility needs it. */
+export function checkSignedRead(config: SignedReading, store: Pick<Store, "scope" | "stored">, reader: string, read: ReadName, arg: string): { key: KeyId; since: number; scoped: boolean; whole: boolean } | { refused: false | "clock-behind" } {
+  const checked = checkLocalSignedRead(config, store, reader, read, arg);
+  if ("refused" in checked) return checked;
+  const { actor, since } = "key" in checked ? { actor: checked.key, since: checked.since } : checked.root;
+  // Summary and legacy own/genesis permissions still need scoped eligibility.
+  // Other entries may qualify by their own causal root, checked by Reads.
   const root = config.chains?.at(0) ?? null;
-  return root && leads(root, actor, since) ? { key: actor, since } : { refused: false };
+  const scoped = "key" in checked || leads(root, actor, since);
+  const whole = store.scope()?.at.kind === "register" && "key" in checked;
+  return read === "summary" && !scoped ? { refused: false } : { key: actor, since, scoped, whole };
 }
 
 /** Whether a root is an entry that `key` signed, at `since` or later. */

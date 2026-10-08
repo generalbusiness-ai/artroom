@@ -9,7 +9,7 @@
  * the user. `memoryStore` keeps them in memory, for a test.
  */
 
-import type { Digest, PlatformDefinition, ScopeId, ScopeRef, SignedIntent } from "@generalbusiness/artroom-contract";
+import type { Digest, FactRef, PlatformDefinition, ScopeId, ScopeRef, SignedIntent } from "@generalbusiness/artroom-contract";
 
 /** The scopes of one repository, as `claim` or `join` learned them. */
 export interface Repository {
@@ -22,10 +22,32 @@ export interface Repository {
 }
 
 /**
- * A claim whose `found` was submitted and whose repository is not known yet: the register it went to, the digest of its signed
- * intent, from which the directory's seed is computed, and the handle it names. No part of it is a secret.
+ * One exact mutation envelope, kept before it leaves. A missing accepted fact
+ * means delivery is uncertain: retry these bytes, never a fresh signature.
  */
-export interface PendingClaim { register: ScopeId; intent: Digest; handle: string }
+export interface ClaimStep { signed: SignedIntent; accepted?: FactRef }
+/**
+ * Public authorization data, not signing keys. `found` is optional only to
+ * recognize older digest-only records: they cannot reconstruct their signature.
+ * Learned repository references and enrollment steps survive interrupted runs.
+ */
+export interface PendingClaim {
+  register: ScopeId; intent: Digest; handle: string;
+  found?: ClaimStep;
+  repository?: Repository;
+  seat?: ClaimStep;
+  firstKey?: ClaimStep;
+}
+
+/** A join keeps its secret-bearing envelope in private storage, never config. */
+export interface PendingJoin {
+  request: string;
+  intent: Digest;
+  link: Digest;
+  repository: Repository;
+  handle: string;
+  accepted?: FactRef;
+}
 
 /**
  * An install that `install --plan` prepared and `install --planned` has not founded yet: the signed `install` intent, the version
@@ -52,6 +74,8 @@ export interface Config {
   handle?: string;
   /** The repository's remote URL as a clone's credential answer gave it. It is no secret. */
   remote?: string;
+  /** Exact pending enrollment; retry the same invitation link to continue. */
+  join?: PendingJoin;
 }
 
 export interface Store {
@@ -61,13 +85,23 @@ export interface Store {
   secret(name: string): Promise<Uint8Array | null>;
   /** Keep a new secret under the name. A name that holds one already is refused: a key is never replaced. */
   keep(name: string, secret: Uint8Array): Promise<void>;
+  /** Owner-only opaque bytes, distinct from signing keys and public config. */
+  private(name: string): Promise<Uint8Array | null>;
+  /** Publish complete private bytes without replacing an existing record. */
+  keepPrivate(name: string, bytes: Uint8Array): Promise<void>;
 }
 
 /** A store in memory, for a test: each instance is one person's config directory. */
 export function memoryStore(): Store {
   let config: Config | null = null;
   const secrets = new Map<string, Uint8Array>();
+  const privateBytes = new Map<string, Uint8Array>();
   return {
+    private: async (name) => privateBytes.get(name)?.slice() ?? null,
+    keepPrivate: async (name, bytes) => {
+      if (privateBytes.has(name)) throw new Error(`a private record named ${name} exists already; it is not replaced`);
+      privateBytes.set(name, bytes.slice());
+    },
     config: async () => (config === null ? null : structuredClone(config)),
     save: async (next) => { config = structuredClone(next); },
     secret: async (name) => secrets.get(name) ?? null,

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
-import type { Digest, Item, OperationId, Read } from "@generalbusiness/artroom-contract";
-import { b64url, canonicalize, definitionDigest, textDigest, timeMs, timeOf, utf8 } from "@generalbusiness/artroom-bytes";
+import type { Digest, Item, OperationId, Read, Seed } from "@generalbusiness/artroom-contract";
+import { b64url, canonicalize, definitionDigest, scopeIdOf, textDigest, timeMs, timeOf, utf8 } from "@generalbusiness/artroom-bytes";
 import type { Fetch } from "@generalbusiness/artroom-client";
 import { repositoryName } from "@generalbusiness/artroom-platform";
 import { net } from "@generalbusiness/artroom-scope/testing";
@@ -149,6 +149,8 @@ async function story(): Promise<void> {
   const sealed = (await M.sealed())[seq]!;
   expect(added.lines).toEqual([`Took effect: entry ${M.name}:${seq}, hash ${sealed.hash.slice(0, 19)}.`]);
   expect((await M.item(seq)).values).toMatchObject({ handle: "@check", kind: "checker" });
+  // Let this accepted act's inbox creation settle before comparing the head around the next, refused act.
+  await settle(M, ...sealed.entry.sends.flatMap((send) => ("creator" in send.to ? [new Platform(scopeIdOf(send.to as Seed))] : [])));
 
   // act, refused: una opens an issue under a definition that the real rules scope has never activated, with its bytes beside the
   // act (`--value`). The scope refuses it by the guard's name, and writes nothing.
@@ -165,6 +167,12 @@ async function story(): Promise<void> {
   const named = await run(rita, "act", "add-member", "--on", "membership", "--set", "handle=no handle", "--set", "kind=checker");
   expect(named).toEqual({ code: 1, lines: [`Refused: bad-field (bad-handle), judged at entry ${M.name}:${atMembership.seq}. Nothing was written.`] });
   expect((await M.summary()).at).toEqual(atMembership);
+  // act, refused: the admin tries to add the checker handle already held by the member above. Membership refuses it by the
+  // guard's name, and writes nothing. This complete act tests a named judgment rather than missing definition bytes.
+  const beforeDuplicate = (await M.summary()).at;
+  const duplicate = await run(rita, "act", "add-member", "--on", "membership", "--set", "handle=@check", "--set", "kind=checker");
+  expect(duplicate).toEqual({ code: 1, lines: [`Refused: guard-failed (handle-in-use), judged at entry ${M.name}:${beforeDuplicate.seq}. Nothing was written.`] });
+  expect((await M.summary()).at).toEqual(beforeDuplicate);
 
   // log, show and verify with una's session: the command asks membership for one with her key.
   const head = (await M.summary()).at.seq;

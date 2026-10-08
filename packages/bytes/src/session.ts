@@ -10,9 +10,10 @@
  */
 
 import { SESSION_DOMAINS } from "@generalbusiness/artroom-contract";
-import type { ReadRequest, SessionRequest, SignedRead, SignedSessionRequest } from "@generalbusiness/artroom-contract";
+import type { Digest, ReadRequest, RetainedInput, SessionRequest, SignedRead, SignedSessionRequest } from "@generalbusiness/artroom-contract";
 import { canonicalBytes, utf8 } from "./canonical.ts";
 import { sign, verify } from "./sign.ts";
+import { digestBytes } from "./hash.ts";
 
 /** A tag, one newline byte, then the bytes. */
 export function taggedBytes(tag: string, bytes: Uint8Array): Uint8Array {
@@ -21,6 +22,11 @@ export function taggedBytes(tag: string, bytes: Uint8Array): Uint8Array {
   out.set(head, 0);
   out.set(bytes, head.length);
   return out;
+}
+
+/** A retained read's exact kind, digest and domain, under one fixed-width argument. */
+export function retainedReadArgument(kind: RetainedInput["kind"], digest: Digest, domain?: string): Digest {
+  return digestBytes(taggedBytes(SESSION_DOMAINS.readResource, canonicalBytes([kind, digest, domain ?? null])));
 }
 
 const requestBytes = (request: SessionRequest): Uint8Array => taggedBytes(SESSION_DOMAINS.request, canonicalBytes(request));

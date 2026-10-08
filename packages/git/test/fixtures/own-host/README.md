@@ -13,7 +13,7 @@ read token in an `Authorization: Bearer` header. No token is in these files.
   `0009done\n`, with no capabilities.
 - `upload-pack.bin`: `POST /git-upload-pack`, 200,
   `application/x-git-upload-pack-result`: `0008NAK\n`, then a raw pack of
-  2 objects (368 bytes including its 20-byte trailer), then a flush
+  2 objects (364 bytes including its 20-byte trailer), then a flush
   packet `0000`. The pack's trailer verifies once the trailing `0000` is
   left out; `git index-pack` accepts the trimmed pack. The read client
   counted the flush packet as pack bytes and refused `hash-mismatch: pack

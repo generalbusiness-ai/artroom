@@ -11,7 +11,7 @@
  * |---|---|---|
  * | `v` | 1 | The constant. |
  * | `deployment` | The deployment's name. | Its own configured name. |
- * | `membership` | The membership scope that issued it, with its incarnation. That is the repository. | The membership reference that the scope itself records: its scope ID and kind, and its incarnation where the scope records one. A membership scope: itself. |
+ * | `membership` | The membership scope that issued it, with its incarnation. That is the repository. | The membership reference that the scope itself records. A membership scope: itself. |
  * | `member`, `key` | The member, and the device key that signed the request. | Nothing: they say whose session it is. |
  * | `reads` | The reads that the member's role had when the session was issued. | The name of the read that is asked. |
  * | `ends` | The end time, at most 600 seconds after membership's reading at issue. Membership's clock wrote it. | The reading scope's own clock, at every read and before every send on a stream. Those are two clocks (W6; assumption H6). |
@@ -19,7 +19,9 @@
  * **How it is verified.** By HMAC-SHA-256 under the deployment's session
  * secret, over a domain tag and the exact claim bytes that were presented.
  * The MAC is compared in constant time, before the claims are parsed. A
- * scope checks a session with no call to membership. So a scope with the
+ * scope checks a session with no call to membership. A destination with no
+ * recorded incarnation first resolves its actual directory's confirmed
+ * membership reference, after local token, clock and read checks. So a scope with the
  * secret can also make a session: the secret is one boundary of trust for
  * every repository of the deployment (section 5.5).
  *
@@ -31,14 +33,7 @@
  * 3. The MAC, then the form of the claims: `forbidden`.
  * 4. The deployment, then the membership reference: `forbidden`. A token
  *    for one repository is refused by every scope of another, and by a
- *    scope that records no membership reference. A rules scope and a
- *    destination record membership's scope ID from their genesis (the
- *    directory's `create` names it), and its incarnation only once an
- *    entry retains an observation of it: until then the scope ID and the
- *    kind are compared, and from then on the incarnation too (the
- *    planner's decision ca8ad1cf). A session is minted under the
- *    deployment's secret by the membership scope it names, so a scope ID
- *    names one repository's membership.
+ *    scope that records no membership reference.
  * 5. The scope's clock reads earlier than its previous entry's time:
  *    `clock-behind`. Only an authentic session of this repository learns it.
  * 6. The reading is at or past `ends`: `forbidden`. A time at the bound is
@@ -64,10 +59,8 @@
  * stream.
  *
  * **What a session cannot do.** It signs nothing and controls nothing.
- * Nothing here takes a session as authority for an act. The one credential
- * it reads is a read token that its own key asked for by a signed
- * `read-token` act, once (the planner's decision for I5): the destination
- * judges that, by the session's key.
+ * It provides no authority for an act. A credential read is limited to the one-time
+ * read token requested by its own key; the outside port checks that handle.
  *
  * Nothing here logs, stores or returns the secret, and no refusal holds a
  * token or a part of one.
@@ -77,8 +70,8 @@ import { SESSION_DOMAINS } from "@generalbusiness/artroom-contract";
 import type { Head, ScopeRef, SessionAnswer, SessionClaims, SessionRefusal, SignedSessionRequest } from "@generalbusiness/artroom-contract";
 import { hex } from "@generalbusiness/artroom-bytes";
 import { b64url, canonicalBytes, canonicalize, hmacSha256, isKeyId, isMemberId, isSignature, parseStrict, taggedBytes, unb64url, utf8, verifySessionRequest } from "@generalbusiness/artroom-bytes";
-import { isObject, isScopeRef, observedOf, timeMs, timeOf, type RecordedRef, type ScopeState, type StateView } from "@generalbusiness/artroom-derive";
-import { isOf, standingOf } from "@generalbusiness/artroom-platform";
+import { isObject, isScopeRef, same, timeMs, timeOf, type RecordedRef, type ScopeState, type StateView } from "@generalbusiness/artroom-derive";
+import { platform, standingOf } from "@generalbusiness/artroom-platform";
 import type { Clock, ReadName, Readers } from "./ports.ts";
 
 // ---------------------------------------------------------------- the secret
@@ -111,20 +104,13 @@ export function sessionsOf(secret: unknown, deployment: unknown): Sessions | nul
 
 // ---------------------------------------------------------------- the token
 
-/**
- * The reads of the contract's section 9.1, which every session is given, and `credential`: the one-time read of a read token
- * that the session's own key asked for by `read-token` (the planner's decision for I5). The destination checks the key.
- */
+/** The member reads, including the one-time read-token credential requested by the session's own key. */
 const MEMBER_READS: readonly ReadName[] = ["summary", "items", "history", "entry", "outbox", "operations", "log", "retained", "credential"];
 /** The reads of the repository's admin page (section 12, G13 and G17). */
 const ADMIN_READS: readonly ReadName[] = ["incidents", "waiting"];
 const READ_NAMES: ReadonlySet<string> = new Set<string>([...MEMBER_READS, ...ADMIN_READS]);
-/**
- * The reads that a session makes of a register, whose membership is any that one of its claims created (`registerSession`): its
- * summary, every entry, and its retained inputs (the planner's decision ca8ad1cf). Items, the outbox and the operations are not
- * among them.
- */
-const REGISTER_READS: readonly ReadName[] = ["summary", "history", "entry", "log", "retained"];
+/** The reads that a session makes of a register, by the cause chain (`chainedSession`): its entries and the inputs they name. */
+const CHAINED_READS: readonly ReadName[] = ["history", "entry", "log", "retained"];
 
 /** How a token begins. A value in a URL that begins so is a credential in a URL. */
 const TOKEN_PREFIX = "ars1";
@@ -215,11 +201,30 @@ export interface SessionReading {
   clock: Clock;
   /** The scope's record: its reference, and the time of its previous entry. Null: it has no genesis. */
   scope(): ScopeState | null;
-  /**
-   * The membership scope that this scope records (authority note, section 3.3): its scope ID and kind, and its incarnation, or null
-   * where the scope records the ID alone. Null: it records none. A membership scope is not asked.
-   */
-  membership(scope: ScopeRef): RecordedRef | null;
+  /** The membership scope that this scope records, with its incarnation (authority note, section 3.3). Null: no full local reference yet. A membership scope is not asked. */
+  membership(scope: ScopeRef): ScopeRef | null;
+  /** Destination-only session preparation. `recorded` reads its local birth
+   * and membership ID. `resolve` reads only that birth's actual directory,
+   * whose confirmation records the full membership reference. */
+  membershipPreparation?: {
+    recorded(scope: ScopeRef): RecordedRef | null;
+    resolve(scope: ScopeRef, reader: string): Promise<ScopeRef | null>;
+  };
+}
+
+/** Authenticate locally before choosing a peer or inspecting its state. */
+function authenticatedSession(config: SessionReading, reader: unknown): { claims: SessionClaims; scope: ScopeState | null } | { refused: false | "sessions-unavailable" } {
+  const token = presented(reader);
+  if (token === null) return { refused: false };
+  const sessions = config.sessions();
+  if (!sessions) return { refused: "sessions-unavailable" };
+  const claims = openSession(sessions, token);
+  return claims && claims.deployment === sessions.deployment ? { claims, scope: config.scope() } : { refused: false };
+}
+function sessionClock(config: SessionReading, scope: ScopeState, claims: SessionClaims): false | "clock-behind" | null {
+  const [reading, previous, ends] = [timeMs(config.clock.read()), timeMs(scope.time), timeMs(claims.ends)];
+  if (reading === null || previous === null || reading < previous) return "clock-behind";
+  return ends === null || reading >= ends ? false : null;
 }
 
 /**
@@ -227,22 +232,16 @@ export interface SessionReading {
  * file. `claims`: the session is authentic, of this repository, and has not
  * ended on this scope's clock at this reading.
  */
-export function checkSession(config: SessionReading, reader: unknown, register = false): { claims: SessionClaims } | { refused: false | "sessions-unavailable" | "clock-behind" } {
-  const token = presented(reader);
-  if (token === null) return { refused: false };
-  const sessions = config.sessions();
-  if (!sessions) return { refused: "sessions-unavailable" };
-  const claims = openSession(sessions, token);
-  if (!claims || claims.deployment !== sessions.deployment) return { refused: false };
-  const scope = config.scope();
-  // A register records no membership: with `register`, it takes the token's, and the register asks whether one of its claims created it (`registerSession`).
-  const own: RecordedRef | null = !scope ? null : register ? (scope.at.kind === "register" ? claims.membership : null) : scope.at.kind === "membership" ? scope.at : config.membership(scope.at);
-  // A scope accepts a session only when the membership reference in the token is the scope's own: the scope ID and the kind, and the incarnation where the scope records one.
-  if (!scope || !own || !observedOf(claims.membership, own)) return { refused: false };
-  const [reading, previous, ends] = [timeMs(config.clock.read()), timeMs(scope.time), timeMs(claims.ends)];
-  // A clock that is behind judges no end time: the read is answered `clock-behind`, and no stream byte is sent (section 3.12, W6).
-  if (reading === null || previous === null || reading < previous) return { refused: "clock-behind" };
-  if (ends === null || reading >= ends) return { refused: false };
+export function checkSession(config: SessionReading, reader: unknown, chained = false): { claims: SessionClaims } | { refused: false | "sessions-unavailable" | "clock-behind" } {
+  const authentic = authenticatedSession(config, reader);
+  if (!("claims" in authentic)) return authentic;
+  const { claims, scope } = authentic;
+  // A register records no membership: with `chained`, it takes the token's, and reads by the cause chain (`chainedSession`).
+  const own = !scope ? null : chained ? (scope.at.kind === "register" ? claims.membership : null) : scope.at.kind === "membership" ? scope.at : config.membership(scope.at);
+  // A scope accepts a session only when the membership reference in the token is the scope's own: the scope ID and the incarnation.
+  if (!scope || !own || own.scope !== claims.membership.scope || own.inc !== claims.membership.inc || own.kind !== claims.membership.kind) return { refused: false };
+  const refused = sessionClock(config, scope, claims);
+  if (refused !== null) return { refused };
   return { claims };
 }
 
@@ -254,14 +253,43 @@ export function checkSession(config: SessionReading, reader: unknown, register =
  * read.
  */
 export function sessionReaders(config: SessionReading): Readers {
+  // This immutable birth reference belongs to this object life, not the
+  // authority ledger. No observation, token or grant is recorded here.
+  let resolved: { scope: ScopeRef; membership: ScopeRef } | null = null;
+  const membership = (scope: ScopeRef): ScopeRef | null => {
+    const fixed = config.membership(scope);
+    if (fixed) return fixed;
+    const recorded = config.membershipPreparation?.recorded(scope);
+    return resolved && recorded && same(resolved.scope, scope) && resolved.membership.scope === recorded.scope && resolved.membership.kind === recorded.kind && (recorded.inc === null || recorded.inc === resolved.membership.inc) ? resolved.membership : null;
+  };
+  const checking: SessionReading = { ...config, membership };
   return {
+    async prepare(reader, read) {
+      try {
+        const preparation = config.membershipPreparation;
+        if (!preparation) return;
+        const authentic = authenticatedSession(config, reader);
+        if (!("claims" in authentic) || !authentic.scope) return;
+        const { claims, scope } = authentic;
+        if (membership(scope.at)) return;
+        const recorded = preparation.recorded(scope.at);
+        if (!recorded || recorded.scope !== claims.membership.scope || recorded.kind !== claims.membership.kind || (recorded.inc !== null && recorded.inc !== claims.membership.inc) || sessionClock(config, scope, claims) !== null || !claims.reads.includes(read)) return;
+        // The native issuer always includes summary. Manually restricted
+        // history-only sessions conservatively cannot resolve this reference.
+        if (!claims.reads.includes("summary")) return;
+        const reference = await preparation.resolve(scope.at, reader as string);
+        const current = config.scope();
+        const after = current && same(current.at, scope.at) ? preparation.recorded(current.at) : null;
+        if (reference && isScopeRef(reference) && same(reference, claims.membership) && after?.scope === reference.scope && after.kind === reference.kind && (after.inc === null || after.inc === reference.inc)) resolved = { scope: scope.at, membership: reference };
+      } catch { /* A failed private read provides no session authority. */ }
+    },
     allows(reader, read) {
-      const checked = checkSession(config, reader);
+      const checked = checkSession(checking, reader);
       return "claims" in checked ? checked.claims.reads.includes(read) : checked.refused;
     },
-    register: (reader, read) => registerSession(config, reader, read),
+    chained: (reader, read) => chainedSession(checking, reader, read),
     holder(reader, read) {
-      const checked = checkSession(config, reader);
+      const checked = checkSession(checking, reader);
       return "claims" in checked ? (checked.claims.reads.includes(read) ? checked.claims.key : false) : checked.refused;
     },
   };
@@ -269,18 +297,18 @@ export function sessionReaders(config: SessionReading): Readers {
 
 /**
  * A session at a register, which records no membership (the planner's
- * decision ca8ad1cf). The order of `checkSession`, with the scope a
- * register in place of its membership reference, and then the read: one of
- * `REGISTER_READS` that the session holds. `membership`: the session reads
- * the register whole, its summary, every entry and its retained inputs,
- * if one of the register's claims caused the directory which created that
- * membership scope (`reads.ts`). There is no window: the session's own end
- * bounds it. The register finds that claim; nothing here reads an entry.
+ * decision on reads by the cause chain). The order of `checkSession`, with
+ * the scope a register in place of its membership reference, and then the
+ * read: one of `CHAINED_READS` that the session holds. `membership`: the
+ * session may read the register's genesis, the entries whose cause chain
+ * leads to the claim that caused the directory which created that
+ * membership scope, and the inputs they name (`reads.ts`). The register
+ * finds that claim; nothing here reads an entry.
  */
-export function registerSession(config: SessionReading, reader: unknown, read: ReadName): { membership: ScopeRef } | false | "sessions-unavailable" | "clock-behind" {
+export function chainedSession(config: SessionReading, reader: unknown, read: ReadName): { membership: ScopeRef } | false | "sessions-unavailable" | "clock-behind" {
   const checked = checkSession(config, reader, true);
   if (!("claims" in checked)) return checked.refused;
-  return REGISTER_READS.includes(read) && checked.claims.reads.includes(read) ? { membership: checked.claims.membership } : false;
+  return CHAINED_READS.includes(read) && checked.claims.reads.includes(read) ? { membership: checked.claims.membership } : false;
 }
 
 // ---------------------------------------------------------------- membership issues a session
@@ -329,7 +357,7 @@ export function issueSession(
   const { to, actor, notAfter } = asked.request;
   const scope = state.scope();
   // A provisional membership answers no session (section 12.1.3).
-  if (!scope || scope.status !== "active" || scope.at.kind !== "membership" || !isOf(pinned?.named, "platform:membership")) return no("not-found");
+  if (!scope || scope.status !== "active" || scope.at.kind !== "membership" || !(pinned && (pinned.named === "platform:membership@1" || pinned.named === "platform:membership@2") && platform(pinned.named))) return no("not-found");
   if (to.scope !== scope.at.scope || to.inc !== scope.at.inc || to.kind !== scope.at.kind) return no("misaddressed");
   const [reading, previous, ends] = [timeMs(config.clock.read()), timeMs(scope.time), timeMs(notAfter)!];
   if (reading === null || previous === null || reading < previous) return no("clock-behind");

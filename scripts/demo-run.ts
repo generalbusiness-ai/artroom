@@ -1,7 +1,7 @@
-#!/usr/bin/env -S node --experimental-transform-types --no-warnings
+#!/usr/bin/env -S node --import tsx --no-warnings
 // The demo runner: a rehearsal of the demo script's middle against a deployment, with a transcript.
 //
-//   node --experimental-transform-types --no-warnings scripts/demo-run.ts <base-url> --host <git-host> --namespace <name> \
+//   node --import tsx --no-warnings scripts/demo-run.ts <base-url> --host <git-host> --namespace <name> \
 //     --scratch <empty directory> --out <directory> [--name <room>] [--setting-set]
 //
 // It runs the shots of `scripts/demo/rehearse.ts` in order, as the command line's own functions, each as its person: the founder,
@@ -19,8 +19,9 @@ import { join, resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { fileStore } from "../packages/cli/src/files.ts";
 import { nodeGit } from "../packages/cli/src/git.ts";
-import type { Outcome } from "../packages/cli/src/commands.ts";
+import type { Context, Outcome } from "../packages/cli/src/commands.ts";
 import { FILES, rehearse, transcript, type Person, type Stage, type Taken } from "./demo/rehearse.ts";
+import { keepCaptureObservations, observeCaptures } from "./demo/capture-context.ts";
 
 const USAGE = "Usage: scripts/demo-run.ts <base-url> --host <git-host> --namespace <name> --scratch <empty directory> --out <directory> [--name <room>] [--setting-set]";
 
@@ -81,9 +82,10 @@ async function main(argv: readonly string[]): Promise<number> {
 
   const read = async (path: string): Promise<Uint8Array | null> => { try { return new Uint8Array(await readFile(join(work, path))); } catch { return null; } };
   const started = new Date().toISOString();
+  const people: Partial<Record<Person, Context>> = {};
   const stage: Stage = {
     service: given.service, host: given.host, namespace: given.namespace, name: given.name,
-    person: (who: Person) => ({ store: fileStore(join(given.scratch, who)), git: nodeGit(), read }),
+    person: (who: Person) => (people[who] = { store: fileStore(join(given.scratch, who)), git: nodeGit(), read }),
     pin: async (register) => {
       if (given.settingSet) return `The operator's setting: --setting-set was given, so the runner did not wait for registerScope ${register}.`;
       process.stdout.write(`\nSet registerScope to ${register} in the Git host's setting (docs/deploy.md), then press Enter.\n`);
@@ -108,6 +110,10 @@ async function main(argv: readonly string[]): Promise<number> {
   const how = `Run by scripts/demo-run.ts under Node ${process.version}, room ${given.name}, config directories under ${given.scratch}.`;
   writeFileSync(join(given.out, "transcript.md"), transcript(rehearsal, { service: given.service, host: given.host, namespace: given.namespace, started, how }));
   writeFileSync(join(given.out, "room.json"), `${JSON.stringify({ ...rehearsal.room, name: given.name, homes: { founder: join(given.scratch, "founder"), member: join(given.scratch, "member"), maintainer: join(given.scratch, "maintainer") } }, null, 2)}\n`);
+  if (rehearsal.ok) {
+    const births = await observeCaptures(people.founder!, rehearsal.room);
+    for (const who of ["founder", "member", "maintainer"] as const) await keepCaptureObservations(join(given.scratch, who), people[who]!, rehearsal.room, births);
+  }
   const failed = rehearsal.shots.filter((shot) => !shot.match).map((shot) => shot.n);
   process.stdout.write(`\n${rehearsal.ok ? `All ${rehearsal.shots.length} shots as the script expects.` : `Not as the script expects: shots ${failed.join(", ")}.`} Transcript: ${join(given.out, "transcript.md")}\n`);
   return rehearsal.ok ? 0 : 1;

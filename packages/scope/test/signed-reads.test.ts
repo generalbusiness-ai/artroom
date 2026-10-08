@@ -1,14 +1,17 @@
 import { describe, expect, test } from "vitest";
+import { env, runInDurableObject } from "cloudflare:test";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { Entry, FactRef, Intent, OperationId, ReadRequest, ScopeId, ScopeRef, Sealed, Seed, SignedReadName } from "@generalbusiness/artroom-contract";
-import { b64url, canonicalBytes, entryHash, intentDigest, scopeIdOf, seedDigest, signIntent, signRead } from "@generalbusiness/artroom-bytes";
+import type { Digest, Entry, FactRef, Intent, OperationId, ReadRequest, ScopeId, ScopeRef, Sealed, Seed, SignedReadName } from "@generalbusiness/artroom-contract";
+import { b64url, canonicalBytes, entryHash, intentDigest, retainedReadArgument, scopeIdOf, seedDigest, signIntent, signRead } from "@generalbusiness/artroom-bytes";
 import { requestSession, secretSigner, sessionRequest, signedLogReader, signedReader, type Fetch } from "@generalbusiness/artroom-client";
 import { timeMs, timeOf, useOf } from "@generalbusiness/artroom-derive";
 import { d, keys, otherLane, t, type Actor } from "@generalbusiness/artroom-derive/testing";
 import { DIRECTORY, REGISTER, platform, repositoryName } from "@generalbusiness/artroom-platform";
 import { httpSource, verify } from "@generalbusiness/artroom-replay";
+import { CHAIN_STEPS, Chains, rootOf } from "../src/signed-reads.ts";
+import { SqliteStore } from "../src/sqlite.ts";
+import { namespace } from "../src/namespace.ts";
 import { mintSession, openSession, sessionsOf } from "../src/sessions.ts";
-import { CHAIN_STEPS, rootOf } from "../src/signed-reads.ts";
 import { net } from "../src/testing.ts";
 import { soon } from "./net.ts";
 import { outsideOf, wired } from "./outside.ts";
@@ -112,13 +115,12 @@ async function seated(M: Platform, who: Actor, operation: string): Promise<strin
 const signed = (who: Actor, scope: ScopeId, read: SignedReadName, arg: string) => signedReader(secretSigner(who.secret), scope, read, arg, { now: () => Date.parse(net.clock.now) });
 const seqs = (body: { value?: unknown }) => (body.value as readonly Sealed[]).map((sealed) => sealed.entry.seq);
 
-// Invariant: with no session, a scope answers a signed read only to a key that signed one of its entries within the intent window.
-// A register answers such a key whole: its summary and every entry (the planner's decision ca8ad1cf). Every other read, scope, key
-// and time is `forbidden`.
+// Invariant: a recent local signer reads the register's whole history and its carried inputs.
+// Other scopes retain the bounded causal-entry policy; mismatched requests and strangers are forbidden.
 // Each scope here is a real register in the namespace `PLATFORM`, under the deployed class's readers: the real read sessions,
 // under a TEST SECRET. No Git host is wired: the claim's creation is recorded and nothing is sent.
-describe("signed reads on real registers (the planner's decisions 61cc5e50, c6499e91 and 70a0680e)", () => {
-  test("the install's key reads the register's summary and every entry with no session, the founder's claim among them, and so does the claim's key; every other read, another scope and a key that signed nothing are forbidden; the replay by the install's key is consistent", async () => {
+describe("signed reads on real registers (the planner's decisions 61cc5e50, c6499e91, 70a0680e and ca8ad1cf)", () => {
+  test("recent install and claim signers read the whole register history with no session; other reads, scopes and strangers are forbidden", async () => {
     net.hold = net.deaf = null;
     const R = await installed(paul);
     const found = await R.intent(rita, "found", { expected: await R.expected({ register: 0 }), fields: { branch: "main", founderHandle: "@rita", recoveryKey: keys.sam.key } });
@@ -126,15 +128,16 @@ describe("signed reads on real registers (the planner's decisions 61cc5e50, c649
 
     // Control: the same reads with no header at all are forbidden, as the deployed class answers a reader with no session.
     expect([(await get(R.name)).status, (await get(`${R.name}/history`)).status]).toEqual([403, 403]);
-    // The install's key: the summary, and a history that holds every entry, the claim that rita signed among them.
+    // The recent install signer reads the whole register, including another key's claim.
     const summary = await get(R.name, await signed(paul, R.name, "summary", "summary"));
     expect([summary.status, (summary.body.value as { scope: { kind: string } }).scope.kind]).toEqual([200, "register"]);
-    const all = await get(`${R.name}/history`, await signed(paul, R.name, "history", "0"));
-    expect([all.status, seqs(all.body)]).toEqual([200, [0, 1]]);
-    // The founder's claim key reads the same whole history; each key reads the entry the other signed.
+    const mine = await get(`${R.name}/history`, await signed(paul, R.name, "history", "0"));
+    expect([mine.status, seqs(mine.body)]).toEqual([200, [0, 1]]);
+    expect((await get(`${R.name}/entries/0`, await signed(paul, R.name, "entry", "0"))).status).toBe(200);
+    // The recent claim signer has the same whole-history authority.
     const claims = await get(`${R.name}/history`, await signed(rita, R.name, "history", "0"));
     expect([claims.status, seqs(claims.body)]).toEqual([200, [0, 1]]);
-    expect([(await get(`${R.name}/entries/0`, await signed(rita, R.name, "entry", "0"))).status, (await get(`${R.name}/entries/1`, await signed(paul, R.name, "entry", "1"))).status]).toEqual([200, 200]);
+    expect([(await get(`${R.name}/entries/1`, await signed(rita, R.name, "entry", "1"))).status, (await get(`${R.name}/entries/1`, await signed(paul, R.name, "entry", "1"))).status]).toEqual([200, 200]);
 
     // Every other read, and a read under a signature of another read or argument, is forbidden.
     expect([
@@ -154,7 +157,7 @@ describe("signed reads on real registers (the planner's decisions 61cc5e50, c649
     const forged = signRead({ v: 1, to: R.name, actor: paul.key, read: "summary", arg: "summary", notAfter: soon(60) }, vic.secret);
     expect((await get(R.name, `Signed ${b64url(canonicalBytes(forged))}`)).status).toBe(403);
 
-    // Replay over the log by a signed read: the install's key reads the whole history, and the verifier folds it to its head.
+    // Whole register replay by the install signer is contiguous through its head.
     platformNet.sessions = true;
     platformNet.secret = b64url(new Uint8Array(32).fill(9));
     try {
@@ -190,6 +193,28 @@ describe("signed reads on real registers (the planner's decisions 61cc5e50, c649
     const { D, children } = await founded(PROPOSED_BOUNDS.dispatchRetrySeconds);
     const [M, Ru, G] = children as [Platform, Platform, Platform];
     expect(await Promise.all(children.map(async (node) => (await node.summary()).value.scope.kind))).toEqual(["membership", "rules", "destination"]);
+    // A cold child needs an ancestor from the real namespace to find its
+    // root. Invalid requests must fail before making any resolver call.
+    const calls: FactRef[] = [];
+    const resolver = namespace(env.PLATFORM).resolver;
+    wired.set(M.name, () => ({ transport: null, resolver: { read: (fact, seconds) => { calls.push(fact); return resolver.read(fact, seconds); } } }));
+    await M.restart();
+    const request: ReadRequest = { v: 1, to: M.name, actor: rita.key, read: "summary", arg: "summary", notAfter: soon(60) };
+    const header = (request: ReadRequest, secret = rita.secret) => `Signed ${b64url(canonicalBytes(signRead(request, secret)))}`;
+    expect([
+      (await get(M.name, "Signed not-a-read")).status,
+      (await get(M.name, header(request, paul.secret))).status,
+      (await get(M.name, header({ ...request, to: D.name }))).status,
+      (await get(`${M.name}/entries/0`, header({ ...request, read: "entry", arg: "1" }))).status,
+      (await get(M.name, header({ ...request, notAfter: net.clock.now }))).status,
+      (await get(M.name, header({ ...request, notAfter: soon(PROPOSED_BOUNDS.intentLifetimeSeconds + 1) }))).status,
+      calls,
+    ]).toEqual([403, 403, 403, 403, 403, 403, []]);
+    const now = net.clock.now;
+    try {
+      net.clock.now = timeOf(timeMs(now)! - 1000);
+      expect([(await get(M.name, await signed(rita, M.name, "summary", "summary"))).status, calls]).toEqual([503, []]);
+    } finally { net.clock.now = now; }
     // For each of the four scopes: the summary, the genesis, and a history that holds every entry, each of whose chains leads to the claim.
     const reads = async (who: Actor, node: Platform) => {
       const history = await get(`${node.name}/history`, await signed(who, node.name, "history", "0"));
@@ -198,8 +223,15 @@ describe("signed reads on real registers (the planner's decisions 61cc5e50, c649
     const all = await Promise.all([D, M, Ru, G].map(async (node) => (await node.entries()).map((entry) => entry.seq)));
     expect(await Promise.all([D, M, Ru, G].map((node) => reads(rita, node)))).toEqual(all.map((seqs) => [200, 200, 200, seqs]));
     expect(all.every((seqs) => seqs.length > 1)).toBe(true);
+    expect(calls.length).toBeGreaterThan(0); // positive control: the valid chain read reaches the real ancestor
     // Control: the same reads with no header, and by the install's key, are forbidden.
     expect(await Promise.all([D, M, Ru, G].map(async (node) => [(await get(node.name)).status, ...(await reads(paul, node))]))).toEqual([D, M, Ru, G].map(() => [403, 403, 403, 403, null]));
+    // A recent local signer needs no chain, even after restart. Keep the
+    // child's dispatcher off so only read authorization can call resolver.
+    expect(await M.act(rita, "seat", { expected: await M.expected({ roster: 0 }) })).toMatchObject({ answer: "accepted" });
+    await M.restart();
+    calls.length = 0;
+    expect([(await get(M.name, await signed(rita, M.name, "summary", "summary"))).status, calls]).toEqual([200, []]);
   });
 
   test("the window of a read by the cause chain is measured at the root entry: the claim, not the genesis that the claim caused", async () => {
@@ -218,12 +250,10 @@ describe("signed reads on real registers (the planner's decisions 61cc5e50, c649
     expect(await both()).toEqual([403, 403]);
   });
 
-  // Invariant: at a register, every key that signed an entry within the window reads every entry and every retained input, so
-  // co-founders read each other's claims. At any other scope a key reads, by signed read, an entry whose cause chain leads within
-  // four causes to an entry it signed, within the window at that entry, and the retained inputs that such an entry names; every
-  // other entry and input is forbidden. On real scopes: a register with two founders, rita and vic, each of whom claims; the
-  // STAND-IN Git host confirms each creation.
-  test("after two claims, the install's key and each claim's key read every entry of the register and every input it retains; at the directory, the claim's key reads the retained inputs of its genesis and the other founder's key is refused them; the replay of the directory over these reads is consistent", async () => {
+  // Invariant: recent register signers read every claim and its actual
+  // carried inputs. Child scopes retain causal restrictions. Real scopes
+  // with two founders; only the Git creation replies are stand-ins.
+  test("multiple cofounders and the install signer read every claim and carried input of the register; register and own-directory replay are contiguous and consistent", async () => {
     net.hold = net.deaf = null;
     const R = await installed(paul, (name) => wired.set(name, () => ({ outside: outsideOf(name) })), [rita, vic]);
     const { D } = await claimedBy(R, rita, "@rita");
@@ -232,18 +262,23 @@ describe("signed reads on real registers (the planner's decisions 61cc5e50, c649
     // The register's history: the install, rita's claim, its outcome and the record of her directory; then the same three of vic's.
     expect(entries.map((entry) => entry.input.type)).toEqual(["genesis", "act", "outcome", "delivery", "act", "outcome", "delivery"]);
     const history = async (who: Actor, node: Platform) => seqs((await get(`${node.name}/history`, await signed(who, node.name, "history", "0"))).body);
-    const whole = [0, 1, 2, 3, 4, 5, 6];
-    expect([await history(rita, R), await history(vic, R), await history(paul, R)]).toEqual([whole, whole, whole]);
+    expect([await history(rita, R), await history(vic, R), await history(paul, R)]).toEqual(Array.from({ length: 3 }, () => [0, 1, 2, 3, 4, 5, 6]));
     const entry = async (who: Actor, seq: number) => (await get(`${R.name}/entries/${seq}`, await signed(who, R.name, "entry", String(seq)))).status;
     expect([await entry(rita, 2), await entry(vic, 2), await entry(paul, 2), await entry(vic, 5), await entry(rita, 5)]).toEqual([200, 200, 200, 200, 200]);
-    // Control: a key that signed no entry of the register reads none of it.
-    expect([(await get(`${R.name}/history`, await signed(keys.sam, R.name, "history", "0"))).status, await entry(keys.sam, 2)]).toEqual([403, 403]);
 
     // Retained inputs: the register's record of each directory retains that directory's genesis, and rita's directory's genesis
-    // retains her claim and its outcome. At the register each key reads both; at the directory, the key whose chain leads there.
-    const retained = async (who: Actor, node: Platform, digest: string) => (await get(`${node.name}/retained/entry/${encodeURIComponent(digest)}`, await signed(who, node.name, "retained", digest))).status;
+    // retains her claim and its outcome. Register cofounders read both claim
+    // inputs, while authority over the separate directories stays causal.
+    const retained = async (who: Actor, node: Platform, digest: string) => (await get(`${node.name}/retained/entry/${encodeURIComponent(digest)}`, await signed(who, node.name, "retained", retainedReadArgument("entry", digest as Digest)))).status;
     const [ritas, vics] = [entries[3]!.uses[0]!.content, entries[6]!.uses[0]!.content];
-    expect([await retained(rita, R, ritas), await retained(vic, R, ritas), await retained(paul, R, ritas), await retained(rita, R, vics), await retained(keys.sam, R, ritas)]).toEqual([200, 200, 200, 200, 403]);
+    expect([await retained(rita, R, ritas), await retained(vic, R, ritas), await retained(paul, R, ritas), await retained(vic, R, vics)]).toEqual([200, 200, 200, 200]);
+    const resourceHeader = await signed(rita, R.name, "retained", retainedReadArgument("entry", ritas));
+    expect([
+      (await get(`${R.name}/retained/entry/${encodeURIComponent(ritas)}`, resourceHeader)).status,
+      (await get(`${R.name}/retained/value/${encodeURIComponent(ritas)}?domain=other`, resourceHeader)).status,
+      (await get(`${R.name}/retained/entry/${encodeURIComponent(ritas)}?domain=other`, resourceHeader)).status,
+      (await get(`${R.name}/retained/entry/${encodeURIComponent(ritas)}`, await signed(rita, R.name, "retained", ritas))).status,
+    ]).toEqual([200, 403, 403, 403]);
     const genesis = (await D.entries())[0]!;
     expect(genesis.uses.map((use) => use.fact.seq).sort()).toEqual([1, 2]);
     expect(await Promise.all(genesis.uses.map((use) => retained(rita, D, use.content)))).toEqual([200, 200]);
@@ -257,40 +292,93 @@ describe("signed reads on real registers (the planner's decisions 61cc5e50, c649
     try {
       const { report, why } = await verify(httpSource(SERVICE, { fetch: routed, reader: signedLogReader(secretSigner(rita.secret), { now: () => Date.parse(net.clock.now) }) }), { mode: "replay", scope: D.name, platform, grants: "proven" });
       expect([report.result, why]).toEqual(["consistent", null]);
+      // Whole register access does not grant another directory's history.
+      // Anchor exactly the foreign genesis facts this fixture has observed;
+      // replay states that trust separately from its contiguous local coverage.
+      const unanchored = await verify(httpSource(SERVICE, { fetch: routed, reader: signedLogReader(secretSigner(vic.secret), { now: () => Date.parse(net.clock.now) }) }), { mode: "replay", scope: R.name, platform, grants: "proven" });
+      expect([unanchored.report.result, unanchored.report.coverage.map((c) => [c.scope.scope, c.from, c.through]), unanchored.why]).toEqual(["missing-dependency", [[R.name, 0, 2]], `the history of the source scope ${D.name} cannot be read, and no anchor names its entry 0`]);
+      const anchors = [entries[3]!, entries[6]!].flatMap((entry) => entry.uses.map((use) => ({ scope: use.fact.at.scope, seq: use.fact.seq, hash: use.fact.hash })));
+      const register = await verify(httpSource(SERVICE, { fetch: routed, reader: signedLogReader(secretSigner(vic.secret), { now: () => Date.parse(net.clock.now) }) }), { mode: "replay", scope: R.name, platform, grants: "proven", anchors });
+      expect([register.report.result, register.report.coverage.map((c) => [c.scope.scope, c.from, c.through]), register.why]).toEqual(["consistent", [[R.name, 0, 6]], null]);
     } finally {
       platformNet.sessions = false;
       platformNet.secret = null;
     }
   });
 
-  // Invariant: a session of a membership scope that one of a register's claims created reads that register whole: its summary,
-  // every entry, the other founders' claims among them, and every input it retains, with no window but the session's end
-  // (decision ca8ad1cf). A session of a membership that no claim of the register created reads nothing there.
-  test("a session of the founded membership reads the register's summary, every entry, another founder's claim among them, and every retained input; not its items; a session of a room founded on another register reads nothing there, and with no session nothing", async () => {
+  // A foreign send's signer qualifies by the delivery's root, even with no
+  // local signed entry or genesis-root authority in the receiving directory.
+  // Real platform rules/scopes; only the Git creation reply is a stand-in.
+  test("a foreign recovery-key send gives its signer the directory delivery and typed retained source, while unrelated readers and scope summary remain forbidden; unavailable old roots do not block independent local roots", async () => {
+    net.hold = net.deaf = null;
+    const R = await installed(paul, (name) => wired.set(name, () => ({ outside: outsideOf(name) })));
+    const { D, children } = await claimedBy(R, rita, "@rita");
+    const M = children[0]!;
+    const seat = await M.did(rita, "seat", { expected: await M.expected({ roster: 0 }) });
+    const key = await M.did(rita, "first-key", { fields: { member: seat }, expected: await M.expected({ roster: 0, member: seat }) });
+    // Real local rows are resolved even when the ancestry reader scripts an
+    // unavailable answer. Resolved rows are not looked up on the next update.
+    const independent = await runInDurableObject(M.object, async (_instance, state) => {
+      const store = new SqliteStore({ exec: (q, ...args) => state.storage.sql.exec(q, ...args), transaction: (f) => state.storage.transactionSync(f) });
+      const looked: number[] = [];
+      const chains = new Chains({ scope: () => store.scope(), stored: (seq) => { looked.push(seq); return store.stored(seq); } }, async () => null);
+      await chains.update();
+      const root = chains.at(key);
+      looked.length = 0;
+      await chains.update();
+      return { unavailable: chains.at(0) === undefined, root, revisited: looked.includes(key) };
+    });
+    expect(independent).toMatchObject({ unavailable: true, root: { actor: rita.key, scope: M.name, seq: key }, revisited: false });
+    const I = await M.created(seat);
+    await settle(M, I);
+    const inboxRecord = (await M.entries()).find((entry) => entry.input.type === "delivery" && entry.input.from.at.scope === I.name)!;
+    const unrelated = inboxRecord.uses.find((use) => use.fact.at.scope === I.name)!.content;
+    const revoked = await M.did(keys.sam, "revoke-key", { idempotencyKey: unrelated, on: key, fields: { as: "compromised" }, expected: await M.expected({ on: key, roster: 0, member: seat }) });
+    await settle(M, D);
+    const delivery = (await D.entries()).find((entry) => entry.input.type === "delivery" && entry.input.from.at.scope === M.name && entry.input.from.seq === revoked)!;
+    expect(delivery.input.type).toBe("delivery");
+    const read = async (who: Actor) => get(`${D.name}/entries/${delivery.seq}`, await signed(who, D.name, "entry", String(delivery.seq)));
+    expect([(await read(keys.sam)).status, (await read(vic)).status, (await get(D.name, await signed(keys.sam, D.name, "summary", "summary"))).status, (await get(`${D.name}/entries/0`, await signed(keys.sam, D.name, "entry", "0"))).status]).toEqual([200, 403, 403, 403]);
+    const kept = delivery.uses.find((use) => use.fact.at.scope === M.name && use.fact.seq === revoked)!.content;
+    expect((await get(`${D.name}/retained/entry/${encodeURIComponent(kept)}`, await signed(keys.sam, D.name, "retained", retainedReadArgument("entry", kept)))).status).toBe(200);
+    // Sam's valid entry names the known inbox digest only as ordinary
+    // idempotency text. It grants no authority over Rita's retained input.
+    expect((await get(`${M.name}/retained/entry/${encodeURIComponent(unrelated)}`, await signed(keys.sam, M.name, "retained", retainedReadArgument("entry", unrelated)))).status).toBe(403);
+    const acknowledgement = (await D.entries()).find((entry) => entry.input.type === "delivery" && entry.input.message.class === "result" && entry.input.message.of.from.at.scope === D.name && entry.input.message.of.from.seq === delivery.seq)!;
+    const history = await get(`${D.name}/history`, await signed(keys.sam, D.name, "history", "0"));
+    expect([history.status, seqs(history.body)]).toEqual([200, [delivery.seq, acknowledgement.seq]]);
+    expect((await get(`${D.name}/history`, await signed(vic, D.name, "history", "0"))).status).toBe(403);
+  });
+
+  // Invariant: a created membership's authenticated session reads the whole
+  // register history and carried inputs without a signed-entry window.
+  test("a created membership session reads every founder's claim and carried inputs after the signed-entry window, while register summary/items remain forbidden", async () => {
     net.hold = net.deaf = null;
     const R = await installed(paul, (name) => wired.set(name, () => ({ outside: outsideOf(name) })), [rita, vic]);
     const { children } = await claimedBy(R, rita, "@rita");
     await claimedBy(R, vic, "@vic");
-    // Another register, founded by sam, with a room of its own.
-    const S = await installed(paul, (name) => wired.set(name, () => ({ outside: outsideOf(name) })), [keys.sam]);
-    const { children: elsewhere } = await claimedBy(S, keys.sam, "@sam");
-    const entries = await R.entries();
+    const M = children[0]!;
+    // Rita takes her seat and her first key, and asks membership for a session, under a TEST SECRET.
+    const seat = await M.did(rita, "seat", { expected: await M.expected({ roster: 0 }) });
+    await M.did(rita, "first-key", { fields: { member: seat }, expected: await M.expected({ roster: 0, member: seat }) });
+    const [at, entries] = [await M.at(), await R.entries()];
+    net.clock.now = soon(PROPOSED_BOUNDS.intentLifetimeSeconds + 1);
+    expect((await get(`${R.name}/history`, await signed(rita, R.name, "history", "0"))).status).toBe(403);
     platformNet.sessions = true;
     platformNet.secret = b64url(new Uint8Array(32).fill(9));
     try {
-      const session = await seated(children[0]!, rita, "chained");
-      const other = await seated(elsewhere[0]!, keys.sam, "elsewhere");
-      const read = async (path: string, as: string | null = session, node: Platform = R) => {
-        const response = await routed(`${SERVICE}/v1/scopes/${node.name}${path}`, as === null ? {} : { headers: { authorization: as } });
+      const issued = await requestSession(SERVICE, M.name, sessionRequest(at, rita.secret, soon(60), "chained"), { fetch: routed as unknown as Fetch });
+      if (!issued.ok) throw new Error(`no session: ${issued.reason}`);
+      const session = issued.session.reader();
+      const read = async (path: string, as: string | null = session) => {
+        const response = await routed(`${SERVICE}/v1/scopes/${R.name}${path}`, as === null ? {} : { headers: { authorization: as } });
         return { status: response.status, body: await response.json() as { value?: unknown } };
       };
       const history = await read("/history");
       expect([history.status, seqs(history.body)]).toEqual([200, [0, 1, 2, 3, 4, 5, 6]]);
-      expect([(await read("")).status, (await read("/entries/2")).status, (await read("/entries/5")).status, (await read(`/retained/entry/${encodeURIComponent(entries[3]!.uses[0]!.content)}`)).status, (await read(`/retained/entry/${encodeURIComponent(entries[6]!.uses[0]!.content)}`)).status]).toEqual([200, 200, 200, 200, 200]);
-      // The register's items are no read of a register's session: forbidden. With no session, the history is forbidden too.
-      expect([(await read("/items/claim")).status, (await read("/history", null)).status]).toEqual([403, 403]);
-      // Sam's session reads his own register, and none of this one: no claim of R created his membership.
-      expect([(await read("/history", other, S)).status, (await read("/history", other)).status, (await read("", other)).status, (await read("/entries/2", other)).status]).toEqual([200, 403, 403, 403]);
+      expect([(await read("/entries/2")).status, (await read("/entries/5")).status, (await read(`/retained/entry/${encodeURIComponent(entries[3]!.uses[0]!.content)}`)).status, (await read(`/retained/entry/${encodeURIComponent(entries[6]!.uses[0]!.content)}`)).status]).toEqual([200, 200, 200, 200]);
+      // The register's summary and its items are no entries: forbidden. With no session, the history is forbidden too.
+      expect([(await read("")).status, (await read("/items/claim")).status, (await read("/history", null)).status]).toEqual([403, 403, 403]);
     } finally {
       platformNet.sessions = false;
       platformNet.secret = null;
@@ -299,7 +387,7 @@ describe("signed reads on real registers (the planner's decisions 61cc5e50, c649
 
   // Invariant: a session of a room's membership reads that room's destination, rules scope and directory whole, as membership itself:
   // the summary, the items, every entry, those that no member signed among them, and the retained inputs (decision ca8ad1cf). The
-  // scope knows its membership from its genesis, before any entry retains an observation of it. A session of another room's
+  // scope resolves its exact membership incarnation from its actual directory before any retained observation. A session of another room's
   // membership reads none of it, and a key with no session keeps the signed-read rule.
   // On real scopes: two rooms founded on one register, with the STAND-IN Git host of `outside.ts` for the register and for rita's
   // destination's founding publication (`publication.ts`).
@@ -342,18 +430,20 @@ describe("signed reads on real registers (the planner's decisions 61cc5e50, c649
       }
       // Vic's session is of another room: refused at each of rita's scopes, and it reads its own destination.
       expect([(await read(G, "/history", theirs)).status, (await read(G, "", theirs)).status, (await read(Ru, "", theirs)).status, (await read(D, "", theirs)).status, (await read(vics[2]!, "/history", theirs)).status]).toEqual([403, 403, 403, 403, 200]);
-      // Where a scope records membership's incarnation, a session must name it; where it records the ID alone, the ID and the kind
-      // are compared. A session minted under the TEST SECRET with the same claims and another incarnation: refused at the directory,
-      // which recorded the incarnation it confirmed, and read at the destination, whose entries retain no observation of membership.
+      // The birth resolution requires the full confirmed membership incarnation even before a local observation.
       const sessions = sessionsOf(platformNet.secret, TEST_DEPLOYMENT)!;
       const claims = openSession(sessions, session.slice("Session ".length))!;
       const another = `Session ${mintSession(sessions, { ...claims, membership: { ...claims.membership, inc: `in_${claims.membership.inc[3] === "a" ? "b" : "a"}${claims.membership.inc.slice(4)}` as never } })}`;
-      expect([(await read(D, "", another)).status, (await read(G, "", another)).status]).toEqual([403, 200]);
+      expect([(await read(D, "", another)).status, (await read(G, "", another)).status]).toEqual([403, 403]);
       // Rita's key with no session keeps the signed-read rule: past the window of her claim she reads nothing of the destination,
       // and her session still reads it whole.
       net.clock.now = timeOf(timeMs(claimed)! + (PROPOSED_BOUNDS.intentLifetimeSeconds + 60) * 1000);
       const late = await seated(M, rita, "late");
-      expect([(await get(`${G.name}/history`, await signed(rita, G.name, "history", "0"))).status, (await read(G, "/history", late)).status]).toEqual([403, 200]);
+      let signedStatus: number;
+      const savedSessions = platformNet.sessions, savedSecret = platformNet.secret;
+      try { signedStatus = (await get(`${G.name}/history`, await signed(rita, G.name, "history", "0"))).status; }
+      finally { platformNet.sessions = savedSessions; platformNet.secret = savedSecret; }
+      expect([signedStatus, (await read(G, "/history", late)).status]).toEqual([403, 200]);
     } finally {
       platformNet.sessions = false;
       platformNet.secret = null;

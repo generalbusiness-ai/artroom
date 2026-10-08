@@ -9,7 +9,7 @@
  * | The definitions | `issue` and `change` of this package. The office creates each lane by its pinned digest, and each lane's handle is checked against the same pin. Real. |
  * | The lanes | Real scopes, written through the turn, the store and the dispatchers of the scope package. |
  * | The acts | Signed by the client's declared handle, and sent to the scope service's own operations. An office is founded over the Worker's HTTP routes, and `over` sends one act over them. |
- * | The office | A made-up directory definition that creates the lanes. A test fixture: the real directory of the platform package creates no lane yet: its guard on an active definition reads an observation of the rules scope, which no runtime reads before a turn. |
+ * | The office | A made-up directory definition that creates the lanes. A test fixture. The separate `room.ts` fixture uses the real platform directory, which creates lanes after the runtime reads its declared active-definition observations from the real rules scope. |
  * | The members | The key set of derive's fixtures. Test keys. |
  * | Authority | The scope package's test authority: every presented grant is current. A STAND-IN. It shows nothing about real authority. |
  * | The capability, on its code | `onCode`: the code of `hold@1` and `git-read@1`, as the production ports hold it. Real: the records, the steps, the guards and the outcomes' rules. A scenario that uses it says so. |

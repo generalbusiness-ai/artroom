@@ -32,7 +32,7 @@ import { DurableObject } from "cloudflare:workers";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { SessionAnswer } from "@generalbusiness/artroom-contract";
 import type { Answer, Beside, Bounds, Cursor, DeclaredDefinition, Digest, DutyId, Entry, Grant, Input, LogPage, OperationId, PlatformDefinition, Read, RetainedInput, ScopeId, Settlement, SignedIntent } from "@generalbusiness/artroom-contract";
-import { isScopeId } from "@generalbusiness/artroom-bytes";
+import { isScopeId, retainedReadArgument } from "@generalbusiness/artroom-bytes";
 import { isEntryOf, timeMs, type Item } from "@generalbusiness/artroom-derive";
 import type { ScopeState } from "@generalbusiness/artroom-derive";
 import type { Delivered, StateView } from "@generalbusiness/artroom-derive";
@@ -43,10 +43,10 @@ import { JoinLimits, isJoin, type LimitConfig } from "./limits.ts";
 import { Operations, type Outside } from "./operations.ts";
 import { OperatorRecord, sendAgain, type Incident, type Resent } from "./operator.ts";
 import { Dispatcher, Wakes } from "./outbox.ts";
-import { production, type Alarm, type Authority, type Clock, type Delivery, type Ports, type Readers, type Transport } from "./ports.ts";
+import { production, type Alarm, type Authority, type Clock, type Delivery, type Ports, type ReadName, type Readers, type Transport } from "./ports.ts";
 import { SessionRequests, Streams, issueSession, type Opened, type Sessions, type StreamRefusal } from "./sessions.ts";
 import { READ_BOUNDS, Reads, type ReadBounds, type Summary } from "./reads.ts";
-import { Chains, presentsSignedRead } from "./signed-reads.ts";
+import { Chains, checkLocalSignedRead, checkSignedReadRequest, presentsSignedRead, signerOf, type SignedReading } from "./signed-reads.ts";
 import { LATE, within } from "./turn.ts";
 import { SqliteStore } from "./sqlite.ts";
 import type { Duty, OperationStatus, Sealed, Store } from "./store.ts";
@@ -109,7 +109,7 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
   readonly #requests: SessionRequests;
   /** The roots of this scope's cause chains, each found once (`signed-reads.ts`). */
   readonly #chains: Chains;
-  /** The outside port as wired, for the one-time read of a member's read credential (`credential`). */
+  readonly #signed: SignedReading;
   readonly #outside: Outside;
   readonly #readers: Readers;
   /** True until this object's first turn: its first call or its alarm (`#first`). In memory, so a restart sets it again. */
@@ -178,13 +178,14 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
       const read = await within(() => ports.resolver.read(use.fact, bounds.fetchSeconds), bounds.fetchSeconds);
       return read !== LATE && read !== null && "entry" in read && isEntryOf(read.entry, use.fact) ? read.entry : null;
     });
-    this.#reads = new Reads(store, () => this.#scope.pinned(), ports.readers, wiring.reads ?? READ_BOUNDS, record, { clock: ports.clock, window: bounds.intentLifetimeSeconds, chains: this.#chains });
+    this.#signed = { clock: ports.clock, window: bounds.intentLifetimeSeconds, chains: this.#chains };
+    this.#readers = ports.readers;
+    this.#reads = new Reads(store, () => this.#scope.pinned(), ports.readers, wiring.reads ?? READ_BOUNDS, record, this.#signed, () => this.#scope.owners());
     this.#deliveries = new Deliveries(this.#name, this.#scope, store, ports, bounds);
     this.#dispatcher = given.transport ? new Dispatcher(this.#scope, store, { transport: given.transport, clock: ports.clock, capabilities: ports.capabilities }, wakes, bounds) : null;
     this.#operations = new Operations(this.#scope, store, ports, wakes, bounds, (operation, attempt, seq) => { record.found("outcome-conflict", [{ operation, attempt }, { entry: seq }]); });
     this.#clock = ports.clock;
     this.#outside = ports.outside;
-    this.#readers = ports.readers;
     this.#transport = given.transport;
     this.#seconds = bounds.dispatchSeconds;
     this.#record = record;
@@ -226,14 +227,11 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
    * caller does not wait for, if an attempt is recorded and has no time to be looked at next (`Store.parked`). Such an attempt
    * asks for no wake-up (`operations.ts`, rule 7), so without this pass it waits for the next commit. So a deployment whose outside
    * port changed, as when the Git host's settings are added, and which is restarted, sends what it recorded and did not send, at
-   * the first call that reaches the object. The pass sends nothing twice: an attempt marked sent is never sent again. At every
-   * later call that runs no pass of its own, the same pass runs if the port now accepts an attempt that it refused in this life
-   * (`Operations.reaccepted`), so a setting that appears with no restart is acted on at the next call too.
+   * the first call that reaches the object. Later calls also retry an unsent attempt when the configured outside port
+   * accepts it again. The pass sends nothing twice: an attempt marked sent is never sent again.
    */
   #first(): void {
     if (!this.#fresh) {
-      // Later in the same life: an attempt that a pass left unsent because the outside port refused its kind, which the port now
-      // accepts, as when the Git host's setting appeared after the attempt was recorded. One pass sends it, with no restart.
       if (this.#operations.reaccepted()) this.ctx.waitUntil(this.#operations.run().catch(() => 0));
       return;
     }
@@ -301,7 +299,7 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
    */
   session(asked: unknown): SessionAnswer { this.#first(); return issueSession({ sessions: this.#sessions(), clock: this.#clock, requests: this.#requests }, this.#store, this.#scope.pinned(), asked); }
   /** A stream of this scope's head, for a read session that may read the summary; or why none is opened (`sessions.ts`, `Streams`). */
-  stream(reader: unknown): Opened | StreamRefusal { this.#first(); return this.#streams.open(reader); }
+  async stream(reader: unknown): Promise<Opened | StreamRefusal> { this.#first(); await this.#prepared(reader, "summary"); return this.#streams.open(reader); }
   /** The reader of the stream with that ID went away. Its subscription is released at once. */
   release(id: unknown): void { this.#streams.release(id); }
   /** The streams open now and the subscriptions released in this run, and the windows and waiting joins of the serving limits. Counts only. */
@@ -328,25 +326,47 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
 
   /**
    * Before a read that may be limited by the cause chain: a signed read, or a session at a register (`signed-reads.ts`, `Chains`).
-   * The roots of the entries that are new are found and kept. A chain that cannot be read now is looked for again at the next such
-   * read, and this one is judged without the roots from there on.
+   * Cheap request or session checks precede every chain read. A local signer needs no chain for the summary, genesis or its own
+   * entry. Other valid limited reads find the roots that are new, and Reads checks authority again on the current clock afterwards.
    */
-  async #rooted(reader: unknown): Promise<void> {
-    if (presentsSignedRead(reader) || (typeof reader === "string" && this.#store.scope()?.at.kind === "register")) await this.#chains.update();
+  async #rooted(reader: unknown, read: ReadName, arg: string): Promise<void> {
+    if (presentsSignedRead(reader)) {
+      if (!("key" in checkSignedReadRequest(this.#signed, this.#store, reader as string, read, arg))) return;
+      const local = checkLocalSignedRead(this.#signed, this.#store, reader as string, read, arg);
+      // The register's recent local signers read its whole history (ca8ad1cf).
+      if ("key" in local && this.#store.scope()?.at.kind === "register") return;
+      if (read === "summary" || read === "entry") {
+        if ("key" in local) {
+          if (read === "summary" || arg === "0") return;
+          const row = this.#store.stored(Number(arg));
+          if (row && signerOf(JSON.parse(row.bytes) as Entry) === local.key) return;
+        }
+      }
+    } else {
+      if (this.#store.scope()?.at.kind !== "register" || this.#readers.allows(reader, read) !== false) return;
+      const chained = this.#readers.chained?.(reader, read);
+      if (typeof chained !== "object" || chained === null) return;
+    }
+    await this.#chains.update();
   }
 
-  async summary(reader: unknown): Promise<Read<Summary>> { this.#first(); await this.#rooted(reader); return this.#reads.summary(reader); }
-  items(reader: unknown, type: string, cursor?: Cursor): Read<readonly Item[]> { this.#first(); return this.#reads.items(reader, type, cursor); }
-  async history(reader: unknown, cursor?: Cursor): Promise<Read<readonly Sealed[]>> { this.#first(); await this.#rooted(reader); return this.#reads.history(reader, cursor); }
-  async entry(reader: unknown, seq: number): Promise<Read<Sealed>> { this.#first(); await this.#rooted(reader); return this.#reads.entry(reader, seq); }
-  outbox(reader: unknown, cursor?: Cursor): Read<readonly Duty[]> { this.#first(); return this.#reads.outbox(reader, cursor); }
-  duty(reader: unknown, duty: DutyId): Read<Duty> { this.#first(); return this.#reads.duty(reader, duty); }
-  operations(reader: unknown, cursor?: Cursor, open = false): Read<readonly OperationStatus[]> { this.#first(); return this.#reads.operations(reader, cursor, open); }
-  operation(reader: unknown, operation: OperationId): Read<OperationStatus> { this.#first(); return this.#reads.operation(reader, operation); }
-  async log(reader: unknown, cursor?: Cursor): Promise<Read<LogPage>> { this.#first(); await this.#rooted(reader); return this.#reads.log(reader, cursor); }
-  async retained(reader: unknown, kind: RetainedInput["kind"], digest: Digest, domain?: string): Promise<Read<RetainedInput>> { this.#first(); await this.#rooted(reader); return this.#reads.retained(reader, kind, digest, domain); }
-  incidents(reader: unknown, cursor?: Cursor): Read<readonly Incident[]> { this.#first(); return this.#reads.incidents(reader, cursor); }
-  waiting(reader: unknown, list: "diagnosed" | "unanswered", cursor?: Cursor): Read<readonly Duty[]> { this.#first(); return this.#reads.waiting(reader, list, cursor); }
+  /** Session preparation is separate from signed-read validation and never runs for a Signed header. */
+  async #prepared(reader: unknown, read: ReadName): Promise<void> {
+    if (!presentsSignedRead(reader)) await this.#readers.prepare?.(reader, read);
+  }
+
+  async summary(reader: unknown): Promise<Read<Summary>> { this.#first(); await this.#prepared(reader, "summary"); await this.#rooted(reader, "summary", "summary"); return this.#reads.summary(reader); }
+  async items(reader: unknown, type: string, cursor?: Cursor): Promise<Read<readonly Item[]>> { this.#first(); await this.#prepared(reader, "items"); return this.#reads.items(reader, type, cursor); }
+  async history(reader: unknown, cursor?: Cursor): Promise<Read<readonly Sealed[]>> { this.#first(); await this.#prepared(reader, "history"); await this.#rooted(reader, "history", cursor ?? "0"); return this.#reads.history(reader, cursor); }
+  async entry(reader: unknown, seq: number): Promise<Read<Sealed>> { this.#first(); await this.#prepared(reader, "entry"); await this.#rooted(reader, "entry", String(seq)); return this.#reads.entry(reader, seq); }
+  async outbox(reader: unknown, cursor?: Cursor): Promise<Read<readonly Duty[]>> { this.#first(); await this.#prepared(reader, "outbox"); return this.#reads.outbox(reader, cursor); }
+  async duty(reader: unknown, duty: DutyId): Promise<Read<Duty>> { this.#first(); await this.#prepared(reader, "outbox"); return this.#reads.duty(reader, duty); }
+  async operations(reader: unknown, cursor?: Cursor, open = false): Promise<Read<readonly OperationStatus[]>> { this.#first(); await this.#prepared(reader, "operations"); return this.#reads.operations(reader, cursor, open); }
+  async operation(reader: unknown, operation: OperationId): Promise<Read<OperationStatus>> { this.#first(); await this.#prepared(reader, "operations"); return this.#reads.operation(reader, operation); }
+  async log(reader: unknown, cursor?: Cursor): Promise<Read<LogPage>> { this.#first(); await this.#prepared(reader, "log"); await this.#rooted(reader, "log", cursor ?? "0"); return this.#reads.log(reader, cursor); }
+  async retained(reader: unknown, kind: RetainedInput["kind"], digest: Digest, domain?: string): Promise<Read<RetainedInput>> { this.#first(); await this.#prepared(reader, "retained"); await this.#rooted(reader, "retained", retainedReadArgument(kind, digest, domain)); return this.#reads.retained(reader, kind, digest, domain); }
+  async incidents(reader: unknown, cursor?: Cursor): Promise<Read<readonly Incident[]>> { this.#first(); await this.#prepared(reader, "incidents"); return this.#reads.incidents(reader, cursor); }
+  async waiting(reader: unknown, list: "diagnosed" | "unanswered", cursor?: Cursor): Promise<Read<readonly Duty[]>> { this.#first(); await this.#prepared(reader, "waiting"); return this.#reads.waiting(reader, list, cursor); }
 
   /**
    * The one-time read of a member's read token at a destination, by its handle (the planner's decision for I5). Only a session
@@ -354,8 +374,9 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
    * judges the rest, and drops the plaintext as it answers. A second read, another key's session, a read after the end, a
    * handle that names nothing and a scope that is no destination are each `forbidden`. Nothing is written.
    */
-  credential(reader: unknown, handle: unknown): Read<{ token: string; ends: string; remote: string }> {
+  async credential(reader: unknown, handle: unknown): Promise<Read<{ token: string; ends: string; remote: string }>> {
     this.#first();
+    await this.#prepared(reader, "credential");
     const key = this.#readers.holder?.(reader, "credential") ?? false;
     if (key === "sessions-unavailable" || key === "clock-behind") return { ok: false, reason: key };
     const scope = this.#store.scope();

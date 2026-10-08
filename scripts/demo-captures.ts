@@ -1,9 +1,9 @@
-#!/usr/bin/env -S node --experimental-transform-types --no-warnings
+#!/usr/bin/env -S node --import tsx --no-warnings
 // The demo's page captures: PNG files of the room's page, in Chromium, for the recording and its rehearsal.
 //
-//   PLAYWRIGHT_CORE=<directory holding playwright-core> node --experimental-transform-types --no-warnings scripts/demo-captures.ts \
+//   PLAYWRIGHT_CORE=<directory holding playwright-core> node --import tsx --no-warnings scripts/demo-captures.ts \
 //     <base-url> --home <a person's config directory> --room <room.json of demo-run.ts> --out <directory>
-//   PLAYWRIGHT_CORE=<...> node --experimental-transform-types --no-warnings scripts/demo-captures.ts --recorded --out <directory>
+//   PLAYWRIGHT_CORE=<...> node --import tsx --no-warnings scripts/demo-captures.ts --recorded --out <directory>
 //
 // The first form opens the deployment's page at <base-url>/page/, signed in with the key that the config directory keeps (the
 // founder's, from demo-run.ts), on the room that room.json names. The second form runs the rehearsal on the test Worker instead
@@ -23,9 +23,10 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSy
 import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { b64url } from "@generalbusiness/artroom-bytes";
+import { b64url, keyIdOfSecret } from "@generalbusiness/artroom-bytes";
 import { fileStore } from "../packages/cli/src/files.ts";
-import { placeOf } from "../packages/page/src/data.ts";
+import type { Config } from "../packages/cli/src/store.ts";
+import { CAPTURE_CONTEXT, captureBinding, captureSource, initializeCapture, ownerJson, type CaptureObservations } from "./demo/capture-context.ts";
 import type { Room } from "./demo/rehearse.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -35,6 +36,7 @@ const USAGE = "Usage: scripts/demo-captures.ts <base-url> --home <config directo
 /** The few parts of playwright-core that this script uses. */
 interface Locator { waitFor(options?: { timeout?: number }): Promise<void>; first(): Locator }
 interface Tab {
+  url(): string;
   goto(url: string): Promise<unknown>;
   getByRole(role: string, options: { name: string | RegExp }): Locator;
   getByText(text: string | RegExp): Locator;
@@ -48,7 +50,7 @@ interface Browser { newContext(options: object): Promise<BrowserContext>; close(
 interface Chromium { launch(options: { executablePath: string }): Promise<Browser> }
 
 /** What the browser needs: the service's base URL, the room, the key, and the recorded answers when there is no service. */
-interface Sitting { service: string; place: { directory: string; membership: unknown }; room: Room; secret: string; answers: Record<string, { status: number; headers: Record<string, string>; body: string }> | null }
+interface Sitting { service: string; place: { directory: string; membership: unknown }; room: Room; secret: string; answers: Record<string, { status: number; headers: Record<string, string>; body: string }> | null; observation?: { source: string; config: string; actor: string } }
 
 function browserPath(): string | null {
   if (process.env["CHROMIUM"]) return existsSync(process.env["CHROMIUM"]) ? process.env["CHROMIUM"] : null;
@@ -80,13 +82,14 @@ function recordedSitting(): Sitting {
 
 /** The live form: the key and the room from a person's config directory, and the IDs from room.json. */
 async function liveSitting(service: string, home: string, roomFile: string): Promise<Sitting> {
-  const store = fileStore(resolve(home));
-  const config = await store.config();
-  if (!config?.repository) throw new Error(`${home} holds no config with a repository: give the config directory of a person of the room.`);
-  const secret = await store.secret(config.key);
-  if (!secret) throw new Error(`${home} holds no key ${config.key}.`);
+  const config = ownerJson(resolve(home), "config.json") as Config;
+  const observed = ownerJson(resolve(home), CAPTURE_CONTEXT) as CaptureObservations;
   const room = JSON.parse(readFileSync(roomFile, "utf8")) as Room;
-  return { service: service.replace(/\/+$/, ""), place: placeOf(JSON.stringify(config))!, room, secret: b64url(secret), answers: null };
+  const bound = captureBinding(config, observed, service, room, captureSource());
+  const store = fileStore(resolve(home));
+  const secret = await store.secret(config.key);
+  if (!secret || keyIdOfSecret(secret) !== bound.actor) throw new Error("Capture key does not match the owner-home observation.");
+  return { ...bound, secret: b64url(secret), answers: null, observation: { source: observed.source, config: observed.config, actor: observed.actor } };
 }
 
 async function captures(chromium: Chromium, executablePath: string, sitting: Sitting, out: string): Promise<{ name: string; bytes: number }[]> {
@@ -112,7 +115,7 @@ async function captures(chromium: Chromium, executablePath: string, sitting: Sit
       });
     }
     // The page's settings, as it keeps them: the page's own origin, the room, and the key.
-    await context.addInitScript((kept: string) => localStorage.setItem("artroom-page", kept), JSON.stringify({ service: "", place: sitting.place, secret: sitting.secret }));
+    await context.addInitScript(initializeCapture, { service, place: sitting.place, secret: sitting.secret });
     const tab = await context.newPage();
     // The whole content, down to its lowest element and at most 1,400 pixels: the viewport is set to that height for the capture.
     const shot = async (name: string) => {
@@ -125,6 +128,7 @@ async function captures(chromium: Chromium, executablePath: string, sitting: Sit
     };
     const screen = async (hash: string, heading: string | RegExp, name: string) => {
       await tab.goto(`${service}/page/#${hash}`);
+      if (new URL(tab.url()).origin !== new URL(service).origin || new URL(tab.url()).pathname !== new URL(`${service}/page/`).pathname) throw new Error("Capture document left the configured page address.");
       await tab.getByRole("heading", { name: heading }).first().waitFor({ timeout: 30_000 });
       await tab.getByText("What you may do here").first().waitFor({ timeout: 30_000 });
       await shot(name);
@@ -135,6 +139,7 @@ async function captures(chromium: Chromium, executablePath: string, sitting: Sit
     await screen(`/change/${room.published}`, /guide\/start\.md/, "change-published");
     await screen("/rules", "The rules of this room", "rules");
     await tab.goto(`${service}/site/${room.directory}/HEAD/guide/start.md`);
+    if (new URL(tab.url()).origin !== new URL(service).origin || new URL(tab.url()).pathname !== new URL(`${service}/site/${room.directory}/HEAD/guide/start.md`).pathname) throw new Error("Capture document left the configured site address.");
     await tab.getByRole("heading", { name: "Getting started" }).first().waitFor({ timeout: 30_000 });
     await shot("site-page");
   } finally {
@@ -148,11 +153,11 @@ async function captures(chromium: Chromium, executablePath: string, sitting: Sit
 
 const SHOWS: Record<string, string> = {
   room: "The room: its issues and changes, with their states, and the acts the signed-in person may sign on the directory.",
-  issue: "The issue: opened by the member, commented on by the maintainer, assigned and closed by the merge.",
-  "change-refused": "The change of ../outside.md: its one-file version, and the merge the destination refused, path-invalid.",
-  "change-published": "The change of guide/start.md: merged and published, with the link that closed the issue.",
+  issue: "Observed issue screen for the rehearsal's issue lane.",
+  "change-refused": "Observed change screen for the rehearsal's outside.md lane.",
+  "change-published": "Observed change screen for the rehearsal's guide/start.md lane.",
   rules: "The rules of this room, and who may change them.",
-  "site-page": "guide/start.md as the site route renders it from the published branch.",
+  "site-page": "Observed guide/start.md site response. Screenshots do not establish publication receipts.",
 };
 
 async function main(argv: readonly string[]): Promise<number> {
@@ -179,8 +184,9 @@ async function main(argv: readonly string[]): Promise<number> {
   writeFileSync(join(resolve(out), "captures.md"), [
     "# Page captures",
     "",
-    `Written by scripts/demo-captures.ts ${recorded ? "--recorded: the page answered with the test Worker's recorded answers on the rehearsal's room" : `against ${sitting.service}, on the room of the rehearsal`}, in Chromium, signed in with the founder's key.`,
+    `Written by scripts/demo-captures.ts ${recorded ? "--recorded: the page answered with the test Worker's recorded answers on the rehearsal's room" : `against ${sitting.service}, on the room bound to the selected owner home`}, in Chromium. These are screen observations. Authoritative outcome and publication proof must be established separately from retained native histories and receipts; this capture does not establish it.`,
     "",
+    ...(sitting.observation ? [`Capture association: source ${sitting.observation.source}; config ${sitting.observation.config}; actor ${sitting.observation.actor}; directory ${sitting.place.directory}; membership ${JSON.stringify(sitting.place.membership)}; lane IDs ${JSON.stringify(sitting.room)}.`, ""] : []),
     "| File | Shows | Bytes |",
     "|---|---|---:|",
     ...sizes.map((size) => `| \`${size.name}.png\` | ${SHOWS[size.name]} | ${size.bytes} |`),

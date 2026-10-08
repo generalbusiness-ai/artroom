@@ -12,6 +12,14 @@ run in this container, **[inferred]** neither.
 
 ## 1. What is built
 
+Historical boundary: this cloud note describes source `31cd35577`. The
+expanded Gate 1 delivery and live witness describe the current integration.
+Current claim recovery preserves exact found/seat/first-key envelopes and
+accepted facts; ca8 whole-register history, typed retained-resource hashes
+and full-reference destination session checks supersede the narrower read
+claims below. Test titles and run results here remain attributed to their
+original source, not the final expanded candidate.
+
 Four defects were seen on the deployment this morning. Each has a change
 and a test here.
 

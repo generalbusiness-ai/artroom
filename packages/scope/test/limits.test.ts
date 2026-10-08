@@ -4,7 +4,7 @@ import { newIncarnation, scopeIdOf, signIntent, textDigest } from "@generalbusin
 import { d } from "@generalbusiness/artroom-derive/testing";
 import { JoinLimits, addressKey, isJoin, type LimitConfig } from "../src/index.ts";
 import { soon } from "./net.ts";
-import { office, rita, routed, una, vic, type Platform } from "./repository.ts";
+import { office, rita, routed, settle, una, vic, type Platform } from "./repository.ts";
 import { platformNet } from "./worker.ts";
 
 // The plan's T39 (authority note, section 3.6, "The limits"; review rows M3 and M4; the proof plan's row for O10). The numbers are FIXTURE
@@ -92,6 +92,8 @@ describe("serving limits of a join (authority note, section 3.6; `limits.ts`)", 
       const { M: scope } = await office();
       const seat = await scope.did(rita, "seat", { expected: { roster: 1 } });
       await scope.did(rita, "first-key", { fields: { member: seat }, expected: await scope.expected({ roster: 0, member: seat }) });
+      // Finish the earlier seat's inbox creation before pinning the head around rejected join requests.
+      await settle(scope, await scope.created(seat));
       const invitation = await scope.did(rita, "invite-member", { fields: { handle: "@una", role: "member", inviteHash: textDigest(SECRET), inviteEnds: soon(3600) } });
       const post = async (node: Platform, signed: SignedIntent, address: string) => {
         const response = await routed(`https://scope.test/v1/scopes/${node.name}/acts`, { method: "POST", headers: { "cf-connecting-ip": address }, body: JSON.stringify({ signed, grants: [] }) });

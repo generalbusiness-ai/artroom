@@ -1,7 +1,9 @@
 # Deploying the scope Worker
 
 This page says which settings and secrets the scope Worker takes, and in
-what order to set them so that a claim creates its repository on GitHub.
+what order to set them so that a claim creates its repository on GitHub,
+the secondary host in the re-cut demo plan. The ARTIFACTS install path is
+the separate host-adapter delivery.
 Nothing in this repository deploys the Worker. The Worker's code is
 `packages/scope/src/worker.ts`; its configuration is
 `packages/scope/wrangler.jsonc`.
@@ -88,6 +90,18 @@ restart. A Worker whose setting changed is still a new version, and an
 object running the earlier version may keep the earlier setting until it
 restarts; a request that reaches it after the restart sends what it
 recorded. Planning first avoids the wait.
+
+Finish the initial bootstrap while the operator's install is within its
+900-second read window. Before enrollment, the claim's causal read window
+also lasts 900 seconds; this delivery does not renew an expired window.
+An expired window is not permission to invent a new signed claim.
+
+Keep `DEPLOYMENT` configured on every source deployment and secret update.
+When the configuration file omits existing plain variables, Wrangler deploy
+needs `--keep-vars` to preserve them. Verify session issuance rather than
+assuming a stored session secret is sufficient: both bindings are required.
+The recorded builder run initially returned `sessions-unavailable` and
+succeeded after both bindings were restored through stdin.
 
 ## The creation credential
 

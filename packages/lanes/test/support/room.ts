@@ -12,7 +12,7 @@
  * | The Git host | A STAND-IN, two parts. `OutsideDouble` of the scope package is the destination's and the register's outside port: it answers what the test writes. `Host` of `graph.ts` is a lane's outside port: it answers the attempts that the code of `hold@1` opens. No repository exists and no commit is read. |
  * | The changed set of a publication | SCRIPTED: the test states the paths that the host's judge read answers with. No tree is diffed. |
  * | The clock, transport and the readers | The scripted clock, the namespace's transport, and the test readers, as in every test of the namespace `PLATFORM`. |
- * | Runner | None. No check is run; no scenario here asks for a required check. |
+ * | Runner | None. W5 requires a check whose answer the test signs; no command or image runs. Other scenarios require no check. |
  */
 
 import { env } from "cloudflare:workers";

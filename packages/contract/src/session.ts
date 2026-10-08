@@ -16,7 +16,7 @@ import type { Base64Url, KeyId, MemberId, ScopeId, ScopeRef, Timestamp } from ".
  * and a signed read's signature are over. None is a tag of `DOMAINS`, so
  * none is ever the bytes of an intent.
  */
-export const SESSION_DOMAINS = { token: "artroom-session-1", request: "artroom-session-request-1", read: "artroom-read-1" } as const;
+export const SESSION_DOMAINS = { token: "artroom-session-1", request: "artroom-session-request-1", read: "artroom-read-1", readResource: "artroom-read-resource-1" } as const;
 
 /**
  * A device's request for a read session. It follows the one form of a
@@ -71,8 +71,10 @@ export type SessionAnswer = { ok: true; token: string; session: SessionClaims } 
  * - `actor`: the key that signs.
  * - `read`: the read's name. `arg`: its argument: `"summary"` for the
  *   summary; the cursor of `history` and `log`, `"0"` for the first page;
- *   the position of an `entry`, in decimal; the digest of a `retained`
- *   input. At most 128 characters.
+ *   the position of an `entry`, in decimal; for `retained`, the SHA-256
+ *   digest of `artroom-read-resource-1`, one newline, and canonical JSON
+ *   `[kind, digest, domain ?? null]`. The complete resource is bound even
+ *   when a domain is long. At most 128 characters; the request's v stays 1.
  * - `notAfter`: after the scope's clock reading, and at most the lifetime
  *   of an intent ahead of it, as for an intent.
  *

@@ -8,8 +8,15 @@ and the command prints the scope's answer. A refusal writes nothing, and
 the command exits 1 with the refusal's reason.
 
 The source is `packages/cli`. In this repository it runs as
-`packages/cli/bin/artroom.js` under Node 22 or later. Nothing is
-published to a registry, and no service is deployed.
+`packages/cli/bin/artroom.js` under Node 22.0.0 or later, using the CLI's
+installed `tsx` 4.21.0 dependency. The launcher resolves that loader beside
+the package, so it works from another directory and fetches no tool when
+it runs. The launcher is checked on Node 22.0.0 and 26.10.0. Nothing is
+published to a registry. A scope Worker is deployed at
+<https://artroom-scope.inguz.workers.dev>; its routes start at `/v1/scopes`.
+The root URL returns 404 because it has no application page. This endpoint
+does not establish a completed live founding, publication, clone or
+authenticated replay.
 
 ## What it needs
 
@@ -26,6 +33,11 @@ A scope is named by its ID (`sc_...`) or by one of the names `claim` or
 `destination`, `inbox`. An entry is named `<scope>:<seq>`. An issue is
 named by its number, `3` or `#3`, as `artroom issues` lists it, or by its
 lane's scope ID.
+
+An install receipt does not enable GitHub effects by itself. The deployment
+must configure its GitHub authority and pin the chosen register's scope ID
+beforehand; other registers do not receive that host authority. Full
+authorization to install a register remains unimplemented.
 
 ## The commands
 
@@ -81,23 +93,31 @@ which makes the founder the first admin. `<name>` is a label for this
 output only: the register's `found` act has no name field (see "What it
 does not do yet").
 
-Before it sends the `found`, the command saves a pending claim in the
-config: the register, the digest of the signed intent and the handle.
-None of these is a secret. If the register refuses the claim, or answers
-that it is unavailable, nothing was written and the pending claim is
-removed. If the command gives up waiting, the claim stays pending:
+Before each founding step, the command saves its exact signed envelope:
+`found`, then `seat`, then `first-key`. It saves accepted fact references
+as each step completes. These records contain no private signing key.
+A refusal, unavailable reply or lost answer leaves the request pending;
+a later run keeps the same signature and deadline. An accepted marker is
+checked against the receipt for that exact envelope before reuse.
 
 ```
 Gave up waiting for the directory after 120 reads. What was asked may still take effect; run artroom claim demo again to go on waiting for this claim, or with --again to sign a new one, which creates a second repository.
 ```
 
-Run `artroom claim <name>` again to go on. It signs nothing: it reads
-the register once, which starts a register that was restarted since the
-claim, and waits for the directory that the pending claim's digest names.
-`--handle` is then ignored: the handle is the one the claim signed.
-`--again` signs a new `found`. Each `found` that takes effect creates a
-repository, so use it only when the first claim was refused or will never
-take effect.
+Run `artroom claim <name>` again to continue the saved claim. The command
+reads or retries the exact saved steps, then waits for their confirmed
+scopes. It checks child identities against the actual directory seed and
+full reference. It does not extend a saved deadline or invent a replacement
+request. `--handle` is ignored on resume: the handle is the one already
+signed. Older digest-only state resumes only when the retained founding
+and enrollment records prove the exact signed steps; otherwise it stops
+without a new submission.
+
+`--again` deliberately replaces the pending claim with a new signed
+`found`. Each `found` that takes effect creates a repository, so an earlier
+unknown claim may still produce another repository. Use this option only
+when deliberately starting another claim. An expired envelope stays saved
+until this explicit replacement.
 
 ```
 Claimed demo: directory sc_hs5f27fz..., membership sc_p6xp2lmd..., rules sc_sfbjwioy..., destination sc_e5xgdizd...; each created and confirmed.
@@ -115,7 +135,14 @@ Link for @una only (it holds the invitation's secret): artroom-invite:eyJ2Ijox..
 ```
 
 **`artroom join <link>`** is membership's `join`, signed by a new key
-that the command makes and keeps. It waits for the member's inbox.
+that the command makes and keeps. Before sending, it saves the exact signed
+request in an owner-only `private/<name>.data` file; the invitation secret
+is absent from public config. It saves the accepted fact and inbox progress
+before waiting for the member's inbox. After a lost reply or an interrupted
+wait, run `artroom join` with the original link again. This reuses the same
+key, request and deadline. An accepted request is confirmed by a read-only
+settlement, even after its deadline. A missing private request or a different
+link stops the retry; it never signs a replacement automatically.
 
 ```
 Joined as @una on key key_H1bY2Hml....
@@ -399,14 +426,17 @@ session a member can read the scopes that record their membership, and,
 at the register, its genesis and the entries that come from the claim
 that founded the repository. A signed read reads the entries that the
 key signed, the entries that come from one of those within 15 minutes of
-it (the intent window), and the retained inputs those entries name.
+it (the intent window), and the retained inputs those entries carry. History and log pages can
+be filtered; a sparse page is not complete replay evidence. The multiple-claim
+coverage and destination-session gaps remain explicit intake findings.
 
 ## What it does not do yet
 
 - There is no page. This is the command line only.
-- Nothing is deployed, so the command has run only against the test
-  Worker. Its tests use a stand-in for the Git host and drive the
-  scopes' dispatchers in place of a deployment's alarms.
+- The documented CLI story is a workerd fixture with real scope rules,
+  authority, signed reads and sessions. Its Git host is a stand-in, and
+  it drives dispatchers in place of deployment alarms. The deployed
+  repository journey still needs its own evidence.
 - `edit` carries a file as UTF-8 text of at most 65,536 bytes: no image
   or other binary file. See `notes/2026-10-07-i5-edit-page-delivery.md`,
   section 3.

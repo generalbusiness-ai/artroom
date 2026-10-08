@@ -4,10 +4,12 @@
  * with mode 0700, and every file in it is written with mode 0600 and then
  * set to 0600, so a key file is readable only by its owner whatever the
  * umask. A key file holds the 32-byte secret as unpadded base64url, and
- * nothing else.
+ * nothing else. Secret-bearing pending requests are opaque base64url bytes
+ * in owner-only `private/<name>.data` records, separate from keys and config.
  */
 
-import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+import { chmodSync, existsSync, linkSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { b64url, unb64url } from "@generalbusiness/artroom-bytes";
@@ -24,23 +26,48 @@ const NAME = /^[a-z][a-z0-9-]{0,31}$/;
 export function fileStore(dir: string): Store {
   const ensure = () => {
     mkdirSync(join(dir, "keys"), { recursive: true, mode: 0o700 });
+    mkdirSync(join(dir, "private"), { recursive: true, mode: 0o700 });
+    chmodSync(join(dir, "private"), 0o700);
     chmodSync(dir, 0o700);
     chmodSync(join(dir, "keys"), 0o700);
   };
   /** Write a whole file owner-only, through a temporary name, so a reader never sees half of it. */
   const write = (path: string, text: string, exclusive: boolean) => {
     ensure();
-    if (exclusive && existsSync(path)) throw new Error(`${path} exists already; it is not replaced`);
-    const temporary = `${path}.${process.pid}.tmp`;
-    writeFileSync(temporary, text, { mode: 0o600, flag: "wx" });
-    chmodSync(temporary, 0o600);
-    renameSync(temporary, path);
+    const temporary = `${path}.${process.pid}.${randomUUID()}.tmp`;
+    let created = false;
+    try {
+      writeFileSync(temporary, text, { mode: 0o600, flag: "wx" });
+      created = true;
+      chmodSync(temporary, 0o600);
+      // A hard link publishes complete owner-only bytes atomically and refuses
+      // an existing name. A check before rename cannot enforce exclusivity.
+      if (exclusive) linkSync(temporary, path);
+      else renameSync(temporary, path);
+    } catch (failure) {
+      if (exclusive && (failure as NodeJS.ErrnoException).code === "EEXIST") throw new Error(`${path} exists already; it is not replaced`);
+      throw failure;
+    } finally {
+      if (created && existsSync(temporary)) unlinkSync(temporary);
+    }
   };
   const keyPath = (name: string) => {
     if (!NAME.test(name)) throw new Error(`${JSON.stringify(name)} is not a key name`);
     return join(dir, "keys", `${name}.key`);
   };
+  const privatePath = (name: string) => {
+    if (!NAME.test(name)) throw new Error(`${JSON.stringify(name)} is not a private record name`);
+    return join(dir, "private", `${name}.data`);
+  };
   return {
+    private: async (name) => {
+      const path = privatePath(name);
+      if (!existsSync(path)) return null;
+      const bytes = unb64url(readFileSync(path, "utf8").trim());
+      if (bytes === null) throw new Error(`${path} holds no private bytes`);
+      return bytes;
+    },
+    keepPrivate: async (name, bytes) => write(privatePath(name), `${b64url(bytes)}\n`, true),
     config: async () => {
       const path = join(dir, "config.json");
       if (!existsSync(path)) return null;

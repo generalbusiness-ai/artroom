@@ -95,10 +95,9 @@ export class PlatformScope extends DeployedScope<PlatformEnv> {
     const deployed = super.wiring(name);
     const { resolver, definitions, transport } = deployed.ports as Required<NonNullable<Wiring["ports"]>>;
     // With a test secret the session configuration is the test's. With none it is the deployed one, from this Worker's bindings.
-    const session = sessionWiring(() => (platformNet.secret === null ? deployed.sessions!() : sessionsOf(platformNet.secret, TEST_DEPLOYMENT)));
+    const session = sessionWiring(() => (platformNet.secret === null ? deployed.sessions!() : sessionsOf(platformNet.secret, TEST_DEPLOYMENT)), this.scopes());
     const outside = platformOutside.get(name ?? "");
     const ports = wired.get(name ?? "")?.();
-    // The deployed outside factory is always wired, and would win over an outside port that a test wired for this name.
     const { outside: _deployed, ...rest } = deployed;
     return {
       ...(ports?.outside ? rest : deployed),
@@ -106,7 +105,12 @@ export class PlatformScope extends DeployedScope<PlatformEnv> {
       sessions: session.sessions,
       readers: (given) => {
         const real = session.readers(given);
-        return { allows: (reader, read) => (!platformNet.sessions || (platformNet.inspector !== null && reader === platformNet.inspector) ? true : real.allows(reader, read)), register: real.register!, holder: real.holder! };
+        return {
+          allows: (reader, read) => (!platformNet.sessions || (platformNet.inspector !== null && reader === platformNet.inspector) ? true : real.allows(reader, read)), chained: real.chained!, holder: real.holder!,
+          // The inspector is an explicit test bypass. It resolves no peer and
+          // supplies no production session authority.
+          prepare: (reader, read) => (!platformNet.sessions || (platformNet.inspector !== null && reader === platformNet.inspector) ? Promise.resolve() : real.prepare!(reader, read)),
+        };
       },
       ...(platformNet.limits ? { limits: platformNet.limits } : {}),
       ports: {

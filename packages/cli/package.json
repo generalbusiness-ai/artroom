@@ -22,7 +22,8 @@
     "@generalbusiness/artroom-contract": "0.1.0-dev.1",
     "@generalbusiness/artroom-derive": "0.1.0-dev.1",
     "@generalbusiness/artroom-platform": "0.1.0-dev.1",
-    "@generalbusiness/artroom-replay": "0.1.0-dev.1"
+    "@generalbusiness/artroom-replay": "0.1.0-dev.1",
+    "tsx": "4.21.0"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "0.22.0",
