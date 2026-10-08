@@ -164,3 +164,24 @@ unchanged. Later composition must apply the compareTrees delta to the selected
 executor source and preserve the executor 340 fence/send-classification path;
 replacing the whole GitHubHost file with this older donor would lose that work.
 No extra control, suite, gate, Room, provider, wiring or activation ran.
+
+## Exact link-step count correction
+
+Planner P2 `96f9ca582a521c2c2d0d877eab54800aa630e164` identified that the
+comparison's old greater-than check admitted a component with linkSteps zero.
+Explicit caller linkSteps now means maximum component count per whole-link
+resolution. The greater-than-or-equal guard refuses zero; the existing fixture
+confirms exact one-step success with unchanged old/new link results. Work still
+bounds aggregate resolution. InspectGit retains its historical N + 1 behavior
+by adding one only to its legacy default count. No broken-link fact is inferred
+from exhaustion. The Reader-boundary correction at 44f8e1f5601d06a0de1eb8128b6175bebc423415
+remains unchanged. Final focused adapter and three affected inspection tests
+passed (provider case skipped); scope source/test typechecks passed. Raw logs:
+
+| Output | SHA-256 |
+|---|---|
+| `/tmp/artroom-edit-candidate-evidence/link-count-focused.log` | `2fe9fdd7f7c0801854b8b06f562a202d16df56be43fbd965b3c18fd44918822f` |
+| `/tmp/artroom-edit-candidate-evidence/link-count-types.log` | `6d6fedb36dbee4bff38ae0d2fcbad3cce9af62a012c11f1517cbd8d6ce0d09a6` |
+
+Earlier heads/logs and the executor 340 composition requirement remain intact.
+No new control, matrix, whole suite, gate, provider or activation was run.

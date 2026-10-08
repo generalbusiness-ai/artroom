@@ -47,6 +47,10 @@ test("candidate needs exact snapshotted base/tree closure and file bytes; preser
   expect(await editCandidate({ ...good, file: { ...good.file, path: "éé" } }, { ...limits, comparison: { ...limits.comparison, pathBytes: 2 } })).toEqual({ result: "refused", reason: "bad-path" });
   expect(await editCandidate(good, { ...limits, read: { ...limits.read, closureObjects: 0 } })).toEqual({ result: "refused", reason: "too-large" });
   expect(await editCandidate(good, { ...limits, read: { ...limits.read, commitBytes: base.body.length - 1 } })).toEqual({ result: "refused", reason: "too-large" });
+  expect(await editCandidate(good, { ...limits, comparison: { ...limits.comparison, linkSteps: 0 } })).toEqual({ result: "refused", reason: "too-large" });
+  const oneStep = await editCandidate(good, { ...limits, comparison: { ...limits.comparison, linkSteps: 1 } });
+  expect(oneStep.result).toBe("candidate");
+  if (oneStep.result === "candidate") expect(oneStep.changes).toEqual(made.changes);
   const size = utf8(canonicalize(made.changes)).length;
   expect((await editCandidate(good, { ...limits, comparison: { ...limits.comparison, changedBytes: size } })).result).toBe("candidate");
   expect(await editCandidate(good, { ...limits, comparison: { ...limits.comparison, changedBytes: size - 1 } })).toEqual({ result: "refused", reason: "too-large" });

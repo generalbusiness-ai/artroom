@@ -211,7 +211,9 @@ export async function sendOnce(request: Parameters<DestinationProvider["send"]>[
 /** Explicit comparison limits; inspectGit retains its established defaults. */
 export interface TreeComparisonLimits {
   trees: number; files: number; pathBytes: number; depth: number;
-  changedPaths: number; links: number; changedBytes: number; linkSteps: number;
+  changedPaths: number; links: number; changedBytes: number;
+  /** Maximum component iterations in each whole-link resolution. */
+  linkSteps: number;
   visit?: (kind: "tree" | "entry" | "bytes" | "link-step", amount: number) => void;
   onLimit?: () => never;
   beforeSerialize?: (changes: JudgeChanges) => void;
@@ -221,7 +223,8 @@ const INSPECTION_LIMITS: TreeComparisonLimits = {
   pathBytes: SNAPSHOT_BOUNDS.pathBytes, depth: SNAPSHOT_BOUNDS.depth,
   changedPaths: DESTINATION_CHANGED_SET.paths, links: DESTINATION_CHANGED_SET.links,
   changedBytes: DESTINATION_CHANGED_SET.max,
-  linkSteps: SNAPSHOT_BOUNDS.pathBytes * (DESTINATION_CHANGED_SET.links + 1),
+  // Preserve legacy `steps++ > N`: it allowed N + 1 component iterations.
+  linkSteps: SNAPSHOT_BOUNDS.pathBytes * (DESTINATION_CHANGED_SET.links + 1) + 1,
 };
 const comparisonLimit = (limits: TreeComparisonLimits): never => limits.onLimit ? limits.onLimit() : bad();
 
@@ -279,7 +282,7 @@ async function resolveLink(reader: Reader, path: string, files: Map<string, Flat
     for (let next = 0; next < components.length; next++) {
       // A work bound is uncertainty, never proof that a resolvable link is broken.
       limits.visit?.("link-step", 1);
-      if (steps++ > limits.linkSteps) return comparisonLimit(limits);
+      if (steps++ >= limits.linkSteps) return comparisonLimit(limits);
       const component = components[next]!;
       if (component === "" || component === ".") continue;
       if (component === "..") { if (at.length === 0) return false; at.pop(); continue; }
