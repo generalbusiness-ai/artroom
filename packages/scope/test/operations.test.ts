@@ -402,6 +402,34 @@ describe("outside operations at a real scope (scope contract, section 4.3; autho
     expect([await surface(s).effect(), await s.alarm(), out.attempts]).toEqual([0, false, [`${op}#1`]]);
   });
 
+  // A batch of permanently refused kinds must not hide a later accepted
+  // kind. Reconsideration never resends that attempt after an unknown reply.
+  test("reads fairly reconsider a refused tail beyond one batch; accepting it sends once, and changing acceptance after its unknown answer never resends it", async () => {
+    const s = await found({ deliveryBatch: 2 });
+    const out = outsideOf(s.name);
+    let enabled = false;
+    out.accepts = (...args: unknown[]) => enabled && args[1] === "mint";
+    const opened = await open(s, pushOf(1), pushOf(1), MINT);
+    expect(opened).not.toBe("scope-full");
+    const tail = (opened as OperationId[])[2]!;
+    out.answer(tail, 1, null);
+    for (let pass = 0; pass < 3; pass++) await surface(s).effect();
+    expect(out.attempts).toEqual([]);
+    enabled = true;
+    for (let read = 0; read < 12 && out.sent.length === 0; read++) {
+      await seen(s, tail);
+      await tick();
+    }
+    expect(out.attempts).toEqual([`${tail}#1`]);
+    while ((await seen(s, tail)).state !== "unknown") await tick();
+    enabled = false;
+    await seen(s, tail);
+    enabled = true;
+    for (let read = 0; read < 3; read++) await seen(s, tail);
+    await surface(s).effect();
+    expect([out.attempts, (await seen(s, tail)).state]).toEqual([[`${tail}#1`], "unknown"]);
+  });
+
   test("a scope whose pinned definition the runtime cannot run sends nothing outside the service: the attempt stays recorded, with no wake-up, and is sent once the runtime can run the definition. The capability is the scripted stand-in", async () => {
     // The lane of the other tests, with one capability guard. The scripted test capability, a stand-in, is the code for it.
     const staged = variant(definition.declared, (def) => { def.acts.report.guards.push({ capability: { name: "hold", guard: "staged", with: { commit: { field: "commit" }, under: { item: "also.commitment" } } } }); def.acts.report.fields.commit = { type: "commit", required: true }; });

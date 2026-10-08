@@ -232,7 +232,7 @@ export class Operations {
    * setting appears, the walk starts again (`reaccepted`), so the attempt is sent at the next turn with no restart. The sent mark
    * keeps it from being sent twice.
    */
-  readonly #refused = new Map<string, { owner: CapabilityName | PlatformDefinition; kind: string }>();
+  readonly #refused = new Map<string, { operation: OperationId; attempt: number; owner: CapabilityName | PlatformDefinition; kind: string }>();
   #running: Promise<number> | null = null;
   #again = false;
   /** A trusted retained-reply page has a successor; memory only, reset on restart. */
@@ -260,22 +260,25 @@ export class Operations {
    * it asks about at most one batch of them, and writes nothing. A pass that finds one starts the walk again (`#pass`).
    */
   reaccepted(): boolean {
-    let asked = 0;
-    for (const { owner, kind } of this.#refused.values()) {
-      if (asked++ >= this.#bounds.deliveryBatch) return false;
+    const count = Math.min(this.#refused.size, this.#bounds.deliveryBatch);
+    for (let asked = 0; asked < count; asked++) {
+      const [key, hint] = this.#refused.entries().next().value!;
+      const { owner, kind } = hint;
+      const row = this.#store.sending(hint.operation, hint.attempt);
+      const operation = this.#store.operation(hint.operation);
+      const attempt = operation?.attempts.find((opened) => opened.attempt === hint.attempt);
+      if (!row || row.sent !== null || row.next !== null || !attempt || attempt.outcomes.length > 0) {
+        this.#refused.delete(key);
+        continue;
+      }
+      // Leave an accepted hint at the front until the actual walk checks
+      // its durable row. A read must not consume the pass's reason to run.
       if (this.#outside.accepts(owner, kind)) return true;
+      // A permanently refused prefix cannot hide another accepted kind.
+      this.#refused.delete(key);
+      this.#refused.set(key, hint);
     }
     return false;
-  }
-  /** As `reaccepted`, and each attempt found accepted is let go: the walk looks at it once, and a pass that still cannot send it records it again. */
-  #accepted(): boolean {
-    let found = false;
-    let asked = 0;
-    for (const [key, { owner, kind }] of [...this.#refused]) {
-      if (asked++ >= this.#bounds.deliveryBatch) break;
-      if (this.#outside.accepts(owner, kind)) { this.#refused.delete(key); found = true; }
-    }
-    return found;
   }
 
   /**
@@ -315,7 +318,7 @@ export class Operations {
     const runs = Boolean(this.#scope.pinned()?.definition);
     const replyMore = this.#replyMore;
     if (!runs) this.#replyMore = false;
-    if (!this.#walk && runs && this.#accepted()) this.#walk = { after: null };
+    if (!this.#walk && runs && this.reaccepted()) this.#walk = { after: null };
     const walked = this.#walk;
     // The page has its own batch, so what is due never uses it up. A page that is not full is the last. The walk goes on by the
     // row it reached, so a row that stays as it is recorded is passed, and holds back no row after it.
@@ -353,7 +356,7 @@ export class Operations {
       const rules = operation ? this.#scope.owners()?.rules(operation.owner, operation.kind) : null;
       if (!operation || !origin || !this.#outside.accepts(operation.owner, operation.kind) || !rules) {
         if (row.next !== null) store.postpone(id, attempt, null);
-        if (operation && origin && rules) this.#refused.set(keyOf(id, attempt), { owner: operation.owner, kind: operation.kind });
+        if (operation && origin && rules) this.#refused.set(keyOf(id, attempt), { operation: id, attempt, owner: operation.owner, kind: operation.kind });
         continue;
       }
       this.#refused.delete(keyOf(id, attempt));

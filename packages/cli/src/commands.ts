@@ -27,7 +27,7 @@
  */
 
 import { PROPOSED_BOUNDS, type Answer, type DeclaredDefinition, type Digest, type Entry, type FieldValue, type Founded, type Item, type KeyId, type OperationId, type PlatformDefinition, type ScopeId, type Seed, type SignedIntent, type Summary } from "@generalbusiness/artroom-contract";
-import { b64url, definitionDigest, digestBytes, intentDigest, keyIdOfSecret, parseStrict, scopeIdOf, textDigest, timeOf, unb64url, utf8 } from "@generalbusiness/artroom-bytes";
+import { b64url, canonicalize, definitionDigest, digestBytes, intentDigest, isScopeId, isSignedIntentShape, keyIdOfSecret, parseStrict, scopeIdOf, textDigest, timeMs, timeOf, unb64url, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import {
   ScopeHandle, TransportError, declaredHandle, found, httpTransport, requestSession, secretSigner, sessionRequest, signedIntent, signedLogReader, signedReads,
   type Fetch, type ReadSigning, type Signing, type Transport,
@@ -343,17 +343,34 @@ export function installPlanned(ctx: Context): Promise<Outcome> {
     const before = await ctx.store.config();
     if (before?.register) return usage(`This config directory has a register already: ${before.register.scope}.`);
     const plan = before?.plan ?? stop(usage("No install is planned here. Run: artroom install --plan <base-url>."));
-    if (plan.definition !== REGISTER || registerIdOf(plan.founding, plan.definition) !== plan.register) {
-      return failed(`Refused: plan-mismatch. The planned register ${plan.register} is not the one that this command would found${plan.definition !== REGISTER ? `, under ${REGISTER} and not ${plan.definition}` : ""}. Nothing was sent. Plan again, and set the new register ID.`);
+    const operator = await ctx.store.secret("operator");
+    const now = ctx.now?.() ?? Date.now();
+    const valid = isOf(plan.definition, "platform:register") && platform(plan.definition) !== null
+      && isSignedIntentShape(plan.founding) && verifySignedIntent(plan.founding)
+      && plan.founding.intent.kind === "install" && plan.founding.intent.to === null && plan.founding.intent.on === null
+      && Object.keys(plan.founding.intent.expected).length === 0
+      && before!.key === "operator" && operator instanceof Uint8Array && operator.length === 32 && plan.founding.intent.actor === keyIdOfSecret(operator)
+      && typeof plan.service === "string" && plan.service === before!.service
+      && isScopeId(plan.register) && registerIdOf(plan.founding, plan.definition) === plan.register
+      && timeMs(plan.founding.intent.notAfter)! - now <= PROPOSED_BOUNDS.intentLifetimeSeconds * 1000;
+    if (!valid) {
+      return failed("Refused: plan-mismatch. The saved plan does not match this service, operator key and supported register version. Nothing was sent. Keep the original plan for recovery; do not silently replace it.");
     }
-    if ((ctx.now?.() ?? Date.now()) >= Date.parse(plan.founding.intent.notAfter)) {
+    if (now >= timeMs(plan.founding.intent.notAfter)!) {
       return failed(`Refused: plan-expired. The planned install could be founded until ${plan.founding.intent.notAfter}. Nothing was sent. Plan again, and set the new register ID.`);
     }
     const { answer } = await found(transportOf(ctx, plan.service), plan.founding, plan.definition);
     const receipt = accepted(answer, null, "Installed").receipt;
     if (receipt.fact.at.scope !== plan.register) return failed(`The register founded is ${receipt.fact.at.scope}, not the planned ${plan.register}. The plan is kept; report this.`);
+    const handle = new ScopeHandle(signedReads(transportOf(ctx, plan.service), secretSigner(operator!), readSigning(ctx)), plan.register, null);
+    const followed = await handle.followReceipt(receipt);
+    if (!followed.ok || followed.entry.seq !== 0 || followed.entry.at.kind !== "register" || followed.entry.input.type !== "genesis"
+      || followed.entry.input.seed.definition !== plan.definition || followed.entry.input.decision !== "applied"
+      || canonicalize(followed.entry.input.founding) !== canonicalize(plan.founding)) {
+      return failed("The install receipt does not prove the planned register's exact founding. The plan is kept; report this.");
+    }
     await ctx.store.save({ v: 1, service: plan.service, key: before!.key, register: receipt.fact.at });
-    return done(`Installed: register ${receipt.fact.at.scope}, under ${REGISTER}, as planned.`, `The operator key ${plan.founding.intent.actor} is kept in the config directory, readable only by you. It is the one founder key.`);
+    return done(`Installed: register ${receipt.fact.at.scope}, under ${plan.definition}, as planned.`, `The operator key ${plan.founding.intent.actor} is kept in the config directory, readable only by you. It is the one founder key.`);
   });
 }
 
