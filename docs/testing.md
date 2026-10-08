@@ -349,7 +349,7 @@ It installs only if `package-lock.json` changed since the last install,
 typechecks every workspace, and runs every test: one vitest process for
 the repository (`vitest.config.ts` at the root, one project for each of
 `bytes`, `derive`, `platform`, `git`, `checkers`, `replay`, `client`,
-`scope`, `lanes`, `cli` and `page`), then one script (`scripts/active-source.test.mjs`). The script checks that no
+`scope`, `scope-denial`, `lanes`, `cli` and `page`), then one script (`scripts/active-source.test.mjs`). The script checks that no
 active file imports from `parked/` or names a removed format, and that no
 platform package depends on the lanes package or imports from it. It prints the head, the tree and
 each step's elapsed and CPU time. It also fails on a whitespace error in
@@ -362,6 +362,21 @@ vitest lets projects share a group only when their worker counts agree. The
 `git` project runs the real `git` program, as a client and as a server, on
 local repositories, and one file of the `checkers` project runs it for the
 runner's checkout. Nothing runs twice.
+
+The `scope-denial` project then runs the post-sent local-denial witness in
+its own Worker runtime, with the same Worker and real SQLite storage. Both
+the root and Scope package entrypoints include it exactly once; the other
+Operations witnesses, including T19's native global abort, stay in `scope`.
+The original denial body and all T19 assertions remain. Their operation
+opening uses one shared helper, not a second fixture implementation.
+
+This isolates the observed T2-to-T19 unsafe-abort interaction in the pinned
+test runtime. It does not fix that native helper bug or prove mixed-cohort
+cleanup or physical draining. Captured frames locate IncomingRequest task
+cancellation through the native abort, but do not identify the actor or
+context. The extra Worker startup costs time and memory; the denial project
+starts no clone fixture or Git server. Current full-gate cost and complete
+exact-head Source acceptance remain separate obligations.
 
 The command line's story, `packages/cli/test/*.scope.test.ts`, runs from
 the root inside the `scope` project too, and has no Worker of its own. Its
