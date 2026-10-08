@@ -11,21 +11,24 @@ import { nodeGit } from "../src/git.ts";
 // configuration, and exits 0. No repository is cloned.
 test("the Node runner passes the header only through git's environment configuration, never in the arguments; with no git on the PATH it answers null", async () => {
   const bin = mkdtempSync(join(tmpdir(), "artroom-clone-"));
-  const record = join(bin, "record");
-  writeFileSync(join(bin, "git"), `#!/bin/sh\nprintf '%s\\n' "$@" > "${record}.args"\nprintf '%s|%s|%s\\n' "$GIT_CONFIG_COUNT" "$GIT_CONFIG_KEY_0" "$GIT_CONFIG_VALUE_0" > "${record}.env"\nexit 0\n`);
-  chmodSync(join(bin, "git"), 0o755);
-  const path = process.env["PATH"];
-  process.env["PATH"] = `${bin}:${path}`;
   try {
-    const env = { GIT_CONFIG_COUNT: "1", GIT_CONFIG_KEY_0: "http.extraHeader", GIT_CONFIG_VALUE_0: "Authorization: Bearer read-plaintext-1" };
-    expect(await nodeGit().run(["clone", "--", "https://service.invalid/git/artroom-demo/r.git", "here"], env)).toBe(0);
-    const args = readFileSync(`${record}.args`, "utf8");
-    expect(args).toBe("clone\n--\nhttps://service.invalid/git/artroom-demo/r.git\nhere\n");
-    expect(args).not.toContain("read-plaintext-1");
-    expect(readFileSync(`${record}.env`, "utf8")).toBe("1|http.extraHeader|Authorization: Bearer read-plaintext-1\n");
-  } finally {
-    process.env["PATH"] = path;
-  }
-  // No git: the program is not found, and the answer is null. Control: the same runner over the stand-in answers 0, above.
-  try { expect(await nodeGit(join(bin, "no-such-git")).run(["--version"], {})).toBeNull(); } finally { rmSync(bin, { recursive: true, force: true }); }
+    const record = join(bin, "record");
+    writeFileSync(join(bin, "git"), `#!/bin/sh\nprintf '%s\\n' "$@" > "${record}.args"\nprintf '%s|%s|%s\\n' "$GIT_CONFIG_COUNT" "$GIT_CONFIG_KEY_0" "$GIT_CONFIG_VALUE_0" > "${record}.env"\nexit 0\n`);
+    chmodSync(join(bin, "git"), 0o755);
+    const path = process.env["PATH"];
+    process.env["PATH"] = `${bin}:${path}`;
+    try {
+      const env = { GIT_CONFIG_COUNT: "1", GIT_CONFIG_KEY_0: "http.extraHeader", GIT_CONFIG_VALUE_0: "Authorization: Bearer read-plaintext-1" };
+      expect(await nodeGit().run(["clone", "--", "https://service.invalid/git/artroom-demo/r.git", "here"], env)).toBe(0);
+      const args = readFileSync(`${record}.args`, "utf8");
+      expect(args).toBe("clone\n--\nhttps://service.invalid/git/artroom-demo/r.git\nhere\n");
+      expect(args).not.toContain("read-plaintext-1");
+      expect(readFileSync(`${record}.env`, "utf8")).toBe("1|http.extraHeader|Authorization: Bearer read-plaintext-1\n");
+    } finally {
+      if (path === undefined) delete process.env["PATH"];
+      else process.env["PATH"] = path;
+    }
+    // No git: the program is not found, and the answer is null. Control: the same runner over the stand-in answers 0, above.
+    expect(await nodeGit(join(bin, "no-such-git")).run(["--version"], {})).toBeNull();
+  } finally { rmSync(bin, { recursive: true, force: true }); }
 });

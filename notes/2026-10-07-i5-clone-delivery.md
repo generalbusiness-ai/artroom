@@ -496,3 +496,11 @@ No original historical admission/bundle, old-room compatibility, executor or
 capacity proof follows from this fresh@2 component. Full original484 scope
 remains required. No additional suite, gate, cloud/provider or main operation
 ran for this documentation successor; Root owns the combined final review.
+
+The later supporting read `633794ed` found that the Node Git witness's owned
+scratch cleanup covered only its final assertion. Its outer `finally` now
+covers the whole lifetime after allocation, including setup and earlier
+assertion failures; the nested PATH restoration preserves an absent variable
+as absent. All argument/header/no-Git assertions remain. The isolated existing
+Git test passed once in `/tmp/artroom-expanded-git-cleanup.log`. No product
+source or token policy changed, and this supplies no broader Git sandbox proof.
