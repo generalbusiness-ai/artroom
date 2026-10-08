@@ -13,6 +13,49 @@ independent SOURCE review to existing Gate 1 request `225da894` and producer
 the required landed-commit gate. Full I3, native lane hold and
 change publication, profiles, capacity and browser obligations stay open.
 
+## Current successor: strict aged rules reads
+
+Planner decision `43d2443f` requires this repair inside whole225 before
+landing. Source `3ca87305fd4f718e00d8d70cd66b8d241a780fe3`, tree
+`5c30003b80b3259acdca2fbce140ee7c5bf28698`, extends verified birth-session
+preparation to rules. The applied rules genesis, held full directory reference
+and creation source must match; the actual active creator directory must
+confirm this exact rules incarnation and the session's full membership
+reference. MAC, deployment, clock and read permission are checked before the
+bounded read and authority is checked again afterward. The object-life cache
+changes no grant observation or history. Typed retained-input eligibility and
+private join recovery remain intact; the incoming ID-only patch was not merged.
+
+The real founding witness ages the histories beyond 900 seconds, reads rules
+before their first act, restarts the object and replays rules, directory and
+destination with an issued session and no anchors. The negative peer controls
+refuse wrong directory, rules or membership incarnations, duplicate repositories
+and locally invalid/disallowed sessions. Removing exact rules-reference equality
+distinguished by assertion; source was restored. Four focused tests and scope
+typecheck passed.
+
+One gate at changed source `3ca87305f` passed **785 tests and six source checks**,
+all typechecks, clean checkout. Packages `29eb48ce38343587a131ac6b227c6fcb129738bb`;
+scripts `c7ffb21b9435e2a7985a2bd0492c72dce1047787`. Gate log
+`/tmp/artroom-gate1-rules-birth-gate.log`; raw logs
+`/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.jnavz21wxw`.
+Typecheck 3.9 elapsed/11.8 CPU seconds; tests 26.2 elapsed/51.5 CPU seconds.
+Install skipped matching lock. Phase figures, shared Mac/Node 26.10.0,
+warm focused caches; load not sampled. No sweep or note-only regate.
+
+Exact source deployed on the isolated Worker as
+`f80e1645-cd3c-4256-ba8b-57f45bc21d40`. **The same aged room now replays all
+six scopes consistently**, without anchors or missing foreign facts. Scope,
+incarnation and target heads match the preceding failed recheck and original
+fresh witness: no new founding, repinning or history rewrite. All six command
+exits were 0 and reports were read in full. The live witness retains the earlier
+failures and exact new evidence/coverage/trusts. Replay still trusts service
+clocks, histories, delivery/outside answers and platform correspondence.
+This closes the observed read failure in producer evidence, not whole225:
+independent exact source review, approval, landing and landed gate remain owed.
+Immutable version selection/old-room host routing is the separate version owner;
+no clone/site/Gate2/fullI3/profile/capacity/browser/manual closure is inferred.
+
 ## Repaired source after review 6a649a90
 
 Builder accepted the two P2s and guide P3s at `2fc33f9b` and repaired them

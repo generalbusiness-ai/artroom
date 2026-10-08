@@ -11,6 +11,27 @@ for independent review. Receipt eligibility remains conditional on exact
 approval, implementer landing and the required landed-commit gate. Full I3, native lane hold and change
 publication, profiles, capacity and browser obligations remain open.
 
+## Strict rules birth-read successor
+
+Current source `3ca87305f` implements lead43d inside225. Gate785+6 and exact
+aged-room deployment/replay are recorded by the current delivery/live witness.
+Packages `29eb48ce38343587a131ac6b227c6fcb129738bb`; scripts remain
+`c7ffb21b9435e2a7985a2bd0492c72dce1047787`. No earlier-head body credit.
+Complete additional source delta from1c9:
+
+```text
+M	packages/scope/README.md
+M	packages/scope/src/authority.ts
+M	packages/scope/src/worker.ts
+M	packages/scope/test/destination-sessions.test.ts
+M	packages/scope/test/founding-real.test.ts
+```
+
+The final filing head is notes-only after this gate. Historical inventory and
+prior failed/consistent live runs remain bound to their stated sources. Whole
+native candidate versus published main is independently reviewable in Git;
+no partial receipt or unchanged platform-version compatibility claim applies.
+
 ## Repaired successor
 
 Source `8ec0d8d73` repairs review `6a649a90`; expanded delivery states exact

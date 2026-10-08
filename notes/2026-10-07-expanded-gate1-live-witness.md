@@ -175,6 +175,36 @@ service/platform/outside-answer trusts and all stand-in limits still apply.
 | `/tmp/artroom-gate1-repair-verify-destination.log` | 2813 | `ff071617852b428df539655adaed7e6ac646d48a2f7cc21797377426e6a3ba2d` |
 | `/tmp/artroom-gate1-repair-verify-inbox.log` | 2358 | `2ca725ed6fc2e59c527a49010566e5285625f8e6c5b209cb363ab62219458ecc` |
 
+## Strict birth repair: same aged histories now replay
+
+Source `3ca87305fd4f718e00d8d70cd66b8d241a780fe3` (785+6 gate; packages
+`29eb48ce38343587a131ac6b227c6fcb129738bb`) deployed as
+`f80e1645-cd3c-4256-ba8b-57f45bc21d40`. The same home, keys, register and
+room above were read with the repaired CLI. No founding, act, anchor, repin
+or history mutation was used to make this recheck pass.
+
+All six commands exited 0, consistent; no anchors or missing foreign facts.
+Full scope/incarnation/head tuples match the original and failed aged reports.
+Target coverage is register 0–3, directory 0–4, membership 0–4, rules 0–1,
+destination 0–7 and inbox 0–1. Source coverage and replay trusts match the
+original all-six coverage table. Foreign facts replayed are 3, 7, 8, 7, 8
+and 9 respectively. Builder read all six reports in full. The earlier aged
+failure remains above; it is not relabelled or replaced by a fresh room.
+This is replay/read-continuity evidence on the preserved founding histories,
+not a new outside-write or room-issued clone witness, source approval or landing.
+
+| Safe retained evidence | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `/tmp/artroom-gate1-rules-birth-gate.log` | 491 | `6c597a96635c3a8f7cd97e4c936ff369887827acd7e5ac65e30da28f10af3209` |
+| `/tmp/artroom-gate1-rules-birth-deploy.log` | 777 | `0cb9078be26f4d45f7b278a2051b2518778fe66d3c664a23e2229c054abfc3bb` |
+| `/tmp/artroom-gate1-rules-birth-verifies.json` | 978 | `72abae965ae7baf061a0b3e1b1fa13d662d7406e1acab548948b29c50c209dd1` |
+| `/tmp/artroom-gate1-rules-birth-verify-register.log` | 1879 | `83889186eaad501298db41f99182fd5cbbc89ee61d1e527f932d76fb7c6724d8` |
+| `/tmp/artroom-gate1-rules-birth-verify-directory.log` | 2610 | `e3244e5af19a9d3558fc494cbdde8d200b3a445d07a982b4a55704b5f25f5b4c` |
+| `/tmp/artroom-gate1-rules-birth-verify-membership.log` | 2363 | `0088c57fbfc8675e2ba6dffacb33e3362902ef29a4833274547e24efded5dddc` |
+| `/tmp/artroom-gate1-rules-birth-verify-rules.log` | 2358 | `6c4146f3aaeaf640d0e7e3b7438f59e031ba641d3ef39698d6c78344b4d1c1c6` |
+| `/tmp/artroom-gate1-rules-birth-verify-destination.log` | 2612 | `be32cd3056944166be8f89e78830252dcf790447a4669edca1b4cf8decf296b3` |
+| `/tmp/artroom-gate1-rules-birth-verify-inbox.log` | 2358 | `2ca725ed6fc2e59c527a49010566e5285625f8e6c5b209cb363ab62219458ecc` |
+
 ## Evidence index
 
 These logs contain command outcomes and replay reports. They exclude token
