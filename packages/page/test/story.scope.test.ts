@@ -47,7 +47,9 @@ test("the page's data functions against the Worker's routes as deployed: join wi
     try {
       const signed = await openRoom(d.as(ritas), place);
       expect([signed.reader, signed.unsessioned, signed.me?.handle]).toEqual([null, "sessions-unavailable", "@rita"]);
-      expect((await loadRules(signed)).definitions.map((x) => x.name)).toEqual(["issue", "change"]);
+      // Limited signed reads do not authorize retained-item enumeration. The
+      // page must show that refusal rather than a partial definition list.
+      await expect(loadRules(signed)).rejects.toThrow(new Unreadable(`Cannot read definition items of ${d.rules.name}: forbidden.`));
       await expect(openRoom(d.as(unas), place)).rejects.toThrow(new Unreadable(`Cannot read ${d.D.name}: forbidden.`));
     } finally {
       platformNet.secret = secret;
@@ -119,6 +121,7 @@ test("the page's data functions against the Worker's routes as deployed: join wi
     expect((await loadSite(forPaul, "AGENTS.md")).text).toContain("Ask before you push.");
 
     // The rules of the room: rita is the one member whose role holds `rules.publish`; she is offered `publish`, paul is not.
+    expect(forPaul.reader).not.toBeNull(); // The complete rules view below uses a real membership session.
     const rules = await loadRules(forPaul);
     expect(rules).toMatchObject({ approvals: 0, ownerMayReview: false, controllers: ["@rita"] });
     expect(rules.extents?.map((e) => [e.name, e.approvals, e.approver])).toEqual([["rules", 1, "rules.publish"], ["infrastructure", 0, "change.merge"], ["source", 0, "change.review"]]);
