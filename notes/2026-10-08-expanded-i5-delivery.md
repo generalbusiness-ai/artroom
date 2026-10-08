@@ -320,3 +320,27 @@ Source review. The previous uncaught timeout diagnostic has no identified
 test owner in the saved log or cache; it remains an unresolved cancellation
 risk, rather than clean-runtime credit. No timer, dependency or assertion
 changes, extra diagnostic suite or cloud/browser/provider run are made.
+
+## Final gate after accepted-result repair
+
+The ordinary gate ran once at clean
+`c582b10467283d0ca3b3497b2c1299dc3286821c`, tree
+`1d1d28cd2c53217bb905a5d62d341ef040ca4385`. Command and phases exit zero:
+whitespace 0.1 seconds; types 4.8 elapsed/15.6 CPU seconds; tests 59.8
+elapsed/89.5 CPU seconds. Vitest reports 131 files passed and one recorder
+file skipped, 842 tests passed and two opt-in recorders skipped. All six
+active-source checks pass. Root read each complete phase log through EOF.
+
+Raw gate log: `/tmp/artroom-expanded-link-repair-gate.log`. Phase outputs:
+`/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.euI035W1FD`.
+This invocation reports no uncaught exception, failed test or unhandled error.
+It is a passing verification of this source head, not an explanation or fix
+of the earlier intermittent timeout diagnostic or native abort interaction.
+Both earlier gate outputs and their qualifications remain retained. No timer,
+dependency, instrumentation, assertion or skip changed to obtain this result.
+
+The final note/evidence successor changes no product source, tests or
+configuration after this gate; package tree equality is recorded before
+filing. Normal complete exact-head Source review and requester judgment
+remain required under the same expanded request. No deferred original proof
+or named follow-up is closed by this passing run.

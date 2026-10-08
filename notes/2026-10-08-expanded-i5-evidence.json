@@ -1,17 +1,17 @@
 {
   "purpose": "Delivery metadata, not authority, readiness or independent Source approval",
   "gate": {
-    "head": "39eda03ec4e8d55d901526d809b8bcf3e9d58122",
-    "tree": "4a450bfe0d3fe31f30694dc8579d8ce35b82bb54",
+    "head": "c582b10467283d0ca3b3497b2c1299dc3286821c",
+    "tree": "1d1d28cd2c53217bb905a5d62d341ef040ca4385",
     "reported_exit": 0,
     "vitest_passed": 842,
     "opt_in_recorders_skipped": 2,
     "active_source_passed": 6,
-    "runtime_diagnostic": "Uncaught cross-Durable-Object RefcountedCanceler exception in Vitest timeout cancellation; no affected task identified; assessment required before landing"
+    "runtime_diagnostic": "None emitted in the complete current raw test log; earlier uncaught timeout/cancellation diagnostic remains unexplained, not claimed fixed"
   },
-  "evidence_head_before_this_note": "5e89ecf6f1eff174e75d84ee0091510f9cafe27b",
-  "package_tree": "700a60b7106ea70b15842e07ffff0bc31c824ed7",
-  "gated_package_tree": "700a60b7106ea70b15842e07ffff0bc31c824ed7",
+  "evidence_head_before_this_note": "c582b10467283d0ca3b3497b2c1299dc3286821c",
+  "package_tree": "78b52f9a48d2b278c57d9f3674d3b1194b7ad296",
+  "gated_package_tree": "78b52f9a48d2b278c57d9f3674d3b1194b7ad296",
   "changes_since_gate_before_this_note": [
     "notes/2026-10-08-expanded-i5-delivery.md"
   ],
@@ -60,6 +60,56 @@
       "path": "/tmp/artroom-expanded-demo-contract-evidence.json",
       "bytes": 3717,
       "sha256": "a2a67f80ae0c7b68590aea11aac17f3e63f18fbdfa04698ae98412edd11a8ffe"
+    },
+    {
+      "path": "/tmp/artroom-expanded-link-repair-gate.log",
+      "bytes": 503,
+      "sha256": "f00d1754910dc9a8da4e6f553fd36520eefa5880e48d8b14b5d26a0bf88e3d9b"
+    },
+    {
+      "path": "/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.euI035W1FD/whitespace.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.euI035W1FD/typecheck.log",
+      "bytes": 1510,
+      "sha256": "b05ed3728460487c42438640e0ac5e1f38c1944c2c38137be5294ffcecabf447"
+    },
+    {
+      "path": "/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.euI035W1FD/test.log",
+      "bytes": 1080,
+      "sha256": "beb15a2e678d5322896519c6b80c457d9e981362a718b04d031886ac11ce4ff9"
+    },
+    {
+      "path": "/tmp/artroom-edit-link-result-evidence/focused-final.log",
+      "bytes": 222,
+      "sha256": "46cbdeb1d63a68a088ebf80528aaf3e1f6b4013ef54137e3f1cbeecc6178387a"
+    },
+    {
+      "path": "/tmp/artroom-edit-link-result-evidence/control.log",
+      "bytes": 2877,
+      "sha256": "b0540c8b56701df7d98fcbafae4852a3225c45a2a2c768e341c51694a9ce3600"
+    },
+    {
+      "path": "/tmp/artroom-edit-link-result-evidence/cli-types.log",
+      "bytes": 137,
+      "sha256": "b071fdcd2a1b9f41028faa45b00336ae371e0f884cc193f14edfaf8c03d0b11f"
+    },
+    {
+      "path": "/tmp/artroom-edit-link-result-evidence/scope-types.log",
+      "bytes": 151,
+      "sha256": "4df6218037a0d03e53f31b1b9e167db9e850ff75810f379cc9c2e0e16ae594e1"
+    },
+    {
+      "path": "/tmp/artroom-edit-link-result-evidence/preservation.json",
+      "bytes": 120,
+      "sha256": "34ddbe460fb2e1aa7a90dad1fc81bc1973d45a421aca19217e001f6cbaaa410c"
+    },
+    {
+      "path": "/tmp/artroom-edit-link-result-evidence/source-hashes.json",
+      "bytes": 562,
+      "sha256": "8ae2261a7342e7a80ebf641c2fc28c9b7cecfdeaa3707bc4331338b661cf7270"
     }
   ],
   "limits": [
@@ -67,6 +117,16 @@
     "Native unsafe-abort interaction isolated, not fixed or mixed-cohort/physical-drain proof",
     "Default test timeouts and all invariant assertions retained",
     "No provider/browser/cloud run or historical admission/source proof",
-    "Normal complete exact-head Source review and requester judgment still required"
-  ]
+    "Normal complete exact-head Source review and requester judgment still required",
+    "Current gate emits no timeout diagnostic; no cause or fix of the earlier diagnostic is established"
+  ],
+  "previous_gate": {
+    "head": "39eda03ec4e8d55d901526d809b8bcf3e9d58122",
+    "tree": "4a450bfe0d3fe31f30694dc8579d8ce35b82bb54",
+    "reported_exit": 0,
+    "vitest_passed": 842,
+    "opt_in_recorders_skipped": 2,
+    "active_source_passed": 6,
+    "runtime_diagnostic": "Uncaught cross-Durable-Object RefcountedCanceler exception in Vitest timeout cancellation; no affected task identified; assessment required before landing"
+  }
 }
