@@ -1,13 +1,14 @@
 import { describe, expect, test } from "vitest";
+import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { Entry, OperationId, Seed, SignedIntent } from "@generalbusiness/artroom-contract";
 import { b64url, intentDigest, scopeIdOf, seedDigest, timeMs, timeOf } from "@generalbusiness/artroom-bytes";
-import type { Fetch } from "@generalbusiness/artroom-client";
+import { ScopeHandle, httpTransport, requestSession, secretSigner, sessionRequest, signedReads, type Fetch } from "@generalbusiness/artroom-client";
 import { repositoryName } from "@generalbusiness/artroom-platform";
 import { net } from "@generalbusiness/artroom-scope/testing";
 import { platformNet } from "@generalbusiness/artroom-scope/testing/worker";
 import { Platform, routed, settle } from "../../scope/test/repository.ts";
 import { outsideOf, wired } from "../../scope/test/outside.ts";
-import { command, memoryStore, type Context } from "../src/index.ts";
+import { command, memoryStore, type Config, type Context } from "../src/index.ts";
 
 const SERVICE = "https://scopes.test";
 /** The test's own reader, which the command never presents. */
@@ -47,6 +48,7 @@ async function resumed(): Promise<void> {
   let beforeFound = false;
   let unavailableFound = false;
   let unavailableSettlement = false;
+  let unknownSettlementPin = false;
   let after: "seat" | "first-key" | null = null;
   const sent: Record<string, SignedIntent[]> = { found: [], seat: [], "first-key": [] };
   const fetch = (async (url: string, init?: RequestInit) => {
@@ -61,12 +63,23 @@ async function resumed(): Promise<void> {
     // STAND-IN for an unavailable reply, before delivery to the real Worker.
     if (kind === "found" && unavailableFound) { unavailableFound = false; return Response.json({ answer: "unavailable", reason: "unavailable" }); }
     const response = await routed(url, init);
+    if (settlement && unknownSettlementPin) {
+      unknownSettlementPin = false;
+      const receipt = await response.json() as { ok: boolean; value: { definition: string } };
+      return Response.json({ ...receipt, value: { ...receipt.value, definition: "platform:register@99" } });
+    }
     if (kind === after) { after = null; await response.body?.cancel(); throw new Error("scripted loss after accepted enrollment"); }
     return response;
   }) as unknown as Fetch;
   // STAND-IN for the scheduler: the dispatchers of the scopes the command waits on. No pass of an operations driver.
   const pause = async (waiting: readonly string[]) => settle(...waiting.map((scope) => new Platform(scope as never)));
-  const rita: Context = { store: memoryStore(), fetch, now: () => timeMs(net.clock.now)!, pause, tries: 3 };
+  const memory = memoryStore();
+  const acceptedSnapshots: Config[] = [];
+  const store = { ...memory, save: async (next: Config) => {
+    await memory.save(next);
+    if (next.claim?.found?.accepted && next.claim.seat?.accepted && next.claim.firstKey?.accepted) acceptedSnapshots.push(structuredClone(next));
+  } };
+  const rita: Context = { store, fetch, now: () => timeMs(net.clock.now)!, pause, tries: 3 };
   // A fresh command context each time; only the store survives. memoryStore
   // stands for local file persistence, and server restarts below are actual.
   const run = (...argv: string[]) => command({ ...rita }, argv);
@@ -195,5 +208,38 @@ async function resumed(): Promise<void> {
   expect(legacyRecovered.code, legacyRecovered.lines.join("\n")).toBe(0);
   expect([sent["found"]!.length, sent["seat"]!.length, sent["first-key"]!.length]).toEqual(beforeLegacySends);
   expect((await rita.store.config())!.repository!.membership).toEqual(config.repository!.membership);
+  // SCRIPTED local interruption: restore the real complete pending snapshot
+  // written after all accepted step receipts, before final config publication.
+  // It retains actual signed envelopes/facts, not hand-made history.
+  const agedPending = acceptedSnapshots.at(-1)!;
+  expect(agedPending.claim?.firstKey?.accepted).toBeDefined();
+  const beforeAgedSends = structuredClone(sent);
+  await rita.store.save(agedPending);
+  // A settlement can select only supported exact code, never NEWEST when an
+  // otherwise matching receipt reports an unknown pin.
+  unknownSettlementPin = true;
+  expect(await run("claim", "demo")).toEqual({ code: 1, lines: ["The register's exact pinned definition or reference is not supported; nothing was submitted."] });
+  expect(await rita.store.config()).toEqual(agedPending);
+  expect(sent).toEqual(beforeAgedSends);
+  net.clock.now = timeOf(timeMs(net.clock.now)! + (PROPOSED_BOUNDS.intentLifetimeSeconds + 1) * 1000);
+  await R.restart();
+  await M.restart();
+  const operator = secretSigner((await rita.store.secret("operator"))!);
+  const signedRegister = new ScopeHandle(signedReads(httpTransport(SERVICE, { fetch }), operator, { now: () => timeMs(net.clock.now)! }), R.name, null);
+  expect(await signedRegister.summary()).toEqual({ ok: false, reason: "forbidden" });
+  const currentSession = await requestSession(SERVICE, M.name, sessionRequest(await M.at(), (await rita.store.secret("operator"))!, timeOf(timeMs(net.clock.now)! + 60_000), "aged-claim-session"), { fetch });
+  expect(currentSession.ok).toBe(true);
+  if (!currentSession.ok) return expect.fail(currentSession.reason);
+  const summaryWithSession = await routed(`${SERVICE}/v1/scopes/${R.name}`, { headers: { authorization: currentSession.session.reader() } });
+  expect([summaryWithSession.status, await summaryWithSession.json()]).toEqual([403, { ok: false, reason: "forbidden" }]);
+  const agedResume = await run("claim", "demo");
+  expect(agedResume.code, agedResume.lines.join("\n")).toBe(0);
+  expect((await rita.store.config())!.repository).toEqual(config.repository);
+  expect(sent).toEqual(beforeAgedSends);
+  expect([(await founds()).length, (await enrollment("seat")).length, (await enrollment("first-key")).length]).toEqual([2, 1, 1]);
+  expect(agedPending.claim!.found!.signed).toEqual(second.found!.signed);
+  expect(agedPending.claim!.seat!.signed).toEqual(seatedPending.seat!.signed);
+  expect(agedPending.claim!.firstKey!.signed).toEqual(keyedPending.firstKey!.signed);
+  await noSecret();
   wired.delete(R.name);
 }
