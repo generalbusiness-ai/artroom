@@ -44,6 +44,7 @@ import type { Wakes } from "./outbox.ts";
 import type { Clock, Ports } from "./ports.ts";
 import type { Sealed, Sending, Store } from "./store.ts";
 import { LATE, within } from "./turn.ts";
+import { OriginalFence, type OriginalAdapter } from "./dispatch.ts";
 
 /**
  * The one request of one attempt, as the port is given it. `origin` is the
@@ -112,6 +113,9 @@ export type LateAnswers = (operation: OperationId, attempt: number, answer: Effe
 export interface Outside {
   accepts(owner: CapabilityName | PlatformDefinition, kind: string): boolean;
   send(request: EffectRequest): Promise<EffectAnswer | null>;
+  /** Reviewed adapter contract for explicit original-dispatch registration.
+   * Unsupported mutation kinds hold; no legacy send fallback is permitted. */
+  original?: OriginalAdapter;
   late?(deliver: LateAnswers): void;
   judged?(at: { scope: ScopeRef; operation: OperationId; attempt: number }, sealed: Sealed | null): void;
   /**
@@ -192,6 +196,7 @@ export class Operations {
   readonly #wakes: Wakes;
   readonly #bounds: Bounds;
   readonly #diagnoses: Ports["diagnoses"];
+  readonly #dispatch: Ports["dispatch"];
   /**
    * True while an attempt is recorded and not sent because its owner's rule
    * says that it is not ready (`OperationRules.ready`): the request of an
@@ -235,12 +240,13 @@ export class Operations {
   readonly #conflict: ((operation: OperationId, attempt: number, seq: number) => void) | undefined;
 
   /** `owners`: the rules of the owners this runtime has code for. With none, no outcome can be judged, so nothing is sent. */
-  constructor(scope: Scope, store: Store, ports: Pick<Ports, "outside" | "clock" | "owners" | "diagnoses">, wakes: Wakes, bounds: Bounds, conflict?: (operation: OperationId, attempt: number, seq: number) => void) {
+  constructor(scope: Scope, store: Store, ports: Pick<Ports, "outside" | "clock" | "owners" | "diagnoses" | "dispatch">, wakes: Wakes, bounds: Bounds, conflict?: (operation: OperationId, attempt: number, seq: number) => void) {
     this.#conflict = conflict;
     this.#scope = scope;
     this.#store = store;
     this.#outside = ports.outside;
     this.#owners = ports.owners ?? undefined;
+    this.#dispatch = ports.dispatch;
     this.#clock = ports.clock;
     this.#wakes = wakes;
     this.#bounds = bounds;
@@ -333,9 +339,21 @@ export class Operations {
       }
       // Durable before the send: from here on the request may have left. A scope that stops here is woken, by the alarm set below,
       // and records `unknown`.
-      store.markSent(id, attempt, timeOf(now), now + this.#bounds.dispatchSeconds * 1000);
       const request: EffectRequest = { scope: scope.at, operation: id, attempt, owner: operation.owner, kind: operation.kind, origin: { entry: JSON.parse(origin.bytes) as Entry, hash: origin.hash } };
-      work.push(() => this.#send(row, request, now));
+      if (this.#dispatch !== undefined) {
+        const prepared = await OriginalFence.prepare(store, this.#dispatch.registration, this.#dispatch.object, request, () => this.#clock.read());
+        const marking = timeMs(this.#clock.read());
+        if (!prepared || marking === null || !prepared.fence.mark(timeOf(marking), marking + this.#bounds.dispatchSeconds * 1000)) {
+          if (row.next !== null) store.postpone(id, attempt, null);
+          continue;
+        }
+        work.push(() => this.#answer(row, request, now, () => prepared.send(prepared.fence)));
+      } else {
+        // Unregistered legacy remains its existing contract, not a fenced
+        // executor or an implicit route under a selected fenced tuple.
+        store.markSent(id, attempt, timeOf(now), now + this.#bounds.dispatchSeconds * 1000);
+        work.push(() => this.#send(row, request, now));
+      }
     }
     await this.#wake(now);
     // Rule 6: each attempt is sent and answered by itself. One that waits for its answer delays no other, and its answer changes no other.

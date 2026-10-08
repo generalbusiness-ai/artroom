@@ -11,10 +11,12 @@ import { byteOrder, valueDigest } from "@generalbusiness/artroom-derive";
 import { DESTINATION_CHANGED_SET, type DestinationObject, type JudgeChanges, type RecordedJudgeEvidence, type TreeLink } from "@generalbusiness/artroom-platform";
 import { GitRefusal, READ_BOUNDS, SNAPSHOT_BOUNDS, Reader, objectId, refName, type GitSource, type ReadBounds, type StoredObject } from "@generalbusiness/artroom-git";
 import { GitHubApp, type GitHubAppOptions, type GitHubInstallationToken } from "@generalbusiness/artroom-git/github";
-import { SmartHttpGit, type RawGitObject, type SmartHttpOptions } from "@generalbusiness/artroom-git/http";
+import { SmartHttpGit, receiveArguments, type RawGitObject, type SmartHttpOptions } from "@generalbusiness/artroom-git/http";
 import { SmartHttpSource } from "@generalbusiness/artroom-git/http-read";
 import type { DestinationBinding, DestinationInspection, DestinationProvider, DestinationRepository } from "./destination-host.ts";
 import type { RegisterProvider } from "./register-host.ts";
+import { requireOriginalFence, type RequestIdentity } from "./dispatch.ts";
+import { canonicalBytes, digestBytes } from "@generalbusiness/artroom-bytes";
 
 export interface GitHubProviderOptions {
   app: GitHubAppOptions;
@@ -148,6 +150,9 @@ export class GitHubProvider implements RegisterProvider, DestinationProvider {
     const remote = this.#remote(request.repository);
     return sendOnce(request, { ...this.#transport(remote), authorization: gitAuthorization(request.token) }, () => this.ref(request.repository, request.ref));
   }
+  originalRequest(request: Parameters<DestinationProvider["send"]>[0]): RequestIdentity {
+    return gitOriginalRequest(`${this.#remote(request.repository)}/git-receive-pack`, request);
+  }
   async inspect(context: DestinationInspection): Promise<{ evidence: RecordedJudgeEvidence; retain?: readonly RetainedInput[] }> {
     context = { ...context, repository: { ...context.repository }, reports: [...context.reports] };
     return inspectGit(new Reader(await this.#source(context.repository), this.#bounds), context, this.#bounds);
@@ -201,11 +206,22 @@ export async function sendOnce(request: Parameters<DestinationProvider["send"]>[
   if ((request.old !== null && commit.parents[0] !== request.old) || (request.requireParentless && commit.parents.length !== 0) || (request.expectedTree !== undefined && commit.tree !== request.expectedTree)) return bad();
   const stop = request.old === null ? new Set<string>() : new Set([objectId(request.old, "old")]);
   if (!(await reader.closure(request.commit, stop)).complete) return bad();
-  const result = await new SmartHttpGit(transport).send({ ref: request.ref, old: request.old, new: request.commit, objects, beforeSend: request.allowed });
+  const fence = request.fence;
+  if (fence !== undefined) requireOriginalFence(fence);
+  const result = await new SmartHttpGit(transport).send({ ref: request.ref, old: request.old, new: request.commit, objects, beforeSend: request.allowed,
+    ...(fence === undefined ? {} : { beforePost: (url, actual) => {
+      // This is trusted adapter code, not a caller's authority predicate.
+      if (!request.allowed()) throw new Error("current destination custody unavailable");
+      fence.consume({ method: "POST", path: url, publicBody: digestBytes(canonicalBytes(actual)), custodyFromSite: null });
+    } }),
+  });
   if (!result.ran || result.reported === "stale") return { send: "not-sent" };
   if (result.exit === 1 && result.reported === "remote-rejected" && !result.timedOut) return { send: "refused" };
   if (result.exit === 0 && (result.reported === "created" || result.reported === "updated") && !result.timedOut && await readBack() === request.commit) return { send: "accepted" };
   return null; // An applied ref cannot settle a lost or incomplete own answer.
+}
+export function gitOriginalRequest(path: string, request: Pick<Parameters<DestinationProvider["send"]>[0], "ref" | "old" | "commit" | "objects">): RequestIdentity {
+  return { method: "POST", path, publicBody: digestBytes(canonicalBytes(receiveArguments({ ref: request.ref, old: request.old, new: request.commit, objects: request.objects.map(({ id, kind, body }) => ({ id, type: kind, data: body })) }))), custodyFromSite: null };
 }
 
 interface FlatFile { id: string; mode: string; path: string | null }

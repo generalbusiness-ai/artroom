@@ -41,6 +41,7 @@ import { Deliveries } from "./delivery.ts";
 import { declaredBy, observedAt, routed, sentText, sourced, type Sourced } from "./namespace.ts";
 import { JoinLimits, isJoin, type LimitConfig } from "./limits.ts";
 import { Operations, type Outside } from "./operations.ts";
+import type { DispatchWiring } from "./dispatch.ts";
 import { OperatorRecord, sendAgain, type Incident, type Resent } from "./operator.ts";
 import { Dispatcher, Wakes } from "./outbox.ts";
 import { production, type Alarm, type Authority, type Clock, type Delivery, type Ports, type ReadName, type Readers, type Transport } from "./ports.ts";
@@ -87,6 +88,9 @@ export interface Wiring {
   authority?: (given: Given) => Authority;
   readers?: (given: Given) => Readers;
   outside?: (given: OutsideGiven) => Outside;
+  /** Trusted process-local selection of adapter and prerequisite supplier;
+   * never supplied by a request or interpreted as production activation. */
+  dispatch?: DispatchWiring;
   sessions?: () => Sessions | null;
   limits?: LimitConfig;
 }
@@ -162,7 +166,8 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
         return kept ? { entry: JSON.parse(kept.bytes) as Entry, hash: kept.hash } : null;
       },
     });
-    const ports: Ports = { ...given, alarm: wakes.deadline, ...(authority ? { authority } : {}), ...(readers ? { readers } : {}), ...(outside ? { outside } : {}) };
+    const basePorts: Ports = { ...given, alarm: wakes.deadline, ...(authority ? { authority } : {}), ...(readers ? { readers } : {}), ...(outside ? { outside } : {}) };
+    const ports: Ports = wiring.dispatch ? { ...basePorts, dispatch: { object: ctx.id.toString(), registration: wiring.dispatch(basePorts.outside, ctx.id.toString()) } } : basePorts;
     // The operator's record: two tables of this object's storage that are no part of the store, and that no judgment is given.
     const record = new OperatorRecord({ exec: (query, ...bindings) => ctx.storage.sql.exec(query, ...bindings) }, ports.clock, () => store.scope()?.at ?? null);
     this.#name = isScopeId(name) ? name : null;

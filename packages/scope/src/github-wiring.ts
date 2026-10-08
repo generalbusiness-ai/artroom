@@ -99,6 +99,7 @@ export function gitHubOutside(given: OutsideGiven, sql: Pick<SqlStorage, "exec">
     };
     return {
       accepts, send,
+      original: destination.original,
       credential: (handle, key) => bound(given.genesis()?.seed.definition ?? "") ? destination.credential(handle, key) : null,
       judged: (at, sealed) => destination.judged(at, sealed),
       recovery: { accepts: (owner, kind) => accepts(owner, kind) && destination.recovery.accepts(owner, kind), read: (request) => accepts(request.owner, request.kind) ? destination.recovery.read(request) : Promise.resolve(null) },

@@ -84,6 +84,9 @@ export const platformNet: { without: string | null; sessions: boolean; secret: s
 /** Test-only, name-bound outside factories. ScopeObject supplies its live
  * readonly store facade after storage exists; no default port is changed. */
 export const platformOutside = new Map<string, (given: OutsideGiven, sql: Pick<SqlStorage, "exec">) => Outside>();
+/** Explicit test-only registration; each supplier states its scripted trust
+ * boundary. Absence preserves the unregistered fixture's legacy contract. */
+export const platformDispatch = new Map<string, NonNullable<Wiring["dispatch"]>>();
 /** The name of the test deployment, which a session's token names. */
 export const TEST_DEPLOYMENT = "artroom-scope-test";
 
@@ -100,6 +103,7 @@ export class PlatformScope extends DeployedScope<PlatformEnv> {
     return {
       ...deployed,
       ...(outside ? { outside: (given: OutsideGiven) => outside(given, this.ctx.storage.sql) } : {}),
+      ...(platformDispatch.has(name ?? "") ? { dispatch: platformDispatch.get(name ?? "")! } : {}),
       sessions: session.sessions,
       readers: (given) => {
         const real = session.readers(given);

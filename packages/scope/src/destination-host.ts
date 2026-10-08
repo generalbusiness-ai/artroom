@@ -11,6 +11,7 @@ import type { OutsideGiven } from "./object.ts";
 import type { EffectAnswer, EffectRequest, Outside } from "./operations.ts";
 import type { Sealed } from "./store.ts";
 import { knownPlatform } from "./platform-version.ts";
+import type { DispatchContext, OriginalAdapter, OriginalFence, PreparedOriginal, RequestIdentity } from "./dispatch.ts";
 
 export interface DestinationRepository { host: string; namespace: string; name: string; id: string }
 export interface DestinationBinding { scope: ScopeRef; mint: OperationId; attempt: number; write: OperationId; writeAttempt: number; ref: string }
@@ -28,7 +29,10 @@ export interface DestinationProvider {
   /** Read and validate the complete object closure before returning it. */
   objects(repository: DestinationRepository, commit: string): Promise<readonly DestinationObject[]>;
   /** Validate object closure and ancestry at the actual send boundary. Own reply: {send:...}. */
-  send(request: { repository: DestinationRepository; ref: string; old: string | null; commit: string; objects: readonly DestinationObject[]; expectedTree?: string; requireParentless: boolean; token: string; binding: DestinationBinding; allowed(): boolean }): Promise<unknown>;
+  send(request: { repository: DestinationRepository; ref: string; old: string | null; commit: string; objects: readonly DestinationObject[]; expectedTree?: string; requireParentless: boolean; token: string; binding: DestinationBinding; allowed(): boolean; fence?: OriginalFence }): Promise<unknown>;
+  /** Exact supported Git terminal contract. Absent: registered mode holds
+   * before preparation, including Artifacts auxiliary-token read paths. */
+  originalRequest?(request: Parameters<DestinationProvider["send"]>[0]): RequestIdentity;
   inspect(context: DestinationInspection): Promise<{ evidence: RecordedJudgeEvidence; retain?: readonly RetainedInput[] }>;
 }
 export interface DestinationHostOptions { host: string; namespace: string; provider: DestinationProvider; custody: Pick<CredentialStore, "put" | "reply" | "live" | "read" | "judged" | "revoked" | "pending" | "expectRevoke" | "revocations" | "held" | "take"> }
@@ -52,6 +56,7 @@ export class DestinationHost implements Outside {
   #replyCursor: CredentialPosition | null = null;
   #revokeCursor: RevocationPosition | null = null;
   constructor(given: OutsideGiven, options: DestinationHostOptions) { this.#given = given; this.#options = options; }
+  readonly original: OriginalAdapter = { prepare: (request, context) => this.#prepareOriginal(request, context) };
 
   #owner(): string | null {
     const named = this.#given.genesis()?.seed.definition;
@@ -241,7 +246,25 @@ export class DestinationHost implements Outside {
   async #seen(repository: DestinationRepository, ref: string): Promise<string> {
     try { const seen = await this.#options.provider.ref(repository, ref); return seen === null ? "absent" : objectId(seen) ? seen : "failed"; } catch { return "failed"; }
   }
+  async #prepareOriginal(request: EffectRequest, context: DispatchContext): Promise<PreparedOriginal | null> {
+    const bound = this.#bound(request);
+    if (!bound || !this.#options.provider.originalRequest || ![DESTINATION_KINDS.firstHead, DESTINATION_KINDS.push, DESTINATION_KINDS.receipt].includes(bound.operation.kind as "first-head")) return null;
+    const prepared = await this.#writeArguments(request, bound.operation, bound.repository, bound.ref);
+    if (!prepared || "result" in prepared) return null;
+    const at = this.#given.clock.read();
+    const credential = this.#options.custody.live(prepared.binding.mint, 1, at);
+    if (!credential || credential.plaintext !== prepared.token) return null;
+    const identity = this.#options.provider.originalRequest(prepared);
+    return {
+      site: { ordinal: 0, site: "git.receive-pack", role: "original", target: { mode: "fixed", value: { provider: context.provider, repository: { ...bound.repository } } }, ref: prepared.ref, rights: { operation: "write", permissions: [{ name: "contents", level: "write" }] }, absoluteLifetime: { notBefore: at, useBefore: credential.ends, requestedSeconds: null, maximumProviderEnds: null }, request: identity, cleanupPredecessor: null },
+      send: (fence) => this.#sendWrite({ ...prepared, fence }),
+    };
+  }
   async #write(request: EffectRequest, write: Operation, repository: DestinationRepository, branchRef: string): Promise<EffectAnswer | null> {
+    const prepared = await this.#writeArguments(request, write, repository, branchRef);
+    return !prepared || "result" in prepared ? prepared : this.#sendWrite(prepared);
+  }
+  async #writeArguments(request: EffectRequest, write: Operation, repository: DestinationRepository, branchRef: string): Promise<Parameters<DestinationProvider["send"]>[0] | EffectAnswer | null> {
     const state = this.#given.state;
     const own = this.#given.own;
     const binding = this.#binding(request, write, request.attempt, branchRef);
@@ -301,10 +324,13 @@ export class DestinationHost implements Outside {
       const held = this.#options.custody.live(binding.mint, 1, this.#given.clock.read());
       return this.#helpers().writeSends(state, own, write, request.attempt) && held?.id === credential.id && held?.plaintext === credential.plaintext;
     };
-    const reply = members(await this.#options.provider.send({ repository, ref: binding.ref, old, commit, objects, ...(expectedTree === undefined ? {} : { expectedTree }), requireParentless, token: live.plaintext!, binding, allowed }), ["send"]);
+    return { repository, ref: binding.ref, old, commit, objects, ...(expectedTree === undefined ? {} : { expectedTree }), requireParentless, token: live.plaintext!, binding, allowed };
+  }
+  async #sendWrite(prepared: Parameters<DestinationProvider["send"]>[0]): Promise<EffectAnswer | null> {
+    const reply = members(await this.#options.provider.send(prepared), ["send"]);
     const sent = reply?.["send"];
     if (sent !== "accepted" && sent !== "refused" && sent !== "not-sent") return null;
-    return answer(sent === "accepted" ? "confirmed" : "refused", { send: sent, seen: await this.#seen(repository, binding.ref) });
+    return answer(sent === "accepted" ? "confirmed" : "refused", { send: sent, seen: await this.#seen(prepared.repository, prepared.ref) });
   }
 
   #readRef(read: Operation, branchRef: string): string | null {

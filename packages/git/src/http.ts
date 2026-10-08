@@ -17,7 +17,13 @@ export interface HttpUpdate {
   ref: string; old: ObjectId | null; new: ObjectId | null; objects?: readonly RawGitObject[];
   /** Trusted caller's live authorization check, immediately before the POST. */
   beforeSend?: () => boolean;
+  /** Trusted registered adapter's synchronous consumption, at the actual
+   * POST boundary. This callback must do only local checks/consumption; the
+   * fetch is invoked directly on the same stack immediately afterwards. */
+  beforePost?: (url: string, arguments_: ReceiveArguments) => void;
 }
+export interface ReceiveArguments { ref: string; old: string | null; new: string | null; objects: readonly { id: string; type: RawGitObject["type"] }[] }
+export const receiveArguments = (update: Pick<HttpUpdate, "ref" | "old" | "new" | "objects">): ReceiveArguments => ({ ref: update.ref, old: update.old, new: update.new, objects: (update.objects ?? []).map(({ id, type }) => ({ id, type })) });
 export interface SmartHttpOptions {
   remote: string;
   /** Caller-chosen buffer allowance for this transport, not a platform quota. */
@@ -165,7 +171,7 @@ export class SmartHttpGit {
     if (!Number.isSafeInteger(this.#maxBytes) || this.#maxBytes < 32 || !Number.isSafeInteger(this.#timeoutMs) || this.#timeoutMs <= 0 || Object.values(this.#bounds).some((n) => !Number.isSafeInteger(n) || n <= 0)) throw new GitRefusal("too-large", "HTTP bounds");
   }
 
-  async #request(path: string, media: string, signal: AbortSignal, body?: Uint8Array): Promise<Uint8Array> {
+  async #request(path: string, media: string, signal: AbortSignal, body?: Uint8Array, beforePost?: (url: string) => void): Promise<Uint8Array> {
     try {
       const url = `${this.#remote}/${path}`;
       const headers = new Headers({ accept: media, "cache-control": "no-cache" });
@@ -173,6 +179,13 @@ export class SmartHttpGit {
       if (body !== undefined) headers.set("content-type", "application/x-git-receive-pack-request");
       const init: RequestInit & { credentials: "omit" } = { method: body === undefined ? "GET" : "POST", headers, redirect: "manual", credentials: "omit", signal, ...(body === undefined ? {} : { body }) };
       const request = new Request(url, init);
+      if (body !== undefined && beforePost) {
+        try { if (beforePost(request.url) !== undefined) throw bad("asynchronous POST fence"); }
+        catch (failure) { await request.body?.cancel().catch(() => undefined); throw failure; }
+      }
+      // No await, preparation or wrapper lies between consume and the actual
+      // trusted fetch invocation. A supplied fetch's deeper behavior is its
+      // separate owner correspondence, not proven by this transport.
       const response = await this.#fetch(request);
       if (response.status !== 200 || response.redirected || (response.url !== "" && response.url !== url) || response.headers.get("content-type")?.split(";", 1)[0]?.trim() !== media) {
         await response.body?.cancel().catch(() => undefined);
@@ -238,6 +251,11 @@ export class SmartHttpGit {
       if (update.old !== null) objectId(update.old, "old object");
       if (update.new !== null) objectId(update.new, "new object");
       if (update.old === update.new) return NOT_RUN("same-commit");
+      // Bind the terminal identity to the same objects that compression sees.
+      if (update.objects) {
+        if (update.objects.length > this.#bounds.closureObjects || update.objects.some((object) => !(object.data instanceof Uint8Array)) || update.objects.reduce((size, object) => size + object.data.length, 0) > this.#maxBytes) return NOT_RUN("too-large");
+        update.objects = update.objects.map(({ id, type, data }) => ({ id, type, data: new Uint8Array(data) }));
+      }
       pack = update.new === null ? new Uint8Array() : await buildPack(update.objects ?? [], { maxBytes: this.#maxBytes, bounds: this.#bounds });
     } catch (e) { return NOT_RUN(e instanceof GitRefusal ? e.reason : "unreadable"); }
     let advertised: ReceiveAdvertisement;
@@ -255,7 +273,7 @@ export class SmartHttpGit {
     const timer = setTimeout(() => controller.abort(), this.#timeoutMs);
     const unknown: PushAnswer = { ran: true, refusal: null, exit: null, timedOut: false, reported: null, others: false, code: null };
     try {
-      const lines = packets(await this.#request("git-receive-pack", "application/x-git-receive-pack-result", controller.signal, body));
+      const lines = packets(await this.#request("git-receive-pack", "application/x-git-receive-pack-result", controller.signal, body, update.beforePost ? (url) => update.beforePost!(url, receiveArguments(update)) : undefined));
       // Plain report-status only: exactly one unpack line, one status, one flush.
       if (lines.length !== 3 || !lines[0]?.startsWith("unpack ") || lines[0].length <= 7) return unknown;
       const status = lines[1];

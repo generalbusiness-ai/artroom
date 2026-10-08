@@ -1,19 +1,21 @@
 import { runInDurableObject } from "cloudflare:test";
 import { expect, test } from "vitest";
 import type { Entry, Intent, ScopeId, Seed } from "@generalbusiness/artroom-contract";
-import { b64url, canonicalize, factRefOf, intentDigest, newIncarnation, scopeIdOf, signIntent, utf8 } from "@generalbusiness/artroom-bytes";
+import { b64url, canonicalize, factRefOf, intentDigest, keyIdOfSecret, newIncarnation, scopeIdOf, signIntent, utf8 } from "@generalbusiness/artroom-bytes";
 import { requestSession, sessionRequest, type Fetch } from "@generalbusiness/artroom-client";
 import { keys } from "@generalbusiness/artroom-derive/testing";
 import { DIRECTORY, REGISTER, destinationMembership, destinationReceipt, destinationTarget, foundingObjects } from "@generalbusiness/artroom-platform";
 import { ZERO_ID } from "@generalbusiness/artroom-git";
 import { decodePack, type DecodedObject } from "@generalbusiness/artroom-git/http-read";
-import { SqliteStore, mintSession, readerOf, sessionsOf } from "../src/index.ts";
+import { SqliteStore, dispatchId, mintSession, readerOf, sessionsOf, signDispatchPermit, DispatchHeld, type DispatchAuthority, type DispatchContext } from "../src/index.ts";
 import { gitHubOutside, type GitHubBindings } from "../src/github-wiring.ts";
 import { net } from "../src/testing.ts";
 import { soon } from "./net.ts";
 import { Platform, rita, routed, sam, settle } from "./repository.ts";
 import { reader } from "./support.ts";
-import { TEST_DEPLOYMENT, platformNet, platformOutside } from "./worker.ts";
+import { TEST_DEPLOYMENT, platformDispatch, platformNet, platformOutside } from "./worker.ts";
+import { CredentialStore } from "../src/credential-store.ts";
+import { destinationMint, destinationSends } from "@generalbusiness/artroom-platform";
 
 const ACCOUNT = { id: 285042784, login: "generalbusiness-ai", type: "Organization" } as const;
 const CREATION = "operator_creation_fixture_secret";
@@ -32,6 +34,7 @@ const json = (value: unknown, status = 200): Response => new Response(JSON.strin
  * Independent tests of the Git package send those bytes to real local Git.
  * This fixture is no oracle of GitHub service behavior or eventual writes. */
 class ScriptedGitHub {
+  beforeReceiveAdvertisement: (() => Promise<void>) | null = null;
   name: string | null = null;
   readonly refs = new Map<string, string>();
   readonly objects = new Map<string, DecodedObject>();
@@ -57,6 +60,7 @@ class ScriptedGitHub {
   }
   readonly fetch = async (request: Request): Promise<Response> => {
     const url = new URL(request.url);
+    if (request.method === "GET" && url.searchParams.get("service") === "git-receive-pack") await this.beforeReceiveAdvertisement?.();
     this.transportPolicies.push(request.redirect);
     expect(url.username + url.password).toBe("");
     if (url.hostname === "api.github.com") {
@@ -278,5 +282,156 @@ test("real PLATFORM founding through production GitHub factory writes exact firs
     net.deaf = priorDeaf;
     Object.assign(platformNet, priorSessions);
     for (const name of wired) platformOutside.delete(name);
+  }
+});
+
+// Invariant: a marked original Git request cannot enter its POST after its
+// durable owner closes, even when nested discovery resumes; restart never
+// resends it. The prerequisite/issuer/admission/bundle/capacity supplier is a
+// SCRIPTED trusted-port stand-in. Scope, SQLite, signature checks, host/custody,
+// smart HTTP preparation and terminal consumption are the actual code. This
+// shows no production tuple, old-release drain, coordinator retirement or host.
+test("registered original Git dispatch fences suspended discovery at the real scope, retains unknown duties, and never adopts an old nonce after restart", async () => {
+  const { paul } = keys;
+  const kp = await crypto.subtle.generateKey({ name: "RSASSA-PKCS1-v1_5", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" }, true, ["sign", "verify"]) as CryptoKeyPair;
+  const raw = new Uint8Array(await crypto.subtle.exportKey("pkcs8", kp.privateKey) as ArrayBuffer);
+  const pem = `-----BEGIN PRIVATE KEY-----\n${btoa(Array.from(raw, (byte) => String.fromCharCode(byte)).join(""))}\n-----END PRIVATE KEY-----\n`;
+  const install: Intent = { v: 1, to: null, actor: paul.key, kind: "install", on: null, expected: {}, fields: { host: "github.com", namespace: ACCOUNT.login, policy: "keys", founders: [rita.key] }, idempotencyKey: crypto.randomUUID(), notAfter: soon(60) };
+  const R = new Platform(scopeIdOf({ v: 1, kind: "register", definition: REGISTER, creator: null, cause: intentDigest(install), ordinal: 0 }));
+  const host = new ScriptedGitHub();
+  const config: GitHubBindings = { GITHUB_APP_CONFIG: canonicalize({ issuer: "Iv1.scripted-fence", installationId: 99, account: ACCOUNT, maxBytes: MAX_BYTES, registerScope: R.name, privateRepositories: false, publicReads: true, credentialIdentity: "adapter-attempt" }), GITHUB_APP_PRIVATE_KEY: pem, GITHUB_CREATION_TOKEN: CREATION };
+  const names = new Set<ScopeId>();
+  const wire = (name: ScopeId) => {
+    names.add(name);
+    platformOutside.set(name, (given, sql) => {
+      const outside = gitHubOutside(given, sql, config, host.fetch);
+      // Fixture construction permits real judged mint custody but no write
+      // dispatch. This is an unregistered legacy setup, not fenced ownership.
+      return { ...outside, accepts: (owner, kind) => !["first-head", "push", "receipt"].includes(kind) && outside.accepts(owner, kind) };
+    });
+  };
+  const oldHold = net.hold;
+  let G: Platform | null = null;
+  try {
+    net.hold = (envelope) => { if ("definition" in envelope.to) wire(scopeIdOf(envelope.to)); return false; };
+    wire(R.name);
+    expect(await R.stub.found(signIntent(install, paul.secret), REGISTER)).toMatchObject({ answer: "accepted" });
+    const found = await R.intent(rita, "found", { expected: await R.expected({ register: 0 }), fields: { branch: "main", founderHandle: "@rita", recoveryKey: sam.key } });
+    const D = new Platform(scopeIdOf({ v: 1, kind: "directory", definition: DIRECTORY, creator: await R.at(), cause: intentDigest(found.intent), ordinal: 0 }));
+    expect(await R.stub.submit(found, [])).toMatchObject({ answer: "accepted" });
+    await (R.stub as unknown as { effect(): Promise<number> }).effect();
+    await settle(R, D);
+    const births = (await D.entries())[0]!.sends;
+    const children = births.filter((send) => "definition" in send.to).map((send) => new Platform(scopeIdOf(send.to as Seed)));
+    G = children.find((node) => births.some((send) => "definition" in send.to && send.to.kind === "destination" && scopeIdOf(send.to) === node.name))!;
+    await settle(R, D, ...children);
+    await (G.stub as unknown as { effect(): Promise<number> }).effect();
+    expect(host.sent).toHaveLength(0);
+    const destination = G;
+    const secret = crypto.getRandomValues(new Uint8Array(32));
+    const key = keyIdOfSecret(secret);
+    let evidenceAvailable = false;
+    let generation = 1;
+    let activeContext: DispatchContext | null = null;
+    let changedBinding = false;
+    let bindingGuardDenied = false;
+    let portCompletions = 0;
+    let portCompleted: (() => void) | null = null;
+    let issuedCount = 0;
+    const preparedChecks: unknown[] = [];
+    platformOutside.set(G.name, (given, sql) => gitHubOutside(given, sql, config, host.fetch));
+    platformDispatch.set(G.name, (outside, object) => {
+      const authority: DispatchAuthority = {
+        current: (request) => {
+          if (!evidenceAvailable) return null;
+          return activeContext = { service: "scripted-service", generation, tuple: dispatchId("test-tuple", generation), coordinator: { namespace: "SCRIPTED coordinator", object: "issuer", key }, owner: { service: "scripted-service", namespace: "SCRIPTED PLATFORM trust", object, scope: request.scope, nonce: dispatchId("test-nonce", [request.scope, request.operation, request.attempt]), release: dispatchId("test-release", 1), build: dispatchId("test-build", 1) }, binding: dispatchId("test-attributed-binding", [request.scope, request.origin.hash, request.operation, request.attempt, changedBinding]), admittedBy: dispatchId("test-admission", request.origin.hash), provider: dispatchId("test-provider", ACCOUNT) };
+        },
+        issue: async (_request, plan) => { issuedCount++; const c = activeContext!; return signDispatchPermit(secret, { format: "artroom-send-permit-1", service: c.service, generation: c.generation, tuple: c.tuple, coordinator: c.coordinator, owner: c.owner, attempt: plan.attempt, callPlan: dispatchId("artroom-dispatch-call-plan-1", plan), purpose: "original-dispatch", duty: null, targetResolution: null }); },
+      };
+      if (!outside.original) expect.fail("fixture has no actual original Git adapter");
+      return { authority, adapter: { prepare: async (request, context) => { const value = await outside.original!.prepare(request, context); preparedChecks.push({ kind: request.kind, site: value?.site ?? null }); return value ? { ...value, send: async (fence) => {
+        // Exercise current binding in the original object's own call stack;
+        // no live fence/store capability crosses fixture inspection callbacks.
+        changedBinding = true;
+        try { fence.consume(value.site.request); }
+        catch (failure) { bindingGuardDenied = failure instanceof DispatchHeld; }
+        finally { changedBinding = false; }
+        try { return await value.send(fence); }
+        finally { portCompletions++; portCompleted?.(); }
+      } } : null; } } };
+    });
+    await G.restart();
+    await (G.stub as unknown as { effect(): Promise<number> }).effect();
+    const inspect = <T>(read: (store: SqliteStore, custody: CredentialStore) => T) => runInDurableObject(destination.object, (_instance, state) => {
+      const store = new SqliteStore({ exec: (query, ...bindings) => state.storage.sql.exec(query, ...bindings), transaction: (closure) => state.storage.transactionSync(closure) });
+      return read(store, new CredentialStore(state.storage.sql, () => store.scope()?.at ?? null));
+    });
+    expect(await inspect((store) => [store.sending("0:0", 1)?.sent, store.originalDispatch("0:0", 1)])).toEqual([null, null]);
+    expect(host.sent).toHaveLength(0); // No missing-input legacy fallback.
+    const runSuspendedOriginal = async () => {
+      evidenceAvailable = true;
+      let resume!: () => void;
+      let reached!: () => void;
+      const suspended = new Promise<void>((resolve) => { resume = resolve; });
+      const ready = new Promise<void>((resolve) => { reached = resolve; });
+      const completed = new Promise<void>((resolve) => { portCompleted = resolve; });
+      host.beforeReceiveAdvertisement = async () => { reached(); await suspended; };
+      try {
+        await destination.restart(); // Reconsider held unsent; no invented wake.
+        const pass = (destination.stub as unknown as { effect(): Promise<number> }).effect();
+        const arrived = await Promise.race([ready.then(() => true), pass.then(() => false)]);
+        expect(arrived, canonicalize({ issuedCount, preparedChecks, portCompletions, record: await inspect((store) => store.originalDispatch("0:0", 1)) })).toBe(true);
+        const previousHead = (await destination.summary()).at;
+        const scope = await destination.at();
+        expect(bindingGuardDenied).toBe(true);
+        const close = await inspect((store, custody) => {
+          const record = store.originalDispatch("0:0", 1)!;
+          const write = store.operation("0:0")!;
+          const own = (seq: number) => { const row = store.stored(seq); return row ? { entry: JSON.parse(row.bytes) as Entry, hash: row.hash } : null; };
+          const mint = destinationMint(store, write, 1)!;
+          expect(destinationSends(store, own, write, 1)).toBe(true);
+          expect(custody.live(mint.id, 1, net.clock.now)?.plaintext).toBeTruthy();
+          expect([store.sending("0:0", 1)?.sent, record.consumed]).toEqual([net.clock.now, null]);
+          return { closure: store.closeOriginalDispatch(record), head: store.scope()!.head };
+        });
+        resume();
+        expect(close.closure).toMatchObject({ closed: true, callEntries: [], owner: { scope } });
+        expect(close.head).toEqual(previousHead);
+        // An outer pass can finish on LATE/unknown while its ask remains live.
+        const physicallyCompleted = await Promise.race([completed.then(() => true), pass.then(() => portCompletions === 1)]);
+        const completion = { physicallyCompleted, portCompletions, bindingGuardDenied };
+        console.info("scripted original port completion before eviction", completion);
+        expect(completion).toEqual({ physicallyCompleted: true, portCompletions: 1, bindingGuardDenied: true });
+        await pass;
+        expect(host.sent).toHaveLength(0); // Control must fail by actual POST count.
+        const owned = await inspect((store) => store.originalDispatch("0:0", 1));
+        expect([owned?.closure, owned?.consumed]).toEqual([close.closure, null]);
+        const beforeRestart = await destination.entries();
+        const unknown = beforeRestart.find((entry) => entry.input.type === "outcome" && entry.input.operation === "0:0");
+        expect(unknown?.input).toMatchObject({ result: "unknown", evidence: { basis: "none" } });
+        // Only serializable snapshots leave this helper. Physical completion
+        // is this scripted port observation, not deployment/provider drain.
+        return { beforeRestart, owned };
+      } finally {
+        resume();
+        host.beforeReceiveAdvertisement = null;
+        portCompleted = null;
+      }
+    };
+    const { beforeRestart, owned } = await runSuspendedOriginal();
+    // Actual local object eviction preserves storage; this does not prove
+    // drainage of a deployed release or provider exclusion.
+    await destination.restart();
+    await (destination.stub as unknown as { effect(): Promise<number> }).effect();
+    expect([host.sent.length, await destination.entries(), await inspect((store) => store.originalDispatch("0:0", 1))]).toEqual([0, beforeRestart, owned]);
+    // Local generation cannot roll back or delete the earlier closed owner.
+    const current = activeContext!;
+    generation = 2;
+    expect(await inspect((store) => [store.acceptDispatchGeneration({ ...current, generation: 2, tuple: dispatchId("test-tuple", 2) }), store.acceptDispatchGeneration(current)])).toEqual([true, false]);
+    expect(await inspect((store) => store.originalDispatch("0:0", 1))).toEqual(owned);
+  } finally {
+    net.hold = oldHold;
+    if (G) platformDispatch.delete(G.name);
+    for (const name of names) platformOutside.delete(name);
   }
 });

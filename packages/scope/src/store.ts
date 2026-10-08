@@ -12,6 +12,7 @@
 
 import type { Digest, Dispatched, Duty, Entry, FactRef, Message, OperationId, RetainedInput, ScopeRef, Sealed, Seed, Timestamp } from "@generalbusiness/artroom-contract";
 import type { Operation, RangeIndex, StateWriter } from "@generalbusiness/artroom-derive";
+import type { CallEntry, DispatchContext, LocalClosureRecord, OriginalRecord } from "./dispatch.ts";
 
 export type { Dispatched, Duty, Sealed };
 
@@ -124,6 +125,12 @@ export interface Store extends StateWriter {
   sending(operation: OperationId, attempt: number): Sending | null;
   /** One durable write, before the request leaves: the attempt may have been sent from `at` on. It is written once and never cleared. */
   markSent(operation: OperationId, attempt: number, at: Timestamp, next: number): void;
+  /** Private original-dispatch bookkeeping. No judgment/history reads these rows. */
+  acceptDispatchGeneration(context: DispatchContext): boolean;
+  markOriginalDispatch(record: OriginalRecord, at: Timestamp, next: number): boolean;
+  originalDispatch(operation: OperationId, attempt: number): OriginalRecord | null;
+  consumeOriginalDispatch(expected: OriginalRecord, entry: CallEntry): boolean;
+  closeOriginalDispatch(expected: OriginalRecord): LocalClosureRecord | null;
   /** When the driver looks at the attempt next, or null for never by itself. */
   postpone(operation: OperationId, attempt: number, next: number | null): void;
   /** At most `limit` operations after the one at `after`, in the order of the entry that opened each and its ordinal there. `open`: only those that are not settled. */

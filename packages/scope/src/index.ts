@@ -8,6 +8,7 @@ export * from "./object.ts";
 export * from "./delivery.ts";
 export * from "./outbox.ts";
 export * from "./operations.ts";
+export * from "./dispatch.ts";
 export * from "./namespace.ts";
 export * from "./authority.ts";
 export * from "./definitions.ts";

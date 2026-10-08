@@ -18,6 +18,7 @@ import { canonicalize } from "@generalbusiness/artroom-bytes";
 import { MemoryState, byteOrder, operationId, operationStanding, pendingOf, slotOf, timeMs } from "@generalbusiness/artroom-derive";
 import type { Accepted, Account, Decided, HeldCreation, Holder, Item, ObservedHead, Operation, Outstanding, OwnRequest, Page, PreparedStep, RangeIndex, RecordState, RecordsWhere, Relation, ScopeState, StateSnapshot } from "@generalbusiness/artroom-derive";
 import type { Dispatched, Duty, OperationStatus, Outgoing, Retained, Sending, Store, Stored } from "./store.ts";
+import { dispatchId, isDispatchContext, isInitialOriginalRecord, sameDispatch, type CallEntry, type DispatchContext, type LocalClosureRecord, type OriginalRecord } from "./dispatch.ts";
 
 export type SqlValue = string | number | null | ArrayBuffer;
 export interface Sql {
@@ -91,6 +92,8 @@ CREATE INDEX IF NOT EXISTS operation_open ON operation (seq, k) WHERE opened + u
 CREATE INDEX IF NOT EXISTS operation_for ON operation (json_extract(value, '$.for'), seq, k) WHERE json_extract(value, '$.for') IS NOT NULL;
 CREATE TABLE IF NOT EXISTS attempt (seq INTEGER NOT NULL, k INTEGER NOT NULL, attempt INTEGER NOT NULL, opened INTEGER NOT NULL, next INTEGER, sent TEXT, outcome INTEGER, PRIMARY KEY (seq, k, attempt)) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS attempt_due ON attempt (next, seq, k, attempt) WHERE outcome IS NULL;
+CREATE TABLE IF NOT EXISTS private_original_tuple (scope TEXT PRIMARY KEY, generation INTEGER NOT NULL, value TEXT NOT NULL) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS private_original_dispatch (scope TEXT NOT NULL, operation TEXT NOT NULL, attempt INTEGER NOT NULL, value TEXT NOT NULL, PRIMARY KEY (scope, operation, attempt)) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS record (capability TEXT NOT NULL, kind TEXT NOT NULL, key TEXT NOT NULL, state TEXT NOT NULL, value TEXT NOT NULL, PRIMARY KEY (capability, kind, key)) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS record_by_state ON record (capability, kind, state);
 CREATE TABLE IF NOT EXISTS prepared (intent TEXT NOT NULL, capability TEXT NOT NULL, step TEXT NOT NULL, seq INTEGER NOT NULL, PRIMARY KEY (intent, capability, step)) WITHOUT ROWID;
@@ -437,6 +440,72 @@ export class SqliteStore implements Store {
     const [seq, k] = partsOf(operation);
     this.#run("UPDATE attempt SET sent = ?, next = ? WHERE seq = ? AND k = ? AND attempt = ? AND sent IS NULL", at, next, seq, k, attempt);
     if (this.sending(operation, attempt)?.sent !== at) throw new Error(`attempt ${attempt} of ${operation} is not one that is recorded and not sent`);
+  }
+  acceptDispatchGeneration(context: DispatchContext): boolean {
+    if (!isDispatchContext(context) || !sameDispatch(this.scope()?.at, context.owner.scope)) return false;
+    const owner = context.owner;
+    const value = canonicalize({ service: context.service, generation: context.generation, tuple: context.tuple, coordinator: context.coordinator, executor: { namespace: owner.namespace, object: owner.object, release: owner.release, build: owner.build }, scope: owner.scope });
+    const scope = canonicalize(owner.scope);
+    return this.transaction(() => {
+      const current = this.#one("SELECT generation, value FROM private_original_tuple WHERE scope = ?", scope);
+      const old = current ? json<{ service: string }>(current["value"]) : null;
+      if (old && old.service !== context.service) return false;
+      if (current && ((current["generation"] as number) > context.generation || (current["generation"] === context.generation && current["value"] !== value))) return false;
+      this.#run("INSERT INTO private_original_tuple (scope, generation, value) VALUES (?, ?, ?) ON CONFLICT (scope) DO UPDATE SET generation = excluded.generation, value = excluded.value", scope, context.generation, value);
+      return true;
+    });
+  }
+  #currentOriginal(record: OriginalRecord): boolean {
+    const p = record.permit.payload;
+    const row = this.#one("SELECT value FROM private_original_tuple WHERE scope = ?", canonicalize(p.attempt.scope));
+    const current = row ? json<Record<string, unknown>>(row["value"]) : null;
+    return Boolean(current && current["generation"] === p.generation && current["tuple"] === p.tuple && current["service"] === p.service && sameDispatch(current["coordinator"], p.coordinator) && sameDispatch(current["executor"], { namespace: p.owner.namespace, object: p.owner.object, release: p.owner.release, build: p.owner.build }) && sameDispatch(this.scope()?.at, p.attempt.scope));
+  }
+  originalDispatch(operation: OperationId, attempt: number): OriginalRecord | null {
+    const scope = this.scope()?.at;
+    const row = scope ? this.#one("SELECT value FROM private_original_dispatch WHERE scope = ? AND operation = ? AND attempt = ?", canonicalize(scope), operation, attempt) : null;
+    return row ? json<OriginalRecord>(row["value"]) : null;
+  }
+  markOriginalDispatch(record: OriginalRecord, at: Timestamp, next: number): boolean {
+    return this.transaction(() => {
+      const p = record.permit.payload;
+      const a = p.attempt;
+      const origin = this.stored(a.origin.seq);
+      const opened = this.operation(a.operation)?.attempts.find((value) => value.attempt === a.attempt);
+      if (!isInitialOriginalRecord(record) || !this.#currentOriginal(record) || !origin || origin.hash !== a.origin.hash || !opened || opened.outcomes.length !== 0 || this.originalDispatch(a.operation, a.attempt)) return false;
+      // The legacy mark is never converted into new ownership, even if its
+      // provider reply was lost. Attribution/exclusion is the supplier's duty.
+      const changed = this.#all("UPDATE attempt SET sent = ?, next = ? WHERE seq = ? AND k = ? AND attempt = ? AND sent IS NULL AND outcome IS NULL RETURNING attempt", at, next, ...partsOf(a.operation), a.attempt);
+      if (changed.length !== 1) return false;
+      this.#run("INSERT INTO private_original_dispatch (scope, operation, attempt, value) VALUES (?, ?, ?, ?)", canonicalize(a.scope), a.operation, a.attempt, canonicalize(record));
+      return true;
+    });
+  }
+  consumeOriginalDispatch(expected: OriginalRecord, entry: CallEntry): boolean {
+    return this.transaction(() => {
+      const a = expected.permit.payload.attempt;
+      const current = this.originalDispatch(a.operation, a.attempt);
+      const marked = this.sending(a.operation, a.attempt);
+      if (!current || !marked || marked.sent === null || !this.#currentOriginal(current) || !sameDispatch(current.permit, expected.permit) || !sameDispatch(current.plan, expected.plan) || !sameDispatch(current.invocation, expected.invocation)) return false;
+      // This is the sole closed-owner exclusion at the actual consumption
+      // boundary. Revision CAS below uses this transaction's current row.
+      if (current.closure !== null) return false;
+      if (current.consumed !== null || !Number.isSafeInteger(current.revision + 1)) return false;
+      const next: OriginalRecord = { ...current, consumed: entry, revision: current.revision + 1 };
+      const changed = this.#all("UPDATE private_original_dispatch SET value = ? WHERE scope = ? AND operation = ? AND attempt = ? AND value = ? RETURNING attempt", canonicalize(next), canonicalize(a.scope), a.operation, a.attempt, canonicalize(current));
+      return changed.length === 1;
+    });
+  }
+  closeOriginalDispatch(expected: OriginalRecord): LocalClosureRecord | null {
+    return this.transaction(() => {
+      const a = expected.permit.payload.attempt;
+      const current = this.originalDispatch(a.operation, a.attempt);
+      if (!current || !sameDispatch(current.permit, expected.permit) || !sameDispatch(current.plan, expected.plan) || !sameDispatch(current.invocation, expected.invocation) || !Number.isSafeInteger(current.revision + 1)) return null;
+      if (current.closure) return current.closure;
+      const closure: LocalClosureRecord = { format: "artroom-dispatch-exclusion-1", permit: dispatchId("artroom-send-permit-1", current.permit.payload), owner: current.permit.payload.owner, attempt: a, closedRevision: current.revision + 1, callEntries: current.consumed ? [dispatchId("artroom-dispatch-call-entry-1", current.consumed)] : [], carriedDuties: [], closed: true };
+      this.#run("UPDATE private_original_dispatch SET value = ? WHERE scope = ? AND operation = ? AND attempt = ?", canonicalize({ ...current, closure, revision: closure.closedRevision }), canonicalize(a.scope), a.operation, a.attempt);
+      return closure;
+    });
   }
   postpone(operation: OperationId, attempt: number, next: number | null): void {
     this.#run("UPDATE attempt SET next = ? WHERE seq = ? AND k = ? AND attempt = ?", next, ...partsOf(operation), attempt);

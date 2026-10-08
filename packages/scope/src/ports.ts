@@ -15,6 +15,7 @@ import { evaluateRules } from "@generalbusiness/artroom-derive/rule";
 import { platform, type Platform } from "@generalbusiness/artroom-platform";
 import { toConsole, type DiagnosisSink } from "./diag.ts";
 import { NO_OUTSIDE, type Outside } from "./operations.ts";
+import type { DispatchRegistration } from "./dispatch.ts";
 
 /** One reading for each call (section 5.3). The core calls it once in a step 3 and once in a commit. */
 export interface Clock { read(): Timestamp }
@@ -263,6 +264,10 @@ export interface Ports {
   capabilities: Capabilities | null;
   /** The port for effects outside the service: one request of one attempt of an operation (`operations.ts`; section 4.3). */
   outside: Outside;
+  /** Explicit process-local executor registration. Undefined is legacy,
+   * never claimed fenced; null is selected but unavailable, so dispatch holds.
+   * No production wiring supplies this registration in this preparation. */
+  dispatch?: { object: string; registration: DispatchRegistration | null };
   /**
    * The rules of the owners of outside operations that this runtime has
    * code for (section 4.3; derive's `Owners`): a capability version or a
