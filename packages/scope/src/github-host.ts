@@ -198,7 +198,9 @@ export async function sendOnce(request: Parameters<DestinationProvider["send"]>[
   const stop = request.old === null ? new Set<string>() : new Set([objectId(request.old, "old")]);
   if (!(await reader.closure(request.commit, stop)).complete) return bad();
   const result = await new SmartHttpGit(transport).send({ ref: request.ref, old: request.old, new: request.commit, objects, beforeSend: request.allowed });
-  if (!result.ran || result.reported === "stale") return { send: "not-sent" };
+  // The actual driver's mark is irreversible. Local checks/discovery cannot
+  // turn that marked attempt into a decisive own answer.
+  if (!result.ran || result.reported === "stale") return request.sentAt === undefined ? { send: "not-sent" } : null;
   if (result.exit === 1 && result.reported === "remote-rejected" && !result.timedOut) return { send: "refused" };
   if (result.exit === 0 && (result.reported === "created" || result.reported === "updated") && !result.timedOut && await readBack() === request.commit) return { send: "accepted" };
   return null; // An applied ref cannot settle a lost or incomplete own answer.

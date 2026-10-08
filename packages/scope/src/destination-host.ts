@@ -7,7 +7,7 @@
  * inspection of those objects. For its push it builds the same objects again, with
  * the time of the entry that reserved it, and sends them with the base's closure.
  * Every provider sends them the same way. */
-import type { Entry, FactRef, FieldValue, KeyId, OperationId, RetainedInput, ScopeRef } from "@generalbusiness/artroom-contract";
+import type { Entry, FactRef, FieldValue, KeyId, OperationId, RetainedInput, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
 import { canonicalize, entryHash, isOperationId, parseStrict, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
 import { isEntryOf, valueDigest, type Item, type Operation } from "@generalbusiness/artroom-derive";
 import { DESTINATION_KINDS, READ_TOKEN_HOURS, destinationBranch, destinationMint, destinationRead, destinationReceipt, destinationRevokedMint, destinationSends, destinationStatement, destinationTarget, destinationWrite, editObjects, editPath, fileOf, fileSound, firstHeadCommit, foundingOf, isOf, isRecordedJudgeEvidence, revokedToken, type DestinationObject, type EditFile, type ObjectFormat, type RecordedJudgeEvidence } from "@generalbusiness/artroom-platform";
@@ -31,7 +31,7 @@ export interface DestinationProvider {
   /** Read and validate the complete object closure before returning it. */
   objects(repository: DestinationRepository, commit: string): Promise<readonly DestinationObject[]>;
   /** Validate object closure and ancestry at the actual send boundary. Own reply: {send:...}. */
-  send(request: { repository: DestinationRepository; ref: string; old: string | null; commit: string; objects: readonly DestinationObject[]; expectedTree?: string; requireParentless: boolean; token: string; binding: DestinationBinding; allowed(): boolean }): Promise<unknown>;
+  send(request: { repository: DestinationRepository; ref: string; old: string | null; commit: string; objects: readonly DestinationObject[]; expectedTree?: string; requireParentless: boolean; token: string; binding: DestinationBinding; allowed(): boolean; sentAt?: Timestamp }): Promise<unknown>;
   inspect(context: DestinationInspection): Promise<{ evidence: RecordedJudgeEvidence; retain?: readonly RetainedInput[] }>;
   /**
    * One read credential for the repository, for a member's `read-token`: `handle` is the host's nonsecret name for it, chosen
@@ -283,7 +283,8 @@ export class DestinationHost implements Outside {
     const target = destinationTarget(state, own, write);
     const mint = destinationMint(state, write, request.attempt);
     const credential = mint ? this.#options.custody.live(mint.id, 1, this.#given.clock.read()) : null;
-    if (!destinationSends(state, own, write, request.attempt) || !credential) return answer("refused", { send: "not-sent", seen: await this.#seen(repository, binding.ref) });
+    // After the driver's mark a local denial supplies no decisive host answer.
+    if (!destinationSends(state, own, write, request.attempt) || !credential) return request.sentAt === undefined ? answer("refused", { send: "not-sent", seen: await this.#seen(repository, binding.ref) }) : null;
     const format = await this.#options.provider.format(repository);
     if (format !== "sha1" && format !== "sha256") return null;
     let commit: string;
@@ -329,14 +330,15 @@ export class DestinationHost implements Outside {
     }
     // Async preparation may have let a read or compromise close the target.
     const live = this.#options.custody.live(binding.mint, 1, this.#given.clock.read());
-    if (!destinationSends(state, own, write, request.attempt) || live?.id !== credential.id || live?.plaintext !== credential.plaintext) return answer("refused", { send: "not-sent", seen: await this.#seen(repository, binding.ref) });
+    if (!destinationSends(state, own, write, request.attempt) || live?.id !== credential.id || live?.plaintext !== credential.plaintext) return request.sentAt === undefined ? answer("refused", { send: "not-sent", seen: await this.#seen(repository, binding.ref) }) : null;
     const allowed = () => {
       const held = this.#options.custody.live(binding.mint, 1, this.#given.clock.read());
       return destinationSends(state, own, write, request.attempt) && held?.id === credential.id && held?.plaintext === credential.plaintext;
     };
-    const reply = members(await this.#options.provider.send({ repository, ref: binding.ref, old, commit, objects, ...(expectedTree === undefined ? {} : { expectedTree }), requireParentless, token: live.plaintext!, binding, allowed }), ["send"]);
+    const reply = members(await this.#options.provider.send({ repository, ref: binding.ref, old, commit, objects, ...(expectedTree === undefined ? {} : { expectedTree }), ...(request.sentAt === undefined ? {} : { sentAt: request.sentAt }), requireParentless, token: live.plaintext!, binding, allowed }), ["send"]);
     const sent = reply?.["send"];
     if (sent !== "accepted" && sent !== "refused" && sent !== "not-sent") return null;
+    if (sent === "not-sent" && request.sentAt !== undefined) return null;
     return answer(sent === "accepted" ? "confirmed" : "refused", { send: sent, seen: await this.#seen(repository, binding.ref) });
   }
 
