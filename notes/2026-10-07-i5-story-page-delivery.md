@@ -316,3 +316,39 @@ that control. All three page TypeScript configurations pass in
 `/tmp/artroom-page-story-authority-types.log`; the existing testing guide
 is unchanged from the already read candidate. No whole gate, cloud, browser
 or provider ran; the host and scheduler remain labelled stand-ins.
+
+## 9 Settings service origin, review F5, 2026-10-08
+
+Planner decision `158be2c4800db1753af32e60674591ff17464cde`, following
+review `376aa53064b8adae9b330d5d655f5fb019b6b168`, selects refusal of
+unsupported service-origin changes for this landing. On base
+`68be1ffeb3d64094232ec7f8e4373629f8527c07`, Settings now reports
+"Unsupported service origin" when the chosen base URL has another origin.
+The actual Settings handlers validate it before saving key/room/service
+state, changing the memory room draft or sending a join. A loaded older
+cross-origin setting is refused before opening a view or sending requests,
+without pretending it works. Empty service still selects this page's own
+origin; explicit own-origin service settings still save. No CSP, scope route,
+transport authority, grant or read permission changes. The explicit data
+client's service remains usable by its existing scripted/real-scope tests.
+The original reviewed cross-origin functionality and trust-boundary obligation
+remain owed; this local refusal neither implements nor waives them.
+
+`settings.test.ts` exercises actual main-module Settings handlers with a
+minimal DOM/localStorage stand-in. It checks unchanged saved state and zero
+requests after unsupported save/join/new-key actions, own-origin default
+saving, and older saved-setting refusal before view I/O. One focused test
+passes in `/tmp/artroom-page-service-setting-focused.log`; disabling the
+origin check fails its state/no-request assertion in
+`/tmp/artroom-page-service-setting-control.log`. Source is restored. All
+three page TypeScript configurations pass in
+`/tmp/artroom-page-service-setting-types.log`. No browser/CSP enforcement
+proof, provider/cloud call, whole suite or gate is claimed.
+
+F3's join-answer category body and docs/page.md's general refusal wording
+are separate repairs. This preparation changes only the main settings
+regions, a data helper, the service-settings documentation and this note.
+The final combined source must rebuild page-assets once after both main
+patches are assembled; the inherited generated bundle is not this F5 source.
+The final combined source-correct gate and independent successor review
+remain Root's landing duties under request 86206b55.
