@@ -1,0 +1,5 @@
+{
+  "extends": "../../../../tsconfig.base.json",
+  "compilerOptions": { "rootDir": "../../../..", "types": ["node"], "skipLibCheck": true },
+  "include": ["local-clone-setup.ts", "local-clone-child.ts", "local-clone.ts"]
+}

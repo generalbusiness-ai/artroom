@@ -111,3 +111,80 @@ and README/tree/remote evidence, old-history proof, final gate, ordinary
 independent source review and witnessed main landing in planner's order.
 No deployment, provider action, source approval or whole-request receipt
 was performed by this preparation.
+
+## Real local Git composition preparation
+
+This next slice uses isolated `request/i5-clone-real-git` from
+`d5a58b418bf12a381072187725e6d2ec2614ecc7`, within the same request/promise.
+The original runtime-versions witness and nodeGit source match exact
+`3eb62581426c5ec619125e15cbfd651b1bec57b2`; clone() also has identical bytes.
+The base's later CLI changes concern edit/value handling. Exact comparisons,
+Node/Git versions and lock hash are in the source-pair output below.
+
+The existing witness now retains its known @2/unknown-code, full birth and
+aged rules/destination session checks while running production founding and
+receipt writes through the Artifacts factory, DestinationHost and private
+SQLite into a real local bare repository. Founding completes with a judged
+ready branch and written receipt before the clock ages by 901 seconds. Its
+register create and Artifacts identity/mint/rights/revoke binding remain
+explicit stand-ins; the scheduler and clock remain scripted. No fake
+verified-source context, ready flag or successful write outcome is supplied.
+
+A fixed loopback Node fixture checks its nonce and exact repository, clone
+argv/environment and owned target. Its child invokes production nodeGit with
+bounded captured output, never returning or printing raw child output. Real
+git http-backend accepts only this repository's live fixture credentials and
+read/write route rights. The CLI signs/read-waits through actual HTTP scope
+routes, obtains its read credential once through the real caller session, and
+real Git transfers/checks out the founding objects. The literal README names
+the saved repository, @rita and exact directory. HEAD equals the judged first
+head; the one-file 100644 tree is checked with independent Node hashes, and
+the saved/origin remote stays the clean provider-shaped HTTPS URL. The private
+credential's second take still refuses and its plaintext is absent from
+recorded history, config, argv and the controlled captured output.
+
+This fixture explicitly excludes ambient global/system Git configuration,
+proxy and trace environment, uses an isolated temporary working directory,
+and trusts its one ephemeral URL rewrite from that fixed HTTPS metadata
+remote to the loopback HTTP backend. The production Web Git client's trusted
+fixture fetch similarly reconstructs a synthetic response from this fixed
+local proxy; it honors manual redirects and the input signal. This proves
+neither TLS nor arbitrary redirect/ambient Git safety. Output nondisclosure
+is observed only for this controlled installed Git run. No bearer is written
+to a config/transcript; ephemeral requests/process environment carry it.
+
+The focused real-Git run passed one test. The final auth-header control's
+unchanged baseline also passed that complete witness, including the added
+independent tree check. Blanking only the actual Node Git child's authorization
+header made real Git exit 128; the CLI returned failure after its one mint and
+private take. The helper reported DISTINGUISHES and restored the child. Scope
+source, Worker tests and separately configured Node helper typechecks pass.
+Node was v26.10.0 and Git was Apple Git 2.54.0. Existing installed dependencies
+were reused with isolated workspace links and the matching lockfile; no
+dependency or lock change/install was made. The scope package only adds the
+Node helper configuration to its existing typecheck script.
+
+Initial dependency-link/type failures were displayed but not retained as
+separate files. Retained chronology/backend failures are original redirected
+outputs: an unknown first-head initially resulted from returning the local
+proxy Response.url, which the production exact-response URL guard correctly
+refused. The correction is confined to the explicit trusted test proxy.
+These files are original command outputs, not reconstructed transcripts:
+
+| Output | SHA-256 |
+|---|---|
+| `/tmp/artroom-clone-real-git-evidence/source-pair.log` | `9bd6cdb47900f129a6afbfb11c1f2b69031c6bb3a74eb8418ae1684f7e43b62d` |
+| `/tmp/artroom-clone-real-git-evidence/focused-proxy.log` | `10a6c6b815e4d1d91ac6be27222eead95b7eebf9fa4c48ab84cde5fb3b934ef5` |
+| `/tmp/artroom-clone-real-git-evidence/typecheck-final.log` | `4df6218037a0d03e53f31b1b9e167db9e850ff75810f379cc9c2e0e16ae594e1` |
+| `/tmp/artroom-clone-real-git-evidence/control-auth-header.log` | `116201cb3e5303295682242c60d187f80336b3be692c4d05a17ce189391b5a40` |
+| `/tmp/artroom-clone-real-git-evidence/focused-chronology.log` | `65c5d1d044121745111518e77ca42c0433fee38fba28b5ed2e0b8cedda9e2d60` |
+| `/tmp/artroom-clone-real-git-evidence/focused-backend-diagnostic.log` | `89ab35449566b544eb3dee807d49e92cc85b5fd3f38343b571d44080ec88ab5d` |
+
+Commands selected only runtime-versions in the scope project, the scope
+package's typechecks, and one scripts/control.mjs header-removal control of
+that same witness. No whole gate, live provider, deployment or main landing
+ran. This closes the local real-Git boundary left scripted in the earlier
+component; it does not prove live provider rights/expiry, original historical
+admission/archives, executor closure, capacity or compatible activation. The
+complete request still owes those actual integrated proofs, final gate,
+ordinary independent source review and source filing/landing in order.
