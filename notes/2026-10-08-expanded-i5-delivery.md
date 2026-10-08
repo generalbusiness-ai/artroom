@@ -415,3 +415,28 @@ logs named by their delivery notes, and
 the composed source head and successor independent Source review are next.
 Earlier gate outcomes and unresolved native/timeout risks remain historical;
 none of these corrections claims their cause or closure of held duties.
+
+### Versions conditional boundary and interrupted gate
+
+Checker `e7c50bce` and planner `5dc4091f` identified a residual F4 after
+the composed `64aa6cca` gate had started: the versions list still checked
+its advertised-ref ETag before annotated-tag peeling and row validation.
+Builder stopped that owned run for the material correction. Its command
+returned 1 and its test phase returned 130 after 58.8 seconds; it reported
+no suite result or active-source pass. Whitespace and types returned zero
+only at that preceding head. Raw output is
+`/tmp/artroom-expanded-six-repairs-gate.log`, with phase logs in
+`/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.KDwIGkDexh`.
+This interruption earns no final gate credit and is not an assertion failure.
+
+Correction `c485e9056412739f87207654554b35aa305bb09e` removes that early
+return and uses the shared successful HTML boundary after every ordinary
+versions row is constructed. ETags and cache headers remain unchanged.
+The existing versions witness retains valid caching and adds an annotated
+tag targeting a blob: ordinary and wildcard requests both fail 502 with
+no-store at the objects step. All 13 Site tests and affected types pass;
+restoring only the old early return fails by answering 304. The complete
+delta, focused/types/control logs and limitations are recorded in the
+existing navigation note. The backend-only correction preserves the rebuilt
+Page source/bundle. One subsequent ordinary gate at the corrected composed
+head is required; it follows this source change, not a blind retry.
