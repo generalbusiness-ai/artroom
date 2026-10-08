@@ -158,8 +158,7 @@ export class GitHubApp {
 
   /** A 404 means GitHub did not expose it; it is not proof of nonexistence. */
   async repository(name: string, plaintext?: string): Promise<GitHubRepository | null> {
-    const answer = await this.#request(this.#repoPath(name), "GET", plaintext === undefined ? undefined : credential(plaintext), 200, undefined, true);
-    return answer === null ? null : this.#repository(answer, name);
+    return githubRepository({ account: this.#account, fetch: this.#fetch, timeoutMs: this.#timeout, maxResponseBytes: this.#maxBytes }, name, plaintext);
   }
 
   /**
@@ -195,75 +194,96 @@ export class GitHubApp {
     return `/repos/${this.#account.login}/${name}`;
   }
 
-  #checkAccount(value: unknown): string {
-    const owner = record(value);
-    const login = owner["login"];
-    if (!loginOK(login) || login.toLowerCase() !== this.#account.login.toLowerCase() || owner["id"] !== this.#account.id || owner["type"] !== this.#account.type) return fail("response");
-    return login;
+  #checkAccount(value: unknown): string { return checkedAccount(this.#account, value); }
+  #repository(value: unknown, expected?: string): GitHubRepository { return checkedRepository(this.#account, value, expected); }
+  #request(path: string, method: "GET" | "POST" | "DELETE", token: string | undefined, status: number, body?: unknown, missing = false): Promise<unknown> {
+    return githubRequest({ fetch: this.#fetch, timeoutMs: this.#timeout, maxResponseBytes: this.#maxBytes }, path, method, token, status, body, missing);
   }
+}
 
-  #repository(value: unknown, expected?: string): GitHubRepository {
-    const repository = record(value);
-    const owner = this.#checkAccount(repository["owner"]);
-    const name = repository["name"];
-    const id = repository["id"];
-    if (!nameOK(name) || !positive(id) || typeof repository["private"] !== "boolean" || (expected !== undefined && name.toLowerCase() !== expected.toLowerCase())) return fail("response");
-    const htmlUrl = `https://github.com/${owner}/${name}`;
-    const gitUrl = `${htmlUrl}.git`;
-    if (repository["full_name"] !== `${owner}/${name}` || repository["html_url"] !== htmlUrl || repository["clone_url"] !== gitUrl) return fail("response");
-    return { id, owner, name, private: repository["private"], htmlUrl, gitUrl };
-  }
+function checkedAccount(account: GitHubAccount, value: unknown): string {
+  const owner = record(value);
+  const login = owner["login"];
+  if (!loginOK(login) || login.toLowerCase() !== account.login.toLowerCase() || owner["id"] !== account.id || owner["type"] !== account.type) return fail("response");
+  return login;
+}
 
-  async #request(path: string, method: "GET" | "POST" | "DELETE", token: string | undefined, status: number, body?: unknown, missing = false): Promise<unknown> {
-    const controller = new AbortController();
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const deadline = new Promise<never>((_, reject) => {
-      timer = setTimeout(() => { controller.abort(); reject(new GitHubFailure("timeout")); }, this.#timeout);
-    });
-    let response: Response | undefined;
-    let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
-    try {
-      const url = `https://api.github.com${path}`;
-      const headers = new Headers({ accept: "application/vnd.github+json", "x-github-api-version": "2022-11-28", "user-agent": "Artroom-GitHub-App" });
-      if (token !== undefined) headers.set("authorization", `Bearer ${token}`);
-      if (body !== undefined) headers.set("content-type", "application/json");
-      // workerd implements manual, not error: no redirect is followed, and
-      // the status/URL checks below refuse every redirect response.
-      const init: RequestInit & { credentials: "omit" } = { method, headers, credentials: "omit", redirect: "manual", signal: controller.signal, ...(body === undefined ? {} : { body: JSON.stringify(body) }) };
-      const request = new Request(url, init);
-      const pending = this.#fetch(request);
-      // Dispose a late response even if a supplied transport ignores abort.
-      void pending.then((late) => { if (controller.signal.aborted) void late.body?.cancel().catch(() => undefined); }, () => undefined);
-      response = await Promise.race([pending, deadline]);
-      if (response.redirected || (response.url !== "" && response.url !== url)) return fail("response", response.status);
-      if (missing && response.status === 404) return null;
-      if (response.status !== status) return fail("response", response.status);
-      if (status === 204) return undefined;
-      if (response.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase() !== "application/json" || response.body === null) return fail("response", response.status);
-      const length = response.headers.get("content-length");
-      if (length !== null && (!/^\d+$/.test(length) || Number(length) > this.#maxBytes)) return fail("too-large");
-      reader = response.body.getReader();
-      const chunks: Uint8Array[] = [];
-      let size = 0;
-      for (;;) {
-        const chunk = await Promise.race([reader.read(), deadline]);
-        if (chunk.done) break;
-        size += chunk.value.length;
-        if (size > this.#maxBytes) return fail("too-large");
-        chunks.push(chunk.value);
-      }
-      const bytes = new Uint8Array(size);
-      let at = 0;
-      for (const chunk of chunks) { bytes.set(chunk, at); at += chunk.length; }
-      try { return JSON.parse(new TextDecoder("utf-8", { fatal: true, ignoreBOM: false }).decode(bytes)) as unknown; }
-      catch { return fail("response"); }
-    } catch (error) {
-      if (error instanceof GitHubFailure) throw error;
-      return fail(controller.signal.aborted ? "timeout" : "request");
-    } finally {
-      if (timer !== undefined) clearTimeout(timer);
-      if (reader !== undefined) { void reader.cancel().catch(() => undefined); reader.releaseLock(); }
-      else { void response?.body?.cancel().catch(() => undefined); }
+function checkedRepository(account: GitHubAccount, value: unknown, expected?: string): GitHubRepository {
+  const repository = record(value);
+  const owner = checkedAccount(account, repository["owner"]);
+  const name = repository["name"];
+  const id = repository["id"];
+  if (!nameOK(name) || !positive(id) || typeof repository["private"] !== "boolean" || (expected !== undefined && name.toLowerCase() !== expected.toLowerCase())) return fail("response");
+  const htmlUrl = `https://github.com/${owner}/${name}`;
+  const gitUrl = `${htmlUrl}.git`;
+  if (repository["full_name"] !== `${owner}/${name}` || repository["html_url"] !== htmlUrl || repository["clone_url"] !== gitUrl) return fail("response");
+  return { id, owner, name, private: repository["private"], htmlUrl, gitUrl };
+}
+
+async function githubRequest(options: Pick<GitHubAppOptions, "fetch" | "timeoutMs" | "maxResponseBytes">, path: string, method: "GET" | "POST" | "DELETE", token: string | undefined, status: number, body?: unknown, missing = false): Promise<unknown> {
+  const timeout = options.timeoutMs ?? 30_000;
+  const maxBytes = options.maxResponseBytes ?? 512 * 1024;
+  const send = options.fetch ?? ((request: Request) => fetch(request));
+  if (!positive(timeout) || timeout > 120_000 || !positive(maxBytes) || maxBytes > 4 * 1024 * 1024) fail("configuration");
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => { controller.abort(); reject(new GitHubFailure("timeout")); }, timeout);
+  });
+  let response: Response | undefined;
+  let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
+  try {
+    const url = `https://api.github.com${path}`;
+    const headers = new Headers({ accept: "application/vnd.github+json", "x-github-api-version": "2022-11-28", "user-agent": "Artroom-GitHub-App" });
+    if (token !== undefined) headers.set("authorization", `Bearer ${token}`);
+    if (body !== undefined) headers.set("content-type", "application/json");
+    // workerd implements manual, not error: no redirect is followed, and
+    // the status/URL checks below refuse every redirect response.
+    const init: RequestInit & { credentials: "omit" } = { method, headers, credentials: "omit", redirect: "manual", signal: controller.signal, ...(body === undefined ? {} : { body: JSON.stringify(body) }) };
+    const request = new Request(url, init);
+    const pending = send(request);
+    // Dispose a late response even if a supplied transport ignores abort.
+    void pending.then((late) => { if (controller.signal.aborted) void late.body?.cancel().catch(() => undefined); }, () => undefined);
+    response = await Promise.race([pending, deadline]);
+    if (response.redirected || (response.url !== "" && response.url !== url)) return fail("response", response.status);
+    if (missing && response.status === 404) return null;
+    if (response.status !== status) return fail("response", response.status);
+    if (status === 204) return undefined;
+    if (response.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase() !== "application/json" || response.body === null) return fail("response", response.status);
+    const length = response.headers.get("content-length");
+    if (length !== null && (!/^\d+$/.test(length) || Number(length) > maxBytes)) return fail("too-large");
+    reader = response.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let size = 0;
+    for (;;) {
+      const chunk = await Promise.race([reader.read(), deadline]);
+      if (chunk.done) break;
+      size += chunk.value.length;
+      if (size > maxBytes) return fail("too-large");
+      chunks.push(chunk.value);
     }
+    const bytes = new Uint8Array(size);
+    let at = 0;
+    for (const chunk of chunks) { bytes.set(chunk, at); at += chunk.length; }
+    try { return JSON.parse(new TextDecoder("utf-8", { fatal: true, ignoreBOM: false }).decode(bytes)) as unknown; }
+    catch { return fail("response"); }
+  } catch (error) {
+    if (error instanceof GitHubFailure) throw error;
+    return fail(controller.signal.aborted ? "timeout" : "request");
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+    if (reader !== undefined) { void reader.cancel().catch(() => undefined); reader.releaseLock(); }
+    else { void response?.body?.cancel().catch(() => undefined); }
   }
+}
+
+/** Read-only repository lookup with the same bounded REST/account decoder as
+ * GitHubApp. It requires no App signing key and cannot mint or mutate. A 404
+ * is unexposed identity, not proof that the repository does not exist. */
+export async function githubRepository(options: Pick<GitHubAppOptions, "account" | "fetch" | "timeoutMs" | "maxResponseBytes">, name: string, plaintext?: string): Promise<GitHubRepository | null> {
+  const account = { ...options.account };
+  if (!positive(account.id) || !loginOK(account.login) || (account.type !== "User" && account.type !== "Organization")) return fail("configuration");
+  if (!nameOK(name)) return fail("input");
+  const answer = await githubRequest(options, `/repos/${account.login}/${name}`, "GET", plaintext === undefined ? undefined : credential(plaintext), 200, undefined, true);
+  return answer === null ? null : checkedRepository(account, answer, name);
 }
