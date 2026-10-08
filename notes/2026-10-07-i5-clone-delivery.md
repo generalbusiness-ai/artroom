@@ -375,3 +375,46 @@ destination resolve the confirmed full membership reference from their actual
 recorded birth directory after local authentication, clock and read checks.
 The preceding ID-only source/control description is evidence of donor315,
 not the merged authorization policy. The final integrated witness remains owed.
+
+## Consolidated preservation of completed clone source
+
+Under45/c878 and original484/3501, the combined4c9 candidate omitted the
+completed clone receipt/opening/outcome proof helpers, bounded/cancellable
+waiter, typed one-time client credential read and actual local-Git witness.
+This selective source closure starts at
+`4c9cf99fa1d6e2cd8587b5dddee0832e3614a56d` and carries those completed files
+from ordered donor `c4dd6032f73c54621a8a3e9d16291247312bfac4`, including the
+owned lazy fixture-root retry/cleanup fix at
+`a77cc128449bb238f7776e899a7254c09935ba10`. It opens no new task or design.
+
+The CLI receives clone-proof.ts, clone-outcome.ts and their existing compact
+Node witnesses. Client receives credential.ts, its export and malformed-wire
+witness. The Node Git runner body stays unchanged; its documentation states
+its actual ambient configuration/output trust boundary and its existing test
+removes its own scratch directory. Current CLI command, store, line and main
+files remain with the install/clone reconciliation owner. They must add the
+same exact proof/wait/credential APIs while preserving install planning,
+saved claim/join recovery, edit/merge/issue dispatch and all current tests.
+No whole donor CLI, catalog, platform or runtime replacement is used.
+
+The scope witness and four test-only local-clone support files retain real
+production nodeGit, real git http-backend, exact nonce/argv/environment/owned
+target, all-token bounded output scanning, actual founding/written receipt,
+literal README/judged HEAD/independent tree checks and one-time custody.
+Initialization remains lazy and cleanup owns only its retained fixture root.
+Scope globalSetup and its Node-helper typecheck are added narrowly.
+The missing donor platform-version helper is replaced only inside the fixture
+by the current closed catalog lookup and exact family comparison. The Node
+unsupported-native test names destination@1 literally instead of using this
+candidate's newest@2 constant. No new runtime lookup policy follows.
+
+Current directory-summary/session trust and full-reference checks are the
+boundary under test; this is not original historical directory-birth,
+executable or admission proof. Host identity/mint rights, clock and scheduler
+remain explicit stand-ins; local Git is actual, with trusted fixture URL
+rewrite and controlled ambient environment. Donor logs are donor evidence.
+No Node/real-Git check has yet run on this helper-only checkpoint: the commands
+API composition must come first, then its focused checks and typechecks once.
+The full original clone scope remains required; a fresh@2 local fixture is
+not whole old-room/historical/provider functionality closure. No gate, cloud,
+provider/account operation or main landing was performed for this carry.
