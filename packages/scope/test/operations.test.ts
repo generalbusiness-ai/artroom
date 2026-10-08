@@ -1,11 +1,14 @@
 import { describe, expect, test } from "vitest";
 import { abortAllDurableObjects } from "cloudflare:test";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { OperationId, Read } from "@generalbusiness/artroom-contract";
-import { canonicalize } from "@generalbusiness/artroom-bytes";
+import type { Entry, OperationId, Read } from "@generalbusiness/artroom-contract";
+import { canonicalize, keyIdOfSecret, utf8 } from "@generalbusiness/artroom-bytes";
+import { snapshotCommit, ZERO_ID } from "@generalbusiness/artroom-git";
 import { checkpointOf, operationId, operationOpening, snapshotInput, snapshotRead, stagedRefName, timeMs, type Opening } from "@generalbusiness/artroom-derive";
 import { isAnswer } from "../src/operations.ts";
-import { ScopeObject, SqliteStore, Turns, Wakes, production, type EffectAnswer, type EffectRequest, type OperationStatus, type OutcomeRecorded, type Outside, type Wiring } from "../src/index.ts";
+import { ScopeObject, SqliteStore, Turns, Wakes, production, dispatchId, signDispatchPermit, type DispatchContext, type EffectAnswer, type EffectRequest, type OperationStatus, type OutcomeRecorded, type Outside, type Wiring } from "../src/index.ts";
+import { gitOriginalRequest, sendOnce } from "../src/github-host.ts";
+import type { DestinationProvider } from "../src/destination-host.ts";
 import { variant } from "@generalbusiness/artroom-derive/testing";
 import { controls, testPorts } from "../src/testing.ts";
 import { FENCE, MINT, mint, outsideOf, owners, pushOf, wired, type OutsideDouble } from "./outside.ts";
@@ -56,6 +59,91 @@ const own = (commit: string): EffectAnswer => ({ result: "confirmed", evidence: 
 const outcomes = (status: OperationStatus) => status.operation.attempts.map((a) => a.outcomes.map((o) => `${o.result} at ${o.seq}`));
 
 describe("outside operations at a real scope (scope contract, section 4.3; authority note, section 5.4). The outside system and the opening entry are stand-ins", () => {
+  // Classification boundary only: opening/owner rules, signed authority,
+  // admission/capacity and live authorization below are labelled stand-ins.
+  // Scope, SQLite mark/owner, Operations, Git validation and transport are
+  // actual. This proves no real mint expiry/revocation or host/drain authority.
+  test("registered post-mark local denial retains unknown while an independent unfenced call keeps legacy not-sent", async () => {
+    const s = await found();
+    const built = snapshotCommit([], "registered denial fixture\n");
+    const remote = "https://git.example/artroom/denial.git";
+    const path = `${remote}/git-receive-pack`;
+    const secret = crypto.getRandomValues(new Uint8Array(32));
+    const key = keyIdOfSecret(secret);
+    let liveAuthorization = true; // STAND-IN predicate, not actual custody.
+    let asks = 0;
+    let posts = 0;
+    let release!: () => void;
+    let reached!: () => void;
+    const held = new Promise<void>((resolve) => { release = resolve; });
+    const ready = new Promise<void>((resolve) => { reached = resolve; });
+    let holdDiscovery = true;
+    const packet = (text: string) => `${(utf8(text).length + 4).toString(16).padStart(4, "0")}${text}`;
+    // SCRIPTED finite Git HTTP upstream; no actual provider is called.
+    const fetch = async (request: Request): Promise<Response> => {
+      if (request.method === "POST") { posts++; return new Response(null, { status: 500 }); }
+      expect(request.url).toBe(`${remote}/info/refs?service=git-receive-pack`);
+      if (holdDiscovery) { reached(); await held; }
+      return new Response(packet("# service=git-receive-pack\n") + "0000" + packet(`${ZERO_ID} capabilities^{}\0report-status object-format=sha1\n`) + "0000", { headers: { "content-type": "application/x-git-receive-pack-advertisement" } });
+    };
+    const transport = { remote, maxBytes: 1024 * 1024, fetch };
+    const argumentsOf = (request: EffectRequest): Parameters<DestinationProvider["send"]>[0] => ({
+      repository: { host: "git.example", namespace: "artroom", name: "denial", id: "scripted-71" }, ref: "refs/heads/main", old: null, commit: built.commit,
+      objects: built.objects.map(({ id, type, data }) => ({ id, kind: type, body: data })), requireParentless: true, token: "scripted_private_token",
+      binding: { scope: request.scope, mint: request.operation, attempt: 1, write: request.operation, writeAttempt: request.attempt, ref: "refs/heads/main" },
+      allowed: () => liveAuthorization,
+    });
+    let current: DispatchContext | null = null;
+    wired.set(s.name, () => ({
+      outside: { accepts: () => true, send: async () => { throw new Error("registered request must not use legacy send"); } },
+      dispatch: { object: s.object.id.toString(), registration: {
+        authority: {
+          current: (request) => current = { service: "SCRIPTED service", generation: 1, tuple: dispatchId("denial-tuple", 1), coordinator: { namespace: "SCRIPTED coordinator", object: "issuer", key }, owner: { service: "SCRIPTED service", namespace: "SCRIPTED namespace", object: s.object.id.toString(), scope: request.scope, nonce: dispatchId("denial-nonce", [request.scope, request.operation, request.attempt]), release: dispatchId("denial-release", 1), build: dispatchId("denial-build", 1) }, binding: dispatchId("denial-binding", request.origin.hash), admittedBy: dispatchId("denial-admission", request.origin.hash), provider: dispatchId("denial-provider", remote) },
+          issue: async (_request, plan) => { const c = current!; return signDispatchPermit(secret, { format: "artroom-send-permit-1", service: c.service, generation: c.generation, tuple: c.tuple, coordinator: c.coordinator, owner: c.owner, attempt: plan.attempt, callPlan: dispatchId("artroom-dispatch-call-plan-1", plan), purpose: "original-dispatch", duty: null, targetResolution: null }); },
+        },
+        adapter: { prepare: async (request, context) => {
+          const arguments_ = argumentsOf(request);
+          return { site: { ordinal: 0, site: "git.receive-pack", role: "original", target: { mode: "fixed", value: { provider: context.provider, repository: arguments_.repository } }, ref: arguments_.ref, rights: { operation: "write", permissions: [{ name: "contents", level: "write" }] }, absoluteLifetime: null, request: gitOriginalRequest(path, arguments_), cleanupPredecessor: null }, send: async (fence) => {
+            asks++;
+            const reply = await sendOnce({ ...arguments_, fence }, transport, async () => null);
+            // The producer conversion is a stand-in. The unchanged real
+            // DestinationHost uses the same decisive/non-answer distinction.
+            return reply === null ? null : { result: "refused", evidence: { basis: "own-answer", body: reply as { send: string } } };
+          } };
+        } },
+      } },
+    }));
+    try {
+      await s.restart(); // Construct registered wiring before any opening.
+      const [op] = await open(s, pushOf(1)) as [OperationId];
+      const request = { scope: s.at, operation: op, attempt: 1, owner: "platform:destination@1", kind: "push", origin: (await s.sealed(1))[0]! } as const;
+      const inspect = () => s.inside((state) => {
+        const store = new SqliteStore({ exec: (query, ...bindings) => state.storage.sql.exec(query, ...bindings), transaction: (closure) => state.storage.transactionSync(closure) });
+        const status = store.operationStatus(op);
+        const outcome = status?.operation.attempts[0]?.outcomes[0];
+        const entry = outcome ? JSON.parse(store.stored(outcome.seq)!.bytes) as Entry : null;
+        return { mark: store.sending(op, 1)?.sent, original: store.originalDispatch(op, 1), status, outcome: entry?.input ?? null, outstanding: store.outstanding() };
+      });
+      const pass = surface(s).effect();
+      expect(await Promise.race([ready.then(() => true), pass.then(() => false)])).toBe(true);
+      const marked = await inspect();
+      expect(marked.mark).toBe(START);
+      expect(marked.original).toMatchObject({ consumed: null, closure: null, revision: 0 });
+      liveAuthorization = false;
+      release();
+      await pass;
+      const denied = await inspect();
+      expect([asks, posts, denied.mark, denied.original]).toEqual([1, 0, marked.mark, marked.original]);
+      expect(denied.outcome).toMatchObject({ type: "outcome", operation: op, attempt: 1, result: "unknown", evidence: { basis: "none" } });
+      expect([denied.status?.state, denied.outstanding.unknown]).toEqual(["unknown", 1]);
+      holdDiscovery = false;
+      // Separate unfenced library invocation, not a replay of the marked
+      // scope attempt. Its false predicate still prevents every POST.
+      expect(await sendOnce(argumentsOf(request), transport, async () => null)).toEqual({ send: "not-sent" });
+      expect([asks, posts, (await inspect()).original]).toEqual([1, 0, marked.original]);
+    } finally { release(); wired.delete(s.name); }
+  });
+
   test("T19: an attempt is recorded before it is sent, and sent at most once; a stop between the send and the outcome leaves `unknown`, which a restart, elapsed time, a later attempt that succeeds, a new ref and a listing do not settle, and its own late answer does", async () => {
     const s = await found();
     const out = outsideOf(s.name);

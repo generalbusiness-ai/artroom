@@ -215,7 +215,9 @@ export async function sendOnce(request: Parameters<DestinationProvider["send"]>[
       fence.consume({ method: "POST", path: url, publicBody: digestBytes(canonicalBytes(actual)), custodyFromSite: null });
     } }),
   });
-  if (!result.ran || result.reported === "stale") return { send: "not-sent" };
+  // A registered original already has its irreversible mark. Local denial
+  // supplies no decisive own answer; its original bindings/duties stay unknown.
+  if (!result.ran || result.reported === "stale") return fence === undefined ? { send: "not-sent" } : null;
   if (result.exit === 1 && result.reported === "remote-rejected" && !result.timedOut) return { send: "refused" };
   if (result.exit === 0 && (result.reported === "created" || result.reported === "updated") && !result.timedOut && await readBack() === request.commit) return { send: "accepted" };
   return null; // An applied ref cannot settle a lost or incomplete own answer.
