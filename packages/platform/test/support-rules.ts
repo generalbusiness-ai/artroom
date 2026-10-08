@@ -27,7 +27,7 @@ import type { DeclaredDefinition, MemberId, MemberRef, ObservationUse, ScopeId, 
 import { PROFILES, clockOf, judgeDelivery, judgeGenesis, validateDefinition } from "@generalbusiness/artroom-derive";
 import type { Judgment, PlatformRules, ValidDefinition } from "@generalbusiness/artroom-derive";
 import { Ledger, Scope, T0, arriving, creation, d, founded, keys, membership, sent } from "@generalbusiness/artroom-derive/testing";
-import { RULES_SCOPE, platform, rulesScope } from "../src/index.ts";
+import { RULES_SCOPE, platform } from "../src/index.ts";
 
 const checked = (result: ReturnType<typeof validateDefinition>): ValidDefinition => {
   if (!result.ok) throw new Error(`a definition of test support is refused: ${JSON.stringify(result.problems)}`);
@@ -96,7 +96,7 @@ export const asker: DeclaredDefinition = {
 export const registrarDefinition = checked(validateDefinition(registrar, PROPOSED_BOUNDS));
 export const askerDefinition = checked(validateDefinition(asker, PROPOSED_BOUNDS));
 /** The rules scope's data, validated as a runtime validates it. */
-export const rulesScopeDefinition = checked(validateDefinition(JSON.parse(JSON.stringify(rulesScope)), PROPOSED_BOUNDS, PROFILES, { platform: true }));
+export const rulesScopeDefinition = checked(validateDefinition(JSON.parse(JSON.stringify(platform(RULES_SCOPE)!.data)), PROPOSED_BOUNDS, PROFILES, { platform: true }));
 /** The rules scope's rules, as the platform package supplies them: what a judge of these tests is given. No stand-in rule is among them. */
 export const rules: PlatformRules = { named: RULES_SCOPE, rules: platform(RULES_SCOPE)!.rules };
 

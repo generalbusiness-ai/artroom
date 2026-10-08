@@ -5,7 +5,7 @@ import type { RuleGiven, StateView } from "@generalbusiness/artroom-derive";
 import { d, keys, otherLane, t } from "@generalbusiness/artroom-derive/testing";
 import { decidingKeys, manifestAuthors, readLane } from "../src/destination-reading.ts";
 import { DESTINATION_CHANGED_SET, isJudgeChanges, isRecordedJudgeEvidence, type Statement } from "../src/reservation.ts";
-import { rulesAnswer } from "../src/rules-scope.ts";
+import { RULES_SCOPE, rulesAnswer } from "../src/rules-scope.ts";
 
 // STAND-INS: recorded lane facts, authority and observations made by hand. These tests show the destination's pure reader,
 // rather than a lane's admission or a membership read. Every subject and provenance check is derived from the records below.
@@ -25,7 +25,7 @@ const statement: Statement = { operation: factRefOf(merge), manifest: factRefOf(
 // The state is made by hand; its answer is the platform's actual projection of the stored checker MemberRef to a MemberId.
 const rulebook = { ...lane, kind: "rules" as const };
 const rulesState = { scope: () => ({ at: rulebook, status: "active", head: { seq: 0, hash: d("a") } }), page: () => ({ items: [{ type: "rules", state: "current", refs: { published: null }, values: { approvals: 1, ownerMayReview: false, labels: [], singleControllerException: false, checks: [{ name: "verify", configuration: d("d"), checker: member, required: true }] } }], more: false }) } as unknown as Pick<StateView, "scope" | "page">;
-const rules: RulesObservation = { ...rulesAnswer(rulesState, { of: rulebook, asked: "rules" })!, at: t(0) };
+const rules: RulesObservation = { ...rulesAnswer(rulesState, { of: rulebook, asked: "rules" }, RULES_SCOPE)!, at: t(0) };
 const given = (entries: readonly Entry[]): Pick<RuleGiven, "uses" | "observed"> => ({ uses: entries.map((entry) => ({ fact: factRefOf(entry), entry, under: "change" })), observed: (asked) => "key" in asked ? grant(asked.key === keys.una.key ? keys.una : keys.rita).fresh : null });
 const records = [manifest, merge, review, job, check];
 

@@ -36,7 +36,7 @@ import type { Digest, Entry, Input, KeyId, Observation, ObservationRequest, Obse
 import { canonicalize, hex, isObservationUse, isRecord, parseStrict } from "@generalbusiness/artroom-bytes";
 import { WINDOWS, contentChecked, contentStates, fixedBy, highestHead, isScopeRef, judgeGrant, membershipOf, namedBy, observationOf, observedName, observedOf, prefer, revoked, same, subjectName, valueDigest, type Clock as Reading, type ContentStates, type GrantJudgment, type Needed, type RecordedRef, type Retains, type StateView, type ValueRead } from "@generalbusiness/artroom-derive";
 import { isPlatformDefinition } from "@generalbusiness/artroom-bytes";
-import { DESTINATION, DIRECTORY, RULES_SCOPE, destinationBranch, platform, standingOf } from "@generalbusiness/artroom-platform";
+import { SIBLINGS_OF, destinationBranch, platform, standingOf } from "@generalbusiness/artroom-platform";
 import type { Asked, Authority, Clock, Further, Random, Standing } from "./ports.ts";
 import type { SessionReading } from "./sessions.ts";
 
@@ -316,7 +316,7 @@ export function observing(config: Observing): Authority {
  * entries hold one read as `fresh`. An act whose row names no action is
  * judged on no grant, and nothing is built for it.
  */
-export function ownStanding(random: Random): Authority {
+export function ownStanding(random: Random, genesis: Repository["genesis"]): Authority {
   const run: RunId = hex(random.bytes(16));
   let count = 0;
   return {
@@ -328,7 +328,9 @@ export function ownStanding(random: Random): Authority {
       return Promise.resolve({
         membership: scope,
         held(view, clock) {
-          const observation = observationOf(standingOf(view, { of: scope, key }), clock.reading);
+          const named = genesis()?.seed.definition;
+          const observation = (named === "platform:membership@1" || named === "platform:membership@2") && platform(named)
+            ? observationOf(standingOf(view, { of: scope, key }, named), clock.reading) : null;
           // No answer: the scope is not an active membership scope at this head, so no grant rests on it (section 12.1.3, case e).
           if (!observation) return null;
           const use: ObservationUse = { observation, read: { run, n }, use: "fresh", prior: null };
@@ -395,14 +397,16 @@ export const fixedMembership = (config: Pick<Repository, "genesis" | "state">, s
 
 /** The actual directory of a rules scope or destination, recorded by its judged creation. A
  * session's claims cannot select this target or substitute its incarnation. */
-function repositorySessionBirth(config: Pick<Repository, "genesis" | "state">, scope: ScopeRef): { directory: ScopeRef; membership: RecordedRef } | null {
+function repositorySessionBirth(config: Pick<Repository, "genesis" | "state">, scope: ScopeRef): { directory: ScopeRef; membership: RecordedRef; definition: string } | null {
   const genesis = config.genesis();
   const state = config.state;
-  if (!state || !same(state.scope()?.at, scope) || genesis?.decision !== "applied" || genesis.seed.kind !== scope.kind || !((scope.kind === "destination" && genesis.seed.definition === DESTINATION) || (scope.kind === "rules" && genesis.seed.definition === RULES_SCOPE))) return null;
+  // The directory/child cohort is the exact supported catalog, never a name alias or newest fallback.
+  const definition = Object.keys(SIBLINGS_OF).find((named) => platform(named) && (scope.kind === "destination" || scope.kind === "rules") && SIBLINGS_OF[named]![scope.kind] === genesis?.seed.definition);
+  if (!definition || !state || !same(state.scope()?.at, scope) || genesis?.decision !== "applied" || genesis.seed.kind !== scope.kind) return null;
   const directory = genesis.seed.creator;
   const held = (scope.kind === "destination" ? destinationBranch(state) : state.page("rules", ["current"], null, 1).items[0])?.refs["directory"];
   const membership = recordedMembership(config, scope);
-  return directory?.kind === "directory" && isScopeRef(held) && same(held, directory) && genesis.source?.seq === 0 && same(genesis.source.at, directory) && genesis.message?.class === "request" && genesis.message.type === "create" && membership?.kind === "membership" ? { directory, membership } : null;
+  return directory?.kind === "directory" && isScopeRef(held) && same(held, directory) && genesis.source?.seq === 0 && same(genesis.source.at, directory) && genesis.message?.class === "request" && genesis.message.type === "create" && membership?.kind === "membership" ? { directory, membership, definition } : null;
 }
 
 /** Resolve only the session reference of a rules scope or destination that has not retained
@@ -417,7 +421,7 @@ export function repositorySessionMembership(config: Pick<Repository, "genesis" |
         if (!birth) return null;
         const reply = await read(birth.directory, reader);
         const value = isRecord(reply) && reply["ok"] === true && isRecord(reply["value"]) ? reply["value"] : null;
-        if (!value || !isScopeRef(value["scope"]) || !same(value["scope"], birth.directory) || value["definition"] !== DIRECTORY || value["status"] !== "active" || !Array.isArray(value["items"])) return null;
+        if (!value || !isScopeRef(value["scope"]) || !same(value["scope"], birth.directory) || value["definition"] !== birth.definition || value["status"] !== "active" || !Array.isArray(value["items"])) return null;
         const repositories = value["items"].filter((item: unknown) => isRecord(item) && item["type"] === "repository" && item["state"] === "open");
         if (repositories.length !== 1) return null;
         const refs = repositories[0]["refs"];
@@ -465,7 +469,7 @@ export function repositorySessionMembership(config: Pick<Repository, "genesis" |
  * the membership scope answers, and nothing a caller brings.
  */
 export function repositoryAuthority(config: Repository): Authority {
-  const own = ownStanding(config.random);
+  const own = ownStanding(config.random, config.genesis);
   const observed = observing({
     clock: config.clock, random: config.random, reader: config.reader, membership: (scope) => recordedMembership(config, scope),
     // Where a version's scopes record their rules reference is code of the version, as for the membership reference. The read goes

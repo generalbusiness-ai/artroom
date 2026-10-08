@@ -11,11 +11,13 @@ import { httpSource, verify } from "@generalbusiness/artroom-replay";
 import { CHAIN_STEPS, Chains, rootOf } from "../src/signed-reads.ts";
 import { SqliteStore } from "../src/sqlite.ts";
 import { namespace } from "../src/namespace.ts";
+import { mintSession, openSession, sessionsOf } from "../src/sessions.ts";
 import { net } from "../src/testing.ts";
 import { soon } from "./net.ts";
 import { outsideOf, wired } from "./outside.ts";
+import { foundingPublication } from "./publication.ts";
 import { Platform, rita, routed, settle } from "./repository.ts";
-import { platformNet } from "./worker.ts";
+import { TEST_DEPLOYMENT, platformNet } from "./worker.ts";
 
 const { paul, vic } = keys;
 const SERVICE = "https://scopes.test";
@@ -84,6 +86,29 @@ async function get(path: string, authorization?: string): Promise<{ status: numb
     platformNet.sessions = false;
     platformNet.secret = null;
   }
+}
+
+/**
+ * `who` takes the seat and first key in membership `M`, once, and asks for a read session by the client, under the TEST SECRET
+ * that the caller has set. The reader is the session's `Authorization` value.
+ */
+async function seated(M: Platform, who: Actor, operation: string): Promise<string> {
+  // The test's own acts and reads of membership go past the read sessions.
+  const sessions = platformNet.sessions;
+  platformNet.sessions = false;
+  let at: ScopeRef;
+  try {
+    if (!(await M.entries()).some((entry) => entry.input.type === "act" && entry.input.signed.intent.kind === "first-key")) {
+      const seat = await M.did(who, "seat", { expected: await M.expected({ roster: 0 }) });
+      await M.did(who, "first-key", { fields: { member: seat }, expected: await M.expected({ roster: 0, member: seat }) });
+    }
+    at = await M.at();
+  } finally {
+    platformNet.sessions = sessions;
+  }
+  const issued = await requestSession(SERVICE, M.name, sessionRequest(at, who.secret, soon(60), operation), { fetch: routed as unknown as Fetch });
+  if (!issued.ok) throw new Error(`no session: ${issued.reason}`);
+  return issued.session.reader();
 }
 
 /** The header of one signed read by `who`, made by the client. */
@@ -354,6 +379,71 @@ describe("signed reads on real registers (the planner's decisions 61cc5e50, c649
       expect([(await read("/entries/2")).status, (await read("/entries/5")).status, (await read(`/retained/entry/${encodeURIComponent(entries[3]!.uses[0]!.content)}`)).status, (await read(`/retained/entry/${encodeURIComponent(entries[6]!.uses[0]!.content)}`)).status]).toEqual([200, 200, 200, 200]);
       // The register's summary and its items are no entries: forbidden. With no session, the history is forbidden too.
       expect([(await read("")).status, (await read("/items/claim")).status, (await read("/history", null)).status]).toEqual([403, 403, 403]);
+    } finally {
+      platformNet.sessions = false;
+      platformNet.secret = null;
+    }
+  });
+
+  // Invariant: a session of a room's membership reads that room's destination, rules scope and directory whole, as membership itself:
+  // the summary, the items, every entry, those that no member signed among them, and the retained inputs (decision ca8ad1cf). The
+  // scope resolves its exact membership incarnation from its actual directory before any retained observation. A session of another room's
+  // membership reads none of it, and a key with no session keeps the signed-read rule.
+  // On real scopes: two rooms founded on one register, with the STAND-IN Git host of `outside.ts` for the register and for rita's
+  // destination's founding publication (`publication.ts`).
+  test("after the founding publication, a session of the room's membership reads the destination's whole history, its host outcomes and receipt among them, its summary, its branch item and receipt item, and the rules scope and the directory whole; a session of another room's membership is refused there; the founder's key with no session is refused once its window has passed", async () => {
+    net.hold = net.deaf = null;
+    const claimed = net.clock.now;
+    const R = await installed(paul, (name) => wired.set(name, () => ({ outside: outsideOf(name) })), [rita, vic]);
+    const { D, children } = await claimedBy(R, rita, "@rita");
+    const { children: vics } = await claimedBy(R, vic, "@vic");
+    const [M, Ru, G] = children as [Platform, Platform, Platform];
+    await foundingPublication(G);
+    const entries = await G.entries();
+    // The publication wrote the host's outcomes, the receipt's among them: entries that no member signed. The branch is ready.
+    expect((await G.item(0)).state).toBe("ready");
+    expect(entries.map((entry) => (entry.input.type === "outcome" ? entry.input.kind : entry.input.type))).toEqual(["genesis", "delivery", "mint", "first-head", "mint", "receipt", "revoke", "revoke"]);
+    const held = new Map(await Promise.all([Ru, D].map(async (node) => [node.name, (await node.entries()).map((entry) => entry.seq)] as const)));
+    platformNet.sessions = true;
+    platformNet.secret = b64url(new Uint8Array(32).fill(9));
+    try {
+      const session = await seated(M, rita, "room");
+      const theirs = await seated(vics[0]!, vic, "theirs");
+      const read = async (node: Platform, path: string, as: string | null) => {
+        const response = await routed(`${SERVICE}/v1/scopes/${node.name}${path}`, as === null ? {} : { headers: { authorization: as } });
+        return { status: response.status, body: await response.json() as { value?: unknown } };
+      };
+      const history = await read(G, "/history", session);
+      expect([history.status, history.status === 200 ? seqs(history.body) : null]).toEqual([200, entries.map((entry) => entry.seq)]);
+      const summary = await read(G, "", session);
+      const items = summary.body.value as { items: { type: string; state: string }[] };
+      expect([summary.status, items.items.find((item) => item.type === "branch")?.state]).toEqual([200, "ready"]);
+      const receipts = await read(G, "/items/receipt", session);
+      expect([receipts.status, (receipts.body.value as unknown[]).length > 0]).toEqual([200, true]);
+      expect((await read(G, `/entries/${entries.at(-1)!.seq}`, session)).status).toBe(200);
+      const retained = entries.flatMap((entry) => entry.uses.map((use) => use.content));
+      expect(await Promise.all(retained.slice(0, 2).map(async (digest) => (await read(G, `/retained/entry/${encodeURIComponent(digest)}`, session)).status))).toEqual(retained.slice(0, 2).map(() => 200));
+      // The rules scope and the directory: whole, though no entry of the rules scope retains an observation of membership yet.
+      for (const node of [Ru, D]) {
+        const whole = await read(node, "/history", session);
+        expect([node.name, whole.status, seqs(whole.body), (await read(node, "", session)).status]).toEqual([node.name, 200, held.get(node.name), 200]);
+      }
+      // Vic's session is of another room: refused at each of rita's scopes, and it reads its own destination.
+      expect([(await read(G, "/history", theirs)).status, (await read(G, "", theirs)).status, (await read(Ru, "", theirs)).status, (await read(D, "", theirs)).status, (await read(vics[2]!, "/history", theirs)).status]).toEqual([403, 403, 403, 403, 200]);
+      // The birth resolution requires the full confirmed membership incarnation even before a local observation.
+      const sessions = sessionsOf(platformNet.secret, TEST_DEPLOYMENT)!;
+      const claims = openSession(sessions, session.slice("Session ".length))!;
+      const another = `Session ${mintSession(sessions, { ...claims, membership: { ...claims.membership, inc: `in_${claims.membership.inc[3] === "a" ? "b" : "a"}${claims.membership.inc.slice(4)}` as never } })}`;
+      expect([(await read(D, "", another)).status, (await read(G, "", another)).status]).toEqual([403, 403]);
+      // Rita's key with no session keeps the signed-read rule: past the window of her claim she reads nothing of the destination,
+      // and her session still reads it whole.
+      net.clock.now = timeOf(timeMs(claimed)! + (PROPOSED_BOUNDS.intentLifetimeSeconds + 60) * 1000);
+      const late = await seated(M, rita, "late");
+      let signedStatus: number;
+      const savedSessions = platformNet.sessions, savedSecret = platformNet.secret;
+      try { signedStatus = (await get(`${G.name}/history`, await signed(rita, G.name, "history", "0"))).status; }
+      finally { platformNet.sessions = savedSessions; platformNet.secret = savedSecret; }
+      expect([signedStatus, (await read(G, "/history", late)).status]).toEqual([403, 200]);
     } finally {
       platformNet.sessions = false;
       platformNet.secret = null;

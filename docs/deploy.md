@@ -8,6 +8,10 @@ Nothing in this repository deploys the Worker. The Worker's code is
 `packages/scope/src/worker.ts`; its configuration is
 `packages/scope/wrangler.jsonc`.
 
+A deployment serves rooms of every definition version that its platform
+package has shipped, each by the version that its genesis pinned
+([scopes.md](scopes.md), "Definition versions").
+
 ## Settings and secrets
 
 A setting is a plain value. A secret is stored by the host and is never
@@ -39,31 +43,53 @@ or in the command line's config.
 
 ## The order
 
-1. **Deploy** the Worker with `DEPLOYMENT` and `SESSION_SECRET`, and with
-   no `GITHUB_APP_CONFIG`.
-2. **Install.** Run `artroom install <base-url> --host github.com
+The host setting pins the register's scope ID, so the setting must name
+the register before its first claim. A register's ID is a function of its
+install's signed intent, so the command line computes it before the
+register exists. Plan first, then set the setting, then install:
+
+1. **Deploy** the Worker with `DEPLOYMENT` and `SESSION_SECRET`.
+2. **Plan.** Run `artroom install --plan <base-url> --host github.com
    --namespace <login>`, where `<login>` is the account's `login`. It
-   prints `Installed: register sc_...`. A register whose host or
-   namespace differs from the configuration sends nothing.
+   founds nothing. It prints `Planned: register sc_...` and the seed's
+   time, and keeps the plan in the config. The plan can be founded until
+   that time, 14 minutes after the plan.
 3. **Set `GITHUB_APP_CONFIG`**, with `registerScope` set to that register
-   ID, and the GitHub secrets. The receipt gives the ID; an exact signed
-   install plan also determines it before submission. Changing that plan's
-   nonce or deadline changes the pin. Set the exact pin before the claim.
-4. **Restart** the Worker, by deploying it again. A scope object reads its
-   settings when it starts. After a restart, a register with a recorded
-   creation that was not sent sends it at the first request it gets.
-   Redeploying does not promise that every already-running scope object
-   immediately reloads its settings. In the planner's 7 October own-host
-   run, a register installed just before its host setting changed kept
-   the previous setting until it restarted, about two minutes later.
-5. **Claim.** Run `artroom claim <name> --handle @you`. If it gives up
-   waiting, run the same command again: it goes on from the pending claim
-   without replacing its saved signed requests or deadlines. In the
-   settings-change run, the first claim reached its 120-read limit; the
-   same command resumed after the register restarted, with no second
-   `found`. This delay is an observed run, not a guaranteed restart bound.
-   `--again` deliberately signs a second claim, which may create a second
-   repository while an earlier unknown claim can still take effect.
+   ID, and the GitHub secrets. A register whose host or namespace differs
+   from the setting sends nothing.
+4. **Install.** Run `artroom install --planned`. It checks that the plan
+   still makes that ID, founds the register, and prints
+   `Installed: register sc_..., ..., as planned.` A plan whose time is
+   over is refused as `plan-expired`, and nothing is sent: plan again and
+   set the new ID.
+5. **Claim.** Run `artroom claim <name> --handle @you`. The register
+   sends its creation at once. If the claim still gives up waiting, run
+   the same command again: it goes on from the pending claim and signs
+   nothing new. `--again` signs a second claim, which creates a second
+   repository.
+
+The same order holds for the hosting's own Git service, with `--host
+artifacts`, `--namespace artroom-demo` and `ARTIFACTS_CONFIG`
+([hosts.md](hosts.md)).
+
+### The earlier order, and its wait
+
+`artroom install <base-url> --host ... --namespace ...` with no plan
+still works: it founds at once and prints the register ID, and the
+setting is set after it. Then the register's object may have started
+before the setting took effect. A claim's creation is then recorded and
+not sent until the object sees the setting. Observed on 2026-10-07, that
+took about two minutes each time, so the claim gave up waiting and had to
+be run again.
+
+Two things now shorten that wait. The Worker reads its host settings at
+each call of its outside port, not once per object. And at each request,
+an object that holds an attempt it could not send because its port
+refused that kind sends it as soon as the port accepts it, once, with no
+restart. A Worker whose setting changed is still a new version, and an
+object running the earlier version may keep the earlier setting until it
+restarts; a request that reaches it after the restart sends what it
+recorded. Planning first avoids the wait.
 
 Finish the initial bootstrap while the operator's install is within its
 900-second read window. Before enrollment, the claim's causal read window
@@ -94,6 +120,13 @@ an installation token cannot do; use the user's own fine-grained token.
 
 When `publicReads` is true and the repositories are public, the Worker
 reads them with no token, and `GITHUB_READ_TOKEN` is not needed.
+
+## The page
+
+The scope Worker serves the room's page at `/page/` from
+`packages/scope/src/page-assets.ts`, which is committed and which the
+page package's build writes (`docs/page.md`). Deploying the Worker
+deploys the page; it needs no binding, setting or secret of its own.
 
 ## What is never written down
 

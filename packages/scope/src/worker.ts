@@ -43,6 +43,7 @@
  * | `GET /v1/scopes/:scope/stream` | A stream of the scope's head, one line of JSON for each, for a read session. |
  * | `GET /v1/scopes/:scope/incidents?cursor=` | A page of the operator's record of the scope, for the session of an admin. |
  * | `GET /v1/scopes/:scope/waiting/:list?cursor=` | One page of the list `diagnosed` or `unanswered` of the requests that wait, for the session of an admin. |
+ * | `GET /v1/scopes/:destination/credential/:handle` | A member's read token, once, for the session of the key that signed its `read-token` act. The answer holds a credential, and is marked not to be stored. |
  *
  * A reader presents a read session in the `Authorization` header, as
  * `Session <token>`, set from memory. A reader with no session may present
@@ -78,11 +79,14 @@ import type { Incident } from "./operator.ts";
 import type { Summary } from "./reads.ts";
 import { credentialInUrl, relay, sessionReaders, sessionsOf, type Opened, type Sessions, type StreamRefusal } from "./sessions.ts";
 import type { Duty, Sealed } from "./store.ts";
+import type { ReadCredential } from "./destination-host.ts";
 import { gitHubOutside, type GitHubBindings } from "./github-wiring.ts";
 import { within } from "./turn.ts";
 import { ARTIFACTS_HOST, artifactsOutside, type ArtifactsBindings } from "./artifacts-wiring.ts";
 import { recordedHost } from "./host-wiring.ts";
 import { NO_OUTSIDE, type Outside } from "./operations.ts";
+import { isSite, site } from "./site/route.ts";
+import { isPage, page } from "./page.ts";
 
 /**
  * The bindings of the deployed Worker (`wrangler.jsonc`): the one scope
@@ -112,6 +116,7 @@ interface Remote {
   release(id: string): Promise<void>;
   incidents(reader: unknown, cursor?: Cursor): Promise<Read<readonly Incident[]>>;
   waiting(reader: unknown, list: "diagnosed" | "unanswered", cursor?: Cursor): Promise<Read<readonly Duty[]>>;
+  credential(reader: unknown, handle: string): Promise<Read<ReadCredential>>;
 }
 
 const MISSING = { ok: false, reason: "not-found" } as const;
@@ -123,6 +128,8 @@ export interface Api extends ScopeApi {
   stream(scope: string, reader: unknown): Promise<ReadableStream<Uint8Array> | StreamRefusal | typeof MISSING>;
   incidents(scope: string, reader: unknown, cursor?: Cursor): Promise<Read<readonly Incident[]>>;
   waiting(scope: string, reader: unknown, list: "diagnosed" | "unanswered", cursor?: Cursor): Promise<Read<readonly Duty[]>>;
+  /** A member's read token at a destination, once (I5). */
+  credential(scope: string, reader: unknown, handle: string): Promise<Read<ReadCredential>>;
 }
 
 
@@ -174,6 +181,7 @@ export function api(binding: Binding, address: string | null = null): Api {
     },
     async incidents(scope: string, reader: unknown, cursor?: Cursor): Promise<Read<readonly Incident[]>> { return (await at(scope)?.incidents(reader, cursor)) ?? MISSING; },
     async waiting(scope: string, reader: unknown, list: "diagnosed" | "unanswered", cursor?: Cursor): Promise<Read<readonly Duty[]>> { return (await at(scope)?.waiting(reader, list, cursor)) ?? MISSING; },
+    async credential(scope: string, reader: unknown, handle: string): Promise<Read<ReadCredential>> { return (await at(scope)?.credential(reader, handle)) ?? MISSING; },
   };
 }
 
@@ -275,6 +283,11 @@ export async function route(request: Request, binding: Binding): Promise<Respons
   if (what === "retained") return read(await scopes.retained(scope, reader, which as RetainedInput["kind"], last as Digest, url.searchParams.get("domain") ?? undefined));
   if (what === "incidents") return read(await scopes.incidents(scope, reader, cursor));
   if (what === "waiting" && (which === "diagnosed" || which === "unanswered")) return read(await scopes.waiting(scope, reader, which, cursor));
+  if (what === "credential" && which !== undefined) {
+    // The answer holds a credential: it is marked so that nothing between here and the device stores it.
+    const answer = await scopes.credential(scope, reader, which);
+    return new Response(JSON.stringify(answer), { status: answer.ok ? 200 : READ_STATUS[answer.reason], headers: { "content-type": "application/json", "cache-control": "no-store" } });
+  }
   if (what === "stream") {
     const stream = await scopes.stream(scope, reader);
     // The body is the reader's side of the scope's stream. A reader that goes away cancels it, and the scope releases the subscription at once.
@@ -294,10 +307,22 @@ export async function route(request: Request, binding: Binding): Promise<Respons
  * authority.
  */
 export function outsideOf(given: OutsideGiven, sql: Pick<SqlStorage, "exec">, env: GitHubBindings & ArtifactsBindings, fetch?: (request: Request) => Promise<Response>): Outside {
-  const hosts = new Map<string, Outside>();
-  if (env.GITHUB_APP_CONFIG) hosts.set("github.com", gitHubOutside(given, sql, env, fetch));
-  if (env.ARTIFACTS_CONFIG) hosts.set(ARTIFACTS_HOST, artifactsOutside(given, sql, env, fetch));
-  const pick = (): Outside => hosts.get(recordedHost(given) ?? "") ?? NO_OUTSIDE;
+  // The settings are read from the environment at every call, and a host's wiring is made again only when one of its values
+  // changed. So a setting that appears in this object's life takes effect at its next call, with no restart.
+  const wired = new Map<string, { values: readonly unknown[]; outside: Outside }>();
+  const wiring = (host: string, values: readonly unknown[], make: () => Outside): Outside => {
+    const last = wired.get(host);
+    if (last && last.values.length === values.length && last.values.every((value, i) => value === values[i])) return last.outside;
+    const outside = make();
+    wired.set(host, { values, outside });
+    return outside;
+  };
+  const pick = (): Outside => {
+    const host = recordedHost(given);
+    if (host === "github.com" && env.GITHUB_APP_CONFIG) return wiring(host, [env.GITHUB_APP_CONFIG, env.GITHUB_APP_PRIVATE_KEY, env.GITHUB_CREATION_TOKEN, env.GITHUB_READ_TOKEN, env.GITHUB_CLEANUP_TOKENS], () => gitHubOutside(given, sql, env, fetch));
+    if (host === ARTIFACTS_HOST && env.ARTIFACTS_CONFIG) return wiring(host, [env.ARTIFACTS_CONFIG, env.ARTIFACTS], () => artifactsOutside(given, sql, env, fetch));
+    return NO_OUTSIDE;
+  };
   return {
     accepts: (owner, kind) => pick().accepts(owner, kind),
     send: (request) => pick().send(request),
@@ -307,6 +332,7 @@ export function outsideOf(given: OutsideGiven, sql: Pick<SqlStorage, "exec">, en
       read: (request) => pick().recovery?.read(request) ?? Promise.resolve(null),
     },
     replies: (limit) => pick().replies?.(limit) ?? { answers: [], more: false },
+    credential: (handle, key) => pick().credential?.(handle, key) ?? null,
   };
 }
 
@@ -336,7 +362,8 @@ export function sessionWiring(sessions: () => Sessions | null, binding?: Binding
  * the one that its authority reads, and against the scope's own clock. A
  * membership scope also issues sessions. Explicit configuration of GitHub or
  * of the hosting's own Git service (`ARTIFACTS_CONFIG`) enables the outside
- * factory (`outsideOf`); with neither, outside effects remain unsent.
+ * factory (`outsideOf`), which reads them at each call; with neither, outside
+ * effects remain unsent.
  *
  * With no secret bound, or a short one, the session configuration is null
  * at every use: no session is issued, none is accepted, and no reader may
@@ -349,7 +376,8 @@ export class DeployedScope<E extends Env = Env> extends ScopeObject<E> {
     return {
       ports: namespace(this.scopes()),
       authority: (given) => repositoryAuthority({ ...given, reader: membershipIn(this.scopes()) }),
-      ...(this.env.GITHUB_APP_CONFIG || this.env.ARTIFACTS_CONFIG ? { outside: (given: OutsideGiven) => outsideOf(given, this.ctx.storage.sql, this.env) } : {}),
+      // Wired whether or not a host is configured now: `outsideOf` reads the settings at each call, and with neither it sends nothing.
+      outside: (given: OutsideGiven) => outsideOf(given, this.ctx.storage.sql, this.env),
       ...sessionWiring(() => sessionsOf(this.env.SESSION_SECRET, this.env.DEPLOYMENT), this.scopes()),
     };
   }
@@ -379,4 +407,13 @@ export class ScopeService<E extends Env = Env> extends WorkerEntrypoint<E> imple
   retained(scope: string, reader: unknown, kind: RetainedInput["kind"], digest: Digest, domain?: string): Promise<Read<RetainedInput>> { return api(this.scopes()).retained(scope, reader, kind, digest, domain); }
 }
 
-export default { fetch: (request: Request, env: Env): Promise<Response> => route(request, env.SCOPES) };
+/**
+ * `GET /site/...` is a room's published pages (`site/route.ts`); `GET /page/` is the room's page, its static files bundled into
+ * this Worker (`page.ts`); every other path is a route of the table above.
+ */
+export default {
+  fetch: async (request: Request, env: Env): Promise<Response> => {
+    if (credentialInUrl(new URL(request.url))) return json(400, { error: "credential-in-url" });
+    return isSite(request) ? site(request, env) : isPage(request) ? page(request) : route(request, env.SCOPES);
+  },
+};

@@ -161,6 +161,20 @@ export class ArtifactsProvider implements RegisterProvider, DestinationProvider 
     // Lost replies or failed custody remain pending; this port never remints.
     return { id, ends: endsOf(own(token, "expiresAt")), plaintext: plaintextOf(own(token, "plaintext")) };
   }
+  /** A member's read token, for the lifetime asked. The service states its expiry; the plaintext goes to custody, never to an answer's body. */
+  async mintRead(repository: DestinationRepository, request: { handle: string; seconds: number }): Promise<unknown> {
+    repository = { ...repository };
+    this.#remote(repository);
+    const id = handle(request.handle);
+    if (!Number.isSafeInteger(request.seconds) || request.seconds < 1) return bad();
+    const handleOf = await this.#options.binding.get(repository.name);
+    let token: unknown;
+    try { token = await handleOf.createToken("read", request.seconds); }
+    catch (e) { if (codeOf(e) !== null) return { minted: false }; throw e; }
+    if (own(token, "scope") !== undefined && own(token, "scope") !== "read") return bad();
+    return { id, ends: endsOf(own(token, "expiresAt")), plaintext: plaintextOf(own(token, "plaintext")) };
+  }
+  remote(repository: DestinationRepository): string { return this.#remote({ ...repository }); }
   async revoke(id: string, plaintext: string): Promise<unknown> {
     handle(id);
     const repository = this.#options.repositoryOf?.() ?? null;

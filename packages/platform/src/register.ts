@@ -1,5 +1,5 @@
 /**
- * `platform:register@1`, as data, with its rules (authority note, sections
+ * `platform:register@1` and `@2`, as data, with their rules (authority note, sections
  * 3.8 and 12.1.1; its table of marks, section 12.1.8, rows 2 to 6, c, k, r
  * and v). One register for a deployment. It holds founding claims, and it
  * owns one kind of outside effect: creating the repository at the Git host.
@@ -44,11 +44,21 @@ import type { Digest, FieldValue, OperationId, PlatformData, PlatformDefinition,
 import { base32, intentDigest, isDigest, seedDigest, utf8 } from "@generalbusiness/artroom-bytes";
 import { isObject, type Item, type Opening, type OutcomeRule, type Own, type RuleGiven, type Rules, type StateView } from "@generalbusiness/artroom-derive";
 import { handleForm } from "./membership.ts";
+import { pinnedBy } from "./versions.ts";
 
-/** The name and version that this data and these rules are. The `operation` effects of its rules state it as their owner. */
-export const REGISTER = "platform:register@1" satisfies PlatformDefinition;
-/** The definition under which the register's `create` makes a directory (section 12.1, "Names, creation and activation"). */
-export const DIRECTORY = "platform:directory@1" satisfies PlatformDefinition;
+/**
+ * The versions of the register that this package serves, each with the
+ * definition under which its `create` makes a directory (section 12.1,
+ * "Names, creation and activation"). The data and the rules are the same
+ * for both. Version 2 differs in one thing: its directories are founded on
+ * `platform:directory@2` (`versions.ts`). The `operation` effects of its
+ * rules state the scope's own version as their owner.
+ */
+export const DIRECTORY_OF: Readonly<Record<string, PlatformDefinition>> = { "platform:register@1": "platform:directory@1", "platform:register@2": "platform:directory@2" };
+/** The newest version of the register: the one under which `install` founds a register. */
+export const REGISTER = "platform:register@2" satisfies PlatformDefinition;
+/** The directory that the newest register creates. */
+export const DIRECTORY = DIRECTORY_OF[REGISTER]!;
 
 /** The bound on the creation attempts of one founding claim, and on the attempts of each cleanup (section 3.8; U9). */
 export const CREATION_ATTEMPTS = 3;
@@ -185,7 +195,7 @@ const signed = ({ input }: RuleGiven) => {
  * is fixed by the `found` entry, and the directory's scope ID is its digest.
  */
 export const directorySeed = (given: RuleGiven): Seed =>
-  ({ v: 1, kind: "directory", definition: DIRECTORY, creator: given.resolved.at, cause: intentDigest(signed(given).intent), ordinal: 0 });
+  ({ v: 1, kind: "directory", definition: DIRECTORY_OF[pinnedBy(given)]!, creator: given.resolved.at, cause: intentDigest(signed(given).intent), ordinal: 0 });
 
 // ---------------------------------------------------------------- the outcomes of the register's operations
 
@@ -231,7 +241,7 @@ const ownName = (state: Pick<StateView, "item">, operation: OperationId, attempt
 };
 
 /** One cleanup that an outcome of `create-repository` opens: 3 attempts (section 12.1.1; U9). */
-const cleanup = (kind: "revoke-credential" | "delete-repository"): Opening => ({ owner: REGISTER, kind, attempts: CREATION_ATTEMPTS });
+const cleanup = (given: RuleGiven, kind: "revoke-credential" | "delete-repository"): Opening => ({ owner: pinnedBy(given), kind, attempts: CREATION_ATTEMPTS });
 /** The entries that the two cleanups of one outcome entry reserve: two operations of three attempts each, with a first outcome and a late answer for each attempt (the contract's section 17.2, row 5). */
 const CLEANUPS = 2 * (2 * CREATION_ATTEMPTS);
 
@@ -311,8 +321,8 @@ export const registerRules: Rules = {
    */
   "open-create-repository": {
     place: "effect", most: 2,
-    run: () => [
-      { effect: "operation", k: 0, owner: REGISTER, kind: "create-repository", attempts: CREATION_ATTEMPTS },
+    run: (given) => [
+      { effect: "operation", k: 0, owner: pinnedBy(given), kind: "create-repository", attempts: CREATION_ATTEMPTS },
       { effect: "attempt", operation: { k: 0 }, attempt: 1, result: "opened", selected: null },
     ],
   },
@@ -371,7 +381,7 @@ export const registerRules: Rules = {
           effects: selected === true ? [{ effect: "value", item: claim.id, slot: "repository", value: repository }] : [],
           sends: [],
           // `selected` is null for an outcome that is not `confirmed`, which opens neither.
-          opens: [...(selected !== null && body["credential"] !== undefined ? [cleanup("revoke-credential")] : []), ...(selected === false ? [cleanup("delete-repository")] : [])],
+          opens: [...(selected !== null && body["credential"] !== undefined ? [cleanup(given, "revoke-credential")] : []), ...(selected === false ? [cleanup(given, "delete-repository")] : [])],
         };
       },
     },
@@ -407,7 +417,7 @@ export const registerRules: Rules = {
       const body = isObject(input.evidence.body) ? input.evidence.body : {};
       if (!opening || opening.entry.input.type !== "act" || !held) throw new Error("the operation create-repository was opened by a found entry of a register");
       const { intent } = opening.entry.input.signed;
-      const seed: Seed = { v: 1, kind: "directory", definition: DIRECTORY, creator: given.resolved.at, cause: intentDigest(intent), ordinal: 0 };
+      const seed: Seed = { v: 1, kind: "directory", definition: DIRECTORY_OF[pinnedBy(given)]!, creator: given.resolved.at, cause: intentDigest(intent), ordinal: 0 };
       const { branch, founderHandle, recoveryKey } = intent.fields;
       const fields = {
         claim: { at: given.resolved.at, seq: opening.entry.seq, hash: opening.hash },

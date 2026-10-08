@@ -121,8 +121,8 @@ describe("a founding on real scopes under the deployed class (authority note, se
     ]).toEqual([
       ["register", R.name, REGISTER, "active", null],
       ["directory", D.name, DIRECTORY, "active", membership],
-      ["membership", membershipScope!.name, "platform:membership@1", "active", membership],
-      ["rules", rulesScope!.name, "platform:rules@1", "active", membership.scope],
+      ["membership", membershipScope!.name, "platform:membership@2", "active", membership],
+      ["rules", rulesScope!.name, "platform:rules@2", "active", membership.scope],
       ["destination", G.name, DESTINATION, "active", membership.scope],
     ]);
     // The directory's repository item: its fixed slots from the creation's fields and from the claim's entry, and the references of
@@ -158,11 +158,11 @@ describe("a founding on real scopes under the deployed class (authority note, se
     expect(learned).toEqual(membership);
 
     // Every declared mark has its production rule, so the third child is created and confirmed too. No duty is held or waiting.
-    expect([lacking(REGISTER), lacking(DIRECTORY), lacking("platform:membership@1"), lacking("platform:rules@1"), lacking(DESTINATION)]).toEqual([[], [], [], [], []]);
+    expect([lacking(REGISTER), lacking(DIRECTORY), lacking("platform:membership@2"), lacking("platform:rules@2"), lacking(DESTINATION)]).toEqual([[], [], [], [], []]);
     expect(((await D.stub.outbox(reader)) as { value: readonly { acknowledged: unknown }[] }).value.every((duty) => duty.acknowledged !== null)).toBe(true);
     // STAND-IN: the destination's Git host. It answers with the exact ID that the package computes for the founding commit.
     const destinationHost = outsideOf(G.name);
-    const firstHead = foundingObjects("sha1", G.name, (await G.entries())[0]!.time, factRefOf(r[1]!)).commit;
+    const firstHead = foundingObjects("sha1", G.name, (await G.entries())[0]!.time, factRefOf(r[1]!), { name, handle: "@rita", directory: D.name }).commit;
     destinationHost.answer("0:0" as OperationId, 1, { result: "confirmed", evidence: { basis: "own-answer", body: { send: "accepted", seen: firstHead } } });
     let driving = "mint";
     wired.set(G.name, () => ({ outside: { accepts: (_owner, kind) => kind === driving, send: (request) => destinationHost.send(request) } }));
@@ -232,8 +232,8 @@ describe("a founding on real scopes under the deployed class (authority note, se
     const observes = async (of: object, asked: string) => { const got = await rulesScope!.stub.observe({ of, asked }); return got && typeof got === "object" && "answer" in got ? got.answer : got; };
     const founding = { asked: "rules", approvals: 1, ownerMayReview: false, checks: [], labels: [], singleControllerException: false, extents: valueDigest(RULES_EXTENTS_VALUE.domain, firstExtents({ approvals: 1, checks: [] })) };
     expect([await observes(rules, "rules"), await observes({ scope: rules.scope, kind: "rules" }, "definitions"), await membershipScope!.stub.observe({ of: membership, asked: "rules" })]).toEqual([
-      { subject: "rules", of: rules, head: (await rulesScope!.summary()).at, revision: 0, content: founding, definition: "platform:rules@1" },
-      { subject: "rules", of: rules, head: (await rulesScope!.summary()).at, revision: 0, content: { asked: "definitions", active: [] }, definition: "platform:rules@1" }, null,
+      { subject: "rules", of: rules, head: (await rulesScope!.summary()).at, revision: 0, content: founding, definition: "platform:rules@2" },
+      { subject: "rules", of: rules, head: (await rulesScope!.summary()).at, revision: 0, content: { asked: "definitions", active: [] }, definition: "platform:rules@2" }, null,
     ]);
     expect(await publish(2)).toMatchObject({ answer: "accepted" });
     const first = proof(await rulesScope!.last());
@@ -252,7 +252,7 @@ describe("a founding on real scopes under the deployed class (authority note, se
     // scope's head. A request that states another incarnation of the rules scope's name is answered by nobody.
     const published = (await rulesScope!.summary()).at;
     expect([await observes(rules, "rules"), (await rulesScope!.item(0)).refs["published"], await observes({ ...rules, inc: register.inc }, "rules")]).toEqual([
-      { subject: "rules", of: rules, head: published, revision: published.seq, content: { ...founding, approvals: 3, extents: valueDigest(RULES_EXTENTS_VALUE.domain, firstExtents({ approvals: 3, checks: [] })) }, definition: "platform:rules@1" }, published.seq, null,
+      { subject: "rules", of: rules, head: published, revision: published.seq, content: { ...founding, approvals: 3, extents: valueDigest(RULES_EXTENTS_VALUE.domain, firstExtents({ approvals: 3, checks: [] })) }, definition: "platform:rules@2" }, published.seq, null,
     ]);
     // A request that states another incarnation of membership's name is answered by nobody, and one by the ID alone is answered.
     const asked = { ...membership, inc: register.inc };

@@ -35,7 +35,7 @@
  * commit and from the object's alarm.
  */
 
-import type { Bounds, CapabilityName, DecisiveEvidence, Entry, Evidence, FactRef, FactUse, OperationId, PlatformDefinition, RetainedInput, ScopeRef } from "@generalbusiness/artroom-contract";
+import type { Bounds, CapabilityName, DecisiveEvidence, Entry, Evidence, FactRef, FactUse, KeyId, OperationId, PlatformDefinition, RetainedInput, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
 import { canonicalize, isEvidence, isOperationId, isRetainedInput, parseStrict, utf8 } from "@generalbusiness/artroom-bytes";
 import { clockOf, recordedOutcome, evidenceValues, valueDigest, settleOutcome, snapshotInput, snapshotRead, timeMs, timeOf, type Clock as Reading, type Fetched, type OutcomeOffered, type Owners } from "@generalbusiness/artroom-derive";
 import { ownOf, valuesOf, type Scope } from "./core.ts";
@@ -55,6 +55,9 @@ export interface EffectRequest {
   scope: ScopeRef; operation: OperationId; attempt: number;
   owner: CapabilityName | PlatformDefinition; kind: string;
   origin: Sealed;
+  /** Internal ledger bookkeeping, read back after this exact attempt's
+   * durable mark. It grants no authority and is not caller-selected over RPC. */
+  sentAt?: Timestamp;
 }
 
 /**
@@ -139,6 +142,12 @@ export interface Outside {
     answers: Array<{ operation: OperationId; attempt: number; answer: EffectAnswer }>;
     more: boolean;
   };
+  /**
+   * The one-time read of a member's read credential, by its nonsecret handle, for the key whose session asks (I5;
+   * `destination-host.ts`, `credential`). The plaintext leaves the port's custody as it is answered. Null: nothing is answered.
+   * Absent: this port holds no such credential.
+   */
+  credential?(handle: string, key: KeyId): { token: string; ends: string; remote: string } | null;
 }
 
 /**
@@ -220,6 +229,13 @@ export class Operations {
    * at once after a restart, whatever stands before it and whatever is due.
    */
   #walk: { after: Sending | null } | null = { after: null };
+  /**
+   * The attempts that a pass of this life left recorded and not sent because the outside port did not accept their kind, by
+   * attempt. In memory only, as the walk is. When the port accepts one of them later in the same life, as when the Git host's
+   * setting appears, the walk starts again (`reaccepted`), so the attempt is sent at the next turn with no restart. The sent mark
+   * keeps it from being sent twice.
+   */
+  readonly #refused = new Map<string, { owner: CapabilityName | PlatformDefinition; kind: string }>();
   #running: Promise<number> | null = null;
   #again = false;
   /** A trusted retained-reply page has a successor; memory only, reset on restart. */
@@ -240,6 +256,34 @@ export class Operations {
     this.#bounds = bounds;
     this.#diagnoses = ports.diagnoses;
     ports.outside.late?.((operation, attempt, answer) => this.answered(operation, attempt, answer));
+  }
+
+  /**
+   * Whether the outside port now accepts the kind of an attempt that a pass of this life left unsent because it did not. Bounded:
+   * it asks about at most one batch of them, and writes nothing. A pass that finds one starts the walk again (`#pass`).
+   */
+  reaccepted(): boolean { return this.#accepted(false); }
+
+  /** Bounded rotating inspection of the in-memory refused queue. A read
+   * leaves an accepted entry first, so its following pass sees that same
+   * entry; a pass removes accepted entries and restarts the durable walk. */
+  #accepted(remove = true): boolean {
+    let found = false;
+    const limit = Math.min(this.#bounds.deliveryBatch, this.#refused.size);
+    for (let n = 0; n < limit; n++) {
+      const first = this.#refused.entries().next().value;
+      if (!first) break;
+      const [key, refused] = first;
+      if (this.#outside.accepts(refused.owner, refused.kind)) {
+        if (!remove) return true;
+        this.#refused.delete(key);
+        found = true;
+      } else {
+        this.#refused.delete(key);
+        this.#refused.set(key, refused);
+      }
+    }
+    return found;
   }
 
   /**
@@ -279,6 +323,7 @@ export class Operations {
     const runs = Boolean(this.#scope.pinned()?.definition);
     const replyMore = this.#replyMore;
     if (!runs) this.#replyMore = false;
+    if (!this.#walk && runs && this.#accepted()) this.#walk = { after: null };
     const walked = this.#walk;
     // The page has its own batch, so what is due never uses it up. A page that is not full is the last. The walk goes on by the
     // row it reached, so a row that stays as it is recorded is passed, and holds back no row after it.
@@ -316,8 +361,10 @@ export class Operations {
       const rules = operation ? this.#scope.owners()?.rules(operation.owner, operation.kind) : null;
       if (!operation || !origin || !this.#outside.accepts(operation.owner, operation.kind) || !rules) {
         if (row.next !== null) store.postpone(id, attempt, null);
+        if (operation && origin && rules) this.#refused.set(keyOf(id, attempt), { owner: operation.owner, kind: operation.kind });
         continue;
       }
+      this.#refused.delete(keyOf(id, attempt));
       // The owner's rule on when the request may leave, such as the tokens of an attempt of a staging. Not ready: recorded and not
       // sent, with no wake-up, until an outcome entry is written and the walk looks again.
       if (rules.ready && !rules.ready(store, operation, attempt)) {
@@ -328,7 +375,9 @@ export class Operations {
       // Durable before the send: from here on the request may have left. A scope that stops here is woken, by the alarm set below,
       // and records `unknown`.
       store.markSent(id, attempt, timeOf(now), now + this.#bounds.dispatchSeconds * 1000);
-      const request: EffectRequest = { scope: scope.at, operation: id, attempt, owner: operation.owner, kind: operation.kind, origin: { entry: JSON.parse(origin.bytes) as Entry, hash: origin.hash } };
+      const marked = store.sending(id, attempt);
+      if (!marked || marked.operation !== id || marked.attempt !== attempt || marked.sent === null) throw new Error("original attempt has no durable sent mark");
+      const request: EffectRequest = { scope: scope.at, operation: id, attempt, owner: operation.owner, kind: operation.kind, origin: { entry: JSON.parse(origin.bytes) as Entry, hash: origin.hash }, sentAt: marked.sent };
       work.push(() => this.#send(row, request, now));
     }
     await this.#wake(now);
@@ -423,7 +472,9 @@ export class Operations {
       const scope = this.#store.scope();
       const origin = this.#store.stored(Number(row.operation.split(":")[0]));
       if (!operation || !scope || !origin || !this.#scope.pinned()?.definition || !this.#scope.owners()?.rules(operation.owner, operation.kind) || !recovery?.accepts(operation.owner, operation.kind)) return null;
-      const request: EffectRequest = { scope: scope.at, operation: row.operation, attempt: row.attempt, owner: operation.owner, kind: operation.kind, origin: { entry: JSON.parse(origin.bytes) as Entry, hash: origin.hash } };
+      const marked = this.#store.sending(row.operation, row.attempt);
+      if (!marked || marked.operation !== row.operation || marked.attempt !== row.attempt || marked.sent === null) return null;
+      const request: EffectRequest = { scope: scope.at, operation: row.operation, attempt: row.attempt, owner: operation.owner, kind: operation.kind, origin: { entry: JSON.parse(origin.bytes) as Entry, hash: origin.hash }, sentAt: marked.sent };
       return { request, read: () => recovery.read(request) };
     } catch (failure) {
       report(this.#diagnoses, "outside-recovery-failed", operation ? `${operation.owner}:${operation.kind}` : "owner", failure);

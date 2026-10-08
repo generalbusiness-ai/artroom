@@ -91,8 +91,9 @@ describe("read sessions (authority note, sections 3.9, 3.12 row W6, 5.3 and 5.5;
       const [unas, ritas] = [await session(M, una), await session(M, rita)];
 
       // What a session binds: the deployment, the membership scope with its incarnation, the member and the key, the reads of the role
-      // at issue, and an end time 600 seconds after membership's reading. Only an admin's session reads the operator's record.
-      const reads = ["summary", "items", "history", "entry", "outbox", "operations", "log", "retained"];
+      // at issue, and an end time 600 seconds after membership's reading. Only an admin's session reads the operator's record. Every
+      // session may ask for `credential`, the one-time read of a read token, which the destination answers only to the signing key.
+      const reads = ["summary", "items", "history", "entry", "outbox", "operations", "log", "retained", "credential"];
       expect(unas.claims).toEqual({ v: 1, deployment: TEST_DEPLOYMENT, membership: m, member: "@una", key: una.key, reads, ends: issued });
       expect([ritas.claims.member, ritas.claims.reads]).toEqual(["@rita", [...reads, "incidents", "waiting"]]);
       // The token is in no text form of a session.

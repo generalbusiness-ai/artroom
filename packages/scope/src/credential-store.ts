@@ -157,6 +157,27 @@ export class CredentialStore {
     return credential?.state === "live" && credential.plaintext !== null && credential.plaintext !== "" && at !== null && ends !== null && at < ends ? credential : null;
   }
 
+  /** The custody row of that credential ID, including its plaintext if custody still holds it. An explicit private read. */
+  held(id: string): ScopePrivateCredential | null {
+    const scope = this.#scope();
+    const row = scope === null ? undefined : this.#sql.exec("SELECT mint, attempt FROM private_credential WHERE scope = ? AND id = ?", scope, id).toArray()[0];
+    return row ? this.#read(scope!, row["mint"] as OperationId, row["attempt"] as number) : null;
+  }
+
+  /**
+   * The one-time take of a live plaintext by its ID (a member's read token, I5): strictly before its end, the plaintext is
+   * returned and dropped from custody in the same step, so no second take finds it. At or after its end it is dropped and
+   * nothing is returned. A held, revoked or dropped row returns nothing and changes nothing.
+   */
+  take(id: string, now: Timestamp): (ScopePrivateCredential & { plaintext: string }) | null {
+    const credential = this.held(id);
+    const scope = this.#scope();
+    if (scope === null || credential?.state !== "live" || credential.plaintext === null || credential.plaintext === "") return null;
+    this.#sql.exec("UPDATE private_credential SET plaintext = NULL WHERE scope = ? AND id = ?", scope, id).toArray();
+    const [at, ends] = [timeMs(now), timeMs(credential.ends)];
+    return at !== null && ends !== null && at < ends ? { ...credential, plaintext: credential.plaintext } : null;
+  }
+
   /**
    * The caller has checked a mint's judgment. Only its exact confirmed live
    * metadata makes custody live. A rejected or mismatched judgment drops

@@ -260,7 +260,9 @@ export async function room(): Promise<Room> {
   const [M, rules, G] = [1, 2, 3].map((n) => new Platform(scopeIdOf(sent.find((send) => send.n === n)!.to as Seed))) as [Platform, Platform, Platform];
   await settle(R, D, M, rules, G);
   wired.delete(R.name);
-  const firstHead = foundingObjects("sha1", G.name, (await G.entries())[0]!.time, factRefOf((await R.entries())[1]!)).commit;
+  // The founding commit of `platform:destination@2`: one README that names the repository, the founder's handle and the directory.
+  const readme = { name: repositoryName(seedDigest(seed), 1), handle: "@rita", directory: D.name };
+  const firstHead = foundingObjects("sha1", G.name, (await G.entries())[0]!.time, factRefOf((await R.entries())[1]!), readme).commit;
   const made = new Room(R, D, M, rules, G, firstHead, {});
   for (const kind of ["mint", "first-head", "mint", "receipt", "revoke"] as const) await made.drive(kind);
   expect(await G.item(0)).toMatchObject({ state: "ready", values: { head: firstHead } });

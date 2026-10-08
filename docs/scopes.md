@@ -48,7 +48,7 @@ share no storage and no transaction.
 A scope has a **kind**, which is one of `register`, `directory`, `membership`,
 `rules`, `destination`, `inbox`, `task` and `lane`. The substrate treats every
 kind alike. A person founds a scope with no creator in one of two ways. Under
-`platform:register@1`, an `install` intent founds a register, of the kind
+a version of `platform:register`, an `install` intent founds a register, of the kind
 `register`. Under any other definition, a `found` intent founds a directory
 with no creator, a path that stays until a repository's founding by its
 register is whole. Every other scope is created by another scope: a
@@ -73,6 +73,39 @@ anchors or missing foreign facts. This empty-tree founding run is separate
 from the planner's room-issued CLI clone flow. It establishes no native
 lane hold, content-change publication, fresh-person signoff or complete I3
 journey. A responding URL alone establishes none of those results.
+
+## Definition versions
+
+A platform definition is named with its version, such as
+`platform:destination@2`. A change to a definition's data or to its rules
+makes a new version, and a version that has shipped does not change. A
+scope pins its version in the seed of its genesis, and it is judged and
+replayed by that version for as long as it exists. The platform package
+serves every version that it has shipped (`VERSIONS`, in
+`packages/platform/src/index.ts`), and `platform(name)` resolves any of
+them. A rule that must state its own version, such as the owner of an
+operation that it opens or the definition of a scope that it creates,
+reads it from the scope's genesis. So a room's versions follow from its
+register: version 1 of the register creates version 1 of the directory,
+which creates membership, the rules scope and the destination at version
+1, and version 2 does the same at version 2. `artroom install` founds a
+register at the newest version, and `artroom claim` founds the room at the
+version that the register creates; both print the versions. A register
+founded before version 2 keeps creating rooms at version 1.
+
+The table describes this candidate's supported declarations. Every @1
+declaration preserves actual main `1eed91aa`, including its definition-byte
+places. It does not establish the executable or admission source of older
+histories; that historical correspondence remains owed.
+
+| Definition | Version 1 | Version 2 |
+|---|---|---|
+| `platform:register` | Main's declaration; creates the version 1 cohort. | The same declaration; creates the directory at version 2. |
+| `platform:directory` | Main's definition-byte places on `open-issue` and `open-pr`; missing bytes are `bad-field`. | Preserves those places and creates its three scopes at version 2, carrying the founder handle for the README. |
+| `platform:membership` | Main's declaration and version 1 standing. | The same declaration, with version 2 standing. |
+| `platform:rules` | Main's definition-byte place on `activate.digest`. | The same declaration, with version 2 cohort and observation identity. |
+| `platform:destination` | Main's declaration: no `read-token`, and a founding commit with the empty tree. | The act `read-token` and its operation `mint-read`. The genesis keeps the founder's handle, and the founding commit holds one file, `README.md`: the repository's name as a heading and the sentence "Founded by <handle> through the room <directory id>." |
+| `platform:inbox` | Main's declaration. | None. |
 
 ## Identity and incarnation
 
@@ -160,17 +193,18 @@ A scope answers a submitted intent in one of four ways (`Answer`):
 | Answer | Means | What the caller does |
 |---|---|---|
 | `accepted` | The act is an entry. The answer carries a receipt. | Keep the receipt. |
-| `refused` | The act was judged and is not allowed. Nothing was written. The answer names a reason and the head it was judged at. When the guard that failed declares a `reason`, the answer also carries it, as `name`. | Read the reason and the name. A refusal is a statement about that head only. |
-| `unavailable` | The act was not judged. | Submit the same signed intent again. |
-| `mismatch` | The same actor and key are on an entry with another intent. | Sign a new intent with a new key. |
+| `refused` | The request was refused. The answer names a reason and the head it was judged at. When the guard that failed declares a `reason`, the answer also carries it, as `name`. The category alone proves no absence of timed entries. | Read the reason and the name. A refusal is a statement about that head only. |
+| `unavailable` | This reply confirms no acceptance. Timed entries may already have been written, or an accepted replay may not have reached its receipt. | Inspect the history and original request before another mutation. Recovery requires the same original signed intent. |
+| `mismatch` | The same actor and key are on an entry with another intent. | Inspect the recorded intent and original request before another mutation. |
 
 A **receipt** (`Receipt`) holds the fact of the entry, the effects it
 derived, and a duty ID for each message it sent.
 
 The idempotency key belongs to the first intent that was accepted under
-it, for the life of the scope. Sending the same signed intent again, at
-any time, returns the same receipt and writes nothing. That is how a
-caller recovers from a lost reply.
+it, for the life of the scope. Exact replay can return the accepted receipt
+without admitting the act again. A timed drain can run first and return
+unavailable before that receipt. Keep the original signed envelope and inspect
+the history rather than signing a new request to recover a lost reply.
 
 ## How a change takes effect
 
@@ -675,6 +709,8 @@ grant access to another directory's private history. A reader with
 neither reads nothing. The scope package's guide says what a
 session binds, how it ends, and the form of a signed read.
 
+One credential route answers a read token once to the authorized session of the key that signed its read-token act, before its end; the token then leaves private custody. Other reads are forbidden.
+
 ## Replay, and what a report means
 
 `@generalbusiness/artroom-replay` checks a history without running the
@@ -749,7 +785,7 @@ if (answer.answer === "accepted") await scope.followReceipt(answer.receipt);
   a key ID and signatures, never a private key. The value returned is the
   value signed: keep it, and retry with it.
 - `ScopeHandle` has `submit`, `settle`, the reads, `definition`, `text`,
-  `followReceipt` and `followDuty`. `found` founds a directory, or, under `platform:register@1`, a register by an `install`. `submit`
+  `followReceipt` and `followDuty`. `found` founds a directory, or, under a version of `platform:register`, a register by an `install`. `submit`
   and `found` take, as one more argument, what travels beside the intent:
   the detached texts, the declared named values and, for an act, the
   presented facts.

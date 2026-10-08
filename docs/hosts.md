@@ -44,7 +44,7 @@ What it needs:
 
   | Field | Value |
   |---|---|
-  | `registerScope` | The register's scope ID, from `artroom install`. |
+  | `registerScope` | The register's scope ID, from `artroom install --plan` before the install (see [deploy.md](deploy.md)), or from `artroom install` after it. |
   | `namespace` | `artroom-demo`, the binding's namespace. |
   | `host` | The service's hostname, as it appears in its remote URLs. |
   | `maxBytes` | The most bytes one Git transfer may hold, at least 32. |
@@ -98,8 +98,8 @@ prints an entry's effects, where the reader is allowed to read that
 entry. The name is 52 lowercase base32 letters, a hyphen, and the attempt
 number, which is 1 unless an earlier attempt failed.
 
-The repository is private: a clone needs a read token, and only an
-operator with access to the service can get one today.
+The repository is private: a clone needs a read token. `artroom clone`
+gets one for the member who runs it (below).
 
 ## GitHub (host `github.com`)
 
@@ -119,10 +119,30 @@ What it needs:
 
 The remote is `https://github.com/<organization>/<name>.git`.
 
+## How a member reads the repository
+
+On either host a member runs `artroom clone`. It signs the destination's
+`read-token` act, which any active member may sign, with a lifetime from
+1 to 24 hours. The destination opens one host operation, `mint-read`. On
+the hosting's own Git service the port mints a read token for the
+repository through the binding, `createToken("read", hours * 3600)`. On
+GitHub it mints an installation token restricted to the repository's ID
+with contents read; GitHub fixes its lifetime at one hour. The outcome
+records the token by a nonsecret handle and its end, never the token. The
+token goes to the destination's private custody, as a write token does,
+and the credential route gives it once to the session of the key that
+signed the act, before its end. The command then runs `git clone` with
+the token in an `Authorization` header that git reads from its
+environment. `artroom remote` prints the repository's remote URL in the
+host's form.
+
 ## What is not built
 
-- A clone command that gets a read token from the room. A person cannot
-  clone a repository on the hosting's own Git service without an operator.
+- A command that gives `git fetch` or `git pull` a token in an existing
+  clone. Each `artroom clone` gets a new token.
+- A sweep of read tokens that were minted and never read. Each ends at
+  its end; its plaintext stays in custody until it is read or the read is
+  refused at its end.
 - Public repositories on the hosting's own Git service.
 - A fork for each lane. Each destination has the one repository.
 - A sweep for a repository whose creation answer was lost. Its outcome

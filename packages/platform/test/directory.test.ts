@@ -207,17 +207,18 @@ test("a directory's genesis, by an outcome entry of its register, opens the repo
   // `create-rules` and `create-destination`, at two send marks that both state `always`: each creation is at the position of its form.
   const cause = seedDigest(genesis.seed);
   expect(p.last.sends.slice(1).map((send) => { const to = send.to as Seed; return [send.n, to.kind, to.definition, to.ordinal, to.cause === cause, to.creator]; })).toEqual([
-    [1, "membership", "platform:membership@1", 0, true, p.at], [2, "rules", "platform:rules@1", 1, true, p.at], [3, "destination", "platform:destination@1", 2, true, p.at],
+    [1, "membership", "platform:membership@2", 0, true, p.at], [2, "rules", "platform:rules@2", 1, true, p.at], [3, "destination", "platform:destination@2", 2, true, p.at],
   ]);
   expect((p.last.sends[1]!.message as { body: unknown }).body).toEqual({ fields: { founder: rita.key, founderHandle: "@rita", recoveryKey: sam.key, directory: p.at } });
   // The creation of the rules scope carries its `membership` field: the scope ID of the sibling that creation 0 asks for, which is
   // the contract's `ScopeId` of that seed (the note's revision 25, section 12.1.2: no operand, the rule of the send mark gives it).
   // Its body holds no member `membership`, as the written `create` of membership beside it holds none.
   expect((p.last.sends[2]!.message as { body: unknown }).body).toEqual({ fields: { branch: "main", directory: p.at, membership: scopeIdOf(p.last.sends[1]!.to as Seed) } });
-  // The creation of the destination carries its seven fields: `import` as a truth value, and the scope IDs of its two siblings.
+  // The creation of the destination carries its eight fields: `import` as a truth value, the scope IDs of its two siblings, and, at
+  // version 2, the founder's handle, which the destination's founding commit names in its README.
   const forDestination = (of: Directory) => (of.entries[0]!.entry.sends[3]!.message as { body: unknown }).body;
   expect([forDestination(p), (forDestination(new Directory({ import: IMPORT, confirmed: false })) as { fields: Record<string, unknown> }).fields["import"]]).toEqual([
-    { fields: { repository: p.item(0).values["repository"], branch: "main", import: false, claim: p.claim, directory: p.at, membership: scopeIdOf(p.last.sends[1]!.to as Seed), rules: scopeIdOf(p.last.sends[2]!.to as Seed) } },
+    { fields: { repository: p.item(0).values["repository"], branch: "main", import: false, claim: p.claim, directory: p.at, membership: scopeIdOf(p.last.sends[1]!.to as Seed), rules: scopeIdOf(p.last.sends[2]!.to as Seed), founderHandle: "@rita" } },
     true,
   ]);
   // The real rules scope takes that creation: its genesis is written under `platform:rules@1`, with the package's own rules, and it

@@ -1,5 +1,5 @@
 /**
- * `platform:rules@1`, as data, with its rules (authority note, revision 26,
+ * `platform:rules@1` and `@2`, as data, with their rules (authority note, revision 26,
  * sections 3.3, 3.11, 12.1.4 and 12.1.4a; its table of marks, section
  * 12.1.8, rows 1 and 27 to 29, and rows w, x and y of the further marks).
  * One rules scope for a repository. It holds the branch rules, with the
@@ -60,8 +60,15 @@ import type { Item, RecordedRef, Rules, StateView } from "@generalbusiness/artro
 import { firstExtents, holdsRulesExtent, isExtents } from "./extents.ts";
 import type { Extent } from "./extents.ts";
 
-/** The name and version that this data and these rules are. */
-export const RULES_SCOPE = "platform:rules@1" satisfies PlatformDefinition;
+/**
+ * The versions of the rules scope that this package serves. Version 2
+ * keeps the newer room cohort and observation identity. Both preserve
+ * actual main1eed's definition-byte place on `activate`; an answer states
+ * the version of the scope that gives it.
+ */
+export const RULES_SCOPE_1 = "platform:rules@1" satisfies PlatformDefinition;
+/** The newest version of the rules scope: the one that a directory of the newest version creates. */
+export const RULES_SCOPE = "platform:rules@2" satisfies PlatformDefinition;
 
 /**
  * The byte domain of a check's configuration (section 3.11). This
@@ -254,10 +261,7 @@ export const rulesScope: PlatformData = {
     activate: {
       step: "open", on: "definition", grant: "rules.activate",
       also: {},
-      // The definition's bytes come beside the intent at a stated place, in the domain of a definition: a value beside an intent is
-      // read only for a place that the pinned data states (the contract's section 6.2, revision 19). Without the place the runtime
-      // reads none, and the guard below can only answer `dependency-unavailable`. One place: the closure of a lane definition that
-      // creates only lanes of `self` is the definition alone.
+      // Actual main1eed shipped this input/retention place under platform:rules@1.
       fields: { digest: { ...DIGEST, required: true, value: { domain: DEFINITION_DOMAIN, max: PROPOSED_BOUNDS.definitionBytes } }, name: { type: "text", max: 64, required: true } },
       guards: [
         { code: "definition-bytes", row: "P21" },
@@ -308,6 +312,10 @@ export const rulesScope: PlatformData = {
   // The rules scope opens no operation.
   outcomes: {},
 };
+
+/** Version 2 has the same declaration bytes as actual main's supported @1.
+ * Its cohort and version-named observation remain distinct executable meaning. */
+export const rulesScope2: PlatformData = rulesScope;
 
 // ---------------------------------------------------------------- reading the rules scope's state
 
@@ -413,7 +421,8 @@ const PAGE = 100;
  *
  * Null: no answer. A provisional rules scope answers none (section 12.1),
  * and so does one that is asked as another scope or incarnation, or for a
- * key or a member.
+ * key or a member. `definition` is the version that the scope pinned at
+ * its genesis, which the answer states.
  *
  * - **Asked as "rules".** `revision`, as `revisionOf` gives it. `content`:
  *   `approvals`, `ownerMayReview` and `singleControllerException` from
@@ -427,12 +436,12 @@ const PAGE = 100;
  * The member `extents` names the canonical value in `artroom-rules-extents-1`. `rulesObservedValues` serves its bounded bytes
  * from the same folded state; the raw observation remains what a replay derives at the recorded head.
  */
-export function rulesAnswer(state: Pick<StateView, "scope" | "page">, asked: ObservationRequest): Omit<RulesObservation, "at"> | null {
+export function rulesAnswer(state: Pick<StateView, "scope" | "page">, asked: ObservationRequest, definition: PlatformDefinition): Omit<RulesObservation, "at"> | null {
   const scope = state.scope();
   if (!scope || scope.status !== "active" || scope.at.kind !== "rules" || asked.of.kind !== "rules" || asked.of.scope !== scope.at.scope || ("inc" in asked.of && asked.of.inc !== scope.at.inc)) return null;
   const [rules, revision] = [rulesOf(state), revisionOf(state)];
   if (!("asked" in asked) || !rules || revision === null) return null;
-  const common = { subject: "rules", of: scope.at, head: scope.head, revision, definition: RULES_SCOPE } as const;
+  const common = { subject: "rules", of: scope.at, head: scope.head, revision, definition } as const;
   if (asked.asked === "definitions") {
     const active: { digest: Digest; name: string }[] = [];
     for (let after: number | null = null; ;) {
@@ -458,7 +467,7 @@ export function rulesAnswer(state: Pick<StateView, "scope" | "page">, asked: Obs
 
 /** The bounded bytes beside a rules observation, from the same folded state as its recorded head. */
 export function rulesObservedValues(state: Pick<StateView, "scope" | "page">, asked: ObservationRequest): readonly { domain: string; bytes: string }[] {
-  if (!("asked" in asked) || asked.asked !== "rules" || rulesAnswer(state, asked) === null) return [];
+  if (!("asked" in asked) || asked.asked !== "rules" || rulesAnswer(state, asked, RULES_SCOPE) === null) return [];
   const extents = extentsOf(state);
   if (extents === null) return [];
   const bytes = canonicalize(extents);

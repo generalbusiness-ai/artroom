@@ -6,7 +6,7 @@
  */
 import type { ScopeId } from "@generalbusiness/artroom-contract";
 import { isScopeId, parseStrict, timeMs } from "@generalbusiness/artroom-bytes";
-import { DESTINATION, REGISTER } from "@generalbusiness/artroom-platform";
+import { isOf } from "@generalbusiness/artroom-platform";
 import type { GitHubAccount, GitHubInstallationToken } from "@generalbusiness/artroom-git/github";
 import { CredentialStore } from "./credential-store.ts";
 import { DestinationHost } from "./destination-host.ts";
@@ -82,12 +82,12 @@ export function gitHubOutside(given: OutsideGiven, sql: Pick<SqlStorage, "exec">
     // accepts names a kind, not one operation. A nonempty cleanup map enables
     // that kind; a missing exact ID/name within it still yields no answer.
     // With no cleanup map, deletion stays recorded and unmarked.
-    const accepts = (owner: string, kind: string): boolean => bound(owner) && (owner === REGISTER
+    const accepts = (owner: string, kind: string): boolean => bound(owner) && (isOf(owner, "platform:register")
       ? register.accepts(owner, kind) && (kind === "create-repository" ? creation !== undefined : kind === "delete-repository" && cleanups.size > 0)
       : destination.accepts(owner, kind));
     const send = (request: EffectRequest) => {
       if (!accepts(request.owner, request.kind)) return Promise.resolve(null);
-      if (request.owner !== REGISTER) return destination.send(request);
+      if (!isOf(request.owner, "platform:register")) return destination.send(request);
       if (request.kind === "delete-repository") {
         const input = request.origin.entry.input;
         const body = input.type === "outcome" ? input.evidence.body as Record<string, unknown> | null : null;
@@ -100,7 +100,8 @@ export function gitHubOutside(given: OutsideGiven, sql: Pick<SqlStorage, "exec">
       accepts, send,
       judged: (at, sealed) => destination.judged(at, sealed),
       recovery: { accepts: (owner, kind) => accepts(owner, kind) && destination.recovery.accepts(owner, kind), read: (request) => accepts(request.owner, request.kind) ? destination.recovery.read(request) : Promise.resolve(null) },
-      replies: (limit) => bound(DESTINATION) ? destination.replies(limit) : { answers: [], more: false },
+      replies: (limit) => bound(given.genesis()?.seed.definition ?? "") ? destination.replies(limit) : { answers: [], more: false },
+      credential: (handle, key) => bound(given.genesis()?.seed.definition ?? "") ? destination.credential(handle, key) : null,
     };
   } catch { return NO_OUTSIDE; }
 }

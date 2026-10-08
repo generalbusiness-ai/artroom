@@ -116,7 +116,7 @@ tells it `rules-wanted`. `Rulebook` is a rules scope in memory below such
 a registrar, whose acts are judged on the test authority of derive's
 fixture set. `standing` is an observation of a member that the test
 writes by hand: no membership scope answered it. A test that uses one
-says so. The data and the six rules of `platform:rules@1` are the
+says so. The data and the six rules of `platform:rules@2` are the
 platform package's, and none of them is a stand-in. Such a test shows
 the rows and the rules as judgments in memory. The rules definition states
 a value place for check configurations and answers a rules observation
@@ -268,6 +268,24 @@ host. What a real change lane does with the service's signed results is
 one scenario of the lanes, `packages/lanes/test/checks.scope.test.ts`,
 which calls the service's origin read and its signer as functions.
 
+`packages/lanes/test/edit.scope.test.ts` runs `artroom edit` as the
+command-line story runs its commands, on each host through the production
+wiring of its ports (`artifacts-wiring.ts`, `github-wiring.ts`) over a
+labelled stand-in of `packages/scope/test/hosts.ts`, which keeps refs and
+objects in maps and decodes each pushed pack; the site route reads the
+published file back over the same stand-in. It lives with the lanes,
+because it needs a lane definition and no other package may name the
+lanes package; the stand-ins live in the scope package, which may name the
+git package. `packages/lanes/test/issues.scope.test.ts` runs `artroom issue`,
+`issues`, `edit --closes`, `merge --closes` and `verify --all` the same way,
+on the hosting's own Git service only, for the same reason.
+`packages/lanes/test/demo.scope.test.ts` runs the demo runner's rehearsal,
+`scripts/demo/rehearse.ts`, the same way: every shot of the demo script's
+middle, from the planned install to the page, with a stand-in for `git`
+that reads the stand-in host. Its second test is the recorder for
+`scripts/demo-captures.ts --recorded`, and runs only with `DEMO_RECORD=1`
+([demo.md](demo.md)).
+
 `packages/lanes/test/support/room.ts` founds a repository on the real
 platform scopes, in the namespace `PLATFORM`, as `founding-real` does, and
 its real directory creates lanes under the digests that its real rules
@@ -331,7 +349,7 @@ It installs only if `package-lock.json` changed since the last install,
 typechecks every workspace, and runs every test: one vitest process for
 the repository (`vitest.config.ts` at the root, one project for each of
 `bytes`, `derive`, `platform`, `git`, `checkers`, `replay`, `client`,
-`scope`, `lanes` and `cli`), then one script (`scripts/active-source.test.mjs`). The script checks that no
+`scope`, `scope-denial`, `lanes`, `cli` and `page`), then one script (`scripts/active-source.test.mjs`). The script checks that no
 active file imports from `parked/` or names a removed format, and that no
 platform package depends on the lanes package or imports from it. It prints the head, the tree and
 each step's elapsed and CPU time. It also fails on a whitespace error in
@@ -345,6 +363,21 @@ vitest lets projects share a group only when their worker counts agree. The
 local repositories, and one file of the `checkers` project runs it for the
 runner's checkout. Nothing runs twice.
 
+The `scope-denial` project then runs the post-sent local-denial witness in
+its own Worker runtime, with the same Worker and real SQLite storage. Both
+the root and Scope package entrypoints include it exactly once; the other
+Operations witnesses, including T19's native global abort, stay in `scope`.
+The original denial body and all T19 assertions remain. Their operation
+opening uses one shared helper, not a second fixture implementation.
+
+This isolates the observed T2-to-T19 unsafe-abort interaction in the pinned
+test runtime. It does not fix that native helper bug or prove mixed-cohort
+cleanup or physical draining. Captured frames locate IncomingRequest task
+cancellation through the native abort, but do not identify the actor or
+context. The extra Worker startup costs time and memory; the denial project
+starts no clone fixture or Git server. Current full-gate cost and complete
+exact-head Source acceptance remain separate obligations.
+
 The command line's story, `packages/cli/test/*.scope.test.ts`, runs from
 the root inside the `scope` project too, and has no Worker of its own. Its
 commands go over the Worker's HTTP routes for the namespace `PLATFORM`,
@@ -356,6 +389,21 @@ the command never presents. The `cli` project is its Node test of the key files.
 `scripts/control.mjs` cannot select a root project, so a control of the
 story is run by hand: change the line, run
 `npx vitest run --project scope story`, restore the file.
+
+The page's story, `packages/page/test/story.scope.test.ts`, runs from the
+root inside the `scope` project too. Its room is `packages/page/test/support/demo.ts`:
+founded by the command line over the Worker's HTTP routes, with the real
+read sessions under a TEST SECRET, and the site route for addresses under
+`/site/`; the Git host (`OwnGit` under the production wiring of the hosting
+own Git service) and the scheduler are labelled stand-ins there. Its reads
+and acts are the page's own data functions. The `page` project is its Node
+tests: the states of a change, and that the scope Worker's page module
+(`packages/scope/src/page-assets.ts`) is the page's build of its source.
+`record.scope.test.ts` is no test of a property: it runs only with
+`PAGE_RECORD=1`, and `packages/page/test/screens.mjs` uses what it prints
+to take the page's screenshots in Chromium. That script needs
+`playwright-core` installed outside the checkout; it is not part of the
+gate.
 
 The lane scenarios, `packages/lanes/test/*.scope.test.ts`, run from
 the root inside the `scope` project: the same test Worker, loaded once.

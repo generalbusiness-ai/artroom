@@ -1,12 +1,13 @@
 import { describe, expect, test } from "vitest";
 import type { Digest, Item, OperationId, Read, Seed } from "@generalbusiness/artroom-contract";
-import { b64url, scopeIdOf, timeMs } from "@generalbusiness/artroom-bytes";
+import { b64url, canonicalize, definitionDigest, scopeIdOf, textDigest, timeMs, timeOf, utf8 } from "@generalbusiness/artroom-bytes";
 import type { Fetch } from "@generalbusiness/artroom-client";
 import { repositoryName } from "@generalbusiness/artroom-platform";
 import { net } from "@generalbusiness/artroom-scope/testing";
 import { platformNet } from "@generalbusiness/artroom-scope/testing/worker";
 import { Platform, routed, settle } from "../../scope/test/repository.ts";
 import { outsideOf, wired } from "../../scope/test/outside.ts";
+import { foundingPublication } from "../../scope/test/publication.ts";
 import { command, memoryStore, type Context, type Outcome } from "../src/index.ts";
 
 const SERVICE = "https://scopes.test";
@@ -25,13 +26,13 @@ const reader = "a test reader";
 // |---|---|
 // | The commands, their keys and their intents | Real: `command` of `src/line.ts`, with a store in memory for each person, which stands for the config directory. |
 // | The readers | Real: the read sessions of the scope package's `sessions.ts` and its signed reads, as deployed. The session secret is a TEST SECRET that the test generates, in place of the deployment's. A reader with no session and no signed read reads nothing. |
-// | The Git host | A STAND-IN: `OutsideDouble` of the scope package's `test/outside.ts`, wired as the register's outside port. It answers the one creation request with what the test writes. No repository is created. |
+// | The Git host | A STAND-IN: `OutsideDouble` of the scope package's `test/outside.ts`, wired as the register's outside port. It answers the one creation request with what the test writes. No repository is created. For the destination's founding publication it is wired as the destination's port (`test/publication.ts`), and answers each request with the commit IDs the platform package computes. Nothing is pushed. |
 // | The scheduler | A STAND-IN: while a command waits, its `pause` runs the register's operations driver and the dispatchers of the scopes it waits on, as a deployment's alarms would. No test waits on the wall clock. |
 // | The clock | The scripted clock of the namespaces. The command signs its intents and reads by it. |
 // | The test's own reads | The test, and the scheduler stand-in, read what each scope holds with a reader that the command never presents (`platformNet.inspector`), past the read sessions. |
 // | Who may install | Nothing checks it: that is the installation design's. |
 describe("the artroom command on real scopes with the real read sessions. The Git host and the scheduler are STAND-INs", () => {
-  test("install, claim by signed reads, seat and session, invite and join over the Worker's routes; acts lists what the role holds; one act takes effect and one is refused by name with nothing written; log and show read the histories back, and verify reports each of the six consistent over the live read surface; a key of another register reads none of it", async () => {
+  test("install, claim by signed reads, seat and session, invite and join over the Worker's routes; acts lists what the role holds; one act takes effect and one is refused by name with nothing written; after the destination's founding publication, log, show and remote read the histories back with the founder's session, and verify reports each of the six consistent over the live read surface after the signed-read window; a key of another register reads none of it", async () => {
     net.hold = net.deaf = null;
     platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32)));
     platformNet.sessions = true;
@@ -64,15 +65,18 @@ async function story(): Promise<void> {
     await settle(...[...(register ? [register] : []), ...waiting.filter((scope) => scope !== register?.name).map((scope) => new Platform(scope as never))]);
   };
   const rita: Context = { store: memoryStore(), fetch, now, pause };
-  const una: Context = { store: memoryStore(), fetch, now, pause };
+  // A made-up value in the domain of a definition, whose bytes are at hand beside an act: no rules scope activated it.
+  const inactive = { name: "a definition that no rules scope activated" };
+  const una: Context = { store: memoryStore(), fetch, now, pause, read: async (path) => (path === "inactive.json" ? utf8(canonicalize(inactive)) : null) };
   const run = async (who: Context, ...argv: string[]): Promise<Outcome> => command(who, argv);
 
   // install: the register, by an `install` intent of a new operator key, which is the one founder key.
   const installed = await run(rita, "install", SERVICE, "--host", "git.example", "--namespace", "artroom");
   expect(installed.code, installed.lines.join("\n")).toBe(0);
   const R = new Platform((await rita.store.config())!.register!.scope);
-  expect(installed.lines).toEqual([`Installed: register ${R.name}.`, expect.stringMatching(/^The operator key key_\S+ is kept in the config directory, readable only by you\. It is the one founder key\.$/)]);
-  expect((await R.summary()).value).toMatchObject({ status: "active", definition: "platform:register@1" });
+  expect(installed.lines).toEqual([`Installed: register ${R.name}, under platform:register@2.`, expect.stringMatching(/^The operator key key_\S+ is kept in the config directory, readable only by you\. It is the one founder key\.$/)]);
+  // A new register is founded on the newest version, and the room that it creates on the newest version of each definition.
+  expect((await R.summary()).value).toMatchObject({ status: "active", definition: "platform:register@2" });
   // Before the claim the operator key holds no session, and reads the register by signed reads of the log: its genesis is all there
   // is, and it replays.
   const early = await run(rita, "verify", "register");
@@ -97,10 +101,17 @@ async function story(): Promise<void> {
   for (const scope of [D, M, new Platform(repository.rules), new Platform(repository.destination), new Platform(repository.inbox!)]) expect((await scope.summary()).value.status).toBe("active");
   expect(claimed.lines).toEqual([
     `Claimed demo: directory ${D.name}, membership ${M.name}, rules ${repository.rules}, destination ${repository.destination}; each created and confirmed.`,
+    "Definitions: platform:directory@2, platform:membership@2, platform:rules@2, platform:destination@2.",
     expect.stringMatching(new RegExp(`^You are @rita, an admin, on key key_\\S+; your inbox is ${repository.inbox}\\.$`)),
   ]);
   expect(outsideOf(R.name).attempts).toEqual(["1:0#1"]);
   wired.delete(R.name);
+  // The destination's founding publication: the first head and its receipt, answered by the STAND-IN host. The destination then
+  // holds entries that no member signed: the host's outcomes, the receipt's among them.
+  const G = new Platform(repository.destination);
+  await foundingPublication(G);
+  const recorded = (await G.item(0)) as { state: string; values: { repository?: { name: string } } };
+  expect(recorded.state).toBe("ready");
 
   // invite and join: membership's `invite-member`, read and signed with rita's session, and `join` by a new key that una's command
   // makes and keeps. The new key reads nothing before it joins; then it reads its own join and the inbox the join caused.
@@ -122,7 +133,7 @@ async function story(): Promise<void> {
   // acts: what una's role holds on the directory, read with her session from the definition and from her standing in membership.
   const unasActs = await run(una, "acts", "directory");
   expect(unasActs).toEqual({ code: 0, lines: [
-    `Acts on ${D.name} (platform:directory@1) for @una (member):`,
+    `Acts on ${D.name} (platform:directory@2) for @una (member):`,
     "  open-issue: opens a lane; needs issue.open. Fields: definition:digest title:text body?:text conditions:list.",
     "  open-pr: opens a lane; needs change.open. Fields: definition:digest title:text body?:text draft:bool.",
     "  open-task: opens a task; needs task.control. Fields: worker:member controller:member lane:scope.",
@@ -141,12 +152,27 @@ async function story(): Promise<void> {
   // Let this accepted act's inbox creation settle before comparing the head around the next, refused act.
   await settle(M, ...sealed.entry.sends.flatMap((send) => ("creator" in send.to ? [new Platform(scopeIdOf(send.to as Seed))] : [])));
 
+  // act, refused: una opens an issue under a definition that the real rules scope has never activated, with its bytes beside the
+  // act (`--value`). The scope refuses it by the guard's name, and writes nothing.
+  const before = (await D.summary()).at;
+  const refused = await run(una, "act", "open-issue", "--on", "directory", "--set", `definition=${definitionDigest(inactive as never)}`, "--set", "title=An inactive definition", "--set", "conditions=[]", "--value", "inactive.json");
+  expect(refused).toEqual({ code: 1, lines: [`Refused: guard-failed (not-activated), judged at entry ${D.name}:${before.seq}. The request was refused.`] });
+  // With no bytes beside it, the digest names a value place that holds nothing: the field is refused before any guard is judged
+  // (the lane wiring's value place; its note, section 6, gap 3).
+  const unnamed = await run(una, "act", "open-issue", "--on", "directory", "--set", `definition=${textDigest("a definition no rules scope activated")}`, "--set", "title=An inactive definition", "--set", "conditions=[]");
+  expect(unnamed).toEqual({ code: 1, lines: [`Refused: bad-field, judged at entry ${D.name}:${before.seq}. The request was refused.`] });
+  expect((await D.summary()).at).toEqual(before);
+  // A refusal by name: rita adds a member whose handle is no handle. The guard `handle-form` refuses it `bad-handle`; nothing is written.
+  const atMembership = (await M.summary()).at;
+  const named = await run(rita, "act", "add-member", "--on", "membership", "--set", "handle=no handle", "--set", "kind=checker");
+  expect(named).toEqual({ code: 1, lines: [`Refused: bad-field (bad-handle), judged at entry ${M.name}:${atMembership.seq}. The request was refused.`] });
+  expect((await M.summary()).at).toEqual(atMembership);
   // act, refused: the admin tries to add the checker handle already held by the member above. Membership refuses it by the
   // guard's name, and writes nothing. This complete act tests a named judgment rather than missing definition bytes.
-  const before = (await M.summary()).at;
-  const refused = await run(rita, "act", "add-member", "--on", "membership", "--set", "handle=@check", "--set", "kind=checker");
-  expect(refused).toEqual({ code: 1, lines: [`Refused: guard-failed (handle-in-use), judged at entry ${M.name}:${before.seq}. Nothing was written.`] });
-  expect((await M.summary()).at).toEqual(before);
+  const beforeDuplicate = (await M.summary()).at;
+  const duplicate = await run(rita, "act", "add-member", "--on", "membership", "--set", "handle=@check", "--set", "kind=checker");
+  expect(duplicate).toEqual({ code: 1, lines: [`Refused: guard-failed (handle-in-use), judged at entry ${M.name}:${beforeDuplicate.seq}. The request was refused.`] });
+  expect((await M.summary()).at).toEqual(beforeDuplicate);
 
   // log, show and verify with una's session: the command asks membership for one with her key.
   const head = (await M.summary()).at.seq;
@@ -163,11 +189,21 @@ async function story(): Promise<void> {
   expect([verified.code, verified.lines[0]], verified.lines.join("\n")).toEqual([0, consistent]);
   expect((await run(una, "log", R.name)).code).toBe(0);
 
-  // Over the live read surface, with rita's session, each of the six histories replays consistent: the register's entries by the
-  // chain of her claim, and every other scope by the membership reference it records.
+  // Past the window of rita's claim, her key's signed reads read nothing that her claim caused; her session reads on (the planner's
+  // decision ca8ad1cf). The destination, with her session: its whole history, the publication's outcomes among them, and the
+  // repository its branch item records.
+  net.clock.now = timeOf(timeMs(net.clock.now)! + 16 * 60_000);
+  const destinationLog = await run(rita, "log", "destination");
+  expect([destinationLog.code, destinationLog.lines.filter((line) => /  outcome; /.test(line)).length, destinationLog.lines.at(-1)], destinationLog.lines.join("\n")).toEqual([0, 6, "8 entries in all."]);
+  expect(await run(rita, "remote")).toEqual({ code: 0, lines: ["Host: git.example", "Namespace: artroom", `Name: ${recorded.values.repository!.name}`, "Remote URL: not known for the host git.example"] });
+
+  // Over the live read surface, with rita's session, each of the six histories replays consistent: the register whole, since her
+  // claim is on it, and every other scope by the membership reference it records, the destination after its publication.
   for (const scope of ["register", "directory", "membership", "rules", "destination", "inbox"]) {
     const live = await run(rita, "verify", scope);
     expect([scope, live.code, live.lines[0]], live.lines.join("\n")).toEqual([scope, 0, consistent]);
+    // The destination is folded through the publication's last outcome, entry 7.
+    if (scope === "destination") expect(live.lines[2]).toMatch(/, destination, through entry 7 \(sha256:/);
   }
 
   // What stays forbidden: a key of another register, which signed nothing in this one and holds no session of this repository.

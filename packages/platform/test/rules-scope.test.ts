@@ -6,7 +6,7 @@ import type { ActJudgment, Judgment } from "@generalbusiness/artroom-derive";
 import { d, desk, deskDefinition, directory, keys, membership, ticket, ticketDefinition } from "@generalbusiness/artroom-derive/testing";
 import { CONFIGURATION_BYTES, CONFIGURATION_DOMAIN, DEFINITION_DOMAIN, PUBLISH, RULES_EXTENTS_VALUE, RULES_SCOPE, extentsOf, firstExtents, membershipId, platform, revisionOf, rulesScope } from "../src/index.ts";
 import type { Extent } from "../src/index.ts";
-import { rulesScopeRules } from "../src/rules-scope.ts";
+import { rulesScope2, rulesScopeRules } from "../src/rules-scope.ts";
 import { BRANCH, Rulebook, lanePointingAt, memberOf, standing } from "./support-rules.ts";
 
 // Every scope here is a `Rulebook` of test support: a rules scope in memory, below a STAND-IN registrar, whose acts are judged on the
@@ -75,7 +75,7 @@ test("the rules definition validates whole with the platform option; its marks a
   // The whole-scope rule (the contract's section 6.1): the package's own rules run the version, with no stand-in. Without any one of
   // the three, or with a rule of another place under a name, it is not runnable.
   const supplied = platform(RULES_SCOPE)!;
-  expect([supplied.data, supplied.rules, platform("platform:rules@2")]).toEqual([rulesScope, rulesScopeRules, null]);
+  expect([supplied.data, supplied.rules, platform("platform:rules@3")]).toEqual([rulesScope2, rulesScopeRules, null]);
   expect([runnable(checked.definition, supplied.rules), ...Object.keys(rulesScopeRules).map((lost) => runnable(checked.definition, { ...supplied.rules, [lost]: undefined as never })), runnable(checked.definition, { ...supplied.rules, checkers: { place: "send", run: () => null } })])
     .toEqual([true, ...Object.keys(rulesScopeRules).map(() => false), false]);
 });

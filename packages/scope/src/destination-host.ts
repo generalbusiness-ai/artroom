@@ -1,13 +1,22 @@
 /** Destination outside effects. Provider calls happen outside the scope's commit;
- * platform rules alone judge their evidence. Plaintexts stay in private custody. */
-import type { Entry, FactRef, FieldValue, OperationId, RetainedInput, ScopeRef } from "@generalbusiness/artroom-contract";
-import { canonicalize, entryHash, isFactRef, isOperationId, parseStrict, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
-import { isEntryOf, type Operation } from "@generalbusiness/artroom-derive";
-import { DESTINATION, DESTINATION_KINDS, destinationBranch, destinationMint, destinationRead, destinationReceipt, destinationRevokedMint, destinationSends, destinationStatement, destinationTarget, destinationWrite, firstHeadCommit, foundingObjects, isRecordedJudgeEvidence, revokedToken, type DestinationObject, type ObjectFormat, type RecordedJudgeEvidence } from "@generalbusiness/artroom-platform";
+ * platform rules alone judge their evidence. Plaintexts stay in private custody.
+ *
+ * A one-file manifest (i5 edit) names no integration commit: this port writes it.
+ * For its `judge` it reads the base's closure from the host, writes the file into
+ * the published tree with the platform's `editObjects`, and answers the shared
+ * inspection of those objects. For its push it builds the same objects again, with
+ * the time of the entry that reserved it, and sends them with the base's closure.
+ * Every provider sends them the same way. */
+import type { Entry, FactRef, FieldValue, KeyId, OperationId, RetainedInput, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
+import { canonicalize, entryHash, isOperationId, parseStrict, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
+import { isEntryOf, valueDigest, type Item, type Operation } from "@generalbusiness/artroom-derive";
+import { DESTINATION_KINDS, READ_TOKEN_HOURS, destinationBranch, destinationMint, destinationRead, destinationReceipt, destinationRevokedMint, destinationSends, destinationStatement, destinationTarget, destinationWrite, editObjects, editPath, fileOf, fileSound, firstHeadCommit, foundingOf, isOf, isRecordedJudgeEvidence, revokedToken, type DestinationObject, type EditFile, type ObjectFormat, type RecordedJudgeEvidence } from "@generalbusiness/artroom-platform";
+import { GitRefusal, READ_BOUNDS, Reader, type GitSource } from "@generalbusiness/artroom-git";
 import type { CredentialPosition, CredentialStore, RevocationPosition } from "./credential-store.ts";
 import type { OutsideGiven } from "./object.ts";
 import type { EffectAnswer, EffectRequest, Outside } from "./operations.ts";
 import type { Sealed } from "./store.ts";
+import { inspectGit } from "./github-host.ts";
 
 export interface DestinationRepository { host: string; namespace: string; name: string; id: string }
 export interface DestinationBinding { scope: ScopeRef; mint: OperationId; attempt: number; write: OperationId; writeAttempt: number; ref: string }
@@ -22,10 +31,27 @@ export interface DestinationProvider {
   /** Read and validate the complete object closure before returning it. */
   objects(repository: DestinationRepository, commit: string): Promise<readonly DestinationObject[]>;
   /** Validate object closure and ancestry at the actual send boundary. Own reply: {send:...}. */
-  send(request: { repository: DestinationRepository; ref: string; old: string | null; commit: string; objects: readonly DestinationObject[]; expectedTree?: string; requireParentless: boolean; token: string; binding: DestinationBinding; allowed(): boolean }): Promise<unknown>;
+  send(request: { repository: DestinationRepository; ref: string; old: string | null; commit: string; objects: readonly DestinationObject[]; expectedTree?: string; requireParentless: boolean; token: string; binding: DestinationBinding; allowed(): boolean; sentAt?: Timestamp }): Promise<unknown>;
   inspect(context: DestinationInspection): Promise<{ evidence: RecordedJudgeEvidence; retain?: readonly RetainedInput[] }>;
+  /**
+   * One read credential for the repository, for a member's `read-token`: `handle` is the host's nonsecret name for it, chosen
+   * before the request; `seconds` the lifetime that the act asked for. Own reply: {id, ends, plaintext}, or {minted:false}.
+   * No request is retried here.
+   */
+  mintRead(repository: DestinationRepository, request: { handle: string; seconds: number }): Promise<unknown>;
+  /** The repository's remote URL at this host, as a person clones it. */
+  remote(repository: DestinationRepository): string;
 }
-export interface DestinationHostOptions { host: string; namespace: string; provider: DestinationProvider; custody: Pick<CredentialStore, "put" | "reply" | "live" | "read" | "judged" | "revoked" | "pending" | "expectRevoke" | "revocations"> }
+/** What the one-time credential read answers: the plaintext, its end, and the remote URL it opens. */
+export interface ReadCredential { token: string; ends: string; remote: string }
+export interface DestinationHostOptions { host: string; namespace: string; provider: DestinationProvider; custody: Pick<CredentialStore, "put" | "reply" | "live" | "read" | "judged" | "revoked" | "pending" | "expectRevoke" | "revocations" | "held" | "take"> }
+
+/** The byte domain of the nonsecret handle of a member's read credential. */
+const READ_HANDLE = "artroom.read-credential.v1";
+/** The kinds whose confirmed outcome puts a plaintext in custody: a write's token, and a member's read token. */
+const MINTS: readonly string[] = [DESTINATION_KINDS.mint, DESTINATION_KINDS.mintRead];
+/** The destination, without its version: every version that the platform package serves is written by this host. */
+const OWNER = "platform:destination";
 
 const sameScope = (a: ScopeRef, b: ScopeRef) => canonicalize(a) === canonicalize(b);
 const objectId = (v: unknown): v is string => typeof v === "string" && /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(v);
@@ -47,10 +73,10 @@ export class DestinationHost implements Outside {
   #revokeCursor: RevocationPosition | null = null;
   constructor(given: OutsideGiven, options: DestinationHostOptions) { this.#given = given; this.#options = options; }
 
-  accepts(owner: string, kind: string): boolean { return owner === DESTINATION && (Object.values(DESTINATION_KINDS) as string[]).includes(kind); }
+  accepts(owner: string, kind: string): boolean { return isOf(owner, OWNER) && (Object.values(DESTINATION_KINDS) as string[]).includes(kind); }
   /** Repeating these reads never repeats a host mutation. The driver keeps the same attempt. */
   readonly recovery = {
-    accepts: (owner: string, kind: string): boolean => owner === DESTINATION && [DESTINATION_KINDS.judge, DESTINATION_KINDS.read, DESTINATION_KINDS.adoptRead].includes(kind as "judge" | "read" | "adopt-read"),
+    accepts: (owner: string, kind: string): boolean => isOf(owner, OWNER) && [DESTINATION_KINDS.judge, DESTINATION_KINDS.read, DESTINATION_KINDS.adoptRead].includes(kind as "judge" | "read" | "adopt-read"),
     read: (request: EffectRequest): Promise<EffectAnswer | null> => this.recovery.accepts(request.owner, request.kind) ? this.send(request) : Promise.resolve(null),
   };
 
@@ -66,7 +92,7 @@ export class DestinationHost implements Outside {
     this.#revokeCursor = revocations.more && lastRevoke ? { revoke: lastRevoke.revoke, attempt: lastRevoke.attempt } : null;
     for (const expected of revocations.items) {
       const operation = this.#given.state.operation(expected.revoke);
-      if (operation?.owner !== DESTINATION || operation.kind !== DESTINATION_KINDS.revoke) continue;
+      if (!isOf(operation?.owner, OWNER) || operation.kind !== DESTINATION_KINDS.revoke) continue;
       const origin = this.#given.own(Number(expected.revoke.split(":")[0]));
       if (!origin || !this.#bound({ scope: scope.at, operation: expected.revoke, attempt: expected.attempt, owner: operation.owner, kind: operation.kind, origin })) continue;
       const mint = destinationRevokedMint(this.#given.state, this.#given.own, operation);
@@ -90,7 +116,7 @@ export class DestinationHost implements Outside {
     this.#replyCursor = page.more && last ? { mint: last.mint, attempt: last.attempt } : null;
     for (const held of page.items) {
       const operation = this.#given.state.operation(held.mint);
-      if (operation?.owner !== DESTINATION || operation.kind !== DESTINATION_KINDS.mint || !text(held.id) || timeMs(held.ends) === null) continue;
+      if (!isOf(operation?.owner, OWNER) || !MINTS.includes(operation.kind) || !text(held.id) || timeMs(held.ends) === null) continue;
       const origin = this.#given.own(Number(held.mint.split(":")[0]));
       if (!origin || !this.#bound({ scope: scope.at, operation: held.mint, attempt: held.attempt, owner: operation.owner, kind: operation.kind, origin })) continue;
       answers.push({ operation: held.mint, attempt: held.attempt, answer: answer("confirmed", { token: held.id, ends: held.ends }) });
@@ -103,6 +129,17 @@ export class DestinationHost implements Outside {
       const context = this.#bound(request);
       if (!context) return null;
       const { operation, repository, ref } = context;
+      if (operation.kind === DESTINATION_KINDS.mintRead) {
+        const hours = this.#hours(operation);
+        if (hours === null) return null;
+        const id = this.#readHandle(request);
+        const reply = await this.#options.provider.mintRead(repository, { handle: id, seconds: hours * 3600 });
+        if (members(reply, ["minted"])?.["minted"] === false) return answer("refused", {});
+        const body = members(reply, ["id", "ends", "plaintext"]);
+        if (!body || body["id"] !== id || typeof body["ends"] !== "string" || timeMs(body["ends"]) === null || typeof body["plaintext"] !== "string" || body["plaintext"].length === 0 || utf8(body["plaintext"]).length > 4096) return null;
+        const held = this.#options.custody.put({ id, ends: body["ends"], plaintext: body["plaintext"], mint: operation.id, attempt: request.attempt });
+        return held === "stored" || held === "repeat" ? answer("confirmed", { token: id, ends: body["ends"] }) : null;
+      }
       if (operation.kind === DESTINATION_KINDS.mint) {
         const served = destinationWrite(this.#given.state, this.#given.own, operation);
         if (!served) return null;
@@ -125,6 +162,8 @@ export class DestinationHost implements Outside {
         return answer(reply["revoked"] ? "confirmed" : "refused", { token });
       }
       if (operation.kind === DESTINATION_KINDS.judge) {
+        const edit = this.#edit(this.#judging());
+        if (edit) return await this.#inspectEdit(repository, ref, edit);
         const inspection = this.#inspection(repository, ref);
         if (!inspection) return null;
         const reply = await this.#options.provider.inspect(inspection);
@@ -145,13 +184,13 @@ export class DestinationHost implements Outside {
   judged(at: { scope: ScopeRef; operation: OperationId; attempt: number }, sealed: Sealed | null): void {
     const scope = this.#given.scope();
     const operation = this.#given.state.operation(at.operation);
-    if (!scope || !sameScope(scope.at, at.scope) || operation?.owner !== DESTINATION || (operation.kind !== DESTINATION_KINDS.mint && operation.kind !== DESTINATION_KINDS.revoke)) return;
+    if (!scope || !sameScope(scope.at, at.scope) || !isOf(operation?.owner, OWNER) || (!MINTS.includes(operation.kind) && operation.kind !== DESTINATION_KINDS.revoke)) return;
     // A repeat/conflict notification carries no new entry. Keep custody backed
     // by the exact confirmed outcome this scope previously committed.
     const outcome = sealed ?? this.#confirmation(operation, at.attempt);
     const recorded = outcome ? this.#given.own(outcome.entry.seq) : null;
     const input = recorded?.entry.input;
-    const valid = outcome && recorded?.hash === outcome.hash && canonicalize(recorded.entry) === canonicalize(outcome.entry) && sameScope(recorded.entry.at, at.scope) && input?.type === "outcome" && input.operation === at.operation && input.attempt === at.attempt && input.owner === DESTINATION && input.kind === operation.kind && input.result === "confirmed" && input.evidence.basis === "own-answer";
+    const valid = outcome && recorded?.hash === outcome.hash && canonicalize(recorded.entry) === canonicalize(outcome.entry) && sameScope(recorded.entry.at, at.scope) && input?.type === "outcome" && input.operation === at.operation && input.attempt === at.attempt && isOf(input.owner, OWNER) && input.kind === operation.kind && input.result === "confirmed" && input.evidence.basis === "own-answer";
     if (operation.kind === DESTINATION_KINDS.revoke) {
       const body = valid && input.type === "outcome" ? members(input.evidence.body, ["token"]) : null;
       const mint = body ? destinationRevokedMint(this.#given.state, this.#given.own, operation) : null;
@@ -162,17 +201,53 @@ export class DestinationHost implements Outside {
     this.#options.custody.judged(at.operation, at.attempt, body && text(body["token"]) && typeof body["ends"] === "string" && timeMs(body["ends"]) !== null ? { id: body["token"], ends: body["ends"] } : null);
   }
 
+  /**
+   * The one-time read of a member's read credential (the planner's decision for I5). It answers only for a `mint-read` whose
+   * confirmed own answer this scope committed, naming that handle; only to the key that signed the `read-token` that opened it;
+   * only before its end; and only once: the plaintext leaves custody as it is answered. Every other case is null, and a read
+   * after the end drops the plaintext. It writes no entry.
+   */
+  credential(handle: string, key: KeyId): ReadCredential | null {
+    try {
+      if (!text(handle) || !this.#given.scope()) return null;
+      const held = this.#options.custody.held(handle);
+      const operation = held ? this.#given.state.operation(held.mint) : null;
+      if (!held || held.state !== "live" || !isOf(operation?.owner, OWNER) || operation.kind !== DESTINATION_KINDS.mintRead) return null;
+      const confirmed = this.#confirmation(operation, held.attempt)?.entry.input;
+      const body = confirmed?.type === "outcome" ? members(confirmed.evidence.body, ["token", "ends"]) : null;
+      const opening = this.#given.own(Number(operation.id.split(":")[0]))?.entry.input;
+      if (body?.["token"] !== handle || body["ends"] !== held.ends || opening?.type !== "act" || opening.signed.intent.kind !== "read-token" || opening.signed.intent.actor !== key) return null;
+      const branch = destinationBranch(this.#given.state);
+      const repository = members(branch?.values["repository"], ["host", "namespace", "name", "id"]);
+      if (!repository || repository["host"] !== this.#options.host || repository["namespace"] !== this.#options.namespace) return null;
+      const remote = this.#options.provider.remote(repository as unknown as DestinationRepository);
+      const taken = this.#options.custody.take(handle, this.#given.clock.read());
+      return taken ? { token: taken.plaintext, ends: taken.ends, remote } : null;
+    } catch { return null; }
+  }
+
+  /** The lifetime that the `read-token` act asked for, in hours, from the entry that opened the `mint-read`. */
+  #hours(operation: Operation): number | null {
+    const input = this.#given.own(Number(operation.id.split(":")[0]))?.entry.input;
+    const hours = input?.type === "act" && input.signed.intent.kind === "read-token" ? input.signed.intent.fields["hours"] : null;
+    return typeof hours === "number" && Number.isSafeInteger(hours) && hours >= READ_TOKEN_HOURS.min && hours <= READ_TOKEN_HOURS.max ? hours : null;
+  }
+  /** A read credential's nonsecret handle, fixed by the sealed operation and its attempt before the request leaves. */
+  #readHandle(request: EffectRequest): string {
+    return `read:${valueDigest(READ_HANDLE, { scope: request.scope, operation: request.operation, attempt: request.attempt, origin: request.origin.hash } as unknown as FieldValue)}`;
+  }
+
   #confirmation(operation: Operation, attempt: number): Sealed | null {
     const scope = this.#given.scope();
     const confirmed = operation.attempts.find((opened) => opened.attempt === attempt)?.outcomes.find((outcome) => outcome.result === "confirmed");
     const sealed = confirmed ? this.#given.own(confirmed.seq) : null;
     const input = sealed?.entry.input;
-    return scope && sealed && sameScope(sealed.entry.at, scope.at) && entryHash(sealed.entry) === sealed.hash && input?.type === "outcome" && input.operation === operation.id && input.attempt === attempt && input.owner === DESTINATION && input.kind === operation.kind && input.result === "confirmed" && input.evidence.basis === "own-answer" ? sealed : null;
+    return scope && sealed && sameScope(sealed.entry.at, scope.at) && entryHash(sealed.entry) === sealed.hash && input?.type === "outcome" && input.operation === operation.id && input.attempt === attempt && isOf(input.owner, OWNER) && input.kind === operation.kind && input.result === "confirmed" && input.evidence.basis === "own-answer" ? sealed : null;
   }
 
   #bound(request: EffectRequest): { operation: Operation; repository: DestinationRepository; ref: string } | null {
     const scope = this.#given.scope();
-    if (!scope || scope.at.kind !== "destination" || !sameScope(scope.at, request.scope) || this.#given.genesis()?.seed.definition !== DESTINATION || !this.accepts(request.owner, request.kind) || !isOperationId(request.operation) || !Number.isSafeInteger(request.attempt) || request.attempt < 1) return null;
+    if (!scope || scope.at.kind !== "destination" || !sameScope(scope.at, request.scope) || this.#given.genesis()?.seed.definition !== request.owner || !this.accepts(request.owner, request.kind) || !isOperationId(request.operation) || !Number.isSafeInteger(request.attempt) || request.attempt < 1) return null;
     const operation = this.#given.state.operation(request.operation);
     if (!operation || operation.owner !== request.owner || operation.kind !== request.kind || !operation.attempts.some((attempt) => attempt.attempt === request.attempt)) return null;
     const [seq, k] = request.operation.split(":").map(Number);
@@ -208,7 +283,8 @@ export class DestinationHost implements Outside {
     const target = destinationTarget(state, own, write);
     const mint = destinationMint(state, write, request.attempt);
     const credential = mint ? this.#options.custody.live(mint.id, 1, this.#given.clock.read()) : null;
-    if (!destinationSends(state, own, write, request.attempt) || !credential) return answer("refused", { send: "not-sent", seen: await this.#seen(repository, binding.ref) });
+    // After the driver's mark a local denial supplies no decisive host answer.
+    if (!destinationSends(state, own, write, request.attempt) || !credential) return request.sentAt === undefined ? answer("refused", { send: "not-sent", seen: await this.#seen(repository, binding.ref) }) : null;
     const format = await this.#options.provider.format(repository);
     if (format !== "sha1" && format !== "sha256") return null;
     let commit: string;
@@ -224,12 +300,10 @@ export class DestinationHost implements Outside {
       requireParentless = true;
     } else if (write.kind === DESTINATION_KINDS.firstHead) {
       commit = firstHeadCommit(state, own, write, format);
-      const claim = destinationBranch(state)?.refs["claim"];
-      const genesis = own(0)?.entry;
-      if (!genesis || !isFactRef(claim)) return null;
-      const founding = foundingObjects(format, genesis.at.scope, genesis.time, claim);
+      // The founding commit of the scope's own version: the empty tree at version 1, a README at version 2.
+      const founding = foundingOf(state, own, format);
       objects = commit === founding.commit ? founding.objects : await this.#options.provider.objects(repository, commit);
-      if (commit === founding.commit) { expectedTree = founding.objects[0]!.id; requireParentless = true; }
+      if (commit === founding.commit) { expectedTree = founding.objects.find((object) => object.kind === "tree")!.id; requireParentless = true; }
     } else {
       const head = destinationBranch(state)?.values["head"];
       const integration = target?.values["integration"];
@@ -239,22 +313,32 @@ export class DestinationHost implements Outside {
       // The confirmed reservation compared this tree with its retained manifest.
       const reservedAt = target?.values["reservedAt"];
       const reserved = typeof reservedAt === "number" ? own(reservedAt)?.entry.input : null;
-      const evidence = reserved?.type === "outcome" && reserved.owner === DESTINATION && reserved.kind === DESTINATION_KINDS.judge && reserved.result === "confirmed" && isRecordedJudgeEvidence(reserved.evidence.body) ? reserved.evidence.body : null;
+      const evidence = reserved?.type === "outcome" && isOf(reserved.owner, OWNER) && reserved.kind === DESTINATION_KINDS.judge && reserved.result === "confirmed" && isRecordedJudgeEvidence(reserved.evidence.body) ? reserved.evidence.body : null;
       const tree = evidence?.tree;
       if (!objectId(tree)) return null;
       expectedTree = tree;
-      objects = await this.#options.provider.objects(repository, commit);
+      const edit = target ? this.#edit(target) : null;
+      if (edit) {
+        // A one-file manifest: the objects that the reservation's tree and commit name, built again on the base's closure.
+        const time = typeof reservedAt === "number" ? own(reservedAt)?.entry.time : undefined;
+        if (time === undefined || edit.base !== head) return null;
+        const base = await this.#options.provider.objects(repository, edit.base);
+        const built = this.#build(format, base, edit, time);
+        if (!built || built.commit !== commit || built.tree !== tree) return null;
+        objects = [...new Map([...base, ...built.objects].map((object) => [object.id, object])).values()];
+      } else objects = await this.#options.provider.objects(repository, commit);
     }
     // Async preparation may have let a read or compromise close the target.
     const live = this.#options.custody.live(binding.mint, 1, this.#given.clock.read());
-    if (!destinationSends(state, own, write, request.attempt) || live?.id !== credential.id || live?.plaintext !== credential.plaintext) return answer("refused", { send: "not-sent", seen: await this.#seen(repository, binding.ref) });
+    if (!destinationSends(state, own, write, request.attempt) || live?.id !== credential.id || live?.plaintext !== credential.plaintext) return request.sentAt === undefined ? answer("refused", { send: "not-sent", seen: await this.#seen(repository, binding.ref) }) : null;
     const allowed = () => {
       const held = this.#options.custody.live(binding.mint, 1, this.#given.clock.read());
       return destinationSends(state, own, write, request.attempt) && held?.id === credential.id && held?.plaintext === credential.plaintext;
     };
-    const reply = members(await this.#options.provider.send({ repository, ref: binding.ref, old, commit, objects, ...(expectedTree === undefined ? {} : { expectedTree }), requireParentless, token: live.plaintext!, binding, allowed }), ["send"]);
+    const reply = members(await this.#options.provider.send({ repository, ref: binding.ref, old, commit, objects, ...(expectedTree === undefined ? {} : { expectedTree }), ...(request.sentAt === undefined ? {} : { sentAt: request.sentAt }), requireParentless, token: live.plaintext!, binding, allowed }), ["send"]);
     const sent = reply?.["send"];
     if (sent !== "accepted" && sent !== "refused" && sent !== "not-sent") return null;
+    if (sent === "not-sent" && request.sentAt !== undefined) return null;
     return answer(sent === "accepted" ? "confirmed" : "refused", { send: sent, seen: await this.#seen(repository, binding.ref) });
   }
 
@@ -274,10 +358,57 @@ export class DestinationHost implements Outside {
     const copy = parseStrict(kept.bytes) as unknown as Entry;
     return isEntryOf(copy, fact) ? copy : null;
   }
+  /** The publication whose `judge` is open. */
+  #judging(): Item | null {
+    const id = destinationBranch(this.#given.state)?.refs["judging"];
+    return typeof id === "number" ? this.#given.state.item(id) : null;
+  }
+  /** The one-file manifest of a publication, from the manifest's entry that its `reserve` retained, with its base and operation; null for any other manifest. */
+  #edit(publication: Item | null): { file: EditFile; base: string; operation: FactRef } | null {
+    const reserve = publication ? this.#given.own(publication.id)?.entry : null;
+    if (!publication || !reserve) return null;
+    const statement = destinationStatement(this.#given.own, publication);
+    const manifest = this.#fact(reserve, statement.manifest);
+    const file = fileOf(manifest);
+    const base = manifest?.input.type === "act" ? manifest.input.signed.intent.fields["base"] : null;
+    return file && objectId(base) ? { file, base, operation: statement.operation } : null;
+  }
+  /** The objects of a one-file edit on the base's closure, or null when the published tree does not let the file be written. */
+  #build(format: ObjectFormat, base: readonly DestinationObject[], edit: { file: EditFile; base: string; operation: FactRef }, time: Entry["time"]) {
+    const scope = this.#given.scope();
+    if (!scope) return null;
+    const read = new Map(base.map((object) => [object.id, object]));
+    return editObjects(format, (id) => read.get(id) ?? null, edit.base, edit.file.path, utf8(edit.file.content), { scope: scope.at.scope, time, operation: edit.operation });
+  }
+  /**
+   * The evidence of `judge` for a one-file manifest. The branch's head, as the host shows it. A path that no tree may hold, bytes
+   * that are not the ones the manifest states, and a published tree that does not let the file be written there give evidence that
+   * the integration is not present. Otherwise the base's closure with the file written is inspected as any integration is, by
+   * `inspectGit`: its tree, its first parent and its changed set.
+   */
+  async #inspectEdit(repository: DestinationRepository, ref: string, edit: { file: EditFile; base: string; operation: FactRef }): Promise<EffectAnswer | null> {
+    const seen = await this.#options.provider.ref(repository, ref);
+    const head = objectId(seen) ? seen : null;
+    const absent: RecordedJudgeEvidence = { head, present: false, tree: null, firstParent: null, ancestors: [], changes: null };
+    if (editPath(edit.file.path) === null || !fileSound(edit.file)) return answer("confirmed", absent);
+    const format = await this.#options.provider.format(repository);
+    const base = await this.#options.provider.objects(repository, edit.base);
+    // The commit's time is not judged here: the tree, the parent and the changed set do not depend on it.
+    const built = this.#build(format, base, edit, this.#given.clock.read());
+    if (!built) return answer("confirmed", absent);
+    const objects = new Map([...base, ...built.objects].map((object) => [object.id, object]));
+    const source: GitSource = {
+      object: async (id) => { const object = objects.get(id); return object ? { type: object.kind, size: object.body.length, data: new Uint8Array(object.body) } : null; },
+      ref: async (name) => (name === ref ? head : null),
+      refs: async () => { throw new GitRefusal("unreadable", "an edit's inspection lists no refs"); },
+    };
+    const branch = destinationBranch(this.#given.state)?.values["head"];
+    const reply = await inspectGit(new Reader(source, READ_BOUNDS), { repository, ref, recorded: objectId(branch) ? branch : null, base: edit.base, integration: built.commit, tree: built.tree, reports: [] });
+    return isRecordedJudgeEvidence(reply.evidence) ? { ...answer("confirmed", reply.evidence), ...(reply.retain === undefined ? {} : { retain: reply.retain }) } : null;
+  }
   #inspection(repository: DestinationRepository, ref: string): DestinationInspection | null {
     const branch = destinationBranch(this.#given.state);
-    const id = branch?.refs["judging"];
-    const publication = typeof id === "number" ? this.#given.state.item(id) : null;
+    const publication = this.#judging();
     if (!publication) return null;
     const statement = destinationStatement(this.#given.own, publication);
     const reserve = this.#given.own(publication.id)?.entry;

@@ -1,5 +1,5 @@
 /**
- * `platform:directory@1`, as data, with its rules (authority note, sections
+ * `platform:directory@1` and `@2`, as data, with their rules (authority note, sections
  * 3.8 and 12.1.2; its table of marks, section 12.1.8, rows 7 to 13, a, d, l
  * and s to u). One directory for a repository. It creates the repository's
  * scopes and its lanes, allocates numbers, and keeps one index row for each
@@ -61,13 +61,25 @@
  * plan owns. They are written as the note has them.
  */
 
-import type { Digest, FactRef, FieldValue, Grant, MemberObservation, MemberRef, PlatformData, RulesObservation, ScopeId, ScopeRef, Seed } from "@generalbusiness/artroom-contract";
+import type { Digest, FactRef, FieldValue, Grant, MemberObservation, MemberRef, PlatformData, PlatformDefinition, RulesObservation, ScopeId, ScopeRef, Seed } from "@generalbusiness/artroom-contract";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import { intentDigest, isDigest, scopeIdOf, seedDigest } from "@generalbusiness/artroom-bytes";
 import { PROFILES, isObject, isScopeRef, same, validateDefinition, type Item, type Operation, type RuleEffect, type RuleGiven, type Rules, type StateView } from "@generalbusiness/artroom-derive";
 import { CREATION_ATTEMPTS, DIRECTORY, REPOSITORY } from "./register.ts";
+import { isOf, pinnedBy } from "./versions.ts";
 
 export { DIRECTORY };
+
+/**
+ * The versions of the directory that this package serves, each with the
+ * definitions of the three scopes that its genesis creates. Version 2
+ * founds them on the second version of each. Both versions retain the
+ * definition-byte places shipped by actual main at1eed91aa.
+ */
+export const SIBLINGS_OF: Readonly<Record<string, { membership: PlatformDefinition; rules: PlatformDefinition; destination: PlatformDefinition }>> = {
+  "platform:directory@1": { membership: "platform:membership@1", rules: "platform:rules@1", destination: "platform:destination@1" },
+  "platform:directory@2": { membership: "platform:membership@2", rules: "platform:rules@2", destination: "platform:destination@2" },
+};
 
 /** The bound on the attempts of the import that a founding opens (section 12.1.2, the row `establish`; U9). */
 export const IMPORT_ATTEMPTS = CREATION_ATTEMPTS;
@@ -92,19 +104,21 @@ const REPOSITORY_ITEM = { repository: { item: "repository", one: true } } as con
  */
 export const SEEN = ["title", "state", "draft", "merge", "labels", "assignees"] as const;
 
-/** The fields of the two acts that open a lane, beside those of the lane's own genesis. */
-const opening = {
+/** The fields of the two acts that open a lane, beside those of the lane's own genesis, as version 1 states them. */
+const opening1 = {
   // The definition under which the lane is created: a digest that the rules scope holds as `active`.
-  // Its bytes come beside the intent at this stated place, in the domain of a definition, so that the runtime reads them for the
-  // guard `definition-active` and the entry retains them for the lane it creates (the contract's section 6.2, revision 19).
+  // Actual main1eed already shipped this value place for both lane-opening acts.
   definition: { type: "digest", required: true, value: { domain: DEFINITION_DOMAIN, max: PROPOSED_BOUNDS.definitionBytes } },
   title: { ...NAME, required: true },
   // A detached text, which travels beside the intent and reaches the lane by its digest.
   body: { type: "text", max: 65536, detached: true, required: false },
 } as const;
 
+/** Version 2 uses the same supported definition-byte input/retention contract. */
+const opening2 = opening1;
+
 /** `open-issue` and `open-pr`: an act that opens a `lane` row and sends the one `create` of a lane under the digest that the field `definition` names. */
-const opens = (kind: "issue" | "pr"): PlatformData["acts"][string] => ({
+const opens = (kind: "issue" | "pr", opening: typeof opening1 | typeof opening2): PlatformData["acts"][string] => ({
   step: "open", on: "lane", grant: kind === "issue" ? "issue.open" : "change.open",
   also: REPOSITORY_ITEM,
   // The fields that the lane's genesis takes from the act are those of the two pinned lane definitions (I3 deltas, entry EP8).
@@ -256,8 +270,8 @@ export const directory: PlatformData = {
       attention: [],
     },
     // `open-issue` and `open-pr`: an act. Grant `issue.open` or `change.open`. It opens `lane`.
-    "open-issue": opens("issue"),
-    "open-pr": opens("pr"),
+    "open-issue": opens("issue", opening1),
+    "open-pr": opens("pr", opening1),
     // `open-task`: an act. Grant `task.control`, as the task's controller or as an admin. It opens `task`, `creating`. The task
     // definition is IA's, so this package cannot run a scope under it: the row is built, and its scope is not.
     "open-task": {
@@ -349,6 +363,27 @@ export const directory: PlatformData = {
   outcomes: { import: { code: "import", row: "P16", send: { code: "import-update", row: "P16", result: {} } } },
 };
 
+/**
+ * `platform:directory@2`: version 1 with the newer child cohort. Its genesis creates
+ * membership under `platform:membership@2` (the rules scope and the
+ * destination follow from `SIBLINGS_OF`, by the rules of the two send
+ * marks), and sends the founder handle for the destination's README.
+ * Both versions preserve actual main's definition-byte places.
+ */
+const establish1 = directory.acts["establish"]!;
+export const directory2: PlatformData = {
+  ...directory,
+  acts: {
+    ...directory.acts,
+    establish: {
+      ...establish1,
+      sends: establish1.sends.map((send) => ("create" in send && send.create.kind === "membership" ? { create: { ...send.create, definition: SIBLINGS_OF["platform:directory@2"]!.membership } } : send)),
+    },
+    "open-issue": opens("issue", opening2),
+    "open-pr": opens("pr", opening2),
+  },
+};
+
 // ---------------------------------------------------------------- reading the directory's state
 
 const PAGE = 100;
@@ -418,14 +453,14 @@ const repositoryAt = (given: RuleGiven): Item => {
 const SIBLINGS = { membership: 0, rules: 1, destination: 2 } as const;
 const sibling = ({ input, resolved }: RuleGiven, kind: keyof typeof SIBLINGS): Seed => {
   if (input.type !== "genesis") throw new Error("a sibling is a scope that the genesis creates");
-  return { v: 1, kind, definition: `platform:${kind}@1`, creator: resolved.at, cause: seedDigest(input.seed), ordinal: SIBLINGS[kind] };
+  return { v: 1, kind, definition: SIBLINGS_OF[input.seed.definition]![kind], creator: resolved.at, cause: seedDigest(input.seed), ordinal: SIBLINGS[kind] };
 };
 /** A sibling's scope ID: the contract's `ScopeId` of the sibling's seed, the text `sc_` and the 52 base32 characters of the seed's digest. It is not the bare digest. */
 const siblingId = (given: RuleGiven, kind: keyof typeof SIBLINGS): ScopeId => scopeIdOf(sibling(given, kind));
 
 /** The effects that open one operation of this definition in the entry being written, at ordinal 0, with its attempt 1. */
-const opened = (kind: string, attempts: number): RuleEffect[] => [
-  { effect: "operation", k: 0, owner: DIRECTORY, kind, attempts },
+const opened = (given: RuleGiven, kind: string, attempts: number): RuleEffect[] => [
+  { effect: "operation", k: 0, owner: pinnedBy(given), kind, attempts },
   { effect: "attempt", operation: { k: 0 }, attempt: 1, result: "opened", selected: null },
 ];
 
@@ -472,7 +507,7 @@ export const directoryRules: Rules = {
    */
   "open-import": {
     place: "effect", most: 2,
-    run: (given) => (typeof repositoryOf(given.state)?.values["import"] === "string" ? opened("import", IMPORT_ATTEMPTS) : []),
+    run: (given) => (typeof repositoryOf(given.state)?.values["import"] === "string" ? opened(given, "import", IMPORT_ATTEMPTS) : []),
   },
   /**
    * Row 8, among the effects of `open-issue` and `open-pr` (P17). It reads
@@ -568,7 +603,7 @@ export const directoryRules: Rules = {
    * Row 11, among the effects of `retry-import` (P16). An `operation`
    * effect, `import`, with 1 attempt, and its attempt 1 (G3).
    */
-  "reopen-import": { place: "effect", most: 2, run: () => opened("import", 1) },
+  "reopen-import": { place: "effect", most: 2, run: (given) => opened(given, "import", 1) },
   /**
    * Row u, the one guard of `retry-import` (P29), as the note's revision 25
    * decides it (section 12.1.2, "The guard of `retry-import`"; I3 delta
@@ -599,7 +634,7 @@ export const directoryRules: Rules = {
         const entry = own(seq)?.entry;
         if (!entry) return refused;
         for (const effect of entry.effects) {
-          if (effect.effect !== "operation" || effect.owner !== DIRECTORY || effect.kind !== "import") continue;
+          if (effect.effect !== "operation" || !isOf(effect.owner, "platform:directory") || effect.kind !== "import") continue;
           const operation = state.operation(`${seq}:${effect.k}`);
           if (!operation || operation.attempts.length < operation.most || operation.attempts.some((attempt) => attempt.outcomes.length === 0)) return refused;
           imports++;
@@ -744,7 +779,13 @@ export const directoryRules: Rules = {
         to: sibling(given, "destination"),
         message: {
           class: "request", type: "create",
-          body: { fields: { repository: fields["repository"], branch: fields["branch"], import: fields["import"] !== undefined, claim: fields["claim"], directory: at, membership: siblingId(given, "membership"), rules: siblingId(given, "rules") } },
+          body: {
+            fields: {
+              repository: fields["repository"], branch: fields["branch"], import: fields["import"] !== undefined, claim: fields["claim"], directory: at, membership: siblingId(given, "membership"), rules: siblingId(given, "rules"),
+              // Version 2: the founder's handle, which the destination's founding commit names in its README.
+              ...(pinnedBy(given) === "platform:directory@1" ? {} : { founderHandle: fields["founderHandle"] }),
+            },
+          },
         },
       };
     },

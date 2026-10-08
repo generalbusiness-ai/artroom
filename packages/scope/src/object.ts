@@ -110,6 +110,7 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
   /** The roots of this scope's cause chains, each found once (`signed-reads.ts`). */
   readonly #chains: Chains;
   readonly #signed: SignedReading;
+  readonly #outside: Outside;
   readonly #readers: Readers;
   /** True until this object's first turn: its first call or its alarm (`#first`). In memory, so a restart sets it again. */
   #fresh = true;
@@ -184,6 +185,7 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
     this.#dispatcher = given.transport ? new Dispatcher(this.#scope, store, { transport: given.transport, clock: ports.clock, capabilities: ports.capabilities }, wakes, bounds) : null;
     this.#operations = new Operations(this.#scope, store, ports, wakes, bounds, (operation, attempt, seq) => { record.found("outcome-conflict", [{ operation, attempt }, { entry: seq }]); });
     this.#clock = ports.clock;
+    this.#outside = ports.outside;
     this.#transport = given.transport;
     this.#seconds = bounds.dispatchSeconds;
     this.#record = record;
@@ -225,10 +227,14 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
    * caller does not wait for, if an attempt is recorded and has no time to be looked at next (`Store.parked`). Such an attempt
    * asks for no wake-up (`operations.ts`, rule 7), so without this pass it waits for the next commit. So a deployment whose outside
    * port changed, as when the Git host's settings are added, and which is restarted, sends what it recorded and did not send, at
-   * the first call that reaches the object. The pass sends nothing twice: an attempt marked sent is never sent again.
+   * the first call that reaches the object. Later calls also retry an unsent attempt when the configured outside port
+   * accepts it again. The pass sends nothing twice: an attempt marked sent is never sent again.
    */
   #first(): void {
-    if (!this.#fresh) return;
+    if (!this.#fresh) {
+      if (this.#operations.reaccepted()) this.ctx.waitUntil(this.#operations.run().catch(() => 0));
+      return;
+    }
     this.#fresh = false;
     if (this.#store.parked(null, 1).length > 0) this.ctx.waitUntil(this.#operations.run().catch(() => 0));
   }
@@ -361,4 +367,20 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
   async retained(reader: unknown, kind: RetainedInput["kind"], digest: Digest, domain?: string): Promise<Read<RetainedInput>> { this.#first(); await this.#prepared(reader, "retained"); await this.#rooted(reader, "retained", retainedReadArgument(kind, digest, domain)); return this.#reads.retained(reader, kind, digest, domain); }
   async incidents(reader: unknown, cursor?: Cursor): Promise<Read<readonly Incident[]>> { this.#first(); await this.#prepared(reader, "incidents"); return this.#reads.incidents(reader, cursor); }
   async waiting(reader: unknown, list: "diagnosed" | "unanswered", cursor?: Cursor): Promise<Read<readonly Duty[]>> { this.#first(); await this.#prepared(reader, "waiting"); return this.#reads.waiting(reader, list, cursor); }
+
+  /**
+   * The one-time read of a member's read token at a destination, by its handle (the planner's decision for I5). Only a session
+   * may read it, and only the session of the key that signed the `read-token` act whose `mint-read` minted it; the outside port
+   * judges the rest, and drops the plaintext as it answers. A second read, another key's session, a read after the end, a
+   * handle that names nothing and a scope that is no destination are each `forbidden`. Nothing is written.
+   */
+  async credential(reader: unknown, handle: unknown): Promise<Read<{ token: string; ends: string; remote: string }>> {
+    this.#first();
+    await this.#prepared(reader, "credential");
+    const key = this.#readers.holder?.(reader, "credential") ?? false;
+    if (key === "sessions-unavailable" || key === "clock-behind") return { ok: false, reason: key };
+    const scope = this.#store.scope();
+    const answer = key !== false && typeof handle === "string" && scope?.at.kind === "destination" ? this.#outside.credential?.(handle, key) ?? null : null;
+    return answer && scope ? { ok: true, at: scope.head, value: answer, complete: true } : { ok: false, reason: "forbidden" };
+  }
 }

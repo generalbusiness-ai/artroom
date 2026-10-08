@@ -1,5 +1,5 @@
 /**
- * `platform:membership@1`, as data, with its rules and its answer to an
+ * `platform:membership@1` and `@2`, as data, with their rules and their answer to an
  * observation (authority note, revision 24, sections 3.1 to 3.3, 3.6 and
  * 12.1.3; its table of marks, section 12.1.8, rows 14 to 26, g to i and o
  * to q). One
@@ -53,9 +53,17 @@ import type { HoldersObservation, KeyId, MemberId, MemberObservation, Observatio
 import { textDigest } from "@generalbusiness/artroom-bytes";
 import { firstHolders } from "@generalbusiness/artroom-derive";
 import type { Item, PlatformRule, RuleGiven, Rules, StateView } from "@generalbusiness/artroom-derive";
+import { pinnedBy } from "./versions.ts";
 
-/** The name and version that this data and these rules are. An observation states it (section 3.3). */
-export const MEMBERSHIP = "platform:membership@1" satisfies PlatformDefinition;
+/**
+ * The versions of membership that this package serves. The data of both is
+ * the same. Version 2 differs in its rule `role-table`: every role's first
+ * list holds `destination.read-token` (`FIRST_ACTIONS_OF`). An observation
+ * states the version of the scope that answers it (section 3.3).
+ */
+export const MEMBERSHIP_1 = "platform:membership@1" satisfies PlatformDefinition;
+/** The newest version of membership: the one that a directory of the newest version creates. */
+export const MEMBERSHIP = "platform:membership@2" satisfies PlatformDefinition;
 
 const KEY = { type: "text", max: 64 } as const;
 const HANDLE = { type: "text", max: 256 } as const;
@@ -104,7 +112,7 @@ export type Role = keyof typeof ROLE_LISTS;
  * `rules.activate`. A cell with a condition on one task lists the action:
  * the condition is a guard of the acting scope's own row (section 3.3).
  */
-export const ROLE_TABLE: readonly (readonly [actions: readonly string[], roles: readonly Role[]])[] = [
+const ROLE_TABLE_1: readonly (readonly [actions: readonly string[], roles: readonly Role[]])[] = [
   [["issue.open", "issue.comment", "issue.edit-own", "issue.close-own", "issue.revise", "issue.judge"], ["admin", "maintainer", "member", "agent"]],
   [["issue.request", "issue.promise", "issue.work"], ["admin", "maintainer", "member", "agent"]],
   [["issue.plan", "issue.triage", "issue.edit-any"], ["admin", "maintainer"]],
@@ -120,6 +128,19 @@ export const ROLE_TABLE: readonly (readonly [actions: readonly string[], roles: 
   [["inbox.own"], ["admin", "maintainer", "member", "agent", "checker"]],
 ];
 
+/**
+ * The table of version 2: version 1's, and one row more. The planner's
+ * decision for I5: any active member may sign the destination's
+ * `read-token`, so the grant names every role.
+ */
+export const ROLE_TABLE: readonly (readonly [actions: readonly string[], roles: readonly Role[]])[] = [
+  ...ROLE_TABLE_1,
+  [["destination.read-token"], ["admin", "maintainer", "member", "agent", "checker"]],
+];
+
+/** The table of each version. */
+export const ROLE_TABLE_OF: Readonly<Record<string, typeof ROLE_TABLE>> = { [MEMBERSHIP_1]: ROLE_TABLE_1, [MEMBERSHIP]: ROLE_TABLE };
+
 /** The actions that the table of section 3.2 gives one role, in the order of its rows. */
 export const actionsIn = (role: Role): string[] => ROLE_TABLE.flatMap(([actions, roles]) => (roles.includes(role) ? actions : []));
 
@@ -133,10 +154,10 @@ const CHANGE_MERGE = ["change.edit-any", "change.dismiss", "change.merge"] as co
  * table, counted", row for row, with the names in the order of that table.
  * An admin has 34 actions, a maintainer 25, a member 22, an agent 18 and a
  * checker 2. It is a constant of version 1, and part of the rule
- * `role-table` (section 12.1.8, row o). `ROLE_TABLE`, above, is the table
- * that the note counts them from, and a test holds the two together.
+ * `role-table` (section 12.1.8, row o). `ROLE_TABLE_1`, above, is the
+ * table that the note counts them from, and a test holds the two together.
  */
-export const FIRST_ACTIONS: { readonly [role in Role]: readonly string[] } = {
+const FIRST_ACTIONS_1: { readonly [role in Role]: readonly string[] } = {
   admin: [
     ...ISSUE_WORK, ...ISSUE_PLAN, ...CHANGE_WORK, "change.review", ...CHANGE_MERGE, "work.export", "task.control", "task.read-private",
     "membership.invite", "membership.manage", "rules.publish", "rules.activate", "destination.adopt", "ledger.retry", "task.operate", "inbox.own",
@@ -146,6 +167,18 @@ export const FIRST_ACTIONS: { readonly [role in Role]: readonly string[] } = {
   agent: [...ISSUE_WORK, ...CHANGE_WORK, "task.operate", "inbox.own"],
   checker: ["change.check", "inbox.own"],
 };
+
+/** The first lists of version 2: each of version 1's, and `destination.read-token` last, as the row of `ROLE_TABLE` that adds it. */
+export const FIRST_ACTIONS: { readonly [role in Role]: readonly string[] } = {
+  admin: [...FIRST_ACTIONS_1.admin, "destination.read-token"],
+  maintainer: [...FIRST_ACTIONS_1.maintainer, "destination.read-token"],
+  member: [...FIRST_ACTIONS_1.member, "destination.read-token"],
+  agent: [...FIRST_ACTIONS_1.agent, "destination.read-token"],
+  checker: [...FIRST_ACTIONS_1.checker, "destination.read-token"],
+};
+
+/** The first lists of each version. */
+export const FIRST_ACTIONS_OF: Readonly<Record<string, typeof FIRST_ACTIONS>> = { [MEMBERSHIP_1]: FIRST_ACTIONS_1, [MEMBERSHIP]: FIRST_ACTIONS };
 
 /**
  * The form of a handle (section 3.1; section 12.1.8, rows q and r): `@`,
@@ -681,7 +714,7 @@ export const membershipRules: Rules = {
    */
   "role-table": {
     place: "effect", most: 5,
-    run: ({ resolved }) => (Object.keys(ROLE_LISTS) as Role[]).map((role) => ({ effect: "value", item: resolved.self, slot: ROLE_LISTS[role], value: [...FIRST_ACTIONS[role]] })),
+    run: (given) => (Object.keys(ROLE_LISTS) as Role[]).map((role) => ({ effect: "value", item: given.resolved.self, slot: ROLE_LISTS[role], value: [...FIRST_ACTIONS_OF[pinnedBy(given)]![role]] })),
   },
   /**
    * Row p, among the effects of `seat`, `invite-member` and `add-member`
@@ -770,15 +803,16 @@ export const NO_MEMBER = "@-" satisfies MemberId;
  *
  * `within` names the scopes of this repository: this membership scope, with
  * its incarnation. No grant of membership has an end time, so `notAfter`
- * is null.
+ * is null. `definition` is the version that the scope pinned at its
+ * genesis, which the answer states.
  */
-export function standingOf(state: Pick<StateView, "scope" | "page" | "item">, asked: ObservationRequest): Omit<Observation, "at"> | Omit<MemberObservation, "at"> | Omit<HoldersObservation, "at"> | null {
+export function standingOf(state: Pick<StateView, "scope" | "page" | "item">, asked: ObservationRequest, definition: PlatformDefinition): Omit<Observation, "at"> | Omit<MemberObservation, "at"> | Omit<HoldersObservation, "at"> | null {
   const scope = state.scope();
   // A request that states an incarnation is answered by that incarnation only. One that asks by the scope ID alone, as the first read
   // of a rules scope or of a destination does, is answered by the scope that holds the name: the answer's `of` says which.
   if (!scope || scope.status !== "active" || scope.at.kind !== "membership" || asked.of.scope !== scope.at.scope || ("inc" in asked.of && asked.of.inc !== scope.at.inc) || asked.of.kind !== scope.at.kind) return null;
   const of: ScopeRef = scope.at;
-  const common = { of, head: scope.head, definition: MEMBERSHIP } as const;
+  const common = { of, head: scope.head, definition } as const;
   const roster = rosterOf(state);
   /** For an agent: its controller, and whether that member is active and has an active key. */
   const controlled = (member: Item): { controller: MemberId | null; controllerActive: boolean | null } => {

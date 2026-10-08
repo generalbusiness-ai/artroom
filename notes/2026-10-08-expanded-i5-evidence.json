@@ -1,0 +1,449 @@
+{
+  "purpose": "Delivery metadata, not authority, readiness or independent Source approval",
+  "gate": {
+    "head": "4db66d8f9534926c4167d57df2aef307794a784f",
+    "tree": "9369c4ef66e4bd81fa69dd1a3b22fc1332198c23",
+    "reported_exit": 0,
+    "vitest_files_passed": 133,
+    "vitest_passed": 844,
+    "opt_in_recorders_skipped": 2,
+    "active_source_passed": 6,
+    "runtime_diagnostic": "None emitted in the complete current raw test log; earlier native/timeout causes remain unexplained"
+  },
+  "evidence_head_before_this_note": "4db66d8f9534926c4167d57df2aef307794a784f",
+  "package_tree": "079d37fb03d0fc8ba05ffffac68ef4ce73173361",
+  "gated_package_tree": "079d37fb03d0fc8ba05ffffac68ef4ce73173361",
+  "changes_since_gate_before_this_note": [
+    "notes/2026-10-08-expanded-i5-delivery.md"
+  ],
+  "records": [
+    {
+      "path": "/tmp/artroom-expanded-corrected-gate.log",
+      "bytes": 503,
+      "sha256": "6cf6aa626a251528b275632605858ec7d01efe2d9d53190997651a84ae5a1a9a"
+    },
+    {
+      "path": "/tmp/artroom-expanded-final-gate.log",
+      "bytes": 2855,
+      "sha256": "d0619857419be5ff028ee7b905081f5ac59e63108dfb1094de7732c6b44571f0"
+    },
+    {
+      "path": "/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.xVtOoQ6ngJ/whitespace.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.xVtOoQ6ngJ/typecheck.log",
+      "bytes": 1510,
+      "sha256": "b05ed3728460487c42438640e0ac5e1f38c1944c2c38137be5294ffcecabf447"
+    },
+    {
+      "path": "/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.xVtOoQ6ngJ/test.log",
+      "bytes": 2071,
+      "sha256": "c8a62477987177728eab2c02b8c227f06090c550f2629b705888ae723de44d18"
+    },
+    {
+      "path": "/tmp/artroom-operations-runtime-isolation-evidence.json",
+      "bytes": 15339,
+      "sha256": "3ebc28466c34de0932e16a5211d03e61c3bcf7633f487b51e8968341168103b7"
+    },
+    {
+      "path": "/tmp/artroom-native-stack-capture/evidence.json",
+      "bytes": 6470,
+      "sha256": "d321421e686362fe6339a35b05932fa43129fd77be910f31ae836b0dc4d54b7f"
+    },
+    {
+      "path": "/tmp/artroom-expanded-reacceptance-evidence.json",
+      "bytes": 3214,
+      "sha256": "38add56bb09c96e1be2d42dab19aadf098895df22d60f3d35159979268586d94"
+    },
+    {
+      "path": "/tmp/artroom-expanded-demo-contract-evidence.json",
+      "bytes": 3717,
+      "sha256": "a2a67f80ae0c7b68590aea11aac17f3e63f18fbdfa04698ae98412edd11a8ffe"
+    },
+    {
+      "path": "/tmp/artroom-expanded-link-repair-gate.log",
+      "bytes": 503,
+      "sha256": "f00d1754910dc9a8da4e6f553fd36520eefa5880e48d8b14b5d26a0bf88e3d9b"
+    },
+    {
+      "path": "/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.euI035W1FD/whitespace.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.euI035W1FD/typecheck.log",
+      "bytes": 1510,
+      "sha256": "b05ed3728460487c42438640e0ac5e1f38c1944c2c38137be5294ffcecabf447"
+    },
+    {
+      "path": "/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.euI035W1FD/test.log",
+      "bytes": 1080,
+      "sha256": "beb15a2e678d5322896519c6b80c457d9e981362a718b04d031886ac11ce4ff9"
+    },
+    {
+      "path": "/tmp/artroom-edit-link-result-evidence/focused-final.log",
+      "bytes": 222,
+      "sha256": "46cbdeb1d63a68a088ebf80528aaf3e1f6b4013ef54137e3f1cbeecc6178387a"
+    },
+    {
+      "path": "/tmp/artroom-edit-link-result-evidence/control.log",
+      "bytes": 2877,
+      "sha256": "b0540c8b56701df7d98fcbafae4852a3225c45a2a2c768e341c51694a9ce3600"
+    },
+    {
+      "path": "/tmp/artroom-edit-link-result-evidence/cli-types.log",
+      "bytes": 137,
+      "sha256": "b071fdcd2a1b9f41028faa45b00336ae371e0f884cc193f14edfaf8c03d0b11f"
+    },
+    {
+      "path": "/tmp/artroom-edit-link-result-evidence/scope-types.log",
+      "bytes": 151,
+      "sha256": "4df6218037a0d03e53f31b1b9e167db9e850ff75810f379cc9c2e0e16ae594e1"
+    },
+    {
+      "path": "/tmp/artroom-edit-link-result-evidence/preservation.json",
+      "bytes": 120,
+      "sha256": "34ddbe460fb2e1aa7a90dad1fc81bc1973d45a421aca19217e001f6cbaaa410c"
+    },
+    {
+      "path": "/tmp/artroom-edit-link-result-evidence/source-hashes.json",
+      "bytes": 562,
+      "sha256": "8ae2261a7342e7a80ebf641c2fc28c9b7cecfdeaa3707bc4331338b661cf7270"
+    },
+    {
+      "path": "/tmp/artroom-expanded-six-repairs-final-gate.log",
+      "bytes": 503,
+      "sha256": "b34b008ce79c580736127869507e137766d9d60608603c929d7c3a2a61973110"
+    },
+    {
+      "path": "/tmp/artroom-expanded-six-repairs-gate.log",
+      "bytes": 667,
+      "sha256": "3d0d4d50c7d035f4da83b58ffe86a2f04f614e21c977864eff60d333481960a9"
+    },
+    {
+      "path": "/tmp/artroom-expanded-recorder-contract.log",
+      "bytes": 808261,
+      "sha256": "7cfe141e9ea1c9f2b5b72cff907a0fe684989be1003999a9f3b03814787782a2",
+      "scope": "Opt-in producer recording; encoded generated-key/body payload is hash-only review evidence, not browser/current PNG proof"
+    },
+    {
+      "path": "/tmp/artroom-expanded-answer-settings-composed.log",
+      "bytes": 222,
+      "sha256": "47dd3ce5d4d6d0643eade18c9bb5080a7a5722c17930ca473468183436ed60b7"
+    },
+    {
+      "path": "/tmp/artroom-expanded-six-repairs-build.log",
+      "bytes": 188,
+      "sha256": "40404738ea0db8d80536340d65cb7108260e1cf4dc22d183f959dc6bfce45eb9"
+    },
+    {
+      "path": "/tmp/artroom-expanded-six-repairs-assets.log",
+      "bytes": 216,
+      "sha256": "0ad612ce0933b4e2bf2e3f36b2f5b65af588df572ac0028c4dce758d8ae5bfd0"
+    },
+    {
+      "path": "/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.kshoakKxWj/whitespace.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.kshoakKxWj/typecheck.log",
+      "bytes": 1510,
+      "sha256": "b05ed3728460487c42438640e0ac5e1f38c1944c2c38137be5294ffcecabf447"
+    },
+    {
+      "path": "/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.kshoakKxWj/test.log",
+      "bytes": 1081,
+      "sha256": "2a54e707ed45f780c7ca1daa073db38986e551430380added098599b6e3287bd"
+    },
+    {
+      "path": "/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.KDwIGkDexh/whitespace.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.KDwIGkDexh/typecheck.log",
+      "bytes": 1510,
+      "sha256": "b05ed3728460487c42438640e0ac5e1f38c1944c2c38137be5294ffcecabf447"
+    },
+    {
+      "path": "/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.KDwIGkDexh/test.log",
+      "bytes": 122,
+      "sha256": "5156083944dbf6da2c4ec182f4463b294517055ba760655bf14f3afb6cd97f2e"
+    },
+    {
+      "path": "/tmp/artroom-f1-evidence/native-ledger.json",
+      "bytes": 3183,
+      "sha256": "e0add6510ff170dbdb151dd2c644aa782f88572594d12c9e199956ecf782c8b1"
+    },
+    {
+      "path": "/tmp/artroom-f1-evidence/focused.log",
+      "bytes": 222,
+      "sha256": "aa5631e88fa4d69bd986720aacfbf9fc533c920b6a0841bda5a51ec08c3320c5"
+    },
+    {
+      "path": "/tmp/artroom-f1-evidence/types.log",
+      "bytes": 263,
+      "sha256": "8988147af473bdbaab3ece05b4354b6a4ecbdac64ba7add32a576f99af0e3d0b"
+    },
+    {
+      "path": "/tmp/artroom-f1-evidence/control-native-value.log",
+      "bytes": 2974,
+      "sha256": "5882c0802a5f77a3b011ce1b9c7be30fcfc9228063d2bf19e3616681d1e4cd00"
+    },
+    {
+      "path": "/tmp/artroom-site-repository-identity-evidence.json",
+      "bytes": 7285,
+      "sha256": "6edbd59e8bbdc1a5d7267495cdaa63b494a14bd11e3e95702e2e8e40653cea73"
+    },
+    {
+      "path": "/tmp/artroom-answer-guidance-evidence/preservation.json",
+      "bytes": 166,
+      "sha256": "38b814a2133f5fec48783508aa08552d07515df0399f4ca6f710d92ac5ccc2db"
+    },
+    {
+      "path": "/tmp/artroom-answer-guidance-evidence/source-hashes.json",
+      "bytes": 2521,
+      "sha256": "f0fc63209612a879909a78e46c47ff77e4f7c3ed75f7e65c4654df8d2163cc42"
+    },
+    {
+      "path": "/tmp/artroom-answer-guidance-evidence/log-hashes.json",
+      "bytes": 822,
+      "sha256": "c64f80e7736c4f56a2087ef63d578d8aa9f3b22297f6b2d42bb4a3391710f8be"
+    },
+    {
+      "path": "/tmp/artroom-answer-guidance-evidence/affected-final.log",
+      "bytes": 228,
+      "sha256": "e9433b77e4796fbdf56c3ef284671f480148c85f59b9c07203109e55dc3251e4"
+    },
+    {
+      "path": "/tmp/artroom-answer-guidance-evidence/join-typed-final.log",
+      "bytes": 227,
+      "sha256": "0e19af3308ab151aa5bbd4a3c7fb79115ad49d40ed6d1b3bc5e1f5715ac2d4cd"
+    },
+    {
+      "path": "/tmp/artroom-answer-guidance-evidence/cli-types.log",
+      "bytes": 137,
+      "sha256": "b071fdcd2a1b9f41028faa45b00336ae371e0f884cc193f14edfaf8c03d0b11f"
+    },
+    {
+      "path": "/tmp/artroom-answer-guidance-evidence/page-types-pass.log",
+      "bytes": 138,
+      "sha256": "413fd38923414e740a3ea5ed91f3e7ed87143234f57629c0165b8e10f183343b"
+    },
+    {
+      "path": "/tmp/artroom-answer-guidance-evidence/focused.log",
+      "bytes": 3593,
+      "sha256": "4a95ea8581e7aaecf1dbcf2a1861235e4f82a8242425bb874b7aa555d1828034"
+    },
+    {
+      "path": "/tmp/artroom-answer-guidance-evidence/page-types.log",
+      "bytes": 684,
+      "sha256": "182097f83993613834bff34469d3dece7c670b51b6e1aec9b9c96fb0ee87fb4e"
+    },
+    {
+      "path": "/tmp/artroom-answer-guidance-evidence/page-types-final.log",
+      "bytes": 3884,
+      "sha256": "d1a129672774d33ac444f5c4af5b324560894135c1a786b26750b811442ee753"
+    },
+    {
+      "path": "/tmp/artroom-answer-guidance-evidence/page-types-corrected.log",
+      "bytes": 950,
+      "sha256": "8c9a5ad3f8913145fa624a8184a2828af374650e90f1b780ca2af4f853b67539"
+    },
+    {
+      "path": "/tmp/artroom-page-service-setting-focused.log",
+      "bytes": 225,
+      "sha256": "f4c2a64c46772d21f9894a8437736075b44b7d146b0454f22f9c4df3e53b12bb"
+    },
+    {
+      "path": "/tmp/artroom-page-service-setting-control.log",
+      "bytes": 1925,
+      "sha256": "8a85e69cd144f96f20b7a9be47aba532519952677be4d20bdf7325c2e259c2ce"
+    },
+    {
+      "path": "/tmp/artroom-page-service-setting-types.log",
+      "bytes": 138,
+      "sha256": "413fd38923414e740a3ea5ed91f3e7ed87143234f57629c0165b8e10f183343b"
+    },
+    {
+      "path": "/tmp/artroom-site-route-f4-focused-corrected.log",
+      "bytes": 351,
+      "sha256": "42807691beb55baad9c851b0d744edac6b34ba161db102f8fef77c5561f0110f"
+    },
+    {
+      "path": "/tmp/artroom-site-route-f4-types-corrected.log",
+      "bytes": 151,
+      "sha256": "4df6218037a0d03e53f31b1b9e167db9e850ff75810f379cc9c2e0e16ae594e1"
+    },
+    {
+      "path": "/tmp/artroom-site-route-f4-control.log",
+      "bytes": 1812,
+      "sha256": "3cfa20cada91ad249ed3c611f9d9b7e7a415f6483e93f18665bdfc9057ff5a9a"
+    },
+    {
+      "path": "/tmp/artroom-site-route-f4-focused.log",
+      "bytes": 10758,
+      "sha256": "1724c935c018fa73882839c96260abeec12a379bf57e27b9529c71f7176c4e73"
+    },
+    {
+      "path": "/tmp/artroom-site-route-f4-types.log",
+      "bytes": 691,
+      "sha256": "49d7b45a87bc5dfdfd1a197f7b11a597dfabd702297877093785467ff81a9800"
+    },
+    {
+      "path": "/tmp/artroom-site-versions-f4-focused.log",
+      "bytes": 354,
+      "sha256": "335b7b732551c9fba74860cbd53a31d227a011e22831898d4344e5c4d62ddab7"
+    },
+    {
+      "path": "/tmp/artroom-site-versions-f4-types.log",
+      "bytes": 151,
+      "sha256": "4df6218037a0d03e53f31b1b9e167db9e850ff75810f379cc9c2e0e16ae594e1"
+    },
+    {
+      "path": "/tmp/artroom-site-versions-f4-control.log",
+      "bytes": 2489,
+      "sha256": "0e12342f97f90c2a76a7b189d95d74c024f79e7a14f1ff41c651c78fba0fc21d"
+    },
+    {
+      "path": "/tmp/artroom-expanded-merge-residue-gate.log",
+      "bytes": 503,
+      "sha256": "0f4b741372607177c3e50c4570c1a1cba462628e0086dd1830f0e22688da56e9"
+    },
+    {
+      "path": "/tmp/artroom-expanded-merge-residue-assets.log",
+      "bytes": 218,
+      "sha256": "a5ca0357a7ef43b8b379f4ae702b707f323797002ab48ea60e7ebf4e530a919e"
+    },
+    {
+      "path": "/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.Vb1RwIJpyb/whitespace.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.Vb1RwIJpyb/typecheck.log",
+      "bytes": 1510,
+      "sha256": "b05ed3728460487c42438640e0ac5e1f38c1944c2c38137be5294ffcecabf447"
+    },
+    {
+      "path": "/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.Vb1RwIJpyb/test.log",
+      "bytes": 1079,
+      "sha256": "2d31442851f35cdb3d4209e15b7d7a01117e1a0547cfd508a01d6b23e8b12272"
+    },
+    {
+      "path": "/tmp/artroom-merge-tail-guidance-evidence/focused.log",
+      "bytes": 2453,
+      "sha256": "7d68fe7b20cb51b41c89d13a0f270dc046073a17af381ef2c8b5899b497f5a43"
+    },
+    {
+      "path": "/tmp/artroom-merge-tail-guidance-evidence/focused-final.log",
+      "bytes": 225,
+      "sha256": "0e424d4ba2f296362a35e9bfe2265f4cc4b7b1d30d078c46dbf7c4329733bf87"
+    },
+    {
+      "path": "/tmp/artroom-merge-tail-guidance-evidence/cli-types.log",
+      "bytes": 137,
+      "sha256": "b071fdcd2a1b9f41028faa45b00336ae371e0f884cc193f14edfaf8c03d0b11f"
+    },
+    {
+      "path": "/tmp/artroom-merge-tail-guidance-evidence/scope-types.log",
+      "bytes": 151,
+      "sha256": "4df6218037a0d03e53f31b1b9e167db9e850ff75810f379cc9c2e0e16ae594e1"
+    },
+    {
+      "path": "/tmp/artroom-merge-tail-guidance-evidence/preservation.json",
+      "bytes": 113,
+      "sha256": "fbe772032989f19f834486dff3271054e0fa439e5dc79b4de3ccf533cd65532c"
+    },
+    {
+      "path": "/tmp/artroom-merge-tail-guidance-evidence/source-hashes.json",
+      "bytes": 560,
+      "sha256": "f37fb468d9265a8833371cb789da762a3392d651bbce4235c27439969f81af2b"
+    },
+    {
+      "path": "/tmp/artroom-merge-tail-guidance-evidence/log-hashes.json",
+      "bytes": 355,
+      "sha256": "ec930523389bb7142cc5af5a8659573bbb14e5962b7a2232d4b45c88da1ccf25"
+    }
+  ],
+  "limits": [
+    "Original failed gate retained",
+    "Native unsafe-abort interaction isolated, not fixed or mixed-cohort/physical-drain proof",
+    "Default test timeouts and all invariant assertions retained",
+    "No provider/browser/cloud run or historical admission/source proof",
+    "Normal complete exact-head Source review and requester judgment still required",
+    "Current gate emits no timeout diagnostic; no cause or fix of the earlier diagnostic is established",
+    "All @1 declarations preserve actual main1eed; original historical executable/admission correspondence still owed",
+    "Unsupported cross-origin setting is refused; original cross-origin trust/route functionality remains owed",
+    "Existing PNGs remain historical; recorder correction is not fresh browser evidence",
+    "Interrupted64aa gate earns no pass credit; final gate follows material residual versions correction"
+  ],
+  "previous_gate": {
+    "head": "39eda03ec4e8d55d901526d809b8bcf3e9d58122",
+    "tree": "4a450bfe0d3fe31f30694dc8579d8ce35b82bb54",
+    "reported_exit": 0,
+    "vitest_passed": 842,
+    "opt_in_recorders_skipped": 2,
+    "active_source_passed": 6,
+    "runtime_diagnostic": "Uncaught cross-Durable-Object RefcountedCanceler exception in Vitest timeout cancellation; no affected task identified; assessment required before landing"
+  },
+  "previous_gates": [
+    {
+      "head": "c582b10467283d0ca3b3497b2c1299dc3286821c",
+      "tree": "1d1d28cd2c53217bb905a5d62d341ef040ca4385",
+      "reported_exit": 0,
+      "vitest_passed": 842,
+      "opt_in_recorders_skipped": 2,
+      "active_source_passed": 6,
+      "runtime_diagnostic": "None emitted in the complete current raw test log; earlier uncaught timeout/cancellation diagnostic remains unexplained, not claimed fixed"
+    },
+    {
+      "head": "97184fa975e8782abb1d0263eae31b8f461accea",
+      "tree": "df1b4a5c08b4d8d17a60779cdf6213c9417acdb4",
+      "reported_exit": 0,
+      "vitest_files_passed": 133,
+      "vitest_passed": 844,
+      "opt_in_recorders_skipped": 2,
+      "active_source_passed": 6,
+      "runtime_diagnostic": "None emitted in the complete current raw test log; earlier timeout/native causes remain unexplained, not claimed fixed"
+    }
+  ],
+  "interrupted_gate": {
+    "head": "64aa6ccafcb740b5cdcb05a0c65b4caafbee14ea",
+    "reported_exit": 1,
+    "test_phase_exit": 130,
+    "test_elapsed_seconds": 58.8,
+    "scope": "Builder interrupted for known residual versions F4 source correction; no suite/active-source result or assertion failure inferred"
+  },
+  "review_corrections": {
+    "review": "376aa53064b8adae9b330d5d655f5fb019b6b168",
+    "decision": "158be2c4800db1753af32e60674591ff17464cde",
+    "comparison_head": "68be1ffeb3d64094232ec7f8e4373629f8527c07",
+    "source_commits": [
+      "22e81dded93708be35e01a3ebf7c178941c936b6",
+      "1a9b19efd268ea3e06f653e43f5036715ca7e430",
+      "775a36e9188afc8ee43c58ddd83757ebbb8e7d1c",
+      "112b9e7bc7b7d2e4cb8055152b64ed721854fbb3",
+      "fa6909fd17def2d44420d826c6ac9ea2f4fdd42a",
+      "bd96ea462a33021c9094a8010b75d1f0ad2b89f4",
+      "64aa6ccafcb740b5cdcb05a0c65b4caafbee14ea",
+      "c485e9056412739f87207654554b35aa305bb09e"
+    ],
+    "scope": "All six corrections plus residual versions F4; current-source evidence, not historical/provider/browser proof"
+  },
+  "bounded_residues": {
+    "review": "db2cf178c71d7d1482a9d6f56289957670e74ffb",
+    "decision": "a049e753f488c7ae47a12e2ba1a630bc92271dc5",
+    "comparison": "05d6df004e86fe2f1c75d67b9046a09ac372f6b9",
+    "commits": [
+      "68fbbb12c6f5d14da07dc7fc3206b86b42d84b76",
+      "62bec463bcd6c7fe634dda44df8184299b5cb680",
+      "4db66d8f9534926c4167d57df2aef307794a784f"
+    ],
+    "scope": "Category-specific merge tail and factual Page guide; accepted receipt, bounded observation and known proposal unchanged",
+    "timing": "Builder resumed14:17 Eastern;14:15 target missed; actual filing/landing requires its own evidence"
+  }
+}

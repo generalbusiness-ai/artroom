@@ -58,8 +58,9 @@
  * **A reader with no session** gets `forbidden` from every read, and no
  * stream.
  *
- * **What a session cannot do.** It signs nothing, controls nothing and gets
- * no credential. Nothing here takes a session as authority for an act.
+ * **What a session cannot do.** It signs nothing and controls nothing.
+ * It provides no authority for an act. A credential read is limited to the one-time
+ * read token requested by its own key; the outside port checks that handle.
  *
  * Nothing here logs, stores or returns the secret, and no refusal holds a
  * token or a part of one.
@@ -70,7 +71,7 @@ import type { Head, ScopeRef, SessionAnswer, SessionClaims, SessionRefusal, Sign
 import { hex } from "@generalbusiness/artroom-bytes";
 import { b64url, canonicalBytes, canonicalize, hmacSha256, isKeyId, isMemberId, isSignature, parseStrict, taggedBytes, unb64url, utf8, verifySessionRequest } from "@generalbusiness/artroom-bytes";
 import { isObject, isScopeRef, same, timeMs, timeOf, type RecordedRef, type ScopeState, type StateView } from "@generalbusiness/artroom-derive";
-import { MEMBERSHIP, standingOf } from "@generalbusiness/artroom-platform";
+import { platform, standingOf } from "@generalbusiness/artroom-platform";
 import type { Clock, ReadName, Readers } from "./ports.ts";
 
 // ---------------------------------------------------------------- the secret
@@ -103,8 +104,8 @@ export function sessionsOf(secret: unknown, deployment: unknown): Sessions | nul
 
 // ---------------------------------------------------------------- the token
 
-/** The reads of the contract's section 9.1, which every session is given. */
-const MEMBER_READS: readonly ReadName[] = ["summary", "items", "history", "entry", "outbox", "operations", "log", "retained"];
+/** The member reads, including the one-time read-token credential requested by the session's own key. */
+const MEMBER_READS: readonly ReadName[] = ["summary", "items", "history", "entry", "outbox", "operations", "log", "retained", "credential"];
 /** The reads of the repository's admin page (section 12, G13 and G17). */
 const ADMIN_READS: readonly ReadName[] = ["incidents", "waiting"];
 const READ_NAMES: ReadonlySet<string> = new Set<string>([...MEMBER_READS, ...ADMIN_READS]);
@@ -287,6 +288,10 @@ export function sessionReaders(config: SessionReading): Readers {
       return "claims" in checked ? checked.claims.reads.includes(read) : checked.refused;
     },
     chained: (reader, read) => chainedSession(checking, reader, read),
+    holder(reader, read) {
+      const checked = checkSession(checking, reader);
+      return "claims" in checked ? (checked.claims.reads.includes(read) ? checked.claims.key : false) : checked.refused;
+    },
   };
 }
 
@@ -352,13 +357,13 @@ export function issueSession(
   const { to, actor, notAfter } = asked.request;
   const scope = state.scope();
   // A provisional membership answers no session (section 12.1.3).
-  if (!scope || scope.status !== "active" || scope.at.kind !== "membership" || pinned?.named !== MEMBERSHIP) return no("not-found");
+  if (!scope || scope.status !== "active" || scope.at.kind !== "membership" || !(pinned && (pinned.named === "platform:membership@1" || pinned.named === "platform:membership@2") && platform(pinned.named))) return no("not-found");
   if (to.scope !== scope.at.scope || to.inc !== scope.at.inc || to.kind !== scope.at.kind) return no("misaddressed");
   const [reading, previous, ends] = [timeMs(config.clock.read()), timeMs(scope.time), timeMs(notAfter)!];
   if (reading === null || previous === null || reading < previous) return no("clock-behind");
   if (reading >= ends) return no("expired");
   if (ends - reading > REQUEST_SECONDS * 1000) return no("bad-request");
-  const standing = standingOf(state, { of: scope.at, key: actor });
+  const standing = standingOf(state, { of: scope.at, key: actor }, pinned.named);
   // A revoked key, a key that membership does not hold, a removed member, and an agent whose controller is not active: none is issued a session.
   if (!standing || !("key" in standing) || standing.keyState !== "active" || standing.memberState !== "active" || standing.controllerActive === false) return no("unauthorized");
   // The last check, and the one write: this key has not been given a session for this operation identity.

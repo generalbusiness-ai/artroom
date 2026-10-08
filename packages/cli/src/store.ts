@@ -9,7 +9,7 @@
  * the user. `memoryStore` keeps them in memory, for a test.
  */
 
-import type { Digest, FactRef, ScopeId, ScopeRef, SignedIntent } from "@generalbusiness/artroom-contract";
+import type { Digest, FactRef, PlatformDefinition, Receipt, ScopeId, ScopeRef, SignedIntent } from "@generalbusiness/artroom-contract";
 
 /** The scopes of one repository, as `claim` or `join` learned them. */
 export interface Repository {
@@ -49,6 +49,20 @@ export interface PendingJoin {
   accepted?: FactRef;
 }
 
+/**
+ * An install that `install --plan` prepared and `install --planned` has not founded yet: the signed `install` intent, the version
+ * of the register it founds under, and the register ID that they make. The register's seed is a function of these alone, so the
+ * ID is known before the register exists, and the Worker's host setting can pin it first. An intent and its signature are no
+ * secret: the register's genesis records both.
+ */
+export interface PlannedInstall {
+  service: string; definition: PlatformDefinition; founding: SignedIntent; register: ScopeId;
+  /** Saved before possible submission, bound to the exact original plan. */
+  attempted?: Digest;
+  /** Configured-service acknowledgement, retained for later history verification. */
+  acknowledged?: { status: "service-acknowledged"; service: string; receipt: Receipt };
+}
+
 export interface Config {
   v: 1;
   /** The scope service's base URL. */
@@ -57,11 +71,15 @@ export interface Config {
   key: string;
   /** The register this command founded, as its receipt names it. */
   register?: ScopeRef;
+  /** The original planned install and its retained acknowledgement, including after success. */
+  plan?: PlannedInstall;
   repository?: Repository;
   /** A claim that `claim` submitted and has not seen through yet. A later `claim` goes on from it. */
   claim?: PendingClaim;
   /** The caller's handle in membership, once it has one. */
   handle?: string;
+  /** The repository's remote URL as a clone's credential answer gave it. It is no secret. */
+  remote?: string;
   /** Exact pending enrollment; retry the same invitation link to continue. */
   join?: PendingJoin;
 }

@@ -14,9 +14,16 @@
  */
 
 import type { Digest, FactRef, MemberId, MemberRef, Observation, RulesObservation, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
-import { canonicalize, isDigest, timeMs } from "@generalbusiness/artroom-bytes";
+import { canonicalize, digestBytes, isDigest, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
 import { byteOrder } from "@generalbusiness/artroom-derive";
+import { editPath } from "./destination-objects.ts";
 import { LANDING, RULES_EXTENT, classify, judgeExtents, type Extent, type ExtentsAsked, type Review, type TreeLink } from "./extents.ts";
+
+/** What a one-file manifest states (i5 edit): the path, the digest and size of the bytes, and the bytes as a text. */
+export interface EditFile { path: string; digest: string; size: number; content: string }
+
+/** True when the text's bytes have the digest and the size that the manifest states: the bytes package's SHA-256 digest of the UTF-8 bytes. */
+export const fileSound = (file: EditFile): boolean => { const bytes = utf8(file.content); return bytes.length === file.size && digestBytes(bytes) === file.digest; };
 
 /** The member `changes` of the evidence of `judge` (section 12.1.4a): facts of the repository, and no judgment. */
 export interface JudgeChanges {
@@ -99,12 +106,15 @@ export interface ReservationRead {
   /**
    * The manifest's entry, in `uses`: its base, integration commit and tree;
    * its authors (section 3.10); and whether it is complete (R2 section
-   * 5.2). `reports`: the commit of each selected report, from the `report`
+   * 5.2). A one-file manifest (i5 edit) names no integration commit and no
+   * tree: `file` holds what it states, and the caller gives the tree of the
+   * host's evidence and the commit that the destination writes for it.
+   * `reports`: the commit of each selected report, from the `report`
    * entry that the statement names for it, in `uses`. Null: the named
    * reports are not the manifest's selections, place for place, or an
    * entry that one names opened no report or set no commit.
    */
-  manifest: { base: string; integration: string; tree: string; reports: readonly string[] | null; authors: readonly MemberId[]; complete: boolean };
+  manifest: { base: string; integration: string | null; tree: string | null; file?: EditFile | null; reports: readonly string[] | null; authors: readonly MemberId[]; complete: boolean };
   /** The controller of each agent among the authors, from their member observations. Null: no retained input says. */
   controllersOfAuthors: readonly MemberId[] | null;
   /** The sole active holder of rules.publish, or an empty list when its count differs from one. Null: no holders observation says. */
@@ -136,6 +146,8 @@ export interface ReservationAsked {
   read: ReservationRead | null;
   /** The time of the entry: the one clock reading of its commit. */
   time: Timestamp;
+  /** The one-file manifest that the statement names, read from its entry in `uses`; null for any other manifest. */
+  file?: EditFile | null;
 }
 
 /**
@@ -146,8 +158,11 @@ export interface ReservationAsked {
  */
 export type Reservation = { reserved: true; integration: string; reason: string | null } | { reserved: false; reason: string } | { reserved: null };
 
-/** The seven reasons of section 6.5, as the slot `reason` holds them. With extents, `rules-not-met` is followed by the names (section 12.1.4a). */
-export const NOT_RESERVED = ["out-of-date", "integration-invalid", "authority-lost", "evidence-invalid", "rules-not-met", "incomplete", "evidence-too-large"] as const;
+/**
+ * The seven reasons of section 6.5, as the slot `reason` holds them. With extents, `rules-not-met` is followed by the names (section
+ * 12.1.4a). The eighth, `path-invalid`, is i5's, not the note's: a one-file manifest whose path no published tree may hold.
+ */
+export const NOT_RESERVED = ["out-of-date", "integration-invalid", "authority-lost", "evidence-invalid", "rules-not-met", "incomplete", "evidence-too-large", "path-invalid"] as const;
 
 /** Section 6.5: "by an observation within ten seconds". It is ten seconds on G's clock (section 3.12). */
 const WINDOW_MS = 10_000;
@@ -158,13 +173,16 @@ const WINDOW_MS = 10_000;
  * statement says is `evidence-invalid`, and it is said before a rule that
  * is not met (I3 deltas, entry FA10).
  */
-export function judgeReservation({ recorded, evidence, statement, read, time }: ReservationAsked): Reservation {
+export function judgeReservation({ recorded, evidence, statement, read, time, file = null }: ReservationAsked): Reservation {
   const no = (reason: string): Reservation => ({ reserved: false, reason });
   // G5: the member `changes` is over its bound. Nothing more is judged.
   if (evidence.changes !== null && "over" in evidence.changes) return no("evidence-too-large");
   // Check 1, as far as this scope's own records say: the head just read is G's recorded head. Where the two differ another
   // writer moved the branch (section 6.9), and nothing is reserved.
   if (evidence.head === null || evidence.head !== recorded) return no("out-of-date");
+  // i5 edit: a one-file manifest's path is one that a published tree may hold, or nothing is reserved, by that name. The host
+  // writes no object for such a path, so this is said before what the evidence lacks.
+  if (file !== null && editPath(file.path) === null) return no("path-invalid");
   // Check 2, as far as the evidence alone says: the integration commit and its whole closure are in the canonical repository.
   if (!evidence.present || evidence.changes === null) return no("integration-invalid");
   if (read === null || read.rules === null || read.rules.content.asked !== "rules") return { reserved: null };
@@ -176,7 +194,11 @@ export function judgeReservation({ recorded, evidence, statement, read, time }: 
   // Check 2: its tree is the one named; the base is its first parent; each selected report's commit is its ancestor.
   // The commits of the reports are read from their entries. Where the named reports are not the manifest's selections no commit
   // is read, and the statement is invalid evidence, below.
-  if (evidence.tree !== manifest.tree || evidence.firstParent !== manifest.base || (manifest.reports !== null && !manifest.reports.every((commit) => evidence.ancestors.includes(commit)))) return no("integration-invalid");
+  // i5 edit: for a one-file manifest the bytes are the ones it states, and the host changed that path and no other.
+  const edited = manifest.file ?? null;
+  if (edited !== null && (!fileSound(edited) || !evidence.changes.paths.every((path) => path === edited.path))) return no("integration-invalid");
+  if (manifest.tree === null || manifest.integration === null || evidence.tree !== manifest.tree || evidence.firstParent !== manifest.base || (manifest.reports !== null && !manifest.reports.every((commit) => evidence.ancestors.includes(commit)))) return no("integration-invalid");
+  const integration = manifest.integration;
   // Check 3: the merger currently holds `change.merge`, including an active controller where one is recorded, by an
   // observation within ten seconds. Approval and check-result evidence below retains its historical noncompromise rules.
   const merger = read.merger;
@@ -222,7 +244,7 @@ export function judgeReservation({ recorded, evidence, statement, read, time }: 
     invalid ||= checks.includes("invalid");
     if (invalid) return no("evidence-invalid");
     if (changesAsked || checks.includes("unmet") || new Set(approvals.map((approval) => approval.member).filter(independent)).size < rules.approvals) return no("rules-not-met");
-    return manifest.complete ? { reserved: true, integration: manifest.integration, reason: null } : no("incomplete");
+    return manifest.complete ? { reserved: true, integration, reason: null } : no("incomplete");
   }
 
   // Section 12.1.4a, "How the rule `judge` judges extents", steps 1 to 7.
@@ -267,7 +289,7 @@ export function judgeReservation({ recorded, evidence, statement, read, time }: 
   if (ordered.length > 0) return no(`rules-not-met:${ordered.join(",")}`);
   if (touched.unclassified.length > 0) return no("rules-not-met");
   if (!manifest.complete) return no("incomplete");
-  return { reserved: true, integration: manifest.integration, reason: used ? `single-controller:${RULES_EXTENT}:${excepted}:m${read.controllersHead ?? merger.head.seq}:r${read.rules.revision}:h${read.rules.head.seq}` : null };
+  return { reserved: true, integration, reason: used ? `single-controller:${RULES_EXTENT}:${excepted}:m${read.controllersHead ?? merger.head.seq}:r${read.rules.revision}:h${read.rules.head.seq}` : null };
 }
 
 const OBJECT_ID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;

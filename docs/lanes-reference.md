@@ -8,7 +8,7 @@ The stamp: the definitions this file was generated from, by their pinned digests
 | Definition | Digest | Canonical bytes |
 |---|---|---|
 | `issue` | `sha256:325cb4f33da9deb1a31d85ba0f1456068d4d9d08009978b779aed70cb08e00ad` | 46160 |
-| `change` | `sha256:e182f6fb8ebc0525214e6fd9139c6c5e405d9bab2885d7202cd66602f8155a07` | 58429 |
+| `change` | `sha256:3f0389ba644e6d58e96a352debcc77d01661ffcf349c6db53d0645c2513eae70` | 59715 |
 
 The rows were written from Lane forms and browser flow, revision 14, at `4b3bf5da`.
 
@@ -126,7 +126,7 @@ Name `change`. Genesis act `open`. Capabilities listed: `hold@1`, `git-read@1`. 
 | Type | How many | States | Slots | Needs |
 |---|---|---|---|---|
 | `proposal` | one | `draft` (initial), `open`, `closed`, **`merged`** | `author`: member (fixed, required); `assignees`: member (list of at most 10); `destination`: scope of kind `destination` (fixed, required); `rulesScope`: scope of kind `rules` (fixed, required); `title`: text, at most 256 bytes (required); `body`: text, at most 65536 bytes, detached; `labels`: list of at most 20, each a text, at most 64 bytes; `number`: int, 1 to 1000000000 |  |
-| `manifest` | many, at most 64 live | `current` (initial), **`superseded`** | `integrator`: member (fixed, required); `authors`: member (fixed, required, list of at most 64); `goal`: fact of kind `file`, `revise` under `issue` (fixed); `plan`: fact of kind `seal-plan` under `issue` (fixed); `staging`: scope of kind `lane` (fixed); `under`: item of type `commitment` (fixed); `pin`: fact of kind `hold@1:check` under `issue` (fixed); `base`: commit (fixed, required); `integration`: commit (fixed, required); `tree`: tree (fixed, required); `selected`: list of at most 32, each a record of `accepted` (fact of kind `accept-report` under `issue`), `report` (fact of kind `report` under `issue`) (fixed); `decisions`: list of at most 32, each a fact of kind `resolve-concern` under `issue` (fixed); `complete`: bool (fixed, required) | `hold@1` |
+| `manifest` | many, at most 64 live | `current` (initial), **`superseded`** | `integrator`: member (fixed, required); `authors`: member (fixed, required, list of at most 64); `goal`: fact of kind `file`, `revise` under `issue` (fixed); `plan`: fact of kind `seal-plan` under `issue` (fixed); `staging`: scope of kind `lane` (fixed); `under`: item of type `commitment` (fixed); `pin`: fact of kind `hold@1:check` under `issue` (fixed); `base`: commit (fixed, required); `integration`: commit (fixed); `tree`: tree (fixed); `path`: text, at most 1024 bytes (fixed); `digest`: digest (fixed); `size`: int, 0 to 65536 (fixed); `selected`: list of at most 32, each a record of `accepted` (fact of kind `accept-report` under `issue`), `report` (fact of kind `report` under `issue`) (fixed); `decisions`: list of at most 32, each a fact of kind `resolve-concern` under `issue` (fixed); `complete`: bool (fixed, required) | `hold@1` |
 | `review` | many, at most 256 live | `submitted` (initial), **`superseded`**, **`withdrawn`**, **`dismissed`** | `reviewer`: member (fixed, required); `manifest`: item of type `manifest` (fixed, required); `verdict`: enum: `approve`, `request-changes` (fixed, required); `extent`: text, at most 64 bytes (fixed); `body`: text, at most 65536 bytes, detached; `dismissal`: text, at most 4096 bytes |  |
 | `review-request` | many, at most 64 live | `open` (initial), **`met`**, **`withdrawn`** | `requested`: member (fixed, required); `requester`: member (fixed, required) |  |
 | `job` | many, at most 64 live | `requested` (initial), `passed`, `failed`, `errored`, `timed-out`, **`superseded`** | `asker`: member (fixed, required); `informed`: member (fixed, list of at most 2); `manifest`: item of type `manifest` (fixed, required); `decidedBy`: fact of kind `check`, `check-error`, `timed:job-deadline` under `change`; `name`: text, at most 128 bytes (fixed, required); `tree`: tree (fixed, required); `configuration`: digest (fixed, required); `deadline`: time (fixed, required) |  |
@@ -140,7 +140,7 @@ Name `change`. Genesis act `open`. Capabilities listed: `hold@1`, `git-read@1`. 
 | `hold` | many, at most 16 live | `held` (initial), **`ended`** | `holder`: member (required); `under`: item of type `commitment` (fixed, required); `extent`: text, at most 1024 bytes; `ends`: time (required); `epoch`: int, 1 to 1000000 (required) |  |
 | `export` | many, at most 16 live | `authorized` (initial), **`done`**, **`refused`** | `from`: member (fixed, required); `to`: member (fixed, required); `authorizer`: member (fixed, required); `hold`: item of type `hold` (fixed, required) |  |
 
-### Acts of `change`: 53
+### Acts of `change`: 54
 
 | Kind | Step | Grant | Other items | Fields | Settles | Guards, effects, sends, attention | Needs |
 |---|---|---|---|---|---|---|---|
@@ -157,6 +157,7 @@ Name `change`. Genesis act `open`. Capabilities listed: `hold@1`, `git-read@1`. 
 | `reopen-any` | transition on `proposal` | `change.edit-any` | None | None |  | 1, 1, 1, 0 |  |
 | `ask-rules` | transition on `proposal` | `change.propose` | None | None |  | 0, 0, 1, 0 |  |
 | `propose-manifest` | open on `manifest` | `change.propose` | `proposal`: `proposal` the one item of its type; `previous`: `manifest` by the field `previous`; `hold`: `hold` by the field `hold`; `commitment`: `commitment` through the slot `under` of `also.hold` | `previous?`: item of type `manifest`; `hold?`: item of type `hold`; `lane?`: scope of kind `lane`; `foreignHold?`: int, 0 to 1000000000; `instance`: text, at most 128 bytes; `goal?`: fact of kind `file`, `revise` under `issue`; `plan?`: fact of kind `seal-plan` under `issue`; `selected`: list of at most 32, each a record of `accepted` (fact of kind `accept-report` under `issue`), `report` (fact of kind `report` under `issue`); `decisions`: list of at most 32, each a fact of kind `resolve-concern` under `issue`; `base`: commit; `integration`: commit; `tree`: tree; `complete`: bool. Presented: `pin?`: fact of kind `hold@1:check` under `issue` |  | 24, 16, 2, 0 | `git-read@1`, `hold@1` |
+| `propose-file` | open on `manifest` | `change.propose` | `proposal`: `proposal` the one item of its type | `base`: commit; `path`: text, at most 1024 bytes; `digest`: digest; `size`: int, 0 to 65536; `content`: text, at most 65536 bytes |  | 4, 7, 0, 0 |  |
 | `request-review-own` | open on `review-request` | `change.edit-own` | `proposal`: `proposal` the one item of its type | `requested`: member |  | 2, 2, 0, 1 |  |
 | `request-review-any` | open on `review-request` | `change.edit-any` | `proposal`: `proposal` the one item of its type | `requested`: member |  | 1, 2, 0, 1 |  |
 | `withdraw-review-request-own` | transition on `review-request` | `change.edit-own` | `proposal`: `proposal` the one item of its type | None |  | 2, 1, 0, 0 |  |

@@ -3,12 +3,13 @@ import { abortAllDurableObjects } from "cloudflare:test";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { OperationId, Read } from "@generalbusiness/artroom-contract";
 import { canonicalize } from "@generalbusiness/artroom-bytes";
-import { checkpointOf, operationId, operationOpening, snapshotInput, snapshotRead, stagedRefName, timeMs, type Opening } from "@generalbusiness/artroom-derive";
+import { operationId, snapshotInput, snapshotRead, stagedRefName, timeMs } from "@generalbusiness/artroom-derive";
 import { isAnswer } from "../src/operations.ts";
-import { ScopeObject, SqliteStore, Turns, Wakes, production, type EffectAnswer, type EffectRequest, type OperationStatus, type OutcomeRecorded, type Outside, type Wiring } from "../src/index.ts";
+import { ScopeObject, SqliteStore, type EffectAnswer, type EffectRequest, type OperationStatus, type OutcomeRecorded, type Outside, type Wiring } from "../src/index.ts";
 import { variant } from "@generalbusiness/artroom-derive/testing";
 import { controls, testPorts } from "../src/testing.ts";
 import { FENCE, MINT, mint, outsideOf, owners, pushOf, wired, type OutsideDouble } from "./outside.ts";
+import { open } from "./operation-opening.ts";
 import { HOLD, Lane, START, at, definition, found, founding, reader, rita, stubOf } from "./support.ts";
 
 /** The delay before the second attempt of an operation. */
@@ -16,31 +17,6 @@ const RETRY = PROPOSED_BOUNDS.dispatchRetrySeconds;
 type Surface = { effect(): Promise<number>; operation(reader: unknown, id: OperationId): Promise<Read<OperationStatus>>; operations(reader: unknown, cursor?: string, open?: boolean): Promise<Read<readonly OperationStatus[]>> };
 const surface = (s: Lane) => s.object as unknown as Surface;
 
-/**
- * A stand-in for the entry that opens an operation: no form of this step
- * opens one. The entry is made by hand, as a checkpoint input with the
- * ledger's own opening effects at the ordinals 0, 1 and so on. It is written
- * through a turn of the real commit protocol, on the object's own storage,
- * with the real alarm. The IDs of the operations, or `scope-full` when the
- * entry and what it reserves do not fit.
- */
-function open(s: Lane, ...opens: Opening[]): Promise<OperationId[] | "scope-full"> {
-  return s.inside(async (state) => {
-    const store = new SqliteStore({ exec: (query, ...bindings) => state.storage.sql.exec(query, ...bindings), transaction: (closure) => state.storage.transactionSync(closure) });
-    const wakes = new Wakes(store, { set: (time) => (time === null ? state.storage.deleteAlarm() : state.storage.setAlarm(timeMs(time)!)) }, false);
-    const turns = new Turns(store, { clock: s.c.clock, rules: production().rules, alarm: wakes.deadline, capabilities: null }, s.c.bounds, () => definition, () => owners);
-    const end = await turns.run<OperationId[] | "scope-full">({
-      asks: () => [],
-      judge: (view) => ({
-        verdict: "write", retain: [],
-        draft: { input: { type: "checkpoint", ...checkpointOf(view) }, uses: [], prepared: [], effects: opens.flatMap((o, k) => operationOpening(k, o)), sends: [], judgesTime: false },
-        sealed: ({ entry }) => opens.map((_, k) => operationId(entry.seq, k)), unfit: () => "scope-full", full: () => "scope-full",
-      }),
-    });
-    if (end.end !== "answer") throw new Error(`the opening entry was not judged: ${end.end}`);
-    return end.answer;
-  });
-}
 /** What a reader sees of one operation. */
 async function seen(s: Lane, id: OperationId): Promise<OperationStatus> {
   const read = await surface(s).operation(reader, id);
@@ -152,6 +128,7 @@ describe("outside operations at a real scope (scope contract, section 4.3; autho
     const next = (await s.head()).seq + 1;
     let derived: EffectRequest | null = null;
     let factory: ScopeObject;
+    let factoryStore: SqliteStore;
     class FactoryScope extends ScopeObject {
       protected override wiring(): Wiring {
         return {
@@ -167,7 +144,9 @@ describe("outside operations at a real scope (scope contract, section 4.3; autho
                 const operation = given.state.operation(request.operation)!;
                 const origin = given.own(operation.attempts[0]!.opened)!;
                 expect([given.state.scope(), scope.head, given.genesis()]).toEqual([scope, { seq: next, hash: origin.hash }, given.own(0)!.entry.input]);
-                derived = { scope: scope.at, operation: operation.id, attempt: operation.attempts[0]!.attempt, owner: operation.owner, kind: operation.kind, origin };
+                const sentAt = factoryStore.sending(request.operation, request.attempt)?.sent;
+                if (sentAt === undefined || sentAt === null) return expect.fail("the factory must receive an actually marked request");
+                derived = { scope: scope.at, operation: operation.id, attempt: operation.attempts[0]!.attempt, owner: operation.owner, kind: operation.kind, origin, sentAt };
                 expect(derived).toEqual(request);
                 return own(origin.hash);
               },
@@ -176,11 +155,14 @@ describe("outside operations at a real scope (scope contract, section 4.3; autho
         };
       }
     }
-    await s.inside((state) => { factory = new FactoryScope(state, {}); });
+    await s.inside((state) => {
+      factoryStore = new SqliteStore({ exec: (query, ...bindings) => state.storage.sql.exec(query, ...bindings), transaction: (closure) => state.storage.transactionSync(closure) });
+      factory = new FactoryScope(state, {});
+    });
     const [fresh] = await open(s, pushOf(1)) as [OperationId];
     expect(await s.inside(() => factory.effect())).toBe(1);
     expect([derived, (await seen(s, fresh)).state, out.sent.length]).toEqual([
-      { scope: s.at, operation: fresh, attempt: 1, owner: "platform:destination@1", kind: "push", origin: (await s.sealed(next))[0] }, "settled", 3,
+      { scope: s.at, operation: fresh, attempt: 1, owner: "platform:destination@1", kind: "push", origin: (await s.sealed(next))[0], sentAt: s.c.clock.now }, "settled", 3,
     ]);
 
     // Recovery is a trusted port boundary, not another send. This made-up
@@ -370,6 +352,62 @@ describe("outside operations at a real scope (scope contract, section 4.3; autho
     // Another restart and every way a pass starts: nothing is sent again.
     await s.restart();
     expect([(await seen(s, op)).state, await surface(s).effect(), await s.alarm(), out.attempts]).toEqual(["settled", 0, false, [`${op}#1`]]);
+  });
+
+  // Invariant: bounded same-life acceptance detection advances past an
+  // unsupported prefix; only the later enabled attempt leaves, once.
+  // Generic owner/kind acceptance is scripted, not a native host policy.
+  test("an attempt recorded while the outside port refused is sent, with no restart, after bounded reads find its later accepted kind beyond an unsupported prefix; it is sent exactly once", async () => {
+    const s = await found({ deliveryBatch: 1 });
+    const out = outsideOf(s.name);
+    let enabled = false;
+    let asked = 0;
+    wired.set(s.name, () => ({ outside: {
+      accepts: (_owner, kind) => { asked++; return enabled && kind === "push"; },
+      send: (request) => out.send(request),
+      late: (answer) => out.late(answer),
+    } }));
+    try {
+      await s.restart(); // Construct the scripted generic port before opening.
+      const [first, second, op] = await open(s, MINT, MINT, pushOf(1)) as [OperationId, OperationId, OperationId];
+      for (let pass = 0; pass < 4; pass++) expect(await surface(s).effect()).toBe(0);
+      expect([out.sent.length, await s.alarmAt()]).toEqual([0, null]);
+      const head = await s.head();
+
+      // While no kind is accepted, ordinary reads inspect at most one batch
+      // without another pass, request, entry or alarm.
+      for (let read = 0; read < 3; read++) {
+        const before = asked;
+        expect((await seen(s, op)).state).toBe("pending");
+        expect(asked - before).toBeLessThanOrEqual(1);
+      }
+      expect([out.sent.length, await s.alarmAt()]).toEqual([0, null]);
+
+      // Only the later kind becomes accepted. The two prefix rows stay
+      // unsupported; repeated reads must reach the later row in this life.
+      out.answer(op, 1, own("c1"));
+      enabled = true;
+      let detected = false;
+      for (let read = 0; read < 3 && !detected; read++) {
+        await seen(s, op);
+        detected = out.sent.length > 0 || await s.alarmAt() !== null;
+      }
+      expect(detected).toBe(true);
+      // Detection restarts the original bounded parked walk. Its immediate
+      // alarms, not event-loop ticks, advance past the two unsupported rows.
+      for (let pass = 0; pass < 3 && out.sent.length === 0; pass++) {
+        expect(await s.alarmAt()).toBe(timeMs(START));
+        expect(await s.alarm()).toBe(true);
+      }
+      expect([out.attempts, out.sent[0]?.origin.hash, out.sent[0]?.origin.entry.seq]).toEqual([[`${op}#1`], head.hash, head.seq]);
+      expect((await seen(s, op)).state).toBe("settled");
+
+      // Unsupported prefix rows remain durable, unsent and pending. Further
+      // reads/passes/alarms cannot resend the accepted attempt's original.
+      for (const id of [first, second]) expect(await seen(s, id)).toMatchObject({ state: "pending", sends: [{ attempt: 1, next: null, sent: null }] });
+      for (let read = 0; read < 3; read++) await seen(s, op);
+      expect([await surface(s).effect(), await s.alarm(), out.attempts, await s.alarmAt()]).toEqual([0, false, [`${op}#1`], null]);
+    } finally { wired.delete(s.name); }
   });
 
   test("a scope whose pinned definition the runtime cannot run sends nothing outside the service: the attempt stays recorded, with no wake-up, and is sent once the runtime can run the definition. The capability is the scripted stand-in", async () => {

@@ -2,7 +2,7 @@ import { expect, test } from "vitest";
 import type { SessionClaims, Timestamp } from "@generalbusiness/artroom-contract";
 import { newIncarnation } from "@generalbusiness/artroom-bytes";
 import { t } from "@generalbusiness/artroom-derive/testing";
-import { DIRECTORY, RULES_SCOPE } from "@generalbusiness/artroom-platform";
+import { DIRECTORY } from "@generalbusiness/artroom-platform";
 import { Branch, MEMBERSHIP, rita } from "../../platform/test/support-destination.ts";
 import { repositorySessionMembership, fixedMembership, type Repository } from "../src/authority.ts";
 import { mintSession, readerOf, sessionReaders, sessionsOf } from "../src/sessions.ts";
@@ -10,21 +10,21 @@ import { mintSession, readerOf, sessionReaders, sessionsOf } from "../src/sessio
 /** Boundary fixture only: Branch is judged in memory under the destination's
  * real rules; its creator, membership, token claims and directory summary are
  * labelled stand-ins. No namespace RPC or actual membership issuer runs. */
-function fixture(kind: "destination" | "rules" = "destination") {
+function fixture(kind: "destination" | "rules" = "destination", cohort: 1 | 2 = 2) {
   const branch = new Branch(false);
   branch.confirmed();
   const at = { ...branch.at, kind };
   const sessions = sessionsOf("a deliberately scripted test secret", "destination-test")!;
   let now: Timestamp = branch.now;
   let calls = 0;
-  let reply: unknown = { ok: true, value: { scope: branch.bureau.at, definition: DIRECTORY, status: "active", items: [{ type: "repository", state: "open", refs: { membership: MEMBERSHIP } }] } };
+  let reply: unknown = { ok: true, value: { scope: branch.bureau.at, definition: `platform:directory@${cohort}`, status: "active", items: [{ type: "repository", state: "open", refs: { membership: MEMBERSHIP } }] } };
   // The rules variant scripts only the birth/state boundary over Branch's
   // fixture; founding-real witnesses the actual rules history and RPC.
   const context: Pick<Repository, "genesis" | "state"> & { state: NonNullable<Repository["state"]> } = { state: kind === "destination" ? branch.state : new Proxy(branch.state, { get(state, key) {
     if (key === "scope") return () => ({ ...state.scope()!, at });
     if (key === "page") return (type: string, states: readonly string[], after: number | null, limit: number) => type === "rules" ? { items: [{ refs: { directory: branch.bureau.at }, values: { membership: MEMBERSHIP.scope } }], next: null } : state.page(type, states, after, limit);
     const value = Reflect.get(state, key); return typeof value === "function" ? value.bind(state) : value;
-  } }), genesis: () => { const input = branch.own(0)?.entry.input; return input?.type === "genesis" ? kind === "destination" ? input : { ...input, seed: { ...input.seed, kind, definition: RULES_SCOPE } } : null; } };
+  } }), genesis: () => { const input = branch.own(0)?.entry.input; return input?.type === "genesis" ? { ...input, seed: { ...input.seed, kind, definition: `platform:${kind}@${cohort}` as const } } : null; } };
   const preparation = repositorySessionMembership(context, async (directory) => {
     calls++;
     expect(directory).toEqual(branch.bureau.at);
@@ -92,6 +92,20 @@ test("destination session preparation accepts only the verified creator's active
   expect(f.calls()).toBe(4);
   f.clock(f.claims.ends);
   expect(f.readers.allows(valid, "history")).toBe(false);
+
+  // Scripted legacy birth context over the same Branch boundary fixture:
+  // the exact @1 child cohort requires @1 directory bytes, never newest @2.
+  // This is no historical @1 founding or namespace/provider proof.
+  const legacy = fixture("destination", 1);
+  const legacyReader = legacy.token();
+  legacy.answer({ ok: true, value: { scope: legacy.branch.bureau.at, definition: DIRECTORY, status: "active", items: [{ type: "repository", state: "open", refs: { membership: MEMBERSHIP } }] } });
+  await legacy.readers.prepare!(legacyReader, "history");
+  expect(legacy.readers.allows(legacyReader, "history")).toBe(false);
+  legacy.answer({ ok: true, value: { scope: legacy.branch.bureau.at, definition: "platform:directory@1", status: "active", items: [{ type: "repository", state: "open", refs: { membership: MEMBERSHIP } }] } });
+  await legacy.readers.prepare!(legacyReader, "history");
+  expect(legacy.readers.allows(legacyReader, "history")).toBe(true);
+  const another = legacy.token({ membership: { ...MEMBERSHIP, inc: newIncarnation(new Uint8Array(16).fill(9)) } });
+  expect(legacy.readers.allows(another, "history")).toBe(false);
 });
 
 // Invariant: a birth read resolves rules only when the actual directory
