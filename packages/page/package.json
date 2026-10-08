@@ -10,7 +10,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "build": "esbuild src/main.ts --bundle --format=esm --platform=browser --target=es2022 --outfile=dist/page.js && cp src/index.html dist/index.html",
+    "build": "node scripts/assets.mjs",
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json && tsc -p tsconfig.scope.json",
     "test": "vitest run --config vitest.config.ts"
   },
