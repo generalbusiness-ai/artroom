@@ -768,3 +768,822 @@ Use the existing selected safe-output witnesses, not a new conformance or
 provider/version matrix. No tests, compilation, gate or provider probes ran
 for this draft. Implementation, integrated review and full site delivery
 remain in existing a231, after read/clone.
+
+## Exact interface finalization draft under existing a231
+
+This prefix-preserving append answers planner
+`70cc2b2b6c07ed12a9ec0e717ba0df030e8180fb`. The preceding 770 lines are
+unchanged from adopted DESIGN `c4a17ee0d62529a8d8ba574ef6e8a6242effb737`,
+SHA-256 `d29723c803149a351b118f75305b10954f6eff97375b4bd90644fbe43b9b078c`.
+Complete normal verdict `5222bc6f42a33c0ed5134d86b3c8e3c659fa99f3`, adoption
+`e5437627fd3dd8ccf38d797fc3c917d397d30ada`, one-file DESIGN
+`721c2f816cd034e762fa8278de02d4d4354dcc88` (all381 lines) and adoption
+`7349458bc1f40004535434363111e0341b7f97c5` were freshly read. Complete checker draft feedback7ea5b116e501471849346de71625600871eff0a0 was read and reconciled below. Earlier proposed/
+review labels in the immutable prefix describe its history. This append is a
+proposed exact successor, refined by full planner3c27459fcf4fcf52648756554403cdc938bbc123 and full c35b3484612833ffd90c3b330767ef7f8ff1df80 plus raw-record confirmation558df5e210d72c6539bc81dd7a2256e9ff195159, for Root steering and complete normal DESIGN review,
+not finalized allocations, supported source wire, code or activation.
+The actual 280 OwnerKey/AttemptKey/InvocationKey/DutyIdentity/closure/signature/
+terminal-port sections and b74 ArtifactRef/ServiceIdentity/canonical-DAG
+sections were freshly read. Those supplemental readings were selected
+sections, not fresh whole 1141-line280 or whole b74-body coverage.
+
+The prefix's request-order phrase "applicable controller eligibility" applies
+only to configuring/delegating controllers and delegation issuers. A members
+viewer needs current active member/key eligibility, not rules.publish.
+
+### Closed records, domains and roles
+
+Every record below rejects extra/missing fields; a union accepts only its exact
+named variant. Optional previous/configuration fields in the prefix become
+explicit null or exact variants at these finalized interfaces. No null/absent
+value licenses another authority, implementation, mode or epoch. ScopeRef,
+FactRef, Seed, Digest, KeyId, timestamp, canonical JSON/UTF-8 and object-ID
+forms retain their actual contract validators. Artifact digests identify
+retained bytes and complete reference closure, never a ready/verified flag.
+
+Propose these distinct canonical byte domains, each framed as its literal
+tag, newline and canonical payload, with no self-digest: the retained
+`artroom-site-delegation-1`, `artroom-site-configuration-1` and
+`artroom-site-binding-1`; additional `artroom-site-room-binding-1`,
+`artroom-site-factory-read-1`, `artroom-site-factory-receipt-1`,
+`artroom-site-selection-read-1`, `artroom-site-current-use-1` and
+`artroom-site-borrow-1`, `artroom-site-handoff-offer-1`,
+`artroom-site-handoff-acceptance-1`,
+`artroom-site-initial-state-1`, `artroom-site-slot-state-1` and
+`artroom-site-factory-closure-1` (closure signature framing only). These are explicit proposed allocations for owner
+collision checking/adoption, not existing DOMAINS/value-read support. Factory
+contract/ABI, installation, bundle and closure artifact identities use their
+existing owner's canonical/raw-digest contracts; format names are not silently
+promoted to new hash domains. Actual signed publication keys and byte/read/
+lifetime allowances remain prerequisites below.
+
+Define a separate SiteFactoryIntent/SignedSiteFactoryIntent byte contract for
+controller factory mutations. Its cryptographic framing remains the existing
+intent-domain tag/newline/canonical payload and signature primitive; it does
+not extend shipped Intent, FieldValue, SignedIntent, ScopeApi or their guards.
+Factory fields explicitly admit only the closed nested records/null variants
+below. Existing FieldValue excludes nested null, even though the current
+runtime isIntent only checks that fields is a record. Neither fact supplies
+this new factory contract or authorizes a cast through the old type.
+The factory is a separately typed route, never ScopeApi.found or an old R act.
+Its commands require to:null, on:null and exactly expected:{binding:epoch};
+expected.binding equals previous.epoch (a number), and both previous.epoch
+and previous.revision must CAS-match the current authenticated slot position.
+All listed fields are signed. This is the new factory CAS, never an old scope
+item alias; ordinary scope endpoints must not acquire these new kinds. Dedicated factory/slot publication keys
+sign factory receipts/selection statements. Registered renderer keys sign
+site-read/use/borrow requests and are disjoint from human/member/operator
+keys. Registered original recovery executors sign their own duty evidence;
+the factory authenticates it against actual executor ownership. No signer
+role is established by a key supplied in the same request/response.
+
+```ts
+interface SiteFactoryIdentityArtifact {
+  format:"artroom-site-factory-identity-1";
+  service:ServiceId; address:ServiceAddress;
+  namespace:string; object:string; contract:ArtifactRef;
+}
+type SiteFactoryIdentity = Digest;
+type Epoch = number;
+interface SiteAuthorityRef {kind:"site";scope:ScopeId;inc:Incarnation}
+interface SiteSeed {
+ v:1;kind:"site";definition:"platform:site-authority@1";
+ creator:null;cause:Digest;ordinal:0;
+}
+interface SiteFactRef {at:SiteAuthorityRef;seq:number;hash:Digest}
+interface SiteScopeOwnerKey {
+ service:string;namespace:string;object:string;scope:SiteAuthorityRef;
+ nonce:Digest;release:Digest;build:Digest;
+}
+interface SiteScopeAttemptKey {
+ scope:SiteAuthorityRef;origin:SiteFactRef;operation:OperationId;
+ attempt:number;binding:Digest;
+}
+interface SiteScopeInvocationKey {attempt:SiteScopeAttemptKey;ordinal:number;site:string}
+interface FactoryRecordRef {
+  factory:Digest; slot:SiteSlot; seq:number; hash:Digest;
+}
+type SiteOwner =
+  | {kind:"factory";factory:Digest;slot:SiteSlot;nonce:Digest;
+     release:Digest;build:Digest}
+  | {kind:"scope";owner:OwnerKey|SiteScopeOwnerKey};
+interface SiteSlot { service: ServiceId; directory: ScopeRef }
+interface SitePosition { epoch: Epoch; revision: Digest }
+type SiteOriginalCause =
+  | { path: "attachment"; request: Digest; envelope:CanonicalArtifactRef<SignedSiteFactoryIntent>;
+      admission: FactoryRecordRef; roomBinding: Digest; seed: SiteSeed }
+  | { path: "native-selection"; request: Digest; envelope:CanonicalArtifactRef<SignedSiteFactoryIntent>;
+      admission: FactoryRecordRef; roomBinding: Digest; authority: NativeSiteAuthority };
+interface PendingSiteCandidate {
+  definition: "platform:site-authority@1"; seed: SiteSeed;
+  scope: ScopeId; genesis: SiteFactRef | null;
+}
+interface NativeSiteAuthority {
+  ref: ScopeRef; definition: "platform:rules@3"; genesis: FactRef;
+}
+interface AppliedAttachmentAuthority {
+  ref: SiteAuthorityRef; definition: "platform:site-authority@1";
+  seed: SiteSeed; genesis: SiteFactRef;
+}
+type SelectedSiteAuthority = NativeSiteAuthority | AppliedAttachmentAuthority;
+interface SitePendingIdentity {
+  factory: SiteFactoryIdentity; slot: SiteSlot; position: SitePosition;
+  original: Extract<SiteOriginalCause, {path:"attachment"}>;
+  candidate: PendingSiteCandidate;
+  executor: SiteOwner; resources: CanonicalArtifactRef<SiteFactoryLedgerOrigin>;
+}
+interface SiteNativeSelectionIdentity {
+  factory: SiteFactoryIdentity; slot: SiteSlot; previous: SitePosition;
+  original: Extract<SiteOriginalCause, {path:"native-selection"}>;
+  executor: SiteOwner; resources: CanonicalArtifactRef<SiteFactoryLedgerOrigin>;
+}
+interface SiteFactoryIntent<K extends SiteFactoryMutationKind = SiteFactoryMutationKind> {
+  v:1; to:null; actor:KeyId; kind:K; on:null;
+  expected:{binding:Epoch};
+  fields:{factory:SiteFactoryIdentity;slot:SiteSlot;previous:SitePosition;
+          body:BodyOf<K>};
+  idempotencyKey:string; notAfter:Timestamp;
+}
+interface SignedSiteFactoryIntent<K extends SiteFactoryMutationKind = SiteFactoryMutationKind> {
+  intent:SiteFactoryIntent<K>; sig:Signature;
+}
+```
+
+ServiceAddress is the exact independently configured full service URL/origin,
+not a link-selected endpoint. FactoryRecordRef names this factory's durable
+record identity and content digest, not a fabricated Scope FactRef.
+Factory identity is the raw b74 ArtifactId of the complete canonical identity
+artifact, retained with encoding canonical-json; its contract ref names the
+actual closed factory ABI. The configured service/namespace/object/tuple must
+cross-match it. Epochs and record sequences are nonnegative safe integers,
+never negative zero; increments are checked and overflow holds without wrapping.
+Native scope owner means actual 280 OwnerKey/AttemptKey/InvocationKey and
+DutyIdentity exactly. Attachment executions use separately typed SiteScopeOwnerKey,
+SiteScopeAttemptKey/SiteScopeInvocationKey, SiteScopeDutyIdentity and site-scope
+closure forms below, with the same exact owner/attempt/duty semantics and
+field layout, substituting only the dedicated site refs. This is an explicit
+new validator/type branch before support, not a cast through old ScopeRef/Seed/
+FactRef or280 records. Private Digest custody-reference meaning remains280.
+Shipped primitive/record validators and signature bytes remain unchanged.
+Site seed ID/hash uses the existing seed-domain framing; its site-only decoder
+must validate the exact SiteSeed shape rather than call a shipped kind guard. Pre-creation factory owner is
+the distinct closed factory variant above and never has an invented ScopeRef.
+CanonicalArtifactRef<T> is b74 ArtifactRef {digest,bytes,encoding:"canonical-json"}
+whose retained bytes validate as the declared closed T, with raw ArtifactId;
+no schema-name field or generic proof/string alias is stored in that reference.
+Controller/registration EvidenceRef retains b74's actual artifact/kind shape;
+its actual authority/custody/registration correspondence remains a declared
+owner prerequisite, not permission obtained from the reference itself. For attachment
+before creation, scope is seed-derived and genesis:null explicitly means no
+verified incarnation yet. A nonnull genesis must have the same scope, kind,
+definition and exact applied seed/cause. SelectedSiteAuthority never has a nullable
+or shortened authority/genesis: ref equals genesis.at, with the exact applied
+birth proof. Native ref is the actual rules ScopeRef; proposed SiteAuthorityRef
+is the full new site-kind ref, whose allocation/validator is still an owner
+input, not an extension assumed present in shipped ScopeRef. Native selection
+never has an attachment seed or a creation ledger fabricated for R.
+
+Room binding bytes are exactly the prefix's full service/D/M/R/G/repository/
+births/bundles record. Their room-binding-domain digest is used everywhere.
+Required birth/source/build/confirmation/repository and historical evidence is
+retained, typed and attributable; equal names/hashes alone do not select code.
+The signed factory identity, slot.service/D, inline binding and original
+resource/executor references must agree before any mutation. The initialized never-admitted absent slot has epoch0 only through its
+actual signed retained initial state; storage loss/missing answer cannot
+supply it. First admitted candidate uses checked epoch1. Candidate pending,
+completion, held, handoff and retirement retain that epoch; another candidate
+requires checked next epoch after actual predecessor exclusion. Every logical
+slot-state transition changes its revision and CAS-matches both previous
+members. Private audit/custody bookkeeping has its own ledger revision and
+must not silently redefine this slot position.
+
+Request identity is exactly existing intentDigest of the unsigned complete
+SiteFactoryIntent canonical payload, under the unchanged intent-domain framing.
+The dedicated nullable factory schema supplies validation; it does not change
+that digest's input. Original seed.cause equals this unsigned request identity.
+Retain the original signed envelope as a separate canonical-json ArtifactRef,
+including its exact signature, alongside its unsigned request digest; verify
+both association and actor signature before using or settling it. Raw artifact,
+unsigned intent digest and signature are distinct, never interchangeable.
+Receipts, records and original-request lookup bind the unsigned request Digest
+and that retained signed-envelope association, not a new signed-request hash.
+Factory read requests likewise have their exact read-domain payload digest,
+with their separately retained signature; they are not creation intent causes.
+
+### Factory record DAG and separate current revision
+
+Closed canonical records have exactly
+{format:"artroom-site-factory-record-1",factory:Digest,slot,seq,
+ predecessor:FactoryRecordRef|null,previous:SitePosition|null,
+ originalRequest:Digest|null,request:Digest|null,
+ signedRequest:CanonicalArtifactRef<SignedSiteFactoryIntent>|null,epoch,
+ transition:SiteFactoryTransition}. IDs/signatures are external. Ref.hash is exactly b74 raw digestBytes of the original retained canonical
+factory-record payload bytes; for that artifact Ref.hash equals its raw
+ArtifactRef.digest. It is not a framed content hash or ordinary entryHash.
+Artroom-site-factory-record-1 is a schema format only: no extra record hash
+or signing domain is allocated. Existing configured factory receipt/selection
+publisher signatures bind that exact raw FactoryRecordRef, current position
+and request/tuple, so an additional record signature is unnecessary.
+Initial/slot position revisions separately use their selected framed state
+domains, so neither is a raw-record hash or BindingDecision ID. Initialize is seq0 with both predecessors and
+requests and signedRequest null, epoch0 and transition:{kind:"initialize",roomBinding:Digest}.
+Other records have checked seq+1 and exact previous record/position; request
+is their actual unsigned current mutation intent digest, signedRequest retains
+its exact envelope/signature association, and originalRequest is the immutable
+original candidate/selection intent digest. They never include their own ref/resulting state
+revision or a future artifact ID.
+
+SiteFactoryTransition is exactly initialize as above or
+{kind:"admit-attachment",plan:CanonicalArtifactRef<SiteFactoryPlan>} or
+{kind:"select-native",authority:NativeSiteAuthority,roomBinding:Digest,
+ controller:EvidenceRef} or
+{kind:"advance",path:"attachment"|"native-selection",
+ action:"complete"|"hold"|"retire"|"reconcile"|"handoff"|"abort",
+ origin:CanonicalArtifactRef<SiteFactoryLedgerOrigin>,
+ evidence:SiteTransitionEvidence}. SiteTransitionEvidence is a closed path/action match. Attachment complete
+has exactly {controller:EvidenceRef,genesis:SiteFactRef}; native complete has
+{controller:EvidenceRef,authority:NativeSiteAuthority}. Hold has
+{reason:SiteFactoryReason,responsible:SiteOwner,next:RecoveryAction}; retire has
+{kind:"attachment",controller:EvidenceRef,genesis:SiteFactRef,closure:SiteClosureRef}
+or {kind:"native",controller:EvidenceRef,authority:NativeSiteAuthority,closure:SiteClosureRef}; reconcile has
+{controller:EvidenceRef,acquired:ArtifactRef[]}; handoff has
+{offer:CanonicalArtifactRef<SiteHandoffOffer>,
+ acceptance:CanonicalArtifactRef<SignedSiteHandoffAcceptance>,
+ closure:SiteClosureRef|null}; abort has
+{controller:EvidenceRef,closure:SiteClosureRef|null}. Acquired refs must have
+exact declared original evidence/resource types and authorized acquisition;
+they cannot be an arbitrary artifact crawl or substitute record. Missing
+actual controller/evidence correspondence remains held, never a verified
+boolean. Native reconcile/retire/handoff/abort map to their corresponding closed
+evidence shape with the original native identity and actual authority, never
+an attachment genesis; attachment actions carry their pending A. Eight mutation
+kinds, five native actions, path-tagged transitions, five authenticated read
+purposes and six result variants are checked together. Each path/action's
+payload/mutation/result links must agree. No unrelated
+action or mutable state artifact substitutes for required original evidence.
+
+Initial state bytes are exactly
+{format:"artroom-site-initial-state-1",factory:Digest,slot,epoch:0,
+ roomBinding:Digest,record:FactoryRecordRef}. External initial-state-domain
+hash is position.revision. Subsequent state bytes are exactly
+{format:"artroom-site-slot-state-1",factory:Digest,slot,epoch,
+ record:FactoryRecordRef,state:"pending"|"held"|"selected"|"retiring"|"terminal",
+ origin:CanonicalArtifactRef<SiteFactoryLedgerOrigin>,
+ candidate:PendingSiteCandidate|SelectedSiteAuthority,
+ decision:Digest|null,responsible:SiteOwner,next:RecoveryAction|null}.
+External slot-state-domain hash is the current position revision. Selected
+requires the SelectedSiteAuthority shape with a full applied ref/genesis and
+its binding decision; unselected states
+confer no use. Origin/candidate/decision/state associations must match their
+actual retained facts. A generic held state cannot hide missing authority,
+fence or evidence; typed receipts retain the actual reason/next action.
+
+Binding decision digest in artroom-site-binding-1 stays independently
+attributable; it is not the lifecycle position revision. In the complete
+SiteUseContext successor, bindingRevision means current position.revision and
+additional bindingDecision names that selected immutable decision. Thus even
+a same-epoch held/retire/handoff transition invalidates an older current-use
+position. Configuration facts retain their separate R/A causal revisions.
+
+DAG order is plan -> original admission record -> immutable ledger origin ->
+later records/state/evidence. Initial record precedes initial state; each
+later record precedes its resulting slot state. Decisions/evidence used by a
+record already exist and contain no resulting record/revision/self ID. Typed
+publisher signatures/read receipts are later envelopes over those identities.
+Mutable ledger snapshots have their own checked predecessor revision; they
+cannot rewrite an original cause, plan, executor, resource or pending epoch.
+
+### Factory mutation and historical settlement interfaces
+
+SiteFactoryMutationKind and BodyOf<K> are exactly the eight mutation rows
+below, with no generic fields/object fallback. Each has exactly the new
+factory fields record above. Previous is the full authenticated SitePosition;
+expected.binding equals previous.epoch, while the full previous revision and
+epoch are compared together. The final ninth row is a separate read, not a
+mutation kind. Body/kind mismatches or extra nested fields reject.
+
+| Kind | Exact body | Boundary |
+|---|---|---|
+| attach-site | {roomBinding,definition:"platform:site-authority@1"} | Fresh current R/M rules.publish, exact pending CAS before creation. Seed is only creator:null, kind:site, that definition, cause:original intent digest, ordinal:0. Persist original admission/executor/resources before possible creation. |
+| select-native-site-authority | {roomBinding,authority:R,definition:"platform:rules@3",genesis:FactRef} | Fresh controller and exact existing R@3 genesis/Room proof. Starts a new checked epoch only after predecessor exclusion. Creates no A/fake R act. R equals binding.rules; G has the combined compatible meaning. |
+| complete-site-opt-in | {pending:SitePendingIdentity,candidateGenesis:SiteFactRef} | Fresh current controller, exact pending CAS and original settled candidate only; retains original and completion proofs separately. |
+| retire-site-selection | {pending:SitePendingIdentity,candidateGenesis:SiteFactRef,selectionClosure:SiteClosureRef} | Known-applied candidate retained/quarantined; actual original selection continuation fence before terminal epoch. |
+| reconcile-site-opt-in | {pending} | Fresh controller authorizes original evidence recovery only; no new creation, changed seed or inferred absence. |
+| handoff-site-opt-in | {offer:SiteHandoffOffer,targetAcceptance:SignedSiteHandoffAcceptance,executorClosure:null\|SiteClosureRef} | Target's separate current signed acceptance binds this exact pending identity/resources. No mutating executor transfer without actual original closure. |
+| abort-site-opt-in | {pending,closure:null\|SiteClosureRef} | Null can record abort-requested only. Terminal abort requires original queued/in-flight creation/selection exclusion. Applied A uses retirement instead. |
+| settle-native-site-selection | {selection:SiteNativeSelectionIdentity,action:NativeSelectionAction} | Fresh controller, full predecessor CAS, same existing R/Room/original epoch and original duties; no attachment or R birth mutation. |
+| read-only settlement | no mutation body | Separate signed factory-read interface below; never rejudge old notAfter as a fresh creation. |
+
+NativeSelectionAction is exactly
+{kind:"complete",authority:NativeSiteAuthority} or {kind:"reconcile"} or
+{kind:"retire",selectionClosure:SiteClosureRef} or
+{kind:"handoff",offer:SiteHandoffOffer,targetAcceptance:SignedSiteHandoffAcceptance,
+ executorClosure:SiteClosureRef|null} or {kind:"abort",closure:SiteClosureRef|null}.
+All require the outer signed factory/slot/previous/expected fields and current
+controller authority. Complete verifies the same actual existing R genesis/
+Room/original epoch; reconcile only acquires original evidence; retire excludes
+original selection/use continuations and preserves duties; null abort is a
+request only and terminal abort needs actual exclusion. Already selected native
+uses retirement. Handoff uses the path-tagged native offer and actual target
+consent, with no physical transfer absent original closure. None creates,
+deletes, aborts the birth of or repins R. Unknown native selection stays held.
+
+The last row is deliberately not a mutating SiteFactoryIntent kind. Thus the
+mutation set contains the preceding eight kinds. The handoff uses a separately retained canonical offer, never the final
+handoff intent digest, so no content-ID cycle is present. Offer-domain bytes
+are exactly {v:1,factory,slot,identity,previous,targetController,requester:KeyId,
+executor:SiteOwner,resources:CanonicalArtifactRef<SiteFactoryLedgerOrigin>,
+source:KeyId,target:KeyId,nonce:Digest,idempotencyKey,notAfter}. Its external offer digest is computed once; the
+payload contains no own digest, acceptance or final handoff digest.
+Identity is the closed path-tagged union
+{path:"attachment",pending:SitePendingIdentity} or
+{path:"native-selection",selection:SiteNativeSelectionIdentity}.
+Its shared owner/resources/predecessor/target fields cross-match that exact
+variant completely, never converting a native selection into a pending A. The
+requester is the final handoff actor, and the target is its exact current
+full membership/member/key controller identity. The unsigned offer conveys
+no authority; it becomes attributable through the final controller signature.
+
+SignedSiteHandoffAcceptance is the dedicated envelope {payload,sig}, signed
+with the target's actual current controller key over
+artroom-site-handoff-acceptance-1/newline/canonical payload. Payload is exactly
+{v:1,offer:Digest,target:KeyId,nonce:Digest,notAfter:Timestamp}. Offer includes
+complete pending/predecessor/original resources, source and target controller
+keys, nonce and notAfter; its retained digest is in offer-domain bytes. The
+acceptance has no final handoff/acceptance digest and cannot outlive the offer.
+Require both current/unexpired, source/target current eligibility, exact CAS
+and unused acceptance at final handoff. Nonce/byte/lifetime allowances remain
+actual owner inputs, not a new TTL. This statement is consent only, not an
+factory mutation or a cast through shipped nullable FieldValue.
+
+Final signed handoff contains the complete offer and acceptance plus actual
+executorClosure or explicit null. It compares the same factory/slot/pending/
+predecessor/epoch/target/requester/executor/resources, validates target signature
+and current permission/acceptance, and CAS-matches both predecessor members.
+Offer and final handoff keep their listed immutable idempotency keys.
+Acceptance has no idempotencyKey field: its exact replay identity is the
+external SHA-256 of UTF8("artroom-site-handoff-acceptance-1\n") plus canonical
+bytes of that unsigned payload. Signature/envelope artifact association is
+retained separately. Consume one acceptance for its exact offer/target/nonce/
+full predecessor. An equal original retry returns only the retained outcome,
+never another handoff or refreshed deadline/consent. All three retain their exact deadlines; final admission must precede all three deadlines and
+satisfy actual configured lifetime bounds. No retry refreshes any of them.
+The current offering controller and current target controller remain eligible
+at final admission. Null closure transfers inspection/recovery responsibility
+only; mutation needs the actual original executor fence. This transfers no
+human keys, provider plaintext or old Room duties.
+
+A native selection's resource ledger belongs only to its actual selection
+and site-use responsibilities; it cannot state that the factory created R.
+A held/lost native selection is settled through authenticated original-request
+or native-selection reads, with the original signed association, admission,
+full existing R birth/source and selected/held/terminal-native-selection result.
+Fresh settle-native-site-selection action:complete finishes only the same R/
+Room/original epoch; it records new completion without rewriting birth/cause.
+Native retire requires fresh current controller, entire-position CAS and actual
+original selection exclusion; it retains R/G and all site/old duties. Its
+terminal-native-selection result names that exact original selection/authority/
+record/closure. No pending attachment, seed, R creation or A deletion is
+fabricated to fit settlement. Native unknown selection never enters attachment
+creation/abort; unsupported evidence remains held with actual owner/action.
+Original attach is the only command permitted to establish its exact seed;
+new completion/reconciliation/retirement signatures never rewrite that cause.
+Retries of an admitted original attach retain its original bytes/key/deadline/
+idempotency identity. Completion is a new current request, not an old issuer
+refresh. Unknown creation remains bound to the original candidate and owner.
+A native selection has its actual existing R genesis and no creation ledger
+fabricated for R. Both paths still require configuration/delegation before use.
+
+A closed factory decision in binding-domain bytes has exactly:
+
+```
+{v:1,factory,slot,positionPrevious,epoch,roomBinding,
+ authority:SelectedSiteAuthority,original,
+ completion:null|FactoryRecordRef,controllerProof:EvidenceRef,
+ admittedAt:Timestamp,executor:SiteOwner,
+ resources:CanonicalArtifactRef<SiteFactoryLedgerOrigin>}
+```
+
+Its external digest is bindingDecision, the immutable selected decision ID.
+It is distinct from bindingRevision/position.revision, the current slot-state
+hash. Neither its own decision ID nor a resulting state revision is inside
+this decision payload. Native original.path is native-selection and
+binds its actual factory selection request/admission separately from R's
+existing genesis/source cause. Attachment original.path is attachment and its
+seed.cause equals original.request. Pending, receipt and decision copies must
+agree on every original/factory/slot/epoch/candidate/executor/resource field;
+a factory admission or a renamed request can never replace R's birth cause. Publication/receipt records bind this exact decision,
+CAS predecessor, tuple and request digest. A conflicting repeat is held;
+no second authority or revision is selected under the same pending predecessor.
+
+Factory receipts are signed envelopes {payload,sig}; payload has exactly
+{v:1,factory,slot,request:Digest,tuple:Digest,record:FactoryRecordRef,result}.
+Result is one closed variant:
+
+```
+{state:"pending",pending,responsible:RecoveryOwner,next:RecoveryAction}
+| {state:"selected",decision:Digest,position:SitePosition,authority:SelectedSiteAuthority}
+| {state:"held",pending,reason:SiteFactoryReason,responsible,next}
+| {state:"held-native-selection",selection:SiteNativeSelectionIdentity,
+   reason:SiteFactoryReason,responsible,next}
+| {state:"terminal",pending:SitePendingIdentity,decision:FactoryRecordRef,closure:SiteClosureRef}
+| {state:"terminal-native-selection",selection:SiteNativeSelectionIdentity,
+   decision:FactoryRecordRef,closure:SiteClosureRef}
+```
+
+RecoveryAction is only acquire-original-evidence, ask-current-controller,
+complete-same-candidate, retire-known-selection, recover-original-fence or
+settle-original-duties. SiteFactoryReason is only missing-provenance,
+unsupported-contract, unavailable-proof, current-authority-missing,
+predecessor-conflict, candidate-conflict, creation-unknown or fence-unproved.
+Ordinary request shape/signature/expiry/authority refusals keep their actual
+existing refusal class; they do not become an acknowledged pending receipt.
+Detailed pending/resources are returned only to a current controller or an
+exact registered responsible recovery executor. A viewer gets a bounded
+nondisclosing denial. No response manufactures candidate incarnation or
+closure; no status/receipt releases secrets or grants new use.
+
+### Exact authenticated reads and current selection
+
+Signed factory reads have {payload,sig}; payload has exactly
+{v:1,factory,slot,actor:KeyId,authorization,purpose,nonce,notAfter,tuple}.
+Authorization is exactly {role:"renderer",registration:EvidenceRef} or
+{role:"recovery",registration:EvidenceRef,executor:SiteOwner} or
+{role:"controller",controllerProof:EvidenceRef}. Controller authorization is
+actual fresh R/M rules.publish, not service registration or old issuer status.
+Purpose is exactly {kind:"binding"} or {kind:"locator",locator:ScopeId} or
+{kind:"pending",pending:SitePendingIdentity} or
+{kind:"native-selection",selection:SiteNativeSelectionIdentity} or
+{kind:"original-request",request:Digest}. Renderer is allowed binding/locator discovery only.
+All detailed purposes require current controller/exact original recovery
+authorization and the same full service/factory/D slot.
+
+Original-request lookup solves lost first replies without inventing generated
+executor/resources. It locates only that exact originally signed request and
+returns its actual retained pending/native-selection identity, selected
+receipt or established terminal record under the same closed receipt variants.
+The factory verifies retained envelope/signature/admission/cause correspondence;
+request digest possession alone grants no read. It neither submits creation
+nor resets selection/expiry, chooses another epoch/candidate, or returns history.
+Once learned, subsequent detailed settlement binds the complete original
+identity. A lost reply is not grounds to refresh/re-sign the opt-in.
+Actual registration verification, nonce/replay/lifetime/byte bounds and signer
+custody come from the existing security/executor owners. They are not granted
+by these fields or an ordinary member session. No public history, service
+credential or operator override is added.
+
+A binding/selection answer in selection-read-domain bytes has exactly
+{v:1,factory,slot,request:Digest,tuple:Digest,at:FactoryRecordRef,result} and its
+configured slot publisher signature. Result is {state:"absent",position} or
+{state:"pending",position} or {state:"disabled",position} or
+{state:"selected",position,decision:Digest,authority:SelectedSiteAuthority}.
+The first three disclose no candidate/resources. Selected carries the exact
+retained decision/genesis proof through the typed internal acquisition path,
+not arbitrary caller URLs. Online selection requires the actual active tuple,
+monotonic publication floor and independently trusted publisher. A valid old
+signature proves the old statement only. Historical settlement uses the
+retained admission/code evidence and current read authorization, not current
+mutation permission for an expired original request.
+
+The site-only slot publisher maintains its authenticated locator index from
+the verified complete Room binding at slot admission; it is not a generic
+registry. Closed locator bytes are exactly
+{format:"artroom-site-locator-1",factory:Digest,service:ServiceId,
+ locator:ScopeId,directory:ScopeRef,genesis:FactRef,roomBinding:Digest,
+ position:SitePosition,record:FactoryRecordRef,tuple:Digest}.
+The actual factory publisher signs this canonical artifact under proposed
+artroom-site-locator-1 domain. Signed locator read binds actual configured
+factory/service, requested locator, nonce/notAfter and active tuple in the
+same factory-read contract, with purpose:{kind:"locator",locator:ScopeId};
+renderer authorization is discovery-only, never detailed pending/resources.
+Answer binds request digest, current factory record/position, locator artifact
+and publisher signature; absent/conflict is nondisclosing denial.
+
+Locator equals directory.scope and genesis is exact applied directory birth;
+service/factory/room-binding/current position cross-match the current slot.
+Lookup must yield one exact currently selected full D. Missing/conflicting
+incarnations deny; no newest-incarnation fallback. Mapping changes need explicit
+publisher-authenticated adjudication plus current slot cross-check and retain
+old evidence. A URL/path/hostname/Room JSON supplies no such authority. These
+new exact locator signature/read/index forms require owner allocation and
+source support; declaration parsing is not implementation.
+
+### Exact factory ledger, use and closure contracts
+
+The following are distinct canonical-json b74 artifacts, not scope280 records
+by cast. The site's proposed artifact format strings are explicit schema
+identities; their raw IDs use b74 and are not new hash domains.
+
+```ts
+interface SiteFactoryPlan {
+ format:"artroom-site-factory-plan-1"; factory:Digest; slot:SiteSlot;
+ epoch:Epoch; request:Digest;envelope:CanonicalArtifactRef<SignedSiteFactoryIntent>;
+ previous:SitePosition;
+ candidate:PendingSiteCandidate|NativeSiteAuthority;
+ owner:Extract<SiteOwner,{kind:"factory"}>; tuple:Digest;
+ reservation:Digest;
+ calls:{ordinal:number;kind:"create-original-attachment"|"select-original-authority"}[];
+}
+interface SiteFactoryLedgerOrigin {
+ format:"artroom-site-factory-ledger-origin-1";factory:Digest;slot:SiteSlot;
+ epoch:Epoch;request:Digest;admission:FactoryRecordRef;
+ plan:CanonicalArtifactRef<SiteFactoryPlan>;
+ originalOwner:Extract<SiteOwner,{kind:"factory"}>;
+ reservation:Digest;tuple:Digest;
+}
+interface SiteFactoryLedgerState {
+ format:"artroom-site-factory-ledger-state-1";
+ origin:CanonicalArtifactRef<SiteFactoryLedgerOrigin>;
+ revision:number;predecessor:CanonicalArtifactRef<SiteFactoryLedgerState>|null;
+ owner:SiteOwner;
+ phase:"pending"|"creation-may-start"|"created-unselected"|"selection-held"
+      |"selected"|"retiring"|"closed";
+ candidate:PendingSiteCandidate|SelectedSiteAuthority;
+ uses:CanonicalArtifactRef<SiteUseIdentity>[];
+ scopeDuties:CanonicalArtifactRef<DutyIdentity|SiteScopeDutyIdentity>[];
+ custody:{ref:Digest;use:CanonicalArtifactRef<SiteUseIdentity>;owner:SiteOwner}[];closure:SiteClosureRef|null;
+}
+type SiteUseTarget =
+ | {kind:"create";seed:SiteSeed;scope:ScopeId}
+ | {kind:"select";authority:SelectedSiteAuthority;roomBinding:Digest}
+ | {kind:"content";action:"mint"|"borrow"|"host-read"|"response-release";
+    repository:{host:string;namespace:string;name:string;id:string};
+    commit:ObjectId;path:string;profile:"site-safe@1";
+    rights:["repository.read"];requestedExpiry:Timestamp;
+    prepared:Digest|null};
+interface SiteFactoryUseOrigin {
+ format:"artroom-site-factory-use-origin-1";
+ factory:Digest;slot:SiteSlot;epoch:Epoch;
+ ledger:CanonicalArtifactRef<SiteFactoryLedgerOrigin>;
+ owner:Extract<SiteOwner,{kind:"factory"}>;request:Digest;
+ requestSource:{kind:"factory-admission";record:FactoryRecordRef;
+                envelope:CanonicalArtifactRef<SignedSiteFactoryIntent>}
+             | {kind:"scope-admission";fact:FactRef|SiteFactRef;
+                envelope:CanonicalArtifactRef<SiteReadSignedIntent>};
+ ordinal:number;target:SiteUseTarget;
+ boundary:"create"|"select"|"mint"|"borrow"|"host-read"|"response-release";
+ context:CanonicalArtifactRef<CompleteSiteUseContext>|null;
+ custody:Digest|null;tuple:Digest;
+}
+type SiteUseIdentity =
+ | {kind:"factory";origin:CanonicalArtifactRef<SiteFactoryUseOrigin>}
+ | {kind:"scope";owner:OwnerKey;attempt:AttemptKey;invocation:InvocationKey;
+    duty:CanonicalArtifactRef<DutyIdentity>|null;
+    context:CanonicalArtifactRef<CompleteSiteUseContext>;target:SiteUseTarget;custody:Digest|null}
+ | {kind:"site-scope";owner:SiteScopeOwnerKey;attempt:SiteScopeAttemptKey;
+    invocation:SiteScopeInvocationKey;duty:CanonicalArtifactRef<SiteScopeDutyIdentity>|null;
+    context:CanonicalArtifactRef<CompleteSiteUseContext>;target:SiteUseTarget;custody:Digest|null};
+interface SiteFactoryExclusion {
+ format:"artroom-site-factory-exclusion-1";factory:Digest;slot:SiteSlot;
+ epoch:Epoch;owner:Extract<SiteOwner,{kind:"factory"}>;
+ origin:CanonicalArtifactRef<SiteFactoryLedgerOrigin>;closedRevision:number;
+ consumedUses:CanonicalArtifactRef<SiteFactoryUseOrigin>[];
+ carriedDuties:CanonicalArtifactRef<DutyIdentity|SiteScopeDutyIdentity>[];
+ retainedCustody:{ref:Digest;use:CanonicalArtifactRef<SiteUseIdentity>;owner:SiteOwner}[];
+ terminalCorrespondence:EvidenceRef;
+}
+interface SiteFactoryClosure {
+ format:"artroom-site-factory-closure-1";factory:Digest;slot:SiteSlot;
+ epoch:Epoch;owner:Extract<SiteOwner,{kind:"factory"}>;
+ origin:CanonicalArtifactRef<SiteFactoryLedgerOrigin>;
+ predecessor:CanonicalArtifactRef<SiteFactoryLedgerState>;
+ closedRevision:number;exclusion:CanonicalArtifactRef<SiteFactoryExclusion>;
+ tuple:Digest;
+}
+type SiteClosureRef =
+ | {kind:"factory";closure:CanonicalArtifactRef<SignedSiteFactoryClosure>}
+ | {kind:"scope";attestation:CanonicalArtifactRef<SignedOwnerRecord<ClosurePayload>>;
+    ownerState:CanonicalArtifactRef<OwnerClosedState>;
+    exclusion:CanonicalArtifactRef<LocalClosureRecord>}
+ | {kind:"site-scope";attestation:CanonicalArtifactRef<SignedOwnerRecord<SiteScopeClosurePayload>>;
+    ownerState:CanonicalArtifactRef<SiteScopeOwnerClosedState>;
+    exclusion:CanonicalArtifactRef<SiteScopeLocalClosureRecord>};
+```
+
+SiteScopeDutyIdentity has exactly 280 DutyIdentity's format/invocation/binding/
+plan/admission/purpose/originalDispatcher/originalMintOwner/originalMintInvocation
+fields, with the three owner/invocation fields and invocation using dedicated
+SiteScope keys. SiteScopeClosurePayload has exactly 280 ClosurePayload fields,
+using SiteScopeOwnerKey/AttemptKey. SiteScopeOwnerClosedState and
+SiteScopeLocalClosureRecord have exactly the 280 fields with those site-scope
+key substitutions. These explicit site-only forms retain 280 original duty,
+permit, closure/finalization/no-resend semantics and signature framing, but
+need their own declared typed validators and actual runtime tuple before use;
+old ScopeRef/Seed/FactRef/OwnerKey validators are byte-identical. No factory
+owner or pre-genesis candidate is cast through this site-scope branch.
+
+SignedSiteFactoryClosure is exactly {key:KeyId,payload:SiteFactoryClosure,sig},
+with the registered actual factory executor key, actual ownership/tuple and
+retained terminal exclusion correspondence; its canonical artifact/signature
+framing is Ed25519 over artroom-site-factory-closure-1/newline/canonical
+SiteFactoryClosure payload. The signed envelope is separately a raw b74
+canonical-json artifact. Actual domain/key/allocation/custody correspondence
+remains a security/executor-owner input. A signature alone is
+not proof that an older deployed continuation cannot execute. Scope closure
+keeps the actual 280 domains, permit/attempt/owner/exclusion/finalization and
+DispatchAuthority semantics without alteration.
+
+Plan calls are exactly create then select for attachment, only select for
+native; selection consumes only the same verified original result/authority.
+No missing genesis/default ID is put in a pre-created scope owner. Origin is
+immutable and retains original admission/plan/reservation/owner. State starts
+revision0 with predecessor:null, then checked increment/full predecessor CAS;
+physical ownership changes require actual original closure. Each custody association's ref is the existing private Digest record reference,
+not a response/token hash. Its owner and typed use must match the exact retained
+original attempt/invocation/duty/store associations, with no duplicate or
+reassigned custody. Neither a bare Digest nor a list entry proves cleanup.
+Create/select use may have context:null; mint/borrow/host/release require the
+complete context, with no nullable permission fallback. Ledger/use references
+never grant access, readiness, new cleanup privilege or a re-mint. Exclusion
+precedes closure, which precedes the next closed state: no content-ID cycle.
+SiteFactoryUseOrigin.request is only the unsigned intent-domain digest of
+its prior actual original/admission envelope identified by requestSource. For
+create/select it binds the already retained factory admission/original request;
+for content it may bind the already admitted renderer site-read intent under
+actual G/A with its exact fact/signature. SiteReadSignedIntent is that separately
+adopted new-site schema, not a nullable cast through shipped Intent. Its exact
+actual schema/validator/source remains a prerequisite. No origin refers to
+the current-use or borrow envelope embedding that origin; their own payload
+digests are later different identities. Missing prior admission holds use,
+not a synthetic current-use hash substituted for the original. This preserves
+prior request -> use origin -> current-use/borrow request -> consumed result.
+
+Plan and immutable pending origin keep pre-creation genesis:null. A later
+applied proof is separate in ledger state/selected authority/settlement evidence;
+it never rewrites plan/origin bytes. Pending copies compare immutable factory/
+slot/epoch/request/seed/scope/owner/resources; genesis may be filled only in the
+later typed applied evidence and must match that exact seed/full SiteFactRef.
+Native birth remains its actual prior FactRef, never an A creator record.
+
+Every scope/site-scope/factory use binds target explicitly. Create consumes
+only its exact seed-derived original scope; select consumes only the full
+verified original authority/Room binding. Content target action equals the
+boundary and exact repository/commit/path/profile equals CompleteSiteUseContext.
+Path is the actual normalized request path under the authorized immutable
+commit, not an unchecked browser string; profile is exactly site-safe@1.
+Requested expiry/rights match actual admitted request/delegation/current
+custody constraints. Prepared is a private Digest reference to the bounded
+owner-held response bytes for response-release, never a bearer or public raw
+content hash; it is nonnull for body release, null for preceding preparation
+or no-body304, whose path/type/eligibility still require this target. An opaque
+handle cannot substitute for these explicit cross-bound members. Ordinary
+bounded nondisclosing denial when no complete context exists carries no site
+bytes/304/private metadata and is not a successful content-use permission.
+
+Actual capacity reservation schema, typed custody associations, state/use
+judgments and terminal correspondence remain executable owner prerequisites,
+not assumed present because the artifact bodies are closed.
+
+### Current-use decision and terminal native consume
+
+CompleteSiteUseContext has exactly
+{service:ServiceId,directory:ScopeRef,bindingEpoch:Epoch,bindingRevision:Digest,
+ bindingDecision:Digest,authority:ScopeRef|SiteAuthorityRef,
+ authorityDefinition:"platform:rules@3"|"platform:site-authority@1",
+ configuration:{fact:FactRef|SiteFactRef,digest:Digest},
+ delegation:{fact:FactRef|SiteFactRef,digest:Digest},
+ repository:{host,namespace,name,id},publishedCommit:ObjectId,
+ publication:{destination:ScopeRef,publication:FactRef,receipt:FactRef,
+              proof:EvidenceRef},path:string,rendering:"site-safe@1",viewer}.
+Authority definition/ref/fact variants must match the one actual selected
+NativeSiteAuthority or AppliedAttachmentAuthority; configuration/delegation
+facts belong to that authority and their own canonical byte domains.
+Publication facts remain actual G FactRefs under G's actual bundle. Viewer is
+exactly the public/members variant below. No absent/null field is complete.
+
+SiteUseContext remains the prefix's exact partial selection record until all
+configuration/delegation/publication proofs resolve. Every consuming interface
+requires the complete record plus the exact renderer installation/key,
+configuration/delegation digests, proved publication/receipt and current viewer
+classification. Public viewer is exactly {audience:"public"}; members viewer
+is {audience:"members",membership:M,member:MemberId,key:KeyId,
+ standing:CanonicalArtifactRef<Observation>,session:Digest}. The session digest is a nonsecret identity,
+not its bearer; actual current summary eligibility/standing is still checked.
+No renderer or cache infers completion from absent fields or a boolean.
+
+Proposed current-use request is a signed renderer envelope in current-use-domain
+bytes. Payload has exactly {v:1,factory,slot,context,renderer:{installation,key},
+ owner:SiteOwner,use:SiteUseIdentity,boundary,tuple,nonce,
+ notAfter}. Boundary is only mint, borrow, host-read or response-release.
+SiteUseIdentity binds the actual owner authority/mint scope (G@3 for native,
+A for attachment), holder/read request, operation/attempt/origin where admitted,
+configuration/delegation and the explicit exact SiteUseTarget repository/commit/path/profile. An absent
+operation is an explicit not-yet-admitted variant, never an invented operation
+or license to re-mint an unknown attempt. Exact forms/physical ownership are
+an existing executor/custody-owner input.
+
+Current decision is not a lease, bearer, cached permission or reusable TTL
+capability. Its signed statement is exactly {v:1,factory,slot,request:Digest,
+ tuple,at:FactoryRecordRef,selection:SitePosition,authority:SelectedSiteAuthority,
+ use:SiteUseIdentity,boundary,disposition:"current"|"stale"|"held"}.
+That statement alone authorizes no consume. Actual terminal native consume
+must authenticate and compare the live slot position/authority, complete
+context/current configuration, viewer/issuer/service/expiry/custody and exact
+original owner at the final native call boundary, with no awaited gap to that
+single borrow/mint/host invocation or response-byte release. Any awaited proof,
+RPC, host read or response preparation returns to this gate, including cache
+hits and304. Replacing the slot invalidates old contexts even if old A's own
+configuration remains valid. Buffered bytes cannot bypass the release gate.
+
+One authoritative site-slot owner performs slot mutations and all final
+mint/borrow/host/release/cache304 consumption. Remote proof preparation can
+precede it; bounded prepared response bytes return to that owner for final
+release. Its trusted terminal port serializes full predecessor/owner/context
+checks against its actual current slot state and invokes/consumes the exact
+native operation in the same synchronous final segment. No awaited gap or
+remotely returned disposition supplies final permission. Scope-owned physical
+calls use the trusted local280 DispatchAuthority only where complete identities
+match; factory-owned calls use the distinct SiteOwner variant and actual
+source-supported terminal authority. This design picks that owner/port, not a
+generic distributed transaction/fence or an invented callback authority.
+The implementation must supply actual selector-to-terminal-consume coupling
+and original-owner exclusion proof in the reviewed runtime/executor tuple.
+A proposed check-then-remote-call, stale replica, TTL authorization or generic
+transaction/fence object cannot satisfy it. This draft adds no generic fence
+authority; where the actual runtime cannot provide that coupling, current use
+is unsupported/held. A signed disposition:"current" from an earlier call must
+not be accepted as substitute evidence. The required operation interface is
+consumeCurrentSiteUse(signedUseRequest, terminalNativeAction), where the latter
+is the exact owner-bound mint/borrow/host-read/response-release action matching
+boundary/use/context. It is not an arbitrary callback or caller-selected URL.
+Its opaque handle/wire/native ABI must be supplied by the executor/custody
+owner, cross-bound to the actual terminal side effect/release and coherent
+tuple. Until that exact owner contract and coupling proof exist, no consume
+interface or permission is claimed available by the declaration parser. Started original attempts remain
+owned; the next response/use still gates current selection.
+
+Borrowing uses its separate signed borrow-domain request with exactly
+{v:1,factory,slot,context,renderer:{installation,key},use:SiteUseIdentity,
+ mint:{kind:"native",scope:ScopeRef,operation:OperationId,attempt:number}
+    | {kind:"attachment",scope:SiteAuthorityRef,operation:OperationId,attempt:number},custody:Digest,
+ tuple,nonce,notAfter}. The private result is an opaque owner-bound borrow
+handle, not a bearer in a receipt/history/URL. It binds those exact fields and
+can be consumed only by the authenticated dedicated renderer's native host
+port after the current-use gate. The existing private store owns plaintext;
+borrow completion/expiry cannot pretend provider revocation. Only an actual
+original recorded duty authenticates reconciliation/cleanup without new-use
+permission. Full current-use/borrow/registration/custody API and actual rights/
+ID/expiry/revocation correspondence must be implemented and proved before use.
+
+### Combined c4 plus721 allocation and tuple dependency map
+
+| Component | One combined contract and unchanged boundary | Actual prerequisite/owner |
+|---|---|---|
+| R/G@3 | One unshipped rules meaning: site acts/items/pointer/observation plus separate configuration-2 keeping and exact selector publishing. One destination meaning: site holders/mint/private borrowing/cleanup plus721 immutable one-file candidate/refused/unknown/late-answer mapping and real operation/time-bound commit reproduction. | Version/platform owners verify unused R/G@3 allocation and whole canonical data/rules/observation/ABI bodies; never competing @3 or rewritten @1/@2. |
+| Root/children | Exact coherent register/directory/membership/rules/destination/inbox births and confirmations. Child-creation changes receive verified fresh identities. | Actual allocation inventory and bundle/birth/source/admission proof; do not assume register@3/directory@3 or silently alter @2. |
+| Attachment/factory | Independently pinned site authority, exact null-creator seed, full Room binding, single site slot and native-versus-attachment selection above. | Site/contract/executor owners allocate actual kind/definition/profile/byte domains/factory record/CAS forms, publisher/read roles and source correspondence. Proposed site/@1 labels alone are not proof of unused allocation. |
+| Signature/trust/custody | Existing controller intent; separate factory/slot publisher, renderer and original recovery signatures/registered custody; no ordinary MemberRef fiction. | Actual service IDs/full addresses, namespaces, public keys, registration/publisher/rotation receipts, secret custody and strict final calls. No key/config guessed or new registry. |
+| Viewer/observation | Separate site operation over existing summary-session authentication plus current plain member/key standing; R@3 site observation and independently typed A observation. | Exact contracts/retained domains, historical M/R meaning, current birth/source/session and after-await proofs; v1 SessionClaims unchanged. |
+| Publication/navigation | Actual judged first-head/import/integration and written nonconflicting receipt/verified objects; immutable same-commit links/images; eligible branch/tag/human label mappings. | G's actual bundle and receipt/source closure plus navigation owner's exact mapping schema and current eligibility. HEAD/proved-commit staging is not full delivery. |
+| One-file/lane |721 base/tree/path/digest/size/previous/target rows, same-mode supersession, actual current predecessor and no intended/committed/unknown merge overlap; new full/demo digests. | Lane/version owners freeze exact new digests and preserve old pins/jobs/reviews/tokens/deadlines. Cross-mode conversion remains held. |
+| Checker | Configuration-1 unchanged; exact configuration-2 selector, canonical one-file ABI, immutable image/adapter/resolved-image, closed report/details/reasons and precedence. | Retained actual contracts/code/image/ABI/reference closure and service-read exact job/target/selector; incompatibility before mint/start, never waive required checks. |
+| Object/checkout | Pure editTree and separate real editCommit; typed authorized base object closure, real base HEAD/candidate index/all tracked worktree before steps. | Existing local/gateway acquisition and live job custody, actual reader/runner adapter/source; no public site acquisition or fabricated candidate commit. |
+| Admission/executor | Separate exact original admission/send/use/resource identities and current terminal consume; pending settlement/retirement/handoff/abort exclude old continuations. | Actual original owner/nonce/release/build/fence/drain/closure proofs and coherent active tuple; no timeout/lease/boolean substitute. |
+| Capacity/retention | Protected immutable Room/binding/config/delegation/manifest/job/content/base/ABI/image/proofs; original holders, mint/unknown/cleanup and caches. | Existing capacity owner supplies measured bytes/work/peak/lifetime/backlog allowances and physical reservations; no new quotas or matrix. |
+
+An actual terminal port must also preserve the bounded 721 read/checker
+acquisition and280 auxiliary mint/cleanup duties; calling an inspection/read
+cannot exempt its physical token mutations from the same owner/exclusion
+boundary. These duties retain their own original scope keys or explicit
+factory origins, never an invented scope or a transferred live bearer.
+
+The complete signed activation tuple must retain the existing stable service,
+generation, runtime release/build, registry/routing revision/digest, bundle-set
+and reviewed compatibility identities, and bind the exact combined cohort,
+factory/slot/signature/controller/viewer/observation/current-use/borrow/renderer/
+publication/navigation contracts; configuration-2/lane/checker/ABI/image/adapter/
+report/details/driver identities; authorized reader/host/provider/custody and
+actual admission/executor/consume coupling; and measured capacity/retention
+reference closure. Every referenced artifact is retained/validated under its
+own typed domain before activation. A list of names, ready flag, parser pass
+or pure-helper success does not establish this tuple or source support.
+
+### Missing inputs before freezing or source enablement
+
+This draft now implements the six concrete3c owner choices: initialized
+absence0/checked next1, exact full-position CAS and separate decision digest,
+factory-record/initial/current-state DAG, acyclic offer/acceptance, distinct
+factory-versus-280 scope ownership with typed b74 ledger/use/closure artifacts,
+one authoritative terminal slot owner, and authenticated full-D locator index.
+It chooses exact record shapes and proposed domains, not factual allocations
+or credentials. Still missing: verified unused identity/
+domain inventory; actual new-kind/domain allocation, configured factory identity and publisher
+registration plus controller/renderer/recovery evidence contracts;
+SiteAuthorityRef allocation, actual validation/source correspondence of the closed transition evidence and native
+consume/borrow wire/opaque-handle correspondence; actual capacity reservation,
+state/use/custody association/closure-signature/terminal exclusion schemas and
+execution proof;
+actual handoff domain/nonce/lifetime allocation and target-controller proof evidence; complete executor/use/resource/
+custody references and terminal consume coupling; actual initialized slot/locator publisher/index/adjudication source and signature/key correspondence;
+actual operator/factory/renderer/recovery keys, roles, service addresses and
+custody/rotation/publication evidence; actual whole historical bundles/builds/
+admissions/cohort; actual immutable image/ABI/adapter/code correspondence;
+exact authenticated configuration/observation/borrow/receipt/source-read wiring;
+provider repository/right/ID/absolute-expiry/revoke proof; navigation mapping;
+and measured proof/body/retention/work/peak/lifetime/reservation allowances.
+
+Root must resolve or explicitly carry each remaining actual owner input before freezing this
+successor; the dedicated site-scope forms also need exact executor/contract allocation and support. Whole normal DESIGN review/adoption follows; implementation, compact
+boundary witnesses, complete integrated source/gate and original filing order
+remain separate. No code, grants, parser enablement, imports, tests, gate,
+provider, key/config changes or activation were performed for this append.
