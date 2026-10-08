@@ -41,6 +41,27 @@ const join = (...parts: Uint8Array[]): Uint8Array => {
 };
 const PNG = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4]);
 
+/**
+ * A pack with these tag objects added after its own: `buildPack` writes commits, trees and blobs only, which is all a push
+ * sends. Each tag is an undeltified entry of type 4, its data deflated; the count and the trailer are written again.
+ */
+async function withTags(pack: Uint8Array, tags: readonly RawGitObject[]): Promise<Uint8Array> {
+  if (tags.length === 0) return pack;
+  const entries: Uint8Array[] = [];
+  for (const tag of tags) {
+    const head = [(4 << 4) | (tag.data.length & 15)];
+    for (let size = tag.data.length >>> 4; size > 0; size >>>= 7) {
+      head[head.length - 1]! |= 0x80;
+      head.push(size & 0x7f);
+    }
+    const deflated = new Uint8Array(await new Response(new Blob([tag.data]).stream().pipeThrough(new CompressionStream("deflate"))).arrayBuffer());
+    entries.push(Uint8Array.from(head), deflated);
+  }
+  const body = join(pack.subarray(0, pack.length - 20), ...entries);
+  new DataView(body.buffer).setUint32(8, new DataView(pack.buffer, pack.byteOffset).getUint32(8) + tags.length);
+  return join(body, new Uint8Array(await crypto.subtle.digest("SHA-1", body)));
+}
+
 /** STAND-IN for the hosting's own Git service: the binding and its smart-HTTP upload-pack, over a map of refs and objects. */
 class Scripted {
   name: string | null = null;
@@ -108,7 +129,8 @@ class Scripted {
     if (request.method === "POST" && url.pathname.endsWith("/git-upload-pack")) {
       this.packs++;
       // Every object, whatever is wanted: the source keeps what it was sent and checks each object it reads.
-      const pack = await buildPack([...this.objects.values()], { maxBytes: MAX_BYTES });
+      const all = [...this.objects.values()];
+      const pack = await withTags(await buildPack(all.filter((o) => o.type !== "tag"), { maxBytes: MAX_BYTES }), all.filter((o) => o.type === "tag"));
       return new Response(join(utf8(pkt("NAK\n")), pack), { headers: { "content-type": "application/x-git-upload-pack-result" } });
     }
     return new Response("unscripted", { status: 404 });
@@ -119,6 +141,7 @@ const host = new Scripted();
 let D: Platform;
 let R: Platform;
 let siteEnv: SiteEnv;
+let nav: string;
 const get = (path: string, init?: RequestInit, environment: SiteEnv = siteEnv) => site(new Request(`https://scopes.test${path}`, init), environment, host.fetch);
 const prior = { hold: net.hold, deaf: net.deaf };
 
@@ -150,6 +173,23 @@ beforeAll(async () => {
   host.refs.set("refs/heads/moving", first);
   host.refs.set("refs/tags/v1", first);
   host.refs.set("refs/tags/empty", host.commit({}, "empty\n"));
+
+  // The navigation's room: two folders, one with no index page, dot-files, and the tag `nav`; and an annotated tag `release` of it.
+  nav = host.commit({
+    "README.md": "# Handbook\n\nThe [guide folder](guide), [the notes](notes/) and [the notes again](guide/../notes).\n",
+    "guide/start.md": "# Getting *started*\n\nBack to [this folder](./) and [the top](../).\n",
+    "guide/plain.md": "No heading here.\n",
+    "guide/.hidden.md": "# Hidden\n",
+    "guide/.config/x.md": "# X\n",
+    "guide/deep/index.md": "# Deep\n",
+    "guide/logo.png": PNG,
+    "notes/index.md": "# Notes index\n",
+  }, "nav\n");
+  host.refs.set("refs/tags/nav", nav);
+  const tag = utf8(`object ${nav}\ntype commit\ntag release\ntagger Rita <rita@example.invalid> 1791000000 +0000\n\nrelease\n`);
+  const tagId = idOf("tag", tag);
+  host.objects.set(tagId, { id: tagId, type: "tag", data: tag });
+  host.refs.set("refs/tags/release", tagId);
 });
 
 afterAll(() => {
@@ -331,4 +371,102 @@ test("an empty tree: the root of a commit with no files answers a page that says
   const empty = await get(`/site/${D.name}/empty/`);
   expect([empty.status, empty.headers.get("content-type")]).toEqual([200, "text/html; charset=utf-8"]);
   expect(await empty.text()).toContain("<h1>empty</h1>\n<p>The repository has no files at this commit.</p>");
+});
+
+// Invariant: every page names the room and links to the root at the same ref, shows the branch or tag, links to the versions,
+// has a breadcrumb of its path, and a footer that names the commit it was rendered from and links to the room's page.
+test("navigation: the header names the room and the branch or tag, the breadcrumb links each folder of the path, and the footer names the commit and links to /page/ (STAND-IN host)", async () => {
+  const at = (ref: string) => `/site/${D.name}/${ref}/`;
+  const start = await page(await get(`${at("nav")}guide/start.md`));
+  expect(start.status).toBe(200);
+  expect(start.body).toContain(`<header><a class="room" href="${at("nav")}">${host.name}</a> <span class="version">tag nav</span> <a href="/site/${D.name}/versions/">versions</a></header>`);
+  expect(start.body).toContain(`<nav aria-label="Breadcrumb"><a href="${at("nav")}">nav</a> / <a href="${at("nav")}guide/">guide</a> / <a href="${at("nav")}guide/start.md">start.md</a></nav>`);
+  expect(start.body).toContain(`<footer>Rendered from commit <code>${nav}</code>. <a href="/page/">The room's page</a>.</footer>`);
+  // The published branch, by HEAD and by its name; the footer names the commit that the branch names.
+  const head = await page(await get(`${at("HEAD")}docs/guide.md`));
+  expect(head.body).toContain(`<span class="version">branch main (HEAD)</span>`);
+  expect(head.body).toContain(`Rendered from commit <code>${host.refs.get("refs/heads/main")}</code>.`);
+  expect((await page(await get(`${at("main")}docs/guide.md`))).body).toContain(`<span class="version">branch main</span>`);
+  // An annotated tag is followed to its commit.
+  expect((await page(await get(`${at("release")}README.md`))).body).toContain(`Rendered from commit <code>${nav}</code>.`);
+});
+
+// Invariant: a folder with no index page lists its sub-folders, then its markdown files by title (else by name), then its other
+// files, and no name that starts with "."; a relative link to a folder answers that folder's index.
+test("a folder: its listing gives sub-folders, markdown files by their first heading else their name, and other files, hiding dot-files; a link to a folder, with or without a slash, answers its index (STAND-IN host)", async () => {
+  const prefix = `/site/${D.name}/nav/`;
+  const guide = await page(await get(`${prefix}guide/`));
+  expect(guide.status).toBe(200);
+  expect(guide.body).toContain([
+    "<ul>",
+    `<li><a href="${prefix}guide/deep/">deep/</a></li>`,
+    `<li><a href="${prefix}guide/plain.md">plain.md</a></li>`,
+    `<li><a href="${prefix}guide/start.md">Getting started <small>start.md</small></a></li>`,
+    `<li><a href="${prefix}guide/logo.png">logo.png</a></li>`,
+    "</ul>",
+  ].join("\n"));
+  expect(guide.body).not.toMatch(/hidden|\.config/i);
+  // A dot-file is not listed, and is still served at its own address.
+  expect((await get(`${prefix}guide/.hidden.md`)).status).toBe(200);
+
+  // The links of a page to folders, each resolved under the same ref, answer the folder's index or listing.
+  const readme = await page(await get(prefix));
+  const links = [...readme.body.matchAll(/<a href="([^"]+)">(?:the |guide)/g)].map((m) => m[1]!);
+  expect(links).toEqual([`${prefix}guide`, `${prefix}notes/`, `${prefix}notes`]);
+  expect((await page(await get(links[0]!))).body).toBe(guide.body);
+  for (const link of links.slice(1)) expect((await page(await get(link))).body).toContain('<h1 id="notes-index">Notes index</h1>');
+  const start = await page(await get(`${prefix}guide/start.md`));
+  expect(start.body).toContain(`<a href="${prefix}guide/">this folder</a>`);
+  expect(start.body).toContain(`<a href="${prefix}">the top</a>`);
+  expect((await page(await get(`${prefix}guide/deep`))).body).toContain('<h1 id="deep">Deep</h1>');
+});
+
+// Invariant: the versions page lists every branch and tag of the repository with the commit it names, an annotated tag
+// followed, and marks the published branch; its ETag changes when a ref changes.
+test("versions: /site/<directory>/versions/ lists each branch and tag with its commit, an annotated tag followed, the published branch marked; a new tag gives a new ETag (STAND-IN host)", async () => {
+  const at = `/site/${D.name}/versions/`;
+  const response = await get(at);
+  const versions = await page(response);
+  expect([versions.status, versions.type]).toEqual([200, "text/html; charset=utf-8"]);
+  const rows = [...versions.body.matchAll(/<tr><td>(branch|tag)<\/td><td><a href="([^"]+)">([^<]+)<\/a>([^<]*)<\/td><td><code>([0-9a-f]{40})<\/code><\/td><\/tr>/g)].map((m) => m.slice(1));
+  const expected = [...host.refs].sort(([a], [b]) => (a < b ? -1 : 1)).map(([ref, id]) => {
+    const tag = ref.startsWith("refs/tags/");
+    const name = ref.replace(/^refs\/(heads|tags)\//, "");
+    return [tag ? "tag" : "branch", `/site/${D.name}/${name}/`, name, name === "main" && !tag ? " (HEAD, the published branch)" : "", name === "release" ? nav : id];
+  });
+  // Branches first, then tags.
+  expect(rows).toEqual([...expected.filter((r) => r[0] === "branch"), ...expected.filter((r) => r[0] === "tag")]);
+  expect(rows.find((r) => r[2] === "release")![4]).not.toBe(host.refs.get("refs/tags/release"));
+  expect(versions.body).toContain(`<a class="room" href="/site/${D.name}/HEAD/">${host.name}</a>`);
+  expect(versions.body).not.toContain("Rendered from commit");
+
+  const etag = response.headers.get("etag")!;
+  expect((await get(at, { headers: { "if-none-match": etag } })).status).toBe(304);
+  host.refs.set("refs/tags/later", nav);
+  try {
+    const later = await get(at, { headers: { "if-none-match": etag } });
+    expect(later.status).toBe(200);
+    expect(later.headers.get("etag")).not.toBe(etag);
+  } finally {
+    host.refs.delete("refs/tags/later");
+  }
+});
+
+// Invariant: the ETag covers what the header shows: the same file at the same commit under HEAD, the branch's name and a tag
+// gives three tags, as the three pages differ.
+test("cache: the same commit and path under HEAD, its branch and a tag give three ETags, as each page's header differs (STAND-IN host)", async () => {
+  const tags = await Promise.all(["HEAD", "main", "v1"].map(async (ref) => (await get(`/site/${D.name}/${ref}/docs/guide.md`)).headers.get("etag")));
+  expect(new Set(tags).size).toBe(3);
+  for (const tag of tags) expect(tag).toMatch(new RegExp(`^"${host.refs.get("refs/heads/main")}\\.[0-9a-f]{24}"$`));
+});
+
+// Invariant: a site address with no ref redirects to the published branch, and reads nothing.
+test("no ref: /site/<directory> and /site/<directory>/ redirect to HEAD/ (STAND-IN host)", async () => {
+  const packs = host.packs;
+  for (const path of [`/site/${D.name}`, `/site/${D.name}/`]) {
+    const response = await get(path);
+    expect([response.status, response.headers.get("location")]).toEqual([302, `/site/${D.name}/HEAD/`]);
+  }
+  expect(host.packs).toBe(packs);
+  expect((await get(`/site//`)).status).toBe(400);
 });
