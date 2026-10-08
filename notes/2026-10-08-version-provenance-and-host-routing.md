@@ -13,9 +13,18 @@ design review and adoption before implementation.
 Revision for findings `2720f4eb70e4ec7b729a1ffdc3a10a1e3a7f8139` and
 boundary clarification `a347c1e6d4ac22ff1a8fc683805f16bb46ada220`, both
 read in full. Committed predecessor
-`5fa375edd27ebae89b0706adbce4cd7e0a260cab` remains immutable. Root read this revision in full; procedural artifact binding belongs to
+`5fa375edd27ebae89b0706adbce4cd7e0a260cab` remains immutable. Root read the
+subsequent b26 predecessor revision in full; procedural artifact binding belongs to
 the planner. Gate1 has separately passed its gate, been approved and landed;
 this design changes none of that reviewed source.
+
+Further proposed clarification follows checker preflight
+`75d62028d7c9e83118c2fc71224cc16b8b77f89e`, read in full. Root chooses the
+conservative outstanding-send-permit proposal below. Committed predecessor
+`b26dd2936bebf529b9ae38c545482c220a791930` remains immutable; this note
+revision has been read in full by Root and is ready for the normal owned
+successor design review. The choice still needs the named owners' adoption
+and proof before implementation.
 
 Explicit versions for future semantic changes are already adopted. This
 proposal supplies the missing choices for histories which already use one
@@ -284,47 +293,84 @@ supported as one root only after its full identity/provenance is resolved;
 an ID alone must not be promoted into authority.
 
 Each scope object identifies its loaded tuple and verifies that its runtime
-supports it. Before semantic preparation/sealing or a provider send, it
-must obtain a generation ticket from the durable coordinator, including
-current final checks after awaited preparation. A stale cached object reloads
-compatible manifests through explicit current ports or refuses affected
-work. All live code runs current guards; no archived Worker receives bindings.
+supports it. Semantic preparation/sealing requires an admission ticket;
+physical dispatch separately requires a send permit. Both are issued by the
+durable coordinator for that tuple. A stale cached object reloads compatible
+manifests through explicit current ports or refuses affected work. All live
+code runs current guards, including final checks after awaited preparation;
+no archived Worker receives bindings.
 
-**Proposed outstanding-ticket barrier.** The coordinator serializes ticket
-issuance and transition to draining in its durable transaction. A ticket
-binds generation/tuple, exact scope/incarnation/head, operation/attempt and
-purpose (scope admission or outside send-start). Once draining begins, no
-new ticket for the old generation is issued. Issued tickets remain durable
-and outstanding until authenticated finalization; timeout, an expired lease
-or a missing object response never retires a ticket.
+**Admission tickets.** The coordinator serializes issuance and transition
+to draining in its durable transaction. An admission ticket binds generation,
+tuple, exact scope/incarnation/head and operation. Once draining begins, no
+new old-generation ticket is issued. The scope finalizes it in its existing
+transaction with the exact committed entry, or an atomic abort record which
+precludes later commit under that ticket. Duplicate processing cannot reopen
+an aborted ticket. The coordinator authenticates that exact finalization
+before retiring the ticket. A logical send mark is not finalization of the
+separate physical-send permit.
 
-The scope persists the ticket and its finalization in its existing
-transaction: either the exact committed entry or logical send-start mark,
-or an atomic abort record which precludes that ticket from committing later.
-Duplicate processing reads this durable state and cannot reopen an aborted
-ticket. Recovery presents the exact finalization to the coordinator over an
-authenticated service boundary. The coordinator validates ticket identity,
-scope/incarnation, tuple and committed hash/mark or abort record, then
-retires that ticket in its own transaction. It switches the active pointer
-only when every issued old-generation ticket has authenticated finalization
-and the candidate tuple serves all resulting entries and attempt duties.
-Unknown or crashed work blocks the switch until recovery proves commit or
-abort. These transactions and the ticket barrier, not a cross-object read,
-provide the proposed exclusion. The contract/transaction owner must adopt
-and prove this mechanism before implementation.
+**Conservative physical-send permit sequence.** The chosen proposal is:
 
-A logical send-start/sent mark is not evidence that the physical provider
-call happened or completed. It reserves the exact original attempt and
-provider/capability binding; physical dispatch still performs the current
-final-send checks through explicit ports. If dispatch has not started when
-the active generation changes, it acquires a compatible new-generation
-send-start ticket before calling the provider. Once the physical call may
-have started, no activation or abort invents an unsent outcome: the original
-attempt and any ambiguity remain duties served by the compatible tuple.
-Retries/recovery keep their existing original-attempt rules; the barrier
-does not become a second effect engine. This design needs proof at both
-the durable send mark and physical-call boundary, not an assumption that
-one atomic transaction encloses a provider RPC.
+1. The coordinator issues a durable send permit for the exact generation,
+   tuple, immutable attempt/provider/capability binding, and one dispatcher
+   owner. Owner identity includes stable service ID, namespace/object ID,
+   complete ScopeRef, a fresh owner nonce and its runtime release/build.
+   Those fields are bound to the permit and held in the scope's durable
+   attempt record; a restart
+   cannot silently adopt the nonce or mint another permit for the same
+   original mutation. Draining stops new old-generation permits.
+2. Before `markSent`, an atomic abort may finalize the permit only if its
+   owner is durably fenced from marking or calling later. The coordinator
+   authenticates the exact abort/fence record. An unanswered RPC, timeout or
+   expired lease is not that proof.
+3. In its existing durable transaction, the dispatcher commits `markSent`
+   once for this owner/nonce/release and original attempt. This makes that
+   dispatcher irreversibly responsible for the sole original mutation and
+   conservatively classifies it as **may have started before the call**.
+   The send permit stays outstanding. The logical mark neither proves that
+   a provider call occurred nor authorizes retiring the permit. After this
+   mark there is no abort-to-unsent and no original resend, including a crash
+   before entering the provider call. The original attempt's uncertainty and
+   reconciliation duties remain; no activation manufactures an outcome.
+4. Immediately before the sole actual mutating call, the explicit live port
+   checks the current authority/freshness/custody conditions and exact
+   original binding, plus the still-open permit and matching owner nonce,
+   release and tuple. After any awaited preparation it rechecks the durable
+   owner/closure state at the actual call boundary. No asynchronous gap may
+   separate that final owner/fence check from invoking the original mutation
+   in which a closed continuation could resume without checking again.
+   This requirement covers nested adapter continuations that can invoke the
+   mutation, not merely entry into an outer async provider wrapper. If a
+   final check refuses after `markSent`, preserve the marked attempt and
+   establish closure; do not reset it to unsent or retry the original call.
+5. The permit remains outstanding while any continuation of that owner can
+   still invoke the original mutation. The executor records durable closure
+   of this exact owner/nonce/release/attempt only after it establishes a
+   fence which prevents every such continuation from starting that call.
+   A stale continuation must observe the closed owner and cannot revive it
+   or acquire a new permit for the original mutation. If the call already
+   entered, closure must also prove that no continuation can invoke it again.
+   Recovery may prove closure after a crash; it cannot assume it from silence.
+   The coordinator authenticates the closure/fence evidence, matching permit
+   and durable owner record, then retires the send permit in its transaction.
+6. Activation flips only after all admission tickets have authenticated
+   commit/abort finalization and all old-generation send permits have this
+   authenticated durable closure/fence. Unknown/crashed ownership blocks the
+   flip until recovery establishes that evidence. The remote outcome need
+   not finish once no original local mutation can start: unknown outcomes,
+   late answers, private custody, recovery reads and cleanup duties still
+   survive under the original attempt/binding and compatible new tuple.
+
+The transaction/executor/port owners must identify the concrete owner fence
+and prove the final-call exclusion, including suspended and nested
+continuations and restart. A durable `closed` row alone is insufficient if
+an old continuation can bypass it. Where the underlying executor cannot
+establish this fence or authenticated closure, the permit cannot retire and
+activation remains blocked. No timeout or lease establishes quiescence.
+This uses an explicit permit contract around the existing attempt driver;
+it does not introduce a second effect engine, atomic provider transaction,
+instant token revocation, or a claim that current code implements the fence.
 
 Old releases without this barrier cannot participate in activation. The
 operator must first verify their replacement/drain, including outstanding
@@ -374,7 +420,8 @@ this task. A separate general provider registry is unnecessary here.
    compatible runtime/registry/routing/bundle tuple, never by lowering the
    trusted registry floor. It must preserve every admitted root, bundle,
    immutable attempt/provider/capability binding and custody/cleanup duty.
-   Review and drain admission tickets exactly as for forward activation.
+   Review admission-ticket finalization and physical-send-permit closure
+   exactly as for forward activation.
    After a new root has duties, removing it is not a safe rollback. Keep the
    compatible runtime and disable new claims while repairing; an older binary lacking
    admitted bundles cannot be used to resume those scopes. Never restore old
@@ -384,10 +431,11 @@ this task. A separate general provider registry is unnecessary here.
 
 | Owner | Exact proposed amendment or input |
 |---|---|
-| Scope contract/security/transaction owner | At section 6.1, define complete semantic identity and legacy binding trust; at section 16.1, require provenance for each historical subject and report coverage/trust. Adopt V1a operation precedence, exact bootstrap read eligibility, typed unresolved reason and V4 mixed-history refusal. Adopt and prove the durable outstanding-ticket barrier, scope transaction finalization, abort exclusion and logical-send/physical-call boundary; coordinator reads and timeouts are not finalization. Choose bounded registry/root/reference-closure work from capacity evidence. No change to seed/history bytes. |
+| Scope contract/security/transaction/executor owner | At section 6.1, define complete semantic identity and legacy binding trust; at section 16.1, require provenance for each historical subject and report coverage/trust. Adopt V1a operation precedence, exact bootstrap read eligibility, typed unresolved reason and V4 mixed-history refusal. Adopt and prove separate admission finalization and conservative physical-send permits, exact owner/nonce/release fencing, irreversible markSent classification, abort exclusion, final actual-call checks and authenticated closure. Coordinator reads, logical send marks, silence and timeouts are not physical-send closure. No change to seed/history bytes. |
+| Existing capacity/contract owner | Account for coordinator issue/finalize transactions, peak outstanding admission tickets/send permits, authenticated recovery backlog, retained abort/owner-nonce/fence exclusion, old/new runtime overlap, root/manifest/reference-closure work and archive bytes. Choose work and storage bounds from capacity evidence, with no numerical readiness claim or new matrix. Backpressure may refuse new work but must retain issued tickets/permits and old duties. Establish the actual consistency domain before considering sharding; throughput cannot weaken the barrier. |
 | Platform/authority owner | Preserve historical executable/observation/grant derivation while current strict `43d` transport/admission guards retain precedence; attest original-main and clone-era bundle correspondence and compatible current ports. Name actual session/token serving and revocation behavior; no inferred instant invalidation. Shared helpers alone are not an archive. |
 | Deployment/host operator and planner | Supply 14:19/17:35 and 19:47-19:51 exact Worker/build-to-source receipts, full scope/incarnation/genesis/head bindings, histories and reference closure; establish any mixed implementation. Adopt stable service identity, canonical signatures/trust anchor, publisher authorization, freshness floors, key rotation/reset, and coherent activation tuples. Supply both exact register roots and existing capability scope without secrets. Procedural review artifact binding remains the planner's work. |
-| Host adapter owner | Adopt `RegisterBinding` and immutable `AttemptBinding`, exact single-match selection, bounded additive config, original-provider recovery/read/cleanup, cached-object convergence and decommission/rollback duties. Numeric bounds remain unadopted and unmeasured. Amend `docs/deploy.md` and `docs/hosts.md` from one register to explicitly adopted roots. |
+| Host adapter owner | Adopt `RegisterBinding` and immutable `AttemptBinding`, exact single-match selection, bounded additive config, original-provider recovery/read/cleanup, cached-object convergence and decommission/rollback duties. Prove sole original mutation and closure across nested port continuations, with final current authority/custody checks and no original resend after markSent. Numeric bounds remain unadopted and unmeasured. Amend `docs/deploy.md` and `docs/hosts.md` from one register to explicitly adopted roots. |
 | Replay/client owner | Add narrow contextual bundle/pure-evaluator interfaces and explicit operator trust, pinned revision and exact head coverage reporting; preserve current access checks. Local manifests require explicit operator trust. CLI must not silently resolve missing legacy provenance or advertise fresh-room success as old-room support. |
 
 The 14:19 and 17:35 attestations identify the same room and source; they
