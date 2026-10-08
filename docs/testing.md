@@ -279,6 +279,12 @@ lanes package; the stand-ins live in the scope package, which may name the
 git package. `packages/lanes/test/issues.scope.test.ts` runs `artroom issue`,
 `issues`, `edit --closes`, `merge --closes` and `verify --all` the same way,
 on the hosting's own Git service only, for the same reason.
+`packages/lanes/test/demo.scope.test.ts` runs the demo runner's rehearsal,
+`scripts/demo/rehearse.ts`, the same way: every shot of the demo script's
+middle, from the planned install to the page, with a stand-in for `git`
+that reads the stand-in host. Its second test is the recorder for
+`scripts/demo-captures.ts --recorded`, and runs only with `DEMO_RECORD=1`
+([demo.md](demo.md)).
 
 `packages/lanes/test/support/room.ts` founds a repository on the real
 platform scopes, in the namespace `PLATFORM`, as `founding-real` does, and
