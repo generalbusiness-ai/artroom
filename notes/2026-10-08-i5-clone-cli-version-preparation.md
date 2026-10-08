@@ -90,6 +90,43 @@ real-scope fixture now explicitly tags its known membership@1 invitation;
 its loss/private-persistence assertions are otherwise unchanged. This proves
 that selected known-pin path, not an untagged historical convention.
 
+### Exact commands and retained captures
+
+The checks above used these exact commands in
+`/tmp/artroom-clone-cli-integrated`:
+
+```
+npm run typecheck --workspace @generalbusiness/artroom-cli
+./node_modules/.bin/vitest run --project cli test/version-selection.test.ts --reporter verbose
+node scripts/control.mjs packages/cli/src/commands.ts 'typeof named === "string" ? platform(named) : null' 'typeof named === "string" ? (platform(named) ?? platform(NEWEST[name]!)) : null' --expect 'join holds an untagged invitation and refuses unknown' -- packages/cli test/version-selection.test.ts
+./node_modules/.bin/vitest run --project scope --project cli test/join.scope.test.ts test/clone.test.ts test/clone-proof.test.ts test/clone-outcome.test.ts --reporter verbose
+```
+
+2026-10-08 evidence-only follow-up: no checks were rerun. Original raw runner
+output was not saved to local files. The tool transcript retains the actual
+outputs. The files below now retain retrospective transcript extracts with
+exact commands, source chunk identifiers and outcomes. Their SHA-256 values
+identify those newly retained extract files, **not** original stdout/stderr
+or Vitest JSON reports; excerpts/summaries do not reproduce every original
+output byte. No hash for an unretained original output is claimed.
+
+| Check | Retained extract path | SHA-256 |
+|---|---|---|
+| CLI typechecks, exit 0 | `/tmp/artroom-clone-cli-evidence-6f42092ac/typecheck.json` | `d73318aa1cb829bf05d372ec78c5fe9b385173ca053057c554b093d52d0ff0e2` |
+| Version selection, 3 passed | `/tmp/artroom-clone-cli-evidence-6f42092ac/version-selection.json` | `e78ccf1871c96741fd289ce9042248c0f4a2e65e9b9f2e391f8759654b2ddbd9` |
+| NEWEST fallback control, distinguishes, source restored | `/tmp/artroom-clone-cli-evidence-6f42092ac/fallback-control.json` | `0ed504033454ebfaffee1a8aad1d11fc09605af63d6ecaf4b3bc935f806ed079` |
+| Selected clone/join checks, 8 passed | `/tmp/artroom-clone-cli-evidence-6f42092ac/clone-join.json` | `21cd1848b42b3632a96a24de47064fd455f6d9dc7527c44f6eaeb24d75d1ef11` |
+
+The helper's original temporary report was
+`/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-control-sHjGS9/after.json`;
+the helper removed it on exit, as designed. It was not recovered or hashed.
+Extracts contain no invitation, private envelope, signing key or provider
+plaintext. They are local scratch artifacts outside Git, not a durable
+source-review receipt. Their extraction/capture limits remain explicit.
+This follow-up changes only this note: the complete `packages` tree remains
+`af0bf741f375c7518cfd2fa4a345b13599f6de0a`, as at source head
+`6f42092aca0d25a522b66775bfa6433796fb02d1`; no new test/gate credit follows.
+
 The existing claim/story witnesses are prepared for explicit future @2
 install and child identities, without loosening their pending enrollment,
 source/fact, named-refusal or secret-exposure assertions. Their actual @2
