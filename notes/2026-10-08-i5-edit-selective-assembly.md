@@ -209,7 +209,7 @@ was patched, stubbed, imported or relabelled as complete. All original tests
 and failed restart evidence remain.
 
 Exact source/parent/body and raw log hashes are retained in
-/tmp/artroom-source-composition-preservation.json, SHA256 11a124aa31c52a990bfbc979b756a1de0cac7749bb2de0c590c2755d35202110.
+/tmp/artroom-source-composition-preservation.json, SHA256 5060e4540f982debe2eed64ab2582de99158289e681455740ca0b2de16a91fd1.
 Raw focused output: /tmp/artroom-source-composition-focused.log; affected type
 outputs: /tmp/artroom-source-composition-{scope,platform,checkers,cli,lanes}-types.log.
 No story/site/c4 wire, provider/browser, matrix, broader suite, control, gate,
