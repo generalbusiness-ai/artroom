@@ -68,3 +68,9 @@ Existing installed dependencies and isolated workspace links were reused; no
 package or lock change/install was made. This documentation successor reruns
 nothing. No gate, provider, acquisition, activation or main landing occurred.
 Ordinary source review and all original integrated obligations remain separate.
+
+## Publication continuity
+
+The parser evidence is now published on its own evidence-only promise rather
+than the ordered clone implementation promise. This note-only successor keeps
+all source and raw evidence unchanged; it adds no test or review credit.
