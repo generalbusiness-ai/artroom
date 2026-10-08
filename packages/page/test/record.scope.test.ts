@@ -75,6 +75,9 @@ test.skipIf(!inject("pageRecord"))("record the Worker's answers to the page's re
     await loadChange(seen, agents);
     await actsOn(seen, agents);
     expect((await loadSite(seen, "README.md")).status).toBe(200);
+    // The current change view offers separate latest-site navigation to
+    // the root, not a rendered link for the immutable version.
+    expect((await loadSite(seen, "")).status).toBe(200);
     // The page itself, as the deployed Worker's one entry serves it.
     for (const path of ["/page/", "/page/page.js"]) await keep(`GET ${path}`, await worker.fetch(new Request(`${SERVICE}${path}`), {} as Env));
 

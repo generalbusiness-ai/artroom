@@ -344,3 +344,30 @@ configuration after this gate; package tree equality is recorded before
 filing. Normal complete exact-head Source review and requester judgment
 remain required under the same expanded request. No deferred original proof
 or named follow-up is closed by this passing run.
+
+## Review corrections under planner decision 158
+
+The complete Source verdict `376aa53064b8adae9b330d5d655f5fb019b6b168`
+requests six changes at `68be1ffe`; builder has read and accepted that review
+as delivered, without conferring implementation approval. Planner decision
+`158be2c4800db1753af32e60674591ff17464cde` owns the composed successor
+under the same request. The preceding gate remains historical evidence and
+does not verify the forthcoming source changes.
+
+For finding 6, the optional Page recorder now waits for the actual status
+answer and its named refusal, rather than the obsolete `.answer.bad` class.
+It checks that immutable version rendering is unavailable, then follows the
+separate **Latest published site** link. The Worker recorder retains the
+existing README read and records the latest-site root as well. Generated
+descriptions distinguish latest navigation from an immutable preview.
+The existing PNGs are unchanged and their README labels them as historical
+fixtures, not current browser evidence.
+
+`node --check packages/page/test/screens.mjs` passes. One opt-in Worker
+recorder invocation passes and emits a whole 13-part record with 37 answers,
+including status 200 for both HEAD/README.md and HEAD/. Its raw output is
+`/tmp/artroom-expanded-recorder-contract.log`; its generated test keys and
+recorded bodies remain local. This verifies the recording boundary, not a
+new Chromium invocation, live deployment or immutable version preview.
+The exact current view/status/link bodies were inspected for the selector
+correction. No browser or provider rehearsal occurred.
