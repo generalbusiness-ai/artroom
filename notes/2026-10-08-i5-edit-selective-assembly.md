@@ -185,3 +185,34 @@ passed (provider case skipped); scope source/test typechecks passed. Raw logs:
 
 Earlier heads/logs and the executor 340 composition requirement remain intact.
 No new control, matrix, whole suite, gate, provider or activation was run.
+
+## Partial executor/candidate/check-contract source composition
+
+Isolated request/i5-source-composition starts at executor 34037c20381c924a36e7eb056e556f7673e7e105.
+Merge ce1ad9897fb9773364c8cc6284bd651a2aca6dc1 has exact parents executor340 and candidate
+38db5775f91c78879cc8560a6012454b8f57b2fa; common ancestor d5a58b418. Pure checker
+f6ea31cbb2941070a65c1584e8af4888d4cf6859 is carried as 5eb4b5a930a05318d44ca8c44e456eb27798686a.
+The GitHubHost automatic merge kept executor fenced/current-context/POST
+identity and post-mark null handling, plus candidate comparison and strict
+count/Reader-work corrections. No conflict or whole-file replacement occurred.
+Every nonoverlap changed path matches its exact donor; selected fenced bodies
+match executor and the comparison tail matches candidate. Prior note prefix
+SHA256 is 2bd604aecf6b398ecd35693897cae6e68a0a8b82e2a79f3363b9b169d74b13d3.
+
+Focused selection ran once: five files, eleven passed and ten filtered skips
+in 4.97 seconds. These are candidate, three existing scripted inspections,
+registered post-mark denial, independent local Git/editTree and pure checker
+contract boundaries. Full restart/provider cases were not run. Scope/platform/
+checkers/CLI types passed; lanes source/Node types passed, scope-test types
+remain blocked by unchanged missing site route/host fixture imports. No fixture
+was patched, stubbed, imported or relabelled as complete. All original tests
+and failed restart evidence remain.
+
+Exact source/parent/body and raw log hashes are retained in
+/tmp/artroom-source-composition-preservation.json, SHA256 11a124aa31c52a990bfbc979b756a1de0cac7749bb2de0c590c2755d35202110.
+Raw focused output: /tmp/artroom-source-composition-focused.log; affected type
+outputs: /tmp/artroom-source-composition-{scope,platform,checkers,cli,lanes}-types.log.
+No story/site/c4 wire, provider/browser, matrix, broader suite, control, gate,
+main or activation was added. Actual ABI/image/supplier/trust/current-context/
+auxiliary/custody/drain/capacity, full functionality, normal complete Source
+review, final integrated gate and ordered filing/landing remain owed.
