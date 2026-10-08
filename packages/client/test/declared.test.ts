@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import type { DeclaredDefinition, FactRef, Grant, ScopeRef, Summary } from "@generalbusiness/artroom-contract";
 import { definitionDigest, textDigest, verifySignedIntent } from "@generalbusiness/artroom-bytes";
-import { ScopeHandle, ShapeError, declaredHandle, secretSigner, type Signer, type Transport } from "../src/index.ts";
+import { ScopeHandle, ShapeError, declaredHandle, shapeDeclaredAct, secretSigner, type Signer, type Transport } from "../src/index.ts";
 
 /** A made-up definition with one act: a note's body is a detached text, and the act is presented one fact. */
 const notes = {
@@ -48,7 +48,11 @@ test("a declared handle signs an act of its definition: each field is checked ag
   const text = "A body, held beside the intent.";
   const proof: FactRef = { at, seq: 2, hash: d("2") };
 
-  const { signed, beside } = await handle.intent(signer, "write", { on: 3, expected: { on: 1 }, fields: { body: text, title: "A title", tone: "loud" }, presented: { proof } });
+  const input = { on: 3, expected: { on: 1 }, fields: { body: text, title: "A title", tone: "loud" as const }, presented: { proof } };
+  expect(shapeDeclaredAct(notes, "write", input)).toEqual({ on: 3, fields: { body: textDigest(text), title: "A title", tone: "loud" }, beside: { texts: [text], presented: { proof } } });
+  expect(signatures).toBe(0);
+  expect(() => shapeDeclaredAct(notes, "write", { ...input, presented: { proof: 2 as never } })).toThrow(ShapeError);
+  const { signed, beside } = await handle.intent(signer, "write", input);
   // The intent is to the scope whose definition was checked, and holds the digest of the text. The signature covers the digest.
   expect(signed.intent).toMatchObject({ to: at, actor: signer.key, kind: "write", on: 3, expected: { on: 1 }, fields: { body: textDigest(text), title: "A title", tone: "loud" } });
   expect([verifySignedIntent(signed), JSON.stringify(signed).includes(text), beside]).toEqual([true, false, { texts: [text], presented: { proof } }]);

@@ -232,3 +232,52 @@ them.
   refuses a command-line test that names the lanes package.)
 - Plain English, no product named in documents but GitHub and "the hosting's
   own Git service"; nothing deployed.
+
+
+## Completed edit preflight preserved in the expanded candidate
+
+Under the existing owner work and expanded request `86206b5595fa55a7d84821a74e200aabc0fa837e`,
+this isolated successor starts at `1377248443acddb7a852107be2e8ff7052fa2e76`.
+It carries the already completed d5/6d preflight selected by planner
+`c82d1d499353309dd7b5218f3f8043714df0a673`, after reading the original
+`50b608c8ab49bc06f21045620226ad535db87fdf` request and checker
+`633794ed827ad5464608c1d10c9822ae7d084fbb`. No parked one-file/check-target
+or c4 authority design is introduced.
+
+Before opening a PR, edit checks the actual activated change definition's
+ask-rules, nondetached file and merge inputs, required field/presentation
+shapes, unconditional field/party/reference sources and rules/reserve sends.
+The destination must be exactly platform:destination@2. After lane/rules
+awaits, edit rereads that protocol and the published head before proposing.
+Unsupported inputs stop before lane creation. The shared shapeDeclaredAct
+extraction is byte-identical to the completed donor client module and retains
+its original validator behavior. Guards, grants, policy and admission are
+still the scopes' judgments; this local support check supplies no history,
+executable provenance, provider or full tuple proof. It does not claim to
+preflight every possible --closes linking condition.
+
+Current --closes/linking, saved claim/enrollment/private join, clone proof and
+bounded wait, known-receipt/finite merge observation and issue/verify workflows
+remain. Existing edit scenarios keep all published-tree/site/policy/replay and
+unknown-merge assertions, adding back the reviewed legacy/detached definitions,
+harmless metadata extension and substituted-native@1 read-boundary witness.
+The last is a labelled summary stand-in over an actual @2 scope, not a real
+native-room compatibility proof. The existing pure declared witness checks
+that direct preflight signs nothing and retains field/fact/side-value behavior.
+
+The focused edit file passed both host scenarios. The initial combined run
+had one erroneous new assertion treating an optional presented fact as
+required; that assertion was corrected to malformed fact input, and the
+client declared file then passed both tests. All affected client, CLI and
+scope Worker/Node type projects passed once. Logs are in
+`/tmp/artroom-edit-preflight-preservation-evidence/`: `focused.log` retains
+the initial assertion, `declared-final.log` the correction, and the three
+`*-types.log` files the successful types. Two narrow current controls are
+retained: removing pre-lane @2 checking makes two mutation requests and moves
+the directory from sequence 4 to 7 before a late refusal; removing workflow
+support leaves a partial lane and then a caught TypeError. Both fail the
+no-lane/no-mutation assertion; `control.log` and `support-control.log` record
+them, and source is restored. `preservation.json` records exact donor and
+unchanged-region comparisons. No gate, cloud, package install, new design or
+whole old command transplant occurred. Final integrated gate and exact-head
+Source review remain owed.
