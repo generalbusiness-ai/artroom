@@ -372,6 +372,36 @@ describe("outside operations at a real scope (scope contract, section 4.3; autho
     expect([(await seen(s, op)).state, await surface(s).effect(), await s.alarm(), out.attempts]).toEqual(["settled", 0, false, [`${op}#1`]]);
   });
 
+  // Invariant: in one life of the object, an attempt that a pass left unsent because the port refused its kind is sent at the
+  // next call after the port accepts it, a read with no commit and no alarm before it, and exactly once. This is the register
+  // whose create-repository attempt was recorded before the Git host's setting was read, with no restart after it.
+  test("an attempt recorded while the outside port refused is sent, with no restart, at the next call after the port accepts its kind, which is a read; it is sent exactly once; while the port still refuses, reads send nothing", async () => {
+    const s = await found();
+    const out = outsideOf(s.name);
+    out.accepting = false;
+    const [op] = await open(s, pushOf(1)) as [OperationId];
+    expect([await surface(s).effect(), out.sent.length, await s.alarmAt()]).toEqual([0, 0, null]);
+    const head = await s.head();
+
+    // Control: while the port refuses, reads and turns of the event loop send nothing.
+    for (let read = 0; read < 3; read++) expect((await seen(s, op)).state).toBe("pending");
+    for (let turn = 0; turn < 50; turn++) await tick();
+    expect(out.sent.length).toBe(0);
+
+    // The setting appears in the same life. The next call is a read of the operation; its pass runs after the answer.
+    out.accepting = true;
+    expect((await seen(s, op)).state).toBe("pending");
+    for (let turn = 0; turn < 200 && out.sent.length === 0; turn++) await tick();
+    expect([out.attempts, await s.head()]).toEqual([[`${op}#1`], head]);
+    out.answer(op, 1, own("c1"));
+    while ((await seen(s, op)).state !== "settled") await tick();
+
+    // Further reads, a pass and the alarm send nothing again.
+    for (let read = 0; read < 3; read++) await seen(s, op);
+    for (let turn = 0; turn < 50; turn++) await tick();
+    expect([await surface(s).effect(), await s.alarm(), out.attempts]).toEqual([0, false, [`${op}#1`]]);
+  });
+
   test("a scope whose pinned definition the runtime cannot run sends nothing outside the service: the attempt stays recorded, with no wake-up, and is sent once the runtime can run the definition. The capability is the scripted stand-in", async () => {
     // The lane of the other tests, with one capability guard. The scripted test capability, a stand-in, is the code for it.
     const staged = variant(definition.declared, (def) => { def.acts.report.guards.push({ capability: { name: "hold", guard: "staged", with: { commit: { field: "commit" }, under: { item: "also.commitment" } } } }); def.acts.report.fields.commit = { type: "commit", required: true }; });

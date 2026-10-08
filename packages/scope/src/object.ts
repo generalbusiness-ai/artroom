@@ -226,10 +226,17 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
    * caller does not wait for, if an attempt is recorded and has no time to be looked at next (`Store.parked`). Such an attempt
    * asks for no wake-up (`operations.ts`, rule 7), so without this pass it waits for the next commit. So a deployment whose outside
    * port changed, as when the Git host's settings are added, and which is restarted, sends what it recorded and did not send, at
-   * the first call that reaches the object. The pass sends nothing twice: an attempt marked sent is never sent again.
+   * the first call that reaches the object. The pass sends nothing twice: an attempt marked sent is never sent again. At every
+   * later call that runs no pass of its own, the same pass runs if the port now accepts an attempt that it refused in this life
+   * (`Operations.reaccepted`), so a setting that appears with no restart is acted on at the next call too.
    */
   #first(): void {
-    if (!this.#fresh) return;
+    if (!this.#fresh) {
+      // Later in the same life: an attempt that a pass left unsent because the outside port refused its kind, which the port now
+      // accepts, as when the Git host's setting appeared after the attempt was recorded. One pass sends it, with no restart.
+      if (this.#operations.reaccepted()) this.ctx.waitUntil(this.#operations.run().catch(() => 0));
+      return;
+    }
     this.#fresh = false;
     if (this.#store.parked(null, 1).length > 0) this.ctx.waitUntil(this.#operations.run().catch(() => 0));
   }
