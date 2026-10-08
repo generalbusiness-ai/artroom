@@ -27,16 +27,18 @@
  * | `issue`, `issues` | `open` is the directory's `open-issue`; `comment`, `assign` and `close` are the issue lane's own acts. `issues` lists each issue as its lane has it. |
  */
 
-import { PROPOSED_BOUNDS, type Answer, type DeclaredDefinition, type Digest, type Entry, type FactRef, type FieldValue, type Founded, type Item, type KeyId, type OperationId, type PlatformDefinition, type ScopeId, type ScopeRef, type Seed, type SignedIntent, type Summary } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS, type Answer, type DeclaredDefinition, type Digest, type Entry, type FactRef, type FieldValue, type Founded, type Item, type KeyId, type PlatformDefinition, type ScopeId, type ScopeRef, type Seed, type SignedIntent, type Summary } from "@generalbusiness/artroom-contract";
 import { READ_REFUSALS, b64url, canonicalize, definitionDigest, digestBytes, factRefOf, intentDigest, isReceipt, isSignedIntentShape, isDigest, isFactRef, isIncarnation, isScopeId, isScopeRef, keyIdOfSecret, parseStrict, scopeIdOf, seedDigest, textDigest, timeMs, timeOf, unb64url, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import {
-  ScopeHandle, TransportError, declaredHandle, found, httpTransport, requestSession, secretSigner, sessionRequest, signedIntent, signedLogReader, signedReads,
+  ScopeHandle, TransportError, readCredential, declaredHandle, found, httpTransport, requestSession, secretSigner, sessionRequest, signedIntent, signedLogReader, signedReads,
   type Fetch, type ReadSigning, type Signing, type Transport,
 } from "@generalbusiness/artroom-client";
 import { TOKENS_FLOOR, capabilitiesOf, gitRead, holdCapability } from "@generalbusiness/artroom-derive";
-import { DIRECTORY_OF, SIBLINGS_OF, READ_TOKEN_HOURS, REGISTER, ROLE_LISTS, isOf, platform, type Role } from "@generalbusiness/artroom-platform";
+import { DIRECTORY_OF, SIBLINGS_OF, READ_TOKEN_HOURS, REGISTER, ROLE_LISTS, platform, type Role } from "@generalbusiness/artroom-platform";
 import { SourceError, httpSource, render, verify as replay, type HistorySource } from "@generalbusiness/artroom-replay";
 import type { ClaimStep, Config, PendingClaim, PendingJoin, PlannedInstall, Repository, Store } from "./store.ts";
+import { outcomeFetch, outcomeWaitLines, pauseOutcome, waitOutcome, type CloneWait } from "./clone-outcome.ts";
+import { readTokenEntry, readTokenOpening, readTokenOutcome, readTokenReceipt } from "./clone-proof.ts";
 
 export interface Context {
   store: Store;
@@ -60,6 +62,8 @@ export interface Context {
   historyPages?: number;
   /** The `git` program, for `clone`. `main.ts` gives Node's (`git.ts`); a test gives a stand-in. Absent: there is none. */
   git?: Git;
+  /** Read-token outcome bounds and caller cancellation; never mint authority. */
+  cloneWait?: CloneWait;
   /** A local file's bytes, for `edit --file` and `act --value`, or null when it cannot be read. `main.ts` gives Node's; a test gives its own. */
   read?: (path: string) => Promise<Uint8Array | null>;
 }
@@ -1046,10 +1050,10 @@ async function destinationOf(ctx: Context, config: Config): Promise<{ summary: S
   let read = await (await handleOf(ctx, config, scope, reader)).summary();
   if (!read.ok && read.reason === "forbidden" && reader !== null) read = await (await handleOf(ctx, config, scope, null)).summary();
   if (!read.ok) return stop(failed(`Cannot read ${scope}: ${read.reason}.`));
-  if (!isOf(read.value.definition, "platform:destination")) return stop(failed(`${scope} is no destination.`));
+  if (read.value.scope.scope !== scope || read.value.scope.kind !== "destination" || !knownPlatform(read.value.definition, "platform:destination")) return stop(failed(`${scope} is no supported destination.`));
   const branch = read.value.items.find((item) => item.type === "branch");
   const repository = branch?.values["repository"] as Recorded | undefined;
-  if (!branch || !repository || typeof repository.host !== "string" || typeof repository.name !== "string") return stop(failed(`The destination ${scope} records no repository.`));
+  if (!branch || !repository || typeof repository.host !== "string" || typeof repository.name !== "string" || typeof repository.namespace !== "string" || typeof repository.id !== "string") return stop(failed(`The destination ${scope} records no repository.`));
   return { summary: read.value, reader, repository };
 }
 
@@ -1069,24 +1073,6 @@ const b64 = (text: string): string => btoa(String.fromCharCode(...utf8(text)));
 /** The configuration that carries the header, as git reads it from its environment: the same as `-c http.extraHeader=...`, but in no argument. */
 const headerEnv = (value: string): Record<string, string> => ({ GIT_CONFIG_COUNT: "1", GIT_CONFIG_KEY_0: "http.extraHeader", GIT_CONFIG_VALUE_0: `Authorization: ${value}` });
 
-/** The JSON of a reply's body, at most 64 KiB, or null. */
-async function bodyOf(body: { getReader(): { read(): Promise<{ done: boolean; value?: Uint8Array | undefined }> } } | null): Promise<unknown> {
-  if (!body) return null;
-  const reader = body.getReader();
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  for (;;) {
-    const { done: ended, value } = await reader.read();
-    if (ended) break;
-    if (value) { size += value.length; chunks.push(value); }
-    if (size > 65536) return null;
-  }
-  const bytes = new Uint8Array(size);
-  let at = 0;
-  for (const chunk of chunks) { bytes.set(chunk, at); at += chunk.length; }
-  try { return JSON.parse(new TextDecoder("utf-8", { fatal: true, ignoreBOM: false }).decode(bytes)); } catch { return null; }
-}
-
 /**
  * `artroom clone [directory] [--hours n]`: a clone of the room's repository, with a read token of its own.
  *
@@ -1094,7 +1080,8 @@ async function bodyOf(body: { getReader(): { read(): Promise<{ done: boolean; va
  * 2. It signs the destination's `read-token` for `hours` (default 1, from 1 to 24), and waits for the outcome of its `mint-read`.
  * 3. It reads the token once, with the caller's session, from the destination's credential route.
  * 4. It runs `git clone -- <remote> [directory]`, with the header in git's environment configuration. The token is in no
- *    argument, in no line printed, and in no file this command writes; git does not keep it in the clone's config.
+ *    argument, command-printed line or command-written file. Ambient Git
+ *    configuration and Git's own output remain trusted.
  */
 export function clone(ctx: Context, directory: string | undefined, options: { hours?: number } = {}): Promise<Outcome> {
   return run(async () => {
@@ -1107,35 +1094,44 @@ export function clone(ctx: Context, directory: string | undefined, options: { ho
       const url = remoteOf(config, repository) ?? `https://<service host>/git/${repository.namespace}/${repository.name}.git`;
       return failed("git is not installed here, so nothing was signed. With git installed, run artroom clone again; it runs:", `git -c http.extraHeader="Authorization: ${repository.host === "github.com" ? "Basic <x-access-token:read token, base64>" : "Bearer <read token>"}" ${args(url).join(" ")}`);
     }
+    if (!platform(summary.definition as PlatformDefinition)?.data.acts["read-token"]) return failed(`The destination definition ${summary.definition} does not support read-token. An explicitly versioned destination and membership integration is required.`);
     // The act: `read-token` on the branch, at the revision the summary has now. The scope judges the grant and the field.
     const scope = summary.scope.scope;
     const signer = secretSigner(await signerOf(ctx, config));
     const branch = summary.items.find((item) => item.type === "branch")!;
     const signed = await signedIntent(signer, { to: summary.scope, kind: "read-token", on: branch.id, fields: { hours }, expected: { on: branch.revision } }, signing(ctx));
-    const seq = accepted(await (await handleOf(ctx, config, scope, null)).submit(signed), scope, "Read token").receipt.fact.seq;
+    const receipt = accepted(await (await handleOf(ctx, config, scope, null)).submit(signed), scope, "Read token").receipt;
+    const proof = readTokenReceipt(receipt, summary, signed);
+    if (!proof) return failed(`The accepted reply does not match this destination, definition and exact read-token request. It may still have been recorded at ${scope}; inspect artroom log destination. No credential was retrieved and nothing was cloned.`);
+    const seq = proof.receipt.fact.seq;
     // The outcome of its `mint-read`, which the host's answer writes: read with the caller's session, which the destination now accepts.
-    const operation: OperationId = `${seq}:0`;
+    const operation = proof.operation;
     const reader = await readerOf(ctx, config) ?? stop(failed(`Signed read-token at ${scope}:${seq}, but no read session is given here, and only a session reads the token.`));
-    const D = await handleOf(ctx, config, scope, reader);
-    let next = seq + 1;
-    const outcome = await waitFor(ctx, () => [scope], async () => {
-      for (;;) {
-        const read = await D.entry(next);
-        if (!read.ok) return read.reason === "not-found" ? null : stop(failed(`Cannot read entry ${scope}:${next}: ${read.reason}.`));
-        next++;
-        const input = read.value.entry.input;
-        if (input.type === "outcome" && input.operation === operation) return input;
+    const send = ctx.fetch ?? (globalThis as { fetch?: Fetch }).fetch!;
+    let D: ScopeHandle | null = null;
+    let openingChecked = false;
+    const waited = await waitOutcome(operation, seq + 1, async (next, signal) => {
+      D ??= await handleOf({ ...ctx, fetch: outcomeFetch(send, signal) }, config, scope, reader);
+      if (!openingChecked) {
+        const opening = await D.entry(seq);
+        if (!opening.ok || !readTokenOpening(opening.value, proof)) return stop(failed(`Cannot confirm the exact accepted read-token act and its mint-read opening at ${scope}:${seq}; inspect artroom show ${scope}:${seq} and artroom log destination. No credential was retrieved and nothing was cloned.`));
+        openingChecked = true;
       }
-    }, `the read token of ${scope}:${seq}`, "the token, if minted, ends at its end unread.");
-    if (outcome.result !== "confirmed") return failed(`The host did not mint a read token: the outcome at ${scope}:${next - 1} is ${outcome.result}. Nothing was cloned.`);
+      const got = await D.entry(next);
+      if (got.ok && (!readTokenEntry(got.value, proof.to, next) || (got.value.entry.input.type === "outcome" && got.value.entry.input.operation === operation && !readTokenOutcome(got.value, next, proof)))) return stop(failed(`The entry at ${scope}:${next} does not match this destination's recorded mint-read (${operation}); inspect artroom log destination. No credential was retrieved and nothing was cloned.`));
+      return got;
+    }, (signal) => ctx.pause ? ctx.pause([scope]) : pauseOutcome(signal), ctx.tries ?? 120, ctx.cloneWait, (error) => error instanceof Stop);
+    if (!waited.ok) return failed(...outcomeWaitLines(scope, seq, operation, waited));
+    const outcome = waited.outcome;
+    const next = waited.next;
+    if (outcome.result === "unknown") return failed(`The read-token mint at ${scope}:${seq} is unknown (outcome ${scope}:${next - 1}). The host may have minted a token; no automatic mint retry was made. Inspect artroom show ${scope}:${seq} and artroom log destination. No credential was retrieved and nothing was cloned.`);
+    if (outcome.result === "refused") return failed(`The host refused the read-token mint at ${scope}:${seq} (outcome ${scope}:${next - 1}). No credential was retrieved and nothing was cloned.`);
     const handle = (outcome.evidence.body as { token?: unknown }).token;
     if (typeof handle !== "string") return failed(`The outcome at ${scope}:${next - 1} names no token.`);
     // The token, once. The route answers it to this session's key only, and then no more.
-    const fetch = ctx.fetch ?? (globalThis as { fetch?: Fetch }).fetch!;
-    const reply = await fetch(`${config.service.replace(/\/+$/, "")}/v1/scopes/${scope}/credential/${encodeURIComponent(handle)}`, { method: "GET", headers: { authorization: reader } });
-    const answer = await bodyOf(reply.body) as { ok?: boolean; reason?: string; value?: { token?: unknown; ends?: unknown; remote?: unknown } } | null;
-    const value = answer?.ok === true ? answer.value : undefined;
-    if (typeof value?.token !== "string" || typeof value.remote !== "string" || typeof value.ends !== "string") return failed(`Cannot read the read token ${handle}: ${answer?.reason ?? `status ${reply.status}`}.`);
+    const answer = await readCredential(config.service, scope, reader, handle, ctx.fetch ? { fetch: ctx.fetch } : {});
+    if (!answer.ok) return failed(`Cannot read the read token ${handle}: ${answer.reason}.`);
+    const value = answer.value;
     if (value.remote !== config.remote) await ctx.store.save({ ...config, remote: value.remote });
     const code = await ctx.git.run(args(value.remote), headerEnv(authorization(repository, value.token)));
     const lines = [`Read token: ${scope}:${seq}, until ${value.ends}.`, `Remote URL: ${value.remote}`];
