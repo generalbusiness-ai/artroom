@@ -102,3 +102,33 @@ The genesis proof read and its inherited bootstrap window remain unchanged
 pending the owner's disposition. This correction does not substitute a
 shape-valid response for independently checked genesis bytes, refresh an
 envelope, widen read authority or approve native acknowledgement as that proof.
+
+### Exact retained output evidence
+
+The correction's source head is
+`d008ad2f2d6cf7f5db9c09be277e09307c920e6b`, tree
+`0ed1302537aee1fd78b126ee7e69d0c9cd1b55b1`. Its packages tree is
+`69249ae7f9c0c27d88e92abdaaa86464bf8b9c54`; its scripts tree is
+`c7ffb21b9435e2a7985a2bd0492c72dce1047787`.
+
+These files preserve the actual tool-returned output after the runs; they
+are labelled transcripts, not original runner-generated log/report files.
+No command was rerun to create them. Their SHA-256 digests are:
+
+| Output transcript | SHA-256 |
+|---|---|
+| `/tmp/artroom-install-metadata-typecheck-transcript.txt` | `4769d772c92d65ef00fe89fde4bdf57efe2808b3e3017dfe90f7194f217a55a4` |
+| `/tmp/artroom-install-metadata-focused-transcript.txt` | `0258e8a44a921d889b7ebb41d022da9a33800c36658b48b50632dbc06cc768a4` |
+| `/tmp/artroom-install-metadata-control-transcript.txt` | `8bd3f031b26424af4865aa6a3f570c84911931841fb31214f08dc41a28c3d493` |
+
+The typecheck command ran the source, Node-test and scope-test configurations
+and returned no diagnostics. It and focused Vitest ran sequentially in one
+shell whose final exit was 0; no separately captured typecheck exit code is
+available. The focused output reports two files and three passing tests.
+The completed manual guard control reports one assertion failure, one skipped
+test and exit 1; its source was restored after completion. The two earlier
+invalid control attempts above supply no successful-control evidence.
+
+This annotation changes only the note. Source, tests, dependencies and the
+packages/scripts trees remain unchanged. The integrated gate and original
+review/filing/landing order remain owed; no document-only rerun is performed.
