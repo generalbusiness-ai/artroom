@@ -285,3 +285,34 @@ Worker must reject credential-bearing URLs before dispatching to site/page,
 while preserving the candidate's site and scope routes. Final composed route
 verification and the candidate's one gate/review remain owed. The claim name
 header is held pending its owner-selected signed founding schema.
+
+## 8 No-session story expectation, 2026-10-08
+
+On combined candidate `4c9cf99fa1d6e2cd8587b5dddee0832e3614a56d`, the
+existing page story failed at its deliberate no-session rules view:
+`loadRules` now reports `definition items ... forbidden`. This is the
+production limited signed-read contract, not a missing incarnation or
+session-wiring authorization. `SIGNED_READS` supports summary/history/entry/
+log/retained, not item enumeration; the page's strict complete enumeration
+correctly refuses rather than returning a partial list. The fixture already
+uses the real session wiring and full birth references.
+
+Only the story expectation changes: the no-session founder summary/read
+phase remains valid, and the complete rules view explicitly reports
+Unreadable. The later real membership-session phase still reads both active
+definitions, extents, controller and grants; its session is now explicitly
+asserted present. Existing enrollment, member denial, two edited publications,
+controlled refusal, role and session-renewal assertions remain intact. No
+product source, authority, full-incarnation guard, read grant or test bypass
+changes. No unknown definition list is relabelled empty.
+
+The original story run is retained in
+`/tmp/artroom-page-story-authority-before.log`. The corrected complete story
+passes once in `/tmp/artroom-page-story-authority-after.log`. A focused
+control returns partial rows on refused enumeration and fails the new
+rejection assertion because the promise resolves instead; its log is
+`/tmp/artroom-page-story-authority-control.log`. Source was restored after
+that control. All three page TypeScript configurations pass in
+`/tmp/artroom-page-story-authority-types.log`; the existing testing guide
+is unchanged from the already read candidate. No whole gate, cloud, browser
+or provider ran; the host and scheduler remain labelled stand-ins.
