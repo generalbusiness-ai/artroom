@@ -456,3 +456,43 @@ focused Node and actual local Git composition batch on this checkpoint; those
 runs are not claimed in this note. This is source preservation within the
 expanded candidate, not provider/deployment, original archive/admission proof,
 final gate or complete Source approval.
+
+
+### Current composed clone evidence
+
+The missing closure is now composed with the current install/clone commands at
+`e2893ada8be2a954ad7c2b1cf1cf42b017a516e5`, tree
+`5d90ff270dc8609d2eda5bf1265f4a658d06ab69`. The command owner retained current
+install planning, exact saved claim/join recovery and all edit/issue flows.
+CLI source/Node/scope-test and scope source/Worker/Node-helper typechecks
+passed there after correcting the Node-only helper project exclusion.
+
+One actual focused batch ran once on that clean checkpoint:
+
+```sh
+./node_modules/.bin/vitest run --project cli --project client --project scope packages/cli/test/clone-proof.test.ts packages/cli/test/clone-outcome.test.ts packages/cli/test/clone.test.ts packages/cli/test/git.test.ts packages/client/test/credential.test.ts packages/scope/test/runtime-versions.test.ts
+```
+
+Six files, eleven tests passed (2.16 seconds Vitest duration). Original output:
+`/tmp/artroom-expanded-clone-current-evidence/focused.log`, SHA-256
+`b867000976435bb82a26d2c560b31ebdd94030c4f18075aaaa86b24e1941234e`.
+The source head stayed unchanged and the checkout was clean after the run.
+The Node cases cover exact receipt/opening/outcome checks, bounded/cancellable
+waiting, malformed credential metadata and no unsupported-native act/private
+read. Their scripted responses are not admitted history or runtime proof.
+
+The runtime case uses actual scopes, current sessions/authority, production
+host ports/private SQLite, production nodeGit and real git http-backend. It
+writes the actual founding head/receipt before aging the clock, then clones
+literal README bytes and checks the judged HEAD, independent one-file tree,
+clean saved/origin remote, one mint/take and second-take refusal. Identity/mint
+rights, scheduler/clock and fixed synthetic loopback transport remain labelled
+stand-ins. The raw Git stdout/stderr scan occurs under controlled ambient
+configuration and trusted URL rewrite; this proves neither live provider/TLS
+nor arbitrary user Git configuration/output safety.
+The earlier header-removal control was donor evidence and was not rerun here;
+its actual Git128 result remains attributed to that original checkpoint.
+No original historical admission/bundle, old-room compatibility, executor or
+capacity proof follows from this fresh@2 component. Full original484 scope
+remains required. No additional suite, gate, cloud/provider or main operation
+ran for this documentation successor; Root owns the combined final review.
