@@ -70,9 +70,14 @@ Links and images:
 - An address with a scheme (`https:`, `mailto:` and so on), and a link to
   a place in the same page (`#setup`), is left as written.
 
-The converter's test runs every example of the specification: all 672
-render as the specification states, with each example's own extension on
-as the specification's runner sets it.
+The converter compares all 672 retained reference examples exactly, with
+the tagged extension enabled, raw HTML passed through, heading ids disabled
+and no URL rewriting. Its two examples tagged `disabled` run locally with
+the task-list extension enabled. This reference configuration differs from
+the safe pages served here. Selected exact-output witnesses check the safe
+page configuration, including heading ids, relative URLs, escaped raw HTML
+and unsafe addresses; they do not establish exact served-profile output for
+all 672 examples or an independent comparison with every upstream byte.
 
 ## What does not render
 
