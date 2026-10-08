@@ -6,7 +6,7 @@ import { expect, test } from "vitest";
 import type { FactRef, ScopeId, Timestamp } from "@generalbusiness/artroom-contract";
 import { canonicalize, digestBytes, utf8 } from "@generalbusiness/artroom-bytes";
 import { d, otherLane } from "@generalbusiness/artroom-derive/testing";
-import { editCommit, editObjects, editPath, type DestinationObject } from "../src/destination-objects.ts";
+import { editCommit, editObjects, editPath, editTree, type DestinationObject } from "../src/destination-objects.ts";
 import { judgeReservation, type EditFile, type Statement } from "../src/reservation.ts";
 import { FOUND, HEAD, TREE, reading } from "./support-destination.ts";
 
@@ -59,6 +59,18 @@ for (const format of ["sha1", "sha256"] as const) test(`Git ${format} reads an e
     // The commit is `editCommit`'s, of that tree on the base.
     expect(replaced.commit).toBe(editCommit(format, scope, time, replaced.tree, base, "README.md", operation).id);
     expect(git(["log", "-1", "--format=%an <%ae>%n%B", replaced.commit])).toBe(`artroom <${scope}@artroom.invalid>\nWrite README.md.\n\noperation ${canonicalize(operation)}`);
+    // Invariant: one manifest tree contains every signed file, shares
+    // folders correctly, and is independent of the file submission order.
+    const files = [{ path: "docs/guide.md", bytes: utf8("updated guide\n") }, { path: "docs/deep/page.md", bytes: utf8("second file\n") }];
+    const combined = editTree(format, read, base, files)!;
+    for (const object of combined.objects) expect(git(["hash-object", "-w", "--stdin", "-t", object.kind], object.body)).toBe(object.id);
+    git(["read-tree", base]);
+    for (const file of files) git(["update-index", "--add", "--cacheinfo", `100644,${git(["hash-object", "-w", "--stdin"], file.bytes)},${file.path}`]);
+    expect(combined.tree).toBe(git(["write-tree"]));
+    expect(git(["diff", "--name-only", base, combined.tree])).toBe("docs/deep/page.md\ndocs/guide.md");
+    expect(editTree(format, read, base, [...files].reverse())!.tree).toBe(combined.tree);
+    expect(editTree(format, read, base, [files[0]!])!.tree).not.toBe(combined.tree);
+    expect([editTree(format, read, base, [files[0]!, files[0]!]), editTree(format, read, base, [{ path: "new", bytes: utf8("file") }, { path: "new/child", bytes: utf8("child") }]), editTree(format, read, base, [])]).toEqual([null, null, null]);
     // The published tree does not let these be written: a folder at the path, a link at the path or on the way, a file on the way.
     expect([edit("docs", "x"), edit("link", "x"), edit("link/guide.md", "x"), edit("README.md/x", "x"), edit("../x", "x")]).toEqual([null, null, null, null, null]);
   } finally { rmSync(directory, { recursive: true, force: true }); }

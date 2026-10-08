@@ -140,13 +140,37 @@ export function editObjects(
   format: ObjectFormat, read: (id: string) => DestinationObject | null, base: string, path: string, bytes: Uint8Array,
   commit: { scope: ScopeId; time: Timestamp; operation: FactRef },
 ): (DestinationCommit & { tree: string }) | null {
-  const segments = editPath(path);
+  const built = editTree(format, read, base, [{ path, bytes }]);
+  if (built === null) return null;
+  const top = editCommit(format, commit.scope, commit.time, built.tree, base, path, commit.operation);
+  return { commit: top.id, tree: built.tree, objects: [...built.objects, top] };
+}
+
+/** One signed file's bytes at a repository path. */
+export interface TreeFile { path: string; bytes: Uint8Array }
+
+/**
+ * Apply every file to one published tree, without choosing a commit identity
+ * or time. The manifest and the destination can compute the same tree before
+ * checks and publication. At most 64 distinct paths, as decision d9e4baa4
+ * states. Conflicting file/folder paths and paths that cannot be written are
+ * refused whole; the caller receives no partial tree.
+ */
+export function editTree(
+  format: ObjectFormat, read: (id: string) => DestinationObject | null, base: string, files: readonly TreeFile[],
+): { tree: string; objects: readonly DestinationObject[] } | null {
+  if (files.length === 0 || files.length > 64 || new Set(files.map((file) => file.path)).size !== files.length) return null;
+  const paths = files.map((file) => editPath(file.path));
+  if (paths.some((path) => path === null)) return null;
   const parent = read(base);
   const rootLine = parent?.kind === "commit" ? /^tree ([0-9a-f]{40}|[0-9a-f]{64})\n/.exec(ascii.decode(parent.body.subarray(0, 80))) : null;
-  if (segments === null || !rootLine) return null;
-  const made: DestinationObject[] = [];
-  const write = (tree: string | null, rest: readonly string[]): string | null => {
-    const body = tree === null ? new Uint8Array() : read(tree)?.kind === "tree" ? read(tree)!.body : null;
+  if (!rootLine) return null;
+  const made = new Map<string, DestinationObject>();
+  const get = (id: string) => made.get(id) ?? read(id);
+  const keep = (written: DestinationObject): string => { made.set(written.id, written); return written.id; };
+  const write = (tree: string | null, rest: readonly string[], bytes: Uint8Array): string | null => {
+    const existing = tree === null ? null : get(tree);
+    const body = tree === null ? new Uint8Array() : existing?.kind === "tree" ? existing.body : null;
     const rows = body === null ? null : treeRows(format, body);
     if (rows === null) return null;
     const name = utf8(rest[0]!);
@@ -154,24 +178,23 @@ export function editObjects(
     let row: TreeRow;
     if (rest.length === 1) {
       if (found !== null && !FILE_MODES.includes(found.mode)) return null;
-      const blob = object(format, "blob", bytes);
-      made.push(blob);
-      row = { mode: found?.mode ?? "100644", name, id: blob.id };
+      row = { mode: found?.mode ?? "100644", name, id: keep(object(format, "blob", bytes)) };
     } else {
       if (found !== null && found.mode !== TREE_MODE) return null;
-      const below = write(found?.id ?? null, rest.slice(1));
+      const below = write(found?.id ?? null, rest.slice(1), bytes);
       if (below === null) return null;
       row = { mode: TREE_MODE, name, id: below };
     }
     const next = [...rows.filter((kept) => kept !== found), row].sort(rowOrder);
-    const written = object(format, "tree", concat(...next.flatMap((kept) => [utf8(`${kept.mode} `), kept.name, new Uint8Array([0]), rawOf(kept.id)])));
-    made.push(written);
-    return written.id;
+    return keep(object(format, "tree", concat(...next.flatMap((kept) => [utf8(`${kept.mode} `), kept.name, new Uint8Array([0]), rawOf(kept.id)]))));
   };
-  const tree = write(rootLine[1]!, segments);
-  if (tree === null) return null;
-  const top = editCommit(format, commit.scope, commit.time, tree, base, path, commit.operation);
-  return { commit: top.id, tree, objects: [...made, top] };
+  let tree = rootLine[1]!;
+  for (let n = 0; n < files.length; n++) {
+    const next = write(tree, paths[n]!, files[n]!.bytes);
+    if (next === null) return null;
+    tree = next;
+  }
+  return { tree, objects: [...made.values()] };
 }
 
 /** The two public ref names: the fact's entry hash, with no additional domain. */
