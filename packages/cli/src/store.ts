@@ -9,7 +9,7 @@
  * the user. `memoryStore` keeps them in memory, for a test.
  */
 
-import type { Digest, FactRef, PlatformDefinition, ScopeId, ScopeRef, SignedIntent } from "@generalbusiness/artroom-contract";
+import type { Digest, FactRef, PlatformDefinition, Receipt, ScopeId, ScopeRef, SignedIntent } from "@generalbusiness/artroom-contract";
 
 /** The scopes of one repository, as `claim` or `join` learned them. */
 export interface Repository {
@@ -55,7 +55,13 @@ export interface PendingJoin {
  * ID is known before the register exists, and the Worker's host setting can pin it first. An intent and its signature are no
  * secret: the register's genesis records both.
  */
-export interface PlannedInstall { service: string; definition: PlatformDefinition; founding: SignedIntent; register: ScopeId }
+export interface PlannedInstall {
+  service: string; definition: PlatformDefinition; founding: SignedIntent; register: ScopeId;
+  /** Saved before possible submission, bound to the exact original plan. */
+  attempted?: Digest;
+  /** Configured-service acknowledgement, retained for later history verification. */
+  acknowledged?: { status: "service-acknowledged"; service: string; receipt: Receipt };
+}
 
 export interface Config {
   v: 1;
@@ -65,7 +71,7 @@ export interface Config {
   key: string;
   /** The register this command founded, as its receipt names it. */
   register?: ScopeRef;
-  /** An install that was planned and is not founded yet. */
+  /** The original planned install and its retained acknowledgement, including after success. */
   plan?: PlannedInstall;
   repository?: Repository;
   /** A claim that `claim` submitted and has not seen through yet. A later `claim` goes on from it. */

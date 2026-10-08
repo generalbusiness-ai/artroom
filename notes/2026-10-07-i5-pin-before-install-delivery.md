@@ -208,3 +208,39 @@ after `apt-get update` it installed **[run]**.
   depends on appears after a recorded unsent attempt, bounded, and sends
   nothing twice.
 - A refusal writes nothing and is the answer. Nothing was deployed.
+
+
+## Completed install recovery preserved in the expanded candidate
+
+Under steering `45c611cca0e991e35b6cbe577f22927dc3ac7390`, this isolated
+successor of `4c9cf99fa1d6e2cd8587b5dddee0832e3614a56d` selectively restores
+reviewed `20a3ca2956644c7e9e3a4a579db2bc0453c6c51d` through assembly
+`3eb62581426c5ec619125e15cbfd651b1bec57b2`. Planner localization
+`9fb617f3c79ea9d07a9b14ce959839ca7924352f` was read in full. The demo's
+already reviewed service acknowledgement expectation is retained.
+
+Current @2 install selection remains. Saved plans validate their signature,
+operator, configured service, exact known register version and derived ID.
+The original durable attempted marker precedes submission and prevents silent
+replacement. An exact attempted late replay can recover an accepted native
+acknowledgement without an aged genesis GET; an unsent expired plan sends
+nothing. Full receipt identities and any prior accepted fact must match.
+The original plan, complete receipt and service-acknowledged status are saved
+before final config and retained after success. Injected founding transports
+require the exact configured service/fetch trust declaration; that declaration
+is not independent history or executable provenance proof.
+
+Only the reviewed planned-install functions and additive plan storage fields
+were carried into current commands/store. Claim/seat/first-key/private-join
+recovery and clone/edit/issues/version routing remain current. The existing
+planned-install witness retains its original first-install/claim assertions
+and the reviewed late reply/save-loss, malformed identity and prior-fact cases.
+Its Git host remains a labelled stand-in; scopes and HTTP admission are real.
+
+Focused install file: two tests passed. CLI source and scope source/test types
+passed. Original logs are `/tmp/artroom-install-clone-preservation-evidence/
+install.log`, `install-cli-types.log` and `install-scope-types.log`. The demo
+worker will run the full existing demo witness once on this exact successor;
+no demo run is claimed here. Preservation comparisons and exact source/log
+hashes are in that evidence directory. No dependency install, cloud, gate,
+deployment, whole-command transplant or new design is included.
