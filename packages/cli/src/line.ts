@@ -3,11 +3,13 @@
  * no state of a process, so a test runs the same lines as a person types.
  */
 
-import { act, acts, claim, clone, install, invite, join, log, remote, show, verify, type Context, type Outcome } from "./commands.ts";
+import { act, acts, claim, clone, install, installPlanned, invite, join, log, planInstall, remote, show, verify, type Context, type Outcome } from "./commands.ts";
 
 export const USAGE = [
   "Usage:",
   "  artroom install <base-url> [--host <git-host>] [--namespace <name>]",
+  "  artroom install --plan <base-url> [--host <git-host>] [--namespace <name>]",
+  "  artroom install --planned",
   "  artroom claim <name> [--handle @you] [--branch main] [--again]",
   "  artroom invite <@member> --role <role> [--hours 24]",
   "  artroom join <link>",
@@ -22,7 +24,7 @@ export const USAGE = [
 ].join("\n");
 
 /** The flags that take no value. */
-const SWITCHES: ReadonlySet<string> = new Set(["again"]);
+const SWITCHES: ReadonlySet<string> = new Set(["again", "plan", "planned"]);
 
 /** The words of a command line: the positional ones, each `--name value`, and each switch; `--set` may be given more than once. */
 export function parse(argv: readonly string[]): { words: string[]; flags: Map<string, string[]> } | null {
@@ -46,7 +48,7 @@ export function parse(argv: readonly string[]): { words: string[]; flags: Map<st
 }
 
 const KNOWN: Record<string, readonly string[]> = {
-  install: ["host", "namespace"], claim: ["handle", "branch", "again"], invite: ["role", "acts", "hours"], join: [], acts: [], act: ["on", "target", "set"], log: ["limit"], show: [], verify: [], remote: [], clone: ["hours"],
+  install: ["host", "namespace", "plan", "planned"], claim: ["handle", "branch", "again"], invite: ["role", "acts", "hours"], join: [], acts: [], act: ["on", "target", "set"], log: ["limit"], show: [], verify: [], remote: [], clone: ["hours"],
 };
 
 /** Runs one command line with the given context. */
@@ -60,7 +62,12 @@ export async function command(ctx: Context, argv: readonly string[]): Promise<Ou
   const number = (f: string) => (flag(f) === undefined ? undefined : Number(flag(f)));
   const needs = (what: string): Outcome => ({ code: 2, lines: [`${name} needs ${what}.`, USAGE] });
   switch (name) {
-    case "install": return first === undefined ? needs("a base URL") : install(ctx, first, { ...(flag("host") ? { host: flag("host")! } : {}), ...(flag("namespace") ? { namespace: flag("namespace")! } : {}) });
+    case "install": {
+      const where = { ...(flag("host") ? { host: flag("host")! } : {}), ...(flag("namespace") ? { namespace: flag("namespace")! } : {}) };
+      if (flag("planned")) return first !== undefined || flag("plan") || flag("host") || flag("namespace") ? { code: 2, lines: ["install --planned takes no base URL and no other flag: the plan holds them.", USAGE] } : installPlanned(ctx);
+      if (first === undefined) return needs("a base URL");
+      return flag("plan") ? planInstall(ctx, first, where) : install(ctx, first, where);
+    }
     case "claim": return first === undefined ? needs("a name") : claim(ctx, first, { ...(flag("handle") ? { handle: flag("handle")! } : {}), ...(flag("branch") ? { branch: flag("branch")! } : {}), ...(flag("again") ? { again: true } : {}) });
     case "invite": return first === undefined ? needs("a member's handle") : invite(ctx, first, { ...(flag("role") ? { role: flag("role")! } : {}), ...(flag("acts") !== undefined ? { acts: flag("acts")! } : {}), ...(flag("hours") ? { hours: number("hours")! } : {}) });
     case "join": return first === undefined ? needs("a link") : join(ctx, first);

@@ -1,0 +1,167 @@
+{
+  "status": "isolated source assembly; not activation or executable admission proof",
+  "request": "da1 / 484",
+  "baseHead": "1d311bf900ff3989d857579fa979a59015cfe660",
+  "featureSourceHead": "20a3ca2956644c7e9e3a4a579db2bc0453c6c51d",
+  "sourcePairs": [
+    {
+      "path": "packages/cli/src/commands.ts",
+      "reviewedFeatureSource": {
+        "head": "20a3ca2956644c7e9e3a4a579db2bc0453c6c51d",
+        "bytes": 70456,
+        "sha256": "37396a657469c279c61a9741644156a0a3c408579cfef7cf8b2b92e8b80a8c15",
+        "gitBlob": "2454cdad7d35d6eababf1d0048d233c0b83e9b07"
+      },
+      "preservedIntegrationBase": {
+        "head": "1d311bf900ff3989d857579fa979a59015cfe660",
+        "bytes": 66497,
+        "sha256": "36fb3c2d5ffaf003c96955fca1d720bc69bfba88b25ec98376cab804ebe41477",
+        "gitBlob": "a83b1057fb446c76d638661c778dadefa2ab6367"
+      },
+      "assembledWorkingBytes": {
+        "bytes": 75880,
+        "sha256": "a02f64f7a75441e6e746df047f8cbd69908f6445b69659ff66c0c4b1b303c5e8"
+      }
+    },
+    {
+      "path": "packages/cli/src/store.ts",
+      "reviewedFeatureSource": {
+        "head": "20a3ca2956644c7e9e3a4a579db2bc0453c6c51d",
+        "bytes": 3866,
+        "sha256": "933fbc8caf7075a8fcd93251bcdc68b19672713fa4f0be9a585140243452cf2e",
+        "gitBlob": "92212ca6aaf3cfd38318c3c43dc12c2efd5d83f3"
+      },
+      "preservedIntegrationBase": {
+        "head": "1d311bf900ff3989d857579fa979a59015cfe660",
+        "bytes": 4049,
+        "sha256": "99d6b1f03292df38b2d1dc30b041e86c481e68f06663929fd71aa78c63cb402f",
+        "gitBlob": "dda8c7ce1ac86dbfd80ffe8db7bb1f4696395646"
+      },
+      "assembledWorkingBytes": {
+        "bytes": 5107,
+        "sha256": "6df7d16a0dd938ee395f1b909e1c2b96852f7b2eb082c3a336b95787cd5a2b13"
+      }
+    },
+    {
+      "path": "packages/cli/src/line.ts",
+      "reviewedFeatureSource": {
+        "head": "20a3ca2956644c7e9e3a4a579db2bc0453c6c51d",
+        "bytes": 5504,
+        "sha256": "e3d574136978aa4c4aa844a4894bd0a3c041150213a9459d70cad6bf269e7d9b",
+        "gitBlob": "14cc6b941df4004c81686bed5047d743b7a5a035"
+      },
+      "preservedIntegrationBase": {
+        "head": "1d311bf900ff3989d857579fa979a59015cfe660",
+        "bytes": 4445,
+        "sha256": "b51de4abe5175cb2febe702ee5091dd2d2c5769dd219ae120d66b455cad5859c",
+        "gitBlob": "a453e36a9f5507c8576d2130d14c77c39f64eb4f"
+      },
+      "assembledWorkingBytes": {
+        "bytes": 4970,
+        "sha256": "2ab9760a5e495432acce81df08c9df40c233248ce13565425e7390ba4de06f8a"
+      }
+    }
+  ],
+  "preservation": [
+    {
+      "boundary": "commands.ts: validStep through end of file, including fullPendingClaim/privatePendingJoin/aged recovery/clone/custody/exact catalog lookup",
+      "unchanged": true,
+      "bytes": 48540,
+      "sha256": "3ac2e3f19f8e59812cef5e40bc7565f9f1203807ab66f32e87356f993bff9390"
+    },
+    {
+      "path": "packages/cli/src/clone-proof.ts",
+      "unchangedFromBase": true,
+      "bytes": 4543,
+      "sha256": "cb63edba42fc7b059fd13a7c55f3e7a0793c16b293e1f7be8779b34e51b01b59"
+    },
+    {
+      "path": "packages/cli/src/clone-outcome.ts",
+      "unchangedFromBase": true,
+      "bytes": 5732,
+      "sha256": "27933dfb6168216e4b376844fe49acf500a168dd9a542ff9639477bdccaf134f"
+    },
+    {
+      "path": "packages/cli/test/claim.scope.test.ts",
+      "unchangedFromBase": true,
+      "bytes": 18407,
+      "sha256": "dccfb2b6c31431b972ec4d258de0182899fc5d354d7f83530f7f8c29fb97acb0"
+    },
+    {
+      "path": "packages/scope/test/runtime-versions.test.ts",
+      "unchangedFromBase": true,
+      "bytes": 9403,
+      "sha256": "a0659126cb58c35986290a721f10d4c5cbdaf6bcc9e66537abc6a7ff7f1ab91d"
+    },
+    {
+      "path": "packages/cli/src/files.ts",
+      "unchangedFromBase": true,
+      "bytes": 4062,
+      "sha256": "338318375ff3390a4179b40713c8e380bcfde94de056e06a9846d344165cdd1e"
+    }
+  ],
+  "checks": {
+    "install": "npm ci; unchanged committed package/lock",
+    "typecheck": "npm run typecheck --workspace @generalbusiness/artroom-cli (3 configs), exit 0",
+    "focused": "./node_modules/.bin/vitest run --project cli packages/cli/test/install.test.ts --project scope packages/cli/test/install.scope.test.ts packages/cli/test/claim.scope.test.ts packages/scope/test/runtime-versions.test.ts; exit 0; 4 files / 5 tests; duration 2.01s; summed test time 664ms",
+    "logs": [
+      {
+        "path": "/tmp/artroom-install-integrated-install.log",
+        "bytes": 869,
+        "sha256": "2f196042c803717dea654e2471c56d179d13e862b32c8616910eb65516597957"
+      },
+      {
+        "path": "/tmp/artroom-install-integrated-typecheck.log",
+        "bytes": 137,
+        "sha256": "b071fdcd2a1b9f41028faa45b00336ae371e0f884cc193f14edfaf8c03d0b11f"
+      },
+      {
+        "path": "/tmp/artroom-install-integrated-focused.log",
+        "bytes": 224,
+        "sha256": "81490962dd45655dfa57e5850c1e150d9348929487456ac5b4e70e2c14b0f402"
+      }
+    ]
+  },
+  "limits": [
+    "No old source branches or entire commands/store files merged.",
+    "No dynamic outside/runtime repair, site, edit, page or issue feature imported.",
+    "Native acknowledgment retains identity and trust label; no independently verified genesis/executable closure supplied.",
+    "Fresh claim after late install still requires register summary; code-backed expected-state context held.",
+    "No gate, live provider, deployment or activation proof."
+  ],
+  "toolchain": {
+    "node": "v26.10.0",
+    "npm": "11.19.1",
+    "vitest": "4.1.11"
+  },
+  "installWitnessSourcePairs": [
+    {
+      "path": "packages/cli/test/install.test.ts",
+      "featureSource": {
+        "head": "20a3ca2956644c7e9e3a4a579db2bc0453c6c51d",
+        "bytes": 1846,
+        "sha256": "f7bf6bf334595d273cce0d6a654b8e0007add1aba008290370381faa32af82dd",
+        "gitBlob": "7bf7324e1b68c84a3aa644c4013767071d11054d"
+      },
+      "assembledWorkingBytes": {
+        "bytes": 1846,
+        "sha256": "f7bf6bf334595d273cce0d6a654b8e0007add1aba008290370381faa32af82dd"
+      },
+      "adaptation": "None; source bytes identical."
+    },
+    {
+      "path": "packages/cli/test/install.scope.test.ts",
+      "featureSource": {
+        "head": "20a3ca2956644c7e9e3a4a579db2bc0453c6c51d",
+        "bytes": 17097,
+        "sha256": "6bfac2cc2c36526fc212e0d2a800f2ff460bfb24392bf28b5fc2ecce076bf873",
+        "gitBlob": "47ab7bb2d995267a4a54bbd9203fade6a263a529"
+      },
+      "assembledWorkingBytes": {
+        "bytes": 17233,
+        "sha256": "bf5d38134262d0fad219eb61cb21002f52ea02dfd44d753d9648441774f1e7ae"
+      },
+      "adaptation": "Scripted directory reply selects DIRECTORY_OF at retained exact plan pin; no production runtime changes."
+    }
+  ]
+}

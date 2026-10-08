@@ -39,36 +39,48 @@ or in the command line's config.
 
 ## The order
 
-1. **Deploy** the Worker with `DEPLOYMENT` and `SESSION_SECRET`, and with
-   no `GITHUB_APP_CONFIG`.
-2. **Install.** Run `artroom install <base-url> --host github.com
-   --namespace <login>`, where `<login>` is the account's `login`. It
-   prints `Installed: register sc_...`. A register whose host or
-   namespace differs from the configuration sends nothing.
-3. **Set `GITHUB_APP_CONFIG`**, with `registerScope` set to that register
-   ID, and the GitHub secrets. The receipt gives the ID; an exact signed
-   install plan also determines it before submission. Changing that plan's
-   nonce or deadline changes the pin. Set the exact pin before the claim.
-4. **Restart** the Worker, by deploying it again. A scope object reads its
-   settings when it starts. After a restart, a register with a recorded
-   creation that was not sent sends it at the first request it gets.
-   Redeploying does not promise that every already-running scope object
-   immediately reloads its settings. In the planner's 7 October own-host
-   run, a register installed just before its host setting changed kept
-   the previous setting until it restarted, about two minutes later.
-5. **Claim.** Run `artroom claim <name> --handle @you`. If it gives up
-   waiting, run the same command again: it goes on from the pending claim
-   without replacing its saved signed requests or deadlines. In the
-   settings-change run, the first claim reached its 120-read limit; the
-   same command resumed after the register restarted, with no second
-   `found`. This delay is an observed run, not a guaranteed restart bound.
-   `--again` deliberately signs a second claim, which may create a second
-   repository while an earlier unknown claim can still take effect.
+The host setting pins the register's exact scope ID. Plan first so the
+setting can be in place before the register starts:
 
-Finish the initial bootstrap while the operator's install is within its
-900-second read window. Before enrollment, the claim's causal read window
-also lasts 900 seconds; this delivery does not renew an expired window.
-An expired window is not permission to invent a new signed claim.
+1. **Deploy** the Worker with `DEPLOYMENT` and `SESSION_SECRET`.
+2. **Plan.** Run `artroom install --plan <base-url> --host github.com
+   --namespace <login>`, where `<login>` is the account's login. It signs
+   and saves the original install intent, prints the register ID and
+   deadline, and submits nothing.
+3. **Set `GITHUB_APP_CONFIG`**, with `registerScope` set to that exact
+   planned ID, and the GitHub secrets. Changing the install envelope,
+   including nonce or deadline, changes the pin. A register whose host
+   or namespace differs from the setting sends nothing.
+4. **Install.** Run `artroom install --planned` before the printed deadline.
+   A never-attempted expired plan sends nothing. An attempted plan cannot
+   be silently replaced: after an uncertain reply or config save, retry
+   this command with the original plan. The server may acknowledge the
+   same accepted founding after expiry; an expired unaccepted founding
+   remains refused. The original plan and native receipt stay retained
+   as `service-acknowledged`, not independently verified genesis bytes.
+5. **Claim.** Run `artroom claim <name> --handle @you` within the initial
+   bootstrap read window. If an accepted claim's enrollment is interrupted,
+   repeat the command: it preserves saved signatures and deadlines. `--again`
+   deliberately signs a second claim, which may create another repository
+   while an earlier unknown claim can still take effect.
+
+For the hosting's own Git service use `--host artifacts --namespace
+artroom-demo` and `ARTIFACTS_CONFIG` ([hosts.md](hosts.md)).
+
+Identity recovery after expiry does not yet guarantee a usable fresh claim.
+The current client still needs the register summary to build a new found
+intent. A code-backed expected-state context is proposed separately; the
+retained native receipt does not establish historical executable
+correspondence or authorize that summary read. Do not refresh the original
+intent or assume a current grant from recovered identity.
+
+Plain `artroom install <base-url>` still founds immediately. If its host
+setting is configured afterwards, an already-running register may retain
+the previous setting until restart. The planner's 7 October own-host run
+observed about two minutes before the object restarted; its first claim
+reached the 120-read limit and resumed without a second found. That is an
+observed delay, not a guaranteed restart bound. Planning first avoids this
+ordering problem without promising a live deployment or immediate restart.
 
 Keep `DEPLOYMENT` configured on every source deployment and secret update.
 When the configuration file omits existing plain variables, Wrangler deploy

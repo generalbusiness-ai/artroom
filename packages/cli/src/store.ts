@@ -9,7 +9,7 @@
  * the user. `memoryStore` keeps them in memory, for a test.
  */
 
-import type { Digest, FactRef, ScopeId, ScopeRef, SignedIntent } from "@generalbusiness/artroom-contract";
+import type { Digest, FactRef, PlatformDefinition, Receipt, ScopeId, ScopeRef, SignedIntent } from "@generalbusiness/artroom-contract";
 
 /** The scopes of one repository, as `claim` or `join` learned them. */
 export interface Repository {
@@ -49,6 +49,21 @@ export interface PendingJoin {
   accepted?: FactRef;
 }
 
+/**
+ * An install that `install --plan` prepared: the signed `install` intent, the version
+ * of the register it founds under, and the register ID that they make. The register's seed is a function of these alone, so the
+ * ID is known before the register exists, and the Worker's host setting can pin it first. An intent and its signature are no
+ * secret: the register's genesis records both. The plan stays after installation,
+ * with its acknowledgement, for later verification and reconciliation.
+ */
+export interface PlannedInstall {
+  service: string; definition: PlatformDefinition; founding: SignedIntent; register: ScopeId;
+  /** Saved before possible submission; binds the exact plan, not proof of acceptance. */
+  attempted?: Digest;
+  /** Native configured-service acknowledgement, retained for later history verification. */
+  acknowledged?: { status: "service-acknowledged"; service: string; receipt: Receipt };
+}
+
 export interface Config {
   v: 1;
   /** The scope service's base URL. */
@@ -57,6 +72,8 @@ export interface Config {
   key: string;
   /** The register this command founded, as its receipt names it. */
   register?: ScopeRef;
+  /** Original planned install and any retained native acknowledgement. */
+  plan?: PlannedInstall;
   repository?: Repository;
   /** A claim that `claim` submitted and has not seen through yet. A later `claim` goes on from it. */
   claim?: PendingClaim;

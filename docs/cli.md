@@ -54,6 +54,56 @@ Installed: register sc_hinqqbm4....
 The operator key key_baqzbaDy... is kept in the config directory, readable only by you. It is the one founder key.
 ```
 
+**`artroom install --plan <base-url> [--host <git-host>] [--namespace <name>]`**
+signs the same `install` intent and founds nothing. A register's ID is a
+function of its seed, and the seed of the intent and the register's
+version alone, so the command prints the ID that the install will found,
+and the seed's time: the intent's `notAfter`, 14 minutes ahead, until
+which it can be founded. It keeps the signed intent, the version and the
+ID in the config. An intent and its signature are no secret; the
+register's genesis records both. A later plan replaces a never-attempted
+plan. Once submission was attempted, both a new plan and plain install
+refuse `install-pending`: recover with the original `install --planned`.
+
+```
+Planned: register sc_4kq2v7..., under platform:register@2, on host artifacts, namespace artroom-demo. The seed's time is 2026-10-08T09:14:00Z.
+Set registerScope to sc_4kq2v7... in the Worker's host setting, then run artroom install --planned before 2026-10-08T09:14:00Z.
+```
+
+**`artroom install --planned`** founds the planned register, with the kept
+intent and no other argument. Before anything is sent it checks the plan:
+a plan whose ID is not the one its intent and version make, or whose
+operator/service binding is wrong, is refused as `plan-mismatch`. An
+unsupported pinned version keeps the pending plan and reports unsupported
+provenance. A never-attempted plan whose time is over is refused as
+`plan-expired`, without network: plan again and set the new ID.
+
+Before the first possible founding submission, the command saves an
+attempted marker bound to the exact plan. If delivery or the final config
+save is uncertain, retry `install --planned`. An attempted plan may send
+only its original envelope after expiry; the server returns an already
+accepted identical founding, or refuses an expired unaccepted one. The
+marker proves no acceptance and extends no deadline. The native configured-service
+acknowledgement is checked against the exact planned definition, intent digest
+and complete register fact. It must match any retained accepted fact. Recovery
+does not require an aged bootstrap read. The command saves the original plan
+and receipt before the installed config and retains them afterwards, labelled
+`service-acknowledged` for later history verification. This acknowledges the
+service's installed identity; it does not independently verify genesis bytes
+or grant new authority. A mismatch or unavailable acknowledgement leaves the
+recovery plan intact.
+
+```
+Installed: register sc_4kq2v7..., under platform:register@2, as planned.
+```
+
+[deploy.md](deploy.md) says why and when to plan first.
+
+The retained service acknowledgement recovers installed identity. A fresh
+claim after the bootstrap read window still needs the current register
+summary in this source. The code-backed expected-state context is a pending
+proposal, not an installed permission or executable-provenance proof.
+
 **`artroom claim <name> [--handle @you] [--branch main] [--again]`**
 signs the register's `found` act. It then waits until the directory,
 membership, the rules scope and the destination are created and
