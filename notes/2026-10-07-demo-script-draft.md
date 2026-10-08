@@ -1,5 +1,14 @@
 # The demo script, draft 1
 
+Corrected on 2026-10-08: every command line and every printed line in
+shots 3 to 12 and in the checklist of section 6 is now the line observed
+when the demo runner (`docs/demo.md`) ran against main `7bb3a641` on
+2026-10-08, 26 of 26 shots matching. The run took 77.3 seconds, a sum of
+the per-shot seconds in the transcript's shot headers, not an observed
+wall-clock time. Scope IDs are shown as placeholders of the printed shape
+(`sc_<directory>`, `key_<founder>`); hashes, times and entry numbers are
+the run's own and differ on every run.
+
 2026-10-07. A shot list for the recording of plan 024 (gate of Monday
 2026-10-13), written by a cloud builder from the documents named below.
 It is a document only: no source changed. Five to seven minutes of screen
@@ -19,14 +28,14 @@ uses plan 019, the nouns, verbs and invariants of plan 025, and the phrase
 
 Labels used in the shot list:
 
-- **Live**: observed on the deployment on 2026-10-07 by the local
-  colleague. The expected lines are copied from the 15:00 sprint report
-  or, where marked, from `docs/cli.md`. IDs, times and hashes differ on
-  every run.
-- **To be confirmed**: not yet run live. The expected outcome is what the
-  lane scenario tests assert. The printed form of the command line for
-  these outcomes has not been observed, and section 7 lists what blocks
-  them today.
+- **Live**: observed on the deployment by the demo runner on 2026-10-08
+  (shots 3 to 12), or, for shot 13, by the local colleague on 2026-10-07.
+  The expected lines are copied from the runner's transcript. IDs, times
+  and hashes differ on every run.
+- **To be confirmed**: not run by the runner. Shot 13's lines are in the
+  form of the 2026-10-07 live runs, and section 7 keeps the gaps as they
+  were found on 2026-10-07, with a note on what the 2026-10-08 run
+  settled.
 
 ## 1. The shape
 
@@ -42,7 +51,8 @@ the jam clip is not ready, cut shot 14 and the total is 6:10.
 
 Screen layout for the whole middle: a terminal on the left (device A,
 the founder, `@hugh`), a second terminal on the right (device B, the
-member, `@una`), and a browser that slides in for the page shots. Large
+member, `@una`), a third terminal for the maintainer `@paul` in shots 8
+to 11, and a browser that slides in for the page shots. Large
 font, a plain prompt `$ `, no shell history visible. Long IDs are cut to
 eight letters in the captions, as the command line prints them in full.
 
@@ -79,39 +89,40 @@ eight letters in the captions, as the command line prints them in full.
 - **Typed**:
 
   ```
-  $ artroom install <base-url> --host artifacts --namespace artroom-demo
+  $ artroom install --plan <base-url> --host artifacts --namespace artroom-demo
   ```
 
-- **Expected**, from the 09:55 run:
+- **Expected**, from the 2026-10-08 run:
 
   ```
-  Installed: register sc_gatlhaw5upazwk4vubzeho2hcxmoza2mvqnpnz2wcsck6oxlnuca.
+  Planned: register sc_<register>, under platform:register@2, on host artifacts, namespace artroom-demo. The seed's time is 2026-10-08T19:50:45Z.
+  Set registerScope to sc_<register> in the Worker's host setting, then run artroom install --planned before 2026-10-08T19:50:45Z.
   ```
-
-  (`docs/cli.md` also shows a second line, "The operator key key_... is
-  kept in the config directory, readable only by you. It is the one
-  founder key." The report did not copy it; confirm on the day.)
 
 - **Cut**: the setting that pins the register is set off camera (section
-  5). The recording resumes at the claim.
+  6). The recording resumes at the second install and the claim.
 - **Typed**:
 
   ```
+  $ artroom install --planned
   $ artroom claim demo-own-host --handle @hugh
   ```
 
-- **Expected**, from the 09:55 run, returned ten seconds after it was
-  typed:
+- **Expected**, from the 2026-10-08 run; the claim returned seven seconds
+  after it was typed:
 
   ```
-  Claimed demo-own-host: directory sc_lm2piehz..., membership sc_5hfk5tpy..., rules sc_knkga4d5..., destination sc_ipwfgr6w...; each created and confirmed.
-  You are @hugh, an admin, on key key_M5p1...; your inbox is sc_wgxtpfct....
+  Installed: register sc_<register>, under platform:register@2, as planned.
+  Service-acknowledged identity recovery. The original plan and receipt are retained for later history verification.
+  Claimed demo-own-host: directory sc_<directory>, membership sc_<membership>, rules sc_<rules>, destination sc_<destination>; each created and confirmed.
+  Definitions: platform:directory@2, platform:membership@2, platform:rules@2, platform:destination@2.
+  You are @hugh, an admin, on key key_<founder>; your inbox is sc_<founder inbox>.
   ```
 
 - **Said**, over the install: "One signed act founds the room's
   register." Over the claim: "A claim creates the repository, its
   members, its rules and its destination, and pushes the founding
-  commit. Ten seconds."
+  commit. Seven seconds."
 
 ### Shot 4. Invite (1:15 to 1:35). Live (member path, 18 seconds end to end)
 
@@ -122,17 +133,21 @@ eight letters in the captions, as the command line prints them in full.
   $ artroom invite @una --role member
   ```
 
-- **Expected**, in the form of `docs/cli.md` (the live lines of the member
-  run are not in the documents I read; copy them in on the day):
+- **Expected**, from the 2026-10-08 run:
 
   ```
-  Invited @una as member: invitation sc_5hfk5tpy...:5, until 2026-10-14T...Z.
+  Invited @una as member: invitation sc_<membership>:5, until 2026-10-09T19:37:00Z.
   Link for @una only (it holds the invitation's secret): artroom-invite:eyJ2Ijox...
   ```
 
 - **Said**: "The founder invites a member. The link carries a one-time
   secret, not a key."
 - **Note for the edit**: blur the link after its first eight letters.
+- **Off camera, or in the same shot**: the maintainer who edits in shots
+  8 to 11 is invited the same way, `artroom invite @paul --role
+  maintainer`, which prints `Invited @paul as maintainer: invitation
+  sc_<membership>:8, until 2026-10-09T19:37:02Z.` and a link for `@paul`
+  only.
 
 ### Shot 5. Join on a second device (1:35 to 1:55). Live
 
@@ -143,15 +158,19 @@ eight letters in the captions, as the command line prints them in full.
   $ artroom join artroom-invite:eyJ2Ijox...
   ```
 
-- **Expected**, in the form of `docs/cli.md`:
+- **Expected**, from the 2026-10-08 run:
 
   ```
-  Joined as @una on key key_H1bY2Hml....
-  Your inbox: sc_zbtu7vax....
+  Joined as @una on key key_<member>.
+  Your inbox: sc_<member inbox>.
   ```
 
 - **Said**: "Una joins from her own machine, with a key made there and
   never sent anywhere."
+- **Off camera, or on the third terminal**: `@paul` joins with his own
+  link, `artroom join artroom-invite:eyJ2Ijox...`, which prints `Joined
+  as @paul on key key_<maintainer>.` and `Your inbox: sc_<maintainer
+  inbox>.`
 
 ### Shot 6. Clone with a token the room issued (1:55 to 2:25). Live
 
@@ -163,13 +182,14 @@ eight letters in the captions, as the command line prints them in full.
   $ git -C site log --oneline
   ```
 
-- **Expected**, from the 14:22 run:
+- **Expected**, from the 2026-10-08 run (the repository's name on the
+  service is the directory's ID without its `sc_` prefix, then `-1`):
 
   ```
-  Read token: sc_ezngnqra...:8, until 2026-10-07T19:22:36.226Z.
-  Remote URL: https://<service>/git/artroom-demo/pjpl7g2x...-1.git
+  Read token: sc_<destination>:8, until 2026-10-08T20:37:05.148Z.
+  Remote URL: https://<service>/git/artroom-demo/<directory>-1.git
   Cloned into site.
-  e1a3edc artroom Found this repository.
+  5924bde Found this repository.
   ```
 
 - **Said**: "To read the repository, Una asks the room for a read token.
@@ -178,11 +198,19 @@ eight letters in the captions, as the command line prints them in full.
 
 ### Shot 7. The room's page (2:25 to 2:45). Live
 
-- **On screen**: the browser at `<base-url>/site/<directory>/HEAD/`.
+- **On screen**: the browser at `<base-url>/site/sc_<directory>/HEAD/`.
 - **Typed**: the address.
-- **Expected**, from the 11:39 run: the index of the founding tree. On
-  the live room today this is the page for an empty repository, because
-  nothing has been published yet. Headers, if shown in a side panel:
+- **Expected**, from the 2026-10-08 run: the index of the tree, titled
+  with the repository's name. Before shot 8 this is the founding tree,
+  because nothing has been published yet.
+
+  ```
+  HTTP 200, text/html; charset=utf-8
+  Title: <directory>-1
+  ```
+
+  Headers, if shown in a side panel, from the 11:39 run of 2026-10-07
+  (the runner does not read them):
 
   ```
   HTTP/2 200   content-type: text/html; charset=utf-8   cache-control: public, max-age=60
@@ -194,136 +222,186 @@ eight letters in the captions, as the command line prints them in full.
 - **Note**: the first part of the ETag is the commit. Shot 9 shows it
   change.
 
-### Shot 8. Edit a page in an open folder (2:45 to 3:30). To be confirmed
+### Shot 8. Edit a page in an open folder (2:45 to 3:30). Live
 
-- **On screen**: device B terminal; the change is `guide/start.md`, a
-  page in the `source` extent, which needs one approval from a member who
-  holds `change.review`.
-- **Typed**, by the act names of the demo profile (`change-demo`); the
-  exact command line is not settled (section 7, gaps 1 to 3):
-
-  ```
-  $ artroom act open-pr --on directory --set definition=<change-demo digest> --set title="Add a getting-started page" --set draft=false
-  $ artroom act propose-manifest --on <change lane> ...
-  $ artroom act request-review-own --on <change lane> --set requested=@paul
-  ```
-
-  then on a third terminal or device A as `@paul`:
+- **On screen**: device B terminal, then the third terminal; the change
+  is `guide/start.md`, a page in the `source` extent, which the rules of
+  section 6 publish with no approval. `start.md` is a local file of 53
+  bytes holding "Clone the room, then edit a page."
+- **Typed**, as `@una` on device B:
 
   ```
-  $ artroom act review-verdict --on <change lane> --set manifest=<manifest> --set verdict=approve --set extent=source
+  $ artroom issue open --title 'Add a getting-started page' --body 'A page that says how to clone and edit.'
   ```
 
-  then as `@una`:
+  then on the third terminal as `@paul`:
 
   ```
-  $ artroom act merge --on <change lane> --set manifest=<manifest> --set reports=[]
+  $ artroom issue comment 1 'I will take this.'
   ```
 
-- **Expected**: each act prints `Took effect: entry <scope>:<seq>, hash
-  sha256:...`. The outcome, as test W1 asserts it: the change lane's
-  merge item is `published`, the destination's publication is
-  `published`, the branch head moves to the new commit, and the linked
-  issue, if any, is `closed` with reason `completed`.
-- **Said**: "Una edits a page in an open folder. One reviewer approves,
-  and the room publishes it."
+  then on device A as `@hugh`:
 
-### Shot 9. The page, published (3:30 to 3:45). To be confirmed
+  ```
+  $ artroom issue assign 1 @paul
+  ```
+
+  then as `@paul`, and, after it, as `@una`:
+
+  ```
+  $ artroom edit guide/start.md --file start.md --closes 1
+  $ artroom issues
+  ```
+
+- **Expected**, from the 2026-10-08 run, in that order (the edit took
+  eight seconds):
+
+  ```
+  Opened issue #1: Add a getting-started page. Its lane is sc_<issue>.
+  Commented: entry sc_<issue>:2, hash sha256:d0d822481c57.
+  Assigned: entry sc_<issue>:3, hash sha256:450a1caf5b35.
+  Proposed guide/start.md (53 bytes) as change sc_<published>, version 5.
+  Linked: when it is published, the change sc_<published> closes issue #1 (sc_<issue>).
+  Published: commit 9c37c9834a03f20c51dbd8601a4ac0c2a6e10d01, by the merge sc_<published>:7.
+  Page: <base-url>/site/sc_<directory>/HEAD/guide/start.md
+  #1  closed (completed)  Add a getting-started page; assigned to @paul; lane sc_<issue>
+  1 issues, 0 open.
+  ```
+
+- **Picture**: `issue.png` (the issue's screen) and
+  `change-published.png` (the `guide/start.md` change's screen), from the
+  room's page at `<base-url>/page/`; `room.png` shows the room's issues
+  and changes with their states, taken at the end of the run.
+- **Said**: "Una opens an issue. Paul takes it and edits a page in an
+  open folder. The room publishes the page and closes the issue."
+
+### Shot 9. The page, published (3:30 to 3:45). Live
 
 - **On screen**: the browser at
-  `<base-url>/site/<directory>/HEAD/guide/start.md`, then the index.
-- **Expected**: the page rendered; a new ETag whose first part is the new
-  commit (`docs/pages.md`, "Caching"). The front page lists `guide/`.
+  `<base-url>/site/sc_<directory>/HEAD/guide/start.md`, then the index.
+- **Expected**, from the 2026-10-08 run:
+
+  ```
+  HTTP 200, text/html; charset=utf-8
+  Title: Getting started
+  Shows: "Clone the room, then edit a page."
+  ```
+
+  A new ETag whose first part is the new commit (`docs/pages.md`,
+  "Caching"), and the front page listing `guide/`, are not read by the
+  runner; confirm in the browser.
+- **Picture**: `site-page.png`, the page as the site renders it.
 - **Said**: "The page is live, from the commit the room just published."
 
-### Shot 10. An edit in a controlled folder, refused by name (3:45 to 4:20). To be confirmed
+### Shot 10. An edit in a controlled folder, refused by name (3:45 to 4:20). Live
 
-- **On screen**: device B terminal. The change touches `AGENTS.md`, the
-  instructions for agents, and one page. `AGENTS.md` is in the `rules`
-  extent by default (`**/AGENTS.md`, `**/CLAUDE.md`,
+- **On screen**: the third terminal, `@paul`. The change touches
+  `AGENTS.md`, the instructions for agents; `agents.md` is a local file
+  of 31 bytes holding "Ask before you push." `AGENTS.md` is in the
+  `rules` extent by default (`**/AGENTS.md`, `**/CLAUDE.md`,
   `.github/workflows/**`, `.github/actions/**`); only the rules scope's
   controller, a holder of `rules.publish`, can meet it. A repository may
   add patterns to that extent, so a folder such as `policy/` can be made
   controlled at founding; that variant is not in any test.
-- **Typed**: as in shot 8, a new change; `@paul` approves for `source`;
-  `@una` merges.
-- **Expected**, as test W2 and the profile story test assert it: the
-  merge act takes effect, and the destination refuses the reservation.
-  The lane's merge item state is `refused` with reason:
-
-  ```
-  rules-not-met:rules
-  ```
-
-  The publication is `not-reserved`, the branch head is unchanged, and
-  the linked issue stays `open`. How the command line prints this (by
-  `artroom show <change lane>:<seq>` or `artroom log`) is to be
-  confirmed.
-- **Said**: "Now Una touches the instructions the agents follow. The
-  source reviewer's approval is not enough. The room refuses, and says
-  which rule is not met. A refusal writes nothing to the repository."
-
-### Shot 11. The controller approves and it publishes (4:20 to 4:45). To be confirmed
-
-- **On screen**: device A terminal, `@hugh`, the founder, who holds
-  `rules.publish` and is not an author of the change.
 - **Typed**:
 
   ```
-  $ artroom act review-verdict --on <change lane> --set manifest=<manifest> --set verdict=approve --set extent=rules
+  $ artroom edit AGENTS.md --file agents.md
   ```
 
-  then `@una` merges again.
-- **Expected**, as test W2 asserts it: merge item `published`,
-  publication `published` with no exception reason, branch head moved,
-  issue `closed`.
+- **Expected**, from the 2026-10-08 run; the command exits 1:
+
+  ```
+  Proposed AGENTS.md (31 bytes) as change sc_<controlled>, version 5.
+  Not published: the merge sc_<controlled>:6 is refused, rules-not-met:rules. The change sc_<controlled> stays open at version 5. When it may be merged, run: artroom merge sc_<controlled>
+  ```
+
+  The branch head is unchanged. A second refusal, if there is time,
+  shows a path outside the repository refused by name, `artroom edit
+  ../outside.md --file start.md`, which exits 1 and prints
+  `Not published: the merge sc_<refused>:6 is refused, path-invalid. ...`
+  after its `Proposed` line.
+- **Picture**: `change-refused.png`, the `../outside.md` change's
+  screen. There is no capture of the `AGENTS.md` change while refused.
+- **Said**: "Now Paul touches the instructions the agents follow. A
+  maintainer's edit is not enough. The room refuses, and says which rule
+  is not met. A refusal writes nothing to the repository."
+
+### Shot 11. The controller approves and it publishes (4:20 to 4:45). Live
+
+- **On screen**: device A terminal, `@hugh`, the founder, who holds
+  `rules.publish` and is not an author of the change; then the third
+  terminal, `@paul`; then the browser.
+- **Typed**:
+
+  ```
+  $ artroom act review-verdict --on sc_<controlled> --set manifest=5 --set verdict=approve --set extent=rules
+  ```
+
+  then `@paul` merges again:
+
+  ```
+  $ artroom merge sc_<controlled>
+  ```
+
+- **Expected**, from the 2026-10-08 run:
+
+  ```
+  Took effect: entry sc_<controlled>:9, hash sha256:54dec834d28b.
+  Published: commit 59a3eb77535834c1cf90f857bf80d3a12601a96b, by the merge sc_<controlled>:10.
+  Page: <base-url>/site/sc_<directory>/HEAD/AGENTS.md
+  ```
+
+  and the browser at that page:
+
+  ```
+  HTTP 200, text/html; charset=utf-8
+  Title: Agents
+  Shows: "Ask before you push."
+  ```
+
+- **Picture**: `rules.png`, the rules of this room and who may change
+  them.
 - **Said**: "The rules scope's controller approves, and the same change
   takes effect. The rules are the room's own: written down, versioned,
   and changed only by the people they name."
 
-### Shot 12. The verifier (4:45 to 5:15). Live for the founding and member path; to be confirmed after a change
+### Shot 12. The verifier (4:45 to 5:15). Live, after the changes
 
 - **On screen**: device B terminal.
 - **Typed**:
 
   ```
-  $ artroom verify register
-  $ artroom verify directory
-  $ artroom verify membership
-  $ artroom verify rules
-  $ artroom verify destination
-  $ artroom verify inbox
+  $ artroom verify --all
   ```
 
-  (In the edit, run them in one line with `for s in ...; do ...; done`
-  and cut to the six results.)
-- **Expected on a room with no change yet**, from the 14:22 run, six
-  times:
+  (The run took 28 seconds; in the edit, cut to the results.)
+- **Expected after shots 8 to 11**, from the 2026-10-08 run, with the
+  second refusal of shot 10 included (without it, its lane's line is
+  absent: an inference, not observed); the entry numbers are the run's
+  own:
 
   ```
-  Result: consistent, for the mode, target, coverage and trusts stated below.
+  register sc_<register>, entry 3: consistent.
+  directory sc_<directory>, entry 23: consistent.
+  membership sc_<membership>, entry 10: consistent.
+  rules sc_<rules>, entry 10: consistent.
+  destination sc_<destination>, entry 35: consistent.
+  lane sc_<issue>, entry 5: consistent.
+  lane sc_<published>, entry 12: consistent.
+  lane sc_<controlled>, entry 13: consistent.
+  lane sc_<refused>, entry 8: consistent.
+  inbox sc_<founder inbox>, entry 1: consistent.
+  inbox sc_<member inbox>, entry 1: consistent.
+  inbox sc_<maintainer inbox>, entry 1: consistent.
+  All consistent: 12 scopes.
   ```
 
-- **Expected after shots 8 to 11**, as test W2 asserts it: register,
-  membership and rules `consistent`; the directory, the destination and
-  both lanes `incomplete`, each for one reason only, said after every
-  other entry derived with no mismatch:
-
-  ```
-  Result: incomplete: the walk of the ancestry record in entry <n> of <change lane> was not derived: this replay reads no commit, ...
-  ```
-
-  This is the verifier's own honest limit: it does not read Git commits
-  (`packages/replay/src/verify.ts`, sections 9.3 and 16.4).
-- **Said**, if shown on a room with no change: "Anyone can replay the
-  room. The verifier folds every history from its first entry and
-  reports each one consistent." If shown after the change: "The verifier
-  replays every history. Each act is derived again, with no mismatch;
-  what it cannot check without reading Git, it says so."
-- **Recommendation**: record shot 12 on the room after the change, and
-  use the second sentence, unless the proof plan's owner adds commit
-  reads before the freeze. Do not say "consistent" over a line that says
-  "incomplete".
+- **Said**: "Anyone can replay the room. The verifier folds every history
+  from its first entry and reports each one consistent."
+- **Recommendation**: record shot 12 on the room after the change, as the
+  runner did. Do not say "consistent" over a line that says anything
+  else.
 
 ## 4. Close
 
@@ -436,13 +514,25 @@ Rooms:
       evening before, with the observed lines copied into this script.
 - [ ] One fresh room per take, founded on camera; a spare register
       installed in case a claim gives up.
-- [ ] The rules scope of each room has activated `issue-demo` and
-      `change-demo` (digests `sha256:82a938c8...` and
-      `sha256:8d777c02...`), and its rules publish `approvals: 1`,
-      `ownerMayReview: false` and the first extents. If a `policy/`
-      folder is to be controlled, its pattern is in the `rules` extent.
-- [ ] `@hugh` holds `rules.publish`; `@paul` holds `change.review` and
-      is no author of the changes; `@una` holds `change.open`.
+- [ ] The rules scope of each room has published its rules (`approvals`
+      0, `ownerMayReview` false, and the first extents: `rules` with
+      `approvals` 1 and approver `rules.publish`, `infrastructure`,
+      `source` with no patterns and `approvals` 0) and activated
+      `issue-demo` and `change-demo` (digests `sha256:82a938c8...` and
+      `sha256:d86c64ae...`). If a `policy/` folder is to be controlled,
+      its pattern is in the `rules` extent. As the founder, after the
+      claim, the three commands of the 2026-10-08 run, each printing
+      `Took effect: entry sc_<rules>:<seq>, hash sha256:...`:
+
+      ```
+      $ artroom act publish --on rules --target 0 --set approvals=0 --set ownerMayReview=false --set 'checks=[]' --set 'labels=[]' --set 'extents=[{"name":"rules","patterns":["**/AGENTS.md","**/CLAUDE.md",".github/workflows/**",".github/actions/**"],"approvals":1,"approver":"rules.publish","checks":[],"class":"authority"},{"name":"infrastructure","patterns":["**/.gitignore","**/.gitattributes",".github/**"],"approvals":0,"approver":"change.merge","checks":[],"class":"deployment"},{"name":"source","patterns":[],"approvals":0,"approver":"change.review","checks":[],"class":"content"}]'
+      $ artroom act activate --on rules --set digest=sha256:82a938c8f54ddcac7974ca688ebea7d51c35d2aa70f4e3729965e9f915bc464e --set name=issue --value issue-demo.json
+      $ artroom act activate --on rules --set digest=sha256:d86c64ae0a570165660a6eb4d75153b8c2f59c9cdaec2ecc789e2c38524a17a2 --set name=change --value change-demo.json
+      ```
+
+- [ ] `@hugh` holds `rules.publish` and is no author of the changes;
+      `@paul`, a maintainer, authors the changes and comments on the
+      issue; `@una`, a member, opens the issue, clones and verifies.
 
 Tokens and timing:
 
@@ -465,8 +555,12 @@ Screen:
 
 ## 7. Gaps that block the "to be confirmed" scenes
 
-Recorded with the exact text where there is one. I invented no route
-around them.
+Recorded on 2026-10-07 with the exact text where there is one. I invented
+no route around them. On 2026-10-08 the runner went through shots 8 to 12
+with `artroom issue`, `artroom edit`, `artroom merge` and `artroom verify
+--all`, as written above; gaps 1, 2 and 4 did not block that run, and
+gap 5 was not seen: the verifier reported all twelve scopes consistent.
+The text below is kept as it was found.
 
 1. **The command line cannot open a lane on the deployed head.** The lane
    wiring's commit `c6fe198` made the definition's bytes a value at a
