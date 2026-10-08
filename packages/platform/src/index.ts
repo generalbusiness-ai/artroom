@@ -116,7 +116,7 @@ export const NEWEST: Readonly<Record<string, PlatformDefinition>> = Object.freez
 /** Native @1 is one exact source profile, not a historical resolver for every
  * colliding @1 room. Before activation the adopted bundle/provenance and
  * evaluator/port/build correspondence must identify the actual source. */
-export const VERSIONS: Readonly<Record<string, Platform>> = Object.freeze({
+const CATALOG: Readonly<Record<string, Platform>> = {
   "platform:inbox@1": { data: inbox, rules: RULES["platform:inbox"]! },
   "platform:register@1": { data: register, rules: RULES["platform:register"]! },
   "platform:directory@1": { data: directory, rules: RULES["platform:directory"]!, membership: directoryMembership, rulesScope: directoryRulesScope },
@@ -128,10 +128,13 @@ export const VERSIONS: Readonly<Record<string, Platform>> = Object.freeze({
   "platform:membership@2": { data: membership2, rules: membershipRules2, observed: (state, asked) => standingOf2(state, asked, "platform:membership@2") },
   "platform:rules@2": { data: rulesScope2, rules: rulesScopeRules2, observed: (state, asked) => rulesAnswer2(state, asked, "platform:rules@2"), observedValues: rulesObservedValues2, revised: PUBLISH, membership: rulesMembership },
   "platform:destination@2": { data: destination2, rules: destinationRules2, membership: destinationMembership, rulesScope: destinationRulesScope },
-});
+};
+/** Freeze only catalog wrappers. Shared native data/rule identities keep their
+ * existing behavior; a caller's lookup wrapper must never poison later reads. */
+export const VERSIONS: Readonly<Record<string, Platform>> = Object.freeze(Object.fromEntries(Object.entries(CATALOG).map(([named, entry]) => [named, Object.freeze(entry)])));
 
 /** Exact named lookup only. Classification helpers and NEWEST are not fallback
  * execution or authority: an unlisted name/version has no supplied code. */
 export function platform(named: string): Platform | null {
-  return Object.hasOwn(VERSIONS, named) ? VERSIONS[named]! : null;
+  return Object.hasOwn(VERSIONS, named) ? { ...VERSIONS[named]! } : null;
 }

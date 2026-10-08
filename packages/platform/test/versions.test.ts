@@ -2,15 +2,17 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { expect, test } from "vitest";
 import { PROPOSED_BOUNDS, type DeclaredDefinition, type PlatformDefinition, type Seed } from "@generalbusiness/artroom-contract";
-import { definitionDigest, intentDigest, signIntent, utf8 } from "@generalbusiness/artroom-bytes";
-import { outcomeValueDomains, PROFILES, runnable, validateDefinition, type PlatformRule, type RuleGiven } from "@generalbusiness/artroom-derive";
+import { definitionDigest, entryHash, intentDigest, signIntent, utf8 } from "@generalbusiness/artroom-bytes";
+import { outcomeValueDomains, PROFILES, runnable, validateDefinition, type Own, type PlatformRule, type RuleGiven } from "@generalbusiness/artroom-derive";
 import { keys, d } from "@generalbusiness/artroom-derive/testing";
 import { definitions, NEWEST, VERSIONS, platform, ROLE_LISTS, DIRECTORY, REGISTER, MEMBERSHIP, DESTINATION, RULES_SCOPE } from "../src/index.ts";
 import { RULES } from "../src/rules.ts";
 import { directorySeed } from "../src/future-2/register.ts";
 import { directorySeed as nativeDirectorySeed } from "../src/register.ts";
-import { foundingObjects, readmeText } from "../src/future-2/destination-objects.ts";
+import { foundingObjects } from "../src/future-2/destination-objects.ts";
 import { foundingObjects as nativeFounding } from "../src/destination-objects.ts";
+import { foundingOf } from "../src/future-2/destination.ts";
+import { Branch } from "./support-destination.ts";
 import { Roster, rita } from "./support.ts";
 
 // Invariant: native source093's data, executable module bytes and defaults
@@ -77,6 +79,38 @@ test("pinned future rules choose their own siblings and grants without reinterpr
   expect(foundingObjects("sha1", scope, time, claim)).toEqual(nativeFounding("sha1", scope, time, claim));
   const readme = { name: "demo", handle: "@rita", directory: scope };
   const future = foundingObjects("sha1", scope, time, claim, readme);
-  expect(future.objects.find((object) => object.kind === "blob")!.body).toEqual(utf8(readmeText(readme)));
+  expect(future.objects.find((object) => object.kind === "blob")!.body).toEqual(utf8(`# demo\n\nFounded by @rita through the room ${scope}.\n`));
   expect(future.commit).not.toBe(nativeFounding("sha1", scope, time, claim).commit);
+  // Script only the own-genesis pin and README fields at the pure helper
+  // boundary; no future scope admission is claimed.
+  const branch = new Branch(false);
+  const original = branch.own(0)!.entry;
+  const input = original.input;
+  if (input.type !== "genesis") return expect.fail("fixture genesis is required");
+  const page = () => ({ ...branch.state.page("branch", ["empty", "ready"], null, 1), items: [{ ...branch.branch, values: { ...branch.branch.values, founderHandle: "@rita" } }] });
+  const own = (named: PlatformDefinition): Own => (seq) => {
+    if (seq !== 0) return branch.own(seq);
+    const entry = { ...original, input: { ...input, seed: { ...input.seed, definition: named } } };
+    return { entry, hash: entryHash(entry) };
+  };
+  const empty = foundingOf({ page }, own("platform:destination@1"), "sha1");
+  expect(empty.objects.some((object) => object.kind === "blob")).toBe(false);
+  const named = foundingOf({ page }, own("platform:destination@2"), "sha1");
+  expect(named.objects.find((object) => object.kind === "blob")!.body).toEqual(utf8(`# demo\n\nFounded by @rita through the room ${branch.bureau.at.scope}.\n`));
+  expect(() => foundingOf({ page }, own("platform:destination@99"), "sha1")).toThrow("unsupported destination founding version");
+  expect(() => foundingOf({ page }, own("platform:register@2"), "sha1")).toThrow("unsupported destination founding version");
+});
+
+// Invariant: modifying a caller's wrapper cannot replace catalog code on the
+// next lookup, while native shared data/rules retain their original identity.
+test("each exact lookup has an independent wrapper and exposed catalog wrappers cannot poison subsequent selection", () => {
+  const first = platform("platform:membership@1")!;
+  const rules = first.rules;
+  Object.assign(first, { rules: {} });
+  const next = platform("platform:membership@1")!;
+  expect(next).not.toBe(first);
+  expect(next.rules).toBe(rules);
+  expect(next.data).toBe(definitions["platform:membership"]);
+  expect(Reflect.set(VERSIONS["platform:membership@1"]!, "rules", {})).toBe(false);
+  expect(platform("platform:membership@1")!.rules).toBe(rules);
 });

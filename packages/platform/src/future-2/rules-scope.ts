@@ -64,10 +64,11 @@ import { firstExtents, holdsRulesExtent, isExtents } from "../extents.ts";
 import type { Extent } from "../extents.ts";
 
 /**
- * The versions of the rules scope that this package serves. Version 2
- * differs in one thing: the field `digest` of `activate` states the place
- * of the definition's bytes (`rulesScope2`). An answer states the version
- * of the scope that gives it.
+ * The future rules implementation preserves the definition-byte place of
+ * current native source093, which already states activate.digest.value.
+ * Original-main data without that place is a different historical source;
+ * this module does not select or restore it. An answer states the exact
+ * version of the scope that gives it.
  */
 export const RULES_SCOPE_1 = "platform:rules@1" satisfies PlatformDefinition;
 /** The newest version of the rules scope: the one that a directory of the newest version creates. */
@@ -316,13 +317,10 @@ export const rulesScope: PlatformData = {
 };
 
 /**
- * `platform:rules@2`: version 1, with the place of the definition's bytes
- * on the field `digest` of `activate`. A value beside an intent is read
- * only for a place that the pinned data states (the contract's section
- * 6.2, revision 19). Without the place, under version 1, the runtime reads
- * none, and the guard `definition-bytes` can only answer
- * `dependency-unavailable`. One place: the closure of a lane definition
- * that creates only lanes of `self` is the definition alone.
+ * Future rules@2 retains activate.digest's definition-byte place, as current
+ * native source093 already does. Original-main data without that place is a
+ * separate historical profile and is not restored here. A value is read only
+ * at a stated place; self-only lane definitions need their own bytes alone.
  */
 const activate1 = rulesScope.acts["activate"]!;
 export const rulesScope2: PlatformData = {

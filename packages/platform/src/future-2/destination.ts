@@ -1037,11 +1037,13 @@ export function firstHeadCommit(state: Pick<StateView, "page">, own: Own, write:
  * directory's scope ID, each held by the branch since the genesis.
  */
 export function foundingOf(state: Pick<StateView, "page">, own: Own, format: ObjectFormat): DestinationCommit {
+  const pinned = pinnedOf(own);
+  if (pinned !== "platform:destination@1" && pinned !== "platform:destination@2") throw new Error("unsupported destination founding version");
   const branch = branchOf(state);
   const claim = branch?.refs["claim"];
   if (!branch || !isFactRef(claim)) throw new Error("a founding first head holds its verified claim");
   const genesis = ownEntry(own, 0);
-  if (pinnedOf(own) === DESTINATION_1) return foundingObjects(format, genesis.at.scope, genesis.time, claim);
+  if (pinned === "platform:destination@1") return foundingObjects(format, genesis.at.scope, genesis.time, claim);
   const [repository, handle, directory] = [branch.values["repository"] as { name?: unknown } | null, branch.values["founderHandle"], branch.refs["directory"]];
   if (typeof repository?.name !== "string" || typeof handle !== "string" || !isScopeRef(directory)) throw new Error("a founding of version 2 holds the repository's name, the founder's handle and the directory");
   return foundingObjects(format, genesis.at.scope, genesis.time, claim, { name: repository.name, handle, directory: directory.scope });
