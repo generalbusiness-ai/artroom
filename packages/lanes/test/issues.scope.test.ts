@@ -188,4 +188,6 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
   for (const line of lines) expect(line).toMatch(/^[a-z]+ sc_[a-z2-7]+, entry \d+: consistent\.$/);
   expect(lines.filter((line) => line.includes(I.name) || line.includes(J.name) || line.includes(lane[1]!) || line.includes(lane2))).toHaveLength(4);
   expect(verified.lines.at(-1)).toBe("All consistent: 12 scopes.");
+  // Nothing is left to deliver when the test ends: each scope's sends are carried, so no pass of this room runs into a later test.
+  await pause(lines.map((line) => line.split(" ")[1]!.replace(/,$/, "")));
 }
