@@ -101,7 +101,7 @@ export function changeScreen(room: Room, change: ChangeView, last: Answer | null
       field("Base", h("code", {}, short(current.base))),
       current.file ? [
         field("File", h("code", {}, current.file.path)), field("Bytes", or(current.file.size)), field("Digest", h("code", {}, short(current.file.digest))),
-        field("Rendered page", h("a", { href: current.file.page }, current.file.page), change.merges.some((m) => m.state === "published" && m.manifest === current.id) ? "" : h("span", { class: "muted" }, " (shows the published branch: this version once it is published)")),
+        field("Rendered page", h("span", {}, h("a", { href: current.file.page }, current.file.page), change.merges.some((m) => m.state === "published" && m.manifest === current.id) ? "" : h("span", { class: "muted" }, " (shows the published branch: this version once it is published)"))),
       ] : [field("Integration commit", h("code", {}, short(current.integration))), field("Tree", h("code", {}, short(current.tree)))],
     ) : h("p", { class: "muted" }, "No version is proposed yet."), change.manifests.length > 1 ? h("p", { class: "muted" }, `${change.manifests.length - 1} earlier version(s).`) : null),
     section("Reviews by extent",

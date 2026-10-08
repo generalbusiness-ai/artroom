@@ -57,9 +57,10 @@ async function as(person) {
   await context.addInitScript((kept) => localStorage.setItem("artroom-page", JSON.stringify(kept)), { service: "", place: record.place, secret: record.people[person] });
   return context.newPage();
 }
-const shot = async (tab, name) => {
+/** A screenshot of the whole page, or of its top `height` pixels. */
+const shot = async (tab, name, height = null) => {
   const file = join(out, `${name}.png`);
-  await tab.screenshot({ path: file, fullPage: true });
+  await tab.screenshot({ path: file, ...(height ? { clip: { x: 0, y: 0, width: 1000, height } } : { fullPage: true }) });
   sizes.push([name, statSync(file).size]);
 };
 
@@ -71,6 +72,7 @@ await shot(una, "issue");
 
 const paul = await as("paul");
 await paul.goto(`${record.service}/page/#/change/${record.agents}`);
+await paul.getByRole("heading", { name: /Rules for agents/ }).waitFor();
 await paul.getByText("What you may do here").waitFor();
 const review = paul.locator('form[data-act="review-verdict"]');
 await paul.locator("details", { has: review }).locator("summary").click();
@@ -82,8 +84,9 @@ await paul.locator(".answer.bad").waitFor();
 await shot(paul, "change-refused");
 
 await paul.goto(`${record.service}/page/#/change/${record.readme}`);
-await paul.getByText("Rendered page").waitFor();
-await shot(paul, "change-published");
+await paul.getByRole("heading", { name: /Write the handbook/ }).waitFor();
+await paul.getByText("What you may do here").waitFor();
+await shot(paul, "change-published", 1500);
 
 await paul.goto(`${record.service}/page/#/rules`);
 await paul.getByRole("heading", { name: "The rules of this room" }).waitFor();
@@ -92,6 +95,7 @@ await shot(paul, "rules");
 
 // The rendered page: the address that the change's "Rendered page" links to, as the site route answered it.
 await paul.goto(`${record.service}/page/#/change/${record.readme}`);
+await paul.getByRole("heading", { name: /Write the handbook/ }).waitFor();
 await paul.getByRole("link", { name: /\/site\// }).click();
 await paul.getByRole("heading", { name: "The handbook" }).waitFor();
 await shot(paul, "site-readme");
@@ -102,7 +106,7 @@ for (const [name, size] of sizes) if (size > MOST) throw new Error(`${name}.png 
 const shows = {
   issue: "Signed in as @una (who joined on the page with an invitation link): the issue she opened through the page, paul's comment, and the acts she may sign on it.",
   "change-refused": "Signed in as @paul: the change that AGENTS.md is, waiting for the rules extent's approval (policy not met), its one-file version, the merge the destination refused (rules-not-met:rules), and paul's own review refused by the lane, author-cannot-review.",
-  "change-published": "Signed in as @paul: the change that rita's artroom edit README.md made, merged and published, its one-file version with path, size and digest, and the link to the rendered page.",
+  "change-published": "Signed in as @paul: the change that rita's artroom edit README.md made, merged and published, its one-file version with path, size and digest, and the link to the rendered page (the top 1,500 pixels).",
   rules: "Signed in as @paul: the rules of this room, who may change them, and that paul may sign no act that changes them.",
   "site-readme": "README.md as the site route renders it from the published branch, reached by the change's link.",
 };

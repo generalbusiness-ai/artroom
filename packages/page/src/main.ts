@@ -52,7 +52,9 @@ const sessionOf = (kept: Settings): Session => {
 };
 
 const root = (): HTMLElement => document.getElementById("page")!;
-const show = (...children: HTMLElement[]) => root().replaceChildren(...children);
+/** The number of the latest draw: a slower, earlier draw that ends after a later one shows nothing. */
+let drawing = 0;
+const showFor = (n: number) => (...children: HTMLElement[]) => { if (n === drawing) root().replaceChildren(...children); };
 const failure = (error: unknown) => h("main", {}, h("h1", {}, "Not read"), h("p", { class: "answer bad" }, error instanceof Error ? error.message : String(error)), h("p", {}, h("a", { href: "#/settings" }, "Settings")));
 
 let opened: { key: string; room: Room } | null = null;
@@ -134,6 +136,7 @@ function settingsScreen(): HTMLElement {
 }
 
 async function draw(): Promise<void> {
+  const show = showFor(++drawing);
   const path = location.hash.replace(/^#/, "") || "/";
   const kept = settings();
   if (path === "/settings" || !kept || !kept.place) return show(settingsScreen());
