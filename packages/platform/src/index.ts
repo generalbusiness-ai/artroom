@@ -30,7 +30,7 @@ export { destination2, directory2, membership2, register2, rulesScope2 };
 /** Explicit future helper module; native helper exports keep their identity. */
 export * as destination2Helpers from "./future-2/destination.ts";
 /** Held edit preparation helpers; these do not change native helper identity. */
-export { EDIT_PATH_BYTES, editCommit, editObjects, editPath } from "./future-2/destination-objects.ts";
+export { EDIT_PATH_BYTES, editCommit, editObjects, editPath, editTree } from "./future-2/destination-objects.ts";
 export { PROPOSE_FILE, fileOf } from "./future-2/destination-reading.ts";
 export { fileSound, type EditFile } from "./future-2/reservation.ts";
 export { isOf, pinnedBy, pinnedOf, versionOf } from "./versions.ts";

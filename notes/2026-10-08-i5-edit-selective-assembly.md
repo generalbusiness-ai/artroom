@@ -87,3 +87,57 @@ registration, provider, Room setup, whole gate, main landing or activation ran.
 Authorized acquisition, actual checker ABI/image, reservation/publication,
 combined-c4 allocations/tuple, custody/executor/capacity/historical proofs and
 full functional/source review remain owed.
+
+## Bounded candidate byte adapter preparation
+
+Isolated request/i5-edit-candidate-prep starts from extraction
+81948340d49262f93a05fd6cb85a413afff9deff under the same 50b/9be owner.
+The new unwired scope/edit-candidate adapter uses existing Git Reader checks
+and the exported pure editTree. Scope already has Git/platform dependencies;
+no dependency or lock change is needed. It snapshots supplied file/object
+bytes and metadata before awaits, validates every supplied SHA-1 ID, checks
+exact file path/digest/size, and verifies the actual base commit plus required
+tree/blob closure. Parent IDs are parsed but ancestry is not traversed or
+claimed. SHA-256 remains explicitly unsupported by this reader adapter.
+
+All caller input/read/object/tree-entry/depth/work/generated/comparison
+allowances are mandatory and detached. Input bytes count supplied file/object
+payloads; identifiers have fixed validated forms and path has its explicit
+UTF-8 byte cap. Work charges reads/hash bytes, occurrence expansion, parsing,
+sorting and link steps. Conservative output/work preflight occurs before raw
+editTree construction; generated candidates are read-verified again. Missing,
+malformed or corrupt basis yields unknown, not empty-tree evidence. Proven
+file/path/format/allowance failure yields a fixed refusal. No raw error text
+escapes. This is byte correspondence, not authenticated source or permission.
+
+The shared compareTrees seam extracts the existing GitHub inspection's raw
+path, mode, changed-set and complete symbolic-link resolution logic. It keeps
+old inspectGit defaults, over-path/link/byte classes and uncertainty versus
+broken links; head/integration/closure/ancestry checks remain byte-identical.
+The new adapter supplies explicit limits and work hooks. A link with unchanged
+bytes may now resolve differently because the candidate adds its target; the
+compact witness checks both old and new results rather than assuming no links.
+
+Final focused checks passed four tests: the new pure candidate witness plus
+three existing scripted object-store inspection cases (provider case skipped).
+Scope/platform source and test typechecks passed. One control omitted required
+blob verification and wrongly accepted a missing unchanged README; the witness
+failed by assertion (DISTINGUISHES), and source was restored. Later link-sort
+work accounting is covered by the final focused run. Original raw outputs:
+
+| Output | SHA-256 |
+|---|---|
+| `/tmp/artroom-edit-candidate-evidence/focused-final.log` | `fced124f6167f6401aed74b1f670f66a5575b5b306392f538328d0008856c771` |
+| `/tmp/artroom-edit-candidate-evidence/types-final.log` | `ece107d2d6c6313853003179434f47991bfc1f7a5707a5f837be502ea89f6b86` |
+| `/tmp/artroom-edit-candidate-evidence/control-closure.log` | `fafdf9a7dc0dc3c229770fe93c148b992abc9630c81625894af63f6c712b5d78` |
+| `/tmp/artroom-edit-candidate-evidence/preservation.log` | `a9857a6ac8c3a77da53e07754b464f1c2904274a85beb4d2365e1dea8849a949` |
+
+The witness includes snapshot mutation, mode/tree/link preservation, missing/
+corrupt basis, file digest/size/path, unused invalid ID, UTF-8 path allowance,
+base closure zero/read-size limits, work/entry/generated and exact changed-set
+byte boundaries. It runs no Room or provider. Earlier original failed type
+log is types-01.log; passing intermediate logs remain separately retained.
+No new wire, factory caller, mint, catalog allocation, activation, provider,
+Room setup, whole gate or main landing ran. Physical peak/capacity, authorized
+acquisition, historical admission, actual checker image/ABI, combined-c4 tuple,
+reservation/publication and current custody/executor proofs remain owed.
