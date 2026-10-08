@@ -92,8 +92,8 @@ membership.
 |---|---|
 | `#/` | The room's issues and changes: the directory's index rows, each with its lane's own state. |
 | `#/issue/<scope>` | One issue: number, title, state and close reason, who opened it, assignees, conditions, body and comments. |
-| `#/change/<scope>` | One change: where it stands; the current version (base and authors; for a one-file version from `artroom edit`, the file's path, size and digest and a link to its rendered page on the site; otherwise the integration commit and tree); reviews by extent, against the extents of the rules the lane holds; review requests; checks; links to the issues it closes; each merge with the destination's publication and its outside operations; and comments. |
-| The site | The room screen links to the published site, `/site/<directory>/HEAD/`, and a one-file version links to its path there. The site serves the published branch, so the file appears there once the merge is published. |
+| `#/change/<scope>` | One change: where it stands; the current version (base and authors; for a one-file version from `artroom edit`, its path, size and digest and any recorded publication commit; otherwise the integration commit and tree); reviews by extent, against the extents of the rules the lane holds; review requests; checks; links to the issues it closes; each merge with the destination's publication and its outside operations; and comments. Immutable version rendering is unavailable. |
+| The site | The room and change screens offer separate **Latest published site** navigation to `/site/<directory>/HEAD/`. This shows the latest published branch, not an immutable preview of a recorded version. The original immutable-preview obligation remains owed. |
 | `#/rules` | The rules of this room, as the rules scope holds them: the revision, the approvals the lanes count, the extents with their classes, approvals, approvers, checks and paths, whether the single-controller exception is declared, required checks, labels and the active definitions. It says who may change them: the members whose role holds `rules.publish`. |
 
 Every screen shows who the page acts as: the member's handle and role, or
@@ -106,8 +106,11 @@ that a rule decides. It computes this the way `artroom acts` does, with the
 command line's own function. Each act is a form: one input for each field,
 typed as the field's declared type reads it, and for a transition the item
 it is on. The button signs the act and sends it. The page then shows the
-answer: "Took effect" with the entry, or "Refused" with the reason and the
-guard's name, and that the scope's head did not move.
+actual answer category: accepted with its recorded fact, refused with its
+reason and any guard name, unavailable, or mismatch. Before/after heads are
+separate observations; a refusal category alone does not show that the head
+stayed unchanged. A failed subsequent read keeps the known answer and reports
+observation unknown. Inspect the recorded result before another mutation.
 
 A value is read as `artroom act --set` reads it: a list or a record as
 JSON, a number for an item, `true` or `false`, and `@handle` for a member.
