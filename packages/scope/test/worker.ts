@@ -97,8 +97,11 @@ export class PlatformScope extends DeployedScope<PlatformEnv> {
     // With a test secret the session configuration is the test's. With none it is the deployed one, from this Worker's bindings.
     const session = sessionWiring(() => (platformNet.secret === null ? deployed.sessions!() : sessionsOf(platformNet.secret, TEST_DEPLOYMENT)));
     const outside = platformOutside.get(name ?? "");
+    const ports = wired.get(name ?? "")?.();
+    // The deployed outside factory is always wired, and would win over an outside port that a test wired for this name.
+    const { outside: _deployed, ...rest } = deployed;
     return {
-      ...deployed,
+      ...(ports?.outside ? rest : deployed),
       ...(outside ? { outside: (given: OutsideGiven) => outside(given, this.ctx.storage.sql) } : {}),
       sessions: session.sessions,
       readers: (given) => {
@@ -115,7 +118,7 @@ export class PlatformScope extends DeployedScope<PlatformEnv> {
         definitions: { read: (named, holder) => definitions.read(named, holder), platform: (named) => (platformNet.without === null ? platform(named) : lacking(named, platformNet.without)) },
         // The ports that one test wired for this name: the STAND-IN host of `outside.ts`, for a register, whose one outside effect is
         // the creation of a repository at the Git host. With none wired the outside port is the production one, which sends nothing.
-        ...wired.get(name ?? "")?.(),
+        ...ports,
       },
     };
   }

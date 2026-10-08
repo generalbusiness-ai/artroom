@@ -284,7 +284,7 @@ test("the Worker's outside port reads the setting at each call: a register refus
     const env: ArtifactsBindings = { ARTIFACTS: s.ns };
     const outside = outsideOf(f.given, state.storage.sql, env);
     expect(outside.accepts(REGISTER, "create-repository")).toBe(false);
-    env.ARTIFACTS_CONFIG = artifactsEnv(f.register.at.scope, s.ns).ARTIFACTS_CONFIG;
+    env.ARTIFACTS_CONFIG = artifactsEnv(f.register.at.scope, s.ns).ARTIFACTS_CONFIG!;
     expect(outside.accepts(REGISTER, "create-repository")).toBe(true);
     delete env.ARTIFACTS_CONFIG;
     expect([outside.accepts(REGISTER, "create-repository"), s.calls]).toEqual([false, []]);
