@@ -31,6 +31,7 @@ import {
 import { DIRECTORY, MEMBERSHIP, REGISTER, ROLE_LISTS, platform, type Role } from "@generalbusiness/artroom-platform";
 import { SourceError, httpSource, render, verify as replay, type HistorySource } from "@generalbusiness/artroom-replay";
 import type { ClaimStep, Config, PendingClaim, PendingJoin, Repository, Store } from "./store.ts";
+import { outcomeFetch, pauseOutcome, waitOutcome, type CloneWait } from "./clone-outcome.ts";
 
 export interface Context {
   store: Store;
@@ -49,6 +50,8 @@ export interface Context {
   tries?: number;
   /** Git runner; absent when this runtime cannot execute Git. */
   git?: Git;
+  /** Read-token outcome wait limits and caller cancellation; never mint authority. */
+  cloneWait?: CloneWait;
 }
 
 /** A Git process receives credential configuration through its environment. */
@@ -839,17 +842,18 @@ export function clone(ctx: Context, directory: string | undefined, options: { ho
     // The outcome of its `mint-read`, which the host's answer writes: read with the caller's session, which the destination now accepts.
     const operation: OperationId = `${seq}:0`;
     const reader = await readerOf(ctx, config) ?? stop(failed(`Signed read-token at ${scope}:${seq}, but no read session is given here, and only a session reads the token.`));
-    const D = await handleOf(ctx, config, scope, reader);
-    let next = seq + 1;
-    const outcome = await waitFor(ctx, () => [scope], async () => {
-      for (;;) {
-        const read = await D.entry(next);
-        if (!read.ok) return read.reason === "not-found" ? null : stop(failed(`Cannot read entry ${scope}:${next}: ${read.reason}.`));
-        next++;
-        const input = read.value.entry.input;
-        if (input.type === "outcome" && input.operation === operation) return input;
-      }
-    }, `the read token of ${scope}:${seq}`, "the token, if minted, ends at its end unread.");
+    const send = ctx.fetch ?? (globalThis as { fetch?: Fetch }).fetch!;
+    let D: ScopeHandle | null = null;
+    const waited = await waitOutcome(operation, seq + 1, async (next, signal) => {
+      D ??= await handleOf({ ...ctx, fetch: outcomeFetch(send, signal) }, config, scope, reader);
+      return D.entry(next);
+    }, (signal) => ctx.pause ? ctx.pause([scope]) : pauseOutcome(signal), ctx.tries ?? 120, ctx.cloneWait);
+    if (!waited.ok) {
+      const reason = waited.reason === "read-refused" ? `entry read refused: ${waited.refusal}` : waited.reason;
+      return failed(`Stopped waiting for read token at ${scope}:${seq} (${operation}): ${reason}; ${waited.scanned} entries in ${waited.polls} polls, next entry ${scope}:${waited.next}.`, `The accepted mint may still finish. Inspect artroom show ${scope}:${seq} and artroom log destination; no credential was retrieved and nothing was cloned. An unread token remains subject to its reported expiry.`);
+    }
+    const outcome = waited.outcome;
+    const next = waited.next;
     if (outcome.result !== "confirmed") return failed(`The host did not mint a read token: the outcome at ${scope}:${next - 1} is ${outcome.result}. Nothing was cloned.`);
     const handle = (outcome.evidence.body as { token?: unknown }).token;
     if (typeof handle !== "string") return failed(`The outcome at ${scope}:${next - 1} names no token.`);

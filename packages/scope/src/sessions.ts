@@ -58,11 +58,15 @@
  * **A reader with no session** gets `forbidden` from every read, and no
  * stream.
  *
- * **What a session cannot do.** It signs nothing, controls nothing and gets
- * no credential. Nothing here takes a session as authority for an act.
+ * **What a session cannot do.** It signs nothing and controls nothing.
+ * Nothing here takes a session as authority for an act or a mint. In the
+ * prepared read-token integration, the signed act authorizes minting;
+ * a session with `credential` reads only its caller's plaintext, once,
+ * after the destination checks the recorded act's signing key. Current
+ * destination @1 and unknown catalog versions do not support that mint.
  *
- * Nothing here logs, stores or returns the secret, and no refusal holds a
- * token or a part of one.
+ * Nothing here logs, stores or returns the session MAC secret, and no
+ * refusal holds a token or a part of one.
  */
 
 import { SESSION_DOMAINS } from "@generalbusiness/artroom-contract";

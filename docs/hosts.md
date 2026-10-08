@@ -101,12 +101,14 @@ prints an entry's effects, where the reader is allowed to read that
 entry. The name is 52 lowercase base32 letters, a hyphen, and the attempt
 number, which is 1 unless an earlier attempt failed.
 
-The repository is private: a clone needs a read token. `artroom clone`
-gets one for the member who runs it (below).
+The repository is private: a clone needs a read token. The member-token
+client and provider boundaries are prepared, as described below. The
+shipped destination `@1` does not support this command's minting flow.
 
 ## GitHub (host `github.com`)
 
-GitHub stays as a second, linked host. Its port is unchanged.
+GitHub stays as a second, linked host. Its provider also has the prepared
+repository-restricted member-token boundary.
 
 What it needs:
 
@@ -124,25 +126,53 @@ The remote is `https://github.com/<organization>/<name>.git`.
 
 ## How a member reads the repository
 
-On either host a member runs `artroom clone`. It signs the destination's
-`read-token` act, which any active member may sign, with a lifetime from
-1 to 24 hours. The destination opens one host operation, `mint-read`. On
-the hosting's own Git service the port mints a read token for the
-repository through the binding, `createToken("read", hours * 3600)`. On
-GitHub it mints an installation token restricted to the repository's ID
-with contents read; GitHub fixes its lifetime at one hour. The outcome
-records the token by a nonsecret handle and its end, never the token. The
-token goes to the destination's private custody, as a write token does,
-and the credential route gives it once to the session of the key that
-signed the act, before its end. The command then runs `git clone` with
-the token in an `Authorization` header that git reads from its
-environment. `artroom remote` prints the repository's remote URL in the
-host's form.
+The `artroom clone` integration is prepared, pending explicitly shipped
+platform versions, membership actions and observation code, and host
+routing that preserves old rooms. The current destination `@1` and unknown
+catalog versions refuse `read-token` and `mint-read`. Component tests with
+scripted histories do not prove a room-issued token or a successful clone.
+Full receipt/fact validation and successful orchestration witnesses remain
+part of the later integration review.
+
+In the prepared flow, the member signs the destination's `read-token` act,
+with requested hours from 1 to 24. That signed act authorizes one
+`mint-read` operation. A session authorizes the one-time retrieval of its
+caller's plaintext, after strict membership-reference preparation and a
+check that the session's key signed the recorded act. It does not authorize
+minting. The outcome records a nonsecret handle and the provider's reported
+expiry; the plaintext stays in private custody until it is taken once,
+strictly before that expiry.
+
+The hosting's own service requests a read token through
+`createToken("read", hours * 3600)`. GitHub verifies the named repository's
+stable ID before requesting an installation token restricted to that ID
+with contents read. It returns GitHub's actual expiry; the requested hours
+do not set GitHub's installation-token lifetime. Neither provider retries
+a lost mint automatically.
+
+The outcome wait lasts at most 120 seconds, with at most 120 polls of
+64 entries, keeping its next-entry cursor between polls. It reports the accepted act,
+operation, scanned entries and next entry if it stops. The accepted mint
+may still finish; inspect `artroom show <scope>:<act sequence>` and
+`artroom log destination`. Stopping the wait does not revoke a token or
+retrieve its plaintext. These are client wait limits, not a token deadline.
+
+A successful prepared flow then runs `git clone`, passing its Authorization
+header through Git's environment configuration. The runner puts no token
+in arguments or a file it writes. It trusts the installed Git program,
+its inherited environment, system/global/local configuration and terminal
+output. The header is global `http.extraHeader`, not limited to a URL;
+Git configuration can rewrite URLs or change proxy and redirect behavior.
+The runner does not sandbox those choices, suppress Git output, or promise
+that Git or a configured helper will never disclose the header. Run this
+command only with Git, configuration and environment you trust.
+
+`artroom remote` reads and prints the recorded repository's URL form.
 
 ## What is not built
 
 - A command that gives `git fetch` or `git pull` a token in an existing
-  clone. Each `artroom clone` gets a new token.
+  clone. The prepared clone flow requests a new token each time.
 - A sweep of read tokens that were minted and never read. Each ends at
   its end; its plaintext stays in custody until it is read or the read is
   refused at its end.
