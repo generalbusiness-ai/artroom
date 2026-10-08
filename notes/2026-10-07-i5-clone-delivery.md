@@ -418,3 +418,41 @@ API composition must come first, then its focused checks and typechecks once.
 The full original clone scope remains required; a fresh@2 local fixture is
 not whole old-room/historical/provider functionality closure. No gate, cloud,
 provider/account operation or main landing was performed for this carry.
+
+
+## Completed clone command guards restored around current features
+
+The command integration continues from install checkpoint
+`93c4c022a9684d550f7d792e63df63db47524208`, with helper closure
+`d70a6de881e451af67c7b1d8a787231ab517461e` and exact Node/Worker project
+separation `f27b3dead747e85327b12a717c08192c44090c8f`. It selectively carries
+the reviewed clone function and imports from
+`c4dd6032f73c54621a8a3e9d16291247312bfac4`, not the whole old commands file.
+Current install acknowledgement, saved claim/enrollment/private join, edit,
+issues, --closes, finite merge observation and verify discovery are retained.
+
+Clone checks the exact signed receipt, accepted opening and full entry facts,
+including owner/kind/attempt and recorded operation, before private retrieval.
+Each outcome poll and the whole wait are bounded; cancellation and exceptional
+stops retain actionable accepted-act/operation/cursor context without printing
+raw transport/provider text. Unknown/refused evidence never causes a second
+mint. The one-time credential read uses the bounded checked client parser;
+malformed plaintext/remote metadata stops generically without retry. Unknown
+and native unsupported destination versions remain disabled by exact catalog
+selection and actual read-token availability. No historical resolver is added.
+
+Only command-owned arguments, output and written config are covered by its
+secret-placement promise. Ambient Git environment/configuration and Git's own
+output remain trusted; the controlled local Git witness cannot establish
+arbitrary program output safety. No Node entry/command parser change was
+needed to restore the reviewed injected CloneWait cancellation contract.
+
+CLI source, Node and scope-test types pass. Scope source, Worker-test and the
+separate Node Git helper project types pass. Final raw logs are
+`/tmp/artroom-install-clone-preservation-evidence/clone-cli-types-final.log`
+and `clone-scope-types-final.log`; initial unused-import and mixed Node/Worker
+project errors remain in the initial logs. The helper owner will run the one
+focused Node and actual local Git composition batch on this checkpoint; those
+runs are not claimed in this note. This is source preservation within the
+expanded candidate, not provider/deployment, original archive/admission proof,
+final gate or complete Source approval.
